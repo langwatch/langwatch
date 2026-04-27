@@ -128,14 +128,37 @@ export class ActivityMonitorService {
     const spentPrev = Number(row.spent_prev) || 0;
     const delta =
       spentPrev > 0 ? Math.round(((spentThis - spentPrev) / spentPrev) * 100) : 0;
+
+    const anomalyBreakdown = await this.openAnomalyBreakdown(
+      input.organizationId,
+    );
+    const openAnomalyCount =
+      anomalyBreakdown.critical + anomalyBreakdown.warning + anomalyBreakdown.info;
+
     return {
       spentThisWindowUsd: roundCurrency(spentThis),
       windowOverPreviousPct: delta,
       activeUsersThisWindow: Number(row.active_users) || 0,
       newUsersThisWindow: 0, // Tracked once we persist user-first-seen
-      openAnomalyCount: 0, // Option C
-      anomalyBreakdown: { critical: 0, warning: 0, info: 0 },
+      openAnomalyCount,
+      anomalyBreakdown,
     };
+  }
+
+  private async openAnomalyBreakdown(
+    organizationId: string,
+  ): Promise<{ critical: number; warning: number; info: number }> {
+    const grouped = await this.prisma.anomalyAlert.groupBy({
+      by: ["severity"],
+      where: { organizationId, state: "open" },
+      _count: { _all: true },
+    });
+    const breakdown = { critical: 0, warning: 0, info: 0 };
+    for (const row of grouped) {
+      const sev = row.severity as keyof typeof breakdown;
+      if (sev in breakdown) breakdown[sev] = row._count._all;
+    }
+    return breakdown;
   }
 
   /**
