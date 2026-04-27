@@ -135,18 +135,35 @@ can ingest the **audit log** the platform exposes. The trace pipeline
 writes one row per audit event into the same store as Tier 1 traces,
 tagged by `SourceType` so dashboards can union or filter at will.
 
-Per-platform mode:
+Per-platform mode (matching the seven `IngestionSource.sourceType`
+values shipped on this branch):
 
-- **Microsoft Purview / Copilot Studio** — pull every 1-5 min via
-  the Office 365 Management Activity API.
-- **Claude Compliance API** — pull. Plus Cowork **OTel push**
-  (Tier 4) when the admin enables it centrally.
-- **OpenAI Compliance Platform** — pull JSONL files at
-  minutes-level latency.
-- **Workato Activity Audit Log** — push to a webhook the customer
-  configures, or stream-to-S3.
-- **Gemini for Workspace / Vertex** — pull via Cloud Logging, or
-  push via Pub/Sub sink.
+- **`copilot_studio`** — Microsoft Purview pull every 1-5 min via
+  the Office 365 Management Activity API. `parserConfig`:
+  `{ tenantId, clientId, clientSecretHash, pollEverySec }`.
+- **`claude_compliance`** — pull from the Claude Compliance API.
+  `parserConfig`: `{ workspaceApiKeyHash, pollEverySec }`.
+- **`claude_cowork`** — OTel push (Tier 4) — admin pastes the
+  LangWatch OTLP URL + bearer token into Cowork org settings;
+  every Cowork install streams to LangWatch automatically.
+  `parserConfig`: `{ workspaceId }`.
+- **`openai_compliance`** — pull JSONL files at minutes-level
+  latency from OpenAI's compliance bucket. `parserConfig`:
+  `{ bucket, prefix, roleArn, pollEverySec }`.
+- **`workato`** — push to a webhook the customer configures
+  in their Activity Audit Log streaming settings.
+  `parserConfig`: `{ sharedSecretLastFour }`.
+- **`s3_custom`** — generic S3 audit-log drop with a configurable
+  parser DSL, for any platform that drops JSON / JSONL / CSV
+  audit logs into a customer-owned bucket. `parserConfig`:
+  `{ bucket, prefix, roleArn, parserDsl, pollEverySec }`.
+  This is the catch-all for customer-specific audit feeds that
+  don't have a first-party adapter yet.
+- **`otel_generic`** — generic OTLP/HTTP receiver. Any agent
+  framework that speaks OpenTelemetry (Cowork OTel as a
+  sub-case, in-house agents, OpenInference-instrumented stacks)
+  can push to a per-source endpoint. `parserConfig`:
+  `{ allowedSourceTypeLabel? }`.
 
 You can't block in-flight here, but you can:
 
