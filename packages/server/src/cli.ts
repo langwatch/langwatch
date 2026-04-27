@@ -88,9 +88,17 @@ program
     };
 
     ensureEnvFile(ctx);
+
+    // Start draining runtime events BEFORE installServices. Now that the
+    // install steps (uv sync × 2, pnpm install, prisma generate, app build)
+    // pipe their stdio through the bus instead of using stdio: 'inherit'
+    // (see services/_pipe-to-bus.ts), the user only sees install output if
+    // the consumer is already running — otherwise events buffer in the bus
+    // until startAll's events arrive. Consume from the start.
+    const eventsStream = streamEventsToTTY(runtime.events(ctx));
+
     await runtime.installServices(ctx);
 
-    const eventsStream = streamEventsToTTY(runtime.events(ctx));
     const handles = await runtime.startAll(ctx);
     await runtime.waitForHealth(ctx, { timeoutMs: 60_000 });
 
