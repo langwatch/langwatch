@@ -101,6 +101,7 @@ model User {
   personalProjects        Project[]                @relation("PersonalProjectOwner")
   routingPoliciesCreated  RoutingPolicy[]          @relation("RoutingPolicyCreatedBy")
   routingPoliciesUpdated  RoutingPolicy[]          @relation("RoutingPolicyUpdatedBy")
+  ingestionSourcesCreated IngestionSource[]        @relation("IngestionSourceCreatedBy")
 }
 
 model VerificationToken {
@@ -185,6 +186,8 @@ model Team {
   ownerUserId String? @db.VarChar(255)
   ownerUser   User?   @relation("PersonalTeamOwner", fields: [ownerUserId], references: [id])
 
+  ingestionSources IngestionSource[]
+
   @@index([organizationId])
   @@index([isPersonal])
 }
@@ -234,6 +237,7 @@ model Organization {
   gatewayBudgets         GatewayBudget[]       @relation("OrgScopedGatewayBudgets")
   gatewayChangeEvents    GatewayChangeEvent[]
   routingPolicies        RoutingPolicy[]
+  ingestionSources       IngestionSource[]
 
   @@index([ssoProvider])
 }
@@ -1671,6 +1675,78 @@ model RoutingPolicy {
   @@unique([organizationId, scope, scopeId, name])
   @@index([organizationId])
   @@index([scope, scopeId])
+}
+
+/// Per-platform fleet configuration that connects a closed SaaS
+/// product's audit / OTel / S3 stream to LangWatch's Activity
+/// Monitor (cf. specs/ai-gateway/governance/activity-monitor.feature
+/// + ingestion-sources.feature, docs/ai-gateway/governance/architecture.md).
+///
+/// One IngestionSource = one upstream fleet (e.g. "Miro Cowork",
+/// "Acme Workato production"). The runtime ingests events on whatever
+/// cadence the source supports — push for OTel/webhook/S3 (Tier C/D),
+/// pull for poll-based admin APIs (Tier C). Per-source-type adapters
+/// normalise platform-specific shapes into OCSF + AOS before they
+/// land in trace_summaries with SourceType + SourceId tags.
+model IngestionSource {
+  id             String       @id @default(nanoid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  /// Optional team-scope. null = org-wide.
+  teamId String?
+  team   Team?   @relation(fields: [teamId], references: [id], onDelete: SetNull)
+
+  /// 'otel_generic' | 'claude_cowork' | 'workato' | 'copilot_studio' |
+  /// 'openai_compliance' | 'claude_compliance' | 's3_custom' (extensible).
+  /// String not enum so adapters can be added without migrations — the
+  /// supported set lives in code (activity-monitor adapter registry).
+  sourceType String
+
+  /// Human-friendly label for the admin UI. Unique per-org so two
+  /// "Cowork" sources can coexist with different names.
+  name        String
+  description String?
+
+  /// HMAC bearer token the upstream operator pastes into the platform
+  /// (or LangWatch sends in pull mode). Stored encrypted at rest via
+  /// the same pepper-derived KEK as VirtualKey secrets. Auto-generated
+  /// on create, rotatable via the admin UI with a 24h grace window.
+  ingestSecretHash String
+
+  /// Per-source-type configuration. Shape is platform-specific:
+  ///   - otel_generic: { allowedSourceTypeLabel?: string }
+  ///   - claude_cowork: { workspaceId: string }
+  ///   - workato: { sharedSecretLastFour: string }
+  ///   - copilot_studio: { tenantId, clientId, clientSecretHash, pollEverySec }
+  ///   - openai_compliance: { bucket, prefix, roleArn, pollEverySec }
+  ///   - claude_compliance: { workspaceApiKeyHash, pollEverySec }
+  ///   - s3_custom: { bucket, prefix, roleArn, parserDsl, pollEverySec }
+  parserConfig Json @default("{}")
+
+  /// For pull-based sources, persisted between polls so the next poll
+  /// resumes where the last left off (timestamp / cursor / file marker).
+  pollerCursor Json?
+
+  /// Status flag. 'active' (default), 'disabled' (admin paused), or
+  /// 'awaiting_first_event' (created but never received).
+  status String @default("awaiting_first_event")
+
+  /// Last event timestamp observed (any direction). Surfaces in the
+  /// admin UI as "last event 2 minutes ago".
+  lastEventAt DateTime?
+
+  archivedAt DateTime?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
+  createdById String?
+  createdBy   User?    @relation("IngestionSourceCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+  @@index([teamId])
+  @@index([sourceType])
 }
 
 model GatewayProviderCredential {

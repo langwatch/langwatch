@@ -123,6 +123,14 @@ const EXEMPT_MODELS = [
    * SQL guard.
    */
   "RoutingPolicy",
+  /**
+   * IngestionSource (iter governance-platform / D2 foundation) is
+   * org-scoped: the natural key is (organizationId, name). Optional
+   * teamId narrows scope but no projectId — the entire point is a
+   * cross-platform feed at the org level. Service layer authorises
+   * by organizationId / teamId membership before any mutation.
+   */
+  "IngestionSource",
 ];
 
 const _guardProjectId = ({ params }: { params: Prisma.MiddlewareParams }) => {
