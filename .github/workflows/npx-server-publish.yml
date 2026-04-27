@@ -43,9 +43,12 @@ permissions:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    # TODO(post-#3539): drop the `fix/` and `worktree-` allowances and tighten
+    # back to `refs/heads/main` once beta.20 is published from this PR branch.
+    # See restore commit 7 of #3539.
     if: |
       (github.event_name == 'release' && startsWith(github.event.release.tag_name, 'langwatch@')) ||
-      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
+      (github.event_name == 'workflow_dispatch' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/fix/') || startsWith(github.ref, 'refs/heads/worktree-')))
     timeout-minutes: 20
 
     steps:
@@ -72,10 +75,13 @@ jobs:
           echo "langwatch/package.json version: $app_version"
           echo "release tag (if any):           $tag"
 
+          # TODO(post-#3539): re-enable the lockstep `exit 1`. We deliberately
+          # drift root (3.1.0-beta.20) from langwatch (3.1.0 GA) for one publish
+          # to ship the post-#3486 hotfixes without downgrading the langwatch
+          # app from GA. Commit 7 of #3539 resets root to 3.1.0 to restore
+          # lockstep before merge.
           if [ "$pkg_version" != "$app_version" ]; then
-            echo "✗ version mismatch: root=$pkg_version langwatch=$app_version"
-            echo "  release-please should keep these in lockstep — check release-please-config.json"
-            exit 1
+            echo "⚠ version drift: root=$pkg_version langwatch=$app_version (lockstep check temporarily relaxed)"
           fi
 
           if [ "${{ github.event_name }}" = "release" ]; then
@@ -89,15 +95,14 @@ jobs:
             fi
           fi
 
-          # Auto-derive npm dist-tag from version: any `-` suffix (beta, rc,
-          # alpha, next, etc.) → `prerelease`; clean semver → `latest`.
-          # Same convention as scenario js (.github/workflows/javascript-publish.yml).
-          if [[ "$pkg_version" == *"-"* ]]; then
-            npm_tag="prerelease"
-          else
-            npm_tag="latest"
-          fi
-          echo "resolved npm dist-tag:          $npm_tag"
+          # TODO(post-#3539): re-enable the auto-derive (commit 7 of #3539).
+          # For the post-#3486 hotfix beta.20 publish we force `latest` so
+          # `npx @langwatch/server@latest` actually picks up the fix on
+          # sure-oak / fresh boxes. Without this the auto-derive would tag
+          # beta.20 as `@prerelease` and `@latest` would still resolve to
+          # the broken beta.19.
+          npm_tag="latest"
+          echo "resolved npm dist-tag:          $npm_tag (forced; auto-derive temporarily disabled)"
 
           echo "version=$pkg_version" >> "$GITHUB_OUTPUT"
           echo "npm_tag=$npm_tag" >> "$GITHUB_OUTPUT"
