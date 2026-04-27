@@ -54,6 +54,8 @@ import { api, type RouterOutputs } from "~/utils/api";
 
 type Source = RouterOutputs["ingestionSources"]["get"];
 type EventRow = RouterOutputs["activityMonitor"]["eventsForSource"][number];
+type SourceHealthMetrics =
+  RouterOutputs["activityMonitor"]["sourceHealthMetrics"];
 
 const STATUS_META: Record<
   string,
@@ -261,6 +263,11 @@ function IngestionSourceDetailPage() {
           />
         </SimpleGrid>
 
+        <StaleTimestampCallout
+          health={health ?? null}
+          eventsCount={events.length}
+        />
+
         <Box
           borderWidth="1px"
           borderColor="border.muted"
@@ -301,6 +308,51 @@ function IngestionSourceDetailPage() {
         onClose={() => setSecretReveal(null)}
       />
     </SettingsLayout>
+  );
+}
+
+function StaleTimestampCallout({
+  health,
+  eventsCount,
+}: {
+  health: SourceHealthMetrics | null;
+  eventsCount: number;
+}) {
+  // F-OTEL-2 frontend leg (Sergey diagnosis): if health metrics show 0
+  // events across 24h/7d/30d but the events list has rows, the user
+  // most likely sent test events with stale `startTimeUnixNano`. CH
+  // health queries filter by EventTimestamp, the events list does not
+  // — they appear contradictory. Surface a callout that names the
+  // diagnosis + the fix (use Date.now() at the moment you fire the
+  // event).
+  if (!health) return null;
+  const all30dZero =
+    (health.events24h ?? 0) === 0 &&
+    (health.events7d ?? 0) === 0 &&
+    (health.events30d ?? 0) === 0;
+  if (!all30dZero || eventsCount === 0) return null;
+  return (
+    <Box
+      borderWidth="1px"
+      borderColor="amber.300"
+      backgroundColor="amber.50"
+      padding={3}
+      borderRadius="md"
+    >
+      <Text fontSize="sm" color="amber.900">
+        <strong>Heads up:</strong> the events list shows {eventsCount}{" "}
+        event{eventsCount === 1 ? "" : "s"}, but the rolling
+        24h&nbsp;/&nbsp;7d&nbsp;/&nbsp;30d health windows are all zero.
+        Your events likely have a stale{" "}
+        <Code fontSize="xs">startTimeUnixNano</Code> (timestamps before
+        today). When firing test events, set{" "}
+        <Code fontSize="xs">startTimeUnixNano</Code> to{" "}
+        <Code fontSize="xs">String(Date.now() * 1_000_000)</Code> so the
+        event lands inside the rolling window. The secret-reveal
+        modal&apos;s &quot;Test it now&quot; curl already does this for
+        you.
+      </Text>
+    </Box>
   );
 }
 
