@@ -188,6 +188,17 @@ const routes: RouteObject[] = [
     ...page(() => import("./pages/settings/routing-policies")),
   },
   {
+    // Top-level governance home (admin oversight dashboard).
+    // Sub-routes for admin authoring (ingestion-sources, anomaly-rules,
+    // routing-policies) stay under /settings/* per the daily-use vs
+    // admin-authoring distinction.
+    path: "/governance",
+    ...page(() => import("./pages/settings/governance")),
+  },
+  {
+    // Back-compat alias for the original path. Any existing bookmarks
+    // / docs referencing /settings/governance still land on the same
+    // dashboard. Removed in a future cleanup once nothing links here.
     path: "/settings/governance",
     ...page(() => import("./pages/settings/governance")),
   },

@@ -250,7 +250,7 @@ function AnomalyRulesPage() {
             <Text color="fg.muted" fontSize="sm" maxW="3xl">
               Define thresholds that page on-call when activity drifts.
               Rules surface on the{" "}
-              <Link href="/settings/governance" color="orange.600">
+              <Link href="/governance" color="orange.600">
                 governance overview
               </Link>{" "}
               once they fire.

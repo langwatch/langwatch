@@ -51,6 +51,7 @@ const ROUTE_PATTERNS = [
   "/me",
   "/me/settings",
   "/cli/auth",
+  "/governance",
   "/:project/messages/:trace/:openTab/:span",
   "/:project/messages/:trace/:openTab",
   "/:project/messages/:trace",

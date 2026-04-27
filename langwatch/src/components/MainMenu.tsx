@@ -317,8 +317,9 @@ export const MainMenu = React.memo(function MainMenu({
                 <SideMenuLink
                   icon={Eye}
                   label="Governance"
-                  href="/settings/governance"
+                  href="/governance"
                   isActive={
+                    router.pathname === "/governance" ||
                     router.pathname === "/settings/governance" ||
                     router.pathname.startsWith("/settings/governance/")
                   }

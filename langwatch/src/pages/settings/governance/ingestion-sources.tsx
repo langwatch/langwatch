@@ -289,7 +289,7 @@ function IngestionSourcesPage() {
               Each source maps an external AI platform into the
               normalised activity stream via OTel push, webhook, or
               S3 audit drops.{" "}
-              <Link href="/settings/governance" color="orange.600">
+              <Link href="/governance" color="orange.600">
                 Back to governance
               </Link>
               .
