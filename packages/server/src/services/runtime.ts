@@ -56,7 +56,7 @@ const runtimeImpl: RuntimeApi = {
     // when its lockfile hash matches the previous run.
     await Promise.all([
       syncVenvs(ctx, bus),
-      ensureLangwatchDeps(ctx, bus),
+      ensureLangwatchDeps(bus),
     ]);
   },
 

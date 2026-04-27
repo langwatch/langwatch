@@ -2,7 +2,6 @@ import { execa } from "execa";
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import type { RuntimeContext } from "../shared/runtime-contract.ts";
 import { appRoot } from "./app-dir.ts";
 import type { EventBus } from "./event-bus.ts";
 import { execAndPipe } from "./_pipe-to-bus.ts";
@@ -14,7 +13,7 @@ import { execAndPipe } from "./_pipe-to-bus.ts";
  * Runs INSIDE the relocated app tree (LANGWATCH_HOME/app/langwatch/) — see
  * services/app-dir.ts for why we relocate out of node_modules.
  */
-export async function ensureLangwatchDeps(ctx: RuntimeContext, bus: EventBus): Promise<void> {
+export async function ensureLangwatchDeps(bus: EventBus): Promise<void> {
   const langwatchDir = locateLangwatchDir();
   if (!langwatchDir) throw new Error("langwatch app dir not found");
 
@@ -53,10 +52,14 @@ export async function ensureLangwatchDeps(ctx: RuntimeContext, bus: EventBus): P
   // invoked through corepack (or sometimes plain pnpm too) — leading to
   // "Missing script: build. Did you mean pnpm run build:cli?" because
   // build:cli is on root. `-C` is the official "change to package dir
-  // and only that dir" flag. Also drop corepack indirection: every CI
-  // runner + dev machine that ships `node` either ships `pnpm` on PATH
-  // (via pnpm/action-setup) or has corepack-enabled pnpm shimmed onto
-  // PATH already, so we can call `pnpm` directly.
+  // and only that dir" flag.
+  //
+  // For the binary, prefer `pnpm` directly on PATH when present (CI via
+  // pnpm/action-setup, end users via corepack-shimmed PATH) and fall back
+  // to `corepack pnpm`. corepack is *not* the primary because `corepack
+  // pnpm -C <dir>` swallows the `-C` flag in some cases and pnpm
+  // re-resolves cwd to its own dir, defeating the workspace-isolation
+  // intent above. See resolvePnpm() below.
   const pnpm = await resolvePnpm();
 
   if (!installFresh) {

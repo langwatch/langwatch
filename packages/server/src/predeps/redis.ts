@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { chmodSync, createReadStream, existsSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { pipeline } from "node:stream/promises";
+import * as tar from "tar";
 import embedsVersions from "../../embeds.versions.json" with { type: "json" };
 import { downloadWithProgress } from "./_download.ts";
 import type { Predep } from "./types.ts";
@@ -61,7 +62,6 @@ export const redisPredep: Predep = {
   async install({ platform, paths, task }) {
     mkdirSync(paths.bin, { recursive: true });
     const url = downloadUrl(platform);
-    const tar = await import("tar");
     const tmp = join(paths.bin, `.redis-${REDIS_VERSION}-${platform}.tar.gz`);
     await downloadWithProgress(url, tmp, task, `downloading redis ${REDIS_VERSION}`);
 

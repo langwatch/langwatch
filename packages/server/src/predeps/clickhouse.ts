@@ -1,6 +1,7 @@
 import { execa } from "execa";
 import { chmodSync, existsSync, mkdirSync, renameSync, rmSync } from "node:fs";
 import { join } from "node:path";
+import * as tar from "tar";
 import { downloadWithProgress } from "./_download.ts";
 import type { Predep } from "./types.ts";
 
@@ -84,7 +85,6 @@ export const clickhousePredep: Predep = {
       // Stage the .tgz under .langwatch/bin/, extract just the binary, then
       // delete the tarball — keeping disk hit minimal (~370MB tarball, ~580MB
       // extracted; we only keep the ~580MB binary).
-      const tar = await import("tar");
       const tmp = join(paths.bin, `.clickhouse-${CH_VERSION}.tgz`);
       await downloadWithProgress(src.url, tmp, task, `downloading clickhouse ${CH_VERSION}`);
 
