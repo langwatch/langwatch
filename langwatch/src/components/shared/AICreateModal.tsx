@@ -1,16 +1,17 @@
 import {
   Box,
   Button,
+  Code,
   HStack,
   Icon,
-  Link,
   Spinner,
   Text,
   Textarea,
   VStack,
 } from "@chakra-ui/react";
-import { AlertCircle, AlertTriangle, Sparkles } from "lucide-react";
+import { AlertCircle, Sparkles } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { classifyGenerationError } from "../scenarios/utils/classifyGenerationError";
 import { Dialog } from "../ui/dialog";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -39,8 +40,6 @@ export interface AICreateModalProps {
   onSkip: () => void;
   /** Text shown during generation (default: "Generating...") */
   generatingText?: string;
-  /** Whether model providers are configured (default: true) */
-  hasModelProviders?: boolean;
 }
 
 type ModalState = "idle" | "generating" | "error";
@@ -67,11 +66,10 @@ export function AICreateModal({
   onGenerate,
   onSkip,
   generatingText = DEFAULT_GENERATING_TEXT,
-  hasModelProviders = true,
 }: AICreateModalProps) {
   const [description, setDescription] = useState("");
   const [modalState, setModalState] = useState<ModalState>("idle");
-  const [errorMessage, setErrorMessage] = useState("");
+  const [capturedError, setCapturedError] = useState<unknown>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Clear timeout on unmount or when state changes
@@ -88,7 +86,7 @@ export function AICreateModal({
     if (open) {
       setDescription("");
       setModalState("idle");
-      setErrorMessage("");
+      setCapturedError(null);
     }
   }, [open]);
 
@@ -112,7 +110,7 @@ export function AICreateModal({
 
     // Action is proceeding - show generating state
     setModalState("generating");
-    setErrorMessage("");
+    setCapturedError(null);
 
     // Set up timeout
     const timeoutPromise = new Promise<never>((_, reject) => {
@@ -124,10 +122,9 @@ export function AICreateModal({
     try {
       await Promise.race([generationPromise, timeoutPromise]);
     } catch (error) {
+      console.error("[AICreateModal] generation error:", error);
       setModalState("error");
-      setErrorMessage(
-        error instanceof Error ? error.message : "An unexpected error occurred"
-      );
+      setCapturedError(error);
     } finally {
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
@@ -164,11 +161,7 @@ export function AICreateModal({
           <Dialog.Title>{title}</Dialog.Title>
         </Dialog.Header>
         <Dialog.Body>
-          {!hasModelProviders && (
-            <NoModelProvidersWarning />
-          )}
-
-          {hasModelProviders && modalState === "idle" && (
+          {modalState === "idle" && (
             <IdleState
               description={description}
               placeholder={placeholder}
@@ -178,18 +171,12 @@ export function AICreateModal({
             />
           )}
 
-          {hasModelProviders && modalState === "generating" && <GeneratingState text={generatingText} />}
+          {modalState === "generating" && <GeneratingState text={generatingText} />}
 
-          {hasModelProviders && modalState === "error" && (
-            <ErrorState errorMessage={errorMessage} />
-          )}
+          {modalState === "error" && <ErrorState error={capturedError} />}
         </Dialog.Body>
         <Dialog.Footer>
-          {!hasModelProviders && (
-            <NoModelProvidersFooter />
-          )}
-
-          {hasModelProviders && modalState === "idle" && (
+          {modalState === "idle" && (
             <IdleFooter
               onSkip={handleSkip}
               onGenerate={handleGenerate}
@@ -197,8 +184,12 @@ export function AICreateModal({
             />
           )}
 
-{hasModelProviders && modalState === "error" && (
-            <ErrorFooter onSkip={handleSkip} onTryAgain={handleTryAgain} />
+          {modalState === "error" && (
+            <ErrorFooter
+              error={capturedError}
+              onSkip={handleSkip}
+              onTryAgain={handleTryAgain}
+            />
           )}
         </Dialog.Footer>
       </Dialog.Content>
@@ -272,25 +263,36 @@ function GeneratingState({ text }: GeneratingStateProps) {
 }
 
 interface ErrorStateProps {
-  errorMessage: string;
+  error: unknown;
 }
 
-function ErrorState({ errorMessage }: ErrorStateProps) {
+function ErrorState({ error }: ErrorStateProps) {
+  const classified = classifyGenerationError(error);
+
   return (
     <VStack gap={4} py={4}>
-      <Box
-        p={3}
-        borderRadius="full"
-        bg="red.100"
-        color="red.600"
-      >
+      <Box p={3} borderRadius="full" bg="red.100" color="red.600">
         <Icon as={AlertCircle} boxSize={6} />
       </Box>
       <VStack gap={1}>
         <Text fontWeight="semibold">Something went wrong</Text>
         <Text color="fg.muted" fontSize="sm" textAlign="center">
-          {errorMessage}
+          {classified.copy}
         </Text>
+        {classified.tier === "unknown" && classified.rawMessage && (
+          <Code
+            fontSize="xs"
+            mt={2}
+            px={2}
+            py={1}
+            borderRadius="md"
+            whiteSpace="pre-wrap"
+            wordBreak="break-word"
+            maxW="100%"
+          >
+            {classified.rawMessage}
+          </Code>
+        )}
       </VStack>
     </VStack>
   );
@@ -321,66 +323,45 @@ function IdleFooter({ onSkip, onGenerate, isGenerateDisabled }: IdleFooterProps)
 }
 
 interface ErrorFooterProps {
+  error: unknown;
   onSkip: () => void;
   onTryAgain: () => void;
 }
 
-function ErrorFooter({ onSkip, onTryAgain }: ErrorFooterProps) {
+function ErrorFooter({ error, onSkip, onTryAgain }: ErrorFooterProps) {
+  const classified = classifyGenerationError(error);
+
+  const showConfigure =
+    classified.cta === "configure" || classified.cta === "configure-and-retry";
+  const showRetry =
+    classified.cta === "retry" ||
+    classified.cta === "configure-and-retry" ||
+    classified.cta === "retry-or-skip";
+
   return (
     <HStack gap={2} justify="flex-end">
       <Button variant="ghost" onClick={onSkip}>
         I'll write it myself
       </Button>
-      <Button colorPalette="blue" onClick={onTryAgain}>
-        Try again
-      </Button>
-    </HStack>
-  );
-}
-
-function NoModelProvidersWarning() {
-  return (
-    <VStack gap={4} py={8} align="center" justify="center">
-      <Box
-        p={3}
-        borderRadius="full"
-        bg="orange.100"
-        color="orange.600"
-      >
-        <Icon as={AlertTriangle} boxSize={6} />
-      </Box>
-      <VStack gap={1}>
-        <Text fontWeight="semibold">No model provider configured</Text>
-        <Text color="fg.muted" fontSize="sm" textAlign="center">
-          Scenarios require a model provider to run. Please configure one to get started.{" "}
-          <Link
+      {showConfigure && (
+        <Button colorPalette="blue" asChild>
+          <a
+            data-testid="error-configure-model-provider-button"
             href="/settings/model-providers"
             target="_blank"
             rel="noopener noreferrer"
-            color="blue.500"
-            fontWeight="medium"
+            style={{ color: "white" }}
           >
             Configure model provider
-          </Link>
-        </Text>
-      </VStack>
-    </VStack>
-  );
-}
-
-function NoModelProvidersFooter() {
-  return (
-    <HStack gap={2} justify="flex-end">
-      <Button colorPalette="blue" asChild>
-        <a
-          data-testid="ai-create-modal-configure-model-provider-button"
-          href="/settings/model-providers"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Configure model provider
-        </a>
-      </Button>
+          </a>
+        </Button>
+      )}
+      {showRetry && (
+        <Button colorPalette="blue" onClick={onTryAgain}>
+          Try again
+        </Button>
+      )}
     </HStack>
   );
 }
+
