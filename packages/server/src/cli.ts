@@ -5,6 +5,7 @@ import prompts from "prompts";
 import { printBanner } from "./animation/banner.ts";
 import { openBrowser } from "./animation/open-browser.ts";
 import { streamEventsToTTY } from "./animation/log-tee.ts";
+import { isInstallEvent, makeInstallPanelRouter, renderInstallPanels } from "./animation/install-panels.ts";
 import { runPredeps } from "./predeps/runner.ts";
 import { inspectPredeps, printDoctorTable } from "./predeps/detect-only.ts";
 import { resolvePortConflicts } from "./port-conflict/resolve.ts";
@@ -89,15 +90,34 @@ program
 
     ensureEnvFile(ctx);
 
-    // Start draining runtime events BEFORE installServices. Now that the
-    // install steps (uv sync × 2, pnpm install, prisma generate, app build)
-    // pipe their stdio through the bus instead of using stdio: 'inherit'
-    // (see services/_pipe-to-bus.ts), the user only sees install output if
-    // the consumer is already running — otherwise events buffer in the bus
-    // until startAll's events arrive. Consume from the start.
-    const eventsStream = streamEventsToTTY(runtime.events(ctx));
+    // Drain runtime events from the start. The same async stream feeds two
+    // renderers:
+    //   - install-phase events → docker-buildx-style bounded panels
+    //     (one per service, last 5 lines visible) via the router below.
+    //   - everything else → `concurrently`-style prefixed scroll lines
+    //     in animation/log-tee.ts.
+    // The router buffers events that arrive before listr2's task subscribes
+    // (typical race: app:relocate emits 'starting' before the panels render
+    // resolves the task callbacks).
+    const installRouter = makeInstallPanelRouter();
+    const panelsPromise = renderInstallPanels(installRouter);
+    const eventsStream = streamEventsToTTY(runtime.events(ctx), {
+      intercept: (ev) => {
+        if (!isInstallEvent(ev)) return false;
+        installRouter.feed(ev);
+        return true;
+      },
+    });
 
-    await runtime.installServices(ctx);
+    try {
+      await runtime.installServices(ctx);
+    } finally {
+      // Signal panels for cached steps to skip and any pending tasks to
+      // close. Even if installServices throws mid-step, we don't want
+      // panels left hanging on the screen during error reporting.
+      installRouter.installFinished();
+    }
+    await panelsPromise;
 
     const handles = await runtime.startAll(ctx);
     await runtime.waitForHealth(ctx, { timeoutMs: 60_000 });

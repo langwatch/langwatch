@@ -48,8 +48,15 @@ export function renderEvent(ev: RuntimeEvent): string | null {
  * closes — typically after `runtime.stopAll` is called and every
  * supervised child has exited.
  */
-export async function streamEventsToTTY(events: AsyncIterable<RuntimeEvent>): Promise<void> {
+export async function streamEventsToTTY(
+  events: AsyncIterable<RuntimeEvent>,
+  options: { intercept?: (ev: RuntimeEvent) => boolean } = {},
+): Promise<void> {
+  const { intercept } = options;
   for await (const ev of events) {
+    // Interceptor returns true to claim the event (e.g. routed into the
+    // install-phase panel renderer) and skip the default scrolling render.
+    if (intercept && intercept(ev)) continue;
     const line = renderEvent(ev);
     if (line) {
       process.stdout.write(`${line}\n`);
