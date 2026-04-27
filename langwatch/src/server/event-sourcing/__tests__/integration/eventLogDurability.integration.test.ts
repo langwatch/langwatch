@@ -49,6 +49,7 @@ import { generateTestTenantId } from "./testHelpers";
 import { EventStoreClickHouse } from "../../stores/eventStoreClickHouse";
 import { EventRepositoryClickHouse } from "../../stores/repositories/eventRepositoryClickHouse";
 import type { AggregateType } from "../../";
+import { createTenantId } from "../../domain/tenantId";
 
 const hasTestcontainers = !!(
   process.env.TEST_CLICKHOUSE_URL || process.env.CI_CLICKHOUSE_URL
@@ -263,7 +264,7 @@ describe.skipIf(!hasTestcontainers)(
 
         const events = await eventStore.getEvents(
           traceId,
-          { tenantId },
+          { tenantId: createTenantId(tenantId) },
           "trace" as AggregateType,
         );
 
@@ -355,7 +356,7 @@ describe.skipIf(!hasTestcontainers)(
 
         const events = await eventStore.getEvents(
           traceId,
-          { tenantId },
+          { tenantId: createTenantId(tenantId) },
           "trace" as AggregateType,
         );
 
@@ -415,12 +416,12 @@ describe.skipIf(!hasTestcontainers)(
 
         const eventsA = await eventStore.getEvents(
           traceA,
-          { tenantId },
+          { tenantId: createTenantId(tenantId) },
           "trace" as AggregateType,
         );
         const eventsB = await eventStore.getEvents(
           traceB,
-          { tenantId },
+          { tenantId: createTenantId(tenantId) },
           "trace" as AggregateType,
         );
 
@@ -455,12 +456,12 @@ describe.skipIf(!hasTestcontainers)(
 
         const eventsForOwner = await eventStore.getEvents(
           traceId,
-          { tenantId: ownerTenant },
+          { tenantId: createTenantId(ownerTenant) },
           "trace" as AggregateType,
         );
         const eventsForOther = await eventStore.getEvents(
           traceId,
-          { tenantId: otherTenant },
+          { tenantId: createTenantId(otherTenant) },
           "trace" as AggregateType,
         );
 
@@ -489,7 +490,7 @@ describe.skipIf(!hasTestcontainers)(
 
         const events = await eventStore.getEvents(
           traceId,
-          { tenantId },
+          { tenantId: createTenantId(tenantId) },
           "trace" as AggregateType,
         );
 
