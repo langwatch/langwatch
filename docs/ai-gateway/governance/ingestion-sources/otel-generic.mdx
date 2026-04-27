@@ -106,6 +106,16 @@ If `eventType` shows `agent.action` instead of `api.call` / `tool.invocation`, t
 
 ## Test it now — copy-paste curl
 
+The five attributes that make the canonical first-event flow useful (and that the secret-reveal modal's auto-generated curl pre-fills):
+
+| Attribute | Maps to | Why include it |
+|---|---|---|
+| `gen_ai.request.model` | `target` | Source detail page shows a model name instead of an empty cell |
+| `user.email` | `actor` | "Spend by user" KPI groups by actor; `agent.action` on its own attributes to "(unattributed)" |
+| `gen_ai.usage.cost_usd` | `costUsd` | Drives the Spend KPI on `/governance` and the per-source health strip |
+| `gen_ai.usage.input_tokens` | `tokensInput` | Tokens KPI |
+| `gen_ai.usage.output_tokens` | `tokensOutput` | Tokens KPI |
+
 A complete OTLP/HTTP JSON body that hits the full normaliser and produces one row in `langwatch ingest tail` / the per-source detail page. Substitute `<otlpUrl>` and `<secret>` from the one-time-reveal modal:
 
 ```bash
