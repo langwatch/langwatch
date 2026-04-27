@@ -27,6 +27,8 @@ import { Hono } from "hono";
 
 import { prisma } from "~/server/db";
 import { IngestionSourceService } from "~/server/governance/activity-monitor/ingestionSource.service";
+import { ActivityEventRepository } from "~/server/governance/activity-monitor/activityEvent.repository";
+import { normalizeOtlpJson } from "~/server/governance/activity-monitor/normalizers/otel";
 import { createLogger } from "~/utils/logger/server";
 
 const logger = createLogger("langwatch:ingest");
@@ -75,17 +77,26 @@ app.post("/otel/:sourceId", async (c: Context) => {
     );
   }
 
-  // Body shape validation is light at this slice — parsers per source
-  // type land later. We just count bytes and attempt JSON parse for
-  // the health metrics, then ack.
+  // Parse + normalise + persist. Even if parse fails we still 202-ack
+  // (upstream platforms shouldn't retry-bomb us); the source's
+  // lastEventAt still flips so the admin sees the connection is alive.
   let bodyBytes = 0;
-  let parseOk = true;
+  let eventCount = 0;
+  let raw = "";
   try {
-    const raw = await c.req.text();
+    raw = await c.req.text();
     bodyBytes = raw.length;
-    JSON.parse(raw); // throws on malformed JSON; we still 202 below
-  } catch {
-    parseOk = false;
+    const events = normalizeOtlpJson(source, raw);
+    eventCount = events.length;
+    if (events.length > 0) {
+      const repo = new ActivityEventRepository();
+      await repo.insert(events);
+    }
+  } catch (err) {
+    logger.warn(
+      { sourceId: source.id, err: String(err) },
+      "otel ingest persist failed (still ack'ing)",
+    );
   }
 
   const service = IngestionSourceService.create(prisma);
@@ -95,14 +106,15 @@ app.post("/otel/:sourceId", async (c: Context) => {
       sourceId: source.id,
       sourceType: source.sourceType,
       bytes: bodyBytes,
-      parseOk,
+      events: eventCount,
     },
     "otel ingest received",
   );
 
-  // 202 Accepted: we've taken the bytes; downstream parse + persist is
-  // async (and a no-op in this foundation slice).
-  return c.json({ accepted: true, bytes: bodyBytes }, 202);
+  return c.json(
+    { accepted: true, bytes: bodyBytes, events: eventCount },
+    202,
+  );
 });
 
 // ---------------------------------------------------------------------------
@@ -138,14 +150,36 @@ app.post("/webhook/:sourceId", async (c: Context) => {
     );
   }
 
+  // Webhook receivers are platform-specific in shape — for this
+  // foundation slice we only persist a single envelope event with the
+  // raw payload. Per-platform normalisers (workato audit shape, S3
+  // custom DSL, etc.) ship in follow-up adapter slices and replace
+  // this minimal envelope with their richer normalised events.
   let bodyBytes = 0;
-  let parseOk = true;
+  let envelopeId = "";
+  let raw = "";
   try {
-    const raw = await c.req.text();
+    raw = await c.req.text();
     bodyBytes = raw.length;
-    JSON.parse(raw);
-  } catch {
-    parseOk = false;
+    const repo = new ActivityEventRepository();
+    envelopeId = `envelope-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+    await repo.insert([
+      {
+        tenantId: source.id,
+        organizationId: source.organizationId,
+        sourceType: source.sourceType,
+        sourceId: source.id,
+        eventId: envelopeId,
+        eventType: "agent.action",
+        rawPayload: raw,
+        eventTimestamp: new Date(),
+      },
+    ]);
+  } catch (err) {
+    logger.warn(
+      { sourceId: source.id, err: String(err) },
+      "webhook ingest persist failed (still ack'ing)",
+    );
   }
 
   const service = IngestionSourceService.create(prisma);
@@ -155,10 +189,10 @@ app.post("/webhook/:sourceId", async (c: Context) => {
       sourceId: source.id,
       sourceType: source.sourceType,
       bytes: bodyBytes,
-      parseOk,
+      envelopeId,
     },
     "webhook ingest received",
   );
 
-  return c.json({ accepted: true, bytes: bodyBytes }, 202);
+  return c.json({ accepted: true, bytes: bodyBytes, eventId: envelopeId }, 202);
 });
