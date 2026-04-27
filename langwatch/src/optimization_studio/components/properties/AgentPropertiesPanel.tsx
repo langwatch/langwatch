@@ -98,7 +98,7 @@ function buildHttpConfig(
 // ---------------------------------------------------------------------------
 
 const DEFAULT_CODE = `class Code:
-    def forward(self, input: str):
+    def __call__(self, input: str):
         # Your code goes here
 
         return {"output": input.upper()}
@@ -623,7 +623,7 @@ function DbAgentPanel({
           <Field.Root>
             <Field.Label fontSize="sm">Python Code</Field.Label>
             <Text fontSize="xs" color="fg.muted" marginBottom={1}>
-              Define a Python class with a `forward` method that takes inputs
+              Define a Python class with a `__call__` method that takes inputs
               and returns outputs.
             </Text>
             <CodeBlockEditor

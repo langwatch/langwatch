@@ -18,7 +18,7 @@ const DEFAULT_CODE_NODE_PROPERTIES: CodeExecutionNode = {
         identifier: "code",
         type: "code",
         value: `class Code:
-    def forward(self, ${INPUT_FIELD_NAME}: str):
+    def __call__(self, ${INPUT_FIELD_NAME}: str):
         # Your code goes here
 
         return {"${OUTPUT_FIELD_NAME}": "Hello world!"}

@@ -613,7 +613,7 @@ const buildSignatureNodeParameters = (
 /**
  * Builds a code node from a TypedAgent with type "code" or "workflow".
  *
- * Code agents contain a Python class (with a `forward` method) that handles
+ * Code agents contain a Python class (with a `__call__` method) that handles
  * its own LLM calls. Parameters are passed directly - no LLM config
  * normalization needed.
  */

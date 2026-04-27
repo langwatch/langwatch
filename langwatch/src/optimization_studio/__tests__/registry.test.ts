@@ -72,7 +72,7 @@ describe("Optimization Studio Registry", () => {
       const codeParam = code.parameters?.find((p) => p.identifier === "code");
 
       expect(codeParam).toBeDefined();
-      expect(codeParam?.value).toContain("def forward(self, input: str)");
+      expect(codeParam?.value).toContain("def __call__(self, input: str)");
     });
 
     it("has code parameter returning output key", () => {
@@ -97,13 +97,18 @@ describe("Optimization Studio Registry", () => {
       expect(value).not.toContain("(dspy.");
     });
 
-    it("default template uses a plain Python class", () => {
+    it("default template uses a plain Python class with __call__", () => {
       const codeParam = code.parameters?.find((p) => p.identifier === "code");
       const value = codeParam?.value as string;
 
-      // Plain class shape: `class Code:` (no parens). The runner
-      // finds the class via its `forward` method regardless of base.
+      // Plain class shape: `class Code:` (no parens), entrypoint via
+      // Python's idiomatic `__call__` protocol — not torch/dspy's
+      // `forward` convention. The runner resolves classes that define
+      // `__call__` on the class itself; legacy customer code using
+      // `forward` or dspy.Module still resolves via fallback rules.
       expect(value).toMatch(/^class\s+\w+\s*:/m);
+      expect(value).toContain("def __call__(self");
+      expect(value).not.toContain("def forward");
     });
   });
 

@@ -4,6 +4,7 @@ import { createStore, type StoreApi } from "zustand";
 import {
   removeInvalidEdges,
   store as storeCreator,
+  updateInputFields,
   type WorkflowStore,
 } from "./workflowStoreCore";
 
@@ -522,6 +523,47 @@ describe("workflowStoreCore", () => {
         testStore.getState().setIsDraggingNode(false);
         expect(testStore.getState().isDraggingNode).toBe(false);
       });
+    });
+  });
+
+  describe("updateInputFields entry-point preservation", () => {
+    // The hook fires when a user adds/removes input fields on a code
+    // node. It rewrites the entrypoint method's signature in-place.
+    // The owner directive on PR #3483 (nlp-go-migration): the new
+    // default template uses Python's idiomatic `__call__` instead of
+    // torch/dspy's `forward`, but legacy customer code with `forward`
+    // must keep working — silently rewriting `forward` to `__call__`
+    // on field-add would surprise users and pollute their diffs.
+    const codeParam = (value: string) => [
+      { identifier: "code", type: "code" as const, value },
+    ];
+
+    it("rewrites __call__ signature when the new default is in use", () => {
+      const result = updateInputFields(
+        codeParam(`class Code:\n    def __call__(self, input: str):\n        return {"output": input}\n`),
+        [
+          { identifier: "input", type: "str" },
+          { identifier: "context", type: "str" },
+        ],
+      );
+      expect(result[0]?.value).toContain(
+        "def __call__(self, input: str, context: str):",
+      );
+    });
+
+    it("rewrites legacy forward signature without converting it to __call__", () => {
+      const result = updateInputFields(
+        codeParam(`class Code:\n    def forward(self, input: str):\n        return {"output": input}\n`),
+        [
+          { identifier: "input", type: "str" },
+          { identifier: "context", type: "str" },
+        ],
+      );
+      // Method name preserved as-is; only the param list is rewritten.
+      expect(result[0]?.value).toContain(
+        "def forward(self, input: str, context: str):",
+      );
+      expect(result[0]?.value).not.toContain("def __call__");
     });
   });
 });

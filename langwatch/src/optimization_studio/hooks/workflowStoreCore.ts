@@ -354,11 +354,17 @@ export const updateInputFields = (parameters: Field[], inputs: Field[]) => {
 
   return parameters.map((p) => {
     if (p.identifier === "code") {
+      // Match either the new idiomatic-Python entrypoint (`__call__`)
+      // or the legacy/torch-style `forward` and preserve whichever the
+      // customer's code already uses — silently rewriting a legacy
+      // `forward` into `__call__` on field-add would surprise users
+      // and break diffs in their commit history.
       let code = (p.value as string).replace(
-        /def forward\([\s\S]*?\):/,
-        `def forward(self, ${inputs
-          .map((i) => `${i.identifier}: ${typesMap[i.type]}`)
-          .join(", ")}):`,
+        /def (__call__|forward)\([\s\S]*?\):/,
+        (_match, methodName: string) =>
+          `def ${methodName}(self, ${inputs
+            .map((i) => `${i.identifier}: ${typesMap[i.type]}`)
+            .join(", ")}):`,
       );
       if (code.includes(": Any") && !code.includes("from typing import Any")) {
         code = `from typing import Any\n${code}`;

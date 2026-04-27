@@ -76,7 +76,7 @@ const code: Code = {
       identifier: "code",
       type: "code",
       value: `class Code:
-    def forward(self, ${defaultInput?.identifier ?? "input"}: str):
+    def __call__(self, ${defaultInput?.identifier ?? "input"}: str):
         # Your code goes here
 
         return {"${defaultOutput?.identifier ?? "output"}": "Hello world!"}

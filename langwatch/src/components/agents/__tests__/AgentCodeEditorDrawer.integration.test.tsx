@@ -347,7 +347,7 @@ describe("AgentCodeEditorDrawer", () => {
       expect(value).not.toContain("(dspy.");
     });
 
-    it("uses a plain Python class with a forward method", async () => {
+    it("uses a plain Python class with a __call__ method", async () => {
       renderDrawer();
 
       const textarea = await waitFor(() =>
@@ -355,8 +355,13 @@ describe("AgentCodeEditorDrawer", () => {
       );
       const value = (textarea as HTMLTextAreaElement).value;
 
+      // Default template uses Python's idiomatic `__call__` (instances
+      // are callable) instead of torch/dspy's `forward` convention.
+      // Existing customer code with `forward` still resolves via the
+      // runner's fallback rules — this only pins the new default shape.
       expect(value).toMatch(/^class\s+\w+\s*:/m);
-      expect(value).toContain("def forward");
+      expect(value).toContain("def __call__(self");
+      expect(value).not.toContain("def forward");
     });
   });
 });

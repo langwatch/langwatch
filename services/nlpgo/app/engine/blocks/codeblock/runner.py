@@ -6,22 +6,37 @@ from stdin describing the user's Python code, declared inputs, and
 declared outputs; executes the code in a fresh module namespace;
 writes a structured JSON result to the path passed as argv[1].
 
-Three accepted user-code shapes (in this order of precedence):
+Four accepted user-code shapes (in this order of precedence):
 
-  1. Legacy dspy.Module-style — what 387/388 production code-blocks use:
+  1. Legacy dspy.Module-style — what 387/388 production code-blocks
+     use; kept as the highest-priority shape so existing customer code
+     keeps working unchanged after the dspy-rip:
 
          class Code(dspy.Module):
              def forward(self, **inputs):
                  return {"output": ...}
 
-  2. Plain class + forward() — the new default template, no dspy ref:
+  2. Class with __call__ — the new idiomatic Python default:
+
+         class Code:
+             def __call__(self, **inputs):
+                 return {"output": ...}
+
+     We require __call__ to be defined on the class itself
+     (`'__call__' in cls.__dict__`) rather than inherited from `type`,
+     otherwise every class would false-match (every class has an
+     inherited __call__ for instantiation).
+
+  3. Plain class + forward() — transitional shape, kept for back-compat
+     with any customer who already wrote `class X: def forward(...)`
+     during the dspy-rip transition window:
 
          class Code:
              def forward(self, **inputs):
                  return {"output": ...}
 
-  3. Top-level execute() — kept for callers (chiefly our own tests +
-     trivial sandboxes) that don't want the class boilerplate:
+  4. Top-level execute() — kept for callers (chiefly our own tests +
+     trivial sandboxes) that don't want a class:
 
          def execute(**inputs):
              return {"output": ...}
@@ -131,50 +146,69 @@ def main() -> int:
 
 
 def _invoke_user_entrypoint(module_globals: dict, inputs: dict):
-    """Find and call the user's entrypoint, supporting all three shapes.
+    """Find and call the user's entrypoint, supporting all four shapes.
 
     Resolution order:
 
       1. A class subclassing fake_dspy.Module (legacy dspy-style code).
-      2. A class with a `forward` method but no Module base (the new
-         plain-Python default template).
-      3. A top-level `execute(**inputs) -> dict` callable.
+      2. A class that defines __call__ on the class itself
+         (the new idiomatic default — `instance(**inputs)` invokes it).
+      3. A class with a `forward` method (transitional shape from the
+         dspy-rip, kept for back-compat with customers who already
+         migrated to plain `class X: def forward(...)`).
+      4. A top-level `execute(**inputs) -> dict` callable.
 
-    The first match wins. We instantiate classes with no args because
-    every customer code-block surveyed defines a no-arg constructor
-    (387 use the implicit `dspy.Module.__init__`, 6 define their own
-    `__init__(self)` with no args). Customer code that needs
-    constructor args is unsupported by design — it didn't appear in
-    production traffic.
+    The first match wins. When multiple classes are present at the
+    same priority level, the first one declared wins.
+
+    We instantiate classes with no args because every customer code-block
+    surveyed defines a no-arg constructor (387 use the implicit
+    `dspy.Module.__init__`, 6 define their own `__init__(self)` with no
+    args). Customer code that needs constructor args is unsupported by
+    design — it didn't appear in production traffic.
     """
-    candidate_class = None
+    dspy_module_cls = None
+    callable_cls = None
+    forward_cls = None
     for value in module_globals.values():
         if not inspect.isclass(value):
             continue
-        # Prefer dspy.Module subclasses when both are present, so a
-        # customer who defines a helper plain class alongside the real
-        # one still gets the dspy.Module entrypoint chosen.
         if issubclass(value, fake_dspy.Module) and value is not fake_dspy.Module:
-            candidate_class = value
-            break
-        if candidate_class is None and hasattr(value, "forward") and callable(getattr(value, "forward")):
-            candidate_class = value
+            if dspy_module_cls is None:
+                dspy_module_cls = value
+            continue
+        # __call__ check: must be defined on the class itself, not
+        # inherited from `type`. Every class has an inherited __call__
+        # for instantiation; without this guard we'd false-match every
+        # class the user defines.
+        if "__call__" in value.__dict__ and callable(value.__dict__["__call__"]):
+            if callable_cls is None:
+                callable_cls = value
+            continue
+        if hasattr(value, "forward") and callable(getattr(value, "forward")):
+            if forward_cls is None:
+                forward_cls = value
 
-    if candidate_class is not None:
-        instance = candidate_class()
-        # dspy.Module.__call__ routes to forward; for plain classes we
-        # call forward directly so both shapes converge here.
-        if isinstance(instance, fake_dspy.Module):
-            return instance(**inputs)
-        return instance.forward(**inputs)
+    if dspy_module_cls is not None:
+        # dspy.Module.__call__ routes to forward; calling the instance
+        # is the path our fake_dspy.Module also follows.
+        return dspy_module_cls()(**inputs)
+    if callable_cls is not None:
+        # Plain Python convention: instances of a class with __call__
+        # are themselves callable. `Code()(**inputs)` first instantiates,
+        # then __call__ runs.
+        return callable_cls()(**inputs)
+    if forward_cls is not None:
+        return forward_cls().forward(**inputs)
 
     execute = module_globals.get("execute")
     if execute is not None and callable(execute):
         return execute(**inputs)
 
     raise NameError(
-        "user code must define one of: a class with a forward(self, **inputs) "
-        "method, or a top-level callable `execute(**inputs) -> dict`"
+        "user code must define one of: a class with __call__(self, **inputs), "
+        "a class with forward(self, **inputs), a dspy.Module subclass, or a "
+        "top-level callable `execute(**inputs) -> dict`"
     )
 
 

@@ -170,6 +170,63 @@ func TestCodeBlock_PlainClassWithForward(t *testing.T) {
 	assert.Equal(t, float64(42), res.Outputs["doubled"])
 }
 
+// TestCodeBlock_PlainClassWithCallable pins the new idiomatic-Python
+// default template (PR #3483 dogfood pushback): a plain class that
+// defines __call__ on itself. The runner must instantiate the class
+// and invoke __call__ via `instance(**inputs)`. Both rchaves and
+// Sarah landed on this shape over `def execute()` (free-function)
+// because helpers can live as methods inside the class without
+// polluting top-level scope, and __call__ is a built-in Python
+// convention rather than a framework lineage carryover from torch/dspy.
+//
+// Crucial detail: the resolution check is `'__call__' in cls.__dict__`,
+// not `hasattr(cls, '__call__')`. Every class has an inherited
+// __call__ from `type` for instantiation, so the loose hasattr check
+// would false-match any class the user defines. The dict-membership
+// check matches only classes that *override* __call__ themselves.
+func TestCodeBlock_PlainClassWithCallable(t *testing.T) {
+	requirePython(t)
+	code := `class Code:
+    def __call__(self, x):
+        return {"doubled": x * 2}
+`
+	res, err := newExec(t).Execute(context.Background(), codeblock.Request{
+		Code:            code,
+		Inputs:          map[string]any{"x": float64(21)},
+		DeclaredOutputs: []string{"doubled"},
+	})
+	require.NoError(t, err)
+	require.Nil(t, res.Error, "expected no error, got %+v", res.Error)
+	assert.Equal(t, float64(42), res.Outputs["doubled"])
+}
+
+// TestCodeBlock_CallableTakesPriorityOverForward pins the resolution
+// order: when a customer's code defines a class with both __call__
+// and forward (e.g. they migrated their template but kept a legacy
+// helper class around for one transition release), __call__ wins.
+// Without this priority, a customer who copy-pastes our new default
+// template alongside an older `forward`-shaped helper would get
+// surprising behavior depending on Python dict iteration order.
+func TestCodeBlock_CallableTakesPriorityOverForward(t *testing.T) {
+	requirePython(t)
+	code := `class Helper:
+    def forward(self, x):
+        return {"out": "wrong"}
+
+class Code:
+    def __call__(self, x):
+        return {"out": "right"}
+`
+	res, err := newExec(t).Execute(context.Background(), codeblock.Request{
+		Code:            code,
+		Inputs:          map[string]any{"x": float64(1)},
+		DeclaredOutputs: []string{"out"},
+	})
+	require.NoError(t, err)
+	require.Nil(t, res.Error, "expected no error, got %+v", res.Error)
+	assert.Equal(t, "right", res.Outputs["out"], "__call__ class must win over a forward-only helper class")
+}
+
 // TestCodeBlock_DspyPredictionReturnValue covers the second-most-common
 // return shape from the survey: customer code returning
 // `dspy.Prediction(**kwargs)` instead of a plain dict. The fake_dspy
