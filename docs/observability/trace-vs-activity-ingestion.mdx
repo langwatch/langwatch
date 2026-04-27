@@ -1,0 +1,62 @@
+---
+title: Choosing the right OTel endpoint
+description: LangWatch exposes two OpenTelemetry-shaped endpoints for two different products. Trace ingestion (`/api/otel/v1/traces`) is for your application's LLM observability. Activity ingestion (`/api/ingest/otel/:sourceId`) is for cross-platform audit-event feeds from third-party AI tools your org runs.
+sidebarTitle: Trace vs activity ingestion
+---
+
+LangWatch accepts OTLP/HTTP at two distinct URLs. They share the OpenTelemetry wire shape; everything downstream is different. **Pick one before configuring your exporter** — sending agent traces to the activity endpoint or audit events to the trace endpoint will silently put your data in the wrong place.
+
+## At a glance
+
+|  | `/api/otel/v1/traces` (existing — trace ingestion) | `/api/ingest/otel/:sourceId` (new — activity ingestion) |
+|---|---|---|
+| **Use it when** | Your application emits LLM traces — you want them in the LangWatch trace viewer | Your org runs a third-party AI platform (Claude Cowork, Workato, custom internal agents) and you want their audit logs surfaced in LangWatch governance |
+| **Auth** | LangWatch project API key / PAT — `X-Auth-Token` or `Authorization: Bearer <project-token>` | IngestionSource bearer secret (`lw_is_<...>`) — minted once via the secret-reveal modal |
+| **Tenancy** | Project-scoped (data lives in the project's CH partition) | Org-scoped (data is keyed by `IngestionSource.id`, spans the whole org) |
+| **Storage** | `Trace` / `Span` model → full LangWatch trace viewer (input/output messages, tool tree, evals, prompts) | `gateway_activity_events` flat OCSF rows (Actor / Action / Target / cost / tokens) |
+| **Downstream consumers** | Trace viewer, evaluations, simulations, prompts, online evals, PII redaction, cost enrichment | Governance dashboard at `/governance`, anomaly detection reactor, `langwatch ingest tail` CLI |
+| **Plan accounting** | Counts against the project's trace allowance | Counts against the org's governance audit-event allowance |
+| **Source identity** | Whoever holds the project key (typically your own apps) | An IngestionSource the admin authored explicitly with per-platform config |
+| **Other shapes** | OTLP only | OTLP **plus** webhook envelope (`/api/ingest/webhook/:id` for Workato + s3_custom callback mode) and future S3 puller for compliance feeds (OpenAI Enterprise Compliance JSONL drops, Anthropic compliance API) |
+
+## Decision tree
+
+**Are you instrumenting your own application?** (Python/TS SDK, OpenAI/Anthropic SDK auto-instrumentation, your own collector) → **`/api/otel/v1/traces`** with your project API key. See [Observability quickstart](/integration/quick-start).
+
+**Are you forwarding events from a third-party AI platform?** (Claude Cowork tenant, Workato workspace, Microsoft Copilot Studio, OpenAI Enterprise Compliance) → **`/api/ingest/otel/:sourceId`** (or `/webhook/:id` for non-OTLP feeds) with an IngestionSource bearer. The IngestionSource is created by an org admin under [Governance → Ingestion sources](/ai-gateway/governance/ingestion-sources). Per-platform setup pages: [Generic OTel](/ai-gateway/governance/ingestion-sources/otel-generic), [Claude Cowork](/ai-gateway/governance/ingestion-sources/claude-cowork), [Workato](/ai-gateway/governance/ingestion-sources/workato).
+
+**Are you driving an LLM call through the AI Gateway and want both?** That happens automatically — gateway requests already emit OTel traces back to the project that owns the virtual key, so your gateway traffic shows up in `/api/otel/v1/traces` semantics with no extra wiring. The activity endpoint is only for *external* platforms LangWatch doesn't proxy.
+
+## Why two endpoints, not one
+
+The OTLP wire shape is the same. Everything else genuinely diverges:
+
+- **Auth model**: A project API key authorises a specific project to write its own traces. An IngestionSource bearer authorises a specific *external system* to push events into one slot the admin has provisioned for it. The two answer different "who is allowed to do what?" questions.
+- **Tenancy**: Trace data is partitioned per project (so per-project access controls, retention, RBAC stay clean). Activity data is partitioned per IngestionSource keyed by org (so audit data spans whatever set of platforms the org has wired). Mixing the two under one URL would force every middleware to fork on which tenancy applies.
+- **Downstream pipeline**: Traces feed the LangWatch trace viewer, evals, simulations, prompts. Activity events feed the governance dashboard, anomaly detection reactor, and SIEM dispatch (in flight). The transformations applied to a span in each path are different — trace ingest enriches with cost / PII redaction / evaluator scoring; activity ingest extracts OCSF Actor / Action / Target.
+- **Non-OTLP shapes**: The activity endpoint isn't OTLP-only. Audit feeds from Workato (HMAC-signed webhooks), S3 (compliance JSONL drops), and the future Copilot Studio Purview poller don't speak OTLP. The activity endpoint family must accommodate them; the trace endpoint never will.
+
+Customers rolling out LangWatch governance typically use **both**: their own apps emit OTel → trace ingestion; their Cowork install emits OCSF audit logs → activity ingestion. Different products, different teams own them, different dashboards consume them.
+
+## Shared internals
+
+The two endpoints intentionally **share** their request-handling internals: body decompression (gzip / deflate / brotli per Content-Encoding) and OTLP body parsing (JSON + protobuf via `@opentelemetry/otlp-transformer`) live in one shared module under `src/server/otel/`. Both receivers call into it before diverging on what they do with the parsed result.
+
+This means anything you can send to `/api/otel/v1/traces` (gzipped JSON, gzipped protobuf, brotli-encoded protobuf, etc.) you can send to `/api/ingest/otel/:sourceId` with the same Content-Encoding semantics. There is no parser-quality gap between the two paths.
+
+## Common confusions
+
+**"My OTel collector is already pointed at `/api/otel/v1/traces` — do I need to add a second exporter for governance?"** No, not for your own apps. The trace endpoint is the right home for traces from systems your org owns. The activity endpoint is for *external* platforms (Cowork, Workato, etc.) that you don't own but want governance over.
+
+**"My collector pushes gzipped protobuf — does the activity endpoint accept that?"** Yes (post the shared-internals refactor). Both endpoints accept the full OTLP wire shape with all standard Content-Encoding values.
+
+**"Can I send the same span to both endpoints?"** Technically yes, but it's not what the design assumes. A span describing a single LLM call doesn't need to live in both the trace viewer and the OCSF activity feed — pick the one that matches the source of the data. Spans you author from your own app go to the trace endpoint; spans you receive from a third-party platform go to the activity endpoint.
+
+**"Will the two endpoints ever merge?"** Not in this PR, and probably not for the foreseeable future — the auth + tenancy + downstream-pipeline differences are not cosmetic. A long-horizon design note exists for a future refactor that would treat your project's trace-ingest as one IngestionSource of type `self_hosted_lw`, normalising every consumer. That's quarters out and beyond the scope of this branch.
+
+## Cross-references
+
+- [Observability quickstart](/integration/quick-start) — set up `/api/otel/v1/traces` from a Python or TypeScript app.
+- [Governance → Ingestion sources](/ai-gateway/governance/ingestion-sources) — set up `/api/ingest/otel/:sourceId` for an external platform.
+- [Generic OTel ingestion source](/ai-gateway/governance/ingestion-sources/otel-generic) — copy-paste curl that pushes a canonical 5-attribute body to the activity endpoint.
+- [Governance CLI debug](/ai-gateway/governance/cli-debug) — `langwatch ingest tail <id>` consumes the activity endpoint's downstream rows; `langwatch ingest health <id>` shows per-source 24h/7d/30d volume.

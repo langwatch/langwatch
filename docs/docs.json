@@ -258,7 +258,8 @@
           {
             "group": "Overview",
             "pages": [
-              "integration/overview"
+              "integration/overview",
+              "observability/trace-vs-activity-ingestion"
             ]
           },
           {

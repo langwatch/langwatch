@@ -6,6 +6,8 @@ sidebarTitle: Generic OTel
 
 `otel_generic` is the production-ready Activity Monitor path. Anything that speaks OTLP/HTTP — your own agents, third-party SDKs, tracing libraries — points at the source's URL with the source's bearer secret and events flow end-to-end into the admin oversight dashboard, the per-source detail page, and the [`langwatch ingest tail`](/ai-gateway/governance/cli-debug) CLI.
 
+<Note>**Not sending your own app's traces here.** This endpoint is for *third-party* OTel feeds your org wants in the governance audit trail. For your own application's LLM traces, use [`/api/otel/v1/traces`](/integration/quick-start) with your project API key — see [Choosing the right OTel endpoint](/observability/trace-vs-activity-ingestion) for the full comparison.</Note>
+
 ## Currently implemented
 
 - **Receiver:** `POST /api/ingest/otel/:sourceId` (also accepts `claude_cowork` sources, see [Anthropic Cowork](/ai-gateway/governance/ingestion-sources/claude-cowork)).
