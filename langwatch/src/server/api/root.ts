@@ -60,6 +60,7 @@ import { personalVirtualKeysRouter } from "./routers/personalVirtualKeys";
 import { routingPoliciesRouter } from "./routers/routingPolicies";
 import { ingestionSourcesRouter } from "./routers/ingestionSources";
 import { activityMonitorRouter } from "./routers/activityMonitor";
+import { anomalyRulesRouter } from "./routers/anomalyRules";
 import { workflowRouter } from "./routers/workflows";
 import { opsRouter } from "./routers/ops";
 
@@ -121,6 +122,7 @@ const coreRouters = {
   routingPolicy: routingPoliciesRouter,
   ingestionSources: ingestionSourcesRouter,
   activityMonitor: activityMonitorRouter,
+  anomalyRules: anomalyRulesRouter,
   gatewayProviders: gatewayProvidersRouter,
   gatewayBudgets: gatewayBudgetsRouter,
   gatewayCacheRules: gatewayCacheRulesRouter,

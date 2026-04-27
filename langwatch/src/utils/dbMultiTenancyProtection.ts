@@ -131,6 +131,14 @@ const EXEMPT_MODELS = [
    * by organizationId / teamId membership before any mutation.
    */
   "IngestionSource",
+  /**
+   * AnomalyRule (iter governance-platform / D2 anomaly authoring) is
+   * org-scoped: the natural key is (organizationId, name). The rule's
+   * `scope` field (organization|team|project|source_type|source) is
+   * an EVALUATION-time narrowing, not a tenancy boundary — service
+   * layer authorises by organizationId membership before any mutation.
+   */
+  "AnomalyRule",
 ];
 
 const _guardProjectId = ({ params }: { params: Prisma.MiddlewareParams }) => {

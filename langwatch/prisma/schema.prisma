@@ -102,6 +102,7 @@ model User {
   routingPoliciesCreated  RoutingPolicy[]          @relation("RoutingPolicyCreatedBy")
   routingPoliciesUpdated  RoutingPolicy[]          @relation("RoutingPolicyUpdatedBy")
   ingestionSourcesCreated IngestionSource[]        @relation("IngestionSourceCreatedBy")
+  anomalyRulesCreated     AnomalyRule[]            @relation("AnomalyRuleCreatedBy")
 }
 
 model VerificationToken {
@@ -238,6 +239,7 @@ model Organization {
   gatewayChangeEvents    GatewayChangeEvent[]
   routingPolicies        RoutingPolicy[]
   ingestionSources       IngestionSource[]
+  anomalyRules           AnomalyRule[]
 
   @@index([ssoProvider])
 }
@@ -1747,6 +1749,74 @@ model IngestionSource {
   @@index([organizationId])
   @@index([teamId])
   @@index([sourceType])
+}
+
+/// Admin-defined anomaly detection rule. Evaluated server-side at
+/// ingest time (Option C — not in this slice yet) against
+/// gateway_activity_events. When triggered, an alert is dispatched
+/// to the destinations configured on the rule (Slack / SIEM / webhook
+/// / PagerDuty / email).
+///
+/// This is a configuration entity — the actual rule evaluation +
+/// alert state lives in a future ClickHouse table
+/// (gateway_anomaly_alerts) and a server-side worker. Spec:
+/// specs/ai-gateway/governance/anomaly-rules.feature
+/// (Alexis lane B C-UI; mocked-v0 today, real persistence is THIS slice).
+model AnomalyRule {
+  id             String       @id @default(nanoid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  /// 'organization' | 'team' | 'project' | 'source_type' | 'source'.
+  /// String not enum so new scopes ship without migrations.
+  scope   String
+  /// Org id / team id / project id / source-type string / source id
+  /// — narrows what the rule applies to.
+  scopeId String
+
+  name        String
+  description String?
+
+  /// 'critical' | 'warning' | 'info'. Drives default destination
+  /// routing (e.g. critical → PagerDuty, warning → Slack only).
+  severity String
+
+  /// Extensible rule taxonomy: 'spend_spike' | 'rate_limit' |
+  /// 'tool_mismatch' | 'after_hours' | 'unusual_model' | 'pii_leak'
+  /// | 'custom'. New types ship without migrations — evaluator
+  /// picks a per-type implementation from a code registry.
+  ruleType String
+
+  /// Per-rule-type threshold shape. Examples:
+  ///   spend_spike: { windowSec, ratioVsBaseline, minBaselineUsd }
+  ///   rate_limit: { windowSec, requestsThreshold }
+  ///   after_hours: { startHour, endHour, timezone, requestsThreshold }
+  thresholdConfig Json @default("{}")
+
+  /// Alert routing per destination. Shape:
+  ///   { slack?: { channelId }, siem?: { endpointUrl, authHeader },
+  ///     webhook?: { url, authHeader }, pagerduty?: { routingKey },
+  ///     email?: { to: string[] } }
+  /// Empty map = use org defaults (when defaults exist; today no-op).
+  destinationConfig Json @default("{}")
+
+  /// 'active' (default — evaluator picks it up) | 'disabled' (admin
+  /// paused; rule rows kept for audit). 'archived' uses archivedAt
+  /// timestamp instead so we can filter `archivedAt IS NULL` cheaply.
+  status String @default("active")
+
+  archivedAt DateTime?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
+  createdById String?
+  createdBy   User?    @relation("AnomalyRuleCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+  @@index([scope, scopeId])
+  @@index([ruleType])
+  @@index([status])
 }
 
 model GatewayProviderCredential {
