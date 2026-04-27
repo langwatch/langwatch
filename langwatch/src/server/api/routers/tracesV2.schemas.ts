@@ -1,0 +1,166 @@
+import { z } from "zod";
+
+// ---------------------------------------------------------------------------
+// Scoped output models – one per drawer use-case
+// ---------------------------------------------------------------------------
+
+/**
+ * Trace header: everything the drawer header + summary tab needs.
+ * Returned by `tracesV2.header`.
+ */
+export const traceHeaderSchema = z.object({
+  traceId: z.string(),
+  timestamp: z.number(),
+  name: z.string(),
+  serviceName: z.string(),
+  origin: z.string(),
+  conversationId: z.string().nullable(),
+  userId: z.string().nullable(),
+  durationMs: z.number(),
+  spanCount: z.number(),
+  status: z.enum(["ok", "error", "warning"]),
+  error: z.string().nullish(),
+  input: z.string().nullish(),
+  output: z.string().nullish(),
+  models: z.array(z.string()),
+  totalCost: z.number().nullable(),
+  totalTokens: z.number(),
+  inputTokens: z.number().nullable(),
+  outputTokens: z.number().nullable(),
+  tokensEstimated: z.boolean(),
+  ttft: z.number().nullish(),
+  rootSpanName: z.string().nullable(),
+  rootSpanType: z.string().nullable(),
+  attributes: z.record(z.string()),
+  events: z
+    .array(
+      z.object({
+        spanId: z.string(),
+        timestamp: z.number(),
+        name: z.string(),
+        attributes: z.record(z.string()),
+      }),
+    )
+    .default([]),
+});
+
+export type TraceHeader = z.infer<typeof traceHeaderSchema>;
+
+/**
+ * Span tree node: lightweight per-span data for waterfall / flame / span-list.
+ * Returned by `tracesV2.spanTree`.
+ */
+export const spanTreeNodeSchema = z.object({
+  spanId: z.string(),
+  parentSpanId: z.string().nullable(),
+  name: z.string(),
+  type: z.string().nullable(),
+  startTimeMs: z.number(),
+  endTimeMs: z.number(),
+  durationMs: z.number(),
+  status: z.enum(["ok", "error", "unset"]),
+  model: z.string().nullable(),
+});
+
+export type SpanTreeNode = z.infer<typeof spanTreeNodeSchema>;
+
+/**
+ * Span detail: full span data for the accordion when a span is selected.
+ * Returned by `tracesV2.spanDetail`.
+ */
+export const spanDetailSchema = z.object({
+  spanId: z.string(),
+  parentSpanId: z.string().nullable(),
+  name: z.string(),
+  type: z.string(),
+  startTimeMs: z.number(),
+  endTimeMs: z.number(),
+  durationMs: z.number(),
+  status: z.enum(["ok", "error", "unset"]),
+  model: z.string().nullish(),
+  vendor: z.string().nullish(),
+  input: z.string().nullish(),
+  output: z.string().nullish(),
+  error: z
+    .object({
+      message: z.string(),
+      stacktrace: z.array(z.string()),
+    })
+    .nullish(),
+  metrics: z
+    .object({
+      promptTokens: z.number().nullish(),
+      completionTokens: z.number().nullish(),
+      cost: z.number().nullish(),
+      tokensEstimated: z.boolean().nullish(),
+    })
+    .nullish(),
+  params: z.record(z.unknown()).nullish(),
+  events: z.array(
+    z.object({
+      name: z.string(),
+      timestampMs: z.number(),
+      attributes: z.record(z.unknown()),
+    }),
+  ),
+});
+
+export type SpanDetail = z.infer<typeof spanDetailSchema>;
+
+/**
+ * Lightweight thread/conversation context — adjacent turns plus position info,
+ * for the "previous / next turn" affordance at the top of the drawer.
+ */
+export const threadTurnSchema = z.object({
+  traceId: z.string(),
+  timestamp: z.number(),
+  name: z.string(),
+  status: z.enum(["ok", "error", "warning"]),
+  input: z.string().nullish(),
+  output: z.string().nullish(),
+});
+
+export type ThreadTurn = z.infer<typeof threadTurnSchema>;
+
+export const threadContextSchema = z.object({
+  conversationId: z.string(),
+  total: z.number(),
+  position: z.number(),
+  previous: threadTurnSchema.nullable(),
+  next: threadTurnSchema.nullable(),
+});
+
+export type ThreadContext = z.infer<typeof threadContextSchema>;
+
+/**
+ * OTel resource info per span — separate read path because the standard
+ * span mapping drops resource attributes and the instrumentation scope.
+ */
+export const instrumentationScopeSchema = z.object({
+  name: z.string(),
+  version: z.string().nullable(),
+});
+
+export type InstrumentationScope = z.infer<typeof instrumentationScopeSchema>;
+
+export const spanResourceInfoSchema = z.object({
+  spanId: z.string(),
+  parentSpanId: z.string().nullable(),
+  resourceAttributes: z.record(z.string()),
+  scope: instrumentationScopeSchema,
+});
+
+export type SpanResourceInfoDto = z.infer<typeof spanResourceInfoSchema>;
+
+export const traceResourceInfoSchema = z.object({
+  /** The root (or earliest) span used as the trace-level representative. */
+  rootSpanId: z.string().nullable(),
+  /** Resource attributes from the root span — usually identical across the trace. */
+  resourceAttributes: z.record(z.string()),
+  /** Instrumentation scope from the root span. */
+  scope: instrumentationScopeSchema.nullable(),
+  /** Per-span info for the rest of the trace, in case scopes diverge. */
+  spans: z.array(spanResourceInfoSchema),
+});
+
+export type TraceResourceInfoDto = z.infer<typeof traceResourceInfoSchema>;
