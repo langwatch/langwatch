@@ -13,7 +13,7 @@ import { paths } from "./shared/paths.ts";
 import { allocatePorts, PORT_BASE_DEFAULT } from "./shared/ports.ts";
 import { detectPlatform } from "./shared/platform.ts";
 import { captureUserEnv, scaffoldEnvFile } from "./shared/env.ts";
-import { placeholderRuntime, type RuntimeApi, type RuntimeContext } from "./shared/runtime-placeholder.ts";
+import { placeholderRuntime, type RuntimeApi, type RuntimeContext, type ServiceHandle } from "./shared/runtime-placeholder.ts";
 
 declare const __LANGWATCH_VERSION__: string;
 const VERSION = typeof __LANGWATCH_VERSION__ !== "undefined" ? __LANGWATCH_VERSION__ : "0.0.0-dev";
@@ -109,6 +109,30 @@ program
       },
     });
 
+    // Register the shutdown handler BEFORE installServices/startAll so a
+    // Ctrl+C during install or boot still tears down anything we've
+    // already spawned. The handles array is populated by `startAll` after
+    // each service comes up; until then the handler closes the events
+    // stream and exits cleanly. Without an early registration, SIGINT
+    // during boot would orphan supervised children (they get reparented
+    // to launchd/init and keep running) and leak postgres/redis/clickhouse
+    // ports across runs.
+    let handles: ServiceHandle[] = [];
+    let shuttingDown = false;
+    const onShutdown = async () => {
+      if (shuttingDown) return;
+      shuttingDown = true;
+      console.log(chalk.yellow("\n  ⏻ shutting down LangWatch..."));
+      installRouter.installFinished();
+      if (handles.length > 0) {
+        await runtime.stopAll(handles).catch(() => undefined);
+      }
+      await eventsStream.catch(() => undefined);
+      process.exit(0);
+    };
+    process.on("SIGINT", onShutdown);
+    process.on("SIGTERM", onShutdown);
+
     try {
       await runtime.installServices(ctx);
     } finally {
@@ -119,20 +143,11 @@ program
     }
     await panelsPromise;
 
-    const handles = await runtime.startAll(ctx);
+    handles = await runtime.startAll(ctx);
     await runtime.waitForHealth(ctx, { timeoutMs: 60_000 });
 
     const url = `http://localhost:${ports.langwatch}`;
     if (opts.open !== false && !process.env.CI) await openBrowser(url);
-
-    const onShutdown = async () => {
-      console.log(chalk.yellow("\n  ⏻ shutting down LangWatch..."));
-      await runtime.stopAll(handles);
-      await eventsStream;
-      process.exit(0);
-    };
-    process.on("SIGINT", onShutdown);
-    process.on("SIGTERM", onShutdown);
 
     // Block forever — drained by the events tee above. SIGINT exits via
     // `onShutdown`; an uncaught crash event in renderEvent ends the

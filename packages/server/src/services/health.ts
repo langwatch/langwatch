@@ -32,11 +32,25 @@ export async function pollUntilHealthy({
   return { ok: false, durationMs: Date.now() - start, reason: `timed out: ${lastReason}` };
 }
 
-export function httpGetCheck(url: string, opts: { expectStatus?: number; expectBodyContains?: string } = {}): HealthCheck {
+export function httpGetCheck(
+  url: string,
+  opts: {
+    expectStatus?: number;
+    expectBodyContains?: string;
+    /** Per-request timeout (default 5s). Without this, a service that
+     *  accept()s the connection but never responds (e.g. ClickHouse during
+     *  startup, Postgres mid-recovery) hangs the whole pollUntilHealthy
+     *  loop and we miss the outer timeout window. */
+    requestTimeoutMs?: number;
+  } = {},
+): HealthCheck {
+  const requestTimeoutMs = opts.requestTimeoutMs ?? 5_000;
   return async () => {
     const start = Date.now();
+    const ac = new AbortController();
+    const timer = setTimeout(() => ac.abort(), requestTimeoutMs);
     try {
-      const res = await fetch(url);
+      const res = await fetch(url, { signal: ac.signal });
       const status = res.status;
       const expected = opts.expectStatus ?? 200;
       if (status !== expected) {
@@ -54,7 +68,12 @@ export function httpGetCheck(url: string, opts: { expectStatus?: number; expectB
       }
       return { ok: true, durationMs: Date.now() - start };
     } catch (err) {
-      return { ok: false, durationMs: Date.now() - start, reason: (err as Error).message };
+      const reason = ac.signal.aborted
+        ? `request timed out after ${requestTimeoutMs}ms`
+        : (err as Error).message;
+      return { ok: false, durationMs: Date.now() - start, reason };
+    } finally {
+      clearTimeout(timer);
     }
   };
 }

@@ -72,7 +72,11 @@ export async function killPidGroups(pids: number[]): Promise<void> {
     try {
       const { stdout } = await execa("ps", ["-o", "pgid=", "-p", String(pid)], { reject: false });
       const pgid = Number.parseInt(stdout.trim(), 10);
-      if (Number.isFinite(pgid)) groups.add(pgid);
+      // 0 / 1 are bogus targets: `process.kill(-0, …)` is `process.kill(0, …)`
+      // which signals THIS process group (us!), and `kill(-1, …)` signals
+      // every process in the system. Either is a foot-gun. Skip them and
+      // skip non-finite values (ps may have raced the pid exiting).
+      if (Number.isFinite(pgid) && pgid > 1) groups.add(pgid);
     } catch {
       // ignore — pid may have already exited
     }
