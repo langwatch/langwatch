@@ -281,11 +281,7 @@ function IngestionSourceDetailPage() {
           {eventsQuery.isLoading && <Spinner size="sm" />}
 
           {!eventsQuery.isLoading && events.length === 0 && (
-            <Text fontSize="sm" color="fg.muted">
-              No events yet. Push an event to{" "}
-              <Code fontSize="xs">/api/ingest/&lt;mode&gt;/{source.id}</Code>{" "}
-              with the source&apos;s bearer secret to start populating.
-            </Text>
+            <EmptyEventsHint source={source} />
           )}
 
           {events.length > 0 && (
@@ -305,6 +301,82 @@ function IngestionSourceDetailPage() {
         onClose={() => setSecretReveal(null)}
       />
     </SettingsLayout>
+  );
+}
+
+function EmptyEventsHint({ source }: { source: Source }) {
+  const baseUrl =
+    typeof window !== "undefined"
+      ? window.location.origin
+      : "https://langwatch.invalid";
+  const isOtel =
+    source.sourceType === "otel_generic" ||
+    source.sourceType === "claude_cowork";
+  const isWebhook = source.sourceType === "workato";
+  const mode = isOtel ? "otel" : isWebhook ? "webhook" : "<mode>";
+  const endpoint = `${baseUrl}/api/ingest/${mode}/${source.id}`;
+  return (
+    <VStack align="stretch" gap={3}>
+      <Text fontSize="sm" color="fg.muted">
+        No events yet. Push an event to{" "}
+        <Code fontSize="xs">{endpoint}</Code> with the source&apos;s
+        bearer secret to start populating.
+      </Text>
+      <Text fontSize="xs" color="fg.muted">
+        Lost the secret? Click <strong>Rotate secret</strong> above —
+        the new bearer is shown once with a copy-paste curl example, and
+        the prior secret stays valid for 24h while you roll the new
+        value through every upstream client.
+      </Text>
+      {isOtel && (
+        <Box
+          borderWidth="1px"
+          borderColor="border.muted"
+          borderRadius="md"
+          padding={3}
+        >
+          <Text fontSize="xs" fontWeight="semibold" color="fg.muted" mb={2}>
+            Minimum viable OTLP body shape (camelCase keys):
+          </Text>
+          <Code
+            display="block"
+            fontSize="xs"
+            whiteSpace="pre"
+            overflowX="auto"
+            padding={2}
+          >{`{
+  "resource_spans": [{
+    "scope_spans": [{
+      "spans": [{
+        "name": "chat.completion",
+        "startTimeUnixNano": "<NOW_NS>",
+        "attributes": [
+          { "key": "gen_ai.request.model",       "value": { "stringValue": "claude-sonnet-4" } },
+          { "key": "gen_ai.usage.input_tokens",  "value": { "intValue": 120 } },
+          { "key": "gen_ai.usage.output_tokens", "value": { "intValue": 480 } },
+          { "key": "gen_ai.usage.cost_usd",      "value": { "doubleValue": 0.025 } },
+          { "key": "user.email",                 "value": { "stringValue": "you@your.org" } }
+        ]
+      }]
+    }]
+  }]
+}`}</Code>
+          <Text fontSize="xs" color="fg.muted" mt={2}>
+            Returns HTTP 202 with{" "}
+            <Code fontSize="xs">events: 1</Code> on success. If you get{" "}
+            <Code fontSize="xs">events: 0</Code> with a hint, the body
+            shape didn&apos;t parse. See the{" "}
+            <Link
+              href="https://docs.langwatch.ai/ai-gateway/governance/ingestion-sources/otel-generic"
+              color="orange.600"
+            >
+              otel-generic docs
+            </Link>{" "}
+            for the full attribute reference.
+          </Text>
+        </Box>
+      )}
+    </VStack>
   );
 }
 
