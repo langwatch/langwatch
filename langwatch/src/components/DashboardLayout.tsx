@@ -13,7 +13,7 @@ import {
 } from "@chakra-ui/react";
 import { OrganizationUserRole } from "@prisma/client";
 import type { Organization, Project, Team } from "@prisma/client";
-import { Activity, ChevronDown, ChevronRight, Info, KeyRound, Plus } from "lucide-react";
+import { Activity, Building2, ChevronDown, ChevronRight, Info, KeyRound, Plus } from "lucide-react";
 import { ErrorBoundary } from "react-error-boundary";
 import { PageErrorFallback } from "./ui/PageErrorFallback";
 import { NotFoundScene } from "~/components/NotFoundScene";
@@ -299,6 +299,16 @@ export type DashboardLayoutProps = {
    * redirect, which would otherwise hijack the route on first paint.
    */
   personalScope?: boolean;
+  /**
+   * Set on org-scope routes (`/governance`) where the page is scoped to
+   * an organization, not a project. Same effect as `personalScope` on
+   * project-redirect gating, but in the header replaces the
+   * `<ProjectSelector>` with a flat org-name indicator (admins crossing
+   * /governance ↔ /:project/* should never see the project picker on
+   * the governance side, since governance is org-scoped, not
+   * project-scoped — see governance-home-routing.feature).
+   */
+  orgScope?: boolean;
 } & StackProps;
 
 export const DashboardLayout = ({
@@ -306,6 +316,7 @@ export const DashboardLayout = ({
   publicPage = false,
   compactMenu: compactMenuProp = false,
   personalScope = false,
+  orgScope = false,
   ...props
 }: DashboardLayoutProps) => {
   // fallback: "lg" tells Chakra to assume large screen during SSR/initial render,
@@ -317,10 +328,11 @@ export const DashboardLayout = ({
 
   const { data: session } = useRequiredSession({ required: !publicPage });
 
+  const bypassProjectGating = personalScope || orgScope;
   const { isLoading, organization, organizations, team, project, organizationRole } =
     useOrganizationTeamProject({
-      redirectToOnboarding: !personalScope,
-      redirectToProjectOnboarding: !personalScope,
+      redirectToOnboarding: !bypassProjectGating,
+      redirectToProjectOnboarding: !bypassProjectGating,
     });
   const { isLiteMember } = useLiteMemberGuard();
   const usage = api.limits.getUsage.useQuery(
@@ -357,6 +369,7 @@ export const DashboardLayout = ({
 
   const isOpsRoute = router.pathname.startsWith("/ops");
   const isPersonalScopeRoute = personalScope || router.pathname.startsWith("/me");
+  const isOrgScopeRoute = orgScope || router.pathname === "/governance";
 
   if (
     !publicPage &&
@@ -364,7 +377,7 @@ export const DashboardLayout = ({
       isLoading ||
       !organization ||
       !organizations ||
-      (!isOpsRoute && !isPersonalScopeRoute && (!team || !project)))
+      (!isOpsRoute && !isPersonalScopeRoute && !isOrgScopeRoute && (!team || !project)))
   ) {
     return <LoadingScreen />;
   }
@@ -472,6 +485,35 @@ export const DashboardLayout = ({
                 <Info size={12} color="var(--chakra-colors-orange-400)" />
                 <Text fontSize="xs" color="orange.400">
                   Platform-wide — not scoped to a project
+                </Text>
+              </HStack>
+            </HStack>
+          ) : isOrgScopeRoute && organization ? (
+            <HStack gap={3} alignItems="center" paddingLeft={2}>
+              <HStack
+                gap={1.5}
+                paddingX={2.5}
+                height="28px"
+                borderRadius="md"
+                bg="bg.emphasized"
+              >
+                <Building2 size={14} />
+                <Text fontSize="sm" fontWeight="medium">
+                  {organization.name}
+                </Text>
+              </HStack>
+              <HStack
+                gap={1.5}
+                paddingX={2.5}
+                height="28px"
+                borderRadius="md"
+                bg="purple.500/8"
+                border="1px solid"
+                borderColor="purple.500/15"
+              >
+                <Info size={12} color="var(--chakra-colors-purple-400)" />
+                <Text fontSize="xs" color="purple.400">
+                  Organization-scoped — not tied to a project
                 </Text>
               </HStack>
             </HStack>

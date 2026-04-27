@@ -133,23 +133,42 @@ Feature: Governance home — route, nav promotion, persona detection
   # Layout — current + future
   # ---------------------------------------------------------------------------
 
-  @bdd @ui @governance-home @layout @current
-  Scenario: /governance currently uses SettingsLayout chrome (transition)
+  @bdd @ui @governance-home @layout
+  Scenario: /governance renders with the GovernanceLayout (top-level chrome)
     When the admin loads "/governance"
-    Then the page renders inside SettingsLayout — the same chrome as
-      every other Settings page
-    # This is INTENTIONAL during the transition. Master_orchestrator
-    # blessed deferring the proper top-level layout (no project picker,
-    # MyLayout-style chrome) to a follow-up iter when the team agrees
-    # on the shape.
+    Then the page renders inside GovernanceLayout — NOT SettingsLayout
+    And the header replaces the per-project ProjectSelector with an
+      org-name chip + "Organization-scoped — not tied to a project"
+      indicator (governance is org-scoped, not project-scoped)
+    And the left rail shows a "GOVERNANCE" section header with these
+      sub-routes:
+      | label             | href                                          |
+      | Overview          | /governance                                   |
+      | Ingestion Sources | /settings/governance/ingestion-sources        |
+      | Anomaly Rules     | /settings/governance/anomaly-rules            |
+      | Routing Policies  | /settings/routing-policies                    |
+    And a footer note explains that sub-pages are admin-config surfaces
+      under Settings, while Overview is the daily-use home
 
-  @bdd @ui @governance-home @layout @future
-  Scenario: Future top-level layout chrome (deferred)
-    Given the team has aligned on the daily-use governance chrome shape
-    When the admin loads "/governance"
-    Then the page renders without the Settings sidebar
-    And without the per-project picker (governance is org-scoped, not
-      project-scoped)
-    And with a thin org-scope shell similar to MyLayout's pattern
-    # Deferred per master_orchestrator's "when the layout is ready"
-    # gate. Tracked as a follow-up slice.
+  @bdd @ui @governance-home @layout @sub-routes
+  Scenario: Admin-authoring sub-routes keep SettingsLayout chrome
+    When the admin clicks "Ingestion Sources" in the GovernanceLayout
+      left rail and lands on "/settings/governance/ingestion-sources"
+    Then the page renders inside SettingsLayout (same chrome as every
+      other Settings page) — NOT GovernanceLayout
+    And the same applies to "/settings/governance/anomaly-rules" and
+      "/settings/routing-policies"
+    # GovernanceLayout owns the daily-use home only. Admin-config
+    # surfaces stay under Settings because they're configuration
+    # entities, not dashboards.
+
+  @bdd @ui @governance-home @layout @bypass-project-redirect
+  Scenario: /governance bypasses the no-project onboarding redirect
+    Given an admin whose org has no projects yet
+    When they navigate to "/governance"
+    Then the GovernanceLayout renders without bouncing them to
+      project-onboarding (DashboardLayout's `orgScope` flag bypasses
+      the `redirectToProjectOnboarding` gate, same effect as
+      `personalScope` for `/me/*` routes)
+    And the org-name chip + indicator render correctly even with
+      project=null

@@ -18,8 +18,8 @@ import {
 import numeral from "numeral";
 import Head from "~/utils/compat/next-head";
 
+import GovernanceLayout from "~/components/governance/GovernanceLayout";
 import { NotFoundScene } from "~/components/NotFoundScene";
-import SettingsLayout from "~/components/SettingsLayout";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { Link } from "~/components/ui/link";
 import { useFeatureFlag } from "~/hooks/useFeatureFlag";
@@ -114,7 +114,7 @@ function GovernanceOverviewPage() {
       summary.openAnomalyCount > 0);
 
   return (
-    <SettingsLayout>
+    <GovernanceLayout>
       <Head>
         <title>Governance · LangWatch</title>
       </Head>
@@ -287,7 +287,7 @@ function GovernanceOverviewPage() {
           )}
         </SectionCard>
       </VStack>
-    </SettingsLayout>
+    </GovernanceLayout>
   );
 }
 
