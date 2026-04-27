@@ -173,10 +173,26 @@ app.post("/otel/:sourceId", async (c: Context) => {
     "otel ingest received",
   );
 
-  return c.json(
-    { accepted: true, bytes: bodyBytes, events: eventCount },
-    202,
-  );
+  // Onboarding-friendly hint: a body arrived but produced zero events.
+  // The receiver still 202-acks (production traffic mustn't be retried
+  // because of one bad span), but during first-event setup this silent
+  // success is the #1 reason fresh users think it works and then get
+  // confused that the dashboard stays empty. Surface a concrete next
+  // step in the response — link to the OTLP shape docs page Andre
+  // shipped in bugbash batch 2.
+  const body: Record<string, unknown> = {
+    accepted: true,
+    bytes: bodyBytes,
+    events: eventCount,
+  };
+  if (bodyBytes > 0 && eventCount === 0) {
+    body.hint =
+      "Body received but no spans extracted. OTLP/HTTP expects " +
+      "resource_spans[].scope_spans[].spans[] with non-empty spans " +
+      "arrays. See https://docs.langwatch.ai/ai-gateway/governance/" +
+      "ingestion-sources/otel-generic for a copy-paste curl.";
+  }
+  return c.json(body, 202);
 });
 
 // ---------------------------------------------------------------------------

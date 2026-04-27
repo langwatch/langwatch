@@ -605,14 +605,12 @@ interface FieldDef {
 }
 
 const PARSER_FIELDS: Record<SourceType, FieldDef[]> = {
-  otel_generic: [
-    {
-      key: "allowedSourceTypeLabel",
-      label: "Expected SourceType label (optional)",
-      placeholder: "Optional source-type label",
-      hint: "If set, only events whose `LangWatchSourceType` attribute matches this label are accepted. Leave blank to accept any.",
-    },
-  ],
+  // No parser-config fields for generic OTel sources today — the
+  // receiver accepts any well-formed OTLP/HTTP body. (Earlier copy
+  // referenced a `LangWatchSourceType` attribute filter that the
+  // normaliser doesn't actually implement; removed during bugbash so
+  // the composer doesn't promise behaviour we don't ship.)
+  otel_generic: [],
   claude_cowork: [
     {
       key: "workspaceId",
@@ -741,6 +739,7 @@ function ParserConfigFields({
   onChange: (next: Record<string, string>) => void;
 }) {
   const fields = PARSER_FIELDS[sourceType];
+  if (fields.length === 0) return null;
   return (
     <VStack align="stretch" gap={3}>
       <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
@@ -947,6 +946,6 @@ function SecretModal({
   );
 }
 
-export default withPermissionGuard("organization:manage", {})(
+export default withPermissionGuard("organization:manage", { bypassOnboardingRedirect: true })(
   IngestionSourcesPage,
 );
