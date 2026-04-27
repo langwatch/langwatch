@@ -33,7 +33,11 @@ import type { IngestionSource } from "@prisma/client";
 import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
 import { IngestionSourceService } from "~/server/governance/activity-monitor/ingestionSource.service";
-import { normalizeOtlpJson } from "~/server/governance/activity-monitor/normalizers/otel";
+import { normalizeOtlpRequest } from "~/server/governance/activity-monitor/normalizers/otel";
+import {
+  parseOtlpTraces,
+  readOtlpBody,
+} from "~/server/otel/parseOtlpBody";
 import { createLogger } from "~/utils/logger/server";
 
 /**
@@ -118,43 +122,61 @@ app.post("/otel/:sourceId", async (c: Context) => {
   // retry-bomb us); the source's lastEventAt still flips synchronously
   // so the admin sees the connection is alive. The map projection
   // writes the row to gateway_activity_events.
+  //
+  // Body read + decompress + protobuf/JSON parse all run through the
+  // shared src/server/otel helper so this path matches /api/otel/v1/traces
+  // for gzip / deflate / brotli + protobuf + JSON-then-protobuf-encode
+  // fallback. OCSF mapping is the only governance-specific step
+  // downstream.
   let bodyBytes = 0;
   let eventCount = 0;
-  let raw = "";
+  let parseHint: string | undefined;
   const eventLogProjectId = await resolveEventLogProjectId(source);
   try {
-    raw = await c.req.text();
-    bodyBytes = raw.length;
-    const events = normalizeOtlpJson(source, raw);
-    eventCount = events.length;
-    if (!eventLogProjectId) {
+    const body = await readOtlpBody(c.req.raw);
+    bodyBytes = body.byteLength;
+    const parsed = parseOtlpTraces(body, c.req.header("content-type"));
+    if (!parsed.ok) {
+      parseHint = parsed.error;
       logger.warn(
-        { sourceId: source.id, organizationId: source.organizationId },
-        "no project in org — activity events not enqueued (lastEventAt still flips)",
+        { sourceId: source.id, err: parsed.error },
+        "otel ingest body did not parse as OTLP (still ack'ing)",
       );
     } else {
-      const occurredAt = Date.now();
-      for (const ev of events) {
-        await getApp().activityMonitor.recordActivityEvent({
-          tenantId: eventLogProjectId,
-          occurredAt,
-          sourceId: source.id,
-          organizationId: source.organizationId,
-          sourceType: ev.sourceType,
-          eventType: ev.eventType,
-          eventId: ev.eventId,
-          actor: ev.actor ?? "",
-          action: ev.action ?? "",
-          target: ev.target ?? "",
-          costUsd: ev.costUsd,
-          tokensInput: ev.tokensInput ?? 0,
-          tokensOutput: ev.tokensOutput ?? 0,
-          rawPayload: ev.rawPayload ?? "",
-          eventTimestampMs: ev.eventTimestamp.getTime(),
-        });
+      const rawPayload =
+        bodyBytes > 0 ? Buffer.from(body).toString("utf-8") : "";
+      const events = normalizeOtlpRequest(source, parsed.request, rawPayload);
+      eventCount = events.length;
+      if (!eventLogProjectId) {
+        logger.warn(
+          { sourceId: source.id, organizationId: source.organizationId },
+          "no project in org — activity events not enqueued (lastEventAt still flips)",
+        );
+      } else {
+        const occurredAt = Date.now();
+        for (const ev of events) {
+          await getApp().activityMonitor.recordActivityEvent({
+            tenantId: eventLogProjectId,
+            occurredAt,
+            sourceId: source.id,
+            organizationId: source.organizationId,
+            sourceType: ev.sourceType,
+            eventType: ev.eventType,
+            eventId: ev.eventId,
+            actor: ev.actor ?? "",
+            action: ev.action ?? "",
+            target: ev.target ?? "",
+            costUsd: ev.costUsd,
+            tokensInput: ev.tokensInput ?? 0,
+            tokensOutput: ev.tokensOutput ?? 0,
+            rawPayload: ev.rawPayload ?? "",
+            eventTimestampMs: ev.eventTimestamp.getTime(),
+          });
+        }
       }
     }
   } catch (err) {
+    parseHint = String(err);
     logger.warn(
       { sourceId: source.id, err: String(err) },
       "otel ingest enqueue failed (still ack'ing)",
@@ -173,26 +195,28 @@ app.post("/otel/:sourceId", async (c: Context) => {
     "otel ingest received",
   );
 
-  // Onboarding-friendly hint: a body arrived but produced zero events.
+  // Onboarding-friendly hint: body present but produced zero events.
   // The receiver still 202-acks (production traffic mustn't be retried
   // because of one bad span), but during first-event setup this silent
   // success is the #1 reason fresh users think it works and then get
-  // confused that the dashboard stays empty. Surface a concrete next
-  // step in the response — link to the OTLP shape docs page Andre
-  // shipped in bugbash batch 2.
-  const body: Record<string, unknown> = {
+  // confused that the dashboard stays empty. parseHint surfaces the
+  // concrete reason (unsupported Content-Encoding, malformed protobuf,
+  // JSON that doesn't decode) when set; otherwise we fall back to the
+  // generic "shape doesn't carry spans" hint.
+  const responseBody: Record<string, unknown> = {
     accepted: true,
     bytes: bodyBytes,
     events: eventCount,
   };
-  if (bodyBytes > 0 && eventCount === 0) {
-    body.hint =
-      "Body received but no spans extracted. OTLP/HTTP expects " +
-      "resource_spans[].scope_spans[].spans[] with non-empty spans " +
-      "arrays. See https://docs.langwatch.ai/ai-gateway/governance/" +
-      "ingestion-sources/otel-generic for a copy-paste curl.";
+  if (eventCount === 0 && (parseHint || bodyBytes > 0)) {
+    responseBody.hint = parseHint
+      ? `Body did not parse as OTLP/HTTP: ${parseHint}. See https://docs.langwatch.ai/observability/trace-vs-activity-ingestion for the canonical shape.`
+      : "Body received but no spans extracted. OTLP/HTTP expects " +
+        "resource_spans[].scope_spans[].spans[] with non-empty spans " +
+        "arrays. See https://docs.langwatch.ai/ai-gateway/governance/" +
+        "ingestion-sources/otel-generic for a copy-paste curl.";
   }
-  return c.json(body, 202);
+  return c.json(responseBody, 202);
 });
 
 // ---------------------------------------------------------------------------

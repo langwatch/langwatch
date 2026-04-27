@@ -2,83 +2,56 @@
  * OTel passthrough normaliser — minimal MVP for the otel_generic +
  * claude_cowork SourceType receivers.
  *
- * Scope: parse an OTLP/HTTP body (JSON-encoded resource_spans), emit
- * one ActivityEventRow per span. Per-platform attribute extraction
+ * Scope: take a canonical OTLP traces export request (shared parser
+ * output, see src/server/otel/parseOtlpBody.ts) and emit one
+ * ActivityEventRow per span. Per-platform attribute extraction
  * (Cowork's tool_use spans, Workato's recipe events) lives in
  * platform-specific normalisers that ship in follow-up adapter slices.
+ *
+ * This module deliberately does NOT parse the wire body — that's
+ * shared between /api/otel/v1/traces and /api/ingest/otel/:sourceId
+ * via the canonical OTLP-transformer parser. We consume the parsed
+ * IExportTraceServiceRequest directly. Master directive 2026-04-27:
+ * shared core for OTLP body parse, separate downstream pipelines.
  *
  * Spec: docs/ai-gateway/governance/architecture.md (OCSF + AOS schema)
  */
 import { randomUUID } from "crypto";
 
 import type { IngestionSource } from "@prisma/client";
+import type {
+  IExportTraceServiceRequest,
+  IKeyValue,
+  ISpan,
+} from "@opentelemetry/otlp-transformer";
 
 import type { ActivityEventRow } from "../activityEvent.repository";
 
-interface OtlpAttribute {
-  key: string;
-  value?: { stringValue?: string; intValue?: number; doubleValue?: number };
-}
-
-interface OtlpSpan {
-  spanId?: string;
-  traceId?: string;
-  name?: string;
-  startTimeUnixNano?: string;
-  attributes?: OtlpAttribute[];
-}
-
-interface OtlpScopeSpans {
-  spans?: OtlpSpan[];
-}
-
-interface OtlpResourceSpans {
-  resource?: { attributes?: OtlpAttribute[] };
-  scope_spans?: OtlpScopeSpans[];
-  scopeSpans?: OtlpScopeSpans[];
-}
-
-interface OtlpBody {
-  resource_spans?: OtlpResourceSpans[];
-  resourceSpans?: OtlpResourceSpans[];
-}
-
 /**
- * Parse a JSON OTLP body and emit one normalised event per span.
- * Empty / malformed payloads return an empty array — receivers still
- * 202-ack so upstream platforms don't retry-bomb us.
+ * Map a parsed OTLP traces export request to a flat list of OCSF
+ * ActivityEventRows. Empty / spanless requests return [] — receivers
+ * still 202-ack so upstream platforms don't retry-bomb us.
  */
-export function normalizeOtlpJson(
+export function normalizeOtlpRequest(
   source: IngestionSource,
-  rawBody: string,
+  request: IExportTraceServiceRequest,
+  rawPayload: string,
 ): ActivityEventRow[] {
-  let parsed: OtlpBody;
-  try {
-    parsed = JSON.parse(rawBody) as OtlpBody;
-  } catch {
-    return [];
-  }
-
-  const resourceSpans = parsed.resource_spans ?? parsed.resourceSpans ?? [];
   const events: ActivityEventRow[] = [];
-
-  for (const rs of resourceSpans) {
+  for (const rs of request.resourceSpans ?? []) {
     const resourceAttrs = attrsToMap(rs.resource?.attributes);
-    const scopeSpans = rs.scope_spans ?? rs.scopeSpans ?? [];
-    for (const ss of scopeSpans) {
-      const spans = ss.spans ?? [];
-      for (const span of spans) {
-        events.push(spanToActivityEvent(source, span, resourceAttrs, rawBody));
+    for (const ss of rs.scopeSpans ?? []) {
+      for (const span of ss.spans ?? []) {
+        events.push(spanToActivityEvent(source, span, resourceAttrs, rawPayload));
       }
     }
   }
-
   return events;
 }
 
 function spanToActivityEvent(
   source: IngestionSource,
-  span: OtlpSpan,
+  span: ISpan,
   resourceAttrs: Record<string, string>,
   rawPayload: string,
 ): ActivityEventRow {
@@ -89,7 +62,7 @@ function spanToActivityEvent(
     organizationId: source.organizationId,
     sourceType: source.sourceType,
     sourceId: source.id,
-    eventId: span.spanId ?? span.traceId ?? randomUUID(),
+    eventId: bytesToHex(span.spanId) || bytesToHex(span.traceId) || randomUUID(),
     eventType: deriveEventType(span.name, all),
     actor: pickActor(all),
     action: span.name ?? "",
@@ -102,18 +75,37 @@ function spanToActivityEvent(
   };
 }
 
+/**
+ * IKeyValue.value can carry stringValue / intValue / doubleValue /
+ * boolValue / arrayValue / kvlistValue / bytesValue. We flatten to a
+ * string for the OCSF mapping; non-scalar shapes (arrays/kvlists) are
+ * skipped today. intValue from protobuf-decoded payloads can arrive
+ * as Long.js / number / string depending on encoding — coerce via
+ * String() rather than typeof checks so all three work.
+ */
 function attrsToMap(
-  attrs: OtlpAttribute[] | undefined,
+  attrs: IKeyValue[] | null | undefined,
 ): Record<string, string> {
   const map: Record<string, string> = {};
   if (!attrs) return map;
   for (const attr of attrs) {
-    if (typeof attr.value?.stringValue === "string") {
-      map[attr.key] = attr.value.stringValue;
-    } else if (typeof attr.value?.intValue === "number") {
-      map[attr.key] = String(attr.value.intValue);
-    } else if (typeof attr.value?.doubleValue === "number") {
-      map[attr.key] = String(attr.value.doubleValue);
+    const v = attr.value;
+    if (!v) continue;
+    if (typeof v.stringValue === "string") {
+      map[attr.key] = v.stringValue;
+      continue;
+    }
+    if (v.intValue !== null && v.intValue !== undefined) {
+      map[attr.key] = String(v.intValue);
+      continue;
+    }
+    if (typeof v.doubleValue === "number") {
+      map[attr.key] = String(v.doubleValue);
+      continue;
+    }
+    if (typeof v.boolValue === "boolean") {
+      map[attr.key] = String(v.boolValue);
+      continue;
     }
   }
   return map;
@@ -196,9 +188,37 @@ function pickTokens(
   return 0;
 }
 
-function parseSpanStart(startTimeUnixNano: string | undefined): Date {
-  if (!startTimeUnixNano) return new Date();
-  const ns = BigInt(startTimeUnixNano);
-  const ms = Number(ns / 1_000_000n);
-  return new Date(ms);
+/**
+ * span.startTimeUnixNano arrives as Long | string | number depending
+ * on whether the body came via protobuf (Long) or JSON (string).
+ * Coerce to BigInt via String() then divide for ms.
+ */
+function parseSpanStart(
+  startTimeUnixNano: ISpan["startTimeUnixNano"] | undefined,
+): Date {
+  if (startTimeUnixNano === undefined || startTimeUnixNano === null) {
+    return new Date();
+  }
+  try {
+    const ns = BigInt(String(startTimeUnixNano));
+    if (ns === 0n) return new Date();
+    const ms = Number(ns / 1_000_000n);
+    return new Date(ms);
+  } catch {
+    return new Date();
+  }
+}
+
+/**
+ * span.spanId / traceId arrive as Uint8Array on protobuf-decoded
+ * bodies, or as a hex string on JSON bodies. Render to a stable hex
+ * string for the eventId.
+ */
+function bytesToHex(value: ISpan["spanId"] | undefined): string {
+  if (!value) return "";
+  if (typeof value === "string") return value;
+  if (value instanceof Uint8Array) {
+    return Buffer.from(value).toString("hex");
+  }
+  return "";
 }
