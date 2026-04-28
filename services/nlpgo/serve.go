@@ -14,8 +14,22 @@ import (
 )
 
 // Serve wires the app into HTTP transport and lifecycle management,
-// blocking until shutdown. The uvicorn child is started first so the
-// reverse proxy is healthy when the HTTP listener starts accepting.
+// blocking until shutdown.
+//
+// Service ordering is load-bearing on AWS Lambda: the HTTP listener must
+// bind $PORT before the uvicorn-child waitHealthy poll runs, otherwise
+// the Lambda init phase (10-second hard limit) times out before the
+// adapter sees the port. With the listener up first, init completes in
+// milliseconds and the uvicorn-child startup happens in the background;
+// /go/* paths (the FF-on hot path) work immediately because they don't
+// touch the proxy, and /studio/* fall-through traffic gets a typed 503
+// from the proxy until the child reports healthy.
+//
+// Pre-fix shape registered Worker("uvicorn-child") before
+// ListenServer("http"); on Lambda this caused INIT_REPORT timeouts at
+// 9999ms and an account-level concurrency exhaustion cascade as failed
+// inits retried (~333→1000 ConcurrentExecutions during the prod incident
+// observed at 18:13 UTC after PR langwatch-saas#473 deployed).
 //
 // `playground` may be nil in test contexts that don't exercise the
 // /go/proxy/v1/* path; the handler falls back to a typed 501 in that
@@ -47,12 +61,24 @@ func Serve(ctx context.Context, application *app.App, deps *Deps, cfg Config, pl
 	)
 	g.Add(
 		lifecycle.Closer("otel", deps.OTel.Shutdown),
-		lifecycle.Worker("uvicorn-child", func(ctx context.Context) {
-			if err := deps.Child.Start(ctx); err != nil {
-				deps.Logger.Error("uvicorn_child_start_failed", zap.Error(err))
-			}
-		}, deps.Child.Stop),
+		// HTTP listener binds $PORT first — Lambda init only needs the
+		// port to be bound, not the upstream proxy to be live. This
+		// keeps init under the 10s ceiling regardless of how long the
+		// python child takes to import litellm + langwatch_nlp.
 		lifecycle.ListenServer("http", srv),
+		// Uvicorn-child starts in the background; the worker startFn
+		// returns immediately so it doesn't block the lifecycle group.
+		// Manager.Start internally polls /health and writes
+		// uvicorn_child_ready on success; until then the proxy fall-
+		// through returns a typed 503 so callers can retry instead of
+		// hanging on a stalled connection.
+		lifecycle.Worker("uvicorn-child", func(ctx context.Context) {
+			go func() {
+				if err := deps.Child.Start(ctx); err != nil {
+					deps.Logger.Error("uvicorn_child_start_failed", zap.Error(err))
+				}
+			}()
+		}, deps.Child.Stop),
 	)
 	return g.Run(ctx)
 }
