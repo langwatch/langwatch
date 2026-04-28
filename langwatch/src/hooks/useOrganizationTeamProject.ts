@@ -259,10 +259,12 @@ export const useOrganizationTeamProject = (
       finalProject.slug !== router.query.project
     ) {
       // Preserve the sub-path so /bad-slug/messages → /good-slug/messages
+      // Decode pathname so that URL-encoded slugs like /%5Bproject%5D match the decoded oldPrefix
       const url = new URL(router.asPath, window.location.origin);
       const oldPrefix = `/${router.query.project as string}`;
-      const subPath = url.pathname.startsWith(oldPrefix)
-        ? url.pathname.slice(oldPrefix.length)
+      const decodedPathname = decodeURIComponent(url.pathname);
+      const subPath = decodedPathname.startsWith(oldPrefix)
+        ? decodedPathname.slice(oldPrefix.length)
         : "";
       void router.push(`/${finalProject.slug}${subPath}${url.search}`);
     }
