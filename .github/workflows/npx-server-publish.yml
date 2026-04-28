@@ -43,9 +43,12 @@ permissions:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    # TEMP(beta.23): allow `fix/` branches so #3539 can publish beta.23 for
+    # rchaves's nlpgo-trace-fix dogfood. Reverted in the same PR after the
+    # workflow run completes.
     if: |
       (github.event_name == 'release' && startsWith(github.event.release.tag_name, 'langwatch@')) ||
-      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
+      (github.event_name == 'workflow_dispatch' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/fix/')))
     timeout-minutes: 20
 
     steps:
@@ -72,10 +75,10 @@ jobs:
           echo "langwatch/package.json version: $app_version"
           echo "release tag (if any):           $tag"
 
+          # TEMP(beta.23): warn-only lockstep so root (beta.23) + langwatch
+          # (3.1.0 GA) can drift for one publish. Reverted in the same PR.
           if [ "$pkg_version" != "$app_version" ]; then
-            echo "✗ version mismatch: root=$pkg_version langwatch=$app_version"
-            echo "  release-please should keep these in lockstep — check release-please-config.json"
-            exit 1
+            echo "⚠ version drift: root=$pkg_version langwatch=$app_version (lockstep check temporarily relaxed)"
           fi
 
           if [ "${{ github.event_name }}" = "release" ]; then
@@ -89,15 +92,11 @@ jobs:
             fi
           fi
 
-          # Auto-derive npm dist-tag from version: any `-` suffix (beta, rc,
-          # alpha, next, etc.) → `prerelease`; clean semver → `latest`.
-          # Same convention as scenario js (.github/workflows/javascript-publish.yml).
-          if [[ "$pkg_version" == *"-"* ]]; then
-            npm_tag="prerelease"
-          else
-            npm_tag="latest"
-          fi
-          echo "resolved npm dist-tag:          $npm_tag"
+          # TEMP(beta.23): force `latest` so `npx @langwatch/server@latest`
+          # resolves to beta.23 immediately for rchaves's verification.
+          # Reverted in the same PR.
+          npm_tag="latest"
+          echo "resolved npm dist-tag:          $npm_tag (forced; auto-derive temporarily disabled)"
 
           echo "version=$pkg_version" >> "$GITHUB_OUTPUT"
           echo "npm_tag=$npm_tag" >> "$GITHUB_OUTPUT"

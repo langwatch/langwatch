@@ -57,6 +57,17 @@ export async function startNlpgo(
         // agent-workflow callbacks. /api/* routes terminate inside the
         // langwatch process.
         NLPGO_ENGINE_LANGWATCH_BASE_URL: `http://127.0.0.1:${ctx.ports.langwatch}`,
+        // OTel exporter target — nlpgo's configureNLPGoOTel reads this
+        // (preferred) or OTEL_OTLP_ENDPOINT (fallback) and appends
+        // /api/otel/v1/traces. With MultiTenant=true (hardcoded in
+        // nlpgo's deps.go), the per-tenant tenant_router pulls
+        // workflow.api_key from the request context and authenticates
+        // each batch as the right project — no static auth header
+        // needed from this side. envFromFile already carries this var
+        // (see shared/env.ts), but we set it explicitly here so an
+        // older ~/.langwatch/.env that pre-dates the variable still
+        // gets the right value at boot.
+        LANGWATCH_ENDPOINT: `http://127.0.0.1:${ctx.ports.langwatch}`,
         LOG_FORMAT: "pretty",
       },
     },
