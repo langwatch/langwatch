@@ -1,7 +1,7 @@
 import type { Row } from "@tanstack/react-table";
 import React from "react";
 import { useDensityTokens } from "../../../hooks/useDensityTokens";
-import { useUIStore } from "../../../stores/uiStore";
+import { useViewStore } from "../../../stores/viewStore";
 import type { TraceStatus } from "../../../types/trace";
 import { Tbody, Td, Tr } from "../TablePrimitives";
 import { ROW_STYLES, StatusRowGroup, rowVariantFor } from "../StatusRow";
@@ -14,25 +14,22 @@ interface RegistryRowProps<TRow> {
   addons: string[];
   status: TraceStatus;
   /**
-   * `unified` — main row + addon rows are visually grouped. Hover and isNew
-   * animation apply across all rows. Use for trace rows where IO preview /
-   * peek / error detail belong to the same unit.
-   *
-   * `split` — main row hovers independently. Addons render their own
-   * sub-rows and manage their own interactions. Use for conversation /
-   * group rows where the expansion contents (turns / nested traces) have
-   * their own selection state.
+   * `unified` groups the main row and addon rows under one hover/animation
+   * scope (trace lens). `split` lets the main row hover independently while
+   * addons own their own interactions (conversation/group lens).
    */
   hoverScope: "unified" | "split";
   isSelected?: boolean;
   isFocused?: boolean;
   isExpanded?: boolean;
   isNew?: boolean;
-  /** Stable identifier used for data-trace-id attribute and isNew animation targeting. */
   rowDomId?: string;
   onSelect?: () => void;
   onTogglePeek?: () => void;
   onToggleExpand?: () => void;
+  /** Forwarded to the outer <tbody> so the virtualizer can measure each row. */
+  ref?: React.Ref<HTMLTableSectionElement>;
+  "data-index"?: number;
 }
 
 export function RegistryRow<TRow>({
@@ -49,9 +46,11 @@ export function RegistryRow<TRow>({
   onSelect,
   onTogglePeek,
   onToggleExpand,
+  ref,
+  "data-index": dataIndex,
 }: RegistryRowProps<TRow>): React.ReactElement {
   const tokens = useDensityTokens();
-  const densityMode = useUIStore((s) => s.density);
+  const densityMode = useViewStore((s) => s.density);
 
   const variant = rowVariantFor({ isSelected, status });
   const style = ROW_STYLES[variant];
@@ -138,6 +137,8 @@ export function RegistryRow<TRow>({
   if (hoverScope === "unified") {
     return (
       <StatusRowGroup
+        ref={ref}
+        data-index={dataIndex}
         style={style}
         onClick={onSelect}
         traceId={rowDomId}
@@ -150,7 +151,11 @@ export function RegistryRow<TRow>({
   }
 
   return (
-    <Tbody css={{ "& > tr, & > tr > td": { transition: "none" } }}>
+    <Tbody
+      ref={ref}
+      data-index={dataIndex}
+      css={{ "& > tr, & > tr > td": { transition: "none" } }}
+    >
       {mainRow}
       {addonRows}
     </Tbody>

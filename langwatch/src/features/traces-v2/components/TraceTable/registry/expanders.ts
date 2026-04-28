@@ -5,14 +5,12 @@ import {
   makeEvalColumnDef,
   makeEventColumnDef,
 } from "../columns";
-import {
-  ErrorTextCell,
-  InputCell,
-  OutputCell,
-  SpanNameCell,
-  SpanTypeCell,
-  TraceIdCell,
-} from "./cells/trace";
+import { ErrorTextCell } from "./cells/trace/ErrorTextCell";
+import { InputCell } from "./cells/trace/InputCell";
+import { OutputCell } from "./cells/trace/OutputCell";
+import { SpanNameCell } from "./cells/trace/SpanNameCell";
+import { SpanTypeCell } from "./cells/trace/SpanTypeCell";
+import { TraceIdCell } from "./cells/trace/TraceIdCell";
 import {
   makeEvalCellDef,
   uniqueEvaluators,
@@ -70,11 +68,6 @@ export const traceComfortableExpanders: Record<
     })),
 };
 
-/**
- * Expand a lens's logical column ids into the concrete columns that should
- * render in comfortable density. Logical ids without an expander pass through
- * with their default column def + cell def.
- */
 export function expandTraceColumns(
   logicalIds: string[],
   rows: TraceListItem[],

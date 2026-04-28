@@ -6,19 +6,23 @@ import { useTraceNewCount } from "../../hooks/useTraceNewCount";
 
 const SCROLL_THRESHOLD_PX = 80;
 
+const ORB_KEYFRAMES = {
+  "@keyframes tracesV2OrbMorph": {
+    "0%, 100%": { borderRadius: "60% 40% 55% 45% / 50% 60% 40% 50%" },
+    "25%": { borderRadius: "44% 56% 68% 32% / 52% 42% 58% 48%" },
+    "50%": { borderRadius: "52% 48% 30% 70% / 60% 50% 50% 40%" },
+    "75%": { borderRadius: "70% 30% 48% 52% / 40% 62% 48% 60%" },
+  },
+  "@keyframes tracesV2OrbBob": {
+    "0%, 100%": { transform: "scale(1)" },
+    "50%": { transform: "scale(1.05)" },
+  },
+} as const;
+
 interface NewTracesScrollUpIndicatorProps {
   scrollRef: React.RefObject<HTMLDivElement | null>;
 }
 
-/**
- * Floating wavy-orb that appears when there are unacknowledged new traces
- * AND the user has scrolled away from the top of the table. Click scrolls
- * smoothly back to the top and acknowledges the count so it dismisses.
- *
- * The orb has two layered animations:
- *   - tracesV2OrbMorph: animates border-radius to give a fluid, organic shape
- *   - tracesV2OrbBob: a gentle scale + translate breathing motion
- */
 export const NewTracesScrollUpIndicator: React.FC<
   NewTracesScrollUpIndicatorProps
 > = ({ scrollRef }) => {
@@ -40,6 +44,8 @@ export const NewTracesScrollUpIndicator: React.FC<
     scrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
     acknowledge();
   };
+
+  const ariaLabel = `${count} new trace${count === 1 ? "" : "s"} above — scroll up`;
 
   return (
     <Box
@@ -63,7 +69,7 @@ export const NewTracesScrollUpIndicator: React.FC<
         pointerEvents="auto"
         role="status"
         aria-live="polite"
-        aria-label={`${count} new trace${count === 1 ? "" : "s"} above — scroll up`}
+        aria-label={ariaLabel}
         css={{
           background:
             "radial-gradient(circle at 30% 25%, rgba(147,197,253,0.95), rgba(37,99,235,0.78) 70%)",
@@ -72,24 +78,7 @@ export const NewTracesScrollUpIndicator: React.FC<
           backdropFilter: "blur(6px)",
           animation:
             "tracesV2OrbMorph 5.5s ease-in-out infinite, tracesV2OrbBob 2.6s ease-in-out infinite",
-          "@keyframes tracesV2OrbMorph": {
-            "0%, 100%": {
-              borderRadius: "60% 40% 55% 45% / 50% 60% 40% 50%",
-            },
-            "25%": {
-              borderRadius: "44% 56% 68% 32% / 52% 42% 58% 48%",
-            },
-            "50%": {
-              borderRadius: "52% 48% 30% 70% / 60% 50% 50% 40%",
-            },
-            "75%": {
-              borderRadius: "70% 30% 48% 52% / 40% 62% 48% 60%",
-            },
-          },
-          "@keyframes tracesV2OrbBob": {
-            "0%, 100%": { transform: "scale(1)" },
-            "50%": { transform: "scale(1.05)" },
-          },
+          ...ORB_KEYFRAMES,
           transition: "filter 180ms ease-out",
         }}
         _hover={{ filter: "brightness(1.1)" }}

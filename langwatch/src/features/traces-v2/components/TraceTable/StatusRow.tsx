@@ -55,6 +55,9 @@ interface StatusRowGroupProps {
   traceId?: string;
   isNew?: boolean;
   children: React.ReactNode;
+  ref?: React.Ref<HTMLTableSectionElement>;
+  /** Set by virtualizer; used by `measureElement` to look up the row index. */
+  "data-index"?: number;
 }
 
 export const StatusRowGroup: React.FC<StatusRowGroupProps> = ({
@@ -63,8 +66,12 @@ export const StatusRowGroup: React.FC<StatusRowGroupProps> = ({
   traceId,
   isNew = false,
   children,
+  ref,
+  "data-index": dataIndex,
 }) => (
   <Tbody
+    ref={ref}
+    data-index={dataIndex}
     onClick={onClick}
     data-trace-id={traceId}
     data-new={isNew ? "true" : undefined}

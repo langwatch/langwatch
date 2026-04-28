@@ -13,14 +13,23 @@ import { MonoCell } from "../../../MonoCell";
 import type { ConversationGroup } from "../../../conversationGroups";
 import type { CellDef } from "../../types";
 
+interface ConversationIO {
+  input: string | null;
+  output: string | null;
+  hasContent: boolean;
+}
+
+function conversationIO(group: ConversationGroup): ConversationIO {
+  const input = group.traces[0]?.input ?? group.lastMessage ?? null;
+  const output = group.lastOutput || null;
+  return { input, output, hasContent: input !== null || output !== null };
+}
+
 export const ConversationCell: CellDef<ConversationGroup> = {
   id: "conversation",
   label: "Conversation",
   render: ({ row, isExpanded }) => {
-    const firstInput = row.traces[0]?.input ?? row.lastMessage ?? null;
-    const lastOutput = row.lastOutput || null;
-    const hasIO = firstInput !== null || lastOutput !== null;
-
+    const io = conversationIO(row);
     return (
       <HStack gap={2} align="start" width="full" minWidth={0}>
         <Icon boxSize="14px" color="fg.subtle" flexShrink={0} marginTop="2px">
@@ -30,8 +39,8 @@ export const ConversationCell: CellDef<ConversationGroup> = {
           {truncateId(row.conversationId)}
         </MonoCell>
         <Box flex={1} minWidth={0}>
-          {hasIO ? (
-            <IOPreview input={firstInput} output={lastOutput} />
+          {io.hasContent ? (
+            <IOPreview input={io.input} output={io.output} />
           ) : (
             <Text textStyle="xs" color="fg.subtle">
               —
@@ -43,9 +52,7 @@ export const ConversationCell: CellDef<ConversationGroup> = {
     );
   },
   renderComfortable: ({ row, isExpanded }) => {
-    const firstInput = row.traces[0]?.input ?? row.lastMessage ?? null;
-    const lastOutput = row.lastOutput || null;
-    const hasIO = firstInput !== null || lastOutput !== null;
+    const io = conversationIO(row);
     return (
       <HStack gap={3} align="start" width="full" minWidth={0}>
         <Icon boxSize="16px" color="fg.subtle" flexShrink={0} marginTop="3px">
@@ -62,8 +69,8 @@ export const ConversationCell: CellDef<ConversationGroup> = {
           {truncateId(row.conversationId)}
         </Text>
         <Box flex={1} minWidth={0}>
-          {hasIO ? (
-            <IOPreview input={firstInput} output={lastOutput} />
+          {io.hasContent ? (
+            <IOPreview input={io.input} output={io.output} />
           ) : (
             <Text textStyle="sm" color="fg.subtle">
               —

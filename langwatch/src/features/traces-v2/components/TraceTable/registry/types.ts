@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import type { Row } from "@tanstack/react-table";
 import type { DensityTokens } from "../../../hooks/useDensityTokens";
-import type { Density } from "../../../stores/uiStore";
+import type { Density } from "../../../stores/viewStore";
 import type { RowStyle } from "../StatusRow";
 
 export type RowKind = "trace" | "conversation" | "group";

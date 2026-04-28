@@ -10,11 +10,14 @@ import {
   formatRelativeTime,
   formatTokens,
 } from "../../../../../utils/formatters";
+import { truncateText } from "../../../chatContent";
 import { MonoCell } from "../../../MonoCell";
-import { ROW_STYLES, StatusDot } from "../../../StatusRow";
+import { ROW_STYLES, StatusDot, rowVariantFor } from "../../../StatusRow";
 import { Td, Tr } from "../../../TablePrimitives";
 import type { TraceGroup } from "../../cells/group/types";
 import type { AddonDef } from "../../types";
+
+const INPUT_PREVIEW_LIMIT = 60;
 
 export const GroupTracesAddon: AddonDef<TraceGroup> = {
   id: "group-traces",
@@ -35,32 +38,29 @@ export const GroupTracesAddon: AddonDef<TraceGroup> = {
   ),
 };
 
-const GroupedTraceRow: React.FC<{
+interface GroupedTraceRowProps {
   trace: TraceListItem;
   groupBy: TraceGroup["groupBy"];
   colCount: number;
   density: DensityTokens;
-}> = ({ trace, groupBy, colCount, density }) => {
+}
+
+const GroupedTraceRow: React.FC<GroupedTraceRowProps> = ({
+  trace,
+  groupBy,
+  colCount,
+  density,
+}) => {
   const { openDrawer, currentDrawer } = useDrawer();
   const params = useDrawerParams();
   const selectedTraceId =
     currentDrawer === "traceV2Details" ? (params.traceId ?? null) : null;
   const isSelected = selectedTraceId === trace.traceId;
-
-  const variant = isSelected
-    ? "selected"
-    : trace.status === "error"
-      ? "error"
-      : trace.status === "warning"
-        ? "warning"
-        : "default";
+  const variant = rowVariantFor({ isSelected, status: trace.status });
   const style = ROW_STYLES[variant];
   const turnBg = isSelected ? style.bg : "fg/2";
-
   const inputPreview = trace.input
-    ? trace.input.length > 60
-      ? `${trace.input.slice(0, 60)}...`
-      : trace.input
+    ? truncateText({ text: trace.input, limit: INPUT_PREVIEW_LIMIT })
     : null;
 
   return (
@@ -110,13 +110,11 @@ const GroupedTraceRow: React.FC<{
             <MonoCell flexShrink={0}>
               {formatCost(trace.totalCost, trace.tokensEstimated)}
             </MonoCell>
-            {groupBy !== "model" &&
-              trace.models.length > 0 &&
-              trace.models[0] && (
-                <MonoCell flexShrink={0}>
-                  {abbreviateModel(trace.models[0])}
-                </MonoCell>
-              )}
+            {groupBy !== "model" && trace.models[0] && (
+              <MonoCell flexShrink={0}>
+                {abbreviateModel(trace.models[0])}
+              </MonoCell>
+            )}
             {trace.totalTokens > 0 && (
               <MonoCell color="fg.subtle" flexShrink={0}>
                 {formatTokens(trace.totalTokens)}

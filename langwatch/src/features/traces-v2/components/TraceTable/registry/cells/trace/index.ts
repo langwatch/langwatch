@@ -17,7 +17,6 @@ import { TraceCell } from "./TraceCell";
 import { TraceIdCell } from "./TraceIdCell";
 
 export const traceCells: Record<string, CellDef<TraceListItem>> = {
-  // Logical (compact-mode default) cells
   [TimeCell.id]: TimeCell,
   [TraceCell.id]: TraceCell,
   [ServiceCell.id]: ServiceCell,
@@ -27,20 +26,10 @@ export const traceCells: Record<string, CellDef<TraceListItem>> = {
   [ModelCell.id]: ModelCell,
   [EvaluationsCell.id]: EvaluationsCell,
   [EventsCell.id]: EventsCell,
-  // Atomic cells used by comfortable-mode column expansion
   [SpanNameCell.id]: SpanNameCell,
   [SpanTypeCell.id]: SpanTypeCell,
   [TraceIdCell.id]: TraceIdCell,
   [InputCell.id]: InputCell,
   [OutputCell.id]: OutputCell,
   [ErrorTextCell.id]: ErrorTextCell,
-};
-
-export {
-  SpanNameCell,
-  SpanTypeCell,
-  TraceIdCell,
-  InputCell,
-  OutputCell,
-  ErrorTextCell,
 };

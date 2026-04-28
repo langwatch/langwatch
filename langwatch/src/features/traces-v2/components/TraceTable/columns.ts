@@ -68,7 +68,7 @@ const traceColumnDefs: Record<string, ColumnDef<TraceListItem, any>> = {
     header: "Trace",
     size: 9999,
     minSize: 200,
-    meta: flex,
+    meta: { ...flex, skeletonLines: 2 },
   }),
   service: traceCol.accessor("serviceName", {
     id: "service",
@@ -95,6 +95,13 @@ const traceColumnDefs: Record<string, ColumnDef<TraceListItem, any>> = {
     header: "Tokens",
     size: 65,
     minSize: 55,
+    meta: num,
+  }),
+  spans: traceCol.accessor("spanCount", {
+    id: "spans",
+    header: "Spans",
+    size: 60,
+    minSize: 50,
     meta: num,
   }),
   model: traceCol.accessor((row) => row.models[0] ?? "", {

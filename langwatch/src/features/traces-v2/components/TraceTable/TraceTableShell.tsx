@@ -1,8 +1,11 @@
-import { Box, Button, HStack, Icon, type SystemStyleObject } from "@chakra-ui/react";
-import { flexRender, type Table } from "@tanstack/react-table";
+import { Button, HStack, Icon, type SystemStyleObject } from "@chakra-ui/react";
+import {
+  type Header,
+  type Table,
+  flexRender,
+} from "@tanstack/react-table";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import type React from "react";
-import { useCallback, useRef, useState } from "react";
 import { Table as TableEl, Th, Thead, Tr } from "./TablePrimitives";
 
 type Color = NonNullable<SystemStyleObject["color"]>;
@@ -10,6 +13,8 @@ type Color = NonNullable<SystemStyleObject["color"]>;
 export interface ColumnMeta {
   align?: "left" | "right";
   flex?: boolean;
+  /** Number of shimmer bars the skeleton should render for this column. */
+  skeletonLines?: number;
 }
 
 interface TraceTableShellProps<T> {
@@ -42,93 +47,13 @@ export function TraceTableShell<T>({
             borderBottomWidth="1px"
             borderColor="border.muted"
           >
-            {headerGroup.headers.map((header, i) => {
-              const meta = header.column.columnDef.meta as
-                | ColumnMeta
-                | undefined;
-              const size = header.column.getSize();
-              const canSort = header.column.getCanSort();
-              return (
-                <Th
-                  key={header.id}
-                  width={meta?.flex ? undefined : `${size}px`}
-                  minWidth={`${header.column.columnDef.minSize}px`}
-                  textAlign={meta?.align ?? "left"}
-                  fontSize="10px"
-                  fontWeight="500"
-                  color="fg.subtle/70"
-                  textTransform="uppercase"
-                  letterSpacing="0.06em"
-                  whiteSpace="nowrap"
-                  transition="none"
-                  position={stickyFirstColumn && i === 0 ? "sticky" : "relative"}
-                  left={stickyFirstColumn && i === 0 ? 0 : undefined}
-                  zIndex={stickyFirstColumn && i === 0 ? 3 : undefined}
-                  bg={stickyFirstColumn && i === 0 ? "bg.surface" : undefined}
-                >
-                  {canSort ? (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      width="full"
-                      height="auto"
-                      minHeight="unset"
-                      paddingX={2}
-                      paddingY={1}
-                      justifyContent={
-                        meta?.align === "right" ? "flex-end" : "flex-start"
-                      }
-                      color="inherit"
-                      userSelect="none"
-                      fontSize="inherit"
-                      fontWeight="inherit"
-                      letterSpacing="inherit"
-                      textTransform="inherit"
-                      bg="transparent"
-                      onClick={header.column.getToggleSortingHandler()}
-                      _hover={{ color: "fg", bg: "transparent" }}
-                      _active={{ bg: "transparent" }}
-                      _focusVisible={{ bg: "transparent" }}
-                    >
-                      <HStack gap={0.5}>
-                        {flexRender(
-                          header.column.columnDef.header,
-                          header.getContext(),
-                        )}
-                        <Icon
-                          boxSize="12px"
-                          color="blue.fg"
-                          visibility={
-                            header.column.getIsSorted() ? "visible" : "hidden"
-                          }
-                        >
-                          {header.column.getIsSorted() === "desc" ? (
-                            <ChevronDown />
-                          ) : (
-                            <ChevronUp />
-                          )}
-                        </Icon>
-                      </HStack>
-                    </Button>
-                  ) : (
-                    flexRender(
-                      header.column.columnDef.header,
-                      header.getContext(),
-                    )
-                  )}
-                  {/* Resize handle — skip for flex columns and pinned first column */}
-                  {!meta?.flex && !(stickyFirstColumn && i === 0) && (
-                    <ColumnResizeHandle
-                      onResize={() => {
-                        // Column resize is handled by TanStack Table's built-in resize handler
-                        // For now, the visual handle is shown; actual resize wiring requires
-                        // enableColumnResizing on the table instance
-                      }}
-                    />
-                  )}
-                </Th>
-              );
-            })}
+            {headerGroup.headers.map((header, i) => (
+              <HeaderCell
+                key={header.id}
+                header={header}
+                isStickyFirst={stickyFirstColumn && i === 0}
+              />
+            ))}
           </Tr>
         ))}
       </Thead>
@@ -137,55 +62,99 @@ export function TraceTableShell<T>({
   );
 }
 
-function ColumnResizeHandle({
-  onResize,
-}: {
-  onResize: (deltaX: number) => void;
-}) {
-  const startXRef = useRef(0);
-  const isDraggingRef = useRef(false);
+interface HeaderCellProps<T> {
+  header: Header<T, unknown>;
+  isStickyFirst: boolean;
+}
 
-  const handleMouseDown = useCallback(
-    (e: React.MouseEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-      startXRef.current = e.clientX;
-      isDraggingRef.current = true;
-
-      const handleMouseMove = (moveEvent: MouseEvent) => {
-        if (!isDraggingRef.current) return;
-        const delta = moveEvent.clientX - startXRef.current;
-        if (Math.abs(delta) > 2) {
-          onResize(delta);
-          startXRef.current = moveEvent.clientX;
-        }
-      };
-
-      const handleMouseUp = () => {
-        isDraggingRef.current = false;
-        document.removeEventListener("mousemove", handleMouseMove);
-        document.removeEventListener("mouseup", handleMouseUp);
-      };
-
-      document.addEventListener("mousemove", handleMouseMove);
-      document.addEventListener("mouseup", handleMouseUp);
-    },
-    [onResize],
-  );
+function HeaderCell<T>({
+  header,
+  isStickyFirst,
+}: HeaderCellProps<T>): React.ReactElement {
+  const meta = header.column.columnDef.meta as ColumnMeta | undefined;
+  const size = header.column.getSize();
+  const align = meta?.align ?? "left";
+  const canSort = header.column.getCanSort();
+  const sortDirection = header.column.getIsSorted();
 
   return (
-    <Box
-      position="absolute"
-      right={0}
-      top={0}
-      bottom={0}
-      width="4px"
-      cursor="col-resize"
+    <Th
+      width={meta?.flex ? undefined : `${size}px`}
+      minWidth={`${header.column.columnDef.minSize}px`}
+      textAlign={align}
+      fontSize="10px"
+      fontWeight="500"
+      color="fg.subtle/70"
+      textTransform="uppercase"
+      letterSpacing="0.06em"
+      whiteSpace="nowrap"
+      transition="none"
+      position={isStickyFirst ? "sticky" : "relative"}
+      left={isStickyFirst ? 0 : undefined}
+      zIndex={isStickyFirst ? 3 : undefined}
+      bg={isStickyFirst ? "bg.surface" : undefined}
+    >
+      {canSort ? (
+        <SortableHeaderButton
+          align={align}
+          sortDirection={sortDirection}
+          onToggle={header.column.getToggleSortingHandler()}
+        >
+          {flexRender(header.column.columnDef.header, header.getContext())}
+        </SortableHeaderButton>
+      ) : (
+        flexRender(header.column.columnDef.header, header.getContext())
+      )}
+    </Th>
+  );
+}
+
+interface SortableHeaderButtonProps {
+  align: "left" | "right";
+  sortDirection: false | "asc" | "desc";
+  onToggle: ((event: unknown) => void) | undefined;
+  children: React.ReactNode;
+}
+
+function SortableHeaderButton({
+  align,
+  sortDirection,
+  onToggle,
+  children,
+}: SortableHeaderButtonProps): React.ReactElement {
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      width="full"
+      height="auto"
+      minHeight="unset"
+      paddingX={2}
+      paddingY={1}
+      justifyContent={align === "right" ? "flex-end" : "flex-start"}
+      color="inherit"
+      userSelect="none"
+      fontSize="inherit"
+      fontWeight="inherit"
+      letterSpacing="inherit"
+      textTransform="inherit"
       bg="transparent"
-      _hover={{ bg: "blue.solid" }}
-      onMouseDown={handleMouseDown}
-      zIndex={4}
-    />
+      onClick={onToggle}
+      _hover={{ color: "fg", bg: "transparent" }}
+      _active={{ bg: "transparent" }}
+      _focusVisible={{ bg: "transparent" }}
+    >
+      <HStack gap={0.5}>
+        {children}
+        <Icon
+          boxSize="12px"
+          color="blue.fg"
+          visibility={sortDirection ? "visible" : "hidden"}
+        >
+          {sortDirection === "desc" ? <ChevronDown /> : <ChevronUp />}
+        </Icon>
+      </HStack>
+    </Button>
   );
 }
 

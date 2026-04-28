@@ -5,10 +5,17 @@ import {
   formatDuration,
   formatTokens,
 } from "../../../../../utils/formatters";
+import type { TraceStatus } from "../../../../../types/trace";
 import { MonoCell } from "../../../MonoCell";
 import { StatusDot, StatusIndicator } from "../../../StatusRow";
 import type { ConversationGroup } from "../../../conversationGroups";
 import type { CellDef } from "../../types";
+
+const STATUS_HEALTH_LABELS: Record<TraceStatus, string> = {
+  ok: "Healthy",
+  warning: "Warnings",
+  error: "Errors",
+};
 
 export const DurationCell: CellDef<ConversationGroup> = {
   id: "duration",
@@ -81,11 +88,7 @@ export const StatusCell: CellDef<ConversationGroup> = {
     <HStack gap={2}>
       <StatusDot status={row.worstStatus} size="10px" />
       <Text textStyle="sm" color="fg.muted">
-        {row.worstStatus === "ok"
-          ? "Healthy"
-          : row.worstStatus === "warning"
-            ? "Warnings"
-            : "Errors"}
+        {STATUS_HEALTH_LABELS[row.worstStatus]}
       </Text>
     </HStack>
   ),

@@ -1,11 +1,10 @@
 import { Box, HStack, Text } from "@chakra-ui/react";
 import type React from "react";
+import { TracePresenceAvatars } from "~/features/presence/components/TracePresenceAvatars";
 import type { TraceListItem } from "../../../../../types/trace";
-import { SPAN_TYPE_BADGE_STYLES } from "../../../../../utils/formatters";
 import { TraceIdPeek } from "../../../../TraceIdPeek";
 import type { CellDef } from "../../types";
-
-const PROMINENT_SPAN_TYPES = new Set(["llm", "agent", "workflow"]);
+import { SpanTypeBadge } from "./SpanTypeBadge";
 
 export const TraceCell: CellDef<TraceListItem> = {
   id: "trace",
@@ -16,6 +15,7 @@ export const TraceCell: CellDef<TraceListItem> = {
         <TraceIdPeek traceId={row.traceId} />
       </Box>
       <TraceContent trace={row} size="compact" />
+      <TracePresenceAvatars traceId={row.traceId} max={3} size="2xs" />
     </HStack>
   ),
   renderComfortable: ({ row }) => (
@@ -24,6 +24,7 @@ export const TraceCell: CellDef<TraceListItem> = {
         <TraceIdPeek traceId={row.traceId} />
       </Box>
       <TraceContent trace={row} size="comfortable" />
+      <TracePresenceAvatars traceId={row.traceId} max={3} size="xs" />
     </HStack>
   ),
 };
@@ -32,36 +33,22 @@ const TraceContent: React.FC<{
   trace: TraceListItem;
   size: "compact" | "comfortable";
 }> = ({ trace, size }) => {
-  const spanType = trace.rootSpanType;
+  const comfortable = size === "comfortable";
+  const nameStyle = comfortable ? "sm" : "xs";
+  const idStyle = comfortable ? "xs" : "2xs";
   const hasName = Boolean(trace.rootSpanName);
-  const displayType =
-    spanType && PROMINENT_SPAN_TYPES.has(spanType) ? spanType : "span";
-  const badgeStyle = SPAN_TYPE_BADGE_STYLES[displayType];
-  const nameStyle = size === "comfortable" ? "sm" : "xs";
-  const idStyle = size === "comfortable" ? "xs" : "2xs";
 
   return (
-    <HStack gap={size === "comfortable" ? 2 : 1.5} minWidth={0}>
-      {spanType && (
-        <Text
-          textStyle="2xs"
-          fontWeight="semibold"
-          color={badgeStyle?.color ?? "gray.fg"}
-          background={badgeStyle?.bg ?? "gray.subtle"}
-          paddingX={1.5}
-          borderRadius="sm"
-          flexShrink={0}
-          lineHeight="tall"
-        >
-          {displayType.toUpperCase()}
-        </Text>
+    <HStack gap={comfortable ? 2 : 1.5} minWidth={0}>
+      {trace.rootSpanType && (
+        <SpanTypeBadge spanType={trace.rootSpanType} flexShrink={0} />
       )}
       {hasName ? (
         <HStack gap={2} minWidth={0} overflow="hidden">
           <Text
             textStyle={nameStyle}
             color="fg"
-            fontWeight={size === "comfortable" ? "500" : "medium"}
+            fontWeight={comfortable ? "500" : "medium"}
             truncate
             flexShrink={1}
             minWidth={0}
