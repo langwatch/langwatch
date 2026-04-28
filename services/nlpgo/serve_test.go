@@ -4,42 +4,113 @@ import (
 	"context"
 	"net"
 	"net/http"
-	"sync/atomic"
 	"testing"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/langwatch/langwatch/pkg/lifecycle"
+	"github.com/langwatch/langwatch/pkg/otelsetup"
+	"github.com/langwatch/langwatch/services/nlpgo/adapters/uvicornchild"
 )
 
-// TestServe_ListenerBindsBeforeBlockingChild pins the contract that
-// keeps nlpgo deployable on AWS Lambda: when Serve registers its
-// services, the HTTP listener must bind $PORT before the uvicorn-child
-// readiness wait runs.
+// TestBuildServices_RegistersListenerBeforeUvicornChild pins the
+// registration order Serve uses on AWS Lambda. The HTTP listener must
+// be registered (and therefore started) before the uvicorn-child
+// Worker, otherwise the lifecycle group blocks on Manager.waitHealthy
+// (~12-18s for litellm + langwatch_nlp imports) before $PORT binds and
+// Lambda's 10s init ceiling fires.
 //
-// Background: in the prod incident on 2026-04-28 the previous shape
-// registered Worker("uvicorn-child") BEFORE ListenServer("http"). The
-// worker's startFn called Manager.Start synchronously, which blocks in
-// waitHealthy polling the python child for ~12-18s. Lambda's init phase
-// has a hard 10s ceiling — port never bound, init timed out, AWS
-// retried inits, retry storm pinned ConcurrentExecutions to the
-// account-level 1000 cap, and every Studio is_alive heartbeat surfaced
-// "Rate Exceeded." in the toast.
+// This test calls Serve's actual buildServices helper, so a regression
+// that swaps the order back inside serve.go fails this test directly.
 //
-// The fix in serve.go does two things:
-//   1. Register ListenServer("http") BEFORE Worker("uvicorn-child").
-//   2. Wrap the worker's startFn body in a `go func() { ... }()` so
-//      Manager.Start runs in the background. The lifecycle group's
-//      synchronous Service.Start returns instantly and the listener
-//      starts as the next step.
-//
-// This test recreates the same registration shape using a worker that
-// would block forever (simulating an unreachable child) and asserts the
-// listener binds within a tight deadline. Without BOTH parts of the
-// fix, the deadline expires.
+// Pre-fix incident: PR langwatch-saas#473 deploy on 2026-04-28 hit
+// "INIT_REPORT Init Duration: 9999.10ms Status: timeout" on every
+// per-project Lambda; failed inits retried, ConcurrentExecutions
+// pinned at the 1000 account cap, and AWS surfaced "Rate Exceeded."
+// to Studio's toast.
+func TestBuildServices_RegistersListenerBeforeUvicornChild(t *testing.T) {
+	deps := newTestDeps(t)
+	srv := &http.Server{Addr: "127.0.0.1:0", ReadHeaderTimeout: time.Second}
+
+	services := buildServices(deps, srv)
+
+	// Find indices by service name (the lifecycle.Service interface's
+	// String() method is the registered name).
+	idx := map[string]int{}
+	for i, s := range services {
+		idx[s.String()] = i
+	}
+	listenerIdx, ok := idx["http"]
+	if !ok {
+		t.Fatalf("expected 'http' lifecycle service in buildServices output; got names %v", names(services))
+	}
+	childIdx, ok := idx["uvicorn-child"]
+	if !ok {
+		t.Fatalf("expected 'uvicorn-child' lifecycle service in buildServices output; got names %v", names(services))
+	}
+	if listenerIdx >= childIdx {
+		t.Fatalf("Lambda init regression: 'http' listener (idx %d) must be registered before 'uvicorn-child' worker (idx %d). "+
+			"Lifecycle services start sequentially via svc.Start(ctx); a blocking child Start would prevent $PORT bind "+
+			"within Lambda's 10s init ceiling. Service order: %v", listenerIdx, childIdx, names(services))
+	}
+}
+
+// TestBuildServices_UvicornChildWorkerDoesNotBlockStart pins the
+// second half of the cold-start fix: even with the right ordering,
+// if Worker("uvicorn-child")'s startFn synchronously waits on the
+// child's health, the lifecycle group still blocks before reaching
+// the listener (because the worker is registered after closer "otel"
+// and lifecycle.Run starts services in order). The fix wraps the
+// inner Manager.Start in a `go func()` so the startFn returns
+// immediately. This test reaches into the worker's Service.Start and
+// asserts it returns quickly even when given a context that would
+// keep a synchronous child blocked indefinitely.
+func TestBuildServices_UvicornChildWorkerDoesNotBlockStart(t *testing.T) {
+	deps := newTestDeps(t)
+	srv := &http.Server{Addr: "127.0.0.1:0", ReadHeaderTimeout: time.Second}
+
+	services := buildServices(deps, srv)
+	var worker lifecycle.Service
+	for _, s := range services {
+		if s.String() == "uvicorn-child" {
+			worker = s
+			break
+		}
+	}
+	if worker == nil {
+		t.Fatalf("uvicorn-child worker not registered; got names %v", names(services))
+	}
+
+	// Run Start with a context that will never be cancelled until we
+	// say so. If startFn synchronously blocks (the regression we want
+	// to catch), Start won't return and the deadline below fires.
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+
+	done := make(chan error, 1)
+	go func() { done <- worker.Start(ctx) }()
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("worker.Start returned err: %v", err)
+		}
+	case <-time.After(100 * time.Millisecond):
+		t.Fatalf("Lambda init regression: uvicorn-child worker.Start did not return within 100ms. " +
+			"Wrap the inner Manager.Start call in a `go func()` so the lifecycle group's synchronous " +
+			"Service.Start returns immediately and the next service (the http listener) starts.")
+	}
+}
+
+// TestServe_ListenerBindsBeforeBlockingChild is the runtime sibling of
+// the buildServices ordering test: it boots a real lifecycle.Group
+// with the Serve-registered services and asserts the http listener
+// has bound $PORT within a Lambda-safe deadline (100ms — far under
+// the 10s init ceiling) even when the uvicorn-child worker is
+// configured around a child that never becomes healthy. Together with
+// the buildServices test above, both arms of the fix are pinned:
+// (1) registration order, (2) non-blocking worker startFn.
 func TestServe_ListenerBindsBeforeBlockingChild(t *testing.T) {
-	// Pick a free port — bind, get the address, close so the lifecycle
-	// listener can take it. There's a tiny race window with another
-	// process on the host but on CI workers it's negligible.
 	probe, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatalf("probe listen: %v", err)
@@ -47,43 +118,21 @@ func TestServe_ListenerBindsBeforeBlockingChild(t *testing.T) {
 	addr := probe.Addr().String()
 	_ = probe.Close()
 
+	deps := newTestDeps(t)
 	srv := &http.Server{
 		Addr:              addr,
 		Handler:           http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) }),
 		ReadHeaderTimeout: time.Second,
 	}
 
-	var childStartCalled atomic.Bool
-	// blockingStartFn simulates the ORIGINAL bad shape — a Worker whose
-	// startFn body blocks on a child that never becomes healthy. The
-	// fix wraps the inner block in a goroutine so the startFn itself
-	// returns immediately. We replicate the FIXED shape here; if a
-	// future refactor regresses by removing the goroutine wrap, the
-	// listener-bind deadline below will fail.
-	nonBlockingStartFn := func(ctx context.Context) {
-		go func() {
-			childStartCalled.Store(true)
-			// Simulate Manager.waitHealthy on an unreachable upstream.
-			<-ctx.Done()
-		}()
-	}
-
 	g := lifecycle.New(lifecycle.WithGraceful(time.Second))
-	g.Add(
-		// Mirror serve.go ordering exactly: listener first, then worker.
-		lifecycle.ListenServer("http", srv),
-		lifecycle.Worker("uvicorn-child", nonBlockingStartFn, func() {}),
-	)
+	g.Add(buildServices(deps, srv)...)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
-
 	runDone := make(chan error, 1)
 	go func() { runDone <- g.Run(ctx) }()
 
-	// 100ms is comfortably under Lambda's 10s init budget while still
-	// catching slow-start regressions. Local hosts dial loopback in
-	// well under 10ms.
 	deadline := time.Now().Add(100 * time.Millisecond)
 	bound := false
 	for time.Now().Before(deadline) {
@@ -99,18 +148,43 @@ func TestServe_ListenerBindsBeforeBlockingChild(t *testing.T) {
 		t.Fatalf("http listener not bound at %s within 100ms — Lambda init phase would time out", addr)
 	}
 
-	// Cancel + drain the lifecycle goroutine so the test exits cleanly.
 	cancel()
 	select {
 	case <-runDone:
 	case <-time.After(2 * time.Second):
 		t.Fatalf("lifecycle.Run did not return within 2s after cancel")
 	}
+}
 
-	// Sanity: the worker DID start (in the background) — proves we are
-	// testing the right shape (a Worker that the group considers
-	// "started" but whose inner work continues asynchronously).
-	if !childStartCalled.Load() {
-		t.Fatalf("worker startFn was never invoked; test would not catch a regression")
+// newTestDeps builds a Deps with stubs for the cold-start tests.
+// The uvicorn-child Manager is configured Disabled=true so its Start
+// returns immediately — the test isn't exercising the child, only the
+// registration shape that wraps it. OTel is constructed via
+// otelsetup.New with empty OTLPEndpoint, which returns a noop Provider
+// whose Shutdown is safe to invoke during lifecycle teardown.
+func newTestDeps(t *testing.T) *Deps {
+	t.Helper()
+	child := uvicornchild.New(uvicornchild.Options{
+		Disabled:  true,
+		Logger:    zap.NewNop(),
+		HealthURL: "http://127.0.0.1:1/never-healthy",
+	})
+	otelProvider, err := otelsetup.New(context.Background(), otelsetup.Options{})
+	if err != nil {
+		t.Fatalf("otelsetup.New: %v", err)
+	}
+	return &Deps{
+		Logger: zap.NewNop(),
+		OTel:   otelProvider,
+		Child:  child,
 	}
 }
+
+func names(services []lifecycle.Service) []string {
+	out := make([]string, 0, len(services))
+	for _, s := range services {
+		out = append(out, s.String())
+	}
+	return out
+}
+

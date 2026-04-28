@@ -59,7 +59,19 @@ func Serve(ctx context.Context, application *app.App, deps *Deps, cfg Config, pl
 		lifecycle.WithGraceful(time.Duration(cfg.Server.GracefulSeconds)*time.Second),
 		lifecycle.WithHealth(deps.Health),
 	)
-	g.Add(
+	g.Add(buildServices(deps, srv)...)
+	return g.Run(ctx)
+}
+
+// buildServices returns the lifecycle services Serve registers, in
+// registration order. Extracted from Serve so tests can assert the
+// ordering invariant directly without rebuilding the slice (which would
+// mask a Serve regression). The contract pinned by serve_test.go:
+// ListenServer("http") MUST come before Worker("uvicorn-child"), and
+// the worker startFn MUST return immediately (the inner Manager.Start
+// runs in a goroutine).
+func buildServices(deps *Deps, srv *http.Server) []lifecycle.Service {
+	return []lifecycle.Service{
 		lifecycle.Closer("otel", deps.OTel.Shutdown),
 		// HTTP listener binds $PORT first — Lambda init only needs the
 		// port to be bound, not the upstream proxy to be live. This
@@ -79,6 +91,5 @@ func Serve(ctx context.Context, application *app.App, deps *Deps, cfg Config, pl
 				}
 			}()
 		}, deps.Child.Stop),
-	)
-	return g.Run(ctx)
+	}
 }
