@@ -12,10 +12,14 @@ import {
   LuBraces,
   LuCheck,
   LuCopy,
+  LuDatabase,
   LuExternalLink,
   LuKeyboard,
+  LuLightbulb,
   LuMaximize2,
   LuMinimize2,
+  LuMoreHorizontal,
+  LuPencil,
   LuPin,
   LuPinOff,
   LuRefreshCw,
@@ -26,8 +30,10 @@ import {
 } from "react-icons/lu";
 import { useCallback, useMemo, useState } from "react";
 import { Link } from "~/components/ui/link";
+import { Menu } from "~/components/ui/menu";
 import { Tooltip } from "~/components/ui/tooltip";
 import { api } from "~/utils/api";
+import { useAnnotationCommentStore } from "~/hooks/useAnnotationCommentStore";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useDejaViewLink } from "~/hooks/useDejaViewLink";
 import { useDrawer } from "~/hooks/useDrawer";
@@ -306,6 +312,10 @@ export function DrawerHeader({
               </Button>
             </Tooltip>
           )}
+          <TraceActionsMenu
+            traceId={trace.traceId}
+            output={trace.output ?? null}
+          />
           <Tooltip
             content="Sharing is coming soon"
             positioning={{ placement: "bottom" }}
@@ -708,6 +718,68 @@ function TooltipRow({ label, value }: { label: string; value: string }) {
         {value}
       </Text>
     </HStack>
+  );
+}
+
+function TraceActionsMenu({
+  traceId,
+  output,
+}: {
+  traceId: string;
+  output: string | null;
+}) {
+  const setCommentState = useAnnotationCommentStore((s) => s.setCommentState);
+  const { openDrawer } = useDrawer();
+
+  const handleAnnotate = useCallback(() => {
+    setCommentState({
+      traceId,
+      action: "new",
+      annotationId: undefined,
+    });
+  }, [setCommentState, traceId]);
+
+  const handleSuggest = useCallback(() => {
+    setCommentState({
+      traceId,
+      action: "new",
+      annotationId: undefined,
+      expectedOutput: output ?? "",
+      expectedOutputAction: "new",
+    });
+  }, [setCommentState, traceId, output]);
+
+  const handleAddToDataset = useCallback(() => {
+    openDrawer("addDatasetRecord", { traceId });
+  }, [openDrawer, traceId]);
+
+  return (
+    <Menu.Root>
+      <Tooltip
+        content="Trace actions"
+        positioning={{ placement: "bottom" }}
+      >
+        <Menu.Trigger asChild>
+          <Button size="xs" variant="ghost" aria-label="Trace actions">
+            <Icon as={LuMoreHorizontal} boxSize={3.5} />
+          </Button>
+        </Menu.Trigger>
+      </Tooltip>
+      <Menu.Content minWidth="180px">
+        <Menu.Item value="annotate" onClick={handleAnnotate}>
+          <Icon as={LuPencil} boxSize={3.5} />
+          Annotate
+        </Menu.Item>
+        <Menu.Item value="suggest" onClick={handleSuggest}>
+          <Icon as={LuLightbulb} boxSize={3.5} />
+          Suggest correction
+        </Menu.Item>
+        <Menu.Item value="add-to-dataset" onClick={handleAddToDataset}>
+          <Icon as={LuDatabase} boxSize={3.5} />
+          Add to Dataset
+        </Menu.Item>
+      </Menu.Content>
+    </Menu.Root>
   );
 }
 
