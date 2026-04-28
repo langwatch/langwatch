@@ -306,3 +306,139 @@ class TestParseComponentEntryAndEndNodes:
 
         with pytest.raises(ValueError, match="End nodes cannot be executed as standalone components"):
             parse_component(node, basic_workflow)
+
+
+class TestCodeNodeClassResolutionShapes:
+    """Pin back-compat for the FF=off (legacy Python) Code node runtime.
+
+    PR #3483 shipped a new Studio default template (`class Code: def
+    __call__(self, ...): ...` — no `dspy.Module` inheritance). The Go
+    runtime's runner.py was updated to resolve __call__ / forward /
+    dspy.Module / top-level execute, but the Python parser only matched
+    `class X(dspy.Module):`. Result: customers still on the legacy
+    Python NLP path (FF=off) would hit
+        Could not find a class that inherits from dspy.Module for component Code
+    when running the new template.
+
+    These tests pin the resolution order in
+    `_resolve_code_class_name` so the Python side accepts the same
+    shapes the Go side does:
+      1. `class X(dspy.Module):` (legacy default — preferred)
+      2. `class X:` matching the node's normalized name
+      3. First `class X:` declaration (single-class file)
+      4. No class → clear error message listing supported shapes.
+    """
+
+    def _make_code_node(self, code: str, name: str = "Code") -> CodeNode:
+        return CodeNode(
+            id="code_node",
+            data=Code(
+                name=name,
+                cls=name,
+                parameters=[
+                    Field(
+                        identifier="code",
+                        type=FieldType.str,
+                        optional=None,
+                        value=code,
+                        desc=None,
+                    ),
+                ],
+            ),
+        )
+
+    def test_class_with_dunder_call_only_no_dspy_inheritance(self):
+        """The new default template — class with __call__, no dspy.Module."""
+        node = self._make_code_node(
+            """
+class Code:
+    def __call__(self, input: str):
+        return {"output": "Hello world!"}
+"""
+        )
+        code, class_name, _ = parse_component(node, basic_workflow)
+        assert class_name == "Code"
+        with materialized_component_class(code, class_name) as Module:
+            instance = Module()
+            assert instance(input="anything") == {"output": "Hello world!"}
+
+    def test_class_with_forward_only_no_dspy_inheritance(self):
+        """`forward()` shape without dspy.Module — must also work."""
+        node = self._make_code_node(
+            """
+class Code:
+    def forward(self, **kwargs):
+        return {"output": kwargs.get("input", "")}
+"""
+        )
+        code, class_name, _ = parse_component(node, basic_workflow)
+        assert class_name == "Code"
+        with materialized_component_class(code, class_name) as Module:
+            instance = Module()
+            assert instance.forward(input="x") == {"output": "x"}
+
+    def test_legacy_dspy_module_subclass_still_resolves_first(self):
+        """Existing customer code keeps working — back-compat anchor."""
+        node = self._make_code_node(
+            """
+import dspy
+
+class Code(dspy.Module):
+    def forward(self, **kwargs):
+        return {"output": "legacy"}
+""",
+            name="Code",
+        )
+        code, class_name, _ = parse_component(node, basic_workflow)
+        assert class_name == "Code"
+        with materialized_component_class(code, class_name) as Module:
+            assert issubclass(Module, dspy.Module)
+
+    def test_dspy_module_wins_over_helper_classes_above_it(self):
+        """When the user defines helpers, the dspy.Module class is picked."""
+        node = self._make_code_node(
+            """
+import dspy
+
+class Helper:
+    def __call__(self, x):
+        return x
+
+class Code(dspy.Module):
+    def forward(self, **kwargs):
+        return {"output": "main"}
+"""
+        )
+        code, class_name, _ = parse_component(node, basic_workflow)
+        # Despite Helper appearing first, the dspy.Module subclass wins.
+        assert class_name == "Code"
+
+    def test_node_name_disambiguates_when_no_dspy_inheritance(self):
+        """Multiple bare classes — pick the one matching the node name."""
+        node = self._make_code_node(
+            """
+class Helper:
+    pass
+
+class Code:
+    def __call__(self, input: str):
+        return {"output": "main"}
+""",
+            name="Code",
+        )
+        code, class_name, _ = parse_component(node, basic_workflow)
+        assert class_name == "Code"
+
+    def test_no_class_in_code_raises_clear_error(self):
+        """Helpful error replaces the misleading 'must inherit dspy.Module'."""
+        node = self._make_code_node(
+            """
+def execute(input: str):
+    return {"output": "no class"}
+"""
+        )
+        with pytest.raises(
+            ValueError,
+            match=r"Could not find a class definition.*Supported shapes",
+        ):
+            parse_component(node, basic_workflow)
