@@ -3,10 +3,13 @@ import { create } from "zustand";
 interface UIState {
   sidebarCollapsed: boolean;
   syntaxHelpOpen: boolean;
+  shortcutsHelpOpen: boolean;
 
   toggleSidebar: () => void;
   setSidebarCollapsed: (collapsed: boolean) => void;
   setSyntaxHelpOpen: (open: boolean) => void;
+  setShortcutsHelpOpen: (open: boolean) => void;
+  toggleShortcutsHelp: () => void;
 }
 
 const STORAGE_KEY = "langwatch:traces-v2:ui";
@@ -45,6 +48,7 @@ const initial = loadPersistedUI();
 export const useUIStore = create<UIState>((set, get) => ({
   sidebarCollapsed: initial.sidebarCollapsed,
   syntaxHelpOpen: false,
+  shortcutsHelpOpen: false,
 
   toggleSidebar: () => {
     const next = !get().sidebarCollapsed;
@@ -58,4 +62,8 @@ export const useUIStore = create<UIState>((set, get) => ({
   },
 
   setSyntaxHelpOpen: (open) => set({ syntaxHelpOpen: open }),
+
+  setShortcutsHelpOpen: (open) => set({ shortcutsHelpOpen: open }),
+  toggleShortcutsHelp: () =>
+    set((s) => ({ shortcutsHelpOpen: !s.shortcutsHelpOpen })),
 }));

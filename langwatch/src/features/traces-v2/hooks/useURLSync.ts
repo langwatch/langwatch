@@ -105,37 +105,35 @@ export function useURLSync(): void {
     setSort,
   ]);
 
-  // Sync state → fragment immediately. URL writes via `replaceState` are
-  // cheap (no reflow, no navigation) and the user wants the URL to track
-  // the editor live. Debouncing made the URL feel laggy compared to the
-  // editor decorations.
+  // Coalesce URL writes on a 150ms timer. `replaceState` itself is cheap,
+  // but `computeOverrides`/`buildFragment` allocate per char, and effect
+  // re-runs on every keystroke add up. 150ms is below human perception of
+  // URL trailing the editor.
   useEffect(() => {
     if (!isInitialized.current) return;
 
-    const activeLens = allLenses.find((l) => l.id === activeLensId);
-    if (!activeLens) return;
+    const handle = window.setTimeout(() => {
+      const activeLens = allLenses.find((l) => l.id === activeLensId);
+      if (!activeLens) return;
 
-    const overrides = computeOverrides({
-      activeLens,
-      query: queryText,
-      timeRange,
-      defaultPresetId: DEFAULT_PRESET_ID,
-      page,
-      // columns / grouping / sort are tracked in `viewStore.draftState`
-      // but no longer serialised into the URL — pass dummies that match
-      // the lens defaults so `computeOverrides` doesn't see them as
-      // diverged. The function ignores them anyway, but the type still
-      // expects the fields.
-      columns: activeLens.columns,
-      grouping: activeLens.grouping,
-      sort: activeLens.sort,
-    });
+      const overrides = computeOverrides({
+        activeLens,
+        query: queryText,
+        timeRange,
+        defaultPresetId: DEFAULT_PRESET_ID,
+        page,
+        columns: activeLens.columns,
+        grouping: activeLens.grouping,
+        sort: activeLens.sort,
+      });
 
-    // Default lens with no overrides → empty fragment for clean URL.
-    if (activeLensId === DEFAULT_LENS_ID && isOverridesEmpty(overrides)) {
-      writeFragment("");
-      return;
-    }
-    writeFragment(buildFragment(activeLensId, overrides));
+      if (activeLensId === DEFAULT_LENS_ID && isOverridesEmpty(overrides)) {
+        writeFragment("");
+        return;
+      }
+      writeFragment(buildFragment(activeLensId, overrides));
+    }, 150);
+
+    return () => window.clearTimeout(handle);
   }, [activeLensId, allLenses, queryText, timeRange, page]);
 }

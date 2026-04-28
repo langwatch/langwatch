@@ -8,6 +8,10 @@ import { parseOccurredAtMs } from "./useTraceOccurredAt";
  * considered settled and rely on focus + manual refresh. */
 const LIVE_WINDOW_MS = 3 * 60 * 1000;
 const LIVE_REFETCH_MS = 10_000;
+/** When prompt aggregation is still catching up (containsPrompt=true but
+ * the projected IDs haven't landed yet), poll on a slower cadence so the
+ * chips fill in without making the user click around. */
+const PROMPTS_PENDING_REFETCH_MS = 8_000;
 
 export function useTraceHeader() {
   const { project } = useOrganizationTeamProject();
@@ -40,7 +44,17 @@ export function useTraceHeader() {
       cacheTime: 1_800_000,
       keepPreviousData: true,
       refetchOnWindowFocus: true,
-      refetchInterval: isLive ? LIVE_REFETCH_MS : false,
+      refetchInterval: (data) => {
+        if (isLive) return LIVE_REFETCH_MS;
+        // The trace knows it used a prompt but the rollup hasn't
+        // populated the IDs yet — keep polling on a slower cadence so
+        // the chips fill in without the user clicking around. Once an
+        // ID is present we go quiet again.
+        if (data?.containsPrompt && !data.lastUsedPromptId) {
+          return PROMPTS_PENDING_REFETCH_MS;
+        }
+        return false;
+      },
     },
   );
 }

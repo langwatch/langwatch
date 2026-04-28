@@ -32,8 +32,8 @@ function nextBackoffInterval(
 
 export function useTraceNewCount(): TraceNewCountResult {
   const { project } = useOrganizationTeamProject();
-  const timeRange = useFilterStore((s) => s.timeRange);
-  const queryText = useFilterStore((s) => s.queryText);
+  const timeRange = useFilterStore((s) => s.debouncedTimeRange);
+  const queryText = useFilterStore((s) => s.debouncedQueryText);
   const [since, setSince] = useState(() => Date.now());
   const refresh = useFreshnessSignal((s) => s.refresh);
 
