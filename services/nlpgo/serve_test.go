@@ -2,8 +2,10 @@ package nlpgo
 
 import (
 	"context"
+	"errors"
 	"net"
 	"net/http"
+	"runtime"
 	"testing"
 	"time"
 
@@ -125,7 +127,10 @@ func TestServe_ListenerBindsBeforeBlockingChild(t *testing.T) {
 		ReadHeaderTimeout: time.Second,
 	}
 
-	g := lifecycle.New(lifecycle.WithGraceful(time.Second))
+	// Generous graceful window because the test's blocking sleep child
+	// can take longer than 1s to be killed by Manager.Stop. The
+	// listener-bind assertion fires long before this window matters.
+	g := lifecycle.New(lifecycle.WithGraceful(5 * time.Second))
 	g.Add(buildServices(deps, srv)...)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -150,25 +155,49 @@ func TestServe_ListenerBindsBeforeBlockingChild(t *testing.T) {
 
 	cancel()
 	select {
-	case <-runDone:
-	case <-time.After(2 * time.Second):
-		t.Fatalf("lifecycle.Run did not return within 2s after cancel")
+	case err := <-runDone:
+		// lifecycle.Run returns nil on graceful cancel, or an error
+		// wrapping context.Canceled if cancel propagated through a
+		// child Start. Either is fine; surface anything else.
+		if err != nil && !errors.Is(err, context.Canceled) {
+			t.Fatalf("lifecycle.Run returned unexpected error: %v", err)
+		}
+	case <-time.After(7 * time.Second):
+		t.Fatalf("lifecycle.Run did not return within 7s after cancel")
 	}
 }
 
-// newTestDeps builds a Deps with stubs for the cold-start tests.
-// The uvicorn-child Manager is configured Disabled=true so its Start
-// returns immediately — the test isn't exercising the child, only the
-// registration shape that wraps it. OTel is constructed via
-// otelsetup.New with empty OTLPEndpoint, which returns a noop Provider
-// whose Shutdown is safe to invoke during lifecycle teardown.
+// newTestDeps builds a Deps whose uvicorn-child Manager will BLOCK in
+// Start until the test's deferred Stop fires. This is load-bearing for
+// the regression tests: with Disabled=true the inner Manager.Start
+// would return immediately, masking a hypothetical regression where
+// the worker startFn dropped the `go func()` wrap and called
+// Manager.Start synchronously. By forcing the child to block, the
+// "doesn't block" assertion only holds if the goroutine wrap is in
+// place.
+//
+// Implementation: spawn a long-running `sleep` binary as the child
+// process and point HealthURL at a closed port — Manager.waitHealthy
+// will poll until StartTimeout elapses. We set StartTimeout to 5s,
+// well over the test's 100ms deadline, so a regression deterministically
+// trips the deadline.
+//
+// OTel is constructed via otelsetup.New with empty OTLPEndpoint, which
+// returns a noop Provider whose Shutdown is safe to invoke during
+// lifecycle teardown.
 func newTestDeps(t *testing.T) *Deps {
 	t.Helper()
+	if runtime.GOOS == "windows" {
+		t.Skip("regression test relies on POSIX `sleep` binary; not exercised on Windows")
+	}
 	child := uvicornchild.New(uvicornchild.Options{
-		Disabled:  true,
-		Logger:    zap.NewNop(),
-		HealthURL: "http://127.0.0.1:1/never-healthy",
+		Command:      "sleep",
+		Args:         []string{"3600"},
+		HealthURL:    "http://127.0.0.1:1/never-healthy",
+		StartTimeout: 5 * time.Second,
+		Logger:       zap.NewNop(),
 	})
+	t.Cleanup(child.Stop) // kills the sleep child after the test
 	otelProvider, err := otelsetup.New(context.Background(), otelsetup.Options{})
 	if err != nil {
 		t.Fatalf("otelsetup.New: %v", err)
