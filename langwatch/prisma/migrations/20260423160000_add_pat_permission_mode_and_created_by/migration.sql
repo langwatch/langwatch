@@ -31,3 +31,6 @@ ALTER TABLE "RoleBinding" DROP CONSTRAINT "RoleBinding_principal_check";
 ALTER TABLE "RoleBinding" ADD CONSTRAINT "RoleBinding_principal_check" CHECK (
     num_nonnulls("userId", "groupId", "apiKeyId") = 1
 );
+
+-- Allow service API keys (not tied to any user)
+ALTER TABLE "ApiKey" ALTER COLUMN "userId" DROP NOT NULL;

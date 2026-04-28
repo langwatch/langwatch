@@ -14,7 +14,7 @@ export type ResolvedToken =
   | {
       type: "apiKey";
       apiKeyId: string;
-      userId: string;
+      userId: string | null;
       organizationId: string;
       project: Project & { team: { id: string; organizationId: string } };
     };

@@ -40,7 +40,7 @@ export class ApiKeyRepository {
     lookupId: string;
     hashedSecret: string;
     permissionMode: string;
-    userId: string;
+    userId?: string | null;
     createdByUserId?: string | null;
     organizationId: string;
     expiresAt?: Date | null;
@@ -52,7 +52,7 @@ export class ApiKeyRepository {
         lookupId,
         hashedSecret,
         permissionMode,
-        userId,
+        userId: userId ?? null,
         createdByUserId: createdByUserId ?? null,
         organizationId,
         expiresAt: expiresAt ?? null,
@@ -65,13 +65,18 @@ export class ApiKeyRepository {
   }: {
     lookupId: string;
   }): Promise<ApiKeyWithBindings | null> {
-    // Reject API keys whose owning user has been deactivated. We use findFirst
-    // rather than findUnique because Prisma's findUnique does not accept
-    // related filters; lookupId is @unique so the result is still unique.
+    // Reject personal API keys whose owning user has been deactivated.
+    // Service keys (userId = null) are always eligible.
+    // We use findFirst rather than findUnique because Prisma's findUnique
+    // does not accept related filters; lookupId is @unique so the result
+    // is still unique.
     return this.prisma.apiKey.findFirst({
       where: {
         lookupId,
-        user: { deactivatedAt: null },
+        OR: [
+          { userId: null },
+          { user: { deactivatedAt: null } },
+        ],
       },
       include: { roleBindings: true },
     });
@@ -95,8 +100,13 @@ export class ApiKeyRepository {
     userId: string;
     organizationId: string;
   }): Promise<ApiKeyWithBindings[]> {
+    // Include both the user's own keys and service keys (userId = null)
     return this.prisma.apiKey.findMany({
-      where: { userId, organizationId, revokedAt: null },
+      where: {
+        organizationId,
+        revokedAt: null,
+        OR: [{ userId }, { userId: null }],
+      },
       include: {
         roleBindings: {
           include: { customRole: { select: { id: true, name: true } } },
