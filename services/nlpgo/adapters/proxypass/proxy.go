@@ -38,15 +38,22 @@ type Options struct {
 	// instead of failing fast, so the cold-start window is invisible to
 	// callers.
 	//
-	// Default: 25s. Empirically the saas Lambda runtime image takes
-	// ~22s end-to-end for uvicorn to import litellm + langwatch_nlp.main
-	// and bind 127.0.0.1:5561 (measured locally on the saas Dockerfile
-	// build: nlpgo binds at ~3s, uvicorn child reachable at ~22s). 25s
-	// absorbs the full cold-start window in a single request rather
-	// than relying on Studio's LambdaClient retry (maxAttempts:6) to
-	// pick up a 503 from an earlier attempt. Stays well under Lambda's
-	// 900s function timeout. Set to 0 to disable the wait entirely
-	// (tests / fail-fast topologies).
+	// Default: 90s. Empirical cold-start measurements:
+	//   - Local docker (M-series CPU): ~22s for uvicorn child to bind
+	//     5561 after litellm + langwatch_nlp.main imports.
+	//   - AWS Lambda 1024MB (~1 vCPU): >50s observed in lw-dev probes;
+	//     even 50s of cumulative active wall-clock didn't get the child
+	//     past the joblib warmup. Lambda CPU is the bottleneck.
+	//
+	// 90s gives generous headroom for Lambda Python imports while still
+	// fitting comfortably under the AWS SDK's 5-minute streaming-invoke
+	// deadline and Lambda's 900s function timeout. Set to 0 to disable
+	// the wait entirely (tests / fail-fast topologies).
+	//
+	// This is paired with a docker-build-time `python langwatch_nlp/main.py`
+	// preload step (in saas's Dockerfile.langwatch_nlp.lambda.runtime)
+	// which warms .pyc bytecode + litellm runtime initializers so cold-
+	// start is dominated by uvicorn process spawn, not import work.
 	ColdStartWait time.Duration
 	// ColdStartProbeInterval is the gap between TCP dial probes during
 	// the wait. Default: 100ms.
@@ -70,7 +77,7 @@ func New(opts Options) (http.Handler, error) {
 		opts.FlushInterval = -1
 	}
 	if opts.ColdStartWait == 0 {
-		opts.ColdStartWait = 25 * time.Second
+		opts.ColdStartWait = 90 * time.Second
 	}
 	if opts.ColdStartProbeInterval == 0 {
 		opts.ColdStartProbeInterval = 100 * time.Millisecond
