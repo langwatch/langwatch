@@ -64,7 +64,15 @@ func TestCodeBlock_MissingDeclaredOutput(t *testing.T) {
 	assert.Contains(t, res.Error.Message, "missing_output: diff")
 }
 
-func TestCodeBlock_ExtraOutputDropped(t *testing.T) {
+func TestCodeBlock_ExtraOutputKeysPreserved(t *testing.T) {
+	// Back-compat with legacy Python NLP path: customer code that returns
+	// extra keys (eg. `class Code: def __call__: return {"output": ...,
+	// "dspy": repr(dspy)}`) used to surface ALL keys in the Studio
+	// OUTPUTS panel, not only the declared ones. The early Go runner
+	// dropped undeclared keys silently, hiding a half of the user's
+	// dict from operator debugging — caught by rchaves on FF=on dogfood
+	// (PR #3543). The declared-output validation is preserved separately
+	// by TestCodeBlock_MissingDeclaredOutput.
 	requirePython(t)
 	res, err := newExec(t).Execute(context.Background(), codeblock.Request{
 		Code:            "def execute():\n    return {'sum': 5, 'scratch': [1,2,3]}\n",
@@ -73,8 +81,9 @@ func TestCodeBlock_ExtraOutputDropped(t *testing.T) {
 	require.NoError(t, err)
 	require.Nil(t, res.Error)
 	assert.Equal(t, float64(5), res.Outputs["sum"])
-	_, hasScratch := res.Outputs["scratch"]
-	assert.False(t, hasScratch, "undeclared outputs should be dropped")
+	scratch, hasScratch := res.Outputs["scratch"]
+	assert.True(t, hasScratch, "undeclared output keys must be preserved (legacy parity)")
+	assert.Equal(t, []any{float64(1), float64(2), float64(3)}, scratch)
 }
 
 func TestCodeBlock_RaisesAreStructured(t *testing.T) {

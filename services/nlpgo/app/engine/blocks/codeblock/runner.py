@@ -122,10 +122,21 @@ def main() -> int:
             exec(compile(code, "<code-block>", "exec"), module_globals)
             result = _invoke_user_entrypoint(module_globals, inputs)
             result = _coerce_result(result)
+            # Validate declared outputs are present (these are wired to
+            # downstream nodes; missing them is a contract violation).
             for name in declared_outputs:
                 if name not in result:
                     raise KeyError(f"missing_output: {name}")
-                outputs[name] = result[name]
+            # Pass ALL keys through, not just the declared ones — legacy
+            # Python NLP path returned everything the user produced and
+            # the Studio UI surfaces extra keys ad-hoc (operator debugging,
+            # ad-hoc dict returns from `class Code: def __call__: return
+            # {"output": ..., "dspy": ...}` were visible in the OUTPUTS
+            # panel even when only "output" was declared). Filtering broke
+            # back-compat: extra keys silently disappeared in the new
+            # engine. Caught by rchaves on the FF-on dogfood. Pinned by
+            # `TestCodeBlock_PreservesUndeclaredOutputKeys`.
+            outputs = dict(result)
     except Exception as exc:  # noqa: BLE001 — sandbox runner intentionally catches every user-code exception so Go can render a structured error in Studio
         error = {
             "type": type(exc).__name__,

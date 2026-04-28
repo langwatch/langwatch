@@ -188,11 +188,21 @@ func stateEvent(traceID, nodeID string, ns *NodeState) StreamEvent {
 		es["error"] = ns.Error.Message
 	}
 	if ns.DurationMS > 0 {
-		// Python emits `timestamps.{started_at, finished_at}` — we don't
-		// track absolute clock-times in NodeState yet, so emit a single
-		// finished_at = now and leave started_at to the running event.
+		// Studio's ExecutionOutputPanel.tsx renders the per-component
+		// duration via `<SpanDuration>` only when BOTH
+		// `timestamps.started_at` and `timestamps.finished_at` are set
+		// (`hasTiming = started_at && finished_at`). We previously
+		// emitted only `finished_at` so the panel's "370ms · Full Trace"
+		// line silently went blank on FF=on (caught by rchaves on the
+		// dogfood). Derive started_at from finished_at − DurationMS
+		// rather than threading absolute clock-times through NodeState
+		// — the wall-clock skew between the running and finished events
+		// would be measured in microseconds anyway, and the UI only
+		// uses the diff.
+		finishedAt := time.Now().UnixMilli()
 		es["timestamps"] = map[string]any{
-			"finished_at": time.Now().UnixMilli(),
+			"started_at":  finishedAt - ns.DurationMS,
+			"finished_at": finishedAt,
 		}
 	}
 	return StreamEvent{
