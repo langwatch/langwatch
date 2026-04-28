@@ -1,5 +1,5 @@
-import { Button, Circle, Flex, HStack, Icon, Text } from "@chakra-ui/react";
-import { LuPin, LuPinOff, LuX } from "react-icons/lu";
+import { Badge, Button, Circle, Flex, HStack, Icon, Text } from "@chakra-ui/react";
+import { LuFileText, LuPin, LuPinOff, LuX } from "react-icons/lu";
 import type { SpanTreeNode } from "~/server/api/routers/tracesV2.schemas";
 import type { DrawerTab } from "../../stores/drawerStore";
 import {
@@ -27,6 +27,8 @@ interface SpanTabBarProps {
   onPinSpan: (spanId: string) => void;
   onUnpinSpan: (spanId: string) => void;
   traceId?: string;
+  /** Distinct prompt references on this trace — drives the Prompts tab. */
+  promptCount?: number;
 }
 
 function DrawerTabPresenceDot({
@@ -77,6 +79,7 @@ export function SpanTabBar({
   onPinSpan,
   onUnpinSpan,
   traceId,
+  promptCount = 0,
 }: SpanTabBarProps) {
   const isSelectedPinned = selectedSpan
     ? pinnedSpans.some((s) => s.spanId === selectedSpan.spanId)
@@ -162,6 +165,43 @@ export function SpanTabBar({
           ) : null}
         </Button>
       </Tooltip>
+
+      {/* Prompts tab — only when this trace used managed prompts. The
+          chip in the header is the lightweight peek; this tab is the full
+          rollup grouped by prompt + version. */}
+      {promptCount > 0 && (
+        <Tooltip
+          content="Prompts used in this trace"
+          positioning={{ placement: "bottom" }}
+        >
+          <Button
+            size="sm"
+            variant="ghost"
+            borderRadius={0}
+            borderBottomWidth="2px"
+            borderBottomColor={
+              activeTab === "prompts" ? "blue.solid" : "transparent"
+            }
+            color={activeTab === "prompts" ? "fg" : "fg.muted"}
+            fontWeight={activeTab === "prompts" ? "semibold" : "medium"}
+            onClick={() => onTabChange("prompts")}
+            paddingX={3}
+            paddingY={0}
+            height="38px"
+            flexShrink={0}
+            gap={1.5}
+          >
+            <Icon as={LuFileText} boxSize={3.5} />
+            Prompts
+            <Badge size="xs" variant="subtle" colorPalette="blue">
+              {promptCount}
+            </Badge>
+            {traceId ? (
+              <DrawerTabPresenceDot traceId={traceId} tab="prompts" />
+            ) : null}
+          </Button>
+        </Tooltip>
+      )}
 
       {/* Pinned span tabs */}
       {pinnedSpans.map((span) => {

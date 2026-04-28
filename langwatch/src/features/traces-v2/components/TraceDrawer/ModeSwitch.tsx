@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Flex, HStack, Text } from "@chakra-ui/react";
+import { Box, Flex, HStack, Text } from "@chakra-ui/react";
 import { Kbd } from "~/components/ops/shared/Kbd";
 import { Tooltip } from "~/components/ui/tooltip";
 import { PresenceMarker } from "~/features/presence/components/PresenceMarker";
@@ -14,20 +14,18 @@ interface ModeSwitchProps {
   onViewModeChange: (mode: DrawerViewMode) => void;
   turnLabel?: string;
   hasConversation?: boolean;
-  hasScenario?: boolean;
   /** Trace id used to scope the per-mode peer presence dots. */
   traceId?: string;
 }
 
-interface SegmentProps {
+interface TabProps {
   label: string;
   shortcut: string;
   active: boolean;
   disabled?: boolean;
   onClick: () => void;
-  isLast?: boolean;
-  accent?: "blue" | "purple";
   presence?: ReactNode;
+  disabledReason?: string;
 }
 
 function ModePresenceDot({
@@ -49,125 +47,106 @@ function ModePresenceDot({
   return <PresenceMarker peers={peers} size={16} tooltipSuffix={`${mode} view`} />;
 }
 
-function Segment({
+function ModeTab({
   label,
   shortcut,
   active,
   disabled,
   onClick,
-  isLast,
-  accent = "blue",
   presence,
-}: SegmentProps) {
-  const activeBg =
-    active && accent === "purple" ? "purple.500/14" : "bg.emphasized";
-  return (
+  disabledReason,
+}: TabProps) {
+  const tab = (
     <Flex
-      as="button"
+      as={disabled ? "div" : "button"}
       align="center"
-      gap={1.5}
-      paddingX={2.5}
-      height="26px"
+      gap={1}
+      paddingX={0.5}
+      paddingY={2}
       cursor={disabled ? "not-allowed" : "pointer"}
-      bg={active ? activeBg : "bg.panel"}
-      color={
-        active
-          ? accent === "purple"
-            ? "purple.fg"
-            : "fg"
-          : disabled
-            ? "fg.subtle"
-            : "fg.muted"
-      }
+      color={active ? "fg" : disabled ? "fg.subtle" : "fg.muted"}
       fontWeight={active ? "semibold" : "medium"}
-      borderRightWidth={isLast ? "0" : "1px"}
-      borderColor="border"
-      transition="background 0.12s ease, color 0.12s ease"
-      _hover={
-        active || disabled
-          ? undefined
-          : { bg: "bg.muted", color: "fg" }
-      }
+      transition="color 0.12s ease"
+      _hover={active || disabled ? undefined : { color: "fg" }}
       onClick={disabled ? undefined : onClick}
-      opacity={disabled ? 0.6 : 1}
+      position="relative"
+      opacity={disabled ? 0.5 : 1}
     >
-      <Text textStyle="xs">{label}</Text>
+      <Text textStyle="sm">{label}</Text>
       <Kbd>{shortcut}</Kbd>
       {presence}
+      {/* Active indicator — a 2px underline that aligns with the row's
+          bottom border. Only the active tab paints it. */}
+      <Box
+        position="absolute"
+        left={0}
+        right={0}
+        bottom="-1px"
+        height="2px"
+        bg={active ? "blue.solid" : "transparent"}
+        borderTopRadius="full"
+        transition="background 0.12s ease"
+      />
     </Flex>
   );
+
+  if (disabled && disabledReason) {
+    return (
+      <Tooltip content={disabledReason} positioning={{ placement: "bottom" }}>
+        {tab}
+      </Tooltip>
+    );
+  }
+
+  return tab;
 }
 
+/**
+ * Inline tab strip below the header chips. Toggles between the trace view
+ * and the conversation rollup. Scenario lives as a chip link-out in the
+ * header, not as a third tab here — keeping this row to two options keeps
+ * the visual weight low.
+ */
 export function ModeSwitch({
   viewMode,
   onViewModeChange,
   turnLabel,
   hasConversation = true,
-  hasScenario = false,
   traceId,
 }: ModeSwitchProps) {
-  const conversationDisabled = !hasConversation;
-  const scenarioDisabled = !hasScenario;
-
   const presenceFor = (mode: DrawerViewMode) =>
     traceId ? <ModePresenceDot traceId={traceId} mode={mode} /> : null;
 
-  const conversationSegment = (
-    <Segment
-      label="Conversation"
-      shortcut="C"
-      active={viewMode === "conversation"}
-      disabled={conversationDisabled}
-      onClick={() => onViewModeChange("conversation")}
-      isLast={!hasScenario}
-      presence={presenceFor("conversation")}
-    />
-  );
-
-  const scenarioSegment = (
-    <Segment
-      label="Scenario"
-      shortcut="S"
-      active={viewMode === "scenario"}
-      disabled={scenarioDisabled}
-      onClick={() => onViewModeChange("scenario")}
-      isLast
-      accent="purple"
-      presence={presenceFor("scenario")}
-    />
-  );
-
   return (
-    <HStack paddingX={4} paddingY={1} gap={2}>
-      <HStack
-        gap={0}
-        borderRadius="md"
-        borderWidth="1px"
-        borderColor="border"
-        overflow="hidden"
-        bg="bg.panel"
-      >
-        <Segment
-          label="Trace"
-          shortcut="T"
-          active={viewMode === "trace"}
-          onClick={() => onViewModeChange("trace")}
-          presence={presenceFor("trace")}
-        />
-        {conversationDisabled ? (
-          <Tooltip
-            content="This trace is not part of a conversation"
-            positioning={{ placement: "bottom" }}
-          >
-            {conversationSegment}
-          </Tooltip>
-        ) : (
-          conversationSegment
-        )}
-        {hasScenario && scenarioSegment}
-      </HStack>
+    <HStack
+      paddingX={4}
+      gap={4}
+      borderBottomWidth="1px"
+      borderColor="border.muted"
+      align="center"
+    >
+      <ModeTab
+        label="Trace"
+        shortcut="T"
+        active={viewMode === "trace"}
+        onClick={() => onViewModeChange("trace")}
+        presence={presenceFor("trace")}
+      />
+      <ModeTab
+        label="Conversation"
+        shortcut="C"
+        active={viewMode === "conversation"}
+        disabled={!hasConversation}
+        disabledReason={
+          hasConversation ? undefined : "This trace is not part of a conversation"
+        }
+        onClick={() => onViewModeChange("conversation")}
+        presence={presenceFor("conversation")}
+      />
       {turnLabel && viewMode === "trace" && (
-        <Text textStyle="xs" color="fg.muted">{turnLabel}</Text>
+        <Text textStyle="xs" color="fg.muted" marginLeft="auto">
+          {turnLabel}
+        </Text>
       )}
     </HStack>
   );

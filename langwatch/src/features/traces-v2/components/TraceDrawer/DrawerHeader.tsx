@@ -34,6 +34,7 @@ import { useDrawer } from "~/hooks/useDrawer";
 import { usePinnedAttributes } from "../../hooks/usePinnedAttributes";
 import { useThreadContext } from "../../hooks/useThreadContext";
 import { useTraceResources } from "../../hooks/useTraceResources";
+import { useTraceHeaderChips } from "../../hooks/useTraceHeaderChips";
 import { useFilterStore } from "../../stores/filterStore";
 import type { PinnedAttribute } from "../../stores/pinnedAttributesStore";
 import type { TraceHeader } from "~/server/api/routers/tracesV2.schemas";
@@ -48,15 +49,21 @@ import {
   STATUS_COLORS,
 } from "../../utils/formatters";
 import { Kbd } from "~/components/ops/shared/Kbd";
-import { parseSdkInfo } from "../../utils/sdkInfo";
+import { ChipBar } from "./ChipBar";
 import { ModeSwitch } from "./ModeSwitch";
 import { RawJsonDialog } from "./RawJsonDialog";
-import { ScenarioChip } from "./ScenarioChip";
 import { TracePresenceAvatars } from "~/features/presence/components/TracePresenceAvatars";
 
 interface DrawerHeaderProps {
   trace: TraceHeader;
   isMaximized: boolean;
+  /**
+   * Threaded down to the chip bar so the latest-prompt chip can deep-link
+   * to its source span via the same path as visualization clicks.
+   */
+  onSelectSpan: (spanId: string) => void;
+  /** Switches the lower tab bar to the Prompts panel. */
+  onOpenPromptsTab: () => void;
   viewMode: DrawerViewMode;
   onViewModeChange: (mode: DrawerViewMode) => void;
   onToggleMaximized: () => void;
@@ -103,6 +110,8 @@ function readNumberAttribute(
 export function DrawerHeader({
   trace,
   isMaximized,
+  onSelectSpan,
+  onOpenPromptsTab,
   viewMode,
   onViewModeChange,
   onToggleMaximized,
@@ -138,15 +147,10 @@ export function DrawerHeader({
     trace.outputTokens != null &&
     (trace.inputTokens > 0 || trace.outputTokens > 0);
 
-  const sdkInfo = parseSdkInfo({
-    name: trace.attributes["sdk.name"],
-    version: trace.attributes["sdk.version"],
-    language: trace.attributes["sdk.language"],
-    scenarioSdkName: trace.attributes["scenario.sdk.name"],
-    scenarioSdkVersion: trace.attributes["scenario.sdk.version"],
-    scenarioActive: !!(trace.scenarioRunId ?? trace.attributes["scenario.run_id"]),
+  const headerChips = useTraceHeaderChips(trace, {
+    onSelectSpan,
+    onOpenPromptsTab,
   });
-
   const resources = useTraceResources(trace.traceId);
   const threadContext = useThreadContext(
     trace.conversationId ?? null,
@@ -602,70 +606,26 @@ export function DrawerHeader({
         })}
       </HStack>
 
-      {/* Row 4: Context tags */}
-      <HStack gap={2} flexWrap="wrap">
-        {trace.serviceName && (
-          <ContextChip>{trace.serviceName}</ContextChip>
-        )}
-        <ContextChip>{trace.origin}</ContextChip>
-        {(trace.scenarioRunId ?? trace.attributes["scenario.run_id"]) && (
-          <ScenarioChip
-            scenarioRunId={(trace.scenarioRunId ?? trace.attributes["scenario.run_id"])!}
-          />
-        )}
-        {sdkInfo && (
-          <Tooltip
-            content={
-              <VStack align="stretch" gap={1.5} minWidth="220px" maxWidth="300px">
-                <Text textStyle="xs" fontWeight="semibold">
-                  {sdkInfo.longLabel}
-                </Text>
-                <Text textStyle="2xs" color="fg.muted" lineHeight="1.4">
-                  {sdkInfo.description}
-                </Text>
-                <VStack align="stretch" gap={0.5} paddingTop={1}>
-                  <TooltipRow label="Library" value={sdkInfo.rawName} />
-                  {sdkInfo.version && (
-                    <TooltipRow label="Version" value={sdkInfo.version} />
-                  )}
-                  <TooltipRow label="Language" value={sdkInfo.language} />
-                  {sdkInfo.family && (
-                    <TooltipRow label="Family" value={sdkInfo.family} />
-                  )}
-                  {sdkInfo.scenario && (
-                    <TooltipRow
-                      label="Scenario"
-                      value={
-                        sdkInfo.scenario.version
-                          ? `SDK ${sdkInfo.scenario.version}`
-                          : "active"
-                      }
-                    />
-                  )}
-                </VStack>
-              </VStack>
-            }
-            positioning={{ placement: "top" }}
-          >
-            <Box>
-              <ContextChip>{sdkInfo.shortLabel}</ContextChip>
-            </Box>
-          </Tooltip>
-        )}
-        <Text textStyle="xs" color="fg.subtle" marginLeft="auto">
-          {formatRelativeTime(trace.timestamp)}
-        </Text>
-      </HStack>
+      {/* Row 4: Metadata chip strip — driven by `useTraceHeaderChips` so
+          adding a new chip (prompt, eval, env, …) is a one-line entry in
+          the hook, not a JSX edit here. */}
+      <ChipBar
+        chips={headerChips}
+        endSlot={
+          <Text textStyle="xs" color="fg.subtle">
+            {formatRelativeTime(trace.timestamp)}
+          </Text>
+        }
+      />
 
-      {/* Row 5: View mode toggle — always shown so the LLM-optimised view
-          is one click away. Conversation/scenario segments disable when
-          their backing data isn't on this trace. */}
+
+      {/* Row 5: Inline mode tabs — Trace / Conversation. Scenario is a
+          link-out chip in row 4, so it isn't a third tab here. */}
       <Box marginX={-4}>
         <ModeSwitch
           viewMode={viewMode}
           onViewModeChange={onViewModeChange}
           hasConversation={!!trace.conversationId}
-          hasScenario={!!(trace.scenarioRunId ?? trace.attributes["scenario.run_id"])}
           traceId={trace.traceId}
         />
       </Box>
@@ -718,21 +678,6 @@ function ThreadProgressIndicator({
         </Box>
       </HStack>
     </Tooltip>
-  );
-}
-
-function ContextChip({ children }: { children: React.ReactNode }) {
-  return (
-    <Text
-      textStyle="xs"
-      color="fg.muted"
-      paddingX={1.5}
-      paddingY={0.5}
-      borderRadius="sm"
-      bg="bg.muted"
-    >
-      {children}
-    </Text>
   );
 }
 

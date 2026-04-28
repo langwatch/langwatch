@@ -16,8 +16,9 @@ import { DrawerHeader } from "./DrawerHeader";
 import { ConversationContext } from "./ConversationContext";
 import { ConversationView } from "./ConversationView";
 import { LlmPanel } from "./LlmPanel";
-import { ScenarioView } from "./ScenarioView";
+import { PromptsPanel } from "./PromptsPanel";
 import { ScenarioRoleProvider } from "./scenarioRoles";
+import { parseTracePromptIds } from "../../utils/promptAttributes";
 import { KeyboardShortcutsHelp } from "./KeyboardShortcutsHelp";
 import { VizPlaceholder } from "./VizPlaceholder";
 import { SpanTabBar } from "./SpanTabBar";
@@ -372,6 +373,20 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
           setActiveTab("llm");
           break;
         }
+        case "p":
+        case "P": {
+          // Only available when this trace touched a managed prompt — same
+          // gate as the tab visibility in SpanTabBar.
+          if (
+            trace.containsPrompt ||
+            (trace.attributes["langwatch.prompt_ids"] ?? "").length > 0
+          ) {
+            e.preventDefault();
+            setStoreViewMode("trace");
+            setActiveTab("prompts");
+          }
+          break;
+        }
         case "t":
         case "T": {
           e.preventDefault();
@@ -383,14 +398,6 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
           if (trace.conversationId) {
             e.preventDefault();
             setStoreViewMode("conversation");
-          }
-          break;
-        }
-        case "s":
-        case "S": {
-          if (trace.scenarioRunId ?? trace.attributes["scenario.run_id"]) {
-            e.preventDefault();
-            setStoreViewMode("scenario");
           }
           break;
         }
@@ -466,6 +473,8 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
                 <DrawerHeader
                   trace={trace}
                   isMaximized={isMaximized}
+                  onSelectSpan={handleSelectSpan}
+                  onOpenPromptsTab={() => setActiveTab("prompts")}
                   viewMode={viewMode}
                   onViewModeChange={setStoreViewMode}
                   onToggleMaximized={handleToggleMaximized}
@@ -501,11 +510,7 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
                 display="flex"
                 flexDirection="column"
               >
-                {viewMode === "scenario" && (trace.scenarioRunId ?? trace.attributes["scenario.run_id"]) ? (
-                  <ScenarioView
-                    scenarioRunId={(trace.scenarioRunId ?? trace.attributes["scenario.run_id"])!}
-                  />
-                ) : viewMode === "conversation" && trace.conversationId ? (
+                {viewMode === "conversation" && trace.conversationId ? (
                   <ConversationView
                     conversationId={trace.conversationId}
                     currentTraceId={trace.traceId}
@@ -561,10 +566,17 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
                       onPinSpan={handlePinSpan}
                       onUnpinSpan={handleUnpinSpan}
                       traceId={trace?.traceId}
+                      promptCount={parseTracePromptIds(trace.attributes).length}
                     />
 
                     {activeTab === "llm" ? (
                       <LlmPanel trace={trace} spans={spanTree} />
+                    ) : activeTab === "prompts" ? (
+                      <PromptsPanel
+                        trace={trace}
+                        spans={spanTree}
+                        onSelectSpan={handleSelectSpan}
+                      />
                     ) : (
                       <TraceAccordions
                         trace={trace}

@@ -8,8 +8,14 @@ import {
   LuQuote,
 } from "react-icons/lu";
 import { Tooltip } from "~/components/ui/tooltip";
+import { useDrawer } from "~/hooks/useDrawer";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { EvalSummary } from "../../types/trace";
 import { formatCost, formatDuration, truncateId } from "../../utils/formatters";
+import {
+  AZURE_SAFETY_NOT_CONFIGURED_MESSAGE,
+  AZURE_SAFETY_PROVIDER_KEY,
+} from "~/server/app-layer/evaluations/azure-safety-env";
 
 const STATUS = {
   pass: {
@@ -156,6 +162,8 @@ function EvalCard({
   const { name, score, scoreType, status } = eval_;
   const tone = STATUS[status] ?? STATUS.warning;
   const noVerdict = isNoVerdict(status);
+  const { openDrawer } = useDrawer();
+  const { project, organization } = useOrganizationTeamProject();
 
   let scoreLabel = "";
   let scoreSubLabel = "";
@@ -339,7 +347,35 @@ function EvalCard({
               fontStyle={showStatusMessage ? "normal" : "italic"}
               fontWeight={showStatusMessage ? "medium" : "normal"}
             >
-              {showStatusMessage ? primaryStatusText : eval_.reasoning}
+              {showStatusMessage ? (
+                primaryStatusText === AZURE_SAFETY_NOT_CONFIGURED_MESSAGE ? (
+                  <>
+                    Azure Safety provider not configured. Configure it in{" "}
+                    <Text
+                      as="button"
+                      type="button"
+                      color="blue.500"
+                      textDecoration="underline"
+                      onClick={() => {
+                        if (!project?.id) return;
+                        openDrawer("editModelProvider", {
+                          projectId: project.id,
+                          organizationId: organization?.id,
+                          providerKey: AZURE_SAFETY_PROVIDER_KEY,
+                          modelProviderId: "new",
+                        });
+                      }}
+                    >
+                      Settings → Model Providers
+                    </Text>{" "}
+                    to run this evaluator.
+                  </>
+                ) : (
+                  primaryStatusText
+                )
+              ) : (
+                eval_.reasoning
+              )}
             </Text>
           </HStack>
         </Box>

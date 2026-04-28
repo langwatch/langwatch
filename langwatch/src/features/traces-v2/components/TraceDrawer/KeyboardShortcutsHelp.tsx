@@ -31,6 +31,7 @@ const DRAWER_GROUPS: ShortcutGroup[] = [
     items: [
       { keys: ["T"], label: "Trace view" },
       { keys: ["L"], label: "LLM tab" },
+      { keys: ["P"], label: "Prompts tab", detail: "When the trace used a managed prompt" },
       { keys: ["C"], label: "Conversation view" },
       { keys: ["M"], label: "Maximize / restore" },
       { keys: ["Esc"], label: "Close drawer / span" },
@@ -90,10 +91,10 @@ export function KeyboardShortcutsHelp({
         left="50%"
         transform="translate(-50%, -50%)"
         bg="bg.panel"
-        borderRadius="lg"
+        borderRadius="md"
         borderWidth="1px"
         borderColor="border"
-        width="560px"
+        width="480px"
         maxWidth="90vw"
         maxHeight="80vh"
         overflow="auto"
@@ -101,32 +102,32 @@ export function KeyboardShortcutsHelp({
         onClick={(e) => e.stopPropagation()}
       >
         <HStack
-          paddingX={5}
-          paddingY={3}
+          paddingX={3}
+          paddingY={2}
           borderBottomWidth="1px"
           borderColor="border.muted"
           justify="space-between"
         >
-          <HStack gap={2}>
-            <Icon as={LuKeyboard} boxSize={4} color="fg.muted" />
-            <Heading textStyle="sm" fontWeight="semibold">
+          <HStack gap={1.5}>
+            <Icon as={LuKeyboard} boxSize="12px" color="fg.muted" />
+            <Heading textStyle="xs" fontWeight="semibold">
               Keyboard Shortcuts
             </Heading>
           </HStack>
           <Box
             as="button"
             onClick={onClose}
-            padding={1}
+            padding={0.5}
             borderRadius="sm"
             _hover={{ bg: "bg.muted" }}
             aria-label="Close shortcuts"
           >
-            <Icon as={LuX} boxSize={4} color="fg.subtle" />
+            <Icon as={LuX} boxSize="12px" color="fg.subtle" />
           </Box>
         </HStack>
-        <VStack align="stretch" gap={5} paddingX={5} paddingY={4}>
+        <VStack align="stretch" gap={3} paddingX={3} paddingY={3}>
           {groups.map((group) => (
-            <VStack key={group.title} align="stretch" gap={1.5}>
+            <VStack key={group.title} align="stretch" gap={1}>
               <Text
                 textStyle="2xs"
                 color="fg.muted"
@@ -136,10 +137,10 @@ export function KeyboardShortcutsHelp({
               >
                 {group.title}
               </Text>
-              <VStack align="stretch" gap={1}>
+              <VStack align="stretch" gap={0.5}>
                 {group.items.map((item) => (
                   <HStack key={item.label} gap={2} justify="space-between">
-                    <Text textStyle="sm" color="fg">
+                    <Text textStyle="xs" color="fg">
                       {item.label}
                     </Text>
                     <HStack gap={1}>
@@ -154,8 +155,8 @@ export function KeyboardShortcutsHelp({
           ))}
         </VStack>
         <Box
-          paddingX={5}
-          paddingY={2.5}
+          paddingX={3}
+          paddingY={1.5}
           borderTopWidth="1px"
           borderColor="border.muted"
           bg="bg.subtle"
