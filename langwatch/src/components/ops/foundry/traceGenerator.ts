@@ -1,10 +1,22 @@
 import { shortId } from "./types";
 import type { SpanConfig, SpanType, TraceConfig } from "./types";
 
+export interface PromptRef {
+  id: string;
+  versionId: string;
+  handle: string | null;
+  model?: string;
+  inputs: Array<{ identifier: string; type: string }>;
+}
+
 export interface GeneratorOptions {
   targetSpanCount: number;
   maxDepth: number;
   genaiRatio: number; // 0.0–1.0: fraction of spans that are genai-typed
+  /** When non-empty, llm spans randomly attach a real prompt id/version/variables. */
+  prompts?: PromptRef[];
+  /** When true, attach OTel semconv span events (gen_ai.*.message, exceptions, logs). */
+  includeEvents?: boolean;
 }
 
 const GENAI_TYPES: SpanType[] = ["llm", "agent", "tool", "rag", "chain", "guardrail"];
@@ -84,37 +96,157 @@ function randInt(min: number, max: number): number {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
-function makeInfraSpan(): SpanConfig {
+function makeLlmEvents({
+  systemPrompt,
+  userMsg,
+  assistantMsg,
+  model,
+  durationMs,
+  toolCalls,
+}: {
+  systemPrompt: string;
+  userMsg: string;
+  assistantMsg: string;
+  model: string;
+  durationMs: number;
+  toolCalls?: Array<{ name: string; args: Record<string, unknown> }>;
+}): SpanConfig["events"] {
+  const events: NonNullable<SpanConfig["events"]> = [
+    {
+      name: "gen_ai.system.message",
+      offsetMs: 0,
+      attributes: {
+        "gen_ai.system": "openai",
+        role: "system",
+        content: systemPrompt,
+      },
+    },
+    {
+      name: "gen_ai.user.message",
+      offsetMs: randInt(1, 5),
+      attributes: {
+        "gen_ai.system": "openai",
+        role: "user",
+        content: userMsg,
+      },
+    },
+  ];
+
+  for (const tc of toolCalls ?? []) {
+    events.push({
+      name: "gen_ai.tool.message",
+      offsetMs: randInt(10, Math.max(11, Math.floor(durationMs * 0.4))),
+      attributes: {
+        "gen_ai.system": "openai",
+        role: "tool",
+        id: shortId(),
+        content: JSON.stringify(tc.args),
+      },
+    });
+  }
+
+  events.push({
+    name: "gen_ai.choice",
+    offsetMs: Math.max(events[events.length - 1]!.offsetMs! + 1, durationMs - randInt(5, 50)),
+    attributes: {
+      "gen_ai.system": "openai",
+      "gen_ai.response.model": model,
+      finish_reason: pick(["stop", "length", "tool_calls"]),
+      index: 0,
+      message: JSON.stringify({ role: "assistant", content: assistantMsg }),
+    },
+  });
+
+  return events;
+}
+
+function makeExceptionEvent(
+  durationMs: number,
+  message: string,
+): NonNullable<SpanConfig["events"]>[number] {
   return {
+    name: "exception",
+    offsetMs: Math.max(1, durationMs - randInt(1, 5)),
+    attributes: {
+      "exception.type": pick([
+        "TimeoutError",
+        "RateLimitError",
+        "ValidationError",
+        "TypeError",
+      ]),
+      "exception.message": message,
+      "exception.stacktrace": `Error: ${message}\n    at handleRequest (server.ts:${randInt(10, 500)})\n    at process (worker.ts:${randInt(10, 200)})`,
+    },
+  };
+}
+
+function makeInfraSpan(includeEvents?: boolean): SpanConfig {
+  const status = Math.random() < 0.02 ? "error" : "ok";
+  const durationMs = randInt(1, 30);
+  const span: SpanConfig = {
     id: shortId(),
     name: pick(INFRA_SPAN_NAMES),
     type: pick(INFRA_TYPES),
-    durationMs: randInt(1, 30),
+    durationMs,
     offsetMs: 0,
-    status: Math.random() < 0.02 ? "error" : "ok",
+    status,
     children: [],
     attributes: {
       "http.method": "POST",
       "http.status_code": 200,
     },
   };
+  if (includeEvents && status === "error") {
+    span.events = [makeExceptionEvent(durationMs, "Upstream call failed")];
+  }
+  return span;
 }
 
-function makeLlmSpan(): SpanConfig {
-  const model = pick(MODEL_NAMES);
+function synthesizePromptVariables(
+  inputs: PromptRef["inputs"],
+): Record<string, string> {
+  const vars: Record<string, string> = {};
+  for (const { identifier, type } of inputs) {
+    switch (type) {
+      case "str":
+        vars[identifier] = pick(USER_MESSAGES);
+        break;
+      case "float":
+      case "int":
+        vars[identifier] = String(randInt(1, 100));
+        break;
+      case "bool":
+        vars[identifier] = Math.random() < 0.5 ? "true" : "false";
+        break;
+      case "list[str]":
+        vars[identifier] = JSON.stringify([pick(USER_MESSAGES), pick(USER_MESSAGES)]);
+        break;
+      default:
+        vars[identifier] = `synthetic-${identifier}`;
+    }
+  }
+  return vars;
+}
+
+function makeLlmSpan(prompts?: PromptRef[], includeEvents?: boolean): SpanConfig {
+  const promptRef =
+    prompts && prompts.length > 0 && Math.random() < 0.7 ? pick(prompts) : null;
+  const model = promptRef?.model ?? pick(MODEL_NAMES);
   const userMsg = pick(USER_MESSAGES);
   const assistantMsg = pick(ASSISTANT_RESPONSES);
   const systemPrompt = pick(SYSTEM_PROMPTS);
   const promptTokens = randInt(50, 800);
   const completionTokens = randInt(20, 600);
+  const durationMs = randInt(200, 3000);
+  const status = Math.random() < 0.03 ? "error" : "ok";
 
-  return {
+  const span: SpanConfig = {
     id: shortId(),
     name: `chat ${model}`,
     type: "llm",
-    durationMs: randInt(200, 3000),
+    durationMs,
     offsetMs: 0,
-    status: Math.random() < 0.03 ? "error" : "ok",
+    status,
     children: [],
     attributes: {},
     llm: {
@@ -142,22 +274,51 @@ function makeLlmSpan(): SpanConfig {
     },
     output: { type: "text", value: assistantMsg },
   };
+
+  if (includeEvents) {
+    span.events = makeLlmEvents({
+      systemPrompt,
+      userMsg,
+      assistantMsg,
+      model,
+      durationMs,
+    });
+    if (status === "error") {
+      span.events.push(makeExceptionEvent(durationMs, "Provider returned 500"));
+    }
+  }
+
+  if (promptRef) {
+    span.prompt = {
+      promptId: promptRef.id,
+      versionId: promptRef.versionId,
+      variables: synthesizePromptVariables(promptRef.inputs),
+    };
+  }
+
+  return span;
 }
 
-function makeToolSpan(): SpanConfig {
+function makeToolSpan(includeEvents?: boolean): SpanConfig {
   const toolName = pick(TOOL_NAMES);
-  return {
+  const durationMs = randInt(10, 500);
+  const status = Math.random() < 0.05 ? "error" : "ok";
+  const span: SpanConfig = {
     id: shortId(),
     name: toolName,
     type: "tool",
-    durationMs: randInt(10, 500),
+    durationMs,
     offsetMs: 0,
-    status: Math.random() < 0.05 ? "error" : "ok",
+    status,
     children: [],
     attributes: {},
     input: { type: "json", value: { query: "example input", limit: 10 } },
     output: { type: "json", value: { results: ["item1", "item2"], count: 2 } },
   };
+  if (includeEvents && status === "error") {
+    span.events = [makeExceptionEvent(durationMs, `${toolName} invocation failed`)];
+  }
+  return span;
 }
 
 function makeRagSpan(): SpanConfig {
@@ -183,13 +344,14 @@ function makeRagSpan(): SpanConfig {
   };
 }
 
-function makeGuardrailSpan(): SpanConfig {
+function makeGuardrailSpan(includeEvents?: boolean): SpanConfig {
   const passed = Math.random() < 0.9;
-  return {
+  const durationMs = randInt(5, 80);
+  const span: SpanConfig = {
     id: shortId(),
     name: pick(["pii_check", "toxicity_filter", "jailbreak_detector", "content_policy"]),
     type: "guardrail",
-    durationMs: randInt(5, 80),
+    durationMs,
     offsetMs: 0,
     status: passed ? "ok" : "error",
     children: [],
@@ -200,6 +362,12 @@ function makeGuardrailSpan(): SpanConfig {
       exception: { message: "Content policy violation detected" },
     }),
   };
+  if (includeEvents && !passed) {
+    span.events = [
+      makeExceptionEvent(durationMs, "Content policy violation detected"),
+    ];
+  }
+  return span;
 }
 
 /**
@@ -215,11 +383,15 @@ function buildSubtree({
   depth,
   maxDepth,
   genaiRatio,
+  prompts,
+  includeEvents,
 }: {
   budget: number;
   depth: number;
   maxDepth: number;
   genaiRatio: number;
+  prompts?: PromptRef[];
+  includeEvents?: boolean;
 }): { spans: SpanConfig[]; used: number } {
   if (budget <= 0 || depth >= maxDepth) return { spans: [], used: 0 };
 
@@ -236,18 +408,18 @@ function buildSubtree({
     if (!isGenai || atMaxDepth) {
       // Leaf-level: infra span, llm, tool, guardrail, or rag
       if (!isGenai) {
-        spans.push(makeInfraSpan());
+        spans.push(makeInfraSpan(includeEvents));
         used++;
       } else {
         const leafType = Math.random();
         if (leafType < 0.4) {
-          spans.push(makeLlmSpan());
+          spans.push(makeLlmSpan(prompts, includeEvents));
         } else if (leafType < 0.6) {
-          spans.push(makeToolSpan());
+          spans.push(makeToolSpan(includeEvents));
         } else if (leafType < 0.8) {
           spans.push(makeRagSpan());
         } else {
-          spans.push(makeGuardrailSpan());
+          spans.push(makeGuardrailSpan(includeEvents));
         }
         used++;
       }
@@ -279,14 +451,14 @@ function buildSubtree({
 
       for (let i = 0; i < loopIterations && childBudget > 0; i++) {
         // LLM call
-        agent.children.push(makeLlmSpan());
+        agent.children.push(makeLlmSpan(prompts, includeEvents));
         childBudget--;
         used++;
 
         // Tool calls (1-3)
         const toolCount = Math.min(randInt(1, 3), childBudget);
         for (let t = 0; t < toolCount; t++) {
-          agent.children.push(makeToolSpan());
+          agent.children.push(makeToolSpan(includeEvents));
           childBudget--;
           used++;
         }
@@ -299,6 +471,8 @@ function buildSubtree({
           depth: depth + 1,
           maxDepth,
           genaiRatio,
+          prompts,
+          includeEvents,
         });
         agent.children.push(...sub.spans);
         used += sub.used;
@@ -328,11 +502,11 @@ function buildSubtree({
 
       // Optional guardrail before generation
       if (Math.random() < 0.3 && remaining > 4) {
-        chain.children.push(makeGuardrailSpan());
+        chain.children.push(makeGuardrailSpan(includeEvents));
         used++;
       }
 
-      chain.children.push(makeLlmSpan());
+      chain.children.push(makeLlmSpan(prompts, includeEvents));
       used++;
 
       const childBudget = Math.min(remaining - used, randInt(0, 5));
@@ -342,6 +516,8 @@ function buildSubtree({
           depth: depth + 1,
           maxDepth,
           genaiRatio,
+          prompts,
+          includeEvents,
         });
         chain.children.push(...sub.spans);
         used += sub.used;
@@ -369,6 +545,8 @@ function buildSubtree({
         depth: depth + 1,
         maxDepth,
         genaiRatio,
+        prompts,
+        includeEvents,
       });
       workflow.children = sub.spans;
       used += sub.used;
@@ -379,11 +557,11 @@ function buildSubtree({
       // Single leaf span
       if (isGenai) {
         const leafType = Math.random();
-        if (leafType < 0.5) spans.push(makeLlmSpan());
-        else if (leafType < 0.75) spans.push(makeToolSpan());
+        if (leafType < 0.5) spans.push(makeLlmSpan(prompts, includeEvents));
+        else if (leafType < 0.75) spans.push(makeToolSpan(includeEvents));
         else spans.push(makeRagSpan());
       } else {
-        spans.push(makeInfraSpan());
+        spans.push(makeInfraSpan(includeEvents));
       }
       used++;
     }
@@ -408,7 +586,7 @@ function countSpans(spans: SpanConfig[]): number {
 }
 
 export function generateTrace(options: GeneratorOptions): TraceConfig {
-  const { targetSpanCount, maxDepth, genaiRatio } = options;
+  const { targetSpanCount, maxDepth, genaiRatio, prompts, includeEvents } = options;
 
   // Build the root span tree
   const rootAgent: SpanConfig = {
@@ -429,6 +607,8 @@ export function generateTrace(options: GeneratorOptions): TraceConfig {
     depth: 1,
     maxDepth,
     genaiRatio,
+    prompts,
+    includeEvents,
   });
 
   rootAgent.children = children;

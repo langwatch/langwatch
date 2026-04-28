@@ -39,7 +39,7 @@ const getBaseUrl = () => {
 };
 
 const MAX_RETRIES = 4;
-const HTTP_STATUS_TO_NOT_RETRY = [400, 401, 403, 404, 431];
+const HTTP_STATUS_TO_NOT_RETRY = [400, 401, 403, 404, 422, 431];
 
 function createTRPCLinks() {
   return [

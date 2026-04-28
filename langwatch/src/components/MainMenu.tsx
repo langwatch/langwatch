@@ -25,6 +25,7 @@ import { projectRoutes } from "../utils/routes";
 import { useTableView } from "./messages/HeaderButtons";
 import { CollapsibleMenuGroup } from "./sidebar/CollapsibleMenuGroup";
 import { SideMenuLink } from "./sidebar/SideMenuLink";
+import { PresenceToggle } from "./sidebar/PresenceToggle";
 import { SupportMenu } from "./sidebar/SupportMenu";
 import { ThemeToggle } from "./sidebar/ThemeToggle";
 import { UsageIndicator } from "./sidebar/UsageIndicator";
@@ -148,7 +149,7 @@ export const MainMenu = React.memo(function MainMenu({
                 project={project}
                 isActive={router.pathname.includes("/traces")}
                 showLabel={showExpanded}
-                beta="This feature is in alpha"
+                beta="Traces v2 is in alpha — expect rough edges. Share feedback or report issues on Slack, or open one at https://github.com/langwatch/langwatch/issues/new/choose."
                 betaLabel="Alpha"
               />
             )}
@@ -406,6 +407,7 @@ export const MainMenu = React.memo(function MainMenu({
               />
             )}
             <SupportMenu showLabel={showExpanded} />
+            <PresenceToggle showLabel={showExpanded} />
             <ThemeToggle showLabel={showExpanded} />
           </VStack>
         </VStack>
@@ -424,7 +426,7 @@ const OpsSection = ({ showExpanded }: { showExpanded: boolean }) => {
 
   const opsData = api.ops.getDashboardSnapshot.useQuery(undefined, {
     enabled: shouldShow,
-    refetchInterval: 10000,
+    refetchInterval: isOnOpsRoute ? 10000 : 60000,
   });
 
   // Backoffice is admin-only. `useOpsPermission` already gates the whole

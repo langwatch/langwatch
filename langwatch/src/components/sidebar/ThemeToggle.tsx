@@ -62,59 +62,56 @@ export const ThemeToggle = ({ showLabel = true }: ThemeToggleProps) => {
     );
   }
 
-  // Expanded mode: 3-button selector with animated pill indicator
+  // Expanded mode: three icons spread across the row with a soft circle that
+  // slides behind the active one. No bordered container, no shared chrome.
   return (
     <Box width="full" px={2} py={3}>
       <HStack
-        bg="bg.muted"
-        borderRadius="lg"
-        border="1px solid"
-        borderColor="border"
-        p="3px"
-        gap={0}
-        justify="center"
+        role="radiogroup"
+        aria-label="Theme"
+        justify="space-between"
         width="full"
         position="relative"
+        height="32px"
       >
-        {/* Animated background pill */}
+        {/* Soft sliding indicator. Width is one-third of the row, so the icon
+            it sits under stays centred as it animates between positions. */}
         <Box
           position="absolute"
-          top="3px"
-          bottom="3px"
-          left="3px"
-          width={`calc((100% - 6px) / ${themeOptions.length})`}
-          bg="bg.panel"
-          borderRadius="md"
+          top="50%"
+          left={0}
+          width={`calc(100% / ${themeOptions.length})`}
+          height="32px"
+          marginTop="-16px"
+          borderRadius="full"
+          bg="bg.muted"
           boxShadow={pillShadow}
-          transition="transform 0.25s cubic-bezier(0.4, 0, 0.2, 1)"
+          transition="transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)"
           transform={`translateX(${safeIndex * 100}%)`}
-          zIndex={0}
+          pointerEvents="none"
         />
         {themeOptions.map((option) => (
           <Box
             key={option.value}
             as="button"
+            role="radio"
+            aria-checked={theme === option.value}
+            aria-label={`Set theme to ${option.value}`}
             flex={1}
             display="flex"
             alignItems="center"
             justifyContent="center"
-            py="8px"
-            px={4}
-            borderRadius="md"
+            height="full"
             color={theme === option.value ? "fg" : "fg.subtle"}
             cursor="pointer"
-            transition="all 0.2s"
+            transition="color 0.2s ease"
             position="relative"
-            zIndex={1}
-            _hover={{
-              color: theme === option.value ? "fg" : "fg.muted",
-            }}
+            _hover={{ color: theme === option.value ? "fg" : "fg.muted" }}
             onClick={() => setTheme(option.value)}
-            aria-label={`Set theme to ${option.value}`}
           >
             <Box
-              transition="transform 0.2s"
-              transform={theme === option.value ? "scale(1.1)" : "scale(1)"}
+              transition="transform 0.25s cubic-bezier(0.4, 0, 0.2, 1)"
+              transform={theme === option.value ? "scale(1.15)" : "scale(1)"}
             >
               {option.icon}
             </Box>

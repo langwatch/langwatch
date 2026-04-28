@@ -7,6 +7,8 @@ interface DialogContentProps extends ChakraDialog.ContentProps {
   portalled?: boolean;
   portalRef?: React.RefObject<HTMLElement>;
   backdrop?: boolean;
+  /** Props merged onto the default backdrop (e.g. stronger blur). */
+  backdropProps?: ChakraDialog.BackdropProps;
   /** Props passed to the positioner (e.g. style for --layer-index). */
   positionerProps?: ChakraDialog.PositionerProps;
 }
@@ -20,6 +22,7 @@ export const DialogContent = React.forwardRef<
     portalled = true,
     portalRef,
     backdrop = true,
+    backdropProps,
     positionerProps,
     ...rest
   } = props;
@@ -30,6 +33,7 @@ export const DialogContent = React.forwardRef<
         <ChakraDialog.Backdrop
           backdropFilter="blur(8px)"
           background="blackAlpha.400/10"
+          {...backdropProps}
         />
       )}
       <ChakraDialog.Positioner {...positionerProps}>

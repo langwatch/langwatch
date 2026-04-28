@@ -1,5 +1,5 @@
 import { WebTracerProvider } from "@opentelemetry/sdk-trace-web";
-import { SimpleSpanProcessor } from "@opentelemetry/sdk-trace-base";
+import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-proto";
 import { resourceFromAttributes } from "@opentelemetry/resources";
 import { attributes } from "langwatch/observability";
@@ -34,11 +34,27 @@ export function createFoundryProvider({
       "x-langwatch-sdk-language": "typescript",
       "x-langwatch-sdk-runtime": "web",
     },
+    // Allow many concurrent batch exports — large foundry traces can produce
+    // thousands of spans, and the default (10) silently drops anything queued
+    // beyond that.
+    concurrencyLimit: 64,
   });
 
   const provider = new WebTracerProvider({
     resource,
-    spanProcessors: [new SimpleSpanProcessor(exporter)],
+    // Batch spans into bigger OTLP payloads instead of one HTTP request per
+    // `span.end()`. The foundry can generate thousands of spans synchronously,
+    // so SimpleSpanProcessor would otherwise blow past the browser's per-origin
+    // connection limit and the exporter's concurrency limit, silently losing
+    // most of them.
+    spanProcessors: [
+      new BatchSpanProcessor(exporter, {
+        maxExportBatchSize: 256,
+        maxQueueSize: 8192,
+        scheduledDelayMillis: 50,
+        exportTimeoutMillis: 30_000,
+      }),
+    ],
   });
 
   return provider;

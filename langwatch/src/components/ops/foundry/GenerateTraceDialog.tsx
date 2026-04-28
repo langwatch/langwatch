@@ -2,9 +2,12 @@ import { useState } from "react";
 import { Box, Button, Flex, Text, Input, VStack } from "@chakra-ui/react";
 import { Sparkles } from "lucide-react";
 import { SimpleSlider } from "~/components/ui/slider";
+import { Switch } from "~/components/ui/switch";
+import { api } from "~/utils/api";
 import { useTraceStore } from "./traceStore";
+import { useFoundryProjectStore } from "./foundryProjectStore";
 import { generateTrace } from "./traceGenerator";
-import type { GeneratorOptions } from "./traceGenerator";
+import type { GeneratorOptions, PromptRef } from "./traceGenerator";
 
 const DEPTH_PRESETS = [
   { label: "Shallow", value: 4 },
@@ -15,16 +18,40 @@ const DEPTH_PRESETS = [
 export function GenerateTraceDialog() {
   const [isOpen, setIsOpen] = useState(false);
   const setTrace = useTraceStore((s) => s.setTrace);
+  const selectedProjectId = useFoundryProjectStore((s) => s.selectedProjectId);
 
   const [targetSpanCount, setTargetSpanCount] = useState(1500);
   const [depthPreset, setDepthPreset] = useState<number>(1); // index into DEPTH_PRESETS
   const [genaiRatio, setGenaiRatio] = useState(0.8);
+  const [useRealPrompts, setUseRealPrompts] = useState(false);
+  const [includeEvents, setIncludeEvents] = useState(false);
+
+  const promptsQuery = api.prompts.getAllPromptsForProject.useQuery(
+    { projectId: selectedProjectId ?? "" },
+    {
+      enabled: isOpen && useRealPrompts && !!selectedProjectId,
+      staleTime: 60_000,
+    },
+  );
 
   function handleGenerate() {
+    const prompts: PromptRef[] | undefined =
+      useRealPrompts && promptsQuery.data
+        ? promptsQuery.data.map((p) => ({
+            id: p.id,
+            versionId: p.versionId,
+            handle: p.handle,
+            model: p.model,
+            inputs: p.inputs ?? [],
+          }))
+        : undefined;
+
     const options: GeneratorOptions = {
       targetSpanCount,
       maxDepth: DEPTH_PRESETS[depthPreset]!.value,
       genaiRatio,
+      prompts,
+      includeEvents,
     };
     const trace = generateTrace(options);
     setTrace(trace);
@@ -168,12 +195,65 @@ export function GenerateTraceDialog() {
                 </Flex>
               </Box>
 
+              {/* OTel events toggle */}
+              <Box>
+                <Flex align="center" justify="space-between" gap={2}>
+                  <Box flex={1} minW={0}>
+                    <Text fontSize="xs" color="fg.muted">
+                      OTel span events
+                    </Text>
+                    <Text fontSize="10px" color="fg.subtle">
+                      Attach gen_ai.* messages, choices, exceptions
+                    </Text>
+                  </Box>
+                  <Switch
+                    size="sm"
+                    colorPalette="orange"
+                    checked={includeEvents}
+                    onCheckedChange={(d) => setIncludeEvents(d.checked)}
+                  />
+                </Flex>
+              </Box>
+
+              {/* Real prompts toggle */}
+              <Box>
+                <Flex align="center" justify="space-between" gap={2}>
+                  <Box flex={1} minW={0}>
+                    <Text fontSize="xs" color="fg.muted">
+                      Use real prompts
+                    </Text>
+                    <Text fontSize="10px" color="fg.subtle">
+                      {!selectedProjectId
+                        ? "Select a project first"
+                        : useRealPrompts
+                          ? promptsQuery.isLoading
+                            ? "Loading prompts…"
+                            : promptsQuery.data?.length
+                              ? `Sampling from ${promptsQuery.data.length} prompt${promptsQuery.data.length === 1 ? "" : "s"}`
+                              : "No prompts in this project"
+                          : "Attach real prompt IDs to LLM spans"}
+                    </Text>
+                  </Box>
+                  <Switch
+                    size="sm"
+                    colorPalette="orange"
+                    checked={useRealPrompts}
+                    onCheckedChange={(d) => setUseRealPrompts(d.checked)}
+                    disabled={!selectedProjectId}
+                  />
+                </Flex>
+              </Box>
+
               {/* Generate button */}
               <Button
                 size="sm"
                 colorPalette="orange"
                 onClick={handleGenerate}
                 w="full"
+                disabled={
+                  useRealPrompts &&
+                  (promptsQuery.isLoading || !promptsQuery.data?.length)
+                }
               >
                 <Sparkles size={14} />
                 Generate {targetSpanCount.toLocaleString()} spans
