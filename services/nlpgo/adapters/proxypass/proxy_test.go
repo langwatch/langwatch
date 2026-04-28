@@ -198,7 +198,7 @@ func TestReverseProxy_UpstreamUnreachable_Returns503AfterWait(t *testing.T) {
 	// 127.0.0.1:1 is reserved and never listens.
 	proxy, err := proxypass.New(proxypass.Options{
 		UpstreamURL: "http://127.0.0.1:1",
-		// Tight wait so the test stays fast; production default is 5s.
+		// Tight wait so the test stays fast; production default is 90s.
 		ColdStartWait:          200 * time.Millisecond,
 		ColdStartProbeInterval: 50 * time.Millisecond,
 		ColdStartProbeTimeout:  50 * time.Millisecond,
@@ -218,6 +218,35 @@ func TestReverseProxy_UpstreamUnreachable_Returns503AfterWait(t *testing.T) {
 		"503 must carry Retry-After:1 so the LambdaClient backs off briefly before retry")
 	assert.GreaterOrEqual(t, elapsed, 200*time.Millisecond,
 		"proxypass must wait the full ColdStartWait window before giving up")
+}
+
+// TestReverseProxy_NegativeColdStartWaitDisablesWait pins the
+// documented contract that a NEGATIVE ColdStartWait disables the
+// preamble entirely, so callers who want the legacy fail-fast
+// behavior have a way to opt out without rewriting the proxy. Per
+// the doc on Options.ColdStartWait, zero is the Go zero-value-is-
+// default idiom (use the 90s default), and negative is the explicit
+// "disabled" signal. With the wait disabled, an unreachable upstream
+// returns 502 immediately from the existing ErrorHandler — same as
+// the pre-cold-start-wait shape.
+func TestReverseProxy_NegativeColdStartWaitDisablesWait(t *testing.T) {
+	proxy, err := proxypass.New(proxypass.Options{
+		UpstreamURL:   "http://127.0.0.1:1",
+		ColdStartWait: -1, // explicit disable
+	})
+	require.NoError(t, err)
+	front := httptest.NewServer(proxy)
+	defer front.Close()
+
+	start := time.Now()
+	resp, err := http.Get(front.URL + "/studio/execute")
+	elapsed := time.Since(start)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	assert.Equal(t, http.StatusBadGateway, resp.StatusCode,
+		"with ColdStartWait disabled, an unreachable upstream must surface as 502 immediately (not 503 after waiting)")
+	assert.Less(t, elapsed, 500*time.Millisecond,
+		"with the wait disabled, request should fail fast — got %s", elapsed)
 }
 
 // TestReverseProxy_UpstreamReachableMidWaitProxiesThrough pins the

@@ -47,8 +47,10 @@ type Options struct {
 	//
 	// 90s gives generous headroom for Lambda Python imports while still
 	// fitting comfortably under the AWS SDK's 5-minute streaming-invoke
-	// deadline and Lambda's 900s function timeout. Set to 0 to disable
-	// the wait entirely (tests / fail-fast topologies).
+	// deadline and Lambda's 900s function timeout. Set to a NEGATIVE
+	// duration (e.g. -1) to disable the wait entirely (tests / fail-fast
+	// topologies); zero means "unset, use the 90s default" per the
+	// usual Go zero-value-is-default idiom.
 	//
 	// This is paired with a docker-build-time `python langwatch_nlp/main.py`
 	// preload step (in saas's Dockerfile.langwatch_nlp.lambda.runtime)
