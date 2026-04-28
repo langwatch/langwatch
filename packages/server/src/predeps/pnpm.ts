@@ -41,12 +41,8 @@ export const pnpmPredep: Predep = {
   required: true,
 
   async detect(paths): Promise<DetectionResult> {
-    // Only accept our own bundled binary. We don't fall through to a
-    // user's system pnpm here because version drift between the
-    // bundled-bin and the lockfile's `packageManager` field can produce
-    // confusing install failures (`ERR_PNPM_BAD_PM_VERSION`). The
-    // resolvePnpm() helper handles dev-machine PATH-pnpm separately for
-    // local checkouts; in the npx flow we always want the pinned binary.
+    // Prefer our own bundled binary when present — exact-version pinned,
+    // deterministic across re-runs.
     const bundled = join(paths.bin, "pnpm");
     if (existsSync(bundled)) {
       const v = await resolveVersion(bundled);
@@ -57,7 +53,21 @@ export const pnpmPredep: Predep = {
       // re-download. install() overwrites, so this is recoverable.
       return { installed: false, reason: `bundled pnpm ${v ?? "unknown"} != pinned ${PNPM_VERSION}` };
     }
-    return { installed: false, reason: "bundled pnpm not yet installed" };
+    // Fall through to user's system pnpm if it's a 10.x — pnpm 10's
+    // `manage-package-manager-versions: true` default handles the
+    // `packageManager: pnpm@10.24.0` lockfile pin transparently across
+    // patch versions (pnpm 10.30.x reads the field, self-fetches 10.24.0
+    // into its own cache when needed, runs scripts with the right
+    // version). This is the same pattern uv.ts uses for the host's uv.
+    // Only download our bundled binary when no usable system pnpm exists
+    // — the bare-Linux case the predep was originally added for.
+    const sysVersion = await resolveVersion("pnpm");
+    if (sysVersion && /^10\./.test(sysVersion)) {
+      return { installed: true, version: sysVersion, resolvedPath: "pnpm" };
+    }
+    return { installed: false, reason: sysVersion
+      ? `system pnpm ${sysVersion} is not 10.x — bundled pnpm ${PNPM_VERSION} required`
+      : "no system pnpm on PATH; will install bundled" };
   },
 
   async install({ platform, paths, task }: InstallContext) {
