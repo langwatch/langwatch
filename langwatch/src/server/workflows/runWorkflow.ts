@@ -122,7 +122,10 @@ export async function runEvaluationWorkflow(
 
     // Process the result
     if (data.result) {
-      if (
+      if ("score" in data.result && typeof data.result.score === "boolean") {
+        // Boolean scores (true/false) are coerced to 1/0 to match the numeric score field
+        data.result.score = data.result.score ? 1 : 0;
+      } else if (
         "score" in data.result &&
         (typeof data.result.score === "number" ||
           typeof data.result.score === "string")
