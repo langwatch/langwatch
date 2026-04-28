@@ -1,5 +1,14 @@
-import { Box, Button, Circle, Flex, HStack, Icon, Text, VStack } from "@chakra-ui/react";
-import { useState, type ReactNode } from "react";
+import {
+  Box,
+  Button,
+  Circle,
+  Flex,
+  HStack,
+  Icon,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
+import { type ReactNode, useState } from "react";
 import {
   LuArrowRight,
   LuCircleAlert,
@@ -10,12 +19,12 @@ import {
 import { Tooltip } from "~/components/ui/tooltip";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import type { EvalSummary } from "../../types/trace";
-import { formatCost, formatDuration, truncateId } from "../../utils/formatters";
 import {
   AZURE_SAFETY_NOT_CONFIGURED_MESSAGE,
   AZURE_SAFETY_PROVIDER_KEY,
 } from "~/server/app-layer/evaluations/azure-safety-env";
+import type { EvalSummary } from "../../types/trace";
+import { formatCost, formatDuration, truncateId } from "../../utils/formatters";
 
 const STATUS = {
   pass: {
@@ -93,7 +102,10 @@ function RunHistorySparkline({ runs }: { runs: EvalRunHistoryEntry[] }) {
   if (runs.length <= 1) return null;
 
   const numericRuns = runs
-    .filter((r): r is EvalRunHistoryEntry & { score: number } => typeof r.score === "number")
+    .filter(
+      (r): r is EvalRunHistoryEntry & { score: number } =>
+        typeof r.score === "number",
+    )
     .slice(-8);
 
   if (numericRuns.length === 0) {
@@ -103,7 +115,13 @@ function RunHistorySparkline({ runs }: { runs: EvalRunHistoryEntry[] }) {
           <Circle
             key={i}
             size="4px"
-            bg={r.status === "pass" ? "green.solid" : r.status === "fail" ? "red.solid" : "yellow.solid"}
+            bg={
+              r.status === "pass"
+                ? "green.solid"
+                : r.status === "fail"
+                  ? "red.solid"
+                  : "yellow.solid"
+            }
           />
         ))}
         <Text textStyle="2xs" color="fg.subtle" marginLeft={0.5}>
@@ -197,8 +215,7 @@ function EvalCard({
   const hasRetries = (eval_.retries ?? 0) > 0;
   // The labeled categorical/boolean verdict is sometimes more informative
   // than the numeric score (e.g. score=1 with label="safe").
-  const hasLabel =
-    !!eval_.label && eval_.label !== String(eval_.score);
+  const hasLabel = !!eval_.label && eval_.label !== String(eval_.score);
 
   const meta: string[] = [];
   if (eval_.executionTime !== undefined && eval_.executionTime > 0)
@@ -206,7 +223,8 @@ function EvalCard({
   if (eval_.evalCost !== undefined && eval_.evalCost > 0)
     meta.push(formatCost(eval_.evalCost));
   if (eval_.evaluatorType) meta.push(eval_.evaluatorType);
-  if (hasRetries) meta.push(`${eval_.retries} retr${eval_.retries === 1 ? "y" : "ies"}`);
+  if (hasRetries)
+    meta.push(`${eval_.retries} retr${eval_.retries === 1 ? "y" : "ies"}`);
 
   // For skipped/error rows the reasoning *is* the message ("provider not
   // configured", "request timed out"). Surface it as the primary content.
@@ -219,7 +237,10 @@ function EvalCard({
   // reasoning was already shown above and we still have a separate error
   // message to surface).
   const showErrorPanel =
-    status === "error" && hasErrorMessage && eval_.errorMessage !== eval_.reasoning && !!eval_.reasoning;
+    status === "error" &&
+    hasErrorMessage &&
+    eval_.errorMessage !== eval_.reasoning &&
+    !!eval_.reasoning;
   // On errored entries, expose the evaluation/evaluator IDs so support can
   // grep logs without having to dig into the raw payload.
   const showErrorIds =
@@ -243,7 +264,9 @@ function EvalCard({
         paddingX={3}
         paddingY={2}
         gap={2}
-        borderBottomWidth={hasReasoning || meta.length > 0 || eval_.spanName ? "1px" : "0"}
+        borderBottomWidth={
+          hasReasoning || meta.length > 0 || eval_.spanName ? "1px" : "0"
+        }
         borderColor="border.muted"
         align="center"
       >
@@ -261,7 +284,12 @@ function EvalCard({
           {status === "error" && (
             <Icon as={LuCircleAlert} boxSize={2.5} color={tone.fg} />
           )}
-          <Text textStyle="2xs" fontWeight="bold" color={tone.fg} letterSpacing="0.06em">
+          <Text
+            textStyle="2xs"
+            fontWeight="bold"
+            color={tone.fg}
+            letterSpacing="0.06em"
+          >
             {tone.label}
           </Text>
         </HStack>
@@ -304,7 +332,9 @@ function EvalCard({
           height="3px"
           bg="bg.subtle"
           position="relative"
-          borderBottomWidth={hasReasoning || meta.length > 0 || eval_.spanName ? "1px" : "0"}
+          borderBottomWidth={
+            hasReasoning || meta.length > 0 || eval_.spanName ? "1px" : "0"
+          }
           borderColor="border.muted"
         >
           <Box
@@ -659,7 +689,8 @@ function DetailRow({
 function formatInputValue(value: unknown): string {
   if (value == null) return "—";
   if (typeof value === "string") return value;
-  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  if (typeof value === "number" || typeof value === "boolean")
+    return String(value);
   try {
     return JSON.stringify(value, null, 2);
   } catch {
@@ -680,16 +711,30 @@ function evalGroupKey(e: EvalEntry): string {
 export function EvalsList({ evals, onSelectSpan }: EvalsListProps) {
   if (!evals || evals.length === 0) {
     return (
-      <VStack gap={2} alignItems="center" textAlign="center" maxWidth="220px" marginX="auto" paddingY={3}>
+      <VStack
+        gap={2}
+        alignItems="center"
+        textAlign="center"
+        maxWidth="220px"
+        marginX="auto"
+        paddingY={3}
+      >
         <Icon as={LuFlaskConical} boxSize={5} color="fg.subtle" />
         <VStack gap={1}>
-          <Text textStyle="xs" fontWeight="medium" color="fg.muted">No evaluations yet</Text>
+          <Text textStyle="xs" fontWeight="medium" color="fg.muted">
+            No evaluations yet
+          </Text>
           <Text textStyle="xs" color="fg.subtle">
-            Set up evaluators to automatically score traces on quality, safety, and accuracy.
+            Set up evaluators to automatically score traces on quality, safety,
+            and accuracy.
           </Text>
         </VStack>
         <Button size="xs" variant="outline" asChild>
-          <a href="https://docs.langwatch.ai/evaluations/overview" target="_blank" rel="noopener noreferrer">
+          <a
+            href="https://docs.langwatch.ai/evaluations/overview"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
             Learn more
           </a>
         </Button>
@@ -711,9 +756,7 @@ export function EvalsList({ evals, onSelectSpan }: EvalsListProps) {
     [...entries].sort((a, b) => (b.timestamp ?? 0) - (a.timestamp ?? 0)),
   );
   // Order groups by their head entry's timestamp (newest evaluator first).
-  orderedGroups.sort(
-    (a, b) => (b[0]?.timestamp ?? 0) - (a[0]?.timestamp ?? 0),
-  );
+  orderedGroups.sort((a, b) => (b[0]?.timestamp ?? 0) - (a[0]?.timestamp ?? 0));
 
   return (
     <VStack align="stretch" gap={2}>
@@ -743,7 +786,9 @@ function EvalGroup({
   const synthesizedHistory: EvalRunHistoryEntry[] | undefined =
     history.length > 0
       ? entries
-          .filter((e): e is EvalEntry & { timestamp: number } => e.timestamp != null)
+          .filter(
+            (e): e is EvalEntry & { timestamp: number } => e.timestamp != null,
+          )
           .map((e) => ({
             score: e.score,
             timestamp: e.timestamp,
@@ -800,11 +845,7 @@ function EvalHistoryStack({
       {expanded && (
         <VStack align="stretch" gap={1} paddingTop={1.5}>
           {entries.map((e, i) => (
-            <EvalHistoryRow
-              key={i}
-              entry={e}
-              onSelectSpan={onSelectSpan}
-            />
+            <EvalHistoryRow key={i} entry={e} onSelectSpan={onSelectSpan} />
           ))}
         </VStack>
       )}
@@ -843,7 +884,12 @@ function EvalHistoryRow({
       _hover={{ bg: "bg.muted" }}
     >
       <Circle size="6px" bg={status.color} flexShrink={0} />
-      <Text textStyle="2xs" color={status.fg} fontWeight="medium" flexShrink={0}>
+      <Text
+        textStyle="2xs"
+        color={status.fg}
+        fontWeight="medium"
+        flexShrink={0}
+      >
         {status.label}
       </Text>
       {scoreLabel !== null && (
@@ -852,7 +898,12 @@ function EvalHistoryRow({
         </Text>
       )}
       {time && (
-        <Text textStyle="2xs" color="fg.subtle" fontFamily="mono" flexShrink={0}>
+        <Text
+          textStyle="2xs"
+          color="fg.subtle"
+          fontFamily="mono"
+          flexShrink={0}
+        >
           {time}
         </Text>
       )}
@@ -862,13 +913,17 @@ function EvalHistoryRow({
             entry.spanName ? (
               <VStack align="stretch" gap={0.5} minWidth="180px">
                 <HStack justify="space-between" gap={4}>
-                  <Text textStyle="2xs" color="fg.muted">name</Text>
+                  <Text textStyle="2xs" color="fg.muted">
+                    name
+                  </Text>
                   <Text textStyle="2xs" fontFamily="mono" color="fg">
                     {entry.spanName}
                   </Text>
                 </HStack>
                 <HStack justify="space-between" gap={4}>
-                  <Text textStyle="2xs" color="fg.muted">id</Text>
+                  <Text textStyle="2xs" color="fg.muted">
+                    id
+                  </Text>
                   <Text textStyle="2xs" fontFamily="mono" color="fg">
                     {entry.spanId}
                   </Text>
@@ -893,9 +948,7 @@ function EvalHistoryRow({
             marginLeft="auto"
             minWidth={0}
             cursor={canJump ? "pointer" : "default"}
-            onClick={
-              canJump ? () => onSelectSpan!(entry.spanId!) : undefined
-            }
+            onClick={canJump ? () => onSelectSpan!(entry.spanId!) : undefined}
             color="fg.muted"
             _hover={canJump ? { color: "fg" } : undefined}
             transition="color 0.12s ease"
@@ -919,9 +972,7 @@ function EvalHistoryRow({
             >
               {truncateId(entry.spanId)}
             </Text>
-            {canJump && (
-              <Icon as={LuArrowRight} boxSize={2.5} flexShrink={0} />
-            )}
+            {canJump && <Icon as={LuArrowRight} boxSize={2.5} flexShrink={0} />}
           </HStack>
         </Tooltip>
       ) : (

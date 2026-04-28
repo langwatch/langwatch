@@ -1,7 +1,7 @@
 import { Box, Flex, HStack, VStack } from "@chakra-ui/react";
-import { useRouter } from "~/utils/compat/next-router";
 import type React from "react";
 import { useTracesV2Presence } from "~/features/presence/hooks/useTracesV2Presence";
+import { useRouter } from "~/utils/compat/next-router";
 import { useProjectHasTraces } from "../../hooks/useProjectHasTraces";
 import { useRollingTimeRange } from "../../hooks/useRollingTimeRange";
 import { useTraceFreshness } from "../../hooks/useTraceFreshness";
@@ -76,13 +76,7 @@ export const TracesPage: React.FC = () => {
           <SearchBar />
         </Box>
 
-        <HStack
-          flex={1}
-          align="stretch"
-          width="full"
-          gap={0}
-          overflow="hidden"
-        >
+        <HStack flex={1} align="stretch" width="full" gap={0} overflow="hidden">
           <FilterAside dimmed={showEmptyState} />
           {showEmptyState ? <EmptyResultsPane /> : <ResultsPane />}
         </HStack>

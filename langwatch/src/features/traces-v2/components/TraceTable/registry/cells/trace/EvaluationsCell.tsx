@@ -1,5 +1,8 @@
 import { HStack, Text } from "@chakra-ui/react";
-import type { TraceEvalResult, TraceListItem } from "../../../../../types/trace";
+import type {
+  TraceEvalResult,
+  TraceListItem,
+} from "../../../../../types/trace";
 import { EvalChip } from "../../sharedChips";
 import type { CellDef } from "../../types";
 

@@ -1,4 +1,4 @@
-import { type Virtualizer, useVirtualizer } from "@tanstack/react-virtual";
+import { useVirtualizer, type Virtualizer } from "@tanstack/react-virtual";
 import { useCallback } from "react";
 import { useDensityStore } from "../../stores/densityStore";
 import { useTraceTableScrollRef } from "./scrollContext";

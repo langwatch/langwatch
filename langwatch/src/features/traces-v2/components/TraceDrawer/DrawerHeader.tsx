@@ -39,10 +39,9 @@ import { useDejaViewLink } from "~/hooks/useDejaViewLink";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { TraceHeader } from "~/server/api/routers/tracesV2.schemas";
-import { useTraceRefresh } from "../../hooks/useTraceRefresh";
 import { usePinnedAttributes } from "../../hooks/usePinnedAttributes";
 import { useThreadContext } from "../../hooks/useThreadContext";
-import { TraceHeaderChips } from "./TraceHeaderChips";
+import { useTraceRefresh } from "../../hooks/useTraceRefresh";
 import { useTraceResources } from "../../hooks/useTraceResources";
 import type { DrawerViewMode } from "../../stores/drawerStore";
 import { useFilterStore } from "../../stores/filterStore";
@@ -58,6 +57,7 @@ import {
 } from "../../utils/formatters";
 import { ModeSwitch } from "./ModeSwitch";
 import { RawJsonDialog } from "./RawJsonDialog";
+import { TraceHeaderChips } from "./TraceHeaderChips";
 
 interface DrawerHeaderProps {
   trace: TraceHeader;
@@ -298,12 +298,7 @@ export function DrawerHeader({
             content="Sharing is coming soon"
             positioning={{ placement: "bottom" }}
           >
-            <Button
-              size="xs"
-              variant="ghost"
-              disabled
-              aria-label="Share trace"
-            >
+            <Button size="xs" variant="ghost" disabled aria-label="Share trace">
               <Icon as={LuShare2} boxSize={3.5} />
             </Button>
           </Tooltip>
@@ -312,7 +307,11 @@ export function DrawerHeader({
               content="Open in DejaView"
               positioning={{ placement: "bottom" }}
             >
-              <Link href={dejaView.href} isExternal aria-label="Open in DejaView">
+              <Link
+                href={dejaView.href}
+                isExternal
+                aria-label="Open in DejaView"
+              >
                 <Button size="xs" variant="ghost">
                   <Icon as={LuExternalLink} boxSize={3.5} />
                 </Button>
@@ -485,10 +484,7 @@ export function DrawerHeader({
       <HStack gap={1.5} flexWrap="wrap">
         <MetricPill label="Duration" value={formatDuration(trace.durationMs)} />
         {trace.spanCount > 0 && (
-          <MetricPill
-            label="Spans"
-            value={trace.spanCount.toLocaleString()}
-          />
+          <MetricPill label="Spans" value={trace.spanCount.toLocaleString()} />
         )}
         {trace.ttft != null && (
           <Tooltip
@@ -506,7 +502,10 @@ export function DrawerHeader({
               <VStack align="stretch" gap={0.5} minWidth="140px">
                 <TooltipRow
                   label="Total"
-                  value={formatCost(trace.totalCost ?? 0, trace.tokensEstimated)}
+                  value={formatCost(
+                    trace.totalCost ?? 0,
+                    trace.tokensEstimated,
+                  )}
                 />
                 {trace.tokensEstimated && !hasAuthoritativeTokens && (
                   <Text textStyle="2xs" color="fg.muted" paddingTop={1}>
@@ -518,7 +517,10 @@ export function DrawerHeader({
             positioning={{ placement: "top" }}
           >
             <Box>
-              <MetricPill label="Cost" value={formatCost(trace.totalCost ?? 0)} />
+              <MetricPill
+                label="Cost"
+                value={formatCost(trace.totalCost ?? 0)}
+              />
             </Box>
           </Tooltip>
         )}
@@ -573,10 +575,7 @@ export function DrawerHeader({
           </Tooltip>
         )}
         {trace.models.length > 0 && (
-          <MetricPill
-            label="Model"
-            value={abbreviateModel(trace.models[0]!)}
-          />
+          <MetricPill label="Model" value={abbreviateModel(trace.models[0]!)} />
         )}
         {/* Pinned attribute pills sit inline with the metrics — they're
             the same kind of "scannable badge" affordance, just driven by
@@ -613,7 +612,6 @@ export function DrawerHeader({
           </Text>
         }
       />
-
 
       {/* Row 5: Inline mode tabs — Trace / Conversation. Scenario is a
           link-out chip in row 4, so it isn't a third tab here. */}
@@ -736,10 +734,7 @@ function TraceActionsMenu({
 
   return (
     <Menu.Root>
-      <Tooltip
-        content="Trace actions"
-        positioning={{ placement: "bottom" }}
-      >
+      <Tooltip content="Trace actions" positioning={{ placement: "bottom" }}>
         <Menu.Trigger asChild>
           <Button size="xs" variant="ghost" aria-label="Trace actions">
             <Icon as={MoreHorizontal} boxSize={3.5} />
@@ -821,14 +816,15 @@ function PinnedMetricPill({
   }, [value]);
 
   const tooltipBody = (
-    <VStack
-      align="stretch"
-      gap={0.5}
-      minWidth="180px"
-      maxWidth="320px"
-    >
+    <VStack align="stretch" gap={0.5} minWidth="180px" maxWidth="320px">
       <TooltipRow
-        label={auto ? "Auto-pinned" : pin.source === "resource" ? "Resource" : "Attribute"}
+        label={
+          auto
+            ? "Auto-pinned"
+            : pin.source === "resource"
+              ? "Resource"
+              : "Attribute"
+        }
         value={pin.key}
       />
       <TooltipRow label="Value" value={display} />
@@ -941,7 +937,8 @@ function PinnedMetricPill({
 function formatPinValue(value: unknown): string | null {
   if (value === undefined || value === null || value === "") return null;
   if (typeof value === "string") return value;
-  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  if (typeof value === "number" || typeof value === "boolean")
+    return String(value);
   try {
     return JSON.stringify(value);
   } catch {

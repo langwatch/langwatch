@@ -4,7 +4,6 @@ import { toaster } from "~/components/ui/toaster";
 import { usePublicEnv } from "~/hooks/usePublicEnv";
 import { buildSampleTraces } from "./sampleTraceTemplates";
 
-
 interface UseSampleDataResult {
   loading: boolean;
   load: () => Promise<boolean>;
@@ -37,7 +36,9 @@ function describeError(error: unknown): string {
     return String(error);
   }
   if (Array.isArray(error)) {
-    const parts = error.map(describeError).filter((s) => s && s !== "Unknown error");
+    const parts = error
+      .map(describeError)
+      .filter((s) => s && s !== "Unknown error");
     if (parts.length) return parts.join("; ");
     return `${error.length} error${error.length === 1 ? "" : "s"} (see console)`;
   }
@@ -52,7 +53,8 @@ function describeError(error: unknown): string {
     if (typeof obj.statusText === "string" && obj.statusText) {
       return `${obj.status ?? ""} ${obj.statusText}`.trim();
     }
-    if (obj.code !== undefined) return `Export failed (code ${String(obj.code)})`;
+    if (obj.code !== undefined)
+      return `Export failed (code ${String(obj.code)})`;
     return "Export failed (see console for details)";
   }
   return String(error);

@@ -28,7 +28,10 @@ function buildSegments(text: string): DecoratedSegment[] {
     if (slot.from > cursor) {
       out.push({ text: text.slice(cursor, slot.from) });
     }
-    out.push({ text: text.slice(slot.from, slot.to), className: slot.className });
+    out.push({
+      text: text.slice(slot.from, slot.to),
+      className: slot.className,
+    });
     cursor = slot.to;
   }
   if (cursor < text.length) {

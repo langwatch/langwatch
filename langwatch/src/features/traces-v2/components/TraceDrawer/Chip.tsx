@@ -1,8 +1,8 @@
 import { Box, Circle, HStack, Icon, Text } from "@chakra-ui/react";
 import type { ReactNode } from "react";
 import { forwardRef } from "react";
-import { LuFilter } from "react-icons/lu";
 import type { IconType } from "react-icons";
+import { LuFilter } from "react-icons/lu";
 import { Popover } from "~/components/ui/popover";
 import { Tooltip } from "~/components/ui/tooltip";
 

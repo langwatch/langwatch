@@ -1,26 +1,26 @@
-import { useState, useMemo } from "react";
 import { Box, Button, HStack, Icon, Text } from "@chakra-ui/react";
+import { useMemo, useState } from "react";
 import { LuCheck, LuChevronDown, LuChevronRight, LuCopy } from "react-icons/lu";
-import { SegmentedToggle } from "./SegmentedToggle";
-import { RenderedMarkdown, ShikiCodeBlock } from "./MarkdownView";
-import { safePrettyJson } from "./JsonHighlight";
 import { useColorMode } from "~/components/ui/color-mode";
+import { safePrettyJson } from "./JsonHighlight";
+import { RenderedMarkdown, ShikiCodeBlock } from "./MarkdownView";
+import { SegmentedToggle } from "./SegmentedToggle";
 import {
   AssistantTurnCard,
-  LONG_THREAD_THRESHOLD,
-  ThreadedTurnView,
-  TurnView,
-  VIRTUALIZE_AT,
-  VirtualizedChatList,
   asMarkdownBody,
-  coerceToChatMessages,
-  extractInlineBlocks,
-  groupMessagesIntoTurns,
-  parseContentBlocks,
-  tryParseJSON,
   type ChatLayout,
   type ChatMessage,
   type ConversationTurn,
+  coerceToChatMessages,
+  extractInlineBlocks,
+  groupMessagesIntoTurns,
+  LONG_THREAD_THRESHOLD,
+  parseContentBlocks,
+  ThreadedTurnView,
+  TurnView,
+  tryParseJSON,
+  VIRTUALIZE_AT,
+  VirtualizedChatList,
 } from "./Transcript";
 
 const COPY_FEEDBACK_MS = 1500;
@@ -148,9 +148,10 @@ export function IOViewer({ label, content, mode = "input" }: IOViewerProps) {
   const [collapsed, setCollapsed] = useState(false);
   const { colorMode } = useColorMode();
 
-  const collapsedSummary = isChat && allChatMessages
-    ? `${allChatMessages.length} ${allChatMessages.length === 1 ? "message" : "messages"}`
-    : `${content.length.toLocaleString()} chars`;
+  const collapsedSummary =
+    isChat && allChatMessages
+      ? `${allChatMessages.length} ${allChatMessages.length === 1 ? "message" : "messages"}`
+      : `${content.length.toLocaleString()} chars`;
 
   const isLong = content.length - TRUNCATE_AT > TRUNCATE_TAIL_MIN;
   const displayContent =
@@ -160,7 +161,10 @@ export function IOViewer({ label, content, mode = "input" }: IOViewerProps) {
     [displayContent],
   );
 
-  const markdownBody = useMemo(() => asMarkdownBody(displayContent), [displayContent]);
+  const markdownBody = useMemo(
+    () => asMarkdownBody(displayContent),
+    [displayContent],
+  );
 
   // For string-shaped content that isn't a clean chat array, walk the lines
   // and pull out any inline `{"type":"thinking"|"tool_use"|"tool_result"}`
@@ -175,7 +179,10 @@ export function IOViewer({ label, content, mode = "input" }: IOViewerProps) {
   );
 
   const formatOptions = useMemo<ViewFormat[]>(
-    () => (canJson ? ["pretty", "text", "json", "markdown"] : ["pretty", "text", "markdown"]),
+    () =>
+      canJson
+        ? ["pretty", "text", "json", "markdown"]
+        : ["pretty", "text", "markdown"],
     [canJson],
   );
 
@@ -256,150 +263,154 @@ export function IOViewer({ label, content, mode = "input" }: IOViewerProps) {
       </HStack>
 
       {!collapsed && (
-      <>
-      <Box
-        bg={flushChatCard ? "transparent" : "bg.subtle"}
-        borderRadius={flushChatCard ? "0" : "md"}
-        borderWidth={flushChatCard ? "0" : "1px"}
-        borderColor="border"
-        padding={
-          flushChatCard
-            ? 0
-            : format === "markdown" || isVirtualizingChat
-              ? 0
-              : 3
-        }
-        maxHeight={
-          isVirtualizingChat
-            ? undefined
-            : isLong && !expanded
-              ? `${COMPACT_MAX_HEIGHT_PX}px`
-              : `${EXPANDED_MAX_HEIGHT_PX}px`
-        }
-        overflow={isVirtualizingChat ? "hidden" : "auto"}
-      >
-        {format === "json" && canJson ? (
-          <ShikiCodeBlock
-            code={prettyJsonContent}
-            language="json"
-            colorMode={colorMode}
-            flush
-          />
-        ) : format === "markdown" ? (
-          markdownSubmode === "rendered" ? (
-            // Rendered markdown — proper formatting + Shiki for any fenced
-            // code blocks inside. Lives behind the toggle because for very
-            // long content the rendered path is heavier than source.
-            <RenderedMarkdown markdown={markdownBody} paddingX={3} paddingY={2} />
-          ) : (
-            // Source — raw markdown with markdown syntax highlighting.
-            // Plain text, copyable, lightning fast even on huge content.
-            <ShikiCodeBlock
-              code={markdownBody}
-              language="markdown"
-              colorMode={colorMode}
-              flush
-            />
-          )
-        ) : format === "pretty" && isChat ? (
-          conversationTurns.length >= VIRTUALIZE_AT ? (
-            <VirtualizedChatList
-              turns={conversationTurns}
-              maxHeightPx={
-                isLong && !expanded
-                  ? COMPACT_MAX_HEIGHT_PX
-                  : EXPANDED_MAX_HEIGHT_PX
-              }
-              layout={chatLayout}
-              collapseTools={mode === "output"}
-            />
-          ) : chatLayout === "thread" ? (
-            <Box>
-              {conversationTurns.map((turn, i) => {
-                // Default-collapse user turns — they're usually the prompt
-                // we already know we sent. Auto-expand assistant/system
-                // turns and the trailing pair so the response is visible
-                // at a glance without users having to click into every
-                // user bubble in long conversations. Once the convo gets
-                // long, collapse aggressively: only the last turn opens.
-                const isLong =
-                  conversationTurns.length > LONG_THREAD_THRESHOLD;
-                const isLastTwo = i >= conversationTurns.length - 2;
-                const defaultExpanded = isLong
-                  ? i === conversationTurns.length - 1
-                  : turn.kind === "user"
-                    ? false
-                    : isLastTwo;
-                return (
-                  <ThreadedTurnView
-                    key={i}
-                    turn={turn}
-                    index={i}
-                    isLast={i === conversationTurns.length - 1}
-                    defaultExpanded={defaultExpanded}
-                    collapseTools={mode === "output"}
-                  />
-                );
-              })}
-            </Box>
-          ) : (
-            <Box>
-              {conversationTurns.map((turn, i) => (
-                <TurnView
-                  key={i}
-                  turn={turn}
+        <>
+          <Box
+            bg={flushChatCard ? "transparent" : "bg.subtle"}
+            borderRadius={flushChatCard ? "0" : "md"}
+            borderWidth={flushChatCard ? "0" : "1px"}
+            borderColor="border"
+            padding={
+              flushChatCard
+                ? 0
+                : format === "markdown" || isVirtualizingChat
+                  ? 0
+                  : 3
+            }
+            maxHeight={
+              isVirtualizingChat
+                ? undefined
+                : isLong && !expanded
+                  ? `${COMPACT_MAX_HEIGHT_PX}px`
+                  : `${EXPANDED_MAX_HEIGHT_PX}px`
+            }
+            overflow={isVirtualizingChat ? "hidden" : "auto"}
+          >
+            {format === "json" && canJson ? (
+              <ShikiCodeBlock
+                code={prettyJsonContent}
+                language="json"
+                colorMode={colorMode}
+                flush
+              />
+            ) : format === "markdown" ? (
+              markdownSubmode === "rendered" ? (
+                // Rendered markdown — proper formatting + Shiki for any fenced
+                // code blocks inside. Lives behind the toggle because for very
+                // long content the rendered path is heavier than source.
+                <RenderedMarkdown
+                  markdown={markdownBody}
+                  paddingX={3}
+                  paddingY={2}
+                />
+              ) : (
+                // Source — raw markdown with markdown syntax highlighting.
+                // Plain text, copyable, lightning fast even on huge content.
+                <ShikiCodeBlock
+                  code={markdownBody}
+                  language="markdown"
+                  colorMode={colorMode}
+                  flush
+                />
+              )
+            ) : format === "pretty" && isChat ? (
+              conversationTurns.length >= VIRTUALIZE_AT ? (
+                <VirtualizedChatList
+                  turns={conversationTurns}
+                  maxHeightPx={
+                    isLong && !expanded
+                      ? COMPACT_MAX_HEIGHT_PX
+                      : EXPANDED_MAX_HEIGHT_PX
+                  }
+                  layout={chatLayout}
                   collapseTools={mode === "output"}
                 />
-              ))}
-            </Box>
-          )
-        ) : format === "pretty" && hasInlineRichContent ? (
-          // Plain-string content with inline typed blocks (e.g. a flattened
-          // agent transcript). Render under a single assistant turn card so
-          // thinking/tool_use/tool_result get the same visual hierarchy as
-          // structured chat — left accent bar, role chip, blocks stacked.
-          <AssistantTurnCard
-            blocks={inlineBlocks}
-            toolCalls={[]}
-            collapseTools={mode === "output"}
-          />
-        ) : format === "pretty" && canJson ? (
-          <ShikiCodeBlock
-            code={prettyJsonContent}
-            language="json"
-            colorMode={colorMode}
-            flush
-          />
-        ) : (
-          <Text
-            textStyle="xs"
-            color="fg"
-            fontFamily="mono"
-            whiteSpace="pre-wrap"
-            wordBreak="break-word"
-            lineHeight="tall"
-          >
-            {displayContent}
-          </Text>
-        )}
-      </Box>
+              ) : chatLayout === "thread" ? (
+                <Box>
+                  {conversationTurns.map((turn, i) => {
+                    // Default-collapse user turns — they're usually the prompt
+                    // we already know we sent. Auto-expand assistant/system
+                    // turns and the trailing pair so the response is visible
+                    // at a glance without users having to click into every
+                    // user bubble in long conversations. Once the convo gets
+                    // long, collapse aggressively: only the last turn opens.
+                    const isLong =
+                      conversationTurns.length > LONG_THREAD_THRESHOLD;
+                    const isLastTwo = i >= conversationTurns.length - 2;
+                    const defaultExpanded = isLong
+                      ? i === conversationTurns.length - 1
+                      : turn.kind === "user"
+                        ? false
+                        : isLastTwo;
+                    return (
+                      <ThreadedTurnView
+                        key={i}
+                        turn={turn}
+                        index={i}
+                        isLast={i === conversationTurns.length - 1}
+                        defaultExpanded={defaultExpanded}
+                        collapseTools={mode === "output"}
+                      />
+                    );
+                  })}
+                </Box>
+              ) : (
+                <Box>
+                  {conversationTurns.map((turn, i) => (
+                    <TurnView
+                      key={i}
+                      turn={turn}
+                      collapseTools={mode === "output"}
+                    />
+                  ))}
+                </Box>
+              )
+            ) : format === "pretty" && hasInlineRichContent ? (
+              // Plain-string content with inline typed blocks (e.g. a flattened
+              // agent transcript). Render under a single assistant turn card so
+              // thinking/tool_use/tool_result get the same visual hierarchy as
+              // structured chat — left accent bar, role chip, blocks stacked.
+              <AssistantTurnCard
+                blocks={inlineBlocks}
+                toolCalls={[]}
+                collapseTools={mode === "output"}
+              />
+            ) : format === "pretty" && canJson ? (
+              <ShikiCodeBlock
+                code={prettyJsonContent}
+                language="json"
+                colorMode={colorMode}
+                flush
+              />
+            ) : (
+              <Text
+                textStyle="xs"
+                color="fg"
+                fontFamily="mono"
+                whiteSpace="pre-wrap"
+                wordBreak="break-word"
+                lineHeight="tall"
+              >
+                {displayContent}
+              </Text>
+            )}
+          </Box>
 
-      {isLong && (
-        <Button
-          size="xs"
-          variant="plain"
-          color="blue.fg"
-          padding={0}
-          height="auto"
-          marginTop={1}
-          onClick={() => setExpanded((e) => !e)}
-        >
-          {expanded
-            ? "Show less"
-            : `Show remaining ${((content.length - TRUNCATE_AT) / 1000).toFixed(0)}K chars`}
-        </Button>
-      )}
-      </>
+          {isLong && (
+            <Button
+              size="xs"
+              variant="plain"
+              color="blue.fg"
+              padding={0}
+              height="auto"
+              marginTop={1}
+              onClick={() => setExpanded((e) => !e)}
+            >
+              {expanded
+                ? "Show less"
+                : `Show remaining ${((content.length - TRUNCATE_AT) / 1000).toFixed(0)}K chars`}
+            </Button>
+          )}
+        </>
       )}
     </Box>
   );

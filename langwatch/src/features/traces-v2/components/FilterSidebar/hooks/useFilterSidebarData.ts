@@ -1,17 +1,20 @@
 import { useCallback, useMemo } from "react";
-import { useTraceFacets } from "../../../hooks/useTraceFacets";
-import { useFacetLensStore, applyLensOrder } from "../../../stores/facetLensStore";
-import { useFilterStore } from "../../../stores/filterStore";
 import { getFacetValueState } from "~/server/app-layer/traces/query-language/queryParser";
+import { useTraceFacets } from "../../../hooks/useTraceFacets";
+import {
+  applyLensOrder,
+  useFacetLensStore,
+} from "../../../stores/facetLensStore";
+import { useFilterStore } from "../../../stores/filterStore";
 import { hashColor } from "../../../utils/formatters";
 import {
   ATTRIBUTES_SECTION_KEY,
   FACET_COLORS,
   FACET_DEFAULTS,
   FACET_GROUPS,
-  VIBRANT_FIELDS,
-  getFacetGroupId,
   type FacetGroupDef,
+  getFacetGroupId,
+  VIBRANT_FIELDS,
 } from "../constants";
 import type {
   AttributeKey,
@@ -169,7 +172,9 @@ function partitionIntoGroups(
   return slices;
 }
 
-function partitionDescriptors(descriptors: ReturnType<typeof useTraceFacets>["data"]) {
+function partitionDescriptors(
+  descriptors: ReturnType<typeof useTraceFacets>["data"],
+) {
   const cats: CategoricalSection[] = [];
   const rngs: RangeSectionData[] = [];
   let attrKeys: AttributeKey[] = [];

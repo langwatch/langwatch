@@ -16,7 +16,11 @@ export const SpanTypeCell: CellDef<TraceListItem> = {
       );
     }
     return (
-      <SpanTypeBadge spanType={spanType} display="inline-block" paddingY={0.5} />
+      <SpanTypeBadge
+        spanType={spanType}
+        display="inline-block"
+        paddingY={0.5}
+      />
     );
   },
 };

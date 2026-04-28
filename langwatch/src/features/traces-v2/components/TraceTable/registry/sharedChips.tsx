@@ -1,16 +1,13 @@
 import {
   Circle,
-  HStack,
   HoverCard,
+  HStack,
   Portal,
   Text,
   VStack,
 } from "@chakra-ui/react";
 import type React from "react";
-import type {
-  TraceEvalResult,
-  TraceListEvent,
-} from "../../../types/trace";
+import type { TraceEvalResult, TraceListEvent } from "../../../types/trace";
 
 const EVAL_CHIP_COLORS: Record<string, string> = {
   processed_pass: "green.500",
@@ -56,7 +53,11 @@ export const EvalChip: React.FC<{ eval_: TraceEvalResult }> = ({ eval_ }) => {
   const displayName = eval_.evaluatorName ?? eval_.evaluatorId;
 
   return (
-    <HoverCard.Root openDelay={200} closeDelay={150} positioning={{ placement: "top" }}>
+    <HoverCard.Root
+      openDelay={200}
+      closeDelay={150}
+      positioning={{ placement: "top" }}
+    >
       <HoverCard.Trigger asChild>
         <HStack
           gap={1.5}
@@ -126,26 +127,42 @@ export const EvalChip: React.FC<{ eval_: TraceEvalResult }> = ({ eval_ }) => {
               </HStack>
               {scoreText && (
                 <HStack justify="space-between" gap={3}>
-                  <Text textStyle="2xs" color="fg.muted">Score</Text>
-                  <Text textStyle="2xs" fontWeight="semibold" color="fg">{scoreText}</Text>
+                  <Text textStyle="2xs" color="fg.muted">
+                    Score
+                  </Text>
+                  <Text textStyle="2xs" fontWeight="semibold" color="fg">
+                    {scoreText}
+                  </Text>
                 </HStack>
               )}
               {eval_.label && (
                 <HStack justify="space-between" gap={3}>
-                  <Text textStyle="2xs" color="fg.muted">Label</Text>
-                  <Text textStyle="2xs" fontWeight="semibold" color="fg">{eval_.label}</Text>
+                  <Text textStyle="2xs" color="fg.muted">
+                    Label
+                  </Text>
+                  <Text textStyle="2xs" fontWeight="semibold" color="fg">
+                    {eval_.label}
+                  </Text>
                 </HStack>
               )}
               {eval_.passed != null && (
                 <HStack justify="space-between" gap={3}>
-                  <Text textStyle="2xs" color="fg.muted">Result</Text>
-                  <Text textStyle="2xs" fontWeight="semibold" color={eval_.passed ? "green.fg" : "red.fg"}>
+                  <Text textStyle="2xs" color="fg.muted">
+                    Result
+                  </Text>
+                  <Text
+                    textStyle="2xs"
+                    fontWeight="semibold"
+                    color={eval_.passed ? "green.fg" : "red.fg"}
+                  >
                     {eval_.passed ? "Passed" : "Failed"}
                   </Text>
                 </HStack>
               )}
               <HStack justify="space-between" gap={3}>
-                <Text textStyle="2xs" color="fg.muted">Status</Text>
+                <Text textStyle="2xs" color="fg.muted">
+                  Status
+                </Text>
                 <Text textStyle="2xs" fontWeight="semibold" color={color}>
                   {getStatusLabel(eval_)}
                 </Text>

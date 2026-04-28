@@ -1,9 +1,17 @@
-import { Box, Button, HStack, Icon, Spinner, Text, VStack } from "@chakra-ui/react";
-import { LuCheck, LuCopy } from "react-icons/lu";
+import {
+  Box,
+  Button,
+  HStack,
+  Icon,
+  Spinner,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
 import { useMemo, useState } from "react";
+import { LuCheck, LuCopy } from "react-icons/lu";
+import { useColorMode } from "~/components/ui/color-mode";
 import { Dialog } from "~/components/ui/dialog";
 import type { TraceHeader } from "~/server/api/routers/tracesV2.schemas";
-import { useColorMode } from "~/components/ui/color-mode";
 import { useSpansFull } from "../../hooks/useSpansFull";
 import { ShikiCodeBlock } from "./MarkdownView";
 import { SegmentedToggle } from "./SegmentedToggle";
@@ -53,7 +61,7 @@ export function RawJsonDialog({ open, onClose, trace }: RawJsonDialogProps) {
             />
             <Box flex={1} />
             <CopyButton
-              payload={tab === "trace" ? traceJson : spansJson ?? ""}
+              payload={tab === "trace" ? traceJson : (spansJson ?? "")}
               disabled={tab === "spans" && !spansJson}
             />
           </HStack>
@@ -96,7 +104,11 @@ export function RawJsonDialog({ open, onClose, trace }: RawJsonDialogProps) {
               <Text textStyle="xs" color="fg.muted">
                 Failed to load spans
               </Text>
-              <Button size="xs" variant="outline" onClick={() => void spansQuery.refetch()}>
+              <Button
+                size="xs"
+                variant="outline"
+                onClick={() => void spansQuery.refetch()}
+              >
                 Retry
               </Button>
             </VStack>
@@ -107,7 +119,13 @@ export function RawJsonDialog({ open, onClose, trace }: RawJsonDialogProps) {
   );
 }
 
-function CopyButton({ payload, disabled }: { payload: string; disabled?: boolean }) {
+function CopyButton({
+  payload,
+  disabled,
+}: {
+  payload: string;
+  disabled?: boolean;
+}) {
   const [copied, setCopied] = useState(false);
   const handleClick = () => {
     if (disabled) return;

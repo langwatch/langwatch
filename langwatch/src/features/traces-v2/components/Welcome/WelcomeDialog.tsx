@@ -1,4 +1,12 @@
-import { Box, Button, Flex, HStack, Icon, Text, VStack } from "@chakra-ui/react";
+import {
+  Box,
+  Button,
+  Flex,
+  HStack,
+  Icon,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import type React from "react";
@@ -72,7 +80,11 @@ export const WelcomeDialog: React.FC<WelcomeDialogProps> = ({
           body slides on step changes. */}
       <HeroBand title={step.title} subtitle={step.subtitle} />
       <Box position="relative" overflow="hidden" paddingX={2}>
-        <AnimatePresence mode="popLayout" initial={false} custom={directionRef.current}>
+        <AnimatePresence
+          mode="popLayout"
+          initial={false}
+          custom={directionRef.current}
+        >
           <motion.div
             key={stepIndex}
             custom={directionRef.current}

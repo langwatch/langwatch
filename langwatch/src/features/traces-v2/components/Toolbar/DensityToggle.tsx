@@ -1,7 +1,7 @@
 import { Group, IconButton } from "@chakra-ui/react";
 import { AArrowDown, AArrowUp } from "lucide-react";
 import type React from "react";
-import { useDensityStore, type Density } from "../../stores/densityStore";
+import { type Density, useDensityStore } from "../../stores/densityStore";
 
 const OPTIONS: {
   density: Density;

@@ -3,21 +3,21 @@ import History from "@tiptap/extension-history";
 import Paragraph from "@tiptap/extension-paragraph";
 import Placeholder from "@tiptap/extension-placeholder";
 import { Text as TiptapText } from "@tiptap/extension-text";
-import { useEditor, type Editor } from "@tiptap/react";
+import { type Editor, useEditor } from "@tiptap/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { removeNodeAtLocation } from "~/server/app-layer/traces/query-language/queryParser";
 import {
-  PARAGRAPH_OFFSET,
   applyAcceptToEditor,
   buildDocument,
+  PARAGRAPH_OFFSET,
   readEditorContext,
 } from "./editorDocument";
 import { FilterHighlight } from "./filterHighlight";
 import { getSuggestionState, type SuggestionState } from "./getSuggestionState";
 import { handleKey } from "./handleKey";
 import {
-  CLOSED_SUGGESTION,
   buildSuggestionUI,
+  CLOSED_SUGGESTION,
   highlightedLabel,
   navigateSuggestion,
   type SuggestionUIState,
@@ -103,18 +103,21 @@ export function useFilterEditor({
   // in the same frame into one parse+serialize pass.
   const pendingCommitRef = useRef<number | null>(null);
   const lastCommittedTextRef = useRef<string>("");
-  const scheduleCommit = useCallback((text: string) => {
-    if (pendingCommitRef.current !== null) return;
-    pendingCommitRef.current = requestAnimationFrame(() => {
-      pendingCommitRef.current = null;
-      // Read the current editor text rather than the captured one — typing
-      // while a frame is queued may have produced more characters.
-      const fresh = editorRef.current?.getText() ?? text;
-      if (fresh === lastCommittedTextRef.current) return;
-      lastCommittedTextRef.current = fresh;
-      applyQueryTextRef.current(fresh);
-    });
-  }, [applyQueryTextRef]);
+  const scheduleCommit = useCallback(
+    (text: string) => {
+      if (pendingCommitRef.current !== null) return;
+      pendingCommitRef.current = requestAnimationFrame(() => {
+        pendingCommitRef.current = null;
+        // Read the current editor text rather than the captured one — typing
+        // while a frame is queued may have produced more characters.
+        const fresh = editorRef.current?.getText() ?? text;
+        if (fresh === lastCommittedTextRef.current) return;
+        lastCommittedTextRef.current = fresh;
+        applyQueryTextRef.current(fresh);
+      });
+    },
+    [applyQueryTextRef],
+  );
   // Cancel any pending commit on unmount so we don't write stale text.
   useEffect(
     () => () => {
@@ -336,8 +339,7 @@ export function useFilterEditor({
   useEffect(() => {
     if (!editor || editor.isDestroyed) return;
     if (editor.isFocused) return;
-    const normalize = (s: string): string =>
-      s.replace(/\u00A0/g, " ").trim();
+    const normalize = (s: string): string => s.replace(/\u00A0/g, " ").trim();
     if (normalize(editor.getText()) === normalize(queryText)) return;
     isProgrammaticRef.current = true;
     editor.commands.setContent(buildDocument(queryText));

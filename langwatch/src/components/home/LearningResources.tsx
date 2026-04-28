@@ -10,11 +10,14 @@ import {
 import { MeshGradient } from "@paper-design/shaders-react";
 import { LuBookOpen, LuCirclePlay, LuExternalLink } from "react-icons/lu";
 import { useReducedMotion } from "~/hooks/useReducedMotion";
+import { useColorModeValue } from "../ui/color-mode";
 import { Link } from "../ui/link";
 
 interface MeshConfig {
-  /** Mesh palette. */
+  /** Mesh palette in light mode (lifted highlights). */
   colors: string[];
+  /** Mesh palette in dark mode (deeper, original tones). */
+  colorsDark: string[];
   /** How much the mesh deforms — higher = more organic blobs. */
   distortion: number;
   /** Rotational twist around the centre. */
@@ -50,7 +53,8 @@ const resources: ResourceCard[] = [
     // barely move — reads like wide ocean horizons. Distortion floored,
     // no swirl, slow speed, anchored at origin.
     mesh: {
-      colors: ["#0c1c3d", "#1e3a8a", "#2563eb", "#06b6d4", "#22d3ee"],
+      colors: ["#0c1c3d", "#1e3a8a", "#3b82f6", "#67e8f9", "#a5f3fc"],
+      colorsDark: ["#0c1c3d", "#1e3a8a", "#2563eb", "#06b6d4", "#22d3ee"],
       distortion: 0.05,
       swirl: 0.0,
       speed: 0.08,
@@ -72,7 +76,8 @@ const resources: ResourceCard[] = [
     // scale puts more colour churn on screen; large opposite-direction
     // offset guarantees the two cards never share a frame.
     mesh: {
-      colors: ["#3d0c0c", "#7f1d1d", "#dc2626", "#f97316", "#fbbf24"],
+      colors: ["#7f1d1d", "#b91c1c", "#ef4444", "#fb923c", "#fde68a"],
+      colorsDark: ["#3d0c0c", "#7f1d1d", "#dc2626", "#f97316", "#fbbf24"],
       distortion: 1.0,
       swirl: 1.0,
       speed: 0.85,
@@ -96,6 +101,14 @@ type ResourceCardItemProps = {
  */
 function ResourceCardItem({ resource }: ResourceCardItemProps) {
   const reduceMotion = useReducedMotion();
+  const meshColors = useColorModeValue(
+    resource.mesh.colors,
+    resource.mesh.colorsDark,
+  );
+  const tintGradient = useColorModeValue(
+    "linear-gradient(135deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.1) 100%)",
+    "linear-gradient(135deg, rgba(0,0,0,0.15) 0%, rgba(0,0,0,0.5) 100%)",
+  );
   return (
     <ChakraLink
       href={resource.href}
@@ -111,15 +124,16 @@ function ResourceCardItem({ resource }: ResourceCardItemProps) {
         overflow="hidden"
         height="full"
         width="full"
+        boxShadow="0 1px 2px rgba(0,0,0,0.06), 0 8px 24px rgba(0,0,0,0.12)"
         transition="all 0.2s ease-in-out"
-        _hover={{ opacity: 0.92 }}
+        _hover={{ opacity: 0.92, boxShadow: "0 2px 4px rgba(0,0,0,0.08), 0 12px 32px rgba(0,0,0,0.16)" }}
       >
         {/* MeshGradient backdrop, scoped to this card. Card-specific
             palette so each card keeps its accent identity (cool blue for
             docs, warm red for videos). */}
         <Box position="absolute" inset={0} pointerEvents="none">
           <MeshGradient
-            colors={resource.mesh.colors}
+            colors={meshColors}
             distortion={resource.mesh.distortion}
             swirl={resource.mesh.swirl}
             grainMixer={resource.mesh.grainMixer}
@@ -137,7 +151,7 @@ function ResourceCardItem({ resource }: ResourceCardItemProps) {
           position="absolute"
           inset={0}
           pointerEvents="none"
-          backgroundImage="linear-gradient(135deg, rgba(0,0,0,0.05) 0%, rgba(0,0,0,0.35) 100%)"
+          backgroundImage={tintGradient}
         />
         <VStack
           position="relative"

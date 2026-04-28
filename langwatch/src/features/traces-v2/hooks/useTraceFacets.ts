@@ -13,7 +13,11 @@ export function useTraceFacets() {
   const query = api.tracesV2.discover.useQuery(
     {
       projectId: projectId ?? "",
-      timeRange: { from: timeRange.from, to: timeRange.to, live: !!timeRange.label },
+      timeRange: {
+        from: timeRange.from,
+        to: timeRange.to,
+        live: !!timeRange.label,
+      },
     },
     {
       enabled: !!projectId,

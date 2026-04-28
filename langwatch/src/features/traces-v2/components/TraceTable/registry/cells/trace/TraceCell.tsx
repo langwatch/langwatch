@@ -77,7 +77,12 @@ const TraceContent: React.FC<{
           </Text>
         </HStack>
       ) : (
-        <Text fontFamily="mono" textStyle={nameStyle} color="fg" userSelect="all">
+        <Text
+          fontFamily="mono"
+          textStyle={nameStyle}
+          color="fg"
+          userSelect="all"
+        >
           {trace.traceId}
         </Text>
       )}

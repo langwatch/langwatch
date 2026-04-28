@@ -1,7 +1,7 @@
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import type { FacetValuesResult } from "~/server/app-layer/traces/trace-list.service";
 import { api } from "~/utils/api";
 import { useFilterStore } from "../stores/filterStore";
-import type { FacetValuesResult } from "~/server/app-layer/traces/trace-list.service";
 
 interface FacetValuesOptions {
   facetKey: string;
@@ -30,7 +30,11 @@ export function useTraceFacetValues({
   const query = api.tracesV2.facetValues.useQuery(
     {
       projectId: project?.id ?? "",
-      timeRange: { from: timeRange.from, to: timeRange.to, live: !!timeRange.label },
+      timeRange: {
+        from: timeRange.from,
+        to: timeRange.to,
+        live: !!timeRange.label,
+      },
       facetKey,
       prefix,
       limit,

@@ -53,9 +53,12 @@ export const RangeSection: React.FC<RangeSectionProps> = ({
     setLocalValue([currentFrom ?? min, currentTo ?? max]);
   }, [currentFrom, currentTo, min, max]);
 
-  useEffect(() => () => {
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-  }, []);
+  useEffect(
+    () => () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    },
+    [],
+  );
 
   const handleChangeEnd = useCallback(
     (details: { value: number[] }) => {

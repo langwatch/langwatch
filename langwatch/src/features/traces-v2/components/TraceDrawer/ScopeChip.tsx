@@ -26,8 +26,8 @@ export function ScopeChip({ scope }: ScopeChipProps) {
             Instrumentation scope
           </Text>
           <Text textStyle="2xs" color="fg.muted" lineHeight="1.4">
-            The OpenTelemetry library that produced these spans — useful to
-            tell apart spans coming from different SDKs or auto-instrumentations
+            The OpenTelemetry library that produced these spans — useful to tell
+            apart spans coming from different SDKs or auto-instrumentations
             within the same trace.
           </Text>
           <VStack align="stretch" gap={0.5} paddingTop={1}>

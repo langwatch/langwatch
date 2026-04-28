@@ -57,7 +57,11 @@ export const LensTabs: React.FC = () => {
     const root = scrollerRef.current;
     if (!root) return;
     const tab = root.querySelector<HTMLElement>(`[data-value="${id}"]`);
-    tab?.scrollIntoView({ behavior: "smooth", inline: "nearest", block: "nearest" });
+    tab?.scrollIntoView({
+      behavior: "smooth",
+      inline: "nearest",
+      block: "nearest",
+    });
   };
 
   return (

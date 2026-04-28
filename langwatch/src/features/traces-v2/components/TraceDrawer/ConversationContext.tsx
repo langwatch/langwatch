@@ -1,15 +1,23 @@
-import { Box, Circle, Flex, HStack, Icon, Skeleton, Text, VStack } from "@chakra-ui/react";
 import {
-  LuArrowLeft,
-  LuArrowRight,
-  LuMessageCircle,
-} from "react-icons/lu";
-import { useThreadContext, type ThreadTurn } from "../../hooks/useThreadContext";
+  Box,
+  Circle,
+  Flex,
+  HStack,
+  Icon,
+  Skeleton,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
+import { LuArrowLeft, LuArrowRight, LuMessageCircle } from "react-icons/lu";
+import { Tooltip } from "~/components/ui/tooltip";
+import {
+  type ThreadTurn,
+  useThreadContext,
+} from "../../hooks/useThreadContext";
 import { useTraceDrawerNavigation } from "../../hooks/useTraceDrawerNavigation";
 import { useDrawerStore } from "../../stores/drawerStore";
 import { STATUS_COLORS } from "../../utils/formatters";
 import { TraceIdPeek } from "../TraceIdPeek";
-import { Tooltip } from "~/components/ui/tooltip";
 import { useDisplayRoleVisuals } from "./scenarioRoles";
 
 interface ConversationContextProps {
@@ -32,7 +40,9 @@ const MAX_PREVIEW = 140;
 
 function truncate(s: string): string {
   const flat = s.replace(/\s+/g, " ").trim();
-  return flat.length <= MAX_PREVIEW ? flat : `${flat.slice(0, MAX_PREVIEW - 1)}…`;
+  return flat.length <= MAX_PREVIEW
+    ? flat
+    : `${flat.slice(0, MAX_PREVIEW - 1)}…`;
 }
 
 /**
@@ -77,7 +87,8 @@ function extractReadableSnippet(
         }
       }
       // Skip pure JSON typed-blocks that aren't text
-      if (t.startsWith('{"type":"') && !t.startsWith('{"type":"text"')) return "";
+      if (t.startsWith('{"type":"') && !t.startsWith('{"type":"text"'))
+        return "";
       return content;
     }
     if (Array.isArray(content)) {
@@ -323,7 +334,8 @@ function ConversationRow({
   // with the bubble headers in the body of the drawer.
   const visuals = useDisplayRoleVisuals(row.role);
   const RoleIcon = visuals.Icon;
-  const iconColor = visuals.displayRole === "assistant" ? "blue.fg" : "fg.muted";
+  const iconColor =
+    visuals.displayRole === "assistant" ? "blue.fg" : "fg.muted";
   const Affordance =
     row.position === "previous"
       ? LuArrowLeft
@@ -335,7 +347,7 @@ function ConversationRow({
   return (
     <Tooltip
       content={`View the trace of the ${row.position} message in the conversation`}
-      disabled={row.position === 'current'}
+      disabled={row.position === "current"}
     >
       <Flex
         as={isCurrent ? "div" : "button"}
@@ -348,11 +360,7 @@ function ConversationRow({
         borderColor="border.muted"
         cursor={isCurrent ? "default" : "pointer"}
         onClick={isCurrent ? undefined : onClick}
-        _hover={
-          isCurrent
-            ? undefined
-            : { bg: "bg.muted" }
-        }
+        _hover={isCurrent ? undefined : { bg: "bg.muted" }}
         transition="background 0.12s ease"
         textAlign="left"
         width="full"
@@ -365,8 +373,10 @@ function ConversationRow({
                 animation: "tracesV2CurrentRowPulse 0.6s ease-out",
                 "@keyframes tracesV2CurrentRowPulse": {
                   "0%": {
-                    backgroundColor: "color-mix(in srgb, var(--chakra-colors-blue-500) 28%, transparent)",
-                    boxShadow: "inset 0 0 0 1px color-mix(in srgb, var(--chakra-colors-blue-500) 35%, transparent)",
+                    backgroundColor:
+                      "color-mix(in srgb, var(--chakra-colors-blue-500) 28%, transparent)",
+                    boxShadow:
+                      "inset 0 0 0 1px color-mix(in srgb, var(--chakra-colors-blue-500) 35%, transparent)",
                   },
                   "100%": {
                     backgroundColor: "var(--chakra-colors-bg-emphasized)",
@@ -381,12 +391,7 @@ function ConversationRow({
         }
       >
         <TraceIdPeek traceId={row.traceId} />
-        <Icon
-          as={RoleIcon}
-          boxSize={3.5}
-          color={iconColor}
-          flexShrink={0}
-        />
+        <Icon as={RoleIcon} boxSize={3.5} color={iconColor} flexShrink={0} />
         <Text
           textStyle="xs"
           color={isCurrent ? "fg" : "fg.muted"}
@@ -400,7 +405,12 @@ function ConversationRow({
         {isCurrent ? (
           <Circle size="8px" bg={statusColor} flexShrink={0} />
         ) : Affordance ? (
-          <Icon as={Affordance} boxSize={3.5} color="fg.subtle" flexShrink={0} />
+          <Icon
+            as={Affordance}
+            boxSize={3.5}
+            color="fg.subtle"
+            flexShrink={0}
+          />
         ) : null}
       </Flex>
     </Tooltip>

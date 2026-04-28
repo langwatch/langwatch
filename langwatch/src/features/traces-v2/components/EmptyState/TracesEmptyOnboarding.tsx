@@ -2,8 +2,8 @@ import {
   Box,
   Button,
   Grid,
-  HStack,
   Heading,
+  HStack,
   Spinner,
   Tabs,
   Text,
@@ -12,11 +12,6 @@ import {
 import { Play } from "lucide-react";
 import type React from "react";
 import { useMemo, useState } from "react";
-import { useRouter } from "~/utils/compat/next-router";
-import {
-  ActiveProjectProvider,
-  type ActiveProjectContextValue,
-} from "~/features/onboarding/contexts/ActiveProjectContext";
 import { DocsLinks } from "~/features/onboarding/components/sections/observability/DocsLinks";
 import { FrameworkGrid } from "~/features/onboarding/components/sections/observability/FrameworkGrid";
 import { FrameworkIntegrationCode } from "~/features/onboarding/components/sections/observability/FrameworkIntegrationCode";
@@ -24,6 +19,10 @@ import { InstallPreview } from "~/features/onboarding/components/sections/observ
 import { PlatformGrid } from "~/features/onboarding/components/sections/observability/PlatformGrid";
 import { ViaClaudeCodeScreen } from "~/features/onboarding/components/sections/ViaClaudeCodeScreen";
 import { ViaMcpClientScreen } from "~/features/onboarding/components/sections/ViaClaudeDesktopScreen";
+import {
+  type ActiveProjectContextValue,
+  ActiveProjectProvider,
+} from "~/features/onboarding/contexts/ActiveProjectContext";
 import { getRegistryEntry } from "~/features/onboarding/regions/observability/codegen/registry";
 import type {
   FrameworkKey,
@@ -34,6 +33,7 @@ import {
   PLATFORM_OPTIONS,
 } from "~/features/onboarding/regions/observability/ui-options";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { useRouter } from "~/utils/compat/next-router";
 import { useFilterStore } from "../../stores/filterStore";
 import { PatIntegrationInfoCard } from "./PatIntegrationInfoCard";
 import { useSampleData } from "./useSampleData";
@@ -103,11 +103,9 @@ export function TracesEmptyOnboarding(): React.ReactElement {
     // fragment on the next render.
     applyQueryText(SAMPLE_QUERY);
     const { empty: _drop, ...rest } = router.query;
-    void router.replace(
-      { pathname: router.pathname, query: rest },
-      undefined,
-      { shallow: true },
-    );
+    void router.replace({ pathname: router.pathname, query: rest }, undefined, {
+      shallow: true,
+    });
   };
 
   // Override project.apiKey with the freshly-minted PAT so every lifted
@@ -118,7 +116,8 @@ export function TracesEmptyOnboarding(): React.ReactElement {
     organization,
   };
 
-  const activeSegment = SEGMENTS.find((s) => s.value === segment) ?? SEGMENTS[0];
+  const activeSegment =
+    SEGMENTS.find((s) => s.value === segment) ?? SEGMENTS[0];
 
   return (
     <ActiveProjectProvider value={activeProjectContext}>
@@ -134,8 +133,8 @@ export function TracesEmptyOnboarding(): React.ReactElement {
         <VStack align="stretch" gap={2}>
           <Heading size="lg">Send your first trace</Heading>
           <Text color="fg.muted" textStyle="sm">
-            Generate an access token, then pick a setup style. Traces will
-            start appearing here once your app sends them.
+            Generate an access token, then pick a setup style. Traces will start
+            appearing here once your app sends them.
           </Text>
         </VStack>
 
@@ -250,7 +249,7 @@ function ManualSetup(): React.ReactElement | null {
   const [selectedFramework, setSelectedFramework] =
     useState<FrameworkKey | null>(
       initialPlatform
-        ? FRAMEWORKS_BY_PLATFORM[initialPlatform]?.[0]?.key ?? null
+        ? (FRAMEWORKS_BY_PLATFORM[initialPlatform]?.[0]?.key ?? null)
         : null,
     );
 
@@ -269,7 +268,7 @@ function ManualSetup(): React.ReactElement | null {
     () =>
       getRegistryEntry(
         selectedPlatform,
-        hasFrameworks ? selectedFramework ?? undefined : undefined,
+        hasFrameworks ? (selectedFramework ?? undefined) : undefined,
       ),
     [selectedPlatform, selectedFramework, hasFrameworks],
   );

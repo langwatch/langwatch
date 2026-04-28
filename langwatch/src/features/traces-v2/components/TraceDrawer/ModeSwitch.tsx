@@ -1,5 +1,5 @@
-import type { ReactNode } from "react";
 import { Box, Flex, HStack, Text } from "@chakra-ui/react";
+import type { ReactNode } from "react";
 import { Kbd } from "~/components/ops/shared/Kbd";
 import { Tooltip } from "~/components/ui/tooltip";
 import { PresenceMarker } from "~/features/presence/components/PresenceMarker";
@@ -44,7 +44,9 @@ function ModePresenceDot({
     ),
   );
   if (peers.length === 0) return null;
-  return <PresenceMarker peers={peers} size={16} tooltipSuffix={`${mode} view`} />;
+  return (
+    <PresenceMarker peers={peers} size={16} tooltipSuffix={`${mode} view`} />
+  );
 }
 
 function ModeTab({
@@ -138,7 +140,9 @@ export function ModeSwitch({
         active={viewMode === "conversation"}
         disabled={!hasConversation}
         disabledReason={
-          hasConversation ? undefined : "This trace is not part of a conversation"
+          hasConversation
+            ? undefined
+            : "This trace is not part of a conversation"
         }
         onClick={() => onViewModeChange("conversation")}
         presence={presenceFor("conversation")}

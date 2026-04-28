@@ -1,8 +1,8 @@
 import { Box } from "@chakra-ui/react";
 import {
-  type SortingState,
   getCoreRowModel,
   getSortedRowModel,
+  type SortingState,
   useReactTable,
 } from "@tanstack/react-table";
 import type React from "react";

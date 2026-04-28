@@ -1,8 +1,4 @@
-import type {
-  GroupingMode,
-  LensConfig,
-  SortConfig,
-} from "../stores/viewStore";
+import type { GroupingMode, LensConfig, SortConfig } from "../stores/viewStore";
 
 // Density is intentionally NOT serialised into the URL — it's a personal
 // preference, not a shareable view setting. Lives in `densityStore.ts`.
@@ -101,7 +97,10 @@ export function parseFragment(fragment: string): FragmentState | null {
 
     const cols = params.get("cols");
     if (cols !== null) {
-      const list = cols.split(",").map((c) => c.trim()).filter(Boolean);
+      const list = cols
+        .split(",")
+        .map((c) => c.trim())
+        .filter(Boolean);
       if (list.length > 0) overrides.columns = list;
     }
 
@@ -113,7 +112,6 @@ export function parseFragment(fragment: string): FragmentState | null {
       const parsed = parseSort(sort);
       if (parsed) overrides.sort = parsed;
     }
-
   }
 
   return { lensId, overrides };
@@ -184,7 +182,10 @@ export function buildFragment(
   if (overrides.columns) params.set("cols", overrides.columns.join(","));
   if (overrides.grouping) params.set("group", overrides.grouping);
   if (overrides.sort) {
-    params.set("sort", `${overrides.sort.columnId}:${overrides.sort.direction}`);
+    params.set(
+      "sort",
+      `${overrides.sort.columnId}:${overrides.sort.direction}`,
+    );
   }
   const encodedLens = encodeURIComponent(lensId);
   const paramStr = params.toString();

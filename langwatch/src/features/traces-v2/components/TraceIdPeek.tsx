@@ -1,8 +1,8 @@
 import {
   Box,
   Circle,
-  HStack,
   HoverCard,
+  HStack,
   Icon,
   Portal,
   Skeleton,
@@ -85,9 +85,7 @@ export const TraceIdPeek: React.FC<TraceIdPeekProps> = ({ traceId }) => {
             backdropFilter="blur(8px)"
             boxShadow="lg"
           >
-            {hasHovered && (
-              <PeekPopoverContent traceId={traceId} />
-            )}
+            {hasHovered && <PeekPopoverContent traceId={traceId} />}
           </HoverCard.Content>
         </HoverCard.Positioner>
       </Portal>
@@ -127,15 +125,27 @@ function PeekPopoverContent({ traceId }: { traceId: string }) {
 
       {/* Metrics */}
       <HStack paddingX={3} paddingBottom={2} gap={3} flexWrap="wrap">
-        <PopoverMetric label="Duration" value={formatDuration(trace.durationMs)} />
+        <PopoverMetric
+          label="Duration"
+          value={formatDuration(trace.durationMs)}
+        />
         {(trace.totalCost ?? 0) > 0 && (
-          <PopoverMetric label="Cost" value={formatCost(trace.totalCost ?? 0)} />
+          <PopoverMetric
+            label="Cost"
+            value={formatCost(trace.totalCost ?? 0)}
+          />
         )}
         {trace.totalTokens > 0 && (
-          <PopoverMetric label="Tokens" value={formatTokens(trace.totalTokens)} />
+          <PopoverMetric
+            label="Tokens"
+            value={formatTokens(trace.totalTokens)}
+          />
         )}
         {trace.models.length > 0 && (
-          <PopoverMetric label="Model" value={abbreviateModel(trace.models[0]!)} />
+          <PopoverMetric
+            label="Model"
+            value={abbreviateModel(trace.models[0]!)}
+          />
         )}
         <PopoverMetric label="Spans" value={String(trace.spanCount)} />
       </HStack>
@@ -147,7 +157,12 @@ function PeekPopoverContent({ traceId }: { traceId: string }) {
         <VStack align="stretch" gap={1} padding={3}>
           {trace.input && (
             <Box>
-              <Text textStyle="2xs" fontWeight="medium" color="fg.muted" marginBottom={0.5}>
+              <Text
+                textStyle="2xs"
+                fontWeight="medium"
+                color="fg.muted"
+                marginBottom={0.5}
+              >
                 Input
               </Text>
               <Text
@@ -164,7 +179,12 @@ function PeekPopoverContent({ traceId }: { traceId: string }) {
           )}
           {trace.output && (
             <Box>
-              <Text textStyle="2xs" fontWeight="medium" color="fg.muted" marginBottom={0.5}>
+              <Text
+                textStyle="2xs"
+                fontWeight="medium"
+                color="fg.muted"
+                marginBottom={0.5}
+              >
                 Output
               </Text>
               <Text

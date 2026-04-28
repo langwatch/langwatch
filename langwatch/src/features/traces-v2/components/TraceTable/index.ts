@@ -1,5 +1,5 @@
-export { TraceTable } from "./TraceTable";
 export { IOPreview } from "./IOPreview";
-export { Pagination } from "./Pagination";
 export { NewTracesScrollUpIndicator } from "./NewTracesScrollUpIndicator";
+export { Pagination } from "./Pagination";
 export { RegistryRow } from "./registry";
+export { TraceTable } from "./TraceTable";

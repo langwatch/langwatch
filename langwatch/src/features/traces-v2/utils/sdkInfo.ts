@@ -114,7 +114,8 @@ export function parseSdkInfo(input: ParseSdkInputs): SdkInfo | null {
 
   const scenarioName = trimmedString(input.scenarioSdkName);
   const scenarioVersion = trimmedString(input.scenarioSdkVersion);
-  const scenarioActive = !!input.scenarioActive || !!scenarioName || !!scenarioVersion;
+  const scenarioActive =
+    !!input.scenarioActive || !!scenarioName || !!scenarioVersion;
   const scenario: ScenarioSdkInfo | null = scenarioActive
     ? { name: scenarioName, version: scenarioVersion, active: true }
     : null;

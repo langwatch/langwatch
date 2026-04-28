@@ -43,7 +43,10 @@ export const KeyboardShortcutsButton = () => {
 
   return (
     <>
-      <Tooltip content="Keyboard shortcuts" positioning={{ placement: "bottom" }}>
+      <Tooltip
+        content="Keyboard shortcuts"
+        positioning={{ placement: "bottom" }}
+      >
         <IconButton
           size="xs"
           variant="ghost"

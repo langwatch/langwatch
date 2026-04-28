@@ -13,26 +13,35 @@
  *   • ThreadedTurnView — Gmail-style collapsible row for one turn
  *   • VirtualizedChatList — virtualized turn list for long transcripts
  */
-import { useState, useMemo, useRef, type ReactNode } from "react";
-import { useVirtualizer } from "@tanstack/react-virtual";
-import { keyframes } from "@emotion/react";
-import { Box, Button, Flex, HStack, Icon, Text, VStack } from "@chakra-ui/react";
+
 import {
+  Box,
+  Button,
+  Flex,
+  HStack,
+  Icon,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
+import { keyframes } from "@emotion/react";
+import { useVirtualizer } from "@tanstack/react-virtual";
+import { type ReactNode, useMemo, useRef, useState } from "react";
+import type { IconType } from "react-icons";
+import {
+  LuBot,
   LuBrain,
   LuChevronDown,
   LuChevronRight,
   LuCode,
-  LuBot,
   LuSettings,
   LuUser,
   LuWrench,
 } from "react-icons/lu";
-import type { IconType } from "react-icons";
 import { RenderedMarkdown } from "./MarkdownView";
 import {
+  type DisplayRoleVisuals,
   getDisplayRoleVisuals,
   useIsScenarioRole,
-  type DisplayRoleVisuals,
 } from "./scenarioRoles";
 
 // ---------------------------------------------------------------------------
@@ -41,10 +50,7 @@ import {
 
 export interface ChatMessage {
   role: string;
-  content:
-    | string
-    | null
-    | Array<Record<string, unknown> | string>;
+  content: string | null | Array<Record<string, unknown> | string>;
   tool_calls?: Array<{
     function: { name: string; arguments: string };
     id: string;
@@ -350,7 +356,9 @@ export function extractInlineBlocks(content: string): ContentBlock[] {
   return out;
 }
 
-export function parseContentBlocks(content: ChatMessage["content"]): ContentBlock[] {
+export function parseContentBlocks(
+  content: ChatMessage["content"],
+): ContentBlock[] {
   if (content == null) return [];
   if (typeof content === "string") {
     if (content.length === 0) return [];
@@ -371,7 +379,9 @@ export function parseContentBlocks(content: ChatMessage["content"]): ContentBloc
             return blocks;
           }
         } else if (parsed && typeof parsed === "object") {
-          const single = parseContentBlocks([parsed as Record<string, unknown>]);
+          const single = parseContentBlocks([
+            parsed as Record<string, unknown>,
+          ]);
           if (single.length > 0 && single[0]!.kind !== "raw") {
             return single;
           }
@@ -481,7 +491,9 @@ export function parseContentBlocks(content: ChatMessage["content"]): ContentBloc
 
 export function joinTextBlocks(blocks: ContentBlock[]): string {
   return blocks
-    .filter((b): b is Extract<ContentBlock, { kind: "text" }> => b.kind === "text")
+    .filter(
+      (b): b is Extract<ContentBlock, { kind: "text" }> => b.kind === "text",
+    )
     .map((b) => b.text)
     .join("\n");
 }
@@ -527,7 +539,9 @@ export function extractReadableText(
 
   // Bare typed-block array (no role wrapper).
   if (Array.isArray(parsed)) {
-    const blocks = parseContentBlocks(parsed as Array<Record<string, unknown> | string>);
+    const blocks = parseContentBlocks(
+      parsed as Array<Record<string, unknown> | string>,
+    );
     const text = joinTextBlocks(blocks);
     if (text.trim()) return text;
   }
@@ -543,8 +557,14 @@ export function extractReadableText(
   return raw;
 }
 
-export function getReasoning(message: ChatMessage, blocks: ContentBlock[]): string {
-  if (typeof message.reasoning_content === "string" && message.reasoning_content) {
+export function getReasoning(
+  message: ChatMessage,
+  blocks: ContentBlock[],
+): string {
+  if (
+    typeof message.reasoning_content === "string" &&
+    message.reasoning_content
+  ) {
     return message.reasoning_content;
   }
   if (typeof message.thinking === "string" && message.thinking) {
@@ -627,7 +647,9 @@ export function toolResultBodyToString(content: unknown): string {
  * tool_use + …) render together inside that message's turn — that's the
  * shape the model emitted, and it should be obvious in the UI.
  */
-export function groupMessagesIntoTurns(messages: ChatMessage[]): ConversationTurn[] {
+export function groupMessagesIntoTurns(
+  messages: ChatMessage[],
+): ConversationTurn[] {
   const turns: ConversationTurn[] = [];
 
   // Fold a user-role message into the preceding assistant turn whenever
@@ -708,36 +730,45 @@ export function groupMessagesIntoTurns(messages: ChatMessage[]): ConversationTur
 export function summarizeTurn(turn: ConversationTurn): string {
   if (turn.kind === "user") {
     const text = turn.blocks
-      .filter((b): b is Extract<ContentBlock, { kind: "text" }> => b.kind === "text")
+      .filter(
+        (b): b is Extract<ContentBlock, { kind: "text" }> => b.kind === "text",
+      )
       .map((b) => b.text)
       .join(" ");
     if (text.trim()) return text.replace(/\s+/g, " ").trim().slice(0, 140);
     const tu = turn.blocks.find(
-      (b): b is Extract<ContentBlock, { kind: "tool_use" }> => b.kind === "tool_use",
+      (b): b is Extract<ContentBlock, { kind: "tool_use" }> =>
+        b.kind === "tool_use",
     );
     if (tu) return `Tool · ${tu.name}`;
     return "—";
   }
   if (turn.kind === "system") {
     const text = turn.blocks
-      .filter((b): b is Extract<ContentBlock, { kind: "text" }> => b.kind === "text")
+      .filter(
+        (b): b is Extract<ContentBlock, { kind: "text" }> => b.kind === "text",
+      )
       .map((b) => b.text)
       .join(" ");
     return text.replace(/\s+/g, " ").trim().slice(0, 140) || "—";
   }
   const text = turn.blocks
-    .filter((b): b is Extract<ContentBlock, { kind: "text" }> => b.kind === "text")
+    .filter(
+      (b): b is Extract<ContentBlock, { kind: "text" }> => b.kind === "text",
+    )
     .map((b) => b.text)
     .join(" ");
   if (text.trim()) return text.replace(/\s+/g, " ").trim().slice(0, 140);
   const thinking = turn.blocks.find(
-    (b): b is Extract<ContentBlock, { kind: "thinking" }> => b.kind === "thinking",
+    (b): b is Extract<ContentBlock, { kind: "thinking" }> =>
+      b.kind === "thinking",
   );
   if (thinking) {
     return `Thinking — ${thinking.text.replace(/\s+/g, " ").trim().slice(0, 100)}`;
   }
   const tu = turn.blocks.find(
-    (b): b is Extract<ContentBlock, { kind: "tool_use" }> => b.kind === "tool_use",
+    (b): b is Extract<ContentBlock, { kind: "tool_use" }> =>
+      b.kind === "tool_use",
   );
   if (tu) return `Tool · ${tu.name}`;
   if (turn.toolCalls.length > 0) {
@@ -780,7 +811,8 @@ export function RoleChip({ role }: { role: string }) {
     isScenario && (role === "user" || role === "assistant")
       ? getDisplayRoleVisuals(role, { isScenario: true })
       : null;
-  const label = scenarioVisuals?.label ?? ROLE_LABELS[role] ?? role.toUpperCase();
+  const label =
+    scenarioVisuals?.label ?? ROLE_LABELS[role] ?? role.toUpperCase();
   // Reuse the existing role palette by keying on the *display* role under
   // scenario, so the swap matches whatever color the bubble/card around it
   // is using.
@@ -1133,7 +1165,11 @@ function ToolPairSection({
   children: ReactNode;
 }) {
   return (
-    <Box paddingX={2.5} paddingY={1.5} _notFirst={{ borderTopWidth: "1px", borderTopColor: "border.muted" }}>
+    <Box
+      paddingX={2.5}
+      paddingY={1.5}
+      _notFirst={{ borderTopWidth: "1px", borderTopColor: "border.muted" }}
+    >
       <Text
         textStyle="2xs"
         fontWeight="600"
@@ -1261,7 +1297,9 @@ export function UserTurnBubble({
   // Pure-prose user message → classic chat bubble layout.
   if (onlyText) {
     const text = blocks
-      .filter((b): b is Extract<ContentBlock, { kind: "text" }> => b.kind === "text")
+      .filter(
+        (b): b is Extract<ContentBlock, { kind: "text" }> => b.kind === "text",
+      )
       .map((b) => b.text)
       .join("\n");
     return (
@@ -1456,8 +1494,9 @@ function BlockStack({
 
   const toolItemCount = useMemo(
     () =>
-      items.filter((it) => it.kind === "tool_pair" || it.kind === "orphan_result")
-        .length + toolCalls.length,
+      items.filter(
+        (it) => it.kind === "tool_pair" || it.kind === "orphan_result",
+      ).length + toolCalls.length,
     [items, toolCalls],
   );
   const firstToolIdx = useMemo(
@@ -1651,8 +1690,7 @@ export function AssistantTurnCard({
   // away and read just the assistant's final reply, which is what they
   // usually came for.
   const operationCount = useMemo(
-    () =>
-      blocks.filter((b) => b.kind !== "text").length + toolCalls.length,
+    () => blocks.filter((b) => b.kind !== "text").length + toolCalls.length,
     [blocks, toolCalls],
   );
   const hasOutputText = useMemo(
@@ -1748,7 +1786,9 @@ export function SystemTurnView({
   blocks: ContentBlock[];
 }) {
   const text = blocks
-    .filter((b): b is Extract<ContentBlock, { kind: "text" }> => b.kind === "text")
+    .filter(
+      (b): b is Extract<ContentBlock, { kind: "text" }> => b.kind === "text",
+    )
     .map((b) => b.text)
     .join("\n");
   return (
@@ -1844,7 +1884,9 @@ export function ThreadedTurnView({
   const color = ROLE_COLORS[colorKey] ?? "fg.muted";
   const RoleIcon = scenarioVisuals?.Icon ?? ROLE_ICONS[sourceRole] ?? LuUser;
   const label =
-    scenarioVisuals?.label ?? ROLE_LABELS[sourceRole] ?? sourceRole.toUpperCase();
+    scenarioVisuals?.label ??
+    ROLE_LABELS[sourceRole] ??
+    sourceRole.toUpperCase();
   const colorBase = color.split(".")[0]!;
 
   return (

@@ -1,6 +1,22 @@
-import { Badge, Button, Circle, Flex, HStack, Icon, Text } from "@chakra-ui/react";
+import {
+  Badge,
+  Button,
+  Circle,
+  Flex,
+  HStack,
+  Icon,
+  Text,
+} from "@chakra-ui/react";
 import { LuFileText, LuPin, LuPinOff, LuX } from "react-icons/lu";
+import { Kbd } from "~/components/ops/shared/Kbd";
+import { Tooltip } from "~/components/ui/tooltip";
+import { PresenceMarker } from "~/features/presence/components/PresenceMarker";
+import {
+  selectPeersMatching,
+  usePresenceStore,
+} from "~/features/presence/stores/presenceStore";
 import type { SpanTreeNode } from "~/server/api/routers/tracesV2.schemas";
+import { usePrefetchSpanDetail } from "../../hooks/usePrefetchSpanDetail";
 import type { DrawerTab } from "../../stores/drawerStore";
 import {
   abbreviateModel,
@@ -8,14 +24,6 @@ import {
   SPAN_TYPE_COLORS,
   truncateId,
 } from "../../utils/formatters";
-import { Tooltip } from "~/components/ui/tooltip";
-import { Kbd } from "~/components/ops/shared/Kbd";
-import { PresenceMarker } from "~/features/presence/components/PresenceMarker";
-import {
-  selectPeersMatching,
-  usePresenceStore,
-} from "~/features/presence/stores/presenceStore";
-import { usePrefetchSpanDetail } from "../../hooks/usePrefetchSpanDetail";
 
 interface SpanTabBarProps {
   activeTab: DrawerTab;
@@ -47,7 +55,9 @@ function DrawerTabPresenceDot({
     ),
   );
   if (peers.length === 0) return null;
-  return <PresenceMarker peers={peers} size={16} tooltipSuffix={`${tab} tab`} />;
+  return (
+    <PresenceMarker peers={peers} size={16} tooltipSuffix={`${tab} tab`} />
+  );
 }
 
 function SpanFocusPresenceDot({
@@ -354,7 +364,10 @@ function SpanTab({
       </Tooltip>
 
       {secondaryActionIcon && onSecondaryAction && (
-        <Tooltip content={secondaryActionLabel ?? ""} positioning={{ placement: "top" }}>
+        <Tooltip
+          content={secondaryActionLabel ?? ""}
+          positioning={{ placement: "top" }}
+        >
           <Flex
             as="button"
             align="center"

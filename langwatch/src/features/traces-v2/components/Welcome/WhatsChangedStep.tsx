@@ -1,4 +1,13 @@
-import { Box, Flex, HStack, Heading, Icon, SimpleGrid, Text, VStack } from "@chakra-ui/react";
+import {
+  Box,
+  Flex,
+  Heading,
+  HStack,
+  Icon,
+  SimpleGrid,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
 import { Layers, LayoutGrid, Zap } from "lucide-react";
 import type React from "react";
 
@@ -80,7 +89,12 @@ const LayoutPreview: React.FC = () => (
       </HStack>
     </Flex>
     <HStack gap={0} align="stretch" height="calc(100% - 30px)">
-      <Box width="22%" borderRightWidth="1px" borderColor="border.muted" padding={2}>
+      <Box
+        width="22%"
+        borderRightWidth="1px"
+        borderColor="border.muted"
+        padding={2}
+      >
         <FauxLine width="60%" />
         <FauxLine width="80%" muted />
         <FauxLine width="50%" muted />

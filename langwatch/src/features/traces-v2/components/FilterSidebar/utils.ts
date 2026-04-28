@@ -1,5 +1,5 @@
-import { HelpCircle, type LucideIcon } from "lucide-react";
 import type { Tokens } from "@chakra-ui/react";
+import { HelpCircle, type LucideIcon } from "lucide-react";
 import {
   FACET_ICONS,
   FACET_LABELS,

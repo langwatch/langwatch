@@ -1,14 +1,14 @@
 import { HStack, Text } from "@chakra-ui/react";
+import type { TraceStatus } from "../../../../../types/trace";
 import {
   abbreviateModel,
   formatCost,
   formatDuration,
   formatTokens,
 } from "../../../../../utils/formatters";
-import type { TraceStatus } from "../../../../../types/trace";
+import type { ConversationGroup } from "../../../conversationGroups";
 import { MonoCell } from "../../../MonoCell";
 import { StatusDot, StatusIndicator } from "../../../StatusRow";
-import type { ConversationGroup } from "../../../conversationGroups";
 import type { CellDef } from "../../types";
 
 const STATUS_HEALTH_LABELS: Record<TraceStatus, string> = {

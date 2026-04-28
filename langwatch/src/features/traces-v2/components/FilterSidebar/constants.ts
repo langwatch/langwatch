@@ -1,3 +1,4 @@
+import type { Tokens } from "@chakra-ui/react";
 import {
   Activity,
   AlertCircle,
@@ -16,6 +17,7 @@ import {
   Hash,
   History,
   ListTree,
+  type LucideIcon,
   MessageSquare,
   Server,
   Shield,
@@ -25,11 +27,9 @@ import {
   TimerReset,
   User,
   Workflow,
-  type LucideIcon,
 } from "lucide-react";
-import type { Tokens } from "@chakra-ui/react";
-import { STATUS_COLORS } from "../../utils/formatters";
 import { FIELD_VALUES } from "~/server/app-layer/traces/query-language/queryParser";
+import { STATUS_COLORS } from "../../utils/formatters";
 
 export const ATTRIBUTES_SECTION_KEY = "__attributes__";
 
@@ -138,13 +138,7 @@ export const GROUP_ICONS: Record<string, LucideIcon> = {
 };
 
 export interface FacetGroupDef {
-  id:
-    | "trace"
-    | "prompts"
-    | "metrics"
-    | "evaluators"
-    | "events"
-    | "attributes";
+  id: "trace" | "prompts" | "metrics" | "evaluators" | "events" | "attributes";
   label: string;
   keys: string[];
 }
@@ -201,7 +195,12 @@ export const FACET_GROUPS: FacetGroupDef[] = [
   {
     id: "evaluators",
     label: "Evaluators",
-    keys: ["evaluator", "evaluatorStatus", "evaluatorVerdict", "evaluatorScore"],
+    keys: [
+      "evaluator",
+      "evaluatorStatus",
+      "evaluatorVerdict",
+      "evaluatorScore",
+    ],
   },
   {
     id: "events",

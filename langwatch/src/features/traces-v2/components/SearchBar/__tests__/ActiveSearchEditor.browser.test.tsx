@@ -269,9 +269,7 @@ describe("SearchBar in real Chromium", () => {
       );
       // Use a shape-agnostic check: any dropdown rendering its option text.
       // Vitest assertion for "something matching status is on screen".
-      expect(
-        document.body.textContent?.includes("status"),
-      ).toBeTruthy();
+      expect(document.body.textContent?.includes("status")).toBeTruthy();
 
       await userEvent.keyboard("[Escape]");
       // Continued typing should NOT reopen the dropdown until blur or `@`.
@@ -664,7 +662,9 @@ describe("SearchBar in real Chromium", () => {
       await userEvent.click(editor);
       await userEvent.keyboard("status:error");
       // Backspace the entire value back to `status:`.
-      await userEvent.keyboard("[Backspace][Backspace][Backspace][Backspace][Backspace]");
+      await userEvent.keyboard(
+        "[Backspace][Backspace][Backspace][Backspace][Backspace]",
+      );
       expect(plainText(editor)).toBe("status:");
       // Retype a different value.
       await userEvent.keyboard("warning");

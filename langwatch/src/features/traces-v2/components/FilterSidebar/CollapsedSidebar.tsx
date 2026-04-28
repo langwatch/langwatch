@@ -12,11 +12,7 @@ import type {
   RangeSectionData,
   TooltipLine,
 } from "./types";
-import {
-  getFacetIcon,
-  getRangeFormatter,
-  summarizeRange,
-} from "./utils";
+import { getFacetIcon, getRangeFormatter, summarizeRange } from "./utils";
 
 interface CollapsedSidebarProps {
   ast: LiqeQuery;

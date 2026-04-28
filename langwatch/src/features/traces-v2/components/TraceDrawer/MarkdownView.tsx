@@ -13,14 +13,20 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import React, { useEffect, useMemo, useRef, useState } from "react";
 import { keyframes } from "@emotion/react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { LuCheck, LuCopy, LuSettings2 } from "react-icons/lu";
 
 const thinkingShimmer = keyframes`
   0% { background-position: 200% center; }
   100% { background-position: -200% center; }
 `;
+
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import { codeToHtml, createHighlighter, type HighlighterGeneric } from "shiki";
+import { Checkbox } from "~/components/ui/checkbox";
+import { useColorMode } from "~/components/ui/color-mode";
 import {
   PopoverArrow,
   PopoverBody,
@@ -28,18 +34,13 @@ import {
   PopoverRoot,
   PopoverTrigger,
 } from "~/components/ui/popover";
-import { Tooltip } from "~/components/ui/tooltip";
-import { Checkbox } from "~/components/ui/checkbox";
 import { Radio, RadioGroup } from "~/components/ui/radio";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
-import { codeToHtml, createHighlighter, type HighlighterGeneric } from "shiki";
+import { Tooltip } from "~/components/ui/tooltip";
 import type {
-  TraceHeader,
-  SpanTreeNode,
   SpanDetail as FullSpan,
+  SpanTreeNode,
+  TraceHeader,
 } from "~/server/api/routers/tracesV2.schemas";
-import { useColorMode } from "~/components/ui/color-mode";
 import {
   abbreviateModel,
   formatCost,
@@ -244,8 +245,7 @@ function compactIO(raw: string | null | undefined): string[] {
               "tool_result",
             ].includes((b as Record<string, unknown>).type as string),
         )) ||
-      (typeof m.rawContent === "string" &&
-        THINKING_TAG_RE.test(m.rawContent));
+      (typeof m.rawContent === "string" && THINKING_TAG_RE.test(m.rawContent));
     // Reset regex lastIndex — `THINKING_TAG_RE` is global so test() advances it.
     THINKING_TAG_RE.lastIndex = 0;
 
@@ -442,7 +442,9 @@ function renderMessageBlocks(content: unknown): string[] {
   for (const b of content) {
     if (typeof b === "string") {
       for (const seg of splitThinkingFromText(b)) {
-        lines.push(seg.kind === "thinking" ? thinkingLine(seg.content) : seg.content);
+        lines.push(
+          seg.kind === "thinking" ? thinkingLine(seg.content) : seg.content,
+        );
       }
       continue;
     }
@@ -454,7 +456,9 @@ function renderMessageBlocks(content: unknown): string[] {
       // blocks instead of using a dedicated block type — tease them apart
       // here so they get the same shimmer treatment.
       for (const seg of splitThinkingFromText(block.text)) {
-        lines.push(seg.kind === "thinking" ? thinkingLine(seg.content) : seg.content);
+        lines.push(
+          seg.kind === "thinking" ? thinkingLine(seg.content) : seg.content,
+        );
       }
       continue;
     }
@@ -510,10 +514,7 @@ function renderMessageBlocks(content: unknown): string[] {
             lines.push(`  - ${truncate(r, 400)}`);
           } else if (r && typeof r === "object") {
             const rblock = r as Record<string, unknown>;
-            if (
-              rblock.type === "text" &&
-              typeof rblock.text === "string"
-            ) {
+            if (rblock.type === "text" && typeof rblock.text === "string") {
               for (const ln of rblock.text.split("\n")) {
                 lines.push(`  ${truncate(ln, 400)}`);
               }
@@ -546,10 +547,7 @@ function renderMessageBlocks(content: unknown): string[] {
  * proper terminal chart, not a fence-and-dot approximation. Width is fixed
  * for deterministic copy-paste alignment.
  */
-function renderSpanTimeline(
-  spans: SpanTreeNode[],
-  width: number,
-): string[] {
+function renderSpanTimeline(spans: SpanTreeNode[], width: number): string[] {
   if (spans.length === 0) return [];
 
   const minStart = Math.min(...spans.map((s) => s.startTimeMs));
@@ -568,7 +566,10 @@ function renderSpanTimeline(
   for (const span of sorted) {
     const startFrac = (span.startTimeMs - minStart) / total;
     const endFrac = (span.endTimeMs - minStart) / total;
-    const startCell = Math.max(0, Math.min(width - 1, Math.floor(startFrac * width)));
+    const startCell = Math.max(
+      0,
+      Math.min(width - 1, Math.floor(startFrac * width)),
+    );
     const endCell = Math.max(
       startCell + 1,
       Math.min(width, Math.ceil(endFrac * width)),
@@ -577,9 +578,10 @@ function renderSpanTimeline(
     for (let i = startCell; i < endCell; i++) {
       cells[i] = span.status === "error" ? "▓" : "█";
     }
-    const label = span.name.length > labelMaxLen
-      ? span.name.slice(0, labelMaxLen - 1) + "…"
-      : span.name.padEnd(labelMaxLen);
+    const label =
+      span.name.length > labelMaxLen
+        ? span.name.slice(0, labelMaxLen - 1) + "…"
+        : span.name.padEnd(labelMaxLen);
     const dur = formatDuration(span.durationMs);
     lines.push(`  ${label} ┤${cells.join("")} ${dur}`);
   }
@@ -709,9 +711,15 @@ function renderUnicodeFlame(spans: SpanTreeNode[], width: number): string[] {
 
   const maxDepth = Math.max(0, ...Array.from(depthOf.values()));
   const cellFor = (timeMs: number): number =>
-    Math.max(0, Math.min(width - 1, Math.floor(((timeMs - minStart) / total) * width)));
+    Math.max(
+      0,
+      Math.min(width - 1, Math.floor(((timeMs - minStart) / total) * width)),
+    );
   const endCellFor = (timeMs: number): number =>
-    Math.max(1, Math.min(width, Math.ceil(((timeMs - minStart) / total) * width)));
+    Math.max(
+      1,
+      Math.min(width, Math.ceil(((timeMs - minStart) / total) * width)),
+    );
 
   // Rows from deepest to shallowest so the call stack reads top-down.
   const lines: string[] = [];
@@ -728,9 +736,7 @@ function renderUnicodeFlame(spans: SpanTreeNode[], width: number): string[] {
     lines.push(`d${d} │ ${cells.join("")}`);
   }
   // Bottom axis with start/mid/end markers.
-  lines.push(
-    `   └${"─".repeat(width)}`,
-  );
+  lines.push(`   └${"─".repeat(width)}`);
   const mid = formatDuration(total / 2);
   const end = formatDuration(total);
   lines.push(
@@ -802,7 +808,9 @@ export function buildTraceMarkdown(
     quickLook.push(`💰 ${formatCost(trace.totalCost ?? 0)}`);
   }
   if (trace.spanCount) {
-    quickLook.push(`📊 ${trace.spanCount} span${trace.spanCount === 1 ? "" : "s"}`);
+    quickLook.push(
+      `📊 ${trace.spanCount} span${trace.spanCount === 1 ? "" : "s"}`,
+    );
   }
   if (trace.ttft != null) {
     quickLook.push(`⚡ TTFT ${formatDuration(trace.ttft)}`);
@@ -824,9 +832,7 @@ export function buildTraceMarkdown(
     );
   }
   if (trace.models.length > 0) {
-    detail.push(
-      `**Models** ${trace.models.map((m) => `\`${m}\``).join(", ")}`,
-    );
+    detail.push(`**Models** ${trace.models.map((m) => `\`${m}\``).join(", ")}`);
   }
   if (trace.userId) detail.push(`**User** \`${trace.userId}\``);
   if (trace.conversationId) {
@@ -964,7 +970,10 @@ export function buildTraceMarkdown(
       // No code fence, no box-drawing — just YAML-style indented list.
       const renderSpanLine = (span: SpanTreeNode, depth: number): string => {
         const indent = "  ".repeat(depth);
-        const bits: string[] = [span.type ?? "span", formatDuration(span.durationMs)];
+        const bits: string[] = [
+          span.type ?? "span",
+          formatDuration(span.durationMs),
+        ];
         if (span.model) bits.push(abbreviateModel(span.model));
         if (span.status === "error") bits.push("error");
         return `${indent}- ${span.name} (${bits.join(", ")})`;
@@ -987,7 +996,9 @@ export function buildTraceMarkdown(
         }
 
         if (opts.includeSpanAttributes && full?.params) {
-          const flat = flattenAttributes(full.params as Record<string, unknown>);
+          const flat = flattenAttributes(
+            full.params as Record<string, unknown>,
+          );
           if (flat.length > 0) {
             lines.push(`${subIndent}attributes:`);
             for (const ln of flat) lines.push(`${subIndent}  ${ln}`);
@@ -1448,7 +1459,12 @@ function buildMarkdownComponents(colorMode: string) {
       );
     },
     del: ({ children }: { children?: React.ReactNode }) => (
-      <Text as="del" textDecoration="line-through" color="fg.muted" display="inline">
+      <Text
+        as="del"
+        textDecoration="line-through"
+        color="fg.muted"
+        display="inline"
+      >
         {children}
       </Text>
     ),

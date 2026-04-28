@@ -1,11 +1,5 @@
 import { Box, Flex, HStack, Icon, Text } from "@chakra-ui/react";
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { LuChevronRight, LuRotateCcw } from "react-icons/lu";
 import { Tooltip } from "~/components/ui/tooltip";
 import type { SpanTreeNode } from "~/server/api/routers/tracesV2.schemas";
@@ -284,8 +278,7 @@ export function FlameView({
       cancelAnimation();
       const rect = el.getBoundingClientRect();
       const x = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-      const isPan =
-        e.shiftKey || Math.abs(e.deltaX) > Math.abs(e.deltaY);
+      const isPan = e.shiftKey || Math.abs(e.deltaX) > Math.abs(e.deltaY);
       const delta = isPan ? e.deltaX || e.deltaY : e.deltaY;
       setViewport((prev) => {
         const dur = prev.endMs - prev.startMs;
@@ -418,7 +411,7 @@ export function FlameView({
   // Context span for the info strip: priority hover > focus > selection.
   const contextNode = useMemo<FlameNode | null>(() => {
     const id = hoveredSpanId ?? focusedSpanId ?? selectedSpanId;
-    return id ? tree.byId.get(id) ?? null : null;
+    return id ? (tree.byId.get(id) ?? null) : null;
   }, [hoveredSpanId, focusedSpanId, selectedSpanId, tree.byId]);
 
   const contextInfo = useMemo<SpanContext | null>(() => {
@@ -526,7 +519,8 @@ export function FlameView({
     if (visibleBlocks.length <= 200) return 0;
     let count = 0;
     for (const node of visibleBlocks) {
-      const widthPct = ((node.span.endTimeMs - node.span.startTimeMs) / dur) * 100;
+      const widthPct =
+        ((node.span.endTimeMs - node.span.startTimeMs) / dur) * 100;
       if (widthPct < 0.1) count++;
     }
     return count;
@@ -555,7 +549,10 @@ export function FlameView({
 
       switch (e.key) {
         case "Escape": {
-          if (viewportRef.current.endMs - viewportRef.current.startMs < fullDur * 0.999) {
+          if (
+            viewportRef.current.endMs - viewportRef.current.startMs <
+            fullDur * 0.999
+          ) {
             e.preventDefault();
             handleResetZoom();
           } else if (selectedSpanId) {
@@ -714,8 +711,7 @@ export function FlameView({
             </Text>
             {breadcrumbs.map((node, i) => {
               const isLast = i === breadcrumbs.length - 1;
-              const crumbDur =
-                node.span.endTimeMs - node.span.startTimeMs;
+              const crumbDur = node.span.endTimeMs - node.span.startTimeMs;
               const parentDur = node.parent
                 ? node.parent.span.endTimeMs - node.parent.span.startTimeMs
                 : null;
@@ -1093,10 +1089,13 @@ export function FlameView({
             const isDescendant =
               relatedSpanIds?.descendants.has(span.spanId) ?? false;
             const isRelated =
-              isAncestor || isDescendant || isSelected || isHovered || isFocused;
+              isAncestor ||
+              isDescendant ||
+              isSelected ||
+              isHovered ||
+              isFocused;
             const isEmphasized = isSelected || isHovered || isFocused;
-            const isDimmed =
-              dimOnHover && !!relatedSpanIds && !isRelated;
+            const isDimmed = dimOnHover && !!relatedSpanIds && !isRelated;
             const bgAlphaPct = Math.round(
               (isEmphasized
                 ? 1
@@ -1117,8 +1116,7 @@ export function FlameView({
               parentDurMs !== null && parentDurMs > 0
                 ? (spanDur / parentDurMs) * 100
                 : null;
-            const pctOfTrace =
-              fullDur > 0 ? (spanDur / fullDur) * 100 : null;
+            const pctOfTrace = fullDur > 0 ? (spanDur / fullDur) * 100 : null;
 
             const tooltipLines = [
               span.name,
@@ -1647,8 +1645,7 @@ function BlockLabel({
   if (widthPct < 2) return null;
   if (widthPct < 5) return <>{name.slice(0, 8)}</>;
   const dur = formatDuration(duration);
-  const pct =
-    pctOfParent !== null ? ` · ${formatPercent(pctOfParent)}` : "";
+  const pct = pctOfParent !== null ? ` · ${formatPercent(pctOfParent)}` : "";
   if (widthPct >= 18 && model) {
     return (
       <>

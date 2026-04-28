@@ -10,24 +10,17 @@ import {
 } from "@chakra-ui/react";
 import {
   AlertTriangle,
+  Check,
   ChevronDown,
   ChevronRight,
   Copy,
-  Check,
   Database,
   Edit3,
   Lightbulb,
   MoreHorizontal,
   Settings2,
 } from "lucide-react";
-import {
-  memo,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Menu } from "~/components/ui/menu";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useAnnotationCommentStore } from "~/hooks/useAnnotationCommentStore";
@@ -44,12 +37,13 @@ import {
 } from "../../utils/formatters";
 import { Bubble } from "../TraceTable/registry/addons/conversation/Bubble";
 import { RenderedMarkdown } from "./MarkdownView";
-import {
-  getDisplayRoleVisuals,
-  useIsScenarioRole,
-} from "./scenarioRoles";
 import { SegmentedToggle } from "./SegmentedToggle";
-import { extractReadableText, extractReasoningText, ReasoningBlock } from "./Transcript";
+import { getDisplayRoleVisuals, useIsScenarioRole } from "./scenarioRoles";
+import {
+  extractReadableText,
+  extractReasoningText,
+  ReasoningBlock,
+} from "./Transcript";
 
 interface ConversationViewProps {
   conversationId: string;
@@ -102,7 +96,8 @@ export function ConversationView({
         // the I/O viewer does (chat arrays, single message objects,
         // typed-block content arrays). parseLastUserText only handled
         // chat arrays, missing single-message and bare-block envelopes.
-        userText: extractReadableText(t.input, "user") || parseLastUserText(t.input),
+        userText:
+          extractReadableText(t.input, "user") || parseLastUserText(t.input),
         assistantText: extractReadableText(t.output, "assistant"),
         assistantReasoning: extractReasoningText(t.output),
         gapSecs,
@@ -229,7 +224,13 @@ const ConversationSkeleton: React.FC<{ conversationId: string }> = ({
         <Skeleton height="20px" width="96px" borderRadius="md" />
       </HStack>
 
-      <VStack align="stretch" gap={5} paddingX={5} paddingY={4} overflow="hidden">
+      <VStack
+        align="stretch"
+        gap={5}
+        paddingX={5}
+        paddingY={4}
+        overflow="hidden"
+      >
         {SKELETON_TURNS.map((turn, i) => (
           <VStack key={i} align="stretch" gap={2}>
             <Flex align="center" gap={2}>
@@ -273,9 +274,17 @@ const ConversationSkeleton: React.FC<{ conversationId: string }> = ({
                 paddingY={2}
               >
                 <Skeleton height="9px" width="56px" borderRadius="sm" />
-                <Skeleton height="11px" width={turn.assistant[0]} borderRadius="sm" />
+                <Skeleton
+                  height="11px"
+                  width={turn.assistant[0]}
+                  borderRadius="sm"
+                />
                 {turn.assistant[1] && (
-                  <Skeleton height="11px" width={turn.assistant[1]} borderRadius="sm" />
+                  <Skeleton
+                    height="11px"
+                    width={turn.assistant[1]}
+                    borderRadius="sm"
+                  />
                 )}
               </VStack>
               <Skeleton boxSize="22px" borderRadius="full" flexShrink={0} />
@@ -573,10 +582,7 @@ const TurnActionsMenu: React.FC<{ turn: TraceListItem }> = ({ turn }) => {
 
   return (
     <Menu.Root>
-      <Tooltip
-        content="Turn actions"
-        positioning={{ placement: "top" }}
-      >
+      <Tooltip content="Turn actions" positioning={{ placement: "top" }}>
         <Menu.Trigger asChild>
           <Button
             size="2xs"

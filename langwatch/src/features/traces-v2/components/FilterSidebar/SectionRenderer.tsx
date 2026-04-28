@@ -8,7 +8,12 @@ import { AttributesSection } from "./AttributesSection";
 import { ATTRIBUTES_SECTION_KEY, NONE_TOGGLE_VALUE } from "./constants";
 import { FacetSection } from "./FacetSection";
 import { RangeSection } from "./RangeSection";
-import type { AttributeKey, FacetItem, FacetValueState, Section } from "./types";
+import type {
+  AttributeKey,
+  FacetItem,
+  FacetValueState,
+  Section,
+} from "./types";
 import { getFacetIcon, getRangeFormatter } from "./utils";
 
 interface SectionRendererProps {

@@ -7,14 +7,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import {
-  AlertTriangle,
-  Bot,
-  Clock,
-  GitBranch,
-  User,
-  Zap,
-} from "lucide-react";
+import { AlertTriangle, Bot, Clock, GitBranch, User, Zap } from "lucide-react";
 import type React from "react";
 import { useDrawer, useDrawerParams } from "~/hooks/useDrawer";
 import type { DensityTokens } from "../../../../../hooks/useDensityTokens";
@@ -31,15 +24,15 @@ import { MonoCell } from "../../../MonoCell";
 import {
   ROW_STYLES,
   type RowStyle,
-  StatusDot,
   rowVariantFor,
+  StatusDot,
 } from "../../../StatusRow";
 import { Td, Tr } from "../../../TablePrimitives";
 import { ConversationSummaryDetail } from "./ConversationSummary";
 import {
+  formatGapSeconds,
   TURN_GAP_PAUSE_SECONDS,
   TURN_GAP_VISIBLE_SECONDS,
-  formatGapSeconds,
   turnGapSeconds,
 } from "./turnGap";
 
@@ -173,7 +166,9 @@ const ConversationTurnRow: React.FC<ConversationTurnRowProps> = ({
             <Badge size="xs" variant="outline" fontFamily="mono" flexShrink={0}>
               T{turnIndex + 1}
             </Badge>
-            {trace.status === "error" && <StatusDot status="error" size="6px" />}
+            {trace.status === "error" && (
+              <StatusDot status="error" size="6px" />
+            )}
             {trace.input && (
               <InlineMessage
                 icon={<User />}

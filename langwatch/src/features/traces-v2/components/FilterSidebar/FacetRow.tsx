@@ -1,8 +1,8 @@
 import { Badge, Box, HStack, Text } from "@chakra-ui/react";
 import { memo } from "react";
-import type { FacetItem, FacetValueState } from "./types";
-import { paletteFromColor, formatCount } from "./utils";
 import { RowButton } from "./RowButton";
+import type { FacetItem, FacetValueState } from "./types";
+import { formatCount, paletteFromColor } from "./utils";
 
 const TYPED_LABEL_REGEX = /^\[([^\]]+)\]\s*(.+)$/;
 

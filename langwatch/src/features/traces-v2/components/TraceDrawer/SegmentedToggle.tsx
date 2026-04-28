@@ -6,7 +6,11 @@ interface SegmentedToggleProps {
   options: readonly string[];
 }
 
-export function SegmentedToggle({ value, onChange, options }: SegmentedToggleProps) {
+export function SegmentedToggle({
+  value,
+  onChange,
+  options,
+}: SegmentedToggleProps) {
   return (
     <HStack
       gap={0}

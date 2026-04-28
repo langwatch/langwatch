@@ -1,4 +1,12 @@
-import { Box, HStack, Heading, Icon, SimpleGrid, Text, VStack } from "@chakra-ui/react";
+import {
+  Box,
+  Heading,
+  HStack,
+  Icon,
+  SimpleGrid,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
 import { Sparkles } from "lucide-react";
 import type React from "react";
 

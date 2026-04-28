@@ -1,12 +1,12 @@
 import { Box, Button, Icon, Portal, Text } from "@chakra-ui/react";
-import { LuChevronDown } from "react-icons/lu";
 import {
+  type RefObject,
   useEffect,
   useLayoutEffect,
   useRef,
   useState,
-  type RefObject,
 } from "react";
+import { LuChevronDown } from "react-icons/lu";
 
 interface BelowFoldIndicatorProps {
   /** The scrollable container the indicator should observe. */

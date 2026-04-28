@@ -1,6 +1,6 @@
 import { useCallback } from "react";
 import { useDrawer } from "~/hooks/useDrawer";
-import { useDrawerStore, type DrawerViewMode } from "../stores/drawerStore";
+import { type DrawerViewMode, useDrawerStore } from "../stores/drawerStore";
 
 /**
  * Trace-to-trace navigation inside the v2 drawer with a back stack.
@@ -37,7 +37,10 @@ export function useTraceDrawerNavigation() {
       toTimestamp?: number;
       toViewMode?: DrawerViewMode;
     }) => {
-      if (fromTraceId === toTraceId && (toViewMode == null || toViewMode === fromViewMode)) {
+      if (
+        fromTraceId === toTraceId &&
+        (toViewMode == null || toViewMode === fromViewMode)
+      ) {
         return;
       }
       pushTraceHistory({ traceId: fromTraceId, viewMode: fromViewMode });

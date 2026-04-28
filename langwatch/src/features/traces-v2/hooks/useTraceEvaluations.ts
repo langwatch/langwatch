@@ -1,9 +1,9 @@
 import { useMemo } from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { api } from "~/utils/api";
 import type { Evaluation } from "~/server/tracer/types";
-import type { EvalSummary } from "../types/trace";
+import { api } from "~/utils/api";
 import { useDrawerStore } from "../stores/drawerStore";
+import type { EvalSummary } from "../types/trace";
 
 export type RichEval = EvalSummary & {
   evaluationId: string;

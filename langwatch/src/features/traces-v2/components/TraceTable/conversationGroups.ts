@@ -22,7 +22,7 @@ export interface ConversationGroup {
 }
 
 export function groupTracesByConversation(
-  traces: TraceListItem[]
+  traces: TraceListItem[],
 ): ConversationGroup[] {
   const map = new Map<string, TraceListItem[]>();
   for (const t of traces) {
@@ -75,7 +75,8 @@ export function groupTracesByConversation(
       }
     }
 
-    const lastOutput = [...sorted].reverse().find((t) => t.output)?.output ?? "";
+    const lastOutput =
+      [...sorted].reverse().find((t) => t.output)?.output ?? "";
 
     result.push({
       conversationId: id,

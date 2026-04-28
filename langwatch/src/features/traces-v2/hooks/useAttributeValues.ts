@@ -15,7 +15,11 @@ export function useAttributeValues(attrKey: string, enabled: boolean) {
   const query = api.tracesV2.facetValues.useQuery(
     {
       projectId: project?.id ?? "",
-      timeRange: { from: timeRange.from, to: timeRange.to, live: !!timeRange.label },
+      timeRange: {
+        from: timeRange.from,
+        to: timeRange.to,
+        live: !!timeRange.label,
+      },
       facetKey: `attribute.${attrKey}`,
       limit: 30,
       offset: 0,

@@ -1,8 +1,8 @@
 import { useCallback } from "react";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { api } from "~/utils/api";
 import type { TraceHeader } from "~/server/api/routers/tracesV2.schemas";
+import { api } from "~/utils/api";
 import type { TraceListItem } from "../types/trace";
 
 function listItemToHeader(item: TraceListItem): TraceHeader {

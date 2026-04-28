@@ -12,7 +12,11 @@ interface PinnedAttributesState {
   byProject: Record<string, PinnedAttribute[]>;
   setForProject: (projectId: string, pins: PinnedAttribute[]) => void;
   togglePin: (projectId: string, pin: PinnedAttribute) => void;
-  removePin: (projectId: string, source: PinnedAttributeSource, key: string) => void;
+  removePin: (
+    projectId: string,
+    source: PinnedAttributeSource,
+    key: string,
+  ) => void;
   reorder: (projectId: string, fromIndex: number, toIndex: number) => void;
   hydrateFromStorage: (projectId: string) => void;
 }

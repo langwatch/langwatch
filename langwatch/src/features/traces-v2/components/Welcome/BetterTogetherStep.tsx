@@ -1,4 +1,13 @@
-import { Badge, Box, Flex, HStack, Icon, SimpleGrid, Text, VStack } from "@chakra-ui/react";
+import {
+  Badge,
+  Box,
+  Flex,
+  HStack,
+  Icon,
+  SimpleGrid,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
 import { MessageCircle, Share2, Users } from "lucide-react";
 import type React from "react";
 
@@ -39,7 +48,12 @@ export const BetterTogetherStep: React.FC<WelcomeStepProps> = () => (
   </VStack>
 );
 
-const FeatureCard: React.FC<MultiplayerFeature> = ({ icon, title, body, accent }) => (
+const FeatureCard: React.FC<MultiplayerFeature> = ({
+  icon,
+  title,
+  body,
+  accent,
+}) => (
   <VStack
     align="stretch"
     gap={2}
@@ -103,13 +117,18 @@ const ComingSoonCallout: React.FC = () => (
         <Text textStyle="xs" fontWeight="semibold" color="pink.fg">
           Live cursors &amp; threaded comments
         </Text>
-        <Badge colorPalette="pink" variant="surface" size="xs" borderRadius="full">
+        <Badge
+          colorPalette="pink"
+          variant="surface"
+          size="xs"
+          borderRadius="full"
+        >
           Coming soon
         </Badge>
       </HStack>
       <Text textStyle="xs" color="fg.muted" lineHeight="1.5">
-        Comment on a span, see a teammate&apos;s cursor as they scroll through
-        a trace, and resolve threads when the bug is fixed.
+        Comment on a span, see a teammate&apos;s cursor as they scroll through a
+        trace, and resolve threads when the bug is fixed.
       </Text>
     </VStack>
   </HStack>

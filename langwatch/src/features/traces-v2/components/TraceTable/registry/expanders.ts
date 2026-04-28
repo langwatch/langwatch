@@ -5,12 +5,6 @@ import {
   makeEvalColumnDef,
   makeEventColumnDef,
 } from "../columns";
-import { ErrorTextCell } from "./cells/trace/ErrorTextCell";
-import { InputCell } from "./cells/trace/InputCell";
-import { OutputCell } from "./cells/trace/OutputCell";
-import { SpanNameCell } from "./cells/trace/SpanNameCell";
-import { SpanTypeCell } from "./cells/trace/SpanTypeCell";
-import { TraceIdCell } from "./cells/trace/TraceIdCell";
 import {
   makeEvalCellDef,
   uniqueEvaluators,
@@ -19,6 +13,12 @@ import {
   makeEventCellDef,
   uniqueEventNames,
 } from "./cells/trace/dynamicEventCell";
+import { ErrorTextCell } from "./cells/trace/ErrorTextCell";
+import { InputCell } from "./cells/trace/InputCell";
+import { OutputCell } from "./cells/trace/OutputCell";
+import { SpanNameCell } from "./cells/trace/SpanNameCell";
+import { SpanTypeCell } from "./cells/trace/SpanTypeCell";
+import { TraceIdCell } from "./cells/trace/TraceIdCell";
 import type { CellDef } from "./types";
 
 export interface ExpandedColumn<TRow> {
@@ -30,11 +30,31 @@ export interface ExpandedColumn<TRow> {
 export type ColumnExpander<TRow> = (rows: TRow[]) => ExpandedColumn<TRow>[];
 
 const TRACE_EXPANSION: ExpandedColumn<TraceListItem>[] = [
-  { id: SpanNameCell.id, cellDef: SpanNameCell, columnDef: getTraceColumnDef("span-name")! },
-  { id: SpanTypeCell.id, cellDef: SpanTypeCell, columnDef: getTraceColumnDef("span-type")! },
-  { id: TraceIdCell.id, cellDef: TraceIdCell, columnDef: getTraceColumnDef("trace-id")! },
-  { id: InputCell.id, cellDef: InputCell, columnDef: getTraceColumnDef("input")! },
-  { id: OutputCell.id, cellDef: OutputCell, columnDef: getTraceColumnDef("output")! },
+  {
+    id: SpanNameCell.id,
+    cellDef: SpanNameCell,
+    columnDef: getTraceColumnDef("span-name")!,
+  },
+  {
+    id: SpanTypeCell.id,
+    cellDef: SpanTypeCell,
+    columnDef: getTraceColumnDef("span-type")!,
+  },
+  {
+    id: TraceIdCell.id,
+    cellDef: TraceIdCell,
+    columnDef: getTraceColumnDef("trace-id")!,
+  },
+  {
+    id: InputCell.id,
+    cellDef: InputCell,
+    columnDef: getTraceColumnDef("input")!,
+  },
+  {
+    id: OutputCell.id,
+    cellDef: OutputCell,
+    columnDef: getTraceColumnDef("output")!,
+  },
 ];
 
 const ERROR_TEXT_COLUMN: ExpandedColumn<TraceListItem> = {

@@ -2,9 +2,9 @@ import { Plugin, PluginKey } from "@tiptap/pm/state";
 import { Decoration, DecorationSet } from "@tiptap/pm/view";
 import { Extension } from "@tiptap/react";
 import {
-  parse as liqeParse,
   type LiqeQuery,
   type LogicalExpressionToken,
+  parse as liqeParse,
   type ParenthesizedExpressionToken,
   type TagToken,
   type UnaryOperatorToken,
@@ -51,7 +51,8 @@ function tagClassName({
   negated: boolean;
 }): string {
   if (negated) return "filter-token filter-token-exclude";
-  if (SCENARIO_FIELDS.has(fieldName)) return "filter-token filter-token-scenario";
+  if (SCENARIO_FIELDS.has(fieldName))
+    return "filter-token filter-token-scenario";
   return "filter-token";
 }
 
@@ -206,7 +207,9 @@ function createDeleteWidget(token: TokenRef): HTMLElement {
   return btn;
 }
 
-function computeDecorations(doc: import("@tiptap/pm/model").Node): DecorationSet {
+function computeDecorations(
+  doc: import("@tiptap/pm/model").Node,
+): DecorationSet {
   const decorations: Decoration[] = [];
   doc.descendants((node, pos) => {
     if (!node.isText || !node.text) return;

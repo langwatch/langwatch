@@ -9,7 +9,6 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { useMemo } from "react";
-import { useDrawer } from "~/hooks/useDrawer";
 import {
   LuArrowRight,
   LuCircleCheck,
@@ -20,6 +19,7 @@ import {
   LuTriangleAlert,
 } from "react-icons/lu";
 import { Tooltip } from "~/components/ui/tooltip";
+import { useDrawer } from "~/hooks/useDrawer";
 import type {
   SpanDetail,
   SpanTreeNode,
@@ -27,14 +27,14 @@ import type {
 } from "~/server/api/routers/tracesV2.schemas";
 import { usePromptByHandle } from "../../hooks/usePromptByHandle";
 import { useSpansFull } from "../../hooks/useSpansFull";
+import { abbreviateModel, formatDuration } from "../../utils/formatters";
 import {
   extractPromptReference,
   formatPromptReferenceLabel,
+  type PromptReference,
   parseTracePromptIds,
   promptReferenceKey,
-  type PromptReference,
 } from "../../utils/promptAttributes";
-import { abbreviateModel, formatDuration } from "../../utils/formatters";
 
 interface PromptsPanelProps {
   trace: TraceHeader;
@@ -123,7 +123,11 @@ function aggregatePromptUsage(
   return ordered;
 }
 
-export function PromptsPanel({ trace, spans, onSelectSpan }: PromptsPanelProps) {
+export function PromptsPanel({
+  trace,
+  spans,
+  onSelectSpan,
+}: PromptsPanelProps) {
   const { openDrawer } = useDrawer();
   const onOpenPromptEditor = (handle: string) => {
     openDrawer("promptEditor", { promptId: handle });
@@ -258,7 +262,12 @@ function SelectedVsLastUsedCallout({
     >
       {hasDrift && (
         <HStack gap={2} align="flex-start">
-          <Icon as={LuTriangleAlert} boxSize={3.5} color="yellow.fg" marginTop="2px" />
+          <Icon
+            as={LuTriangleAlert}
+            boxSize={3.5}
+            color="yellow.fg"
+            marginTop="2px"
+          />
           <VStack align="stretch" gap={0.5}>
             <Text textStyle="xs" fontWeight="semibold" color="yellow.fg">
               Pinned prompt drifted at runtime
@@ -277,7 +286,12 @@ function SelectedVsLastUsedCallout({
 
       {outOfDate && latestVersion != null && (
         <HStack gap={2} align="flex-start">
-          <Icon as={LuTriangleAlert} boxSize={3.5} color="yellow.fg" marginTop="2px" />
+          <Icon
+            as={LuTriangleAlert}
+            boxSize={3.5}
+            color="yellow.fg"
+            marginTop="2px"
+          />
           <VStack align="stretch" gap={0.5}>
             <Text textStyle="xs" fontWeight="semibold" color="yellow.fg">
               Trace ran an out-of-date prompt
@@ -294,14 +308,19 @@ function SelectedVsLastUsedCallout({
 
       {promptMissing && (
         <HStack gap={2} align="flex-start">
-          <Icon as={LuCircleDashed} boxSize={3.5} color="fg.muted" marginTop="2px" />
+          <Icon
+            as={LuCircleDashed}
+            boxSize={3.5}
+            color="fg.muted"
+            marginTop="2px"
+          />
           <VStack align="stretch" gap={0.5}>
             <Text textStyle="xs" fontWeight="semibold" color="fg.muted">
               Prompt no longer exists in this project
             </Text>
             <Text textStyle="2xs" color="fg.muted">
-              The trace still shows what ran at the time, but the
-              underlying managed prompt has been deleted.
+              The trace still shows what ran at the time, but the underlying
+              managed prompt has been deleted.
             </Text>
           </VStack>
         </HStack>
@@ -391,7 +410,14 @@ function PromptIdentityRow({
       >
         {label}
       </Text>
-      <Text textStyle="sm" fontFamily="mono" color="fg" truncate flex={1} minWidth={0}>
+      <Text
+        textStyle="sm"
+        fontFamily="mono"
+        color="fg"
+        truncate
+        flex={1}
+        minWidth={0}
+      >
         {handle}
       </Text>
       {versionNumber != null && (
@@ -541,8 +567,8 @@ function PromptUsageCard({
           <Text textStyle="xs" color="fg.subtle">
             No span on this trace carries data for this prompt. The trace
             attributes record it, but the spans themselves don&rsquo;t expose
-            the prompt id — likely emitted from a path that bypasses the
-            span attribute.
+            the prompt id — likely emitted from a path that bypasses the span
+            attribute.
           </Text>
         ) : (
           <VStack align="stretch" gap={0.5}>

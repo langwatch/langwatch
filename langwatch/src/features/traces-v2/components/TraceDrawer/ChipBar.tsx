@@ -1,7 +1,7 @@
 import { HStack, VStack } from "@chakra-ui/react";
 import type { ReactElement, ReactNode } from "react";
-import { Chip } from "./Chip";
 import type { ChipProps } from "./Chip";
+import { Chip } from "./Chip";
 
 export interface ChipDef extends ChipProps {
   /** Stable key for React reconciliation. */
@@ -58,24 +58,25 @@ export function ChipBar({
   const primaryById = new Set(primary.map((c) => c.id));
   const orderedPrimary = visibleChips.filter((c) => primaryById.has(c.id));
 
-  const overflowChip: ReactElement | null = overflow.length > 0 ? (
-    <Chip
-      key="__overflow"
-      label={`+${overflow.length}`}
-      value="more"
-      tone="neutral"
-      popover={
-        <VStack align="stretch" gap={1.5} padding={3}>
-          {overflow.map((c) => (
-            <HStack key={c.id} gap={2}>
-              <Chip {...c} />
-            </HStack>
-          ))}
-        </VStack>
-      }
-      ariaLabel={`Show ${overflow.length} more`}
-    />
-  ) : null;
+  const overflowChip: ReactElement | null =
+    overflow.length > 0 ? (
+      <Chip
+        key="__overflow"
+        label={`+${overflow.length}`}
+        value="more"
+        tone="neutral"
+        popover={
+          <VStack align="stretch" gap={1.5} padding={3}>
+            {overflow.map((c) => (
+              <HStack key={c.id} gap={2}>
+                <Chip {...c} />
+              </HStack>
+            ))}
+          </VStack>
+        }
+        ariaLabel={`Show ${overflow.length} more`}
+      />
+    ) : null;
 
   return (
     <HStack gap={1.5} flexWrap="wrap" align="center" width="full">

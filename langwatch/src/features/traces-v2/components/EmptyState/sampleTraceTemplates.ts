@@ -27,11 +27,46 @@ const MODELS: Array<{
   outputTokens: number;
   cost: number;
 }> = [
-  { system: "openai", request: "gpt-4o", response: "gpt-4o-2024-08-06", inputTokens: 412, outputTokens: 184, cost: 0.0042 },
-  { system: "openai", request: "gpt-4o-mini", response: "gpt-4o-mini-2024-07-18", inputTokens: 318, outputTokens: 96, cost: 0.0006 },
-  { system: "anthropic", request: "claude-haiku-4-5", response: "claude-haiku-4-5-20251001", inputTokens: 524, outputTokens: 212, cost: 0.0017 },
-  { system: "anthropic", request: "claude-sonnet-4-5", response: "claude-sonnet-4-5-20250514", inputTokens: 612, outputTokens: 348, cost: 0.0184 },
-  { system: "google", request: "gemini-2.5-flash", response: "gemini-2.5-flash", inputTokens: 489, outputTokens: 156, cost: 0.0009 },
+  {
+    system: "openai",
+    request: "gpt-4o",
+    response: "gpt-4o-2024-08-06",
+    inputTokens: 412,
+    outputTokens: 184,
+    cost: 0.0042,
+  },
+  {
+    system: "openai",
+    request: "gpt-4o-mini",
+    response: "gpt-4o-mini-2024-07-18",
+    inputTokens: 318,
+    outputTokens: 96,
+    cost: 0.0006,
+  },
+  {
+    system: "anthropic",
+    request: "claude-haiku-4-5",
+    response: "claude-haiku-4-5-20251001",
+    inputTokens: 524,
+    outputTokens: 212,
+    cost: 0.0017,
+  },
+  {
+    system: "anthropic",
+    request: "claude-sonnet-4-5",
+    response: "claude-sonnet-4-5-20250514",
+    inputTokens: 612,
+    outputTokens: 348,
+    cost: 0.0184,
+  },
+  {
+    system: "google",
+    request: "gemini-2.5-flash",
+    response: "gemini-2.5-flash",
+    inputTokens: 489,
+    outputTokens: 156,
+    cost: 0.0009,
+  },
 ];
 
 const SCENARIOS: Array<{
@@ -44,17 +79,25 @@ const SCENARIOS: Array<{
   rag?: string[];
 }> = [
   {
-    systemPrompt: "You are a customer support agent. Resolve issues using the available tools.",
+    systemPrompt:
+      "You are a customer support agent. Resolve issues using the available tools.",
     user: "Where is my order #84219? It was supposed to arrive yesterday.",
-    assistant: "I see your order shipped on Monday and is currently at the regional sort facility. The delay is from a weather event in your area; expected delivery is now tomorrow before 6pm.",
+    assistant:
+      "I see your order shipped on Monday and is currently at the regional sort facility. The delay is from a weather event in your area; expected delivery is now tomorrow before 6pm.",
     toolName: "lookup_order",
     toolArgs: { order_id: "84219" },
-    toolResult: JSON.stringify({ status: "in_transit", delayed: true, expected: "2026-04-29T18:00:00Z" }),
+    toolResult: JSON.stringify({
+      status: "in_transit",
+      delayed: true,
+      expected: "2026-04-29T18:00:00Z",
+    }),
   },
   {
-    systemPrompt: "You are a research assistant. Cite sources from the retrieved context.",
+    systemPrompt:
+      "You are a research assistant. Cite sources from the retrieved context.",
     user: "Summarize the key findings on transformer scaling laws from the recent papers.",
-    assistant: "Three converging findings: (1) compute-optimal training favors smaller models on more tokens (Hoffmann et al.), (2) instruction-tuning quality matters more than quantity past a threshold, and (3) sparse attention reduces inference cost ~40% with negligible quality loss.",
+    assistant:
+      "Three converging findings: (1) compute-optimal training favors smaller models on more tokens (Hoffmann et al.), (2) instruction-tuning quality matters more than quantity past a threshold, and (3) sparse attention reduces inference cost ~40% with negligible quality loss.",
     rag: [
       "Hoffmann et al. (2022) demonstrate that for compute-optimal training, model size and dataset size should scale equally.",
       "Wang et al. (2024) show that 1k high-quality instruction examples outperform 100k mixed-quality examples on alignment benchmarks.",
@@ -62,15 +105,18 @@ const SCENARIOS: Array<{
     ],
   },
   {
-    systemPrompt: "You are a coding assistant. Generate runnable code with brief explanations.",
+    systemPrompt:
+      "You are a coding assistant. Generate runnable code with brief explanations.",
     user: "Write a Python function that retries a flaky HTTP call with exponential backoff.",
     assistant:
       "```python\nimport time, random\nfrom typing import Callable\n\ndef retry_with_backoff(fn: Callable, max_retries: int = 5, base_delay: float = 0.5):\n    for attempt in range(max_retries):\n        try:\n            return fn()\n        except Exception:\n            if attempt == max_retries - 1:\n                raise\n            delay = base_delay * (2 ** attempt) + random.uniform(0, 0.1)\n            time.sleep(delay)\n```\nThis grows the delay 0.5s → 1s → 2s → 4s → 8s with a small random jitter to avoid thundering herd.",
   },
   {
-    systemPrompt: "You are a data analyst. Translate natural-language questions into SQL.",
+    systemPrompt:
+      "You are a data analyst. Translate natural-language questions into SQL.",
     user: "How many users signed up last month who are still active?",
-    assistant: "There were 1,247 signups in March 2026 and 891 (71.5%) are still active.",
+    assistant:
+      "There were 1,247 signups in March 2026 and 891 (71.5%) are still active.",
     toolName: "execute_sql",
     toolArgs: {
       query:
@@ -79,14 +125,18 @@ const SCENARIOS: Array<{
     toolResult: JSON.stringify({ rows: [{ count: 891 }] }),
   },
   {
-    systemPrompt: "You are a meeting assistant. Extract action items from transcripts.",
+    systemPrompt:
+      "You are a meeting assistant. Extract action items from transcripts.",
     user: "From yesterday's standup, what are the action items for the platform team?",
-    assistant: "Three for the platform team: (1) finalize the rate-limit rollout plan by Thursday, (2) post-mortem the Tuesday outage, (3) review the auth migration RFC.",
+    assistant:
+      "Three for the platform team: (1) finalize the rate-limit rollout plan by Thursday, (2) post-mortem the Tuesday outage, (3) review the auth migration RFC.",
   },
   {
-    systemPrompt: "You are a translator. Preserve technical terminology and tone.",
+    systemPrompt:
+      "You are a translator. Preserve technical terminology and tone.",
     user: "Translate to Spanish: 'Our microservices use event-driven communication via Kafka.'",
-    assistant: "Nuestros microservicios utilizan comunicación dirigida por eventos a través de Kafka.",
+    assistant:
+      "Nuestros microservicios utilizan comunicación dirigida por eventos a través de Kafka.",
   },
 ];
 
@@ -299,10 +349,8 @@ export function buildVercelAiTrace({ startedAtMs }: BuildOptions): TraceConfig {
   ];
 
   const totalDuration =
-    children.reduce(
-      (max, s) => Math.max(max, s.offsetMs + s.durationMs),
-      0,
-    ) + 4;
+    children.reduce((max, s) => Math.max(max, s.offsetMs + s.durationMs), 0) +
+    4;
 
   const root: SpanConfig = {
     id: shortId(),
@@ -354,7 +402,9 @@ export function buildVercelAiTrace({ startedAtMs }: BuildOptions): TraceConfig {
  * agent → step → llm/tool tree, with `mastra.*` attributes alongside
  * the GenAI semconv ones.
  */
-export function buildMastraAgentTrace({ startedAtMs }: BuildOptions): TraceConfig {
+export function buildMastraAgentTrace({
+  startedAtMs,
+}: BuildOptions): TraceConfig {
   const model = pickRandom(MODELS);
   const scenario = pickRandom(SCENARIOS);
   const userId = `user_${shortId()}`;
@@ -430,10 +480,7 @@ export function buildMastraAgentTrace({ startedAtMs }: BuildOptions): TraceConfi
       }
     : null;
 
-  const stepChildren: SpanConfig[] = [
-    llmSpan,
-    ...(toolSpan ? [toolSpan] : []),
-  ];
+  const stepChildren: SpanConfig[] = [llmSpan, ...(toolSpan ? [toolSpan] : [])];
 
   const stepDuration =
     stepChildren.reduce(

@@ -36,10 +36,7 @@ interface TraceDrawerEmptyStateProps {
 
 type ErrorKind = "not-found" | "load-failed" | "no-selection";
 
-function classifyError(
-  error: unknown,
-  traceId: string | undefined,
-): ErrorKind {
+function classifyError(error: unknown, traceId: string | undefined): ErrorKind {
   if (!traceId) return "no-selection";
   const data = (
     error as { data?: { code?: string; domainError?: { kind?: string } } }
@@ -203,12 +200,7 @@ export function TraceDrawerEmptyState({
             <Text>Try again</Text>
           </Button>
         )}
-        <Button
-          size="sm"
-          variant="solid"
-          colorPalette="blue"
-          onClick={onClose}
-        >
+        <Button size="sm" variant="solid" colorPalette="blue" onClick={onClose}>
           Close
         </Button>
       </HStack>

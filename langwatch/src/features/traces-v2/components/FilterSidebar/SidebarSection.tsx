@@ -58,7 +58,9 @@ export const SidebarSection: React.FC<SidebarSectionProps> = ({
     onOpenChange?.(next);
   };
 
-  const handleTriggerClick: React.MouseEventHandler<HTMLButtonElement> = (e) => {
+  const handleTriggerClick: React.MouseEventHandler<HTMLButtonElement> = (
+    e,
+  ) => {
     if (!e.shiftKey || !onShiftToggle) return;
     e.preventDefault();
     e.stopPropagation();

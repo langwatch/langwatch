@@ -1,16 +1,16 @@
-import { create } from "zustand";
 import type { LiqeQuery } from "liqe";
+import { create } from "zustand";
 import {
-  parse,
-  serialize,
-  isEmptyAST,
   getFacetValueState,
-  toggleFacetInQuery,
-  setRangeInQuery,
-  removeFieldFromQuery,
-  removeFacetValueFromQuery,
-  validateAst,
+  isEmptyAST,
   ParseError,
+  parse,
+  removeFacetValueFromQuery,
+  removeFieldFromQuery,
+  serialize,
+  setRangeInQuery,
+  toggleFacetInQuery,
+  validateAst,
 } from "~/server/app-layer/traces/query-language/queryParser";
 
 export interface TimeRange {
@@ -148,12 +148,19 @@ export const useFilterStore = create<FilterState>((set, get) => ({
   toggleFacet: (field, value) =>
     set((s) =>
       applyMutation(s, (q) =>
-        toggleFacetInQuery(q, field, value, getFacetValueState(s.ast, field, value)),
+        toggleFacetInQuery(
+          q,
+          field,
+          value,
+          getFacetValueState(s.ast, field, value),
+        ),
       ),
     ),
 
   removeFacet: (field, value) =>
-    set((s) => applyMutation(s, (q) => removeFacetValueFromQuery(q, field, value))),
+    set((s) =>
+      applyMutation(s, (q) => removeFacetValueFromQuery(q, field, value)),
+    ),
 
   removeField: (field) =>
     set((s) => applyMutation(s, (q) => removeFieldFromQuery(q, field))),

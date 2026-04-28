@@ -1,6 +1,6 @@
 import { Text } from "@chakra-ui/react";
-import { MonoCell } from "../../../MonoCell";
 import type { ConversationGroup } from "../../../conversationGroups";
+import { MonoCell } from "../../../MonoCell";
 import type { CellDef } from "../../types";
 
 export const TurnsCell: CellDef<ConversationGroup> = {

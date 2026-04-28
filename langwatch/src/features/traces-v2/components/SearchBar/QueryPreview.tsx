@@ -1,5 +1,5 @@
-import { Box } from "@chakra-ui/react";
 import type { SystemStyleObject } from "@chakra-ui/react";
+import { Box } from "@chakra-ui/react";
 import type React from "react";
 import { useMemo } from "react";
 import { buildDecorationPlan } from "./filterHighlight";

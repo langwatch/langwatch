@@ -1,21 +1,13 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import {
-  Box,
-  Circle,
-  Flex,
-  HStack,
-  Icon,
-  Input,
-  Text,
-} from "@chakra-ui/react";
+import { Box, Circle, Flex, HStack, Icon, Input, Text } from "@chakra-ui/react";
 import { useVirtualizer } from "@tanstack/react-virtual";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { LuArrowDown, LuArrowUp, LuSearch, LuX } from "react-icons/lu";
 import { Tooltip } from "~/components/ui/tooltip";
 import type { SpanTreeNode } from "~/server/api/routers/tracesV2.schemas";
 import {
+  formatDuration,
   SPAN_TYPE_COLORS,
   STATUS_COLORS,
-  formatDuration,
   truncateId,
 } from "../../utils/formatters";
 
@@ -28,13 +20,7 @@ interface SpanListViewProps {
   initialTypeFilter?: string;
 }
 
-type SortField =
-  | "name"
-  | "type"
-  | "duration"
-  | "model"
-  | "status"
-  | "start";
+type SortField = "name" | "type" | "duration" | "model" | "status" | "start";
 type SortDirection = "asc" | "desc";
 
 interface DerivedSpan {
@@ -59,7 +45,13 @@ const COLUMNS: {
 }[] = [
   { field: "name", label: "Name", width: "auto", flex: 1, mono: true },
   { field: "type", label: "Type", width: "72px" },
-  { field: "duration", label: "Duration", width: "76px", align: "right", mono: true },
+  {
+    field: "duration",
+    label: "Duration",
+    width: "76px",
+    align: "right",
+    mono: true,
+  },
   { field: "model", label: "Model", width: "100px" },
   { field: "status", label: "", width: "32px", align: "center" },
   { field: "start", label: "Start", width: "72px", align: "right", mono: true },
@@ -90,16 +82,11 @@ function compareDerived(
     case "name":
       return mul * a.span.name.localeCompare(b.span.name);
     case "type":
-      return (
-        mul *
-        (a.span.type ?? "span").localeCompare(b.span.type ?? "span")
-      );
+      return mul * (a.span.type ?? "span").localeCompare(b.span.type ?? "span");
     case "duration":
       return mul * (a.duration - b.duration);
     case "model":
-      return (
-        mul * (a.span.model ?? "").localeCompare(b.span.model ?? "")
-      );
+      return mul * (a.span.model ?? "").localeCompare(b.span.model ?? "");
     case "status": {
       const sa = a.span.status === "error" ? 0 : 1;
       const sb = b.span.status === "error" ? 0 : 1;
@@ -170,15 +157,11 @@ export function SpanListView({
   const filteredDerived = useMemo(() => {
     let result = allDerived;
     if (isTypeFiltered) {
-      result = result.filter((d) =>
-        activeTypes.has(d.span.type ?? "span"),
-      );
+      result = result.filter((d) => activeTypes.has(d.span.type ?? "span"));
     }
     if (searchQuery.trim()) {
       const q = searchQuery.trim().toLowerCase();
-      result = result.filter((d) =>
-        d.span.name.toLowerCase().includes(q),
-      );
+      result = result.filter((d) => d.span.name.toLowerCase().includes(q));
     }
     return result;
   }, [allDerived, activeTypes, isTypeFiltered, searchQuery]);
@@ -201,14 +184,18 @@ export function SpanListView({
     const traceDuration = rootSpan
       ? rootSpan.duration
       : allDerived.length > 0
-        ? Math.max(...allDerived.map((d) => d.span.startTimeMs + d.span.durationMs)) - rootStart
+        ? Math.max(
+            ...allDerived.map((d) => d.span.startTimeMs + d.span.durationMs),
+          ) - rootStart
         : 0;
 
     return {
-      duration: isFiltered && source.length > 0
-        ? Math.max(...source.map((d) => d.span.startTimeMs + d.span.durationMs)) -
-          Math.min(...source.map((d) => d.span.startTimeMs))
-        : traceDuration,
+      duration:
+        isFiltered && source.length > 0
+          ? Math.max(
+              ...source.map((d) => d.span.startTimeMs + d.span.durationMs),
+            ) - Math.min(...source.map((d) => d.span.startTimeMs))
+          : traceDuration,
     };
   }, [allDerived, filteredDerived, isFiltered, rootStart]);
 
@@ -288,7 +275,10 @@ export function SpanListView({
             paddingX={2}
             height="28px"
             bg="bg.panel"
-            _focusWithin={{ borderColor: "blue.solid", boxShadow: "0 0 0 1px var(--chakra-colors-blue-solid)" }}
+            _focusWithin={{
+              borderColor: "blue.solid",
+              boxShadow: "0 0 0 1px var(--chakra-colors-blue-solid)",
+            }}
             transition="all 0.15s ease"
           >
             <Icon as={LuSearch} boxSize={3} color="fg.subtle" flexShrink={0} />
@@ -321,7 +311,12 @@ export function SpanListView({
           </Flex>
 
           {/* Span count */}
-          <Text textStyle="xs" color="fg.subtle" flexShrink={0} whiteSpace="nowrap">
+          <Text
+            textStyle="xs"
+            color="fg.subtle"
+            flexShrink={0}
+            whiteSpace="nowrap"
+          >
             {filteredDerived.length === spans.length
               ? `${spans.length} spans`
               : `${filteredDerived.length} of ${spans.length} spans`}
@@ -416,7 +411,13 @@ export function SpanListView({
         }}
       >
         {sortedDerived.length === 0 ? (
-          <Flex direction="column" align="center" justify="center" paddingY={8} gap={2}>
+          <Flex
+            direction="column"
+            align="center"
+            justify="center"
+            paddingY={8}
+            gap={2}
+          >
             <Text textStyle="xs" color="fg.subtle">
               No spans match the current filter
             </Text>
@@ -527,7 +528,11 @@ export function SpanListView({
                     : "flex-start"
               }
             >
-              <FooterCell field={col.field} totals={totals} isFiltered={isFiltered} />
+              <FooterCell
+                field={col.field}
+                totals={totals}
+                isFiltered={isFiltered}
+              />
             </Box>
           ))}
         </Flex>
@@ -536,13 +541,7 @@ export function SpanListView({
   );
 }
 
-function CellContent({
-  col,
-  data,
-}: {
-  col: SortField;
-  data: DerivedSpan;
-}) {
+function CellContent({ col, data }: { col: SortField; data: DerivedSpan }) {
   switch (col) {
     case "name":
       return (
@@ -622,10 +621,13 @@ function FooterCell({
           content={isFiltered ? "Sum of filtered spans" : "Trace duration"}
           positioning={{ placement: "top" }}
         >
-          <Text textStyle="xs" fontWeight="semibold" fontFamily="mono" color="fg.muted">
-            {totals.duration === 0
-              ? "<1ms"
-              : formatDuration(totals.duration)}
+          <Text
+            textStyle="xs"
+            fontWeight="semibold"
+            fontFamily="mono"
+            color="fg.muted"
+          >
+            {totals.duration === 0 ? "<1ms" : formatDuration(totals.duration)}
             {!isFiltered && "*"}
           </Text>
         </Tooltip>
@@ -637,7 +639,8 @@ function FooterCell({
 
 function SpanTypeBadge({ type }: { type: string }) {
   const color = (SPAN_TYPE_COLORS[type] as string) ?? "gray.solid";
-  const label = type.length <= 5 ? type.toUpperCase() : type.slice(0, 5).toUpperCase();
+  const label =
+    type.length <= 5 ? type.toUpperCase() : type.slice(0, 5).toUpperCase();
 
   return (
     <Box
@@ -687,15 +690,11 @@ function FilterChip({
       opacity={isDisabled ? 0.4 : 1}
       onClick={isDisabled ? undefined : onClick}
       _hover={
-        isDisabled
-          ? undefined
-          : { bg: isActive ? "bg.emphasized" : "bg.muted" }
+        isDisabled ? undefined : { bg: isActive ? "bg.emphasized" : "bg.muted" }
       }
       transition="all 0.15s ease"
     >
-      {color && (
-        <Circle size="6px" bg={color} />
-      )}
+      {color && <Circle size="6px" bg={color} />}
       <Text
         textStyle="xs"
         color={isActive ? "fg" : "fg.muted"}

@@ -40,15 +40,16 @@ const PROVIDER_ABBREVIATIONS: Readonly<Record<string, string>> = {
   google: "ggl",
 };
 
-const MODEL_ABBREVIATIONS: ReadonlyArray<readonly [from: string, to: string]> = [
-  ["gpt-4o-mini", "4o-mini"],
-  ["gpt-4o", "4o"],
-  ["gpt-5-mini", "5-mini"],
-  ["claude-sonnet-4-20250514", "sonnet-4"],
-  ["claude-haiku-4-5-20251001", "haiku-4.5"],
-  ["gemini-2.5-pro", "2.5-pro"],
-  ["text-embedding-3-small", "emb-3-sm"],
-];
+const MODEL_ABBREVIATIONS: ReadonlyArray<readonly [from: string, to: string]> =
+  [
+    ["gpt-4o-mini", "4o-mini"],
+    ["gpt-4o", "4o"],
+    ["gpt-5-mini", "5-mini"],
+    ["claude-sonnet-4-20250514", "sonnet-4"],
+    ["claude-haiku-4-5-20251001", "haiku-4.5"],
+    ["gemini-2.5-pro", "2.5-pro"],
+    ["text-embedding-3-small", "emb-3-sm"],
+  ];
 
 export function abbreviateModel(model: string): string {
   const slash = model.indexOf("/");

@@ -1,6 +1,6 @@
 import { Box, Flex, Icon, IconButton, Input } from "@chakra-ui/react";
 import { ChevronDown, ChevronUp, Search, X } from "lucide-react";
-import { useDeferredValue, useState, type KeyboardEvent } from "react";
+import { type KeyboardEvent, useDeferredValue, useState } from "react";
 import { useTraceList } from "../../hooks/useTraceList";
 import { useFindStore } from "../../stores/findStore";
 import { CurrentMatchHighlight } from "./CurrentMatchHighlight";

@@ -25,9 +25,9 @@ import { Td, Tr } from "../../../TablePrimitives";
 import { Bubble } from "./Bubble";
 import { ConversationSummaryLine } from "./ConversationSummary";
 import {
+  formatGapSeconds,
   TURN_GAP_PAUSE_SECONDS,
   TURN_GAP_VISIBLE_SECONDS,
-  formatGapSeconds,
   turnGapSeconds,
 } from "./turnGap";
 
@@ -248,7 +248,9 @@ const TurnDivider: React.FC<{
           Turn {turnIndex + 1}
         </Text>
         {trace.status === "error" && <StatusDot status="error" size="6px" />}
-        <Text textStyle="2xs" color="fg.subtle">·</Text>
+        <Text textStyle="2xs" color="fg.subtle">
+          ·
+        </Text>
         <Text textStyle="2xs" color="fg.subtle" fontFamily="mono">
           {formatDuration(trace.durationMs)}
         </Text>

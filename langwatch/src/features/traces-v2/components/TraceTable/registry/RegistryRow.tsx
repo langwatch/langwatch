@@ -3,8 +3,8 @@ import React from "react";
 import { useDensityTokens } from "../../../hooks/useDensityTokens";
 import { useDensityStore } from "../../../stores/densityStore";
 import type { TraceStatus } from "../../../types/trace";
+import { ROW_STYLES, rowVariantFor, StatusRowGroup } from "../StatusRow";
 import { Tbody, Td, Tr } from "../TablePrimitives";
-import { ROW_STYLES, StatusRowGroup, rowVariantFor } from "../StatusRow";
 import { cellPropsFor } from "../TraceTableShell";
 import { pickCell, type Registry, type RowActions } from "./types";
 
@@ -93,9 +93,7 @@ export function RegistryRow<TRow>({
       cursor={onSelect || onToggleExpand ? "pointer" : "default"}
       onClick={hoverScope === "split" ? handleRowClick : undefined}
       bg={hoverScope === "split" ? style.bg : undefined}
-      _hover={
-        hoverScope === "split" ? { bg: style.hoverBg } : undefined
-      }
+      _hover={hoverScope === "split" ? { bg: style.hoverBg } : undefined}
     >
       {visibleCells.map((cell, i) => (
         <Td

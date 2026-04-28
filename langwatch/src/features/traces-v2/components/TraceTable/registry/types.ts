@@ -1,5 +1,5 @@
-import type { ReactNode } from "react";
 import type { Row } from "@tanstack/react-table";
+import type { ReactNode } from "react";
 import type { DensityTokens } from "../../../hooks/useDensityTokens";
 import type { Density } from "../../../stores/viewStore";
 import type { RowStyle } from "../StatusRow";

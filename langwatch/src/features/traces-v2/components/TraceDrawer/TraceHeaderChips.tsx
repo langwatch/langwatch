@@ -10,10 +10,10 @@ import {
 } from "react-icons/lu";
 import type { TraceHeader } from "~/server/api/routers/tracesV2.schemas";
 import {
-  useTraceHeaderChips,
   type PromptChipState,
   type SdkInfoLike,
   type TraceHeaderChipData,
+  useTraceHeaderChips,
 } from "../../hooks/useTraceHeaderChips";
 import type { ChipDef } from "./ChipBar";
 import { ChipBar } from "./ChipBar";
@@ -45,9 +45,8 @@ export function TraceHeaderChips({
   });
 
   const chipDefs: ChipDef[] = chips
-    .map(
-      (c, idx): ChipDef | null =>
-        buildChipDef(c, idx, { onSelectSpan, onOpenPromptsTab }),
+    .map((c, idx): ChipDef | null =>
+      buildChipDef(c, idx, { onSelectSpan, onOpenPromptsTab }),
     )
     .filter((c): c is ChipDef => c != null);
 

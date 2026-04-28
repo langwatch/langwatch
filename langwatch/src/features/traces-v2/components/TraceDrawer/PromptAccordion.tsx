@@ -1,4 +1,3 @@
-import { useMemo } from "react";
 import {
   Badge,
   Box,
@@ -8,6 +7,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { useMemo } from "react";
 import { LuCopy, LuExternalLink, LuPencil } from "react-icons/lu";
 import { useDrawer } from "~/hooks/useDrawer";
 import type { SpanDetail } from "~/server/api/routers/tracesV2.schemas";

@@ -51,11 +51,7 @@ function* iterateLeafPaths(
 ): Generator<string> {
   for (const [key, value] of Object.entries(obj)) {
     const path = prefix ? `${prefix}.${key}` : key;
-    if (
-      value !== null &&
-      typeof value === "object" &&
-      !Array.isArray(value)
-    ) {
+    if (value !== null && typeof value === "object" && !Array.isArray(value)) {
       yield* iterateLeafPaths(value as Record<string, unknown>, path);
     } else {
       yield path;
@@ -196,11 +192,7 @@ function parsePromptVariables(
   if (typeof wrapped === "string") {
     try {
       const parsed: unknown = JSON.parse(wrapped);
-      if (
-        typeof parsed === "object" &&
-        parsed !== null &&
-        "value" in parsed
-      ) {
+      if (typeof parsed === "object" && parsed !== null && "value" in parsed) {
         const value = (parsed as { value: unknown }).value;
         if (
           typeof value === "object" &&
@@ -227,7 +219,9 @@ function parsePromptVariables(
     !Array.isArray(wrapped)
   ) {
     const result: Record<string, string> = {};
-    for (const [key, val] of Object.entries(wrapped as Record<string, unknown>)) {
+    for (const [key, val] of Object.entries(
+      wrapped as Record<string, unknown>,
+    )) {
       if (val == null) continue;
       result[key] = typeof val === "string" ? val : JSON.stringify(val);
     }

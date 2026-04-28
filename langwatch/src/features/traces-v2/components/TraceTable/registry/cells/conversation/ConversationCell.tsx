@@ -8,9 +8,9 @@ import {
 } from "lucide-react";
 import type React from "react";
 import { truncateId } from "../../../../../utils/formatters";
+import type { ConversationGroup } from "../../../conversationGroups";
 import { IOPreview } from "../../../IOPreview";
 import { MonoCell } from "../../../MonoCell";
-import type { ConversationGroup } from "../../../conversationGroups";
 import type { CellDef } from "../../types";
 
 interface ConversationIO {

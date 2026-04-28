@@ -71,7 +71,9 @@ export const ConversationSummaryLine: React.FC<SummaryProps> = ({ group }) => {
   );
 };
 
-export const ConversationSummaryDetail: React.FC<SummaryProps> = ({ group }) => {
+export const ConversationSummaryDetail: React.FC<SummaryProps> = ({
+  group,
+}) => {
   const endTime = endTimestamp(group);
   return (
     <HStack gap={3} textStyle="xs" color="fg.subtle">

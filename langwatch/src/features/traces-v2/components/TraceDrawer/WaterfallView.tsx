@@ -1,6 +1,6 @@
 import { Box, Flex, HStack, Icon, Text } from "@chakra-ui/react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   LuChevronDown,
   LuChevronRight,
@@ -49,9 +49,7 @@ interface SiblingGroup {
   parentSpanId: string | null;
 }
 
-type FlatRow =
-  | { kind: "span"; node: WaterfallTreeNode }
-  | SiblingGroup;
+type FlatRow = { kind: "span"; node: WaterfallTreeNode } | SiblingGroup;
 
 const ROW_HEIGHT = 28;
 const LLM_ROW_HEIGHT = 40;
@@ -97,9 +95,7 @@ function buildTree(spans: SpanTreeNode[]): WaterfallTreeNode[] {
     depth: number,
   ): WaterfallTreeNode[] {
     const children = childrenMap.get(parentId) ?? [];
-    const sorted = [...children].sort(
-      (a, b) => a.startTimeMs - b.startTimeMs,
-    );
+    const sorted = [...children].sort((a, b) => a.startTimeMs - b.startTimeMs);
     return sorted.map((span) => {
       const isOrphaned =
         span.parentSpanId !== null && !byId.has(span.parentSpanId);
@@ -115,7 +111,9 @@ function buildTree(spans: SpanTreeNode[]): WaterfallTreeNode[] {
   return buildNodes(null, 0);
 }
 
-function groupSiblings(children: WaterfallTreeNode[]): (WaterfallTreeNode | SiblingGroup)[] {
+function groupSiblings(
+  children: WaterfallTreeNode[],
+): (WaterfallTreeNode | SiblingGroup)[] {
   if (children.length <= SIBLING_GROUP_THRESHOLD) return children;
 
   const nameGroups = new Map<string, WaterfallTreeNode[]>();
@@ -142,8 +140,7 @@ function groupSiblings(children: WaterfallTreeNode[]): (WaterfallTreeNode | Sibl
         type: group[0]!.span.type ?? "span",
         count: group.length,
         spans,
-        avgDuration:
-          durations.reduce((a, b) => a + b, 0) / durations.length,
+        avgDuration: durations.reduce((a, b) => a + b, 0) / durations.length,
         minDuration: Math.min(...durations),
         maxDuration: Math.max(...durations),
         errorCount,
@@ -258,10 +255,7 @@ export function WaterfallView({
   );
 
   // Detect multi-root (forest)
-  const rootCount = useMemo(
-    () => tree.length,
-    [tree],
-  );
+  const rootCount = useMemo(() => tree.length, [tree]);
 
   const handleToggleCollapse = useCallback((spanId: string) => {
     setCollapsedIds((prev) => {
@@ -351,22 +345,22 @@ export function WaterfallView({
   }, []);
 
   // Resizable divider
-  const handleDividerStart = useCallback(
-    (e: React.MouseEvent) => {
-      e.preventDefault();
-      isDraggingDivider.current = true;
-      document.body.style.cursor = "col-resize";
-      document.body.style.userSelect = "none";
-    },
-    [],
-  );
+  const handleDividerStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    isDraggingDivider.current = true;
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+  }, []);
 
   useEffect(() => {
     const handleMove = (e: MouseEvent) => {
       if (!isDraggingDivider.current || !containerRef.current) return;
       const rect = containerRef.current.getBoundingClientRect();
       const x = e.clientX - rect.left;
-      const pct = Math.min(0.7, Math.max(MIN_TREE_WIDTH / rect.width, x / rect.width));
+      const pct = Math.min(
+        0.7,
+        Math.max(MIN_TREE_WIDTH / rect.width, x / rect.width),
+      );
       setTreePct(pct);
     };
 
@@ -480,7 +474,11 @@ export function WaterfallView({
             "&::-webkit-scrollbar-track": { background: "transparent" },
           }}
         >
-          <Box position="relative" height={`${virtualizer.getTotalSize()}px`} width="full">
+          <Box
+            position="relative"
+            height={`${virtualizer.getTotalSize()}px`}
+            width="full"
+          >
             {virtualizer.getVirtualItems().map((virtualRow) => {
               const row = flatRows[virtualRow.index]!;
               const i = virtualRow.index;
@@ -502,9 +500,7 @@ export function WaterfallView({
                         `${row.parentSpanId}::${row.name}`,
                       )}
                       onToggle={() =>
-                        handleToggleGroup(
-                          `${row.parentSpanId}::${row.name}`,
-                        )
+                        handleToggleGroup(`${row.parentSpanId}::${row.name}`)
                       }
                       onSwitchToSpanList={onSwitchToSpanList}
                     />
@@ -586,7 +582,13 @@ export function WaterfallView({
       </Box>
 
       {/* Timeline panel */}
-      <Flex direction="column" flex={1} minWidth={0} height="full" overflow="hidden">
+      <Flex
+        direction="column"
+        flex={1}
+        minWidth={0}
+        height="full"
+        overflow="hidden"
+      >
         {/* Time axis header */}
         <Flex
           align="center"
@@ -599,8 +601,7 @@ export function WaterfallView({
           bg="bg.subtle/30"
         >
           {timeMarkers.map((ms, idx) => {
-            const pct =
-              rootDuration > 0 ? (ms / rootDuration) * 100 : 0;
+            const pct = rootDuration > 0 ? (ms / rootDuration) * 100 : 0;
             const isLast = idx === timeMarkers.length - 1;
             const isFirst = idx === 0;
             return (
@@ -645,8 +646,7 @@ export function WaterfallView({
             {/* Vertical grid lines */}
             <Box position="absolute" inset={0} pointerEvents="none" zIndex={0}>
               {timeMarkers.map((ms, idx) => {
-                const pct =
-                  rootDuration > 0 ? (ms / rootDuration) * 100 : 0;
+                const pct = rootDuration > 0 ? (ms / rootDuration) * 100 : 0;
                 return (
                   <Box
                     key={idx}
@@ -750,7 +750,8 @@ function TreeRow({
 }) {
   const { span, depth, isOrphaned } = node;
   const isError = span.status === "error";
-  const color = (SPAN_TYPE_COLORS[span.type ?? "span"] as string) ?? "gray.solid";
+  const color =
+    (SPAN_TYPE_COLORS[span.type ?? "span"] as string) ?? "gray.solid";
   const isLlm = span.type === "llm" && span.model != null;
   const rowH = isLlm ? LLM_ROW_HEIGHT : ROW_HEIGHT;
   const icon = SPAN_TYPE_ICONS[span.type ?? "span"] ?? "○";
@@ -762,7 +763,12 @@ function TreeRow({
 
   const tooltipContent = (
     <Box minWidth="240px" maxWidth="340px">
-      <Text textStyle="xs" fontWeight="semibold" color="fg" wordBreak="break-word">
+      <Text
+        textStyle="xs"
+        fontWeight="semibold"
+        color="fg"
+        wordBreak="break-word"
+      >
         {span.name}
       </Text>
       <HStack gap={1.5} marginTop={1} flexWrap="wrap">
@@ -795,8 +801,17 @@ function TreeRow({
           </Text>
         )}
       </HStack>
-      <Box marginTop={1.5} display="grid" gridTemplateColumns="auto 1fr" gap={0.5} columnGap={3}>
-        <TipCell label="Duration" value={isZeroDuration ? "<1ms" : formatDuration(duration)} />
+      <Box
+        marginTop={1.5}
+        display="grid"
+        gridTemplateColumns="auto 1fr"
+        gap={0.5}
+        columnGap={3}
+      >
+        <TipCell
+          label="Duration"
+          value={isZeroDuration ? "<1ms" : formatDuration(duration)}
+        />
         {sharePct > 0 && <TipCell label="Of trace" value={`${sharePct}%`} />}
         <TipCell label="Offset" value={`+${formatDuration(offsetMs)}`} />
         <TipCell label="Span ID" value={span.spanId.slice(0, 16)} mono />
@@ -813,10 +828,7 @@ function TreeRow({
   );
 
   return (
-    <Tooltip
-      content={tooltipContent}
-      positioning={{ placement: "right" }}
-    >
+    <Tooltip content={tooltipContent} positioning={{ placement: "right" }}>
       <Box>
         <HStack
           height={`${rowH}px`}
@@ -882,7 +894,10 @@ function TreeRow({
 
           {/* Orphaned indicator */}
           {isOrphaned && (
-            <Tooltip content="Parent not in trace" positioning={{ placement: "top" }}>
+            <Tooltip
+              content="Parent not in trace"
+              positioning={{ placement: "top" }}
+            >
               <Flex flexShrink={0} marginRight={1}>
                 <Icon as={LuUnlink} boxSize={3} color="yellow.fg" />
               </Flex>
@@ -981,7 +996,13 @@ function GroupRow({
       borderLeftColor={color}
     >
       {/* Chevron */}
-      <Flex width="16px" height="16px" align="center" justify="center" flexShrink={0}>
+      <Flex
+        width="16px"
+        height="16px"
+        align="center"
+        justify="center"
+        flexShrink={0}
+      >
         <Icon
           as={isExpanded ? LuChevronDown : LuChevronRight}
           boxSize={3}
@@ -990,7 +1011,14 @@ function GroupRow({
       </Flex>
 
       {/* Type icon */}
-      <Flex width="18px" height="18px" align="center" justify="center" flexShrink={0} marginRight={1}>
+      <Flex
+        width="18px"
+        height="18px"
+        align="center"
+        justify="center"
+        flexShrink={0}
+        marginRight={1}
+      >
         <Text textStyle="xs" color={color} lineHeight={1}>
           {icon}
         </Text>
@@ -1016,7 +1044,8 @@ function GroupRow({
             avg {formatDuration(group.avgDuration)}
           </Text>
           <Text textStyle="xs" color="fg.subtle" whiteSpace="nowrap">
-            {formatDuration(group.minDuration)}–{formatDuration(group.maxDuration)}
+            {formatDuration(group.minDuration)}–
+            {formatDuration(group.maxDuration)}
           </Text>
           {group.errorCount > 0 && (
             <Text textStyle="xs" color="red.fg" whiteSpace="nowrap">
@@ -1077,15 +1106,15 @@ function TimelineBar({
 }) {
   const isError = span.status === "error";
   const duration = span.durationMs;
-  const color = (SPAN_TYPE_COLORS[span.type ?? "span"] as string) ?? "gray.solid";
+  const color =
+    (SPAN_TYPE_COLORS[span.type ?? "span"] as string) ?? "gray.solid";
   const isZeroDuration = duration === 0;
 
   const leftPct =
     rootDuration > 0
       ? ((span.startTimeMs - rootStart) / rootDuration) * 100
       : 0;
-  const widthPct =
-    rootDuration > 0 ? (duration / rootDuration) * 100 : 50;
+  const widthPct = rootDuration > 0 ? (duration / rootDuration) * 100 : 50;
 
   return (
     <Flex
@@ -1125,7 +1154,9 @@ function TimelineBar({
           bg={color}
           opacity={isSelected ? 0.95 : isHovered ? 0.85 : 0.7}
           borderWidth={isError ? "1.5px" : isSelected ? "1px" : "0px"}
-          borderColor={isError ? "red.solid" : isSelected ? "border.emphasized" : undefined}
+          borderColor={
+            isError ? "red.solid" : isSelected ? "border.emphasized" : undefined
+          }
           transition="opacity 0.1s ease"
           boxShadow={
             isSelected
@@ -1151,9 +1182,7 @@ function GroupTimelineBar({
 }) {
   const color = (SPAN_TYPE_COLORS[group.type] as string) ?? "gray.solid";
   const leftPct =
-    rootDuration > 0
-      ? ((group.minStart - rootStart) / rootDuration) * 100
-      : 0;
+    rootDuration > 0 ? ((group.minStart - rootStart) / rootDuration) * 100 : 0;
   const widthPct =
     rootDuration > 0
       ? ((group.maxEnd - group.minStart) / rootDuration) * 100

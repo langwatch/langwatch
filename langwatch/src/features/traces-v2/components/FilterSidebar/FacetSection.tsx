@@ -91,7 +91,12 @@ export const FacetSection: React.FC<FacetSectionProps> = ({
       hasActive={activeCount > 0}
       activeIndicator={
         activeCount > 0 ? (
-          <Badge variant="solid" size="xs" colorPalette="blue" borderRadius="full">
+          <Badge
+            variant="solid"
+            size="xs"
+            colorPalette="blue"
+            borderRadius="full"
+          >
             {activeCount}
           </Badge>
         ) : undefined

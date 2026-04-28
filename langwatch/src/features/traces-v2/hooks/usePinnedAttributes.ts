@@ -1,8 +1,8 @@
 import { useCallback, useEffect } from "react";
 import {
-  usePinnedAttributesStore,
   type PinnedAttribute,
   type PinnedAttributeSource,
+  usePinnedAttributesStore,
 } from "../stores/pinnedAttributesStore";
 
 const EMPTY: PinnedAttribute[] = [];
@@ -19,7 +19,7 @@ export function usePinnedAttributes(
   projectId: string | undefined,
 ): UsePinnedAttributesResult {
   const pins = usePinnedAttributesStore((s) =>
-    projectId ? s.byProject[projectId] ?? EMPTY : EMPTY,
+    projectId ? (s.byProject[projectId] ?? EMPTY) : EMPTY,
   );
   const hydrate = usePinnedAttributesStore((s) => s.hydrateFromStorage);
   const togglePinAction = usePinnedAttributesStore((s) => s.togglePin);

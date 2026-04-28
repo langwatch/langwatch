@@ -94,7 +94,11 @@ export function tryParseChat(raw: string | null | undefined): ParsedIO {
     };
   }
   if (typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)) {
-    return { text: snippet(JSON.stringify(parsed)), isChat: false, isTool: false };
+    return {
+      text: snippet(JSON.stringify(parsed)),
+      isChat: false,
+      isTool: false,
+    };
   }
   return { text: snippet(raw), isChat: false, isTool: false };
 }
@@ -111,7 +115,11 @@ export function findMessageContent({
   if (!raw) return "";
   const parsed = tryParseJson(raw);
   if (!isMessageArray(parsed)) {
-    if (typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)) {
+    if (
+      typeof parsed === "object" &&
+      parsed !== null &&
+      !Array.isArray(parsed)
+    ) {
       return JSON.stringify(parsed);
     }
     return raw;

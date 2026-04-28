@@ -11,7 +11,10 @@ const groupCol = createColumnHelper<TraceGroup>();
 const num: ColumnMeta = { align: "right" };
 const flex: ColumnMeta = { flex: true };
 
-export const traceAtomicColumnDefs: Record<string, ColumnDef<TraceListItem, any>> = {
+export const traceAtomicColumnDefs: Record<
+  string,
+  ColumnDef<TraceListItem, any>
+> = {
   "span-name": traceCol.accessor((row) => row.rootSpanName ?? row.name, {
     id: "span-name",
     header: "Name",
@@ -255,12 +258,14 @@ function buildGroupColumnDefs(
 export function buildTraceColumns(
   ids: string[],
 ): Array<ColumnDef<TraceListItem, any>> {
-  return ids.map((id) => traceColumnDefs[id]).filter(
-    (def): def is ColumnDef<TraceListItem, any> => Boolean(def),
-  );
+  return ids
+    .map((id) => traceColumnDefs[id])
+    .filter((def): def is ColumnDef<TraceListItem, any> => Boolean(def));
 }
 
-export function getTraceColumnDef(id: string): ColumnDef<TraceListItem, any> | undefined {
+export function getTraceColumnDef(
+  id: string,
+): ColumnDef<TraceListItem, any> | undefined {
   return traceColumnDefs[id] ?? traceAtomicColumnDefs[id];
 }
 
@@ -281,22 +286,27 @@ export function makeEvalColumnDef(
   );
 }
 
-export function makeEventColumnDef(name: string): ColumnDef<TraceListItem, any> {
-  return traceCol.accessor((row) => row.events.filter((e) => e.name === name).length, {
-    id: `event:${name}`,
-    header: name,
-    size: 110,
-    minSize: 90,
-    enableSorting: false,
-  });
+export function makeEventColumnDef(
+  name: string,
+): ColumnDef<TraceListItem, any> {
+  return traceCol.accessor(
+    (row) => row.events.filter((e) => e.name === name).length,
+    {
+      id: `event:${name}`,
+      header: name,
+      size: 110,
+      minSize: 90,
+      enableSorting: false,
+    },
+  );
 }
 
 export function buildConversationColumns(
   ids: string[],
 ): Array<ColumnDef<ConversationGroup, any>> {
-  return ids.map((id) => conversationColumnDefs[id]).filter(
-    (def): def is ColumnDef<ConversationGroup, any> => Boolean(def),
-  );
+  return ids
+    .map((id) => conversationColumnDefs[id])
+    .filter((def): def is ColumnDef<ConversationGroup, any> => Boolean(def));
 }
 
 export function buildGroupColumns(
@@ -304,9 +314,9 @@ export function buildGroupColumns(
   groupBy: "service" | "model" | "user",
 ): Array<ColumnDef<TraceGroup, any>> {
   const defs = buildGroupColumnDefs(groupBy);
-  return ids.map((id) => defs[id]).filter(
-    (def): def is ColumnDef<TraceGroup, any> => Boolean(def),
-  );
+  return ids
+    .map((id) => defs[id])
+    .filter((def): def is ColumnDef<TraceGroup, any> => Boolean(def));
 }
 
 export const allTraceColumnIds = Object.keys(traceColumnDefs);

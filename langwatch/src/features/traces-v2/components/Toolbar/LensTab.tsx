@@ -1,13 +1,8 @@
 import { Badge, Box, Input, Tabs } from "@chakra-ui/react";
-import { useState } from "react";
 import type React from "react";
-import {
-  LuCopy,
-  LuPencil,
-  LuSave,
-  LuTrash2,
-  LuUndo2,
-} from "react-icons/lu";
+import { useState } from "react";
+import { LuCopy, LuPencil, LuSave, LuTrash2, LuUndo2 } from "react-icons/lu";
+import { Tooltip } from "~/components/ui/tooltip";
 import {
   MenuContent,
   MenuContextTrigger,
@@ -15,7 +10,6 @@ import {
   MenuRoot,
   MenuSeparator,
 } from "../../../../components/ui/menu";
-import { Tooltip } from "~/components/ui/tooltip";
 import type { LensConfig } from "../../stores/viewStore";
 import { useViewStore } from "../../stores/viewStore";
 
@@ -56,10 +50,7 @@ export const LensTab: React.FC<LensTabProps> = ({
           {/* Built-in lenses dim their label instead of carrying a
               sparkles badge — saves horizontal space and the muted colour
               already telegraphs "this one's structural, you can't edit it". */}
-          <Box
-            as="span"
-            color={lens.isBuiltIn ? "fg.muted" : undefined}
-          >
+          <Box as="span" color={lens.isBuiltIn ? "fg.muted" : undefined}>
             {lens.name}
           </Box>
         </BuiltInTooltip>

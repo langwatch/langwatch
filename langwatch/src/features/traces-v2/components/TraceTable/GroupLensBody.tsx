@@ -1,20 +1,20 @@
 import { Flex, Text } from "@chakra-ui/react";
 import {
-  type SortingState,
   getCoreRowModel,
   getSortedRowModel,
+  type SortingState,
   useReactTable,
 } from "@tanstack/react-table";
 import type React from "react";
 import { useMemo, useState } from "react";
-import { type LensConfig, groupByForGrouping } from "../../stores/viewStore";
+import { groupByForGrouping, type LensConfig } from "../../stores/viewStore";
 import type { TraceListItem } from "../../types/trace";
 import { buildGroupColumns } from "./columns";
 import {
-  RegistryRow,
-  type TraceGroup,
   buildGroups,
   groupRegistry,
+  RegistryRow,
+  type TraceGroup,
 } from "./registry";
 import { TraceTableShell } from "./TraceTableShell";
 import { useTraceTableVirtualizer } from "./useTraceTableVirtualizer";

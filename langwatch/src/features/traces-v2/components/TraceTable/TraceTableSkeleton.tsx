@@ -7,8 +7,8 @@ import {
 import type React from "react";
 import { useDensityTokens } from "../../hooks/useDensityTokens";
 import {
-  type LensConfig,
   groupByForGrouping,
+  type LensConfig,
   rowKindForGrouping,
   useViewStore,
 } from "../../stores/viewStore";
@@ -18,7 +18,7 @@ import {
   buildTraceColumns,
 } from "./columns";
 import { Td, Tr } from "./TablePrimitives";
-import { TraceTableShell, type ColumnMeta } from "./TraceTableShell";
+import { type ColumnMeta, TraceTableShell } from "./TraceTableShell";
 
 const SKELETON_ROW_COUNT = 18;
 const TRACE_MIN_WIDTH = "1500px";
@@ -38,12 +38,7 @@ const SkeletonBar: React.FC<SkeletonBarProps> = ({
   width,
   height = "10px",
 }) => (
-  <Box
-    width={width}
-    height={height}
-    borderRadius="full"
-    bg="fg.muted/20"
-  />
+  <Box width={width} height={height} borderRadius="full" bg="fg.muted/20" />
 );
 
 interface SkeletonShape {

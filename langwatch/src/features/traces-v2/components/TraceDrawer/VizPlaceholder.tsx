@@ -1,25 +1,18 @@
-import {
-  Box,
-  Flex,
-  HStack,
-  Icon,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Flex, HStack, Icon, Text, VStack } from "@chakra-ui/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  LuChartGantt,
   LuChevronDown,
   LuChevronUp,
   LuFlame,
   LuGripHorizontal,
   LuList,
   LuMinus,
-  LuChartGantt,
 } from "react-icons/lu";
-import { Tooltip } from "~/components/ui/tooltip";
 import { Kbd } from "~/components/ops/shared/Kbd";
-import { PresenceMarker } from "~/features/presence/components/PresenceMarker";
+import { Tooltip } from "~/components/ui/tooltip";
 import { PeerCursorOverlay } from "~/features/presence/components/PeerCursorOverlay";
+import { PresenceMarker } from "~/features/presence/components/PresenceMarker";
 import {
   selectPeersMatching,
   usePresenceStore,
@@ -30,10 +23,10 @@ import type {
 } from "~/server/api/routers/tracesV2.schemas";
 import type { VizTab } from "../../stores/drawerStore";
 import { SPAN_TYPE_COLORS } from "../../utils/formatters";
-import { WaterfallView } from "./WaterfallView";
 import { FlameView } from "./FlameView";
 import { NewSpanFlash } from "./NewSpanFlash";
 import { SpanListView } from "./SpanListView";
+import { WaterfallView } from "./WaterfallView";
 
 interface VizPlaceholderProps {
   vizTab: VizTab;
@@ -70,10 +63,17 @@ function VizTabPresenceDot({
     ),
   );
   if (peers.length === 0) return null;
-  return <PresenceMarker peers={peers} size={16} tooltipSuffix={`${panel} panel`} />;
+  return (
+    <PresenceMarker peers={peers} size={16} tooltipSuffix={`${panel} panel`} />
+  );
 }
 
-const TABS: { value: VizTab; label: string; icon: typeof LuChartGantt; shortcut: string }[] = [
+const TABS: {
+  value: VizTab;
+  label: string;
+  icon: typeof LuChartGantt;
+  shortcut: string;
+}[] = [
   { value: "waterfall", label: "Waterfall", icon: LuChartGantt, shortcut: "1" },
   { value: "flame", label: "Flame", icon: LuFlame, shortcut: "2" },
   { value: "spanlist", label: "Span List", icon: LuList, shortcut: "3" },
@@ -103,7 +103,9 @@ export function VizPlaceholder({
 }: VizPlaceholderProps) {
   const [height, setHeight] = useState(getStoredHeight);
   const [spanListSearch, setSpanListSearch] = useState("");
-  const [spanListTypeFilter, setSpanListTypeFilter] = useState<string | undefined>();
+  const [spanListTypeFilter, setSpanListTypeFilter] = useState<
+    string | undefined
+  >();
   const isDragging = useRef(false);
   const dragStartY = useRef(0);
   const dragStartHeight = useRef(0);
@@ -135,21 +137,27 @@ export function VizPlaceholder({
   }, [vizTab]);
 
   // Handle cross-view navigation: waterfall group → span list
-  const handleSwitchToSpanList = useCallback((nameFilter: string, typeFilter: string) => {
-    setSpanListSearch(nameFilter);
-    setSpanListTypeFilter(typeFilter);
-    onVizTabChange("spanlist");
-    onSwitchToSpanList?.(nameFilter, typeFilter);
-  }, [onVizTabChange, onSwitchToSpanList]);
+  const handleSwitchToSpanList = useCallback(
+    (nameFilter: string, typeFilter: string) => {
+      setSpanListSearch(nameFilter);
+      setSpanListTypeFilter(typeFilter);
+      onVizTabChange("spanlist");
+      onSwitchToSpanList?.(nameFilter, typeFilter);
+    },
+    [onVizTabChange, onSwitchToSpanList],
+  );
 
   // Clear span list filters when switching away from span list
-  const handleVizTabChange = useCallback((tab: VizTab) => {
-    if (tab !== "spanlist") {
-      setSpanListSearch("");
-      setSpanListTypeFilter(undefined);
-    }
-    onVizTabChange(tab);
-  }, [onVizTabChange]);
+  const handleVizTabChange = useCallback(
+    (tab: VizTab) => {
+      if (tab !== "spanlist") {
+        setSpanListSearch("");
+        setSpanListTypeFilter(undefined);
+      }
+      onVizTabChange(tab);
+    },
+    [onVizTabChange],
+  );
 
   const handleCycleSize = useCallback(() => {
     setHeight((prev) => {
@@ -192,9 +200,10 @@ export function VizPlaceholder({
       const clientY = "touches" in e ? e.touches[0]!.clientY : e.clientY;
       const delta = clientY - dragStartY.current;
       const raw = dragStartHeight.current + delta;
-      const next = raw < MIN_HEIGHT / 2
-        ? 0
-        : Math.min(MAX_HEIGHT, Math.max(MIN_HEIGHT, raw));
+      const next =
+        raw < MIN_HEIGHT / 2
+          ? 0
+          : Math.min(MAX_HEIGHT, Math.max(MIN_HEIGHT, raw));
       setHeight(next);
     };
 
@@ -316,56 +325,59 @@ export function VizPlaceholder({
 
         {/* Visualization content */}
         {!isMinimized && (
-        <Box
-          height={`${height}px`}
-          overflow="hidden"
-          transition={isDragging.current ? "none" : "height 0.2s ease"}
-          onClick={isCollapsed ? handleExpandFromCollapsed : undefined}
-          cursor={isCollapsed ? "pointer" : "default"}
-          position="relative"
-        >
-          <NewSpanFlash spanCount={spans.length} resetKey={trace?.traceId ?? null} />
-          <PeerCursorOverlay
-            anchor={trace ? `trace:${trace.traceId}:panel:${vizTab}` : null}
-            enabled={!!trace && !isCollapsed}
+          <Box
+            height={`${height}px`}
+            overflow="hidden"
+            transition={isDragging.current ? "none" : "height 0.2s ease"}
+            onClick={isCollapsed ? handleExpandFromCollapsed : undefined}
+            cursor={isCollapsed ? "pointer" : "default"}
+            position="relative"
           >
-          {isLoading && spans.length === 0 ? (
-            <VizSkeleton />
-          ) : spans.length === 0 ? (
-            <Flex align="center" justify="center" height="full">
-              <Text textStyle="xs" color="fg.subtle">
-                No span data available for this trace
-              </Text>
-            </Flex>
-          ) : isCollapsed ? (
-            <CollapsedOverview spans={spans} />
-          ) : vizTab === "waterfall" ? (
-            <WaterfallView
-              spans={spans}
-              selectedSpanId={selectedSpanId}
-              onSelectSpan={onSelectSpan}
-              onClearSpan={onClearSpan}
-              onSwitchToSpanList={handleSwitchToSpanList}
+            <NewSpanFlash
+              spanCount={spans.length}
+              resetKey={trace?.traceId ?? null}
             />
-          ) : vizTab === "flame" ? (
-            <FlameView
-              spans={spans}
-              selectedSpanId={selectedSpanId}
-              onSelectSpan={onSelectSpan}
-              onClearSpan={onClearSpan}
-            />
-          ) : (
-            <SpanListView
-              spans={spans}
-              selectedSpanId={selectedSpanId}
-              onSelectSpan={onSelectSpan}
-              onClearSpan={onClearSpan}
-              initialSearch={spanListSearch}
-              initialTypeFilter={spanListTypeFilter}
-            />
-          )}
-          </PeerCursorOverlay>
-        </Box>
+            <PeerCursorOverlay
+              anchor={trace ? `trace:${trace.traceId}:panel:${vizTab}` : null}
+              enabled={!!trace && !isCollapsed}
+            >
+              {isLoading && spans.length === 0 ? (
+                <VizSkeleton />
+              ) : spans.length === 0 ? (
+                <Flex align="center" justify="center" height="full">
+                  <Text textStyle="xs" color="fg.subtle">
+                    No span data available for this trace
+                  </Text>
+                </Flex>
+              ) : isCollapsed ? (
+                <CollapsedOverview spans={spans} />
+              ) : vizTab === "waterfall" ? (
+                <WaterfallView
+                  spans={spans}
+                  selectedSpanId={selectedSpanId}
+                  onSelectSpan={onSelectSpan}
+                  onClearSpan={onClearSpan}
+                  onSwitchToSpanList={handleSwitchToSpanList}
+                />
+              ) : vizTab === "flame" ? (
+                <FlameView
+                  spans={spans}
+                  selectedSpanId={selectedSpanId}
+                  onSelectSpan={onSelectSpan}
+                  onClearSpan={onClearSpan}
+                />
+              ) : (
+                <SpanListView
+                  spans={spans}
+                  selectedSpanId={selectedSpanId}
+                  onSelectSpan={onSelectSpan}
+                  onClearSpan={onClearSpan}
+                  initialSearch={spanListSearch}
+                  initialTypeFilter={spanListTypeFilter}
+                />
+              )}
+            </PeerCursorOverlay>
+          </Box>
         )}
 
         {/* Resize handle */}
@@ -449,7 +461,13 @@ function CollapsedOverview({ spans }: { spans: SpanTreeNode[] }) {
       gap={0}
       position="relative"
     >
-      <Box width="full" height="32px" position="relative" borderRadius="md" overflow="hidden">
+      <Box
+        width="full"
+        height="32px"
+        position="relative"
+        borderRadius="md"
+        overflow="hidden"
+      >
         {spans.map((span) => {
           const left = ((span.startTimeMs - minStart) / totalDuration) * 100;
           const width = Math.max(
@@ -457,7 +475,8 @@ function CollapsedOverview({ spans }: { spans: SpanTreeNode[] }) {
             ((span.endTimeMs - span.startTimeMs) / totalDuration) * 100,
           );
           const isError = span.status === "error";
-          const color = (SPAN_TYPE_COLORS[span.type ?? "span"] as string) ?? "gray.solid";
+          const color =
+            (SPAN_TYPE_COLORS[span.type ?? "span"] as string) ?? "gray.solid";
 
           return (
             <Box

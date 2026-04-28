@@ -14,8 +14,10 @@ export function turnGapSeconds({
   prevTrace: TraceListItem | undefined;
 }): number {
   if (!prevTrace) return 0;
-  return (trace.timestamp - (prevTrace.timestamp + prevTrace.durationMs)) /
-    MS_PER_SECOND;
+  return (
+    (trace.timestamp - (prevTrace.timestamp + prevTrace.durationMs)) /
+    MS_PER_SECOND
+  );
 }
 
 export function formatGapSeconds(seconds: number): string {

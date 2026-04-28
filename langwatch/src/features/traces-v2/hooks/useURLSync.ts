@@ -10,13 +10,13 @@
 import { useEffect, useRef } from "react";
 import { useFilterStore } from "../stores/filterStore";
 import { useViewStore } from "../stores/viewStore";
+import { getPresetById, matchPreset } from "../utils/timeRangePresets";
 import {
   buildFragment,
   computeOverrides,
   isOverridesEmpty,
   parseFragment,
 } from "../utils/urlState";
-import { getPresetById, matchPreset } from "../utils/timeRangePresets";
 
 const DEFAULT_LENS_ID = "all-traces";
 const DEFAULT_PRESET_ID = "30d";

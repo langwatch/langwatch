@@ -1,12 +1,12 @@
-import { useMemo, useState } from "react";
 import { Box, Button, HStack, Icon, Input, Text } from "@chakra-ui/react";
+import { useMemo, useState } from "react";
 import { LuCheck, LuCopy, LuPin, LuPinOff } from "react-icons/lu";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { usePinnedAttributes } from "../../hooks/usePinnedAttributes";
 import type { PinnedAttributeSource } from "../../stores/pinnedAttributesStore";
-import { SegmentedToggle } from "./SegmentedToggle";
 import { PinnedAwareJsonView } from "./JsonHighlight";
+import { SegmentedToggle } from "./SegmentedToggle";
 
 const EM_DASH = "\u2014";
 const COPY_FEEDBACK_MS = 1500;
@@ -21,7 +21,10 @@ type AttrViewMode = "flat" | "json";
 
 const VIEW_MODE_OPTIONS = ["flat", "json"] as const;
 
-const PIN_TINT: Record<PinnedAttributeSource, { bg: string; border: string; fg: string }> = {
+const PIN_TINT: Record<
+  PinnedAttributeSource,
+  { bg: string; border: string; fg: string }
+> = {
   resource: { bg: "purple.subtle", border: "purple.muted", fg: "purple.fg" },
   attribute: { bg: "blue.subtle", border: "blue.muted", fg: "blue.fg" },
 };
@@ -157,7 +160,11 @@ function CopyAllButton({ payload }: { payload: string }) {
       height="26px"
       gap={1}
     >
-      <Icon as={copied ? LuCheck : LuCopy} boxSize={3} color={copied ? "green.fg" : "fg.subtle"} />
+      <Icon
+        as={copied ? LuCheck : LuCopy}
+        boxSize={3}
+        color={copied ? "green.fg" : "fg.subtle"}
+      />
       <Text textStyle="2xs" color="fg.muted">
         {copied ? "Copied" : "Copy"}
       </Text>
@@ -344,7 +351,8 @@ export function AttributeTable({
 
   const flatAttrs = useMemo(() => flattenAttributes(attributes), [attributes]);
   const flatResAttrs = useMemo(
-    () => (resourceAttributes ? flattenAttributes(resourceAttributes) : undefined),
+    () =>
+      resourceAttributes ? flattenAttributes(resourceAttributes) : undefined,
     [resourceAttributes],
   );
 

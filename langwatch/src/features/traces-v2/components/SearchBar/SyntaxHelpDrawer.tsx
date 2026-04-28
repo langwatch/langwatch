@@ -3,14 +3,13 @@ import {
   Box,
   Clipboard,
   Code,
-  HStack,
   Heading,
+  HStack,
   IconButton,
   Table,
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { QueryPreview } from "./QueryPreview";
 import {
   ArrowUpRight,
   Check,
@@ -30,6 +29,7 @@ import {
 } from "~/server/app-layer/traces/query-language/queryParser";
 import { useFilterStore } from "../../stores/filterStore";
 import { useUIStore } from "../../stores/uiStore";
+import { QueryPreview } from "./QueryPreview";
 
 interface Example {
   label: string;
@@ -59,7 +59,10 @@ const EXAMPLE_GROUPS: ReadonlyArray<{
     icon: Wand2,
     accent: "red",
     examples: [
-      { label: "Failing or warning", query: "(status:error OR status:warning)" },
+      {
+        label: "Failing or warning",
+        query: "(status:error OR status:warning)",
+      },
       { label: "Failing OpenAI", query: "status:error AND model:gpt-*" },
       { label: "Not OK", query: "NOT status:ok" },
     ],
@@ -91,10 +94,22 @@ const OPERATOR_ROWS: ReadonlyArray<{
   meaning: string;
   example: string;
 }> = [
-  { op: "AND", meaning: "Both must match", example: "status:error AND model:gpt-4o" },
-  { op: "OR", meaning: "Either may match", example: "origin:simulation OR origin:evaluation" },
+  {
+    op: "AND",
+    meaning: "Both must match",
+    example: "status:error AND model:gpt-4o",
+  },
+  {
+    op: "OR",
+    meaning: "Either may match",
+    example: "origin:simulation OR origin:evaluation",
+  },
   { op: "NOT  /  -", meaning: "Negate next clause", example: "NOT status:ok" },
-  { op: "( … )", meaning: "Group clauses", example: "(status:error OR status:warning)" },
+  {
+    op: "( … )",
+    meaning: "Group clauses",
+    example: "(status:error OR status:warning)",
+  },
 ];
 
 const VALUE_ROWS: ReadonlyArray<{
@@ -106,8 +121,16 @@ const VALUE_ROWS: ReadonlyArray<{
   { form: "Wildcard", example: "model:gpt-*", notes: "* matches anything" },
   { form: "Comparison", example: "cost:>0.05", notes: ">, >=, <, <=" },
   { form: "Range", example: "cost:[0.01 TO 1.00]", notes: "Inclusive" },
-  { form: "Quoted", example: 'user:"alice@x.com"', notes: "For values with spaces" },
-  { form: "Free text", example: '"refund policy"', notes: "Searches input/output" },
+  {
+    form: "Quoted",
+    example: 'user:"alice@x.com"',
+    notes: "For values with spaces",
+  },
+  {
+    form: "Free text",
+    example: '"refund policy"',
+    notes: "Searches input/output",
+  },
 ];
 
 /**
@@ -151,7 +174,10 @@ const SyntaxHelpBody: React.FC<SyntaxHelpBodyProps> = ({ onClose }) => {
 
   return (
     <VStack align="stretch" gap={6} paddingX={5} paddingY={6}>
-      <Section title="Cookbook" caption="Click to apply, or copy with the icon.">
+      <Section
+        title="Cookbook"
+        caption="Click to apply, or copy with the icon."
+      >
         <ExampleCookbook onApply={apply} />
       </Section>
 
@@ -223,7 +249,12 @@ const SyntaxTipStrip: React.FC = () => (
     <HStack gap={4} flexWrap="wrap" rowGap={2}>
       {SYNTAX_TIPS.map((tip) => (
         <HStack key={tip.label} gap={1.5}>
-          <Text textStyle="2xs" color="fg.subtle" textTransform="uppercase" letterSpacing="0.06em">
+          <Text
+            textStyle="2xs"
+            color="fg.subtle"
+            textTransform="uppercase"
+            letterSpacing="0.06em"
+          >
             {tip.label}:
           </Text>
           <QueryPreview query={tip.example} />
@@ -465,12 +496,7 @@ const FieldsTable: React.FC<{ onApply: (query: string) => void }> = ({
       </Table.Header>
       <Table.Body>
         {entries.map(([name, meta]) => (
-          <FieldRow
-            key={name}
-            name={name}
-            meta={meta}
-            onApply={onApply}
-          />
+          <FieldRow key={name} name={name} meta={meta} onApply={onApply} />
         ))}
       </Table.Body>
     </Table.Root>
@@ -498,7 +524,11 @@ const FieldRow: React.FC<{
         </Code>
       </Table.Cell>
       <Table.Cell>
-        <Badge size="xs" colorPalette={TYPE_PALETTE[meta.valueType]} variant="subtle">
+        <Badge
+          size="xs"
+          colorPalette={TYPE_PALETTE[meta.valueType]}
+          variant="subtle"
+        >
           {meta.valueType}
         </Badge>
       </Table.Cell>

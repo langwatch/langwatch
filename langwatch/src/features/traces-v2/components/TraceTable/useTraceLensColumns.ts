@@ -3,11 +3,7 @@ import { useMemo } from "react";
 import { useDensityStore } from "../../stores/densityStore";
 import type { TraceListItem } from "../../types/trace";
 import { buildTraceColumns } from "./columns";
-import {
-  type Registry,
-  expandTraceColumns,
-  traceRegistry,
-} from "./registry";
+import { expandTraceColumns, type Registry, traceRegistry } from "./registry";
 import { traceCells } from "./registry/cells/trace";
 
 const COMPACT_MIN_WIDTH_PX = 1500;

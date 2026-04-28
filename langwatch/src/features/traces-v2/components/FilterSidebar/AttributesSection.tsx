@@ -1,12 +1,12 @@
 import { Input, Text, VStack } from "@chakra-ui/react";
 import type React from "react";
 import { useMemo, useState } from "react";
-import { SidebarSection } from "./SidebarSection";
+import { AttributeKeyRow } from "./AttributeKeyRow";
 import {
   PREFETCH_TOP_ATTRIBUTE_KEYS,
   SEARCHABLE_VALUE_THRESHOLD,
 } from "./constants";
-import { AttributeKeyRow } from "./AttributeKeyRow";
+import { SidebarSection } from "./SidebarSection";
 import type { AttributeKey, FacetValueState } from "./types";
 
 interface AttributesSectionProps {

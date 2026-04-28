@@ -1,8 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  buildDecorationPlan,
-  buildDecorationSlots,
-} from "../filterHighlight";
+import { buildDecorationPlan, buildDecorationSlots } from "../filterHighlight";
 
 describe("buildDecorationSlots", () => {
   describe("given an empty string", () => {
@@ -15,9 +12,7 @@ describe("buildDecorationSlots", () => {
   describe("given a single tag", () => {
     it("decorates the whole field:value span as a filter-token", () => {
       const slots = buildDecorationSlots("status:error");
-      expect(slots).toEqual([
-        { from: 0, to: 12, className: "filter-token" },
-      ]);
+      expect(slots).toEqual([{ from: 0, to: 12, className: "filter-token" }]);
     });
   });
 
@@ -91,25 +86,23 @@ describe("buildDecorationSlots", () => {
   describe("given leading whitespace", () => {
     it("offsets locations to match the original string", () => {
       const slots = buildDecorationSlots("  status:error");
-      expect(slots).toEqual([
-        { from: 2, to: 14, className: "filter-token" },
-      ]);
+      expect(slots).toEqual([{ from: 2, to: 14, className: "filter-token" }]);
     });
   });
 
   describe("given an unparseable query", () => {
     it("falls back to the regex highlighter", () => {
       const slots = buildDecorationSlots("status:error AND ");
-      expect(slots.some((s) => s.className.includes("filter-token"))).toBe(true);
+      expect(slots.some((s) => s.className.includes("filter-token"))).toBe(
+        true,
+      );
     });
   });
 
   describe("given a baseOffset", () => {
     it("shifts every decoration by the offset", () => {
       const slots = buildDecorationSlots("status:error", 5);
-      expect(slots).toEqual([
-        { from: 5, to: 17, className: "filter-token" },
-      ]);
+      expect(slots).toEqual([{ from: 5, to: 17, className: "filter-token" }]);
     });
   });
 });

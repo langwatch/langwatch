@@ -49,9 +49,7 @@ function buildPeekTree(spans: SpanTreeNode[]): PeekTreeNode[] {
   const byId = new Set(spans.map((s) => s.spanId));
 
   for (const span of spans) {
-    const parentExists = span.parentSpanId
-      ? byId.has(span.parentSpanId)
-      : true;
+    const parentExists = span.parentSpanId ? byId.has(span.parentSpanId) : true;
     const key = parentExists ? span.parentSpanId : null;
     const list = childrenMap.get(key) ?? [];
     list.push(span);
@@ -136,7 +134,12 @@ const InlinePeekContent: React.FC<{ trace: TraceListItem }> = ({ trace }) => {
               bg="red.subtle"
               align="start"
             >
-              <Circle size="6px" bg="red.solid" flexShrink={0} marginTop="4px" />
+              <Circle
+                size="6px"
+                bg="red.solid"
+                flexShrink={0}
+                marginTop="4px"
+              />
               <VStack align="start" gap={0} minWidth={0}>
                 {trace.errorSpanName && (
                   <Text textStyle="2xs" color="red.fg" fontWeight="medium">

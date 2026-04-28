@@ -23,11 +23,7 @@ export const CollapsedFacetIcon: React.FC<CollapsedFacetIconProps> = ({
 }) => (
   <Tooltip
     content={
-      isActive ? (
-        <ActiveTooltip label={label} lines={tooltipLines} />
-      ) : (
-        label
-      )
+      isActive ? <ActiveTooltip label={label} lines={tooltipLines} /> : label
     }
     positioning={{ placement: "right" }}
   >

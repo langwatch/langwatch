@@ -24,9 +24,7 @@ export const RefreshProgressBar: React.FC<RefreshProgressBarProps> = ({
   // refresh gets the mild fade. Holding `boomActive` true for a fixed
   // duration keeps the bar visible even if the underlying refetch resolves
   // sooner — otherwise the aurora vanishes mid-swell.
-  const [boomed] = useState(
-    () => useFreshnessSignal.getState().welcomeBoom,
-  );
+  const [boomed] = useState(() => useFreshnessSignal.getState().welcomeBoom);
   const [boomActive, setBoomActive] = useState(boomed);
   const setWelcomeBoom = useFreshnessSignal((s) => s.setWelcomeBoom);
   useEffect(() => {

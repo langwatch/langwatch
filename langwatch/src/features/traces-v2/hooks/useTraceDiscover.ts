@@ -1,7 +1,7 @@
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import type { FacetDescriptor } from "~/server/app-layer/traces/trace-list.service";
 import { api } from "~/utils/api";
 import { useFilterStore } from "../stores/filterStore";
-import type { FacetDescriptor } from "~/server/app-layer/traces/trace-list.service";
 
 interface DiscoverResult {
   data: FacetDescriptor[];
@@ -15,7 +15,11 @@ export function useTraceDiscover(): DiscoverResult {
   const query = api.tracesV2.discover.useQuery(
     {
       projectId: project?.id ?? "",
-      timeRange: { from: timeRange.from, to: timeRange.to, live: !!timeRange.label },
+      timeRange: {
+        from: timeRange.from,
+        to: timeRange.to,
+        live: !!timeRange.label,
+      },
     },
     {
       enabled: !!project?.id,

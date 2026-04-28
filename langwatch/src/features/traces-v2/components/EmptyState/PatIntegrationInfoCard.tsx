@@ -225,8 +225,8 @@ export function PatIntegrationInfoCard({
         </Text>
         <Text fontSize="xs" color="fg.muted" lineHeight="tall">
           Creates a Personal Access Token scoped to read and write traces and
-          prompts on this project. We&apos;ll plumb it into every setup
-          option below.
+          prompts on this project. We&apos;ll plumb it into every setup option
+          below.
         </Text>
       </VStack>
       <HStack>

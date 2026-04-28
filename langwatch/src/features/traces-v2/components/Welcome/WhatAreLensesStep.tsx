@@ -1,4 +1,12 @@
-import { Box, Flex, HStack, Icon, SimpleGrid, Text, VStack } from "@chakra-ui/react";
+import {
+  Box,
+  Flex,
+  HStack,
+  Icon,
+  SimpleGrid,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
 import {
   AlertTriangle,
   Bot,
@@ -21,19 +29,48 @@ interface Lens {
 }
 
 const LENSES: Lens[] = [
-  { icon: <LayoutGrid />,    accent: "blue",   name: "All Traces",    desc: "The flat list — no grouping" },
-  { icon: <MessageSquare />, accent: "green",  name: "Conversations", desc: "Grouped by thread" },
-  { icon: <AlertTriangle />, accent: "red",    name: "Errors",        desc: "Only traces with errors" },
-  { icon: <Bot />,           accent: "purple", name: "By Model",      desc: "Grouped by LLM model" },
-  { icon: <Server />,        accent: "cyan",   name: "By Service",    desc: "Grouped by service name" },
-  { icon: <Users />,         accent: "orange", name: "By User",       desc: "Grouped by user ID" },
+  {
+    icon: <LayoutGrid />,
+    accent: "blue",
+    name: "All Traces",
+    desc: "The flat list — no grouping",
+  },
+  {
+    icon: <MessageSquare />,
+    accent: "green",
+    name: "Conversations",
+    desc: "Grouped by thread",
+  },
+  {
+    icon: <AlertTriangle />,
+    accent: "red",
+    name: "Errors",
+    desc: "Only traces with errors",
+  },
+  {
+    icon: <Bot />,
+    accent: "purple",
+    name: "By Model",
+    desc: "Grouped by LLM model",
+  },
+  {
+    icon: <Server />,
+    accent: "cyan",
+    name: "By Service",
+    desc: "Grouped by service name",
+  },
+  {
+    icon: <Users />,
+    accent: "orange",
+    name: "By User",
+    desc: "Grouped by user ID",
+  },
 ];
 
 export const WhatAreLensesStep: React.FC<WelcomeStepProps> = () => (
   <VStack align="stretch" gap={5}>
     <Text color="fg.muted" textStyle="sm">
-      Six built-ins ship with traces. Tweak one, then click{" "}
-      <InlineSaveBadge />{" "}
+      Six built-ins ship with traces. Tweak one, then click <InlineSaveBadge />{" "}
       to save it as your own.
     </Text>
 

@@ -2,8 +2,11 @@ import { Badge, Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
 import { BookOpen } from "lucide-react";
 import { motion } from "motion/react";
 import type React from "react";
+import {
+  SEARCH_FIELDS,
+  type SearchFieldMeta,
+} from "~/server/app-layer/traces/query-language/queryParser";
 import { useUIStore } from "../../stores/uiStore";
-import { SEARCH_FIELDS, type SearchFieldMeta } from "~/server/app-layer/traces/query-language/queryParser";
 import type { SuggestionState } from "./getSuggestionState";
 import type { SuggestionUIState } from "./suggestionUI";
 
@@ -55,12 +58,7 @@ export const SuggestionDropdown: React.FC<SuggestionDropdownProps> = ({
         bg="bg.panel"
         position="relative"
       >
-        <VStack
-          gap={0}
-          align="stretch"
-          maxHeight="240px"
-          overflowY="auto"
-        >
+        <VStack gap={0} align="stretch" maxHeight="240px" overflowY="auto">
           {ui.items.map((label, index) => (
             <SuggestionRow
               key={label}
@@ -164,7 +162,12 @@ const SuggestionRow: React.FC<SuggestionRowProps> = ({
         {fieldMeta && <FieldMetaSummary meta={fieldMeta} />}
       </HStack>
       {count !== undefined && (
-        <Text textStyle="2xs" color="fg.subtle" fontFamily="mono" marginLeft={2}>
+        <Text
+          textStyle="2xs"
+          color="fg.subtle"
+          fontFamily="mono"
+          marginLeft={2}
+        >
           {count}
         </Text>
       )}

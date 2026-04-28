@@ -20,7 +20,9 @@ export function useTraceFreshness() {
   const { project } = useOrganizationTeamProject();
   const trpcUtils = api.useContext();
   const requestFastPoll = useFreshnessSignal((s) => s.requestFastPoll);
-  const setSseConnectionState = useFreshnessSignal((s) => s.setSseConnectionState);
+  const setSseConnectionState = useFreshnessSignal(
+    (s) => s.setSseConnectionState,
+  );
   const setLastEventAt = useFreshnessSignal((s) => s.setLastEventAt);
   const setRefresh = useFreshnessSignal((s) => s.setRefresh);
 

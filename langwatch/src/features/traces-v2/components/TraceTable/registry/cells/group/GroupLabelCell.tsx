@@ -1,7 +1,7 @@
 import { Box, HStack, Icon, Text } from "@chakra-ui/react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import type { CellDef } from "../../types";
-import { type TraceGroup, dotColorForIndex } from "./types";
+import { dotColorForIndex, type TraceGroup } from "./types";
 
 export const GroupLabelCell: CellDef<TraceGroup> = {
   id: "group",

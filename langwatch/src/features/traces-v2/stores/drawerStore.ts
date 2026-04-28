@@ -85,11 +85,9 @@ export const useDrawerStore = create<DrawerState>((set, get) => ({
       };
     }),
 
-  selectSpan: (spanId) =>
-    set({ selectedSpanId: spanId, activeTab: "span" }),
+  selectSpan: (spanId) => set({ selectedSpanId: spanId, activeTab: "span" }),
 
-  clearSpan: () =>
-    set({ selectedSpanId: null, activeTab: "summary" }),
+  clearSpan: () => set({ selectedSpanId: null, activeTab: "summary" }),
 
   setViewMode: (mode) => set({ viewMode: mode }),
   setVizTab: (tab) => set({ vizTab: tab }),
@@ -111,7 +109,11 @@ export const useDrawerStore = create<DrawerState>((set, get) => ({
   pushTraceHistory: (entry) =>
     set((s) => {
       const top = s.traceBackStack[s.traceBackStack.length - 1];
-      if (top && top.traceId === entry.traceId && top.viewMode === entry.viewMode) {
+      if (
+        top &&
+        top.traceId === entry.traceId &&
+        top.viewMode === entry.viewMode
+      ) {
         return s;
       }
       return { traceBackStack: [...s.traceBackStack, entry] };

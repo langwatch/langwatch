@@ -1,8 +1,8 @@
 import { Flex, Text } from "@chakra-ui/react";
 import {
-  type SortingState,
   getCoreRowModel,
   getSortedRowModel,
+  type SortingState,
   useReactTable,
 } from "@tanstack/react-table";
 import type React from "react";
@@ -14,7 +14,7 @@ import {
   type ConversationGroup,
   groupTracesByConversation,
 } from "./conversationGroups";
-import { RegistryRow, conversationRegistry } from "./registry";
+import { conversationRegistry, RegistryRow } from "./registry";
 import { TraceTableShell } from "./TraceTableShell";
 import { useTraceTableVirtualizer } from "./useTraceTableVirtualizer";
 import { VirtualSpacer } from "./VirtualSpacer";

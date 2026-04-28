@@ -10,11 +10,11 @@ import {
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { memo, useMemo, useState } from "react";
 import { useAttributeValues } from "../../hooks/useAttributeValues";
-import { formatCount } from "./utils";
 import { AttributeValueRow } from "./AttributeValueRow";
 import { NoneAttributeRow } from "./NoneAttributeRow";
 import { RowButton } from "./RowButton";
 import type { FacetValueState } from "./types";
+import { formatCount } from "./utils";
 
 export const AttributeKeyRow = memo(function AttributeKeyRow({
   attrKey,
@@ -80,7 +80,12 @@ export const AttributeKeyRow = memo(function AttributeKeyRow({
               {attrKey}
             </Text>
             {activeCount > 0 && (
-              <Badge variant="solid" size="xs" colorPalette="blue" borderRadius="full">
+              <Badge
+                variant="solid"
+                size="xs"
+                colorPalette="blue"
+                borderRadius="full"
+              >
                 {activeCount}
               </Badge>
             )}

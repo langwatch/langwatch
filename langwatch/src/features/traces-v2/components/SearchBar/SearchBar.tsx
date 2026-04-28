@@ -1,22 +1,45 @@
-import { Box, Button, Flex, HStack, IconButton, Icon, Text, VStack } from "@chakra-ui/react";
-import { AlertTriangle, BookOpen, Lightbulb, Search, Sparkles, X } from "lucide-react";
+import {
+  Box,
+  Button,
+  Flex,
+  HStack,
+  Icon,
+  IconButton,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
+import { MeshGradient } from "@paper-design/shaders-react";
+import {
+  AlertTriangle,
+  BookOpen,
+  Lightbulb,
+  Search,
+  Sparkles,
+  X,
+} from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import type React from "react";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { createPortal } from "react-dom";
 import { Kbd } from "~/components/ops/shared/Kbd";
 import { Popover } from "~/components/ui/popover";
 import { Tooltip } from "~/components/ui/tooltip";
+import { useReducedMotion } from "~/hooks/useReducedMotion";
+import { hasCrossFacetOR } from "~/server/app-layer/traces/query-language/queryParser";
 import { useFilterStore } from "../../stores/filterStore";
 import { useUIStore } from "../../stores/uiStore";
-import { hasCrossFacetOR } from "~/server/app-layer/traces/query-language/queryParser";
-import { useReducedMotion } from "~/hooks/useReducedMotion";
-import { MeshGradient } from "@paper-design/shaders-react";
+import { AskAiButton } from "../ai/AskAiButton";
+import { aiBrandPalette } from "../ai/aiBrandPalette";
 import { ActiveSearchEditor } from "./ActiveSearchEditor";
 import { AiQueryComposer } from "./AiQueryComposer";
 import { AiShaderBackdrop } from "./AiShaderBackdrop";
-import { aiBrandPalette } from "../ai/aiBrandPalette";
-import { AskAiButton } from "../ai/AskAiButton";
 import { editorStyles } from "./editorStyles";
 import { PlaceholderEditor } from "./PlaceholderEditor";
 import { SyntaxHelpDrawerHost } from "./SyntaxHelpDrawer";
@@ -338,7 +361,13 @@ const ParseErrorIndicator: React.FC<{ message: string }> = ({ message }) => {
               <AlertTriangle size={11} />
             </Box>
             <VStack align="start" gap={0.5}>
-              <Text textStyle="xs" fontWeight="700" color="fg" textTransform="uppercase" letterSpacing="0.08em">
+              <Text
+                textStyle="xs"
+                fontWeight="700"
+                color="fg"
+                textTransform="uppercase"
+                letterSpacing="0.08em"
+              >
                 Invalid query
               </Text>
               <Text textStyle="sm" color="fg">

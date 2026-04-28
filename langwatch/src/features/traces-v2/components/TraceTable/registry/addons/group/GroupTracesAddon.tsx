@@ -12,7 +12,7 @@ import {
 } from "../../../../../utils/formatters";
 import { truncateText } from "../../../chatContent";
 import { MonoCell } from "../../../MonoCell";
-import { ROW_STYLES, StatusDot, rowVariantFor } from "../../../StatusRow";
+import { ROW_STYLES, rowVariantFor, StatusDot } from "../../../StatusRow";
 import { Td, Tr } from "../../../TablePrimitives";
 import type { TraceGroup } from "../../cells/group/types";
 import type { AddonDef } from "../../types";

@@ -14,7 +14,9 @@ interface AiShaderBackdropProps {
  * lift, plus a sharp mesh whose 1.5px reveal at the panel's edges reads as
  * a thin moving border. Speeds up when `active`. Goes static under reduced-motion.
  */
-export const AiShaderBackdrop: React.FC<AiShaderBackdropProps> = ({ active = false }) => {
+export const AiShaderBackdrop: React.FC<AiShaderBackdropProps> = ({
+  active = false,
+}) => {
   const reduceMotion = useReducedMotion();
   const speed = reduceMotion ? 0 : active ? 1.1 : 0.3;
   return (

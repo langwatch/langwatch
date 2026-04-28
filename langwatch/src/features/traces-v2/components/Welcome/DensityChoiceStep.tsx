@@ -1,8 +1,16 @@
-import { Box, Flex, HStack, Icon, SimpleGrid, Text, VStack } from "@chakra-ui/react";
+import {
+  Box,
+  Flex,
+  HStack,
+  Icon,
+  SimpleGrid,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
 import { AArrowDown, AArrowUp, ArrowRight, Check } from "lucide-react";
 import { motion } from "motion/react";
 import type React from "react";
-import { useDensityStore, type Density } from "../../stores/densityStore";
+import { type Density, useDensityStore } from "../../stores/densityStore";
 import type { WelcomeStepProps } from "./steps";
 
 interface DensityOption {
@@ -404,9 +412,15 @@ const BigToggleButton: React.FC<BigToggleButtonProps> = ({
     }}
   >
     <motion.div
-      animate={active ? { scale: 1.12, opacity: 1 } : { scale: 1, opacity: 0.8 }}
+      animate={
+        active ? { scale: 1.12, opacity: 1 } : { scale: 1, opacity: 0.8 }
+      }
       transition={{ duration: 0.3 }}
-      style={{ display: "flex", alignItems: "center", justifyContent: "center" }}
+      style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+      }}
     >
       <Icon boxSize={12}>{icon}</Icon>
     </motion.div>

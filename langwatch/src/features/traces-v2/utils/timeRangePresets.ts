@@ -17,13 +17,48 @@ function rolling(windowMs: number): () => { from: number; to: number } {
 }
 
 export const ROLLING_PRESETS: ReadonlyArray<TimeRangePreset> = [
-  { id: "15m", label: "Last 15 minutes", shortLabel: "15m", compute: rolling(15 * MS_PER_MINUTE) },
-  { id: "1h", label: "Last 1 hour", shortLabel: "1h", compute: rolling(MS_PER_HOUR) },
-  { id: "4h", label: "Last 4 hours", shortLabel: "4h", compute: rolling(4 * MS_PER_HOUR) },
-  { id: "24h", label: "Last 24 hours", shortLabel: "24h", compute: rolling(MS_PER_DAY) },
-  { id: "7d", label: "Last 7 days", shortLabel: "7d", compute: rolling(7 * MS_PER_DAY) },
-  { id: "30d", label: "Last 30 days", shortLabel: "30d", compute: rolling(30 * MS_PER_DAY) },
-  { id: "60d", label: "Last 60 days", shortLabel: "60d", compute: rolling(60 * MS_PER_DAY) },
+  {
+    id: "15m",
+    label: "Last 15 minutes",
+    shortLabel: "15m",
+    compute: rolling(15 * MS_PER_MINUTE),
+  },
+  {
+    id: "1h",
+    label: "Last 1 hour",
+    shortLabel: "1h",
+    compute: rolling(MS_PER_HOUR),
+  },
+  {
+    id: "4h",
+    label: "Last 4 hours",
+    shortLabel: "4h",
+    compute: rolling(4 * MS_PER_HOUR),
+  },
+  {
+    id: "24h",
+    label: "Last 24 hours",
+    shortLabel: "24h",
+    compute: rolling(MS_PER_DAY),
+  },
+  {
+    id: "7d",
+    label: "Last 7 days",
+    shortLabel: "7d",
+    compute: rolling(7 * MS_PER_DAY),
+  },
+  {
+    id: "30d",
+    label: "Last 30 days",
+    shortLabel: "30d",
+    compute: rolling(30 * MS_PER_DAY),
+  },
+  {
+    id: "60d",
+    label: "Last 60 days",
+    shortLabel: "60d",
+    compute: rolling(60 * MS_PER_DAY),
+  },
 ];
 
 export const CALENDAR_PRESETS: ReadonlyArray<TimeRangePreset> = [

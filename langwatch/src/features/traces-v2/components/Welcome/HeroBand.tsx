@@ -1,8 +1,16 @@
-import { Badge, Box, HStack, Heading, Icon, Text, VStack } from "@chakra-ui/react";
+import {
+  Badge,
+  Box,
+  Heading,
+  HStack,
+  Icon,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
 import { MeshGradient } from "@paper-design/shaders-react";
 import { Sparkles } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
-import { memo, type FC } from "react";
+import { type FC, memo } from "react";
 
 interface HeroBandProps {
   title: string;
@@ -49,7 +57,12 @@ export const HeroBand: FC<HeroBandProps> = ({ title, subtitle }) => (
     <HeroBackdrop />
     <VStack align="stretch" gap={2} position="relative" color="white">
       <HStack gap={2}>
-        <Badge colorPalette="orange" variant="solid" size="sm" borderRadius="full">
+        <Badge
+          colorPalette="orange"
+          variant="solid"
+          size="sm"
+          borderRadius="full"
+        >
           <Icon boxSize={3}>
             <Sparkles />
           </Icon>

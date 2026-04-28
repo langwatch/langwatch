@@ -2,28 +2,32 @@ import { Box, Skeleton, VStack } from "@chakra-ui/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Drawer } from "~/components/ui/drawer";
 import { useDrawer, useDrawerParams } from "~/hooks/useDrawer";
-import type { DrawerTab, DrawerViewMode, VizTab } from "../../stores/drawerStore";
-import { useDrawerStore } from "../../stores/drawerStore";
-import { useTraceHeader } from "../../hooks/useTraceHeader";
+import type { SpanTreeNode } from "~/server/api/routers/tracesV2.schemas";
+import { usePrefetchSpanDetail } from "../../hooks/usePrefetchSpanDetail";
 import { useSpanTree } from "../../hooks/useSpanSummary";
-import { useTraceDrawerNavigation } from "../../hooks/useTraceDrawerNavigation";
 import { useThreadContext } from "../../hooks/useThreadContext";
 import { useThreadPrefetch } from "../../hooks/useThreadPrefetch";
-import { usePrefetchSpanDetail } from "../../hooks/usePrefetchSpanDetail";
-import type { SpanTreeNode } from "~/server/api/routers/tracesV2.schemas";
+import { useTraceDrawerNavigation } from "../../hooks/useTraceDrawerNavigation";
+import { useTraceHeader } from "../../hooks/useTraceHeader";
+import type {
+  DrawerTab,
+  DrawerViewMode,
+  VizTab,
+} from "../../stores/drawerStore";
+import { useDrawerStore } from "../../stores/drawerStore";
+import { parseTracePromptIds } from "../../utils/promptAttributes";
 import { BelowFoldIndicator } from "./BelowFoldIndicator";
-import { DrawerHeader } from "./DrawerHeader";
 import { ConversationContext } from "./ConversationContext";
 import { ConversationView } from "./ConversationView";
+import { DrawerHeader } from "./DrawerHeader";
+import { KeyboardShortcutsHelp } from "./KeyboardShortcutsHelp";
 import { LlmPanel } from "./LlmPanel";
 import { PromptsPanel } from "./PromptsPanel";
-import { ScenarioRoleProvider } from "./scenarioRoles";
-import { parseTracePromptIds } from "../../utils/promptAttributes";
-import { KeyboardShortcutsHelp } from "./KeyboardShortcutsHelp";
-import { VizPlaceholder } from "./VizPlaceholder";
 import { SpanTabBar } from "./SpanTabBar";
+import { ScenarioRoleProvider } from "./scenarioRoles";
 import { TraceAccordions } from "./TraceAccordions";
 import { TraceDrawerEmptyState } from "./TraceDrawerEmptyState";
+import { VizPlaceholder } from "./VizPlaceholder";
 
 export interface TraceV2DrawerShellProps {
   open?: boolean;
@@ -50,9 +54,7 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
   // the lower SpanTabBar as a "LLM" tab and is no longer a viz option.
   const rawViz = params.viz as string | undefined;
   const vizParam: VizTab =
-    rawViz === "waterfall" ||
-    rawViz === "flame" ||
-    rawViz === "spanlist"
+    rawViz === "waterfall" || rawViz === "flame" || rawViz === "spanlist"
       ? rawViz
       : "waterfall";
 
@@ -87,15 +89,17 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
   // reloading a drawer URL renders the 404 page for one frame before the
   // refetch even runs. Once data (or an error) arrives we drop into the
   // normal shell or empty state respectively.
-  const isLoading = traceId
-    ? !trace && !headerQuery.error
-    : false;
+  const isLoading = traceId ? !trace && !headerQuery.error : false;
 
   // Local UI state
   const [isMaximized, setIsMaximized] = useState(false);
   const [vizTab, setVizTab] = useState<VizTab>(vizParam);
-  const [selectedSpanId, setSelectedSpanId] = useState<string | null>(spanParam);
-  const [activeTab, setActiveTab] = useState<DrawerTab>(spanParam ? "span" : "summary");
+  const [selectedSpanId, setSelectedSpanId] = useState<string | null>(
+    spanParam,
+  );
+  const [activeTab, setActiveTab] = useState<DrawerTab>(
+    spanParam ? "span" : "summary",
+  );
   const [pinnedSpanIds, setPinnedSpanIds] = useState<string[]>([]);
   const viewMode = useDrawerStore((s) => s.viewMode);
   const setStoreViewMode = useDrawerStore((s) => s.setViewMode);
@@ -120,7 +124,10 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
   } = useTraceDrawerNavigation();
 
   const selectedSpan = useMemo(
-    () => (selectedSpanId ? spanTree.find((s) => s.spanId === selectedSpanId) ?? null : null),
+    () =>
+      selectedSpanId
+        ? (spanTree.find((s) => s.spanId === selectedSpanId) ?? null)
+        : null,
     [selectedSpanId, spanTree],
   );
 
@@ -173,10 +180,7 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
   );
 
   // Warm sibling trace headers so navigating between turns is instant.
-  useThreadPrefetch(
-    trace?.conversationId ?? null,
-    trace?.traceId ?? null,
-  );
+  useThreadPrefetch(trace?.conversationId ?? null, trace?.traceId ?? null);
 
   // Double-click anywhere outside the drawer panel to close. Single clicks are
   // intentionally ignored — the drawer is non-modal so users can interact with
@@ -200,11 +204,14 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
     setIsMaximized((prev) => !prev);
   }, []);
 
-  const handleSelectSpan = useCallback((spanId: string) => {
-    setSelectedSpanId(spanId);
-    setActiveTab("span");
-    storeSelectSpan(spanId);
-  }, [storeSelectSpan]);
+  const handleSelectSpan = useCallback(
+    (spanId: string) => {
+      setSelectedSpanId(spanId);
+      setActiveTab("span");
+      storeSelectSpan(spanId);
+    },
+    [storeSelectSpan],
+  );
 
   const handleClearSpan = useCallback(() => {
     setSelectedSpanId(null);
@@ -218,14 +225,17 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
     );
   }, []);
 
-  const handleUnpinSpan = useCallback((spanId: string) => {
-    setPinnedSpanIds((prev) => prev.filter((id) => id !== spanId));
-    if (selectedSpanId === spanId) {
-      setSelectedSpanId(null);
-      setActiveTab("summary");
-      storeClearSpan();
-    }
-  }, [selectedSpanId, storeClearSpan]);
+  const handleUnpinSpan = useCallback(
+    (spanId: string) => {
+      setPinnedSpanIds((prev) => prev.filter((id) => id !== spanId));
+      if (selectedSpanId === spanId) {
+        setSelectedSpanId(null);
+        setActiveTab("summary");
+        storeClearSpan();
+      }
+    },
+    [selectedSpanId, storeClearSpan],
+  );
 
   const pinnedSpans = useMemo(
     () =>
@@ -413,11 +423,21 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [
-    trace, traceId, selectedSpanId, viewMode,
-    handleClearSpan, handleClose, setStoreViewMode,
-    threadContext.next, threadContext.previous,
-    spanTree, navigateToTrace, storeSelectSpan,
-    canGoBack, goBackInTraceHistory, shortcutsOpen,
+    trace,
+    traceId,
+    selectedSpanId,
+    viewMode,
+    handleClearSpan,
+    handleClose,
+    setStoreViewMode,
+    threadContext.next,
+    threadContext.previous,
+    spanTree,
+    navigateToTrace,
+    storeSelectSpan,
+    canGoBack,
+    goBackInTraceHistory,
+    shortcutsOpen,
   ]);
 
   // Error state: trace not found, network failure, or no selection.
@@ -500,96 +520,103 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
             ) : trace ? (
               /* Content area — fades on switch */
               <ScenarioRoleProvider
-                isScenario={!!(trace.scenarioRunId ?? trace.attributes["scenario.run_id"])}
+                isScenario={
+                  !!(trace.scenarioRunId ?? trace.attributes["scenario.run_id"])
+                }
               >
-              <Box
-                ref={scrollContentRef}
-                flex={1}
-                overflow="auto"
-                position="relative"
-                display="flex"
-                flexDirection="column"
-              >
-                {viewMode === "conversation" && trace.conversationId ? (
-                  <ConversationView
-                    conversationId={trace.conversationId}
-                    currentTraceId={trace.traceId}
-                  />
-                ) : (
-                  <VStack align="stretch" gap={0} flex={1} minHeight={0}>
-                    {/* The viz + conversation context are skipped on the
+                <Box
+                  ref={scrollContentRef}
+                  flex={1}
+                  overflow="auto"
+                  position="relative"
+                  display="flex"
+                  flexDirection="column"
+                >
+                  {viewMode === "conversation" && trace.conversationId ? (
+                    <ConversationView
+                      conversationId={trace.conversationId}
+                      currentTraceId={trace.traceId}
+                    />
+                  ) : (
+                    <VStack align="stretch" gap={0} flex={1} minHeight={0}>
+                      {/* The viz + conversation context are skipped on the
                         LLM tab — that view is a self-contained markdown
                         document for copying, so the chrome above it would
                         just push the prose down without adding signal. */}
-                    {activeTab !== "llm" && (
-                      <>
-                        {trace.conversationId && (
+                      {activeTab !== "llm" && (
+                        <>
+                          {trace.conversationId && (
+                            <Box
+                              data-section-label="Conversation context"
+                              bg="bg.subtle"
+                              borderTopWidth="1px"
+                              borderBottomWidth="1px"
+                              borderColor="border.muted"
+                              paddingY={4}
+                            >
+                              <ConversationContext
+                                conversationId={trace.conversationId}
+                                traceId={trace.traceId}
+                              />
+                            </Box>
+                          )}
+
                           <Box
-                            data-section-label="Conversation context"
-                            bg="bg.subtle"
-                            borderTopWidth="1px"
-                            borderBottomWidth="1px"
-                            borderColor="border.muted"
-                            paddingY={4}
+                            data-section-label="Visualisation"
+                            paddingTop={2}
                           >
-                            <ConversationContext
-                              conversationId={trace.conversationId}
-                              traceId={trace.traceId}
+                            <VizPlaceholder
+                              vizTab={vizTab}
+                              onVizTabChange={setVizTab}
+                              trace={trace}
+                              spans={spanTree}
+                              isLoading={spanTreeQuery.isLoading}
+                              selectedSpanId={selectedSpanId}
+                              onSelectSpan={handleSelectSpan}
+                              onClearSpan={handleClearSpan}
                             />
                           </Box>
-                        )}
 
-                        <Box data-section-label="Visualisation" paddingTop={2}>
-                          <VizPlaceholder
-                            vizTab={vizTab}
-                            onVizTabChange={setVizTab}
-                            trace={trace}
-                            spans={spanTree}
-                            isLoading={spanTreeQuery.isLoading}
-                            selectedSpanId={selectedSpanId}
-                            onSelectSpan={handleSelectSpan}
-                            onClearSpan={handleClearSpan}
-                          />
-                        </Box>
+                          <Box borderBottomWidth="1px" borderColor="border" />
+                        </>
+                      )}
 
-                        <Box borderBottomWidth="1px" borderColor="border" />
-                      </>
-                    )}
-
-                    <SpanTabBar
-                      activeTab={activeTab}
-                      onTabChange={setActiveTab}
-                      selectedSpan={selectedSpan}
-                      onCloseSpanTab={handleClearSpan}
-                      pinnedSpans={pinnedSpans}
-                      onSelectSpan={handleSelectSpan}
-                      onPinSpan={handlePinSpan}
-                      onUnpinSpan={handleUnpinSpan}
-                      traceId={trace?.traceId}
-                      promptCount={parseTracePromptIds(trace.attributes).length}
-                    />
-
-                    {activeTab === "llm" ? (
-                      <LlmPanel trace={trace} spans={spanTree} />
-                    ) : activeTab === "prompts" ? (
-                      <PromptsPanel
-                        trace={trace}
-                        spans={spanTree}
-                        onSelectSpan={handleSelectSpan}
-                      />
-                    ) : (
-                      <TraceAccordions
-                        trace={trace}
-                        spans={spanTree}
-                        selectedSpan={selectedSpan}
+                      <SpanTabBar
                         activeTab={activeTab}
+                        onTabChange={setActiveTab}
+                        selectedSpan={selectedSpan}
+                        onCloseSpanTab={handleClearSpan}
+                        pinnedSpans={pinnedSpans}
                         onSelectSpan={handleSelectSpan}
+                        onPinSpan={handlePinSpan}
+                        onUnpinSpan={handleUnpinSpan}
+                        traceId={trace?.traceId}
+                        promptCount={
+                          parseTracePromptIds(trace.attributes).length
+                        }
                       />
-                    )}
-                  </VStack>
-                )}
-              </Box>
-              <BelowFoldIndicator scrollRef={scrollContentRef} />
+
+                      {activeTab === "llm" ? (
+                        <LlmPanel trace={trace} spans={spanTree} />
+                      ) : activeTab === "prompts" ? (
+                        <PromptsPanel
+                          trace={trace}
+                          spans={spanTree}
+                          onSelectSpan={handleSelectSpan}
+                        />
+                      ) : (
+                        <TraceAccordions
+                          trace={trace}
+                          spans={spanTree}
+                          selectedSpan={selectedSpan}
+                          activeTab={activeTab}
+                          onSelectSpan={handleSelectSpan}
+                        />
+                      )}
+                    </VStack>
+                  )}
+                </Box>
+                <BelowFoldIndicator scrollRef={scrollContentRef} />
               </ScenarioRoleProvider>
             ) : null}
           </VStack>

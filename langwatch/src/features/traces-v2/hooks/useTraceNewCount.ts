@@ -71,7 +71,11 @@ export function useTraceNewCount(): TraceNewCountResult {
   const query = api.tracesV2.newCount.useQuery(
     {
       projectId: project?.id ?? "",
-      timeRange: { from: timeRange.from, to: timeRange.to, live: !!timeRange.label },
+      timeRange: {
+        from: timeRange.from,
+        to: timeRange.to,
+        live: !!timeRange.label,
+      },
       since,
       query: queryText || undefined,
     },

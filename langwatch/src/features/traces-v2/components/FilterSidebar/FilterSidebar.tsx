@@ -1,13 +1,19 @@
-import { Button, HStack, Separator, Spacer, Text, VStack } from "@chakra-ui/react";
-import { Kbd } from "~/components/ops/shared/Kbd";
+import {
+  Button,
+  HStack,
+  Separator,
+  Spacer,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
 import {
   closestCenter,
   DndContext,
+  type DragEndEvent,
   KeyboardSensor,
   PointerSensor,
   useSensor,
   useSensors,
-  type DragEndEvent,
 } from "@dnd-kit/core";
 import {
   arrayMove,
@@ -18,19 +24,20 @@ import {
 import { PanelLeftClose } from "lucide-react";
 import type React from "react";
 import { useCallback, useMemo } from "react";
-import { useUIStore } from "../../stores/uiStore";
+import { Kbd } from "~/components/ops/shared/Kbd";
 import {
   FIELD_NAMES,
   getFacetValues,
   getRangeValue,
   SEARCH_FIELDS,
 } from "~/server/app-layer/traces/query-language/queryParser";
+import { useUIStore } from "../../stores/uiStore";
 import { CollapsedSidebar } from "./CollapsedSidebar";
 import { getFacetGroupId } from "./constants";
 import { FacetGroupHeader } from "./FacetGroupHeader";
 import { FilterSidebarSkeleton } from "./FilterSidebarSkeleton";
-import { SectionRenderer } from "./SectionRenderer";
 import { useFilterSidebarData } from "./hooks/useFilterSidebarData";
+import { SectionRenderer } from "./SectionRenderer";
 
 const GROUP_ID_PREFIX = "__group:";
 const groupSortableId = (id: string): string => `${GROUP_ID_PREFIX}${id}`;

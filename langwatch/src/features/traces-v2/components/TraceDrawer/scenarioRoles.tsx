@@ -14,7 +14,7 @@
  * signal it isn't a real human). The underlying chat payloads, exports,
  * and parsing stay untouched.
  */
-import { useEffect, type ReactNode } from "react";
+import { type ReactNode, useEffect } from "react";
 import type { IconType } from "react-icons";
 import { LuBot, LuFlaskConical, LuUser } from "react-icons/lu";
 import { create } from "zustand";

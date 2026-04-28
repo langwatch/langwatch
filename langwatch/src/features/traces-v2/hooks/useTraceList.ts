@@ -105,7 +105,11 @@ export function useTraceList(): TraceListResult {
   const query = api.tracesV2.list.useQuery(
     {
       projectId: project?.id ?? "",
-      timeRange: { from: timeRange.from, to: timeRange.to, live: !!timeRange.label },
+      timeRange: {
+        from: timeRange.from,
+        to: timeRange.to,
+        live: !!timeRange.label,
+      },
       sort: { columnId: sort.columnId, direction: sort.direction },
       page,
       pageSize,
@@ -223,7 +227,8 @@ export function useTraceList(): TraceListResult {
   }, [wantsRefresh, setRefreshing]);
   useEffect(
     () => () => {
-      if (refreshClearTimerRef.current) clearTimeout(refreshClearTimerRef.current);
+      if (refreshClearTimerRef.current)
+        clearTimeout(refreshClearTimerRef.current);
     },
     [],
   );

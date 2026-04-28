@@ -1,8 +1,8 @@
 import { useDrawer } from "~/hooks/useDrawer";
 import type { TraceHeader } from "~/server/api/routers/tracesV2.schemas";
 import {
-  useScenarioChipData,
   type ScenarioChipData,
+  useScenarioChipData,
 } from "../components/TraceDrawer/ScenarioChip";
 import { useFilterStore } from "../stores/filterStore";
 import { parseSdkInfo, type SdkInfo } from "../utils/sdkInfo";

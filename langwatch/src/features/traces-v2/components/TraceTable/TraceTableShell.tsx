@@ -1,9 +1,5 @@
 import { Button, HStack, Icon, type SystemStyleObject } from "@chakra-ui/react";
-import {
-  type Header,
-  type Table,
-  flexRender,
-} from "@tanstack/react-table";
+import { flexRender, type Header, type Table } from "@tanstack/react-table";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import type React from "react";
 import { Table as TableEl, Th, Thead, Tr } from "./TablePrimitives";
