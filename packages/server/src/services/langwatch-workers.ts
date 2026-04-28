@@ -47,6 +47,16 @@ export async function startLangwatchWorkers(
         // PORT isn't used by workers but we set it for symmetry with the
         // app — some shared bootstrap code reads it for log tagging.
         PORT: String(ctx.ports.langwatch),
+        // Workers self-exit every 15 min by default (memory-leak safety).
+        // helm/docker re-spawn them via their orchestrator's restart
+        // policy. supervise() in spawn.ts doesn't restart-on-exit, so on
+        // the npx path the worker would silently die at T+15m and every
+        // subsequent trace would queue but never get drained — the
+        // collector/evaluations/topic-clustering jobs pile up in Redis
+        // and the UI shows "Trace not found" forever. Disabling the
+        // self-exit timer is the surgical fix; broader supervisor
+        // restart-on-exit is a separate follow-up.
+        LANGWATCH_WORKERS_MAX_RUNTIME_MS: "0",
       },
     },
     paths: sp,
