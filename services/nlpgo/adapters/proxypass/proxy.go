@@ -31,13 +31,19 @@ type Options struct {
 	// in services/nlpgo/serve.go (PR #3559) made the HTTP listener bind
 	// $PORT before the uvicorn child finishes warming, which closed the
 	// Lambda init-timeout problem but opened a new one: requests that
-	// land in the ~12-18s child-warmup window would dial 127.0.0.1:5561
-	// and get connection-refused, surfacing as "502 child upstream
-	// unavailable" to Studio (the prod symptom on 2026-04-28 19:xx UTC
-	// after saas#476 deploy). With ColdStartWait > 0 we briefly poll for
-	// the child instead of failing fast, so the cold-start window is
-	// invisible to callers. Default: 5s. Set to 0 to disable the wait
-	// (tests).
+	// land in the child-warmup window would dial 127.0.0.1:5561 and get
+	// connection-refused, surfacing as "502 child upstream unavailable"
+	// to Studio (the prod symptom on 2026-04-28 19:xx UTC after saas#476
+	// deploy). With ColdStartWait > 0 we briefly poll for the child
+	// instead of failing fast, so the cold-start window is invisible to
+	// callers.
+	//
+	// Default: 15s. Empirically the saas Lambda runtime image takes
+	// ~14s for uvicorn to import litellm + langwatch_nlp.main and bind
+	// 127.0.0.1:5561 (measured locally on the saas Dockerfile build).
+	// 15s gives a small safety margin while staying well under Lambda's
+	// 900s function timeout. Set to 0 to disable the wait entirely
+	// (tests / fail-fast topologies).
 	ColdStartWait time.Duration
 	// ColdStartProbeInterval is the gap between TCP dial probes during
 	// the wait. Default: 100ms.
@@ -61,7 +67,7 @@ func New(opts Options) (http.Handler, error) {
 		opts.FlushInterval = -1
 	}
 	if opts.ColdStartWait == 0 {
-		opts.ColdStartWait = 5 * time.Second
+		opts.ColdStartWait = 15 * time.Second
 	}
 	if opts.ColdStartProbeInterval == 0 {
 		opts.ColdStartProbeInterval = 100 * time.Millisecond
