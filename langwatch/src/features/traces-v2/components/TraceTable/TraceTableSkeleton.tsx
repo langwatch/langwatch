@@ -22,7 +22,7 @@ import {
   groupSelectColumnDef,
   traceSelectColumnDef,
 } from "./selectColumn";
-import { Td, Tr } from "./TablePrimitives";
+import { Tbody, Td, Tr } from "./TablePrimitives";
 import { type ColumnMeta, TraceTableShell } from "./TraceTableShell";
 
 const SKELETON_ROW_COUNT = 18;
@@ -113,48 +113,50 @@ export const TraceTableSkeleton: React.FC = () => {
         minWidth={minWidth}
         stickyFirstColumn={isTraceLens}
       >
-        {Array.from({ length: SKELETON_ROW_COUNT }).map((_, rowIdx) => (
-          <Tr
-            key={`skel-row-${rowIdx}`}
-            borderBottomWidth="1px"
-            borderBottomColor="border.muted/40"
-          >
-            {columns.map((col, i) => {
-              const meta = col.columnDef.meta as ColumnMeta | undefined;
-              const align = meta?.align ?? "left";
-              const lines = Math.max(meta?.skeletonLines ?? 1, 1);
-              const size = col.getSize();
-              const isSticky = isTraceLens && i === 0;
-              return (
-                <Td
-                  key={`skel-cell-${col.id}`}
-                  width={meta?.flex ? undefined : `${size}px`}
-                  minWidth={`${col.columnDef.minSize}px`}
-                  textAlign={align}
-                  padding={`${tokens.rowPaddingY} 8px`}
-                  position={isSticky ? "sticky" : undefined}
-                  left={isSticky ? 0 : undefined}
-                  zIndex={isSticky ? 1 : undefined}
-                  bg={isSticky ? "bg.surface" : undefined}
-                >
-                  <Flex
-                    direction="column"
-                    align={align === "right" ? "flex-end" : "flex-start"}
-                    gap={lines > 1 ? "5px" : 0}
+        <Tbody>
+          {Array.from({ length: SKELETON_ROW_COUNT }).map((_, rowIdx) => (
+            <Tr
+              key={`skel-row-${rowIdx}`}
+              borderBottomWidth="1px"
+              borderBottomColor="border.muted/40"
+            >
+              {columns.map((col, i) => {
+                const meta = col.columnDef.meta as ColumnMeta | undefined;
+                const align = meta?.align ?? "left";
+                const lines = Math.max(meta?.skeletonLines ?? 1, 1);
+                const size = col.getSize();
+                const isSticky = isTraceLens && i === 0;
+                return (
+                  <Td
+                    key={`skel-cell-${col.id}`}
+                    width={meta?.flex ? undefined : `${size}px`}
+                    minWidth={`${col.columnDef.minSize}px`}
+                    textAlign={align}
+                    padding={`${tokens.rowPaddingY} 8px`}
+                    position={isSticky ? "sticky" : undefined}
+                    left={isSticky ? 0 : undefined}
+                    zIndex={isSticky ? 1 : undefined}
+                    bg={isSticky ? "bg.surface" : undefined}
                   >
-                    {Array.from({ length: lines }).map((_, lineIdx) => (
-                      <SkeletonBar
-                        key={lineIdx}
-                        width={widthFor(rowIdx + lineIdx * 3, i)}
-                        height={lineIdx === 0 ? "10px" : "7px"}
-                      />
-                    ))}
-                  </Flex>
-                </Td>
-              );
-            })}
-          </Tr>
-        ))}
+                    <Flex
+                      direction="column"
+                      align={align === "right" ? "flex-end" : "flex-start"}
+                      gap={lines > 1 ? "5px" : 0}
+                    >
+                      {Array.from({ length: lines }).map((_, lineIdx) => (
+                        <SkeletonBar
+                          key={lineIdx}
+                          width={widthFor(rowIdx + lineIdx * 3, i)}
+                          height={lineIdx === 0 ? "10px" : "7px"}
+                        />
+                      ))}
+                    </Flex>
+                  </Td>
+                );
+              })}
+            </Tr>
+          ))}
+        </Tbody>
       </TraceTableShell>
     </Box>
   );
