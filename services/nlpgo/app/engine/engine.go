@@ -190,7 +190,6 @@ func (e *Engine) runLayer(ctx context.Context, req ExecuteRequest, plan *planner
 			started := time.Now()
 			outputs, derr := e.dispatch(nodeCtx, req, node, inputs, ns)
 			ns.DurationMS = time.Since(started).Milliseconds()
-			endNodeSpan(span, ns, derr)
 			if derr != nil {
 				ns.Status = "error"
 				ns.Error = derr
@@ -201,6 +200,11 @@ func (e *Engine) runLayer(ctx context.Context, req ExecuteRequest, plan *planner
 				ns.Outputs = outputs
 				state.recordOutputs(nodeID, outputs)
 			}
+			// endNodeSpan reads ns.Outputs to stamp langwatch.output, so
+			// it must run after the success branch sets it. Tracing parity
+			// with Python's execute_component depends on this attribute
+			// being present.
+			endNodeSpan(span, ns, derr)
 			state.recordState(nodeID, ns)
 		}()
 	}

@@ -114,7 +114,6 @@ func (e *Engine) runLayerStream(ctx context.Context, req ExecuteRequest, plan *p
 			started := time.Now()
 			outputs, derr := e.dispatch(nodeCtx, req, node, inputs, ns)
 			ns.DurationMS = time.Since(started).Milliseconds()
-			endNodeSpan(span, ns, derr)
 			if derr != nil {
 				ns.Status = "error"
 				ns.Error = derr
@@ -125,6 +124,9 @@ func (e *Engine) runLayerStream(ctx context.Context, req ExecuteRequest, plan *p
 				ns.Outputs = outputs
 				state.recordOutputs(nodeID, outputs)
 			}
+			// endNodeSpan reads ns.Outputs to stamp langwatch.output;
+			// must run after the success branch sets it (Python parity).
+			endNodeSpan(span, ns, derr)
 			state.recordState(nodeID, ns)
 			emit(ctx, out, stateEvent(traceID, nodeID, ns))
 		}()
