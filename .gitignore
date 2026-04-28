@@ -41,6 +41,7 @@ prompts/**
 # Claude Code personal settings
 **/.claude/settings.local.json
 **/.claude/agent-memory/
+**/.claude/projects/
 .claude/scheduled_tasks.lock
 .claude/skills/local-*/
 

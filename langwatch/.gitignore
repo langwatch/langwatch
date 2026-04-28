@@ -78,6 +78,12 @@ node_modules/
 # Auto-generated self-signed dev certs for HTTPS+HTTP/2 (LANGWATCH_DEV_HTTP2=1)
 /.dev-certs/
 
+# Vitest browser-mode test attachment cache (regenerated on each run)
+/.vitest-attachments/
+
+# Local-only experimental package — not part of the shipped app
+/packages/insanity-check/
+
 licenses.json
 .pnpm-store/
 server.log
