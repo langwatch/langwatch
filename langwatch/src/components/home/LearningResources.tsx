@@ -14,7 +14,7 @@ import { Link } from "../ui/link";
 
 interface MeshConfig {
   /** Mesh palette. */
-  colors: readonly string[];
+  colors: string[];
   /** How much the mesh deforms — higher = more organic blobs. */
   distortion: number;
   /** Rotational twist around the centre. */
