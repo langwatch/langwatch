@@ -71,9 +71,9 @@ import {
 import { formatSpansDigest } from "../../tracer/spanToReadableSpan";
 import {
   AZURE_SAFETY_NOT_CONFIGURED_MESSAGE,
-  getAzureSafetyEnvFromProject,
   isAzureEvaluatorType,
 } from "../../app-layer/evaluations/azure-safety-env";
+import { getAzureSafetyEnvFromProject } from "../../app-layer/evaluations/azure-safety-env.server";
 import { runEvaluationWorkflow } from "../../workflows/runWorkflow";
 import {
   EVALUATIONS_QUEUE,

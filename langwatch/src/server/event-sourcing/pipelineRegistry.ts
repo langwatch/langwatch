@@ -63,7 +63,7 @@ import {
   BILLING_REPORTING_PIPELINE_NAME,
   createBillingReportingPipeline,
 } from "./pipelines/billing-reporting/pipeline";
-import { getAzureSafetyEnvFromProject } from "../app-layer/evaluations/azure-safety-env";
+import { getAzureSafetyEnvFromProject } from "../app-layer/evaluations/azure-safety-env.server";
 import { ExecuteEvaluationCommand } from "./pipelines/evaluation-processing/commands/executeEvaluation.command";
 import { EvaluationRunStore } from "./pipelines/evaluation-processing/projections/evaluationRun.store";
 import type { EvaluationEsSyncReactorDeps } from "./pipelines/evaluation-processing/reactors/evaluationEsSync.reactor";

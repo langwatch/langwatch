@@ -9,9 +9,9 @@ import { trackServerEvent } from "~/server/posthog";
 import { createLogger } from "~/utils/logger/server";
 import {
   AZURE_SAFETY_ENV_VARS,
-  getAzureSafetyEnvFromProject,
   isAzureEvaluatorType,
 } from "../../app-layer/evaluations/azure-safety-env";
+import { getAzureSafetyEnvFromProject } from "../../app-layer/evaluations/azure-safety-env.server";
 import { runEvaluationForTrace } from "../../background/workers/evaluationsWorker";
 import {
   AVAILABLE_EVALUATORS,

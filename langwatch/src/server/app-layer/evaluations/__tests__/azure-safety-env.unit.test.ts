@@ -25,9 +25,9 @@ import {
   AZURE_SAFETY_ENV_VARS,
   AZURE_SAFETY_NOT_CONFIGURED_MESSAGE,
   AZURE_SAFETY_PROVIDER_KEY,
-  getAzureSafetyEnvFromProject,
   isAzureEvaluatorType,
 } from "../azure-safety-env";
+import { getAzureSafetyEnvFromProject } from "../azure-safety-env.server";
 
 describe("azure-safety-env constants", () => {
   it("exports the provider key", () => {

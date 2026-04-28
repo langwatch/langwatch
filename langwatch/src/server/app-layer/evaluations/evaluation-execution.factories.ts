@@ -5,10 +5,8 @@ import {
 } from "~/server/api/routers/modelProviders.utils";
 import { resolveMaxTokensCeiling } from "~/server/modelProviders/resolveMaxTokensCeiling";
 import { clampMaxTokens } from "~/utils/clampMaxTokens";
-import {
-  getAzureSafetyEnvFromProject,
-  isAzureEvaluatorType,
-} from "./azure-safety-env";
+import { isAzureEvaluatorType } from "./azure-safety-env";
+import { getAzureSafetyEnvFromProject } from "./azure-safety-env.server";
 import { EvaluatorConfigError } from "./errors";
 import type { ModelEnvResolver } from "./evaluation-execution.service";
 
