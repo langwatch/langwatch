@@ -88,3 +88,6 @@ licenses.json
 .pnpm-store/
 server.log
 screenshot-*.png
+
+# Vitest browser-mode auto-captured test screenshots (regenerated on each run)
+**/__screenshots__/
