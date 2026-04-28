@@ -32,6 +32,18 @@ export function usePostHog() {
           recordCrossOriginIframes: true,
         },
         loaded: (posthog) => {
+          // Explicitly expose `window.posthog` so the PostHog toolbar
+          // (launched from the PostHog dashboard's "Toolbar" button)
+          // can attach in any environment, not just development. The
+          // posthog-js library sets this internally on most builds, but
+          // bundlers and strict-mode wrappers can sometimes strip the
+          // implicit global; the assignment is best-effort and has no
+          // downside in environments where it's already set. rchaves
+          // hit a missing window.posthog dogfooding the PR.
+          if (typeof window !== "undefined") {
+            (window as unknown as { posthog: typeof posthog }).posthog =
+              posthog;
+          }
           if (publicEnv.data?.NODE_ENV === "development") posthog.debug();
         },
       });
