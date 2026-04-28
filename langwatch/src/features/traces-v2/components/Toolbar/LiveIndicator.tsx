@@ -2,50 +2,52 @@ import { Box, Flex, IconButton } from "@chakra-ui/react";
 import { RefreshCw, Wifi, WifiOff } from "lucide-react";
 import type React from "react";
 import { Tooltip } from "~/components/ui/tooltip";
+import type { ConnectionState } from "~/hooks/useSSESubscription";
 import { useFreshnessSignal } from "../../stores/freshnessSignal";
 
-interface LiveIndicatorProps {
-  onRefresh: () => void;
-}
+const SSE_STATE_STYLE: Record<
+  ConnectionState,
+  { dotColor: string; pulse: boolean }
+> = {
+  connected: { dotColor: "green.500", pulse: true },
+  connecting: { dotColor: "yellow.500", pulse: false },
+  error: { dotColor: "red.500", pulse: false },
+  disconnected: { dotColor: "red.500", pulse: false },
+};
 
-export const LiveIndicator: React.FC<LiveIndicatorProps> = ({ onRefresh }) => {
+const REFRESH_SPIN_KEYFRAMES = {
+  "& svg": {
+    animation: "tracesV2RefreshSpin 0.9s linear infinite",
+  },
+  "@keyframes tracesV2RefreshSpin": {
+    from: { transform: "rotate(0deg)" },
+    to: { transform: "rotate(360deg)" },
+  },
+};
+
+export const LiveIndicator: React.FC = () => {
   const sseState = useFreshnessSignal((s) => s.sseConnectionState);
   const lastEventAt = useFreshnessSignal((s) => s.lastEventAt);
   const isRefreshing = useFreshnessSignal((s) => s.isRefreshing);
+  const refresh = useFreshnessSignal((s) => s.refresh);
 
+  const { dotColor, pulse } = SSE_STATE_STYLE[sseState];
   const isConnected = sseState === "connected";
-  const isConnecting = sseState === "connecting";
-  const hasError = sseState === "error";
-
-  const sseTooltip = isConnected
-    ? `Live updates active${lastEventAt ? ` — last event ${formatTimeAgo(lastEventAt)}` : ""}`
-    : isConnecting
-      ? "Connecting to live updates..."
-      : hasError
-        ? "Live updates disconnected — click refresh to retry"
-        : "Live updates disabled";
-
-  const dotColor = isConnected
-    ? "green.500"
-    : isConnecting
-      ? "yellow.500"
-      : "red.500";
 
   return (
     <Flex align="center" gap={1}>
-      <Tooltip content={sseTooltip} positioning={{ placement: "bottom" }}>
+      <Tooltip
+        content={describeSseState(sseState, lastEventAt)}
+        positioning={{ placement: "bottom" }}
+      >
         <Flex align="center" gap={1} cursor="default" paddingX={1}>
-          {isConnected ? (
-            <Wifi size={12} />
-          ) : (
-            <WifiOff size={12} />
-          )}
+          {isConnected ? <Wifi size={12} /> : <WifiOff size={12} />}
           <Box
             width="6px"
             height="6px"
             borderRadius="full"
             bg={dotColor}
-            animation={isConnected ? "pulse 2s infinite" : undefined}
+            animation={pulse ? "pulse 2s infinite" : undefined}
           />
         </Flex>
       </Tooltip>
@@ -58,19 +60,9 @@ export const LiveIndicator: React.FC<LiveIndicatorProps> = ({ onRefresh }) => {
           aria-label="Refresh traces"
           variant="ghost"
           size="xs"
-          onClick={onRefresh}
+          onClick={refresh}
           disabled={isRefreshing}
-          css={{
-            ...(isRefreshing && {
-              "& svg": {
-                animation: "tracesV2RefreshSpin 0.9s linear infinite",
-              },
-              "@keyframes tracesV2RefreshSpin": {
-                from: { transform: "rotate(0deg)" },
-                to: { transform: "rotate(360deg)" },
-              },
-            }),
-          }}
+          css={isRefreshing ? REFRESH_SPIN_KEYFRAMES : undefined}
         >
           <RefreshCw size={12} />
         </IconButton>
@@ -79,11 +71,32 @@ export const LiveIndicator: React.FC<LiveIndicatorProps> = ({ onRefresh }) => {
   );
 };
 
+function describeSseState(
+  state: ConnectionState,
+  lastEventAt: number | null,
+): string {
+  switch (state) {
+    case "connected":
+      return lastEventAt
+        ? `Live updates active — last event ${formatTimeAgo(lastEventAt)}`
+        : "Live updates active";
+    case "connecting":
+      return "Connecting to live updates...";
+    case "error":
+      return "Live updates disconnected — click refresh to retry";
+    case "disconnected":
+      return "Live updates disabled";
+  }
+}
+
+const SECOND = 1000;
+const MINUTE = 60 * SECOND;
+const HOUR = 60 * MINUTE;
+
 function formatTimeAgo(timestamp: number): string {
-  const seconds = Math.floor((Date.now() - timestamp) / 1000);
-  if (seconds < 5) return "just now";
-  if (seconds < 60) return `${seconds}s ago`;
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
-  return `${Math.floor(minutes / 60)}h ago`;
+  const elapsed = Date.now() - timestamp;
+  if (elapsed < 5 * SECOND) return "just now";
+  if (elapsed < MINUTE) return `${Math.floor(elapsed / SECOND)}s ago`;
+  if (elapsed < HOUR) return `${Math.floor(elapsed / MINUTE)}m ago`;
+  return `${Math.floor(elapsed / HOUR)}h ago`;
 }

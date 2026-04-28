@@ -8,28 +8,26 @@ import {
   MenuRoot,
   MenuTrigger,
 } from "../../../../components/ui/menu";
-import { useViewStore } from "../../stores/viewStore";
 import type { GroupingMode } from "../../stores/viewStore";
+import { useViewStore } from "../../stores/viewStore";
 
-const GROUPING_OPTIONS: { value: GroupingMode; label: string }[] = [
-  { value: "flat", label: "Flat" },
-  { value: "by-session", label: "By Session" },
-  { value: "by-service", label: "By Service" },
-  { value: "by-user", label: "By User" },
-  { value: "by-model", label: "By Model" },
-];
+const GROUPING_OPTIONS: Record<GroupingMode, string> = {
+  flat: "Flat",
+  "by-session": "By Session",
+  "by-service": "By Service",
+  "by-user": "By User",
+  "by-model": "By Model",
+};
 
 export const GroupingSelector: React.FC = () => {
   const grouping = useViewStore((s) => s.grouping);
   const setGrouping = useViewStore((s) => s.setGrouping);
 
-  const current = GROUPING_OPTIONS.find((o) => o.value === grouping);
-
   return (
     <MenuRoot>
       <MenuTrigger asChild>
         <Button size="xs" variant="outline" fontWeight="normal">
-          Group: {current?.label ?? "Flat"}
+          Group: {GROUPING_OPTIONS[grouping]}
           <ChevronDown size={12} />
         </Button>
       </MenuTrigger>
@@ -38,14 +36,14 @@ export const GroupingSelector: React.FC = () => {
           value={grouping}
           onValueChange={(e) => setGrouping(e.value as GroupingMode)}
         >
-          {GROUPING_OPTIONS.map((opt) => (
+          {Object.entries(GROUPING_OPTIONS).map(([value, label]) => (
             <MenuRadioItem
-              key={opt.value}
-              value={opt.value}
+              key={value}
+              value={value}
               fontSize="xs"
               paddingY={1}
             >
-              {opt.label}
+              {label}
             </MenuRadioItem>
           ))}
         </MenuRadioItemGroup>

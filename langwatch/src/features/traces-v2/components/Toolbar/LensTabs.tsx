@@ -1,33 +1,21 @@
-import { Badge, Box, HStack, Input, Tabs, Text } from "@chakra-ui/react";
-import { useState, useRef, useCallback } from "react";
+import { Box, Button, HStack, Tabs } from "@chakra-ui/react";
+import { startTransition, useEffect, useRef, useState } from "react";
 import type React from "react";
-import { LuCopy, LuPencil, LuPlus, LuTrash2, LuUndo2 } from "react-icons/lu";
-import { LuSave } from "react-icons/lu";
-import {
-  DialogBody,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogRoot,
-  DialogTitle,
-} from "../../../../components/ui/dialog";
+import { MoreHorizontal } from "lucide-react";
 import {
   MenuContent,
-  MenuContextTrigger,
   MenuItem,
   MenuRoot,
-  MenuSeparator,
+  MenuTrigger,
 } from "../../../../components/ui/menu";
-import {
-  PopoverBody,
-  PopoverContent,
-  PopoverRoot,
-  PopoverTrigger,
-} from "../../../../components/ui/popover";
-import { useViewStore } from "../../stores/viewStore";
 import { useErrorCount } from "../../hooks/useErrorCount";
 import type { LensConfig } from "../../stores/viewStore";
-import { Button } from "@chakra-ui/react";
+import { useViewStore } from "../../stores/viewStore";
+import { CreateLensButton } from "./CreateLensButton";
+import { LensTab } from "./LensTab";
+import { UnsavedLensDialog } from "./UnsavedLensDialog";
+
+const ERRORS_LENS_ID = "errors";
 
 export const LensTabs: React.FC = () => {
   const activeLensId = useViewStore((s) => s.activeLensId);
@@ -36,342 +24,174 @@ export const LensTabs: React.FC = () => {
   const saveLens = useViewStore((s) => s.saveLens);
   const revertLens = useViewStore((s) => s.revertLens);
   const isDraft = useViewStore((s) => s.isDraft);
-  const createLens = useViewStore((s) => s.createLens);
   const errorCount = useErrorCount();
 
   const [pendingLensId, setPendingLensId] = useState<string | null>(null);
-  const showDraftDialog = pendingLensId !== null;
+  const scrollerRef = useRef<HTMLDivElement>(null);
+  const hiddenIds = useHiddenLensTabs(scrollerRef, allLenses);
 
-  const handleLensChange = useCallback(
-    (targetId: string) => {
-      if (targetId === activeLensId) return;
+  const activeLens = allLenses.find((l) => l.id === activeLensId);
+  const activeLensIsDraft = isDraft(activeLensId);
+  const hiddenLenses = allLenses.filter((l) => hiddenIds.has(l.id));
 
-      const currentLens = allLenses.find((l) => l.id === activeLensId);
-      if (currentLens && !currentLens.isBuiltIn && isDraft(activeLensId)) {
-        setPendingLensId(targetId);
-        return;
-      }
+  const handleLensChange = (targetId: string) => {
+    if (targetId === activeLensId) return;
+    if (activeLens && !activeLens.isBuiltIn && activeLensIsDraft) {
+      setPendingLensId(targetId);
+      return;
+    }
+    startTransition(() => selectLens(targetId));
+  };
 
-      selectLens(targetId);
-    },
-    [activeLensId, allLenses, isDraft, selectLens],
-  );
-
-  const handleSaveAndSwitch = useCallback(() => {
-    saveLens(activeLensId);
-    if (pendingLensId) selectLens(pendingLensId);
+  const resolvePending = (resolve: (lensId: string) => void) => {
+    resolve(activeLensId);
+    if (pendingLensId) {
+      const target = pendingLensId;
+      startTransition(() => selectLens(target));
+    }
     setPendingLensId(null);
-  }, [activeLensId, pendingLensId, saveLens, selectLens]);
+  };
 
-  const handleDiscardAndSwitch = useCallback(() => {
-    revertLens(activeLensId);
-    if (pendingLensId) selectLens(pendingLensId);
-    setPendingLensId(null);
-  }, [activeLensId, pendingLensId, revertLens, selectLens]);
-
-  const handleCancel = useCallback(() => {
-    setPendingLensId(null);
-  }, []);
-
-  const activeLensName =
-    allLenses.find((l) => l.id === activeLensId)?.name ?? "this lens";
+  const handleOverflowSelect = (id: string) => {
+    handleLensChange(id);
+    const root = scrollerRef.current;
+    if (!root) return;
+    const tab = root.querySelector<HTMLElement>(`[data-value="${id}"]`);
+    tab?.scrollIntoView({ behavior: "smooth", inline: "nearest", block: "nearest" });
+  };
 
   return (
     <>
-      <Tabs.Root
-        value={activeLensId}
-        onValueChange={(e) => handleLensChange(e.value)}
-        variant="line"
-        paddingY={0}
-        size="sm"
-        colorPalette="blue"
-        borderBottomWidth={0}
-        marginBottom={"-2px"}
-      >
-        <HStack gap={0}>
-          <Tabs.List borderBottomWidth={0}>
-            {allLenses.map((lens) => (
-              <LensTab
-                key={lens.id}
-                lens={lens}
-                isActive={activeLensId === lens.id}
-                isDraft={isDraft(lens.id)}
-                errorCount={lens.id === "errors" ? errorCount : 0}
-              />
-            ))}
-          </Tabs.List>
-          <CreateLensButton onCreate={createLens} />
-        </HStack>
-      </Tabs.Root>
+      <HStack gap={0} flex="1" minWidth={0}>
+        <Tabs.Root
+          value={activeLensId}
+          onValueChange={(e) => handleLensChange(e.value)}
+          variant="line"
+          size="sm"
+          colorPalette="blue"
+          borderBottomWidth={0}
+          marginBottom="-2px"
+          flex="1"
+          minWidth={0}
+        >
+          <Box
+            ref={scrollerRef}
+            overflowX="auto"
+            css={{
+              scrollbarWidth: "none",
+              "&::-webkit-scrollbar": { display: "none" },
+            }}
+          >
+            <Tabs.List borderBottomWidth={0} flexWrap="nowrap" width="max-content">
+              {allLenses.map((lens) => (
+                <LensTab
+                  key={lens.id}
+                  lens={lens}
+                  isDraft={isDraft(lens.id)}
+                  errorCount={lens.id === ERRORS_LENS_ID ? errorCount : 0}
+                />
+              ))}
+            </Tabs.List>
+          </Box>
+        </Tabs.Root>
+        <OverflowMenu
+          hiddenLenses={hiddenLenses}
+          activeLensId={activeLensId}
+          onSelect={handleOverflowSelect}
+        />
+        <CreateLensButton />
+      </HStack>
 
-      <DialogRoot
-        open={showDraftDialog}
-        onOpenChange={(e) => { if (!e.open) handleCancel(); }}
-        size="sm"
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Unsaved changes</DialogTitle>
-          </DialogHeader>
-          <DialogBody>
-            <Text color="fg.muted" fontSize="sm">
-              You have unsaved changes on <strong>{activeLensName}</strong>.
-              Would you like to save or discard them?
-            </Text>
-          </DialogBody>
-          <DialogFooter>
-            <HStack gap={2}>
-              <Button variant="ghost" size="sm" onClick={handleCancel}>
-                Cancel
-              </Button>
-              <Button variant="outline" size="sm" onClick={handleDiscardAndSwitch}>
-                Discard
-              </Button>
-              <Button colorPalette="blue" size="sm" onClick={handleSaveAndSwitch}>
-                Save
-              </Button>
-            </HStack>
-          </DialogFooter>
-        </DialogContent>
-      </DialogRoot>
+      <UnsavedLensDialog
+        open={pendingLensId !== null}
+        lensName={activeLens?.name ?? ""}
+        onSave={() => resolvePending(saveLens)}
+        onDiscard={() => resolvePending(revertLens)}
+        onCancel={() => setPendingLensId(null)}
+      />
     </>
   );
 };
 
-interface LensTabProps {
-  lens: LensConfig;
-  isActive: boolean;
-  isDraft: boolean;
-  errorCount: number;
+function useHiddenLensTabs(
+  scrollerRef: React.RefObject<HTMLDivElement | null>,
+  allLenses: LensConfig[],
+): Set<string> {
+  const [hiddenIds, setHiddenIds] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    const root = scrollerRef.current;
+    if (!root) return;
+    const tabs = root.querySelectorAll<HTMLElement>("[data-value]");
+    if (tabs.length === 0) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        setHiddenIds((prev) => {
+          const next = new Set(prev);
+          let changed = false;
+          for (const entry of entries) {
+            const id = entry.target.getAttribute("data-value");
+            if (!id) continue;
+            const fullyVisible = entry.intersectionRatio >= 0.99;
+            if (fullyVisible && next.has(id)) {
+              next.delete(id);
+              changed = true;
+            } else if (!fullyVisible && !next.has(id)) {
+              next.add(id);
+              changed = true;
+            }
+          }
+          return changed ? next : prev;
+        });
+      },
+      { root, threshold: [0, 0.99, 1] },
+    );
+
+    tabs.forEach((tab) => observer.observe(tab));
+    return () => observer.disconnect();
+  }, [allLenses, scrollerRef]);
+
+  return hiddenIds;
 }
 
-const LensTab: React.FC<LensTabProps> = ({
-  lens,
-  isActive,
-  isDraft,
-  errorCount,
+interface OverflowMenuProps {
+  hiddenLenses: LensConfig[];
+  activeLensId: string;
+  onSelect: (id: string) => void;
+}
+
+const OverflowMenu: React.FC<OverflowMenuProps> = ({
+  hiddenLenses,
+  activeLensId,
+  onSelect,
 }) => {
-  const saveLens = useViewStore((s) => s.saveLens);
-  const revertLens = useViewStore((s) => s.revertLens);
-  const renameLens = useViewStore((s) => s.renameLens);
-  const duplicateLens = useViewStore((s) => s.duplicateLens);
-  const deleteLens = useViewStore((s) => s.deleteLens);
-
-  const [isRenaming, setIsRenaming] = useState(false);
-  const [renameValue, setRenameValue] = useState(lens.name);
-  const renameInputRef = useRef<HTMLInputElement>(null);
-
-  const handleRenameStart = useCallback(() => {
-    setRenameValue(lens.name);
-    setIsRenaming(true);
-    setTimeout(() => renameInputRef.current?.focus(), 0);
-  }, [lens.name]);
-
-  const handleRenameConfirm = useCallback(() => {
-    const trimmed = renameValue.trim();
-    if (trimmed && trimmed !== lens.name) {
-      renameLens(lens.id, trimmed);
-    }
-    setIsRenaming(false);
-  }, [renameValue, lens.name, lens.id, renameLens]);
-
-  const handleRenameKeyDown = useCallback(
-    (e: React.KeyboardEvent) => {
-      if (e.key === "Enter") {
-        handleRenameConfirm();
-      } else if (e.key === "Escape") {
-        setIsRenaming(false);
-        setRenameValue(lens.name);
-      }
-    },
-    [handleRenameConfirm, lens.name],
-  );
-
-  const tabContent = (
-    <Tabs.Trigger value={lens.id}>
-      {isRenaming ? (
-        <Input
-          ref={renameInputRef}
-          size="xs"
-          value={renameValue}
-          onChange={(e) => setRenameValue(e.target.value)}
-          onBlur={handleRenameConfirm}
-          onKeyDown={handleRenameKeyDown}
-          onClick={(e) => e.stopPropagation()}
-          width="80px"
-          paddingX={1}
-          paddingY={0}
-          height="20px"
-        />
-      ) : (
-        <>
-          {lens.name}
-          {isDraft && (
-            <Box
-              as="span"
-              width="6px"
-              height="6px"
-              borderRadius="full"
-              backgroundColor="blue.500"
-              display="inline-block"
-              marginLeft={1}
-              flexShrink={0}
-            />
-          )}
-        </>
-      )}
-      {errorCount > 0 && (
-        <Badge
-          size="xs"
-          variant="solid"
-          colorPalette="red"
-          borderRadius="full"
-          marginLeft={1}
-        >
-          {errorCount}
-        </Badge>
-      )}
-    </Tabs.Trigger>
-  );
-
-  if (lens.isBuiltIn) {
-    return (
-      <MenuRoot>
-        <MenuContextTrigger asChild>{tabContent}</MenuContextTrigger>
-        <MenuContent minWidth="160px">
-          <MenuItem
-            value="duplicate"
-            onClick={() => duplicateLens(lens.id)}
-          >
-            <LuCopy />
-            Duplicate
-          </MenuItem>
-        </MenuContent>
-      </MenuRoot>
-    );
-  }
-
+  if (hiddenLenses.length === 0) return null;
   return (
     <MenuRoot>
-      <MenuContextTrigger asChild>{tabContent}</MenuContextTrigger>
-      <MenuContent minWidth="160px">
-        <MenuItem
-          value="save"
-          onClick={() => saveLens(lens.id)}
-          disabled={!isDraft}
-        >
-          <LuSave />
-          Save
-        </MenuItem>
-        <MenuItem
-          value="revert"
-          onClick={() => revertLens(lens.id)}
-          disabled={!isDraft}
-        >
-          <LuUndo2 />
-          Revert
-        </MenuItem>
-        <MenuSeparator />
-        <MenuItem value="rename" onClick={handleRenameStart}>
-          <LuPencil />
-          Rename
-        </MenuItem>
-        <MenuItem
-          value="duplicate"
-          onClick={() => duplicateLens(lens.id)}
-        >
-          <LuCopy />
-          Duplicate
-        </MenuItem>
-        <MenuSeparator />
-        <MenuItem
-          value="delete"
-          onClick={() => deleteLens(lens.id)}
-          color="fg.error"
-        >
-          <LuTrash2 />
-          Delete
-        </MenuItem>
-      </MenuContent>
-    </MenuRoot>
-  );
-};
-
-interface CreateLensButtonProps {
-  onCreate: (name: string) => string;
-}
-
-const CreateLensButton: React.FC<CreateLensButtonProps> = ({ onCreate }) => {
-  const [newName, setNewName] = useState("");
-  const [open, setOpen] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  const handleCreate = useCallback(() => {
-    const trimmed = newName.trim();
-    if (!trimmed) return;
-    onCreate(trimmed);
-    setNewName("");
-    setOpen(false);
-  }, [newName, onCreate]);
-
-  const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent) => {
-      if (e.key === "Enter") {
-        handleCreate();
-      } else if (e.key === "Escape") {
-        setOpen(false);
-        setNewName("");
-      }
-    },
-    [handleCreate],
-  );
-
-  return (
-    <PopoverRoot
-      open={open}
-      onOpenChange={(e) => {
-        setOpen(e.open);
-        if (e.open) {
-          setTimeout(() => inputRef.current?.focus(), 0);
-        } else {
-          setNewName("");
-        }
-      }}
-    >
-      <PopoverTrigger asChild>
+      <MenuTrigger asChild>
         <Button
           size="xs"
           variant="ghost"
-          marginLeft={1}
-          minWidth="auto"
           paddingX={1}
-          aria-label="Create new lens"
+          minWidth="auto"
+          aria-label={`Show ${hiddenLenses.length} more lenses`}
         >
-          <LuPlus />
+          <MoreHorizontal />
         </Button>
-      </PopoverTrigger>
-      <PopoverContent width="240px">
-        <PopoverBody>
-          <HStack gap={2}>
-            <Input
-              ref={inputRef}
-              size="sm"
-              placeholder="Lens name"
-              value={newName}
-              onChange={(e) => setNewName(e.target.value)}
-              onKeyDown={handleKeyDown}
-            />
-            <Button
-              size="sm"
-              colorPalette="blue"
-              onClick={handleCreate}
-              disabled={!newName.trim()}
-            >
-              Create
-            </Button>
-          </HStack>
-        </PopoverBody>
-      </PopoverContent>
-    </PopoverRoot>
+      </MenuTrigger>
+      <MenuContent minWidth="180px">
+        {hiddenLenses.map((lens) => (
+          <MenuItem
+            key={lens.id}
+            value={lens.id}
+            onClick={() => onSelect(lens.id)}
+            fontWeight={lens.id === activeLensId ? "semibold" : undefined}
+          >
+            {lens.name}
+          </MenuItem>
+        ))}
+      </MenuContent>
+    </MenuRoot>
   );
 };
