@@ -162,13 +162,7 @@ func (e *Engine) Execute(ctx context.Context, req ExecuteRequest) (*ExecuteResul
 		return nil, err
 	}
 	state := newRunState(req.Workflow)
-	if req.NodeID != "" && len(req.Inputs) > 0 {
-		// execute_component: feed user-typed inputs straight into the
-		// target node, regardless of how the workflow's edges are wired.
-		// resolveInputs picks these up before walking inbound edges.
-		state.manualInputsTarget = req.NodeID
-		state.manualInputs = req.Inputs
-	}
+	applyManualInputs(state, req)
 	started := time.Now()
 	for _, layer := range plan.Layers {
 		if err := ctx.Err(); err != nil {
@@ -645,6 +639,20 @@ func (e *Engine) runAgentWorkflow(ctx context.Context, req ExecuteRequest, node 
 		}
 	}
 	return map[string]any{"value": res.Result}, nil
+}
+
+// applyManualInputs primes runState with the inbound execute_component
+// payload's `node_id` + `inputs` so resolveInputs can short-circuit for
+// the target node. Both Execute and ExecuteStream MUST call this — the
+// streaming path forgot it once already (Bug 1, ash-detected via Studio
+// dogfood) and the symptom (Code.__call__() missing input) was bizarre.
+// Helper exists to keep that parity from drifting again.
+func applyManualInputs(state *runState, req ExecuteRequest) {
+	if req.NodeID == "" || len(req.Inputs) == 0 {
+		return
+	}
+	state.manualInputsTarget = req.NodeID
+	state.manualInputs = req.Inputs
 }
 
 // runState aggregates per-node outputs and tracks the first error

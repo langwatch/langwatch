@@ -51,6 +51,7 @@ func (e *Engine) ExecuteStream(ctx context.Context, req ExecuteRequest, opts Exe
 		return nil, err
 	}
 	state := newRunState(req.Workflow)
+	applyManualInputs(state, req)
 
 	out := make(chan StreamEvent, 16)
 	go func() {
