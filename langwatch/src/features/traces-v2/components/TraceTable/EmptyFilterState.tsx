@@ -1,4 +1,4 @@
-import { Box, Button, Flex, HStack, Heading, Stack, Text } from "@chakra-ui/react";
+import { Box, Button, Flex, Heading, HStack, Stack, Text } from "@chakra-ui/react";
 import type React from "react";
 import type { TimeRange } from "../../stores/filterStore";
 import { useFilterStore } from "../../stores/filterStore";

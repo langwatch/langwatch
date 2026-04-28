@@ -22,7 +22,7 @@ export const DurationCell: CellDef<ConversationGroup> = {
   label: "Duration",
   render: ({ row }) => <MonoCell>{formatDuration(row.totalDuration)}</MonoCell>,
   renderComfortable: ({ row }) => (
-    <Text textStyle="sm" color="fg.muted" textAlign="right">
+    <Text textStyle="xs" color="fg.muted" textAlign="right">
       {formatDuration(row.totalDuration)}
     </Text>
   ),
@@ -33,7 +33,7 @@ export const CostCell: CellDef<ConversationGroup> = {
   label: "Cost",
   render: ({ row }) => <MonoCell>{formatCost(row.totalCost)}</MonoCell>,
   renderComfortable: ({ row }) => (
-    <Text textStyle="sm" color="fg.muted" textAlign="right">
+    <Text textStyle="xs" color="fg.muted" textAlign="right">
       {formatCost(row.totalCost)}
     </Text>
   ),
@@ -44,7 +44,7 @@ export const TokensCell: CellDef<ConversationGroup> = {
   label: "Tokens",
   render: ({ row }) => <MonoCell>{formatTokens(row.totalTokens)}</MonoCell>,
   renderComfortable: ({ row }) => (
-    <Text textStyle="sm" color="fg.muted" textAlign="right">
+    <Text textStyle="xs" color="fg.muted" textAlign="right">
       {formatTokens(row.totalTokens)}
     </Text>
   ),
@@ -59,7 +59,7 @@ export const ModelCell: CellDef<ConversationGroup> = {
     </MonoCell>
   ),
   renderComfortable: ({ row }) => (
-    <Text textStyle="sm" color="fg.muted" truncate>
+    <Text textStyle="xs" color="fg.muted" truncate>
       {row.primaryModel ? abbreviateModel(row.primaryModel) : "—"}
     </Text>
   ),
@@ -69,12 +69,12 @@ export const ServiceCell: CellDef<ConversationGroup> = {
   id: "service",
   label: "Service",
   render: ({ row }) => (
-    <Text textStyle="sm" color="fg.subtle" truncate>
+    <Text textStyle="xs" color="fg.subtle" truncate>
       {row.serviceName || "—"}
     </Text>
   ),
   renderComfortable: ({ row }) => (
-    <Text textStyle="sm" color="fg.muted" truncate>
+    <Text textStyle="xs" color="fg.muted" truncate>
       {row.serviceName || "—"}
     </Text>
   ),
@@ -87,7 +87,7 @@ export const StatusCell: CellDef<ConversationGroup> = {
   renderComfortable: ({ row }) => (
     <HStack gap={2}>
       <StatusDot status={row.worstStatus} size="10px" />
-      <Text textStyle="sm" color="fg.muted">
+      <Text textStyle="xs" color="fg.muted">
         {STATUS_HEALTH_LABELS[row.worstStatus]}
       </Text>
     </HStack>

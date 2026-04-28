@@ -1,6 +1,6 @@
 import { type Virtualizer, useVirtualizer } from "@tanstack/react-virtual";
 import { useCallback } from "react";
-import { useViewStore } from "../../stores/viewStore";
+import { useDensityStore } from "../../stores/densityStore";
 import { useTraceTableScrollRef } from "./scrollContext";
 
 /** Px estimate per row before measureElement runs. */
@@ -32,7 +32,7 @@ export function useTraceTableVirtualizer({
   addonCount,
 }: VirtualizerArgs): VirtualizerResult {
   const scrollRef = useTraceTableScrollRef();
-  const density = useViewStore((s) => s.density);
+  const density = useDensityStore((s) => s.density);
 
   const baseEstimate =
     ESTIMATE_PER_DENSITY[density] + addonCount * ESTIMATE_PER_ADDON;

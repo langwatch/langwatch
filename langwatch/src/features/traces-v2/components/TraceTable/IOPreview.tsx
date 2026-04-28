@@ -2,7 +2,7 @@ import { Flex, HStack, Icon, Text, VStack } from "@chakra-ui/react";
 import { ArrowDown, ArrowUp, Bot, User, Wrench } from "lucide-react";
 import type React from "react";
 import { useDensityTokens } from "../../hooks/useDensityTokens";
-import { useViewStore } from "../../stores/viewStore";
+import { useDensityStore } from "../../stores/densityStore";
 import { type ParsedIO, tryParseChat } from "./chatContent";
 
 const VERTICAL_BAR = "\u2506";
@@ -14,7 +14,7 @@ interface IOPreviewProps {
 }
 
 export const IOPreview: React.FC<IOPreviewProps> = ({ input, output }) => {
-  const density = useViewStore((s) => s.density);
+  const density = useDensityStore((s) => s.density);
   if (density === "comfortable") {
     return <ComfortableIOPreview input={input} output={output} />;
   }

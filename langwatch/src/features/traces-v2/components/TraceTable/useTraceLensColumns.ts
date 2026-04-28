@@ -1,6 +1,6 @@
 import type { ColumnDef } from "@tanstack/react-table";
 import { useMemo } from "react";
-import { useViewStore } from "../../stores/viewStore";
+import { useDensityStore } from "../../stores/densityStore";
 import type { TraceListItem } from "../../types/trace";
 import { buildTraceColumns } from "./columns";
 import {
@@ -26,7 +26,7 @@ export function useTraceLensColumns({
   logicalColumnIds: string[];
   traces: TraceListItem[];
 }): TraceLensColumns {
-  const density = useViewStore((s) => s.density);
+  const density = useDensityStore((s) => s.density);
 
   const expanded = useMemo(
     () =>

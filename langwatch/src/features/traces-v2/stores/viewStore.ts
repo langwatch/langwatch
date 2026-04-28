@@ -8,7 +8,11 @@ export type GroupingMode =
   | "by-user"
   | "by-model";
 
-export type Density = "compact" | "comfortable";
+// Density is no longer a per-lens or per-view setting — it's a global user
+// preference managed by `densityStore.ts`. The `recommendedDensity` field
+// on a lens is advisory only (future "use the recommended density?" prompt).
+import type { Density } from "./densityStore";
+export type { Density };
 
 export interface SortConfig {
   columnId: string;
@@ -33,7 +37,13 @@ export interface LensConfig {
   addons: string[];
   grouping: GroupingMode;
   sort: SortConfig;
-  density: Density;
+  /**
+   * Optional density hint — purely advisory. Density is a global user
+   * preference (see `densityStore`); this field never overrides it.
+   * Lenses created before this change may still have a `density` field in
+   * localStorage; it's read into `recommendedDensity` for back-compat.
+   */
+  recommendedDensity?: Density;
   lockedFilters: string[];
   lockedGrouping?: boolean;
 }
@@ -57,7 +67,6 @@ interface DraftLensState {
   sort?: SortConfig;
   grouping?: GroupingMode;
   columns?: string[];
-  density?: Density;
 }
 
 interface ViewState {
@@ -65,7 +74,6 @@ interface ViewState {
   allLenses: LensConfig[];
   sort: SortConfig;
   grouping: GroupingMode;
-  density: Density;
   columnOrder: string[];
   hiddenColumns: Set<string>;
   draftState: Map<string, DraftLensState>;
@@ -73,7 +81,6 @@ interface ViewState {
   selectLens: (id: string) => void;
   setSort: (sort: SortConfig) => void;
   setGrouping: (mode: GroupingMode) => void;
-  setDensity: (density: Density) => void;
   toggleColumn: (columnId: string) => void;
   reorderColumns: (fromIndex: number, toIndex: number) => void;
   setVisibleColumns: (columns: string[]) => void;
@@ -91,7 +98,6 @@ const STORAGE_KEY = "langwatch:traces-v2:lenses:v2";
 const DISMISSED_BUILTINS_KEY = "langwatch:traces-v2:dismissed-builtins:v1";
 
 const DEFAULT_SORT: SortConfig = { columnId: "time", direction: "desc" };
-const DEFAULT_DENSITY: Density = "compact";
 
 function isGroupingMode(value: unknown): value is GroupingMode {
   return (
@@ -114,18 +120,30 @@ function loadCustomLenses(): LensConfig[] {
     if (!raw) return [];
     const parsed = JSON.parse(raw) as Array<Partial<LensConfig>>;
     if (!Array.isArray(parsed)) return [];
-    return parsed.map((lens) => ({
-      id: lens.id ?? "",
-      name: lens.name ?? "Untitled",
-      isBuiltIn: false,
-      columns: Array.isArray(lens.columns) ? lens.columns : [],
-      addons: Array.isArray(lens.addons) ? lens.addons : [],
-      grouping: isGroupingMode(lens.grouping) ? lens.grouping : "flat",
-      sort: lens.sort ?? DEFAULT_SORT,
-      density: isDensity(lens.density) ? lens.density : DEFAULT_DENSITY,
-      lockedFilters: Array.isArray(lens.lockedFilters) ? lens.lockedFilters : [],
-      lockedGrouping: lens.lockedGrouping,
-    }));
+    return parsed.map((lens) => {
+      // Back-compat: pre-migration lenses had a required `density` field.
+      // Read it as a recommendation only; the global density store wins.
+      const legacyDensity = (lens as { density?: unknown }).density;
+      const recommended = isDensity(legacyDensity)
+        ? legacyDensity
+        : isDensity(lens.recommendedDensity)
+          ? lens.recommendedDensity
+          : undefined;
+      return {
+        id: lens.id ?? "",
+        name: lens.name ?? "Untitled",
+        isBuiltIn: false,
+        columns: Array.isArray(lens.columns) ? lens.columns : [],
+        addons: Array.isArray(lens.addons) ? lens.addons : [],
+        grouping: isGroupingMode(lens.grouping) ? lens.grouping : "flat",
+        sort: lens.sort ?? DEFAULT_SORT,
+        recommendedDensity: recommended,
+        lockedFilters: Array.isArray(lens.lockedFilters)
+          ? lens.lockedFilters
+          : [],
+        lockedGrouping: lens.lockedGrouping,
+      };
+    });
   } catch {
     return [];
   }
@@ -183,7 +201,7 @@ const builtInLenses: LensConfig[] = [
     addons: ["io-preview", "expanded-peek"],
     grouping: "flat",
     sort: DEFAULT_SORT,
-    density: DEFAULT_DENSITY,
+
     lockedFilters: [],
   },
   {
@@ -203,7 +221,7 @@ const builtInLenses: LensConfig[] = [
     addons: ["conversation-turns"],
     grouping: "by-session",
     sort: DEFAULT_SORT,
-    density: "comfortable",
+    recommendedDensity: "comfortable",
     lockedFilters: ["metadata.thread_id"],
     lockedGrouping: true,
   },
@@ -224,7 +242,7 @@ const builtInLenses: LensConfig[] = [
     addons: ["error-detail", "expanded-peek"],
     grouping: "flat",
     sort: DEFAULT_SORT,
-    density: DEFAULT_DENSITY,
+
     lockedFilters: ["traces.error"],
   },
   {
@@ -243,7 +261,7 @@ const builtInLenses: LensConfig[] = [
     addons: ["error-detail", "io-preview"],
     grouping: "flat",
     sort: { columnId: "duration", direction: "desc" },
-    density: DEFAULT_DENSITY,
+
     lockedFilters: [],
   },
   {
@@ -261,7 +279,7 @@ const builtInLenses: LensConfig[] = [
     addons: ["io-preview"],
     grouping: "flat",
     sort: DEFAULT_SORT,
-    density: "comfortable",
+    recommendedDensity: "comfortable",
     lockedFilters: ["evaluations.status"],
   },
   {
@@ -272,31 +290,7 @@ const builtInLenses: LensConfig[] = [
     addons: ["group-traces"],
     grouping: "by-model",
     sort: { columnId: "count", direction: "desc" },
-    density: DEFAULT_DENSITY,
-    lockedFilters: [],
-    lockedGrouping: true,
-  },
-  {
-    id: "by-service",
-    name: "By Service",
-    isBuiltIn: true,
-    columns: ["group", "count", "duration", "cost", "tokens", "errors"],
-    addons: ["group-traces"],
-    grouping: "by-service",
-    sort: { columnId: "count", direction: "desc" },
-    density: DEFAULT_DENSITY,
-    lockedFilters: [],
-    lockedGrouping: true,
-  },
-  {
-    id: "by-user",
-    name: "By User",
-    isBuiltIn: true,
-    columns: ["group", "count", "duration", "cost", "tokens", "errors"],
-    addons: ["group-traces"],
-    grouping: "by-user",
-    sort: { columnId: "count", direction: "desc" },
-    density: DEFAULT_DENSITY,
+
     lockedFilters: [],
     lockedGrouping: true,
   },
@@ -345,7 +339,6 @@ export const useViewStore = create<ViewState>((set, get) => ({
   allLenses: initialLenses,
   sort: DEFAULT_SORT,
   grouping: "flat",
-  density: DEFAULT_DENSITY,
   columnOrder: defaultColumnOrder,
   hiddenColumns: new Set<string>(),
   draftState: new Map<string, DraftLensState>(),
@@ -359,44 +352,28 @@ export const useViewStore = create<ViewState>((set, get) => ({
         activeLensId: id,
         sort: draft?.sort ?? lens.sort,
         grouping: draft?.grouping ?? lens.grouping,
-        density: draft?.density ?? lens.density,
         columnOrder: draft?.columns ?? lens.columns,
         hiddenColumns: new Set<string>(),
       };
     }),
 
+  // Every per-view tweak goes through `draftState` regardless of whether
+  // the active lens is built-in or custom. The "unsaved" dot on the lens
+  // tab keys off `isDraft(lensId)`, so showing it for built-ins requires
+  // tracking those drafts too. Built-in lenses can't be saved into
+  // localStorage (the menu's Save item stays disabled), but the user can
+  // duplicate to keep the changes.
   setSort: (sort) =>
-    set((s) => {
-      const lens = s.allLenses.find((l) => l.id === s.activeLensId);
-      if (lens && !lens.isBuiltIn) {
-        return { sort, draftState: setDraft(s.draftState, s.activeLensId, { sort }) };
-      }
-      return { sort };
-    }),
+    set((s) => ({
+      sort,
+      draftState: setDraft(s.draftState, s.activeLensId, { sort }),
+    })),
 
   setGrouping: (mode) =>
-    set((s) => {
-      const lens = s.allLenses.find((l) => l.id === s.activeLensId);
-      if (lens && !lens.isBuiltIn) {
-        return {
-          grouping: mode,
-          draftState: setDraft(s.draftState, s.activeLensId, { grouping: mode }),
-        };
-      }
-      return { grouping: mode };
-    }),
-
-  setDensity: (density) =>
-    set((s) => {
-      const lens = s.allLenses.find((l) => l.id === s.activeLensId);
-      if (lens && !lens.isBuiltIn) {
-        return {
-          density,
-          draftState: setDraft(s.draftState, s.activeLensId, { density }),
-        };
-      }
-      return { density };
-    }),
+    set((s) => ({
+      grouping: mode,
+      draftState: setDraft(s.draftState, s.activeLensId, { grouping: mode }),
+    })),
 
   toggleColumn: (columnId) =>
     set((s) => {
@@ -408,15 +385,11 @@ export const useViewStore = create<ViewState>((set, get) => ({
         ? s.columnOrder
         : [...s.columnOrder, columnId];
 
-      const lens = s.allLenses.find((l) => l.id === s.activeLensId);
-      if (lens && !lens.isBuiltIn) {
-        return {
-          hiddenColumns: next,
-          columnOrder: order,
-          draftState: setDraft(s.draftState, s.activeLensId, { columns: order }),
-        };
-      }
-      return { hiddenColumns: next, columnOrder: order };
+      return {
+        hiddenColumns: next,
+        columnOrder: order,
+        draftState: setDraft(s.draftState, s.activeLensId, { columns: order }),
+      };
     }),
 
   reorderColumns: (fromIndex, toIndex) =>
@@ -435,31 +408,18 @@ export const useViewStore = create<ViewState>((set, get) => ({
       if (!moved) return s;
       order.splice(toIndex, 0, moved);
 
-      const lens = s.allLenses.find((l) => l.id === s.activeLensId);
-      if (lens && !lens.isBuiltIn) {
-        return {
-          columnOrder: order,
-          draftState: setDraft(s.draftState, s.activeLensId, { columns: order }),
-        };
-      }
-      return { columnOrder: order };
+      return {
+        columnOrder: order,
+        draftState: setDraft(s.draftState, s.activeLensId, { columns: order }),
+      };
     }),
 
   setVisibleColumns: (columns) =>
-    set((s) => {
-      const lens = s.allLenses.find((l) => l.id === s.activeLensId);
-      if (lens && !lens.isBuiltIn) {
-        return {
-          columnOrder: columns,
-          hiddenColumns: new Set<string>(),
-          draftState: setDraft(s.draftState, s.activeLensId, { columns }),
-        };
-      }
-      return {
-        columnOrder: columns,
-        hiddenColumns: new Set<string>(),
-      };
-    }),
+    set((s) => ({
+      columnOrder: columns,
+      hiddenColumns: new Set<string>(),
+      draftState: setDraft(s.draftState, s.activeLensId, { columns }),
+    })),
 
   isDraft: (lensId) => get().draftState.has(lensId),
 
@@ -474,7 +434,6 @@ export const useViewStore = create<ViewState>((set, get) => ({
       addons: [],
       grouping: state.grouping,
       sort: { ...state.sort },
-      density: state.density,
       lockedFilters: [],
     };
     const allLenses = [...state.allLenses, newLens];
@@ -495,7 +454,6 @@ export const useViewStore = create<ViewState>((set, get) => ({
         sort: draft.sort ?? lens.sort,
         grouping: draft.grouping ?? lens.grouping,
         columns: draft.columns ?? lens.columns,
-        density: draft.density ?? lens.density,
       };
       const allLenses = s.allLenses.map((l) => (l.id === lensId ? updated : l));
       const nextDraft = new Map(s.draftState);
@@ -515,7 +473,6 @@ export const useViewStore = create<ViewState>((set, get) => ({
         draftState: nextDraft,
         sort: lens.sort,
         grouping: lens.grouping,
-        density: lens.density,
         columnOrder: lens.columns,
         hiddenColumns: new Set<string>(),
       };
@@ -550,7 +507,6 @@ export const useViewStore = create<ViewState>((set, get) => ({
       activeLensId: id,
       sort: { ...newLens.sort },
       grouping: newLens.grouping,
-      density: newLens.density,
       columnOrder: [...newLens.columns],
       hiddenColumns: new Set<string>(),
     });
@@ -582,7 +538,6 @@ export const useViewStore = create<ViewState>((set, get) => ({
         activeLensId: firstLens.id,
         sort: firstLens.sort,
         grouping: firstLens.grouping,
-        density: firstLens.density,
         columnOrder: firstLens.columns,
         hiddenColumns: new Set<string>(),
       };

@@ -59,7 +59,7 @@ export const ConversationCell: CellDef<ConversationGroup> = {
           {isExpanded ? <ChevronDown /> : <ChevronRight />}
         </Icon>
         <Text
-          textStyle="sm"
+          textStyle="xs"
           fontWeight="500"
           color="blue.fg"
           fontFamily="mono"
@@ -72,7 +72,7 @@ export const ConversationCell: CellDef<ConversationGroup> = {
           {io.hasContent ? (
             <IOPreview input={io.input} output={io.output} />
           ) : (
-            <Text textStyle="sm" color="fg.subtle">
+            <Text textStyle="xs" color="fg.subtle">
               —
             </Text>
           )}

@@ -16,7 +16,7 @@ export const TurnsCell: CellDef<ConversationGroup> = {
     </MonoCell>
   ),
   renderComfortable: ({ row }) => (
-    <Text textStyle="sm" color="fg.muted" textAlign="right">
+    <Text textStyle="xs" color="fg.muted" textAlign="right">
       {row.traces.length} {row.traces.length === 1 ? "turn" : "turns"}
     </Text>
   ),

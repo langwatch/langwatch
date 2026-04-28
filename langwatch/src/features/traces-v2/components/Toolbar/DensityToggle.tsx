@@ -1,8 +1,7 @@
 import { Group, IconButton } from "@chakra-ui/react";
 import { AArrowDown, AArrowUp } from "lucide-react";
 import type React from "react";
-import type { Density } from "../../stores/viewStore";
-import { useViewStore } from "../../stores/viewStore";
+import { useDensityStore, type Density } from "../../stores/densityStore";
 
 const OPTIONS: {
   density: Density;
@@ -16,8 +15,8 @@ const OPTIONS: {
 const INACTIVE_ICON_OPACITY = 0.7;
 
 export const DensityToggle: React.FC = () => {
-  const density = useViewStore((s) => s.density);
-  const setDensity = useViewStore((s) => s.setDensity);
+  const density = useDensityStore((s) => s.density);
+  const setDensity = useDensityStore((s) => s.setDensity);
 
   return (
     <Group attached>

@@ -13,7 +13,7 @@ export const LastTurnCell: CellDef<ConversationGroup> = {
     </MonoCell>
   ),
   renderComfortable: ({ row }) => (
-    <Text textStyle="sm" color="fg">
+    <Text textStyle="xs" color="fg">
       {formatRelativeTime(row.latestTimestamp)}
     </Text>
   ),

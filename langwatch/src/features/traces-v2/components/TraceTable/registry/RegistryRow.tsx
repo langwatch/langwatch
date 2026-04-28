@@ -1,7 +1,7 @@
 import type { Row } from "@tanstack/react-table";
 import React from "react";
 import { useDensityTokens } from "../../../hooks/useDensityTokens";
-import { useViewStore } from "../../../stores/viewStore";
+import { useDensityStore } from "../../../stores/densityStore";
 import type { TraceStatus } from "../../../types/trace";
 import { Tbody, Td, Tr } from "../TablePrimitives";
 import { ROW_STYLES, StatusRowGroup, rowVariantFor } from "../StatusRow";
@@ -50,7 +50,7 @@ export function RegistryRow<TRow>({
   "data-index": dataIndex,
 }: RegistryRowProps<TRow>): React.ReactElement {
   const tokens = useDensityTokens();
-  const densityMode = useViewStore((s) => s.density);
+  const densityMode = useDensityStore((s) => s.density);
 
   const variant = rowVariantFor({ isSelected, status });
   const style = ROW_STYLES[variant];

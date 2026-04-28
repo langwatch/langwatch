@@ -1,4 +1,4 @@
-import { useViewStore } from "../stores/viewStore";
+import { useDensityStore } from "../stores/densityStore";
 
 /**
  * All density-dependent sizing in one place.
@@ -53,6 +53,6 @@ const COMFORTABLE: Readonly<DensityTokens> = {
 };
 
 export function useDensityTokens(): DensityTokens {
-  const density = useViewStore((s) => s.density);
+  const density = useDensityStore((s) => s.density);
   return density === "compact" ? COMPACT : COMFORTABLE;
 }
