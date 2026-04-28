@@ -141,13 +141,8 @@ export function useTraceList(): TraceListResult {
 
   const newIds = useNewlyArrivedTraceIds(data);
 
-  // Publish refetch state so other components (top progress bar, refresh icon)
-  // can react. Only true for refetches — initial load uses skeleton state.
   const setRefreshing = useFreshnessSignal((s) => s.setRefreshing);
   const isRefetching = query.isFetching && !query.isLoading;
-  useEffect(() => {
-    setRefreshing(isRefetching);
-  }, [isRefetching, setRefreshing]);
 
   // Dim the table only when the user explicitly switches view (filter, sort,
   // page, pageSize, or a non-rolling time range change). isPreviousData fires
@@ -193,6 +188,45 @@ export function useTraceList(): TraceListResult {
   useEffect(() => {
     setReplacingData(viewSwitching && query.isPreviousData);
   }, [viewSwitching, query.isPreviousData, setReplacingData]);
+
+  // Publish refresh state so the aurora progress bar appears every time the
+  // user updates the query (filter, sort, page, time range). Cache hits can
+  // resolve before isFetching ever flips, so we drive visibility from
+  // viewSwitching too and hold the bar visible for a minimum duration so
+  // the user always sees that something happened.
+  const MIN_REFRESH_VISIBLE_MS = 450;
+  const wantsRefresh = isRefetching || viewSwitching;
+  const refreshStartedAtRef = useRef<number | null>(null);
+  const refreshClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
+  useEffect(() => {
+    if (wantsRefresh) {
+      if (refreshClearTimerRef.current) {
+        clearTimeout(refreshClearTimerRef.current);
+        refreshClearTimerRef.current = null;
+      }
+      if (refreshStartedAtRef.current === null) {
+        refreshStartedAtRef.current = Date.now();
+        setRefreshing(true);
+      }
+      return;
+    }
+    if (refreshStartedAtRef.current === null) return;
+    const elapsed = Date.now() - refreshStartedAtRef.current;
+    const remaining = Math.max(0, MIN_REFRESH_VISIBLE_MS - elapsed);
+    refreshClearTimerRef.current = setTimeout(() => {
+      setRefreshing(false);
+      refreshStartedAtRef.current = null;
+      refreshClearTimerRef.current = null;
+    }, remaining);
+  }, [wantsRefresh, setRefreshing]);
+  useEffect(
+    () => () => {
+      if (refreshClearTimerRef.current) clearTimeout(refreshClearTimerRef.current);
+    },
+    [],
+  );
 
   return {
     data,

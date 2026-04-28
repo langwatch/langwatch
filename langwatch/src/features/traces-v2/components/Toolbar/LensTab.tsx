@@ -5,7 +5,6 @@ import {
   LuCopy,
   LuPencil,
   LuSave,
-  LuSparkles,
   LuTrash2,
   LuUndo2,
 } from "react-icons/lu";
@@ -53,12 +52,19 @@ export const LensTab: React.FC<LensTabProps> = ({
           onCancel={() => setIsRenaming(false)}
         />
       ) : (
-        <>
-          {lens.name}
-          {lens.isBuiltIn && <ExampleBadge />}
-          {isDraft && <DraftDot />}
-        </>
+        <BuiltInTooltip enabled={lens.isBuiltIn}>
+          {/* Built-in lenses dim their label instead of carrying a
+              sparkles badge — saves horizontal space and the muted colour
+              already telegraphs "this one's structural, you can't edit it". */}
+          <Box
+            as="span"
+            color={lens.isBuiltIn ? "fg.muted" : undefined}
+          >
+            {lens.name}
+          </Box>
+        </BuiltInTooltip>
       )}
+      {isDraft && <DraftDot />}
       {errorCount > 0 && <ErrorBadge count={errorCount} />}
     </Tabs.Trigger>
   );
@@ -68,22 +74,7 @@ export const LensTab: React.FC<LensTabProps> = ({
       <MenuContextTrigger asChild>{trigger}</MenuContextTrigger>
       <MenuContent minWidth="160px">
         {lens.isBuiltIn ? (
-          <>
-            <MenuItem value="duplicate" onClick={() => duplicateLens(lens.id)}>
-              <LuCopy />
-              Duplicate
-            </MenuItem>
-            <MenuSeparator />
-            <MenuItem
-              value="delete"
-              onClick={() => deleteLens(lens.id)}
-              disabled={!canDelete}
-              color="fg.error"
-            >
-              <LuTrash2 />
-              Delete
-            </MenuItem>
-          </>
+          <BuiltInLensMenuItems lensId={lens.id} canDelete={canDelete} />
         ) : (
           <UserLensMenuItems
             lensId={lens.id}
@@ -96,23 +87,25 @@ export const LensTab: React.FC<LensTabProps> = ({
   );
 };
 
-const ExampleBadge: React.FC = () => (
-  <Tooltip
-    content="Example lens — right-click to delete"
-    positioning={{ placement: "bottom" }}
-  >
-    <Box
-      as="span"
-      display="inline-flex"
-      alignItems="center"
-      color="fg.muted"
-      marginLeft={0.5}
-      flexShrink={0}
+interface BuiltInTooltipProps {
+  enabled: boolean;
+  children: React.ReactNode;
+}
+
+const BuiltInTooltip: React.FC<BuiltInTooltipProps> = ({
+  enabled,
+  children,
+}) => {
+  if (!enabled) return <>{children}</>;
+  return (
+    <Tooltip
+      content="Built-in lens — duplicate to customise, right-click for options"
+      positioning={{ placement: "bottom" }}
     >
-      <LuSparkles size={11} />
-    </Box>
-  </Tooltip>
-);
+      {children}
+    </Tooltip>
+  );
+};
 
 const DraftDot: React.FC = () => (
   <Box
@@ -165,6 +158,43 @@ const RenameInput: React.FC<{
       paddingY={0}
       height="20px"
     />
+  );
+};
+
+const BuiltInLensMenuItems: React.FC<{
+  lensId: string;
+  canDelete: boolean;
+}> = ({ lensId, canDelete }) => {
+  const isDraft = useViewStore((s) => s.isDraft(lensId));
+  const revertLens = useViewStore((s) => s.revertLens);
+  const duplicateLens = useViewStore((s) => s.duplicateLens);
+  const deleteLens = useViewStore((s) => s.deleteLens);
+
+  return (
+    <>
+      <MenuItem
+        value="revert"
+        onClick={() => revertLens(lensId)}
+        disabled={!isDraft}
+      >
+        <LuUndo2 />
+        Revert
+      </MenuItem>
+      <MenuItem value="duplicate" onClick={() => duplicateLens(lensId)}>
+        <LuCopy />
+        Duplicate to save changes
+      </MenuItem>
+      <MenuSeparator />
+      <MenuItem
+        value="delete"
+        onClick={() => deleteLens(lensId)}
+        disabled={!canDelete}
+        color="fg.error"
+      >
+        <LuTrash2 />
+        Delete
+      </MenuItem>
+    </>
   );
 };
 

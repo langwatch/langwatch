@@ -10,24 +10,28 @@ import {
 } from "../../../../components/ui/popover";
 import { useViewStore } from "../../stores/viewStore";
 
+/**
+ * Manual lens creation. AI-driven lens creation lives in the search bar's
+ * Ask-AI mode (it doubles as a search composer with a mode toggle).
+ */
 export const CreateLensButton: React.FC = () => {
   const createLens = useViewStore((s) => s.createLens);
   const [name, setName] = useState("");
   const [open, setOpen] = useState(false);
 
-  const reset = () => {
+  const reset = (): void => {
     setName("");
     setOpen(false);
   };
 
-  const submit = () => {
+  const submit = (): void => {
     const trimmed = name.trim();
     if (!trimmed) return;
     createLens(trimmed);
     reset();
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
+  const handleKeyDown = (e: React.KeyboardEvent): void => {
     if (e.key === "Enter") submit();
     else if (e.key === "Escape") reset();
   };

@@ -69,9 +69,9 @@ export const LensTabs: React.FC = () => {
           variant="line"
           size="sm"
           fontSize="xs"
-          colorPalette="blue"
+          colorPalette="orange"
           borderBottomWidth={0}
-          marginBottom="-2px"
+          marginBottom="-5px"
           flex="1"
           minWidth={0}
         >
@@ -83,16 +83,27 @@ export const LensTabs: React.FC = () => {
               "&::-webkit-scrollbar": { display: "none" },
             }}
           >
-            <Tabs.List borderBottomWidth={0} flexWrap="nowrap" width="max-content">
-              {allLenses.map((lens) => (
-                <LensTab
-                  key={lens.id}
-                  lens={lens}
-                  isDraft={isDraft(lens.id)}
-                  errorCount={lens.id === ERRORS_LENS_ID ? errorCount : 0}
-                />
-              ))}
-            </Tabs.List>
+            <HStack
+              gap={0}
+              flexWrap="nowrap"
+              width="max-content"
+              align="center"
+            >
+              <Tabs.List borderBottomWidth={0} flexWrap="nowrap">
+                {allLenses.map((lens) => (
+                  <LensTab
+                    key={lens.id}
+                    lens={lens}
+                    isDraft={isDraft(lens.id)}
+                    errorCount={lens.id === ERRORS_LENS_ID ? errorCount : 0}
+                  />
+                ))}
+              </Tabs.List>
+              {/* `+` lives inside the same horizontal scroller, immediately
+                  after the last tab — sits next to the lenses regardless of
+                  how much room the toolbar has. */}
+              <CreateLensButton />
+            </HStack>
           </Box>
         </Tabs.Root>
         <OverflowMenu
@@ -100,7 +111,6 @@ export const LensTabs: React.FC = () => {
           activeLensId={activeLensId}
           onSelect={handleOverflowSelect}
         />
-        <CreateLensButton />
       </HStack>
 
       <UnsavedLensDialog

@@ -1,9 +1,11 @@
 import type {
-  Density,
   GroupingMode,
   LensConfig,
   SortConfig,
 } from "../stores/viewStore";
+
+// Density is intentionally NOT serialised into the URL — it's a personal
+// preference, not a shareable view setting. Lives in `densityStore.ts`.
 
 export interface BarStateOverrides {
   query?: string;
@@ -17,7 +19,6 @@ export interface BarStateOverrides {
   columns?: string[];
   grouping?: GroupingMode;
   sort?: SortConfig;
-  density?: Density;
 }
 
 export interface FragmentState {
@@ -35,10 +36,6 @@ const VALID_GROUPINGS: ReadonlySet<GroupingMode> = new Set([
 
 function isGroupingMode(value: string): value is GroupingMode {
   return VALID_GROUPINGS.has(value as GroupingMode);
-}
-
-function isDensity(value: string): value is Density {
-  return value === "compact" || value === "comfortable";
 }
 
 function parseSort(value: string): SortConfig | undefined {
@@ -117,8 +114,6 @@ export function parseFragment(fragment: string): FragmentState | null {
       if (parsed) overrides.sort = parsed;
     }
 
-    const density = params.get("density");
-    if (density && isDensity(density)) overrides.density = density;
   }
 
   return { lensId, overrides };
@@ -133,7 +128,6 @@ interface ComputeOverridesInput {
   columns: string[];
   grouping: GroupingMode;
   sort: SortConfig;
-  density: Density;
 }
 
 function arraysEqual(a: readonly string[], b: readonly string[]): boolean {
@@ -162,18 +156,12 @@ export function computeOverrides(
     overrides.timeTo = input.timeRange.to;
   }
   if (input.page !== 1) overrides.page = input.page;
-  if (!arraysEqual(input.columns, input.activeLens.columns)) {
-    overrides.columns = input.columns;
-  }
-  if (input.grouping !== input.activeLens.grouping) {
-    overrides.grouping = input.grouping;
-  }
-  if (!sortsEqual(input.sort, input.activeLens.sort)) {
-    overrides.sort = input.sort;
-  }
-  if (input.density !== input.activeLens.density) {
-    overrides.density = input.density;
-  }
+  // Column / grouping / sort drafts are intentionally NOT serialised into
+  // the URL — they're per-user view tweaks, not shareable query state.
+  // They live in `viewStore`'s `draftState` map; the lens tab shows a
+  // "unsaved" dot when any are active. To persist them across reloads,
+  // the user saves them into a (custom) lens. Older URLs that still
+  // carry `cols`/`group`/`sort` are honoured on parse for back-compat.
   return overrides;
 }
 
@@ -198,7 +186,6 @@ export function buildFragment(
   if (overrides.sort) {
     params.set("sort", `${overrides.sort.columnId}:${overrides.sort.direction}`);
   }
-  if (overrides.density) params.set("density", overrides.density);
   const encodedLens = encodeURIComponent(lensId);
   const paramStr = params.toString();
   return paramStr ? `${encodedLens}?${paramStr}` : encodedLens;

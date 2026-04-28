@@ -1,8 +1,8 @@
 import { Box, Flex, HStack, VStack } from "@chakra-ui/react";
 import { useRouter } from "~/utils/compat/next-router";
 import type React from "react";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useTracesV2Presence } from "~/features/presence/hooks/useTracesV2Presence";
+import { useProjectHasTraces } from "../../hooks/useProjectHasTraces";
 import { useRollingTimeRange } from "../../hooks/useRollingTimeRange";
 import { useTraceFreshness } from "../../hooks/useTraceFreshness";
 import { useURLSync } from "../../hooks/useURLSync";
@@ -21,6 +21,17 @@ import { useFindShortcut, useSidebarShortcut } from "./useKeyboardShortcuts";
 const SIDEBAR_WIDTH_EXPANDED = "220px";
 const SIDEBAR_WIDTH_COLLAPSED = "40px";
 
+const DIMMED_PROPS = {
+  opacity: 0.45,
+  pointerEvents: "none" as const,
+  "aria-disabled": true,
+  // `inert` keeps focus, hover, and pointer interactions out of the chrome
+  // while the empty-state body is what the user should be touching.
+  // React types lag the DOM property, so we widen via a record cast at the
+  // call sites that compose this object.
+  inert: "",
+};
+
 export const TracesPage: React.FC = () => {
   useURLSync();
   useRollingTimeRange();
@@ -32,29 +43,17 @@ export const TracesPage: React.FC = () => {
   useFindShortcut();
 
   const router = useRouter();
-  const { project } = useOrganizationTeamProject();
-  const showEmptyPreview = "empty" in router.query;
-
-  if (showEmptyPreview) {
-    return (
-      <DensityProvider>
-        <VStack
-          width="full"
-          height="full"
-          gap={0}
-          overflow="hidden"
-          bg="bg.surface"
-          role="application"
-          aria-label="Trace explorer"
-        >
-          <EmptyState
-            settingsHref={project ? `/${project.slug}/setup` : "/"}
-            onLoadDemoData={() => {}}
-          />
-        </VStack>
-      </DensityProvider>
-    );
-  }
+  const previewParam = "empty" in router.query;
+  const { hasAnyTraces } = useProjectHasTraces();
+  // Show the onboarding empty state when:
+  //   1. The user explicitly previewed it via `?empty` (designer flow), or
+  //   2. The project has truly never received a trace.
+  // We deliberately don't trigger on a filter returning zero results —
+  // that's a "no matches" state for the populated view to handle, not an
+  // onboarding moment. `hasAnyTraces === false` is the only "true zero"
+  // signal; while it's `undefined` (still loading) we keep showing the
+  // table so we don't flash empty-state on every page load.
+  const showEmptyState = previewParam || hasAnyTraces === false;
 
   return (
     <DensityProvider>
@@ -68,7 +67,12 @@ export const TracesPage: React.FC = () => {
         aria-label="Trace explorer"
         position="relative"
       >
-        <Box role="search" aria-label="Trace search" width="full">
+        <Box
+          role="search"
+          aria-label="Trace search"
+          width="full"
+          {...(showEmptyState ? (DIMMED_PROPS as Record<string, unknown>) : {})}
+        >
           <SearchBar />
         </Box>
 
@@ -79,15 +83,15 @@ export const TracesPage: React.FC = () => {
           gap={0}
           overflow="hidden"
         >
-          <FilterAside />
-          <ResultsPane />
+          <FilterAside dimmed={showEmptyState} />
+          {showEmptyState ? <EmptyResultsPane /> : <ResultsPane />}
         </HStack>
       </VStack>
     </DensityProvider>
   );
 };
 
-const FilterAside: React.FC = () => {
+const FilterAside: React.FC<{ dimmed?: boolean }> = ({ dimmed = false }) => {
   const sidebarCollapsed = useUIStore((s) => s.sidebarCollapsed);
 
   return (
@@ -103,6 +107,7 @@ const FilterAside: React.FC = () => {
       borderRightWidth="1px"
       borderColor="border"
       overflow="hidden"
+      {...(dimmed ? (DIMMED_PROPS as Record<string, unknown>) : {})}
     >
       <FilterSidebar />
     </Box>
@@ -125,6 +130,26 @@ const ResultsPane: React.FC = () => (
         <TraceTable />
       </Box>
       <FindBar />
+    </Box>
+  </Flex>
+);
+
+const EmptyResultsPane: React.FC = () => (
+  <Flex
+    as="main"
+    role="main"
+    aria-label="Set up tracing"
+    direction="column"
+    flex={1}
+    minWidth={0}
+    height="full"
+    overflow="hidden"
+  >
+    <Box width="full" {...(DIMMED_PROPS as Record<string, unknown>)}>
+      <Toolbar />
+    </Box>
+    <Box flex={1} minHeight={0} overflow="auto" bg="bg.panel">
+      <EmptyState />
     </Box>
   </Flex>
 );

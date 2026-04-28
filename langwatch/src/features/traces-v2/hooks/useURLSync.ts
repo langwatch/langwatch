@@ -18,7 +18,6 @@ import {
 } from "../utils/urlState";
 import { getPresetById, matchPreset } from "../utils/timeRangePresets";
 
-const DEBOUNCE_MS = 300;
 const DEFAULT_LENS_ID = "all-traces";
 const DEFAULT_PRESET_ID = "30d";
 
@@ -41,7 +40,6 @@ function writeFragment(fragmentBody: string): void {
  * Call once at the page level (TracesPage).
  */
 export function useURLSync(): void {
-  const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isInitialized = useRef(false);
 
   const queryText = useFilterStore((s) => s.queryText);
@@ -53,15 +51,12 @@ export function useURLSync(): void {
 
   const activeLensId = useViewStore((s) => s.activeLensId);
   const allLenses = useViewStore((s) => s.allLenses);
-  const sort = useViewStore((s) => s.sort);
-  const grouping = useViewStore((s) => s.grouping);
-  const density = useViewStore((s) => s.density);
-  const columnOrder = useViewStore((s) => s.columnOrder);
-  const hiddenColumns = useViewStore((s) => s.hiddenColumns);
   const selectLens = useViewStore((s) => s.selectLens);
+  // Setters are only used to apply legacy URL fragments on mount (back-compat
+  // with shared URLs that still carry `cols`/`group`/`sort`). The URL-write
+  // path no longer reads any of these from the store.
   const setSort = useViewStore((s) => s.setSort);
   const setGrouping = useViewStore((s) => s.setGrouping);
-  const setDensity = useViewStore((s) => s.setDensity);
   const setVisibleColumns = useViewStore((s) => s.setVisibleColumns);
 
   // Initialize from fragment on mount
@@ -97,7 +92,6 @@ export function useURLSync(): void {
     if (overrides.columns) setVisibleColumns(overrides.columns);
     if (overrides.grouping) setGrouping(overrides.grouping);
     if (overrides.sort) setSort(overrides.sort);
-    if (overrides.density) setDensity(overrides.density);
     // Apply page last — applyQueryText/setTimeRange reset it to 1.
     if (overrides.page !== undefined) setPage(overrides.page);
   }, [
@@ -109,53 +103,39 @@ export function useURLSync(): void {
     setVisibleColumns,
     setGrouping,
     setSort,
-    setDensity,
   ]);
 
-  // Sync state → fragment (debounced). One effect, one timer; the cleanup
-  // clears any pending write so the final unmount can't race with replaceState.
+  // Sync state → fragment immediately. URL writes via `replaceState` are
+  // cheap (no reflow, no navigation) and the user wants the URL to track
+  // the editor live. Debouncing made the URL feel laggy compared to the
+  // editor decorations.
   useEffect(() => {
     if (!isInitialized.current) return;
 
-    if (debounceTimer.current) clearTimeout(debounceTimer.current);
-    debounceTimer.current = setTimeout(() => {
-      const activeLens = allLenses.find((l) => l.id === activeLensId);
-      if (!activeLens) return;
+    const activeLens = allLenses.find((l) => l.id === activeLensId);
+    if (!activeLens) return;
 
-      const visibleColumns = columnOrder.filter((c) => !hiddenColumns.has(c));
-      const overrides = computeOverrides({
-        activeLens,
-        query: queryText,
-        timeRange,
-        defaultPresetId: DEFAULT_PRESET_ID,
-        page,
-        columns: visibleColumns,
-        grouping,
-        sort,
-        density,
-      });
+    const overrides = computeOverrides({
+      activeLens,
+      query: queryText,
+      timeRange,
+      defaultPresetId: DEFAULT_PRESET_ID,
+      page,
+      // columns / grouping / sort are tracked in `viewStore.draftState`
+      // but no longer serialised into the URL — pass dummies that match
+      // the lens defaults so `computeOverrides` doesn't see them as
+      // diverged. The function ignores them anyway, but the type still
+      // expects the fields.
+      columns: activeLens.columns,
+      grouping: activeLens.grouping,
+      sort: activeLens.sort,
+    });
 
-      // Default lens with no overrides → empty fragment for clean URL.
-      if (activeLensId === DEFAULT_LENS_ID && isOverridesEmpty(overrides)) {
-        writeFragment("");
-        return;
-      }
-      writeFragment(buildFragment(activeLensId, overrides));
-    }, DEBOUNCE_MS);
-
-    return () => {
-      if (debounceTimer.current) clearTimeout(debounceTimer.current);
-    };
-  }, [
-    activeLensId,
-    allLenses,
-    queryText,
-    timeRange,
-    page,
-    columnOrder,
-    hiddenColumns,
-    grouping,
-    sort,
-    density,
-  ]);
+    // Default lens with no overrides → empty fragment for clean URL.
+    if (activeLensId === DEFAULT_LENS_ID && isOverridesEmpty(overrides)) {
+      writeFragment("");
+      return;
+    }
+    writeFragment(buildFragment(activeLensId, overrides));
+  }, [activeLensId, allLenses, queryText, timeRange, page]);
 }
