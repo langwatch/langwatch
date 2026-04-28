@@ -59,7 +59,14 @@ export function SignedInExtraFooterComponents() {
   // sent to the CDP provider from the browser.
   const { data: profileData } = api.user.externalProfileId.useQuery(
     {},
-    { enabled: !!session.data?.user, staleTime: Infinity },
+    {
+      enabled: !!session.data?.user,
+      // No staleTime: Infinity here — the query must refetch on mount so
+      // a logout→login in the same tab gets a fresh HMAC for the new user.
+      // The tRPC query key is static (no userId in input), so stale cache
+      // from a previous user would be reused otherwise.
+      refetchOnWindowFocus: false,
+    },
   );
 
   // Customer.io in-app messaging — must be called unconditionally (React
