@@ -75,6 +75,9 @@ node_modules/
 # GDPR compliance reports (contain PII)
 /reports/
 
+# Auto-generated self-signed dev certs for HTTPS+HTTP/2 (LANGWATCH_DEV_HTTP2=1)
+/.dev-certs/
+
 licenses.json
 .pnpm-store/
 server.log
