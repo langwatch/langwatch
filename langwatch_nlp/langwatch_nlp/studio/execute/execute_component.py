@@ -79,11 +79,20 @@ async def execute_component(event: ExecuteComponentPayload):
                     # (services/nlpgo/.../codeblock/runner.py). dspy.Module
                     # subclasses always have __call__ so they hit the fast
                     # path unchanged.
+                    #
+                    # `callable(invoke_target)` covers both legs of the failure
+                    # surface: missing-attribute (`getattr` default = None,
+                    # `callable(None)` is False) AND non-callable-attribute
+                    # (e.g. a string class attribute named `forward`). Either
+                    # case raises a typed error here so the operator sees a
+                    # message naming the class instead of asyncify's
+                    # less-informative 'object is not callable'.
                     invoke_target = instance if callable(instance) else getattr(instance, "forward", None)
-                    if invoke_target is None:
+                    if not callable(invoke_target):
                         raise TypeError(
                             f"Class '{class_name}' for component {node.data.name} "
-                            f"is not callable and has no forward() method."
+                            f"has no callable entrypoint. Define __call__(self, ...) "
+                            f"or forward(self, ...) on the class."
                         )
                     result = await dspy.asyncify(invoke_target)(
                         **forward_inputs
