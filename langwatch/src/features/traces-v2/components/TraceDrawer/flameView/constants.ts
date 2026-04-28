@@ -1,0 +1,13 @@
+export const ROW_HEIGHT = 22;
+export const ROW_GAP = 2;
+export const MIN_BLOCK_PX = 2;
+export const DEPTH_FADE_STEP = 0.06;
+export const DEPTH_FADE_FLOOR = 0.45;
+export const MINIMAP_WIDTH = 280;
+export const MINIMAP_HEIGHT = 72;
+export const MINIMAP_HANDLE_PX = 10;
+export const ZOOM_ANIMATION_MS = 220;
+export const DRAG_THRESHOLD_PX = 4;
+export const MIN_VIEWPORT_MS = 0.05;
+export const ZOOM_FIT_PADDING = 0.04;
+export const WHEEL_ZOOM_SENSITIVITY = 0.0015;

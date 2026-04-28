@@ -1,158 +1,33 @@
 import { Box, Flex, HStack, Icon, Text } from "@chakra-ui/react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useVirtualizer } from "@tanstack/react-virtual";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { LuChevronRight, LuRotateCcw } from "react-icons/lu";
+import { Kbd } from "~/components/ops/shared/Kbd";
 import { Tooltip } from "~/components/ui/tooltip";
-import type { SpanTreeNode } from "~/server/api/routers/tracesV2.schemas";
-import { formatDuration, SPAN_TYPE_COLORS } from "../../utils/formatters";
+import { formatDuration, SPAN_TYPE_COLORS } from "../../../utils/formatters";
+import { BlockLabel } from "./BlockLabel";
+import {
+  DEPTH_FADE_FLOOR,
+  DEPTH_FADE_STEP,
+  DRAG_THRESHOLD_PX,
+  MIN_BLOCK_PX,
+  MIN_VIEWPORT_MS,
+  ROW_GAP,
+  ROW_HEIGHT,
+  WHEEL_ZOOM_SENSITIVITY,
+  ZOOM_ANIMATION_MS,
+  ZOOM_FIT_PADDING,
+} from "./constants";
+import { Minimap } from "./Minimap";
+import {
+  buildTree,
+  computeSpanContext,
+  formatPercent,
+  generateTicks,
+} from "./tree";
+import type { FlameNode, FlameViewProps, SpanContext, Viewport } from "./types";
 
-interface FlameViewProps {
-  spans: SpanTreeNode[];
-  selectedSpanId: string | null;
-  onSelectSpan: (spanId: string) => void;
-  onClearSpan: () => void;
-}
-
-const ROW_HEIGHT = 22;
-const ROW_GAP = 2;
-const MIN_BLOCK_PX = 2;
-const DEPTH_FADE_STEP = 0.06;
-const DEPTH_FADE_FLOOR = 0.45;
-const MINIMAP_WIDTH = 280;
-const MINIMAP_HEIGHT = 72;
-const MINIMAP_HANDLE_PX = 10;
-const ZOOM_ANIMATION_MS = 220;
-const DRAG_THRESHOLD_PX = 4;
-const MIN_VIEWPORT_MS = 0.05;
-const ZOOM_FIT_PADDING = 0.04;
-const WHEEL_ZOOM_SENSITIVITY = 0.0015;
-
-interface SpanContext {
-  duration: number;
-  parentName: string | null;
-  parentDuration: number | null;
-  pctOfParent: number | null;
-  pctOfTrace: number | null;
-}
-
-function computeSpanContext(node: FlameNode, fullRange: Viewport): SpanContext {
-  const dur = node.span.endTimeMs - node.span.startTimeMs;
-  const parentDur = node.parent
-    ? node.parent.span.endTimeMs - node.parent.span.startTimeMs
-    : null;
-  const traceDur = fullRange.endMs - fullRange.startMs;
-  return {
-    duration: dur,
-    parentName: node.parent?.span.name ?? null,
-    parentDuration: parentDur,
-    pctOfParent:
-      parentDur !== null && parentDur > 0 ? (dur / parentDur) * 100 : null,
-    pctOfTrace: traceDur > 0 ? (dur / traceDur) * 100 : null,
-  };
-}
-
-function formatPercent(pct: number): string {
-  if (pct >= 99.95) return "100%";
-  if (pct >= 10) return `${pct.toFixed(0)}%`;
-  if (pct >= 1) return `${pct.toFixed(1)}%`;
-  return `${pct.toFixed(2)}%`;
-}
-
-interface FlameNode {
-  span: SpanTreeNode;
-  depth: number;
-  parent: FlameNode | null;
-  children: FlameNode[];
-  isOrphaned: boolean;
-}
-
-interface Viewport {
-  startMs: number;
-  endMs: number;
-}
-
-interface BuiltTree {
-  roots: FlameNode[];
-  all: FlameNode[];
-  byId: Map<string, FlameNode>;
-  maxDepth: number;
-}
-
-function buildTree(spans: SpanTreeNode[]): BuiltTree {
-  const spanById = new Map<string, SpanTreeNode>();
-  for (const s of spans) spanById.set(s.spanId, s);
-
-  const childrenMap = new Map<string | null, SpanTreeNode[]>();
-  for (const s of spans) {
-    const parentExists = s.parentSpanId ? spanById.has(s.parentSpanId) : false;
-    const key = parentExists ? s.parentSpanId : null;
-    const list = childrenMap.get(key) ?? [];
-    list.push(s);
-    childrenMap.set(key, list);
-  }
-
-  const all: FlameNode[] = [];
-  const byId = new Map<string, FlameNode>();
-  let maxDepth = 0;
-
-  function build(
-    parentSpanId: string | null,
-    parent: FlameNode | null,
-    depth: number,
-  ): FlameNode[] {
-    const children = (childrenMap.get(parentSpanId) ?? [])
-      .slice()
-      .sort((a, b) => a.startTimeMs - b.startTimeMs);
-    return children.map((span) => {
-      const node: FlameNode = {
-        span,
-        depth,
-        parent,
-        children: [],
-        isOrphaned:
-          span.parentSpanId !== null && !spanById.has(span.parentSpanId),
-      };
-      all.push(node);
-      byId.set(span.spanId, node);
-      if (depth > maxDepth) maxDepth = depth;
-      node.children = build(span.spanId, node, depth + 1);
-      return node;
-    });
-  }
-
-  const roots = build(null, null, 0);
-  return { roots, all, byId, maxDepth };
-}
-
-// 1-2-5 nice-number step for smart tick spacing.
-function niceStep(roughStep: number): number {
-  if (roughStep <= 0) return 1;
-  const exp = Math.floor(Math.log10(roughStep));
-  const f = roughStep / Math.pow(10, exp);
-  let nice: number;
-  if (f < 1.5) nice = 1;
-  else if (f < 3.5) nice = 2;
-  else if (f < 7.5) nice = 5;
-  else nice = 10;
-  return nice * Math.pow(10, exp);
-}
-
-function generateTicks(
-  viewport: Viewport,
-  fullStartMs: number,
-  approxCount = 6,
-): { time: number; label: string }[] {
-  const duration = viewport.endMs - viewport.startMs;
-  if (duration <= 0) return [];
-  const step = niceStep(duration / approxCount);
-  const first = Math.ceil(viewport.startMs / step) * step;
-  const ticks: { time: number; label: string }[] = [];
-  for (let t = first; t <= viewport.endMs + 1e-9; t += step) {
-    ticks.push({ time: t, label: formatDuration(t - fullStartMs) });
-  }
-  return ticks;
-}
-
-export function FlameView({
+export const FlameView = memo(function FlameView({
   spans,
   selectedSpanId,
   onSelectSpan,
@@ -515,6 +390,18 @@ export function FlameView({
     );
   }, [tree.all, viewport.startMs, viewport.endMs, dur]);
 
+  // Group visible blocks by depth so the virtualizer can render each row's
+  // contents independently without scanning the full list per row.
+  const blocksByDepth = useMemo(() => {
+    const map = new Map<number, FlameNode[]>();
+    for (const node of visibleBlocks) {
+      const list = map.get(node.depth);
+      if (list) list.push(node);
+      else map.set(node.depth, [node]);
+    }
+    return map;
+  }, [visibleBlocks]);
+
   const hiddenSpanCount = useMemo(() => {
     if (visibleBlocks.length <= 200) return 0;
     let count = 0;
@@ -531,7 +418,23 @@ export function FlameView({
     [viewport, fullRange.startMs],
   );
 
-  const totalHeight = (tree.maxDepth + 1) * (ROW_HEIGHT + ROW_GAP);
+  const rowSize = ROW_HEIGHT + ROW_GAP;
+  const totalHeight = (tree.maxDepth + 1) * rowSize;
+
+  // Virtualize one row per depth level. The flame area itself is the scroll
+  // container — `getScrollElement` returns its ref. Each virtual item renders
+  // the depth-stripe + the spans at that depth (positioned absolutely in time).
+  const getScrollElement = useCallback(() => flameAreaRef.current, []);
+  const estimateSize = useCallback(() => rowSize, [rowSize]);
+
+  const virtualizer = useVirtualizer({
+    count: tree.maxDepth + 1,
+    getScrollElement,
+    estimateSize,
+    overscan: 4,
+  });
+
+  const virtualRows = virtualizer.getVirtualItems();
 
   // Keyboard navigation. Uses functional setState so the listener is stable.
   useEffect(() => {
@@ -757,7 +660,12 @@ export function FlameView({
           </HStack>
           {isZoomed && (
             <Tooltip
-              content="Reset zoom (Esc)"
+              content={
+                <HStack gap={1}>
+                  <Text>Reset zoom</Text>
+                  <Kbd>Esc</Kbd>
+                </HStack>
+              }
               positioning={{ placement: "top" }}
             >
               <Flex
@@ -882,12 +790,12 @@ export function FlameView({
           }}
         >
           {/* Tick lines + labels (ruler-like) */}
-          {ticks.map((tick, i) => {
+          {ticks.map((tick) => {
             const offset = (tick.time - viewport.startMs) / dur;
             if (offset < -0.001 || offset > 1.001) return null;
             const left = `calc(12px + ${offset} * (100% - 24px))`;
             return (
-              <Box key={i} pointerEvents="none">
+              <Box key={`${tick.label}-${tick.time}`} pointerEvents="none">
                 <Box
                   position="absolute"
                   left={left}
@@ -949,7 +857,7 @@ export function FlameView({
         </Box>
       </Tooltip>
 
-      {/* Flame area */}
+      {/* Flame area — vertical scroll container for the row virtualizer */}
       <Box
         ref={flameAreaRef}
         flex={1}
@@ -974,15 +882,16 @@ export function FlameView({
           data-flame-layer="true"
           position="relative"
           minHeight={`${Math.max(totalHeight, 32)}px`}
+          height={`${Math.max(totalHeight, 32)}px`}
           userSelect="none"
         >
-          {/* Tick grid lines */}
-          {ticks.map((tick, i) => {
+          {/* Tick grid lines (full layer height — outside virtualization) */}
+          {ticks.map((tick) => {
             const offset = (tick.time - viewport.startMs) / dur;
             if (offset < 0 || offset > 1) return null;
             return (
               <Box
-                key={`grid-${i}`}
+                key={`grid-${tick.label}-${tick.time}`}
                 position="absolute"
                 top={0}
                 bottom={0}
@@ -1043,175 +952,193 @@ export function FlameView({
               );
             })()}
 
-          {/* Row striping for depth readability */}
-          {Array.from({ length: tree.maxDepth + 1 }).map((_, depth) =>
-            depth % 2 === 1 ? (
+          {/* Virtualized depth rows — only renders rows visible in the scroll container */}
+          {virtualRows.map((virtualRow) => {
+            const depth = virtualRow.index;
+            const rowNodes = blocksByDepth.get(depth);
+            const isStripe = depth % 2 === 1;
+            return (
               <Box
-                key={`row-${depth}`}
+                key={virtualRow.key}
                 position="absolute"
-                top={`${depth * (ROW_HEIGHT + ROW_GAP)}px`}
+                top={0}
                 left={0}
                 right={0}
-                height={`${ROW_HEIGHT}px`}
-                bg="bg.subtle"
-                opacity={0.5}
+                height={`${virtualRow.size}px`}
+                transform={`translateY(${virtualRow.start}px)`}
                 pointerEvents="none"
-              />
-            ) : null,
-          )}
-
-          {/* Span blocks */}
-          {visibleBlocks.map((node) => {
-            const { span, depth } = node;
-            const spanDur = span.endTimeMs - span.startTimeMs;
-            const top = depth * (ROW_HEIGHT + ROW_GAP);
-            const leftPct =
-              dur > 0 ? ((span.startTimeMs - viewport.startMs) / dur) * 100 : 0;
-            const widthPct = dur > 0 ? (spanDur / dur) * 100 : 100;
-
-            // Skip ultra-narrow blocks at large traces (perf).
-            if (widthPct < 0.05 && spans.length > 200) return null;
-
-            const color =
-              (SPAN_TYPE_COLORS[span.type ?? "span"] as string) ?? "gray.solid";
-            const depthAlpha = Math.max(
-              DEPTH_FADE_FLOOR,
-              1 - depth * DEPTH_FADE_STEP,
-            );
-            const isError = span.status === "error";
-            const isSelected = span.spanId === selectedSpanId;
-            const isHovered = span.spanId === hoveredSpanId;
-            const isFocused = span.spanId === focusedSpanId && !isSelected;
-            const isAncestor =
-              relatedSpanIds?.ancestors.has(span.spanId) ?? false;
-            const isDirectChild =
-              relatedSpanIds?.children.has(span.spanId) ?? false;
-            const isDescendant =
-              relatedSpanIds?.descendants.has(span.spanId) ?? false;
-            const isRelated =
-              isAncestor ||
-              isDescendant ||
-              isSelected ||
-              isHovered ||
-              isFocused;
-            const isEmphasized = isSelected || isHovered || isFocused;
-            const isDimmed = dimOnHover && !!relatedSpanIds && !isRelated;
-            const bgAlphaPct = Math.round(
-              (isEmphasized
-                ? 1
-                : isAncestor
-                  ? Math.max(depthAlpha, 0.85)
-                  : isDirectChild
-                    ? Math.max(depthAlpha, 0.8)
-                    : isDimmed
-                      ? depthAlpha * 0.3
-                      : depthAlpha) * 100,
-            );
-            const isZeroDuration = spanDur === 0;
-
-            const parentDurMs = node.parent
-              ? node.parent.span.endTimeMs - node.parent.span.startTimeMs
-              : null;
-            const pctOfParent =
-              parentDurMs !== null && parentDurMs > 0
-                ? (spanDur / parentDurMs) * 100
-                : null;
-            const pctOfTrace = fullDur > 0 ? (spanDur / fullDur) * 100 : null;
-
-            const tooltipLines = [
-              span.name,
-              `Duration: ${isZeroDuration ? "<1ms" : formatDuration(spanDur)}`,
-              pctOfParent !== null && node.parent
-                ? `${formatPercent(pctOfParent)} of parent (${node.parent.span.name}, ${formatDuration(parentDurMs ?? 0)})`
-                : null,
-              pctOfTrace !== null && node.parent
-                ? `${formatPercent(pctOfTrace)} of trace`
-                : null,
-              span.model ? `Model: ${span.model}` : null,
-              node.isOrphaned ? "⚠ Parent not in trace" : null,
-            ].filter(Boolean);
-
-            // Visual hierarchy: selected > focused > hovered > ancestor/child > rest.
-            const borderWidth = isError
-              ? "1.5px"
-              : isSelected
-                ? "2px"
-                : isFocused
-                  ? "1.5px"
-                  : isAncestor || isDirectChild
-                    ? "1px"
-                    : "0.5px";
-            const borderColor = isError
-              ? "red.solid"
-              : isSelected
-                ? "fg"
-                : isFocused
-                  ? "fg.muted"
-                  : isAncestor
-                    ? "fg.muted"
-                    : isDirectChild
-                      ? "border.emphasized"
-                      : "blackAlpha.200";
-            const boxShadow = isSelected
-              ? "0 0 0 2px var(--chakra-colors-bg-panel), 0 2px 8px rgba(0,0,0,0.18)"
-              : isHovered
-                ? "sm"
-                : undefined;
-
-            return (
-              <Tooltip
-                key={span.spanId}
-                content={tooltipLines.join("\n")}
-                positioning={{ placement: "top" }}
               >
-                <Box
-                  position="absolute"
-                  top={`${top}px`}
-                  left={`${leftPct}%`}
-                  width={`${widthPct}%`}
-                  minWidth={`${MIN_BLOCK_PX}px`}
-                  height={`${ROW_HEIGHT}px`}
-                  bg={`${color}/${bgAlphaPct}`}
-                  borderWidth={borderWidth}
-                  borderColor={borderColor}
-                  borderStyle={node.isOrphaned ? "dashed" : "solid"}
-                  borderRadius="sm"
-                  cursor="pointer"
-                  overflow="hidden"
-                  zIndex={isSelected ? 3 : isFocused || isHovered ? 2 : 1}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleSpanClick(span.spanId);
-                  }}
-                  onDoubleClick={(e) => {
-                    e.stopPropagation();
-                    handleSpanDoubleClick(span.spanId);
-                  }}
-                  onMouseEnter={() => setHoveredSpanId(span.spanId)}
-                  onMouseLeave={() => setHoveredSpanId(null)}
-                  display="flex"
-                  alignItems="center"
-                  paddingX={1}
-                  boxShadow={boxShadow}
-                >
-                  <Text
-                    textStyle="xs"
-                    color={isEmphasized ? "white" : "whiteAlpha.900"}
-                    truncate
-                    lineHeight={1}
-                    userSelect="none"
-                    textShadow="0 1px 1px rgba(0,0,0,0.35)"
-                  >
-                    <BlockLabel
-                      name={span.name}
-                      duration={spanDur}
-                      model={span.type === "llm" ? span.model : null}
-                      pctOfParent={pctOfParent}
-                      widthPct={widthPct}
-                    />
-                  </Text>
-                </Box>
-              </Tooltip>
+                {isStripe && (
+                  <Box
+                    position="absolute"
+                    top={0}
+                    left={0}
+                    right={0}
+                    height={`${ROW_HEIGHT}px`}
+                    bg="bg.subtle"
+                    opacity={0.5}
+                    pointerEvents="none"
+                  />
+                )}
+                {rowNodes?.map((node) => {
+                  const { span } = node;
+                  const spanDur = span.endTimeMs - span.startTimeMs;
+                  const leftPct =
+                    dur > 0
+                      ? ((span.startTimeMs - viewport.startMs) / dur) * 100
+                      : 0;
+                  const widthPct = dur > 0 ? (spanDur / dur) * 100 : 100;
+
+                  // Skip ultra-narrow blocks at large traces (perf).
+                  if (widthPct < 0.05 && spans.length > 200) return null;
+
+                  const color =
+                    (SPAN_TYPE_COLORS[span.type ?? "span"] as string) ??
+                    "gray.solid";
+                  const depthAlpha = Math.max(
+                    DEPTH_FADE_FLOOR,
+                    1 - depth * DEPTH_FADE_STEP,
+                  );
+                  const isError = span.status === "error";
+                  const isSelected = span.spanId === selectedSpanId;
+                  const isHovered = span.spanId === hoveredSpanId;
+                  const isFocused =
+                    span.spanId === focusedSpanId && !isSelected;
+                  const isAncestor =
+                    relatedSpanIds?.ancestors.has(span.spanId) ?? false;
+                  const isDirectChild =
+                    relatedSpanIds?.children.has(span.spanId) ?? false;
+                  const isDescendant =
+                    relatedSpanIds?.descendants.has(span.spanId) ?? false;
+                  const isRelated =
+                    isAncestor ||
+                    isDescendant ||
+                    isSelected ||
+                    isHovered ||
+                    isFocused;
+                  const isEmphasized = isSelected || isHovered || isFocused;
+                  const isDimmed = dimOnHover && !!relatedSpanIds && !isRelated;
+                  const bgAlphaPct = Math.round(
+                    (isEmphasized
+                      ? 1
+                      : isAncestor
+                        ? Math.max(depthAlpha, 0.85)
+                        : isDirectChild
+                          ? Math.max(depthAlpha, 0.8)
+                          : isDimmed
+                            ? depthAlpha * 0.3
+                            : depthAlpha) * 100,
+                  );
+                  const isZeroDuration = spanDur === 0;
+
+                  const parentDurMs = node.parent
+                    ? node.parent.span.endTimeMs - node.parent.span.startTimeMs
+                    : null;
+                  const pctOfParent =
+                    parentDurMs !== null && parentDurMs > 0
+                      ? (spanDur / parentDurMs) * 100
+                      : null;
+                  const pctOfTrace =
+                    fullDur > 0 ? (spanDur / fullDur) * 100 : null;
+
+                  const tooltipLines = [
+                    span.name,
+                    `Duration: ${isZeroDuration ? "<1ms" : formatDuration(spanDur)}`,
+                    pctOfParent !== null && node.parent
+                      ? `${formatPercent(pctOfParent)} of parent (${node.parent.span.name}, ${formatDuration(parentDurMs ?? 0)})`
+                      : null,
+                    pctOfTrace !== null && node.parent
+                      ? `${formatPercent(pctOfTrace)} of trace`
+                      : null,
+                    span.model ? `Model: ${span.model}` : null,
+                    node.isOrphaned ? "⚠ Parent not in trace" : null,
+                  ].filter(Boolean);
+
+                  // Visual hierarchy: selected > focused > hovered > ancestor/child > rest.
+                  const borderWidth = isError
+                    ? "1.5px"
+                    : isSelected
+                      ? "2px"
+                      : isFocused
+                        ? "1.5px"
+                        : isAncestor || isDirectChild
+                          ? "1px"
+                          : "0.5px";
+                  const borderColor = isError
+                    ? "red.solid"
+                    : isSelected
+                      ? "fg"
+                      : isFocused
+                        ? "fg.muted"
+                        : isAncestor
+                          ? "fg.muted"
+                          : isDirectChild
+                            ? "border.emphasized"
+                            : "border.muted";
+                  const boxShadow = isSelected
+                    ? "0 0 0 2px var(--chakra-colors-bg-panel), 0 2px 8px rgba(0,0,0,0.18)"
+                    : isHovered
+                      ? "sm"
+                      : undefined;
+
+                  return (
+                    <Tooltip
+                      key={span.spanId}
+                      content={tooltipLines.join("\n")}
+                      positioning={{ placement: "top" }}
+                    >
+                      <Box
+                        position="absolute"
+                        top={0}
+                        left={`${leftPct}%`}
+                        width={`${widthPct}%`}
+                        minWidth={`${MIN_BLOCK_PX}px`}
+                        height={`${ROW_HEIGHT}px`}
+                        bg={`${color}/${bgAlphaPct}`}
+                        borderWidth={borderWidth}
+                        borderColor={borderColor}
+                        borderStyle={node.isOrphaned ? "dashed" : "solid"}
+                        borderRadius="sm"
+                        cursor="pointer"
+                        pointerEvents="auto"
+                        overflow="hidden"
+                        zIndex={isSelected ? 3 : isFocused || isHovered ? 2 : 1}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleSpanClick(span.spanId);
+                        }}
+                        onDoubleClick={(e) => {
+                          e.stopPropagation();
+                          handleSpanDoubleClick(span.spanId);
+                        }}
+                        onMouseEnter={() => setHoveredSpanId(span.spanId)}
+                        onMouseLeave={() => setHoveredSpanId(null)}
+                        display="flex"
+                        alignItems="center"
+                        paddingX={1}
+                        boxShadow={boxShadow}
+                      >
+                        <Text
+                          textStyle="xs"
+                          color={isEmphasized ? "white" : "whiteAlpha.900"}
+                          truncate
+                          lineHeight={1}
+                          userSelect="none"
+                          textShadow="0 1px 1px rgba(0,0,0,0.35)"
+                        >
+                          <BlockLabel
+                            name={span.name}
+                            duration={spanDur}
+                            model={span.type === "llm" ? span.model : null}
+                            pctOfParent={pctOfParent}
+                            widthPct={widthPct}
+                          />
+                        </Text>
+                      </Box>
+                    </Tooltip>
+                  );
+                })}
+              </Box>
             );
           })}
         </Box>
@@ -1291,383 +1218,4 @@ export function FlameView({
       )}
     </Flex>
   );
-}
-
-function Minimap({
-  allNodes,
-  maxDepth,
-  fullRange,
-  viewport,
-  onViewport,
-  onReset,
-}: {
-  allNodes: FlameNode[];
-  maxDepth: number;
-  fullRange: Viewport;
-  viewport: Viewport;
-  onViewport: (v: Viewport) => void;
-  onReset: () => void;
-}) {
-  const ref = useRef<HTMLDivElement>(null);
-  const fullDur = fullRange.endMs - fullRange.startMs;
-  const vpDur = viewport.endMs - viewport.startMs;
-
-  const handleAreaClick = useCallback(
-    (e: React.MouseEvent) => {
-      const rect = ref.current?.getBoundingClientRect();
-      if (!rect || fullDur <= 0) return;
-      const x = (e.clientX - rect.left) / rect.width;
-      const center = fullRange.startMs + x * fullDur;
-      onViewport({
-        startMs: center - vpDur / 2,
-        endMs: center + vpDur / 2,
-      });
-    },
-    [fullRange.startMs, fullDur, vpDur, onViewport],
-  );
-
-  const handleViewportPointerDown = useCallback(
-    (e: React.PointerEvent) => {
-      e.stopPropagation();
-      e.preventDefault();
-      const rect = ref.current?.getBoundingClientRect();
-      if (!rect || fullDur <= 0) return;
-      const startX = e.clientX;
-      const startVp = viewport;
-      document.body.style.cursor = "grabbing";
-
-      const handleMove = (ev: PointerEvent) => {
-        const dx = ev.clientX - startX;
-        const dt = (dx / rect.width) * fullDur;
-        onViewport({
-          startMs: startVp.startMs + dt,
-          endMs: startVp.endMs + dt,
-        });
-      };
-
-      const handleUp = () => {
-        document.body.style.cursor = "";
-        window.removeEventListener("pointermove", handleMove);
-        window.removeEventListener("pointerup", handleUp);
-      };
-
-      window.addEventListener("pointermove", handleMove);
-      window.addEventListener("pointerup", handleUp);
-    },
-    [viewport, fullDur, onViewport],
-  );
-
-  const handleEdgePointerDown = useCallback(
-    (edge: "left" | "right") => (e: React.PointerEvent) => {
-      e.stopPropagation();
-      e.preventDefault();
-      const rect = ref.current?.getBoundingClientRect();
-      if (!rect || fullDur <= 0) return;
-      const startX = e.clientX;
-      const startVp = viewport;
-      document.body.style.cursor = "ew-resize";
-
-      const handleMove = (ev: PointerEvent) => {
-        const dx = ev.clientX - startX;
-        const dt = (dx / rect.width) * fullDur;
-        if (edge === "left") {
-          const proposed = startVp.startMs + dt;
-          const maxStart = startVp.endMs - MIN_VIEWPORT_MS;
-          onViewport({
-            startMs: Math.min(proposed, maxStart),
-            endMs: startVp.endMs,
-          });
-        } else {
-          const proposed = startVp.endMs + dt;
-          const minEnd = startVp.startMs + MIN_VIEWPORT_MS;
-          onViewport({
-            startMs: startVp.startMs,
-            endMs: Math.max(proposed, minEnd),
-          });
-        }
-      };
-
-      const handleUp = () => {
-        document.body.style.cursor = "";
-        window.removeEventListener("pointermove", handleMove);
-        window.removeEventListener("pointerup", handleUp);
-      };
-
-      window.addEventListener("pointermove", handleMove);
-      window.addEventListener("pointerup", handleUp);
-    },
-    [viewport, fullDur, onViewport],
-  );
-
-  if (fullDur <= 0) return null;
-
-  const headerH = 14;
-  const innerH = MINIMAP_HEIGHT - headerH - 4;
-  const rowH = Math.max(1, innerH / (maxDepth + 1));
-  const vpLeft = ((viewport.startMs - fullRange.startMs) / fullDur) * 100;
-  const vpWidth = Math.max(0.5, (vpDur / fullDur) * 100);
-  const minimapTickFractions = [0.25, 0.5, 0.75];
-
-  return (
-    <Tooltip
-      content="Drag the bracket to pan · drag the edges to resize zoom · click to recenter · double-click to reset"
-      positioning={{ placement: "top" }}
-      openDelay={500}
-    >
-      <Box
-        ref={ref}
-        position="absolute"
-        bottom={3}
-        right={3}
-        width={`${MINIMAP_WIDTH}px`}
-        height={`${MINIMAP_HEIGHT}px`}
-        borderRadius="md"
-        bg="bg.panel"
-        overflow="hidden"
-        cursor="pointer"
-        onClick={handleAreaClick}
-        onDoubleClick={(e) => {
-          e.stopPropagation();
-          onReset();
-        }}
-        borderWidth="1px"
-        borderColor="border.emphasized"
-        boxShadow="lg"
-        zIndex={2}
-      >
-        {/* Header strip */}
-        <Flex
-          position="absolute"
-          top={0}
-          left={0}
-          right={0}
-          height={`${headerH}px`}
-          align="center"
-          justify="space-between"
-          paddingX={2}
-          bg="bg.muted"
-          borderBottomWidth="0.5px"
-          borderColor="border.subtle"
-          pointerEvents="none"
-        >
-          <Text
-            textStyle="2xs"
-            fontWeight="semibold"
-            letterSpacing="0.04em"
-            textTransform="uppercase"
-            color="fg.muted"
-            lineHeight={1}
-          >
-            Overview
-          </Text>
-          <Text
-            textStyle="2xs"
-            color="fg.subtle"
-            fontFamily="mono"
-            lineHeight={1}
-          >
-            {formatDuration(fullDur)}
-          </Text>
-        </Flex>
-
-        {/* Span dot area */}
-        <Box
-          position="absolute"
-          top={`${headerH}px`}
-          left={0}
-          right={0}
-          bottom={0}
-        >
-          {/* Quartile tick guide lines */}
-          {minimapTickFractions.map((f) => (
-            <Box
-              key={f}
-              position="absolute"
-              left={`${f * 100}%`}
-              top={0}
-              bottom={0}
-              width="1px"
-              bg="border.subtle"
-              opacity={0.6}
-              pointerEvents="none"
-            />
-          ))}
-
-          {/* Span dots */}
-          {allNodes.map((node) => {
-            const left =
-              ((node.span.startTimeMs - fullRange.startMs) / fullDur) * 100;
-            const width = Math.max(
-              0.2,
-              ((node.span.endTimeMs - node.span.startTimeMs) / fullDur) * 100,
-            );
-            const top = 2 + node.depth * rowH;
-            const color =
-              (SPAN_TYPE_COLORS[node.span.type ?? "span"] as string) ??
-              "gray.solid";
-            return (
-              <Box
-                key={node.span.spanId}
-                position="absolute"
-                left={`${left}%`}
-                width={`${width}%`}
-                top={`${top}px`}
-                height={`${Math.max(1, rowH - 0.5)}px`}
-                bg={color}
-                opacity={0.75}
-                minWidth="1px"
-                pointerEvents="none"
-                borderRadius="xs"
-              />
-            );
-          })}
-
-          {/* Outside-viewport dim */}
-          <Box
-            position="absolute"
-            left={0}
-            width={`${Math.max(0, vpLeft)}%`}
-            top={0}
-            bottom={0}
-            bg="blackAlpha.500"
-            pointerEvents="none"
-          />
-          <Box
-            position="absolute"
-            left={`${vpLeft + vpWidth}%`}
-            right={0}
-            top={0}
-            bottom={0}
-            bg="blackAlpha.500"
-            pointerEvents="none"
-          />
-
-          {/* Viewport indicator: edge handles + draggable middle */}
-          <Box
-            position="absolute"
-            left={`${vpLeft}%`}
-            width={`${vpWidth}%`}
-            top={0}
-            bottom={0}
-            borderTopWidth="2px"
-            borderBottomWidth="2px"
-            borderColor="blue.solid"
-            bg="blue.solid/12"
-            borderRadius="sm"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Left resize handle */}
-            <Flex
-              position="absolute"
-              left={0}
-              top={0}
-              bottom={0}
-              width={`${MINIMAP_HANDLE_PX}px`}
-              align="center"
-              justify="center"
-              bg="blue.solid"
-              cursor="ew-resize"
-              onPointerDown={handleEdgePointerDown("left")}
-              borderTopLeftRadius="sm"
-              borderBottomLeftRadius="sm"
-              _hover={{ bg: "blue.fg" }}
-              transition="background-color 0.1s ease"
-            >
-              <HandleGrip />
-            </Flex>
-            {/* Pan middle */}
-            <Box
-              position="absolute"
-              left={`${MINIMAP_HANDLE_PX}px`}
-              right={`${MINIMAP_HANDLE_PX}px`}
-              top={0}
-              bottom={0}
-              cursor="grab"
-              _active={{ cursor: "grabbing" }}
-              onPointerDown={handleViewportPointerDown}
-            />
-            {/* Right resize handle */}
-            <Flex
-              position="absolute"
-              right={0}
-              top={0}
-              bottom={0}
-              width={`${MINIMAP_HANDLE_PX}px`}
-              align="center"
-              justify="center"
-              bg="blue.solid"
-              cursor="ew-resize"
-              onPointerDown={handleEdgePointerDown("right")}
-              borderTopRightRadius="sm"
-              borderBottomRightRadius="sm"
-              _hover={{ bg: "blue.fg" }}
-              transition="background-color 0.1s ease"
-            >
-              <HandleGrip />
-            </Flex>
-          </Box>
-        </Box>
-      </Box>
-    </Tooltip>
-  );
-}
-
-function HandleGrip() {
-  return (
-    <Flex direction="column" gap="2px" pointerEvents="none">
-      {[0, 1, 2].map((i) => (
-        <Box
-          key={i}
-          width="2px"
-          height="2px"
-          borderRadius="full"
-          bg="white"
-          opacity={0.85}
-        />
-      ))}
-    </Flex>
-  );
-}
-
-function BlockLabel({
-  name,
-  duration,
-  model,
-  pctOfParent,
-  widthPct,
-}: {
-  name: string;
-  duration: number;
-  model: string | null;
-  pctOfParent: number | null;
-  widthPct: number;
-}) {
-  if (widthPct < 2) return null;
-  if (widthPct < 5) return <>{name.slice(0, 8)}</>;
-  const dur = formatDuration(duration);
-  const pct = pctOfParent !== null ? ` · ${formatPercent(pctOfParent)}` : "";
-  if (widthPct >= 18 && model) {
-    return (
-      <>
-        {name} ({dur}
-        {pct}) · {model.split("/").pop()}
-      </>
-    );
-  }
-  if (widthPct >= 10) {
-    return (
-      <>
-        {name} ({dur}
-        {pct})
-      </>
-    );
-  }
-  if (widthPct >= 8) {
-    return (
-      <>
-        {name} ({dur})
-      </>
-    );
-  }
-  return <>{name}</>;
-}
+});
