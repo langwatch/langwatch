@@ -26,22 +26,24 @@ function buildFieldHandlers(): Record<string, FieldHandler> {
     // Auto-derive from facet definition
     if (def.kind === "categorical" && "expression" in def) {
       if (def.table === "trace_summaries") {
-        handlers[def.key] = stringEquality(def.expression);
+        handlers[def.key] = stringEquality(def.expression, def.key);
       } else {
         handlers[def.key] = crossTableStringEquality(
           def.table,
           TABLE_TIME_COLUMNS[def.table],
           def.expression,
+          def.key,
         );
       }
     } else if (def.kind === "range") {
       if (def.table === "trace_summaries") {
-        handlers[def.key] = numericComparison(def.expression);
+        handlers[def.key] = numericComparison(def.expression, def.key);
       } else {
         handlers[def.key] = crossTableNumericComparison(
           def.table,
           TABLE_TIME_COLUMNS[def.table],
           def.expression,
+          def.key,
         );
       }
     }
@@ -50,6 +52,12 @@ function buildFieldHandlers(): Record<string, FieldHandler> {
 
   // Meta-fields that don't correspond to registry facets
   Object.assign(handlers, META_HANDLERS);
+
+  // Back-compat aliases for renamed fields. Any saved query/lens using the
+  // old key keeps working; the canonical field surfaces in autocomplete.
+  if (handlers.evaluatorVerdict) {
+    handlers.evaluatorPassed = handlers.evaluatorVerdict;
+  }
 
   return handlers;
 }

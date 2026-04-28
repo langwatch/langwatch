@@ -16,12 +16,13 @@ export function translateNumericField(
   tag: TagToken,
   negated: boolean,
   ctx: TranslationContext,
+  name: string = "value",
 ): string {
   if (tag.expression.type === "RangeExpression") {
     const min = tag.expression.range.min;
     const max = tag.expression.range.max;
-    const pMin = nextParam(ctx);
-    const pMax = nextParam(ctx);
+    const pMin = nextParam(ctx, `${name}Min`);
+    const pMax = nextParam(ctx, `${name}Max`);
     ctx.params[pMin] = min;
     ctx.params[pMax] = max;
     return wrap(
@@ -32,7 +33,7 @@ export function translateNumericField(
 
   const operator = tag.operator.operator;
   const num = extractNumericValue(tag);
-  const p = nextParam(ctx);
+  const p = nextParam(ctx, name);
   ctx.params[p] = num;
 
   switch (operator) {
@@ -56,28 +57,33 @@ export function translateStringField(
   tag: TagToken,
   negated: boolean,
   ctx: TranslationContext,
+  name: string = "value",
 ): string {
   const value = extractStringValue(tag);
   validateValueLength(value);
-  const p = nextParam(ctx);
+  const p = nextParam(ctx, name);
   ctx.params[p] = value;
   return wrap(`${columnExpr} = {${p}:String}`, negated);
 }
 
-export function stringEquality(expression: string): FieldHandler {
+export function stringEquality(
+  expression: string,
+  name?: string,
+): FieldHandler {
   return (tag, negated, ctx) =>
-    translateStringField(expression, tag, negated, ctx);
+    translateStringField(expression, tag, negated, ctx, name);
 }
 
 export function crossTableStringEquality(
   table: string,
   timeColumn: string,
   expression: string,
+  name: string = "value",
 ): FieldHandler {
   return (tag, negated, ctx) => {
     const value = extractStringValue(tag);
     validateValueLength(value);
-    const p = nextParam(ctx);
+    const p = nextParam(ctx, name);
     ctx.params[p] = value;
     return wrap(
       boundedSubquery(table, timeColumn, `${expression} = {${p}:String}`),
@@ -86,9 +92,12 @@ export function crossTableStringEquality(
   };
 }
 
-export function numericComparison(expression: string): FieldHandler {
+export function numericComparison(
+  expression: string,
+  name?: string,
+): FieldHandler {
   return (tag, negated, ctx) =>
-    translateNumericField(expression, tag, negated, ctx);
+    translateNumericField(expression, tag, negated, ctx, name);
 }
 
 const NUMERIC_OP_MAP: Record<string, string> = {
@@ -103,13 +112,14 @@ export function crossTableNumericComparison(
   table: string,
   timeColumn: string,
   expression: string,
+  name: string = "value",
 ): FieldHandler {
   return (tag, negated, ctx) => {
     if (tag.expression.type === "RangeExpression") {
       const min = tag.expression.range.min;
       const max = tag.expression.range.max;
-      const pMin = nextParam(ctx);
-      const pMax = nextParam(ctx);
+      const pMin = nextParam(ctx, `${name}Min`);
+      const pMax = nextParam(ctx, `${name}Max`);
       ctx.params[pMin] = min;
       ctx.params[pMax] = max;
       return wrap(
@@ -123,7 +133,7 @@ export function crossTableNumericComparison(
     }
     const operator = tag.operator.operator;
     const num = extractNumericValue(tag);
-    const p = nextParam(ctx);
+    const p = nextParam(ctx, name);
     ctx.params[p] = num;
     const cmp = NUMERIC_OP_MAP[operator];
     if (!cmp) {

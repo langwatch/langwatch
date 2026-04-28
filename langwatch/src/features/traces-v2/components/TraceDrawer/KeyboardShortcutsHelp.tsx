@@ -48,8 +48,8 @@ const DRAWER_GROUPS: ShortcutGroup[] = [
   {
     title: "Navigation",
     items: [
-      { keys: ["J"], label: "Next trace in conversation" },
-      { keys: ["K"], label: "Previous trace in conversation" },
+      { keys: ["→", "J"], label: "Next trace in conversation" },
+      { keys: ["←", "K"], label: "Previous trace in conversation" },
       { keys: ["]"], label: "Next span" },
       { keys: ["["], label: "Previous span" },
       { keys: ["O"], label: "Back to trace summary" },

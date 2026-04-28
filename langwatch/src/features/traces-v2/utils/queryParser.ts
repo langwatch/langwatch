@@ -162,6 +162,8 @@ export const SEARCH_FIELDS: Readonly<Record<string, SearchFieldMeta>> = {
   cost: { label: "Cost", hasSidebar: true, facetField: "cost", valueType: "range" },
   duration: { label: "Duration", hasSidebar: true, facetField: "duration", valueType: "range" },
   tokens: { label: "Tokens", hasSidebar: true, facetField: "tokens", valueType: "range" },
+  spans: { label: "Span Count", hasSidebar: true, facetField: "spans", valueType: "range" },
+  prompt: { label: "Prompt ID", hasSidebar: false, valueType: "text" },
   user: { label: "User", hasSidebar: false, valueType: "text" },
   conversation: { label: "Conversation", hasSidebar: false, valueType: "text" },
   scenario: { label: "Scenario", hasSidebar: false, valueType: "text" },
@@ -175,9 +177,10 @@ export const SEARCH_FIELDS: Readonly<Record<string, SearchFieldMeta>> = {
   event: { label: "Event", hasSidebar: false, valueType: "text" },
   eval: { label: "Eval", hasSidebar: false, valueType: "text" },
   evaluatorStatus: { label: "Evaluator Status", hasSidebar: true, facetField: "evaluatorStatus", valueType: "categorical" },
-  evaluatorPassed: { label: "Evaluator Verdict", hasSidebar: true, facetField: "evaluatorPassed", valueType: "categorical" },
+  evaluatorVerdict: { label: "Evaluator Verdict", hasSidebar: true, facetField: "evaluatorVerdict", valueType: "categorical" },
   evaluatorScore: { label: "Evaluator Score", hasSidebar: true, facetField: "evaluatorScore", valueType: "range" },
-  trace: { label: "Trace", hasSidebar: false, valueType: "text" },
+  traceId: { label: "Trace ID", hasSidebar: false, valueType: "text" },
+  spanId: { label: "Span ID", hasSidebar: false, valueType: "text" },
 };
 
 /** Field names whose tokens render with the scenario accent in the search bar. */
@@ -222,7 +225,7 @@ export const FIELD_VALUES: Record<string, string[]> = {
     "queued",
   ],
   evaluatorStatus: ["scheduled", "in_progress", "processed", "skipped", "error"],
-  evaluatorPassed: ["pass", "fail", "unknown"],
+  evaluatorVerdict: ["pass", "fail", "unknown"],
 };
 
 export type FacetState = "neutral" | "include" | "exclude";
@@ -390,6 +393,29 @@ export function removeFacetValueFromQuery(
   }
 }
 
+/**
+ * Drop the Tag node at the given liqe location (start/end relative to the
+ * @-stripped query string). Used by the inline X-button on each token —
+ * `filterAST` collapses any orphaned logical/parenthesized parents so we
+ * don't end up with stray operators or empty parens.
+ */
+export function removeNodeAtLocation(
+  currentQuery: string,
+  start: number,
+  end: number,
+): string {
+  if (!currentQuery.trim()) return "";
+  try {
+    const next = filterAST(parse(currentQuery), (node) => {
+      if (node.type !== "Tag") return true;
+      return !(node.location.start === start && node.location.end === end);
+    });
+    return isEmptyAST(next) ? "" : liqeSerialize(next);
+  } catch {
+    return currentQuery;
+  }
+}
+
 function appendClause(query: string, clause: string): string {
   const trimmed = query.trim();
   if (!trimmed) return clause;
@@ -431,6 +457,9 @@ function filterAST(
   if (ast.type === "ParenthesizedExpression") {
     const inner = filterAST(ast.expression, predicate);
     if (isEmptyAST(inner)) return EMPTY_AST;
+    // Unwrap parens that no longer wrap a logical group — `(status:error)`
+    // after a sibling is removed adds noise without changing precedence.
+    if (inner.type !== "LogicalExpression") return inner;
     return { ...ast, expression: inner };
   }
 

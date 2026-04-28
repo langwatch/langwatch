@@ -28,20 +28,27 @@ export interface FilteredCommands {
  */
 export function useFilteredCommands(
   query: string,
-  isSaas: boolean | undefined
+  isSaas: boolean | undefined,
+  projectId: string | undefined,
 ): FilteredCommands {
   const { enabled: isDarkModeEnabled } = useFeatureFlag(
     "release_ui_dark_mode_enabled",
   );
+  const { enabled: isTracesV2Enabled } = useFeatureFlag(
+    "release_ui_traces_v2_enabled",
+    { projectId, enabled: !!projectId },
+  );
   const { hasAccess: hasOpsAccess } = useOpsPermission();
 
-  const availableNavCommands = useMemo(
-    () =>
-      hasOpsAccess
-        ? navigationCommands
-        : navigationCommands.filter((cmd) => !cmd.id.startsWith("nav-ops")),
-    [hasOpsAccess],
-  );
+  const availableNavCommands = useMemo(() => {
+    let commands = hasOpsAccess
+      ? navigationCommands
+      : navigationCommands.filter((cmd) => !cmd.id.startsWith("nav-ops"));
+    if (!isTracesV2Enabled) {
+      commands = commands.filter((cmd) => cmd.id !== "nav-traces-v2");
+    }
+    return commands;
+  }, [hasOpsAccess, isTracesV2Enabled]);
 
   const filteredNavigation = useMemo(() => {
     if (!query.trim()) return [];

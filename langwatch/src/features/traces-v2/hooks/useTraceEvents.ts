@@ -19,6 +19,7 @@ export function useTraceEvents() {
     {
       enabled: !!project?.id && !!traceId && eventsExpanded,
       staleTime: 300_000,
+      gcTime: 1_800_000,
     },
   );
 }

@@ -6,6 +6,7 @@ import type { EvalSummary } from "../types/trace";
 import { useDrawerStore } from "../stores/drawerStore";
 
 export type RichEval = EvalSummary & {
+  evaluationId: string;
   evaluatorId: string;
   evaluatorType?: string;
   spanId?: string;
@@ -105,6 +106,7 @@ export function useTraceEvaluations(): TraceEvaluationsResult {
             : undefined;
 
         return {
+          evaluationId: e.evaluation_id,
           evaluatorId: e.evaluator_id,
           evaluatorType: e.type ?? undefined,
           name: e.name,

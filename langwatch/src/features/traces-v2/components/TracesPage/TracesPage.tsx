@@ -1,11 +1,14 @@
 import { Box, Flex, HStack, VStack } from "@chakra-ui/react";
+import { useRouter } from "~/utils/compat/next-router";
 import type React from "react";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useTracesV2Presence } from "~/features/presence/hooks/useTracesV2Presence";
 import { useRollingTimeRange } from "../../hooks/useRollingTimeRange";
 import { useTraceFreshness } from "../../hooks/useTraceFreshness";
 import { useURLSync } from "../../hooks/useURLSync";
 import { useUIStore } from "../../stores/uiStore";
 import { DensityProvider } from "../DensityProvider";
+import { EmptyState } from "../EmptyState";
 import { FilterSidebar } from "../FilterSidebar/FilterSidebar";
 import { FindBar } from "../FindBar";
 import { SearchBar } from "../SearchBar/SearchBar";
@@ -27,6 +30,31 @@ export const TracesPage: React.FC = () => {
   useAutoOpenWelcome();
   useSidebarShortcut();
   useFindShortcut();
+
+  const router = useRouter();
+  const { project } = useOrganizationTeamProject();
+  const showEmptyPreview = "empty" in router.query;
+
+  if (showEmptyPreview) {
+    return (
+      <DensityProvider>
+        <VStack
+          width="full"
+          height="full"
+          gap={0}
+          overflow="hidden"
+          bg="bg.surface"
+          role="application"
+          aria-label="Trace explorer"
+        >
+          <EmptyState
+            settingsHref={project ? `/${project.slug}/setup` : "/"}
+            onLoadDemoData={() => {}}
+          />
+        </VStack>
+      </DensityProvider>
+    );
+  }
 
   return (
     <DensityProvider>

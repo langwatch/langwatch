@@ -579,11 +579,6 @@ export const DashboardLayout = ({
           width="full"
           height="full"
           background="bg.page"
-          borderTopLeftRadius="xl"
-          boxShadow="-4px -2px 12px 0px rgba(0, 0, 0, 0.06)"
-          _dark={{
-            boxShadow: "-4px -2px 16px 0px rgba(0, 0, 0, 0.4)",
-          }}
           minHeight="calc(100vh - 56px)"
           maxHeight="calc(100vh - 56px)"
           maxWidth={`calc(100vw - ${menuWidth})`}

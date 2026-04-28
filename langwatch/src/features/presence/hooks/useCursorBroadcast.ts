@@ -27,7 +27,11 @@ export function useCursorBroadcast({
 }: UseCursorBroadcastOptions): void {
   const sessionId = useTabSessionId();
   const hidden = usePresencePreferencesStore((s) => s.hidden);
-  const cursorMutation = api.presence.cursor.useMutation();
+  // Route this mutation over the persistent tRPC WebSocket — at ~15 Hz one
+  // HTTP request per tick was saturating the browser's connection cap.
+  const cursorMutation = api.presence.cursor.useMutation({
+    trpc: { context: { useWS: true } },
+  });
   const sendRef = useRef(cursorMutation.mutateAsync);
   sendRef.current = cursorMutation.mutateAsync;
 

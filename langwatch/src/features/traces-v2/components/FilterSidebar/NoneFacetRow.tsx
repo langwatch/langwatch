@@ -22,16 +22,13 @@ export const NoneFacetRow = memo(function NoneFacetRow({
       width="full"
       paddingY={1}
       paddingLeft={1.5}
-      paddingRight={2}
+      paddingRight={0}
       cursor="pointer"
       textAlign="left"
       borderRadius="sm"
       overflow="hidden"
       background={active ? "bg.subtle" : "transparent"}
       borderWidth={0}
-      borderRightWidth="2px"
-      borderRightStyle="solid"
-      borderRightColor={active ? "gray.solid" : "transparent"}
       data-state={active ? "include" : "neutral"}
       onClick={onToggle}
       transition="background 120ms ease, border-color 120ms ease"
@@ -44,6 +41,17 @@ export const NoneFacetRow = memo(function NoneFacetRow({
         outlineOffset: "-2px",
       }}
     >
+      {active && (
+        <Box
+          position="absolute"
+          top={0}
+          right={0}
+          bottom={0}
+          width="2px"
+          bg="gray.solid"
+          pointerEvents="none"
+        />
+      )}
       <HStack gap={1.5} position="relative" minWidth={0} zIndex={1}>
         <Box
           width="8px"

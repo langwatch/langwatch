@@ -9,10 +9,9 @@ export type PresenceToggleProps = {
 };
 
 /**
- * Sidebar control that lets the user opt out of broadcasting their
- * multiplayer presence. The combination of an eye icon and a coloured
- * status dot is meant to convey state at a glance: green = visible to
- * teammates, grey = hidden / ghost mode.
+ * Sidebar control that lets the user opt out of broadcasting which trace
+ * (and location within it) they're viewing. Green dot = sharing trace
+ * location, grey = hidden.
  */
 export const PresenceToggle = ({ showLabel = true }: PresenceToggleProps) => {
   const hidden = usePresencePreferencesStore((s) => s.hidden);
@@ -20,10 +19,10 @@ export const PresenceToggle = ({ showLabel = true }: PresenceToggleProps) => {
 
   const visible = !hidden;
   const Icon = visible ? LuEye : LuEyeOff;
-  const label = visible ? "Visible to teammates" : "Hidden from teammates";
+  const label = visible ? "Sharing trace location" : "Trace location hidden";
   const tooltip = visible
-    ? "Teammates can see what you're looking at. Click to go invisible."
-    : "You're in ghost mode — teammates can't see you. Click to share again.";
+    ? "Teammates can see which trace you're viewing and where in it you are, to make collaboration easier. Click to stop sharing."
+    : "Teammates can't see which trace you're viewing. Click to share your trace location again.";
 
   const dotColor = visible ? "green.solid" : "fg.subtle";
 

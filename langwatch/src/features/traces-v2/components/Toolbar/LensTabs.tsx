@@ -1,7 +1,7 @@
 import { Box, Button, HStack, Tabs } from "@chakra-ui/react";
-import { startTransition, useEffect, useRef, useState } from "react";
-import type React from "react";
 import { MoreHorizontal } from "lucide-react";
+import type React from "react";
+import { startTransition, useEffect, useRef, useState } from "react";
 import {
   MenuContent,
   MenuItem,
@@ -68,6 +68,7 @@ export const LensTabs: React.FC = () => {
           onValueChange={(e) => handleLensChange(e.value)}
           variant="line"
           size="sm"
+          fontSize="xs"
           colorPalette="blue"
           borderBottomWidth={0}
           marginBottom="-2px"
@@ -148,7 +149,7 @@ function useHiddenLensTabs(
       { root, threshold: [0, 0.99, 1] },
     );
 
-    tabs.forEach((tab) => observer.observe(tab));
+    tabs.forEach((tab) => void observer.observe(tab));
     return () => observer.disconnect();
   }, [allLenses, scrollerRef]);
 

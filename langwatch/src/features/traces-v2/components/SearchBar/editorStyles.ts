@@ -55,4 +55,33 @@ export const editorStyles: SystemStyleObject = {
     color: "fg.subtle",
     fontWeight: "semibold",
   },
+  "& .filter-token-delete": {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    width: "14px",
+    height: "14px",
+    marginLeft: "2px",
+    padding: 0,
+    border: "none",
+    borderRadius: "3px",
+    background: "transparent",
+    color: "fg.muted",
+    fontSize: "13px",
+    fontWeight: "bold",
+    lineHeight: 1,
+    cursor: "pointer",
+    opacity: 0,
+    transition: "opacity 80ms ease-out, background 80ms ease-out",
+    verticalAlign: "middle",
+    userSelect: "none",
+  },
+  "& .filter-token:hover + .filter-token-delete, & .filter-token-delete:hover":
+    {
+      opacity: 1,
+    },
+  "& .filter-token-delete:hover": {
+    background: "red.500/15",
+    color: "red.fg",
+  },
 };

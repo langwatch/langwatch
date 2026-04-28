@@ -207,10 +207,12 @@ export function ConversationContext({
 
   const navigate = (id: string) => {
     if (id === traceId) return;
+    const turn = ctx.turns.find((t) => t.traceId === id);
     navigateToTrace({
       fromTraceId: traceId,
       fromViewMode: viewMode,
       toTraceId: id,
+      toTimestamp: turn?.timestamp,
     });
   };
 
@@ -354,6 +356,29 @@ function ConversationRow({
         transition="background 0.12s ease"
         textAlign="left"
         width="full"
+        // One-shot pulse on the current row whenever it (re)mounts — the
+        // row's key includes the trace id, so navigating to a sibling
+        // remounts this element and the animation re-fires.
+        css={
+          isCurrent
+            ? {
+                animation: "tracesV2CurrentRowPulse 0.6s ease-out",
+                "@keyframes tracesV2CurrentRowPulse": {
+                  "0%": {
+                    backgroundColor: "color-mix(in srgb, var(--chakra-colors-blue-500) 28%, transparent)",
+                    boxShadow: "inset 0 0 0 1px color-mix(in srgb, var(--chakra-colors-blue-500) 35%, transparent)",
+                  },
+                  "100%": {
+                    backgroundColor: "var(--chakra-colors-bg-emphasized)",
+                    boxShadow: "inset 0 0 0 1px transparent",
+                  },
+                },
+                "@media (prefers-reduced-motion: reduce)": {
+                  animation: "none",
+                },
+              }
+            : undefined
+        }
       >
         <TraceIdPeek traceId={row.traceId} />
         <Icon

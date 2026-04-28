@@ -8,6 +8,7 @@ import { useTraceHeader } from "../../hooks/useTraceHeader";
 import { useSpanTree } from "../../hooks/useSpanSummary";
 import { useTraceDrawerNavigation } from "../../hooks/useTraceDrawerNavigation";
 import { useThreadContext } from "../../hooks/useThreadContext";
+import { useThreadPrefetch } from "../../hooks/useThreadPrefetch";
 import { usePrefetchSpanDetail } from "../../hooks/usePrefetchSpanDetail";
 import type { SpanTreeNode } from "~/server/api/routers/tracesV2.schemas";
 import { BelowFoldIndicator } from "./BelowFoldIndicator";
@@ -94,7 +95,6 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
   const [vizTab, setVizTab] = useState<VizTab>(vizParam);
   const [selectedSpanId, setSelectedSpanId] = useState<string | null>(spanParam);
   const [activeTab, setActiveTab] = useState<DrawerTab>(spanParam ? "span" : "summary");
-  const [contentKey, setContentKey] = useState(0);
   const [pinnedSpanIds, setPinnedSpanIds] = useState<string[]>([]);
   const viewMode = useDrawerStore((s) => s.viewMode);
   const setStoreViewMode = useDrawerStore((s) => s.setViewMode);
@@ -147,12 +147,15 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
     setActiveTab(spanParam ? "span" : "summary");
   }, [spanParam]);
 
-  // Reset state when trace changes
+  // Reset transient span state when the trace changes. We deliberately do
+  // NOT bump `contentKey` here — that would unmount the whole content tree
+  // on every J/K press, which is what made rapid back-and-forth feel laggy.
+  // The "current row" pop in ConversationContext already gives a per-press
+  // visual cue without the cost of remounting the visualizer + accordions.
   useEffect(() => {
     setSelectedSpanId(spanParam);
     setActiveTab(spanParam ? "span" : "summary");
     setPinnedSpanIds([]);
-    setContentKey((k) => k + 1);
   }, [traceId, spanParam]);
 
   const handleClose = useCallback(() => {
@@ -164,6 +167,12 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
 
   // Sibling navigation in conversation thread (J / K shortcuts)
   const threadContext = useThreadContext(
+    trace?.conversationId ?? null,
+    trace?.traceId ?? null,
+  );
+
+  // Warm sibling trace headers so navigating between turns is instant.
+  useThreadPrefetch(
     trace?.conversationId ?? null,
     trace?.traceId ?? null,
   );
@@ -228,7 +237,6 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
   const handleNavigateToTrace = useCallback(
     (newTraceId: string) => {
       openDrawer("traceV2Details", { traceId: newTraceId });
-      setContentKey((k) => k + 1);
     },
     [openDrawer],
   );
@@ -268,6 +276,7 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
           setShortcutsOpen((v) => !v);
           break;
         }
+        case "ArrowRight":
         case "j":
         case "J": {
           if (threadContext.next) {
@@ -276,10 +285,12 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
               fromTraceId: trace.traceId,
               fromViewMode: viewMode,
               toTraceId: threadContext.next.traceId,
+              toTimestamp: threadContext.next.timestamp,
             });
           }
           break;
         }
+        case "ArrowLeft":
         case "k":
         case "K": {
           if (threadContext.previous) {
@@ -288,6 +299,7 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
               fromTraceId: trace.traceId,
               fromViewMode: viewMode,
               toTraceId: threadContext.previous.traceId,
+              toTimestamp: threadContext.previous.timestamp,
             });
           }
           break;
@@ -482,20 +494,12 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
                 isScenario={!!(trace.scenarioRunId ?? trace.attributes["scenario.run_id"])}
               >
               <Box
-                key={contentKey}
                 ref={scrollContentRef}
                 flex={1}
                 overflow="auto"
                 position="relative"
                 display="flex"
                 flexDirection="column"
-                css={{
-                  animation: "traceDrawerFadeIn 0.15s ease-in",
-                  "@keyframes traceDrawerFadeIn": {
-                    from: { opacity: 0 },
-                    to: { opacity: 1 },
-                  },
-                }}
               >
                 {viewMode === "scenario" && (trace.scenarioRunId ?? trace.attributes["scenario.run_id"]) ? (
                   <ScenarioView

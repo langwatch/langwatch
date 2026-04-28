@@ -5,6 +5,7 @@ import Placeholder from "@tiptap/extension-placeholder";
 import { Text as TiptapText } from "@tiptap/extension-text";
 import { useEditor, type Editor } from "@tiptap/react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { removeNodeAtLocation } from "../../utils/queryParser";
 import {
   PARAGRAPH_OFFSET,
   applyAcceptToEditor,
@@ -12,7 +13,7 @@ import {
   readEditorContext,
 } from "./editorDocument";
 import { FilterHighlight } from "./filterHighlight";
-import { getSuggestionState } from "./getSuggestionState";
+import { getSuggestionState, type SuggestionState } from "./getSuggestionState";
 import { handleKey } from "./handleKey";
 import {
   CLOSED_SUGGESTION,
@@ -23,9 +24,42 @@ import {
 } from "./suggestionUI";
 import { useLatestRef } from "./useLatestRef";
 
+const TRIGGER_TERMINATOR_REGEX = /[ \t\n()]/;
+const TRIGGER_PRECEDERS = new Set([" ", "\t", "\n", "("]);
+
+/**
+ * When a trigger anchor is set (`@` was intercepted at this position),
+ * derive the suggestion state from the segment after the anchor instead of
+ * scanning the whole text. This lets us drive the dropdown without ever
+ * inserting a literal `@` into the editor.
+ */
+function suggestionFromTrigger(
+  text: string,
+  cursorPos: number,
+  trigger: number,
+): SuggestionState | null {
+  if (cursorPos < trigger) return null;
+  const segment = text.slice(trigger, cursorPos);
+  if (TRIGGER_TERMINATOR_REGEX.test(segment)) return null;
+  const colonIdx = segment.indexOf(":");
+  if (colonIdx >= 0) {
+    const field = segment.slice(0, colonIdx);
+    const query = segment.slice(colonIdx + 1);
+    if (!field) return { open: false };
+    if (query.includes('"')) return { open: false };
+    return { open: true, mode: "value", field, query, tokenStart: trigger };
+  }
+  return { open: true, mode: "field", query: segment, tokenStart: trigger };
+}
+
 interface UseFilterEditorParams {
   queryText: string;
   applyQueryText: (text: string) => void;
+}
+
+export interface DynamicSuggestionItems {
+  items: string[];
+  counts?: Record<string, number>;
 }
 
 interface FilterEditorApi {
@@ -34,6 +68,12 @@ interface FilterEditorApi {
   hasContent: boolean;
   acceptSuggestion: (label: string) => void;
   reset: () => void;
+  /**
+   * Replace the dropdown's items with a freshly-fetched list (e.g. DB-backed
+   * value suggestions for `model:`). Pass `null` to revert to the static
+   * items computed from `FIELD_VALUES`.
+   */
+  overrideSuggestionItems: (next: DynamicSuggestionItems | null) => void;
 }
 
 export function useFilterEditor({
@@ -47,19 +87,39 @@ export function useFilterEditor({
 
   const editorRef = useRef<Editor | null>(null);
   const isProgrammaticRef = useRef(false);
+  const triggerPosRef = useRef<number | null>(null);
   const applyQueryTextRef = useLatestRef(applyQueryText);
   const suggestionRef = useLatestRef(suggestion);
   const dismissedRef = useLatestRef(dropdownDismissed);
 
   const refreshSuggestion = useCallback(
     (editor: Editor) => {
-      const { state } = readEditorContext(editor);
+      const text = editor.getText();
+      const cursorPos = editor.state.selection.from - PARAGRAPH_OFFSET;
+      const trigger = triggerPosRef.current;
+
+      let state: SuggestionState;
+      if (trigger !== null) {
+        const fromTrigger = suggestionFromTrigger(text, cursorPos, trigger);
+        if (fromTrigger === null) {
+          // Cursor moved before the anchor, or a terminator entered the
+          // segment — the trigger is no longer live.
+          triggerPosRef.current = null;
+          state = getSuggestionState(text, cursorPos);
+        } else {
+          state = fromTrigger;
+        }
+      } else {
+        state = getSuggestionState(text, cursorPos);
+      }
+
+      // Escape is sticky for the session — `dismissedRef` only clears on blur,
+      // reset, or a fresh `@` trigger. We no longer auto-clear it when the
+      // suggestion happens to close, otherwise Escape would only mute the
+      // dropdown until the next keystroke.
       if (dismissedRef.current && state.open) {
         setSuggestion(CLOSED_SUGGESTION);
         return;
-      }
-      if (!state.open && dismissedRef.current) {
-        setDropdownDismissed(false);
       }
       setSuggestion((prev) =>
         buildSuggestionUI({ state, previousSelected: prev.selectedIndex }),
@@ -75,7 +135,7 @@ export function useFilterEditor({
       TiptapText,
       History,
       Placeholder.configure({
-        placeholder: "Filter traces… type a field name or free text",
+        placeholder: "Filter traces… type a field name free text",
       }),
       FilterHighlight,
     ],
@@ -96,13 +156,46 @@ export function useFilterEditor({
       applyQueryTextRef.current(ed.getText().trim());
       setSuggestion(CLOSED_SUGGESTION);
       setDropdownDismissed(false);
+      triggerPosRef.current = null;
     },
     editorProps: {
       attributes: { spellcheck: "false" },
       handleKeyDown: (view, event) => {
         const text = view.state.doc.textContent;
         const cursorPos = view.state.selection.from - PARAGRAPH_OFFSET;
-        const liveState = getSuggestionState(text, cursorPos);
+
+        // `@` is a virtual trigger: it never enters the document. We anchor
+        // the autocomplete to the cursor position and let subsequent typing
+        // grow the active token. If the cursor isn't at a clean token start,
+        // auto-insert a space so the new clause doesn't glue onto the
+        // previous one.
+        if (event.key === "@") {
+          event.preventDefault();
+          const target = editorRef.current;
+          if (!target) return true;
+          // `@` is the explicit "force open" — it bypasses any sticky-Escape
+          // dismissal so the user can always re-arm the dropdown.
+          setDropdownDismissed(false);
+          const prev = cursorPos === 0 ? undefined : text[cursorPos - 1];
+          const isCleanStart =
+            prev === undefined || TRIGGER_PRECEDERS.has(prev);
+          if (isCleanStart) {
+            triggerPosRef.current = cursorPos;
+            refreshSuggestion(target);
+          } else {
+            triggerPosRef.current = cursorPos + 1;
+            target.commands.insertContent(" ");
+            // insertContent fires onUpdate -> refreshSuggestion automatically.
+          }
+          return true;
+        }
+
+        const trigger = triggerPosRef.current;
+        const triggerState =
+          trigger !== null
+            ? suggestionFromTrigger(text, cursorPos, trigger)
+            : null;
+        const liveState = triggerState ?? getSuggestionState(text, cursorPos);
         const dismissed = dismissedRef.current;
         const action = handleKey(
           {
@@ -121,14 +214,17 @@ export function useFilterEditor({
             return false;
           case "submit":
             event.preventDefault();
+            triggerPosRef.current = null;
             applyQueryTextRef.current(action.text.trim());
             return true;
           case "blur":
             event.preventDefault();
+            triggerPosRef.current = null;
             (view.dom as HTMLElement).blur();
             return true;
           case "close-dropdown":
             event.preventDefault();
+            triggerPosRef.current = null;
             setDropdownDismissed(true);
             setSuggestion(CLOSED_SUGGESTION);
             return true;
@@ -153,6 +249,29 @@ export function useFilterEditor({
     editorRef.current = editor ?? null;
   }, [editor]);
 
+  // Per-token X button: ProseMirror widgets in `filterHighlight` carry
+  // `data-filter-delete` plus the liqe location. We delegate the click on
+  // the editor's content element rather than wiring a callback per widget
+  // (cheaper to mount, easier to keep refs fresh).
+  useEffect(() => {
+    if (!editor || editor.isDestroyed) return;
+    const dom = editor.view.dom;
+    const handler = (event: MouseEvent) => {
+      const target = event.target as HTMLElement | null;
+      const btn = target?.closest("[data-filter-delete]") as HTMLElement | null;
+      if (!btn) return;
+      event.preventDefault();
+      event.stopPropagation();
+      const start = Number(btn.dataset.locStart);
+      const end = Number(btn.dataset.locEnd);
+      if (!Number.isFinite(start) || !Number.isFinite(end)) return;
+      const next = removeNodeAtLocation(editor.getText(), start, end);
+      applyQueryTextRef.current(next);
+    };
+    dom.addEventListener("mousedown", handler);
+    return () => dom.removeEventListener("mousedown", handler);
+  }, [editor, applyQueryTextRef]);
+
   // Sync external query changes back into the editor.
   useEffect(() => {
     if (!editor || editor.isDestroyed) return;
@@ -160,6 +279,7 @@ export function useFilterEditor({
     isProgrammaticRef.current = true;
     editor.commands.setContent(buildDocument(queryText));
     setHasContent(queryText.length > 0);
+    triggerPosRef.current = null;
     isProgrammaticRef.current = false;
   }, [editor, queryText]);
 
@@ -183,7 +303,40 @@ export function useFilterEditor({
     setHasContent(false);
     setSuggestion(CLOSED_SUGGESTION);
     setDropdownDismissed(false);
+    triggerPosRef.current = null;
   }, [editor]);
 
-  return { editor, suggestion, hasContent, acceptSuggestion, reset };
+  const overrideSuggestionItems = useCallback(
+    (next: DynamicSuggestionItems | null) => {
+      setSuggestion((prev) => {
+        if (!prev.state.open) return prev;
+        if (next === null) {
+          return buildSuggestionUI({
+            state: prev.state,
+            previousSelected: prev.selectedIndex,
+          });
+        }
+        const selectedIndex =
+          next.items.length === 0
+            ? 0
+            : Math.min(prev.selectedIndex, next.items.length - 1);
+        return {
+          ...prev,
+          items: next.items,
+          itemCounts: next.counts,
+          selectedIndex,
+        };
+      });
+    },
+    [],
+  );
+
+  return {
+    editor,
+    suggestion,
+    hasContent,
+    acceptSuggestion,
+    reset,
+    overrideSuggestionItems,
+  };
 }

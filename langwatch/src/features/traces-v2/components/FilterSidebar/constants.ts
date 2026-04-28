@@ -35,7 +35,7 @@ export const NORMAL_CASE_FIELDS = new Set([
   "origin",
   "spanType",
   "evaluatorStatus",
-  "evaluatorPassed",
+  "evaluatorVerdict",
 ]);
 
 /**
@@ -84,7 +84,7 @@ export const FACET_ICONS: Record<string, LucideIcon> = {
   label: Tag,
   evaluator: CheckSquare,
   evaluatorStatus: Activity,
-  evaluatorPassed: CheckSquare,
+  evaluatorVerdict: CheckSquare,
   evaluatorScore: Hash,
   event: Activity,
   cost: DollarSign,
@@ -138,7 +138,7 @@ export const FACET_GROUPS: FacetGroupDef[] = [
   {
     id: "evaluators",
     label: "Evaluators",
-    keys: ["evaluator", "evaluatorStatus", "evaluatorPassed", "evaluatorScore"],
+    keys: ["evaluator", "evaluatorStatus", "evaluatorVerdict", "evaluatorScore"],
   },
   {
     id: "events",

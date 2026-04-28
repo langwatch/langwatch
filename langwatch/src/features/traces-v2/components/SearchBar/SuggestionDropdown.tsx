@@ -37,6 +37,7 @@ export const SuggestionDropdown: React.FC<SuggestionDropdownProps> = ({
             key={label}
             label={label}
             state={state}
+            count={ui.itemCounts?.[label]}
             isSelected={index === ui.selectedIndex}
             onSelect={onSelect}
           />
@@ -49,6 +50,7 @@ export const SuggestionDropdown: React.FC<SuggestionDropdownProps> = ({
 interface SuggestionRowProps {
   label: string;
   state: Extract<SuggestionState, { open: true }>;
+  count?: number;
   isSelected: boolean;
   onSelect: (label: string) => void;
 }
@@ -56,6 +58,7 @@ interface SuggestionRowProps {
 const SuggestionRow: React.FC<SuggestionRowProps> = ({
   label,
   state,
+  count,
   isSelected,
   onSelect,
 }) => {
@@ -65,7 +68,7 @@ const SuggestionRow: React.FC<SuggestionRowProps> = ({
   return (
     <Button
       alignItems="center"
-      justifyContent="flex-start"
+      justifyContent="space-between"
       width="full"
       height="auto"
       minHeight="unset"
@@ -92,6 +95,11 @@ const SuggestionRow: React.FC<SuggestionRowProps> = ({
           </Text>
         )}
       </Text>
+      {count !== undefined && (
+        <Text textStyle="2xs" color="fg.subtle" fontFamily="mono" marginLeft={2}>
+          {count}
+        </Text>
+      )}
     </Button>
   );
 };

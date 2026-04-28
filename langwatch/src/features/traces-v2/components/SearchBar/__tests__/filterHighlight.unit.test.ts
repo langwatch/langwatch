@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { buildDecorationSlots } from "../filterHighlight";
+import {
+  buildDecorationPlan,
+  buildDecorationSlots,
+} from "../filterHighlight";
 
 describe("buildDecorationSlots", () => {
   describe("given an empty string", () => {
@@ -106,6 +109,97 @@ describe("buildDecorationSlots", () => {
       const slots = buildDecorationSlots("status:error", 5);
       expect(slots).toEqual([
         { from: 5, to: 17, className: "filter-token" },
+      ]);
+    });
+  });
+});
+
+describe("buildDecorationPlan — wildcard + boolean cases", () => {
+  describe("given a wildcard value followed by AND and another tag", () => {
+    it("emits two tag tokens with the AND keyword between them — never one merged token", () => {
+      const text = "model:gpt-* AND status:error";
+      const plan = buildDecorationPlan(text);
+
+      const tokenSlots = plan.slots.filter((s) =>
+        s.className.includes("filter-token"),
+      );
+      expect(tokenSlots).toEqual([
+        { from: 0, to: 11, className: "filter-token" },
+        { from: 16, to: 28, className: "filter-token" },
+      ]);
+
+      // AND keyword is its own decoration, not glued to either tag.
+      expect(plan.slots).toContainEqual({
+        from: 12,
+        to: 15,
+        className: "filter-keyword filter-keyword-and",
+      });
+
+      // Two tag widgets, one per tag.
+      expect(plan.tokens).toEqual([
+        { start: 0, end: 11, field: "model", value: "gpt-*" },
+        { start: 16, end: 28, field: "status", value: "error" },
+      ]);
+    });
+  });
+
+  describe("given a single wildcard value", () => {
+    it("decorates only the field:value span — the `*` is part of the value", () => {
+      const plan = buildDecorationPlan("model:gpt-*");
+      expect(plan.slots).toEqual([
+        { from: 0, to: 11, className: "filter-token" },
+      ]);
+      expect(plan.tokens).toEqual([
+        { start: 0, end: 11, field: "model", value: "gpt-*" },
+      ]);
+    });
+  });
+
+  describe("given an OR between two wildcard tags", () => {
+    it("emits two tag tokens and the OR keyword separately", () => {
+      const plan = buildDecorationPlan("model:gpt-* OR model:claude-*");
+      const tokens = plan.slots.filter((s) =>
+        s.className.includes("filter-token"),
+      );
+      expect(tokens).toHaveLength(2);
+      expect(plan.slots).toContainEqual({
+        from: 12,
+        to: 14,
+        className: "filter-keyword filter-keyword-or",
+      });
+    });
+  });
+
+  describe("given an incomplete `<tag> AND` (no right operand)", () => {
+    it("falls back to the regex highlighter and only decorates the parseable left tag", () => {
+      const plan = buildDecorationPlan("model:gpt-* AND");
+      // Liqe parse fails for incomplete AND. The regex fallback only matches
+      // the field:value span and leaves the dangling AND unstyled.
+      const tokenSlots = plan.slots.filter((s) =>
+        s.className.includes("filter-token"),
+      );
+      expect(tokenSlots).toEqual([
+        { from: 0, to: 11, className: "filter-token" },
+      ]);
+      // No AND keyword decoration — the parser couldn't confirm it as one.
+      expect(
+        plan.slots.some((s) => s.className.includes("filter-keyword-and")),
+      ).toBe(false);
+      // No widget tokens emitted by the regex fallback.
+      expect(plan.tokens).toEqual([]);
+    });
+  });
+
+  describe("given an unquoted value followed immediately by AND with no space", () => {
+    it("matches the entire run as one regex-fallback token (this is the failure mode the user can produce by accidentally eating the space)", () => {
+      // Sanity check: this documents what a missing space looks like, so a
+      // future regression that ate the user's space would show up here.
+      const plan = buildDecorationPlan("model:gpt-*AND");
+      const tokenSlots = plan.slots.filter((s) =>
+        s.className.includes("filter-token"),
+      );
+      expect(tokenSlots).toEqual([
+        { from: 0, to: 14, className: "filter-token" },
       ]);
     });
   });

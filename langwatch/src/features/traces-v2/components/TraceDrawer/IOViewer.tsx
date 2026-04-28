@@ -7,6 +7,7 @@ import { safePrettyJson } from "./JsonHighlight";
 import { useColorMode } from "~/components/ui/color-mode";
 import {
   AssistantTurnCard,
+  LONG_THREAD_THRESHOLD,
   ThreadedTurnView,
   TurnView,
   VIRTUALIZE_AT,
@@ -319,10 +320,16 @@ export function IOViewer({ label, content, mode = "input" }: IOViewerProps) {
                 // we already know we sent. Auto-expand assistant/system
                 // turns and the trailing pair so the response is visible
                 // at a glance without users having to click into every
-                // user bubble in long conversations.
+                // user bubble in long conversations. Once the convo gets
+                // long, collapse aggressively: only the last turn opens.
+                const isLong =
+                  conversationTurns.length > LONG_THREAD_THRESHOLD;
                 const isLastTwo = i >= conversationTurns.length - 2;
-                const defaultExpanded =
-                  turn.kind === "user" ? false : isLastTwo;
+                const defaultExpanded = isLong
+                  ? i === conversationTurns.length - 1
+                  : turn.kind === "user"
+                    ? false
+                    : isLastTwo;
                 return (
                   <ThreadedTurnView
                     key={i}

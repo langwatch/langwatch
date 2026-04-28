@@ -23,6 +23,26 @@ export interface DecorationSlot {
   className: string;
 }
 
+/**
+ * Identifies a Tag in the query — used by the per-token X button so the
+ * delete handler knows which liqe node to drop. Locations are absolute
+ * positions in the query text (not the @-stripped form, since the editor
+ * never holds `@` characters in the new flow).
+ */
+export interface TokenRef {
+  start: number;
+  end: number;
+  field: string | null;
+  value: string | null;
+}
+
+interface DecorationPlan {
+  slots: DecorationSlot[];
+  tokens: TokenRef[];
+  /** Leading-whitespace offset between original text and the parsed string. */
+  leadingWs: number;
+}
+
 function tagClassName({
   fieldName,
   negated,
@@ -39,16 +59,34 @@ function walkAst(
   node: LiqeQuery,
   negated: boolean,
   baseOffset: number,
-  out: DecorationSlot[],
+  plan: DecorationPlan,
 ): void {
   switch (node.type) {
     case "Tag": {
       const tag = node as TagToken;
-      if (tag.field.type === "ImplicitField") return; // free text — no decoration
-      out.push({
-        from: baseOffset + tag.location.start,
-        to: baseOffset + tag.location.end,
-        className: tagClassName({ fieldName: tag.field.name, negated }),
+      const start = baseOffset + tag.location.start;
+      const end = baseOffset + tag.location.end;
+      const isImplicit = tag.field.type === "ImplicitField";
+      const fieldName = isImplicit ? "" : (tag.field as { name: string }).name;
+      const value =
+        tag.expression.type === "LiteralExpression"
+          ? String(tag.expression.value)
+          : null;
+
+      // Token coords are in @-stripped trimmed-string space — same as what
+      // `removeNodeAtLocation` will see when it re-parses the query.
+      plan.tokens.push({
+        start: tag.location.start,
+        end: tag.location.end,
+        field: isImplicit ? null : fieldName,
+        value,
+      });
+
+      if (isImplicit) return; // free text — no inline accent
+      plan.slots.push({
+        from: start,
+        to: end,
+        className: tagClassName({ fieldName, negated }),
       });
       return;
     }
@@ -56,41 +94,41 @@ function walkAst(
       const unary = node as UnaryOperatorToken;
       const isNeg = unary.operator === "NOT" || unary.operator === "-";
       const kwLen = unary.operator === "NOT" ? 3 : 1;
-      out.push({
+      plan.slots.push({
         from: baseOffset + unary.location.start,
         to: baseOffset + unary.location.start + kwLen,
         className: "filter-keyword filter-keyword-not",
       });
-      walkAst(unary.operand, negated !== isNeg, baseOffset, out);
+      walkAst(unary.operand, negated !== isNeg, baseOffset, plan);
       return;
     }
     case "LogicalExpression": {
       const logic = node as LogicalExpressionToken;
-      walkAst(logic.left, negated, baseOffset, out);
+      walkAst(logic.left, negated, baseOffset, plan);
       if (logic.operator.type === "BooleanOperator") {
         const op = logic.operator;
-        out.push({
+        plan.slots.push({
           from: baseOffset + op.location.start,
           to: baseOffset + op.location.end,
           className: `filter-keyword filter-keyword-${op.operator.toLowerCase()}`,
         });
       }
-      walkAst(logic.right, negated, baseOffset, out);
+      walkAst(logic.right, negated, baseOffset, plan);
       return;
     }
     case "ParenthesizedExpression": {
       const paren = node as ParenthesizedExpressionToken;
-      out.push({
+      plan.slots.push({
         from: baseOffset + paren.location.start,
         to: baseOffset + paren.location.start + 1,
         className: "filter-paren",
       });
-      out.push({
+      plan.slots.push({
         from: baseOffset + paren.location.end - 1,
         to: baseOffset + paren.location.end,
         className: "filter-paren",
       });
-      walkAst(paren.expression, negated, baseOffset, out);
+      walkAst(paren.expression, negated, baseOffset, plan);
       return;
     }
   }
@@ -114,21 +152,51 @@ function regexFallback(text: string, baseOffset: number): DecorationSlot[] {
   return out;
 }
 
+export function buildDecorationPlan(
+  text: string,
+  baseOffset = 0,
+): DecorationPlan {
+  const trimmed = text.trim();
+  if (!trimmed) return { slots: [], tokens: [], leadingWs: 0 };
+  const leadingWs = text.length - text.trimStart().length;
+  try {
+    const ast = liqeParse(trimmed);
+    const plan: DecorationPlan = { slots: [], tokens: [], leadingWs };
+    walkAst(ast, false, baseOffset + leadingWs, plan);
+    return plan;
+  } catch {
+    return {
+      slots: regexFallback(text, baseOffset),
+      tokens: [],
+      leadingWs,
+    };
+  }
+}
+
+/** Backwards-compat shim used by the existing test suite. */
 export function buildDecorationSlots(
   text: string,
   baseOffset = 0,
 ): DecorationSlot[] {
-  const trimmed = text.trim();
-  if (!trimmed) return [];
-  const leadingWs = text.length - text.trimStart().length;
-  try {
-    const ast = liqeParse(trimmed);
-    const slots: DecorationSlot[] = [];
-    walkAst(ast, false, baseOffset + leadingWs, slots);
-    return slots;
-  } catch {
-    return regexFallback(text, baseOffset);
-  }
+  return buildDecorationPlan(text, baseOffset).slots;
+}
+
+const DELETE_DATA_ATTR = "data-filter-delete";
+
+function createDeleteWidget(token: TokenRef): HTMLElement {
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "filter-token-delete";
+  btn.setAttribute(DELETE_DATA_ATTR, "true");
+  btn.setAttribute("contenteditable", "false");
+  btn.setAttribute("aria-label", "Remove this filter");
+  btn.setAttribute("tabindex", "-1");
+  btn.dataset.locStart = String(token.start);
+  btn.dataset.locEnd = String(token.end);
+  if (token.field) btn.dataset.field = token.field;
+  if (token.value !== null) btn.dataset.value = token.value;
+  btn.textContent = "×";
+  return btn;
 }
 
 export const FilterHighlight = Extension.create({
@@ -143,10 +211,21 @@ export const FilterHighlight = Extension.create({
             const decorations: Decoration[] = [];
             state.doc.descendants((node, pos) => {
               if (!node.isText || !node.text) return;
-              for (const slot of buildDecorationSlots(node.text, pos)) {
+              const plan = buildDecorationPlan(node.text, pos);
+              for (const slot of plan.slots) {
                 decorations.push(
                   Decoration.inline(slot.from, slot.to, {
                     class: slot.className,
+                  }),
+                );
+              }
+              for (const token of plan.tokens) {
+                // Token coords are in trimmed-text space; convert to doc pos.
+                const widgetPos = pos + plan.leadingWs + token.end;
+                decorations.push(
+                  Decoration.widget(widgetPos, () => createDeleteWidget(token), {
+                    side: 1,
+                    ignoreSelection: true,
                   }),
                 );
               }

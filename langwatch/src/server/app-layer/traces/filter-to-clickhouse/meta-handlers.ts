@@ -48,11 +48,27 @@ const SCENARIO_VERDICT_BY_LABEL: Record<string, string> = {
   inconclusive: "INCONCLUSIVE",
 };
 
+function translateTraceId(
+  tag: TagToken,
+  negated: boolean,
+  ctx: TranslationContext,
+): string {
+  const value = extractStringValue(tag);
+  validateValueLength(value);
+  const p = nextParam(ctx, "traceId");
+  if (value.includes("*")) {
+    ctx.params[p] = value.replace(/\*/g, "%");
+    return wrap(`TraceId LIKE {${p}:String}`, negated);
+  }
+  ctx.params[p] = value;
+  return wrap(`TraceId = {${p}:String}`, negated);
+}
+
 function makeScenarioColumnHandler(column: string): FieldHandler {
   return (tag, negated, ctx) => {
     const value = extractStringValue(tag);
     validateValueLength(value);
-    const p = nextParam(ctx);
+    const p = nextParam(ctx, column);
     ctx.params[p] = value;
     return wrap(scenarioRunSubquery(`${column} = {${p}:String}`), negated);
   };
@@ -72,7 +88,7 @@ function translateExistence(
     if (!attrKey) {
       throw new FilterParseError("attribute.<key> requires a key after the dot");
     }
-    const p = nextParam(ctx);
+    const p = nextParam(ctx, "attrKey");
     ctx.params[p] = attrKey;
     return wrap(`Attributes[{${p}:String}] != ''`, negated);
   }
@@ -132,7 +148,7 @@ export const META_HANDLERS: Record<string, FieldHandler> = {
   eval: (tag, negated, ctx) => {
     const value = extractStringValue(tag);
     validateValueLength(value);
-    const p = nextParam(ctx);
+    const p = nextParam(ctx, "evaluatorName");
     ctx.params[p] = value;
     return wrap(
       boundedSubquery(
@@ -147,7 +163,7 @@ export const META_HANDLERS: Record<string, FieldHandler> = {
   event: (tag, negated, ctx) => {
     const value = extractStringValue(tag);
     validateValueLength(value);
-    const p = nextParam(ctx);
+    const p = nextParam(ctx, "eventName");
     ctx.params[p] = value;
     return wrap(
       boundedSubquery(
@@ -159,25 +175,52 @@ export const META_HANDLERS: Record<string, FieldHandler> = {
     );
   },
 
-  trace: (tag, negated, ctx) => {
+  trace: (tag, negated, ctx) => translateTraceId(tag, negated, ctx),
+  traceId: (tag, negated, ctx) => translateTraceId(tag, negated, ctx),
+
+  // Prompt IDs are hoisted onto trace_summaries as a JSON array string in
+  // `Attributes['langwatch.prompt_ids']` — every prompt referenced anywhere
+  // in the trace ends up there. We parse it to Array(String) and check
+  // membership; ClickHouse caches the JSONExtract per granule so this is
+  // cheap relative to the rest of the WHERE.
+  prompt: (tag, negated, ctx) => {
     const value = extractStringValue(tag);
     validateValueLength(value);
-    const p = nextParam(ctx);
+    const p = nextParam(ctx, "promptId");
+    ctx.params[p] = value;
+    return wrap(
+      `has(JSONExtract(Attributes['langwatch.prompt_ids'], 'Array(String)'), {${p}:String})`,
+      negated,
+    );
+  },
 
+  spanId: (tag, negated, ctx) => {
+    const value = extractStringValue(tag);
+    validateValueLength(value);
+    const p = nextParam(ctx, "spanId");
     if (value.includes("*")) {
       ctx.params[p] = value.replace(/\*/g, "%");
-      return wrap(`TraceId LIKE {${p}:String}`, negated);
+      return wrap(
+        boundedSubquery(
+          "stored_spans",
+          "StartTime",
+          `SpanId LIKE {${p}:String}`,
+        ),
+        negated,
+      );
     }
-
     ctx.params[p] = value;
-    return wrap(`TraceId = {${p}:String}`, negated);
+    return wrap(
+      boundedSubquery("stored_spans", "StartTime", `SpanId = {${p}:String}`),
+      negated,
+    );
   },
 
   // Direct match on the hoisted attribute. No join.
   scenarioRun: (tag, negated, ctx) => {
     const value = extractStringValue(tag);
     validateValueLength(value);
-    const p = nextParam(ctx);
+    const p = nextParam(ctx, "scenarioRunId");
     ctx.params[p] = value;
     return wrap(`Attributes['scenario.run_id'] = {${p}:String}`, negated);
   },
@@ -195,7 +238,7 @@ export const META_HANDLERS: Record<string, FieldHandler> = {
         `Unknown scenario verdict "${raw}". Valid: success, failure, inconclusive`,
       );
     }
-    const p = nextParam(ctx);
+    const p = nextParam(ctx, "scenarioVerdict");
     ctx.params[p] = mapped;
     return wrap(scenarioRunSubquery(`Verdict = {${p}:String}`), negated);
   },
@@ -209,7 +252,7 @@ export const META_HANDLERS: Record<string, FieldHandler> = {
         `Unknown scenario status "${raw}". Valid: ${Object.keys(SCENARIO_STATUS_BY_LABEL).join(", ")}`,
       );
     }
-    const p = nextParam(ctx);
+    const p = nextParam(ctx, "scenarioStatus");
     ctx.params[p] = mapped;
     return wrap(scenarioRunSubquery(`Status = {${p}:String}`), negated);
   },

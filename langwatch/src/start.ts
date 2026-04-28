@@ -14,6 +14,7 @@ import { createLogger } from "./utils/logger/server";
 import type { Hono } from "hono";
 import { createApiRouter } from "./server/api-router";
 import { serveStaticOrFallback } from "./server/static-handler";
+import { setupTRPCWebSocket } from "./server/websockets/trpc-ws";
 
 const logger = createLogger("langwatch:start");
 
@@ -193,6 +194,11 @@ export const startApp = async (dir = path.dirname(__dirname)) => {
       res.end("internal server error");
     }
   });
+
+  // Bind the tRPC router to a WebSocket transport on the same HTTP server.
+  // Lets high-frequency procedures (presence cursor today) escape the
+  // browser's 6-connection HTTP cap by riding a single long-lived socket.
+  setupTRPCWebSocket(server);
 
   server.once("error", (err) => {
     logger.error({ error: err }, "error occurred on server");

@@ -49,8 +49,11 @@ export function getSuggestionState(
     return { open: true, mode: "value", field, query, tokenStart };
   }
 
-  // Field-mode autocomplete still requires the `@` trigger so we don't pop
-  // the dropdown over every word the user types as free text.
-  if (!hadSigil) return { open: false };
+  // Open field-mode whenever the active token looks like an identifier in
+  // progress. The dropdown is invisible when no field name matches, so this
+  // adds discoverability without spamming the UI for free-text queries.
+  if (!hadSigil && !/^[a-zA-Z][\w]*$/.test(remaining)) {
+    return { open: false };
+  }
   return { open: true, mode: "field", query: remaining, tokenStart };
 }

@@ -66,7 +66,7 @@ describe("handleKey", () => {
     });
 
     describe("when the dropdown is open in value mode with a highlight", () => {
-      it("accepts the highlighted value and inserts a trailing space (no @ in replacement)", () => {
+      it("accepts the highlighted value with no @ and a trailing space in replacement", () => {
         const action = handleKey(
           ctx({
             text: "@status:err",
@@ -308,6 +308,36 @@ describe("handleKey", () => {
       it("returns noop", () => {
         const action = handleKey(ctx({ text: "x", cursorPos: 1 }), "y");
         expect(action).toEqual<KeyAction>({ kind: "noop" });
+      });
+    });
+  });
+
+  // ── Passive identifier-shape suggestions ────────────────────────────────
+
+  describe("given the dropdown is open from a passive identifier-shape token", () => {
+    describe("when Enter is pressed", () => {
+      it("accepts the highlighted field — the dropdown is only visible when something matches", () => {
+        const action = handleKey(
+          ctx({
+            text: "stat",
+            cursorPos: 4,
+            suggestion: {
+              open: true,
+              mode: "field",
+              query: "stat",
+              tokenStart: 0,
+            },
+            highlightedText: "status",
+          }),
+          "Enter",
+        );
+        expect(action).toEqual<KeyAction>({
+          kind: "accept",
+          tokenStart: 0,
+          tokenEnd: 4,
+          replacement: "status:",
+          reopenInValueMode: true,
+        });
       });
     });
   });

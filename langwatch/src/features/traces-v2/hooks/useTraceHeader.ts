@@ -23,6 +23,8 @@ export function useTraceHeader() {
     {
       enabled: !!project?.id && !!traceId,
       staleTime: 300_000,
+      gcTime: 1_800_000,
+      keepPreviousData: true,
     },
   );
 }

@@ -65,6 +65,7 @@ interface EvalRunHistoryEntry {
 }
 
 type EvalEntry = EvalSummary & {
+  evaluationId?: string;
   evaluatorId?: string;
   evaluatorType?: string;
   spanName?: string;
@@ -211,9 +212,13 @@ function EvalCard({
   // message to surface).
   const showErrorPanel =
     status === "error" && hasErrorMessage && eval_.errorMessage !== eval_.reasoning && !!eval_.reasoning;
+  // On errored entries, expose the evaluation/evaluator IDs so support can
+  // grep logs without having to dig into the raw payload.
+  const showErrorIds =
+    status === "error" && (!!eval_.evaluationId || !!eval_.evaluatorId);
   // Whether we have anything that warrants the "Show details" expand.
   const hasExpandableDetails =
-    hasInputs || hasStacktrace || hasLabel || showErrorPanel;
+    hasInputs || hasStacktrace || hasLabel || showErrorPanel || showErrorIds;
   const hasFooterRow =
     !!eval_.spanName || meta.length > 0 || hasExpandableDetails;
 
@@ -352,6 +357,7 @@ function EvalCard({
           hasStacktrace={hasStacktrace}
           hasLabel={hasLabel}
           showErrorPanel={showErrorPanel}
+          showErrorIds={showErrorIds}
           hasExpandableDetails={hasExpandableDetails}
         />
       )}
@@ -369,6 +375,7 @@ function EvalCardFooter({
   hasStacktrace,
   hasLabel,
   showErrorPanel,
+  showErrorIds,
   hasExpandableDetails,
 }: {
   eval_: EvalEntry;
@@ -380,6 +387,7 @@ function EvalCardFooter({
   hasStacktrace: boolean;
   hasLabel: boolean;
   showErrorPanel: boolean;
+  showErrorIds: boolean;
   hasExpandableDetails: boolean;
 }) {
   const [open, setOpen] = useState(false);
@@ -474,6 +482,54 @@ function EvalCardFooter({
               >
                 {eval_.errorMessage}
               </Text>
+            </DetailRow>
+          )}
+          {showErrorIds && (
+            <DetailRow label="IDs">
+              <VStack align="stretch" gap={1}>
+                {eval_.evaluationId && (
+                  <HStack align="flex-start" gap={2} minWidth={0}>
+                    <Text
+                      textStyle="2xs"
+                      fontFamily="mono"
+                      color="fg.subtle"
+                      flexShrink={0}
+                      minWidth="80px"
+                    >
+                      evaluation
+                    </Text>
+                    <Text
+                      textStyle="2xs"
+                      fontFamily="mono"
+                      color="fg"
+                      wordBreak="break-all"
+                    >
+                      {eval_.evaluationId}
+                    </Text>
+                  </HStack>
+                )}
+                {eval_.evaluatorId && (
+                  <HStack align="flex-start" gap={2} minWidth={0}>
+                    <Text
+                      textStyle="2xs"
+                      fontFamily="mono"
+                      color="fg.subtle"
+                      flexShrink={0}
+                      minWidth="80px"
+                    >
+                      evaluator
+                    </Text>
+                    <Text
+                      textStyle="2xs"
+                      fontFamily="mono"
+                      color="fg"
+                      wordBreak="break-all"
+                    >
+                      {eval_.evaluatorId}
+                    </Text>
+                  </HStack>
+                )}
+              </VStack>
             </DetailRow>
           )}
           {hasStacktrace && (

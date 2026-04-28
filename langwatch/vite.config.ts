@@ -80,11 +80,13 @@ export default defineConfig({
     allowedHosts: true,
     port: FRONTEND_PORT,
     strictPort: true,
-    // Proxy API requests to the Hono backend (PORT + 1000)
+    // Proxy API requests to the Hono backend (PORT + 1000). `ws: true`
+    // forwards WebSocket upgrades for the tRPC WS transport at /api/trpc-ws.
     proxy: {
       "/api": {
         target: `http://localhost:${API_PORT}`,
         changeOrigin: true,
+        ws: true,
       },
     },
   },

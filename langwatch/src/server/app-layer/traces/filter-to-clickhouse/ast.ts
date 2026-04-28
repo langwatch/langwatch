@@ -155,8 +155,8 @@ function translateAttributeField(
   }
   const value = extractStringValue(tag);
   validateValueLength(value);
-  const pKey = nextParam(ctx);
-  const pVal = nextParam(ctx);
+  const pKey = nextParam(ctx, "attrKey");
+  const pVal = nextParam(ctx, "attrValue");
   ctx.params[pKey] = attrKey;
   ctx.params[pVal] = value;
   return wrap(
@@ -172,7 +172,7 @@ function translateFreeText(
 ): string {
   const value = extractStringValue(tag);
   validateValueLength(value);
-  const paramName = nextParam(ctx);
+  const paramName = nextParam(ctx, "freeText");
   ctx.params[paramName] = `%${value}%`;
 
   const clause = `(ComputedInput ILIKE {${paramName}:String} OR ComputedOutput ILIKE {${paramName}:String})`;

@@ -5,12 +5,14 @@
  * We also create a few inference helpers for input and output types.
  */
 import {
+  createWSClient,
   httpBatchLink,
   httpLink,
   loggerLink,
   splitLink,
   TRPCClientError,
   createTRPCClient,
+  wsLink,
 } from "@trpc/client";
 import { createTRPCReact } from "@trpc/react-query";
 import {
@@ -38,17 +40,70 @@ const getBaseUrl = () => {
   return `http://localhost:${process.env.PORT ?? 5560}`; // dev SSR should use localhost
 };
 
+/**
+ * Lazy singleton WS client for the tRPC WebSocket transport. The socket
+ * opens on first access; call sites opt their procedure in by passing
+ * `trpc: { context: { useWS: true } }` on the query/mutation.
+ *
+ * Why opt-in? Routing is a property of the call site — typically because
+ * the operation fires often enough that one HTTP request per call would
+ * saturate the browser's 6-connection HTTP/1.1 cap. Encoding that as a
+ * context flag keeps the transport layer free of a hardcoded procedure
+ * list and matches the existing `skipBatch` opt-in pattern below.
+ */
+let cachedWSClient: ReturnType<typeof createWSClient> | null = null;
+function getOrCreateWSClient(): ReturnType<typeof createWSClient> | null {
+  if (typeof window === "undefined") return null;
+  if (cachedWSClient) return cachedWSClient;
+  const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
+  cachedWSClient = createWSClient({
+    url: `${proto}//${window.location.host}/api/trpc-ws`,
+  });
+  return cachedWSClient;
+}
+
 const MAX_RETRIES = 4;
 const HTTP_STATUS_TO_NOT_RETRY = [400, 401, 403, 404, 422, 431];
 
 function createTRPCLinks() {
+  const wsClient = getOrCreateWSClient();
+
+  // Inner HTTP layer: skipBatch context flag picks unbatched httpLink, else
+  // batched httpBatchLink. Same as before.
+  const httpRouting = splitLink({
+    condition(op) {
+      return op.context.skipBatch === true;
+    },
+    true: httpLink({
+      url: `${getBaseUrl()}/api/trpc`,
+    }),
+    false: httpBatchLink({
+      url: `${getBaseUrl()}/api/trpc`,
+      maxURLLength: 4000,
+    }),
+  });
+
+  // Mid layer: callers opt in to the WS transport per-call by setting
+  // `trpc: { context: { useWS: true } }` on a query/mutation. Anything
+  // without that flag falls through to HTTP.
+  const httpOrWsRouting = wsClient
+    ? splitLink({
+        condition(op) {
+          return op.context.useWS === true;
+        },
+        true: wsLink({ client: wsClient }),
+        false: httpRouting,
+      })
+    : httpRouting;
+
   return [
     loggerLink({
       enabled: (opts) =>
         process.env.NODE_ENV === "development" ||
         (opts.direction === "down" && opts.result instanceof Error),
     }),
-    // Split subscriptions to SSE link, everything else to HTTP
+    // Top layer: subscriptions ride the existing SSE link; everything else
+    // goes through the WS-or-HTTP router below.
     splitLink({
       condition(op) {
         return op.type === "subscription";
@@ -59,21 +114,7 @@ function createTRPCLinks() {
         maxReconnectAttempts: 5,
         reconnectDelay: 1000,
       }),
-      false: splitLink({
-        condition(op) {
-          // check for context property `skipBatch`
-          return op.context.skipBatch === true || process.env.NODE_ENV === 'development';
-        },
-        // when condition is true, use normal request
-        true: httpLink({
-          url: `${getBaseUrl()}/api/trpc`,
-        }),
-        // when condition is false, use batching
-        false: httpBatchLink({
-          url: `${getBaseUrl()}/api/trpc`,
-          maxURLLength: 4000,
-        }),
-      }),
+      false: httpOrWsRouting,
     }),
   ];
 }

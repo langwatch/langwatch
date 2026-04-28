@@ -2,6 +2,7 @@ import { EditorContent } from "@tiptap/react";
 import type React from "react";
 import { useEffect, useRef } from "react";
 import { SuggestionDropdown } from "./SuggestionDropdown";
+import { useDynamicValueSuggestions } from "./useDynamicValueSuggestions";
 import { useFilterEditor } from "./useFilterEditor";
 import { useGlobalSlashFocus } from "./useGlobalSlashFocus";
 
@@ -25,10 +26,20 @@ export const ActiveSearchEditor: React.FC<ActiveSearchEditorProps> = ({
   autoFocus,
   onHasContentChange,
 }) => {
-  const { editor, suggestion, hasContent, acceptSuggestion } =
-    useFilterEditor({ queryText, applyQueryText });
+  const {
+    editor,
+    suggestion,
+    hasContent,
+    acceptSuggestion,
+    overrideSuggestionItems,
+  } = useFilterEditor({ queryText, applyQueryText });
 
   useGlobalSlashFocus(editor);
+
+  useDynamicValueSuggestions({
+    state: suggestion.state,
+    override: overrideSuggestionItems,
+  });
 
   const focusedRef = useRef(false);
   useEffect(() => {

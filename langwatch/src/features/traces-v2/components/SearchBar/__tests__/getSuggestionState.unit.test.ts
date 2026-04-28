@@ -92,18 +92,33 @@ describe("getSuggestionState", () => {
       });
     });
 
-    describe("when the cursor sits inside free text with no '@' before it", () => {
-      it("returns closed", () => {
-        expect(getSuggestionState("refund", 6)).toEqual({ open: false });
+    describe("when the cursor sits inside an identifier-shape word with no '@' before it", () => {
+      it("opens passive field-mode autocomplete", () => {
+        // Passive suggestions are filtered to known fields by `getSuggestionItems`,
+        // so the dropdown only renders when at least one field name matches.
+        expect(getSuggestionState("refund", 6)).toEqual({
+          open: true,
+          mode: "field",
+          query: "refund",
+          tokenStart: 0,
+        });
       });
     });
 
     describe("when the user types multi-word free text", () => {
-      it("stays closed at every cursor position", () => {
+      it("opens at each identifier-shape word but closes at the spaces", () => {
         const text = "model is broken";
-        for (let pos = 0; pos <= text.length; pos++) {
-          expect(getSuggestionState(text, pos)).toEqual({ open: false });
+        // pos 0: empty token, closed.
+        expect(getSuggestionState(text, 0)).toEqual({ open: false });
+        // pos 1-5: typing "model" — open with growing query.
+        for (let pos = 1; pos <= 5; pos++) {
+          expect(getSuggestionState(text, pos)).toMatchObject({
+            open: true,
+            mode: "field",
+          });
         }
+        // pos 6: cursor right after the space — empty token, closed.
+        expect(getSuggestionState(text, 6)).toEqual({ open: false });
       });
     });
   });
@@ -143,7 +158,8 @@ describe("getSuggestionState", () => {
     describe("when the cursor sits inside a later @-token but the @ immediately follows another token char (no space)", () => {
       it("returns closed because the active token has no field/sigil shape", () => {
         // "foo@bar" — no separator before the @, so the active token is "foo@bar".
-        // The token doesn't start with `@` and has no `:`, so dropdown stays closed.
+        // The token doesn't start with `@`, has no `:`, and contains a non-identifier
+        // char, so the dropdown stays closed.
         expect(getSuggestionState("foo@bar", 7)).toEqual({ open: false });
       });
     });
@@ -181,9 +197,15 @@ describe("getSuggestionState", () => {
     });
 
     describe("when the cursor sits inside a quoted value after a space inside the quotes", () => {
-      it("returns closed because the space terminates the token", () => {
+      it("opens passive field-mode for the post-space identifier (the active token is no longer the quoted value)", () => {
+        // The space terminates the value-mode token, leaving "po" as the new
+        // active word. Identifier-shape, so passive autocomplete opens —
+        // dropdown is invisible if no fields prefix-match.
         expect(getSuggestionState('@status:"refund po', 18)).toEqual({
-          open: false,
+          open: true,
+          mode: "field",
+          query: "po",
+          tokenStart: 16,
         });
       });
     });

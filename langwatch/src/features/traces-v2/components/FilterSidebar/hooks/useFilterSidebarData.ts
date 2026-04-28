@@ -175,7 +175,10 @@ function partitionDescriptors(descriptors: ReturnType<typeof useTraceFacets>["da
   let attrKeys: AttributeKey[] = [];
 
   for (const d of descriptors) {
-    if (d.kind === "categorical" && d.topValues.length > 0) {
+    if (
+      d.kind === "categorical" &&
+      (d.topValues.length > 0 || FACET_DEFAULTS[d.key])
+    ) {
       cats.push({
         kind: "cat",
         key: d.key,

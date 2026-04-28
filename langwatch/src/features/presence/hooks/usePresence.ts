@@ -40,8 +40,16 @@ export function usePresence({
   const applyEvent = usePresenceStore((s) => s.applyEvent);
   const reset = usePresenceStore((s) => s.reset);
 
-  const updateMutation = api.presence.update.useMutation();
-  const leaveMutation = api.presence.leave.useMutation();
+  // Heartbeat + location updates ride the persistent tRPC WebSocket. The
+  // heartbeat alone fires every 15s per tab; location updates fire on
+  // every span/tab/section change — at multiple-tab scale, the cumulative
+  // HTTP traffic was noticeable. Same opt-in pattern as `presence.cursor`.
+  const updateMutation = api.presence.update.useMutation({
+    trpc: { context: { useWS: true } },
+  });
+  const leaveMutation = api.presence.leave.useMutation({
+    trpc: { context: { useWS: true } },
+  });
 
   const updateRef = useRef(updateMutation.mutateAsync);
   updateRef.current = updateMutation.mutateAsync;
@@ -126,6 +134,23 @@ export function usePresence({
       document.removeEventListener("visibilitychange", onVisibility);
     };
   }, [active, projectId, sessionId]);
+
+  // Hide-toggle: fire `leave` the moment the user goes invisible, instead of
+  // waiting for peers to TTL-evict us. The unmount cleanup below would also
+  // do this when `active` flips false, but going through a dedicated effect
+  // makes the intent legible and isolates it from effect-cleanup ordering.
+  const previouslyHiddenRef = useRef(hidden);
+  useEffect(() => {
+    const wasHidden = previouslyHiddenRef.current;
+    previouslyHiddenRef.current = hidden;
+    if (!hidden || wasHidden) return; // only on false → true transition
+    if (!projectId || !sessionId) return;
+    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+    lastLocationRef.current = null;
+    void leaveRef.current({ projectId, sessionId }).catch(() => {
+      // Ignore — server-side TTL reclaims the session anyway.
+    });
+  }, [hidden, projectId, sessionId]);
 
   // Best-effort leave on tab close / unmount.
   useEffect(() => {

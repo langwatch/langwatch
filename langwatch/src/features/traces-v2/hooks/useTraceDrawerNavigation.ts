@@ -22,11 +22,19 @@ export function useTraceDrawerNavigation() {
       fromTraceId,
       fromViewMode,
       toTraceId,
+      toTimestamp,
       toViewMode,
     }: {
       fromTraceId: string;
       fromViewMode: DrawerViewMode;
       toTraceId: string;
+      /**
+       * Trace's actual occurredAt (ms). Forwarded to the URL as `drawer.t`
+       * so per-trace queries use the same cache key as the prefetch — without
+       * this, jumping between siblings creates a fresh key each time and
+       * re-fetches even when the data is already in the cache.
+       */
+      toTimestamp?: number;
       toViewMode?: DrawerViewMode;
     }) => {
       if (fromTraceId === toTraceId && (toViewMode == null || toViewMode === fromViewMode)) {
@@ -34,7 +42,10 @@ export function useTraceDrawerNavigation() {
       }
       pushTraceHistory({ traceId: fromTraceId, viewMode: fromViewMode });
       if (toViewMode) setViewMode(toViewMode);
-      openDrawer("traceV2Details", { traceId: toTraceId });
+      openDrawer("traceV2Details", {
+        traceId: toTraceId,
+        ...(toTimestamp !== undefined ? { t: String(toTimestamp) } : {}),
+      });
     },
     [openDrawer, pushTraceHistory, setViewMode],
   );

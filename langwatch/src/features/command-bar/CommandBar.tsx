@@ -167,7 +167,11 @@ export function CommandBar() {
     navigator.platform.toUpperCase().indexOf("MAC") >= 0;
 
   // Extract filtered commands and projects using hooks
-  const filteredCommands = useFilteredCommands(query, publicEnv.data?.IS_SAAS);
+  const filteredCommands = useFilteredCommands(
+    query,
+    publicEnv.data?.IS_SAAS,
+    project?.id,
+  );
   const filteredProjects = useFilteredProjects(
     query,
     organizations,
@@ -190,6 +194,7 @@ export function CommandBar() {
     idResult,
     groupedItems,
     project?.slug,
+    project?.id,
   );
 
   // Easter egg effects

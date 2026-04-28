@@ -4,6 +4,8 @@ import { getSuggestionItems } from "./suggestionItems";
 export interface SuggestionUIState {
   state: SuggestionState;
   items: string[];
+  /** Per-item occurrence counts when items come from a DB-backed facet. */
+  itemCounts?: Record<string, number>;
   selectedIndex: number;
 }
 

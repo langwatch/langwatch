@@ -41,8 +41,15 @@ export function extractNumericValue(tag: TagToken): number {
   return num;
 }
 
-export function nextParam(ctx: TranslationContext): string {
-  const name = `f${ctx.paramCounter}`;
+/**
+ * Generate a unique parameter name for the ClickHouse SDK to bind. Pass a
+ * semantic `base` (e.g. `"traceId"`) so the resulting query reads naturally —
+ * `WHERE TraceId = {traceId_0:String}` instead of `{f0:String}`. The trailing
+ * counter keeps names unique when the same field appears multiple times in
+ * one query.
+ */
+export function nextParam(ctx: TranslationContext, base = "f"): string {
+  const name = `${base}${base === "f" ? "" : "_"}${ctx.paramCounter}`;
   ctx.paramCounter++;
   return name;
 }

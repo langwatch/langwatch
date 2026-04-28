@@ -347,7 +347,7 @@ export const FACET_REGISTRY: readonly FacetDefinition[] = [
     expression: "Status",
   },
   {
-    key: "evaluatorPassed",
+    key: "evaluatorVerdict",
     kind: "categorical",
     label: "Evaluator Verdict",
     group: "evaluation",

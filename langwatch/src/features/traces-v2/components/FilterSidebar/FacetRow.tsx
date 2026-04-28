@@ -60,16 +60,13 @@ export const FacetRow = memo(function FacetRow({
       width="full"
       paddingY={1}
       paddingLeft={1.5}
-      paddingRight={2}
+      paddingRight={0}
       cursor="pointer"
       textAlign="left"
       borderRadius="sm"
       overflow="hidden"
       background={isActive ? subtleBg : "transparent"}
       borderWidth={0}
-      borderRightWidth="2px"
-      borderRightStyle="solid"
-      borderRightColor={isActive ? solidBar : "transparent"}
       data-state={state}
       onClick={() => onToggle(item.value)}
       transition="background 120ms ease, border-color 120ms ease"
@@ -97,6 +94,17 @@ export const FacetRow = memo(function FacetRow({
         pointerEvents="none"
         transition="width 120ms ease"
       />
+      {isActive && (
+        <Box
+          position="absolute"
+          top={0}
+          right={0}
+          bottom={0}
+          width="2px"
+          bg={solidBar}
+          pointerEvents="none"
+        />
+      )}
       <HStack gap={1.5} position="relative" minWidth={0} zIndex={1}>
         <Box
           data-facet-orb

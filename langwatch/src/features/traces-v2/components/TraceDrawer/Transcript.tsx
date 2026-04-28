@@ -104,6 +104,14 @@ export type ConversationTurn =
 export type ChatLayout = "thread" | "bubbles";
 export const VIRTUALIZE_AT = 20;
 
+/**
+ * Above this turn count we collapse everything except the last turn by
+ * default — short convos still benefit from showing the last couple
+ * expanded; long convos drown the user in collapsed noise unless we're
+ * aggressive about hiding.
+ */
+export const LONG_THREAD_THRESHOLD = 6;
+
 // ---------------------------------------------------------------------------
 // Detection / parsing helpers
 // ---------------------------------------------------------------------------
@@ -119,12 +127,36 @@ export function looksLikeXml(s: string): boolean {
 }
 
 /**
- * Format raw text as markdown, wrapping in a fenced code block if it's
- * detectably XML so Shiki highlights it.
+ * Heuristic test for "this whole string is a JSON document". We only fence
+ * when the entire content parses — a JSON snippet embedded in prose stays
+ * as-is so the prose still renders normally.
+ */
+export function looksLikeJson(s: string): boolean {
+  const t = s.trim();
+  if (t.length === 0) return false;
+  if (t[0] !== "{" && t[0] !== "[") return false;
+  const last = t[t.length - 1];
+  if (last !== "}" && last !== "]") return false;
+  try {
+    JSON.parse(t);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Format raw text as markdown, wrapping it in a fenced code block when the
+ * content is recognisably one of: XML, a JSON document. This is what gives
+ * the conversation bubbles syntax-highlighted code snippets via the
+ * existing `RenderedMarkdown` → Shiki pipeline.
  */
 export function asMarkdownBody(content: string): string {
   if (looksLikeXml(content)) {
     return "```xml\n" + content + "\n```";
+  }
+  if (looksLikeJson(content)) {
+    return "```json\n" + tryPrettyJson(content) + "\n```";
   }
   return content;
 }
@@ -1946,7 +1978,13 @@ export function VirtualizedChatList({
         {virtualizer.getVirtualItems().map((virtualRow) => {
           const i = virtualRow.index;
           const turn = turns[i]!;
-          const defaultExpanded = i >= turns.length - 2;
+          // For long conversations, default to only the last turn expanded —
+          // expanding the last 2 (or all of them on shorter convos) buries
+          // the user in noise. Tuned at the same threshold as virtualization.
+          const isLong = turns.length > LONG_THREAD_THRESHOLD;
+          const defaultExpanded = isLong
+            ? i === turns.length - 1
+            : i >= turns.length - 2;
           return (
             <Box
               key={virtualRow.key}

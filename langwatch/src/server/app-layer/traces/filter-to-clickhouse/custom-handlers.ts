@@ -11,7 +11,7 @@ export const CUSTOM_FACET_HANDLERS: Record<string, FieldHandler> = {
   model: (tag, negated, ctx) => {
     const value = extractStringValue(tag);
     validateValueLength(value);
-    const p = nextParam(ctx);
+    const p = nextParam(ctx, "model");
 
     if (value.includes("*")) {
       ctx.params[p] = value.replace(/\*/g, "%");
@@ -28,7 +28,7 @@ export const CUSTOM_FACET_HANDLERS: Record<string, FieldHandler> = {
   label: (tag, negated, ctx) => {
     const value = extractStringValue(tag);
     validateValueLength(value);
-    const p = nextParam(ctx);
+    const p = nextParam(ctx, "label");
     ctx.params[p] = value;
     return wrap(
       `arrayExists(x -> trim(BOTH '"' FROM x) = {${p}:String}, JSONExtractArrayRaw(Attributes['langwatch.labels']))`,
@@ -39,7 +39,7 @@ export const CUSTOM_FACET_HANDLERS: Record<string, FieldHandler> = {
   evaluator: (tag, negated, ctx) => {
     const value = extractStringValue(tag);
     validateValueLength(value);
-    const p = nextParam(ctx);
+    const p = nextParam(ctx, "evaluatorId");
     ctx.params[p] = value;
     return wrap(
       boundedSubquery(

@@ -46,6 +46,10 @@ function acceptAction(
     kind: "accept",
     tokenStart,
     tokenEnd,
+    // Trailing space lets the user start the next clause without manually
+    // separating, and visually pushes the cursor past the per-token X widget.
+    // The space-swallow rule in `useFilterEditor` handles any redundant
+    // space the user types defensively.
     replacement: `${ctx.suggestion.field}${FIELD_VALUE_SEPARATOR}${highlighted} `,
     reopenInValueMode: false,
   };
@@ -57,7 +61,6 @@ export function handleKey(ctx: EditorContext, key: string): KeyAction {
       const accept = acceptAction(ctx, ctx.highlightedText);
       if (accept) return accept;
     }
-    // No suggestion to accept on Tab — let the browser handle it (focus moves out, blur submits).
     if (key === "Tab") return { kind: "noop" };
     return { kind: "submit", text: ctx.text };
   }
