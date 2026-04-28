@@ -1,9 +1,5 @@
 import { z } from "zod";
 
-// ---------------------------------------------------------------------------
-// Span Insert (write path)
-// ---------------------------------------------------------------------------
-
 export const spanInsertDataSchema = z.object({
   id: z.string(),
   tenantId: z.string(),
@@ -46,10 +42,6 @@ export const spanInsertDataSchema = z.object({
 });
 
 export type SpanInsertData = z.infer<typeof spanInsertDataSchema>;
-
-// ---------------------------------------------------------------------------
-// Trace Summary (write + read)
-// ---------------------------------------------------------------------------
 
 export const traceSummaryDataSchema = z.object({
   traceId: z.string(),

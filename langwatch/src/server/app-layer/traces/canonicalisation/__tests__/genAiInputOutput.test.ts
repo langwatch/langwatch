@@ -1,18 +1,13 @@
 import { describe, expect, it } from "vitest";
-import type { NormalizedSpan } from "../../../../event-sourcing/pipelines/trace-processing/schemas/spans";
 import { CanonicalizeSpanAttributesService } from "../canonicalizeSpanAttributesService";
+import { makeStubSpan } from "./_helpers";
 
 const service = new CanonicalizeSpanAttributesService();
 
-/** Minimal span context for canonicalize() */
-const stubSpan: Pick<
-  NormalizedSpan,
-  "name" | "kind" | "instrumentationScope"
-> = {
+const stubSpan = makeStubSpan({
   name: "chat claude-opus-4-6",
-  kind: "CLIENT",
   instrumentationScope: { name: "openclaw", version: "1.0.0" },
-} as any;
+});
 
 describe("CanonicalizeSpanAttributesService", () => {
   describe("when span has gen_ai.input.messages and gen_ai.output.messages", () => {
@@ -66,7 +61,7 @@ describe("CanonicalizeSpanAttributesService", () => {
           "gen_ai.usage.output_tokens": 25,
         },
         [],
-        stubSpan as any,
+        stubSpan,
       );
 
       // gen_ai.input.messages must survive as-is
@@ -108,7 +103,7 @@ describe("CanonicalizeSpanAttributesService", () => {
           "gen_ai.output.messages": outputMessages,
         },
         [],
-        stubSpan as any,
+        stubSpan,
       );
 
       // System messages stripped; only non-system messages preserved
@@ -134,10 +129,10 @@ describe("CanonicalizeSpanAttributesService", () => {
           "gen_ai.tool.call.id": "call_abc123",
         },
         [],
-        {
+        makeStubSpan({
           ...stubSpan,
           name: "get_weather",
-        } as any,
+        }),
       );
 
       expect(result.attributes["langwatch.span.type"]).toBe("tool");
@@ -157,7 +152,7 @@ describe("CanonicalizeSpanAttributesService", () => {
           ]),
         },
         [],
-        stubSpan as any,
+        stubSpan,
       );
 
       // gen_ai.input.messages wins over gen_ai.prompt

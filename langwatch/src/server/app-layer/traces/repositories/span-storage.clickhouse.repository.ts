@@ -9,12 +9,217 @@ import type { ElasticSearchEvent, Span } from "~/server/tracer/types";
 import { createLogger } from "~/utils/logger/server";
 import type { SpanInsertData } from "../types";
 import type {
+  OccurredAtHint,
   SpanResourceInfo,
   SpanStorageRepository,
   SpanSummaryRow,
 } from "./span-storage.repository";
 
 const TABLE_NAME = "stored_spans" as const;
+
+/**
+ * `stored_spans` is partitioned by `toYearWeek(StartTime)`. When the caller
+ * passes an approximate trace timestamp we narrow the scan to a ±2-day
+ * window around it — this keeps drawer reads on the warm partition tier
+ * instead of walking every weekly partition (incl. cold S3) on every query.
+ *
+ * Generous on purpose: long-running traces and clock skew should still hit
+ * the hinted window. If they don't, callers retry without the hint.
+ */
+const PARTITION_WINDOW_MS = 2 * 24 * 60 * 60 * 1000;
+
+interface PartitionWindow {
+  fromMs: number;
+  toMs: number;
+}
+
+interface PartitionFragment {
+  sqlAnd: string;
+  sqlAndInner: string;
+  params: Record<string, unknown>;
+}
+
+function partitionWindowFor(hint: OccurredAtHint | undefined): PartitionWindow | undefined {
+  if (hint?.occurredAtMs === undefined) return undefined;
+  return {
+    fromMs: hint.occurredAtMs - PARTITION_WINDOW_MS,
+    toMs: hint.occurredAtMs + PARTITION_WINDOW_MS,
+  };
+}
+
+function partitionFragment(window: PartitionWindow | undefined): PartitionFragment {
+  if (!window) {
+    return { sqlAnd: "", sqlAndInner: "", params: {} };
+  }
+  return {
+    sqlAnd:
+      "AND StartTime >= fromUnixTimestamp64Milli({fromMs:Int64}) " +
+      "AND StartTime <= fromUnixTimestamp64Milli({toMs:Int64})",
+    sqlAndInner:
+      "AND StartTime >= fromUnixTimestamp64Milli({fromMs:Int64}) " +
+      "AND StartTime <= fromUnixTimestamp64Milli({toMs:Int64})",
+    params: { fromMs: window.fromMs, toMs: window.toMs },
+  };
+}
+
+/**
+ * Run a hinted query first; if the hint window misses (e.g. long-running
+ * trace, stale URL hint, clock skew), fall back to an unconstrained scan.
+ * Avoids the slow path on the happy path while keeping correctness when
+ * hints are wrong.
+ */
+async function withPartitionHint<T>(
+  hint: OccurredAtHint | undefined,
+  isEmpty: (result: T) => boolean,
+  run: (window: PartitionWindow | undefined) => Promise<T>,
+): Promise<T> {
+  const window = partitionWindowFor(hint);
+  if (!window) return run(undefined);
+  const hinted = await run(window);
+  if (!isEmpty(hinted)) return hinted;
+  return run(undefined);
+}
+
+/**
+ * Full-span column projection used by every reader that returns `Span[]`.
+ * Defined once so a column rename in `stored_spans` lands in one place.
+ *
+ * Heavy columns (`SpanAttributes`, `Events.*` arrays, `Links.*` arrays) are
+ * intentional — they're what callers need. Trim only when adding a new
+ * reader that doesn't need them.
+ */
+const FULL_SPAN_SELECT = `
+  SpanId,
+  TraceId,
+  TenantId,
+  ParentSpanId,
+  ParentTraceId,
+  ParentIsRemote,
+  Sampled,
+  toUnixTimestamp64Milli(StartTime) AS StartTimeMs,
+  toUnixTimestamp64Milli(EndTime) AS EndTimeMs,
+  DurationMs,
+  SpanName,
+  SpanKind,
+  ResourceAttributes,
+  SpanAttributes,
+  StatusCode,
+  StatusMessage,
+  ScopeName,
+  ScopeVersion,
+  arrayMap(x -> toUnixTimestamp64Milli(x), \`Events.Timestamp\`) AS Events_Timestamp,
+  \`Events.Name\` AS Events_Name,
+  \`Events.Attributes\` AS Events_Attributes,
+  \`Links.TraceId\` AS Links_TraceId,
+  \`Links.SpanId\` AS Links_SpanId,
+  \`Links.Attributes\` AS Links_Attributes
+`;
+
+/**
+ * Light projection used by readers that only need the span tree shape
+ * (waterfall/flame, span list). Avoids reading heavy `SpanAttributes`,
+ * `Events.*`, and `Links.*` columns. Map subscripts (`['key']`) read a
+ * single value out of the Map without materializing the whole column.
+ */
+const SUMMARY_SPAN_SELECT = `
+  SpanId,
+  ParentSpanId,
+  SpanName,
+  DurationMs,
+  StatusCode,
+  SpanAttributes['langwatch.span.type'] AS SpanType,
+  SpanAttributes['gen_ai.request.model'] AS Model,
+  toUnixTimestamp64Milli(StartTime) AS StartTimeMs
+`;
+
+/**
+ * IN-tuple dedup subquery body. Renders the inner `SELECT … GROUP BY` that
+ * picks the latest version (max UpdatedAt) per spanId. Caller assembles the
+ * surrounding `AND (TenantId, TraceId, SpanId, UpdatedAt) IN (…)`.
+ *
+ * Kept as a function so optional extra predicates (partition window,
+ * sinceStartTimeMs) are applied symmetrically in inner + outer scopes —
+ * essential because the dedup must see the same row set as the outer scan.
+ */
+function dedupInTuple(extraInnerWhere: string): string {
+  return `(TenantId, TraceId, SpanId, UpdatedAt) IN (
+    SELECT TenantId, TraceId, SpanId, max(UpdatedAt)
+    FROM ${TABLE_NAME}
+    WHERE TenantId = {tenantId:String}
+      AND TraceId = {traceId:String}
+      ${extraInnerWhere}
+    GROUP BY TenantId, TraceId, SpanId
+  )`;
+}
+
+interface SpanSummaryQueryRow {
+  SpanId: string;
+  ParentSpanId: string | null;
+  SpanName: string;
+  DurationMs: number;
+  StatusCode: number | null;
+  SpanType: string;
+  Model: string;
+  StartTimeMs: number;
+}
+
+function mapSpanSummaryRow(row: SpanSummaryQueryRow): SpanSummaryRow {
+  return {
+    spanId: row.SpanId,
+    parentSpanId: row.ParentSpanId,
+    spanName: row.SpanName,
+    durationMs: Number(row.DurationMs),
+    statusCode: row.StatusCode,
+    spanType: row.SpanType || null,
+    model: row.Model || null,
+    startTimeMs: Number(row.StartTimeMs),
+  };
+}
+
+interface EventRow {
+  event_id: string;
+  trace_id: string;
+  project_id: string;
+  started_at: string | number;
+  event_type: string;
+  attributes: Record<string, string>;
+}
+
+function mapEventRow(row: EventRow): ElasticSearchEvent {
+  const startedAt =
+    typeof row.started_at === "string"
+      ? parseInt(row.started_at, 10)
+      : row.started_at;
+
+  const metrics: Array<{ key: string; value: number }> = [];
+  const eventDetails: Array<{ key: string; value: string }> = [];
+
+  for (const [key, value] of Object.entries(row.attributes)) {
+    const isMetricKey =
+      key === "vote" || key === "score" ||
+      key.startsWith("metrics.") || key.startsWith("event.metrics.");
+    if (isMetricKey) {
+      const metricKey = key.replace(/^(event\.)?metrics\./, "");
+      metrics.push({ key: metricKey, value: parseFloat(value) || 0 });
+    } else {
+      eventDetails.push({ key, value });
+    }
+  }
+
+  return {
+    event_id: row.event_id,
+    event_type: row.event_type,
+    project_id: row.project_id,
+    trace_id: row.trace_id,
+    timestamps: {
+      started_at: startedAt,
+      inserted_at: startedAt,
+      updated_at: startedAt,
+    },
+    metrics,
+    event_details: eventDetails,
+  };
+}
 
 /**
  * Matches strings that look like decimal numbers (including scientific notation).
@@ -326,59 +531,44 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     }
   }
 
-  async getSpansByTraceId({ tenantId, traceId }: { tenantId: string; traceId: string }): Promise<Span[]> {
+  async getSpansByTraceId({
+    tenantId,
+    traceId,
+    occurredAtMs,
+  }: {
+    tenantId: string;
+    traceId: string;
+  } & OccurredAtHint): Promise<Span[]> {
     EventUtils.validateTenantId(
       { tenantId },
       "SpanStorageClickHouseRepository.getSpansByTraceId",
     );
 
     try {
-      const client = await this.resolveClient(tenantId);
-      const result = await client.query({
-        query: `
-          SELECT
-            SpanId,
-            TraceId,
-            TenantId,
-            ParentSpanId,
-            ParentTraceId,
-            ParentIsRemote,
-            Sampled,
-            toUnixTimestamp64Milli(StartTime) AS StartTimeMs,
-            toUnixTimestamp64Milli(EndTime) AS EndTimeMs,
-            DurationMs,
-            SpanName,
-            SpanKind,
-            ResourceAttributes,
-            SpanAttributes,
-            StatusCode,
-            StatusMessage,
-            ScopeName,
-            ScopeVersion,
-            arrayMap(x -> toUnixTimestamp64Milli(x), \`Events.Timestamp\`) AS Events_Timestamp,
-            \`Events.Name\` AS Events_Name,
-            \`Events.Attributes\` AS Events_Attributes,
-            \`Links.TraceId\` AS Links_TraceId,
-            \`Links.SpanId\` AS Links_SpanId,
-            \`Links.Attributes\` AS Links_Attributes
-          FROM ${TABLE_NAME}
-          WHERE TenantId = {tenantId:String}
-            AND TraceId = {traceId:String}
-            AND (TenantId, TraceId, SpanId, StartTime) IN (
-              SELECT TenantId, TraceId, SpanId, max(StartTime)
+      return await withPartitionHint<Span[]>(
+        { occurredAtMs },
+        (rows) => rows.length === 0,
+        async (window) => {
+          const partition = partitionFragment(window);
+          const client = await this.resolveClient(tenantId);
+          const result = await client.query({
+            query: `
+              SELECT ${FULL_SPAN_SELECT}
               FROM ${TABLE_NAME}
               WHERE TenantId = {tenantId:String}
                 AND TraceId = {traceId:String}
-              GROUP BY TenantId, TraceId, SpanId
-            )
-          ORDER BY StartTimeMs ASC
-        `,
-        query_params: { tenantId, traceId },
-        format: "JSONEachRow",
-      });
+                ${partition.sqlAnd}
+                AND ${dedupInTuple(partition.sqlAndInner)}
+              ORDER BY StartTimeMs ASC
+            `,
+            query_params: { tenantId, traceId, ...partition.params },
+            format: "JSONEachRow",
+          });
 
-      const rows = (await result.json()) as FullSpanRow[];
-      return mapNormalizedSpansToSpans(rows.map(mapChRowToNormalized));
+          const rows = (await result.json()) as FullSpanRow[];
+          return mapNormalizedSpansToSpans(rows.map(mapChRowToNormalized));
+        },
+      );
     } catch (error) {
       logger.error(
         {
@@ -392,157 +582,179 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     }
   }
 
-  async getSpanResourcesByTraceId({
+  async getSpanByIds({
     tenantId,
     traceId,
+    spanId,
+    occurredAtMs,
   }: {
     tenantId: string;
     traceId: string;
-  }): Promise<SpanResourceInfo[]> {
+    spanId: string;
+  } & OccurredAtHint): Promise<Span | null> {
     EventUtils.validateTenantId(
       { tenantId },
-      "SpanStorageClickHouseRepository.getSpanResourcesByTraceId",
+      "SpanStorageClickHouseRepository.getSpanByIds",
     );
 
     try {
-      const client = await this.resolveClient(tenantId);
-      const result = await client.query({
-        query: `
-          SELECT
-            SpanId,
-            ParentSpanId,
-            toUnixTimestamp64Milli(StartTime) AS StartTimeMs,
-            ResourceAttributes,
-            ScopeName,
-            ScopeVersion
-          FROM ${TABLE_NAME}
-          WHERE TenantId = {tenantId:String}
-            AND TraceId = {traceId:String}
-            AND (TenantId, TraceId, SpanId, StartTime) IN (
-              SELECT TenantId, TraceId, SpanId, max(StartTime)
+      return await withPartitionHint<Span | null>(
+        { occurredAtMs },
+        (span) => span === null,
+        async (window) => {
+          const partition = partitionFragment(window);
+          const client = await this.resolveClient(tenantId);
+          // Single-span fetch: WHERE pins (TenantId, TraceId, SpanId) — the
+          // primary key prefix — so we hit a tiny granule range. With at most
+          // a handful of versions per spanId, ORDER BY UpdatedAt DESC LIMIT 1
+          // is cheaper than the IN-tuple dedup the multi-row paths need.
+          const result = await client.query({
+            query: `
+              SELECT ${FULL_SPAN_SELECT}
               FROM ${TABLE_NAME}
               WHERE TenantId = {tenantId:String}
                 AND TraceId = {traceId:String}
-              GROUP BY TenantId, TraceId, SpanId
-            )
-          ORDER BY StartTimeMs ASC
-        `,
-        query_params: { tenantId, traceId },
-        format: "JSONEachRow",
-      });
+                AND SpanId = {spanId:String}
+                ${partition.sqlAnd}
+              ORDER BY UpdatedAt DESC
+              LIMIT 1
+            `,
+            query_params: { tenantId, traceId, spanId, ...partition.params },
+            format: "JSONEachRow",
+          });
 
-      const rows = (await result.json()) as Array<{
-        SpanId: string;
-        ParentSpanId: string | null;
-        StartTimeMs: number;
-        ResourceAttributes: Record<string, string>;
-        ScopeName: string | null;
-        ScopeVersion: string | null;
-      }>;
-
-      return rows.map((row) => ({
-        spanId: row.SpanId,
-        parentSpanId: row.ParentSpanId,
-        startTimeMs: row.StartTimeMs,
-        resourceAttributes: ensureStringRecord(row.ResourceAttributes),
-        scopeName: row.ScopeName ?? null,
-        scopeVersion: row.ScopeVersion ?? null,
-      }));
+          const rows = (await result.json()) as FullSpanRow[];
+          if (rows.length === 0) return null;
+          const [span] = mapNormalizedSpansToSpans(rows.map(mapChRowToNormalized));
+          return span ?? null;
+        },
+      );
     } catch (error) {
       logger.error(
         {
           tenantId,
           traceId,
+          spanId,
           error: error instanceof Error ? error.message : String(error),
         },
-        "Failed to get span resources by trace ID from ClickHouse",
+        "Failed to get span by ids from ClickHouse",
       );
       throw error;
     }
   }
 
-  async getEventsByTraceId({ tenantId, traceId }: { tenantId: string; traceId: string }): Promise<ElasticSearchEvent[]> {
+  async findSpanResourcesByTraceId({
+    tenantId,
+    traceId,
+    occurredAtMs,
+  }: {
+    tenantId: string;
+    traceId: string;
+  } & OccurredAtHint): Promise<SpanResourceInfo[]> {
+    EventUtils.validateTenantId(
+      { tenantId },
+      "SpanStorageClickHouseRepository.findSpanResourcesByTraceId",
+    );
+
+    return withPartitionHint<SpanResourceInfo[]>(
+      { occurredAtMs },
+      (rows) => rows.length === 0,
+      async (window) => {
+        const partition = partitionFragment(window);
+        const client = await this.resolveClient(tenantId);
+        // Light projection: only the resource/scope columns plus the bits
+        // needed for ordering. SpanAttributes/Events/Links are heavy and
+        // unrelated to OTel resource info, so don't read them.
+        const result = await client.query({
+          query: `
+            SELECT
+              SpanId,
+              ParentSpanId,
+              toUnixTimestamp64Milli(StartTime) AS StartTimeMs,
+              ResourceAttributes,
+              ScopeName,
+              ScopeVersion
+            FROM ${TABLE_NAME}
+            WHERE TenantId = {tenantId:String}
+              AND TraceId = {traceId:String}
+              ${partition.sqlAnd}
+              AND ${dedupInTuple(partition.sqlAndInner)}
+            ORDER BY StartTimeMs ASC
+          `,
+          query_params: { tenantId, traceId, ...partition.params },
+          format: "JSONEachRow",
+        });
+
+        const rows = (await result.json()) as Array<{
+          SpanId: string;
+          ParentSpanId: string | null;
+          StartTimeMs: number;
+          ResourceAttributes: Record<string, string>;
+          ScopeName: string | null;
+          ScopeVersion: string | null;
+        }>;
+
+        return rows.map((row) => ({
+          spanId: row.SpanId,
+          parentSpanId: row.ParentSpanId,
+          startTimeMs: row.StartTimeMs,
+          resourceAttributes: ensureStringRecord(row.ResourceAttributes),
+          scopeName: row.ScopeName ?? null,
+          scopeVersion: row.ScopeVersion ?? null,
+        }));
+      },
+    );
+  }
+
+  async getEventsByTraceId({
+    tenantId,
+    traceId,
+    occurredAtMs,
+  }: {
+    tenantId: string;
+    traceId: string;
+  } & OccurredAtHint): Promise<ElasticSearchEvent[]> {
     EventUtils.validateTenantId(
       { tenantId },
       "SpanStorageClickHouseRepository.getEventsByTraceId",
     );
 
     try {
-      const client = await this.resolveClient(tenantId);
-      const result = await client.query({
-        query: `
-          SELECT
-            SpanId AS event_id,
-            TraceId AS trace_id,
-            TenantId AS project_id,
-            toUnixTimestamp64Milli(event_timestamp) AS started_at,
-            event_name AS event_type,
-            event_attrs AS attributes
-          FROM ${TABLE_NAME}
-          WHERE TenantId = {tenantId:String}
-            AND TraceId = {traceId:String}
-            AND (TenantId, TraceId, SpanId, StartTime) IN (
-              SELECT TenantId, TraceId, SpanId, max(StartTime)
+      return await withPartitionHint<ElasticSearchEvent[]>(
+        { occurredAtMs },
+        (rows) => rows.length === 0,
+        async (window) => {
+          const partition = partitionFragment(window);
+          const client = await this.resolveClient(tenantId);
+          const result = await client.query({
+            query: `
+              SELECT
+                SpanId AS event_id,
+                TraceId AS trace_id,
+                TenantId AS project_id,
+                toUnixTimestamp64Milli(event_timestamp) AS started_at,
+                event_name AS event_type,
+                event_attrs AS attributes
               FROM ${TABLE_NAME}
               WHERE TenantId = {tenantId:String}
                 AND TraceId = {traceId:String}
-              GROUP BY TenantId, TraceId, SpanId
-            )
-          ARRAY JOIN
-            "Events.Timestamp" AS event_timestamp,
-            "Events.Name" AS event_name,
-            "Events.Attributes" AS event_attrs
-          WHERE event_name != 'exception'
-          ORDER BY event_timestamp DESC
-        `,
-        query_params: { tenantId, traceId },
-        format: "JSONEachRow",
-      });
+                ${partition.sqlAnd}
+                AND ${dedupInTuple(partition.sqlAndInner)}
+              ARRAY JOIN
+                "Events.Timestamp" AS event_timestamp,
+                "Events.Name" AS event_name,
+                "Events.Attributes" AS event_attrs
+              WHERE event_name != 'exception'
+              ORDER BY event_timestamp DESC
+            `,
+            query_params: { tenantId, traceId, ...partition.params },
+            format: "JSONEachRow",
+          });
 
-      const rows = (await result.json()) as Array<{
-        event_id: string;
-        trace_id: string;
-        project_id: string;
-        started_at: string | number;
-        event_type: string;
-        attributes: Record<string, string>;
-      }>;
-
-      return rows.map((row) => {
-        const startedAt =
-          typeof row.started_at === "string"
-            ? parseInt(row.started_at, 10)
-            : row.started_at;
-
-        const metrics: Array<{ key: string; value: number }> = [];
-        const eventDetails: Array<{ key: string; value: string }> = [];
-
-        for (const [key, value] of Object.entries(row.attributes)) {
-          const isMetricKey =
-            key === "vote" || key === "score" ||
-            key.startsWith("metrics.") || key.startsWith("event.metrics.");
-          if (isMetricKey) {
-            const metricKey = key.replace(/^(event\.)?metrics\./, "");
-            metrics.push({ key: metricKey, value: parseFloat(value) || 0 });
-          } else {
-            eventDetails.push({ key, value });
-          }
-        }
-
-        return {
-          event_id: row.event_id,
-          event_type: row.event_type,
-          project_id: row.project_id,
-          trace_id: row.trace_id,
-          timestamps: {
-            started_at: startedAt,
-            inserted_at: startedAt,
-            updated_at: startedAt,
-          },
-          metrics,
-          event_details: eventDetails,
-        };
-      });
+          const rows = (await result.json()) as EventRow[];
+          return rows.map(mapEventRow);
+        },
+      );
     } catch (error) {
       logger.error(
         {
@@ -556,73 +768,116 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     }
   }
 
-  async getSpanSummaryByTraceId({ tenantId, traceId }: { tenantId: string; traceId: string }): Promise<SpanSummaryRow[]> {
+  async getSpanEvents({
+    tenantId,
+    traceId,
+    spanId,
+    occurredAtMs,
+  }: {
+    tenantId: string;
+    traceId: string;
+    spanId: string;
+  } & OccurredAtHint): Promise<ElasticSearchEvent[]> {
     EventUtils.validateTenantId(
       { tenantId },
-      "SpanStorageClickHouseRepository.getSpanSummaryByTraceId",
+      "SpanStorageClickHouseRepository.getSpanEvents",
     );
 
     try {
-      const client = await this.resolveClient(tenantId);
-      const result = await client.query({
-        query: `
-          SELECT
-            SpanId,
-            ParentSpanId,
-            SpanName,
-            DurationMs,
-            StatusCode,
-            SpanAttributes['langwatch.span.type'] AS SpanType,
-            SpanAttributes['gen_ai.request.model'] AS Model,
-            toUnixTimestamp64Milli(StartTime) AS StartTimeMs
-          FROM ${TABLE_NAME}
-          WHERE TenantId = {tenantId:String}
-            AND TraceId = {traceId:String}
-            AND (TenantId, TraceId, SpanId, StartTime) IN (
-              SELECT TenantId, TraceId, SpanId, max(StartTime)
-              FROM ${TABLE_NAME}
-              WHERE TenantId = {tenantId:String}
-                AND TraceId = {traceId:String}
-              GROUP BY TenantId, TraceId, SpanId
-            )
-          ORDER BY StartTimeMs ASC
-        `,
-        query_params: { tenantId, traceId },
-        format: "JSONEachRow",
-      });
+      return await withPartitionHint<ElasticSearchEvent[]>(
+        { occurredAtMs },
+        (rows) => rows.length === 0,
+        async (window) => {
+          const partition = partitionFragment(window);
+          const client = await this.resolveClient(tenantId);
+          const result = await client.query({
+            query: `
+              SELECT
+                SpanId AS event_id,
+                TraceId AS trace_id,
+                TenantId AS project_id,
+                toUnixTimestamp64Milli(event_timestamp) AS started_at,
+                event_name AS event_type,
+                event_attrs AS attributes
+              FROM (
+                SELECT
+                  TenantId, TraceId, SpanId,
+                  "Events.Timestamp" AS Events_Timestamp,
+                  "Events.Name" AS Events_Name,
+                  "Events.Attributes" AS Events_Attributes
+                FROM ${TABLE_NAME}
+                WHERE TenantId = {tenantId:String}
+                  AND TraceId = {traceId:String}
+                  AND SpanId = {spanId:String}
+                  ${partition.sqlAnd}
+                ORDER BY UpdatedAt DESC
+                LIMIT 1
+              )
+              ARRAY JOIN
+                Events_Timestamp AS event_timestamp,
+                Events_Name AS event_name,
+                Events_Attributes AS event_attrs
+              ORDER BY event_timestamp DESC
+            `,
+            query_params: { tenantId, traceId, spanId, ...partition.params },
+            format: "JSONEachRow",
+          });
 
-      const rows = await result.json<{
-        SpanId: string;
-        ParentSpanId: string | null;
-        SpanName: string;
-        DurationMs: number;
-        StatusCode: number | null;
-        SpanType: string;
-        Model: string;
-        StartTimeMs: number;
-      }>();
-
-      return rows.map((row) => ({
-        spanId: row.SpanId,
-        parentSpanId: row.ParentSpanId,
-        spanName: row.SpanName,
-        durationMs: Number(row.DurationMs),
-        statusCode: row.StatusCode,
-        spanType: row.SpanType || null,
-        model: row.Model || null,
-        startTimeMs: Number(row.StartTimeMs),
-      }));
+          const rows = (await result.json()) as EventRow[];
+          return rows.map(mapEventRow);
+        },
+      );
     } catch (error) {
       logger.error(
         {
           tenantId,
           traceId,
+          spanId,
           error: error instanceof Error ? error.message : String(error),
         },
-        "Failed to get span summary from ClickHouse",
+        "Failed to get events by span ID from ClickHouse",
       );
       throw error;
     }
+  }
+
+  async getSpanSummaryByTraceId({
+    tenantId,
+    traceId,
+    occurredAtMs,
+  }: {
+    tenantId: string;
+    traceId: string;
+  } & OccurredAtHint): Promise<SpanSummaryRow[]> {
+    EventUtils.validateTenantId(
+      { tenantId },
+      "SpanStorageClickHouseRepository.getSpanSummaryByTraceId",
+    );
+
+    return withPartitionHint<SpanSummaryRow[]>(
+      { occurredAtMs },
+      (rows) => rows.length === 0,
+      async (window) => {
+        const partition = partitionFragment(window);
+        const client = await this.resolveClient(tenantId);
+        const result = await client.query({
+          query: `
+            SELECT ${SUMMARY_SPAN_SELECT}
+            FROM ${TABLE_NAME}
+            WHERE TenantId = {tenantId:String}
+              AND TraceId = {traceId:String}
+              ${partition.sqlAnd}
+              AND ${dedupInTuple(partition.sqlAndInner)}
+            ORDER BY StartTimeMs ASC
+          `,
+          query_params: { tenantId, traceId, ...partition.params },
+          format: "JSONEachRow",
+        });
+
+        const rows = await result.json<SpanSummaryQueryRow>();
+        return rows.map(mapSpanSummaryRow);
+      },
+    );
   }
 
   async findSpansPaginated({
@@ -630,132 +885,116 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     traceId,
     limit,
     offset,
+    occurredAtMs,
   }: {
     tenantId: string;
     traceId: string;
     limit: number;
     offset: number;
-  }): Promise<{ spans: Span[]; total: number }> {
+  } & OccurredAtHint): Promise<{ spans: Span[]; total: number }> {
     EventUtils.validateTenantId(
       { tenantId },
       "SpanStorageClickHouseRepository.findSpansPaginated",
     );
 
-    try {
-      const client = await this.resolveClient(tenantId);
-      const result = await client.query({
-        query: `
-          SELECT
-            SpanId, TraceId, TenantId, ParentSpanId, ParentTraceId, ParentIsRemote,
-            Sampled,
-            toUnixTimestamp64Milli(StartTime) AS StartTimeMs,
-            toUnixTimestamp64Milli(EndTime) AS EndTimeMs,
-            DurationMs, SpanName, SpanKind,
-            ResourceAttributes, SpanAttributes,
-            StatusCode, StatusMessage, ScopeName, ScopeVersion,
-            arrayMap(x -> toUnixTimestamp64Milli(x), \`Events.Timestamp\`) AS Events_Timestamp,
-            \`Events.Name\` AS Events_Name,
-            \`Events.Attributes\` AS Events_Attributes,
-            \`Links.TraceId\` AS Links_TraceId,
-            \`Links.SpanId\` AS Links_SpanId,
-            \`Links.Attributes\` AS Links_Attributes,
-            TotalCount
-          FROM (
-            SELECT *, count() OVER () AS TotalCount
-            FROM ${TABLE_NAME}
-            WHERE TenantId = {tenantId:String}
-              AND TraceId = {traceId:String}
-              AND (TenantId, TraceId, SpanId, StartTime) IN (
-                SELECT TenantId, TraceId, SpanId, max(StartTime)
-                FROM ${TABLE_NAME}
-                WHERE TenantId = {tenantId:String}
-                  AND TraceId = {traceId:String}
-                GROUP BY TenantId, TraceId, SpanId
-              )
-            ORDER BY StartTime ASC
-            LIMIT {limit:UInt32}
-            OFFSET {offset:UInt32}
-          )
-        `,
-        query_params: { tenantId, traceId, limit, offset },
-        format: "JSONEachRow",
-      });
+    return withPartitionHint<{ spans: Span[]; total: number }>(
+      { occurredAtMs },
+      (result) => result.spans.length === 0,
+      async (window) => {
+        const partition = partitionFragment(window);
+        const client = await this.resolveClient(tenantId);
+        // Two-step instead of one query with `count() OVER ()`:
+        //   - Page query reads the heavy span columns for LIMIT rows only.
+        //   - Count query touches just the dedup keys, no heavy payload.
+        // Window-counting in a single query forces ClickHouse to materialize
+        // every span in the trace (incl. SpanAttributes, Events.*, Links.*)
+        // — fine for tiny traces, ruinous for the long ones. Parallel two
+        // queries scan the same partitions but don't pay for heavy columns
+        // on the count side.
+        const [pageResult, countResult] = await Promise.all([
+          client.query({
+            query: `
+              SELECT ${FULL_SPAN_SELECT}
+              FROM ${TABLE_NAME}
+              WHERE TenantId = {tenantId:String}
+                AND TraceId = {traceId:String}
+                ${partition.sqlAnd}
+                AND ${dedupInTuple(partition.sqlAndInner)}
+              ORDER BY StartTime ASC
+              LIMIT {limit:UInt32}
+              OFFSET {offset:UInt32}
+            `,
+            query_params: { tenantId, traceId, limit, offset, ...partition.params },
+            format: "JSONEachRow",
+          }),
+          client.query({
+            query: `
+              SELECT count(DISTINCT SpanId) AS Total
+              FROM ${TABLE_NAME}
+              WHERE TenantId = {tenantId:String}
+                AND TraceId = {traceId:String}
+                ${partition.sqlAnd}
+            `,
+            query_params: { tenantId, traceId, ...partition.params },
+            format: "JSONEachRow",
+          }),
+        ]);
 
-      const rows = (await result.json()) as Array<FullSpanRow & { TotalCount: number }>;
-      const total = rows.length > 0 ? Number(rows[0]!.TotalCount) : 0;
+        const pageRows = (await pageResult.json()) as FullSpanRow[];
+        const countRows = (await countResult.json()) as Array<{ Total: number | string }>;
+        const total = countRows.length > 0 ? Number(countRows[0]!.Total) : 0;
 
-      return {
-        spans: mapNormalizedSpansToSpans(rows.map(mapChRowToNormalized)),
-        total,
-      };
-    } catch (error) {
-      logger.error(
-        { tenantId, traceId, error: error instanceof Error ? error.message : String(error) },
-        "Failed to get paginated spans from ClickHouse",
-      );
-      throw error;
-    }
+        return {
+          spans: mapNormalizedSpansToSpans(pageRows.map(mapChRowToNormalized)),
+          total,
+        };
+      },
+    );
   }
 
   async findSpansSince({
     tenantId,
     traceId,
     sinceStartTimeMs,
+    occurredAtMs,
   }: {
     tenantId: string;
     traceId: string;
     sinceStartTimeMs: number;
-  }): Promise<Span[]> {
+  } & OccurredAtHint): Promise<Span[]> {
     EventUtils.validateTenantId(
       { tenantId },
       "SpanStorageClickHouseRepository.findSpansSince",
     );
 
-    try {
-      const client = await this.resolveClient(tenantId);
-      const result = await client.query({
-        query: `
-          SELECT
-            SpanId, TraceId, TenantId, ParentSpanId, ParentTraceId, ParentIsRemote,
-            Sampled,
-            toUnixTimestamp64Milli(StartTime) AS StartTimeMs,
-            toUnixTimestamp64Milli(EndTime) AS EndTimeMs,
-            DurationMs, SpanName, SpanKind,
-            ResourceAttributes, SpanAttributes,
-            StatusCode, StatusMessage, ScopeName, ScopeVersion,
-            arrayMap(x -> toUnixTimestamp64Milli(x), \`Events.Timestamp\`) AS Events_Timestamp,
-            \`Events.Name\` AS Events_Name,
-            \`Events.Attributes\` AS Events_Attributes,
-            \`Links.TraceId\` AS Links_TraceId,
-            \`Links.SpanId\` AS Links_SpanId,
-            \`Links.Attributes\` AS Links_Attributes
-          FROM ${TABLE_NAME}
-          WHERE TenantId = {tenantId:String}
-            AND TraceId = {traceId:String}
-            AND StartTime > fromUnixTimestamp64Milli({sinceStartTimeMs:Int64})
-            AND (TenantId, TraceId, SpanId, StartTime) IN (
-              SELECT TenantId, TraceId, SpanId, max(StartTime)
-              FROM ${TABLE_NAME}
-              WHERE TenantId = {tenantId:String}
-                AND TraceId = {traceId:String}
-                AND StartTime > fromUnixTimestamp64Milli({sinceStartTimeMs:Int64})
-              GROUP BY TenantId, TraceId, SpanId
-            )
-          ORDER BY StartTime ASC
-        `,
-        query_params: { tenantId, traceId, sinceStartTimeMs },
-        format: "JSONEachRow",
-      });
+    return withPartitionHint<Span[]>(
+      { occurredAtMs },
+      (rows) => rows.length === 0,
+      async (window) => {
+        const partition = partitionFragment(window);
+        const sinceFilter =
+          "AND StartTime > fromUnixTimestamp64Milli({sinceStartTimeMs:Int64})";
+        const innerExtra = `${sinceFilter} ${partition.sqlAndInner}`;
+        const client = await this.resolveClient(tenantId);
+        const result = await client.query({
+          query: `
+            SELECT ${FULL_SPAN_SELECT}
+            FROM ${TABLE_NAME}
+            WHERE TenantId = {tenantId:String}
+              AND TraceId = {traceId:String}
+              ${sinceFilter}
+              ${partition.sqlAnd}
+              AND ${dedupInTuple(innerExtra)}
+            ORDER BY StartTime ASC
+          `,
+          query_params: { tenantId, traceId, sinceStartTimeMs, ...partition.params },
+          format: "JSONEachRow",
+        });
 
-      const rows = (await result.json()) as FullSpanRow[];
-      return mapNormalizedSpansToSpans(rows.map(mapChRowToNormalized));
-    } catch (error) {
-      logger.error(
-        { tenantId, traceId, error: error instanceof Error ? error.message : String(error) },
-        "Failed to get spans since timestamp from ClickHouse",
-      );
-      throw error;
-    }
+        const rows = (await result.json()) as FullSpanRow[];
+        return mapNormalizedSpansToSpans(rows.map(mapChRowToNormalized));
+      },
+    );
   }
 
   async findSpanSummariesPaginated({
@@ -763,169 +1002,113 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     traceId,
     limit,
     offset,
+    occurredAtMs,
   }: {
     tenantId: string;
     traceId: string;
     limit: number;
     offset: number;
-  }): Promise<{ rows: SpanSummaryRow[]; total: number }> {
+  } & OccurredAtHint): Promise<{ rows: SpanSummaryRow[]; total: number }> {
     EventUtils.validateTenantId(
       { tenantId },
       "SpanStorageClickHouseRepository.findSpanSummariesPaginated",
     );
 
-    try {
-      const client = await this.resolveClient(tenantId);
-      const result = await client.query({
-        query: `
-          SELECT
-            SpanId,
-            ParentSpanId,
-            SpanName,
-            DurationMs,
-            StatusCode,
-            SpanAttributes['langwatch.span.type'] AS SpanType,
-            SpanAttributes['gen_ai.request.model'] AS Model,
-            toUnixTimestamp64Milli(StartTime) AS StartTimeMs,
-            TotalCount
-          FROM (
-            SELECT *, count() OVER () AS TotalCount
-            FROM ${TABLE_NAME}
-            WHERE TenantId = {tenantId:String}
-              AND TraceId = {traceId:String}
-              AND (TenantId, TraceId, SpanId, StartTime) IN (
-                SELECT TenantId, TraceId, SpanId, max(StartTime)
-                FROM ${TABLE_NAME}
-                WHERE TenantId = {tenantId:String}
-                  AND TraceId = {traceId:String}
-                GROUP BY TenantId, TraceId, SpanId
-              )
-            ORDER BY StartTime ASC
-            LIMIT {limit:UInt32}
-            OFFSET {offset:UInt32}
-          )
-        `,
-        query_params: { tenantId, traceId, limit, offset },
-        format: "JSONEachRow",
-      });
+    return withPartitionHint<{ rows: SpanSummaryRow[]; total: number }>(
+      { occurredAtMs },
+      (result) => result.rows.length === 0,
+      async (window) => {
+        const partition = partitionFragment(window);
+        const client = await this.resolveClient(tenantId);
+        // Same two-step rationale as findSpansPaginated, except the page
+        // query is already light (summary columns only). Splitting still
+        // helps because count() OVER () forces the deduped row set to be
+        // materialized in full before the LIMIT — a wasted scan when the
+        // user is on page N and we just want a number.
+        const [pageResult, countResult] = await Promise.all([
+          client.query({
+            query: `
+              SELECT ${SUMMARY_SPAN_SELECT}
+              FROM ${TABLE_NAME}
+              WHERE TenantId = {tenantId:String}
+                AND TraceId = {traceId:String}
+                ${partition.sqlAnd}
+                AND ${dedupInTuple(partition.sqlAndInner)}
+              ORDER BY StartTime ASC
+              LIMIT {limit:UInt32}
+              OFFSET {offset:UInt32}
+            `,
+            query_params: { tenantId, traceId, limit, offset, ...partition.params },
+            format: "JSONEachRow",
+          }),
+          client.query({
+            query: `
+              SELECT count(DISTINCT SpanId) AS Total
+              FROM ${TABLE_NAME}
+              WHERE TenantId = {tenantId:String}
+                AND TraceId = {traceId:String}
+                ${partition.sqlAnd}
+            `,
+            query_params: { tenantId, traceId, ...partition.params },
+            format: "JSONEachRow",
+          }),
+        ]);
 
-      const rows = await result.json<{
-        SpanId: string;
-        ParentSpanId: string | null;
-        SpanName: string;
-        DurationMs: number;
-        StatusCode: number | null;
-        SpanType: string;
-        Model: string;
-        StartTimeMs: number;
-        TotalCount: number;
-      }>();
+        const pageRows = await pageResult.json<SpanSummaryQueryRow>();
+        const countRows = (await countResult.json()) as Array<{ Total: number | string }>;
+        const total = countRows.length > 0 ? Number(countRows[0]!.Total) : 0;
 
-      const total = rows.length > 0 ? Number(rows[0]!.TotalCount) : 0;
-
-      return {
-        rows: rows.map((row) => ({
-          spanId: row.SpanId,
-          parentSpanId: row.ParentSpanId,
-          spanName: row.SpanName,
-          durationMs: Number(row.DurationMs),
-          statusCode: row.StatusCode,
-          spanType: row.SpanType || null,
-          model: row.Model || null,
-          startTimeMs: Number(row.StartTimeMs),
-        })),
-        total,
-      };
-    } catch (error) {
-      logger.error(
-        {
-          tenantId,
-          traceId,
-          error: error instanceof Error ? error.message : String(error),
-        },
-        "Failed to get paginated span summaries from ClickHouse",
-      );
-      throw error;
-    }
+        return {
+          rows: pageRows.map(mapSpanSummaryRow),
+          total,
+        };
+      },
+    );
   }
 
   async findSpanSummariesSince({
     tenantId,
     traceId,
     sinceStartTimeMs,
+    occurredAtMs,
   }: {
     tenantId: string;
     traceId: string;
     sinceStartTimeMs: number;
-  }): Promise<SpanSummaryRow[]> {
+  } & OccurredAtHint): Promise<SpanSummaryRow[]> {
     EventUtils.validateTenantId(
       { tenantId },
       "SpanStorageClickHouseRepository.findSpanSummariesSince",
     );
 
-    try {
-      const client = await this.resolveClient(tenantId);
-      const result = await client.query({
-        query: `
-          SELECT
-            SpanId,
-            ParentSpanId,
-            SpanName,
-            DurationMs,
-            StatusCode,
-            SpanAttributes['langwatch.span.type'] AS SpanType,
-            SpanAttributes['gen_ai.request.model'] AS Model,
-            toUnixTimestamp64Milli(StartTime) AS StartTimeMs
-          FROM ${TABLE_NAME}
-          WHERE TenantId = {tenantId:String}
-            AND TraceId = {traceId:String}
-            AND StartTime > fromUnixTimestamp64Milli({sinceStartTimeMs:Int64})
-            AND (TenantId, TraceId, SpanId, StartTime) IN (
-              SELECT TenantId, TraceId, SpanId, max(StartTime)
-              FROM ${TABLE_NAME}
-              WHERE TenantId = {tenantId:String}
-                AND TraceId = {traceId:String}
-                AND StartTime > fromUnixTimestamp64Milli({sinceStartTimeMs:Int64})
-              GROUP BY TenantId, TraceId, SpanId
-            )
-          ORDER BY StartTimeMs ASC
-        `,
-        query_params: { tenantId, traceId, sinceStartTimeMs },
-        format: "JSONEachRow",
-      });
+    return withPartitionHint<SpanSummaryRow[]>(
+      { occurredAtMs },
+      (rows) => rows.length === 0,
+      async (window) => {
+        const partition = partitionFragment(window);
+        const sinceFilter =
+          "AND StartTime > fromUnixTimestamp64Milli({sinceStartTimeMs:Int64})";
+        const innerExtra = `${sinceFilter} ${partition.sqlAndInner}`;
+        const client = await this.resolveClient(tenantId);
+        const result = await client.query({
+          query: `
+            SELECT ${SUMMARY_SPAN_SELECT}
+            FROM ${TABLE_NAME}
+            WHERE TenantId = {tenantId:String}
+              AND TraceId = {traceId:String}
+              ${sinceFilter}
+              ${partition.sqlAnd}
+              AND ${dedupInTuple(innerExtra)}
+            ORDER BY StartTimeMs ASC
+          `,
+          query_params: { tenantId, traceId, sinceStartTimeMs, ...partition.params },
+          format: "JSONEachRow",
+        });
 
-      const rows = await result.json<{
-        SpanId: string;
-        ParentSpanId: string | null;
-        SpanName: string;
-        DurationMs: number;
-        StatusCode: number | null;
-        SpanType: string;
-        Model: string;
-        StartTimeMs: number;
-      }>();
-
-      return rows.map((row) => ({
-        spanId: row.SpanId,
-        parentSpanId: row.ParentSpanId,
-        spanName: row.SpanName,
-        durationMs: Number(row.DurationMs),
-        statusCode: row.StatusCode,
-        spanType: row.SpanType || null,
-        model: row.Model || null,
-        startTimeMs: Number(row.StartTimeMs),
-      }));
-    } catch (error) {
-      logger.error(
-        {
-          tenantId,
-          traceId,
-          error: error instanceof Error ? error.message : String(error),
-        },
-        "Failed to get span summaries since timestamp from ClickHouse",
-      );
-      throw error;
-    }
+        const rows = await result.json<SpanSummaryQueryRow>();
+        return rows.map(mapSpanSummaryRow);
+      },
+    );
   }
 
   private toClickHouseRecord(span: SpanInsertData): ClickHouseSpanWriteRecord {

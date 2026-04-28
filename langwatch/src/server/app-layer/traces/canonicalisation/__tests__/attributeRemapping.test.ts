@@ -1,19 +1,10 @@
 import { describe, expect, it } from "vitest";
-import type { NormalizedSpan } from "../../../../event-sourcing/pipelines/trace-processing/schemas/spans";
 import { CanonicalizeSpanAttributesService } from "../canonicalizeSpanAttributesService";
+import { makeStubSpan } from "./_helpers";
 
 const service = new CanonicalizeSpanAttributesService();
 
-const stubSpan: Pick<
-  NormalizedSpan,
-  "name" | "kind" | "instrumentationScope" | "statusMessage" | "statusCode"
-> = {
-  name: "test",
-  kind: "CLIENT",
-  instrumentationScope: { name: "test", version: "1.0" },
-  statusMessage: null,
-  statusCode: null,
-} as any;
+const stubSpan = makeStubSpan();
 
 describe("CanonicalizeSpanAttributesService — take vs preserve semantics", () => {
   describe("when attributes are taken (consumed)", () => {
@@ -21,7 +12,7 @@ describe("CanonicalizeSpanAttributesService — take vs preserve semantics", () 
       const result = service.canonicalize(
         { "gen_ai.prompt": "Hello world" },
         [],
-        stubSpan as any,
+        stubSpan,
       );
 
       // gen_ai.prompt is taken by GenAIExtractor → should not appear in output
@@ -34,7 +25,7 @@ describe("CanonicalizeSpanAttributesService — take vs preserve semantics", () 
       const result = service.canonicalize(
         { "gen_ai.completion": "The answer is 42" },
         [],
-        stubSpan as any,
+        stubSpan,
       );
 
       expect(result.attributes["gen_ai.completion"]).toBeUndefined();
@@ -48,7 +39,7 @@ describe("CanonicalizeSpanAttributesService — take vs preserve semantics", () 
       const result = service.canonicalize(
         { "llm.input_messages": messages },
         [],
-        stubSpan as any,
+        stubSpan,
       );
 
       expect(result.attributes["llm.input_messages"]).toBeUndefined();
@@ -62,7 +53,7 @@ describe("CanonicalizeSpanAttributesService — take vs preserve semantics", () 
       const result = service.canonicalize(
         { "llm.output_messages": messages },
         [],
-        stubSpan as any,
+        stubSpan,
       );
 
       expect(result.attributes["llm.output_messages"]).toBeUndefined();
@@ -74,7 +65,7 @@ describe("CanonicalizeSpanAttributesService — take vs preserve semantics", () 
       const result = service.canonicalize(
         { "traceloop.entity.input": input },
         [],
-        stubSpan as any,
+        stubSpan,
       );
 
       expect(result.attributes["traceloop.entity.input"]).toBeUndefined();
@@ -85,7 +76,7 @@ describe("CanonicalizeSpanAttributesService — take vs preserve semantics", () 
       const result = service.canonicalize(
         { "langwatch.thread.id": "thread-123" },
         [],
-        stubSpan as any,
+        stubSpan,
       );
 
       expect(result.attributes["langwatch.thread.id"]).toBeUndefined();
@@ -96,7 +87,7 @@ describe("CanonicalizeSpanAttributesService — take vs preserve semantics", () 
       const result = service.canonicalize(
         { "langwatch.input": "some raw input" },
         [],
-        stubSpan as any,
+        stubSpan,
       );
 
       // langwatch.input is taken then re-set via setAttr
@@ -109,13 +100,10 @@ describe("CanonicalizeSpanAttributesService — take vs preserve semantics", () 
         { "ai.prompt": JSON.stringify("A vercel prompt") },
         [],
         // Vercel extractor requires instrumentationScope.name === "ai"
-        {
+        makeStubSpan({
           name: "ai.generateText",
-          kind: "CLIENT",
           instrumentationScope: { name: "ai", version: "3.0" },
-          statusMessage: null,
-          statusCode: null,
-        } as any,
+        }),
       );
 
       expect(result.attributes["ai.prompt"]).toBeUndefined();
@@ -132,7 +120,7 @@ describe("CanonicalizeSpanAttributesService — take vs preserve semantics", () 
       const result = service.canonicalize(
         { metadata },
         [],
-        stubSpan as any,
+        stubSpan,
       );
 
       // metadata is consumed via take(), so raw blob is gone
@@ -147,7 +135,7 @@ describe("CanonicalizeSpanAttributesService — take vs preserve semantics", () 
       const result = service.canonicalize(
         { "langwatch.span.type": "llm" },
         [],
-        stubSpan as any,
+        stubSpan,
       );
 
       // langwatch.span.type is read with get() by LangWatch extractor
@@ -171,7 +159,7 @@ describe("CanonicalizeSpanAttributesService — take vs preserve semantics", () 
           "gen_ai.input.messages": originalMessages,
         },
         [],
-        stubSpan as any,
+        stubSpan,
       );
 
       // gen_ai.input.messages stays in the bag (it's not taken by anyone when already present)
@@ -192,7 +180,7 @@ describe("CanonicalizeSpanAttributesService — take vs preserve semantics", () 
       const result = service.canonicalize(
         { "langwatch.input": structuredInput },
         [],
-        stubSpan as any,
+        stubSpan,
       );
 
       // langwatch.input is taken from bag (removing from remaining)
@@ -216,7 +204,7 @@ describe("CanonicalizeSpanAttributesService — take vs preserve semantics", () 
           "another.unknown": "data",
         },
         [],
-        stubSpan as any,
+        stubSpan,
       );
 
       // Unknown attributes are not consumed by any extractor
@@ -233,7 +221,7 @@ describe("CanonicalizeSpanAttributesService — take vs preserve semantics", () 
           "custom.trace.tag": "experiment-42",
         },
         [],
-        stubSpan as any,
+        stubSpan,
       );
 
       // gen_ai.prompt is consumed and mapped

@@ -1,26 +1,16 @@
 import { describe, expect, it } from "vitest";
-import type { NormalizedEvent, NormalizedSpan } from "../../../../event-sourcing/pipelines/trace-processing/schemas/spans";
+import type { NormalizedEvent } from "../../../../event-sourcing/pipelines/trace-processing/schemas/spans";
 import { ATTR_KEYS } from "../extractors/_constants";
 import { CanonicalizeSpanAttributesService } from "../canonicalizeSpanAttributesService";
+import { makeStubSpan } from "./_helpers";
 
 const service = new CanonicalizeSpanAttributesService();
 
-const stubSpan: Pick<
-  NormalizedSpan,
-  | "name"
-  | "kind"
-  | "instrumentationScope"
-  | "statusMessage"
-  | "statusCode"
-  | "parentSpanId"
-> = {
+const stubSpan = makeStubSpan({
   name: "main",
   kind: 1,
   instrumentationScope: { name: "langwatch", version: "1.0" },
-  statusMessage: null,
-  statusCode: null,
-  parentSpanId: null,
-} as any;
+});
 
 describe("CanonicalizeSpanAttributesService — evaluation events", () => {
   describe("when span has langwatch.evaluation.custom events", () => {
@@ -39,7 +29,7 @@ describe("CanonicalizeSpanAttributesService — evaluation events", () => {
         },
       ];
 
-      const result = service.canonicalize({}, events, stubSpan as any);
+      const result = service.canonicalize({}, events, stubSpan);
 
       expect(result.attributes[ATTR_KEYS.GEN_AI_EVALUATION_NAME]).toBe(
         "relevance",
@@ -66,7 +56,7 @@ describe("CanonicalizeSpanAttributesService — evaluation events", () => {
         },
       ];
 
-      const result = service.canonicalize({}, events, stubSpan as any);
+      const result = service.canonicalize({}, events, stubSpan);
 
       expect(
         result.attributes[ATTR_KEYS.LANGWATCH_RESERVED_EVALUATIONS],
@@ -89,7 +79,7 @@ describe("CanonicalizeSpanAttributesService — evaluation events", () => {
           },
         ];
 
-        const result = service.canonicalize({}, events, stubSpan as any);
+        const result = service.canonicalize({}, events, stubSpan);
 
         expect(result.attributes[ATTR_KEYS.GEN_AI_EVALUATION_NAME]).toBe(
           "toxicity",
@@ -115,7 +105,7 @@ describe("CanonicalizeSpanAttributesService — evaluation events", () => {
         },
       ];
 
-      const result = service.canonicalize({}, events, stubSpan as any);
+      const result = service.canonicalize({}, events, stubSpan);
 
       expect(result.appliedRules).toContain("langwatch:evaluation.custom");
     });
@@ -123,7 +113,7 @@ describe("CanonicalizeSpanAttributesService — evaluation events", () => {
 
   describe("when span has no evaluation events", () => {
     it("does not set GenAI evaluation attributes", () => {
-      const result = service.canonicalize({}, [], stubSpan as any);
+      const result = service.canonicalize({}, [], stubSpan);
 
       expect(
         result.attributes[ATTR_KEYS.GEN_AI_EVALUATION_NAME],

@@ -310,6 +310,14 @@ export const FACET_REGISTRY: readonly FacetDefinition[] = [
     table: "trace_summaries",
     expression: "TimeToFirstTokenMs",
   },
+  {
+    key: "spans",
+    kind: "range",
+    label: "Spans",
+    group: "trace",
+    table: "trace_summaries",
+    expression: "SpanCount",
+  },
 
   // metadata: dynamic keys
   {
@@ -329,6 +337,32 @@ export const FACET_REGISTRY: readonly FacetDefinition[] = [
     group: "evaluation",
     table: "evaluation_runs",
     queryBuilder: buildEvaluatorFacetQuery,
+  },
+  {
+    key: "evaluatorStatus",
+    kind: "categorical",
+    label: "Evaluator Status",
+    group: "evaluation",
+    table: "evaluation_runs",
+    expression: "Status",
+  },
+  {
+    key: "evaluatorPassed",
+    kind: "categorical",
+    label: "Evaluator Verdict",
+    group: "evaluation",
+    table: "evaluation_runs",
+    // Surface a 3-way label so users can pick pass / fail / unknown without
+    // dealing with the 0/1/null underlying UInt8 storage.
+    expression: "if(Passed = 1, 'pass', if(Passed = 0, 'fail', 'unknown'))",
+  },
+  {
+    key: "evaluatorScore",
+    kind: "range",
+    label: "Evaluator Score",
+    group: "evaluation",
+    table: "evaluation_runs",
+    expression: "Score",
   },
 
   // stored_spans: cross-table

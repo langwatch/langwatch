@@ -17,7 +17,7 @@ import { createLogger } from "~/utils/logger/server";
 import { TtlCache } from "~/server/utils/ttlCache";
 import type { EvalSummary } from "~/server/app-layer/evaluations/types";
 import type { EvaluationRunService } from "~/server/app-layer/evaluations/evaluation-run.service";
-import type { TopicRepository } from "~/server/app-layer/topics/topic.repository";
+import type { TopicService } from "~/server/app-layer/topics/topic.service";
 
 export interface TraceListEvent {
   spanId: string;
@@ -231,7 +231,7 @@ export class TraceListService {
   constructor(
     private readonly repository: TraceListRepository,
     private readonly evaluationRunService: EvaluationRunService,
-    private readonly topicRepository: TopicRepository,
+    private readonly topicService: TopicService,
   ) {}
 
   /**
@@ -244,7 +244,7 @@ export class TraceListService {
   ): Promise<CategoricalFacetResult> {
     const ids = result.values.map((v) => v.value).filter(Boolean);
     if (ids.length === 0) return result;
-    const names = await this.topicRepository.findNamesByIds(projectId, ids);
+    const names = await this.topicService.getNamesByIds(projectId, ids);
     return {
       ...result,
       values: result.values.map((v) => {
@@ -508,66 +508,18 @@ export class TraceListService {
   private async attributeFacetValues(
     params: FacetValuesParams,
   ): Promise<FacetValuesResult> {
-    const attrKey = params.facetKey.slice("attribute.".length);
-    if (!attrKey || !ATTRIBUTE_KEY_REGEX.test(attrKey)) {
-      throw new Error(`Invalid attribute key: ${attrKey}`);
+    const attributeKey = params.facetKey.slice("attribute.".length);
+    if (!attributeKey || !ATTRIBUTE_KEY_REGEX.test(attributeKey)) {
+      throw new Error(`Invalid attribute key: ${attributeKey}`);
     }
 
-    // Attribute values are typically low-cardinality (sdk.version, sdk.language, …
-    // a handful of values). We don't need exact counts to populate the picker —
-    // we just need the distinct values, and we need them fast.
-    //
-    // Strategy: scan a bounded prefix of rows that have the key set and pull the
-    // distinct values out of that sample. For low-cardinality keys the sample
-    // surfaces every value in milliseconds; for high-cardinality keys the user
-    // narrows via the search input and we re-query with a prefix.
-    //
-    // Counts come back as 0 — the UI hides them for attribute facets.
-    const ATTR_VALUE_SAMPLE_ROWS = 50_000;
-
-    const innerPrefix = params.prefix
-      ? "AND lower(Attributes[{attrKey:String}]) LIKE concat({prefix:String}, '%')"
-      : "";
-
-    const sql = `
-      SELECT
-        facet_value,
-        0 AS cnt,
-        0 AS total_distinct
-      FROM (
-        SELECT DISTINCT Attributes[{attrKey:String}] AS facet_value
-        FROM trace_summaries
-        PREWHERE TenantId = {tenantId:String}
-          AND OccurredAt >= fromUnixTimestamp64Milli({timeFrom:Int64})
-          AND OccurredAt <= fromUnixTimestamp64Milli({timeTo:Int64})
-          AND mapContains(Attributes, {attrKey:String})
-        WHERE Attributes[{attrKey:String}] != ''
-          ${innerPrefix}
-        LIMIT {sampleRows:UInt32}
-        SETTINGS
-          max_execution_time = 3,
-          timeout_overflow_mode = 'break',
-          max_threads = 8
-      )
-      ORDER BY facet_value
-      LIMIT {limit:UInt32} OFFSET {offset:UInt32}
-    `;
-
-    return this.repository.findCategoricalFacetRaw({
+    return this.repository.findAttributeValues({
       tenantId: params.tenantId,
-      query: {
-        sql,
-        params: {
-          tenantId: params.tenantId,
-          timeFrom: params.timeRange.from,
-          timeTo: params.timeRange.to,
-          attrKey,
-          limit: params.limit,
-          offset: params.offset,
-          sampleRows: ATTR_VALUE_SAMPLE_ROWS,
-          ...(params.prefix ? { prefix: params.prefix } : {}),
-        },
-      },
+      timeRange: params.timeRange,
+      attributeKey,
+      limit: params.limit,
+      offset: params.offset,
+      ...(params.prefix ? { prefix: params.prefix } : {}),
     });
   }
 

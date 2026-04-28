@@ -1,10 +1,16 @@
 import type { Span, ElasticSearchEvent } from "~/server/tracer/types";
 import type {
+  OccurredAtHint,
   SpanResourceInfo,
   SpanStorageRepository,
   SpanSummaryRow,
 } from "./repositories/span-storage.repository";
 import type { SpanInsertData } from "./types";
+
+type ByTraceId = { tenantId: string; traceId: string } & OccurredAtHint;
+type BySpanId = ByTraceId & { spanId: string };
+type Paginated = ByTraceId & { limit: number; offset: number };
+type Since = ByTraceId & { sinceStartTimeMs: number };
 
 export class SpanStorageService {
   constructor(readonly repository: SpanStorageRepository) {}
@@ -13,77 +19,43 @@ export class SpanStorageService {
     await this.repository.insertSpan(span);
   }
 
-  async getSpansByTraceId({ tenantId, traceId }: { tenantId: string; traceId: string }): Promise<Span[]> {
-    return this.repository.getSpansByTraceId({ tenantId, traceId });
+  async getSpansByTraceId(params: ByTraceId): Promise<Span[]> {
+    return this.repository.getSpansByTraceId(params);
   }
 
-  async getEventsByTraceId({ tenantId, traceId }: { tenantId: string; traceId: string }): Promise<ElasticSearchEvent[]> {
-    return this.repository.getEventsByTraceId({ tenantId, traceId });
+  async getSpanById(params: BySpanId): Promise<Span | null> {
+    return this.repository.getSpanByIds(params);
   }
 
-  async getSpanSummaryByTraceId({ tenantId, traceId }: { tenantId: string; traceId: string }): Promise<SpanSummaryRow[]> {
-    return this.repository.getSpanSummaryByTraceId({ tenantId, traceId });
+  async getEventsByTraceId(params: ByTraceId): Promise<ElasticSearchEvent[]> {
+    return this.repository.getEventsByTraceId(params);
   }
 
-  async getSpanResourcesByTraceId({
-    tenantId,
-    traceId,
-  }: {
-    tenantId: string;
-    traceId: string;
-  }): Promise<SpanResourceInfo[]> {
-    return this.repository.getSpanResourcesByTraceId({ tenantId, traceId });
+  async getSpanEvents(params: BySpanId): Promise<ElasticSearchEvent[]> {
+    return this.repository.getSpanEvents(params);
   }
 
-  async getSpansPaginated({
-    tenantId,
-    traceId,
-    limit,
-    offset,
-  }: {
-    tenantId: string;
-    traceId: string;
-    limit: number;
-    offset: number;
-  }): Promise<{ spans: Span[]; total: number }> {
-    return this.repository.findSpansPaginated({ tenantId, traceId, limit, offset });
+  async getSpanSummaryByTraceId(params: ByTraceId): Promise<SpanSummaryRow[]> {
+    return this.repository.getSpanSummaryByTraceId(params);
   }
 
-  async getSpansSince({
-    tenantId,
-    traceId,
-    sinceStartTimeMs,
-  }: {
-    tenantId: string;
-    traceId: string;
-    sinceStartTimeMs: number;
-  }): Promise<Span[]> {
-    return this.repository.findSpansSince({ tenantId, traceId, sinceStartTimeMs });
+  async getSpanResourcesByTraceId(params: ByTraceId): Promise<SpanResourceInfo[]> {
+    return this.repository.findSpanResourcesByTraceId(params);
   }
 
-  async getSpanSummariesPaginated({
-    tenantId,
-    traceId,
-    limit,
-    offset,
-  }: {
-    tenantId: string;
-    traceId: string;
-    limit: number;
-    offset: number;
-  }): Promise<{ rows: SpanSummaryRow[]; total: number }> {
-    return this.repository.findSpanSummariesPaginated({ tenantId, traceId, limit, offset });
+  async getSpansPaginated(params: Paginated): Promise<{ spans: Span[]; total: number }> {
+    return this.repository.findSpansPaginated(params);
   }
 
-  async getSpanSummariesSince({
-    tenantId,
-    traceId,
-    sinceStartTimeMs,
-  }: {
-    tenantId: string;
-    traceId: string;
-    sinceStartTimeMs: number;
-  }): Promise<SpanSummaryRow[]> {
-    return this.repository.findSpanSummariesSince({ tenantId, traceId, sinceStartTimeMs });
+  async getSpansSince(params: Since): Promise<Span[]> {
+    return this.repository.findSpansSince(params);
+  }
+
+  async getSpanSummariesPaginated(params: Paginated): Promise<{ rows: SpanSummaryRow[]; total: number }> {
+    return this.repository.findSpanSummariesPaginated(params);
+  }
+
+  async getSpanSummariesSince(params: Since): Promise<SpanSummaryRow[]> {
+    return this.repository.findSpanSummariesSince(params);
   }
 }

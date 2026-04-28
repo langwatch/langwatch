@@ -83,6 +83,20 @@ export interface TraceListRepository {
     timeColumn: string;
     column: string;
   }): Promise<{ min: number; max: number }>;
+
+  /**
+   * Distinct values for a single dynamic Attributes key, sampled for speed.
+   * Caller must validate `attributeKey` against an injection-safe whitelist —
+   * the repo trusts it.
+   */
+  findAttributeValues(params: {
+    tenantId: string;
+    timeRange: { from: number; to: number; live?: boolean };
+    attributeKey: string;
+    prefix?: string;
+    limit: number;
+    offset: number;
+  }): Promise<CategoricalFacetResult>;
 }
 
 export class NullTraceListRepository implements TraceListRepository {
@@ -109,5 +123,8 @@ export class NullTraceListRepository implements TraceListRepository {
   }
   async findRangeStatsForTable(): Promise<{ min: number; max: number }> {
     return { min: 0, max: 0 };
+  }
+  async findAttributeValues(): Promise<CategoricalFacetResult> {
+    return { values: [], totalDistinct: 0 };
   }
 }

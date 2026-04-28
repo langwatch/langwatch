@@ -1,0 +1,137 @@
+import type { TagToken } from "liqe";
+import { FilterParseError } from "../errors";
+import { boundedSubquery } from "./subqueries";
+import {
+  extractNumericValue,
+  extractStringValue,
+  nextParam,
+  validateValueLength,
+  wrap,
+  type FieldHandler,
+  type TranslationContext,
+} from "./value-helpers";
+
+export function translateNumericField(
+  columnExpr: string,
+  tag: TagToken,
+  negated: boolean,
+  ctx: TranslationContext,
+): string {
+  if (tag.expression.type === "RangeExpression") {
+    const min = tag.expression.range.min;
+    const max = tag.expression.range.max;
+    const pMin = nextParam(ctx);
+    const pMax = nextParam(ctx);
+    ctx.params[pMin] = min;
+    ctx.params[pMax] = max;
+    return wrap(
+      `(${columnExpr} >= {${pMin}:Float64} AND ${columnExpr} <= {${pMax}:Float64})`,
+      negated,
+    );
+  }
+
+  const operator = tag.operator.operator;
+  const num = extractNumericValue(tag);
+  const p = nextParam(ctx);
+  ctx.params[p] = num;
+
+  switch (operator) {
+    case ":":
+      return wrap(`${columnExpr} = {${p}:Float64}`, negated);
+    case ":>":
+      return wrap(`${columnExpr} > {${p}:Float64}`, negated);
+    case ":<":
+      return wrap(`${columnExpr} < {${p}:Float64}`, negated);
+    case ":>=":
+      return wrap(`${columnExpr} >= {${p}:Float64}`, negated);
+    case ":<=":
+      return wrap(`${columnExpr} <= {${p}:Float64}`, negated);
+    default:
+      throw new FilterParseError(`Unsupported operator: ${operator}`);
+  }
+}
+
+export function translateStringField(
+  columnExpr: string,
+  tag: TagToken,
+  negated: boolean,
+  ctx: TranslationContext,
+): string {
+  const value = extractStringValue(tag);
+  validateValueLength(value);
+  const p = nextParam(ctx);
+  ctx.params[p] = value;
+  return wrap(`${columnExpr} = {${p}:String}`, negated);
+}
+
+export function stringEquality(expression: string): FieldHandler {
+  return (tag, negated, ctx) =>
+    translateStringField(expression, tag, negated, ctx);
+}
+
+export function crossTableStringEquality(
+  table: string,
+  timeColumn: string,
+  expression: string,
+): FieldHandler {
+  return (tag, negated, ctx) => {
+    const value = extractStringValue(tag);
+    validateValueLength(value);
+    const p = nextParam(ctx);
+    ctx.params[p] = value;
+    return wrap(
+      boundedSubquery(table, timeColumn, `${expression} = {${p}:String}`),
+      negated,
+    );
+  };
+}
+
+export function numericComparison(expression: string): FieldHandler {
+  return (tag, negated, ctx) =>
+    translateNumericField(expression, tag, negated, ctx);
+}
+
+const NUMERIC_OP_MAP: Record<string, string> = {
+  ":": "=",
+  ":>": ">",
+  ":<": "<",
+  ":>=": ">=",
+  ":<=": "<=",
+};
+
+export function crossTableNumericComparison(
+  table: string,
+  timeColumn: string,
+  expression: string,
+): FieldHandler {
+  return (tag, negated, ctx) => {
+    if (tag.expression.type === "RangeExpression") {
+      const min = tag.expression.range.min;
+      const max = tag.expression.range.max;
+      const pMin = nextParam(ctx);
+      const pMax = nextParam(ctx);
+      ctx.params[pMin] = min;
+      ctx.params[pMax] = max;
+      return wrap(
+        boundedSubquery(
+          table,
+          timeColumn,
+          `${expression} >= {${pMin}:Float64} AND ${expression} <= {${pMax}:Float64}`,
+        ),
+        negated,
+      );
+    }
+    const operator = tag.operator.operator;
+    const num = extractNumericValue(tag);
+    const p = nextParam(ctx);
+    ctx.params[p] = num;
+    const cmp = NUMERIC_OP_MAP[operator];
+    if (!cmp) {
+      throw new FilterParseError(`Unsupported operator: ${operator}`);
+    }
+    return wrap(
+      boundedSubquery(table, timeColumn, `${expression} ${cmp} {${p}:Float64}`),
+      negated,
+    );
+  };
+}

@@ -5,6 +5,47 @@ import { z } from "zod";
 // ---------------------------------------------------------------------------
 
 /**
+ * Trace list row shape returned by `tracesV2.list`. Defaults are wide because
+ * older callers / replayed cached responses may pre-date newer fields — falling
+ * back keeps consumers safe instead of throwing on a fresh deploy.
+ */
+export const traceListItemSchema = z.object({
+  traceId: z.string(),
+  timestamp: z.number(),
+  name: z.string(),
+  serviceName: z.string(),
+  durationMs: z.number(),
+  totalCost: z.number(),
+  totalTokens: z.number(),
+  inputTokens: z.number().nullable().optional(),
+  outputTokens: z.number().nullable().optional(),
+  models: z.array(z.string()),
+  status: z.enum(["ok", "error", "warning"]),
+  spanCount: z.number().int().nonnegative().default(0),
+  input: z.string().nullable(),
+  output: z.string().nullable(),
+  error: z.string().nullable().optional(),
+  conversationId: z.string().nullable().optional(),
+  userId: z.string().nullable().optional(),
+  origin: z.string(),
+  tokensEstimated: z.boolean().optional(),
+  ttft: z.number().nullable().optional(),
+  rootSpanName: z.string().nullable().optional(),
+  rootSpanType: z.string().nullable().optional(),
+  events: z
+    .array(
+      z.object({
+        spanId: z.string(),
+        timestamp: z.number(),
+        name: z.string(),
+      }),
+    )
+    .default([]),
+});
+
+export type TraceListItemDto = z.infer<typeof traceListItemSchema>;
+
+/**
  * Trace header: everything the drawer header + summary tab needs.
  * Returned by `tracesV2.header`.
  */
@@ -31,6 +72,7 @@ export const traceHeaderSchema = z.object({
   ttft: z.number().nullish(),
   rootSpanName: z.string().nullable(),
   rootSpanType: z.string().nullable(),
+  scenarioRunId: z.string().nullable(),
   attributes: z.record(z.string()),
   events: z
     .array(

@@ -168,98 +168,40 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
   async getByTraceId(
     tenantId: string,
     traceId: string,
+    options?: { occurredAtMs?: number },
   ): Promise<TraceSummaryData | null> {
     EventUtils.validateTenantId(
       { tenantId },
       "TraceSummaryClickHouseRepository.getByTraceId",
     );
 
+    // First attempt: when the caller has a rough timestamp, narrow the
+    // scan to a ±2-day window around it for partition pruning. The
+    // IO/Attributes columns are heavy and without pruning ClickHouse
+    // scans every partition including cold S3 tier — this trims drawer-
+    // open latency from ~1s to ~100ms.
+    //
+    // The hint is *best-effort*. If the hint window misses (clock skew,
+    // stale URL, the row's `timestamp` ≠ trace's actual OccurredAt) we
+    // fall back to an unconstrained scan so the drawer doesn't 404 on a
+    // trace that genuinely exists. The fallback is the slow path; the
+    // happy path stays fast.
+    const PARTITION_WINDOW_MS = 2 * 24 * 60 * 60 * 1000;
+    const hasHint = options?.occurredAtMs !== undefined;
+
     try {
-      const client = await this.resolveClient(tenantId);
-      // IN-tuple dedup over the ReplacingMergeTree: the inner SELECT scans
-      // only (TenantId, TraceId, UpdatedAt) — small, sparse — to find the
-      // latest version, then the outer SELECT pulls the heavy columns
-      // (ComputedInput, ComputedOutput, Attributes, etc.) for that one row.
-      //
-      // Do not "simplify" to `ORDER BY UpdatedAt DESC LIMIT 1`: with many
-      // unmerged versions per (TenantId, TraceId) it forces the engine to
-      // read every version *with* the heavy columns just to sort them in
-      // memory. Called per-event during the trace-summary projection apply,
-      // so a 100× read amplification compounds fast under load.
-      //
-      // Outer SELECT references columns via the `t.` alias because the
-      // SELECT projects `toUnixTimestamp64Milli(UpdatedAt) AS UpdatedAt`
-      // (and similar for Created/OccurredAt). Without the alias the
-      // IN-tuple's `UpdatedAt` could resolve to the projected UInt64 alias
-      // instead of the raw DateTime64 column and the type comparison would
-      // break. See dev/docs/best_practices/clickhouse-queries.md.
-      const result = await client.query({
-        query: `
-          SELECT
-            t.ProjectionId AS ProjectionId,
-            t.TenantId AS TenantId,
-            t.TraceId AS TraceId,
-            t.Version AS Version,
-            t.Attributes AS Attributes,
-            toUnixTimestamp64Milli(t.OccurredAt) AS OccurredAt,
-            toUnixTimestamp64Milli(t.CreatedAt) AS CreatedAt,
-            toUnixTimestamp64Milli(t.UpdatedAt) AS UpdatedAt,
-            t.ComputedIOSchemaVersion AS ComputedIOSchemaVersion,
-            t.ComputedInput AS ComputedInput,
-            t.ComputedOutput AS ComputedOutput,
-            t.TimeToFirstTokenMs AS TimeToFirstTokenMs,
-            t.TimeToLastTokenMs AS TimeToLastTokenMs,
-            t.TotalDurationMs AS TotalDurationMs,
-            t.TokensPerSecond AS TokensPerSecond,
-            t.SpanCount AS SpanCount,
-            t.ContainsErrorStatus AS ContainsErrorStatus,
-            t.ContainsOKStatus AS ContainsOKStatus,
-            t.ErrorMessage AS ErrorMessage,
-            t.Models AS Models,
-            t.TotalCost AS TotalCost,
-            t.TokensEstimated AS TokensEstimated,
-            t.TotalPromptTokenCount AS TotalPromptTokenCount,
-            t.TotalCompletionTokenCount AS TotalCompletionTokenCount,
-            t.OutputFromRootSpan AS OutputFromRootSpan,
-            t.OutputSpanEndTimeMs AS OutputSpanEndTimeMs,
-            t.BlockedByGuardrail AS BlockedByGuardrail,
-            t.RootSpanName AS RootSpanName,
-            t.RootSpanType AS RootSpanType,
-            t.ContainsAi AS ContainsAi,
-            t.TopicId AS TopicId,
-            t.SubTopicId AS SubTopicId,
-            t.AnnotationIds AS AnnotationIds,
-            t.HasAnnotation AS HasAnnotation,
-            t.ScenarioRoleCosts AS ScenarioRoleCosts,
-            t.ScenarioRoleLatencies AS ScenarioRoleLatencies,
-            t.TraceName AS TraceName,
-            t.ScenarioRoleSpans AS ScenarioRoleSpans,
-            t.SpanCosts AS SpanCosts,
-            t.\`Events.SpanId\` AS \`Events.SpanId\`,
-            t.\`Events.Timestamp\` AS \`Events.Timestamp\`,
-            t.\`Events.Name\` AS \`Events.Name\`,
-            t.\`Events.Attributes\` AS \`Events.Attributes\`
-          FROM ${TABLE_NAME} AS t
-          WHERE t.TenantId = {tenantId:String}
-            AND t.TraceId = {traceId:String}
-            AND (t.TenantId, t.TraceId, t.UpdatedAt) IN (
-              SELECT TenantId, TraceId, max(UpdatedAt)
-              FROM ${TABLE_NAME}
-              WHERE TenantId = {tenantId:String}
-                AND TraceId = {traceId:String}
-              GROUP BY TenantId, TraceId
-            )
-          LIMIT 1
-        `,
-        query_params: { tenantId, traceId },
-        format: "JSONEachRow",
-      });
-
-      const rows = await result.json<ClickHouseSummaryRecord>();
-      const row = rows[0];
-      if (!row) return null;
-
-      return this.fromClickHouseRecord(row);
+      if (hasHint) {
+        const hinted = await this.queryByTraceId(tenantId, traceId, {
+          fromMs: options!.occurredAtMs! - PARTITION_WINDOW_MS,
+          toMs: options!.occurredAtMs! + PARTITION_WINDOW_MS,
+        });
+        if (hinted) return hinted;
+        logger.debug(
+          { tenantId, traceId, occurredAtMs: options!.occurredAtMs },
+          "Trace summary not found in hint window — retrying without partition prune",
+        );
+      }
+      return await this.queryByTraceId(tenantId, traceId);
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
@@ -269,6 +211,98 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
       );
       throw error;
     }
+  }
+
+  private async queryByTraceId(
+    tenantId: string,
+    traceId: string,
+    window?: { fromMs: number; toMs: number },
+  ): Promise<TraceSummaryData | null> {
+    const outerTimeFilter = window
+      ? "AND t.OccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64}) " +
+        "AND t.OccurredAt <= fromUnixTimestamp64Milli({toMs:Int64})"
+      : "";
+    const innerTimeFilter = window
+      ? "AND OccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64}) " +
+        "AND OccurredAt <= fromUnixTimestamp64Milli({toMs:Int64})"
+      : "";
+
+    const client = await this.resolveClient(tenantId);
+    // IN-tuple dedup over the ReplacingMergeTree: the inner SELECT scans
+    // only (TenantId, TraceId, UpdatedAt) — small, sparse — to find the
+    // latest version, then the outer SELECT pulls the heavy columns
+    // (ComputedInput, ComputedOutput, Attributes, etc.) for that one row.
+    // See dev/docs/best_practices/clickhouse-queries.md.
+    const result = await client.query({
+      query: `
+        SELECT
+          t.ProjectionId AS ProjectionId,
+          t.TenantId AS TenantId,
+          t.TraceId AS TraceId,
+          t.Version AS Version,
+          t.Attributes AS Attributes,
+          toUnixTimestamp64Milli(t.OccurredAt) AS OccurredAt,
+          toUnixTimestamp64Milli(t.CreatedAt) AS CreatedAt,
+          toUnixTimestamp64Milli(t.UpdatedAt) AS UpdatedAt,
+          t.ComputedIOSchemaVersion AS ComputedIOSchemaVersion,
+          t.ComputedInput AS ComputedInput,
+          t.ComputedOutput AS ComputedOutput,
+          t.TimeToFirstTokenMs AS TimeToFirstTokenMs,
+          t.TimeToLastTokenMs AS TimeToLastTokenMs,
+          t.TotalDurationMs AS TotalDurationMs,
+          t.TokensPerSecond AS TokensPerSecond,
+          t.SpanCount AS SpanCount,
+          t.ContainsErrorStatus AS ContainsErrorStatus,
+          t.ContainsOKStatus AS ContainsOKStatus,
+          t.ErrorMessage AS ErrorMessage,
+          t.Models AS Models,
+          t.TotalCost AS TotalCost,
+          t.TokensEstimated AS TokensEstimated,
+          t.TotalPromptTokenCount AS TotalPromptTokenCount,
+          t.TotalCompletionTokenCount AS TotalCompletionTokenCount,
+          t.OutputFromRootSpan AS OutputFromRootSpan,
+          t.OutputSpanEndTimeMs AS OutputSpanEndTimeMs,
+          t.BlockedByGuardrail AS BlockedByGuardrail,
+          t.RootSpanName AS RootSpanName,
+          t.RootSpanType AS RootSpanType,
+          t.ContainsAi AS ContainsAi,
+          t.TopicId AS TopicId,
+          t.SubTopicId AS SubTopicId,
+          t.AnnotationIds AS AnnotationIds,
+          t.HasAnnotation AS HasAnnotation,
+          t.ScenarioRoleCosts AS ScenarioRoleCosts,
+          t.ScenarioRoleLatencies AS ScenarioRoleLatencies,
+          t.ScenarioRoleSpans AS ScenarioRoleSpans,
+          t.SpanCosts AS SpanCosts,
+          t.TraceName AS TraceName,
+          t.\`Events.SpanId\` AS \`Events.SpanId\`,
+          t.\`Events.Timestamp\` AS \`Events.Timestamp\`,
+          t.\`Events.Name\` AS \`Events.Name\`,
+          t.\`Events.Attributes\` AS \`Events.Attributes\`
+        FROM ${TABLE_NAME} AS t
+        WHERE t.TenantId = {tenantId:String}
+          AND t.TraceId = {traceId:String}
+          ${outerTimeFilter}
+          AND (t.TenantId, t.TraceId, t.UpdatedAt) IN (
+            SELECT TenantId, TraceId, max(UpdatedAt)
+            FROM ${TABLE_NAME}
+            WHERE TenantId = {tenantId:String}
+              AND TraceId = {traceId:String}
+              ${innerTimeFilter}
+            GROUP BY TenantId, TraceId
+          )
+        LIMIT 1
+      `,
+      query_params: window
+        ? { tenantId, traceId, fromMs: window.fromMs, toMs: window.toMs }
+        : { tenantId, traceId },
+      format: "JSONEachRow",
+    });
+
+    const rows = await result.json<ClickHouseSummaryRecord>();
+    const row = rows[0];
+    if (!row) return null;
+    return this.fromClickHouseRecord(row);
   }
 
   private fromClickHouseRecord(

@@ -18,6 +18,35 @@ import type {
 import { checkProjectPermission } from "../rbac";
 
 // ---------------------------------------------------------------------------
+// Shared input fragments
+// ---------------------------------------------------------------------------
+
+/**
+ * Reusable Zod fields for span-read endpoints that accept the partition-
+ * pruning hint. The drawer carries the trace's approximate timestamp in
+ * the URL, so callers thread it through every span query that targets
+ * `stored_spans`. Spread into a procedure's input shape with `...`.
+ */
+const spanReadHintShape = {
+  /**
+   * Approximate trace timestamp (ms since epoch) used as a partition-
+   * pruning hint on `stored_spans`. Supplying it narrows the scan from
+   * every weekly partition (incl. cold S3) down to a ±2-day window.
+   * Optional — missing/invalid values fall back to the unconstrained
+   * scan path on the server.
+   */
+  occurredAtMs: z.number().int().optional(),
+} as const;
+
+function occurredAtFromInput(input: { occurredAtMs?: number }):
+  | { occurredAtMs: number }
+  | Record<string, never> {
+  return input.occurredAtMs !== undefined
+    ? { occurredAtMs: input.occurredAtMs }
+    : {};
+}
+
+// ---------------------------------------------------------------------------
 // Mappers – internal types → scoped output models
 // ---------------------------------------------------------------------------
 
@@ -56,6 +85,7 @@ function mapTraceSummaryToHeader(summary: TraceSummaryData): TraceHeader {
     ttft: summary.timeToFirstTokenMs,
     rootSpanName: summary.rootSpanName,
     rootSpanType: summary.rootSpanType,
+    scenarioRunId: summary.attributes["scenario.run_id"] ?? null,
     attributes: summary.attributes,
     events: summary.events ?? [],
   };
@@ -361,6 +391,14 @@ export const tracesV2Router = createTRPCRouter({
       z.object({
         projectId: z.string(),
         traceId: z.string(),
+        /**
+         * Optional approximate trace timestamp (ms since epoch) used as a
+         * partition-pruning hint. The drawer typically opens from a row
+         * click that already knows the trace's `timestamp`; passing it
+         * here trims the heavy summary fetch from a full-table scan to a
+         * few partitions.
+         */
+        occurredAtMs: z.number().int().optional(),
       }),
     )
     .use(checkProjectPermission("traces:view"))
@@ -369,6 +407,9 @@ export const tracesV2Router = createTRPCRouter({
       const summary = await app.traces.summary.getByTraceId(
         input.projectId,
         input.traceId,
+        input.occurredAtMs !== undefined
+          ? { occurredAtMs: input.occurredAtMs }
+          : undefined,
       );
       if (!summary) {
         throw new TraceNotFoundError(input.traceId);
@@ -383,6 +424,7 @@ export const tracesV2Router = createTRPCRouter({
         traceId: z.string(),
         limit: z.number().int().min(1).max(1000).default(250),
         offset: z.number().int().min(0).default(0),
+        ...spanReadHintShape,
       }),
     )
     .use(checkProjectPermission("traces:view"))
@@ -393,6 +435,7 @@ export const tracesV2Router = createTRPCRouter({
         traceId: input.traceId,
         limit: input.limit,
         offset: input.offset,
+        ...occurredAtFromInput(input),
       });
     }),
 
@@ -402,6 +445,7 @@ export const tracesV2Router = createTRPCRouter({
         projectId: z.string(),
         traceId: z.string(),
         sinceStartTimeMs: z.number(),
+        ...spanReadHintShape,
       }),
     )
     .use(checkProjectPermission("traces:view"))
@@ -411,6 +455,7 @@ export const tracesV2Router = createTRPCRouter({
         tenantId: input.projectId,
         traceId: input.traceId,
         sinceStartTimeMs: input.sinceStartTimeMs,
+        ...occurredAtFromInput(input),
       });
     }),
 
@@ -421,6 +466,7 @@ export const tracesV2Router = createTRPCRouter({
         traceId: z.string(),
         limit: z.number().int().min(1).max(1000).default(200),
         offset: z.number().int().min(0).default(0),
+        ...spanReadHintShape,
       }),
     )
     .use(checkProjectPermission("traces:view"))
@@ -431,6 +477,7 @@ export const tracesV2Router = createTRPCRouter({
         traceId: input.traceId,
         limit: input.limit,
         offset: input.offset,
+        ...occurredAtFromInput(input),
       });
       return {
         nodes: result.rows.map(mapSpanSummaryToTreeNode),
@@ -444,6 +491,7 @@ export const tracesV2Router = createTRPCRouter({
         projectId: z.string(),
         traceId: z.string(),
         sinceStartTimeMs: z.number(),
+        ...spanReadHintShape,
       }),
     )
     .use(checkProjectPermission("traces:view"))
@@ -453,6 +501,7 @@ export const tracesV2Router = createTRPCRouter({
         tenantId: input.projectId,
         traceId: input.traceId,
         sinceStartTimeMs: input.sinceStartTimeMs,
+        ...occurredAtFromInput(input),
       });
       return rows.map(mapSpanSummaryToTreeNode);
     }),
@@ -462,6 +511,7 @@ export const tracesV2Router = createTRPCRouter({
       z.object({
         projectId: z.string(),
         traceId: z.string(),
+        ...spanReadHintShape,
       }),
     )
     .use(checkProjectPermission("traces:view"))
@@ -470,6 +520,7 @@ export const tracesV2Router = createTRPCRouter({
       const rows = await app.traces.spans.getSpanSummaryByTraceId({
         tenantId: input.projectId,
         traceId: input.traceId,
+        ...occurredAtFromInput(input),
       });
       return rows.map(mapSpanSummaryToTreeNode);
     }),
@@ -484,6 +535,7 @@ export const tracesV2Router = createTRPCRouter({
       z.object({
         projectId: z.string(),
         traceId: z.string(),
+        ...spanReadHintShape,
       }),
     )
     .use(checkProjectPermission("traces:view"))
@@ -492,6 +544,7 @@ export const tracesV2Router = createTRPCRouter({
       const spans = await app.traces.spans.getSpansByTraceId({
         tenantId: input.projectId,
         traceId: input.traceId,
+        ...occurredAtFromInput(input),
       });
       return spans.map((span) => mapSpanToDetail(span, []));
     }),
@@ -502,35 +555,51 @@ export const tracesV2Router = createTRPCRouter({
         projectId: z.string(),
         traceId: z.string(),
         spanId: z.string(),
+        ...spanReadHintShape,
       }),
     )
     .use(checkProjectPermission("traces:view"))
     .query(async ({ input }): Promise<SpanDetail> => {
       const app = getApp();
-      const spans = await app.traces.spans.getSpansByTraceId({
-        tenantId: input.projectId,
-        traceId: input.traceId,
-      });
-      const span = spans.find((s) => s.span_id === input.spanId);
+      const hint = occurredAtFromInput(input);
+      // One narrow span fetch + one narrow events fetch in parallel —
+      // both keyed by SpanId (and partition-pruned by occurredAtMs when
+      // available). Replaces an older path that pulled every span in the
+      // trace into Node memory just to .find() one, plus a third query
+      // whose result was never read.
+      const [span, rawEvents] = await Promise.all([
+        app.traces.spans.getSpanById({
+          tenantId: input.projectId,
+          traceId: input.traceId,
+          spanId: input.spanId,
+          ...hint,
+        }),
+        app.traces.spans.getSpanEvents({
+          tenantId: input.projectId,
+          traceId: input.traceId,
+          spanId: input.spanId,
+          ...hint,
+        }),
+      ]);
+
       if (!span) {
         throw new TraceNotFoundError(input.spanId);
       }
 
-      // Fetch raw events for this span from the normalized store
-      const allSummaryRows = await app.traces.spans.getSpanSummaryByTraceId({
-        tenantId: input.projectId,
-        traceId: input.traceId,
-      });
-      // Events are embedded in the span — extract from the normalized data
-      // The mapNormalizedSpansToSpans drops raw events, so we re-fetch from CH
-      const rawEvents = await getRawSpanEvents({
-        app,
-        tenantId: input.projectId,
-        traceId: input.traceId,
-        spanId: input.spanId,
-      });
-
-      return mapSpanToDetail(span, rawEvents);
+      return mapSpanToDetail(
+        span,
+        rawEvents.map((e) => ({
+          name: e.event_type,
+          timeUnixMs:
+            typeof e.timestamps.started_at === "number"
+              ? e.timestamps.started_at
+              : parseInt(String(e.timestamps.started_at), 10),
+          attributes: Object.fromEntries([
+            ...e.event_details.map((d) => [d.key, d.value]),
+            ...e.metrics.map((m) => [m.key, m.value]),
+          ]),
+        })),
+      );
     }),
 
   /**
@@ -543,6 +612,7 @@ export const tracesV2Router = createTRPCRouter({
       z.object({
         projectId: z.string(),
         traceId: z.string(),
+        ...spanReadHintShape,
       }),
     )
     .use(checkProjectPermission("traces:view"))
@@ -551,6 +621,7 @@ export const tracesV2Router = createTRPCRouter({
       const rows = await app.traces.spans.getSpanResourcesByTraceId({
         tenantId: input.projectId,
         traceId: input.traceId,
+        ...occurredAtFromInput(input),
       });
 
       const spans = rows.map((r) => ({
@@ -579,6 +650,7 @@ export const tracesV2Router = createTRPCRouter({
       z.object({
         projectId: z.string(),
         traceId: z.string(),
+        ...spanReadHintShape,
       }),
     )
     .use(checkProjectPermission("traces:view"))
@@ -587,6 +659,7 @@ export const tracesV2Router = createTRPCRouter({
       return app.traces.spans.getEventsByTraceId({
         tenantId: input.projectId,
         traceId: input.traceId,
+        ...occurredAtFromInput(input),
       });
     }),
 
@@ -607,49 +680,3 @@ export const tracesV2Router = createTRPCRouter({
     }),
 });
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-async function getRawSpanEvents({
-  app,
-  tenantId,
-  traceId,
-  spanId,
-}: {
-  app: ReturnType<typeof getApp>;
-  tenantId: string;
-  traceId: string;
-  spanId: string;
-}): Promise<Array<{ name: string; timeUnixMs: number; attributes: Record<string, unknown> }>> {
-  // The span storage repository has a getSpansByTraceId that returns full Span[]
-  // but events are dropped during mapping. We get events through the events endpoint
-  // which uses ARRAY JOIN on the Events columns.
-  // For span-level events, we filter by span ID from the trace-level events.
-  try {
-    const allEvents = await app.traces.spans.getEventsByTraceId({
-      tenantId,
-      traceId,
-    });
-    // getEventsByTraceId returns ElasticSearchEvent[] with event_id = SpanId
-    // Filter to this span and include ALL events (the service already excludes exceptions,
-    // so we return what we get)
-    return allEvents
-      .filter((e) => e.event_id === spanId)
-      .map((e) => ({
-        name: e.event_type,
-        timeUnixMs:
-          typeof e.timestamps.started_at === "number"
-            ? e.timestamps.started_at
-            : parseInt(String(e.timestamps.started_at), 10),
-        attributes: Object.fromEntries(
-          [
-            ...e.event_details.map((d) => [d.key, d.value]),
-            ...e.metrics.map((m) => [m.key, m.value]),
-          ],
-        ),
-      }));
-  } catch {
-    return [];
-  }
-}

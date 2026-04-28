@@ -1,19 +1,10 @@
 import { describe, expect, it } from "vitest";
-import type { NormalizedSpan } from "../../../../event-sourcing/pipelines/trace-processing/schemas/spans";
 import { CanonicalizeSpanAttributesService } from "../canonicalizeSpanAttributesService";
+import { makeStubSpan } from "./_helpers";
 
 const service = new CanonicalizeSpanAttributesService();
 
-const stubSpan: Pick<
-  NormalizedSpan,
-  "name" | "kind" | "instrumentationScope" | "statusMessage" | "statusCode"
-> = {
-  name: "test",
-  kind: "CLIENT",
-  instrumentationScope: { name: "test", version: "1.0" },
-  statusMessage: null,
-  statusCode: null,
-} as any;
+const stubSpan = makeStubSpan();
 
 describe("CanonicalizeSpanAttributesService — metadata handling", () => {
   describe("when Python SDK sends metadata JSON blob", () => {
@@ -23,7 +14,7 @@ describe("CanonicalizeSpanAttributesService — metadata handling", () => {
           metadata: JSON.stringify({ user_id: "user-42" }),
         },
         [],
-        stubSpan as any,
+        stubSpan,
       );
 
       expect(result.attributes["langwatch.user.id"]).toBe("user-42");
@@ -35,7 +26,7 @@ describe("CanonicalizeSpanAttributesService — metadata handling", () => {
           metadata: JSON.stringify({ userId: "user-43" }),
         },
         [],
-        stubSpan as any,
+        stubSpan,
       );
 
       expect(result.attributes["langwatch.user.id"]).toBe("user-43");
@@ -47,7 +38,7 @@ describe("CanonicalizeSpanAttributesService — metadata handling", () => {
           metadata: JSON.stringify({ thread_id: "thread-100" }),
         },
         [],
-        stubSpan as any,
+        stubSpan,
       );
 
       expect(result.attributes["gen_ai.conversation.id"]).toBe("thread-100");
@@ -59,7 +50,7 @@ describe("CanonicalizeSpanAttributesService — metadata handling", () => {
           metadata: JSON.stringify({ threadId: "thread-101" }),
         },
         [],
-        stubSpan as any,
+        stubSpan,
       );
 
       expect(result.attributes["gen_ai.conversation.id"]).toBe("thread-101");
@@ -71,7 +62,7 @@ describe("CanonicalizeSpanAttributesService — metadata handling", () => {
           metadata: JSON.stringify({ customer_id: "cust-1" }),
         },
         [],
-        stubSpan as any,
+        stubSpan,
       );
 
       expect(result.attributes["langwatch.customer.id"]).toBe("cust-1");
@@ -83,7 +74,7 @@ describe("CanonicalizeSpanAttributesService — metadata handling", () => {
           metadata: JSON.stringify({ customerId: "cust-2" }),
         },
         [],
-        stubSpan as any,
+        stubSpan,
       );
 
       expect(result.attributes["langwatch.customer.id"]).toBe("cust-2");
@@ -95,7 +86,7 @@ describe("CanonicalizeSpanAttributesService — metadata handling", () => {
           metadata: JSON.stringify({ labels: ["prod", "v2"] }),
         },
         [],
-        stubSpan as any,
+        stubSpan,
       );
 
       expect(result.attributes["langwatch.labels"]).toEqual(["prod", "v2"]);
@@ -110,7 +101,7 @@ describe("CanonicalizeSpanAttributesService — metadata handling", () => {
       const result = service.canonicalize(
         { metadata },
         [],
-        stubSpan as any,
+        stubSpan,
       );
 
       // metadata blob is consumed (take), raw blob no longer present
@@ -129,7 +120,7 @@ describe("CanonicalizeSpanAttributesService — metadata handling", () => {
       const result = service.canonicalize(
         { metadata },
         [],
-        stubSpan as any,
+        stubSpan,
       );
 
       expect(result.attributes["metadata.nested"]).toBe(
@@ -145,7 +136,7 @@ describe("CanonicalizeSpanAttributesService — metadata handling", () => {
           "langwatch.metadata": JSON.stringify({ user_id: "lw-user-1" }),
         },
         [],
-        stubSpan as any,
+        stubSpan,
       );
 
       expect(result.attributes["langwatch.user.id"]).toBe("lw-user-1");
@@ -157,7 +148,7 @@ describe("CanonicalizeSpanAttributesService — metadata handling", () => {
           "langwatch.metadata": JSON.stringify({ thread_id: "lw-thread-1" }),
         },
         [],
-        stubSpan as any,
+        stubSpan,
       );
 
       expect(result.attributes["gen_ai.conversation.id"]).toBe("lw-thread-1");
@@ -169,7 +160,7 @@ describe("CanonicalizeSpanAttributesService — metadata handling", () => {
           "langwatch.metadata": JSON.stringify({ customer_id: "lw-cust-1" }),
         },
         [],
-        stubSpan as any,
+        stubSpan,
       );
 
       expect(result.attributes["langwatch.customer.id"]).toBe("lw-cust-1");
@@ -181,7 +172,7 @@ describe("CanonicalizeSpanAttributesService — metadata handling", () => {
           "langwatch.metadata": JSON.stringify({ labels: ["beta"] }),
         },
         [],
-        stubSpan as any,
+        stubSpan,
       );
 
       expect(result.attributes["langwatch.labels"]).toEqual(["beta"]);
@@ -194,7 +185,7 @@ describe("CanonicalizeSpanAttributesService — metadata handling", () => {
           "langwatch.metadata": JSON.stringify({ user_id: "from-lw-metadata" }),
         },
         [],
-        stubSpan as any,
+        stubSpan,
       );
 
       // "metadata" is checked first via ??, so it wins
@@ -210,7 +201,7 @@ describe("CanonicalizeSpanAttributesService — metadata handling", () => {
           metadata: JSON.stringify({ user_id: "meta-user" }),
         },
         [],
-        stubSpan as any,
+        stubSpan,
       );
 
       expect(result.attributes["langwatch.user.id"]).toBe("explicit-user");
@@ -223,7 +214,7 @@ describe("CanonicalizeSpanAttributesService — metadata handling", () => {
           metadata: JSON.stringify({ thread_id: "meta-thread" }),
         },
         [],
-        stubSpan as any,
+        stubSpan,
       );
 
       expect(result.attributes["gen_ai.conversation.id"]).toBe(
@@ -238,7 +229,7 @@ describe("CanonicalizeSpanAttributesService — metadata handling", () => {
           metadata: JSON.stringify({ customer_id: "meta-cust" }),
         },
         [],
-        stubSpan as any,
+        stubSpan,
       );
 
       expect(result.attributes["langwatch.customer.id"]).toBe("explicit-cust");
@@ -251,7 +242,7 @@ describe("CanonicalizeSpanAttributesService — metadata handling", () => {
           metadata: JSON.stringify({ labels: ["meta"] }),
         },
         [],
-        stubSpan as any,
+        stubSpan,
       );
 
       expect(result.attributes["langwatch.labels"]).toEqual(["explicit"]);
@@ -265,7 +256,7 @@ describe("CanonicalizeSpanAttributesService — metadata handling", () => {
           metadata: "not valid json {{{",
         },
         [],
-        stubSpan as any,
+        stubSpan,
       );
 
       // Invalid JSON: stored as metadata._raw (string preserved)
@@ -280,7 +271,7 @@ describe("CanonicalizeSpanAttributesService — metadata handling", () => {
           metadata: JSON.stringify([1, 2, 3]),
         },
         [],
-        stubSpan as any,
+        stubSpan,
       );
 
       // Array is not a JSON object, so no field promotion
@@ -299,7 +290,7 @@ describe("CanonicalizeSpanAttributesService — metadata handling", () => {
           "langwatch.thread.id": "ts-thread-1",
         },
         [],
-        stubSpan as any,
+        stubSpan,
       );
 
       expect(result.attributes["gen_ai.conversation.id"]).toBe("ts-thread-1");
@@ -313,7 +304,7 @@ describe("CanonicalizeSpanAttributesService — metadata handling", () => {
           thread_id: "legacy-thread-1",
         },
         [],
-        stubSpan as any,
+        stubSpan,
       );
 
       expect(result.attributes["gen_ai.conversation.id"]).toBe(
@@ -327,7 +318,7 @@ describe("CanonicalizeSpanAttributesService — metadata handling", () => {
           "langwatch.user.id": "user-direct",
         },
         [],
-        stubSpan as any,
+        stubSpan,
       );
 
       expect(result.attributes["langwatch.user.id"]).toBe("user-direct");
@@ -339,7 +330,7 @@ describe("CanonicalizeSpanAttributesService — metadata handling", () => {
           "langwatch.customer.id": "cust-direct",
         },
         [],
-        stubSpan as any,
+        stubSpan,
       );
 
       expect(result.attributes["langwatch.customer.id"]).toBe("cust-direct");

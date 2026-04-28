@@ -1,19 +1,10 @@
 import { describe, expect, it } from "vitest";
-import type { NormalizedSpan } from "../../../../event-sourcing/pipelines/trace-processing/schemas/spans";
 import { CanonicalizeSpanAttributesService } from "../canonicalizeSpanAttributesService";
+import { makeStubSpan } from "./_helpers";
 
 const service = new CanonicalizeSpanAttributesService();
 
-const stubSpan: Pick<
-  NormalizedSpan,
-  "name" | "kind" | "instrumentationScope" | "statusMessage" | "statusCode"
-> = {
-  name: "test",
-  kind: "CLIENT",
-  instrumentationScope: { name: "test", version: "1.0" },
-  statusMessage: null,
-  statusCode: null,
-} as any;
+const stubSpan = makeStubSpan();
 
 describe("CanonicalizeSpanAttributesService — structured IO", () => {
   describe("when input type is chat_messages", () => {
@@ -29,7 +20,7 @@ describe("CanonicalizeSpanAttributesService — structured IO", () => {
           }),
         },
         [],
-        stubSpan as any,
+        stubSpan,
       );
 
       // Trailing assistant messages are stripped — they are the model's
@@ -53,7 +44,7 @@ describe("CanonicalizeSpanAttributesService — structured IO", () => {
           }),
         },
         [],
-        stubSpan as any,
+        stubSpan,
       );
 
       // Last message is `user` — full multi-turn history kept intact.
@@ -74,7 +65,7 @@ describe("CanonicalizeSpanAttributesService — structured IO", () => {
           }),
         },
         [],
-        stubSpan as any,
+        stubSpan,
       );
 
       expect(result.attributes["langwatch.span.type"]).toBe("agent");
@@ -92,7 +83,7 @@ describe("CanonicalizeSpanAttributesService — structured IO", () => {
           }),
         },
         [],
-        stubSpan as any,
+        stubSpan,
       );
 
       expect(result.attributes["gen_ai.system_instructions"]).toBe(
@@ -108,7 +99,7 @@ describe("CanonicalizeSpanAttributesService — structured IO", () => {
       const result = service.canonicalize(
         { "langwatch.input": wrapper },
         [],
-        stubSpan as any,
+        stubSpan,
       );
 
       // The wrapper object is re-set back to langwatch.input
@@ -127,7 +118,7 @@ describe("CanonicalizeSpanAttributesService — structured IO", () => {
           }),
         },
         [],
-        stubSpan as any,
+        stubSpan,
       );
 
       expect(result.attributes["langwatch.reserved.value_types"]).toEqual([
@@ -147,7 +138,7 @@ describe("CanonicalizeSpanAttributesService — structured IO", () => {
           }),
         },
         [],
-        stubSpan as any,
+        stubSpan,
       );
 
       expect(result.attributes["gen_ai.output.messages"]).toEqual(messages);
@@ -163,7 +154,7 @@ describe("CanonicalizeSpanAttributesService — structured IO", () => {
           }),
         },
         [],
-        stubSpan as any,
+        stubSpan,
       );
 
       expect(result.attributes["langwatch.output"]).toEqual(messages);
@@ -178,7 +169,7 @@ describe("CanonicalizeSpanAttributesService — structured IO", () => {
           }),
         },
         [],
-        stubSpan as any,
+        stubSpan,
       );
 
       expect(result.attributes["langwatch.reserved.value_types"]).toEqual([
@@ -201,7 +192,7 @@ describe("CanonicalizeSpanAttributesService — structured IO", () => {
           }),
         },
         [],
-        stubSpan as any,
+        stubSpan,
       );
 
       expect(result.attributes["langwatch.reserved.value_types"]).toEqual([
@@ -221,7 +212,7 @@ describe("CanonicalizeSpanAttributesService — structured IO", () => {
           }),
         },
         [],
-        stubSpan as any,
+        stubSpan,
       );
 
       expect(result.attributes["gen_ai.output.messages"]).toEqual([
@@ -238,7 +229,7 @@ describe("CanonicalizeSpanAttributesService — structured IO", () => {
           }),
         },
         [],
-        stubSpan as any,
+        stubSpan,
       );
 
       // Unwrapped string array passes through toAttrValue as-is
@@ -256,7 +247,7 @@ describe("CanonicalizeSpanAttributesService — structured IO", () => {
           }),
         },
         [],
-        stubSpan as any,
+        stubSpan,
       );
 
       // Value is unwrapped
@@ -281,7 +272,7 @@ describe("CanonicalizeSpanAttributesService — structured IO", () => {
           }),
         },
         [],
-        stubSpan as any,
+        stubSpan,
       );
 
       // Value is unwrapped (object stored directly)
@@ -303,7 +294,7 @@ describe("CanonicalizeSpanAttributesService — structured IO", () => {
           }),
         },
         [],
-        stubSpan as any,
+        stubSpan,
       );
 
       // Value is unwrapped — string array passes through toAttrValue
@@ -322,7 +313,7 @@ describe("CanonicalizeSpanAttributesService — structured IO", () => {
           "langwatch.input": JSON.stringify(["only item"]),
         },
         [],
-        stubSpan as any,
+        stubSpan,
       );
 
       expect(result.attributes["langwatch.input"]).toBe("only item");
@@ -335,7 +326,7 @@ describe("CanonicalizeSpanAttributesService — structured IO", () => {
           "langwatch.input": JSON.stringify(arr),
         },
         [],
-        stubSpan as any,
+        stubSpan,
       );
 
       expect(result.attributes["langwatch.input"]).toEqual(arr);
@@ -347,7 +338,7 @@ describe("CanonicalizeSpanAttributesService — structured IO", () => {
           "langwatch.input": "just a string",
         },
         [],
-        stubSpan as any,
+        stubSpan,
       );
 
       expect(result.attributes["langwatch.input"]).toBe("just a string");
@@ -360,7 +351,7 @@ describe("CanonicalizeSpanAttributesService — structured IO", () => {
           "langwatch.input": JSON.stringify(obj),
         },
         [],
-        stubSpan as any,
+        stubSpan,
       );
 
       expect(result.attributes["langwatch.input"]).toEqual(obj);
@@ -372,7 +363,7 @@ describe("CanonicalizeSpanAttributesService — structured IO", () => {
           "langwatch.input": "just a string",
         },
         [],
-        stubSpan as any,
+        stubSpan,
       );
 
       expect(result.attributes["langwatch.reserved.value_types"]).toBeUndefined();
@@ -385,7 +376,7 @@ describe("CanonicalizeSpanAttributesService — structured IO", () => {
       const result = service.canonicalize(
         { "langwatch.input": wrapper },
         [],
-        stubSpan as any,
+        stubSpan,
       );
 
       expect(result.attributes["gen_ai.input.messages"]).toBeUndefined();
@@ -397,7 +388,7 @@ describe("CanonicalizeSpanAttributesService — structured IO", () => {
       const result = service.canonicalize(
         { "langwatch.input": wrapper },
         [],
-        stubSpan as any,
+        stubSpan,
       );
 
       expect(result.attributes["gen_ai.input.messages"]).toBeUndefined();
