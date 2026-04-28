@@ -1,6 +1,7 @@
 package httpmiddleware
 
 import (
+	"errors"
 	"net/http"
 
 	"go.uber.org/zap"
@@ -37,10 +38,13 @@ func Recover() func(http.Handler) http.Handler {
 				if v == nil {
 					return
 				}
-				if v == http.ErrAbortHandler {
+				if err, ok := v.(error); ok && errors.Is(err, http.ErrAbortHandler) {
 					// Re-panic without touching the response writer.
 					// net/http's serve loop catches this sentinel and
-					// closes the connection silently.
+					// closes the connection silently. Use errors.Is
+					// (not direct ==) so a wrapped ErrAbortHandler from
+					// a deeper handler is still caught — errorlint
+					// flags the bare equality check.
 					panic(v)
 				}
 

@@ -67,7 +67,8 @@ func TestRecover_ErrAbortHandlerIsRePanickedWithoutWritingResponse(t *testing.T)
 		defer func() {
 			if v := recover(); v != nil {
 				rePanicked = true
-				if v != http.ErrAbortHandler {
+				err, ok := v.(error)
+				if !ok || !errors.Is(err, http.ErrAbortHandler) {
 					t.Errorf("expected ErrAbortHandler re-panic, got %v", v)
 				}
 			}
