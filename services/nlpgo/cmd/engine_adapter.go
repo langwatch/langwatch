@@ -37,6 +37,7 @@ func (a engineAdapter) ExecuteStream(ctx context.Context, req app.WorkflowReques
 		TraceID:   req.TraceID,
 		ProjectID: req.ProjectID,
 		ThreadID:  req.ThreadID,
+		NodeID:    req.NodeID,
 	}, engine.ExecuteStreamOptions{Heartbeat: opts.Heartbeat})
 	if err != nil {
 		ch := make(chan app.WorkflowStreamEvent, 1)
@@ -77,6 +78,7 @@ func (a engineAdapter) Execute(ctx context.Context, req app.WorkflowRequest) (*a
 		TraceID:   req.TraceID,
 		ProjectID: req.ProjectID,
 		ThreadID:  req.ThreadID,
+		NodeID:    req.NodeID,
 	})
 	if err != nil {
 		return &app.WorkflowResult{

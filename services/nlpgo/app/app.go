@@ -53,6 +53,14 @@ type WorkflowRequest struct {
 	TraceID      string
 	ProjectID    string
 	ThreadID     string
+	// NodeID, when non-empty, identifies the single node the Studio
+	// "Run with manual input" flow targets. In that mode `Inputs` are
+	// fed directly into the named node (bypassing edge-based input
+	// resolution) so users can exercise a node in isolation without
+	// wiring a parent Entry → target edge first. Empty means
+	// execute_flow / execute_evaluation, where Inputs go to the Entry
+	// node and propagate via edges.
+	NodeID string
 }
 
 // WorkflowResult is the engine's response, ready for JSON serialization.

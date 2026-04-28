@@ -137,12 +137,18 @@ func decodeStudioClientEvent(r *http.Request, body []byte) (*app.WorkflowRequest
 	}
 
 	var inner struct {
-		TraceID   string          `json:"trace_id"`
-		ThreadID  string          `json:"thread_id,omitempty"`
-		Workflow  json.RawMessage `json:"workflow"`
-		Inputs    any             `json:"inputs,omitempty"`
-		Origin    string          `json:"origin,omitempty"`
-		ProjectID string          `json:"project_id,omitempty"`
+		TraceID  string          `json:"trace_id"`
+		ThreadID string          `json:"thread_id,omitempty"`
+		Workflow json.RawMessage `json:"workflow"`
+		Inputs   any             `json:"inputs,omitempty"`
+		Origin   string          `json:"origin,omitempty"`
+		// NodeID names the single node targeted by execute_component.
+		// Studio's "Run with manual input" sends Inputs as the typed
+		// values for THIS node, not as Entry-node outputs — see
+		// langwatch/src/optimization_studio/hooks/useComponentExecution.ts.
+		// Absent for execute_flow / execute_evaluation.
+		NodeID    string `json:"node_id,omitempty"`
+		ProjectID string `json:"project_id,omitempty"`
 	}
 	if err := json.Unmarshal(innerBytes, &inner); err != nil {
 		e := herr.New(r.Context(), domain.ErrBadRequest, herr.M{
@@ -172,6 +178,7 @@ func decodeStudioClientEvent(r *http.Request, body []byte) (*app.WorkflowRequest
 		TraceID:      inner.TraceID,
 		ProjectID:    inner.ProjectID,
 		ThreadID:     threadID,
+		NodeID:       inner.NodeID,
 	}, nil
 }
 
