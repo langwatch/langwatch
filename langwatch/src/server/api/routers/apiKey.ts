@@ -180,7 +180,7 @@ export const apiKeyRouter = createTRPCRouter({
         if (b.customRoleId) customRoleIds.add(b.customRoleId);
       }
       for (const k of apiKeys) {
-        userIds.add(k.userId);
+        if (k.userId) userIds.add(k.userId);
         if (k.createdByUserId) userIds.add(k.createdByUserId);
       }
 
@@ -230,7 +230,7 @@ export const apiKeyRouter = createTRPCRouter({
         description: apiKey.description,
         permissionMode: apiKey.permissionMode,
         userId: apiKey.userId,
-        userName: userName.get(apiKey.userId) ?? null,
+        userName: apiKey.userId ? (userName.get(apiKey.userId) ?? null) : null,
         createdByUserId: apiKey.createdByUserId,
         createdByUserName: apiKey.createdByUserId
           ? userName.get(apiKey.createdByUserId) ?? null
@@ -266,8 +266,9 @@ export const apiKeyRouter = createTRPCRouter({
         description: z.string().max(500).optional(),
         expiresAt: z.coerce.date().optional(),
         permissionMode: z.enum(["all", "readonly", "restricted"]).default("all"),
+        keyType: z.enum(["personal", "service"]).default("personal"),
         assignedToUserId: z.string().optional(),
-        bindings: z.array(roleBindingSchema).min(1).max(20),
+        bindings: z.array(roleBindingSchema).max(20),
       }),
     )
     .use(
@@ -276,8 +277,10 @@ export const apiKeyRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      // If assigning to another user, caller must be an org admin
-      if (input.assignedToUserId && input.assignedToUserId !== ctx.session.user.id) {
+      const isService = input.keyType === "service";
+
+      // Service keys and assigning to another user both require admin
+      if (isService || (input.assignedToUserId && input.assignedToUserId !== ctx.session.user.id)) {
         const callerIsAdmin = await isOrgAdmin(
           ctx.prisma,
           ctx.session.user.id,
@@ -286,13 +289,15 @@ export const apiKeyRouter = createTRPCRouter({
         if (!callerIsAdmin) {
           throw new TRPCError({
             code: "FORBIDDEN",
-            message: "Only organization admins can create API keys for other users",
+            message: isService
+              ? "Only organization admins can create service API keys"
+              : "Only organization admins can create API keys for other users",
           });
         }
       }
 
-      const targetUserId = input.assignedToUserId ?? ctx.session.user.id;
-      const createdByUserId = input.assignedToUserId ? ctx.session.user.id : null;
+      const targetUserId = isService ? null : (input.assignedToUserId ?? ctx.session.user.id);
+      const createdByUserId = ctx.session.user.id;
 
       const apiKeyService = ApiKeyService.create(ctx.prisma);
       try {
@@ -303,7 +308,7 @@ export const apiKeyRouter = createTRPCRouter({
           createdByUserId,
           organizationId: input.organizationId,
           expiresAt: input.expiresAt,
-          permissionMode: input.permissionMode,
+          permissionMode: isService ? "all" : input.permissionMode,
           bindings: input.bindings,
         });
 

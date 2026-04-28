@@ -270,7 +270,7 @@ export async function resolveApiKeyPermission({
 }: {
   prisma: PrismaClient;
   apiKeyId: string;
-  userId: string;
+  userId: string | null;
   organizationId: string;
   scope: ScopeRef;
   permission: Permission;
@@ -285,7 +285,10 @@ export async function resolveApiKeyPermission({
   });
   if (!apiKeyAllowed) return false;
 
-  // 2. Check owning user's current bindings (ceiling)
+  // 2. Service keys (no userId) have no user ceiling — binding check is sufficient
+  if (!userId) return true;
+
+  // 3. Check owning user's current bindings (ceiling)
   return checkRoleBindingPermission({
     prisma,
     principal: { type: "user", id: userId },

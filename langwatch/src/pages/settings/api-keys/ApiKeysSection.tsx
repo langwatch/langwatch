@@ -62,7 +62,7 @@ export function ApiKeysSection({
   const [apiKeyToEdit, setApiKeyToEdit] = useState<ApiKeyRow | null>(null);
 
   const handleCreate = (input: CreateApiKeyInput) => {
-    if (input.bindings.length === 0) {
+    if (input.keyType === "personal" && input.bindings.length === 0) {
       toaster.create({
         title: "No permissions to grant",
         description:
@@ -83,6 +83,7 @@ export function ApiKeysSection({
           : undefined,
         expiresAt: input.expiresAt,
         permissionMode: input.permissionMode,
+        keyType: input.keyType,
         assignedToUserId: input.assignedToUserId,
         bindings: input.bindings as Parameters<typeof createMutation.mutate>[0]["bindings"],
       },
@@ -318,9 +319,13 @@ export function ApiKeysSection({
                       )}
                     </Table.Cell>
                     <Table.Cell>
-                      <Text fontSize="sm">
-                        {apiKey.createdByUserName ?? apiKey.userName ?? "—"}
-                      </Text>
+                      {apiKey.userId ? (
+                        <Text fontSize="sm">
+                          {apiKey.createdByUserName ?? apiKey.userName ?? "—"}
+                        </Text>
+                      ) : (
+                        <Badge size="sm" colorPalette="purple">Service</Badge>
+                      )}
                     </Table.Cell>
                     <Table.Cell>
                       <Text fontSize="sm">

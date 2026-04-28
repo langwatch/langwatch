@@ -77,19 +77,22 @@ export class ApiKeyService {
   }: {
     name: string;
     description?: string | null;
-    userId: string;
+    userId?: string | null;
     createdByUserId?: string | null;
     organizationId: string;
     expiresAt?: Date | null;
     permissionMode: string;
     bindings: RoleBindingInput[];
   }): Promise<{ token: string; apiKey: ApiKey }> {
-    await this.assertOrgMembership({ userId, organizationId });
-    await this.assertBindingsWithinCeiling({
-      ceilingUserId: userId,
-      organizationId,
-      bindings,
-    });
+    // Service keys (no userId) skip user-level checks
+    if (userId) {
+      await this.assertOrgMembership({ userId, organizationId });
+      await this.assertBindingsWithinCeiling({
+        ceilingUserId: userId,
+        organizationId,
+        bindings,
+      });
+    }
 
     const { token, lookupId, hashedSecret } = generateApiKeyToken();
 
@@ -157,15 +160,18 @@ export class ApiKeyService {
       throw new ApiKeyNotFoundError(id);
     }
 
-    // Non-admins can only update their own keys
-    if (!callerIsAdmin && existing.userId !== callerUserId) {
-      throw new ApiKeyNotOwnedError(id);
+    // Service keys (no userId) can only be managed by admins
+    // Personal keys can be updated by the owner or admins
+    if (!callerIsAdmin) {
+      if (!existing.userId || existing.userId !== callerUserId) {
+        throw new ApiKeyNotOwnedError(id);
+      }
     }
 
     if (existing.revokedAt) throw new ApiKeyAlreadyRevokedError(id);
 
-    // Validate new bindings against the key owner's ceiling
-    if (bindings) {
+    // Validate new bindings against the key owner's ceiling (skip for service keys)
+    if (bindings && existing.userId) {
       await this.assertBindingsWithinCeiling({
         ceilingUserId: existing.userId,
         organizationId,
@@ -479,8 +485,10 @@ export class ApiKeyService {
   }): Promise<ApiKey> {
     const apiKey = await this.repo.findById({ id });
     if (!apiKey) throw new ApiKeyNotFoundError(id);
-    if (!callerIsAdmin && apiKey.userId !== callerUserId) {
-      throw new ApiKeyNotOwnedError(id);
+    if (!callerIsAdmin) {
+      if (!apiKey.userId || apiKey.userId !== callerUserId) {
+        throw new ApiKeyNotOwnedError(id);
+      }
     }
     if (apiKey.revokedAt) throw new ApiKeyAlreadyRevokedError(id);
 
