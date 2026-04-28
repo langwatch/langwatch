@@ -101,7 +101,17 @@ export function splitApiKeyToken(
 /**
  * HMAC-SHA256 of an API key secret, keyed by the server pepper. Deterministic
  * and fast — suitable for per-request verification on the hot path.
+ *
+ * CodeQL flags this as "insufficient computational effort" because it sees
+ * a secret being hashed without bcrypt/argon2. This is intentional:
+ *   - API key secrets are 48 chars from a 62-char alphabet (~286 bits of
+ *     entropy) — brute-force is infeasible regardless of hash speed.
+ *   - This runs on every authenticated request. A slow KDF (bcrypt at
+ *     100ms) would cap throughput at ~10 req/s and become a DoS surface.
+ *   - The HMAC pepper means a DB-only leak is useless without the pepper.
+ * This is NOT a user-chosen password — it is a machine-generated secret.
  */
+// eslint-disable-next-line @codeql/js/insufficient-password-hash -- see rationale above
 export function hashSecret(secret: string): string {
   return crypto
     .createHmac("sha256", getApiKeyPepper())
