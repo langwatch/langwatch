@@ -11,46 +11,45 @@ import {
   useBreakpointValue,
   VStack,
 } from "@chakra-ui/react";
-import { OrganizationUserRole } from "@prisma/client";
 import type { Organization, Project, Team } from "@prisma/client";
+import { OrganizationUserRole } from "@prisma/client";
 import { Activity, ChevronDown, ChevronRight, Info, KeyRound, Plus } from "lucide-react";
+import numeral from "numeral";
+import React, { useState } from "react";
 import { ErrorBoundary } from "react-error-boundary";
-import { PageErrorFallback } from "./ui/PageErrorFallback";
 import { NotFoundScene } from "~/components/NotFoundScene";
 import Head from "~/utils/compat/next-head";
 import { useRouter } from "~/utils/compat/next-router";
-import { signOut } from "~/utils/auth-client";
-import numeral from "numeral";
-import React, { useState } from "react";
+import { ImpersonationBanner } from "../../ee/admin/ImpersonationBanner";
+import { ImpersonationSwitchBackMenuItem } from "../../ee/admin/ImpersonationSwitchBackMenuItem";
+import { CommandBarTrigger } from "../features/command-bar";
+import { WelcomeScreen } from "../features/traces-v2/components/Welcome";
 import { useDrawer } from "../hooks/useDrawer";
 import { useLiteMemberGuard } from "../hooks/useLiteMemberGuard";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
-import { useUpgradeModalStore } from "../stores/upgradeModalStore";
-import { UpgradeModal } from "./UpgradeModal";
 import { usePlanManagementUrl } from "../hooks/usePlanManagementUrl";
 import { usePostHogIdentify } from "../hooks/usePostHogIdentify";
 import { usePublicEnv } from "../hooks/usePublicEnv";
 import { useRequiredSession } from "../hooks/useRequiredSession";
-import { ImpersonationBanner } from "../../ee/admin/ImpersonationBanner";
-import { ImpersonationSwitchBackMenuItem } from "../../ee/admin/ImpersonationSwitchBackMenuItem";
+import { SavedViewsProvider } from "../hooks/useSavedViews";
 import type { FullyLoadedOrganization } from "../server/app-layer/organizations/repositories/organization.repository";
+import { useUpgradeModalStore } from "../stores/upgradeModalStore";
 import { api } from "../utils/api";
 import { findCurrentRoute, projectRoutes, type Route } from "../utils/routes";
 import { trackEvent } from "../utils/tracking";
-import { CurrentDrawer } from "./CurrentDrawer";
-import { SavedViewsBar } from "./messages/SavedViewsBar";
 import { AnnouncementBanner } from "./AnnouncementBanner";
-import { SdkRadarBanner } from "./SdkRadarBanner";
-import { SavedViewsProvider } from "../hooks/useSavedViews";
+import { CurrentDrawer } from "./CurrentDrawer";
 import { FullLogo } from "./icons/FullLogo";
 import { LogoIcon } from "./icons/LogoIcon";
 import { LoadingScreen } from "./LoadingScreen";
 import { MainMenu, MENU_WIDTH_COMPACT, MENU_WIDTH_EXPANDED } from "./MainMenu";
+import { SavedViewsBar } from "./messages/SavedViewsBar";
 import { ProjectAvatar } from "./ProjectAvatar";
+import { SdkRadarBanner } from "./SdkRadarBanner";
+import { UpgradeModal } from "./UpgradeModal";
 import { Link } from "./ui/link";
 import { Menu } from "./ui/menu";
-import { CommandBarTrigger } from "../features/command-bar";
-import { WelcomeScreen } from "../features/traces-v2/components/Welcome";
+import { PageErrorFallback } from "./ui/PageErrorFallback";
 
 const Breadcrumbs = ({ currentRoute }: { currentRoute: Route | undefined }) => {
   const { project } = useOrganizationTeamProject();
@@ -140,8 +139,7 @@ export const ProjectSelector = React.memo(function ProjectSelector({
         <Box zIndex="popover" padding={0}>
           {open && (
             <Menu.Content>
-              <>
-                {projectGroups
+              {projectGroups
                   .filter((projectGroup) => {
                     // Org admins created via RoleBinding-only flow have no TeamUser row
                     // but still have full access. Resolve the current user's
@@ -248,7 +246,6 @@ export const ProjectSelector = React.memo(function ProjectSelector({
                       />
                     </Menu.ItemGroup>
                   ))}
-              </>
             </Menu.Content>
           )}
         </Box>
@@ -372,7 +369,7 @@ export const DashboardLayout = ({
       <Head>
         <title>
           LangWatch{project ? ` - ${project.name}` : ""}
-          {currentRoute && currentRoute.title != "Home"
+          {currentRoute && currentRoute.title !== "Home"
             ? ` - ${currentRoute?.title}`
             : ""}
         </title>

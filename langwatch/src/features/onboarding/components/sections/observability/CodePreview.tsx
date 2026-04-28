@@ -111,6 +111,7 @@ export function CodePreview({
         {() => (
           <CodeBlock.Root
             size="sm"
+            colorPalette="orange"
             code={displayCode}
             language={chakraLanguage}
             meta={{ highlightLines, colorScheme: colorMode }}

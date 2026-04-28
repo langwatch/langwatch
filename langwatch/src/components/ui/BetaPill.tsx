@@ -77,7 +77,7 @@ export function BetaPill({
         <Badge
           size="sm"
           variant="subtle"
-          colorPalette="purple"
+          colorPalette="blue"
           cursor="pointer"
           tabIndex={0}
           onMouseEnter={handleOpen}

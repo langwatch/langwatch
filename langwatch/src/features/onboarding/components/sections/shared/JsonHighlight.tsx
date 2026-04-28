@@ -153,20 +153,61 @@ function tokenizeJson(input: string): Token[] {
   return tokens;
 }
 
+/**
+ * Walk tokens once and split them into per-line groups so each line can be
+ * rendered as its own block element. Whitespace tokens that contain a
+ * newline are split between the lines they straddle so the leading
+ * indentation of the next line lands on that line's element.
+ */
+function splitTokensIntoLines(tokens: Token[]): Token[][] {
+  const lines: Token[][] = [[]];
+  for (const token of tokens) {
+    if (token.type === "whitespace" && token.value.includes("\n")) {
+      const parts = token.value.split("\n");
+      for (let i = 0; i < parts.length; i++) {
+        if (parts[i]) {
+          lines[lines.length - 1]!.push({
+            type: "whitespace",
+            value: parts[i]!,
+          });
+        }
+        if (i < parts.length - 1) lines.push([]);
+      }
+    } else {
+      lines[lines.length - 1]!.push(token);
+    }
+  }
+  return lines;
+}
+
 export function JsonHighlight({
   code,
+  highlightLines,
 }: {
   code: string;
+  /**
+   * 1-indexed line numbers to call out with a background tint. Used by
+   * the empty-state onboarding to flag the env-var lines (API key,
+   * project id, endpoint) the user actually has to copy.
+   */
+  highlightLines?: number[];
 }): React.ReactElement {
   const { colorMode } = useColorMode();
   const colors = colorMode === "dark" ? darkColors : lightColors;
   const baseColor = colorMode === "dark" ? "#e1e4e8" : "#24292e";
 
   const tokens = tokenizeJson(code);
+  const lines = splitTokensIntoLines(tokens);
+  const highlightSet = new Set(highlightLines ?? []);
+  // LangWatch's tracing accent — kept in-line so the highlight tracks
+  // colour-mode without depending on a Chakra theme token.
+  const highlightBg =
+    colorMode === "dark"
+      ? "rgba(237,137,38,0.18)"
+      : "rgba(237,137,38,0.12)";
 
   return (
     <Box
-      as="pre"
       px={5}
       py={4}
       pr={12}
@@ -174,22 +215,49 @@ export function JsonHighlight({
       fontFamily="'Geist Mono', 'IBM Plex Mono', 'Source Code Pro', Menlo, monospace"
       lineHeight="1.8"
       overflowX="hidden"
-      whiteSpace="pre-wrap"
-      wordBreak="break-all"
       letterSpacing="0.01em"
-      style={{ background: "transparent", color: baseColor, margin: 0 }}
+      style={{
+        background: "transparent",
+        color: baseColor,
+        margin: 0,
+        whiteSpace: "pre",
+      }}
     >
-      {tokens.map((token, idx) => (
-        <span
-          key={idx}
-          style={{
-            color:
-              token.type === "whitespace" ? undefined : colors[token.type],
-          }}
-        >
-          {token.value}
-        </span>
-      ))}
+      {lines.map((lineTokens, lineIdx) => {
+        const isHighlighted = highlightSet.has(lineIdx + 1);
+        return (
+          <Box
+            as="div"
+            key={lineIdx}
+            // Stretch the highlight to the full code-block width by negating
+            // the parent's horizontal padding. Without this the tint clips
+            // to the rendered token width and reads like a typo.
+            mx={isHighlighted ? -5 : 0}
+            px={isHighlighted ? 5 : 0}
+            style={{
+              background: isHighlighted ? highlightBg : "transparent",
+              borderLeft: isHighlighted
+                ? "2px solid rgba(237,137,38,0.6)"
+                : undefined,
+              paddingLeft: isHighlighted ? "calc(1.25rem - 2px)" : undefined,
+            }}
+          >
+            {lineTokens.map((token, tokenIdx) => (
+              <span
+                key={tokenIdx}
+                style={{
+                  color:
+                    token.type === "whitespace"
+                      ? undefined
+                      : colors[token.type],
+                }}
+              >
+                {token.value}
+              </span>
+            ))}
+          </Box>
+        );
+      })}
     </Box>
   );
 }

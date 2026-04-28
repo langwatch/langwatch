@@ -139,7 +139,7 @@ export function NewTracesPromo({
               textTransform="uppercase"
               lineHeight={1.2}
             >
-              Alpha
+              Beta
             </Text>
           </Box>
         </HStack>

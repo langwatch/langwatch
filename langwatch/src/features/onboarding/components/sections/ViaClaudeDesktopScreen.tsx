@@ -7,7 +7,10 @@ import { usePublicEnv } from "~/hooks/usePublicEnv";
 import { Tooltip } from "../../../../components/ui/tooltip";
 import { useActiveProject } from "../../contexts/ActiveProjectContext";
 import { maskApiKey } from "./shared/api-key-utils";
-import { buildMcpConfig } from "./shared/build-mcp-config";
+import {
+  buildMcpConfig,
+  findLangwatchEnvLines,
+} from "./shared/build-mcp-config";
 import { InlineCopyButton } from "./shared/InlineCopyButton";
 import { JsonHighlight } from "./shared/JsonHighlight";
 import { TabButton } from "./shared/TabButton";
@@ -48,6 +51,7 @@ export function ViaMcpClientScreen(): React.ReactElement {
 
   const effectiveApiKey = project?.apiKey ?? "";
   const effectiveEndpoint = publicEnv.data?.BASE_HOST;
+  const effectiveProjectId = project?.id;
 
   const configReady = !!publicEnv.data && !!effectiveApiKey;
 
@@ -58,12 +62,13 @@ export function ViaMcpClientScreen(): React.ReactElement {
             buildMcpConfig({
               apiKey: effectiveApiKey,
               endpoint: effectiveEndpoint,
+              projectId: effectiveProjectId,
             }),
             null,
             2,
           )
         : null,
-    [configReady, effectiveApiKey, effectiveEndpoint],
+    [configReady, effectiveApiKey, effectiveEndpoint, effectiveProjectId],
   );
 
   const maskedApiKey = maskApiKey(effectiveApiKey);
@@ -75,12 +80,13 @@ export function ViaMcpClientScreen(): React.ReactElement {
             buildMcpConfig({
               apiKey: maskedApiKey,
               endpoint: effectiveEndpoint,
+              projectId: effectiveProjectId,
             }),
             null,
             2,
           )
         : null,
-    [configReady, maskedApiKey, effectiveEndpoint],
+    [configReady, maskedApiKey, effectiveEndpoint, effectiveProjectId],
   );
 
   const currentApp = APPS.find((a) => a.key === activeApp)!;
@@ -242,7 +248,14 @@ export function ViaMcpClientScreen(): React.ReactElement {
             boxShadow: "md",
           }}
         >
-          <JsonHighlight code={displayConfigJson ?? "Loading config…"} />
+          <JsonHighlight
+            code={displayConfigJson ?? "Loading config…"}
+            highlightLines={
+              displayConfigJson
+                ? findLangwatchEnvLines(displayConfigJson)
+                : undefined
+            }
+          />
           {configJson && (
             <Box position="absolute" top={2.5} right={2.5}>
               <InlineCopyButton text={configJson} label="Config" />

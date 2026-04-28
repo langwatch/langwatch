@@ -17,7 +17,11 @@ import {
   PROMPT_TRACING,
 } from "./code-prompts";
 import { maskApiKey } from "./shared/api-key-utils";
-import { buildMcpJson, CLOUD_ENDPOINT } from "./shared/build-mcp-config";
+import {
+  buildMcpJson,
+  CLOUD_ENDPOINT,
+  findLangwatchEnvLines,
+} from "./shared/build-mcp-config";
 import { copyToClipboard } from "./shared/copy-to-clipboard";
 import { InlineCopyButton } from "./shared/InlineCopyButton";
 import { JsonHighlight } from "./shared/JsonHighlight";
@@ -228,6 +232,30 @@ function SkillRow({
   );
 }
 
+/**
+ * Splits a shell command at credential-bearing segments (LANGWATCH_* env
+ * assignments and the `--api-key` flag) so they can be rendered with a
+ * subtle orange accent. Everything else passes through untouched.
+ */
+function accentCredentialSegments(command: string): React.ReactNode[] {
+  const re =
+    /(--api-key \S+|LANGWATCH_(?:API_KEY|PROJECT_ID|ENDPOINT)=\S+)/g;
+  return command.split(re).map((part, i) =>
+    i % 2 === 1 ? (
+      <Text
+        as="span"
+        key={i}
+        color="orange.500"
+        fontWeight="semibold"
+      >
+        {part}
+      </Text>
+    ) : (
+      part
+    ),
+  );
+}
+
 function QuickCommand({
   label,
   displayCommand,
@@ -254,7 +282,7 @@ function QuickCommand({
             {label}
           </Text>
           <Text fontSize="xs" fontFamily="mono" color="fg.muted" wordBreak="break-all">
-            {displayCommand}
+            {accentCredentialSegments(displayCommand)}
           </Text>
         </VStack>
       </HStack>
@@ -269,16 +297,28 @@ function McpTab({
   apiKey,
   maskedKey,
   endpoint,
+  projectId,
 }: {
   mcpJson: string;
   displayConfigJson: string;
   apiKey: string;
   maskedKey: string;
   endpoint: string | undefined;
+  projectId: string | undefined;
 }): React.ReactElement {
   const isSelfHosted = endpoint && endpoint !== CLOUD_ENDPOINT;
   const endpointFlag = isSelfHosted ? ` --endpoint ${endpoint}` : "";
   const maskedEndpointFlag = isSelfHosted ? ` --endpoint ${endpoint}` : "";
+  // PROJECT_ID is plumbed through `claude mcp add`'s own --env flag (set
+  // before `--`) so the MCP server inherits it via its environment, with
+  // no dependency on a `--project-id` CLI flag we don't control. Codex
+  // already uses --env consistently, so we just append.
+  const projectIdEnvBefore = projectId
+    ? ` --env LANGWATCH_PROJECT_ID=${projectId}`
+    : "";
+  const projectIdEnvAfter = projectId
+    ? ` --env LANGWATCH_PROJECT_ID=${projectId}`
+    : "";
 
   return (
     <VStack align="stretch" gap={4}>
@@ -289,13 +329,13 @@ function McpTab({
         </Text>
         <QuickCommand
           label="Claude Code"
-          displayCommand={`claude mcp add langwatch -- npx -y @langwatch/mcp-server --api-key ${maskedKey}${maskedEndpointFlag}`}
-          copyCommand={`claude mcp add langwatch -- npx -y @langwatch/mcp-server --api-key ${apiKey}${endpointFlag}`}
+          displayCommand={`claude mcp add langwatch${projectIdEnvBefore} -- npx -y @langwatch/mcp-server --api-key ${maskedKey}${maskedEndpointFlag}`}
+          copyCommand={`claude mcp add langwatch${projectIdEnvBefore} -- npx -y @langwatch/mcp-server --api-key ${apiKey}${endpointFlag}`}
         />
         <QuickCommand
           label="OpenAI Codex"
-          displayCommand={`codex mcp add langwatch --env LANGWATCH_API_KEY=${maskedKey}${isSelfHosted ? ` --env LANGWATCH_ENDPOINT=${endpoint}` : ""} -- npx -y @langwatch/mcp-server`}
-          copyCommand={`codex mcp add langwatch --env LANGWATCH_API_KEY=${apiKey}${isSelfHosted ? ` --env LANGWATCH_ENDPOINT=${endpoint}` : ""} -- npx -y @langwatch/mcp-server`}
+          displayCommand={`codex mcp add langwatch --env LANGWATCH_API_KEY=${maskedKey}${projectIdEnvAfter}${isSelfHosted ? ` --env LANGWATCH_ENDPOINT=${endpoint}` : ""} -- npx -y @langwatch/mcp-server`}
+          copyCommand={`codex mcp add langwatch --env LANGWATCH_API_KEY=${apiKey}${projectIdEnvAfter}${isSelfHosted ? ` --env LANGWATCH_ENDPOINT=${endpoint}` : ""} -- npx -y @langwatch/mcp-server`}
         />
       </VStack>
 
@@ -318,7 +358,10 @@ function McpTab({
           boxShadow: "0 6px 28px rgba(237,137,38,0.06)",
         }}
       >
-        <JsonHighlight code={displayConfigJson} />
+        <JsonHighlight
+          code={displayConfigJson}
+          highlightLines={findLangwatchEnvLines(displayConfigJson)}
+        />
         <Box position="absolute" top={2.5} right={2.5}>
           <InlineCopyButton text={mcpJson} label="Config" />
         </Box>
@@ -364,26 +407,46 @@ function McpTab({
   );
 }
 
-export function ViaClaudeCodeScreen(): React.ReactElement {
+interface ViaClaudeCodeScreenProps {
+  /**
+   * When false, the MCP sub-tab is hidden. Used by the traces-v2 empty
+   * state, which surfaces MCP setup as its own top-level tab and doesn't
+   * want the duplicate. Defaults to true for the original onboarding flow.
+   */
+  showMcpTab?: boolean;
+}
+
+export function ViaClaudeCodeScreen({
+  showMcpTab = true,
+}: ViaClaudeCodeScreenProps = {}): React.ReactElement {
   const { project } = useActiveProject();
   const publicEnv = usePublicEnv();
   const [activeTab, setActiveTab] = useState<TabKey>("prompt");
 
   const effectiveApiKey = project?.apiKey ?? "";
   const effectiveEndpoint = publicEnv.data?.BASE_HOST;
+  const effectiveProjectId = project?.id;
 
   const maskedApiKey = maskApiKey(effectiveApiKey);
 
   const mcpJson = useMemo(
     () =>
-      buildMcpJson({ apiKey: effectiveApiKey, endpoint: effectiveEndpoint }),
-    [effectiveApiKey, effectiveEndpoint],
+      buildMcpJson({
+        apiKey: effectiveApiKey,
+        endpoint: effectiveEndpoint,
+        projectId: effectiveProjectId,
+      }),
+    [effectiveApiKey, effectiveEndpoint, effectiveProjectId],
   );
 
   const displayConfigJson = useMemo(
     () =>
-      buildMcpJson({ apiKey: maskedApiKey, endpoint: effectiveEndpoint }),
-    [maskedApiKey, effectiveEndpoint],
+      buildMcpJson({
+        apiKey: maskedApiKey,
+        endpoint: effectiveEndpoint,
+        projectId: effectiveProjectId,
+      }),
+    [maskedApiKey, effectiveEndpoint, effectiveProjectId],
   );
 
   return (
@@ -412,11 +475,13 @@ export function ViaClaudeCodeScreen(): React.ReactElement {
             active={activeTab === "skill"}
             onClick={() => setActiveTab("skill")}
           />
-          <TabButton
-            label="MCP"
-            active={activeTab === "mcp"}
-            onClick={() => setActiveTab("mcp")}
-          />
+          {showMcpTab && (
+            <TabButton
+              label="MCP"
+              active={activeTab === "mcp"}
+              onClick={() => setActiveTab("mcp")}
+            />
+          )}
         </HStack>
 
         {/* Description — stays fixed, only text swaps */}
@@ -449,7 +514,7 @@ export function ViaClaudeCodeScreen(): React.ReactElement {
                 in your coding agent whenever you need it.
               </Text>
             )}
-            {activeTab === "mcp" && (
+            {showMcpTab && activeTab === "mcp" && (
               <Text fontSize="sm" color="fg.DEFAULT/70" lineHeight="tall">
                 <Text as="span" fontWeight="semibold" color="fg.DEFAULT">
                   Live connection.
@@ -485,8 +550,15 @@ export function ViaClaudeCodeScreen(): React.ReactElement {
                 ))}
               </VStack>
             )}
-            {activeTab === "mcp" && (
-              <McpTab mcpJson={mcpJson} displayConfigJson={displayConfigJson} apiKey={effectiveApiKey} maskedKey={maskedApiKey} endpoint={effectiveEndpoint} />
+            {showMcpTab && activeTab === "mcp" && (
+              <McpTab
+                mcpJson={mcpJson}
+                displayConfigJson={displayConfigJson}
+                apiKey={effectiveApiKey}
+                maskedKey={maskedApiKey}
+                endpoint={effectiveEndpoint}
+                projectId={effectiveProjectId}
+              />
             )}
           </MotionVStack>
         </AnimatePresence>
