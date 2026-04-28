@@ -6,7 +6,7 @@ import { useDebouncedCallback } from "use-debounce";
 import { useShallow } from "zustand/react/shallow";
 import { z } from "zod";
 import DynamicZodForm from "../../../components/checks/DynamicZodForm";
-import type { EvaluatorMappingsConfig } from "../../../components/evaluators/EvaluatorEditorDrawer";
+import type { EvaluatorMappingsConfig } from "../../../components/evaluators/EvaluatorEditorShared";
 import { EvaluatorEditorContent } from "../../../components/evaluators/EvaluatorEditorContent";
 import { useAvailableEvaluators } from "../../../hooks/useAvailableEvaluators";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";

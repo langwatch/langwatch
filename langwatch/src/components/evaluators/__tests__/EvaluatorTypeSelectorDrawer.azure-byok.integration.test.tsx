@@ -275,9 +275,13 @@ describe("Feature: EvaluatorTypeSelectorDrawer Azure Safety BYOK gating", () => 
             screen.getByTestId("evaluator-type-azure-content_safety-cta"),
           );
 
-          expect(mockRouterPush).toHaveBeenCalledWith(
-            "/settings/model-providers?provider=azure_safety",
-          );
+          expect(mockRouterPush).toHaveBeenCalledWith({
+            pathname: "/settings/model-providers",
+            query: {
+              "drawer.open": "editModelProvider",
+              "drawer.providerKey": "azure_safety",
+            },
+          });
         });
       });
     });

@@ -14,7 +14,7 @@ import { Link } from "~/components/ui/link";
 import type { EvaluatorTypes } from "~/server/evaluations/evaluators.generated";
 import { WorkflowCardDisplay } from "~/optimization_studio/components/workflow/WorkflowCard";
 import { EvaluatorMappingsSection } from "./EvaluatorMappingsSection";
-import type { EvaluatorMappingsConfig } from "./EvaluatorEditorDrawer";
+import type { EvaluatorMappingsConfig } from "./EvaluatorEditorShared";
 
 /**
  * Props for the evaluator editor content.
