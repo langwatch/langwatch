@@ -145,6 +145,7 @@ export const FacetRow = memo(function FacetRow({
           textStyle="xs"
           color="fg.subtle"
           fontFamily="mono"
+          mr={2}
           fontWeight={isActive ? "600" : "400"}
           flexShrink={0}
         >

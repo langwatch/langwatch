@@ -129,7 +129,7 @@ export const SidebarSection: React.FC<SidebarSectionProps> = ({
               onClick={handleTriggerClick}
               onKeyDown={handleTriggerKeyDown}
             >
-              <HStack gap={1.5}>
+              <HStack gap={1.5} paddingRight="5px">
                 {SectionIcon && (
                   <Icon boxSize="12px" color={hasActive ? "fg" : "fg.subtle"}>
                     <SectionIcon />
@@ -155,7 +155,7 @@ export const SidebarSection: React.FC<SidebarSectionProps> = ({
                   )}
                 {activeIndicator}
               </HStack>
-              <Icon color="fg.subtle" boxSize="12px">
+              <Icon color="fg.subtle" boxSize="12px" mr={2}>
                 {effectiveOpen ? <ChevronUp /> : <ChevronDown />}
               </Icon>
             </Button>

@@ -19,11 +19,17 @@ import { PanelLeftClose } from "lucide-react";
 import type React from "react";
 import { useCallback, useMemo } from "react";
 import { useUIStore } from "../../stores/uiStore";
+import {
+  FIELD_NAMES,
+  getFacetValues,
+  getRangeValue,
+  SEARCH_FIELDS,
+} from "../../utils/queryParser";
 import { CollapsedSidebar } from "./CollapsedSidebar";
+import { getFacetGroupId } from "./constants";
 import { FacetGroupHeader } from "./FacetGroupHeader";
 import { FilterSidebarSkeleton } from "./FilterSidebarSkeleton";
 import { SectionRenderer } from "./SectionRenderer";
-import { SortableSection } from "./SortableSection";
 import { useFilterSidebarData } from "./hooks/useFilterSidebarData";
 
 const GROUP_ID_PREFIX = "__group:";
@@ -54,7 +60,6 @@ export const FilterSidebar: React.FC = () => {
     toggleFacet,
     setRange,
     removeRange,
-    setSectionOrder,
     setGroupOrder,
     setAllSectionsOpen,
   } = useFilterSidebarData();
@@ -63,6 +68,30 @@ export const FilterSidebar: React.FC = () => {
     () => orderedGroups.map((g) => groupSortableId(g.id)),
     [orderedGroups],
   );
+
+  // A group is "modified" when at least one of its sections has an active
+  // filter in the working AST. We walk every known SEARCH_FIELD (not just
+  // sections present in the current discover response) so the dot still
+  // lights when a filter has been applied to a section that hasn't
+  // rendered yet — e.g. a query bar typed `selectedPrompt:foo` before any
+  // matching trace has come back.
+  const modifiedGroupIds = useMemo(() => {
+    const set = new Set<string>();
+    for (const field of FIELD_NAMES) {
+      const meta = SEARCH_FIELDS[field];
+      if (!meta?.hasSidebar || !meta.facetField) continue;
+      const groupId = getFacetGroupId(meta.facetField);
+      if (!groupId) continue;
+      if (set.has(groupId)) continue;
+      if (meta.valueType === "range") {
+        if (getRangeValue(ast, field) !== null) set.add(groupId);
+      } else if (meta.valueType === "categorical") {
+        const { include, exclude } = getFacetValues(ast, field);
+        if (include.length + exclude.length > 0) set.add(groupId);
+      }
+    }
+    return set;
+  }, [ast]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -73,41 +102,24 @@ export const FilterSidebar: React.FC = () => {
     }),
   );
 
+  // Only the group headers are reorderable. Sections inside a group sit in
+  // their registry order — letting users shuffle them turned out to be more
+  // confusing than useful (everyone's sidebar looked subtly different).
   const handleDragEnd = useCallback(
     ({ active, over }: DragEndEvent) => {
       if (!over || active.id === over.id) return;
       const activeId = String(active.id);
       const overId = String(over.id);
-
-      // Group-level drag — both ids carry the GROUP prefix.
-      if (isGroupSortableId(activeId) && isGroupSortableId(overId)) {
-        const oldIndex = groupSortableIds.indexOf(activeId);
-        const newIndex = groupSortableIds.indexOf(overId);
-        if (oldIndex < 0 || newIndex < 0) return;
-        const reordered = arrayMove(groupSortableIds, oldIndex, newIndex).map(
-          groupIdFromSortableId,
-        );
-        setGroupOrder(reordered);
-        return;
-      }
-
-      // Section-level drag — reject if it crosses a group boundary.
-      if (isGroupSortableId(activeId) || isGroupSortableId(overId)) return;
-      const sourceGroup = orderedGroups.find((g) => g.keys.includes(activeId));
-      const targetGroup = orderedGroups.find((g) => g.keys.includes(overId));
-      if (!sourceGroup || sourceGroup.id !== targetGroup?.id) return;
-      const oldIndex = orderedKeys.indexOf(activeId);
-      const newIndex = orderedKeys.indexOf(overId);
+      if (!isGroupSortableId(activeId) || !isGroupSortableId(overId)) return;
+      const oldIndex = groupSortableIds.indexOf(activeId);
+      const newIndex = groupSortableIds.indexOf(overId);
       if (oldIndex < 0 || newIndex < 0) return;
-      setSectionOrder(arrayMove(orderedKeys, oldIndex, newIndex));
+      const reordered = arrayMove(groupSortableIds, oldIndex, newIndex).map(
+        groupIdFromSortableId,
+      );
+      setGroupOrder(reordered);
     },
-    [
-      orderedKeys,
-      orderedGroups,
-      groupSortableIds,
-      setSectionOrder,
-      setGroupOrder,
-    ],
+    [groupSortableIds, setGroupOrder],
   );
 
   const handleShiftToggle = useCallback(
@@ -120,22 +132,18 @@ export const FilterSidebar: React.FC = () => {
       const section = sectionByKey.get(key);
       if (!section) return null;
       return (
-        <SortableSection key={key} id={key}>
-          {({ dragHandleProps }) => (
-            <SectionRenderer
-              section={section}
-              ast={ast}
-              attributeKeys={attributeKeys}
-              facetItemsByKey={facetItems}
-              valueStateGetters={getValueStates}
-              toggleFacet={toggleFacet}
-              setRange={setRange}
-              removeRange={removeRange}
-              onShiftToggle={handleShiftToggle}
-              dragHandleProps={dragHandleProps}
-            />
-          )}
-        </SortableSection>
+        <SectionRenderer
+          key={key}
+          section={section}
+          ast={ast}
+          attributeKeys={attributeKeys}
+          facetItemsByKey={facetItems}
+          valueStateGetters={getValueStates}
+          toggleFacet={toggleFacet}
+          setRange={setRange}
+          removeRange={removeRange}
+          onShiftToggle={handleShiftToggle}
+        />
       );
     },
     [
@@ -191,13 +199,9 @@ export const FilterSidebar: React.FC = () => {
                   key={group.id}
                   id={groupSortableId(group.id)}
                   label={group.label}
+                  isModified={modifiedGroupIds.has(group.id)}
                 >
-                  <SortableContext
-                    items={group.keys}
-                    strategy={verticalListSortingStrategy}
-                  >
-                    {group.keys.map(renderSection)}
-                  </SortableContext>
+                  {group.keys.map(renderSection)}
                 </FacetGroupHeader>
               ))}
             </SortableContext>

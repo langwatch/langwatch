@@ -25,7 +25,7 @@ export interface TooltipLine {
   negated: boolean;
 }
 
-export type SectionGroup = "trace" | "evaluation" | "span" | "metadata";
+export type SectionGroup = "trace" | "evaluation" | "span" | "metadata" | "prompt";
 
 export type SectionKind = "cat" | "range" | "attributes";
 

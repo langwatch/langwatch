@@ -21,7 +21,6 @@ interface SectionRendererProps {
   setRange: (field: string, from: string, to: string) => void;
   removeRange: (field: string) => void;
   onShiftToggle: (nextOpen: boolean) => void;
-  dragHandleProps: React.HTMLAttributes<HTMLDivElement>;
 }
 
 export const SectionRenderer: React.FC<SectionRendererProps> = ({
@@ -34,7 +33,6 @@ export const SectionRenderer: React.FC<SectionRendererProps> = ({
   setRange,
   removeRange,
   onShiftToggle,
-  dragHandleProps,
 }) => {
   const icon = getFacetIcon({ key: section.key, group: section.group });
 
@@ -56,7 +54,6 @@ export const SectionRenderer: React.FC<SectionRendererProps> = ({
         items={facetItemsByKey.get(section.key)!}
         getValueState={valueStateGetters.get(section.key)!}
         onToggle={toggleFacet}
-        dragHandleProps={dragHandleProps}
         onShiftToggle={onShiftToggle}
         noneRow={noneRow}
       />
@@ -77,7 +74,6 @@ export const SectionRenderer: React.FC<SectionRendererProps> = ({
         formatValue={getRangeFormatter(section.key)}
         onChange={(from, to) => setRange(section.key, from, to)}
         onClear={() => removeRange(section.key)}
-        dragHandleProps={dragHandleProps}
         onShiftToggle={onShiftToggle}
       />
     );
@@ -100,7 +96,6 @@ export const SectionRenderer: React.FC<SectionRendererProps> = ({
         toggleFacet(`attribute.${attrKey}`, value)
       }
       onToggleNone={(attrKey) => toggleFacet("none", `attribute.${attrKey}`)}
-      dragHandleProps={dragHandleProps}
       onShiftToggle={onShiftToggle}
     />
   );

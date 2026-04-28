@@ -1,5 +1,6 @@
 import {
   Activity,
+  BookMarked,
   Boxes,
   CheckSquare,
   Clock,
@@ -7,6 +8,7 @@ import {
   Database,
   DollarSign,
   Hash,
+  History,
   ListTree,
   MessageSquare,
   Server,
@@ -92,6 +94,9 @@ export const FACET_ICONS: Record<string, LucideIcon> = {
   ttft: Timer,
   tokens: Hash,
   metadataKeys: Database,
+  selectedPrompt: BookMarked,
+  lastUsedPrompt: History,
+  promptVersion: Hash,
   [ATTRIBUTES_SECTION_KEY]: Database,
 };
 
@@ -103,7 +108,13 @@ export const GROUP_ICONS: Record<string, LucideIcon> = {
 };
 
 export interface FacetGroupDef {
-  id: "trace" | "metrics" | "evaluators" | "events" | "attributes";
+  id:
+    | "trace"
+    | "prompts"
+    | "metrics"
+    | "evaluators"
+    | "events"
+    | "attributes";
   label: string;
   keys: string[];
 }
@@ -129,6 +140,11 @@ export const FACET_GROUPS: FacetGroupDef[] = [
       "subtopic",
       "label",
     ],
+  },
+  {
+    id: "prompts",
+    label: "Prompts",
+    keys: ["selectedPrompt", "lastUsedPrompt", "promptVersion"],
   },
   {
     id: "metrics",

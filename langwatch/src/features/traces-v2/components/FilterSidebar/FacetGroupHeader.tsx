@@ -8,6 +8,10 @@ interface FacetGroupHeaderProps {
   /** Sortable id — convention is `__group:<groupId>`. */
   id: string;
   label: string;
+  /** True when the group has filters active that differ from the saved lens.
+   * Renders a small dot next to the label so users can see at a glance which
+   * groups are currently driving narrowing. */
+  isModified?: boolean;
   children: React.ReactNode;
 }
 
@@ -23,6 +27,7 @@ const DRAG_HANDLE_GLYPH = "12px";
 export const FacetGroupHeader: React.FC<FacetGroupHeaderProps> = ({
   id,
   label,
+  isModified = false,
   children,
 }) => {
   const {
@@ -96,6 +101,20 @@ export const FacetGroupHeader: React.FC<FacetGroupHeaderProps> = ({
         >
           {label}
         </Text>
+        {isModified && (
+          <Box
+            as="span"
+            width="8px"
+            height="8px"
+            borderRadius="full"
+            backgroundColor="blue.500"
+            display="inline-block"
+            flexShrink={0}
+            marginLeft={1}
+            aria-label={`${label} group has filters applied`}
+            title={`${label} group has filters applied`}
+          />
+        )}
       </HStack>
       {children}
     </Box>

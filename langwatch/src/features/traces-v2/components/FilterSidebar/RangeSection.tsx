@@ -106,24 +106,39 @@ export const RangeSection: React.FC<RangeSectionProps> = ({
       }
     >
       <VStack gap={2} align="stretch" paddingX={2}>
-        <SimpleSlider
-          size="sm"
-          min={min}
-          max={max}
-          value={localValue}
-          onValueChange={(d) => setLocalValue([d.value[0]!, d.value[1]!])}
-          onValueChangeEnd={handleChangeEnd}
-          colorPalette={isActive ? "blue" : "gray"}
-        />
+        {/*
+         * A SimpleSlider with `min === max` (or any non-positive span)
+         * trips zag-js's invariants and throws synchronously, which has
+         * been masking real errors during empty-state mounts. Skip the
+         * slider in that degenerate case and render the single value
+         * as static text instead.
+         */}
+        {max > min ? (
+          <>
+            <SimpleSlider
+              size="sm"
+              min={min}
+              max={max}
+              value={localValue}
+              onValueChange={(d) => setLocalValue([d.value[0]!, d.value[1]!])}
+              onValueChangeEnd={handleChangeEnd}
+              colorPalette={isActive ? "blue" : "gray"}
+            />
 
-        <HStack justify="space-between">
+            <HStack justify="space-between">
+              <Text textStyle="2xs" color="fg.subtle" fontFamily="mono">
+                {formatValue(localValue[0])}
+              </Text>
+              <Text textStyle="2xs" color="fg.subtle" fontFamily="mono">
+                {formatValue(localValue[1])}
+              </Text>
+            </HStack>
+          </>
+        ) : (
           <Text textStyle="2xs" color="fg.subtle" fontFamily="mono">
-            {formatValue(localValue[0])}
+            {formatValue(min)}
           </Text>
-          <Text textStyle="2xs" color="fg.subtle" fontFamily="mono">
-            {formatValue(localValue[1])}
-          </Text>
-        </HStack>
+        )}
       </VStack>
     </SidebarSection>
   );
