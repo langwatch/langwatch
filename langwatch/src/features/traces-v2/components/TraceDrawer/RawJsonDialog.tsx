@@ -13,7 +13,7 @@ import { useColorMode } from "~/components/ui/color-mode";
 import { Dialog } from "~/components/ui/dialog";
 import type { TraceHeader } from "~/server/api/routers/tracesV2.schemas";
 import { useSpansFull } from "../../hooks/useSpansFull";
-import { ShikiCodeBlock } from "./MarkdownView";
+import { ShikiCodeBlock } from "./markdownView";
 import { SegmentedToggle } from "./SegmentedToggle";
 
 const COPY_FEEDBACK_MS = 1500;

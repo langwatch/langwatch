@@ -1,14 +1,20 @@
-import { HStack, Icon, Text, VStack } from "@chakra-ui/react";
+import { Avatar, Box, HStack, Icon, Text, VStack } from "@chakra-ui/react";
+import { Lightbulb } from "lucide-react";
 import {
-  LuBoxes,
+  LuBookMarked,
   LuCircleDashed,
   LuCode,
-  LuFileText,
+  LuCompass,
+  LuHistory,
+  LuMessageSquare,
   LuServer,
   LuSparkles,
   LuTriangleAlert,
 } from "react-icons/lu";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { TraceHeader } from "~/server/api/routers/tracesV2.schemas";
+import { api } from "~/utils/api";
+import { useConversationTurns } from "../../hooks/useConversationTurns";
 import {
   type PromptChipState,
   type SdkInfoLike,
@@ -50,7 +56,103 @@ export function TraceHeaderChips({
     )
     .filter((c): c is ChipDef => c != null);
 
+  const annotationsChip = useAnnotationsChip(trace);
+  if (annotationsChip) chipDefs.push(annotationsChip);
+
   return <ChipBar chips={chipDefs} endSlot={endSlot} />;
+}
+
+/**
+ * Header chip listing annotations on this trace + every other turn in the
+ * same conversation. Hidden when there are zero. Click to peek at the list;
+ * clicking an entry doesn't edit (kept lightweight) — the conversation
+ * view's Annotations mode is the place for editing the rollup.
+ */
+function useAnnotationsChip(trace: TraceHeader): ChipDef | null {
+  const { project, hasPermission } = useOrganizationTeamProject();
+  const conversation = useConversationTurns(trace.conversationId ?? null);
+  const traceIds = [
+    trace.traceId,
+    ...(conversation.data?.items ?? [])
+      .map((t) => t.traceId)
+      .filter((id) => id !== trace.traceId),
+  ];
+
+  const annotations = api.annotation.getByTraceIds.useQuery(
+    { projectId: project?.id ?? "", traceIds },
+    {
+      enabled:
+        !!project?.id && traceIds.length > 0 && hasPermission("annotations:view"),
+    },
+  );
+
+  const items = annotations.data ?? [];
+  if (items.length === 0) return null;
+  const hasCorrection = items.some((a) => a.expectedOutput);
+
+  return {
+    id: "annotations",
+    label: "Annotations",
+    value: String(items.length),
+    icon: LuMessageSquare,
+    tone: "yellow",
+    priority: 1,
+    popover: (
+      <VStack
+        align="stretch"
+        gap={3}
+        minWidth="300px"
+        maxWidth="380px"
+        paddingX={3}
+        paddingY={2.5}
+      >
+        <HStack gap={2}>
+          <Text textStyle="xs" fontWeight="600">
+            {items.length} annotation{items.length === 1 ? "" : "s"}
+          </Text>
+          {hasCorrection && (
+            <HStack gap={1} color="yellow.fg">
+              <Icon as={Lightbulb} boxSize={3} />
+              <Text textStyle="2xs">includes corrections</Text>
+            </HStack>
+          )}
+        </HStack>
+        <Box height="1px" bg="border.muted" marginX={-3} />
+        <VStack align="stretch" gap={3} maxHeight="280px" overflowY="auto">
+          {items.map((a) => (
+            <HStack key={a.id} gap={2.5} align="start">
+              <Avatar.Root size="xs" background="gray.solid" color="white">
+                <Avatar.Fallback name={a.user?.name ?? a.email ?? "?"} />
+              </Avatar.Root>
+              <VStack align="start" gap={0.5} flex={1} minWidth={0}>
+                <HStack gap={1.5} width="full">
+                  <Text textStyle="2xs" fontWeight="600">
+                    {a.user?.name ?? a.email ?? "anonymous"}
+                  </Text>
+                  {a.expectedOutput && (
+                    <Icon as={Lightbulb} boxSize={2.5} color="yellow.fg" />
+                  )}
+                  <Box flex={1} />
+                  <Text textStyle="2xs" color="fg.subtle">
+                    {new Date(a.createdAt).toLocaleDateString()}
+                  </Text>
+                </HStack>
+                {a.comment && (
+                  <Text textStyle="2xs" color="fg.muted" lineClamp={3}>
+                    {a.comment}
+                  </Text>
+                )}
+              </VStack>
+            </HStack>
+          ))}
+        </VStack>
+        <Box height="1px" bg="border.muted" marginX={-3} />
+        <Text textStyle="2xs" color="fg.subtle">
+          Open Conversation → Annotations to edit.
+        </Text>
+      </VStack>
+    ),
+  };
 }
 
 function buildChipDef(
@@ -79,7 +181,7 @@ function buildChipDef(
         id: "origin",
         label: "Origin",
         value: data.value,
-        icon: LuBoxes,
+        icon: LuCompass,
         tone: "neutral",
         priority,
         onFilter: data.onFilter,
@@ -158,7 +260,7 @@ function buildSelectedPromptChipDef(
     id: `prompt-selected:${selectedId}`,
     label: "Selected",
     value: selectedId,
-    icon: LuFileText,
+    icon: LuBookMarked,
     tone: "blue",
     onClick: spanId ? () => onSelectSpan(spanId) : undefined,
     tooltip: (
@@ -205,7 +307,7 @@ function buildLastUsedPromptChipDef({
     ? LuCircleDashed
     : driftFromSelection || outOfDate
       ? LuTriangleAlert
-      : LuFileText;
+      : LuHistory;
 
   const onClick = () => {
     if (spanId) {

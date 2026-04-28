@@ -197,7 +197,7 @@ export function PinnedAwareJsonView({
           marginLeft={-2}
           borderLeftWidth="2px"
           borderLeftColor={pinned ? "blue.solid" : "transparent"}
-          bg={pinned ? "blue.500/8" : "transparent"}
+          bg={pinned ? "blue.solid/8" : "transparent"}
         >
           <HighlightedJson json={line} />
         </Box>

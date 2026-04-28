@@ -1,7 +1,13 @@
 import { Box, Skeleton, VStack } from "@chakra-ui/react";
+import { motion } from "motion/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Drawer } from "~/components/ui/drawer";
-import { useDrawer, useDrawerParams } from "~/hooks/useDrawer";
+import { Tooltip } from "~/components/ui/tooltip";
+import {
+  useDrawer,
+  useDrawerParams,
+  useUpdateDrawerParams,
+} from "~/hooks/useDrawer";
 import type { SpanTreeNode } from "~/server/api/routers/tracesV2.schemas";
 import { usePrefetchSpanDetail } from "../../hooks/usePrefetchSpanDetail";
 import { useSpanTree } from "../../hooks/useSpanSummary";
@@ -9,6 +15,7 @@ import { useThreadContext } from "../../hooks/useThreadContext";
 import { useThreadPrefetch } from "../../hooks/useThreadPrefetch";
 import { useTraceDrawerNavigation } from "../../hooks/useTraceDrawerNavigation";
 import { useTraceHeader } from "../../hooks/useTraceHeader";
+import { useTraceRefresh } from "../../hooks/useTraceRefresh";
 import type {
   DrawerTab,
   DrawerViewMode,
@@ -18,15 +25,15 @@ import { useDrawerStore } from "../../stores/drawerStore";
 import { parseTracePromptIds } from "../../utils/promptAttributes";
 import { BelowFoldIndicator } from "./BelowFoldIndicator";
 import { ConversationContext } from "./ConversationContext";
-import { ConversationView } from "./ConversationView";
-import { DrawerHeader } from "./DrawerHeader";
+import { ConversationView } from "./conversationView";
+import { DrawerHeader } from "./drawerHeader";
 import { KeyboardShortcutsHelp } from "./KeyboardShortcutsHelp";
 import { LlmPanel } from "./LlmPanel";
 import { PromptsPanel } from "./PromptsPanel";
 import { SpanTabBar } from "./SpanTabBar";
 import { ScenarioRoleProvider } from "./scenarioRoles";
-import { TraceAccordions } from "./TraceAccordions";
 import { TraceDrawerEmptyState } from "./TraceDrawerEmptyState";
+import { TraceAccordions } from "./traceAccordions";
 import { VizPlaceholder } from "./VizPlaceholder";
 
 export interface TraceV2DrawerShellProps {
@@ -54,9 +61,28 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
   // the lower SpanTabBar as a "LLM" tab and is no longer a viz option.
   const rawViz = params.viz as string | undefined;
   const vizParam: VizTab =
-    rawViz === "waterfall" || rawViz === "flame" || rawViz === "spanlist"
+    rawViz === "waterfall" ||
+    rawViz === "flame" ||
+    rawViz === "spanlist" ||
+    rawViz === "sequence"
       ? rawViz
       : "waterfall";
+
+  const rawTab = params.tab as string | undefined;
+  const tabParam: DrawerTab | null =
+    rawTab === "summary" ||
+    rawTab === "span" ||
+    rawTab === "llm" ||
+    rawTab === "prompts" ||
+    rawTab === "annotations"
+      ? rawTab
+      : null;
+
+  const rawMode = params.mode as string | undefined;
+  const modeParam: DrawerViewMode =
+    rawMode === "trace" || rawMode === "conversation" ? rawMode : "trace";
+
+  const updateDrawerParams = useUpdateDrawerParams();
 
   // Sync URL params → zustand store so hooks can read from it
   const storeOpenTrace = useDrawerStore((s) => s.openTrace);
@@ -98,11 +124,18 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
     spanParam,
   );
   const [activeTab, setActiveTab] = useState<DrawerTab>(
-    spanParam ? "span" : "summary",
+    tabParam ?? (spanParam ? "span" : "summary"),
   );
   const [pinnedSpanIds, setPinnedSpanIds] = useState<string[]>([]);
-  const viewMode = useDrawerStore((s) => s.viewMode);
+  const [viewMode, setViewModeLocal] = useState<DrawerViewMode>(modeParam);
   const setStoreViewMode = useDrawerStore((s) => s.setViewMode);
+  const setViewMode = useCallback(
+    (mode: DrawerViewMode) => {
+      setViewModeLocal(mode);
+      setStoreViewMode(mode);
+    },
+    [setStoreViewMode],
+  );
   const setStoreVizTab = useDrawerStore((s) => s.setVizTab);
   const setStoreActiveTab = useDrawerStore((s) => s.setActiveTab);
 
@@ -122,6 +155,12 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
     canGoBack,
     backStackDepth,
   } = useTraceDrawerNavigation();
+
+  // Same hook DrawerHeader's refresh button uses — we re-instantiate
+  // it here so the `R` shortcut can fire even if the header is in a
+  // refreshing-spinner state. The hook is memoized per traceId so
+  // duplicating it does not mean duplicate work.
+  const { refresh: refreshActiveTrace } = useTraceRefresh(traceId ?? "");
 
   const selectedSpan = useMemo(
     () =>
@@ -145,10 +184,41 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
     if (next) prefetchSpan(next.spanId);
   }, [selectedSpanId, spanTree, prefetchSpan]);
 
-  // Sync from URL params when they change
+  // ── URL ↔ state bidirectional sync ──────────────────────────────────────
+  // Reading: when URL params change (browser back/forward, paste-in URL,
+  // tab restore), pull the values back into local state.
   useEffect(() => {
     setVizTab(vizParam);
   }, [vizParam]);
+
+  useEffect(() => {
+    if (tabParam && tabParam !== activeTab) setActiveTab(tabParam);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tabParam]);
+
+  useEffect(() => {
+    if (modeParam !== viewMode) setViewMode(modeParam);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [modeParam]);
+
+  // Writing: when local state diverges from URL params, push a history
+  // entry so back/forward walks the user's tab navigation. The push only
+  // fires when state ≠ URL, so the URL → state effect above never causes
+  // a feedback loop.
+  useEffect(() => {
+    if (vizTab !== vizParam) updateDrawerParams({ viz: vizTab });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vizTab]);
+
+  useEffect(() => {
+    if (activeTab !== tabParam) updateDrawerParams({ tab: activeTab });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
+
+  useEffect(() => {
+    if (viewMode !== modeParam) updateDrawerParams({ mode: viewMode });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewMode]);
 
   useEffect(() => {
     setSelectedSpanId(spanParam);
@@ -181,6 +251,25 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
 
   // Warm sibling trace headers so navigating between turns is instant.
   useThreadPrefetch(trace?.conversationId ?? null, trace?.traceId ?? null);
+
+  // Direction the user is moving in the conversation thread, derived from
+  // the change in thread position. Drives the body's slide animation: J
+  // (forward) slides left → in, K (backward) slides right → in. -1 = forward,
+  // +1 = backward, 0 = no slide (initial / non-thread navigation).
+  const prevThreadPosRef = useRef<number | null>(null);
+  const [navDirection, setNavDirection] = useState<-1 | 0 | 1>(0);
+  useEffect(() => {
+    const next = threadContext.position;
+    const prev = prevThreadPosRef.current;
+    prevThreadPosRef.current = next;
+    if (prev == null || next == null || prev === next) {
+      setNavDirection(0);
+      return;
+    }
+    setNavDirection(next > prev ? -1 : 1);
+    const id = setTimeout(() => setNavDirection(0), 360);
+    return () => clearTimeout(id);
+  }, [threadContext.position, traceId]);
 
   // Double-click anywhere outside the drawer panel to close. Single clicks are
   // intentionally ignored — the drawer is non-modal so users can interact with
@@ -361,6 +450,11 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
           setVizTab("spanlist");
           break;
         }
+        case "4": {
+          e.preventDefault();
+          setVizTab("sequence");
+          break;
+        }
         case "o":
         case "O": {
           if (selectedSpanId) {
@@ -372,7 +466,7 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
         case "l":
         case "L": {
           e.preventDefault();
-          setStoreViewMode("trace");
+          setViewMode("trace");
           setActiveTab("llm");
           break;
         }
@@ -385,7 +479,7 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
             (trace.attributes["langwatch.prompt_ids"] ?? "").length > 0
           ) {
             e.preventDefault();
-            setStoreViewMode("trace");
+            setViewMode("trace");
             setActiveTab("prompts");
           }
           break;
@@ -393,14 +487,14 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
         case "t":
         case "T": {
           e.preventDefault();
-          setStoreViewMode("trace");
+          setViewMode("trace");
           break;
         }
         case "c":
         case "C": {
           if (trace.conversationId) {
             e.preventDefault();
-            setStoreViewMode("conversation");
+            setViewMode("conversation");
           }
           break;
         }
@@ -408,6 +502,18 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
         case "M": {
           e.preventDefault();
           setIsMaximized((prev) => !prev);
+          break;
+        }
+        case "r":
+        case "R": {
+          e.preventDefault();
+          void refreshActiveTrace();
+          break;
+        }
+        case "y":
+        case "Y": {
+          e.preventDefault();
+          void navigator.clipboard.writeText(trace.traceId);
           break;
         }
       }
@@ -422,7 +528,7 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
     viewMode,
     handleClearSpan,
     handleClose,
-    setStoreViewMode,
+    setViewMode,
     threadContext.next,
     threadContext.previous,
     spanTree,
@@ -431,6 +537,7 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
     canGoBack,
     goBackInTraceHistory,
     shortcutsOpen,
+    refreshActiveTrace,
   ]);
 
   // Error state: trace not found, network failure, or no selection.
@@ -473,6 +580,41 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
         maxWidth={isMaximized ? undefined : "45%"}
         transition="max-width 0.2s ease"
       >
+        <Tooltip
+          content="Double-click to expand · click again to restore"
+          positioning={{ placement: "right" }}
+          openDelay={500}
+        >
+          <Box
+            position="absolute"
+            top={0}
+            bottom={0}
+            left={0}
+            width="6px"
+            cursor="ew-resize"
+            zIndex={2}
+            onDoubleClick={handleToggleMaximized}
+            _hover={{
+              "& > [data-edge-grip]": { opacity: 1 },
+            }}
+            aria-label="Drag edge to resize, double-click to toggle"
+          >
+            <Box
+              data-edge-grip
+              position="absolute"
+              top="50%"
+              left="2px"
+              transform="translateY(-50%)"
+              width="2px"
+              height="32px"
+              borderRadius="full"
+              bg="border.emphasized"
+              opacity={0.35}
+              transition="opacity 120ms ease"
+              pointerEvents="none"
+            />
+          </Box>
+        </Tooltip>
         <Drawer.Body paddingY={0} paddingX={0} overflowY="auto">
           <VStack align="stretch" gap={0} height="full">
             {/* Header — always visible, renders first */}
@@ -489,13 +631,14 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
                   onSelectSpan={handleSelectSpan}
                   onOpenPromptsTab={() => setActiveTab("prompts")}
                   viewMode={viewMode}
-                  onViewModeChange={setStoreViewMode}
+                  onViewModeChange={setViewMode}
                   onToggleMaximized={handleToggleMaximized}
                   onClose={handleClose}
                   onShowShortcuts={() => setShortcutsOpen(true)}
                   canGoBack={canGoBack}
                   onGoBack={goBackInTraceHistory}
                   backStackDepth={backStackDepth}
+                  isNavigating={headerQuery.isFetching}
                 />
               </Box>
             )}
@@ -511,19 +654,38 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
                 <Skeleton height="80px" borderRadius="md" />
               </VStack>
             ) : trace ? (
-              /* Content area — fades on switch */
+              /* Content area — animated via a single persistent motion.div
+                 (NO key change → no remount → no Mermaid / Shiki / viz-canvas
+                 re-instantiation). The body slides + fades + scales to
+                 communicate navigation direction; once the new trace data
+                 lands it springs back to centre. Heavy children stay mounted
+                 throughout, which is why thread navigation feels snappy. */
               <ScenarioRoleProvider
                 isScenario={
                   !!(trace.scenarioRunId ?? trace.attributes["scenario.run_id"])
                 }
               >
-                <Box
+                <motion.div
                   ref={scrollContentRef}
-                  flex={1}
-                  overflow="auto"
-                  position="relative"
-                  display="flex"
-                  flexDirection="column"
+                  animate={{
+                    x: headerQuery.isFetching ? navDirection * 16 : 0,
+                    opacity: headerQuery.isFetching ? 0.82 : 1,
+                    scale: headerQuery.isFetching ? 0.994 : 1,
+                  }}
+                  transition={{
+                    type: "spring",
+                    stiffness: 280,
+                    damping: 30,
+                    mass: 0.7,
+                  }}
+                  style={{
+                    flex: 1,
+                    overflow: "auto",
+                    position: "relative",
+                    display: "flex",
+                    flexDirection: "column",
+                    minHeight: 0,
+                  }}
                 >
                   {viewMode === "conversation" && trace.conversationId ? (
                     <ConversationView
@@ -608,7 +770,7 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
                       )}
                     </VStack>
                   )}
-                </Box>
+                </motion.div>
                 <BelowFoldIndicator scrollRef={scrollContentRef} />
               </ScenarioRoleProvider>
             ) : null}

@@ -1,5 +1,12 @@
 import { Box, Flex, HStack, Icon, Text, VStack } from "@chakra-ui/react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import {
   LuChartGantt,
   LuChevronDown,
@@ -7,6 +14,7 @@ import {
   LuFlame,
   LuGripHorizontal,
   LuList,
+  LuMessagesSquare,
   LuMinus,
 } from "react-icons/lu";
 import { Kbd } from "~/components/ops/shared/Kbd";
@@ -23,10 +31,23 @@ import type {
 } from "~/server/api/routers/tracesV2.schemas";
 import type { VizTab } from "../../stores/drawerStore";
 import { SPAN_TYPE_COLORS } from "../../utils/formatters";
-import { FlameView } from "./FlameView";
 import { NewSpanFlash } from "./NewSpanFlash";
-import { SpanListView } from "./SpanListView";
-import { WaterfallView } from "./WaterfallView";
+
+// Each viz lives in its own chunk so the trace drawer's initial JS payload
+// stays small. Only the active tab's chunk is downloaded — and React only
+// mounts the active viz, so non-active ones cost nothing at runtime either.
+const WaterfallView = lazy(() =>
+  import("./waterfallView").then((m) => ({ default: m.WaterfallView })),
+);
+const FlameView = lazy(() =>
+  import("./flameView").then((m) => ({ default: m.FlameView })),
+);
+const SpanListView = lazy(() =>
+  import("./spanListView").then((m) => ({ default: m.SpanListView })),
+);
+const SequenceView = lazy(() =>
+  import("./sequenceView").then((m) => ({ default: m.SequenceView })),
+);
 
 interface VizPlaceholderProps {
   vizTab: VizTab;
@@ -77,6 +98,12 @@ const TABS: {
   { value: "waterfall", label: "Waterfall", icon: LuChartGantt, shortcut: "1" },
   { value: "flame", label: "Flame", icon: LuFlame, shortcut: "2" },
   { value: "spanlist", label: "Span List", icon: LuList, shortcut: "3" },
+  {
+    value: "sequence",
+    label: "Sequence",
+    icon: LuMessagesSquare,
+    shortcut: "4",
+  },
 ];
 
 function getStoredHeight(): number {
@@ -342,7 +369,7 @@ export function VizPlaceholder({
               enabled={!!trace && !isCollapsed}
             >
               {isLoading && spans.length === 0 ? (
-                <VizSkeleton />
+                <VizSkeleton vizTab={vizTab} />
               ) : spans.length === 0 ? (
                 <Flex align="center" justify="center" height="full">
                   <Text textStyle="xs" color="fg.subtle">
@@ -351,30 +378,41 @@ export function VizPlaceholder({
                 </Flex>
               ) : isCollapsed ? (
                 <CollapsedOverview spans={spans} />
-              ) : vizTab === "waterfall" ? (
-                <WaterfallView
-                  spans={spans}
-                  selectedSpanId={selectedSpanId}
-                  onSelectSpan={onSelectSpan}
-                  onClearSpan={onClearSpan}
-                  onSwitchToSpanList={handleSwitchToSpanList}
-                />
-              ) : vizTab === "flame" ? (
-                <FlameView
-                  spans={spans}
-                  selectedSpanId={selectedSpanId}
-                  onSelectSpan={onSelectSpan}
-                  onClearSpan={onClearSpan}
-                />
               ) : (
-                <SpanListView
-                  spans={spans}
-                  selectedSpanId={selectedSpanId}
-                  onSelectSpan={onSelectSpan}
-                  onClearSpan={onClearSpan}
-                  initialSearch={spanListSearch}
-                  initialTypeFilter={spanListTypeFilter}
-                />
+                <Suspense fallback={<VizSkeleton vizTab={vizTab} />}>
+                  {vizTab === "waterfall" ? (
+                    <WaterfallView
+                      spans={spans}
+                      selectedSpanId={selectedSpanId}
+                      onSelectSpan={onSelectSpan}
+                      onClearSpan={onClearSpan}
+                      onSwitchToSpanList={handleSwitchToSpanList}
+                    />
+                  ) : vizTab === "flame" ? (
+                    <FlameView
+                      spans={spans}
+                      selectedSpanId={selectedSpanId}
+                      onSelectSpan={onSelectSpan}
+                      onClearSpan={onClearSpan}
+                    />
+                  ) : vizTab === "sequence" ? (
+                    <SequenceView
+                      spans={spans}
+                      selectedSpanId={selectedSpanId}
+                      onSelectSpan={onSelectSpan}
+                      onClearSpan={onClearSpan}
+                    />
+                  ) : (
+                    <SpanListView
+                      spans={spans}
+                      selectedSpanId={selectedSpanId}
+                      onSelectSpan={onSelectSpan}
+                      onClearSpan={onClearSpan}
+                      initialSearch={spanListSearch}
+                      initialTypeFilter={spanListTypeFilter}
+                    />
+                  )}
+                </Suspense>
               )}
             </PeerCursorOverlay>
           </Box>
@@ -403,44 +441,193 @@ export function VizPlaceholder({
   );
 }
 
-const SKELETON_ROWS = [
-  { left: 4, width: 92 },
-  { left: 8, width: 58 },
-  { left: 14, width: 36 },
-  { left: 22, width: 44 },
-  { left: 12, width: 70 },
-  { left: 6, width: 30 },
-  { left: 50, width: 26 },
-  { left: 24, width: 60 },
+const PULSE_KEYFRAMES = {
+  "@keyframes vizPulse": {
+    "0%, 100%": { opacity: 0.55 },
+    "50%": { opacity: 0.85 },
+  },
+} as const;
+
+/**
+ * Loading skeleton dispatched by the active viz tab. Each variant mimics
+ * the shape of the real view so the user's eye doesn't have to re-anchor
+ * when data lands — waterfall rows stay where waterfall rows will be,
+ * flame strips at flame depths, span list as a table.
+ */
+function VizSkeleton({ vizTab }: { vizTab?: VizTab }) {
+  if (vizTab === "flame") return <FlameSkeleton />;
+  if (vizTab === "spanlist") return <SpanListSkeleton />;
+  return <WaterfallSkeleton />;
+}
+
+const WATERFALL_ROWS = [
+  { depth: 0, barLeft: 0, barWidth: 96 },
+  { depth: 1, barLeft: 2, barWidth: 70 },
+  { depth: 2, barLeft: 4, barWidth: 42 },
+  { depth: 2, barLeft: 48, barWidth: 18 },
+  { depth: 1, barLeft: 14, barWidth: 56 },
+  { depth: 2, barLeft: 18, barWidth: 28 },
+  { depth: 1, barLeft: 70, barWidth: 22 },
+  { depth: 2, barLeft: 72, barWidth: 14 },
 ] as const;
 
-function VizSkeleton() {
+function WaterfallSkeleton() {
+  return (
+    <Flex direction="row" height="full" css={PULSE_KEYFRAMES}>
+      <VStack
+        align="stretch"
+        gap={1.5}
+        flex={0.4}
+        paddingX={3}
+        paddingY={3}
+        borderRightWidth="1px"
+        borderColor="border.subtle"
+      >
+        {WATERFALL_ROWS.map((row, i) => (
+          <Flex key={i} height="14px" align="center" gap={2}>
+            <Box width={`${row.depth * 10}px`} flexShrink={0} />
+            <Box
+              width="8px"
+              height="8px"
+              borderRadius="full"
+              bg="bg.muted"
+              flexShrink={0}
+              css={{
+                animation: `vizPulse 1.4s ease-in-out ${i * 0.08}s infinite`,
+              }}
+            />
+            <Box
+              height="8px"
+              borderRadius="sm"
+              bg="bg.muted"
+              flex={1}
+              css={{
+                animation: `vizPulse 1.4s ease-in-out ${i * 0.08}s infinite`,
+              }}
+            />
+          </Flex>
+        ))}
+      </VStack>
+      <VStack align="stretch" gap={1.5} flex={0.6} paddingX={3} paddingY={3}>
+        {WATERFALL_ROWS.map((row, i) => (
+          <Flex key={i} height="14px" align="center" position="relative">
+            <Box
+              position="absolute"
+              left={`${row.barLeft}%`}
+              width={`${row.barWidth}%`}
+              height="10px"
+              borderRadius="sm"
+              bg="blue.muted"
+              css={{
+                animation: `vizPulse 1.4s ease-in-out ${i * 0.08}s infinite`,
+              }}
+            />
+          </Flex>
+        ))}
+      </VStack>
+    </Flex>
+  );
+}
+
+const FLAME_STRIPS = [
+  [{ left: 0, width: 100 }],
+  [
+    { left: 0, width: 38 },
+    { left: 40, width: 24 },
+    { left: 66, width: 32 },
+  ],
+  [
+    { left: 2, width: 16 },
+    { left: 22, width: 14 },
+    { left: 42, width: 20 },
+    { left: 68, width: 28 },
+  ],
+  [
+    { left: 4, width: 10 },
+    { left: 46, width: 12 },
+    { left: 70, width: 8 },
+    { left: 82, width: 12 },
+  ],
+] as const;
+
+function FlameSkeleton() {
   return (
     <VStack
       align="stretch"
-      gap={1.5}
-      paddingX={4}
+      gap="2px"
+      paddingX={3}
       paddingY={3}
       height="full"
-      css={{
-        "@keyframes vizPulse": {
-          "0%, 100%": { opacity: 0.55 },
-          "50%": { opacity: 0.85 },
-        },
-      }}
+      css={PULSE_KEYFRAMES}
     >
-      {SKELETON_ROWS.map((row, i) => (
-        <Flex key={i} height="14px" align="center">
+      {FLAME_STRIPS.map((strip, depth) => (
+        <Box key={depth} position="relative" height="22px">
+          {strip.map((seg, i) => (
+            <Box
+              key={i}
+              position="absolute"
+              top={0}
+              left={`${seg.left}%`}
+              width={`${seg.width}%`}
+              height="full"
+              borderRadius="sm"
+              bg={depth === 0 ? "purple.muted" : "blue.muted"}
+              css={{
+                animation: `vizPulse 1.4s ease-in-out ${(depth + i) * 0.08}s infinite`,
+              }}
+            />
+          ))}
+        </Box>
+      ))}
+    </VStack>
+  );
+}
+
+function SpanListSkeleton() {
+  return (
+    <VStack align="stretch" gap={0} height="full" css={PULSE_KEYFRAMES}>
+      <Flex
+        gap={3}
+        paddingX={3}
+        paddingY={2}
+        borderBottomWidth="1px"
+        borderColor="border.subtle"
+        bg="bg.subtle/30"
+      >
+        {[16, 24, 12, 18, 14].map((width, i) => (
           <Box
-            height="full"
+            key={i}
+            height="8px"
+            width={`${width}%`}
             borderRadius="sm"
             bg="bg.muted"
-            marginLeft={`${row.left}%`}
-            width={`${row.width}%`}
             css={{
-              animation: `vizPulse 1.4s ease-in-out ${i * 0.08}s infinite`,
+              animation: `vizPulse 1.4s ease-in-out ${i * 0.06}s infinite`,
             }}
           />
+        ))}
+      </Flex>
+      {Array.from({ length: 9 }).map((_, i) => (
+        <Flex
+          key={i}
+          gap={3}
+          paddingX={3}
+          paddingY={2}
+          borderBottomWidth="1px"
+          borderColor="border.subtle"
+        >
+          {[18, 22, 12, 16, 12].map((width, j) => (
+            <Box
+              key={j}
+              height="10px"
+              width={`${width}%`}
+              borderRadius="sm"
+              bg="bg.muted"
+              css={{
+                animation: `vizPulse 1.4s ease-in-out ${(i + j) * 0.05}s infinite`,
+              }}
+            />
+          ))}
         </Flex>
       ))}
     </VStack>

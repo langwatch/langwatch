@@ -7,8 +7,9 @@ import {
   Icon,
   Text,
 } from "@chakra-ui/react";
-import { LuFileText, LuPin, LuPinOff, LuX } from "react-icons/lu";
+import { LuChevronDown, LuFileText, LuPin, LuPinOff, LuX } from "react-icons/lu";
 import { Kbd } from "~/components/ops/shared/Kbd";
+import { Menu } from "~/components/ui/menu";
 import { Tooltip } from "~/components/ui/tooltip";
 import { PresenceMarker } from "~/features/presence/components/PresenceMarker";
 import {
@@ -22,8 +23,29 @@ import {
   abbreviateModel,
   formatDuration,
   SPAN_TYPE_COLORS,
-  truncateId,
 } from "../../utils/formatters";
+
+/**
+ * When more than this many spans are pinned, collapse the tail into a
+ * "+N more" dropdown so the tab strip doesn't run away into a horizontal
+ * scrollbar swamp. We always keep the first three inline so the user has a
+ * stable anchor on the left, then the menu picks up the rest.
+ */
+const MAX_INLINE_PINNED = 4;
+const INLINE_KEEP_WHEN_OVERFLOW = 3;
+
+/** Map span type → Chakra colorPalette so Badge variants stay consistent. */
+const SPAN_TYPE_PALETTE: Record<string, string> = {
+  llm: "blue",
+  tool: "green",
+  agent: "purple",
+  rag: "orange",
+  guardrail: "yellow",
+  evaluation: "teal",
+  chain: "gray",
+  span: "gray",
+  module: "gray",
+};
 
 interface SpanTabBarProps {
   activeTab: DrawerTab;
@@ -181,7 +203,12 @@ export function SpanTabBar({
           rollup grouped by prompt + version. */}
       {promptCount > 0 && (
         <Tooltip
-          content="Prompts used in this trace"
+          content={
+            <HStack gap={1}>
+              <Text>Prompts used in this trace</Text>
+              <Kbd>P</Kbd>
+            </HStack>
+          }
           positioning={{ placement: "bottom" }}
         >
           <Button
@@ -203,6 +230,7 @@ export function SpanTabBar({
           >
             <Icon as={LuFileText} boxSize={3.5} />
             Prompts
+            <Kbd>P</Kbd>
             <Badge size="xs" variant="subtle" colorPalette="blue">
               {promptCount}
             </Badge>
@@ -213,28 +241,54 @@ export function SpanTabBar({
         </Tooltip>
       )}
 
-      {/* Pinned span tabs */}
-      {pinnedSpans.map((span) => {
-        const isActive =
-          activeTab === "span" && selectedSpan?.spanId === span.spanId;
+      {/* Pinned span tabs — first N inline, the rest collapse into a dropdown
+          to keep the strip readable when many spans are pinned. */}
+      {(() => {
+        const overflowing = pinnedSpans.length > MAX_INLINE_PINNED;
+        const inlineCount = overflowing
+          ? INLINE_KEEP_WHEN_OVERFLOW
+          : pinnedSpans.length;
+        const inline = pinnedSpans.slice(0, inlineCount);
+        const overflow = overflowing ? pinnedSpans.slice(inlineCount) : [];
         return (
-          <SpanTab
-            key={span.spanId}
-            span={span}
-            isActive={isActive}
-            onClick={() => onSelectSpan(span.spanId)}
-            onHover={() => prefetchSpan(span.spanId)}
-            actionIcon={<Icon as={LuPinOff} boxSize={3} />}
-            actionLabel="Unpin span tab"
-            onAction={() => onUnpinSpan(span.spanId)}
-            presence={
-              traceId ? (
-                <SpanFocusPresenceDot traceId={traceId} spanId={span.spanId} />
-              ) : null
-            }
-          />
+          <>
+            {inline.map((span) => {
+              const isActive =
+                activeTab === "span" && selectedSpan?.spanId === span.spanId;
+              return (
+                <SpanTab
+                  key={span.spanId}
+                  span={span}
+                  isActive={isActive}
+                  onClick={() => onSelectSpan(span.spanId)}
+                  onHover={() => prefetchSpan(span.spanId)}
+                  actionIcon={<Icon as={LuPinOff} boxSize={3} />}
+                  actionLabel="Unpin span tab"
+                  onAction={() => onUnpinSpan(span.spanId)}
+                  presence={
+                    traceId ? (
+                      <SpanFocusPresenceDot
+                        traceId={traceId}
+                        spanId={span.spanId}
+                      />
+                    ) : null
+                  }
+                />
+              );
+            })}
+            {overflow.length > 0 && (
+              <PinnedSpanOverflowMenu
+                spans={overflow}
+                activeSpanId={
+                  activeTab === "span" ? (selectedSpan?.spanId ?? null) : null
+                }
+                onSelectSpan={onSelectSpan}
+                onUnpinSpan={onUnpinSpan}
+              />
+            )}
+          </>
         );
-      })}
+      })()}
 
       {/* Ephemeral span tab — only if selected span is not pinned */}
       {selectedSpan && !isSelectedPinned && (
@@ -292,119 +346,215 @@ function SpanTab({
   const activeBorderColor =
     (SPAN_TYPE_COLORS[span.type ?? "span"] as string) ?? "gray.solid";
   return (
-    <HStack
-      gap={1}
-      paddingX={3}
-      paddingY={0}
-      height="38px"
-      flexShrink={0}
-      borderRadius={0}
-      borderBottomWidth="2px"
-      borderBottomColor={isActive ? activeBorderColor : "transparent"}
-      color={isActive ? "fg" : "fg.muted"}
-      fontWeight={isActive ? "semibold" : "normal"}
-      cursor="pointer"
-      onClick={onClick}
-      onMouseEnter={onHover}
-      onFocus={onHover}
-      _hover={{ bg: "bg.muted", color: "fg" }}
-      transition="background 0.12s ease, color 0.12s ease"
+    <Tooltip
+      content={`${span.name} · ${span.spanId}`}
+      positioning={{ placement: "bottom" }}
+      openDelay={400}
     >
-      <SpanTypeBadge type={span.type ?? "span"} />
-      <Text
-        textStyle="xs"
-        color="inherit"
-        fontWeight="inherit"
-        maxWidth="160px"
-        truncate
-        fontFamily="mono"
+      <HStack
+        gap={1.5}
+        paddingX={3}
+        paddingY={0}
+        height="38px"
+        flexShrink={0}
+        borderRadius={0}
+        borderBottomWidth="2px"
+        borderBottomColor={isActive ? activeBorderColor : "transparent"}
+        color={isActive ? "fg" : "fg.muted"}
+        fontWeight={isActive ? "semibold" : "normal"}
+        cursor="pointer"
+        onClick={onClick}
+        onMouseEnter={onHover}
+        onFocus={onHover}
+        _hover={{ bg: "bg.muted", color: "fg" }}
+        transition="background 0.12s ease, color 0.12s ease"
       >
-        {span.name}
-      </Text>
-
-      <Tooltip content={span.spanId} positioning={{ placement: "top" }}>
-        <Text textStyle="xs" color="fg.subtle" fontFamily="mono">
-          {truncateId(span.spanId)}
-        </Text>
-      </Tooltip>
-
-      <Text textStyle="xs" color="fg.subtle">
-        {formatDuration(span.durationMs)}
-      </Text>
-
-      {span.type === "llm" && span.model != null && (
-        <Text textStyle="xs" color="fg.subtle" fontFamily="mono">
-          {abbreviateModel(span.model)}
-        </Text>
-      )}
-
-      {span.status === "error" && (
-        <Circle size="6px" bg="red.solid" flexShrink={0} />
-      )}
-
-      {presence}
-
-      <Tooltip content={actionLabel} positioning={{ placement: "top" }}>
-        <Flex
-          as="button"
-          align="center"
-          onClick={(e: React.MouseEvent) => {
-            e.stopPropagation();
-            onAction();
-          }}
-          aria-label={actionLabel}
-          color="fg.subtle"
-          paddingX={1.5}
-          paddingY={1}
-          borderRadius="sm"
-          _hover={{ color: "fg", bg: "bg.emphasized" }}
+        <SpanTypeBadge type={span.type ?? "span"} />
+        <Text
+          textStyle="xs"
+          color="inherit"
+          fontWeight="inherit"
+          maxWidth="180px"
+          truncate
+          fontFamily="mono"
         >
-          {actionIcon}
-        </Flex>
-      </Tooltip>
+          {span.name}
+        </Text>
 
-      {secondaryActionIcon && onSecondaryAction && (
-        <Tooltip
-          content={secondaryActionLabel ?? ""}
-          positioning={{ placement: "top" }}
-        >
+        {span.type === "llm" && span.model != null && (
+          <Text textStyle="2xs" color="fg.subtle" fontFamily="mono">
+            {abbreviateModel(span.model)}
+          </Text>
+        )}
+
+        <Text textStyle="2xs" color="fg.subtle">
+          {formatDuration(span.durationMs)}
+        </Text>
+
+        {span.status === "error" && (
+          <Circle size="6px" bg="red.solid" flexShrink={0} />
+        )}
+
+        {presence}
+
+        <Tooltip content={actionLabel} positioning={{ placement: "top" }}>
           <Flex
             as="button"
             align="center"
             onClick={(e: React.MouseEvent) => {
               e.stopPropagation();
-              onSecondaryAction();
+              onAction();
             }}
-            aria-label={secondaryActionLabel}
+            aria-label={actionLabel}
             color="fg.subtle"
-            paddingX={1}
+            paddingX={1.5}
+            paddingY={1}
             borderRadius="sm"
             _hover={{ color: "fg", bg: "bg.emphasized" }}
           >
-            {secondaryActionIcon}
+            {actionIcon}
           </Flex>
         </Tooltip>
-      )}
-    </HStack>
+
+        {secondaryActionIcon && onSecondaryAction && (
+          <Tooltip
+            content={secondaryActionLabel ?? ""}
+            positioning={{ placement: "top" }}
+          >
+            <Flex
+              as="button"
+              align="center"
+              onClick={(e: React.MouseEvent) => {
+                e.stopPropagation();
+                onSecondaryAction();
+              }}
+              aria-label={secondaryActionLabel}
+              color="fg.subtle"
+              paddingX={1}
+              borderRadius="sm"
+              _hover={{ color: "fg", bg: "bg.emphasized" }}
+            >
+              {secondaryActionIcon}
+            </Flex>
+          </Tooltip>
+        )}
+      </HStack>
+    </Tooltip>
   );
 }
 
 function SpanTypeBadge({ type }: { type: string }) {
-  const color = (SPAN_TYPE_COLORS[type] as string) ?? "gray.solid";
-  const label = type.toUpperCase();
-
+  const palette = SPAN_TYPE_PALETTE[type] ?? "gray";
+  const label = type === "llm" || type === "rag" ? type.toUpperCase() : type;
   return (
-    <Text
-      textStyle="2xs"
-      fontWeight="semibold"
-      color={color}
-      paddingX={1.5}
-      paddingY={0}
-      borderRadius="sm"
-      borderWidth="1px"
-      borderColor={color}
+    <Badge
+      size="sm"
+      variant="subtle"
+      colorPalette={palette}
+      flexShrink={0}
+      borderRadius="md"
+      fontWeight="medium"
+      textTransform="capitalize"
+      letterSpacing="0.01em"
     >
       {label}
-    </Text>
+    </Badge>
+  );
+}
+
+interface PinnedSpanOverflowMenuProps {
+  spans: SpanTreeNode[];
+  activeSpanId: string | null;
+  onSelectSpan: (spanId: string) => void;
+  onUnpinSpan: (spanId: string) => void;
+}
+
+/**
+ * Dropdown picker for pinned spans that overflowed the inline tab strip.
+ * Each menu item behaves like a tab row: clicking the body selects the span,
+ * the unpin button on the right removes it without closing the menu.
+ */
+function PinnedSpanOverflowMenu({
+  spans,
+  activeSpanId,
+  onSelectSpan,
+  onUnpinSpan,
+}: PinnedSpanOverflowMenuProps) {
+  const hasActive = spans.some((s) => s.spanId === activeSpanId);
+  return (
+    <Menu.Root>
+      <Menu.Trigger asChild>
+        <Button
+          size="sm"
+          variant="ghost"
+          borderRadius={0}
+          borderBottomWidth="2px"
+          borderBottomColor={hasActive ? "blue.solid" : "transparent"}
+          color={hasActive ? "fg" : "fg.muted"}
+          fontWeight={hasActive ? "semibold" : "medium"}
+          paddingX={3}
+          paddingY={0}
+          height="38px"
+          flexShrink={0}
+          gap={1.5}
+        >
+          <Text textStyle="xs">+{spans.length} more</Text>
+          <Icon as={LuChevronDown} boxSize={3} />
+        </Button>
+      </Menu.Trigger>
+      <Menu.Content minWidth="280px">
+        {spans.map((span) => {
+          const isActive = span.spanId === activeSpanId;
+          return (
+            <Menu.Item
+              key={span.spanId}
+              value={span.spanId}
+              onClick={() => onSelectSpan(span.spanId)}
+              bg={isActive ? "bg.muted" : undefined}
+            >
+              <HStack flex={1} gap={2} minWidth={0}>
+                <SpanTypeBadge type={span.type ?? "span"} />
+                <Text
+                  textStyle="xs"
+                  fontFamily="mono"
+                  truncate
+                  flex={1}
+                  fontWeight={isActive ? "semibold" : "normal"}
+                >
+                  {span.name}
+                </Text>
+                <Text textStyle="2xs" color="fg.subtle" flexShrink={0}>
+                  {formatDuration(span.durationMs)}
+                </Text>
+                {span.status === "error" && (
+                  <Circle size="6px" bg="red.solid" flexShrink={0} />
+                )}
+                <Tooltip
+                  content="Unpin span tab"
+                  positioning={{ placement: "top" }}
+                >
+                  <Flex
+                    as="button"
+                    align="center"
+                    onClick={(e: React.MouseEvent) => {
+                      e.stopPropagation();
+                      onUnpinSpan(span.spanId);
+                    }}
+                    aria-label="Unpin span tab"
+                    color="fg.subtle"
+                    paddingX={1.5}
+                    paddingY={1}
+                    borderRadius="sm"
+                    _hover={{ color: "fg", bg: "bg.emphasized" }}
+                  >
+                    <Icon as={LuPinOff} boxSize={3} />
+                  </Flex>
+                </Tooltip>
+              </HStack>
+            </Menu.Item>
+          );
+        })}
+      </Menu.Content>
+    </Menu.Root>
   );
 }

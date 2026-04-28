@@ -1,9 +1,18 @@
 import { Box, Button, HStack, Icon, Text } from "@chakra-ui/react";
-import { useMemo, useState } from "react";
-import { LuCheck, LuChevronDown, LuChevronRight, LuCopy } from "react-icons/lu";
+import { forwardRef, useEffect, useMemo, useRef, useState } from "react";
+import {
+  LuCheck,
+  LuChevronDown,
+  LuChevronRight,
+  LuCopy,
+  LuLightbulb,
+  LuPencil,
+} from "react-icons/lu";
 import { useColorMode } from "~/components/ui/color-mode";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { AnnotationPopover } from "./conversationView/AnnotationPopover";
 import { safePrettyJson } from "./JsonHighlight";
-import { RenderedMarkdown, ShikiCodeBlock } from "./MarkdownView";
+import { RenderedMarkdown, ShikiCodeBlock } from "./markdownView";
 import { SegmentedToggle } from "./SegmentedToggle";
 import {
   AssistantTurnCard,
@@ -21,7 +30,7 @@ import {
   tryParseJSON,
   VIRTUALIZE_AT,
   VirtualizedChatList,
-} from "./Transcript";
+} from "./transcript";
 
 const COPY_FEEDBACK_MS = 1500;
 const TRUNCATE_AT = 100_000;
@@ -42,6 +51,75 @@ interface IOViewerProps {
    * whole transcript. For non-chat content this is a no-op.
    */
   mode?: "input" | "output";
+  /**
+   * When provided, the panel header shows Annotate + Suggest-correction
+   * actions wired to the annotation comment store. These belong on the
+   * trace's input/output specifically (annotations target a trace, not a
+   * span), so per-span IOViewers leave this undefined.
+   */
+  traceId?: string;
+}
+
+const ActionButton = forwardRef<
+  HTMLButtonElement,
+  {
+    icon: typeof LuPencil;
+    label: string;
+  } & React.ComponentProps<typeof Button>
+>(function ActionButton({ icon, label, ...buttonProps }, ref) {
+  return (
+    <Button
+      ref={ref}
+      size="xs"
+      variant="ghost"
+      color="fg.muted"
+      gap={1.5}
+      paddingX={2}
+      height="22px"
+      onClick={(e) => e.stopPropagation()}
+      {...buttonProps}
+    >
+      <Icon as={icon} boxSize={3} />
+      {label}
+    </Button>
+  );
+});
+
+function AnnotateButton({ traceId }: { traceId: string }) {
+  const { hasPermission } = useOrganizationTeamProject();
+  const [open, setOpen] = useState(false);
+  if (!hasPermission("annotations:manage")) return null;
+  return (
+    <AnnotationPopover
+      traceId={traceId}
+      mode="annotate"
+      open={open}
+      onOpenChange={setOpen}
+      trigger={<ActionButton icon={LuPencil} label="Annotate" />}
+    />
+  );
+}
+
+function SuggestCorrectionButton({
+  traceId,
+  output,
+}: {
+  traceId: string;
+  output: string;
+}) {
+  const { hasPermission } = useOrganizationTeamProject();
+  const [open, setOpen] = useState(false);
+  if (!hasPermission("annotations:manage")) return null;
+  return (
+    <AnnotationPopover
+      traceId={traceId}
+      output={output}
+      mode="suggest"
+      open={open}
+      onOpenChange={setOpen}
+      trigger={<ActionButton icon={LuLightbulb} label="Suggest edit" />}
+    />
+  );
 }
 
 type ViewFormat = "pretty" | "text" | "json" | "markdown";
@@ -75,7 +153,12 @@ function CopyButton({ text }: { text: string }) {
   );
 }
 
-export function IOViewer({ label, content, mode = "input" }: IOViewerProps) {
+export function IOViewer({
+  label,
+  content,
+  mode = "input",
+  traceId,
+}: IOViewerProps) {
   const parsed = useMemo(() => tryParseJSON(content), [content]);
   // Coerce parsed into a chat message array — handles top-level arrays,
   // single message objects, and `{messages: [...]}` / `{input: [...]}`
@@ -147,6 +230,26 @@ export function IOViewer({ label, content, mode = "input" }: IOViewerProps) {
   const [expanded, setExpanded] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const { colorMode } = useColorMode();
+
+  // Two-mode interaction: idle = panel is a static preview that lets wheel
+  // events pass through to the page. Engaged (after a click) = fully
+  // interactive with internal scroll. Clicking anywhere outside the panel
+  // disengages it. Combined with `overscroll-behavior: auto` below, the
+  // panel never traps scroll either at boundaries or globally.
+  const [engaged, setEngaged] = useState(false);
+  const engagedRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!engaged) return;
+    const onPointerDown = (e: MouseEvent) => {
+      const target = e.target as Node | null;
+      if (!target || !engagedRef.current) return;
+      if (engagedRef.current.contains(target)) return;
+      setEngaged(false);
+    };
+    document.addEventListener("mousedown", onPointerDown);
+    return () => document.removeEventListener("mousedown", onPointerDown);
+  }, [engaged]);
 
   const collapsedSummary =
     isChat && allChatMessages
@@ -259,11 +362,18 @@ export function IOViewer({ label, content, mode = "input" }: IOViewerProps) {
             options={formatOptions}
           />
         )}
+        {!collapsed && traceId && (
+          <AnnotateButton traceId={traceId} />
+        )}
+        {!collapsed && traceId && mode === "output" && (
+          <SuggestCorrectionButton traceId={traceId} output={content} />
+        )}
         <CopyButton text={content} />
       </HStack>
 
       {!collapsed && (
         <>
+          <Box ref={engagedRef} position="relative">
           <Box
             bg={flushChatCard ? "transparent" : "bg.subtle"}
             borderRadius={flushChatCard ? "0" : "md"}
@@ -276,14 +386,23 @@ export function IOViewer({ label, content, mode = "input" }: IOViewerProps) {
                   ? 0
                   : 3
             }
+            opacity={!isVirtualizingChat && !engaged ? 0.6 : 1}
+            transition="opacity 120ms ease-out"
             maxHeight={
               isVirtualizingChat
                 ? undefined
-                : isLong && !expanded
-                  ? `${COMPACT_MAX_HEIGHT_PX}px`
-                  : `${EXPANDED_MAX_HEIGHT_PX}px`
+                : engaged
+                  ? "min(90vh, 900px)"
+                  : "min(80vh, 600px)"
             }
-            overflow={isVirtualizingChat ? "hidden" : "auto"}
+            // Idle: overflow hidden so wheel falls through to the page.
+            // Engaged: overflow auto + `overscroll-behavior: auto` so the
+            // panel scrolls internally but chains back to the page at
+            // boundaries (no trap).
+            overflow={
+              isVirtualizingChat ? "hidden" : engaged ? "auto" : "hidden"
+            }
+            overscrollBehavior="auto"
           >
             {format === "json" && canJson ? (
               <ShikiCodeBlock
@@ -393,6 +512,35 @@ export function IOViewer({ label, content, mode = "input" }: IOViewerProps) {
                 {displayContent}
               </Text>
             )}
+          </Box>
+          {!isVirtualizingChat && !engaged && (
+            <Box
+              position="absolute"
+              inset={0}
+              cursor="zoom-in"
+              onClick={() => setEngaged(true)}
+              display="flex"
+              alignItems="flex-end"
+              justifyContent="center"
+              paddingBottom={2}
+              background="linear-gradient(to bottom, transparent 60%, var(--chakra-colors-bg-subtle) 100%)"
+              borderRadius={flushChatCard ? "0" : "md"}
+            >
+              <Text
+                textStyle="2xs"
+                color="fg.muted"
+                fontWeight="medium"
+                bg="bg.surface"
+                paddingX={2}
+                paddingY={0.5}
+                borderRadius="full"
+                borderWidth="1px"
+                borderColor="border"
+              >
+                Click to interact
+              </Text>
+            </Box>
+          )}
           </Box>
 
           {isLong && (

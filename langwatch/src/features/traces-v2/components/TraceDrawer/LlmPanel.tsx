@@ -12,7 +12,7 @@ import {
   MarkdownConfigurePopover,
   MarkdownCopyButton,
   RenderedMarkdown,
-} from "./MarkdownView";
+} from "./markdownView";
 
 interface LlmPanelProps {
   trace: TraceHeader;

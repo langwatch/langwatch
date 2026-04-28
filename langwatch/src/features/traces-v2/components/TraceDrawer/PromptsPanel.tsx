@@ -243,9 +243,9 @@ function SelectedVsLastUsedCallout({
     latestVersion > trace.lastUsedPromptVersionNumber;
 
   const banner = hasDrift
-    ? "yellow.500/6"
+    ? "yellow.solid/6"
     : outOfDate
-      ? "yellow.500/6"
+      ? "yellow.solid/6"
       : promptMissing
         ? "bg.muted"
         : "bg.subtle";
