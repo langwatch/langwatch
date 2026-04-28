@@ -188,17 +188,14 @@ func stateEvent(traceID, nodeID string, ns *NodeState) StreamEvent {
 		es["error"] = ns.Error.Message
 	}
 	if ns.DurationMS > 0 {
-		// Studio's ExecutionOutputPanel.tsx renders the per-component
+		// Studio's ExecutionOutputPanel renders the per-component
 		// duration via `<SpanDuration>` only when BOTH
 		// `timestamps.started_at` and `timestamps.finished_at` are set
-		// (`hasTiming = started_at && finished_at`). We previously
-		// emitted only `finished_at` so the panel's "370ms · Full Trace"
-		// line silently went blank on FF=on (caught by rchaves on the
-		// dogfood). Derive started_at from finished_at − DurationMS
-		// rather than threading absolute clock-times through NodeState
-		// — the wall-clock skew between the running and finished events
-		// would be measured in microseconds anyway, and the UI only
-		// uses the diff.
+		// (`hasTiming = started_at && finished_at`). Derive started_at
+		// from finished_at − DurationMS rather than threading absolute
+		// clock-times through NodeState — the UI only uses the diff,
+		// and the wall-clock skew between the running and finished
+		// events is measured in microseconds.
 		finishedAt := time.Now().UnixMilli()
 		es["timestamps"] = map[string]any{
 			"started_at":  finishedAt - ns.DurationMS,

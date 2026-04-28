@@ -127,15 +127,12 @@ def main() -> int:
             for name in declared_outputs:
                 if name not in result:
                     raise KeyError(f"missing_output: {name}")
-            # Pass ALL keys through, not just the declared ones — legacy
-            # Python NLP path returned everything the user produced and
-            # the Studio UI surfaces extra keys ad-hoc (operator debugging,
-            # ad-hoc dict returns from `class Code: def __call__: return
-            # {"output": ..., "dspy": ...}` were visible in the OUTPUTS
-            # panel even when only "output" was declared). Filtering broke
-            # back-compat: extra keys silently disappeared in the new
-            # engine. Caught by rchaves on the FF-on dogfood. Pinned by
-            # `TestCodeBlock_PreservesUndeclaredOutputKeys`.
+            # Pass ALL keys through, not just the declared ones. The
+            # Studio UI surfaces extra keys ad-hoc — operator-debug
+            # returns like `{"output": ..., "dspy": repr(dspy)}` need
+            # the diagnostic key visible in the panel even when only
+            # "output" is on the node's declared outputs. Filtering
+            # would silently drop them.
             outputs = dict(result)
     except Exception as exc:  # noqa: BLE001 — sandbox runner intentionally catches every user-code exception so Go can render a structured error in Studio
         error = {

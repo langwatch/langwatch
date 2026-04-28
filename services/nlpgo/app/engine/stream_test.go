@@ -60,18 +60,16 @@ func TestExecuteStream_HeartbeatExitDoesNotRaceWithClose(t *testing.T) {
 	}
 }
 
-// TestStateEvent_TimestampsHaveBothStartedAndFinished pins the fix for
-// Studio's per-component duration display going blank on FF=on.
+// TestStateEvent_TimestampsHaveBothStartedAndFinished pins both
+// timestamps on the per-component finished event so Studio's
+// ExecutionOutputPanel can render the duration line.
 //
-// ExecutionOutputPanel.tsx line 80:
+// ExecutionOutputPanel.tsx gates "<duration>ms · Full Trace" on:
 //
 //	const hasTiming = executionState.timestamps?.started_at &&
 //	                  executionState.timestamps?.finished_at;
 //
-// `hasTiming` is the gate for rendering "<duration>ms · Full Trace".
-// Without `started_at`, the line goes silent; rchaves spotted this on
-// the dogfood. The Python emitter ships both; the Go emitter previously
-// shipped only finished_at.
+// Both must be present or the line goes silent.
 func TestStateEvent_TimestampsHaveBothStartedAndFinished(t *testing.T) {
 	ns := &NodeState{
 		ID:         "code",

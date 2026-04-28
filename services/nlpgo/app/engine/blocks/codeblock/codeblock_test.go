@@ -65,14 +65,12 @@ func TestCodeBlock_MissingDeclaredOutput(t *testing.T) {
 }
 
 func TestCodeBlock_ExtraOutputKeysPreserved(t *testing.T) {
-	// Back-compat with legacy Python NLP path: customer code that returns
-	// extra keys (eg. `class Code: def __call__: return {"output": ...,
-	// "dspy": repr(dspy)}`) used to surface ALL keys in the Studio
-	// OUTPUTS panel, not only the declared ones. The early Go runner
-	// dropped undeclared keys silently, hiding a half of the user's
-	// dict from operator debugging — caught by rchaves on FF=on dogfood
-	// (PR #3543). The declared-output validation is preserved separately
-	// by TestCodeBlock_MissingDeclaredOutput.
+	// User code that returns extra keys (eg. `class Code: def __call__:
+	// return {"output": ..., "dspy": repr(dspy)}`) must surface ALL
+	// keys in the Studio OUTPUTS panel, not only the declared ones —
+	// operators rely on undeclared diagnostic keys for debug visibility.
+	// Declared-output validation is exercised separately by
+	// TestCodeBlock_MissingDeclaredOutput.
 	requirePython(t)
 	res, err := newExec(t).Execute(context.Background(), codeblock.Request{
 		Code:            "def execute():\n    return {'sum': 5, 'scratch': [1,2,3]}\n",
@@ -179,14 +177,12 @@ func TestCodeBlock_PlainClassWithForward(t *testing.T) {
 	assert.Equal(t, float64(42), res.Outputs["doubled"])
 }
 
-// TestCodeBlock_PlainClassWithCallable pins the new idiomatic-Python
-// default template (PR #3483 dogfood pushback): a plain class that
-// defines __call__ on itself. The runner must instantiate the class
-// and invoke __call__ via `instance(**inputs)`. Both rchaves and
-// Sarah landed on this shape over `def execute()` (free-function)
-// because helpers can live as methods inside the class without
-// polluting top-level scope, and __call__ is a built-in Python
-// convention rather than a framework lineage carryover from torch/dspy.
+// TestCodeBlock_PlainClassWithCallable pins the idiomatic-Python
+// shape: a plain class that defines __call__ on itself. The runner
+// instantiates the class and invokes __call__ via `instance(**inputs)`.
+// __call__ is a built-in Python convention (helpers can live as
+// methods on the class) so it's preferred over a free-function
+// `def execute()` template that would force helpers to top level.
 //
 // Crucial detail: the resolution check is `'__call__' in cls.__dict__`,
 // not `hasattr(cls, '__call__')`. Every class has an inherited
