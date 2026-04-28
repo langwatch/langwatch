@@ -3,6 +3,10 @@ import type { SpanConfig, SpanType, TraceConfig } from "./types";
 
 export interface PromptRef {
   id: string;
+  /** Numeric version. Surfaced as `langwatch.prompt.version.number` on the
+   * emitted span so the trace-summary projection can populate the
+   * `LastUsedPromptVersionNumber` column without parsing the shorthand. */
+  version: number;
   versionId: string;
   handle: string | null;
   model?: string;
@@ -290,7 +294,11 @@ function makeLlmSpan(prompts?: PromptRef[], includeEvents?: boolean): SpanConfig
 
   if (promptRef) {
     span.prompt = {
-      promptId: promptRef.id,
+      // Prefer the human-readable handle so chip labels read clean
+      // ("refund-policy v3"), fall back to the db id when older test
+      // data didn't carry one.
+      promptId: promptRef.handle ?? promptRef.id,
+      version: promptRef.version,
       versionId: promptRef.versionId,
       variables: synthesizePromptVariables(promptRef.inputs),
     };

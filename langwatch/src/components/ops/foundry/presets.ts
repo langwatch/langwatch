@@ -556,6 +556,7 @@ export const builtInPresets: Preset[] = [
               durationMs: 50,
               prompt: {
                 promptId: "customer-support-v2",
+                version: 3,
                 versionId: "ver-abc123",
                 variables: {
                   customer_name: "Alice",
@@ -1504,6 +1505,7 @@ export const builtInPresets: Preset[] = [
               durationMs: 30,
               prompt: {
                 promptId: "intent-classifier",
+                version: 3,
                 versionId: "ver-ic-prod-3",
                 variables: { user_message: "I want to cancel my subscription and get a refund" },
               },
@@ -1531,6 +1533,7 @@ export const builtInPresets: Preset[] = [
               offsetMs: 500,
               prompt: {
                 promptId: "cancellation-handler",
+                version: 7,
                 versionId: "ver-ch-v7",
                 variables: {
                   customer_name: "Sarah Chen",
@@ -1587,6 +1590,7 @@ export const builtInPresets: Preset[] = [
               offsetMs: 1450,
               prompt: {
                 promptId: "conversation-summarizer",
+                version: 1,
                 versionId: "ver-cs-latest",
                 variables: {
                   conversation: "[user: cancel subscription] [agent: retention offer]",

@@ -45,6 +45,11 @@ function injectRealPrompts(
     s.prompt = {
       ...s.prompt,
       promptId: real.handle ?? real.id,
+      // The trace-summary projection only registers prompts in the
+      // canonical `handle:version` shorthand. Always include the numeric
+      // version so the executor can synthesize that form on emit and
+      // chips light up on the resulting trace.
+      version: real.version,
       versionId: real.versionId,
     };
     s.name = `prompt:${real.handle ?? real.id}`;

@@ -25,6 +25,7 @@ export function ExecutionControls({ compact = false }: { compact?: boolean }) {
           trace,
           apiKey,
           endpoint: window.location.origin,
+          projectId: project?.id,
         });
         updateLogEntry(logId, { status: "success", traceId });
       } catch (err) {

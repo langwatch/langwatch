@@ -39,6 +39,7 @@ export function GenerateTraceDialog() {
       useRealPrompts && promptsQuery.data
         ? promptsQuery.data.map((p) => ({
             id: p.id,
+            version: p.version,
             versionId: p.versionId,
             handle: p.handle,
             model: p.model,

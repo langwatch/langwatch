@@ -51,7 +51,12 @@ export function FoundryDrawer() {
     const logId = `log-${Date.now()}`;
     addLogEntry({ id: logId, traceId: logId, timestamp: Date.now(), status: "pending" });
     try {
-      const traceId = await executeTrace({ trace, apiKey, endpoint: window.location.origin });
+      const traceId = await executeTrace({
+        trace,
+        apiKey,
+        endpoint: window.location.origin,
+        projectId: project?.id,
+      });
       updateLogEntry(logId, { status: "success", traceId });
       setLastTraceId(traceId);
       setCopied(false);

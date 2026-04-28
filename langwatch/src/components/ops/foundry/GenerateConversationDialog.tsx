@@ -39,6 +39,7 @@ export function GenerateConversationDialog() {
             trace: traces[i]!,
             apiKey,
             endpoint: window.location.origin,
+            projectId: project?.id,
           });
           updateLogEntry(logId, { status: "success", traceId });
         } catch (err) {
