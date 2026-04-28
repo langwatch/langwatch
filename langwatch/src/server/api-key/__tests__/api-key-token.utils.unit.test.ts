@@ -6,7 +6,6 @@ import {
   verifySecret,
   getTokenType,
   API_KEY_PREFIX,
-  LEGACY_PAT_PREFIX,
 } from "../api-key-token.utils";
 
 describe("generateApiKeyToken", () => {
