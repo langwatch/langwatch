@@ -86,6 +86,13 @@ function mapTraceSummaryToHeader(summary: TraceSummaryData): TraceHeader {
     rootSpanName: summary.rootSpanName,
     rootSpanType: summary.rootSpanType,
     scenarioRunId: summary.attributes["scenario.run_id"] ?? null,
+    containsPrompt: summary.containsPrompt ?? false,
+    selectedPromptId: summary.selectedPromptId ?? null,
+    selectedPromptSpanId: summary.selectedPromptSpanId ?? null,
+    lastUsedPromptId: summary.lastUsedPromptId ?? null,
+    lastUsedPromptVersionNumber: summary.lastUsedPromptVersionNumber ?? null,
+    lastUsedPromptVersionId: summary.lastUsedPromptVersionId ?? null,
+    lastUsedPromptSpanId: summary.lastUsedPromptSpanId ?? null,
     attributes: summary.attributes,
     events: summary.events ?? [],
   };

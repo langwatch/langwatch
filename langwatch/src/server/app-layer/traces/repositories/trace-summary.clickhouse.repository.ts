@@ -54,6 +54,13 @@ interface ClickHouseSummaryRecord {
   RootSpanName: string | null;
   RootSpanType: string | null;
   ContainsAi: number;
+  ContainsPrompt: number;
+  SelectedPromptId: string | null;
+  SelectedPromptSpanId: string | null;
+  LastUsedPromptId: string | null;
+  LastUsedPromptVersionNumber: number | null;
+  LastUsedPromptVersionId: string | null;
+  LastUsedPromptSpanId: string | null;
   TopicId: string | null;
   SubTopicId: string | null;
   AnnotationIds: string[];
@@ -266,6 +273,13 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
           t.RootSpanName AS RootSpanName,
           t.RootSpanType AS RootSpanType,
           t.ContainsAi AS ContainsAi,
+          t.ContainsPrompt AS ContainsPrompt,
+          t.SelectedPromptId AS SelectedPromptId,
+          t.SelectedPromptSpanId AS SelectedPromptSpanId,
+          t.LastUsedPromptId AS LastUsedPromptId,
+          t.LastUsedPromptVersionNumber AS LastUsedPromptVersionNumber,
+          t.LastUsedPromptVersionId AS LastUsedPromptVersionId,
+          t.LastUsedPromptSpanId AS LastUsedPromptSpanId,
           t.TopicId AS TopicId,
           t.SubTopicId AS SubTopicId,
           t.AnnotationIds AS AnnotationIds,
@@ -332,6 +346,16 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
       rootSpanName: record.RootSpanName,
       rootSpanType: record.RootSpanType,
       containsAi: !!record.ContainsAi,
+      containsPrompt: !!record.ContainsPrompt,
+      selectedPromptId: record.SelectedPromptId,
+      selectedPromptSpanId: record.SelectedPromptSpanId,
+      // Internal tiebreakers are not persisted; reconstruct as null on read.
+      selectedPromptStartTimeMs: null,
+      lastUsedPromptId: record.LastUsedPromptId,
+      lastUsedPromptVersionNumber: record.LastUsedPromptVersionNumber,
+      lastUsedPromptVersionId: record.LastUsedPromptVersionId,
+      lastUsedPromptSpanId: record.LastUsedPromptSpanId,
+      lastUsedPromptStartTimeMs: null,
       topicId: record.TopicId,
       subTopicId: record.SubTopicId,
       annotationIds: record.AnnotationIds ?? [],
@@ -392,6 +416,13 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
       RootSpanName: data.rootSpanName,
       RootSpanType: data.rootSpanType,
       ContainsAi: data.containsAi ? 1 : 0,
+      ContainsPrompt: data.containsPrompt ? 1 : 0,
+      SelectedPromptId: data.selectedPromptId,
+      SelectedPromptSpanId: data.selectedPromptSpanId,
+      LastUsedPromptId: data.lastUsedPromptId,
+      LastUsedPromptVersionNumber: data.lastUsedPromptVersionNumber,
+      LastUsedPromptVersionId: data.lastUsedPromptVersionId,
+      LastUsedPromptSpanId: data.lastUsedPromptSpanId,
       TopicId: data.topicId,
       SubTopicId: data.subTopicId,
       AnnotationIds: data.annotationIds,

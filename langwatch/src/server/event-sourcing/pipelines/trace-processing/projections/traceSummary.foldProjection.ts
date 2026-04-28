@@ -42,6 +42,7 @@ import {
   TraceAttributeAccumulationService,
   TraceIOAccumulationService,
   ScenarioRoleCostService,
+  TracePromptAccumulationService,
   accumulateEvents,
   shouldOverrideOutput,
   extractIOFromLogRecord,
@@ -72,6 +73,7 @@ const traceIOAccumulationService = new TraceIOAccumulationService(
   traceIOExtractionService,
 );
 const scenarioRoleCostService = new ScenarioRoleCostService(spanCostService);
+const tracePromptAccumulationService = new TracePromptAccumulationService();
 
 // ─── Main composition ───────────────────────────────────────────────
 
@@ -136,6 +138,8 @@ export function applySpanToSummary({
 
   const events = accumulateEvents({ state, span });
 
+  const promptRollup = tracePromptAccumulationService.accumulate({ state, span });
+
   const isRoot = span.parentSpanId === null;
   const spanType = String(span.spanAttributes[ATTR_KEYS.SPAN_TYPE] ?? "");
 
@@ -167,6 +171,7 @@ export function applySpanToSummary({
     rootSpanName,
     rootSpanType,
     containsAi,
+    ...promptRollup,
     attributes,
     ...roleAccumulation,
     events,
@@ -233,6 +238,15 @@ export class TraceSummaryFoldProjection
       rootSpanName: null,
       rootSpanType: null,
       containsAi: false,
+      containsPrompt: false,
+      selectedPromptId: null,
+      selectedPromptSpanId: null,
+      selectedPromptStartTimeMs: null,
+      lastUsedPromptId: null,
+      lastUsedPromptVersionNumber: null,
+      lastUsedPromptVersionId: null,
+      lastUsedPromptSpanId: null,
+      lastUsedPromptStartTimeMs: null,
       topicId: null,
       subTopicId: null,
       annotationIds: [],

@@ -73,6 +73,21 @@ export const traceHeaderSchema = z.object({
   rootSpanName: z.string().nullable(),
   rootSpanType: z.string().nullable(),
   scenarioRunId: z.string().nullable(),
+  /**
+   * Trace-level prompt rollup, projected from span attributes by the
+   * trace-summary projection (PRD-023). `selected*` is what the developer
+   * pinned (`langwatch.prompt.selected.id`); `lastUsed*` is what actually
+   * ran (`langwatch.prompt.id`). When both are set and disagree the drawer
+   * surfaces a drift warning. `containsPrompt` is the cheap precondition
+   * gate — `false` when no span on this trace touched a managed prompt.
+   */
+  containsPrompt: z.boolean().default(false),
+  selectedPromptId: z.string().nullable().default(null),
+  selectedPromptSpanId: z.string().nullable().default(null),
+  lastUsedPromptId: z.string().nullable().default(null),
+  lastUsedPromptVersionNumber: z.number().nullable().default(null),
+  lastUsedPromptVersionId: z.string().nullable().default(null),
+  lastUsedPromptSpanId: z.string().nullable().default(null),
   attributes: z.record(z.string()),
   events: z
     .array(

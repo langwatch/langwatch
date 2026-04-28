@@ -1,5 +1,5 @@
 export type FacetTable = "trace_summaries" | "evaluation_runs" | "stored_spans";
-export type FacetGroup = "trace" | "evaluation" | "span" | "metadata";
+export type FacetGroup = "trace" | "evaluation" | "span" | "metadata" | "prompt";
 
 export interface FacetQueryContext {
   tenantId: string;
@@ -267,6 +267,32 @@ export const FACET_REGISTRY: readonly FacetDefinition[] = [
     expression: "SubTopicId",
   },
 
+  // trace_summaries: prompt facets (rolled up at ingest from span attributes)
+  {
+    key: "selectedPrompt",
+    kind: "categorical",
+    label: "Selected prompt",
+    group: "prompt",
+    table: "trace_summaries",
+    expression: "SelectedPromptId",
+  },
+  {
+    key: "lastUsedPrompt",
+    kind: "categorical",
+    label: "Last used prompt",
+    group: "prompt",
+    table: "trace_summaries",
+    expression: "LastUsedPromptId",
+  },
+  {
+    key: "promptVersion",
+    kind: "range",
+    label: "Prompt version",
+    group: "prompt",
+    table: "trace_summaries",
+    expression: "LastUsedPromptVersionNumber",
+  },
+
   // trace_summaries: queryBuilder facets
   {
     key: "label",
@@ -313,7 +339,7 @@ export const FACET_REGISTRY: readonly FacetDefinition[] = [
   {
     key: "spans",
     kind: "range",
-    label: "Spans",
+    label: "Span Count",
     group: "trace",
     table: "trace_summaries",
     expression: "SpanCount",

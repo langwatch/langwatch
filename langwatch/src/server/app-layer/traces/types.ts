@@ -67,6 +67,17 @@ export const traceSummaryDataSchema = z.object({
   rootSpanName: z.string().nullable(),
   rootSpanType: z.string().nullable(),
   containsAi: z.boolean(),
+  containsPrompt: z.boolean(),
+  selectedPromptId: z.string().nullable(),
+  selectedPromptSpanId: z.string().nullable(),
+  /** Tracks the latest source span's startTimeUnixMs — internal bookkeeping
+   * to disambiguate which span won the "latest" race. Not surfaced. */
+  selectedPromptStartTimeMs: z.number().nullable(),
+  lastUsedPromptId: z.string().nullable(),
+  lastUsedPromptVersionNumber: z.number().nullable(),
+  lastUsedPromptVersionId: z.string().nullable(),
+  lastUsedPromptSpanId: z.string().nullable(),
+  lastUsedPromptStartTimeMs: z.number().nullable(),
   topicId: z.string().nullable(),
   subTopicId: z.string().nullable(),
   annotationIds: z.array(z.string()),

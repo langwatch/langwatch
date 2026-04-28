@@ -40,6 +40,13 @@ interface ClickHouseSummaryRow {
   RootSpanName: string | null;
   RootSpanType: string | null;
   ContainsAi: number;
+  ContainsPrompt: number;
+  SelectedPromptId: string | null;
+  SelectedPromptSpanId: string | null;
+  LastUsedPromptId: string | null;
+  LastUsedPromptVersionNumber: number | null;
+  LastUsedPromptVersionId: string | null;
+  LastUsedPromptSpanId: string | null;
   TopicId: string | null;
   SubTopicId: string | null;
   AnnotationIds: string[];
@@ -165,6 +172,13 @@ export class TraceListClickHouseRepository implements TraceListRepository {
           RootSpanName,
           RootSpanType,
           ContainsAi,
+          ContainsPrompt,
+          SelectedPromptId,
+          SelectedPromptSpanId,
+          LastUsedPromptId,
+          LastUsedPromptVersionNumber,
+          LastUsedPromptVersionId,
+          LastUsedPromptSpanId,
           TopicId,
           SubTopicId,
           AnnotationIds,
@@ -642,6 +656,15 @@ export class TraceListClickHouseRepository implements TraceListRepository {
       rootSpanName: row.RootSpanName,
       rootSpanType: row.RootSpanType,
       containsAi: !!row.ContainsAi,
+      containsPrompt: !!row.ContainsPrompt,
+      selectedPromptId: row.SelectedPromptId,
+      selectedPromptSpanId: row.SelectedPromptSpanId,
+      selectedPromptStartTimeMs: null,
+      lastUsedPromptId: row.LastUsedPromptId,
+      lastUsedPromptVersionNumber: row.LastUsedPromptVersionNumber,
+      lastUsedPromptVersionId: row.LastUsedPromptVersionId,
+      lastUsedPromptSpanId: row.LastUsedPromptSpanId,
+      lastUsedPromptStartTimeMs: null,
       topicId: row.TopicId,
       subTopicId: row.SubTopicId,
       annotationIds: row.AnnotationIds ?? [],
