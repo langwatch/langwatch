@@ -32,8 +32,7 @@ import { Menu } from "~/components/ui/menu";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useAnnotationCommentStore } from "~/hooks/useAnnotationCommentStore";
 import { useDrawer } from "~/hooks/useDrawer";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { api } from "~/utils/api";
+import { useConversationTurns } from "../../hooks/useConversationTurns";
 import { useTraceDrawerNavigation } from "../../hooks/useTraceDrawerNavigation";
 import type { TraceListItem } from "../../types/trace";
 import {
@@ -79,39 +78,9 @@ export function ConversationView({
   conversationId,
   currentTraceId,
 }: ConversationViewProps) {
-  const { project } = useOrganizationTeamProject();
   const { navigateToTrace } = useTraceDrawerNavigation();
   const [mode, setMode] = useState<Mode>("bubbles");
-
-  // Stable time range. Inlining `Date.now()` here would re-derive the bounds
-  // every render → the query key would churn → React Query would refetch
-  // forever and the UI would never settle. Pin the window per (project,
-  // conversation).
-  const timeRange = useMemo(
-    () => {
-      const now = Date.now();
-      return { from: now - 365 * 24 * 60 * 60 * 1000, to: now };
-    },
-    [project?.id, conversationId],
-  );
-
-  const query = api.tracesV2.list.useQuery(
-    {
-      projectId: project?.id ?? "",
-      timeRange,
-      sort: { columnId: "time", direction: "asc" },
-      page: 1,
-      pageSize: 100,
-      query: `conversation:"${conversationId.replace(/"/g, '\\"')}"`,
-    },
-    {
-      enabled: !!project?.id && !!conversationId,
-      staleTime: 30_000,
-      // Keep the previous turn list visible during background refetches
-      // instead of flashing the loading skeleton.
-      keepPreviousData: true,
-    },
-  );
+  const query = useConversationTurns(conversationId);
 
   const turns =
     (query.data?.items as TraceListItem[] | undefined) ?? EMPTY_TURNS;

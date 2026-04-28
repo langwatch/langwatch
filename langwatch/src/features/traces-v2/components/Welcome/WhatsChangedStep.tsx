@@ -2,6 +2,8 @@ import { Box, Flex, HStack, Heading, Icon, SimpleGrid, Text, VStack } from "@cha
 import { Layers, LayoutGrid, Zap } from "lucide-react";
 import type React from "react";
 
+import type { WelcomeStepProps } from "./steps";
+
 type Accent = "purple" | "blue" | "orange";
 
 interface Feature {
@@ -16,23 +18,23 @@ const FEATURES: Feature[] = [
     icon: <Layers />,
     accent: "purple",
     title: "Lens-based views",
-    body: "Switch context with a tab — columns, filters, sort, and grouping all baked in.",
+    body: "Switch with a tab — columns, filters, sort, and grouping baked in.",
   },
   {
     icon: <LayoutGrid />,
     accent: "blue",
-    title: "One screen, three panels",
-    body: "Filters, results, and the trace drawer side by side. No more page hops.",
+    title: "Three panels, one screen",
+    body: "Filters, results, and the trace drawer side by side.",
   },
   {
     icon: <Zap />,
     accent: "orange",
-    title: "Live, dense, formatted",
-    body: "Live-tail, density toggle, and rules that highlight the rows you care about.",
+    title: "Live updates",
+    body: "Rows arrive as they happen. Density and highlight rules are configurable.",
   },
 ];
 
-export const WhatsChangedStep: React.FC = () => (
+export const WhatsChangedStep: React.FC<WelcomeStepProps> = () => (
   <VStack align="stretch" gap={5}>
     <LayoutPreview />
     <SimpleGrid columns={{ base: 1, md: 3 }} gap={3}>

@@ -29,7 +29,7 @@ import {
 } from "lucide-react";
 import type { Tokens } from "@chakra-ui/react";
 import { STATUS_COLORS } from "../../utils/formatters";
-import { FIELD_VALUES } from "../../utils/queryParser";
+import { FIELD_VALUES } from "~/server/app-layer/traces/query-language/queryParser";
 
 export const ATTRIBUTES_SECTION_KEY = "__attributes__";
 

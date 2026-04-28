@@ -133,8 +133,7 @@ function createDeps(
   return {
     triggers: {
       getActiveTraceTriggersForProject: vi.fn().mockResolvedValue([]),
-      hasSentForTrace: vi.fn().mockResolvedValue(false),
-      recordSent: vi.fn().mockResolvedValue(undefined),
+      claimSend: vi.fn().mockResolvedValue(true),
       updateLastRunAt: vi.fn().mockResolvedValue(undefined),
       invalidate: vi.fn(),
     } as any,
@@ -270,7 +269,7 @@ describe("evaluationAlertTrigger reactor", () => {
 
       await reactor.handle(event, context);
 
-      expect(deps.triggers.recordSent).not.toHaveBeenCalled();
+      expect(deps.triggers.claimSend).not.toHaveBeenCalled();
     });
   });
 
@@ -296,7 +295,7 @@ describe("evaluationAlertTrigger reactor", () => {
 
       await reactor.handle(event, context);
 
-      expect(deps.triggers.recordSent).toHaveBeenCalledWith({
+      expect(deps.triggers.claimSend).toHaveBeenCalledWith({
         triggerId: "trigger-1",
         traceId: "trace-1",
         projectId: "tenant-1",
@@ -330,7 +329,7 @@ describe("evaluationAlertTrigger reactor", () => {
 
       await reactor.handle(event, context);
 
-      expect(deps.triggers.recordSent).not.toHaveBeenCalled();
+      expect(deps.triggers.claimSend).not.toHaveBeenCalled();
     });
   });
 
@@ -363,7 +362,7 @@ describe("evaluationAlertTrigger reactor", () => {
 
       await reactor.handle(event, context);
 
-      expect(deps.triggers.recordSent).not.toHaveBeenCalled();
+      expect(deps.triggers.claimSend).not.toHaveBeenCalled();
     });
   });
 
@@ -371,7 +370,7 @@ describe("evaluationAlertTrigger reactor", () => {
     it("skips dispatch (dedup)", async () => {
       const trigger = createTrigger();
       (deps.triggers.getActiveTraceTriggersForProject as any).mockResolvedValue([trigger]);
-      (deps.triggers.hasSentForTrace as any).mockResolvedValue(true);
+      (deps.triggers.claimSend as any).mockResolvedValue(false);
       (deps.evaluationRuns.findByTraceId as any).mockResolvedValue([
         createEvalFoldState({ evaluatorId: "evaluator-1", passed: true }),
       ]);
@@ -386,7 +385,9 @@ describe("evaluationAlertTrigger reactor", () => {
 
       await reactor.handle(event, context);
 
-      expect(deps.triggers.recordSent).not.toHaveBeenCalled();
+      // claim attempted but lost the race → no dispatch, no lastRunAt update.
+      expect(deps.triggers.claimSend).toHaveBeenCalled();
+      expect(deps.triggers.updateLastRunAt).not.toHaveBeenCalled();
     });
   });
 
@@ -408,7 +409,8 @@ describe("evaluationAlertTrigger reactor", () => {
 
       await reactor.handle(event, context);
 
-      expect(deps.triggers.recordSent).toHaveBeenCalled();
+      expect(deps.triggers.claimSend).toHaveBeenCalled();
+      expect(deps.triggers.updateLastRunAt).toHaveBeenCalled();
     });
   });
 
@@ -436,7 +438,8 @@ describe("evaluationAlertTrigger reactor", () => {
 
       await reactor.handle(event, context);
 
-      expect(deps.triggers.recordSent).toHaveBeenCalled();
+      expect(deps.triggers.claimSend).toHaveBeenCalled();
+      expect(deps.triggers.updateLastRunAt).toHaveBeenCalled();
     });
   });
 });

@@ -16,19 +16,19 @@ export interface TriggerSummary {
 export interface TriggerRepository {
   findActiveForProject(projectId: string): Promise<TriggerSummary[]>;
 
-  /** Returns true if a TriggerSent record exists for this trigger + trace pair. */
-  hasSentForTrace(params: {
+  /**
+   * Atomically claim ownership of (triggerId, traceId). Inserts a
+   * TriggerSent row using the unique (triggerId, traceId) constraint.
+   * Returns true iff this caller is the first to claim the pair —
+   * at-most-once dispatch is built on top of this guarantee. Concurrent
+   * reactors (trace-processing + evaluation-processing) racing on the
+   * same trigger/trace will each see exactly one `true`.
+   */
+  claimSend(params: {
     triggerId: string;
     traceId: string;
     projectId: string;
   }): Promise<boolean>;
-
-  /** Records that a trigger fired for a trace (idempotent — skips duplicates). */
-  recordSent(params: {
-    triggerId: string;
-    traceId: string;
-    projectId: string;
-  }): Promise<void>;
 
   /** Updates the trigger's lastRunAt timestamp. */
   updateLastRunAt(triggerId: string, projectId: string): Promise<void>;
@@ -39,19 +39,13 @@ export class NullTriggerRepository implements TriggerRepository {
     return [];
   }
 
-  async hasSentForTrace(_params: {
+  async claimSend(_params: {
     triggerId: string;
     traceId: string;
     projectId: string;
   }): Promise<boolean> {
-    return false;
+    return true;
   }
-
-  async recordSent(_params: {
-    triggerId: string;
-    traceId: string;
-    projectId: string;
-  }): Promise<void> {}
 
   async updateLastRunAt(
     _triggerId: string,

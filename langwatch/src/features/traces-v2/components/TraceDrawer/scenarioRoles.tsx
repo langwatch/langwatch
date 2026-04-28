@@ -14,16 +14,26 @@
  * signal it isn't a real human). The underlying chat payloads, exports,
  * and parsing stay untouched.
  */
-import {
-  createContext,
-  useContext,
-  type ReactNode,
-} from "react";
+import { useEffect, type ReactNode } from "react";
 import type { IconType } from "react-icons";
 import { LuBot, LuFlaskConical, LuUser } from "react-icons/lu";
+import { create } from "zustand";
 
-const ScenarioRoleContext = createContext(false);
+interface ScenarioRoleState {
+  isScenario: boolean;
+  setIsScenario: (value: boolean) => void;
+}
 
+const useScenarioRoleStore = create<ScenarioRoleState>((set) => ({
+  isScenario: false,
+  setIsScenario: (value) => set({ isScenario: value }),
+}));
+
+/**
+ * Sets the scenario flag for the lifetime of the wrapping component.
+ * Replaces a prior React Context (banned by traces-v2 STANDARDS §2). Only
+ * one drawer mounts at a time, so the single shared store is safe.
+ */
 export function ScenarioRoleProvider({
   isScenario,
   children,
@@ -31,15 +41,16 @@ export function ScenarioRoleProvider({
   isScenario: boolean;
   children: ReactNode;
 }) {
-  return (
-    <ScenarioRoleContext.Provider value={isScenario}>
-      {children}
-    </ScenarioRoleContext.Provider>
-  );
+  const setIsScenario = useScenarioRoleStore((s) => s.setIsScenario);
+  useEffect(() => {
+    setIsScenario(isScenario);
+    return () => setIsScenario(false);
+  }, [isScenario, setIsScenario]);
+  return <>{children}</>;
 }
 
 export function useIsScenarioRole(): boolean {
-  return useContext(ScenarioRoleContext);
+  return useScenarioRoleStore((s) => s.isScenario);
 }
 
 export type SourceRole = "user" | "assistant";
@@ -90,7 +101,7 @@ export function getDisplayRoleVisuals(
       };
 }
 
-/** Hook variant — consumes scenario context and returns visuals in one call. */
+/** Hook variant — consumes scenario state and returns visuals in one call. */
 export function useDisplayRoleVisuals(role: SourceRole): DisplayRoleVisuals {
   const isScenario = useIsScenarioRole();
   return getDisplayRoleVisuals(role, { isScenario });

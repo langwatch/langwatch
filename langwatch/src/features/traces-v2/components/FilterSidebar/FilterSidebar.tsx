@@ -24,7 +24,7 @@ import {
   getFacetValues,
   getRangeValue,
   SEARCH_FIELDS,
-} from "../../utils/queryParser";
+} from "~/server/app-layer/traces/query-language/queryParser";
 import { CollapsedSidebar } from "./CollapsedSidebar";
 import { getFacetGroupId } from "./constants";
 import { FacetGroupHeader } from "./FacetGroupHeader";

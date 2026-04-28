@@ -7,14 +7,32 @@ import { api } from "~/utils/api";
 import type { ChipDef } from "./ChipBar";
 
 /**
- * Returns a ChipDef for the trace's scenario run, or null when the trace
- * isn't part of a scenario. Clicking the chip opens the scenario run
- * drawer directly — preview info (status, criteria, reasoning) lives in
- * the hover tooltip so the chip doubles as a navigation link.
+ * Plain data describing the scenario run a trace belongs to. Returned by
+ * `useScenarioChipData`; rendered to JSX by `buildScenarioChipDef`.
+ * Splitting data from JSX keeps the hook in `.ts`-land.
  */
-export function useScenarioChipDef(
+export interface ScenarioChipData {
+  scenarioRunId: string;
+  name: string | null;
+  isLoading: boolean;
+  status:
+    | (typeof SCENARIO_RUN_STATUS_CONFIG)[keyof typeof SCENARIO_RUN_STATUS_CONFIG]
+    | undefined;
+  statusKey: keyof typeof SCENARIO_RUN_STATUS_CONFIG | undefined;
+  durationInMs: number | null;
+  metCriteria: string[];
+  unmetCriteria: string[];
+  reasoning: string | null;
+  openScenarioDrawer: () => void;
+}
+
+/**
+ * Returns scenario-chip data, or null when the trace isn't part of a
+ * scenario run. Pure data — JSX is built downstream.
+ */
+export function useScenarioChipData(
   scenarioRunId: string | null | undefined,
-): ChipDef | null {
+): ScenarioChipData | null {
   const { project } = useOrganizationTeamProject();
   const { openDrawer } = useDrawer();
 
@@ -31,47 +49,57 @@ export function useScenarioChipDef(
 
   if (!scenarioRunId) return null;
 
-  const status = data?.status;
-  const statusConfig = status ? SCENARIO_RUN_STATUS_CONFIG[status] : undefined;
-  const dotColor = statusConfig?.fgColor ?? "fg.subtle";
-
-  const metCount = data?.results?.metCriteria?.length ?? 0;
-  const unmetCount = data?.results?.unmetCriteria?.length ?? 0;
-  const totalCount = metCount + unmetCount;
-  const hasResults = !!data?.results && totalCount > 0;
-
-  const displayName =
-    data?.name ?? (isLoading ? "loading…" : `run ${scenarioRunId.slice(0, 8)}`);
-
-  const openScenarioDrawer = () => {
-    openDrawer("scenarioRunDetail", {
-      urlParams: { scenarioRunId },
-    });
-  };
+  const statusKey = data?.status;
+  const status = statusKey ? SCENARIO_RUN_STATUS_CONFIG[statusKey] : undefined;
 
   return {
-    id: `scenario:${scenarioRunId}`,
+    scenarioRunId,
+    name: data?.name ?? null,
+    isLoading,
+    status,
+    statusKey,
+    durationInMs: data?.durationInMs ?? null,
+    metCriteria: data?.results?.metCriteria ?? [],
+    unmetCriteria: data?.results?.unmetCriteria ?? [],
+    reasoning: data?.results?.reasoning ?? null,
+    openScenarioDrawer: () =>
+      openDrawer("scenarioRunDetail", { urlParams: { scenarioRunId } }),
+  };
+}
+
+/** Build a `ChipDef` (with rendered tooltip JSX) from scenario chip data. */
+export function buildScenarioChipDef(d: ScenarioChipData): ChipDef {
+  const dotColor = d.status?.fgColor ?? "fg.subtle";
+  const metCount = d.metCriteria.length;
+  const unmetCount = d.unmetCriteria.length;
+  const totalCount = metCount + unmetCount;
+  const hasResults = totalCount > 0;
+  const displayName =
+    d.name ?? (d.isLoading ? "loading…" : `run ${d.scenarioRunId.slice(0, 8)}`);
+
+  return {
+    id: `scenario:${d.scenarioRunId}`,
     label: "Scenario",
     value: hasResults
       ? `${displayName} · ${metCount}/${totalCount}`
       : displayName,
     dot: dotColor,
     tone: "purple",
-    onClick: openScenarioDrawer,
+    onClick: d.openScenarioDrawer,
     tooltip: (
       <VStack align="stretch" gap={1.5} minWidth="240px" maxWidth="320px">
         <HStack gap={2}>
           <Circle size="8px" bg={dotColor} flexShrink={0} />
           <Text textStyle="sm" fontWeight="semibold" truncate>
-            {data?.name ?? "Untitled scenario"}
+            {d.name ?? "Untitled scenario"}
           </Text>
         </HStack>
-        {statusConfig && (
+        {d.status && (
           <Text textStyle="xs" color="fg.muted" textTransform="capitalize">
-            {statusConfig.label}
+            {d.status.label}
             {hasResults && ` · ${metCount}/${totalCount} criteria met`}
-            {data?.durationInMs != null &&
-              ` · ${(data.durationInMs / 1000).toFixed(1)}s`}
+            {d.durationInMs != null &&
+              ` · ${(d.durationInMs / 1000).toFixed(1)}s`}
           </Text>
         )}
         {hasResults && (
@@ -82,10 +110,10 @@ export function useScenarioChipDef(
             borderTopWidth="1px"
             borderColor="border.muted"
           >
-            {data?.results?.metCriteria?.slice(0, 3).map((c, i) => (
+            {d.metCriteria.slice(0, 3).map((c, i) => (
               <CriterionRow key={`met-${i}`} text={c} met />
             ))}
-            {data?.results?.unmetCriteria?.slice(0, 3).map((c, i) => (
+            {d.unmetCriteria.slice(0, 3).map((c, i) => (
               <CriterionRow key={`unmet-${i}`} text={c} met={false} />
             ))}
             {totalCount > 6 && (
@@ -95,7 +123,7 @@ export function useScenarioChipDef(
             )}
           </VStack>
         )}
-        {data?.results?.reasoning && (
+        {d.reasoning && (
           <Text
             textStyle="2xs"
             color="fg.muted"
@@ -104,7 +132,7 @@ export function useScenarioChipDef(
             borderTopWidth="1px"
             borderColor="border.muted"
           >
-            {data.results.reasoning}
+            {d.reasoning}
           </Text>
         )}
         <Text
@@ -118,7 +146,7 @@ export function useScenarioChipDef(
         </Text>
       </VStack>
     ),
-    ariaLabel: `Open scenario run ${data?.name ?? scenarioRunId}`,
+    ariaLabel: `Open scenario run ${d.name ?? d.scenarioRunId}`,
   };
 }
 
@@ -128,7 +156,7 @@ function CriterionRow({ text, met }: { text: string; met: boolean }) {
       <Icon
         as={met ? LuCheck : LuX}
         boxSize={3}
-        color={met ? "green.500" : "red.500"}
+        color={met ? "green.fg" : "red.fg"}
         marginTop="3px"
         flexShrink={0}
       />

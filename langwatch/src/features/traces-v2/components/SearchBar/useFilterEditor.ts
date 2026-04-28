@@ -5,7 +5,7 @@ import Placeholder from "@tiptap/extension-placeholder";
 import { Text as TiptapText } from "@tiptap/extension-text";
 import { useEditor, type Editor } from "@tiptap/react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { removeNodeAtLocation } from "../../utils/queryParser";
+import { removeNodeAtLocation } from "~/server/app-layer/traces/query-language/queryParser";
 import {
   PARAGRAPH_OFFSET,
   applyAcceptToEditor,

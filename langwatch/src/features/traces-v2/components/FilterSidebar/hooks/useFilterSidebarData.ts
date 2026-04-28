@@ -2,7 +2,7 @@ import { useCallback, useMemo } from "react";
 import { useTraceFacets } from "../../../hooks/useTraceFacets";
 import { useFacetLensStore, applyLensOrder } from "../../../stores/facetLensStore";
 import { useFilterStore } from "../../../stores/filterStore";
-import { getFacetValueState } from "../../../utils/queryParser";
+import { getFacetValueState } from "~/server/app-layer/traces/query-language/queryParser";
 import { hashColor } from "../../../utils/formatters";
 import {
   ATTRIBUTES_SECTION_KEY,

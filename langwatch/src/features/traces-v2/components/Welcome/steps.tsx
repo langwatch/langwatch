@@ -1,34 +1,51 @@
 import type React from "react";
 import { BetterTogetherStep } from "./BetterTogetherStep";
+import { DensityChoiceStep } from "./DensityChoiceStep";
 import { TryItStep } from "./TryItStep";
 import { WhatAreLensesStep } from "./WhatAreLensesStep";
 import { WhatsChangedStep } from "./WhatsChangedStep";
 
+export interface WelcomeStepProps {
+  /** Step content calls this once the user has answered any required prompt. */
+  markAnswered: () => void;
+}
+
 export interface WelcomeStep {
   title: string;
   subtitle: string;
-  content: React.FC;
+  content: React.FC<WelcomeStepProps>;
+  /** When true, Next/Finish is disabled until the step calls `markAnswered`. */
+  requiresAnswer?: boolean;
 }
 
 export const STEPS: WelcomeStep[] = [
   {
-    title: "Welcome to the new Traces Experience",
-    subtitle: "A faster, more explorative, more focused way to explore what your AI agents are doing.",
+    title: "What's new in Traces",
+    subtitle: "Lens-based views, a side-by-side layout, and live updates.",
     content: WhatsChangedStep,
   },
   {
-    title: "Forgot your contacts?",
-    subtitle: "Use Lenses to create views that capture unique variants of filters, columns, density, and groupings. Then share them.",
+    title: "Pick your destiny",
+    subtitle:
+      "Compact fits more rows. Comfortable gives each row more room. You can change it any time.",
+    content: DensityChoiceStep,
+    requiresAnswer: true,
+  },
+  {
+    title: "Lenses",
+    subtitle:
+      "Saved views with their own filters, columns, sort, and grouping.",
     content: WhatAreLensesStep,
   },
   {
-    title: "Better together",
-    subtitle: "Traces is multiplayer — see where your teammates are exploring and share what you find without leaving the page.",
+    title: "Multiplayer",
+    subtitle:
+      "Your teammates show up where you do. Share what you find without leaving the page.",
     content: BetterTogetherStep,
   },
   {
-    title: "Before you dive in",
-    subtitle: "A few keyboard shortcuts and one important note about alpha.",
+    title: "Before you start",
+    subtitle: "Shortcuts and a note about beta.",
     content: TryItStep,
   },
 ];

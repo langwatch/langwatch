@@ -3,7 +3,7 @@ import {
   getFacetValueState,
   getRangeValue,
   type LiqeQuery,
-} from "../../utils/queryParser";
+} from "~/server/app-layer/traces/query-language/queryParser";
 import { AttributesSection } from "./AttributesSection";
 import { ATTRIBUTES_SECTION_KEY, NONE_TOGGLE_VALUE } from "./constants";
 import { FacetSection } from "./FacetSection";

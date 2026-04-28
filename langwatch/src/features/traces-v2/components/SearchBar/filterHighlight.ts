@@ -9,7 +9,7 @@ import {
   type TagToken,
   type UnaryOperatorToken,
 } from "liqe";
-import { SCENARIO_FIELDS } from "../../utils/queryParser";
+import { SCENARIO_FIELDS } from "~/server/app-layer/traces/query-language/queryParser";
 
 // Tolerant fallback for queries that don't yet parse (mid-typing, unmatched
 // quotes, trailing operator). Decorates anything shaped like `field:value`

@@ -1,4 +1,4 @@
-import { FIELD_NAMES, FIELD_VALUES } from "../../utils/queryParser";
+import { FIELD_NAMES, FIELD_VALUES } from "~/server/app-layer/traces/query-language/queryParser";
 import type { SuggestionState } from "./getSuggestionState";
 
 const MAX_ITEMS = 10;

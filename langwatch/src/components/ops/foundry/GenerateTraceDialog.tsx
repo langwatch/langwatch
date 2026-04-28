@@ -1,6 +1,12 @@
 import { useState } from "react";
 import { Box, Button, Flex, Text, Input, VStack } from "@chakra-ui/react";
 import { Sparkles } from "lucide-react";
+import {
+  PopoverBody,
+  PopoverContent,
+  PopoverRoot,
+  PopoverTrigger,
+} from "~/components/ui/popover";
 import { SimpleSlider } from "~/components/ui/slider";
 import { Switch } from "~/components/ui/switch";
 import { api } from "~/utils/api";
@@ -60,46 +66,24 @@ export function GenerateTraceDialog() {
   }
 
   return (
-    <Box position="relative">
-      <Button
-        size="xs"
-        variant="outline"
-        onClick={() => setIsOpen(!isOpen)}
-      >
-        <Sparkles size={14} />
-        Generate
-      </Button>
-      {isOpen && (
-        <>
-          <Box
-            position="fixed"
-            inset={0}
-            zIndex={40}
-            onClick={() => setIsOpen(false)}
-          />
-          <Box
-            position="absolute"
-            right={0}
-            zIndex={50}
-            mt={1}
-            w="340px"
-            rounded="lg"
-            border="1px solid"
-            borderColor="border"
-            bg="bg.panel"
-            shadow="xl"
-            p={4}
-          >
-            <Text
-              fontSize="sm"
-              fontWeight="semibold"
-              color="fg.default"
-              mb={3}
-            >
-              Generate Trace
-            </Text>
+    <PopoverRoot
+      open={isOpen}
+      onOpenChange={(e) => setIsOpen(e.open)}
+      positioning={{ placement: "bottom-end" }}
+    >
+      <PopoverTrigger asChild>
+        <Button size="xs" variant="outline">
+          <Sparkles size={14} />
+          Generate
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent width="340px">
+        <PopoverBody p={4}>
+          <Text fontSize="sm" fontWeight="semibold" color="fg.default" mb={3}>
+            Generate Trace
+          </Text>
 
-            <VStack gap={4} align="stretch">
+          <VStack gap={4} align="stretch">
               {/* Span count */}
               <Box>
                 <Flex justify="space-between" mb={1}>
@@ -259,10 +243,9 @@ export function GenerateTraceDialog() {
                 <Sparkles size={14} />
                 Generate {targetSpanCount.toLocaleString()} spans
               </Button>
-            </VStack>
-          </Box>
-        </>
-      )}
-    </Box>
+          </VStack>
+        </PopoverBody>
+      </PopoverContent>
+    </PopoverRoot>
   );
 }

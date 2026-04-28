@@ -20,12 +20,23 @@ export const WelcomeDialog: React.FC<WelcomeDialogProps> = ({
 }) => {
   const [stepIndex, setStepIndex] = useState(0);
   const [dontShowAgain, setDontShowAgain] = useState(false);
+  const [answered, setAnswered] = useState<Set<number>>(() => new Set());
   const directionRef = useRef<1 | -1>(1);
   const reducedMotion = useReducedMotion();
 
   const isLastStep = stepIndex === STEPS.length - 1;
   const step = STEPS[stepIndex]!;
   const StepContent = step.content;
+  const blocked = !!step.requiresAnswer && !answered.has(stepIndex);
+
+  const markAnswered = useCallback(() => {
+    setAnswered((prev) => {
+      if (prev.has(stepIndex)) return prev;
+      const next = new Set(prev);
+      next.add(stepIndex);
+      return next;
+    });
+  }, [stepIndex]);
 
   const goNext = useCallback(() => {
     directionRef.current = 1;
@@ -44,13 +55,14 @@ export const WelcomeDialog: React.FC<WelcomeDialogProps> = ({
       if (e.key !== "Enter") return;
       const target = e.target as HTMLElement | null;
       if (target && target.tagName === "BUTTON") return;
+      if (blocked) return;
       e.preventDefault();
       if (isLastStep) onFinish();
       else goNext();
     };
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
-  }, [isLastStep, onFinish, goNext]);
+  }, [isLastStep, onFinish, goNext, blocked]);
 
   return (
     <VStack gap={6} width="full" align="stretch">
@@ -91,7 +103,7 @@ export const WelcomeDialog: React.FC<WelcomeDialogProps> = ({
             transition={{ duration: 0.3, ease: [0.32, 0.72, 0, 1] }}
             style={{ width: "100%" }}
           >
-            <StepContent />
+            <StepContent markAnswered={markAnswered} />
           </motion.div>
         </AnimatePresence>
       </Box>
@@ -130,14 +142,26 @@ export const WelcomeDialog: React.FC<WelcomeDialogProps> = ({
             Back
           </Button>
           {isLastStep ? (
-            <Button size="sm" colorPalette="blue" onClick={onFinish}>
+            <Button
+              size="sm"
+              colorPalette="blue"
+              onClick={onFinish}
+              disabled={blocked}
+              title={blocked ? "Pick an option to continue" : undefined}
+            >
               Dive in
               <Icon boxSize={3.5}>
                 <ArrowRight />
               </Icon>
             </Button>
           ) : (
-            <Button size="sm" colorPalette="blue" onClick={goNext}>
+            <Button
+              size="sm"
+              colorPalette="blue"
+              onClick={goNext}
+              disabled={blocked}
+              title={blocked ? "Pick an option to continue" : undefined}
+            >
               Next
               <Icon boxSize={3.5}>
                 <ArrowRight />

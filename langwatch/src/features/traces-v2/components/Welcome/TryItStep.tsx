@@ -1,7 +1,10 @@
 import { Box, HStack, Heading, Icon, SimpleGrid, Text, VStack } from "@chakra-ui/react";
 import { Sparkles } from "lucide-react";
 import type React from "react";
+
 import { Kbd } from "~/components/ops/shared/Kbd";
+
+import type { WelcomeStepProps } from "./steps";
 
 interface Shortcut {
   keys: React.ReactNode;
@@ -23,7 +26,7 @@ const SHORTCUTS: Shortcut[] = [
   { keys: <Kbd>Esc</Kbd>, label: "Close the trace drawer" },
 ];
 
-export const TryItStep: React.FC = () => (
+export const TryItStep: React.FC<WelcomeStepProps> = () => (
   <VStack align="stretch" gap={5}>
     <ShortcutsSection />
     <RecallTourSection />
@@ -34,7 +37,7 @@ export const TryItStep: React.FC = () => (
 const ShortcutsSection: React.FC = () => (
   <VStack align="stretch" gap={2.5}>
     <Heading size="sm" letterSpacing="-0.01em">
-      Handy shortcuts
+      Shortcuts
     </Heading>
     <SimpleGrid columns={{ base: 1, md: 2 }} gap={2.5}>
       {SHORTCUTS.map((shortcut) => (
@@ -47,10 +50,10 @@ const ShortcutsSection: React.FC = () => (
 const RecallTourSection: React.FC = () => (
   <VStack align="stretch" gap={2}>
     <Heading size="sm" letterSpacing="-0.01em">
-      Need this tour again?
+      Reopen this tour
     </Heading>
     <Text textStyle="sm" color="fg.muted">
-      It&apos;s tucked under the <WhatsNewBadge /> button in the toolbar.
+      Under the <WhatsNewBadge /> button in the toolbar.
     </Text>
   </VStack>
 );
@@ -97,8 +100,7 @@ const BetaCallout: React.FC = () => (
         This is beta
       </Text>
       <Text textStyle="xs" color="fg.muted" lineHeight="1.5">
-        Things will change. If you hit something rough, please share feedback
-        — your reports shape what ships.
+        Things will change. If you hit something rough, send us feedback.
       </Text>
     </VStack>
   </HStack>

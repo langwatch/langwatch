@@ -11,6 +11,8 @@ import {
 } from "lucide-react";
 import type React from "react";
 
+import type { WelcomeStepProps } from "./steps";
+
 interface Lens {
   icon: React.ReactNode;
   accent: string;
@@ -27,10 +29,10 @@ const LENSES: Lens[] = [
   { icon: <Users />,         accent: "orange", name: "By User",       desc: "Grouped by user ID" },
 ];
 
-export const WhatAreLensesStep: React.FC = () => (
+export const WhatAreLensesStep: React.FC<WelcomeStepProps> = () => (
   <VStack align="stretch" gap={5}>
     <Text color="fg.muted" textStyle="sm">
-      Six built-in lenses ship with traces. Tweak any of them and click{" "}
+      Six built-ins ship with traces. Tweak one, then click{" "}
       <InlineSaveBadge />{" "}
       to save it as your own.
     </Text>

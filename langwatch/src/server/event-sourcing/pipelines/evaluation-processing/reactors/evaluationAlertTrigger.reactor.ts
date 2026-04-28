@@ -143,13 +143,13 @@ export function createEvaluationAlertTriggerReactor(
             continue;
           }
 
-          // Dedup: check if already sent for this trace
-          const alreadySent = await deps.triggers.hasSentForTrace({
+          // Atomic claim: see alertTrigger.reactor.ts for rationale.
+          const claimed = await deps.triggers.claimSend({
             triggerId: trigger.id,
             traceId,
             projectId: tenantId,
           });
-          if (alreadySent) continue;
+          if (!claimed) continue;
 
           await dispatchTriggerAction({
             deps,

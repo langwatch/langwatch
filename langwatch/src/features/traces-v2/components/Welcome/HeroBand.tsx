@@ -20,11 +20,11 @@ const HeroBackdrop = memo(() => (
     <MeshGradient
       style={{ width: "100%", height: "100%" }}
       colors={[
-        "#1e1b4b", // indigo anchor
-        "#4c1d95", // violet
-        "#7c3aed", // mid violet
-        "#ec4899", // pink accent
-        "#f59e0b", // brand amber warmth
+        "#1c0e05", // espresso anchor
+        "#451a03", // dark brown
+        "#7c2d12", // mahogany
+        "#c2410c", // deep orange
+        "#f97316", // brand orange highlight
       ]}
       distortion={0.45}
       swirl={0.45}
@@ -49,14 +49,14 @@ export const HeroBand: FC<HeroBandProps> = ({ title, subtitle }) => (
     <HeroBackdrop />
     <VStack align="stretch" gap={2} position="relative" color="white">
       <HStack gap={2}>
-        <Badge colorPalette="purple" variant="solid" size="sm" borderRadius="full">
+        <Badge colorPalette="orange" variant="solid" size="sm" borderRadius="full">
           <Icon boxSize={3}>
             <Sparkles />
           </Icon>
           Beta
         </Badge>
         <Text textStyle="xs" color="white/70" fontWeight="medium">
-          Traces · v2
+          Traces, Evolved
         </Text>
       </HStack>
       {/* Crossfade just the title+subtitle text so the shader behind keeps

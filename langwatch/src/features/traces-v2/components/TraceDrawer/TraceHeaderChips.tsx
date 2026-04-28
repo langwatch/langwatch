@@ -9,27 +9,114 @@ import {
   LuTriangleAlert,
 } from "react-icons/lu";
 import type { TraceHeader } from "~/server/api/routers/tracesV2.schemas";
-import { useDrawer } from "~/hooks/useDrawer";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { api } from "~/utils/api";
-import type { ChipDef } from "../components/TraceDrawer/ChipBar";
-import { useScenarioChipDef } from "../components/TraceDrawer/ScenarioChip";
-import { useFilterStore } from "../stores/filterStore";
-import { parseSdkInfo } from "../utils/sdkInfo";
+import {
+  useTraceHeaderChips,
+  type PromptChipState,
+  type SdkInfoLike,
+  type TraceHeaderChipData,
+} from "../../hooks/useTraceHeaderChips";
+import type { ChipDef } from "./ChipBar";
+import { ChipBar } from "./ChipBar";
+import { buildScenarioChipDef } from "./ScenarioChip";
 
-interface SdkInfoLike {
-  shortLabel: string;
-  longLabel: string;
-  description: string;
-  rawName: string;
-  version?: string | null;
-  language: string;
-  family?: string | null;
-  scenario?: { version?: string | null } | null;
+interface TraceHeaderChipsProps {
+  trace: TraceHeader;
+  onSelectSpan: (spanId: string) => void;
+  onOpenPromptsTab: () => void;
+  endSlot?: React.ReactNode;
 }
 
-function buildSdkChip(sdk: SdkInfoLike | null): ChipDef | null {
-  if (!sdk) return null;
+/**
+ * Renders the trace-drawer header chip strip.
+ *
+ * Pulls plain data from `useTraceHeaderChips` and turns it into `ChipDef[]`
+ * with rendered tooltip JSX. Splitting keeps the hook in `.ts`-land
+ * (CLAUDE.md: "Hooks return state and callbacks, never JSX").
+ */
+export function TraceHeaderChips({
+  trace,
+  onSelectSpan,
+  onOpenPromptsTab,
+  endSlot,
+}: TraceHeaderChipsProps) {
+  const { chips } = useTraceHeaderChips(trace, {
+    onSelectSpan,
+    onOpenPromptsTab,
+  });
+
+  const chipDefs: ChipDef[] = chips
+    .map(
+      (c, idx): ChipDef | null =>
+        buildChipDef(c, idx, { onSelectSpan, onOpenPromptsTab }),
+    )
+    .filter((c): c is ChipDef => c != null);
+
+  return <ChipBar chips={chipDefs} endSlot={endSlot} />;
+}
+
+function buildChipDef(
+  data: TraceHeaderChipData,
+  index: number,
+  callbacks: {
+    onSelectSpan: (spanId: string) => void;
+    onOpenPromptsTab: () => void;
+  },
+): ChipDef | null {
+  const priority = index;
+  switch (data.kind) {
+    case "service":
+      return {
+        id: "service",
+        label: "Service",
+        value: data.value,
+        icon: LuServer,
+        tone: "neutral",
+        priority,
+        onFilter: data.onFilter,
+        filterLabel: `Filter the trace table by service ${data.value}`,
+      };
+    case "origin":
+      return {
+        id: "origin",
+        label: "Origin",
+        value: data.value,
+        icon: LuBoxes,
+        tone: "neutral",
+        priority,
+        onFilter: data.onFilter,
+        filterLabel: `Filter the trace table by origin ${data.value}`,
+      };
+    case "scenario":
+      return { ...buildScenarioChipDef(data.data), priority };
+    case "sdk":
+      return { ...buildSdkChipDef(data.sdk), priority };
+    case "promptSelected":
+      return {
+        ...buildSelectedPromptChipDef(
+          data.selectedId,
+          data.spanId,
+          callbacks.onSelectSpan,
+        ),
+        priority,
+      };
+    case "promptLastUsed":
+      return {
+        ...buildLastUsedPromptChipDef({
+          handle: data.handle,
+          versionNumber: data.versionNumber,
+          spanId: data.spanId,
+          state: data.state,
+          driftFromSelection: data.driftFromSelection,
+          outOfDate: data.outOfDate,
+          onSelectSpan: callbacks.onSelectSpan,
+          onOpenPromptsTab: callbacks.onOpenPromptsTab,
+        }),
+        priority,
+      };
+  }
+}
+
+function buildSdkChipDef(sdk: SdkInfoLike): ChipDef {
   return {
     id: "sdk",
     label: "SDK",
@@ -52,7 +139,9 @@ function buildSdkChip(sdk: SdkInfoLike | null): ChipDef | null {
           {sdk.scenario && (
             <SdkRow
               label="Scenario"
-              value={sdk.scenario.version ? `SDK ${sdk.scenario.version}` : "active"}
+              value={
+                sdk.scenario.version ? `SDK ${sdk.scenario.version}` : "active"
+              }
             />
           )}
         </VStack>
@@ -61,140 +150,7 @@ function buildSdkChip(sdk: SdkInfoLike | null): ChipDef | null {
   };
 }
 
-interface PromptChipState {
-  /** Latest version number from the live prompt config. Null when the lookup
-   * hasn't completed or the prompt no longer exists in the project. */
-  latestVersion: number | null;
-  /** True when the looked-up handle returned no row — the prompt was deleted
-   * or never existed in this project. */
-  missing: boolean;
-}
-
-interface UseTraceHeaderChipsOptions {
-  onSelectSpan: (spanId: string) => void;
-  onOpenPromptsTab: () => void;
-}
-
-export function useTraceHeaderChips(
-  trace: TraceHeader,
-  { onSelectSpan, onOpenPromptsTab }: UseTraceHeaderChipsOptions,
-): ChipDef[] {
-  const { project } = useOrganizationTeamProject();
-  const toggleFacet = useFilterStore((s) => s.toggleFacet);
-  const { closeDrawer } = useDrawer();
-  // "Add to filter" affordance — pins the value as a facet on the trace
-  // table query and closes the drawer so the user lands on the filtered
-  // result. Used by service / origin / labels chips below.
-  const addToFilter = (field: string, value: string) => () => {
-    toggleFacet(field, value);
-    closeDrawer();
-  };
-
-  const scenarioRunId =
-    trace.scenarioRunId ?? trace.attributes["scenario.run_id"] ?? null;
-  const scenarioChip = useScenarioChipDef(scenarioRunId);
-
-  const sdkInfo = parseSdkInfo({
-    name: trace.attributes["sdk.name"],
-    version: trace.attributes["sdk.version"],
-    language: trace.attributes["sdk.language"],
-    scenarioSdkName: trace.attributes["scenario.sdk.name"],
-    scenarioSdkVersion: trace.attributes["scenario.sdk.version"],
-    scenarioActive: !!scenarioRunId,
-  });
-  const sdkChip = buildSdkChip(sdkInfo);
-
-  // Live lookup of the prompt's *current* latest version. Only fires when
-  // the trace recorded a last-used prompt — older traces without the
-  // PRD-023 projection never trigger the request. Failure (NOT_FOUND
-  // mapped to error) is treated as "prompt was deleted" via the
-  // `missing` flag so the chip can show that state honestly.
-  const lastUsedHandle = trace.lastUsedPromptId;
-  const lookup = api.prompts.getByIdOrHandle.useQuery(
-    {
-      idOrHandle: lastUsedHandle ?? "",
-      projectId: project?.id ?? "",
-    },
-    {
-      enabled: !!project?.id && !!lastUsedHandle,
-      staleTime: 60_000,
-      retry: false,
-    },
-  );
-
-  const lastUsedState: PromptChipState = {
-    latestVersion: lookup.data?.version ?? null,
-    missing: !!lastUsedHandle && lookup.isError,
-  };
-
-  const driftFromSelection =
-    !!trace.selectedPromptId &&
-    !!trace.lastUsedPromptId &&
-    trace.selectedPromptId !== trace.lastUsedPromptId;
-
-  const isOutOfDate =
-    !!trace.lastUsedPromptVersionNumber &&
-    !!lastUsedState.latestVersion &&
-    lastUsedState.latestVersion > trace.lastUsedPromptVersionNumber;
-
-  const promptChips: ChipDef[] = [];
-
-  if (trace.selectedPromptId && !driftFromSelection) {
-    // Same as last-used — collapse into one chip representing both. The
-    // last-used branch below handles rendering for this case.
-  } else if (trace.selectedPromptId) {
-    promptChips.push(
-      buildSelectedChip(trace.selectedPromptId, trace.selectedPromptSpanId, onSelectSpan),
-    );
-  }
-
-  if (trace.lastUsedPromptId) {
-    promptChips.push(
-      buildLastUsedChip({
-        handle: trace.lastUsedPromptId,
-        versionNumber: trace.lastUsedPromptVersionNumber,
-        spanId: trace.lastUsedPromptSpanId,
-        state: lastUsedState,
-        driftFromSelection,
-        outOfDate: isOutOfDate,
-        onSelectSpan,
-        onOpenPromptsTab,
-      }),
-    );
-  }
-
-  const chips: Array<ChipDef | null> = [
-    trace.serviceName
-      ? {
-          id: "service",
-          label: "Service",
-          value: trace.serviceName,
-          icon: LuServer,
-          tone: "neutral",
-          priority: 0,
-          onFilter: addToFilter("service", trace.serviceName),
-          filterLabel: `Filter the trace table by service ${trace.serviceName}`,
-        }
-      : null,
-    {
-      id: "origin",
-      label: "Origin",
-      value: trace.origin,
-      icon: LuBoxes,
-      tone: "neutral",
-      priority: 1,
-      onFilter: addToFilter("origin", trace.origin),
-      filterLabel: `Filter the trace table by origin ${trace.origin}`,
-    },
-    scenarioChip ? { ...scenarioChip, priority: 2 } : null,
-    sdkChip ? { ...sdkChip, priority: 3 } : null,
-    ...promptChips.map((c, idx) => ({ ...c, priority: 4 + idx })),
-  ];
-
-  return chips.filter((c): c is ChipDef => c != null);
-}
-
-function buildSelectedChip(
+function buildSelectedPromptChipDef(
   selectedId: string,
   spanId: string | null,
   onSelectSpan: (spanId: string) => void,
@@ -221,7 +177,7 @@ function buildSelectedChip(
   };
 }
 
-function buildLastUsedChip({
+function buildLastUsedPromptChipDef({
   handle,
   versionNumber,
   spanId,
@@ -282,8 +238,8 @@ function buildLastUsedChip({
         </HStack>
         {state.missing ? (
           <Text textStyle="2xs" color="fg.muted">
-            Prompt no longer exists in this project. The trace still shows
-            what ran at the time.
+            Prompt no longer exists in this project. The trace still shows what
+            ran at the time.
           </Text>
         ) : (
           <HStack gap={1}>

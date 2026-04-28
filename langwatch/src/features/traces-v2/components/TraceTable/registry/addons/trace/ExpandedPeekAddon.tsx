@@ -9,9 +9,8 @@ import {
 } from "@chakra-ui/react";
 import type React from "react";
 import { useMemo } from "react";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { SpanTreeNode } from "~/server/api/routers/tracesV2.schemas";
-import { api } from "~/utils/api";
+import { useTraceSpanTree } from "../../../../../hooks/useTraceSpanTree";
 import type {
   TraceEvalResult,
   TraceListItem,
@@ -86,12 +85,7 @@ function flattenPeekTree(nodes: PeekTreeNode[]): PeekTreeNode[] {
 }
 
 const InlinePeekContent: React.FC<{ trace: TraceListItem }> = ({ trace }) => {
-  const { project } = useOrganizationTeamProject();
-
-  const { data: spans, isLoading } = api.tracesV2.spanTree.useQuery(
-    { projectId: project?.id ?? "", traceId: trace.traceId },
-    { enabled: !!project?.id, staleTime: 300_000 },
-  );
+  const { data: spans, isLoading } = useTraceSpanTree(trace.traceId);
 
   const flatSpans = useMemo(() => {
     if (!spans || spans.length === 0) return [];

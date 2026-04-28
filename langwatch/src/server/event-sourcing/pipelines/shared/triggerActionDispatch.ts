@@ -71,7 +71,6 @@ export async function dispatchTriggerAction({
 
   const triggerData = buildTriggerData(traceId, tenantId, foldState, fullTrace);
   const params = (trigger.actionParams ?? {}) as ActionParams;
-  let dispatched = true;
 
   switch (trigger.action) {
     case TriggerAction.SEND_EMAIL:
@@ -106,7 +105,7 @@ export async function dispatchTriggerAction({
       break;
 
     case TriggerAction.ADD_TO_DATASET:
-      dispatched = await addTraceToDataset({
+      await addTraceToDataset({
         deps,
         trigger,
         traceId,
@@ -116,14 +115,6 @@ export async function dispatchTriggerAction({
       });
       break;
   }
-
-  if (!dispatched) return;
-
-  await deps.triggers.recordSent({
-    triggerId: trigger.id,
-    traceId,
-    projectId: tenantId,
-  });
 
   await deps.triggers.updateLastRunAt(trigger.id, tenantId);
 

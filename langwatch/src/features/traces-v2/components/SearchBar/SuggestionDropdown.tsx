@@ -3,7 +3,7 @@ import { BookOpen } from "lucide-react";
 import { motion } from "motion/react";
 import type React from "react";
 import { useUIStore } from "../../stores/uiStore";
-import { SEARCH_FIELDS, type SearchFieldMeta } from "../../utils/queryParser";
+import { SEARCH_FIELDS, type SearchFieldMeta } from "~/server/app-layer/traces/query-language/queryParser";
 import type { SuggestionState } from "./getSuggestionState";
 import type { SuggestionUIState } from "./suggestionUI";
 

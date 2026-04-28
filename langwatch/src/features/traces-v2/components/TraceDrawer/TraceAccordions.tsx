@@ -1,6 +1,7 @@
 import { Accordion, Box, Button, HStack, Icon, Skeleton, Spinner, Text, VStack } from "@chakra-ui/react";
 import { LuCalendarClock, LuCircleX } from "react-icons/lu";
-import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { create } from "zustand";
 import type { TraceHeader, SpanTreeNode } from "~/server/api/routers/tracesV2.schemas";
 import { PresenceSection } from "~/features/presence/components/PresenceSection";
 import { SectionPresenceDot } from "~/features/presence/components/SectionPresenceDot";
@@ -42,35 +43,28 @@ export function TraceAccordions({
   activeTab,
   onSelectSpan,
 }: TraceAccordionsProps) {
-  const presenceCtx = useMemo<SectionPresenceContext>(
-    () => ({ traceId: trace.traceId, tab: activeTab }),
-    [trace.traceId, activeTab],
-  );
+  useSyncSectionPresence({ traceId: trace.traceId, tab: activeTab });
 
   if (activeTab === "span" && selectedSpan) {
     return (
-      <SectionPresenceCtx.Provider value={presenceCtx}>
-        {/* Key on spanId so React fully unmounts the old span's accordion
-            state when the user switches spans — otherwise the previous
-            span's open/closed sections and stale detail flicker through
-            during the transition. */}
-        <SpanAccordions
-          key={selectedSpan.spanId}
-          traceId={trace.traceId}
-          span={selectedSpan}
-          onSelectSpan={onSelectSpan}
-        />
-      </SectionPresenceCtx.Provider>
+      // Key on spanId so React fully unmounts the old span's accordion
+      // state when the user switches spans — otherwise the previous
+      // span's open/closed sections and stale detail flicker through
+      // during the transition.
+      <SpanAccordions
+        key={selectedSpan.spanId}
+        traceId={trace.traceId}
+        span={selectedSpan}
+        onSelectSpan={onSelectSpan}
+      />
     );
   }
   return (
-    <SectionPresenceCtx.Provider value={presenceCtx}>
-      <TraceSummaryAccordions
-        trace={trace}
-        spans={spans}
-        onSelectSpan={onSelectSpan}
-      />
-    </SectionPresenceCtx.Provider>
+    <TraceSummaryAccordions
+      trace={trace}
+      spans={spans}
+      onSelectSpan={onSelectSpan}
+    />
   );
 }
 
@@ -151,11 +145,37 @@ function useAutoOpenSections(
   return [open, setOpen];
 }
 
-interface SectionPresenceContext {
+interface SectionPresenceState {
+  traceId: string | null;
+  tab: "summary" | "span" | null;
+  set: (next: { traceId: string; tab: "summary" | "span" }) => void;
+  clear: () => void;
+}
+
+/**
+ * Holds which trace + tab is currently rendered in the accordion shell so
+ * deeply-nested `Section` components can broadcast presence without
+ * prop-drilling and without React Context (banned by traces-v2 STANDARDS §2).
+ * Only one drawer mounts at a time.
+ */
+const useSectionPresenceStore = create<SectionPresenceState>((set) => ({
+  traceId: null,
+  tab: null,
+  set: ({ traceId, tab }) => set({ traceId, tab }),
+  clear: () => set({ traceId: null, tab: null }),
+}));
+
+function useSyncSectionPresence(value: {
   traceId: string;
   tab: "summary" | "span";
+}): void {
+  const setPresence = useSectionPresenceStore((s) => s.set);
+  const clearPresence = useSectionPresenceStore((s) => s.clear);
+  useEffect(() => {
+    setPresence(value);
+    return () => clearPresence();
+  }, [value.traceId, value.tab, setPresence, clearPresence]);
 }
-const SectionPresenceCtx = createContext<SectionPresenceContext | null>(null);
 
 function Section({
   value,
@@ -177,9 +197,8 @@ function Section({
   children: ReactNode;
   isFirst?: boolean;
 }) {
-  const presence = useContext(SectionPresenceCtx);
-  const presenceTraceId = presence?.traceId;
-  const presenceTab = presence?.tab;
+  const presenceTraceId = useSectionPresenceStore((s) => s.traceId);
+  const presenceTab = useSectionPresenceStore((s) => s.tab);
   const trackPresence = !!(presenceTraceId && presenceTab);
   return (
     <Accordion.Item

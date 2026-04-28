@@ -28,20 +28,18 @@ export class TriggerService {
     return traceOnly;
   }
 
-  async hasSentForTrace(params: {
+  /**
+   * Atomically claim (triggerId, traceId). Returns true on first claim,
+   * false if another reactor already claimed it. Side effects (email,
+   * slack, dataset write) must run only when this returns true to avoid
+   * double-fire on concurrent dispatch or reactor retry.
+   */
+  async claimSend(params: {
     triggerId: string;
     traceId: string;
     projectId: string;
   }): Promise<boolean> {
-    return this.repo.hasSentForTrace(params);
-  }
-
-  async recordSent(params: {
-    triggerId: string;
-    traceId: string;
-    projectId: string;
-  }): Promise<void> {
-    return this.repo.recordSent(params);
+    return this.repo.claimSend(params);
   }
 
   async updateLastRunAt(

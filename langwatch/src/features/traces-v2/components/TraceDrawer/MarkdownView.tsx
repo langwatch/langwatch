@@ -33,7 +33,7 @@ import { Checkbox } from "~/components/ui/checkbox";
 import { Radio, RadioGroup } from "~/components/ui/radio";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import type { HighlighterGeneric } from "shiki";
+import { codeToHtml, createHighlighter, type HighlighterGeneric } from "shiki";
 import type {
   TraceHeader,
   SpanTreeNode,
@@ -1342,7 +1342,6 @@ function useShikiAdapter(colorMode: string) {
   return useMemo(() => {
     return createShikiAdapter<HighlighterGeneric<any, any>>({
       async load() {
-        const { createHighlighter } = await import("shiki");
         return createHighlighter({
           langs: [
             "markdown",
@@ -1638,8 +1637,7 @@ export function ShikiHighlight({
     let cancelled = false;
     void (async () => {
       try {
-        const shiki = await import("shiki");
-        const result = await shiki.codeToHtml(code, { lang: language, theme });
+        const result = await codeToHtml(code, { lang: language, theme });
         if (!cancelled) setHtml(result);
       } catch {
         if (!cancelled) setHtml(null);

@@ -11,7 +11,7 @@ import {
   removeFacetValueFromQuery,
   validateAst,
   ParseError,
-} from "../utils/queryParser";
+} from "~/server/app-layer/traces/query-language/queryParser";
 
 export interface TimeRange {
   from: number;

@@ -1,13 +1,7 @@
-import {
-  Box,
-  HStack,
-  Heading,
-  Icon,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
-import { LuKeyboard, LuX } from "react-icons/lu";
+import { Box, Heading, HStack, Icon, Text, VStack } from "@chakra-ui/react";
+import { LuKeyboard } from "react-icons/lu";
 import { Kbd } from "~/components/ops/shared/Kbd";
+import { Dialog } from "~/components/ui/dialog";
 
 export interface ShortcutGroup {
   title: string;
@@ -31,7 +25,11 @@ const DRAWER_GROUPS: ShortcutGroup[] = [
     items: [
       { keys: ["T"], label: "Trace view" },
       { keys: ["L"], label: "LLM tab" },
-      { keys: ["P"], label: "Prompts tab", detail: "When the trace used a managed prompt" },
+      {
+        keys: ["P"],
+        label: "Prompts tab",
+        detail: "When the trace used a managed prompt",
+      },
       { keys: ["C"], label: "Conversation view" },
       { keys: ["M"], label: "Maximize / restore" },
       { keys: ["Esc"], label: "Close drawer / span" },
@@ -68,45 +66,20 @@ export function KeyboardShortcutsHelp({
   onClose,
   groups = DRAWER_GROUPS,
 }: KeyboardShortcutsHelpProps) {
-  if (!open) return null;
-
   return (
-    <Box
-      position="fixed"
-      inset={0}
-      zIndex={2000}
-      bg="blackAlpha.600"
-      onClick={onClose}
-      css={{
-        animation: "kbdHelpFade 0.12s ease-out",
-        "@keyframes kbdHelpFade": {
-          from: { opacity: 0 },
-          to: { opacity: 1 },
-        },
+    <Dialog.Root
+      open={open}
+      onOpenChange={(e) => {
+        if (!e.open) onClose();
       }}
+      size="sm"
     >
-      <Box
-        position="absolute"
-        top="50%"
-        left="50%"
-        transform="translate(-50%, -50%)"
-        bg="bg.panel"
-        borderRadius="md"
-        borderWidth="1px"
-        borderColor="border"
-        width="480px"
-        maxWidth="90vw"
-        maxHeight="80vh"
-        overflow="auto"
-        boxShadow="lg"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <HStack
+      <Dialog.Content maxHeight="80vh" overflow="hidden">
+        <Dialog.Header
           paddingX={3}
           paddingY={2}
           borderBottomWidth="1px"
           borderColor="border.muted"
-          justify="space-between"
         >
           <HStack gap={1.5}>
             <Icon as={LuKeyboard} boxSize="12px" color="fg.muted" />
@@ -114,46 +87,39 @@ export function KeyboardShortcutsHelp({
               Keyboard Shortcuts
             </Heading>
           </HStack>
-          <Box
-            as="button"
-            onClick={onClose}
-            padding={0.5}
-            borderRadius="sm"
-            _hover={{ bg: "bg.muted" }}
-            aria-label="Close shortcuts"
-          >
-            <Icon as={LuX} boxSize="12px" color="fg.subtle" />
-          </Box>
-        </HStack>
-        <VStack align="stretch" gap={3} paddingX={3} paddingY={3}>
-          {groups.map((group) => (
-            <VStack key={group.title} align="stretch" gap={1}>
-              <Text
-                textStyle="2xs"
-                color="fg.muted"
-                textTransform="uppercase"
-                letterSpacing="0.08em"
-                fontWeight="semibold"
-              >
-                {group.title}
-              </Text>
-              <VStack align="stretch" gap={0.5}>
-                {group.items.map((item) => (
-                  <HStack key={item.label} gap={2} justify="space-between">
-                    <Text textStyle="xs" color="fg">
-                      {item.label}
-                    </Text>
-                    <HStack gap={1}>
-                      {item.keys.map((k) => (
-                        <Kbd key={k}>{k}</Kbd>
-                      ))}
+          <Dialog.CloseTrigger />
+        </Dialog.Header>
+        <Dialog.Body paddingX={3} paddingY={3} overflow="auto">
+          <VStack align="stretch" gap={3}>
+            {groups.map((group) => (
+              <VStack key={group.title} align="stretch" gap={1}>
+                <Text
+                  textStyle="2xs"
+                  color="fg.muted"
+                  textTransform="uppercase"
+                  letterSpacing="0.08em"
+                  fontWeight="semibold"
+                >
+                  {group.title}
+                </Text>
+                <VStack align="stretch" gap={0.5}>
+                  {group.items.map((item) => (
+                    <HStack key={item.label} gap={2} justify="space-between">
+                      <Text textStyle="xs" color="fg">
+                        {item.label}
+                      </Text>
+                      <HStack gap={1}>
+                        {item.keys.map((k) => (
+                          <Kbd key={k}>{k}</Kbd>
+                        ))}
+                      </HStack>
                     </HStack>
-                  </HStack>
-                ))}
+                  ))}
+                </VStack>
               </VStack>
-            </VStack>
-          ))}
-        </VStack>
+            ))}
+          </VStack>
+        </Dialog.Body>
         <Box
           paddingX={3}
           paddingY={1.5}
@@ -165,7 +131,7 @@ export function KeyboardShortcutsHelp({
             Shortcuts are disabled while typing in inputs.
           </Text>
         </Box>
-      </Box>
-    </Box>
+      </Dialog.Content>
+    </Dialog.Root>
   );
 }

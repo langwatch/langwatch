@@ -7,8 +7,8 @@ import {
   parse,
   validateAst,
   isEmptyAST,
-} from "~/features/traces-v2/utils/queryParser";
-import { QUERY_SYNTAX_DOC } from "~/features/traces-v2/searchSyntax/grammar";
+} from "./query-language/queryParser";
+import { QUERY_SYNTAX_DOC } from "./query-language/grammar";
 import { getApp } from "~/server/app-layer/app";
 import { createLogger } from "~/utils/logger";
 

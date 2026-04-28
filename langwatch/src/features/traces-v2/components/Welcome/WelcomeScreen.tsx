@@ -39,6 +39,7 @@ export const WelcomeScreen: React.FC = () => {
         if (!e.open) handleDismiss({ remember: false });
       }}
       size="xl"
+      placement="center"
       motionPreset="scale"
       closeOnInteractOutside={false}
       closeOnEscape={false}
@@ -48,22 +49,36 @@ export const WelcomeScreen: React.FC = () => {
         aria-label="Welcome to Traces"
         maxWidth="820px"
         width="full"
-        bg="bg.panel/25"
+        bg="bg.panel/12"
         borderRadius="2xl"
         borderWidth="1px"
         borderColor="border.muted"
-        boxShadow="2xl"
+        // Outer drop shadow + an inset vignette so the backdrop blur fades
+        // softly toward the rounded edge instead of clipping abruptly.
+        boxShadow="0 24px 60px rgba(0,0,0,0.35), inset 0 0 80px 0 rgba(0,0,0,0.28)"
         padding={6}
-        backdropFilter="blur(96px) saturate(140%)"
+        backdropFilter="blur(25px) saturate(100%)"
         backdropProps={{
           position: "absolute",
           inset: 0,
-          backdropFilter: "blur(14px)",
+          backdropFilter: "blur(10px)",
           background: "blackAlpha.500",
         }}
         positionerProps={{
-          position: "absolute",
-          inset: 0,
+          // Inline style so we beat the Chakra dialog recipe's class CSS.
+          // The recipe ships `position: fixed; width: 100vw; height: 100dvh`
+          // — without overriding width/height the positioner stays viewport-
+          // sized even after we flip to `position: absolute`, so its center
+          // sits below + right of the dashboard content area's center.
+          style: {
+            position: "absolute",
+            inset: 0,
+            width: "auto",
+            height: "auto",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          },
         }}
       >
         <WelcomeDialog

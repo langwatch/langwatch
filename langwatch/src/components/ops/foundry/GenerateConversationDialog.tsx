@@ -1,6 +1,12 @@
 import { useState } from "react";
 import { Box, Button, Flex, Text, VStack, HStack, Input } from "@chakra-ui/react";
 import { MessagesSquare } from "lucide-react";
+import {
+  PopoverBody,
+  PopoverContent,
+  PopoverRoot,
+  PopoverTrigger,
+} from "~/components/ui/popover";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useExecutionStore } from "./executionStore";
 import { useFoundryProjectStore } from "./foundryProjectStore";
@@ -58,53 +64,34 @@ export function GenerateConversationDialog() {
   }
 
   return (
-    <Box position="relative">
-      <Button
-        size="xs"
-        variant="outline"
-        onClick={() => setIsOpen(!isOpen)}
-        loading={isSending}
-        loadingText="Sending…"
-        disabled={!apiKey}
-      >
-        <MessagesSquare size={14} />
-        Fake conversation
-      </Button>
-      {isOpen && (
-        <>
-          <Box
-            position="fixed"
-            inset={0}
-            zIndex={40}
-            onClick={() => setIsOpen(false)}
-          />
-          <Box
-            position="absolute"
-            right={0}
-            zIndex={50}
-            mt={1}
-            w="320px"
-            rounded="lg"
-            border="1px solid"
-            borderColor="border"
-            bg="bg.panel"
-            shadow="xl"
-            p={4}
-          >
-            <Text
-              fontSize="sm"
-              fontWeight="semibold"
-              color="fg.default"
-              mb={1}
-            >
-              Send a fake conversation
-            </Text>
-            <Text fontSize="xs" color="fg.muted" mb={3}>
-              Each turn is its own trace, sharing a thread ID. Input grows with
-              the chat history; output is the latest assistant reply.
-            </Text>
+    <PopoverRoot
+      open={isOpen}
+      onOpenChange={(e) => setIsOpen(e.open)}
+      positioning={{ placement: "bottom-end" }}
+    >
+      <PopoverTrigger asChild>
+        <Button
+          size="xs"
+          variant="outline"
+          loading={isSending}
+          loadingText="Sending…"
+          disabled={!apiKey}
+        >
+          <MessagesSquare size={14} />
+          Fake conversation
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent width="320px">
+        <PopoverBody p={4}>
+          <Text fontSize="sm" fontWeight="semibold" color="fg.default" mb={1}>
+            Send a fake conversation
+          </Text>
+          <Text fontSize="xs" color="fg.muted" mb={3}>
+            Each turn is its own trace, sharing a thread ID. Input grows with
+            the chat history; output is the latest assistant reply.
+          </Text>
 
-            <VStack gap={4} align="stretch">
+          <VStack gap={4} align="stretch">
               <Box>
                 <Flex justify="space-between" mb={1}>
                   <Text fontSize="xs" color="fg.muted">
@@ -179,10 +166,9 @@ export function GenerateConversationDialog() {
                   Navigate to a project first.
                 </Text>
               )}
-            </VStack>
-          </Box>
-        </>
-      )}
-    </Box>
+          </VStack>
+        </PopoverBody>
+      </PopoverContent>
+    </PopoverRoot>
   );
 }

@@ -5,7 +5,7 @@ import {
   getFacetValues,
   getRangeValue,
   type LiqeQuery,
-} from "../../utils/queryParser";
+} from "~/server/app-layer/traces/query-language/queryParser";
 import { CollapsedFacetIcon } from "./CollapsedFacetIcon";
 import type {
   CategoricalSection,

@@ -2,6 +2,8 @@ import { Badge, Box, Flex, HStack, Icon, SimpleGrid, Text, VStack } from "@chakr
 import { MessageCircle, Share2, Users } from "lucide-react";
 import type React from "react";
 
+import type { WelcomeStepProps } from "./steps";
+
 type Accent = "teal" | "orange";
 
 interface MultiplayerFeature {
@@ -15,18 +17,18 @@ const FEATURES: MultiplayerFeature[] = [
   {
     icon: <Users />,
     accent: "teal",
-    title: "See your teammates",
-    body: "Avatars surface on the lenses and traces your team is exploring right now.",
+    title: "Teammate avatars",
+    body: "Show up on the lenses and traces your team is currently looking at.",
   },
   {
     icon: <Share2 />,
     accent: "orange",
-    title: "Share in one click",
-    body: "Send a lens, a filtered view, or a single trace — the link opens to the exact same state.",
+    title: "Shareable links",
+    body: "Send a lens, a filtered view, or a single trace — the link opens to the same state.",
   },
 ];
 
-export const BetterTogetherStep: React.FC = () => (
+export const BetterTogetherStep: React.FC<WelcomeStepProps> = () => (
   <VStack align="stretch" gap={5}>
     <SimpleGrid columns={{ base: 1, md: 2 }} gap={3}>
       {FEATURES.map((feature) => (
@@ -106,8 +108,8 @@ const ComingSoonCallout: React.FC = () => (
         </Badge>
       </HStack>
       <Text textStyle="xs" color="fg.muted" lineHeight="1.5">
-        Drop a note directly on a span, watch a teammate&apos;s cursor as they
-        scroll through the trace, and resolve threads when the bug ships.
+        Comment on a span, see a teammate&apos;s cursor as they scroll through
+        a trace, and resolve threads when the bug is fixed.
       </Text>
     </VStack>
   </HStack>

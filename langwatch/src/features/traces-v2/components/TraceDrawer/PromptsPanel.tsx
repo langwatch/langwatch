@@ -19,14 +19,14 @@ import {
   LuSparkles,
   LuTriangleAlert,
 } from "react-icons/lu";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { Tooltip } from "~/components/ui/tooltip";
 import type {
   SpanDetail,
   SpanTreeNode,
   TraceHeader,
 } from "~/server/api/routers/tracesV2.schemas";
-import { api } from "~/utils/api";
+import { usePromptByHandle } from "../../hooks/usePromptByHandle";
+import { useSpansFull } from "../../hooks/useSpansFull";
 import {
   extractPromptReference,
   formatPromptReferenceLabel,
@@ -124,7 +124,6 @@ function aggregatePromptUsage(
 }
 
 export function PromptsPanel({ trace, spans, onSelectSpan }: PromptsPanelProps) {
-  const { project } = useOrganizationTeamProject();
   const { openDrawer } = useDrawer();
   const onOpenPromptEditor = (handle: string) => {
     openDrawer("promptEditor", { promptId: handle });
@@ -135,16 +134,7 @@ export function PromptsPanel({ trace, spans, onSelectSpan }: PromptsPanelProps) 
     [trace.attributes],
   );
 
-  const { data: spansFull, isLoading } = api.tracesV2.spansFull.useQuery(
-    {
-      projectId: project?.id ?? "",
-      traceId: trace.traceId,
-    },
-    {
-      enabled: !!project?.id && !!trace.traceId,
-      staleTime: 60_000,
-    },
-  );
+  const { data: spansFull, isLoading } = useSpansFull(true);
 
   const usages = useMemo(
     () => aggregatePromptUsage(spansFull, fallbackRefs),
@@ -233,7 +223,6 @@ function SelectedVsLastUsedCallout({
   hasDrift: boolean;
   onSelectSpan: (spanId: string) => void;
 }) {
-  const { project } = useOrganizationTeamProject();
   const sameRef =
     !!trace.selectedPromptId &&
     trace.selectedPromptId === trace.lastUsedPromptId;
@@ -241,19 +230,9 @@ function SelectedVsLastUsedCallout({
   // Look up the latest version of the last-used prompt to detect
   // out-of-date traces — when the prompt has moved on since this trace
   // ran. Falls quietly to no-warning when the lookup errors.
-  const lookup = api.prompts.getByIdOrHandle.useQuery(
-    {
-      idOrHandle: trace.lastUsedPromptId ?? "",
-      projectId: project?.id ?? "",
-    },
-    {
-      enabled: !!project?.id && !!trace.lastUsedPromptId,
-      staleTime: 60_000,
-      retry: false,
-    },
+  const { latestVersion, missing: promptMissing } = usePromptByHandle(
+    trace.lastUsedPromptId,
   );
-  const latestVersion = lookup.data?.version ?? null;
-  const promptMissing = !!trace.lastUsedPromptId && lookup.isError;
   const outOfDate =
     !!trace.lastUsedPromptVersionNumber &&
     !!latestVersion &&

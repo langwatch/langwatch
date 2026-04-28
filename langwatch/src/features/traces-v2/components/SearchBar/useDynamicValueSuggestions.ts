@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { useTraceFacetValues } from "../../hooks/useTraceFacetValues";
-import { SEARCH_FIELDS } from "../../utils/queryParser";
+import { SEARCH_FIELDS } from "~/server/app-layer/traces/query-language/queryParser";
 import type { SuggestionState } from "./getSuggestionState";
 import type { DynamicSuggestionItems } from "./useFilterEditor";
 

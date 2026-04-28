@@ -284,7 +284,7 @@ export const startApp = async (dir = path.dirname(__dirname)) => {
   // Bind the tRPC router to a WebSocket transport on the same HTTP server.
   // Lets high-frequency procedures (presence cursor today) escape the
   // browser's 6-connection HTTP cap by riding a single long-lived socket.
-  setupTRPCWebSocket(server as ReturnType<typeof createServer>);
+  const wsHandle = setupTRPCWebSocket(server as ReturnType<typeof createServer>);
 
   server.once("error", (err) => {
     logger.error({ error: err }, "error occurred on server");
@@ -326,6 +326,15 @@ export const startApp = async (dir = path.dirname(__dirname)) => {
       process.exit(1);
     }, 5_000);
     forceExitTimer.unref();
+    // Politely tell WS clients to reconnect *before* tearing down the
+    // socket — gives them tRPC's staggered reconnect path instead of a
+    // hard TCP RST and a thundering herd on the next pod.
+    try {
+      wsHandle.broadcastReconnectNotification();
+      await wsHandle.close();
+    } catch (error) {
+      logger.warn({ error }, "error while closing tRPC websocket server");
+    }
     server.close();
     server.closeAllConnections();
     mcpHandler.closeAllSessions();

@@ -99,13 +99,16 @@ export function createAlertTriggerReactor(
             continue;
           }
 
-          // Dedup: check if already sent for this trace
-          const alreadySent = await deps.triggers.hasSentForTrace({
+          // Atomic claim: insert TriggerSent first, dispatch only on success.
+          // Two reactors racing on the same trigger/trace (trace pipeline +
+          // eval pipeline) will see exactly one true. A reactor retry after
+          // a dispatch failure also sees false here — at-most-once.
+          const claimed = await deps.triggers.claimSend({
             triggerId: trigger.id,
             traceId,
             projectId: tenantId,
           });
-          if (alreadySent) continue;
+          if (!claimed) continue;
 
           await dispatchTriggerAction({
             deps,

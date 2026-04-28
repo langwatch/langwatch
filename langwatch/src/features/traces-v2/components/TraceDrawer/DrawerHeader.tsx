@@ -7,6 +7,8 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { MoreHorizontal } from "lucide-react";
+import { useCallback, useMemo, useState } from "react";
 import {
   LuArrowLeft,
   LuBraces,
@@ -18,7 +20,6 @@ import {
   LuLightbulb,
   LuMaximize2,
   LuMinimize2,
-  LuMoreHorizontal,
   LuPencil,
   LuPin,
   LuPinOff,
@@ -28,23 +29,24 @@ import {
   LuSparkles,
   LuX,
 } from "react-icons/lu";
-import { useCallback, useMemo, useState } from "react";
+import { Kbd } from "~/components/ops/shared/Kbd";
 import { Link } from "~/components/ui/link";
 import { Menu } from "~/components/ui/menu";
 import { Tooltip } from "~/components/ui/tooltip";
-import { api } from "~/utils/api";
+import { TracePresenceAvatars } from "~/features/presence/components/TracePresenceAvatars";
 import { useAnnotationCommentStore } from "~/hooks/useAnnotationCommentStore";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useDejaViewLink } from "~/hooks/useDejaViewLink";
 import { useDrawer } from "~/hooks/useDrawer";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import type { TraceHeader } from "~/server/api/routers/tracesV2.schemas";
+import { useTraceRefresh } from "../../hooks/useTraceRefresh";
 import { usePinnedAttributes } from "../../hooks/usePinnedAttributes";
 import { useThreadContext } from "../../hooks/useThreadContext";
+import { TraceHeaderChips } from "./TraceHeaderChips";
 import { useTraceResources } from "../../hooks/useTraceResources";
-import { useTraceHeaderChips } from "../../hooks/useTraceHeaderChips";
+import type { DrawerViewMode } from "../../stores/drawerStore";
 import { useFilterStore } from "../../stores/filterStore";
 import type { PinnedAttribute } from "../../stores/pinnedAttributesStore";
-import type { TraceHeader } from "~/server/api/routers/tracesV2.schemas";
-import type { DrawerViewMode } from "../../stores/drawerStore";
 import {
   abbreviateModel,
   formatCost,
@@ -54,11 +56,8 @@ import {
   SPAN_TYPE_COLORS,
   STATUS_COLORS,
 } from "../../utils/formatters";
-import { Kbd } from "~/components/ops/shared/Kbd";
-import { ChipBar } from "./ChipBar";
 import { ModeSwitch } from "./ModeSwitch";
 import { RawJsonDialog } from "./RawJsonDialog";
-import { TracePresenceAvatars } from "~/features/presence/components/TracePresenceAvatars";
 
 interface DrawerHeaderProps {
   trace: TraceHeader;
@@ -153,10 +152,6 @@ export function DrawerHeader({
     trace.outputTokens != null &&
     (trace.inputTokens > 0 || trace.outputTokens > 0);
 
-  const headerChips = useTraceHeaderChips(trace, {
-    onSelectSpan,
-    onOpenPromptsTab,
-  });
   const resources = useTraceResources(trace.traceId);
   const threadContext = useThreadContext(
     trace.conversationId ?? null,
@@ -210,26 +205,9 @@ export function DrawerHeader({
     closeDrawer();
   }, [applyQueryText, closeDrawer, findSimilarQuery]);
 
-  const trpcUtils = api.useContext();
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const handleRefresh = useCallback(async () => {
-    if (isRefreshing) return;
-    setIsRefreshing(true);
-    try {
-      await Promise.all([
-        trpcUtils.tracesV2.header.invalidate({ traceId: trace.traceId }),
-        trpcUtils.tracesV2.spanTree.invalidate({ traceId: trace.traceId }),
-        trpcUtils.tracesV2.evals.invalidate({ traceId: trace.traceId }),
-        // Refreshing inside the drawer should also bring the row in the
-        // underlying table back in sync — without this, fields like
-        // duration / cost / status that the projection just refreshed
-        // stay stale on the table while the drawer shows the latest.
-        trpcUtils.tracesV2.list.invalidate(),
-      ]);
-    } finally {
-      setIsRefreshing(false);
-    }
-  }, [isRefreshing, trace.traceId, trpcUtils]);
+  const { refresh: handleRefresh, isRefreshing } = useTraceRefresh(
+    trace.traceId,
+  );
 
   return (
     <VStack align="stretch" gap={2} paddingX={4} paddingY={3}>
@@ -621,11 +599,14 @@ export function DrawerHeader({
         })}
       </HStack>
 
-      {/* Row 4: Metadata chip strip — driven by `useTraceHeaderChips` so
-          adding a new chip (prompt, eval, env, …) is a one-line entry in
-          the hook, not a JSX edit here. */}
-      <ChipBar
-        chips={headerChips}
+      {/* Row 4: Metadata chip strip — adding a new chip (prompt, eval,
+          env, …) is a one-line entry in `useTraceHeaderChips` (data) plus
+          one switch case in `TraceHeaderChips` (JSX), not a JSX edit
+          here. */}
+      <TraceHeaderChips
+        trace={trace}
+        onSelectSpan={onSelectSpan}
+        onOpenPromptsTab={onOpenPromptsTab}
         endSlot={
           <Text textStyle="xs" color="fg.subtle">
             {formatRelativeTime(trace.timestamp)}
@@ -761,7 +742,7 @@ function TraceActionsMenu({
       >
         <Menu.Trigger asChild>
           <Button size="xs" variant="ghost" aria-label="Trace actions">
-            <Icon as={LuMoreHorizontal} boxSize={3.5} />
+            <Icon as={MoreHorizontal} boxSize={3.5} />
           </Button>
         </Menu.Trigger>
       </Tooltip>
