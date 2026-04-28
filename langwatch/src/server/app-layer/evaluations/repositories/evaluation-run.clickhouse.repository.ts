@@ -311,6 +311,7 @@ export class EvaluationRunClickHouseRepository
   async findSummariesByTraceIds(
     tenantId: string,
     traceIds: string[],
+    since: number,
   ): Promise<Record<string, EvalSummary[]>> {
     if (traceIds.length === 0) return {};
 
@@ -336,11 +337,11 @@ export class EvaluationRunClickHouseRepository
             Label
           FROM ${TABLE_NAME}
           WHERE TenantId = {tenantId:String}
-            AND ScheduledAt >= now() - INTERVAL 7 DAY
+            AND ScheduledAt >= fromUnixTimestamp64Milli({since:Int64})
             AND TraceId IN ({traceIds:Array(String)})
           ORDER BY UpdatedAt DESC
         `,
-        query_params: { tenantId, traceIds },
+        query_params: { tenantId, traceIds, since },
         format: "JSONEachRow",
       });
 

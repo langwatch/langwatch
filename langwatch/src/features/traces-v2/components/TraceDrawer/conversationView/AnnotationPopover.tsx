@@ -15,7 +15,10 @@ import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { Popover } from "~/components/ui/popover";
 import { toaster } from "~/components/ui/toaster";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { api } from "~/utils/api";
+import { api, type RouterOutputs } from "~/utils/api";
+
+type AnnotationScoreList =
+  RouterOutputs["annotationScore"]["getAllActive"];
 
 type Mode = "annotate" | "suggest";
 
@@ -64,7 +67,7 @@ export function AnnotationPopover(props: AnnotationPopoverProps) {
         // being clipped when opened near an edge. Cuts the "popover gets
         // squeezed and chops off the bottom" failure mode.
         flip: true,
-        shift: { padding: 16 },
+        shift: 16,
         overflowPadding: 16,
       }}
     >
@@ -102,7 +105,7 @@ interface AnnotationFormState {
   setExpectedOutput: (v: string) => void;
   scoreOptions: ScoreOptions;
   setScoreOptions: React.Dispatch<React.SetStateAction<ScoreOptions>>;
-  scores: ReturnType<typeof api.annotationScore.getAllActive.useQuery>;
+  scores: { data: AnnotationScoreList | undefined; isLoading: boolean };
   isEdit: boolean;
   isSaving: boolean;
   isDeleting: boolean;
@@ -149,7 +152,9 @@ function useAnnotationForm(
     if (isEdit && existing) {
       setComment(existing.comment ?? "");
       setExpectedOutput(existing.expectedOutput ?? "");
-      setScoreOptions((existing.scoreOptions as ScoreOptions) ?? {});
+      setScoreOptions(
+        (existing.scoreOptions as unknown as ScoreOptions) ?? {},
+      );
     } else {
       setComment("");
       setExpectedOutput(
@@ -422,7 +427,7 @@ function ScoreFields({ state }: { state: AnnotationFormState }) {
             name={s.name}
             description={s.description}
             dataType={s.dataType!}
-            options={(s.options as AnnotationScoreOption[]) ?? []}
+            options={(s.options as unknown as AnnotationScoreOption[]) ?? []}
             value={state.scoreOptions[s.id]?.value}
             reason={state.scoreOptions[s.id]?.reason ?? ""}
             onChange={(value, reason) =>

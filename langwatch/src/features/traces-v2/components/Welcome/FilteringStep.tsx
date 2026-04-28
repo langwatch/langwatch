@@ -1,4 +1,4 @@
-import { Box, Flex, HStack, Icon, Text, VStack } from "@chakra-ui/react";
+import { Box, chakra, Flex, HStack, Icon, Text, VStack } from "@chakra-ui/react";
 import { ArrowRight, Sparkles, X } from "lucide-react";
 import type React from "react";
 import { useCallback, useMemo, useState } from "react";
@@ -208,8 +208,7 @@ const FacetRowMock: React.FC<FacetRowMockProps> = ({
   const solidBar = `${palette}.solid`;
 
   return (
-    <Box
-      as="button"
+    <chakra.button
       type="button"
       onClick={onToggle}
       aria-pressed={selected}
@@ -283,7 +282,7 @@ const FacetRowMock: React.FC<FacetRowMockProps> = ({
           {count.toLocaleString()}
         </Text>
       </HStack>
-    </Box>
+    </chakra.button>
   );
 };
 
@@ -468,8 +467,7 @@ const FilterChip: React.FC<FilterChipProps> = ({
       </Text>
       {value}
     </Text>
-    <Flex
-      as="button"
+    <chakra.button
       type="button"
       onClick={onRemove}
       aria-label={`Remove ${field}:${value}`}
@@ -478,8 +476,9 @@ const FilterChip: React.FC<FilterChipProps> = ({
       right={0}
       bottom={0}
       width="14px"
-      align="center"
-      justify="center"
+      display="flex"
+      alignItems="center"
+      justifyContent="center"
       color="fg.muted"
       borderTopRightRadius="3px"
       borderBottomRightRadius="3px"
@@ -493,7 +492,7 @@ const FilterChip: React.FC<FilterChipProps> = ({
       <Icon boxSize="8px">
         <X />
       </Icon>
-    </Flex>
+    </chakra.button>
   </Box>
 );
 

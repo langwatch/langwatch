@@ -88,11 +88,6 @@ export function setupTRPCWebSocket(server: HttpServer): TRPCWebSocketHandle {
         >[0]["req"],
         res: opts.res as Parameters<typeof createTRPCContext>[0]["res"],
       }),
-    keepAlive: {
-      enabled: true,
-      pingMs: 30_000,
-      pongWaitMs: 5_000,
-    },
   });
 
   return {

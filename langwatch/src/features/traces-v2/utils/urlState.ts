@@ -24,14 +24,17 @@ export interface FragmentState {
 
 const VALID_GROUPINGS: ReadonlySet<GroupingMode> = new Set([
   "flat",
-  "by-session",
+  "by-conversation",
   "by-service",
   "by-user",
   "by-model",
 ]);
 
-function isGroupingMode(value: string): value is GroupingMode {
-  return VALID_GROUPINGS.has(value as GroupingMode);
+function normalizeGrouping(value: string): GroupingMode | undefined {
+  if (value === "by-session") return "by-conversation";
+  return VALID_GROUPINGS.has(value as GroupingMode)
+    ? (value as GroupingMode)
+    : undefined;
 }
 
 function parseSort(value: string): SortConfig | undefined {
@@ -105,7 +108,10 @@ export function parseFragment(fragment: string): FragmentState | null {
     }
 
     const group = params.get("group");
-    if (group && isGroupingMode(group)) overrides.grouping = group;
+    if (group) {
+      const normalized = normalizeGrouping(group);
+      if (normalized) overrides.grouping = normalized;
+    }
 
     const sort = params.get("sort");
     if (sort !== null) {

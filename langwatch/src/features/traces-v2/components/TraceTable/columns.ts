@@ -58,7 +58,7 @@ export const traceAtomicColumnDefs: Record<
   }),
 };
 
-const traceColumnDefs: Record<string, ColumnDef<TraceListItem, any>> = {
+const traceColumnDefs = {
   time: traceCol.accessor("timestamp", {
     id: "time",
     header: "Time",
@@ -72,12 +72,14 @@ const traceColumnDefs: Record<string, ColumnDef<TraceListItem, any>> = {
     size: 9999,
     minSize: 200,
     meta: { ...flex, skeletonLines: 2 },
+    enableSorting: false,
   }),
   service: traceCol.accessor("serviceName", {
     id: "service",
     header: "Service",
     size: 100,
     minSize: 90,
+    enableSorting: false,
   }),
   duration: traceCol.accessor("durationMs", {
     id: "duration",
@@ -112,6 +114,7 @@ const traceColumnDefs: Record<string, ColumnDef<TraceListItem, any>> = {
     header: "Model",
     size: 120,
     minSize: 110,
+    enableSorting: false,
   }),
   evaluations: traceCol.accessor((row) => row.evaluations.length, {
     id: "evaluations",
@@ -127,7 +130,63 @@ const traceColumnDefs: Record<string, ColumnDef<TraceListItem, any>> = {
     minSize: 140,
     enableSorting: false,
   }),
-};
+  status: traceCol.accessor("status", {
+    id: "status",
+    header: "Status",
+    size: 70,
+    minSize: 70,
+    enableSorting: false,
+  }),
+  ttft: traceCol.accessor((row) => row.ttft ?? 0, {
+    id: "ttft",
+    header: "TTFT",
+    size: 80,
+    minSize: 70,
+    meta: num,
+  }),
+  userId: traceCol.accessor((row) => row.userId ?? "", {
+    id: "userId",
+    header: "User ID",
+    size: 120,
+    minSize: 100,
+    enableSorting: false,
+  }),
+  conversationId: traceCol.accessor((row) => row.conversationId ?? "", {
+    id: "conversationId",
+    header: "Conversation ID",
+    size: 140,
+    minSize: 120,
+    enableSorting: false,
+  }),
+  origin: traceCol.accessor("origin", {
+    id: "origin",
+    header: "Origin",
+    size: 110,
+    minSize: 100,
+    enableSorting: false,
+  }),
+  tokensIn: traceCol.accessor((row) => row.inputTokens ?? 0, {
+    id: "tokensIn",
+    header: "Tokens In",
+    size: 80,
+    minSize: 70,
+    meta: num,
+  }),
+  tokensOut: traceCol.accessor((row) => row.outputTokens ?? 0, {
+    id: "tokensOut",
+    header: "Tokens Out",
+    size: 80,
+    minSize: 70,
+    meta: num,
+  }),
+} satisfies Record<string, ColumnDef<TraceListItem, any>>;
+
+/**
+ * Union of every id present in `traceColumnDefs`. Used to constrain the
+ * STANDARD_COLUMNS list and the cell registry — adding an id to one place
+ * but not the others becomes a compile error instead of a silent blank cell.
+ */
+export type TraceColumnId = keyof typeof traceColumnDefs;
 
 const conversationColumnDefs: Record<
   string,
@@ -233,16 +292,16 @@ function buildGroupColumnDefs(
     }),
     cost: groupCol.accessor("totalCost", {
       id: "cost",
-      header: "Cost",
-      size: 70,
-      minSize: 70,
+      header: "Total Cost",
+      size: 80,
+      minSize: 80,
       meta: num,
     }),
     tokens: groupCol.accessor("totalTokens", {
       id: "tokens",
-      header: "Tokens",
-      size: 80,
-      minSize: 70,
+      header: "Total Tokens",
+      size: 90,
+      minSize: 80,
       meta: num,
     }),
     errors: groupCol.accessor("errorCount", {

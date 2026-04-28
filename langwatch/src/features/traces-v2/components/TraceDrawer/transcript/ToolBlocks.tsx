@@ -1,4 +1,4 @@
-import { Box, HStack, Icon, Text, VStack } from "@chakra-ui/react";
+import { Box, chakra, HStack, Icon, Text, VStack } from "@chakra-ui/react";
 import { type ReactNode, useMemo, useState } from "react";
 import { LuChevronDown, LuChevronRight, LuWrench } from "react-icons/lu";
 import { toolResultBodyToString, tryPrettyJson } from "./parsing";
@@ -112,9 +112,10 @@ export function ToolPairCard({
       bg="bg.subtle"
       overflow="hidden"
     >
-      <HStack
-        as="button"
+      <chakra.button
         type="button"
+        display="flex"
+        alignItems="center"
         gap={2}
         paddingX={2.5}
         paddingY={1.5}
@@ -182,7 +183,7 @@ export function ToolPairCard({
           color="fg.subtle"
           flexShrink={0}
         />
-      </HStack>
+      </chakra.button>
       {open && (
         <VStack
           align="stretch"

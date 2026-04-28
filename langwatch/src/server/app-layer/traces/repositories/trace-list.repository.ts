@@ -1,7 +1,17 @@
 import type { TraceSummaryData } from "../types";
 
+export type TraceListSortColumn =
+  | "OccurredAt"
+  | "TotalDurationMs"
+  | "TotalCost"
+  | "SpanCount"
+  | "TotalTokens"
+  | "TimeToFirstTokenMs"
+  | "TotalPromptTokenCount"
+  | "TotalCompletionTokenCount";
+
 export interface TraceListSort {
-  column: "OccurredAt" | "TotalDurationMs" | "TotalCost";
+  column: TraceListSortColumn;
   direction: "asc" | "desc";
 }
 
@@ -27,6 +37,16 @@ export interface FacetCountResult {
 export interface CategoricalFacetResult {
   values: { value: string; label?: string; count: number }[];
   totalDistinct: number;
+}
+
+export type FacetTableName =
+  | "trace_summaries"
+  | "evaluation_runs"
+  | "stored_spans";
+
+export interface BatchedFacetResult {
+  categoricals: Record<string, CategoricalFacetResult>;
+  ranges: Record<string, { min: number; max: number }>;
 }
 
 export interface TraceListRepository {
@@ -85,6 +105,21 @@ export interface TraceListRepository {
   }): Promise<{ min: number; max: number }>;
 
   /**
+   * Compute multiple categorical and range facets over the same table scan.
+   * Categoricals share a single arrayJoin pass; ranges share a single agg pass.
+   * Used by `discover` to collapse ~25 parallel queries into ~2 per table.
+   */
+  findBatchedFacets(params: {
+    tenantId: string;
+    timeRange: { from: number; to: number; live?: boolean };
+    table: FacetTableName;
+    timeColumn: string;
+    categoricalSpecs: { key: string; expression: string }[];
+    rangeSpecs: { key: string; expression: string }[];
+    topN: number;
+  }): Promise<BatchedFacetResult>;
+
+  /**
    * Distinct values for a single dynamic Attributes key, sampled for speed.
    * Caller must validate `attributeKey` against an injection-safe whitelist —
    * the repo trusts it.
@@ -123,6 +158,9 @@ export class NullTraceListRepository implements TraceListRepository {
   }
   async findRangeStatsForTable(): Promise<{ min: number; max: number }> {
     return { min: 0, max: 0 };
+  }
+  async findBatchedFacets(): Promise<BatchedFacetResult> {
+    return { categoricals: {}, ranges: {} };
   }
   async findAttributeValues(): Promise<CategoricalFacetResult> {
     return { values: [], totalDistinct: 0 };

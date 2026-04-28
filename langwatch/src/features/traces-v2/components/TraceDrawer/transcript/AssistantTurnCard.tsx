@@ -1,4 +1,4 @@
-import { Box, Flex, HStack, Icon, Text } from "@chakra-ui/react";
+import { Box, chakra, Flex, HStack, Icon, Text } from "@chakra-ui/react";
 import { useMemo, useState } from "react";
 import { LuBot } from "react-icons/lu";
 import type { DisplayRoleVisuals } from "../scenarioRoles";
@@ -74,7 +74,7 @@ export function AssistantTurnCard({
           justify="center"
           flexShrink={0}
         >
-          <Icon as={visuals?.Icon ?? LuBot} size="2.5" color="purple.fg" />
+          <Icon as={visuals?.Icon ?? LuBot} boxSize={2.5} color="purple.fg" />
         </Flex>
         <Text
           textStyle="2xs"
@@ -88,8 +88,7 @@ export function AssistantTurnCard({
         {!collapseTools && operationCount > 0 && hasOutputText && (
           <>
             <Box flex="1" />
-            <Text
-              as="button"
+            <chakra.button
               type="button"
               onClick={() => setOpsHidden((v) => !v)}
               textStyle="2xs"
@@ -102,7 +101,7 @@ export function AssistantTurnCard({
               {opsHidden
                 ? `Show ${operationCount} ${operationCount === 1 ? "step" : "steps"}`
                 : `Hide ${operationCount === 1 ? "step" : "steps"}`}
-            </Text>
+            </chakra.button>
           </>
         )}
       </HStack>

@@ -73,7 +73,7 @@ export const WelcomeDialog: React.FC<WelcomeDialogProps> = ({
   }, [isLastStep, onFinish, goNext, blocked]);
 
   return (
-    <VStack gap={6} width="full" align="stretch">
+    <VStack gap={6} width="auto" align="stretch">
       {/* HeroBand stays mounted across step changes — its WebGL shader
           backdrop runs an ongoing animation we don't want to restart. The
           title/subtitle crossfade lives inside HeroBand. Only the step

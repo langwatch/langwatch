@@ -5,6 +5,7 @@ import type { TraceListItem } from "../../types/trace";
 import { buildTraceColumns } from "./columns";
 import { expandTraceColumns, type Registry, traceRegistry } from "./registry";
 import { traceCells } from "./registry/cells/trace";
+import { traceSelectColumnDef } from "./selectColumn";
 
 const COMPACT_MIN_WIDTH_PX = 1500;
 const COMFORTABLE_FALLBACK_MIN_SIZE_PX = 100;
@@ -33,8 +34,10 @@ export function useTraceLensColumns({
   );
 
   const columns = useMemo(() => {
-    if (expanded) return expanded.map((e) => e.columnDef);
-    return buildTraceColumns(logicalColumnIds);
+    const dataColumns = expanded
+      ? expanded.map((e) => e.columnDef)
+      : buildTraceColumns(logicalColumnIds);
+    return [traceSelectColumnDef, ...dataColumns];
   }, [expanded, logicalColumnIds]);
 
   const registry = useMemo<Registry<TraceListItem>>(() => {

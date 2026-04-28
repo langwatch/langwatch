@@ -29,21 +29,20 @@ export function useTracesV2Presence(): void {
   const section = useSectionTrackerStore(selectMostVisibleSection);
 
   const location = useMemo<PresenceLocation>(() => {
-    return {
-      lens: "traces",
-      route: {
-        traceId: isOpen ? traceId ?? null : null,
-        spanId: isOpen ? selectedSpanId ?? null : null,
-      },
-      view: isOpen
-        ? {
-            mode: viewMode,
-            panel: vizTab,
-            tab: activeTab,
-            section: section ?? undefined,
-          }
-        : undefined,
+    const route: PresenceLocation["route"] = {
+      traceId: isOpen ? traceId ?? null : null,
+      spanId: isOpen ? selectedSpanId ?? null : null,
     };
+    if (!isOpen) {
+      return { lens: "traces", route };
+    }
+    const view: NonNullable<PresenceLocation["view"]> = {
+      mode: viewMode,
+      panel: vizTab,
+      tab: activeTab,
+      ...(section ? { section } : {}),
+    };
+    return { lens: "traces", route, view };
   }, [isOpen, traceId, selectedSpanId, viewMode, vizTab, activeTab, section]);
 
   usePresence({

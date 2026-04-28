@@ -1,6 +1,7 @@
 import {
   Box,
   Button,
+  chakra,
   Flex,
   HStack,
   Icon,
@@ -230,8 +231,7 @@ export function EvalCard({
                 primaryStatusText === AZURE_SAFETY_NOT_CONFIGURED_MESSAGE ? (
                   <>
                     Azure Safety provider not configured. Configure it in{" "}
-                    <Text
-                      as="button"
+                    <chakra.button
                       type="button"
                       color="blue.fg"
                       textDecoration="underline"
@@ -246,7 +246,7 @@ export function EvalCard({
                       }}
                     >
                       Settings → Model Providers
-                    </Text>{" "}
+                    </chakra.button>{" "}
                     to run this evaluator.
                   </>
                 ) : (

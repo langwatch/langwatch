@@ -1,6 +1,7 @@
 import {
   Badge,
   Box,
+  chakra,
   Clipboard,
   Code,
   Heading,
@@ -374,8 +375,7 @@ const ExampleRow: React.FC<{
     transition="background 100ms ease"
     _hover={{ bg: `${accent}.subtle` }}
   >
-    <Box
-      as="button"
+    <chakra.button
       type="button"
       onClick={() => onApply(example.query)}
       flex={1}
@@ -392,7 +392,7 @@ const ExampleRow: React.FC<{
         {example.label}
       </Text>
       <QueryPreview query={example.query} />
-    </Box>
+    </chakra.button>
     <CopyTrigger value={example.query} />
     <Tooltip content="Apply" openDelay={200}>
       <IconButton
@@ -462,8 +462,7 @@ const CopyableQuery: React.FC<{
   onApply: (query: string) => void;
 }> = ({ query, onApply }) => (
   <HStack gap={1.5} role="group">
-    <Box
-      as="button"
+    <chakra.button
       type="button"
       onClick={() => onApply(query)}
       cursor="pointer"
@@ -475,7 +474,7 @@ const CopyableQuery: React.FC<{
       }}
     >
       <QueryPreview query={query} />
-    </Box>
+    </chakra.button>
     <CopyTrigger value={query} />
   </HStack>
 );

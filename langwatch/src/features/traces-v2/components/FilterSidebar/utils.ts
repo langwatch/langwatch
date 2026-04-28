@@ -1,4 +1,3 @@
-import type { Tokens } from "@chakra-ui/react";
 import { HelpCircle, type LucideIcon } from "lucide-react";
 import {
   FACET_ICONS,
@@ -46,7 +45,7 @@ export function sortBySectionOrder<T extends { key: string; label: string }>(
   });
 }
 
-export function paletteFromColor(color: Tokens["colors"] | undefined): string {
+export function paletteFromColor(color: unknown): string {
   if (typeof color !== "string") return "gray";
   const dotIndex = color.indexOf(".");
   return dotIndex === -1 ? color : color.slice(0, dotIndex);

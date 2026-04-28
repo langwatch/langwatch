@@ -1,6 +1,7 @@
 import { Button, Flex, Icon } from "@chakra-ui/react";
-import { Sparkles } from "lucide-react";
+import { Download, Search, Sparkles } from "lucide-react";
 import type React from "react";
+import { useFindStore } from "../../stores/findStore";
 import { useWelcomeStore } from "../../stores/welcomeStore";
 import { ColumnsDropdown } from "./ColumnsDropdown";
 import { DensityToggle } from "./DensityToggle";
@@ -10,8 +11,15 @@ import { LensTabs } from "./LensTabs";
 import { LiveIndicator } from "./LiveIndicator";
 import { TimeRangePicker } from "./TimeRangePicker";
 
-export const Toolbar: React.FC = () => {
+interface ToolbarProps {
+  onExportAll?: () => void;
+}
+
+export const Toolbar: React.FC<ToolbarProps> = ({ onExportAll }) => {
   const openWelcome = useWelcomeStore((s) => s.open);
+  const findIsOpen = useFindStore((s) => s.isOpen);
+  const openFind = useFindStore((s) => s.open);
+  const closeFind = useFindStore((s) => s.close);
 
   return (
     <Flex
@@ -41,6 +49,31 @@ export const Toolbar: React.FC = () => {
         <ColumnsDropdown />
         <GroupingSelector />
         <DensityToggle />
+        <Button
+          size="xs"
+          variant={findIsOpen ? "subtle" : "ghost"}
+          onClick={() => (findIsOpen ? closeFind() : openFind())}
+          aria-label="Find in loaded traces"
+          aria-pressed={findIsOpen}
+        >
+          <Icon boxSize={3.5}>
+            <Search />
+          </Icon>
+          Find
+        </Button>
+        {onExportAll && (
+          <Button
+            size="xs"
+            variant="ghost"
+            onClick={onExportAll}
+            aria-label="Export traces"
+          >
+            <Icon boxSize={3.5}>
+              <Download />
+            </Icon>
+            Export
+          </Button>
+        )}
         <KeyboardShortcutsButton />
       </Flex>
     </Flex>

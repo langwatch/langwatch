@@ -236,7 +236,7 @@ const ConversationTurnRow: React.FC<ConversationTurnRowProps> = ({
 const GapRow: React.FC<{
   seconds: number;
   colCount: number;
-  borderColor: string;
+  borderColor: RowStyle["borderColor"];
 }> = ({ seconds, colCount, borderColor }) => {
   const isPause = seconds > TURN_GAP_PAUSE_SECONDS;
   const color = isPause ? "yellow.fg" : "fg.subtle";

@@ -2,22 +2,33 @@ import { Box, Flex, HStack, VStack } from "@chakra-ui/react";
 import type React from "react";
 import { useTracesV2Presence } from "~/features/presence/hooks/useTracesV2Presence";
 import { useRouter } from "~/utils/compat/next-router";
+import { ExportConfigDialog } from "~/components/messages/ExportConfigDialog";
+import { ExportProgress } from "~/components/messages/ExportProgress";
 import { useProjectHasTraces } from "../../hooks/useProjectHasTraces";
+import { useResetSelectionOnViewChange } from "../../hooks/useResetSelectionOnViewChange";
 import { useRollingTimeRange } from "../../hooks/useRollingTimeRange";
 import { useTraceFreshness } from "../../hooks/useTraceFreshness";
+import { useTraceListExport } from "../../hooks/useTraceListExport";
+import { useTraceListSnapshot } from "../../hooks/useTraceListSnapshot";
 import { useURLSync } from "../../hooks/useURLSync";
+import {
+  SELECT_ALL_MATCHING_CAP,
+  useSelectionStore,
+} from "../../stores/selectionStore";
 import { useUIStore } from "../../stores/uiStore";
 import { DensityProvider } from "../DensityProvider";
 import { EmptyState } from "../EmptyState";
 import { FilterSidebar } from "../FilterSidebar/FilterSidebar";
 import { FindBar } from "../FindBar";
 import { SearchBar } from "../SearchBar/SearchBar";
+import { BulkActionBar } from "../Toolbar/BulkActionBar";
 import { Toolbar } from "../Toolbar/Toolbar";
 import { TraceTable } from "../TraceTable/TraceTable";
 import { PageKeyboardShortcuts } from "./PageKeyboardShortcuts";
 import { useAutoOpenWelcome } from "./useAutoOpenWelcome";
 import { useDebouncedFilterCommit } from "./useDebouncedFilterCommit";
 import {
+  useClearSelectionShortcut,
   useDensityToggleShortcut,
   useFindShortcut,
   useShortcutsHelpShortcut,
@@ -49,6 +60,8 @@ export const TracesPage: React.FC = () => {
   useFindShortcut();
   useShortcutsHelpShortcut();
   useDensityToggleShortcut();
+  useClearSelectionShortcut();
+  useResetSelectionOnViewChange();
 
   const router = useRouter();
   const previewParam = "empty" in router.query;
@@ -117,25 +130,86 @@ const FilterAside: React.FC<{ dimmed?: boolean }> = ({ dimmed = false }) => {
   );
 };
 
-const ResultsPane: React.FC = () => (
-  <Flex
-    as="main"
-    role="main"
-    aria-label="Trace results"
-    direction="column"
-    flex={1}
-    minWidth={0}
-    height="full"
-  >
-    <Toolbar />
-    <Box flex={1} minHeight={0} position="relative">
-      <Box height="full" overflow="auto" bg="bg.panel">
-        <TraceTable />
+const ResultsPane: React.FC = () => {
+  const { pageTraceIds, totalHits } = useTraceListSnapshot();
+  const selectionMode = useSelectionStore((s) => s.mode);
+  const explicitCount = useSelectionStore((s) => s.traceIds.size);
+  const clearSelection = useSelectionStore((s) => s.clear);
+  const {
+    isDialogOpen,
+    openExportDialog,
+    closeExportDialog,
+    isExporting,
+    progress,
+    startExport,
+    cancelExport,
+  } = useTraceListExport();
+
+  const isSelectedExport =
+    selectionMode === "all-matching" || explicitCount > 0;
+  const dialogTraceCount =
+    selectionMode === "all-matching"
+      ? Math.min(totalHits, SELECT_ALL_MATCHING_CAP)
+      : explicitCount > 0
+        ? explicitCount
+        : Math.min(totalHits, SELECT_ALL_MATCHING_CAP);
+
+  return (
+    <Flex
+      as="main"
+      role="main"
+      aria-label="Trace results"
+      direction="column"
+      flex={1}
+      minWidth={0}
+      height="full"
+    >
+      <Toolbar onExportAll={() => openExportDialog()} />
+      <BulkActionBar
+        totalHits={totalHits}
+        pageTraceIds={pageTraceIds}
+        onExportSelected={(ids) => {
+          // In all-matching mode, omit traceIds so the export reuses filters.
+          openExportDialog(
+            selectionMode === "all-matching" ? {} : { selectedTraceIds: ids },
+          );
+        }}
+      />
+      <Box flex={1} minHeight={0} position="relative">
+        <Box height="full" overflow="auto" bg="bg.panel">
+          <TraceTable />
+        </Box>
+        <FindBar />
+        <Box
+          position="absolute"
+          bottom={4}
+          right={4}
+          width="320px"
+          pointerEvents="none"
+        >
+          <Box pointerEvents="auto">
+            <ExportProgress
+              exported={progress.exported}
+              total={progress.total}
+              isExporting={isExporting}
+              onCancel={cancelExport}
+            />
+          </Box>
+        </Box>
       </Box>
-      <FindBar />
-    </Box>
-  </Flex>
-);
+      <ExportConfigDialog
+        isOpen={isDialogOpen}
+        onClose={closeExportDialog}
+        onExport={(config) => {
+          startExport(config);
+          if (isSelectedExport) clearSelection();
+        }}
+        traceCount={dialogTraceCount}
+        isSelectedExport={isSelectedExport}
+      />
+    </Flex>
+  );
+};
 
 const EmptyResultsPane: React.FC = () => (
   <Flex

@@ -1,4 +1,5 @@
 import type { ConversationGroup } from "../../../conversationGroups";
+import { ConversationSelectCell } from "../SelectCells";
 import type { CellDef } from "../../types";
 import { ConversationCell } from "./ConversationCell";
 import { LastTurnCell } from "./LastTurnCell";
@@ -14,6 +15,7 @@ import { StartedCell } from "./StartedCell";
 import { TurnsCell } from "./TurnsCell";
 
 export const conversationCells: Record<string, CellDef<ConversationGroup>> = {
+  [ConversationSelectCell.id]: ConversationSelectCell,
   [ConversationCell.id]: ConversationCell,
   [StartedCell.id]: StartedCell,
   [LastTurnCell.id]: LastTurnCell,

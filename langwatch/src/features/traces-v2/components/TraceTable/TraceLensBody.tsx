@@ -3,11 +3,12 @@ import {
   getCoreRowModel,
   getSortedRowModel,
   type SortingState,
+  type Updater,
   useReactTable,
 } from "@tanstack/react-table";
 import type React from "react";
-import { useState } from "react";
-import type { LensConfig } from "../../stores/viewStore";
+import { useCallback, useMemo } from "react";
+import { type LensConfig, useViewStore } from "../../stores/viewStore";
 import type { TraceListItem } from "../../types/trace";
 import { RegistryRow } from "./registry";
 import { TraceTableShell } from "./TraceTableShell";
@@ -40,18 +41,45 @@ export const TraceLensBody: React.FC<TraceLensBodyProps> = ({
     handleKeyDown,
   } = useTraceLensKeyboard({ traces });
 
-  const [sorting, setSorting] = useState<SortingState>([
-    { id: lens.sort.columnId, desc: lens.sort.direction === "desc" },
-  ]);
+  const sortFromStore = useViewStore((s) => s.sort);
+  const setSortInStore = useViewStore((s) => s.setSort);
+
+  const sorting = useMemo<SortingState>(
+    () => [
+      {
+        id: sortFromStore.columnId,
+        desc: sortFromStore.direction === "desc",
+      },
+    ],
+    [sortFromStore],
+  );
+
+  const handleSortingChange = useCallback(
+    (updater: Updater<SortingState>) => {
+      const next =
+        typeof updater === "function" ? updater(sorting) : updater;
+      const first = next[0];
+      if (!first) return;
+      setSortInStore({
+        columnId: first.id,
+        direction: first.desc ? "desc" : "asc",
+      });
+    },
+    [sorting, setSortInStore],
+  );
 
   const table = useReactTable({
     data: traces,
     columns,
     state: { sorting },
-    onSortingChange: setSorting,
+    onSortingChange: handleSortingChange,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     manualSorting: true,
+    // Cycle is asc → desc → asc; without this, the third click hits the
+    // clear-sort branch which our handler ignores, leaving the column
+    // stuck on desc.
+    enableSortingRemoval: false,
     getRowId: (row) => row.traceId,
   });
 

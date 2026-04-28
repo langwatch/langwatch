@@ -1,4 +1,4 @@
-import { Box, HStack, Text } from "@chakra-ui/react";
+import { Box, chakra, Text } from "@chakra-ui/react";
 import { LuEye, LuEyeOff } from "react-icons/lu";
 import { Tooltip } from "~/components/ui/tooltip";
 import { usePresencePreferencesStore } from "~/features/presence/stores/presencePreferencesStore";
@@ -27,12 +27,13 @@ export const PresenceToggle = ({ showLabel = true }: PresenceToggleProps) => {
   const dotColor = visible ? "green.solid" : "fg.subtle";
 
   const trigger = (
-    <HStack
-      as="button"
+    <chakra.button
       type="button"
       onClick={toggleHidden}
       aria-pressed={hidden}
       aria-label={tooltip}
+      display="flex"
+      alignItems="center"
       width={showLabel ? "full" : "auto"}
       height={MENU_ITEM_HEIGHT}
       gap={3}
@@ -75,7 +76,7 @@ export const PresenceToggle = ({ showLabel = true }: PresenceToggleProps) => {
           <StatusDot color={dotColor} pulse={visible} />
         </>
       )}
-    </HStack>
+    </chakra.button>
   );
 
   return (

@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { useDensityStore } from "../../stores/densityStore";
 import { useDrawerStore } from "../../stores/drawerStore";
 import { useFindStore } from "../../stores/findStore";
+import { useSelectionStore } from "../../stores/selectionStore";
 import { useUIStore } from "../../stores/uiStore";
 
 const isTextInput = (target: EventTarget | null): boolean => {
@@ -32,28 +33,34 @@ export const useSidebarShortcut = (): void => {
  * Cmd/Ctrl+F: 1st press opens our in-page find over loaded trace data;
  * 2nd press (while open) closes our overlay and lets the browser's native
  * find take over — no preventDefault on the second press.
+ *
+ * Registered at capture phase so we beat any TipTap / editor handler that
+ * might preventDefault first, and `key.toLowerCase()` because Caps Lock
+ * produces "F" without shiftKey.
  */
 export const useFindShortcut = (): void => {
-  const isOpen = useFindStore((s) => s.isOpen);
-  const open = useFindStore((s) => s.open);
-  const close = useFindStore((s) => s.close);
-
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const isMod = e.metaKey || e.ctrlKey;
-      if (!isMod || e.key !== "f" || e.shiftKey || e.altKey) return;
+      if (!isMod || e.key.toLowerCase() !== "f" || e.shiftKey || e.altKey) {
+        return;
+      }
 
+      // Read latest state imperatively so we never operate on stale isOpen
+      // captured by an effect closure.
+      const { isOpen, open, close } = useFindStore.getState();
       if (isOpen) {
         close();
         return;
       }
 
       e.preventDefault();
+      e.stopPropagation();
       open();
     };
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, open, close]);
+    document.addEventListener("keydown", handleKeyDown, true);
+    return () => document.removeEventListener("keydown", handleKeyDown, true);
+  }, []);
 };
 
 /**
@@ -76,6 +83,33 @@ export const useShortcutsHelpShortcut = (): void => {
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [toggle]);
+};
+
+/**
+ * Escape clears the bulk selection when one is active. We claim the event
+ * (stopPropagation + preventDefault) so the drawer's Escape handler doesn't
+ * also fire and close it — clearing selection should be the smaller undo.
+ *
+ * When no selection is active the handler bails early and other Escape
+ * listeners (drawer close, modal dismiss) handle the key as usual.
+ */
+export const useClearSelectionShortcut = (): void => {
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      if (isTextInput(e.target)) return;
+      const { mode, traceIds, clear } = useSelectionStore.getState();
+      const hasSelection = mode === "all-matching" || traceIds.size > 0;
+      if (!hasSelection) return;
+      e.stopPropagation();
+      e.preventDefault();
+      clear();
+    };
+    // Capture phase so we win against bubble-phase Escape handlers (e.g.
+    // the drawer's window-level keydown listener).
+    document.addEventListener("keydown", handleKeyDown, true);
+    return () => document.removeEventListener("keydown", handleKeyDown, true);
+  }, []);
 };
 
 /** `D` flips between compact and comfortable density. */

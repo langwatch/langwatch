@@ -190,7 +190,7 @@ export function TracesEmptyOnboarding(): React.ReactElement {
             pointerEvents: "none" as const,
             userSelect: "none" as const,
             "aria-hidden": "true",
-            inert: "",
+            inert: true,
           })}
           transition="filter 0.25s ease, opacity 0.25s ease"
         >

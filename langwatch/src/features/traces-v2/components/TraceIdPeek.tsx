@@ -13,6 +13,7 @@ import { Eye } from "lucide-react";
 import type React from "react";
 import { useState } from "react";
 import { useDrawer } from "~/hooks/useDrawer";
+import { useFeatureFlag } from "~/hooks/useFeatureFlag";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import {
@@ -34,9 +35,12 @@ interface TraceIdPeekProps {
  * Drop this next to any trace ID display across the platform.
  */
 export const TraceIdPeek: React.FC<TraceIdPeekProps> = ({ traceId }) => {
+  const { enabled } = useFeatureFlag("release_ui_traces_v2_enabled");
   const { openDrawer } = useDrawer();
   const [hasHovered, setHasHovered] = useState(false);
   const [open, setOpen] = useState(false);
+
+  if (!enabled) return null;
 
   const handleOpenDrawer = (e: React.MouseEvent) => {
     e.stopPropagation();

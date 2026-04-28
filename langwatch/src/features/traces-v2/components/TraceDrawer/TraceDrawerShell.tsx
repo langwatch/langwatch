@@ -93,8 +93,7 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
     rawTab === "summary" ||
     rawTab === "span" ||
     rawTab === "llm" ||
-    rawTab === "prompts" ||
-    rawTab === "annotations"
+    rawTab === "prompts"
       ? rawTab
       : null;
 

@@ -1,4 +1,4 @@
-import { type CoreMessage, generateObject, generateText } from "ai";
+import { type ModelMessage, generateObject, generateText } from "ai";
 import { z } from "zod";
 import { getApp } from "~/server/app-layer/app";
 import { getVercelAIModel } from "~/server/modelProviders/utils";
@@ -83,7 +83,7 @@ export async function generateTraceQueryFromPrompt(
 ): Promise<AiQueryResult> {
   const fieldsBlock = await buildFieldsBlock(input);
   const systemPrompt = buildSystemPrompt(fieldsBlock);
-  const messages: CoreMessage[] = [{ role: "user", content: input.prompt }];
+  const messages: ModelMessage[] = [{ role: "user", content: input.prompt }];
 
   const model = await getVercelAIModel(input.projectId);
 

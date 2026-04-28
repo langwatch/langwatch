@@ -16,6 +16,7 @@ import {
   RegistryRow,
   type TraceGroup,
 } from "./registry";
+import { groupSelectColumnDef } from "./selectColumn";
 import { TraceTableShell } from "./TraceTableShell";
 import { useTraceTableVirtualizer } from "./useTraceTableVirtualizer";
 import { VirtualSpacer } from "./VirtualSpacer";
@@ -41,7 +42,10 @@ export const GroupLensBody: React.FC<GroupLensBodyProps> = ({
     { id: lens.sort.columnId, desc: lens.sort.direction === "desc" },
   ]);
   const columns = useMemo(
-    () => (groupBy ? buildGroupColumns(lens.columns, groupBy) : []),
+    () =>
+      groupBy
+        ? [groupSelectColumnDef, ...buildGroupColumns(lens.columns, groupBy)]
+        : [],
     [lens.columns, groupBy],
   );
 
@@ -52,6 +56,7 @@ export const GroupLensBody: React.FC<GroupLensBodyProps> = ({
     onSortingChange: setSorting,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
+    enableSortingRemoval: false,
     getRowId: (row) => row.key,
   });
 

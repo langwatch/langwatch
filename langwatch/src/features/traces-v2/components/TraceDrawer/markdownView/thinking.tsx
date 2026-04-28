@@ -33,22 +33,22 @@ export function ThinkingText({ children }: { children: React.ReactNode }) {
         backgroundSize="220% 100%"
         backgroundRepeat="no-repeat"
         backgroundClip="text"
-        WebkitBackgroundClip="text"
         color="transparent !important"
         animation={`${thinkingShimmer} 2.4s linear infinite`}
         css={{
+          WebkitBackgroundClip: "text",
           "& *": {
             color: "inherit !important",
             background: "inherit !important",
             backgroundClip: "inherit !important",
             WebkitBackgroundClip: "inherit !important",
           },
-        }}
-        // Reduced motion: kill the animation but keep the muted italic
-        _reducedMotion={{
-          animation: "none",
-          backgroundImage: "none",
-          color: "fg.muted !important",
+          // Reduced motion: kill the animation but keep the muted italic
+          "@media (prefers-reduced-motion: reduce)": {
+            animation: "none",
+            backgroundImage: "none",
+            color: "var(--chakra-colors-fg-muted) !important",
+          },
         }}
       >
         {children}

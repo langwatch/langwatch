@@ -114,7 +114,7 @@ function makeLlmEvents({
   model: string;
   durationMs: number;
   toolCalls?: Array<{ name: string; args: Record<string, unknown> }>;
-}): SpanConfig["events"] {
+}): NonNullable<SpanConfig["events"]> {
   const events: NonNullable<SpanConfig["events"]> = [
     {
       name: "gen_ai.system.message",
@@ -280,7 +280,7 @@ function makeLlmSpan(prompts?: PromptRef[], includeEvents?: boolean): SpanConfig
   };
 
   if (includeEvents) {
-    span.events = makeLlmEvents({
+    const events = makeLlmEvents({
       systemPrompt,
       userMsg,
       assistantMsg,
@@ -288,8 +288,9 @@ function makeLlmSpan(prompts?: PromptRef[], includeEvents?: boolean): SpanConfig
       durationMs,
     });
     if (status === "error") {
-      span.events.push(makeExceptionEvent(durationMs, "Provider returned 500"));
+      events.push(makeExceptionEvent(durationMs, "Provider returned 500"));
     }
+    span.events = events;
   }
 
   if (promptRef) {

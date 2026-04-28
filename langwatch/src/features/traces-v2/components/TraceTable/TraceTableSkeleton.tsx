@@ -17,6 +17,11 @@ import {
   buildGroupColumns,
   buildTraceColumns,
 } from "./columns";
+import {
+  conversationSelectColumnDef,
+  groupSelectColumnDef,
+  traceSelectColumnDef,
+} from "./selectColumn";
 import { Td, Tr } from "./TablePrimitives";
 import { type ColumnMeta, TraceTableShell } from "./TraceTableShell";
 
@@ -50,23 +55,28 @@ function buildSkeletonShape(lens: LensConfig): SkeletonShape {
   const rowKind = rowKindForGrouping(lens.grouping);
   if (rowKind === "conversation") {
     return {
-      columns: buildConversationColumns(lens.columns) as Array<
-        ColumnDef<unknown, any>
-      >,
+      columns: [
+        conversationSelectColumnDef,
+        ...buildConversationColumns(lens.columns),
+      ] as Array<ColumnDef<unknown, any>>,
       minWidth: NARROW_MIN_WIDTH,
     };
   }
   if (rowKind === "group") {
     const groupBy = groupByForGrouping(lens.grouping) ?? "service";
     return {
-      columns: buildGroupColumns(lens.columns, groupBy) as Array<
-        ColumnDef<unknown, any>
-      >,
+      columns: [
+        groupSelectColumnDef,
+        ...buildGroupColumns(lens.columns, groupBy),
+      ] as Array<ColumnDef<unknown, any>>,
       minWidth: NARROW_MIN_WIDTH,
     };
   }
   return {
-    columns: buildTraceColumns(lens.columns) as Array<ColumnDef<unknown, any>>,
+    columns: [
+      traceSelectColumnDef,
+      ...buildTraceColumns(lens.columns),
+    ] as Array<ColumnDef<unknown, any>>,
     minWidth: TRACE_MIN_WIDTH,
   };
 }

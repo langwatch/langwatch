@@ -60,7 +60,7 @@ export const LiveIndicator: React.FC = () => {
           aria-label="Refresh traces"
           variant="ghost"
           size="xs"
-          onClick={refresh}
+          onClick={refresh ?? undefined}
           disabled={isRefreshing}
           css={isRefreshing ? REFRESH_SPIN_KEYFRAMES : undefined}
         >

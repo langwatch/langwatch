@@ -274,7 +274,10 @@ export const startApp = async (dir = path.dirname(__dirname)) => {
     // ServerResponse shapes the http server uses, so the handler
     // body doesn't need to know which transport it's on.
     // eslint-disable-next-line @typescript-eslint/no-misused-promises
-    server = createSecureServer({ cert, key, allowHTTP1: true }, handler);
+    server = createSecureServer(
+      { cert, key, allowHTTP1: true },
+      handler as unknown as Parameters<typeof createSecureServer>[1],
+    );
     logger.info("HTTP/2 + TLS enabled (LANGWATCH_DEV_HTTP2=1)");
   } else {
     // eslint-disable-next-line @typescript-eslint/no-misused-promises
@@ -336,7 +339,7 @@ export const startApp = async (dir = path.dirname(__dirname)) => {
       logger.warn({ error }, "error while closing tRPC websocket server");
     }
     server.close();
-    server.closeAllConnections();
+    if ("closeAllConnections" in server) server.closeAllConnections();
     mcpHandler.closeAllSessions();
     try {
       await Promise.all([getApp().close(), shutdownPostHog()]);

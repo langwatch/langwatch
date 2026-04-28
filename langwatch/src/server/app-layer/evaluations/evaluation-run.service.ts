@@ -28,7 +28,8 @@ export class EvaluationRunService {
   async findSummariesByTraceIds(
     tenantId: string,
     traceIds: string[],
+    since: number,
   ): Promise<Record<string, EvalSummary[]>> {
-    return this.repository.findSummariesByTraceIds(tenantId, traceIds);
+    return this.repository.findSummariesByTraceIds(tenantId, traceIds, since);
   }
 }

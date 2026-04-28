@@ -77,7 +77,9 @@ export const SectionRenderer: React.FC<SectionRendererProps> = ({
         currentFrom={current?.from}
         currentTo={current?.to}
         formatValue={getRangeFormatter(section.key)}
-        onChange={(from, to) => setRange(section.key, from, to)}
+        onChange={(from, to) =>
+          setRange(section.key, String(from), String(to))
+        }
         onClear={() => removeRange(section.key)}
         onShiftToggle={onShiftToggle}
       />

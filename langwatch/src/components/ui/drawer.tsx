@@ -63,6 +63,9 @@ export const DrawerContent = React.forwardRef<
           ref={ref}
           margin={2}
           pointerEvents="auto"
+          borderRadius="lg"
+          background="bg.surface/80"
+          backdropFilter="blur(25px)"
           {...rest}
           marginTop={marginTopProp}
           asChild={false}

@@ -59,8 +59,18 @@ export const WelcomeScreen: React.FC = () => {
         padding={6}
         backdropFilter="blur(25px) saturate(100%)"
         backdropProps={{
-          position: "absolute",
-          inset: 0,
+          // Chakra's Dialog.Backdrop recipe ships `position: fixed; width:
+          // 100vw; height: 100dvh`. With `portalled={false}` the backdrop
+          // renders inside the dashboard's content-area container, but the
+          // 100vw width overflows that container's `maxWidth: calc(100vw -
+          // menuWidth)` and surfaces a horizontal scrollbar. Inline-style
+          // overrides to beat the recipe class.
+          style: {
+            position: "absolute",
+            inset: 0,
+            width: "auto",
+            height: "auto",
+          },
           backdropFilter: "blur(10px)",
           background: "blackAlpha.500",
         }}
@@ -70,6 +80,10 @@ export const WelcomeScreen: React.FC = () => {
           // — without overriding width/height the positioner stays viewport-
           // sized even after we flip to `position: absolute`, so its center
           // sits below + right of the dashboard content area's center.
+          //
+          // overflow:hidden traps any sub-pixel overflow from the centered
+          // Content + blur layer so the surrounding scroll container can't
+          // pick it up and surface a horizontal scrollbar.
           style: {
             position: "absolute",
             inset: 0,
@@ -78,6 +92,7 @@ export const WelcomeScreen: React.FC = () => {
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
+            overflow: "hidden",
           },
         }}
       >

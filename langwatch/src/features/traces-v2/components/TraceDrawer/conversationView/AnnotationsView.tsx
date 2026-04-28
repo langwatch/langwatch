@@ -11,7 +11,10 @@ import {
 import { Edit3, Lightbulb, MessageSquare } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { api } from "~/utils/api";
+import { api, type RouterOutputs } from "~/utils/api";
+
+type AnnotationByTraceIds =
+  RouterOutputs["annotation"]["getByTraceIds"][number];
 import type { ParsedTurn } from "./types";
 import { AnnotationPopover } from "./AnnotationPopover";
 
@@ -125,9 +128,7 @@ function AnnotationRow({
 }: {
   traceId: string;
   output?: string | null;
-  annotation: NonNullable<
-    ReturnType<typeof api.annotation.getByTraceIds.useQuery>["data"]
-  >[number];
+  annotation: AnnotationByTraceIds;
 }) {
   const [open, setOpen] = useState(false);
   const { hasPermission } = useOrganizationTeamProject();

@@ -15,6 +15,7 @@ import {
   groupTracesByConversation,
 } from "./conversationGroups";
 import { conversationRegistry, RegistryRow } from "./registry";
+import { conversationSelectColumnDef } from "./selectColumn";
 import { TraceTableShell } from "./TraceTableShell";
 import { useTraceTableVirtualizer } from "./useTraceTableVirtualizer";
 import { VirtualSpacer } from "./VirtualSpacer";
@@ -32,7 +33,7 @@ export const ConversationLensBody: React.FC<ConversationLensBodyProps> = ({
 }) => {
   const groups = useMemo(() => groupTracesByConversation(traces), [traces]);
   const columns = useMemo(
-    () => buildConversationColumns(lens.columns),
+    () => [conversationSelectColumnDef, ...buildConversationColumns(lens.columns)],
     [lens.columns],
   );
   const [sorting, setSorting] = useState<SortingState>([
@@ -48,6 +49,7 @@ export const ConversationLensBody: React.FC<ConversationLensBodyProps> = ({
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     manualSorting: true,
+    enableSortingRemoval: false,
     getRowId: (row) => row.conversationId,
   });
 

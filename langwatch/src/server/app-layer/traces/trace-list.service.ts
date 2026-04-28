@@ -6,10 +6,12 @@ import { createLogger } from "~/utils/logger/server";
 import type {
   ExpressionCategoricalDef,
   FacetDefinition,
+  FacetTable,
   RangeFacetDef,
 } from "./facet-registry";
 import { FACET_REGISTRY, TABLE_TIME_COLUMNS } from "./facet-registry";
 import type {
+  BatchedFacetResult,
   CategoricalFacetResult,
   TraceListRepository,
   TraceListSort,
@@ -135,6 +137,25 @@ const FACET_VALUES_CACHE = new TtlCache<CachedFacetValues>(
   "tracesV2:facetValues:",
 );
 
+/**
+ * SWR cache for the full discover() payload. The table view fires `discover`
+ * on every time-range change for every viewer; caching by tenant + bucketed
+ * window collapses concurrent viewers and rapid-refetches onto a single
+ * ClickHouse run.
+ */
+const DISCOVER_TTL_MS = 2 * 60 * 1000;
+const DISCOVER_REFRESH_AFTER_MS = 30_000;
+
+interface CachedDiscover {
+  value: FacetDescriptor[];
+  timestamp: number;
+}
+
+const DISCOVER_CACHE = new TtlCache<CachedDiscover>(
+  DISCOVER_TTL_MS,
+  "tracesV2:discover:",
+);
+
 /** Bucket size for live-range time params so the cache key stabilises across rapid refetches. */
 const CACHE_TIME_BUCKET_MS = 60_000;
 
@@ -153,6 +174,14 @@ function facetValuesCacheKey(params: FacetValuesParams): string {
     params.prefix ?? "",
     params.limit,
     params.offset,
+  ].join("|");
+}
+
+function discoverCacheKey(params: DiscoverParams): string {
+  return [
+    params.tenantId,
+    bucketTime(params.timeRange.from),
+    bucketTime(params.timeRange.to),
   ].join("|");
 }
 
@@ -207,6 +236,11 @@ const SORT_COLUMN_MAP: Record<string, TraceListSort["column"]> = {
   time: "OccurredAt",
   duration: "TotalDurationMs",
   cost: "TotalCost",
+  spans: "SpanCount",
+  tokens: "TotalTokens",
+  ttft: "TimeToFirstTokenMs",
+  tokensIn: "TotalPromptTokenCount",
+  tokensOut: "TotalCompletionTokenCount",
 };
 
 const FACET_EXPRESSIONS: Record<string, string> = {
@@ -270,6 +304,7 @@ export class TraceListService {
     const evaluations = await this.evaluationRunService.findSummariesByTraceIds(
       params.tenantId,
       traceIds,
+      params.timeRange.from,
     );
 
     return {
@@ -368,35 +403,226 @@ export class TraceListService {
     });
   }
 
+  /** Per-pod dedup of in-flight background refreshes. */
+  private readonly discoverRefreshing = new Set<string>();
+
   async discover(params: DiscoverParams): Promise<FacetDescriptor[]> {
+    const cacheKey = discoverCacheKey(params);
+    const cached = await DISCOVER_CACHE.get(cacheKey);
+
+    if (cached) {
+      if (Date.now() - cached.timestamp > DISCOVER_REFRESH_AFTER_MS) {
+        this.refreshDiscoverInBackground(params, cacheKey);
+      }
+      return cached.value;
+    }
+
+    const result = await this.computeDiscover(params);
+    await DISCOVER_CACHE.set(cacheKey, {
+      value: result,
+      timestamp: Date.now(),
+    });
+    return result;
+  }
+
+  private refreshDiscoverInBackground(
+    params: DiscoverParams,
+    cacheKey: string,
+  ): void {
+    if (this.discoverRefreshing.has(cacheKey)) return;
+    this.discoverRefreshing.add(cacheKey);
+
+    void this.computeDiscover(params)
+      .then((fresh) =>
+        DISCOVER_CACHE.set(cacheKey, {
+          value: fresh,
+          timestamp: Date.now(),
+        }),
+      )
+      .catch((err) => {
+        discoverLogger.warn(
+          {
+            cacheKey,
+            error: err instanceof Error ? err.message : String(err),
+          },
+          "Background discover refresh failed; cached value still served",
+        );
+      })
+      .finally(() => {
+        this.discoverRefreshing.delete(cacheKey);
+      });
+  }
+
+  private async computeDiscover(
+    params: DiscoverParams,
+  ): Promise<FacetDescriptor[]> {
     const TOP_N = 10;
 
-    const promises = FACET_REGISTRY.map(async (def) => {
-      switch (def.kind) {
-        case "categorical":
-          return this.discoverCategorical(def, params, TOP_N);
-        case "range":
-          return this.discoverRange(def, params);
-        case "dynamic_keys":
-          return this.discoverDynamicKeys(def, params, TOP_N);
+    // Partition the registry: simple-expression facets per table go through
+    // the batched ClickHouse path; arrayJoin/queryBuilder/dynamic_keys facets
+    // can't share a scan and run independently.
+    const batched = new Map<
+      FacetTable,
+      {
+        categoricals: ExpressionCategoricalDef[];
+        ranges: RangeFacetDef[];
       }
-    });
+    >();
+    const standalone: FacetDefinition[] = [];
 
-    const results = await Promise.allSettled(promises);
-
-    const facets: FacetDescriptor[] = [];
-    for (const result of results) {
-      if (result.status === "fulfilled") {
-        facets.push(result.value);
+    for (const def of FACET_REGISTRY) {
+      if (def.kind === "categorical") {
+        if (
+          isExpressionCategorical(def) &&
+          !def.expression.includes("arrayJoin")
+        ) {
+          const slot = batched.get(def.table) ?? {
+            categoricals: [],
+            ranges: [],
+          };
+          slot.categoricals.push(def);
+          batched.set(def.table, slot);
+        } else {
+          standalone.push(def);
+        }
+      } else if (def.kind === "range") {
+        const slot = batched.get(def.table) ?? {
+          categoricals: [],
+          ranges: [],
+        };
+        slot.ranges.push(def);
+        batched.set(def.table, slot);
       } else {
-        discoverLogger.warn(
-          { error: String(result.reason) },
-          "Facet discovery query failed, omitting facet",
-        );
+        standalone.push(def);
       }
     }
 
+    type Outcome =
+      | { kind: "batch"; table: FacetTable; result: BatchedFacetResult }
+      | { kind: "standalone"; key: string; descriptor: FacetDescriptor };
+
+    const tasks: Promise<Outcome>[] = [];
+
+    for (const [table, slot] of batched) {
+      tasks.push(
+        this.repository
+          .findBatchedFacets({
+            tenantId: params.tenantId,
+            timeRange: params.timeRange,
+            table,
+            timeColumn: TABLE_TIME_COLUMNS[table],
+            categoricalSpecs: slot.categoricals.map((d) => ({
+              key: d.key,
+              expression: d.expression,
+            })),
+            rangeSpecs: slot.ranges.map((d) => ({
+              key: d.key,
+              expression: d.expression,
+            })),
+            topN: TOP_N,
+          })
+          .then(
+            (result): Outcome => ({ kind: "batch", table, result }),
+          ),
+      );
+    }
+
+    for (const def of standalone) {
+      tasks.push(
+        (async (): Promise<Outcome> => {
+          let descriptor: FacetDescriptor;
+          switch (def.kind) {
+            case "categorical":
+              descriptor = await this.discoverCategorical(def, params, TOP_N);
+              break;
+            case "range":
+              descriptor = await this.discoverRange(def, params);
+              break;
+            case "dynamic_keys":
+              descriptor = await this.discoverDynamicKeys(def, params, TOP_N);
+              break;
+          }
+          return { kind: "standalone", key: def.key, descriptor };
+        })(),
+      );
+    }
+
+    const settled = await Promise.allSettled(tasks);
+
+    const batchByTable = new Map<FacetTable, BatchedFacetResult>();
+    const standaloneByKey = new Map<string, FacetDescriptor>();
+
+    for (const result of settled) {
+      if (result.status === "rejected") {
+        discoverLogger.warn(
+          { error: String(result.reason) },
+          "Facet discovery query failed, omitting affected facets",
+        );
+        continue;
+      }
+      if (result.value.kind === "batch") {
+        batchByTable.set(result.value.table, result.value.result);
+      } else {
+        standaloneByKey.set(result.value.key, result.value.descriptor);
+      }
+    }
+
+    // Assemble in registry order so the sidebar's group ordering is preserved.
+    const facets: FacetDescriptor[] = [];
+    for (const def of FACET_REGISTRY) {
+      const descriptor = await this.materializeDescriptor(
+        def,
+        params,
+        batchByTable,
+        standaloneByKey,
+      );
+      if (descriptor) facets.push(descriptor);
+    }
     return facets;
+  }
+
+  private async materializeDescriptor(
+    def: FacetDefinition,
+    params: DiscoverParams,
+    batchByTable: Map<FacetTable, BatchedFacetResult>,
+    standaloneByKey: Map<string, FacetDescriptor>,
+  ): Promise<FacetDescriptor | null> {
+    if (def.kind === "categorical" && isExpressionCategorical(def)) {
+      if (def.expression.includes("arrayJoin")) {
+        return standaloneByKey.get(def.key) ?? null;
+      }
+      const batch = batchByTable.get(def.table);
+      const raw = batch?.categoricals[def.key];
+      if (!raw) return null;
+      const enriched =
+        def.key === "topic" || def.key === "subtopic"
+          ? await this.enrichTopicNames(params.tenantId, raw)
+          : raw;
+      return {
+        key: def.key,
+        kind: "categorical",
+        label: def.label,
+        group: def.group,
+        topValues: enriched.values,
+        totalDistinct: enriched.totalDistinct,
+      };
+    }
+
+    if (def.kind === "range") {
+      const batch = batchByTable.get(def.table);
+      const range = batch?.ranges[def.key];
+      if (!range) return null;
+      return {
+        key: def.key,
+        kind: "range",
+        label: def.label,
+        group: def.group,
+        min: range.min,
+        max: range.max,
+      };
+    }
+
+    return standaloneByKey.get(def.key) ?? null;
   }
 
   /** Per-pod dedup of in-flight background refreshes. */

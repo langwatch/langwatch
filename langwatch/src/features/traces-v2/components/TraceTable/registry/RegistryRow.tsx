@@ -6,6 +6,7 @@ import type { TraceStatus } from "../../../types/trace";
 import { ROW_STYLES, rowVariantFor, StatusRowGroup } from "../StatusRow";
 import { Tbody, Td, Tr } from "../TablePrimitives";
 import { cellPropsFor } from "../TraceTableShell";
+import { SELECT_COLUMN_ID } from "./cells/SelectCells";
 import { pickCell, type Registry, type RowActions } from "./types";
 
 interface RegistryRowProps<TRow> {
@@ -95,24 +96,32 @@ export function RegistryRow<TRow>({
       bg={hoverScope === "split" ? style.bg : undefined}
       _hover={hoverScope === "split" ? { bg: style.hoverBg } : undefined}
     >
-      {visibleCells.map((cell, i) => (
-        <Td
-          key={cell.id}
-          bg={hoverScope === "unified" ? style.bg : undefined}
-          padding={`${tokens.rowPaddingY} 8px`}
-          {...cellPropsFor(cell, style.borderColor, i)}
-        >
-          {pickCell(registry, cell.column.id, densityMode, {
-            row: tanstackRow.original,
-            density: tokens,
-            densityMode,
-            isExpanded,
-            isSelected,
-            isFocused,
-            actions,
-          })}
-        </Td>
-      ))}
+      {visibleCells.map((cell, i) => {
+        const isSelectCell = cell.column.id === SELECT_COLUMN_ID;
+        return (
+          <Td
+            key={cell.id}
+            bg={hoverScope === "unified" ? style.bg : undefined}
+            // Select cells own their full padding so clicks anywhere inside
+            // the cell (including the edge padding) hit the checkbox Box,
+            // not the Td. The Box stops propagation so the row's
+            // drawer-open / expand handler does not also fire.
+            padding={isSelectCell ? 0 : `${tokens.rowPaddingY} 8px`}
+            cursor={isSelectCell ? "pointer" : undefined}
+            {...cellPropsFor(cell, style.borderColor, i)}
+          >
+            {pickCell(registry, cell.column.id, densityMode, {
+              row: tanstackRow.original,
+              density: tokens,
+              densityMode,
+              isExpanded,
+              isSelected,
+              isFocused,
+              actions,
+            })}
+          </Td>
+        );
+      })}
     </Tr>
   );
 

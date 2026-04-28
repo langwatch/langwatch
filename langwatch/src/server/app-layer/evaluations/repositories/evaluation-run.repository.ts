@@ -14,6 +14,7 @@ export interface EvaluationRunRepository {
   findSummariesByTraceIds(
     tenantId: string,
     traceIds: string[],
+    since: number,
   ): Promise<Record<string, EvalSummary[]>>;
 }
 
@@ -37,6 +38,7 @@ export class NullEvaluationRunRepository implements EvaluationRunRepository {
   async findSummariesByTraceIds(
     _tenantId: string,
     _traceIds: string[],
+    _since: number,
   ): Promise<Record<string, EvalSummary[]>> {
     return {};
   }

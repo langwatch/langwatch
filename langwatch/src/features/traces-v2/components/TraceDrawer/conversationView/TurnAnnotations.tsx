@@ -156,7 +156,7 @@ export function TurnAnnotationBadges({
         positioning={{
           placement: "bottom-end",
           flip: true,
-          shift: { padding: 16 },
+          shift: 16,
           overflowPadding: 16,
         }}
       >
@@ -198,8 +198,8 @@ export function TurnAnnotationBadges({
               {items.map((a) => (
                 <Box
                   key={a.id}
-                  as={canEdit ? "button" : "div"}
-                  type={canEdit ? "button" : undefined}
+                  role={canEdit ? "button" : undefined}
+                  tabIndex={canEdit ? 0 : undefined}
                   onClick={
                     canEdit
                       ? (e: React.MouseEvent) => {

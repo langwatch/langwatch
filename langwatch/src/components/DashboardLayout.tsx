@@ -568,7 +568,7 @@ export const DashboardLayout = ({
         width="full"
         alignItems="stretch"
         gap={0}
-        minHeight="calc(100vh - 60px)"
+        minHeight="calc(100vh - 56px)"
       >
         <MainMenu isCompact={compactMenu} />
 

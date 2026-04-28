@@ -1,4 +1,4 @@
-import { Box, HStack, Icon, Text } from "@chakra-ui/react";
+import { Box, chakra, Icon, Text } from "@chakra-ui/react";
 import { keyframes } from "@emotion/react";
 import { useState } from "react";
 import { LuBrain, LuChevronDown, LuChevronRight } from "react-icons/lu";
@@ -24,13 +24,14 @@ export function ReasoningBlock({
 
   return (
     <Box mb="2" width="full">
-      <HStack
-        as="button"
+      <chakra.button
         type="button"
         onClick={(e) => {
           e.stopPropagation();
           setIsOpen(!isOpen);
         }}
+        display="flex"
+        alignItems="center"
         gap="1.5"
         color="fg.muted"
         _hover={{ color: "fg.default" }}
@@ -40,10 +41,10 @@ export function ReasoningBlock({
         py="1"
         textAlign="left"
       >
-        <Icon as={isOpen ? LuChevronDown : LuChevronRight} size="3" />
-        <Icon as={LuBrain} size="3" />
+        <Icon as={isOpen ? LuChevronDown : LuChevronRight} boxSize={3} />
+        <Icon as={LuBrain} boxSize={3} />
         <Text>Reasoned</Text>
-      </HStack>
+      </chakra.button>
 
       {isOpen && (
         <Box
@@ -58,12 +59,12 @@ export function ReasoningBlock({
           backgroundImage="linear-gradient(110deg, var(--chakra-colors-fg-muted) 35%, var(--chakra-colors-blue-fg) 45%, var(--chakra-colors-purple-fg) 50%, var(--chakra-colors-blue-fg) 55%, var(--chakra-colors-fg-muted) 65%)"
           backgroundSize="200% auto"
           backgroundClip="text"
-          WebkitBackgroundClip="text"
           // Make the text itself transparent so the background shows through
           color="transparent !important"
           animation={`${thinkingMirror} 3s linear infinite`}
           // Ensure all nested markdown elements inherit the transparency and background clip
           css={{
+            WebkitBackgroundClip: "text",
             "& *": {
               color: "inherit !important",
               background: "inherit !important",

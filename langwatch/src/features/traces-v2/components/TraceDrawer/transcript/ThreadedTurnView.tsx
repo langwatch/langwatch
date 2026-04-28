@@ -1,4 +1,4 @@
-import { Box, Flex, HStack, Icon, Text } from "@chakra-ui/react";
+import { Box, chakra, Flex, HStack, Icon, Text } from "@chakra-ui/react";
 import { useMemo, useState } from "react";
 import { LuChevronDown, LuChevronRight, LuUser } from "react-icons/lu";
 import { getDisplayRoleVisuals, useIsScenarioRole } from "../scenarioRoles";
@@ -83,10 +83,11 @@ export function ThreadedTurnView({
         <Icon as={RoleIcon} boxSize="8px" color={color} />
       </Flex>
 
-      <HStack
-        as="button"
+      <chakra.button
         type="button"
         onClick={() => setExpanded((v) => !v)}
+        display="flex"
+        alignItems="center"
         gap={1.5}
         paddingY={0.5}
         paddingX={1.5}
@@ -95,7 +96,6 @@ export function ThreadedTurnView({
         _hover={{ bg: "bg.muted" }}
         textAlign="left"
         width="full"
-        align="center"
       >
         <Text
           textStyle="2xs"
@@ -125,7 +125,7 @@ export function ThreadedTurnView({
           color="fg.subtle"
           flexShrink={0}
         />
-      </HStack>
+      </chakra.button>
 
       {expanded && (
         <Box paddingTop={1} paddingBottom={2}>

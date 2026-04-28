@@ -1,5 +1,6 @@
 import {
   Box,
+  chakra,
   Flex,
   HStack,
   Icon,
@@ -111,8 +112,7 @@ const DensityCard: React.FC<DensityCardProps> = ({
   active,
   onSelect,
 }) => (
-  <Box
-    as="button"
+  <chakra.button
     type="button"
     onClick={onSelect}
     aria-pressed={active}
@@ -179,7 +179,7 @@ const DensityCard: React.FC<DensityCardProps> = ({
         {option.blurb}
       </Text>
     </VStack>
-  </Box>
+  </chakra.button>
 );
 
 const DensityPreview: React.FC<{ option: DensityOption }> = ({ option }) => {

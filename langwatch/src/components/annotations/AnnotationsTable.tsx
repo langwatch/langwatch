@@ -14,6 +14,7 @@ import type { Annotation } from "@prisma/client";
 import { useRouter } from "~/utils/compat/next-router";
 import { useMemo, useState } from "react";
 import { ChevronDown, Edit, MessageCircle, MoreVertical } from "react-feather";
+import { TraceIdPeek } from "~/features/traces-v2/components/TraceIdPeek";
 import { useAnnotationQueues } from "~/hooks/useAnnotationQueues";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -565,9 +566,14 @@ export const AnnotationsTable = ({
                                 scoreOptionsIDArray,
                               )}
                             <Table.Cell>
-                              {new Date(
-                                item.trace?.timestamps.started_at ?? "",
-                              ).toLocaleDateString()}
+                              <HStack gap={1}>
+                                <Text>
+                                  {new Date(
+                                    item.trace?.timestamps.started_at ?? "",
+                                  ).toLocaleDateString()}
+                                </Text>
+                                <TraceIdPeek traceId={item.traceId} />
+                              </HStack>
                             </Table.Cell>
                           </Table.Row>
                         );

@@ -13,7 +13,7 @@ import { useViewStore } from "../../stores/viewStore";
 
 const GROUPING_OPTIONS: Record<GroupingMode, string> = {
   flat: "Flat",
-  "by-session": "By Session",
+  "by-conversation": "By Conversation",
   "by-service": "By Service",
   "by-user": "By User",
   "by-model": "By Model",

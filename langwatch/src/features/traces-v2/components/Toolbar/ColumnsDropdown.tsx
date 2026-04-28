@@ -31,11 +31,9 @@ const SECTION_LABEL_CSS = {
 
 export const ColumnsDropdown: React.FC = () => {
   const columnOrder = useViewStore((s) => s.columnOrder);
-  const hiddenColumns = useViewStore((s) => s.hiddenColumns);
   const toggleColumn = useViewStore((s) => s.toggleColumn);
 
-  const isVisible = (id: string) =>
-    columnOrder.includes(id) && !hiddenColumns.has(id);
+  const isVisible = (id: string) => columnOrder.includes(id);
 
   return (
     <MenuRoot closeOnSelect={false}>

@@ -1,6 +1,14 @@
+import type { TraceColumnId } from "../components/TraceTable/columns";
 import type { ColumnConfig } from "../stores/viewStore";
 
-export const STANDARD_COLUMNS: readonly ColumnConfig[] = [
+/**
+ * Every entry's `id` must be a valid TraceColumnId — otherwise the dropdown
+ * exposes a column the renderer can't render. Compile error if an id slips
+ * out of sync with the column-def registry.
+ */
+type StandardColumnConfig = ColumnConfig & { id: TraceColumnId };
+
+export const STANDARD_COLUMNS: readonly StandardColumnConfig[] = [
   {
     id: "time",
     label: "Time",
@@ -115,10 +123,10 @@ export const STANDARD_COLUMNS: readonly ColumnConfig[] = [
     minWidth: 80,
   },
   {
-    id: "spanCount",
-    label: "Span count",
+    id: "spans",
+    label: "Spans",
     section: "standard",
     visible: false,
-    minWidth: 80,
+    minWidth: 60,
   },
 ];

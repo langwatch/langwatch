@@ -23,6 +23,7 @@ export const presenceVizTabSchema = z.enum([
   "waterfall",
   "flame",
   "spanlist",
+  "topology",
   "sequence",
 ]);
 export const presenceDrawerTabSchema = z.enum([

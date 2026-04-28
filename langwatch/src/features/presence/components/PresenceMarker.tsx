@@ -1,4 +1,4 @@
-import { Box, HStack, Text } from "@chakra-ui/react";
+import { Box, chakra, HStack, Text } from "@chakra-ui/react";
 import { Tooltip } from "~/components/ui/tooltip";
 import type { PresenceSession } from "~/server/app-layer/presence/types";
 import {
@@ -158,8 +158,7 @@ function PresenceChip({
         boxShadow="sm"
       >
         {image ? (
-          <Box
-            as="img"
+          <chakra.img
             src={image}
             alt=""
             width="100%"
