@@ -38,10 +38,13 @@ type Options struct {
 	// instead of failing fast, so the cold-start window is invisible to
 	// callers.
 	//
-	// Default: 15s. Empirically the saas Lambda runtime image takes
-	// ~14s for uvicorn to import litellm + langwatch_nlp.main and bind
-	// 127.0.0.1:5561 (measured locally on the saas Dockerfile build).
-	// 15s gives a small safety margin while staying well under Lambda's
+	// Default: 25s. Empirically the saas Lambda runtime image takes
+	// ~22s end-to-end for uvicorn to import litellm + langwatch_nlp.main
+	// and bind 127.0.0.1:5561 (measured locally on the saas Dockerfile
+	// build: nlpgo binds at ~3s, uvicorn child reachable at ~22s). 25s
+	// absorbs the full cold-start window in a single request rather
+	// than relying on Studio's LambdaClient retry (maxAttempts:6) to
+	// pick up a 503 from an earlier attempt. Stays well under Lambda's
 	// 900s function timeout. Set to 0 to disable the wait entirely
 	// (tests / fail-fast topologies).
 	ColdStartWait time.Duration
@@ -67,7 +70,7 @@ func New(opts Options) (http.Handler, error) {
 		opts.FlushInterval = -1
 	}
 	if opts.ColdStartWait == 0 {
-		opts.ColdStartWait = 15 * time.Second
+		opts.ColdStartWait = 25 * time.Second
 	}
 	if opts.ColdStartProbeInterval == 0 {
 		opts.ColdStartProbeInterval = 100 * time.Millisecond
