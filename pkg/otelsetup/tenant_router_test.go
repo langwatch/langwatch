@@ -164,7 +164,10 @@ func TestTenantRouter_ChildSpanInheritsParentAuth(t *testing.T) {
 	tracer := tp.Tracer("test")
 
 	parentCtx := context.WithValue(context.Background(), APIKeyContextKey{}, "key-X")
-	parentCtx, parent := tracer.Start(parentCtx, "parent")
+	// Discard the returned context: the child below intentionally builds
+	// a fresh context from the span context (not from this returned ctx)
+	// to repro the goroutine-without-ctx-propagation scenario.
+	_, parent := tracer.Start(parentCtx, "parent")
 
 	// Start a child but DROP the api_key from context — only the
 	// span context carries forward. Production case: goroutine that
