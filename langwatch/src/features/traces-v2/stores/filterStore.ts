@@ -4,25 +4,13 @@ import {
   parse,
   serialize,
   isEmptyAST,
-  getFacetValues,
   getFacetValueState,
-  getRangeValue,
-  hasCrossFacetOR,
   toggleFacetInQuery,
   setRangeInQuery,
   removeFieldFromQuery,
   removeFacetValueFromQuery,
   ParseError,
 } from "../utils/queryParser";
-
-export type { LiqeQuery };
-export {
-  getFacetValues,
-  getFacetValueState,
-  getRangeValue,
-  isEmptyAST,
-  hasCrossFacetOR,
-};
 
 export interface TimeRange {
   from: number;
@@ -81,10 +69,12 @@ const EMPTY_AST: LiqeQuery = {
   location: { start: 0, end: 0 },
 };
 
+const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
+
 function defaultTimeRange(): TimeRange {
   const now = Date.now();
   return {
-    from: now - 30 * 24 * 60 * 60 * 1000,
+    from: now - THIRTY_DAYS_MS,
     to: now,
     label: "Last 30 days",
     presetId: "30d",
@@ -93,12 +83,13 @@ function defaultTimeRange(): TimeRange {
 
 export const INITIAL_TIME_RANGE = defaultTimeRange();
 
-/** Parse a query string safely, returning the AST and normalized text */
-function safeParseAndSerialize(text: string): {
+interface ParseResult {
   ast: LiqeQuery;
   queryText: string;
   parseError: string | null;
-} {
+}
+
+function safeParseAndSerialize(text: string): ParseResult {
   const trimmed = text.trim();
   if (!trimmed) {
     return { ast: EMPTY_AST, queryText: "", parseError: null };
@@ -114,6 +105,11 @@ function safeParseAndSerialize(text: string): {
         : "Invalid query syntax — check for unmatched quotes or parentheses.";
     return { ast: EMPTY_AST, queryText: text, parseError: message };
   }
+}
+
+function applyMutation(state: FilterState, mutate: (text: string) => string) {
+  const next = safeParseAndSerialize(mutate(state.queryText));
+  return { ...next, page: 1 };
 }
 
 export const useFilterStore = create<FilterState>((set, get) => ({
@@ -137,57 +133,31 @@ export const useFilterStore = create<FilterState>((set, get) => ({
     }),
 
   setQuery: (text, ast) =>
-    set(() => ({
+    set({
       ast,
       queryText: text,
       parseError: null,
       page: 1,
-    })),
+    }),
 
   toggleFacet: (field, value) =>
-    set((s) => {
-      const currentState = getFacetValueState(s.ast, field, value);
-      const newQueryText = toggleFacetInQuery(
-        s.queryText,
-        field,
-        value,
-        currentState,
-      );
-      const result = safeParseAndSerialize(newQueryText);
-      return { ...result, page: 1 };
-    }),
+    set((s) =>
+      applyMutation(s, (q) =>
+        toggleFacetInQuery(q, field, value, getFacetValueState(s.ast, field, value)),
+      ),
+    ),
 
   removeFacet: (field, value) =>
-    set((s) => {
-      const newQueryText = removeFacetValueFromQuery(
-        s.queryText,
-        field,
-        value,
-      );
-      const result = safeParseAndSerialize(newQueryText);
-      return { ...result, page: 1 };
-    }),
+    set((s) => applyMutation(s, (q) => removeFacetValueFromQuery(q, field, value))),
 
   removeField: (field) =>
-    set((s) => {
-      const newQueryText = removeFieldFromQuery(s.queryText, field);
-      const result = safeParseAndSerialize(newQueryText);
-      return { ...result, page: 1 };
-    }),
+    set((s) => applyMutation(s, (q) => removeFieldFromQuery(q, field))),
 
   setRange: (field, from, to) =>
-    set((s) => {
-      const newQueryText = setRangeInQuery(s.queryText, field, from, to);
-      const result = safeParseAndSerialize(newQueryText);
-      return { ...result, page: 1 };
-    }),
+    set((s) => applyMutation(s, (q) => setRangeInQuery(q, field, from, to))),
 
   removeRange: (field) =>
-    set((s) => {
-      const newQueryText = removeFieldFromQuery(s.queryText, field);
-      const result = safeParseAndSerialize(newQueryText);
-      return { ...result, page: 1 };
-    }),
+    set((s) => applyMutation(s, (q) => removeFieldFromQuery(q, field))),
 
   setTimeRange: (range) => set({ timeRange: range, page: 1 }),
   rollTimeRange: (range) => set({ timeRange: range }),
@@ -215,20 +185,3 @@ export const useFilterStore = create<FilterState>((set, get) => ({
     });
   },
 }));
-
-// ─── Legacy compatibility ─────────────────────────────────────────────────────
-
-/**
- * Get include values for a field using legacy field naming.
- * @deprecated Use getFacetValues() directly.
- */
-export function getFilterValues(ast: LiqeQuery, legacyField: string): string[] {
-  const fieldMap: Record<string, string> = {
-    "traces.status": "status",
-    "traces.origin": "origin",
-    "spans.service": "service",
-    "spans.model": "model",
-  };
-  const field = fieldMap[legacyField] ?? legacyField;
-  return getFacetValues(ast, field).include;
-}

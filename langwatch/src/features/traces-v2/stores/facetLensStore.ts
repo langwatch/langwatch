@@ -20,8 +20,7 @@ interface FacetLensState {
   lens: FacetLens;
   setSectionOrder: (order: string[]) => void;
   setSectionOpen: (key: string, open: boolean) => void;
-  clearSectionOpen: (key: string) => void;
-  reset: () => void;
+  setAllSectionsOpen: (keys: string[], open: boolean) => void;
 }
 
 const STORAGE_KEY = "langwatch:traces-v2:facet-lens";
@@ -60,7 +59,7 @@ function persistLens(lens: FacetLens): void {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(lens));
   } catch {
-    // ignore quota / disabled storage
+    // storage may be full / disabled
   }
 }
 
@@ -84,20 +83,13 @@ export const useFacetLensStore = create<FacetLensState>((set) => ({
       return { lens: next };
     }),
 
-  clearSectionOpen: (key) =>
+  setAllSectionsOpen: (keys, open) =>
     set((s) => {
-      if (!(key in s.lens.sectionOpen)) return s;
-      const nextOpen = { ...s.lens.sectionOpen };
-      delete nextOpen[key];
-      const next: FacetLens = { ...s.lens, sectionOpen: nextOpen };
+      const sectionOpen = { ...s.lens.sectionOpen };
+      for (const k of keys) sectionOpen[k] = open;
+      const next: FacetLens = { ...s.lens, sectionOpen };
       persistLens(next);
       return { lens: next };
-    }),
-
-  reset: () =>
-    set(() => {
-      persistLens(defaultLens);
-      return { lens: defaultLens };
     }),
 }));
 

@@ -11,63 +11,61 @@ interface UIState {
   setSidebarCollapsed: (collapsed: boolean) => void;
 }
 
-function loadPersistedUI(): Pick<UIState, "density" | "sidebarCollapsed"> {
-  if (typeof window === "undefined") {
-    return { density: "compact", sidebarCollapsed: true };
-  }
-  try {
-    const stored = localStorage.getItem("langwatch:traces-v2:ui");
-    if (stored) {
-      const parsed = JSON.parse(stored) as Partial<
-        Pick<UIState, "density" | "sidebarCollapsed">
-      >;
-      return {
-        density: parsed.density ?? "compact",
-        sidebarCollapsed: parsed.sidebarCollapsed ?? true,
-      };
-    }
-  } catch {
-    // ignore
-  }
-  return { density: "compact", sidebarCollapsed: true };
+const STORAGE_KEY = "langwatch:traces-v2:ui";
+type Persisted = Pick<UIState, "density" | "sidebarCollapsed">;
+
+const DEFAULT_PERSISTED: Persisted = { density: "compact", sidebarCollapsed: true };
+
+function isDensity(value: unknown): value is Density {
+  return value === "compact" || value === "comfortable";
 }
 
-function persistUI(state: Pick<UIState, "density" | "sidebarCollapsed">) {
+function loadPersistedUI(): Persisted {
+  if (typeof window === "undefined") return DEFAULT_PERSISTED;
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (!stored) return DEFAULT_PERSISTED;
+    const parsed = JSON.parse(stored) as Partial<Persisted>;
+    return {
+      density: isDensity(parsed.density) ? parsed.density : DEFAULT_PERSISTED.density,
+      sidebarCollapsed:
+        typeof parsed.sidebarCollapsed === "boolean"
+          ? parsed.sidebarCollapsed
+          : DEFAULT_PERSISTED.sidebarCollapsed,
+    };
+  } catch {
+    return DEFAULT_PERSISTED;
+  }
+}
+
+function persistUI(state: Persisted): void {
   if (typeof window === "undefined") return;
   try {
-    localStorage.setItem(
-      "langwatch:traces-v2:ui",
-      JSON.stringify({ density: state.density, sidebarCollapsed: state.sidebarCollapsed })
-    );
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   } catch {
-    // ignore
+    // storage may be full / disabled
   }
 }
 
 const initial = loadPersistedUI();
 
-export const useUIStore = create<UIState>((set) => ({
+export const useUIStore = create<UIState>((set, get) => ({
   density: initial.density,
   sidebarCollapsed: initial.sidebarCollapsed,
 
-  setDensity: (density) =>
-    set((s) => {
-      const next = { ...s, density };
-      persistUI(next);
-      return { density };
-    }),
+  setDensity: (density) => {
+    persistUI({ density, sidebarCollapsed: get().sidebarCollapsed });
+    set({ density });
+  },
 
-  toggleSidebar: () =>
-    set((s) => {
-      const next = { ...s, sidebarCollapsed: !s.sidebarCollapsed };
-      persistUI(next);
-      return { sidebarCollapsed: !s.sidebarCollapsed };
-    }),
+  toggleSidebar: () => {
+    const next = !get().sidebarCollapsed;
+    persistUI({ density: get().density, sidebarCollapsed: next });
+    set({ sidebarCollapsed: next });
+  },
 
-  setSidebarCollapsed: (collapsed) =>
-    set((s) => {
-      const next = { ...s, sidebarCollapsed: collapsed };
-      persistUI(next);
-      return { sidebarCollapsed: collapsed };
-    }),
+  setSidebarCollapsed: (collapsed) => {
+    persistUI({ density: get().density, sidebarCollapsed: collapsed });
+    set({ sidebarCollapsed: collapsed });
+  },
 }));

@@ -12,6 +12,8 @@ interface FreshnessSignal {
   setRefresh: (fn: () => void) => void;
   isRefreshing: boolean;
   setRefreshing: (value: boolean) => void;
+  isReplacingData: boolean;
+  setReplacingData: (value: boolean) => void;
 }
 
 export const useFreshnessSignal = create<FreshnessSignal>((set) => ({
@@ -25,4 +27,6 @@ export const useFreshnessSignal = create<FreshnessSignal>((set) => ({
   setRefresh: (fn) => set({ refresh: fn }),
   isRefreshing: false,
   setRefreshing: (value) => set({ isRefreshing: value }),
+  isReplacingData: false,
+  setReplacingData: (value) => set({ isReplacingData: value }),
 }));

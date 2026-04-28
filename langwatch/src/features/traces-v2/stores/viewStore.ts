@@ -83,21 +83,34 @@ interface ViewState {
 
 const STORAGE_KEY = "langwatch:traces-v2:lenses:v2";
 
+const DEFAULT_SORT: SortConfig = { columnId: "time", direction: "desc" };
+
+function isGroupingMode(value: unknown): value is GroupingMode {
+  return (
+    value === "flat" ||
+    value === "by-session" ||
+    value === "by-service" ||
+    value === "by-user" ||
+    value === "by-model"
+  );
+}
+
 function loadCustomLenses(): LensConfig[] {
   if (typeof window === "undefined") return [];
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw) as Array<Partial<LensConfig>>;
+    if (!Array.isArray(parsed)) return [];
     return parsed.map((lens) => ({
       id: lens.id ?? "",
       name: lens.name ?? "Untitled",
       isBuiltIn: false,
-      columns: lens.columns ?? [],
-      addons: lens.addons ?? [],
-      grouping: lens.grouping ?? "flat",
-      sort: lens.sort ?? { columnId: "time", direction: "desc" },
-      lockedFilters: lens.lockedFilters ?? [],
+      columns: Array.isArray(lens.columns) ? lens.columns : [],
+      addons: Array.isArray(lens.addons) ? lens.addons : [],
+      grouping: isGroupingMode(lens.grouping) ? lens.grouping : "flat",
+      sort: lens.sort ?? DEFAULT_SORT,
+      lockedFilters: Array.isArray(lens.lockedFilters) ? lens.lockedFilters : [],
       lockedGrouping: lens.lockedGrouping,
     }));
   } catch {
@@ -111,7 +124,7 @@ function persistCustomLenses(allLenses: LensConfig[]): void {
     const custom = allLenses.filter((l) => !l.isBuiltIn);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(custom));
   } catch {
-    // Silently ignore storage errors
+    // storage may be full / disabled
   }
 }
 
@@ -133,7 +146,7 @@ const builtInLenses: LensConfig[] = [
     ],
     addons: ["io-preview", "expanded-peek"],
     grouping: "flat",
-    sort: { columnId: "time", direction: "desc" },
+    sort: DEFAULT_SORT,
     lockedFilters: [],
   },
   {
@@ -152,7 +165,7 @@ const builtInLenses: LensConfig[] = [
     ],
     addons: ["conversation-turns"],
     grouping: "by-session",
-    sort: { columnId: "time", direction: "desc" },
+    sort: DEFAULT_SORT,
     lockedFilters: ["metadata.thread_id"],
     lockedGrouping: true,
   },
@@ -172,7 +185,7 @@ const builtInLenses: LensConfig[] = [
     ],
     addons: ["error-detail", "expanded-peek"],
     grouping: "flat",
-    sort: { columnId: "time", direction: "desc" },
+    sort: DEFAULT_SORT,
     lockedFilters: ["traces.error"],
   },
   {
@@ -210,7 +223,7 @@ const builtInLenses: LensConfig[] = [
   },
 ];
 
-const defaultColumnOrder = [
+const defaultColumnOrder: string[] = [
   "time",
   "trace",
   "service",
@@ -221,16 +234,26 @@ const defaultColumnOrder = [
 ];
 
 let idCounter = 0;
-
 function generateId(): string {
   idCounter += 1;
   return `custom-${Date.now()}-${idCounter}`;
 }
 
+function setDraft(
+  drafts: Map<string, DraftLensState>,
+  lensId: string,
+  patch: DraftLensState,
+): Map<string, DraftLensState> {
+  const next = new Map(drafts);
+  const current = next.get(lensId) ?? {};
+  next.set(lensId, { ...current, ...patch });
+  return next;
+}
+
 export const useViewStore = create<ViewState>((set, get) => ({
   activeLensId: "all-traces",
   allLenses: [...builtInLenses, ...loadCustomLenses()],
-  sort: { columnId: "time", direction: "desc" },
+  sort: DEFAULT_SORT,
   grouping: "flat",
   columnOrder: defaultColumnOrder,
   hiddenColumns: new Set<string>(),
@@ -254,10 +277,7 @@ export const useViewStore = create<ViewState>((set, get) => ({
     set((s) => {
       const lens = s.allLenses.find((l) => l.id === s.activeLensId);
       if (lens && !lens.isBuiltIn) {
-        const draft = s.draftState.get(s.activeLensId) ?? {};
-        const next = new Map(s.draftState);
-        next.set(s.activeLensId, { ...draft, sort });
-        return { sort, draftState: next };
+        return { sort, draftState: setDraft(s.draftState, s.activeLensId, { sort }) };
       }
       return { sort };
     }),
@@ -266,10 +286,10 @@ export const useViewStore = create<ViewState>((set, get) => ({
     set((s) => {
       const lens = s.allLenses.find((l) => l.id === s.activeLensId);
       if (lens && !lens.isBuiltIn) {
-        const draft = s.draftState.get(s.activeLensId) ?? {};
-        const next = new Map(s.draftState);
-        next.set(s.activeLensId, { ...draft, grouping: mode });
-        return { grouping: mode, draftState: next };
+        return {
+          grouping: mode,
+          draftState: setDraft(s.draftState, s.activeLensId, { grouping: mode }),
+        };
       }
       return { grouping: mode };
     }),
@@ -277,39 +297,46 @@ export const useViewStore = create<ViewState>((set, get) => ({
   toggleColumn: (columnId) =>
     set((s) => {
       const next = new Set(s.hiddenColumns);
-      if (next.has(columnId)) {
-        next.delete(columnId);
-      } else {
-        next.add(columnId);
-      }
+      if (next.has(columnId)) next.delete(columnId);
+      else next.add(columnId);
+
       const order = s.columnOrder.includes(columnId)
         ? s.columnOrder
         : [...s.columnOrder, columnId];
 
       const lens = s.allLenses.find((l) => l.id === s.activeLensId);
       if (lens && !lens.isBuiltIn) {
-        const draft = s.draftState.get(s.activeLensId) ?? {};
-        const nextDraft = new Map(s.draftState);
-        nextDraft.set(s.activeLensId, { ...draft, columns: order });
-        return { hiddenColumns: next, columnOrder: order, draftState: nextDraft };
+        return {
+          hiddenColumns: next,
+          columnOrder: order,
+          draftState: setDraft(s.draftState, s.activeLensId, { columns: order }),
+        };
       }
       return { hiddenColumns: next, columnOrder: order };
     }),
 
   reorderColumns: (fromIndex, toIndex) =>
     set((s) => {
+      if (
+        fromIndex === toIndex ||
+        fromIndex < 0 ||
+        toIndex < 0 ||
+        fromIndex >= s.columnOrder.length ||
+        toIndex >= s.columnOrder.length
+      ) {
+        return s;
+      }
       const order = [...s.columnOrder];
       const [moved] = order.splice(fromIndex, 1);
-      if (moved) {
-        order.splice(toIndex, 0, moved);
-      }
+      if (!moved) return s;
+      order.splice(toIndex, 0, moved);
 
       const lens = s.allLenses.find((l) => l.id === s.activeLensId);
       if (lens && !lens.isBuiltIn) {
-        const draft = s.draftState.get(s.activeLensId) ?? {};
-        const nextDraft = new Map(s.draftState);
-        nextDraft.set(s.activeLensId, { ...draft, columns: order });
-        return { columnOrder: order, draftState: nextDraft };
+        return {
+          columnOrder: order,
+          draftState: setDraft(s.draftState, s.activeLensId, { columns: order }),
+        };
       }
       return { columnOrder: order };
     }),
@@ -318,13 +345,10 @@ export const useViewStore = create<ViewState>((set, get) => ({
     set((s) => {
       const lens = s.allLenses.find((l) => l.id === s.activeLensId);
       if (lens && !lens.isBuiltIn) {
-        const draft = s.draftState.get(s.activeLensId) ?? {};
-        const nextDraft = new Map(s.draftState);
-        nextDraft.set(s.activeLensId, { ...draft, columns });
         return {
           columnOrder: columns,
           hiddenColumns: new Set<string>(),
-          draftState: nextDraft,
+          draftState: setDraft(s.draftState, s.activeLensId, { columns }),
         };
       }
       return {
@@ -333,9 +357,7 @@ export const useViewStore = create<ViewState>((set, get) => ({
       };
     }),
 
-  isDraft: (lensId) => {
-    return get().draftState.has(lensId);
-  },
+  isDraft: (lensId) => get().draftState.has(lensId),
 
   createLens: (name) => {
     const id = generateId();
@@ -352,10 +374,7 @@ export const useViewStore = create<ViewState>((set, get) => ({
     };
     const allLenses = [...state.allLenses, newLens];
     persistCustomLenses(allLenses);
-    set({
-      allLenses,
-      activeLensId: id,
-    });
+    set({ allLenses, activeLensId: id });
     return id;
   },
 
@@ -385,17 +404,13 @@ export const useViewStore = create<ViewState>((set, get) => ({
       if (!lens) return s;
       const nextDraft = new Map(s.draftState);
       nextDraft.delete(lensId);
-      const isActive = s.activeLensId === lensId;
+      if (s.activeLensId !== lensId) return { draftState: nextDraft };
       return {
         draftState: nextDraft,
-        ...(isActive
-          ? {
-              sort: lens.sort,
-              grouping: lens.grouping,
-              columnOrder: lens.columns,
-              hiddenColumns: new Set<string>(),
-            }
-          : {}),
+        sort: lens.sort,
+        grouping: lens.grouping,
+        columnOrder: lens.columns,
+        hiddenColumns: new Set<string>(),
       };
     }),
 
@@ -441,28 +456,19 @@ export const useViewStore = create<ViewState>((set, get) => ({
       const allLenses = s.allLenses.filter((l) => l.id !== lensId);
       const nextDraft = new Map(s.draftState);
       nextDraft.delete(lensId);
-      const switchToFirst = s.activeLensId === lensId;
-      const firstLens = allLenses[0]!;
       persistCustomLenses(allLenses);
+      if (s.activeLensId !== lensId) {
+        return { allLenses, draftState: nextDraft };
+      }
+      const firstLens = allLenses[0]!;
       return {
         allLenses,
         draftState: nextDraft,
-        ...(switchToFirst
-          ? {
-              activeLensId: firstLens.id,
-              sort: firstLens.sort,
-              grouping: firstLens.grouping,
-              columnOrder: firstLens.columns,
-              hiddenColumns: new Set<string>(),
-            }
-          : {}),
+        activeLensId: firstLens.id,
+        sort: firstLens.sort,
+        grouping: firstLens.grouping,
+        columnOrder: firstLens.columns,
+        hiddenColumns: new Set<string>(),
       };
     }),
 }));
-
-export function getActiveLens(state: ViewState): LensConfig {
-  return (
-    state.allLenses.find((l) => l.id === state.activeLensId) ??
-    builtInLenses[0]!
-  );
-}

@@ -1,8 +1,10 @@
 import { create } from "zustand";
 
-export type DrawerViewMode = "trace" | "conversation";
-export type VizTab = "waterfall" | "flame" | "spanlist" | "markdown";
-export type DrawerTab = "summary" | "span";
+export type DrawerViewMode = "trace" | "conversation" | "scenario";
+export type VizTab = "waterfall" | "flame" | "spanlist";
+export type DrawerTab = "summary" | "span" | "llm";
+
+type AccordionSection = "events" | "evals" | "conversation";
 
 interface TraceHistoryEntry {
   traceId: string;
@@ -33,7 +35,7 @@ interface DrawerState {
   setVizTab: (tab: VizTab) => void;
   setActiveTab: (tab: DrawerTab) => void;
   toggleMaximized: () => void;
-  toggleAccordion: (section: "events" | "evals" | "conversation") => void;
+  toggleAccordion: (section: AccordionSection) => void;
   pushTraceHistory: (entry: TraceHistoryEntry) => void;
   popTraceHistory: () => TraceHistoryEntry | null;
   clearTraceHistory: () => void;
@@ -79,7 +81,7 @@ export const useDrawerStore = create<DrawerState>((set, get) => ({
         isOpen: true,
         traceId,
         selectedSpanId: null,
-        activeTab: "summary" as const,
+        activeTab: "summary",
       };
     }),
 
