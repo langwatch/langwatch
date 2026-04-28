@@ -69,6 +69,13 @@ const parseLambdaConfig = (): LangWatchLambdaConfig => {
   }
 };
 
+// SDK default is 3 retries for retryable errors (incl. TooManyRequestsException
+// which surfaces as "Rate Exceeded."). When the per-project Lambda fleet is
+// cold-starting under a fresh image, a transient ConcurrentExecutions burst
+// can cause 3-retry windows to all land inside the saturation. Bumped to 6
+// to ride out a ~30-60s burst without surfacing the error to Studio.
+const LAMBDA_CLIENT_MAX_ATTEMPTS = 6;
+
 export const createLambdaClient = (): LambdaClient => {
   const config = parseLambdaConfig();
   return new LambdaClient({
@@ -77,6 +84,7 @@ export const createLambdaClient = (): LambdaClient => {
       accessKeyId: config.AWS_ACCESS_KEY_ID,
       secretAccessKey: config.AWS_SECRET_ACCESS_KEY,
     },
+    maxAttempts: LAMBDA_CLIENT_MAX_ATTEMPTS,
   });
 };
 
