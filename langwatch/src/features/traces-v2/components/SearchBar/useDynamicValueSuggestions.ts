@@ -43,6 +43,13 @@ export function useDynamicValueSuggestions({
       return;
     }
     if (!data) return;
+    if (data.values.length === 0) {
+      // No DB hits in the current time range — don't blank out the static
+      // suggestions (e.g. the closed enum for `status:`), otherwise the
+      // dropdown disappears and the user can't accept anything.
+      override(null);
+      return;
+    }
     const items = data.values.map((v) => v.value);
     const counts: Record<string, number> = {};
     for (const v of data.values) counts[v.value] = v.count;

@@ -20,25 +20,20 @@ export const editorStyles: SystemStyleObject = {
     pointerEvents: "none",
   },
   "& .filter-token": {
-    background:
-      "color-mix(in srgb, var(--chakra-colors-blue-500) 14%, transparent)",
-    border:
-      "1px solid color-mix(in srgb, var(--chakra-colors-blue-500) 22%, transparent)",
+    background: "blue.subtle",
+    border: "1px solid",
+    borderColor: "blue.muted",
     borderRadius: "4px",
     padding: "0px 4px",
     margin: "0 1px",
   },
   "& .filter-token-exclude": {
-    background:
-      "color-mix(in srgb, var(--chakra-colors-red-500) 14%, transparent)",
-    border:
-      "1px solid color-mix(in srgb, var(--chakra-colors-red-500) 22%, transparent)",
+    background: "red.subtle",
+    borderColor: "red.muted",
   },
   "& .filter-token-scenario": {
-    background:
-      "color-mix(in srgb, var(--chakra-colors-purple-500) 14%, transparent)",
-    border:
-      "1px solid color-mix(in srgb, var(--chakra-colors-purple-500) 28%, transparent)",
+    background: "purple.subtle",
+    borderColor: "purple.muted",
   },
   "& .filter-keyword": {
     color: "fg.muted",
@@ -55,16 +50,22 @@ export const editorStyles: SystemStyleObject = {
     color: "fg.subtle",
     fontWeight: "semibold",
   },
+  // X overlaps the chip's right edge — no reserved padding so neighbouring
+  // text doesn't get pushed around. Absolute-positioned inside the chip's
+  // own bounding box so it visually belongs to the colour blob, can hover
+  // over a following character without affecting layout.
   "& .filter-token-delete": {
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
     width: "14px",
     height: "14px",
-    marginLeft: "2px",
+    marginLeft: "-14px",
+    marginRight: "0px",
     padding: 0,
     border: "none",
-    borderRadius: "3px",
+    borderTopRightRadius: "3px",
+    borderBottomRightRadius: "3px",
     background: "transparent",
     color: "fg.muted",
     fontSize: "13px",
@@ -75,13 +76,14 @@ export const editorStyles: SystemStyleObject = {
     transition: "opacity 80ms ease-out, background 80ms ease-out",
     verticalAlign: "middle",
     userSelect: "none",
+    pointerEvents: "auto",
   },
   "& .filter-token:hover + .filter-token-delete, & .filter-token-delete:hover":
     {
       opacity: 1,
     },
   "& .filter-token-delete:hover": {
-    background: "red.500/15",
+    background: "red.subtle",
     color: "red.fg",
   },
 };

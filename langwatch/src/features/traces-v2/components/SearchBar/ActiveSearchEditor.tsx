@@ -32,6 +32,7 @@ export const ActiveSearchEditor: React.FC<ActiveSearchEditorProps> = ({
     hasContent,
     acceptSuggestion,
     overrideSuggestionItems,
+    cursorAnchorX,
   } = useFilterEditor({ queryText, applyQueryText });
 
   useGlobalSlashFocus(editor);
@@ -55,7 +56,11 @@ export const ActiveSearchEditor: React.FC<ActiveSearchEditorProps> = ({
   return (
     <>
       <EditorContent editor={editor} />
-      <SuggestionDropdown ui={suggestion} onSelect={acceptSuggestion} />
+      <SuggestionDropdown
+        ui={suggestion}
+        onSelect={acceptSuggestion}
+        anchorX={cursorAnchorX}
+      />
     </>
   );
 };

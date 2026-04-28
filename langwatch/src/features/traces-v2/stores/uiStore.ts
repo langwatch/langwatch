@@ -2,9 +2,11 @@ import { create } from "zustand";
 
 interface UIState {
   sidebarCollapsed: boolean;
+  syntaxHelpOpen: boolean;
 
   toggleSidebar: () => void;
   setSidebarCollapsed: (collapsed: boolean) => void;
+  setSyntaxHelpOpen: (open: boolean) => void;
 }
 
 const STORAGE_KEY = "langwatch:traces-v2:ui";
@@ -42,6 +44,7 @@ const initial = loadPersistedUI();
 
 export const useUIStore = create<UIState>((set, get) => ({
   sidebarCollapsed: initial.sidebarCollapsed,
+  syntaxHelpOpen: false,
 
   toggleSidebar: () => {
     const next = !get().sidebarCollapsed;
@@ -53,4 +56,6 @@ export const useUIStore = create<UIState>((set, get) => ({
     persistUI({ sidebarCollapsed: collapsed });
     set({ sidebarCollapsed: collapsed });
   },
+
+  setSyntaxHelpOpen: (open) => set({ syntaxHelpOpen: open }),
 }));

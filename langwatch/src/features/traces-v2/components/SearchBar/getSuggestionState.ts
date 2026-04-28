@@ -22,6 +22,12 @@ export function getSuggestionState(
   text: string,
   cursorPos: number,
 ): SuggestionState {
+  // Empty/whitespace-only input — open in field mode on focus so users can
+  // discover available fields without having to type a leading character.
+  if (text.trim().length === 0) {
+    return { open: true, mode: "field", query: "", tokenStart: 0 };
+  }
+
   const wordStart = findActiveTokenStart(text, cursorPos);
 
   // Only consume chars that are actually behind the cursor. When cursor sits

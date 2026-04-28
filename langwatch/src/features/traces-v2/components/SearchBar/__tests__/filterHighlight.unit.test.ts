@@ -191,9 +191,11 @@ describe("buildDecorationPlan — wildcard + boolean cases", () => {
   });
 
   describe("given an unquoted value followed immediately by AND with no space", () => {
-    it("matches the entire run as one regex-fallback token (this is the failure mode the user can produce by accidentally eating the space)", () => {
-      // Sanity check: this documents what a missing space looks like, so a
-      // future regression that ate the user's space would show up here.
+    it("parses as one Tag whose value contains the literal `AND` — liqe doesn't strip operator-shaped substrings from inside unquoted values", () => {
+      // This is the silent-failure mode: if the user's space gets eaten,
+      // `model:gpt-*AND` round-trips to a Tag with value `gpt-*AND`, no
+      // AND keyword recognised. The test pins that behaviour so a future
+      // regression that DOES strip the space would show up loudly.
       const plan = buildDecorationPlan("model:gpt-*AND");
       const tokenSlots = plan.slots.filter((s) =>
         s.className.includes("filter-token"),
@@ -201,6 +203,13 @@ describe("buildDecorationPlan — wildcard + boolean cases", () => {
       expect(tokenSlots).toEqual([
         { from: 0, to: 14, className: "filter-token" },
       ]);
+      expect(plan.tokens).toEqual([
+        { start: 0, end: 14, field: "model", value: "gpt-*AND" },
+      ]);
+      // No AND keyword decoration — there is no boolean operator in the AST.
+      expect(
+        plan.slots.some((s) => s.className.includes("filter-keyword-and")),
+      ).toBe(false);
     });
   });
 });

@@ -86,7 +86,7 @@ describe("handleKey", () => {
           kind: "accept",
           tokenStart: 0,
           tokenEnd: 11,
-          replacement: "status:error ",
+          replacement: "status:error\u00A0",
           reopenInValueMode: false,
         });
       });
@@ -366,7 +366,7 @@ describe("handleKey", () => {
           kind: "accept",
           tokenStart: 18,
           tokenEnd: 29,
-          replacement: "status:error ",
+          replacement: "status:error\u00A0",
           reopenInValueMode: false,
         });
       });

@@ -156,9 +156,16 @@ export function buildDecorationPlan(
   text: string,
   baseOffset = 0,
 ): DecorationPlan {
-  const trimmed = text.trim();
+  // The editor stores U+00A0 NBSP (we insert it after a value-accept so the
+  // browser doesn't collapse the trailing space). Normalise to regular space
+  // before parsing so liqe sees a token boundary — otherwise the `AND`
+  // typed after the accept glues into the previous Tag's value. Locations
+  // returned from liqe are still character indices in the normalised
+  // string, which has the same length as the original (1:1 substitution).
+  const normalized = text.replace(/\u00A0/g, " ");
+  const trimmed = normalized.trim();
   if (!trimmed) return { slots: [], tokens: [], leadingWs: 0 };
-  const leadingWs = text.length - text.trimStart().length;
+  const leadingWs = normalized.length - normalized.trimStart().length;
   try {
     const ast = liqeParse(trimmed);
     const plan: DecorationPlan = { slots: [], tokens: [], leadingWs };
@@ -166,7 +173,7 @@ export function buildDecorationPlan(
     return plan;
   } catch {
     return {
-      slots: regexFallback(text, baseOffset),
+      slots: regexFallback(normalized, baseOffset),
       tokens: [],
       leadingWs,
     };
@@ -199,38 +206,53 @@ function createDeleteWidget(token: TokenRef): HTMLElement {
   return btn;
 }
 
+function computeDecorations(doc: import("@tiptap/pm/model").Node): DecorationSet {
+  const decorations: Decoration[] = [];
+  doc.descendants((node, pos) => {
+    if (!node.isText || !node.text) return;
+    const plan = buildDecorationPlan(node.text, pos);
+    for (const slot of plan.slots) {
+      decorations.push(
+        Decoration.inline(slot.from, slot.to, { class: slot.className }),
+      );
+    }
+    for (const token of plan.tokens) {
+      const widgetPos = pos + plan.leadingWs + token.end;
+      decorations.push(
+        Decoration.widget(widgetPos, () => createDeleteWidget(token), {
+          side: 1,
+          ignoreSelection: true,
+        }),
+      );
+    }
+  });
+  return DecorationSet.create(doc, decorations);
+}
+
 export const FilterHighlight = Extension.create({
   name: "filterHighlight",
 
   addProseMirrorPlugins() {
+    const key = new PluginKey<DecorationSet>("filterHighlight");
     return [
-      new Plugin({
-        key: new PluginKey("filterHighlight"),
+      new Plugin<DecorationSet>({
+        key,
+        // Cache decorations in plugin state. Reuse them across selection-only
+        // transactions (cursor moves, focus changes) — the parse + decorate
+        // pass is the expensive bit and shouldn't run when the text hasn't
+        // changed. Cuts perceived typing lag dramatically.
+        state: {
+          init(_config, state) {
+            return computeDecorations(state.doc);
+          },
+          apply(tr, prev) {
+            if (!tr.docChanged) return prev;
+            return computeDecorations(tr.doc);
+          },
+        },
         props: {
           decorations(state) {
-            const decorations: Decoration[] = [];
-            state.doc.descendants((node, pos) => {
-              if (!node.isText || !node.text) return;
-              const plan = buildDecorationPlan(node.text, pos);
-              for (const slot of plan.slots) {
-                decorations.push(
-                  Decoration.inline(slot.from, slot.to, {
-                    class: slot.className,
-                  }),
-                );
-              }
-              for (const token of plan.tokens) {
-                // Token coords are in trimmed-text space; convert to doc pos.
-                const widgetPos = pos + plan.leadingWs + token.end;
-                decorations.push(
-                  Decoration.widget(widgetPos, () => createDeleteWidget(token), {
-                    side: 1,
-                    ignoreSelection: true,
-                  }),
-                );
-              }
-            });
-            return DecorationSet.create(state.doc, decorations);
+            return key.getState(state) ?? DecorationSet.empty;
           },
         },
       }),

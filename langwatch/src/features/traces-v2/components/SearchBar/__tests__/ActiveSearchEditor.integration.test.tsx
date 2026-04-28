@@ -108,18 +108,25 @@ describe("ActiveSearchEditor rendered DOM", () => {
   });
 
   describe("given a value glued to AND with no space (regression case)", () => {
-    it("falls back to the regex highlighter and renders the whole run as one token — surfacing the missing-space bug visually", async () => {
-      // If the user's space ever gets eaten on the way into the editor, this
-      // is what the DOM looks like: one merged token spanning the entire run.
-      // The test documents that failure mode so a future regression is loud.
+    it("renders the whole run as one merged token — liqe accepts `AND` inside an unquoted value, so a missing space silently fuses the clauses", async () => {
+      // Liqe parses `model:gpt-*AND` as a single Tag whose value is the
+      // literal string `gpt-*AND`. There's no AND keyword decoration because
+      // the parser never saw a boolean operator. This is the failure mode
+      // the user reported — a missing space corrupts the entire query.
       renderEditor("model:gpt-*AND");
       const editor = await waitForEditor();
 
       const tokens = editor.querySelectorAll(".filter-token");
       expect(tokens).toHaveLength(1);
       expect(tokens[0]?.textContent).toBe("model:gpt-*AND");
-      // Regex fallback doesn't emit AST widgets.
-      expect(editor.querySelectorAll("[data-filter-delete]")).toHaveLength(0);
+
+      // No AND keyword decoration — there's no boolean operator in the AST.
+      expect(editor.querySelector(".filter-keyword-and")).toBeNull();
+
+      // The single tag still gets a widget — it's a valid (if accidentally
+      // glued) tag from the parser's perspective.
+      const deleteWidget = editor.querySelector("[data-filter-delete]");
+      expect(deleteWidget?.getAttribute("data-value")).toBe("gpt-*AND");
     });
   });
 

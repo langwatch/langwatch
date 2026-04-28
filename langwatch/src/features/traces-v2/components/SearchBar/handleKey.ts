@@ -48,9 +48,15 @@ function acceptAction(
     tokenEnd,
     // Trailing space lets the user start the next clause without manually
     // separating, and visually pushes the cursor past the per-token X widget.
-    // The space-swallow rule in `useFilterEditor` handles any redundant
-    // space the user types defensively.
-    replacement: `${ctx.suggestion.field}${FIELD_VALUE_SEPARATOR}${highlighted} `,
+    //
+    // We insert U+00A0 (NBSP) instead of a regular space because
+    // contenteditable normalisation eats trailing regular spaces at the
+    // end of a text node when the user types the next character —
+    // `origin:evaluation ` + `A` becomes `origin:evaluationA` (no space).
+    // NBSP survives that round-trip. The parser converts NBSP → space in
+    // `stripAtSigils`, so the user sees a space, ProseMirror keeps the
+    // char, and liqe splits the clauses correctly.
+    replacement: `${ctx.suggestion.field}${FIELD_VALUE_SEPARATOR}${highlighted}\u00A0`,
     reopenInValueMode: false,
   };
 }

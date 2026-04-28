@@ -4,8 +4,13 @@ import { getSuggestionState } from "../getSuggestionState";
 describe("getSuggestionState", () => {
   describe("given an empty editor", () => {
     describe("when the cursor is at position 0", () => {
-      it("returns closed", () => {
-        expect(getSuggestionState("", 0)).toEqual({ open: false });
+      it("opens in field mode with empty query so the dropdown can list all fields on focus", () => {
+        expect(getSuggestionState("", 0)).toEqual({
+          open: true,
+          mode: "field",
+          query: "",
+          tokenStart: 0,
+        });
       });
     });
   });

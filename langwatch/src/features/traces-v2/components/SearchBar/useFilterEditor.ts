@@ -74,6 +74,12 @@ interface FilterEditorApi {
    * items computed from `FIELD_VALUES`.
    */
   overrideSuggestionItems: (next: DynamicSuggestionItems | null) => void;
+  /**
+   * Horizontal offset (px) from the search bar's left edge to the cursor's
+   * current screen position. Drives the dropdown's anchor so it sits under
+   * the active token, not back at column 0.
+   */
+  cursorAnchorX: number;
 }
 
 export function useFilterEditor({
@@ -84,6 +90,7 @@ export function useFilterEditor({
   const [suggestion, setSuggestion] =
     useState<SuggestionUIState>(CLOSED_SUGGESTION);
   const [dropdownDismissed, setDropdownDismissed] = useState(false);
+  const [cursorAnchorX, setCursorAnchorX] = useState(0);
 
   const editorRef = useRef<Editor | null>(null);
   const isProgrammaticRef = useRef(false);
@@ -91,6 +98,32 @@ export function useFilterEditor({
   const applyQueryTextRef = useLatestRef(applyQueryText);
   const suggestionRef = useLatestRef(suggestion);
   const dismissedRef = useLatestRef(dropdownDismissed);
+  // Defer `applyQueryText` to the next animation frame so the keystroke
+  // handler returns immediately. Coalesces multiple keystrokes that land
+  // in the same frame into one parse+serialize pass.
+  const pendingCommitRef = useRef<number | null>(null);
+  const lastCommittedTextRef = useRef<string>("");
+  const scheduleCommit = useCallback((text: string) => {
+    if (pendingCommitRef.current !== null) return;
+    pendingCommitRef.current = requestAnimationFrame(() => {
+      pendingCommitRef.current = null;
+      // Read the current editor text rather than the captured one — typing
+      // while a frame is queued may have produced more characters.
+      const fresh = editorRef.current?.getText() ?? text;
+      if (fresh === lastCommittedTextRef.current) return;
+      lastCommittedTextRef.current = fresh;
+      applyQueryTextRef.current(fresh);
+    });
+  }, [applyQueryTextRef]);
+  // Cancel any pending commit on unmount so we don't write stale text.
+  useEffect(
+    () => () => {
+      if (pendingCommitRef.current !== null) {
+        cancelAnimationFrame(pendingCommitRef.current);
+      }
+    },
+    [],
+  );
 
   const refreshSuggestion = useCallback(
     (editor: Editor) => {
@@ -102,8 +135,6 @@ export function useFilterEditor({
       if (trigger !== null) {
         const fromTrigger = suggestionFromTrigger(text, cursorPos, trigger);
         if (fromTrigger === null) {
-          // Cursor moved before the anchor, or a terminator entered the
-          // segment — the trigger is no longer live.
           triggerPosRef.current = null;
           state = getSuggestionState(text, cursorPos);
         } else {
@@ -113,10 +144,22 @@ export function useFilterEditor({
         state = getSuggestionState(text, cursorPos);
       }
 
-      // Escape is sticky for the session — `dismissedRef` only clears on blur,
-      // reset, or a fresh `@` trigger. We no longer auto-clear it when the
-      // suggestion happens to close, otherwise Escape would only mute the
-      // dropdown until the next keystroke.
+      // Cursor screen position drives the dropdown anchor. Only measure
+      // when the dropdown is actually open — `coordsAtPos` forces layout
+      // and isn't worth running when nothing's going to render.
+      if (state.open) {
+        try {
+          const view = editor.view;
+          const editorRect = view.dom.getBoundingClientRect();
+          const coords = view.coordsAtPos(editor.state.selection.from);
+          setCursorAnchorX(coords.left - editorRect.left);
+        } catch {
+          // coordsAtPos can throw if the doc isn't yet mounted; ignore.
+        }
+      }
+
+      // Escape is sticky for the session — `dismissedRef` only clears on
+      // blur, reset, or a fresh `@` trigger.
       if (dismissedRef.current && state.open) {
         setSuggestion(CLOSED_SUGGESTION);
         return;
@@ -135,7 +178,7 @@ export function useFilterEditor({
       TiptapText,
       History,
       Placeholder.configure({
-        placeholder: "Filter traces… type a field name free text",
+        placeholder: "Search filters, free text, or Ask AI…",
       }),
       FilterHighlight,
     ],
@@ -144,6 +187,11 @@ export function useFilterEditor({
       if (isProgrammaticRef.current) return;
       setHasContent(ed.getText().length > 0);
       refreshSuggestion(ed);
+      // Live-commit, but deferred via rAF so the keystroke handler returns
+      // before liqe runs. Multiple keystrokes in one frame coalesce into a
+      // single parse+serialize pass. The sync effect below tolerates NBSP/
+      // trim differences so the editor's trailing NBSP isn't clobbered.
+      scheduleCommit(ed.getText());
     },
     onSelectionUpdate: ({ editor: ed }) => {
       if (isProgrammaticRef.current) return;
@@ -266,16 +314,31 @@ export function useFilterEditor({
       const end = Number(btn.dataset.locEnd);
       if (!Number.isFinite(start) || !Number.isFinite(end)) return;
       const next = removeNodeAtLocation(editor.getText(), start, end);
+      // Update the editor directly — the sync effect skips while focused
+      // (so it doesn't race with typing), so a delete from a still-focused
+      // editor would otherwise leave the visible content stale until blur.
+      isProgrammaticRef.current = true;
+      editor.commands.setContent(buildDocument(next));
+      isProgrammaticRef.current = false;
+      lastCommittedTextRef.current = next;
       applyQueryTextRef.current(next);
     };
     dom.addEventListener("mousedown", handler);
     return () => dom.removeEventListener("mousedown", handler);
   }, [editor, applyQueryTextRef]);
 
-  // Sync external query changes back into the editor.
+  // Sync external query changes back into the editor. Only runs while the
+  // editor is NOT focused — while focused, the editor is the source of
+  // truth and clobbering its content (via setContent) would race with
+  // in-flight typing and drop characters. When the store changes from
+  // outside (URL load, clear button, X-widget delete), the editor is
+  // unfocused or the call is paired with a re-mount.
   useEffect(() => {
     if (!editor || editor.isDestroyed) return;
-    if (editor.getText() === queryText) return;
+    if (editor.isFocused) return;
+    const normalize = (s: string): string =>
+      s.replace(/\u00A0/g, " ").trim();
+    if (normalize(editor.getText()) === normalize(queryText)) return;
     isProgrammaticRef.current = true;
     editor.commands.setContent(buildDocument(queryText));
     setHasContent(queryText.length > 0);
@@ -338,5 +401,6 @@ export function useFilterEditor({
     acceptSuggestion,
     reset,
     overrideSuggestionItems,
+    cursorAnchorX,
   };
 }

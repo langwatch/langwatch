@@ -1,8 +1,41 @@
 import { Box } from "@chakra-ui/react";
 import type React from "react";
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
+import { buildDecorationPlan } from "./filterHighlight";
 
-const PLACEHOLDER_TEXT = "Filter traces… type a field name or free text";
+const PLACEHOLDER_TEXT = "Search filters, free text, or Ask AI…";
+
+interface DecoratedSegment {
+  text: string;
+  className?: string;
+}
+
+/**
+ * Slice the query into segments matching the decoration plan, so the
+ * placeholder mirrors the same syntax-highlighted look as the live editor.
+ * Segments without a className render as plain text. Sigh-of-relief
+ * substitution keeps decorations visible even when the user clicks away.
+ */
+function buildSegments(text: string): DecoratedSegment[] {
+  if (!text) return [];
+  const plan = buildDecorationPlan(text);
+  // Sort slots by `from` so we can splice the original text linearly.
+  const slots = [...plan.slots].sort((a, b) => a.from - b.from);
+  const out: DecoratedSegment[] = [];
+  let cursor = 0;
+  for (const slot of slots) {
+    if (slot.from < cursor) continue; // overlap (rare); skip
+    if (slot.from > cursor) {
+      out.push({ text: text.slice(cursor, slot.from) });
+    }
+    out.push({ text: text.slice(slot.from, slot.to), className: slot.className });
+    cursor = slot.to;
+  }
+  if (cursor < text.length) {
+    out.push({ text: text.slice(cursor) });
+  }
+  return out;
+}
 
 interface PlaceholderEditorProps {
   queryText: string;
@@ -39,6 +72,7 @@ export const PlaceholderEditor: React.FC<PlaceholderEditorProps> = ({
   }, [onActivate]);
 
   const isEmpty = queryText.length === 0;
+  const segments = useMemo(() => buildSegments(queryText), [queryText]);
 
   return (
     <Box
@@ -57,7 +91,17 @@ export const PlaceholderEditor: React.FC<PlaceholderEditorProps> = ({
       cursor="text"
       color={isEmpty ? "fg.subtle" : undefined}
     >
-      {isEmpty ? PLACEHOLDER_TEXT : queryText}
+      {isEmpty
+        ? PLACEHOLDER_TEXT
+        : segments.map((seg, i) =>
+            seg.className ? (
+              <span key={i} className={seg.className}>
+                {seg.text}
+              </span>
+            ) : (
+              <span key={i}>{seg.text}</span>
+            ),
+          )}
     </Box>
   );
 };

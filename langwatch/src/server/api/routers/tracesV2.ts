@@ -5,6 +5,10 @@ import {
 } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
 import { TraceNotFoundError } from "~/server/app-layer/traces/errors";
+import {
+  generateTraceQueryFromPrompt,
+  generateTraceAction,
+} from "~/server/app-layer/traces/ai-query";
 import { translateFilterToClickHouse } from "~/server/app-layer/traces/filter-to-clickhouse";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type { SpanSummaryRow } from "~/server/app-layer/traces/repositories/span-storage.repository";
@@ -390,6 +394,44 @@ export const tracesV2Router = createTRPCRouter({
         prefix: input.prefix,
         limit: input.limit,
         offset: input.offset,
+      });
+    }),
+
+  aiQuery: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        prompt: z.string().min(1).max(2000),
+        timeRange: timeRangeSchema,
+      }),
+    )
+    .use(checkProjectPermission("traces:view"))
+    .mutation(async ({ input }) => {
+      return generateTraceQueryFromPrompt({
+        projectId: input.projectId,
+        prompt: input.prompt,
+        timeRange: { from: input.timeRange.from, to: input.timeRange.to },
+      });
+    }),
+
+  // Higher-level AI action — the model picks between filtering and creating
+  // a saved lens. The composer in the search bar uses this so users can
+  // say "save as Failing GPT-4" and get a new tab, or "show errors" and
+  // just get a query applied.
+  aiAction: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        prompt: z.string().min(1).max(2000),
+        timeRange: timeRangeSchema,
+      }),
+    )
+    .use(checkProjectPermission("traces:view"))
+    .mutation(async ({ input }) => {
+      return generateTraceAction({
+        projectId: input.projectId,
+        prompt: input.prompt,
+        timeRange: { from: input.timeRange.from, to: input.timeRange.to },
       });
     }),
 

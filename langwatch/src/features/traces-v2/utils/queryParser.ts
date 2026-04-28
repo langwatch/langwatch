@@ -68,18 +68,28 @@ export class ParseError extends Error {
 const TOKEN_START_PRECEDERS = new Set([" ", "\t", "\n", "("]);
 
 /**
- * Strip the `@` autocomplete trigger sigil before parsing. The `@` opens the
- * suggestion dropdown but is not valid liqe syntax — once the user submits,
- * any stray triggers need to be removed. Only strip `@` at token-start
- * positions and outside quoted strings, so a literal `@` inside a value like
- * `"user@example.com"` is preserved.
+ * Strip the `@` autocomplete trigger sigil before parsing AND normalise
+ * U+00A0 NBSP → regular space. Both are silent failure modes:
+ *   - `@` is the dropdown sigil; liqe doesn't accept it as a field-name
+ *     prefix, so any stray `@` (e.g. typed before the interceptor caught
+ *     up, or pasted in) would 422 the backend.
+ *   - NBSP can leak in via clipboard pastes, IME, or rich-text auto-format
+ *     of suggestion replacements. Liqe doesn't treat NBSP as whitespace,
+ *     so `field:value\u00A0AND` parses as one Tag with value
+ *     `value\u00A0AND` — silently fusing two clauses.
+ *
+ * Only strip `@` at token-start positions and outside quoted strings, so a
+ * literal `@` inside a value like `"user@example.com"` is preserved.
  */
 export function stripAtSigils(text: string): string {
+  // Replace any NBSP with regular space first — uniform treatment from
+  // here on, and the @-strip pass needs to see the post-replacement chars.
+  const normalized = text.replace(/\u00A0/g, " ");
   let out = "";
   let inQuotes = false;
   let quoteChar = "";
-  for (let i = 0; i < text.length; i++) {
-    const ch = text[i] as string;
+  for (let i = 0; i < normalized.length; i++) {
+    const ch = normalized[i] as string;
     if (inQuotes) {
       out += ch;
       if (ch === quoteChar) inQuotes = false;
@@ -92,7 +102,7 @@ export function stripAtSigils(text: string): string {
       continue;
     }
     if (ch === "@") {
-      const prev = i === 0 ? undefined : text[i - 1];
+      const prev = i === 0 ? undefined : normalized[i - 1];
       if (prev === undefined || TOKEN_START_PRECEDERS.has(prev)) continue;
     }
     out += ch;
@@ -164,6 +174,9 @@ export const SEARCH_FIELDS: Readonly<Record<string, SearchFieldMeta>> = {
   tokens: { label: "Tokens", hasSidebar: true, facetField: "tokens", valueType: "range" },
   spans: { label: "Span Count", hasSidebar: true, facetField: "spans", valueType: "range" },
   prompt: { label: "Prompt ID", hasSidebar: false, valueType: "text" },
+  selectedPrompt: { label: "Selected prompt", hasSidebar: true, facetField: "selectedPrompt", valueType: "categorical" },
+  lastUsedPrompt: { label: "Last used prompt", hasSidebar: true, facetField: "lastUsedPrompt", valueType: "categorical" },
+  promptVersion: { label: "Prompt version", hasSidebar: true, facetField: "promptVersion", valueType: "range" },
   user: { label: "User", hasSidebar: false, valueType: "text" },
   conversation: { label: "Conversation", hasSidebar: false, valueType: "text" },
   scenario: { label: "Scenario", hasSidebar: false, valueType: "text" },
@@ -210,7 +223,7 @@ const HAS_NONE_VALUES: string[] = [
 /** Known values for autocomplete suggestions. */
 export const FIELD_VALUES: Record<string, string[]> = {
   status: ["error", "warning", "ok"],
-  origin: ["application", "simulation", "evaluation"],
+  origin: ["application", "simulation", "evaluation", "sample"],
   has: HAS_NONE_VALUES,
   none: HAS_NONE_VALUES,
   scenarioVerdict: ["success", "failure", "inconclusive"],
