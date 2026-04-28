@@ -76,9 +76,12 @@ func executeSyncHandler(application *app.App) http.HandlerFunc {
 		if req.Origin != "" {
 			ctx = withOrigin(ctx, req.Origin)
 		}
+		ctx, span := startStudioSpan(ctx, "nlpgo.studio.execute_sync", req, req.APIKey)
+		defer span.End()
 		clog.Get(ctx).Info("execute_flow_received")
 		result, err := executor.Execute(ctx, *req)
 		if err != nil {
+			span.RecordError(err)
 			herr.WriteHTTP(w, herr.New(r.Context(), domain.ErrBadRequest, herr.M{
 				"reason": "engine_error",
 			}, err))
@@ -137,12 +140,18 @@ func decodeStudioClientEvent(r *http.Request, body []byte) (*app.WorkflowRequest
 	}
 
 	var inner struct {
-		TraceID   string          `json:"trace_id"`
-		ThreadID  string          `json:"thread_id,omitempty"`
-		Workflow  json.RawMessage `json:"workflow"`
-		Inputs    any             `json:"inputs,omitempty"`
-		Origin    string          `json:"origin,omitempty"`
-		ProjectID string          `json:"project_id,omitempty"`
+		TraceID  string          `json:"trace_id"`
+		ThreadID string          `json:"thread_id,omitempty"`
+		Workflow json.RawMessage `json:"workflow"`
+		Inputs   any             `json:"inputs,omitempty"`
+		Origin   string          `json:"origin,omitempty"`
+		// NodeID names the single node targeted by execute_component.
+		// Studio's "Run with manual input" sends Inputs as the typed
+		// values for THIS node, not as Entry-node outputs — see
+		// langwatch/src/optimization_studio/hooks/useComponentExecution.ts.
+		// Absent for execute_flow / execute_evaluation.
+		NodeID    string `json:"node_id,omitempty"`
+		ProjectID string `json:"project_id,omitempty"`
 	}
 	if err := json.Unmarshal(innerBytes, &inner); err != nil {
 		e := herr.New(r.Context(), domain.ErrBadRequest, herr.M{
@@ -172,7 +181,28 @@ func decodeStudioClientEvent(r *http.Request, body []byte) (*app.WorkflowRequest
 		TraceID:      inner.TraceID,
 		ProjectID:    inner.ProjectID,
 		ThreadID:     threadID,
+		NodeID:       inner.NodeID,
+		APIKey:       peekWorkflowAPIKey(inner.Workflow),
 	}, nil
+}
+
+// peekWorkflowAPIKey extracts the `api_key` field from raw workflow
+// JSON without parsing the full Workflow struct (a fully-typed parse
+// happens later in cmd/engine_adapter). The handler needs the key
+// up-front to seed the OTel context for its top-level span — without
+// it, the TenantRouter drops the span and the trace is missing the
+// root.
+func peekWorkflowAPIKey(raw json.RawMessage) string {
+	if len(raw) == 0 {
+		return ""
+	}
+	var peek struct {
+		APIKey string `json:"api_key"`
+	}
+	if err := json.Unmarshal(raw, &peek); err != nil {
+		return ""
+	}
+	return peek.APIKey
 }
 
 // peekStudioControlEventType returns "is_alive" or "stop_execution"
@@ -302,6 +332,8 @@ func executeStreamHandler(application *app.App) http.HandlerFunc {
 		if req.Origin != "" {
 			ctx = withOrigin(ctx, req.Origin)
 		}
+		ctx, span := startStudioSpan(ctx, "nlpgo.studio.execute_stream", req, req.APIKey)
+		defer span.End()
 		clog.Get(ctx).Info("execute_flow_received", zap.Bool("stream", true))
 
 		flusher, ok := w.(http.Flusher)

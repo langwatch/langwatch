@@ -80,9 +80,12 @@ func New(opts Options) *Engine {
 // ExecuteRequest is what the handler hands to the engine per call.
 type ExecuteRequest struct {
 	Workflow *dsl.Workflow
-	// Inputs, if non-nil, provide entry-node outputs explicitly and
-	// bypass dataset materialization. For dataset-driven runs leave
-	// nil and the engine reads workflow.nodes[entry].dataset.inline.
+	// Inputs, if non-nil, provide either entry-node outputs (for
+	// execute_flow / execute_evaluation, when NodeID is empty) or the
+	// target node's manual inputs (for execute_component, when NodeID
+	// names that target). The Studio "Run with manual input" flow
+	// types into a node's input panel and clicks Execute → the
+	// values land here keyed by input identifier.
 	Inputs    map[string]any
 	Origin    string
 	TraceID   string
@@ -94,6 +97,13 @@ type ExecuteRequest struct {
 	// the `X-LangWatch-Thread-Id` header so the receiving services can
 	// stamp it onto the spans they emit.
 	ThreadID string
+	// NodeID, when non-empty, signals the Studio execute_component
+	// flow: Inputs are the user-typed values for the named node, fed
+	// in directly (bypassing edge-based resolution). Empty means
+	// execute_flow / execute_evaluation, where Inputs are entry-node
+	// outputs and propagate via edges. Mirrors Python's
+	// `ExecuteComponentPayload.node_id` (langwatch_nlp/studio/app.py).
+	NodeID string
 }
 
 // ExecuteResult is what the engine returns. It mirrors the Python
@@ -152,6 +162,7 @@ func (e *Engine) Execute(ctx context.Context, req ExecuteRequest) (*ExecuteResul
 		return nil, err
 	}
 	state := newRunState(req.Workflow)
+	applyManualInputs(state, req)
 	started := time.Now()
 	for _, layer := range plan.Layers {
 		if err := ctx.Err(); err != nil {
@@ -175,9 +186,11 @@ func (e *Engine) runLayer(ctx context.Context, req ExecuteRequest, plan *planner
 			node := state.nodes[nodeID]
 			inputs := state.resolveInputs(plan, nodeID)
 			ns := &NodeState{ID: nodeID, Status: "running", Inputs: inputs}
+			nodeCtx, span := startNodeSpan(ctx, node, req)
 			started := time.Now()
-			outputs, derr := e.dispatch(ctx, req, node, inputs, ns)
+			outputs, derr := e.dispatch(nodeCtx, req, node, inputs, ns)
 			ns.DurationMS = time.Since(started).Milliseconds()
+			endNodeSpan(span, ns, derr)
 			if derr != nil {
 				ns.Status = "error"
 				ns.Error = derr
@@ -227,7 +240,12 @@ func (e *Engine) runEntry(node *dsl.Node, req ExecuteRequest) (map[string]any, *
 	// means "use the workflow's dataset", not "set entry outputs to
 	// the empty map". Only honor explicit non-empty inputs as a
 	// dataset override.
-	if len(req.Inputs) > 0 {
+	//
+	// When NodeID is set (execute_component) the inputs belong to that
+	// target node, NOT to entry — runState.resolveInputs short-circuits
+	// for the target. Entry must fall through to dataset materialization
+	// here so it doesn't accidentally swallow the user's per-node typing.
+	if len(req.Inputs) > 0 && req.NodeID == "" {
 		return req.Inputs, nil
 	}
 	if node.Data.Dataset == nil || node.Data.Dataset.Inline == nil {
@@ -625,6 +643,20 @@ func (e *Engine) runAgentWorkflow(ctx context.Context, req ExecuteRequest, node 
 	return map[string]any{"value": res.Result}, nil
 }
 
+// applyManualInputs primes runState with the inbound execute_component
+// payload's `node_id` + `inputs` so resolveInputs can short-circuit for
+// the target node. Both Execute and ExecuteStream MUST call this — the
+// streaming path forgot it once already (Bug 1, ash-detected via Studio
+// dogfood) and the symptom (Code.__call__() missing input) was bizarre.
+// Helper exists to keep that parity from drifting again.
+func applyManualInputs(state *runState, req ExecuteRequest) {
+	if req.NodeID == "" || len(req.Inputs) == 0 {
+		return
+	}
+	state.manualInputsTarget = req.NodeID
+	state.manualInputs = req.Inputs
+}
+
 // runState aggregates per-node outputs and tracks the first error
 // observed. It is the engine's equivalent of WorkflowState.execution.
 type runState struct {
@@ -639,6 +671,12 @@ type runState struct {
 	// resolveInputs can rename outputs.<source_name> → inputs.<target_name>
 	// per Studio's wire convention.
 	edgesByTarget map[string][]dsl.Edge
+	// manualInputsTarget + manualInputs back the Studio
+	// execute_component flow: when manualInputsTarget == nodeID,
+	// resolveInputs returns manualInputs directly instead of walking
+	// inbound edges. Both are zero-valued for execute_flow runs.
+	manualInputsTarget string
+	manualInputs       map[string]any
 }
 
 func newRunState(w *dsl.Workflow) *runState {
@@ -702,6 +740,17 @@ func (r *runState) resolveInputs(_ *planner.Plan, id string) map[string]any {
 	// principle return a half-written upstream output map under load.
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	// execute_component: return the user's manual inputs verbatim for
+	// the named target. Skips edge resolution entirely so a fresh-dragged
+	// node with no Entry→target wiring still receives the typed values.
+	// `Code.__call__()` missing-positional-arg errors traced back here.
+	if id == r.manualInputsTarget && r.manualInputs != nil {
+		copied := make(map[string]any, len(r.manualInputs))
+		for k, v := range r.manualInputs {
+			copied[k] = v
+		}
+		return copied
+	}
 	edges := r.edgesByTarget[id]
 	for _, e := range edges {
 		parentOut, ok := r.outputs[e.Source]

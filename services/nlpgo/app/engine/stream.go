@@ -51,6 +51,7 @@ func (e *Engine) ExecuteStream(ctx context.Context, req ExecuteRequest, opts Exe
 		return nil, err
 	}
 	state := newRunState(req.Workflow)
+	applyManualInputs(state, req)
 
 	out := make(chan StreamEvent, 16)
 	go func() {
@@ -109,9 +110,11 @@ func (e *Engine) runLayerStream(ctx context.Context, req ExecuteRequest, plan *p
 			inputs := state.resolveInputs(plan, nodeID)
 			ns := &NodeState{ID: nodeID, Status: "running", Inputs: inputs}
 			emit(ctx, out, stateEvent(traceID, nodeID, ns))
+			nodeCtx, span := startNodeSpan(ctx, node, req)
 			started := time.Now()
-			outputs, derr := e.dispatch(ctx, req, node, inputs, ns)
+			outputs, derr := e.dispatch(nodeCtx, req, node, inputs, ns)
 			ns.DurationMS = time.Since(started).Milliseconds()
+			endNodeSpan(span, ns, derr)
 			if derr != nil {
 				ns.Status = "error"
 				ns.Error = derr
@@ -188,11 +191,18 @@ func stateEvent(traceID, nodeID string, ns *NodeState) StreamEvent {
 		es["error"] = ns.Error.Message
 	}
 	if ns.DurationMS > 0 {
-		// Python emits `timestamps.{started_at, finished_at}` — we don't
-		// track absolute clock-times in NodeState yet, so emit a single
-		// finished_at = now and leave started_at to the running event.
+		// Studio's ExecutionOutputPanel renders the per-component
+		// duration via `<SpanDuration>` only when BOTH
+		// `timestamps.started_at` and `timestamps.finished_at` are set
+		// (`hasTiming = started_at && finished_at`). Derive started_at
+		// from finished_at − DurationMS rather than threading absolute
+		// clock-times through NodeState — the UI only uses the diff,
+		// and the wall-clock skew between the running and finished
+		// events is measured in microseconds.
+		finishedAt := time.Now().UnixMilli()
 		es["timestamps"] = map[string]any{
-			"finished_at": time.Now().UnixMilli(),
+			"started_at":  finishedAt - ns.DurationMS,
+			"finished_at": finishedAt,
 		}
 	}
 	return StreamEvent{

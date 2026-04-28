@@ -53,6 +53,22 @@ type WorkflowRequest struct {
 	TraceID      string
 	ProjectID    string
 	ThreadID     string
+	// NodeID, when non-empty, identifies the single node the Studio
+	// "Run with manual input" flow targets. In that mode `Inputs` are
+	// fed directly into the named node (bypassing edge-based input
+	// resolution) so users can exercise a node in isolation without
+	// wiring a parent Entry → target edge first. Empty means
+	// execute_flow / execute_evaluation, where Inputs go to the Entry
+	// node and propagate via edges.
+	NodeID string
+	// APIKey is `workflow.api_key` from the inbound payload — peeked
+	// out of WorkflowJSON at decode time so the request handler can
+	// stash it on the request context before creating its top-level
+	// OTel span. Without this, the handler-level span runs before the
+	// engine_adapter parses the workflow, so the TenantRouter has no
+	// api_key in context yet and drops the span. Engine-internal spans
+	// also use it for sibling-trace correlation.
+	APIKey string
 }
 
 // WorkflowResult is the engine's response, ready for JSON serialization.
