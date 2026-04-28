@@ -118,7 +118,9 @@ export function BelowFoldIndicator({
     el.addEventListener("scroll", onScroll, { passive: true });
     window.addEventListener("scroll", onScroll, true);
     window.addEventListener("resize", measure);
-    const ro = new ResizeObserver(measure);
+    const ro = new ResizeObserver(() => {
+      measure();
+    });
     ro.observe(el);
     if (el.firstElementChild) ro.observe(el.firstElementChild);
 
