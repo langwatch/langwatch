@@ -1,7 +1,9 @@
 import { Box } from "@chakra-ui/react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 const PRESS_FLASH_MS = 140;
+const DEMO_FIRST_DELAY_MS = 1500;
+const DEMO_INTERVAL_MS = 4000;
 
 /**
  * Normalises an arbitrary Kbd label into the `event.key` we'd see when the
@@ -45,12 +47,45 @@ function flattenChildrenToString(children: React.ReactNode): string {
   return "";
 }
 
-export function Kbd({ children }: { children: React.ReactNode }) {
+interface KbdProps {
+  children: React.ReactNode;
+  /**
+   * When true, the key auto-presses itself on a loop after a short delay so a
+   * reader who hasn't tried the keyboard yet still sees the flash. As soon as
+   * the reader presses the real key for themselves, the demo stops — they've
+   * "found" it.
+   */
+  demo?: boolean;
+  /** Override the demo interval (ms between auto-presses). */
+  demoEveryMs?: number;
+  /** Delay before the very first demo press fires. Useful for staggering. */
+  demoFirstDelayMs?: number;
+}
+
+export function Kbd({
+  children,
+  demo = false,
+  demoEveryMs = DEMO_INTERVAL_MS,
+  demoFirstDelayMs = DEMO_FIRST_DELAY_MS,
+}: KbdProps) {
   const [pressed, setPressed] = useState(false);
+  const [userPressed, setUserPressed] = useState(false);
+  const flashTimeoutRef = useRef<number | null>(null);
   const targetKey = useMemo(() => {
     const label = flattenChildrenToString(children);
     return deriveKey(label);
   }, [children]);
+
+  const flash = () => {
+    setPressed(true);
+    if (flashTimeoutRef.current != null) {
+      window.clearTimeout(flashTimeoutRef.current);
+    }
+    flashTimeoutRef.current = window.setTimeout(() => {
+      setPressed(false);
+      flashTimeoutRef.current = null;
+    }, PRESS_FLASH_MS);
+  };
 
   useEffect(() => {
     if (!targetKey) return;
@@ -59,12 +94,37 @@ export function Kbd({ children }: { children: React.ReactNode }) {
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       const got = e.key.length === 1 ? e.key.toLowerCase() : e.key;
       if (got !== expected) return;
-      setPressed(true);
-      window.setTimeout(() => setPressed(false), PRESS_FLASH_MS);
+      setUserPressed(true);
+      flash();
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, [targetKey]);
+
+  // Self-demo loop: runs only when `demo` is on and the user hasn't pressed
+  // the real key yet. First press happens after a short pause so the screen
+  // can settle, then it repeats on `demoEveryMs`.
+  useEffect(() => {
+    if (!demo || userPressed) return;
+    let intervalId: number | null = null;
+    const firstId = window.setTimeout(() => {
+      flash();
+      intervalId = window.setInterval(flash, demoEveryMs);
+    }, demoFirstDelayMs);
+    return () => {
+      window.clearTimeout(firstId);
+      if (intervalId != null) window.clearInterval(intervalId);
+    };
+  }, [demo, userPressed, demoEveryMs, demoFirstDelayMs]);
+
+  useEffect(
+    () => () => {
+      if (flashTimeoutRef.current != null) {
+        window.clearTimeout(flashTimeoutRef.current);
+      }
+    },
+    [],
+  );
 
   return (
     <Box

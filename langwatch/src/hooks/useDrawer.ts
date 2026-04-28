@@ -142,6 +142,51 @@ export const navigateToDrawer = (
 // ============================================================================
 
 /**
+ * Update individual `drawer.<key>` params in the URL without touching the
+ * rest of the query or replacing the open drawer. Returns a setter that
+ * accepts a partial update map; pass `undefined` to remove a key.
+ *
+ * Use `push: true` (default) so each call adds a browser history entry —
+ * back / forward then walks through the user's tab navigation. Pass
+ * `push: false` for silent updates (e.g. mirroring local state on mount).
+ */
+export const useUpdateDrawerParams = () => {
+  const router = useRouter();
+  return useCallback(
+    (
+      updates: Record<string, string | undefined>,
+      options: { push?: boolean } = {},
+    ) => {
+      const push = options.push ?? true;
+      const { path, queryString, hash } = splitAsPath(router.asPath);
+      const parsed = qs.parse(queryString, {
+        allowDots: true,
+        comma: true,
+        allowEmptyArrays: true,
+      }) as Record<string, unknown>;
+      const drawer = ((parsed.drawer as Record<string, unknown>) ?? {}) as Record<
+        string,
+        unknown
+      >;
+      for (const [key, value] of Object.entries(updates)) {
+        if (value === undefined) delete drawer[key];
+        else drawer[key] = value;
+      }
+      parsed.drawer = drawer;
+      const newQs = qs.stringify(parsed, {
+        allowDots: true,
+        arrayFormat: "comma",
+        // @ts-ignore - allowEmptyArrays exists
+        allowEmptyArrays: true,
+      });
+      const url = buildUrl(path, newQs, hash);
+      void router[push ? "push" : "replace"](url, undefined, { shallow: true });
+    },
+    [router],
+  );
+};
+
+/**
  * Get simple (serializable) drawer params from URL query.
  * Call this inside a component to get params like `category`, `evaluatorType`, etc.
  */

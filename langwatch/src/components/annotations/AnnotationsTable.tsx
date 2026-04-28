@@ -360,7 +360,7 @@ export const AnnotationsTable = ({
                     <Link
                       href="https://docs.langwatch.ai/features/annotations"
                       isExternal
-                      color="orange.400"
+                      color="orange.fg"
                     >
                       documentation
                     </Link>
@@ -423,7 +423,7 @@ export const AnnotationsTable = ({
                                 item.doneAt,
                               )
                             }
-                            backgroundColor={item.doneAt ? "gray.50" : "white"}
+                            backgroundColor={item.doneAt ? "bg.subtle" : "bg.panel"}
                             padding={2}
                           >
                             <Table.Cell>

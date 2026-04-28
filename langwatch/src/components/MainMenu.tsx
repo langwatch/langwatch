@@ -99,7 +99,24 @@ export const MainMenu = React.memo(function MainMenu({
           width={MENU_WIDTH_EXPANDED}
           justifyContent="space-between"
         >
-          <VStack width="full" gap={0.5} align="start">
+          <VStack
+            width="full"
+            gap={0.5}
+            align="start"
+            flex={1}
+            minHeight={0}
+            overflowY="auto"
+            overflowX="hidden"
+            css={{
+              scrollbarWidth: "thin",
+              "&::-webkit-scrollbar": { width: "4px" },
+              "&::-webkit-scrollbar-thumb": {
+                background: "var(--chakra-colors-border-emphasized)",
+                borderRadius: "2px",
+              },
+              "&::-webkit-scrollbar-track": { background: "transparent" },
+            }}
+          >
             <PageMenuLink
               path={projectRoutes.home.path}
               icon={featureIcons.home.icon}

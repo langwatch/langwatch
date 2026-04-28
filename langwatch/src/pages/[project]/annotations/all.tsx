@@ -185,7 +185,6 @@ export default function Annotations() {
       </Heading>
       <Spacer />
       <Button
-        colorPalette="black"
         minWidth="fit-content"
         variant="ghost"
         onClick={() => downloadCSV()}
