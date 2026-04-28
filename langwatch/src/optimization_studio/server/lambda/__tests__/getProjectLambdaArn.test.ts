@@ -45,14 +45,16 @@ describe("getProjectLambdaArn", () => {
     });
   });
 
-  describe("createLambdaClient", () => {
-    it("configures maxAttempts above SDK default to ride out cold-start TooManyRequests bursts", async () => {
-      const client = createLambdaClient();
-      // SDK default is 3; we override to 6. Verifies the override is wired
-      // through to the AWS SDK config so the cold-start regression that hit
-      // prod on 2026-04-28 (account-level concurrency exhaustion → "Rate
-      // Exceeded.") doesn't surface to Studio after 3 retries.
-      expect(await client.config.maxAttempts()).toBeGreaterThanOrEqual(6);
+  describe("given a Lambda client", () => {
+    describe("when constructed via createLambdaClient", () => {
+      it("configures maxAttempts above SDK default to ride out cold-start TooManyRequests bursts", async () => {
+        const client = createLambdaClient();
+        // SDK default is 3; we override to 6. Verifies the override is wired
+        // through to the AWS SDK config so the cold-start regression that
+        // hit prod on 2026-04-28 (account-level concurrency exhaustion →
+        // "Rate Exceeded.") doesn't surface to Studio after 3 retries.
+        expect(await client.config.maxAttempts()).toBe(6);
+      });
     });
   });
 
