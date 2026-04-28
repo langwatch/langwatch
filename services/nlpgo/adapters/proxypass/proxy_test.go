@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -177,23 +178,115 @@ func TestReverseProxy_ClientCancelPropagatesUpstream(t *testing.T) {
 	}
 }
 
-// TestReverseProxy_UpstreamUnreachable_Returns502 verifies the error
-// path: when uvicorn is down (or wrong URL), proxypass returns 502
-// with a clean message rather than leaking a connection-refused error
-// or hanging.
-func TestReverseProxy_UpstreamUnreachable_Returns502(t *testing.T) {
+// TestReverseProxy_UpstreamUnreachable_Returns503AfterWait verifies the
+// cold-start fix: when uvicorn is unreachable, proxypass polls the
+// upstream for ColdStartWait before giving up, then returns 503 with
+// Retry-After:1 (not 502) so the AWS SDK's retryable-status logic
+// kicks in instead of failing the user-visible request immediately.
+//
+// Pre-fix this test asserted 502 — the old behavior was correct for a
+// permanently-down upstream but wrong during the Lambda cold-start
+// window where the python child takes ~12-18s to import litellm. After
+// the lifecycle reorder in PR #3559 binds $PORT immediately, requests
+// can land while the child is still warming, and 502 surfaced as
+// "Failed run workflow: 502 child upstream unavailable" in Studio
+// (prod incident on 2026-04-28 19:xx UTC after saas#476 deploy). The
+// 503 + Retry-After contract lets the LambdaClient retry transparently
+// — see langwatch/src/optimization_studio/server/lambda/index.ts
+// (maxAttempts:6, also from PR #3559).
+func TestReverseProxy_UpstreamUnreachable_Returns503AfterWait(t *testing.T) {
 	// 127.0.0.1:1 is reserved and never listens.
-	proxy, err := proxypass.New(proxypass.Options{UpstreamURL: "http://127.0.0.1:1"})
+	proxy, err := proxypass.New(proxypass.Options{
+		UpstreamURL: "http://127.0.0.1:1",
+		// Tight wait so the test stays fast; production default is 5s.
+		ColdStartWait:          200 * time.Millisecond,
+		ColdStartProbeInterval: 50 * time.Millisecond,
+		ColdStartProbeTimeout:  50 * time.Millisecond,
+	})
 	require.NoError(t, err)
 	front := httptest.NewServer(proxy)
 	defer front.Close()
 
+	start := time.Now()
+	resp, err := http.Get(front.URL + "/studio/execute")
+	elapsed := time.Since(start)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	assert.Equal(t, http.StatusServiceUnavailable, resp.StatusCode,
+		"unreachable upstream after the cold-start wait must surface as 503 (not 502) so the LambdaClient retries transparently")
+	assert.Equal(t, "1", resp.Header.Get("Retry-After"),
+		"503 must carry Retry-After:1 so the LambdaClient backs off briefly before retry")
+	assert.GreaterOrEqual(t, elapsed, 200*time.Millisecond,
+		"proxypass must wait the full ColdStartWait window before giving up")
+}
+
+// TestReverseProxy_UpstreamReachableMidWaitProxiesThrough pins the
+// happy cold-start path: when the upstream isn't reachable on the
+// first probe but becomes reachable inside the wait window, the proxy
+// polls until it sees the host, then proxies the request through.
+// Without this behavior /studio/execute requests landing in the child
+// warmup window would 503 even though the child becomes ready ~ms
+// later — caller would have to retry an already-survivable request.
+func TestReverseProxy_UpstreamReachableMidWaitProxiesThrough(t *testing.T) {
+	// Reserve a free port; don't bind it yet. The proxy will see
+	// connection-refused, wait, then succeed once we start the listener.
+	probe, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	addr := probe.Addr().String()
+	require.NoError(t, probe.Close())
+
+	proxy, err := proxypass.New(proxypass.Options{
+		UpstreamURL:            "http://" + addr,
+		ColdStartWait:          1 * time.Second,
+		ColdStartProbeInterval: 30 * time.Millisecond,
+		ColdStartProbeTimeout:  50 * time.Millisecond,
+	})
+	require.NoError(t, err)
+	front := httptest.NewServer(proxy)
+	defer front.Close()
+
+	// Start the upstream after a short delay so the proxy sees a few
+	// connection-refused probes before the host comes up.
+	type observed struct {
+		method, path string
+	}
+	hits := make(chan observed, 1)
+	upstream := http.Server{
+		Addr: addr,
+		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			hits <- observed{r.Method, r.URL.Path}
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte("ok"))
+		}),
+		ReadHeaderTimeout: time.Second,
+	}
+	defer func() { _ = upstream.Close() }()
+	upstreamReady := make(chan struct{})
+	go func() {
+		time.Sleep(150 * time.Millisecond) // simulate child warmup
+		ln, err := net.Listen("tcp", addr)
+		if err != nil {
+			t.Errorf("delayed listen: %v", err)
+			close(upstreamReady)
+			return
+		}
+		close(upstreamReady)
+		_ = upstream.Serve(ln)
+	}()
+
 	resp, err := http.Get(front.URL + "/studio/execute")
 	require.NoError(t, err)
 	defer resp.Body.Close()
-	assert.Equal(t, http.StatusBadGateway, resp.StatusCode)
-	body, _ := io.ReadAll(resp.Body)
-	assert.Contains(t, strings.ToLower(string(body)), "upstream")
+	assert.Equal(t, http.StatusOK, resp.StatusCode,
+		"upstream became reachable inside ColdStartWait; proxypass must proxy through, not 503")
+
+	select {
+	case h := <-hits:
+		assert.Equal(t, "/studio/execute", h.path)
+	case <-time.After(2 * time.Second):
+		t.Fatal("upstream never received the proxied request")
+	}
+	<-upstreamReady
 }
 
 // TestReverseProxy_ForwardsMethodAndPath ensures the proxy doesn't
