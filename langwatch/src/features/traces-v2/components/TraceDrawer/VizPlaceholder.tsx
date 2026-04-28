@@ -10,7 +10,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   LuChevronDown,
   LuChevronUp,
-  LuFileText,
   LuFlame,
   LuGripHorizontal,
   LuList,
@@ -19,24 +18,22 @@ import {
 } from "react-icons/lu";
 import { Tooltip } from "~/components/ui/tooltip";
 import { Kbd } from "~/components/ops/shared/Kbd";
+import { PresenceMarker } from "~/features/presence/components/PresenceMarker";
+import { PeerCursorOverlay } from "~/features/presence/components/PeerCursorOverlay";
+import {
+  selectPeersMatching,
+  usePresenceStore,
+} from "~/features/presence/stores/presenceStore";
 import type {
   SpanTreeNode,
   TraceHeader,
 } from "~/server/api/routers/tracesV2.schemas";
 import type { VizTab } from "../../stores/drawerStore";
 import { SPAN_TYPE_COLORS } from "../../utils/formatters";
-import { useSpansFull } from "../../hooks";
 import { WaterfallView } from "./WaterfallView";
 import { FlameView } from "./FlameView";
+import { NewSpanFlash } from "./NewSpanFlash";
 import { SpanListView } from "./SpanListView";
-import {
-  buildTraceMarkdown,
-  DEFAULT_MARKDOWN_CONFIG,
-  MarkdownConfigurePopover,
-  MarkdownCopyButton,
-  MarkdownView,
-  type MarkdownConfig,
-} from "./MarkdownView";
 
 interface VizPlaceholderProps {
   vizTab: VizTab;
@@ -57,23 +54,39 @@ const MAX_HEIGHT = 700;
 const STORAGE_KEY = "langwatch:traces-v2:viz-height";
 const VIZ_TAB_STORAGE_KEY = "langwatch:traces-v2:viz-tab";
 
+function VizTabPresenceDot({
+  traceId,
+  panel,
+}: {
+  traceId: string;
+  panel: VizTab;
+}) {
+  const peers = usePresenceStore((s) =>
+    selectPeersMatching(
+      s,
+      (session) =>
+        session.location.route.traceId === traceId &&
+        session.location.view?.panel === panel,
+    ),
+  );
+  if (peers.length === 0) return null;
+  return <PresenceMarker peers={peers} size={16} tooltipSuffix={`${panel} panel`} />;
+}
+
 const TABS: { value: VizTab; label: string; icon: typeof LuChartGantt; shortcut: string }[] = [
   { value: "waterfall", label: "Waterfall", icon: LuChartGantt, shortcut: "1" },
   { value: "flame", label: "Flame", icon: LuFlame, shortcut: "2" },
   { value: "spanlist", label: "Span List", icon: LuList, shortcut: "3" },
-  { value: "markdown", label: "LLM Optimized Trace", icon: LuFileText, shortcut: "4" },
 ];
 
 function getStoredHeight(): number {
   if (typeof window === "undefined") return DEFAULT_HEIGHT;
   const stored = localStorage.getItem(STORAGE_KEY);
-  if (stored) {
-    const parsed = parseInt(stored, 10);
-    if (!isNaN(parsed) && parsed === 0) return 0;
-    if (!isNaN(parsed) && parsed >= MIN_HEIGHT && parsed <= MAX_HEIGHT) {
-      return parsed;
-    }
-  }
+  if (!stored) return DEFAULT_HEIGHT;
+  const parsed = parseInt(stored, 10);
+  if (Number.isNaN(parsed)) return DEFAULT_HEIGHT;
+  if (parsed === 0) return 0;
+  if (parsed >= MIN_HEIGHT && parsed <= MAX_HEIGHT) return parsed;
   return DEFAULT_HEIGHT;
 }
 
@@ -91,23 +104,6 @@ export function VizPlaceholder({
   const [height, setHeight] = useState(getStoredHeight);
   const [spanListSearch, setSpanListSearch] = useState("");
   const [spanListTypeFilter, setSpanListTypeFilter] = useState<string | undefined>();
-  const [markdownConfig, setMarkdownConfig] = useState<MarkdownConfig>(
-    DEFAULT_MARKDOWN_CONFIG,
-  );
-  // Full span data is needed only by the LLM Optimized markdown view, and only
-  // when the user opted into per-span attributes or per-span I/O. Lazy-fetch.
-  const needsFullSpans =
-    vizTab === "markdown" &&
-    (markdownConfig.includeSpanAttributes || markdownConfig.includeSpanIO);
-  const fullSpansQuery = useSpansFull(needsFullSpans);
-  const fullSpans = fullSpansQuery.data;
-  const markdownText = useMemo(
-    () =>
-      trace
-        ? buildTraceMarkdown(trace, spans, markdownConfig, fullSpans)
-        : "",
-    [trace, spans, markdownConfig, fullSpans],
-  );
   const isDragging = useRef(false);
   const dragStartY = useRef(0);
   const dragStartHeight = useRef(0);
@@ -119,6 +115,19 @@ export function VizPlaceholder({
   const persistHeight = useCallback((h: number) => {
     localStorage.setItem(STORAGE_KEY, String(h));
   }, []);
+
+  // When span data arrives but the user previously minimized the panel,
+  // restore the default height so the visualisation is always visible
+  // alongside the chrome — the panel is the primary affordance for the
+  // viz, not an opt-in surface.
+  const hasData = spans.length > 0;
+  useEffect(() => {
+    if (hasData && height === 0) {
+      setHeight(DEFAULT_HEIGHT);
+      persistHeight(DEFAULT_HEIGHT);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasData]);
 
   // Persist viz tab preference
   useEffect(() => {
@@ -254,6 +263,12 @@ export function VizPlaceholder({
                       {tab.label}
                     </Text>
                     <Kbd>{tab.shortcut}</Kbd>
+                    {trace ? (
+                      <VizTabPresenceDot
+                        traceId={trace.traceId}
+                        panel={tab.value}
+                      />
+                    ) : null}
                   </Flex>
                 </Tooltip>
               );
@@ -261,15 +276,6 @@ export function VizPlaceholder({
           </HStack>
 
           <HStack gap={1.5}>
-            {vizTab === "markdown" && (
-              <>
-                <MarkdownConfigurePopover
-                  config={markdownConfig}
-                  onChange={setMarkdownConfig}
-                />
-                <MarkdownCopyButton markdown={markdownText} />
-              </>
-            )}
             <Tooltip
               content={
                 isMinimized
@@ -318,14 +324,12 @@ export function VizPlaceholder({
           cursor={isCollapsed ? "pointer" : "default"}
           position="relative"
         >
-          {vizTab === "markdown" ? (
-            <MarkdownView
-              trace={trace}
-              spans={spans}
-              fullSpans={fullSpans}
-              config={markdownConfig}
-            />
-          ) : isLoading && spans.length === 0 ? (
+          <NewSpanFlash spanCount={spans.length} resetKey={trace?.traceId ?? null} />
+          <PeerCursorOverlay
+            anchor={trace ? `trace:${trace.traceId}:panel:${vizTab}` : null}
+            enabled={!!trace && !isCollapsed}
+          >
+          {isLoading && spans.length === 0 ? (
             <VizSkeleton />
           ) : spans.length === 0 ? (
             <Flex align="center" justify="center" height="full">
@@ -360,6 +364,7 @@ export function VizPlaceholder({
               initialTypeFilter={spanListTypeFilter}
             />
           )}
+          </PeerCursorOverlay>
         </Box>
         )}
 
@@ -386,19 +391,18 @@ export function VizPlaceholder({
   );
 }
 
-function VizSkeleton() {
-  // Simulated waterfall bars; widths/offsets vary so it reads as data, not just stripes.
-  const rows = [
-    { left: 4, width: 92 },
-    { left: 8, width: 58 },
-    { left: 14, width: 36 },
-    { left: 22, width: 44 },
-    { left: 12, width: 70 },
-    { left: 6, width: 30 },
-    { left: 50, width: 26 },
-    { left: 24, width: 60 },
-  ];
+const SKELETON_ROWS = [
+  { left: 4, width: 92 },
+  { left: 8, width: 58 },
+  { left: 14, width: 36 },
+  { left: 22, width: 44 },
+  { left: 12, width: 70 },
+  { left: 6, width: 30 },
+  { left: 50, width: 26 },
+  { left: 24, width: 60 },
+] as const;
 
+function VizSkeleton() {
   return (
     <VStack
       align="stretch"
@@ -413,14 +417,14 @@ function VizSkeleton() {
         },
       }}
     >
-      {rows.map((r, i) => (
+      {SKELETON_ROWS.map((row, i) => (
         <Flex key={i} height="14px" align="center">
           <Box
             height="full"
             borderRadius="sm"
             bg="bg.muted"
-            marginLeft={`${r.left}%`}
-            width={`${r.width}%`}
+            marginLeft={`${row.left}%`}
+            width={`${row.width}%`}
             css={{
               animation: `vizPulse 1.4s ease-in-out ${i * 0.08}s infinite`,
             }}

@@ -1,178 +1,58 @@
 import { useState, useMemo } from "react";
-import { Box, Button, HStack, Icon, Text, VStack } from "@chakra-ui/react";
-import {
-  LuCheck,
-  LuCode,
-  LuCopy,
-  LuBot,
-  LuSettings,
-  LuUser,
-  LuWrench,
-} from "react-icons/lu";
-import type { IconType } from "react-icons";
+import { Box, Button, HStack, Icon, Text } from "@chakra-ui/react";
+import { LuCheck, LuChevronDown, LuChevronRight, LuCopy } from "react-icons/lu";
 import { SegmentedToggle } from "./SegmentedToggle";
-import { JsonView } from "./JsonHighlight";
+import { RenderedMarkdown, ShikiCodeBlock } from "./MarkdownView";
+import { safePrettyJson } from "./JsonHighlight";
+import { useColorMode } from "~/components/ui/color-mode";
+import {
+  AssistantTurnCard,
+  ThreadedTurnView,
+  TurnView,
+  VIRTUALIZE_AT,
+  VirtualizedChatList,
+  asMarkdownBody,
+  coerceToChatMessages,
+  extractInlineBlocks,
+  groupMessagesIntoTurns,
+  parseContentBlocks,
+  tryParseJSON,
+  type ChatLayout,
+  type ChatMessage,
+  type ConversationTurn,
+} from "./Transcript";
+
+const COPY_FEEDBACK_MS = 1500;
+const TRUNCATE_AT = 100_000;
+// Require a meaningful tail before offering an expander — otherwise we
+// render "Show remaining 0K chars" on borderline content right at the cap.
+const TRUNCATE_TAIL_MIN = 1_000;
+const COMPACT_MAX_HEIGHT_PX = 300;
+const EXPANDED_MAX_HEIGHT_PX = 500;
 
 interface IOViewerProps {
   label: string;
   content: string;
+  /**
+   * "input" renders the full chat history (all messages, all roles, tool calls
+   * inline). "output" — when the content happens to be a chat-history array —
+   * narrows to just the *final assistant message* of that array, since the
+   * trace's actual output for this turn is the model's last reply, not the
+   * whole transcript. For non-chat content this is a no-op.
+   */
+  mode?: "input" | "output";
 }
 
-type ViewFormat = "pretty" | "text" | "json";
-
-interface ChatMessage {
-  role: string;
-  content: string | null | Array<{ type: string; text?: string }>;
-  tool_calls?: Array<{
-    function: { name: string; arguments: string };
-    id: string;
-    type: string;
-  }>;
-}
-
-function tryParseJSON(s: string): unknown | null {
-  try {
-    const trimmed = s.trim();
-    if (
-      (trimmed.startsWith("{") || trimmed.startsWith("[")) &&
-      (trimmed.endsWith("}") || trimmed.endsWith("]"))
-    ) {
-      return JSON.parse(trimmed);
-    }
-    return null;
-  } catch {
-    return null;
-  }
-}
-
-function isChatMessagesArray(data: unknown): data is ChatMessage[] {
-  if (!Array.isArray(data)) return false;
-  if (data.length === 0) return false;
-  return data.every((item: unknown) => {
-    if (typeof item !== "object" || item === null) return false;
-    const obj = item as Record<string, unknown>;
-    return typeof obj.role === "string";
-  });
-}
-
-function getMessageContent(
-  content: string | null | Array<{ type: string; text?: string }>,
-): string {
-  if (content === null) return "";
-  if (typeof content === "string") return content;
-  if (Array.isArray(content)) {
-    return content
-      .filter((c) => c.type === "text" && c.text)
-      .map((c) => c.text)
-      .join("\n");
-  }
-  return String(content);
-}
-
-const ROLE_LABELS: Record<string, string> = {
-  system: "SYSTEM",
-  user: "USER",
-  assistant: "ASSISTANT",
-  tool: "TOOL",
-  developer: "DEVELOPER",
-};
-
-const ROLE_COLORS: Record<string, string> = {
-  system: "fg.muted",
-  user: "blue.fg",
-  assistant: "green.fg",
-  tool: "orange.fg",
-  developer: "purple.fg",
-};
-
-const ROLE_ICONS: Record<string, IconType> = {
-  system: LuSettings,
-  user: LuUser,
-  assistant: LuBot,
-  tool: LuWrench,
-  developer: LuCode,
-};
-
-function ChatMessageView({ message }: { message: ChatMessage }) {
-  const label = ROLE_LABELS[message.role] ?? message.role.toUpperCase();
-  const color = ROLE_COLORS[message.role] ?? "fg.muted";
-  const RoleIcon = ROLE_ICONS[message.role];
-  const content = getMessageContent(message.content);
-
-  return (
-    <Box marginBottom={2}>
-      <HStack gap={1} marginBottom={0.5}>
-        {RoleIcon && <Icon as={RoleIcon} boxSize={3} color={color} />}
-        <Text
-          textStyle="xs"
-          fontWeight="semibold"
-          color={color}
-          letterSpacing="wide"
-        >
-          {label}
-        </Text>
-      </HStack>
-      {message.tool_calls && message.tool_calls.length > 0 ? (
-        <VStack align="stretch" gap={1} marginLeft={4}>
-          {message.tool_calls.map((tc, i) => (
-            <Box
-              key={i}
-              paddingLeft={2}
-              borderLeftWidth="2px"
-              borderColor="orange.muted"
-            >
-              <Text textStyle="xs" fontWeight="semibold" color="orange.fg">
-                TOOL CALL: {tc.function.name}
-              </Text>
-              <Box
-                bg="bg.subtle"
-                borderRadius="sm"
-                padding={2}
-                marginTop={1}
-                textStyle="xs"
-                fontFamily="mono"
-                color="fg.muted"
-                whiteSpace="pre-wrap"
-                wordBreak="break-all"
-              >
-                {tc.function.arguments}
-              </Box>
-            </Box>
-          ))}
-        </VStack>
-      ) : content ? (
-        <Text
-          textStyle="xs"
-          color="fg"
-          marginLeft={4}
-          lineHeight="tall"
-          whiteSpace="pre-wrap"
-          wordBreak="break-word"
-        >
-          {content}
-        </Text>
-      ) : (
-        <Text
-          textStyle="xs"
-          color="fg.subtle"
-          fontStyle="italic"
-          marginLeft={4}
-        >
-          No content
-        </Text>
-      )}
-    </Box>
-  );
-}
-
+type ViewFormat = "pretty" | "text" | "json" | "markdown";
 
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
 
-  const handleCopy = () => {
+  const handleCopy = (e: React.MouseEvent) => {
+    e.stopPropagation();
     void navigator.clipboard.writeText(text);
     setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
+    setTimeout(() => setCopied(false), COPY_FEEDBACK_MS);
   };
 
   return (
@@ -194,60 +74,295 @@ function CopyButton({ text }: { text: string }) {
   );
 }
 
-export function IOViewer({ label, content }: IOViewerProps) {
+export function IOViewer({ label, content, mode = "input" }: IOViewerProps) {
   const parsed = useMemo(() => tryParseJSON(content), [content]);
-  const isChat = useMemo(() => isChatMessagesArray(parsed), [parsed]);
+  // Coerce parsed into a chat message array — handles top-level arrays,
+  // single message objects, and `{messages: [...]}` / `{input: [...]}`
+  // envelopes uniformly. Returns null when the payload genuinely isn't
+  // chat-shaped (e.g. a string blob, a flat object).
+  const allChatMessages = useMemo(() => coerceToChatMessages(parsed), [parsed]);
+  const isChat = allChatMessages !== null;
   const canJson = parsed !== null;
 
-  const [format, setFormat] = useState<ViewFormat>("pretty");
-  const [expanded, setExpanded] = useState(false);
+  // Split the chat-shape payload between the two panels:
+  //   • Input panel = the full conversation history sent to the model on
+  //     this turn — user messages, system / developer prompts, and every
+  //     prior assistant operation (thinking, tool_use, tool_result echoes,
+  //     intermediate text). Tool_use IDs in input are distinct from those
+  //     in output (they belong to earlier LLM calls in the agent loop),
+  //     so this is real history, not duplicated output. Trailing
+  //     assistant messages still get trimmed because those are this
+  //     turn's response and live in the output panel.
+  //   • Output panel = everything from the last text-bearing user message
+  //     onwards, in full. That keeps the agent's reasoning, tool calls,
+  //     tool results, and intermediate assistant turns visible as the
+  //     response — which is what they actually are. Earlier behaviour
+  //     narrowed this to the final assistant message; that hid the
+  //     operation chain.
+  const chatMessagesToRender = useMemo<ChatMessage[]>(() => {
+    if (!allChatMessages) return [];
+    const all = allChatMessages;
+    if (mode === "output") {
+      let lastUserIdx = -1;
+      for (let i = all.length - 1; i >= 0; i--) {
+        const msg = all[i]!;
+        if (msg.role !== "user") continue;
+        const blocks = parseContentBlocks(msg.content);
+        const hasText = blocks.some((b) => b.kind === "text");
+        if (hasText) {
+          lastUserIdx = i;
+          break;
+        }
+      }
+      return lastUserIdx >= 0 ? all.slice(lastUserIdx + 1) : all;
+    }
+    let end = all.length;
+    while (end > 0 && all[end - 1]!.role === "assistant") {
+      end--;
+    }
+    return all.slice(0, end);
+  }, [allChatMessages, mode]);
 
-  const isLong = content.length > 5000;
+  // Group raw messages into logical turns: user prose vs assistant operation
+  // chains (which absorb thinking, tool_use, tool_result wrappers from
+  // Anthropic's user-role messages).
+  const conversationTurns = useMemo<ConversationTurn[]>(
+    () => groupMessagesIntoTurns(chatMessagesToRender),
+    [chatMessagesToRender],
+  );
+
+  const [format, setFormat] = useState<ViewFormat>("pretty");
+  // For output mode, default to bubbles — there's only ever one assistant
+  // message, so a "Turn N" thread row is meaningless. For input mode (the
+  // full chat history), keep thread as the default.
+  const [chatLayout, setChatLayout] = useState<ChatLayout>(
+    mode === "output" ? "bubbles" : "thread",
+  );
+  // Markdown sub-mode: rendered (with formatting + Shiki for code fences)
+  // or source (raw markdown text, syntax-highlighted as markdown).
+  const [markdownSubmode, setMarkdownSubmode] = useState<"rendered" | "source">(
+    "rendered",
+  );
+  const [expanded, setExpanded] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
+  const { colorMode } = useColorMode();
+
+  const collapsedSummary = isChat && allChatMessages
+    ? `${allChatMessages.length} ${allChatMessages.length === 1 ? "message" : "messages"}`
+    : `${content.length.toLocaleString()} chars`;
+
+  const isLong = content.length - TRUNCATE_AT > TRUNCATE_TAIL_MIN;
   const displayContent =
-    !isLong || expanded ? content : content.slice(0, 5000) + "...";
+    !isLong || expanded ? content : content.slice(0, TRUNCATE_AT) + "...";
+  const prettyJsonContent = useMemo(
+    () => safePrettyJson(displayContent),
+    [displayContent],
+  );
+
+  const markdownBody = useMemo(() => asMarkdownBody(displayContent), [displayContent]);
+
+  // For string-shaped content that isn't a clean chat array, walk the lines
+  // and pull out any inline `{"type":"thinking"|"tool_use"|"tool_result"}`
+  // JSON blocks so we can render them as cards instead of dumping raw JSON.
+  const inlineBlocks = useMemo(
+    () => (isChat ? [] : extractInlineBlocks(displayContent)),
+    [isChat, displayContent],
+  );
+  const hasInlineRichContent = useMemo(
+    () => inlineBlocks.some((b) => b.kind !== "text" && b.kind !== "raw"),
+    [inlineBlocks],
+  );
+
+  const formatOptions = useMemo<ViewFormat[]>(
+    () => (canJson ? ["pretty", "text", "json", "markdown"] : ["pretty", "text", "markdown"]),
+    [canJson],
+  );
+
+  // When the virtualized chat list is active it owns its own scroll viewport;
+  // the outer card must not impose its own overflow/maxHeight or we'd end up
+  // with nested scroll containers.
+  const isVirtualizingChat =
+    format === "pretty" && isChat && conversationTurns.length >= VIRTUALIZE_AT;
+  // Output mode + chat = a single AssistantTurnCard. That card already has
+  // its own purple-bordered chrome; wrapping it in the IOViewer's outer
+  // card makes a card-in-card. Drop the outer chrome there so the
+  // assistant card sits flush at the root of the section.
+  const flushChatCard = format === "pretty" && isChat && mode === "output";
 
   return (
     <Box>
       <HStack marginBottom={1} gap={2}>
-        <Text
-          textStyle="xs"
-          fontWeight="semibold"
-          color="fg.muted"
-          letterSpacing="wide"
-          textTransform="uppercase"
+        <Button
+          size="xs"
+          variant="ghost"
+          onClick={() => setCollapsed((c) => !c)}
+          aria-label={collapsed ? "Expand" : "Collapse"}
+          padding={0}
+          minWidth="auto"
+          height="auto"
         >
-          {label}
-        </Text>
-        <Box flex={1} />
-        {canJson && (
+          <Icon
+            as={collapsed ? LuChevronRight : LuChevronDown}
+            boxSize={3}
+            color="fg.muted"
+          />
+        </Button>
+        <HStack
+          gap={2}
+          flex={1}
+          cursor="pointer"
+          onClick={() => setCollapsed((c) => !c)}
+        >
+          <Text
+            textStyle="xs"
+            fontWeight="semibold"
+            color="fg.muted"
+            letterSpacing="wide"
+            textTransform="uppercase"
+          >
+            {label}
+          </Text>
+          {collapsed && (
+            <Text textStyle="xs" color="fg.muted">
+              {collapsedSummary}
+            </Text>
+          )}
+        </HStack>
+        {!collapsed && format === "pretty" && isChat && mode !== "output" && (
+          // Output is always a single assistant message — the thread/bubbles
+          // distinction is meaningless there, hide the toggle.
+          <SegmentedToggle
+            value={chatLayout}
+            onChange={(l) => setChatLayout(l as ChatLayout)}
+            options={["thread", "bubbles"]}
+          />
+        )}
+        {!collapsed && format === "markdown" && (
+          <SegmentedToggle
+            value={markdownSubmode}
+            onChange={(m) => setMarkdownSubmode(m as "rendered" | "source")}
+            options={["rendered", "source"]}
+          />
+        )}
+        {!collapsed && (
           <SegmentedToggle
             value={format}
             onChange={(f) => setFormat(f as ViewFormat)}
-            options={["pretty", "text", "json"]}
+            options={formatOptions}
           />
         )}
         <CopyButton text={content} />
       </HStack>
 
+      {!collapsed && (
+      <>
       <Box
-        bg="bg.subtle"
-        borderRadius="md"
-        borderWidth="1px"
+        bg={flushChatCard ? "transparent" : "bg.subtle"}
+        borderRadius={flushChatCard ? "0" : "md"}
+        borderWidth={flushChatCard ? "0" : "1px"}
         borderColor="border"
-        padding={3}
-        maxHeight={isLong && !expanded ? "300px" : "500px"}
-        overflow="auto"
+        padding={
+          flushChatCard
+            ? 0
+            : format === "markdown" || isVirtualizingChat
+              ? 0
+              : 3
+        }
+        maxHeight={
+          isVirtualizingChat
+            ? undefined
+            : isLong && !expanded
+              ? `${COMPACT_MAX_HEIGHT_PX}px`
+              : `${EXPANDED_MAX_HEIGHT_PX}px`
+        }
+        overflow={isVirtualizingChat ? "hidden" : "auto"}
       >
         {format === "json" && canJson ? (
-          <JsonView content={displayContent} />
+          <ShikiCodeBlock
+            code={prettyJsonContent}
+            language="json"
+            colorMode={colorMode}
+            flush
+          />
+        ) : format === "markdown" ? (
+          markdownSubmode === "rendered" ? (
+            // Rendered markdown — proper formatting + Shiki for any fenced
+            // code blocks inside. Lives behind the toggle because for very
+            // long content the rendered path is heavier than source.
+            <RenderedMarkdown markdown={markdownBody} paddingX={3} paddingY={2} />
+          ) : (
+            // Source — raw markdown with markdown syntax highlighting.
+            // Plain text, copyable, lightning fast even on huge content.
+            <ShikiCodeBlock
+              code={markdownBody}
+              language="markdown"
+              colorMode={colorMode}
+              flush
+            />
+          )
         ) : format === "pretty" && isChat ? (
-          <Box>
-            {(parsed as ChatMessage[]).map((msg, i) => (
-              <ChatMessageView key={i} message={msg} />
-            ))}
-          </Box>
+          conversationTurns.length >= VIRTUALIZE_AT ? (
+            <VirtualizedChatList
+              turns={conversationTurns}
+              maxHeightPx={
+                isLong && !expanded
+                  ? COMPACT_MAX_HEIGHT_PX
+                  : EXPANDED_MAX_HEIGHT_PX
+              }
+              layout={chatLayout}
+              collapseTools={mode === "output"}
+            />
+          ) : chatLayout === "thread" ? (
+            <Box>
+              {conversationTurns.map((turn, i) => {
+                // Default-collapse user turns — they're usually the prompt
+                // we already know we sent. Auto-expand assistant/system
+                // turns and the trailing pair so the response is visible
+                // at a glance without users having to click into every
+                // user bubble in long conversations.
+                const isLastTwo = i >= conversationTurns.length - 2;
+                const defaultExpanded =
+                  turn.kind === "user" ? false : isLastTwo;
+                return (
+                  <ThreadedTurnView
+                    key={i}
+                    turn={turn}
+                    index={i}
+                    isLast={i === conversationTurns.length - 1}
+                    defaultExpanded={defaultExpanded}
+                    collapseTools={mode === "output"}
+                  />
+                );
+              })}
+            </Box>
+          ) : (
+            <Box>
+              {conversationTurns.map((turn, i) => (
+                <TurnView
+                  key={i}
+                  turn={turn}
+                  collapseTools={mode === "output"}
+                />
+              ))}
+            </Box>
+          )
+        ) : format === "pretty" && hasInlineRichContent ? (
+          // Plain-string content with inline typed blocks (e.g. a flattened
+          // agent transcript). Render under a single assistant turn card so
+          // thinking/tool_use/tool_result get the same visual hierarchy as
+          // structured chat — left accent bar, role chip, blocks stacked.
+          <AssistantTurnCard
+            blocks={inlineBlocks}
+            toolCalls={[]}
+            collapseTools={mode === "output"}
+          />
         ) : format === "pretty" && canJson ? (
-          <JsonView content={displayContent} />
+          <ShikiCodeBlock
+            code={prettyJsonContent}
+            language="json"
+            colorMode={colorMode}
+            flush
+          />
         ) : (
           <Text
             textStyle="xs"
@@ -274,8 +389,10 @@ export function IOViewer({ label, content }: IOViewerProps) {
         >
           {expanded
             ? "Show less"
-            : `Show full output (${(content.length / 1000).toFixed(1)}K chars)`}
+            : `Show remaining ${((content.length - TRUNCATE_AT) / 1000).toFixed(0)}K chars`}
         </Button>
+      )}
+      </>
       )}
     </Box>
   );

@@ -1,6 +1,12 @@
+import type { ReactNode } from "react";
 import { Flex, HStack, Text } from "@chakra-ui/react";
 import { Kbd } from "~/components/ops/shared/Kbd";
 import { Tooltip } from "~/components/ui/tooltip";
+import { PresenceMarker } from "~/features/presence/components/PresenceMarker";
+import {
+  selectPeersMatching,
+  usePresenceStore,
+} from "~/features/presence/stores/presenceStore";
 import type { DrawerViewMode } from "../../stores/drawerStore";
 
 interface ModeSwitchProps {
@@ -8,6 +14,9 @@ interface ModeSwitchProps {
   onViewModeChange: (mode: DrawerViewMode) => void;
   turnLabel?: string;
   hasConversation?: boolean;
+  hasScenario?: boolean;
+  /** Trace id used to scope the per-mode peer presence dots. */
+  traceId?: string;
 }
 
 interface SegmentProps {
@@ -17,10 +26,42 @@ interface SegmentProps {
   disabled?: boolean;
   onClick: () => void;
   isLast?: boolean;
+  accent?: "blue" | "purple";
+  presence?: ReactNode;
 }
 
-function Segment({ label, shortcut, active, disabled, onClick, isLast }: SegmentProps) {
-  const inner = (
+function ModePresenceDot({
+  traceId,
+  mode,
+}: {
+  traceId: string;
+  mode: DrawerViewMode;
+}) {
+  const peers = usePresenceStore((s) =>
+    selectPeersMatching(
+      s,
+      (session) =>
+        session.location.route.traceId === traceId &&
+        session.location.view?.mode === mode,
+    ),
+  );
+  if (peers.length === 0) return null;
+  return <PresenceMarker peers={peers} size={16} tooltipSuffix={`${mode} view`} />;
+}
+
+function Segment({
+  label,
+  shortcut,
+  active,
+  disabled,
+  onClick,
+  isLast,
+  accent = "blue",
+  presence,
+}: SegmentProps) {
+  const activeBg =
+    active && accent === "purple" ? "purple.500/14" : "bg.emphasized";
+  return (
     <Flex
       as="button"
       align="center"
@@ -28,8 +69,16 @@ function Segment({ label, shortcut, active, disabled, onClick, isLast }: Segment
       paddingX={2.5}
       height="26px"
       cursor={disabled ? "not-allowed" : "pointer"}
-      bg={active ? "bg.emphasized" : "bg.panel"}
-      color={active ? "fg" : disabled ? "fg.subtle" : "fg.muted"}
+      bg={active ? activeBg : "bg.panel"}
+      color={
+        active
+          ? accent === "purple"
+            ? "purple.fg"
+            : "fg"
+          : disabled
+            ? "fg.subtle"
+            : "fg.muted"
+      }
       fontWeight={active ? "semibold" : "medium"}
       borderRightWidth={isLast ? "0" : "1px"}
       borderColor="border"
@@ -44,9 +93,9 @@ function Segment({ label, shortcut, active, disabled, onClick, isLast }: Segment
     >
       <Text textStyle="xs">{label}</Text>
       <Kbd>{shortcut}</Kbd>
+      {presence}
     </Flex>
   );
-  return inner;
 }
 
 export function ModeSwitch({
@@ -54,8 +103,14 @@ export function ModeSwitch({
   onViewModeChange,
   turnLabel,
   hasConversation = true,
+  hasScenario = false,
+  traceId,
 }: ModeSwitchProps) {
   const conversationDisabled = !hasConversation;
+  const scenarioDisabled = !hasScenario;
+
+  const presenceFor = (mode: DrawerViewMode) =>
+    traceId ? <ModePresenceDot traceId={traceId} mode={mode} /> : null;
 
   const conversationSegment = (
     <Segment
@@ -64,7 +119,21 @@ export function ModeSwitch({
       active={viewMode === "conversation"}
       disabled={conversationDisabled}
       onClick={() => onViewModeChange("conversation")}
+      isLast={!hasScenario}
+      presence={presenceFor("conversation")}
+    />
+  );
+
+  const scenarioSegment = (
+    <Segment
+      label="Scenario"
+      shortcut="S"
+      active={viewMode === "scenario"}
+      disabled={scenarioDisabled}
+      onClick={() => onViewModeChange("scenario")}
       isLast
+      accent="purple"
+      presence={presenceFor("scenario")}
     />
   );
 
@@ -83,6 +152,7 @@ export function ModeSwitch({
           shortcut="T"
           active={viewMode === "trace"}
           onClick={() => onViewModeChange("trace")}
+          presence={presenceFor("trace")}
         />
         {conversationDisabled ? (
           <Tooltip
@@ -94,6 +164,7 @@ export function ModeSwitch({
         ) : (
           conversationSegment
         )}
+        {hasScenario && scenarioSegment}
       </HStack>
       {turnLabel && viewMode === "trace" && (
         <Text textStyle="xs" color="fg.muted">{turnLabel}</Text>

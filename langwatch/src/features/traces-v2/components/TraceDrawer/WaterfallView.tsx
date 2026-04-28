@@ -539,6 +539,8 @@ export function WaterfallView({
                   )}
                   <TreeRow
                     node={node}
+                    rootStart={rootStart}
+                    rootDuration={rootDuration}
                     isSelected={node.span.spanId === selectedSpanId}
                     isHovered={node.span.spanId === hoveredSpanId}
                     isCollapsed={collapsedIds.has(node.span.spanId)}
@@ -726,6 +728,8 @@ export function WaterfallView({
 
 function TreeRow({
   node,
+  rootStart,
+  rootDuration,
   isSelected,
   isHovered,
   isCollapsed,
@@ -737,6 +741,8 @@ function TreeRow({
   onHoverEnd,
 }: {
   node: WaterfallTreeNode;
+  rootStart: number;
+  rootDuration: number;
   isSelected: boolean;
   isHovered: boolean;
   isCollapsed: boolean;
@@ -755,18 +761,65 @@ function TreeRow({
   const icon = SPAN_TYPE_ICONS[span.type ?? "span"] ?? "○";
   const duration = span.durationMs;
   const isZeroDuration = duration === 0;
+  const offsetMs = Math.max(0, span.startTimeMs - rootStart);
+  const sharePct =
+    rootDuration > 0 ? Math.round((duration / rootDuration) * 100) : 0;
 
-  const tooltipLines = [
-    span.name,
-    `Type: ${(span.type ?? "span").toUpperCase()}`,
-    `Duration: ${isZeroDuration ? "<1ms" : formatDuration(duration)}`,
-    span.model ? `Model: ${span.model}` : null,
-    isOrphaned ? "⚠ Parent not in trace" : null,
-  ].filter(Boolean);
+  const tooltipContent = (
+    <Box minWidth="240px" maxWidth="340px">
+      <Text textStyle="xs" fontWeight="semibold" color="fg" wordBreak="break-word">
+        {span.name}
+      </Text>
+      <HStack gap={1.5} marginTop={1} flexWrap="wrap">
+        <Text
+          textStyle="2xs"
+          color={color}
+          paddingX={1.5}
+          borderRadius="sm"
+          borderWidth="1px"
+          borderColor={color}
+          fontWeight="semibold"
+        >
+          {(span.type ?? "span").toUpperCase()}
+        </Text>
+        {isError && (
+          <Text
+            textStyle="2xs"
+            color="red.fg"
+            paddingX={1.5}
+            borderRadius="sm"
+            bg="red.subtle"
+            fontWeight="semibold"
+          >
+            ERROR
+          </Text>
+        )}
+        {span.model && (
+          <Text textStyle="2xs" color="fg.muted" fontFamily="mono">
+            {span.model}
+          </Text>
+        )}
+      </HStack>
+      <Box marginTop={1.5} display="grid" gridTemplateColumns="auto 1fr" gap={0.5} columnGap={3}>
+        <TipCell label="Duration" value={isZeroDuration ? "<1ms" : formatDuration(duration)} />
+        {sharePct > 0 && <TipCell label="Of trace" value={`${sharePct}%`} />}
+        <TipCell label="Offset" value={`+${formatDuration(offsetMs)}`} />
+        <TipCell label="Span ID" value={span.spanId.slice(0, 16)} mono />
+        {span.parentSpanId && (
+          <TipCell label="Parent" value={span.parentSpanId.slice(0, 16)} mono />
+        )}
+      </Box>
+      {isOrphaned && (
+        <Text textStyle="2xs" color="orange.fg" marginTop={1.5}>
+          ⚠ Parent not in trace
+        </Text>
+      )}
+    </Box>
+  );
 
   return (
     <Tooltip
-      content={tooltipLines.join("\n")}
+      content={tooltipContent}
       positioning={{ placement: "right" }}
     >
       <Box>
@@ -1138,5 +1191,32 @@ function GroupTimelineBar({
         }}
       />
     </Flex>
+  );
+}
+
+function TipCell({
+  label,
+  value,
+  mono,
+}: {
+  label: string;
+  value: string;
+  mono?: boolean;
+}) {
+  return (
+    <>
+      <Text textStyle="2xs" color="fg.muted">
+        {label}
+      </Text>
+      <Text
+        textStyle="2xs"
+        color="fg"
+        fontFamily={mono ? "mono" : undefined}
+        textAlign="right"
+        wordBreak="break-all"
+      >
+        {value}
+      </Text>
+    </>
   );
 }

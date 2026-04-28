@@ -9,12 +9,7 @@ import {
 import { LuKeyboard, LuX } from "react-icons/lu";
 import { Kbd } from "~/components/ops/shared/Kbd";
 
-interface KeyboardShortcutsHelpProps {
-  open: boolean;
-  onClose: () => void;
-}
-
-interface ShortcutGroup {
+export interface ShortcutGroup {
   title: string;
   items: Array<{
     keys: string[];
@@ -23,11 +18,19 @@ interface ShortcutGroup {
   }>;
 }
 
-const GROUPS: ShortcutGroup[] = [
+interface KeyboardShortcutsHelpProps {
+  open: boolean;
+  onClose: () => void;
+  /** Override the shortcut groups shown. Defaults to the trace drawer set. */
+  groups?: ShortcutGroup[];
+}
+
+const DRAWER_GROUPS: ShortcutGroup[] = [
   {
     title: "View",
     items: [
       { keys: ["T"], label: "Trace view" },
+      { keys: ["L"], label: "LLM tab" },
       { keys: ["C"], label: "Conversation view" },
       { keys: ["M"], label: "Maximize / restore" },
       { keys: ["Esc"], label: "Close drawer / span" },
@@ -62,6 +65,7 @@ const GROUPS: ShortcutGroup[] = [
 export function KeyboardShortcutsHelp({
   open,
   onClose,
+  groups = DRAWER_GROUPS,
 }: KeyboardShortcutsHelpProps) {
   if (!open) return null;
 
@@ -121,7 +125,7 @@ export function KeyboardShortcutsHelp({
           </Box>
         </HStack>
         <VStack align="stretch" gap={5} paddingX={5} paddingY={4}>
-          {GROUPS.map((group) => (
+          {groups.map((group) => (
             <VStack key={group.title} align="stretch" gap={1.5}>
               <Text
                 textStyle="2xs"

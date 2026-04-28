@@ -4,32 +4,45 @@ import {
   Flex,
   HStack,
   Icon,
+  Skeleton,
   Text,
-  Textarea,
   VStack,
 } from "@chakra-ui/react";
 import {
   AlertTriangle,
-  Bot,
   ChevronDown,
   ChevronRight,
   Copy,
   Check,
   Settings2,
-  User,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { useTraceDrawerNavigation } from "../../hooks/useTraceDrawerNavigation";
 import type { TraceListItem } from "../../types/trace";
 import {
   abbreviateModel,
+  formatCost,
   formatDuration,
   formatRelativeTime,
+  formatTokens,
 } from "../../utils/formatters";
 import { Bubble } from "../TraceTable/registry/addons/conversation/Bubble";
+import { RenderedMarkdown } from "./MarkdownView";
+import {
+  getDisplayRoleVisuals,
+  useIsScenarioRole,
+} from "./scenarioRoles";
 import { SegmentedToggle } from "./SegmentedToggle";
+import { extractReadableText, extractReasoningText, ReasoningBlock } from "./Transcript";
 
 interface ConversationViewProps {
   conversationId: string;
@@ -37,6 +50,22 @@ interface ConversationViewProps {
 }
 
 type Mode = "bubbles" | "markdown";
+
+interface ParsedTurn {
+  turn: TraceListItem;
+  userText: string;
+  /**
+   * Pre-extracted assistant prose for the bubble. Strips Anthropic-style
+   * `{role:"assistant",content:[{type:"thinking"…},…]}` envelopes and
+   * pulls just the text blocks, so we don't dump raw JSON in the bubble.
+   */
+  assistantText: string;
+  assistantReasoning: string;
+  gapSecs: number;
+  showGap: boolean;
+}
+
+const EMPTY_TURNS: TraceListItem[] = [];
 
 export function ConversationView({
   conversationId,
@@ -46,13 +75,22 @@ export function ConversationView({
   const { navigateToTrace } = useTraceDrawerNavigation();
   const [mode, setMode] = useState<Mode>("bubbles");
 
+  // Stable time range. Inlining `Date.now()` here would re-derive the bounds
+  // every render → the query key would churn → React Query would refetch
+  // forever and the UI would never settle. Pin the window per (project,
+  // conversation).
+  const timeRange = useMemo(
+    () => {
+      const now = Date.now();
+      return { from: now - 365 * 24 * 60 * 60 * 1000, to: now };
+    },
+    [project?.id, conversationId],
+  );
+
   const query = api.tracesV2.list.useQuery(
     {
       projectId: project?.id ?? "",
-      timeRange: {
-        from: Date.now() - 365 * 24 * 60 * 60 * 1000,
-        to: Date.now(),
-      },
+      timeRange,
       sort: { columnId: "time", direction: "asc" },
       page: 1,
       pageSize: 100,
@@ -61,43 +99,78 @@ export function ConversationView({
     {
       enabled: !!project?.id && !!conversationId,
       staleTime: 30_000,
+      // Keep the previous turn list visible during background refetches
+      // instead of flashing the loading skeleton.
+      keepPreviousData: true,
     },
   );
 
-  const turns = useMemo<TraceListItem[]>(
-    () => (query.data?.items as TraceListItem[]) ?? [],
-    [query.data],
+  const turns =
+    (query.data?.items as TraceListItem[] | undefined) ?? EMPTY_TURNS;
+
+  // Single pass over `turns`: pre-parse the latest user message and the
+  // wall-clock gap to the previous turn. Without this, every ChatTurnRow
+  // re-render would re-JSON.parse the entire input payload on its own.
+  const parsedTurns = useMemo<ParsedTurn[]>(() => {
+    const out: ParsedTurn[] = new Array(turns.length);
+    for (let i = 0; i < turns.length; i++) {
+      const t = turns[i]!;
+      const prev = i > 0 ? turns[i - 1]! : undefined;
+      const gapSecs = prev
+        ? (t.timestamp - (prev.timestamp + prev.durationMs)) / 1000
+        : 0;
+      out[i] = {
+        turn: t,
+        // Use the shared Transcript helper so we handle the same shapes
+        // the I/O viewer does (chat arrays, single message objects,
+        // typed-block content arrays). parseLastUserText only handled
+        // chat arrays, missing single-message and bare-block envelopes.
+        userText: extractReadableText(t.input, "user") || parseLastUserText(t.input),
+        assistantText: extractReadableText(t.output, "assistant"),
+        assistantReasoning: extractReasoningText(t.output),
+        gapSecs,
+        showGap: gapSecs > 5,
+      };
+    }
+    return out;
+  }, [turns]);
+
+  // Stable select callback. Closes over a ref instead of `currentTraceId` so
+  // its identity doesn't change every time the user navigates to a different
+  // turn — otherwise every row's memo would bail on each navigation even
+  // though only the previously- and newly-selected rows actually change.
+  const currentTraceIdRef = useRef(currentTraceId);
+  useEffect(() => {
+    currentTraceIdRef.current = currentTraceId;
+  }, [currentTraceId]);
+  const handleSelectTurn = useCallback(
+    (traceId: string) => {
+      navigateToTrace({
+        fromTraceId: currentTraceIdRef.current,
+        fromViewMode: "conversation",
+        toTraceId: traceId,
+        toViewMode: "trace",
+      });
+    },
+    [navigateToTrace],
   );
 
-  const handleSelectTurn = (traceId: string) => {
-    navigateToTrace({
-      fromTraceId: currentTraceId,
-      fromViewMode: "conversation",
-      toTraceId: traceId,
-      toViewMode: "trace",
-    });
-  };
+  // Build markdown at the parent so the result survives mode toggles. Stay
+  // lazy: skip the build until the user has actually viewed markdown at least
+  // once, so first render in bubbles mode pays nothing.
+  const [hasViewedMarkdown, setHasViewedMarkdown] = useState(
+    () => mode === "markdown",
+  );
+  useEffect(() => {
+    if (mode === "markdown") setHasViewedMarkdown(true);
+  }, [mode]);
+  const markdown = useMemo(() => {
+    if (!hasViewedMarkdown) return "";
+    return buildConversationMarkdown(conversationId, parsedTurns);
+  }, [hasViewedMarkdown, conversationId, parsedTurns]);
 
   if (query.isLoading) {
-    return (
-      <VStack align="stretch" gap={2} padding={4}>
-        {[1, 2, 3].map((i) => (
-          <Box
-            key={i}
-            height="56px"
-            borderRadius="md"
-            bg="bg.muted"
-            css={{
-              animation: `convoPulse 1.4s ease-in-out ${i * 0.1}s infinite`,
-              "@keyframes convoPulse": {
-                "0%, 100%": { opacity: 0.55 },
-                "50%": { opacity: 0.85 },
-              },
-            }}
-          />
-        ))}
-      </VStack>
-    );
+    return <ConversationSkeleton conversationId={conversationId} />;
   }
 
   if (turns.length === 0) {
@@ -120,19 +193,118 @@ export function ConversationView({
       />
       {mode === "bubbles" ? (
         <BubblesView
-          turns={turns}
+          parsedTurns={parsedTurns}
+          systemPromptInput={turns[0]?.input}
           currentTraceId={currentTraceId}
           onSelectTurn={handleSelectTurn}
         />
       ) : (
-        <MarkdownConversationView
-          turns={turns}
-          conversationId={conversationId}
-        />
+        <MarkdownConversationView markdown={markdown} />
       )}
     </VStack>
   );
 }
+
+const SKELETON_TURNS: { user: string; assistant: [string, string?] }[] = [
+  { user: "62%", assistant: ["88%", "54%"] },
+  { user: "44%", assistant: ["76%"] },
+  { user: "70%", assistant: ["92%", "68%"] },
+];
+
+const ConversationSkeleton: React.FC<{ conversationId: string }> = ({
+  conversationId,
+}) => {
+  return (
+    <VStack
+      align="stretch"
+      gap={0}
+      height="full"
+      aria-busy="true"
+      aria-label="Loading conversation"
+    >
+      <HStack
+        gap={2}
+        paddingX={4}
+        paddingY={2.5}
+        borderBottomWidth="1px"
+        borderColor="border.muted"
+        bg="bg.subtle"
+        flexShrink={0}
+      >
+        <Text
+          textStyle="2xs"
+          color="fg.muted"
+          textTransform="uppercase"
+          letterSpacing="0.06em"
+          fontWeight="semibold"
+        >
+          Conversation
+        </Text>
+        <Text textStyle="xs" color="fg.subtle" fontFamily="mono" truncate>
+          {conversationId}
+        </Text>
+        <Box flex={1} />
+        <Skeleton height="10px" width="40px" borderRadius="sm" />
+        <Skeleton height="20px" width="96px" borderRadius="md" />
+      </HStack>
+
+      <VStack align="stretch" gap={5} paddingX={5} paddingY={4} overflow="hidden">
+        {SKELETON_TURNS.map((turn, i) => (
+          <VStack key={i} align="stretch" gap={2}>
+            <Flex align="center" gap={2}>
+              <Skeleton height="14px" width="20px" borderRadius="sm" />
+              <Box height="1px" flex={1} bg="border.muted" />
+              <Skeleton height="10px" width="48px" borderRadius="sm" />
+            </Flex>
+
+            <HStack align="flex-start" gap={2}>
+              <Skeleton boxSize="22px" borderRadius="full" flexShrink={0} />
+              <VStack
+                align="stretch"
+                gap={1}
+                flex={1}
+                maxWidth="78%"
+                borderRadius="lg"
+                borderTopLeftRadius="sm"
+                borderWidth="1px"
+                borderColor="border.muted"
+                bg="bg.subtle"
+                paddingX={3}
+                paddingY={2}
+              >
+                <Skeleton height="9px" width="32px" borderRadius="sm" />
+                <Skeleton height="11px" width={turn.user} borderRadius="sm" />
+              </VStack>
+            </HStack>
+
+            <HStack align="flex-start" gap={2} justify="flex-end">
+              <VStack
+                align="stretch"
+                gap={1}
+                flex={1}
+                maxWidth="78%"
+                borderRadius="lg"
+                borderTopRightRadius="sm"
+                borderWidth="1px"
+                borderColor="border.muted"
+                bg="bg.panel"
+                paddingX={3}
+                paddingY={2}
+              >
+                <Skeleton height="9px" width="56px" borderRadius="sm" />
+                <Skeleton height="11px" width={turn.assistant[0]} borderRadius="sm" />
+                {turn.assistant[1] && (
+                  <Skeleton height="11px" width={turn.assistant[1]} borderRadius="sm" />
+                )}
+              </VStack>
+              <Skeleton boxSize="22px" borderRadius="full" flexShrink={0} />
+            </HStack>
+          </VStack>
+        ))}
+      </VStack>
+    </VStack>
+  );
+};
 
 const ConversationHeader: React.FC<{
   conversationId: string;
@@ -174,26 +346,31 @@ const ConversationHeader: React.FC<{
 );
 
 const BubblesView: React.FC<{
-  turns: TraceListItem[];
+  parsedTurns: ParsedTurn[];
+  systemPromptInput: string | null | undefined;
   currentTraceId: string;
   onSelectTurn: (traceId: string) => void;
-}> = ({ turns, currentTraceId, onSelectTurn }) => {
+}> = ({ parsedTurns, systemPromptInput, currentTraceId, onSelectTurn }) => {
   const systemPrompt = useMemo(
-    () => parseSystemPrompt(turns[0]?.input),
-    [turns],
+    () => parseSystemPrompt(systemPromptInput),
+    [systemPromptInput],
   );
 
   return (
     <VStack align="stretch" gap={5} paddingX={5} paddingY={4} overflow="auto">
       {systemPrompt && <SystemPromptBanner text={systemPrompt} />}
-      {turns.map((turn, i) => (
+      {parsedTurns.map((p, i) => (
         <ChatTurnRow
-          key={turn.traceId}
-          turn={turn}
+          key={p.turn.traceId}
+          turn={p.turn}
+          userText={p.userText}
+          assistantText={p.assistantText}
+          assistantReasoning={p.assistantReasoning}
+          gapSecs={p.gapSecs}
+          showGap={p.showGap}
           index={i + 1}
-          prev={i > 0 ? turns[i - 1] : undefined}
-          isCurrent={turn.traceId === currentTraceId}
-          onSelect={() => onSelectTurn(turn.traceId)}
+          isCurrent={p.turn.traceId === currentTraceId}
+          onSelect={onSelectTurn}
         />
       ))}
     </VStack>
@@ -260,19 +437,53 @@ const SystemPromptBanner: React.FC<{ text: string }> = ({ text }) => {
   );
 };
 
-const ChatTurnRow: React.FC<{
+interface ChatTurnRowProps {
   turn: TraceListItem;
+  userText: string;
+  assistantText: string;
+  assistantReasoning: string;
+  gapSecs: number;
+  showGap: boolean;
   index: number;
-  prev?: TraceListItem;
   isCurrent: boolean;
-  onSelect: () => void;
-}> = ({ turn, index, prev, isCurrent, onSelect }) => {
-  const gapSecs = prev
-    ? (turn.timestamp - (prev.timestamp + prev.durationMs)) / 1000
-    : 0;
-  const showGap = gapSecs > 5;
-  const turnInput = parseLastUserText(turn.input);
-  const turnOutput = turn.output;
+  onSelect: (traceId: string) => void;
+}
+
+const ChatTurnRow = memo<ChatTurnRowProps>(function ChatTurnRow({
+  turn,
+  userText,
+  assistantText,
+  assistantReasoning,
+  gapSecs,
+  showGap,
+  index,
+  isCurrent,
+  onSelect,
+}) {
+  const handleSelect = useCallback(
+    () => onSelect(turn.traceId),
+    [onSelect, turn.traceId],
+  );
+
+  // Scenario-aware visual mapping. The text fields stay role-faithful
+  // (`userText` is whatever the source `user` message said), but the
+  // bubble's side / tone / label / icon flip in scenario mode so the
+  // agent under test reads as the trace's "user" and the simulator
+  // reads as the "assistant".
+  const isScenario = useIsScenarioRole();
+  const userVisuals = getDisplayRoleVisuals("user", { isScenario });
+  const assistantVisuals = getDisplayRoleVisuals("assistant", { isScenario });
+  const userSide = userVisuals.displayRole === "user" ? "left" : "right";
+  const assistantSide =
+    assistantVisuals.displayRole === "user" ? "left" : "right";
+  const UserIcon = userVisuals.Icon;
+  const AssistantIcon = assistantVisuals.Icon;
+  // Model abbreviation belongs with the agent's response — i.e. whichever
+  // bubble carries `assistantText`. The fallback comes from the helper so
+  // it reads "Assistant" normally and "Agent" in scenario mode.
+  const assistantLabel = turn.models[0]
+    ? abbreviateModel(turn.models[0])
+    : assistantVisuals.bubbleLabel;
 
   return (
     <VStack align="stretch" gap={2}>
@@ -290,121 +501,193 @@ const ChatTurnRow: React.FC<{
         index={index}
         turn={turn}
         isCurrent={isCurrent}
-        onSelect={onSelect}
+        onSelect={handleSelect}
       />
 
-      {turnInput && (
+      {userText && (
         <Bubble
-          side="left"
-          tone="user"
-          label="User"
-          icon={<User />}
-          text={turnInput}
+          side={userSide}
+          tone={userVisuals.displayRole}
+          label={userVisuals.bubbleLabel}
+          icon={<UserIcon />}
+          text={userText}
           isSelected={isCurrent}
-          onClick={onSelect}
+          onClick={handleSelect}
           size="compact"
           maxChars={500}
         />
       )}
 
-      {turnOutput ? (
+      {assistantText ? (
         <Bubble
-          side="right"
-          tone="assistant"
-          label={turn.models[0] ? abbreviateModel(turn.models[0]) : "Assistant"}
-          icon={<Bot />}
-          text={turnOutput}
+          side={assistantSide}
+          tone={assistantVisuals.displayRole}
+          label={assistantLabel}
+          icon={<AssistantIcon />}
+          text={assistantText}
+          reasoning={assistantReasoning}
           isSelected={isCurrent}
-          onClick={onSelect}
+          onClick={handleSelect}
           size="compact"
           maxChars={500}
         />
       ) : turn.error ? (
         <Bubble
-          side="right"
+          side={assistantSide}
           tone="error"
           label="Error"
           icon={<AlertTriangle />}
           text={turn.error}
+          reasoning={assistantReasoning}
           isSelected={isCurrent}
-          onClick={onSelect}
+          onClick={handleSelect}
+          size="compact"
+          maxChars={500}
+        />
+      ) : assistantReasoning ? (
+        <Bubble
+          side={assistantSide}
+          tone={assistantVisuals.displayRole}
+          label={assistantLabel}
+          icon={<AssistantIcon />}
+          text=""
+          reasoning={assistantReasoning}
+          isSelected={isCurrent}
+          onClick={handleSelect}
           size="compact"
           maxChars={500}
         />
       ) : null}
     </VStack>
   );
-};
+});
 
 const TurnSeparator: React.FC<{
   index: number;
   turn: TraceListItem;
   isCurrent: boolean;
   onSelect: () => void;
-}> = ({ index, turn, isCurrent, onSelect }) => (
-  <Flex
-    align="center"
-    gap={2}
-    cursor="pointer"
-    onClick={onSelect}
-    role="group"
-    _hover={{ "& > .turn-line": { bg: "border.emphasized" } }}
-  >
-    <Box
-      className="turn-line"
-      height="1px"
-      flex={1}
-      bg={isCurrent ? "blue.solid" : "border.muted"}
-      transition="background 0.12s ease"
-    />
-    <HStack gap={1.5} flexShrink={0}>
-      <Text
-        textStyle="2xs"
-        color={isCurrent ? "blue.fg" : "fg.subtle"}
-        fontWeight="600"
-        textTransform="uppercase"
-        letterSpacing="0.06em"
-      >
-        Turn {index}
-      </Text>
-      <Text textStyle="2xs" color="fg.subtle" fontFamily="mono">
-        ·
-      </Text>
-      <Text textStyle="2xs" color="fg.subtle" fontFamily="mono">
-        {formatDuration(turn.durationMs)}
-      </Text>
-      <Text textStyle="2xs" color="fg.subtle">
-        ·
-      </Text>
-      <Text textStyle="2xs" color="fg.subtle">
-        {formatRelativeTime(turn.timestamp)}
-      </Text>
-    </HStack>
-    <Box
-      className="turn-line"
-      height="1px"
-      flex={1}
-      bg={isCurrent ? "blue.solid" : "border.muted"}
-      transition="background 0.12s ease"
-    />
-  </Flex>
-);
+}> = ({ index, turn, isCurrent, onSelect }) => {
+  // Pick the bits worth showing per turn — model, duration, latency, token
+  // load, cost, error state — so the separator reads as a per-turn ledger
+  // rather than just "Turn N · Xs". Skips fields that don't apply (no cost
+  // → no `$0` chip; ok status → no error chip) to stay scannable.
+  const model = turn.models[0] ? abbreviateModel(turn.models[0]) : null;
+  const hasCost = (turn.totalCost ?? 0) > 0;
+  const hasTokens = turn.totalTokens > 0;
+  const isError = turn.status === "error";
 
-const MarkdownConversationView: React.FC<{
-  turns: TraceListItem[];
-  conversationId: string;
-}> = ({ turns, conversationId }) => {
-  const markdown = useMemo(
-    () => buildConversationMarkdown(conversationId, turns),
-    [conversationId, turns],
+  const Sep = () => (
+    <Text textStyle="2xs" color="fg.subtle" fontFamily="mono">
+      ·
+    </Text>
   );
+
+  return (
+    <Flex
+      align="center"
+      gap={2}
+      cursor="pointer"
+      onClick={onSelect}
+      role="group"
+      _hover={{ "& > .turn-line": { bg: "border.emphasized" } }}
+    >
+      <Box
+        className="turn-line"
+        height="1px"
+        flex={1}
+        bg={isCurrent ? "blue.solid" : "border.muted"}
+        transition="background 0.12s ease"
+      />
+      <HStack gap={1.5} flexShrink={0} flexWrap="wrap" justify="center">
+        <Text
+          textStyle="2xs"
+          color={isCurrent ? "blue.fg" : "fg.subtle"}
+          fontWeight="600"
+          textTransform="uppercase"
+          letterSpacing="0.06em"
+        >
+          Turn {index}
+        </Text>
+        {model && (
+          <>
+            <Sep />
+            <Text textStyle="2xs" color="fg.muted" fontFamily="mono">
+              {model}
+            </Text>
+          </>
+        )}
+        <Sep />
+        <Text textStyle="2xs" color="fg.subtle" fontFamily="mono">
+          {formatDuration(turn.durationMs)}
+        </Text>
+        {turn.ttft != null && turn.ttft > 0 && (
+          <>
+            <Sep />
+            <Text textStyle="2xs" color="fg.subtle" fontFamily="mono">
+              ttft {formatDuration(turn.ttft)}
+            </Text>
+          </>
+        )}
+        {hasTokens && (
+          <>
+            <Sep />
+            <Text textStyle="2xs" color="fg.subtle" fontFamily="mono">
+              {turn.inputTokens != null && turn.outputTokens != null
+                ? `${formatTokens(turn.inputTokens)}→${formatTokens(turn.outputTokens)}`
+                : `${formatTokens(turn.totalTokens)} tok`}
+              {turn.tokensEstimated ? "*" : ""}
+            </Text>
+          </>
+        )}
+        {hasCost && (
+          <>
+            <Sep />
+            <Text textStyle="2xs" color="fg.subtle" fontFamily="mono">
+              {formatCost(turn.totalCost)}
+            </Text>
+          </>
+        )}
+        <Sep />
+        <Text textStyle="2xs" color="fg.subtle">
+          {formatRelativeTime(turn.timestamp)}
+        </Text>
+        {isError && (
+          <>
+            <Sep />
+            <Text
+              textStyle="2xs"
+              color="red.fg"
+              fontWeight="600"
+              textTransform="uppercase"
+              letterSpacing="0.06em"
+            >
+              error
+            </Text>
+          </>
+        )}
+      </HStack>
+      <Box
+        className="turn-line"
+        height="1px"
+        flex={1}
+        bg={isCurrent ? "blue.solid" : "border.muted"}
+        transition="background 0.12s ease"
+      />
+    </Flex>
+  );
+};
+
+const MarkdownConversationView: React.FC<{ markdown: string }> = ({
+  markdown,
+}) => {
   const [copied, setCopied] = useState(false);
 
-  const handleCopy = () => {
+  const handleCopy = useCallback(() => {
     void navigator.clipboard.writeText(markdown);
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
-  };
+  }, [markdown]);
 
   return (
     <VStack align="stretch" gap={0} flex={1} minHeight={0}>
@@ -418,7 +701,7 @@ const MarkdownConversationView: React.FC<{
         flexShrink={0}
       >
         <Text textStyle="xs" color="fg.muted">
-          Plain markdown — paste into any LLM or doc.
+          Rendered for reading — Copy gives you the raw markdown source.
         </Text>
         <Box flex={1} />
         <Button
@@ -431,21 +714,8 @@ const MarkdownConversationView: React.FC<{
           {copied ? "Copied" : "Copy"}
         </Button>
       </HStack>
-      <Box flex={1} overflow="auto" padding={4} bg="bg.subtle">
-        <Textarea
-          value={markdown}
-          readOnly
-          fontFamily="mono"
-          fontSize="xs"
-          lineHeight="1.6"
-          minHeight="100%"
-          resize="none"
-          border="none"
-          background="transparent"
-          padding={0}
-          _focus={{ boxShadow: "none", outline: "none" }}
-          spellCheck={false}
-        />
+      <Box flex={1} overflow="auto" bg="bg.panel">
+        <RenderedMarkdown markdown={markdown} paddingX={4} paddingY={3} />
       </Box>
     </VStack>
   );
@@ -453,12 +723,12 @@ const MarkdownConversationView: React.FC<{
 
 function buildConversationMarkdown(
   conversationId: string,
-  turns: TraceListItem[],
+  parsedTurns: ParsedTurn[],
 ): string {
   const lines: string[] = [];
   lines.push(`# Conversation \`${conversationId}\``);
   lines.push("");
-  const systemPrompt = parseSystemPrompt(turns[0]?.input);
+  const systemPrompt = parseSystemPrompt(parsedTurns[0]?.turn.input);
   if (systemPrompt) {
     lines.push("## System");
     lines.push("");
@@ -467,32 +737,31 @@ function buildConversationMarkdown(
     lines.push("```");
     lines.push("");
   }
-  lines.push(`- **Turns:** ${turns.length}`);
-  if (turns.length > 0) {
-    const first = turns[0]!;
-    const last = turns[turns.length - 1]!;
-    lines.push(
-      `- **Started:** ${new Date(first.timestamp).toISOString()}`,
-    );
-    lines.push(
-      `- **Last turn:** ${new Date(last.timestamp).toISOString()}`,
-    );
-    const totalCost = turns.reduce((s, t) => s + (t.totalCost ?? 0), 0);
+  lines.push(`- **Turns:** ${parsedTurns.length}`);
+  if (parsedTurns.length > 0) {
+    const first = parsedTurns[0]!.turn;
+    const last = parsedTurns[parsedTurns.length - 1]!.turn;
+    lines.push(`- **Started:** ${new Date(first.timestamp).toISOString()}`);
+    lines.push(`- **Last turn:** ${new Date(last.timestamp).toISOString()}`);
+    let totalCost = 0;
+    let totalTokens = 0;
+    for (const p of parsedTurns) {
+      totalCost += p.turn.totalCost ?? 0;
+      totalTokens += p.turn.totalTokens;
+    }
     if (totalCost > 0) lines.push(`- **Total cost:** $${totalCost.toFixed(4)}`);
-    const totalTokens = turns.reduce((s, t) => s + t.totalTokens, 0);
     if (totalTokens > 0) lines.push(`- **Total tokens:** ${totalTokens}`);
   }
   lines.push("");
 
-  for (let i = 0; i < turns.length; i++) {
-    const turn = turns[i]!;
+  for (let i = 0; i < parsedTurns.length; i++) {
+    const { turn, userText } = parsedTurns[i]!;
     const model = turn.models[0] ? abbreviateModel(turn.models[0]) : "—";
     lines.push(
       `## Turn ${i + 1} — ${formatRelativeTime(turn.timestamp)} · ${model} · ${formatDuration(turn.durationMs)}`,
     );
     lines.push("");
 
-    const userText = parseLastUserText(turn.input);
     if (userText) {
       lines.push("**User:**");
       lines.push("");

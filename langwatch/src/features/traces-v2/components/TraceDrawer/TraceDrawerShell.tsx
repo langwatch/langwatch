@@ -1,4 +1,4 @@
-import { Box, Button, Skeleton, Text, VStack } from "@chakra-ui/react";
+import { Box, Skeleton, VStack } from "@chakra-ui/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Drawer } from "~/components/ui/drawer";
 import { useDrawer, useDrawerParams } from "~/hooks/useDrawer";
@@ -8,15 +8,20 @@ import { useTraceHeader } from "../../hooks/useTraceHeader";
 import { useSpanTree } from "../../hooks/useSpanSummary";
 import { useTraceDrawerNavigation } from "../../hooks/useTraceDrawerNavigation";
 import { useThreadContext } from "../../hooks/useThreadContext";
+import { usePrefetchSpanDetail } from "../../hooks/usePrefetchSpanDetail";
 import type { SpanTreeNode } from "~/server/api/routers/tracesV2.schemas";
+import { BelowFoldIndicator } from "./BelowFoldIndicator";
 import { DrawerHeader } from "./DrawerHeader";
-import { ContextualAlerts } from "./ContextualAlerts";
 import { ConversationContext } from "./ConversationContext";
 import { ConversationView } from "./ConversationView";
+import { LlmPanel } from "./LlmPanel";
+import { ScenarioView } from "./ScenarioView";
+import { ScenarioRoleProvider } from "./scenarioRoles";
 import { KeyboardShortcutsHelp } from "./KeyboardShortcutsHelp";
 import { VizPlaceholder } from "./VizPlaceholder";
 import { SpanTabBar } from "./SpanTabBar";
 import { TraceAccordions } from "./TraceAccordions";
+import { TraceDrawerEmptyState } from "./TraceDrawerEmptyState";
 
 export interface TraceV2DrawerShellProps {
   open?: boolean;
@@ -25,6 +30,12 @@ export interface TraceV2DrawerShellProps {
   span?: string;
   mode?: string;
   viz?: string;
+  /**
+   * Approximate trace timestamp (ms since epoch) — read by `useTraceHeader`
+   * as a partition-pruning hint when refetching the heavy summary fields.
+   * Optional; the bare `traceId` query path still works on cache miss.
+   */
+  t?: string;
 }
 
 export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
@@ -33,7 +44,15 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
 
   const traceId = params.traceId;
   const spanParam = params.span ?? null;
-  const vizParam = (params.viz as VizTab | undefined) ?? "waterfall";
+  // Coerce legacy "markdown" URL value to "waterfall" — that view moved to
+  // the lower SpanTabBar as a "LLM" tab and is no longer a viz option.
+  const rawViz = params.viz as string | undefined;
+  const vizParam: VizTab =
+    rawViz === "waterfall" ||
+    rawViz === "flame" ||
+    rawViz === "spanlist"
+      ? rawViz
+      : "waterfall";
 
   // Sync URL params → zustand store so hooks can read from it
   const storeOpenTrace = useDrawerStore((s) => s.openTrace);
@@ -60,10 +79,15 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
 
   const trace = headerQuery.data ?? null;
   const spanTree = spanTreeQuery.data ?? [];
-  // Only show the full-shell skeleton when we have NO header data at all.
-  // Once seed data from the row (or hover prefetch) is available, render the
-  // shell immediately; child sections handle their own per-section loading.
-  const isLoading = headerQuery.isLoading && !trace;
+  // Show the full-shell skeleton whenever we have a traceId in the URL
+  // but no result yet — including the moment before the project context
+  // has loaded and the query is still disabled. Without this guard, hard
+  // reloading a drawer URL renders the 404 page for one frame before the
+  // refetch even runs. Once data (or an error) arrives we drop into the
+  // normal shell or empty state respectively.
+  const isLoading = traceId
+    ? !trace && !headerQuery.error
+    : false;
 
   // Local UI state
   const [isMaximized, setIsMaximized] = useState(false);
@@ -74,6 +98,19 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
   const [pinnedSpanIds, setPinnedSpanIds] = useState<string[]>([]);
   const viewMode = useDrawerStore((s) => s.viewMode);
   const setStoreViewMode = useDrawerStore((s) => s.setViewMode);
+  const setStoreVizTab = useDrawerStore((s) => s.setVizTab);
+  const setStoreActiveTab = useDrawerStore((s) => s.setActiveTab);
+
+  // Mirror local drawer UI state into the global drawerStore so that
+  // out-of-tree consumers (multiplayer presence, in particular) can read
+  // the active panel/tab without threading it through props.
+  useEffect(() => {
+    setStoreVizTab(vizTab);
+  }, [vizTab, setStoreVizTab]);
+
+  useEffect(() => {
+    setStoreActiveTab(activeTab);
+  }, [activeTab, setStoreActiveTab]);
   const {
     navigateToTrace,
     goBack: goBackInTraceHistory,
@@ -81,17 +118,24 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
     backStackDepth,
   } = useTraceDrawerNavigation();
 
-  const handleViewModeChange = useCallback(
-    (mode: DrawerViewMode) => {
-      setStoreViewMode(mode);
-    },
-    [setStoreViewMode],
-  );
-
   const selectedSpan = useMemo(
     () => (selectedSpanId ? spanTree.find((s) => s.spanId === selectedSpanId) ?? null : null),
     [selectedSpanId, spanTree],
   );
+
+  // Prefetch the previous + next span's detail whenever a span is selected
+  // so [/] navigation feels instantaneous. Without this, switching with the
+  // arrow shortcuts shows the loading skeleton on every step.
+  const prefetchSpan = usePrefetchSpanDetail();
+  useEffect(() => {
+    if (!selectedSpanId || spanTree.length === 0) return;
+    const idx = spanTree.findIndex((s) => s.spanId === selectedSpanId);
+    if (idx === -1) return;
+    const prev = spanTree[idx - 1];
+    const next = spanTree[idx + 1];
+    if (prev) prefetchSpan(prev.spanId);
+    if (next) prefetchSpan(next.spanId);
+  }, [selectedSpanId, spanTree, prefetchSpan]);
 
   // Sync from URL params when they change
   useEffect(() => {
@@ -129,6 +173,7 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
   // the underlying page; only an explicit double-click means "I'm done with this
   // trace, get the panel out of my way."
   const drawerContentRef = useRef<HTMLDivElement>(null);
+  const scrollContentRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const handleDoubleClick = (e: MouseEvent) => {
       const content = drawerContentRef.current;
@@ -145,10 +190,6 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
     setIsMaximized((prev) => !prev);
   }, []);
 
-  const handleVizTabChange = useCallback((tab: VizTab) => {
-    setVizTab(tab);
-  }, []);
-
   const handleSelectSpan = useCallback((spanId: string) => {
     setSelectedSpanId(spanId);
     setActiveTab("span");
@@ -156,16 +197,6 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
   }, [storeSelectSpan]);
 
   const handleClearSpan = useCallback(() => {
-    setSelectedSpanId(null);
-    setActiveTab("summary");
-    storeClearSpan();
-  }, [storeClearSpan]);
-
-  const handleTabChange = useCallback((tab: DrawerTab) => {
-    setActiveTab(tab);
-  }, []);
-
-  const handleCloseSpanTab = useCallback(() => {
     setSelectedSpanId(null);
     setActiveTab("summary");
     storeClearSpan();
@@ -214,6 +245,11 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
         target.isContentEditable;
 
       if (isInputFocused) return;
+
+      // Don't hijack OS chords. Without this guard, Ctrl/Cmd+C (copy) was
+      // landing in the `case "c"` branch and switching to the conversation
+      // tab instead of copying the selection. Same risk for Ctrl+V/X/T etc.
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
 
       switch (e.key) {
         case "Escape": {
@@ -309,17 +345,19 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
           setVizTab("spanlist");
           break;
         }
-        case "4": {
-          e.preventDefault();
-          setVizTab("markdown");
-          break;
-        }
         case "o":
         case "O": {
           if (selectedSpanId) {
             e.preventDefault();
             setActiveTab("summary");
           }
+          break;
+        }
+        case "l":
+        case "L": {
+          e.preventDefault();
+          setStoreViewMode("trace");
+          setActiveTab("llm");
           break;
         }
         case "t":
@@ -333,6 +371,14 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
           if (trace.conversationId) {
             e.preventDefault();
             setStoreViewMode("conversation");
+          }
+          break;
+        }
+        case "s":
+        case "S": {
+          if (trace.scenarioRunId ?? trace.attributes["scenario.run_id"]) {
+            e.preventDefault();
+            setStoreViewMode("scenario");
           }
           break;
         }
@@ -355,7 +401,9 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
     canGoBack, goBackInTraceHistory, shortcutsOpen,
   ]);
 
-  // Error state: trace not found or loading failed
+  // Error state: trace not found, network failure, or no selection.
+  // The dedicated empty-state component differentiates 404 vs load-failed
+  // and surfaces the trace ID + retry path.
   if (!isLoading && !trace) {
     return (
       <Drawer.Root
@@ -365,24 +413,15 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
         onOpenChange={() => handleClose()}
       >
         <Drawer.Content>
-          <Drawer.Body>
-            <VStack justify="center" align="center" height="full" gap={3}>
-              <Text color="fg.muted" textStyle="sm">
-                {headerQuery.error
-                  ? "This trace no longer exists"
-                  : traceId
-                    ? "Failed to load trace data"
-                    : "No trace selected"}
-              </Text>
-              <Button
-                size="sm"
-                variant="solid"
-                colorPalette="blue"
-                onClick={handleClose}
-              >
-                Close
-              </Button>
-            </VStack>
+          <Drawer.Body padding={0}>
+            <TraceDrawerEmptyState
+              error={headerQuery.error}
+              traceId={traceId}
+              onClose={handleClose}
+              onRetry={() => void headerQuery.refetch()}
+              canGoBack={canGoBack}
+              onGoBack={goBackInTraceHistory}
+            />
           </Drawer.Body>
         </Drawer.Content>
       </Drawer.Root>
@@ -416,7 +455,7 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
                   trace={trace}
                   isMaximized={isMaximized}
                   viewMode={viewMode}
-                  onViewModeChange={handleViewModeChange}
+                  onViewModeChange={setStoreViewMode}
                   onToggleMaximized={handleToggleMaximized}
                   onClose={handleClose}
                   onShowShortcuts={() => setShortcutsOpen(true)}
@@ -439,10 +478,17 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
               </VStack>
             ) : trace ? (
               /* Content area — fades on switch */
+              <ScenarioRoleProvider
+                isScenario={!!(trace.scenarioRunId ?? trace.attributes["scenario.run_id"])}
+              >
               <Box
                 key={contentKey}
+                ref={scrollContentRef}
                 flex={1}
                 overflow="auto"
+                position="relative"
+                display="flex"
+                flexDirection="column"
                 css={{
                   animation: "traceDrawerFadeIn 0.15s ease-in",
                   "@keyframes traceDrawerFadeIn": {
@@ -451,59 +497,84 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
                   },
                 }}
               >
-                {viewMode === "conversation" && trace.conversationId ? (
+                {viewMode === "scenario" && (trace.scenarioRunId ?? trace.attributes["scenario.run_id"]) ? (
+                  <ScenarioView
+                    scenarioRunId={(trace.scenarioRunId ?? trace.attributes["scenario.run_id"])!}
+                  />
+                ) : viewMode === "conversation" && trace.conversationId ? (
                   <ConversationView
                     conversationId={trace.conversationId}
                     currentTraceId={trace.traceId}
                   />
                 ) : (
-                  <VStack align="stretch" gap={0}>
-                    {/* Conversation context — sibling turns */}
-                    <ConversationContext
-                      conversationId={trace.conversationId}
-                      traceId={trace.traceId}
-                    />
+                  <VStack align="stretch" gap={0} flex={1} minHeight={0}>
+                    {/* The viz + conversation context are skipped on the
+                        LLM tab — that view is a self-contained markdown
+                        document for copying, so the chrome above it would
+                        just push the prose down without adding signal. */}
+                    {activeTab !== "llm" && (
+                      <>
+                        {trace.conversationId && (
+                          <Box
+                            data-section-label="Conversation context"
+                            bg="bg.subtle"
+                            borderTopWidth="1px"
+                            borderBottomWidth="1px"
+                            borderColor="border.muted"
+                            paddingY={4}
+                          >
+                            <ConversationContext
+                              conversationId={trace.conversationId}
+                              traceId={trace.traceId}
+                            />
+                          </Box>
+                        )}
 
-                    {/* Contextual Alerts — Trace mode only */}
-                    <ContextualAlerts trace={trace} />
+                        <Box data-section-label="Visualisation" paddingTop={2}>
+                          <VizPlaceholder
+                            vizTab={vizTab}
+                            onVizTabChange={setVizTab}
+                            trace={trace}
+                            spans={spanTree}
+                            isLoading={spanTreeQuery.isLoading}
+                            selectedSpanId={selectedSpanId}
+                            onSelectSpan={handleSelectSpan}
+                            onClearSpan={handleClearSpan}
+                          />
+                        </Box>
 
-                    {/* Visualization */}
-                    <VizPlaceholder
-                      vizTab={vizTab}
-                      onVizTabChange={handleVizTabChange}
-                      trace={trace}
-                      spans={spanTree}
-                      isLoading={spanTreeQuery.isLoading}
-                      selectedSpanId={selectedSpanId}
-                      onSelectSpan={handleSelectSpan}
-                      onClearSpan={handleClearSpan}
-                    />
+                        <Box borderBottomWidth="1px" borderColor="border" />
+                      </>
+                    )}
 
-                    <Box borderBottomWidth="1px" borderColor="border" />
-
-                    {/* Tab Bar */}
                     <SpanTabBar
                       activeTab={activeTab}
-                      onTabChange={handleTabChange}
+                      onTabChange={setActiveTab}
                       selectedSpan={selectedSpan}
-                      onCloseSpanTab={handleCloseSpanTab}
+                      onCloseSpanTab={handleClearSpan}
                       pinnedSpans={pinnedSpans}
                       onSelectSpan={handleSelectSpan}
                       onPinSpan={handlePinSpan}
                       onUnpinSpan={handleUnpinSpan}
+                      traceId={trace?.traceId}
                     />
 
-                    {/* Accordions */}
-                    <TraceAccordions
-                      trace={trace}
-                      spans={spanTree}
-                      selectedSpan={selectedSpan}
-                      activeTab={activeTab}
-                      onSelectSpan={handleSelectSpan}
-                    />
+                    {activeTab === "llm" ? (
+                      <LlmPanel trace={trace} spans={spanTree} />
+                    ) : (
+                      <TraceAccordions
+                        trace={trace}
+                        spans={spanTree}
+                        selectedSpan={selectedSpan}
+                        activeTab={activeTab}
+                        onSelectSpan={handleSelectSpan}
+                      />
+                    )}
                   </VStack>
                 )}
               </Box>
+              <BelowFoldIndicator scrollRef={scrollContentRef} />
+              </ScenarioRoleProvider>
             ) : null}
           </VStack>
         </Drawer.Body>

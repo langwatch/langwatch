@@ -10,6 +10,12 @@ import {
 } from "../../utils/formatters";
 import { Tooltip } from "~/components/ui/tooltip";
 import { Kbd } from "~/components/ops/shared/Kbd";
+import { PresenceMarker } from "~/features/presence/components/PresenceMarker";
+import {
+  selectPeersMatching,
+  usePresenceStore,
+} from "~/features/presence/stores/presenceStore";
+import { usePrefetchSpanDetail } from "../../hooks/usePrefetchSpanDetail";
 
 interface SpanTabBarProps {
   activeTab: DrawerTab;
@@ -20,6 +26,45 @@ interface SpanTabBarProps {
   onSelectSpan: (spanId: string) => void;
   onPinSpan: (spanId: string) => void;
   onUnpinSpan: (spanId: string) => void;
+  traceId?: string;
+}
+
+function DrawerTabPresenceDot({
+  traceId,
+  tab,
+}: {
+  traceId: string;
+  tab: DrawerTab;
+}) {
+  const peers = usePresenceStore((s) =>
+    selectPeersMatching(
+      s,
+      (session) =>
+        session.location.route.traceId === traceId &&
+        session.location.view?.tab === tab,
+    ),
+  );
+  if (peers.length === 0) return null;
+  return <PresenceMarker peers={peers} size={16} tooltipSuffix={`${tab} tab`} />;
+}
+
+function SpanFocusPresenceDot({
+  traceId,
+  spanId,
+}: {
+  traceId: string;
+  spanId: string;
+}) {
+  const peers = usePresenceStore((s) =>
+    selectPeersMatching(
+      s,
+      (session) =>
+        session.location.route.traceId === traceId &&
+        session.location.route.spanId === spanId,
+    ),
+  );
+  if (peers.length === 0) return null;
+  return <PresenceMarker peers={peers} size={16} tooltipSuffix="this span" />;
 }
 
 export function SpanTabBar({
@@ -31,10 +76,12 @@ export function SpanTabBar({
   onSelectSpan,
   onPinSpan,
   onUnpinSpan,
+  traceId,
 }: SpanTabBarProps) {
   const isSelectedPinned = selectedSpan
     ? pinnedSpans.some((s) => s.spanId === selectedSpan.spanId)
     : false;
+  const prefetchSpan = usePrefetchSpanDetail();
 
   return (
     <HStack
@@ -44,6 +91,8 @@ export function SpanTabBar({
       borderColor="border"
       overflowX="auto"
       flexShrink={0}
+      align="stretch"
+      minHeight="38px"
       css={{ "&::-webkit-scrollbar": { display: "none" } }}
     >
       <Tooltip
@@ -67,12 +116,50 @@ export function SpanTabBar({
           fontWeight={activeTab === "summary" ? "semibold" : "medium"}
           onClick={() => onTabChange("summary")}
           paddingX={3}
-          paddingY={2}
+          paddingY={0}
+          height="38px"
           flexShrink={0}
           gap={1.5}
         >
-          Trace Summary
+          Trace
           <Kbd>O</Kbd>
+          {traceId ? (
+            <DrawerTabPresenceDot traceId={traceId} tab="summary" />
+          ) : null}
+        </Button>
+      </Tooltip>
+
+      <Tooltip
+        content={
+          <HStack gap={1}>
+            <Text>Token-efficient summary for an LLM</Text>
+            <Kbd>L</Kbd>
+          </HStack>
+        }
+        positioning={{ placement: "bottom" }}
+      >
+        <Button
+          size="sm"
+          variant="ghost"
+          borderRadius={0}
+          borderBottomWidth="2px"
+          borderBottomColor={
+            activeTab === "llm" ? "purple.solid" : "transparent"
+          }
+          color={activeTab === "llm" ? "purple.fg" : "fg.muted"}
+          fontWeight={activeTab === "llm" ? "semibold" : "medium"}
+          onClick={() => onTabChange("llm")}
+          paddingX={3}
+          paddingY={0}
+          height="38px"
+          flexShrink={0}
+          gap={1.5}
+        >
+          LLM
+          <Kbd>L</Kbd>
+          {traceId ? (
+            <DrawerTabPresenceDot traceId={traceId} tab="llm" />
+          ) : null}
         </Button>
       </Tooltip>
 
@@ -86,9 +173,15 @@ export function SpanTabBar({
             span={span}
             isActive={isActive}
             onClick={() => onSelectSpan(span.spanId)}
+            onHover={() => prefetchSpan(span.spanId)}
             actionIcon={<Icon as={LuPinOff} boxSize={3} />}
             actionLabel="Unpin span tab"
             onAction={() => onUnpinSpan(span.spanId)}
+            presence={
+              traceId ? (
+                <SpanFocusPresenceDot traceId={traceId} spanId={span.spanId} />
+              ) : null
+            }
           />
         );
       })}
@@ -105,6 +198,14 @@ export function SpanTabBar({
           secondaryActionIcon={<Icon as={LuX} boxSize={3} />}
           secondaryActionLabel="Close span tab"
           onSecondaryAction={onCloseSpanTab}
+          presence={
+            traceId ? (
+              <SpanFocusPresenceDot
+                traceId={traceId}
+                spanId={selectedSpan.spanId}
+              />
+            ) : null
+          }
         />
       )}
     </HStack>
@@ -115,24 +216,28 @@ interface SpanTabProps {
   span: SpanTreeNode;
   isActive: boolean;
   onClick: () => void;
+  onHover?: () => void;
   actionIcon: React.ReactNode;
   actionLabel: string;
   onAction: () => void;
   secondaryActionIcon?: React.ReactNode;
   secondaryActionLabel?: string;
   onSecondaryAction?: () => void;
+  presence?: React.ReactNode;
 }
 
 function SpanTab({
   span,
   isActive,
   onClick,
+  onHover,
   actionIcon,
   actionLabel,
   onAction,
   secondaryActionIcon,
   secondaryActionLabel,
   onSecondaryAction,
+  presence,
 }: SpanTabProps) {
   const activeBorderColor =
     (SPAN_TYPE_COLORS[span.type ?? "span"] as string) ?? "gray.solid";
@@ -140,7 +245,8 @@ function SpanTab({
     <HStack
       gap={1}
       paddingX={3}
-      paddingY={2}
+      paddingY={0}
+      height="38px"
       flexShrink={0}
       borderRadius={0}
       borderBottomWidth="2px"
@@ -149,6 +255,8 @@ function SpanTab({
       fontWeight={isActive ? "semibold" : "normal"}
       cursor="pointer"
       onClick={onClick}
+      onMouseEnter={onHover}
+      onFocus={onHover}
       _hover={{ bg: "bg.muted", color: "fg" }}
       transition="background 0.12s ease, color 0.12s ease"
     >
@@ -183,6 +291,8 @@ function SpanTab({
       {span.status === "error" && (
         <Circle size="6px" bg="red.solid" flexShrink={0} />
       )}
+
+      {presence}
 
       <Tooltip content={actionLabel} positioning={{ placement: "top" }}>
         <Flex

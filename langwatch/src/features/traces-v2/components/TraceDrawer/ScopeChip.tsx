@@ -10,40 +10,44 @@ interface ScopeChipProps {
 }
 
 /**
- * Compact chip surfacing the OTel instrumentation scope (e.g. the SDK
- * library that produced the span). The scope answers "where did this come
- * from" — invaluable when triaging instrumentation bugs.
+ * Quiet inline indicator for the OTel instrumentation scope (the library
+ * that produced the spans). Renders as a single subtle mono line — no
+ * badge chrome — so it reads like a footer attribution rather than a
+ * loud chip.
  */
-export function ScopeChip({ scope, prominent = false }: ScopeChipProps) {
+export function ScopeChip({ scope }: ScopeChipProps) {
   if (!scope || !scope.name) return null;
-
-  const label = scope.version ? `${scope.name} ${scope.version}` : scope.name;
-
+  const label = scope.version ? `${scope.name} v${scope.version}` : scope.name;
   return (
     <Tooltip
       content={
-        <VStack align="stretch" gap={0.5} minWidth="180px">
-          <TooltipRow label="Scope" value={scope.name} />
-          {scope.version && <TooltipRow label="Version" value={scope.version} />}
+        <VStack align="stretch" gap={1.5} minWidth="220px" maxWidth="320px">
+          <Text textStyle="xs" fontWeight="semibold">
+            Instrumentation scope
+          </Text>
+          <Text textStyle="2xs" color="fg.muted" lineHeight="1.4">
+            The OpenTelemetry library that produced these spans — useful to
+            tell apart spans coming from different SDKs or auto-instrumentations
+            within the same trace.
+          </Text>
+          <VStack align="stretch" gap={0.5} paddingTop={1}>
+            <TooltipRow label="Library" value={scope.name} />
+            {scope.version && (
+              <TooltipRow label="Version" value={scope.version} />
+            )}
+          </VStack>
         </VStack>
       }
       positioning={{ placement: "top" }}
     >
-      <HStack
-        gap={1.5}
-        paddingX={prominent ? 2 : 1.5}
-        paddingY={prominent ? 0.5 : 0}
-        borderRadius="sm"
-        bg="bg.muted"
-        flexShrink={0}
-      >
+      <HStack gap={1} flexShrink={0} cursor="help">
         <Icon as={LuPackage} boxSize={3} color="fg.subtle" />
         <Text
           textStyle="2xs"
-          color="fg.muted"
+          color="fg.subtle"
           fontFamily="mono"
           truncate
-          maxWidth="220px"
+          maxWidth="320px"
         >
           {label}
         </Text>

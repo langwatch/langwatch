@@ -9,17 +9,33 @@ import {
 } from "@chakra-ui/react";
 import {
   LuArrowLeft,
+  LuBraces,
+  LuCheck,
   LuCopy,
   LuExternalLink,
   LuKeyboard,
   LuMaximize2,
   LuMinimize2,
+  LuPin,
+  LuPinOff,
+  LuRefreshCw,
+  LuScanSearch,
   LuShare2,
+  LuSparkles,
+  LuX,
 } from "react-icons/lu";
+import { useCallback, useMemo, useState } from "react";
 import { Link } from "~/components/ui/link";
 import { Tooltip } from "~/components/ui/tooltip";
+import { api } from "~/utils/api";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useDejaViewLink } from "~/hooks/useDejaViewLink";
+import { useDrawer } from "~/hooks/useDrawer";
+import { usePinnedAttributes } from "../../hooks/usePinnedAttributes";
+import { useThreadContext } from "../../hooks/useThreadContext";
+import { useTraceResources } from "../../hooks/useTraceResources";
+import { useFilterStore } from "../../stores/filterStore";
+import type { PinnedAttribute } from "../../stores/pinnedAttributesStore";
 import type { TraceHeader } from "~/server/api/routers/tracesV2.schemas";
 import type { DrawerViewMode } from "../../stores/drawerStore";
 import {
@@ -32,7 +48,11 @@ import {
   STATUS_COLORS,
 } from "../../utils/formatters";
 import { Kbd } from "~/components/ops/shared/Kbd";
+import { parseSdkInfo } from "../../utils/sdkInfo";
 import { ModeSwitch } from "./ModeSwitch";
+import { RawJsonDialog } from "./RawJsonDialog";
+import { ScenarioChip } from "./ScenarioChip";
+import { TracePresenceAvatars } from "~/features/presence/components/TracePresenceAvatars";
 
 interface DrawerHeaderProps {
   trace: TraceHeader;
@@ -46,6 +66,26 @@ interface DrawerHeaderProps {
   onGoBack: () => void;
   backStackDepth: number;
 }
+
+interface DisplayedPin {
+  pin: PinnedAttribute;
+  auto: boolean;
+}
+
+/**
+ * Curated hoisted attribute keys we know are valuable enough to surface
+ * in the pinned strip whenever they're present on a trace. The user can
+ * still pin/unpin their own — auto-pins just bootstrap the strip so it
+ * isn't empty out of the box.
+ */
+const HOISTED_AUTO_PINS: Array<{ key: string; label: string }> = [
+  { key: "scenario.run_id", label: "Scenario run" },
+  { key: "evaluation.run_id", label: "Eval run" },
+  { key: "gen_ai.conversation.id", label: "Conversation" },
+  { key: "langwatch.thread_id", label: "Thread" },
+  { key: "langwatch.user_id", label: "User" },
+  { key: "langwatch.labels", label: "Labels" },
+];
 
 function readNumberAttribute(
   attributes: Record<string, string>,
@@ -98,21 +138,83 @@ export function DrawerHeader({
     trace.outputTokens != null &&
     (trace.inputTokens > 0 || trace.outputTokens > 0);
 
-  const sdkName = trace.attributes["sdk.name"];
-  const sdkVersion = trace.attributes["sdk.version"];
-  const sdkLanguage = trace.attributes["sdk.language"];
-  const sdkChip = sdkName
-    ? {
-        name: sdkName,
-        version: sdkVersion,
-        language: sdkLanguage,
-        label: sdkVersion ? `${sdkName} ${sdkVersion}` : sdkName,
-      }
-    : null;
+  const sdkInfo = parseSdkInfo({
+    name: trace.attributes["sdk.name"],
+    version: trace.attributes["sdk.version"],
+    language: trace.attributes["sdk.language"],
+    scenarioSdkName: trace.attributes["scenario.sdk.name"],
+    scenarioSdkVersion: trace.attributes["scenario.sdk.version"],
+    scenarioActive: !!(trace.scenarioRunId ?? trace.attributes["scenario.run_id"]),
+  });
+
+  const resources = useTraceResources(trace.traceId);
+  const threadContext = useThreadContext(
+    trace.conversationId ?? null,
+    trace.traceId,
+  );
+  const { pins, removePin } = usePinnedAttributes(project?.id);
+  // Render hoisted attributes that are present on this trace as auto-pins
+  // so users see them out of the gate. They sit before user pins and are
+  // skipped if the user has already pinned them explicitly.
+  const allPins = useMemo<DisplayedPin[]>(() => {
+    const userKeys = new Set(pins.map((p) => `${p.source}:${p.key}`));
+    const auto: DisplayedPin[] = [];
+    for (const def of HOISTED_AUTO_PINS) {
+      if (userKeys.has(`attribute:${def.key}`)) continue;
+      const value = trace.attributes[def.key];
+      if (!value) continue;
+      auto.push({
+        pin: { source: "attribute", key: def.key, label: def.label },
+        auto: true,
+      });
+    }
+    return [
+      ...auto,
+      ...pins.map<DisplayedPin>((p) => ({ pin: p, auto: false })),
+    ];
+  }, [pins, trace.attributes]);
 
   const handleCopyTraceId = () => {
     void navigator.clipboard.writeText(trace.traceId);
   };
+
+  const [rawOpen, setRawOpen] = useState(false);
+
+  const applyQueryText = useFilterStore((s) => s.applyQueryText);
+  const { closeDrawer } = useDrawer();
+  // Build a query string from the highest-signal axes available on this trace.
+  // Service + status are usually present; root span name is a strong cluster
+  // signal. We quote bare strings to keep liqe happy with spaces/dashes.
+  const findSimilarQuery = useMemo(() => {
+    const parts: string[] = [];
+    if (trace.serviceName) parts.push(`service:"${trace.serviceName}"`);
+    if (trace.status === "error") parts.push("status:error");
+    if (trace.rootSpanName) {
+      parts.push(`"${trace.rootSpanName.replace(/"/g, '\\"')}"`);
+    }
+    return parts.join(" ");
+  }, [trace.serviceName, trace.status, trace.rootSpanName]);
+  const handleFindSimilar = useCallback(() => {
+    if (!findSimilarQuery) return;
+    applyQueryText(findSimilarQuery);
+    closeDrawer();
+  }, [applyQueryText, closeDrawer, findSimilarQuery]);
+
+  const trpcUtils = api.useContext();
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const handleRefresh = useCallback(async () => {
+    if (isRefreshing) return;
+    setIsRefreshing(true);
+    try {
+      await Promise.all([
+        trpcUtils.tracesV2.header.invalidate({ traceId: trace.traceId }),
+        trpcUtils.tracesV2.spanTree.invalidate({ traceId: trace.traceId }),
+        trpcUtils.tracesV2.evals.invalidate({ traceId: trace.traceId }),
+      ]);
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [isRefreshing, trace.traceId, trpcUtils]);
 
   return (
     <VStack align="stretch" gap={2} paddingX={4} paddingY={3}>
@@ -139,8 +241,18 @@ export function DrawerHeader({
               </Button>
             </Tooltip>
           )}
-          <Text textStyle="xs" color="fg.subtle" fontFamily="mono" cursor="default" truncate>
-            trace: {trace.traceId}
+          <Text
+            textStyle="2xs"
+            color="fg.subtle"
+            fontFamily="mono"
+            cursor="default"
+            truncate
+            letterSpacing="0.02em"
+          >
+            <Text as="span" color="fg.muted" opacity={0.7}>
+              trace
+            </Text>{" "}
+            {trace.traceId}
           </Text>
           <Button
             size="xs"
@@ -157,6 +269,34 @@ export function DrawerHeader({
         </HStack>
 
         <HStack gap={1} flexShrink={0}>
+          <TracePresenceAvatars traceId={trace.traceId} max={3} size="2xs" />
+          {findSimilarQuery && (
+            <Tooltip
+              content={
+                <VStack align="stretch" gap={0.5} maxWidth="280px">
+                  <Text textStyle="xs" fontWeight="semibold">
+                    Find similar traces
+                  </Text>
+                  <Text textStyle="2xs" color="fg.muted">
+                    Closes the drawer and prefills the search with{" "}
+                    <Text as="span" fontFamily="mono">
+                      {findSimilarQuery}
+                    </Text>
+                  </Text>
+                </VStack>
+              }
+              positioning={{ placement: "bottom" }}
+            >
+              <Button
+                size="xs"
+                variant="ghost"
+                onClick={handleFindSimilar}
+                aria-label="Find similar traces"
+              >
+                <Icon as={LuScanSearch} boxSize={3.5} />
+              </Button>
+            </Tooltip>
+          )}
           <Tooltip
             content="Sharing is coming soon"
             positioning={{ placement: "bottom" }}
@@ -183,6 +323,19 @@ export function DrawerHeader({
             </Tooltip>
           )}
           <Tooltip
+            content="View raw JSON for trace + spans"
+            positioning={{ placement: "bottom" }}
+          >
+            <Button
+              size="xs"
+              variant="ghost"
+              onClick={() => setRawOpen(true)}
+              aria-label="View raw JSON"
+            >
+              <Icon as={LuBraces} boxSize={3.5} />
+            </Button>
+          </Tooltip>
+          <Tooltip
             content={
               <HStack gap={1}>
                 <Text>Keyboard shortcuts</Text>
@@ -198,6 +351,34 @@ export function DrawerHeader({
               aria-label="Show keyboard shortcuts"
             >
               <Icon as={LuKeyboard} boxSize={3.5} />
+            </Button>
+          </Tooltip>
+          <Tooltip
+            content={isRefreshing ? "Refreshing…" : "Refresh"}
+            positioning={{ placement: "bottom" }}
+          >
+            <Button
+              size="xs"
+              variant="ghost"
+              onClick={() => void handleRefresh()}
+              disabled={isRefreshing}
+              aria-label="Refresh trace"
+              css={
+                isRefreshing
+                  ? {
+                      "& svg": {
+                        animation:
+                          "tracesV2DrawerRefreshSpin 0.9s linear infinite",
+                      },
+                      "@keyframes tracesV2DrawerRefreshSpin": {
+                        from: { transform: "rotate(0deg)" },
+                        to: { transform: "rotate(360deg)" },
+                      },
+                    }
+                  : undefined
+              }
+            >
+              <Icon as={LuRefreshCw} boxSize={3.5} />
             </Button>
           </Tooltip>
           <Tooltip
@@ -221,6 +402,13 @@ export function DrawerHeader({
               />
             </Button>
           </Tooltip>
+          <Box
+            width="1px"
+            height="16px"
+            bg="border.muted"
+            marginX={0.5}
+            flexShrink={0}
+          />
           <Tooltip
             content={
               <HStack gap={1}>
@@ -236,14 +424,16 @@ export function DrawerHeader({
               onClick={onClose}
               aria-label="Close drawer"
             >
-              x
+              <Icon as={LuX} boxSize={3.5} />
             </Button>
           </Tooltip>
         </HStack>
       </HStack>
 
-      {/* Row 2: Root span name + type badge + status */}
-      <HStack gap={2} minWidth={0} flexWrap="wrap">
+      {/* Row 2: Root span name + type badge + status — primary visual
+          anchor of the header. The name reads at md so it dominates the
+          metadata above and the metric pills below. */}
+      <HStack gap={2.5} minWidth={0} flexWrap="wrap" align="center">
         {trace.rootSpanType && (
           <Text
             textStyle="2xs"
@@ -252,17 +442,25 @@ export function DrawerHeader({
               (SPAN_TYPE_COLORS[trace.rootSpanType] as string) ?? "gray.solid"
             }
             paddingX={1.5}
+            paddingY={0.5}
             borderRadius="sm"
             borderWidth="1px"
             borderColor={
               (SPAN_TYPE_COLORS[trace.rootSpanType] as string) ?? "gray.solid"
             }
+            letterSpacing="0.04em"
             flexShrink={0}
           >
             {trace.rootSpanType.toUpperCase()}
           </Text>
         )}
-        <Text fontWeight="semibold" textStyle="sm" truncate fontFamily="mono">
+        <Text
+          fontWeight="semibold"
+          textStyle="md"
+          truncate
+          fontFamily="mono"
+          letterSpacing="-0.005em"
+        >
           {trace.rootSpanName ?? trace.name}
         </Text>
         <HStack gap={1}>
@@ -270,6 +468,7 @@ export function DrawerHeader({
           {trace.status !== "ok" && (
             <Text
               textStyle="xs"
+              fontWeight="medium"
               color={statusColor}
               textTransform="capitalize"
             >
@@ -277,11 +476,23 @@ export function DrawerHeader({
             </Text>
           )}
         </HStack>
+        {threadContext.total > 1 && (
+          <ThreadProgressIndicator
+            position={threadContext.position}
+            total={threadContext.total}
+          />
+        )}
       </HStack>
 
       {/* Row 3: Metric pills */}
       <HStack gap={1.5} flexWrap="wrap">
         <MetricPill label="Duration" value={formatDuration(trace.durationMs)} />
+        {trace.spanCount > 0 && (
+          <MetricPill
+            label="Spans"
+            value={trace.spanCount.toLocaleString()}
+          />
+        )}
         {trace.ttft != null && (
           <Tooltip
             content={`Time to First Token: ${formatDuration(trace.ttft)}`}
@@ -370,6 +581,25 @@ export function DrawerHeader({
             value={abbreviateModel(trace.models[0]!)}
           />
         )}
+        {/* Pinned attribute pills sit inline with the metrics — they're
+            the same kind of "scannable badge" affordance, just driven by
+            user choice + auto-hoist instead of fixed metrics. */}
+        {allPins.map(({ pin, auto }) => {
+          const valueSource =
+            pin.source === "resource"
+              ? resources.resourceAttributes
+              : trace.attributes;
+          const value = resolveAttributeValue(valueSource, pin.key);
+          return (
+            <PinnedMetricPill
+              key={`${pin.source}:${pin.key}`}
+              pin={pin}
+              value={value}
+              auto={auto}
+              onUnpin={removePin}
+            />
+          );
+        })}
       </HStack>
 
       {/* Row 4: Context tags */}
@@ -378,25 +608,47 @@ export function DrawerHeader({
           <ContextChip>{trace.serviceName}</ContextChip>
         )}
         <ContextChip>{trace.origin}</ContextChip>
-        {sdkChip && (
+        {(trace.scenarioRunId ?? trace.attributes["scenario.run_id"]) && (
+          <ScenarioChip
+            scenarioRunId={(trace.scenarioRunId ?? trace.attributes["scenario.run_id"])!}
+          />
+        )}
+        {sdkInfo && (
           <Tooltip
             content={
-              <VStack align="stretch" gap={0.5} minWidth="160px">
-                {sdkChip.name && (
-                  <TooltipRow label="SDK" value={sdkChip.name} />
-                )}
-                {sdkChip.version && (
-                  <TooltipRow label="Version" value={sdkChip.version} />
-                )}
-                {sdkChip.language && (
-                  <TooltipRow label="Language" value={sdkChip.language} />
-                )}
+              <VStack align="stretch" gap={1.5} minWidth="220px" maxWidth="300px">
+                <Text textStyle="xs" fontWeight="semibold">
+                  {sdkInfo.longLabel}
+                </Text>
+                <Text textStyle="2xs" color="fg.muted" lineHeight="1.4">
+                  {sdkInfo.description}
+                </Text>
+                <VStack align="stretch" gap={0.5} paddingTop={1}>
+                  <TooltipRow label="Library" value={sdkInfo.rawName} />
+                  {sdkInfo.version && (
+                    <TooltipRow label="Version" value={sdkInfo.version} />
+                  )}
+                  <TooltipRow label="Language" value={sdkInfo.language} />
+                  {sdkInfo.family && (
+                    <TooltipRow label="Family" value={sdkInfo.family} />
+                  )}
+                  {sdkInfo.scenario && (
+                    <TooltipRow
+                      label="Scenario"
+                      value={
+                        sdkInfo.scenario.version
+                          ? `SDK ${sdkInfo.scenario.version}`
+                          : "active"
+                      }
+                    />
+                  )}
+                </VStack>
               </VStack>
             }
             positioning={{ placement: "top" }}
           >
             <Box>
-              <ContextChip>{sdkChip.label}</ContextChip>
+              <ContextChip>{sdkInfo.shortLabel}</ContextChip>
             </Box>
           </Tooltip>
         )}
@@ -405,17 +657,67 @@ export function DrawerHeader({
         </Text>
       </HStack>
 
-      {/* Row 5: View mode toggle (only when this trace belongs to a conversation) */}
-      {trace.conversationId && (
-        <Box marginX={-4}>
-          <ModeSwitch
-            viewMode={viewMode}
-            onViewModeChange={onViewModeChange}
-            hasConversation={!!trace.conversationId}
+      {/* Row 5: View mode toggle — always shown so the LLM-optimised view
+          is one click away. Conversation/scenario segments disable when
+          their backing data isn't on this trace. */}
+      <Box marginX={-4}>
+        <ModeSwitch
+          viewMode={viewMode}
+          onViewModeChange={onViewModeChange}
+          hasConversation={!!trace.conversationId}
+          hasScenario={!!(trace.scenarioRunId ?? trace.attributes["scenario.run_id"])}
+          traceId={trace.traceId}
+        />
+      </Box>
+      <RawJsonDialog
+        open={rawOpen}
+        onClose={() => setRawOpen(false)}
+        trace={trace}
+      />
+    </VStack>
+  );
+}
+
+function ThreadProgressIndicator({
+  position,
+  total,
+}: {
+  position: number;
+  total: number;
+}) {
+  const safePosition = Math.max(1, Math.min(position, total));
+  const percent = total > 0 ? (safePosition / total) * 100 : 0;
+  return (
+    <Tooltip
+      content={
+        <HStack gap={1}>
+          <Text>Navigate thread</Text>
+          <Kbd>J</Kbd>
+          <Kbd>K</Kbd>
+        </HStack>
+      }
+      positioning={{ placement: "bottom" }}
+    >
+      <HStack gap={1.5} flexShrink={0} cursor="default">
+        <Text textStyle="2xs" color="fg.subtle" fontFamily="mono">
+          {safePosition} / {total}
+        </Text>
+        <Box
+          width="48px"
+          height="2px"
+          borderRadius="full"
+          bg="border.muted"
+          overflow="hidden"
+        >
+          <Box
+            width={`${percent}%`}
+            height="full"
+            bg="blue.solid"
+            transition="width 0.18s ease"
           />
         </Box>
-      )}
-    </VStack>
+      </HStack>
+    </Tooltip>
   );
 }
 
@@ -436,11 +738,23 @@ function ContextChip({ children }: { children: React.ReactNode }) {
 
 function TooltipRow({ label, value }: { label: string; value: string }) {
   return (
-    <HStack justify="space-between" gap={4}>
-      <Text textStyle="xs" color="fg.muted">
+    <HStack justify="space-between" gap={4} align="flex-start" minWidth={0}>
+      <Text textStyle="xs" color="fg.muted" flexShrink={0}>
         {label}
       </Text>
-      <Text textStyle="xs" fontFamily="mono" color="fg">
+      <Text
+        textStyle="xs"
+        fontFamily="mono"
+        color="fg"
+        textAlign="right"
+        // Long values (conversation IDs, scenario run IDs) need to wrap
+        // inside the tooltip box rather than spilling out of it.
+        wordBreak="break-all"
+        whiteSpace="nowrap"
+        textOverflow="ellipsis"
+        overflow="hidden"
+        // minWidth={0}
+      >
         {value}
       </Text>
     </HStack>
@@ -472,5 +786,367 @@ function MetricPill({ label, value }: { label: string; value: string }) {
         {value}
       </Text>
     </HStack>
+  );
+}
+
+/**
+ * MetricPill-shaped pill for a pinned (or auto-pinned) attribute. Sits
+ * inline with Duration/Cost/Tokens so the user sees their pinned attrs
+ * exactly where they expect scannable data — not as a separate strip up
+ * top.
+ */
+function PinnedMetricPill({
+  pin,
+  value,
+  auto,
+  onUnpin,
+}: {
+  pin: PinnedAttribute;
+  value: string | null;
+  auto: boolean;
+  onUnpin: (source: PinnedAttribute["source"], key: string) => void;
+}) {
+  const [copied, setCopied] = useState(false);
+  const display = value ?? "—";
+  const label = pin.label ?? pin.key;
+
+  const handleCopy = useCallback(() => {
+    if (value == null) return;
+    void navigator.clipboard.writeText(value);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1200);
+  }, [value]);
+
+  const tooltipBody = (
+    <VStack
+      align="stretch"
+      gap={0.5}
+      minWidth="180px"
+      maxWidth="320px"
+    >
+      <TooltipRow
+        label={auto ? "Auto-pinned" : pin.source === "resource" ? "Resource" : "Attribute"}
+        value={pin.key}
+      />
+      <TooltipRow label="Value" value={display} />
+      <Text textStyle="2xs" color="fg.muted" paddingTop={1}>
+        Click value to copy{auto ? "" : " · click pin to unpin"}
+      </Text>
+    </VStack>
+  );
+
+  const fg = auto ? "purple.fg" : "blue.fg";
+  const bg = auto ? "purple.500/8" : "blue.500/8";
+  const border = auto ? "purple.500/30" : "blue.500/30";
+
+  return (
+    <Tooltip content={tooltipBody} positioning={{ placement: "top" }}>
+      <HStack
+        gap={1.5}
+        paddingX={2.5}
+        paddingY={0.5}
+        borderRadius="full"
+        borderWidth="1px"
+        borderColor={border}
+        bg={bg}
+        maxWidth="260px"
+        minWidth={0}
+        overflow="hidden"
+        transition="filter 0.12s ease"
+        _hover={{ filter: "brightness(1.05)" }}
+      >
+        {/* Pin icon — non-auto pins click here to unpin. Auto pins are
+            non-removable, so the icon is decorative only. */}
+        <Box
+          as={auto ? "span" : "button"}
+          onClick={
+            auto
+              ? undefined
+              : (e: React.MouseEvent) => {
+                  e.stopPropagation();
+                  onUnpin(pin.source, pin.key);
+                }
+          }
+          aria-label={auto ? undefined : `Unpin ${pin.key}`}
+          cursor={auto ? "default" : "pointer"}
+          display="inline-flex"
+          alignItems="center"
+          flexShrink={0}
+        >
+          <Icon
+            as={auto ? LuSparkles : LuPin}
+            boxSize={3}
+            color={fg}
+            flexShrink={0}
+          />
+        </Box>
+        <Text
+          textStyle="2xs"
+          color={fg}
+          fontFamily="mono"
+          textTransform="uppercase"
+          letterSpacing="0.04em"
+          fontWeight="medium"
+          truncate
+          flexShrink={0}
+          maxWidth="100px"
+        >
+          {label}
+        </Text>
+        {/* Value: click copies. Doubles as the primary affordance —
+            users mostly want the value; unpinning is secondary. */}
+        <Box
+          as="button"
+          onClick={(e: React.MouseEvent) => {
+            e.stopPropagation();
+            handleCopy();
+          }}
+          aria-label={`Copy ${pin.key}`}
+          cursor="pointer"
+          display="inline-flex"
+          alignItems="center"
+          gap={1}
+          minWidth={0}
+          flex={1}
+          overflow="hidden"
+        >
+          <Text
+            textStyle="xs"
+            color={value == null ? "fg.subtle" : "fg"}
+            fontFamily="mono"
+            fontWeight="medium"
+            truncate
+            minWidth={0}
+            flex={1}
+          >
+            {copied ? "copied" : display}
+          </Text>
+          <Icon
+            as={copied ? LuCheck : LuCopy}
+            boxSize={2.5}
+            color={fg}
+            opacity={copied ? 1 : 0.55}
+            transition="opacity 0.12s ease"
+            flexShrink={0}
+          />
+        </Box>
+      </HStack>
+    </Tooltip>
+  );
+}
+
+function formatPinValue(value: unknown): string | null {
+  if (value === undefined || value === null || value === "") return null;
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return null;
+  }
+}
+
+function resolveAttributeValue(
+  source: Record<string, string> | Record<string, unknown>,
+  key: string,
+): string | null {
+  if (key in source) {
+    return formatPinValue((source as Record<string, unknown>)[key]);
+  }
+  // Dot-path traversal as a fallback for nested objects.
+  const parts = key.split(".");
+  let current: unknown = source;
+  for (const part of parts) {
+    if (current == null || typeof current !== "object") return null;
+    current = (current as Record<string, unknown>)[part];
+  }
+  return formatPinValue(current);
+}
+
+const PIN_SOURCE_LABEL: Record<PinnedAttribute["source"], string> = {
+  attribute: "attr",
+  resource: "res",
+};
+
+function PinnedAttributesStrip({
+  pins,
+  attributes,
+  resourceAttributes,
+  onUnpin,
+}: {
+  pins: DisplayedPin[];
+  attributes: Record<string, string>;
+  resourceAttributes: Record<string, string>;
+  onUnpin: (source: PinnedAttribute["source"], key: string) => void;
+}) {
+  return (
+    <HStack
+      gap={1.5}
+      flexWrap="wrap"
+      paddingY={1}
+      paddingX={1.5}
+      borderRadius="sm"
+      bg="bg.subtle"
+      borderWidth="1px"
+      borderColor="border.muted"
+    >
+      <Tooltip
+        content="Pinned attributes (auto + team-shared)"
+        positioning={{ placement: "top" }}
+      >
+        <Icon as={LuPin} boxSize={3} color="fg.subtle" />
+      </Tooltip>
+      {pins.map(({ pin, auto }) => {
+        const valueSource =
+          pin.source === "resource" ? resourceAttributes : attributes;
+        const value = resolveAttributeValue(valueSource, pin.key);
+        return (
+          <PinnedPill
+            key={`${pin.source}:${pin.key}`}
+            pin={pin}
+            value={value}
+            auto={auto}
+            onUnpin={onUnpin}
+          />
+        );
+      })}
+    </HStack>
+  );
+}
+
+function PinnedPill({
+  pin,
+  value,
+  auto,
+  onUnpin,
+}: {
+  pin: PinnedAttribute;
+  value: string | null;
+  auto: boolean;
+  onUnpin: (source: PinnedAttribute["source"], key: string) => void;
+}) {
+  const display = value ?? "—";
+  const label = pin.label ?? pin.key;
+  // Auto-pins aren't unpinnable yet — they're driven by the trace having a
+  // hoisted attribute. Make the pill non-interactive in that case so users
+  // don't get confused by a missing-but-implied pin behaviour.
+  if (auto) {
+    return (
+      <Tooltip
+        content={
+          <VStack align="stretch" gap={0.5} minWidth="160px">
+            <TooltipRow label="Auto-pinned" value={pin.key} />
+            <TooltipRow label="Value" value={display} />
+            <Text textStyle="2xs" color="fg.muted" paddingTop={1}>
+              Always shown when present
+            </Text>
+          </VStack>
+        }
+        positioning={{ placement: "top" }}
+      >
+        <HStack
+          gap={1.5}
+          paddingX={2}
+          paddingY={0.5}
+          borderRadius="full"
+          borderWidth="1px"
+          borderColor="purple.500/30"
+          bg="purple.500/8"
+          maxWidth="280px"
+        >
+          <Icon as={LuSparkles} boxSize={3} color="purple.fg" flexShrink={0} />
+          <Text
+            textStyle="xs"
+            color="purple.fg"
+            fontFamily="mono"
+            truncate
+            maxWidth="100px"
+          >
+            {label}
+          </Text>
+          <Text
+            textStyle="xs"
+            color={value == null ? "fg.subtle" : "fg"}
+            fontFamily="mono"
+            fontWeight="medium"
+            truncate
+            maxWidth="160px"
+          >
+            {display}
+          </Text>
+        </HStack>
+      </Tooltip>
+    );
+  }
+  return (
+    <Tooltip
+      content={
+        <VStack align="stretch" gap={0.5} minWidth="160px">
+          <TooltipRow
+            label={pin.source === "resource" ? "Resource" : "Attribute"}
+            value={pin.key}
+          />
+          <TooltipRow label="Value" value={display} />
+          <Text textStyle="2xs" color="fg.muted" paddingTop={1}>
+            Click to unpin
+          </Text>
+        </VStack>
+      }
+      positioning={{ placement: "top" }}
+    >
+      <HStack
+        as="button"
+        onClick={() => onUnpin(pin.source, pin.key)}
+        gap={1.5}
+        paddingX={2}
+        paddingY={0.5}
+        borderRadius="full"
+        borderWidth="1px"
+        borderColor="border.muted"
+        bg="bg.panel"
+        cursor="pointer"
+        _hover={{ borderColor: "border.emphasized", bg: "bg.muted" }}
+        aria-label={`Unpin ${pin.key}`}
+        maxWidth="280px"
+      >
+        <Text
+          textStyle="2xs"
+          color="fg.subtle"
+          fontFamily="mono"
+          textTransform="uppercase"
+          letterSpacing="0.04em"
+          fontWeight="medium"
+          flexShrink={0}
+        >
+          {PIN_SOURCE_LABEL[pin.source]}
+        </Text>
+        <Text
+          textStyle="xs"
+          color="fg.muted"
+          fontFamily="mono"
+          truncate
+          maxWidth="100px"
+        >
+          {label}
+        </Text>
+        <Text
+          textStyle="xs"
+          color={value == null ? "fg.subtle" : "fg"}
+          fontFamily="mono"
+          fontWeight="medium"
+          truncate
+          maxWidth="160px"
+        >
+          {display}
+        </Text>
+        <Icon
+          as={LuPinOff}
+          boxSize={3}
+          color="fg.subtle"
+          flexShrink={0}
+          opacity={0.6}
+        />
+      </HStack>
+    </Tooltip>
   );
 }

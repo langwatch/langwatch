@@ -16,7 +16,6 @@ import {
   SPAN_TYPE_COLORS,
   STATUS_COLORS,
   formatDuration,
-  formatCost,
   truncateId,
 } from "../../utils/formatters";
 
@@ -33,8 +32,6 @@ type SortField =
   | "name"
   | "type"
   | "duration"
-  | "cost"
-  | "tokens"
   | "model"
   | "status"
   | "start";
@@ -43,15 +40,15 @@ type SortDirection = "asc" | "desc";
 interface DerivedSpan {
   span: SpanTreeNode;
   duration: number;
-  cost: number | undefined;
-  inputTokens: number | undefined;
-  outputTokens: number | undefined;
-  totalTokens: number | undefined;
   startOffset: number;
 }
 
 const ROW_HEIGHT = 32;
 
+// Cost + Tokens previously had columns here but the span tree payload
+// never carries those numbers (they live on the heavier per-span detail
+// query), so the cells were always empty dashes — pure noise. We drop
+// them; the per-span drawer surfaces tokens/cost when you select a row.
 const COLUMNS: {
   field: SortField;
   label: string;
@@ -63,8 +60,6 @@ const COLUMNS: {
   { field: "name", label: "Name", width: "auto", flex: 1, mono: true },
   { field: "type", label: "Type", width: "72px" },
   { field: "duration", label: "Duration", width: "76px", align: "right", mono: true },
-  { field: "cost", label: "Cost", width: "76px", align: "right", mono: true },
-  { field: "tokens", label: "Tokens", width: "88px", align: "right", mono: true },
   { field: "model", label: "Model", width: "100px" },
   { field: "status", label: "", width: "32px", align: "center" },
   { field: "start", label: "Start", width: "72px", align: "right", mono: true },
@@ -74,10 +69,6 @@ function deriveSpan(span: SpanTreeNode, rootStart: number): DerivedSpan {
   return {
     span,
     duration: span.durationMs,
-    cost: undefined,
-    inputTokens: undefined,
-    outputTokens: undefined,
-    totalTokens: undefined,
     startOffset: span.startTimeMs - rootStart,
   };
 }
@@ -86,14 +77,6 @@ function formatOffset(ms: number): string {
   if (ms === 0) return "+0ms";
   if (ms < 1_000) return `+${Math.round(ms)}ms`;
   return `+${(ms / 1_000).toFixed(1)}s`;
-}
-
-function formatTokenPair(
-  input: number | undefined,
-  output: number | undefined,
-): string {
-  if (input == null && output == null) return "\u2014";
-  return `${input ?? 0}\u2192${output ?? 0}`;
 }
 
 function compareDerived(
@@ -113,10 +96,6 @@ function compareDerived(
       );
     case "duration":
       return mul * (a.duration - b.duration);
-    case "cost":
-      return mul * ((a.cost ?? 0) - (b.cost ?? 0));
-    case "tokens":
-      return mul * ((a.totalTokens ?? 0) - (b.totalTokens ?? 0));
     case "model":
       return (
         mul * (a.span.model ?? "").localeCompare(b.span.model ?? "")
@@ -225,32 +204,11 @@ export function SpanListView({
         ? Math.max(...allDerived.map((d) => d.span.startTimeMs + d.span.durationMs)) - rootStart
         : 0;
 
-    let costSum = 0;
-    let inputTokenSum = 0;
-    let outputTokenSum = 0;
-    let hasAnyCost = false;
-    let hasAnyTokens = false;
-
-    for (const d of source) {
-      if (d.cost != null) {
-        costSum += d.cost;
-        hasAnyCost = true;
-      }
-      if (d.inputTokens != null || d.outputTokens != null) {
-        inputTokenSum += d.inputTokens ?? 0;
-        outputTokenSum += d.outputTokens ?? 0;
-        hasAnyTokens = true;
-      }
-    }
-
     return {
       duration: isFiltered && source.length > 0
         ? Math.max(...source.map((d) => d.span.startTimeMs + d.span.durationMs)) -
           Math.min(...source.map((d) => d.span.startTimeMs))
         : traceDuration,
-      cost: hasAnyCost ? costSum : undefined,
-      inputTokens: hasAnyTokens ? inputTokenSum : undefined,
-      outputTokens: hasAnyTokens ? outputTokenSum : undefined,
     };
   }, [allDerived, filteredDerived, isFiltered, rootStart]);
 
@@ -606,18 +564,6 @@ function CellContent({
           {data.duration === 0 ? "<1ms" : formatDuration(data.duration)}
         </Text>
       );
-    case "cost":
-      return (
-        <Text textStyle="xs" fontFamily="mono" color="fg.muted">
-          {data.cost != null ? formatCost(data.cost) : "\u2014"}
-        </Text>
-      );
-    case "tokens":
-      return (
-        <Text textStyle="xs" fontFamily="mono" color="fg.muted">
-          {formatTokenPair(data.inputTokens, data.outputTokens)}
-        </Text>
-      );
     case "model":
       return (
         <Text
@@ -660,9 +606,6 @@ function FooterCell({
   field: SortField;
   totals: {
     duration: number;
-    cost: number | undefined;
-    inputTokens: number | undefined;
-    outputTokens: number | undefined;
   };
   isFiltered: boolean;
 }) {
@@ -686,18 +629,6 @@ function FooterCell({
             {!isFiltered && "*"}
           </Text>
         </Tooltip>
-      );
-    case "cost":
-      return (
-        <Text textStyle="xs" fontWeight="semibold" fontFamily="mono" color="fg.muted">
-          {totals.cost != null ? formatCost(totals.cost) : "\u2014"}
-        </Text>
-      );
-    case "tokens":
-      return (
-        <Text textStyle="xs" fontWeight="semibold" fontFamily="mono" color="fg.muted">
-          {formatTokenPair(totals.inputTokens, totals.outputTokens)}
-        </Text>
       );
     default:
       return null;

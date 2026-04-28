@@ -1,15 +1,18 @@
-import { Accordion, Box, Button, HStack, Icon, Text, VStack } from "@chakra-ui/react";
+import { Accordion, Box, Button, HStack, Icon, Skeleton, Spinner, Text, VStack } from "@chakra-ui/react";
 import { LuCalendarClock, LuCircleX } from "react-icons/lu";
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { TraceHeader, SpanTreeNode } from "~/server/api/routers/tracesV2.schemas";
+import { PresenceSection } from "~/features/presence/components/PresenceSection";
+import { SectionPresenceDot } from "~/features/presence/components/SectionPresenceDot";
 import { useSpanDetail } from "../../hooks/useSpanDetail";
+import { usePrefetchSpanDetail } from "../../hooks/usePrefetchSpanDetail";
 import { useTraceEvaluations } from "../../hooks/useTraceEvaluations";
 import { useTraceResources } from "../../hooks/useTraceResources";
 import { IOViewer } from "./IOViewer";
 import { AttributeTable } from "./AttributeTable";
 import { EvalsList } from "./EvalCards";
 import { hasPromptMetadata, PromptAccordion } from "./PromptAccordion";
-import { ScopeBlock } from "./ScopeChip";
+import { ScopeBlock, ScopeChip } from "./ScopeChip";
 
 function countFlatLeaves(obj: Record<string, unknown> | undefined | null): number {
   if (!obj) return 0;
@@ -39,17 +42,35 @@ export function TraceAccordions({
   activeTab,
   onSelectSpan,
 }: TraceAccordionsProps) {
+  const presenceCtx = useMemo<SectionPresenceContext>(
+    () => ({ traceId: trace.traceId, tab: activeTab }),
+    [trace.traceId, activeTab],
+  );
+
   if (activeTab === "span" && selectedSpan) {
     return (
-      <SpanAccordions
-        traceId={trace.traceId}
-        span={selectedSpan}
-        onSelectSpan={onSelectSpan}
-      />
+      <SectionPresenceCtx.Provider value={presenceCtx}>
+        {/* Key on spanId so React fully unmounts the old span's accordion
+            state when the user switches spans — otherwise the previous
+            span's open/closed sections and stale detail flicker through
+            during the transition. */}
+        <SpanAccordions
+          key={selectedSpan.spanId}
+          traceId={trace.traceId}
+          span={selectedSpan}
+          onSelectSpan={onSelectSpan}
+        />
+      </SectionPresenceCtx.Provider>
     );
   }
   return (
-    <TraceSummaryAccordions trace={trace} spans={spans} onSelectSpan={onSelectSpan} />
+    <SectionPresenceCtx.Provider value={presenceCtx}>
+      <TraceSummaryAccordions
+        trace={trace}
+        spans={spans}
+        onSelectSpan={onSelectSpan}
+      />
+    </SectionPresenceCtx.Provider>
   );
 }
 
@@ -130,22 +151,43 @@ function useAutoOpenSections(
   return [open, setOpen];
 }
 
+interface SectionPresenceContext {
+  traceId: string;
+  tab: "summary" | "span";
+}
+const SectionPresenceCtx = createContext<SectionPresenceContext | null>(null);
+
 function Section({
   value,
   title,
   count,
+  empty,
   children,
   isFirst,
 }: {
   value: string;
   title: string;
   count?: number;
+  /**
+   * When true (and there's no count), render an "(empty)" tag inline with the
+   * title so users can see at a glance there's nothing inside without having
+   * to expand.
+   */
+  empty?: boolean;
   children: ReactNode;
   isFirst?: boolean;
-  isLast?: boolean;
 }) {
+  const presence = useContext(SectionPresenceCtx);
+  const presenceTraceId = presence?.traceId;
+  const presenceTab = presence?.tab;
+  const trackPresence = !!(presenceTraceId && presenceTab);
   return (
-    <Accordion.Item value={value} border="0">
+    <Accordion.Item
+      value={value}
+      border="0"
+      data-section-label={title}
+      data-section-count={count ?? ""}
+    >
       <Accordion.ItemTrigger
         width="100%"
         paddingX={4}
@@ -169,13 +211,38 @@ function Section({
               · {count}
             </Text>
           )}
+          {empty && (count == null || count === 0) && (
+            <Text
+              textStyle="xs"
+              color="fg.subtle"
+              fontWeight="normal"
+              fontStyle="italic"
+            >
+              · empty
+            </Text>
+          )}
+          {trackPresence ? (
+            <SectionPresenceDot
+              traceId={presenceTraceId!}
+              tab={presenceTab!}
+              section={value}
+            />
+          ) : null}
         </HStack>
         <Accordion.ItemIndicator />
       </Accordion.ItemTrigger>
       <Accordion.ItemContent>
-        <Box paddingX={4} paddingY={2} paddingBottom={3}>
-          {children}
-        </Box>
+        {trackPresence ? (
+          <PresenceSection id={value}>
+            <Box paddingX={4} paddingY={2} paddingBottom={3}>
+              {children}
+            </Box>
+          </PresenceSection>
+        ) : (
+          <Box paddingX={4} paddingY={2} paddingBottom={3}>
+            {children}
+          </Box>
+        )}
       </Accordion.ItemContent>
     </Accordion.Item>
   );
@@ -196,8 +263,8 @@ function TraceSummaryAccordions({
   const resources = useTraceResources(trace.traceId);
   const hasResourceAttributes =
     Object.keys(resources.resourceAttributes).length > 0;
-  const hasAttributes =
-    Object.keys(traceAttributes).length > 0 || hasResourceAttributes;
+  const hasTraceAttributes = Object.keys(traceAttributes).length > 0;
+  const hasAttributes = hasTraceAttributes || hasResourceAttributes;
   const hasScope = !!resources.scope?.name;
   const hasError = trace.status === "error" && !!trace.error;
 
@@ -223,35 +290,60 @@ function TraceSummaryAccordions({
     list.push("io");
     if (hasError && hasIO) list.push("exceptions");
     list.push("attributes");
-    if (hasScope) list.push("scope");
+    // Instrumentation scope is surfaced as a chip in the trace header (via
+    // sdkInfo) — no need for a separate accordion section here. Keeping the
+    // hook in case we want to bring it back later.
     list.push("evals");
     list.push("events");
     return list;
-  }, [hasIO, hasError, hasScope]);
+  }, [hasIO, hasError]);
 
   const hasEvalsContent = evalsForList.length > 0 || pendingCount > 0;
   const hasEventsContent = traceEvents.length > 0;
 
+  // Auto-open Metadata only when the trace has its own attributes — when
+  // only resource attributes are present (which is most of the time on
+  // SDK-instrumented traces), keep the section collapsed so users aren't
+  // distracted by long resource dumps that rarely change between traces.
   const [openSections, setOpenSections] = useAutoOpenSections(trace.traceId, {
     exceptions: hasError,
     io: hasIO,
-    attributes: hasAttributes,
+    attributes: hasTraceAttributes,
     scope: hasScope,
     evals: hasEvalsContent,
     events: hasEventsContent,
   });
 
   return (
+    <Box>
+    {hasScope && (
+      <Box
+        paddingX={4}
+        paddingY={2}
+        borderBottomWidth="1px"
+        borderColor="border.muted"
+      >
+        <ScopeChip scope={resources.scope} />
+      </Box>
+    )}
     <AccordionShell value={openSections} onValueChange={setOpenSections}>
       {sections.map((id, idx) => {
         const isFirst = idx === 0;
         if (id === "io") {
           return (
-            <Section key="io" value="io" title="I/O" isFirst={isFirst}>
+            <Section
+              key="io"
+              value="io"
+              title="Input and Output"
+              empty={!hasIO}
+              isFirst={isFirst}
+            >
               {hasIO ? (
                 <VStack align="stretch" gap={2}>
                   {trace.input && <IOViewer label="Input" content={trace.input} />}
-                  {trace.output && <IOViewer label="Output" content={trace.output} />}
+                  {trace.output && (
+                    <IOViewer label="Output" content={trace.output} mode="output" />
+                  )}
                 </VStack>
               ) : (
                 <EmptyHint>No I/O captured for this trace</EmptyHint>
@@ -269,6 +361,7 @@ function TraceSummaryAccordions({
               value="attributes"
               title="Metadata"
               count={attrCount}
+              empty={!hasAttributes && !resources.isLoading}
               isFirst={isFirst}
             >
               {hasAttributes ? (
@@ -338,6 +431,7 @@ function TraceSummaryAccordions({
               value="evals"
               title="Evals"
               count={evalsForList.length > 0 ? evalsForList.length : undefined}
+              empty={!evalsLoading && evalsForList.length === 0 && pendingCount === 0}
               isFirst={isFirst}
             >
               {evalsLoading ? (
@@ -366,6 +460,7 @@ function TraceSummaryAccordions({
             value="events"
             title="Events"
             count={traceEvents.length > 0 ? traceEvents.length : undefined}
+            empty={traceEvents.length === 0}
             isFirst={isFirst}
           >
             {traceEvents.length > 0 ? (
@@ -402,6 +497,7 @@ function TraceSummaryAccordions({
         );
       })}
     </AccordionShell>
+    </Box>
   );
 }
 
@@ -423,9 +519,9 @@ function SpanAccordions({
   const hasIO = !!(detail?.input || detail?.output);
   const hasResourceAttrs =
     !!spanResource && Object.keys(spanResource.resourceAttributes).length > 0;
-  const hasAttributes =
-    (!!detail?.params && Object.keys(detail.params).length > 0) ||
-    hasResourceAttrs;
+  const hasSpanAttrs =
+    !!detail?.params && Object.keys(detail.params).length > 0;
+  const hasAttributes = hasSpanAttrs || hasResourceAttrs;
   const hasScope = !!(spanScope && spanScope.name);
   const hasPrompt =
     !!detail && hasPromptMetadata(detail.params);
@@ -439,33 +535,78 @@ function SpanAccordions({
     if (hasError && hasIO) list.push("exceptions");
     if (hasPrompt) list.push("prompt");
     list.push("attributes");
-    if (hasScope) list.push("scope");
+    // Scope chip lives in the span header — no dedicated section needed.
     list.push("events");
     return list;
-  }, [hasError, hasIO, hasPrompt, hasScope]);
+  }, [hasError, hasIO, hasPrompt]);
 
+  // Same rule as the trace summary view: only auto-expand Attributes when
+  // the span itself has attributes — resource-only is rarely interesting
+  // and clutters the default view.
   const [openSections, setOpenSections] = useAutoOpenSections(span.spanId, {
     exceptions: hasError,
     io: hasIO,
     prompt: hasPrompt,
-    attributes: hasAttributes,
+    attributes: hasSpanAttrs,
     scope: hasScope,
     events: hasEvents,
   });
 
   return (
+    <Box>
+    {/* Span-switch loading banner — makes it explicit that the panel
+        below is still resolving, instead of letting the user stare at
+        an empty accordion stack and wonder if anything's happening. */}
+    {detailQuery.isLoading && (
+      <HStack
+        paddingX={4}
+        paddingY={2}
+        gap={2}
+        bg="bg.subtle"
+        borderBottomWidth="1px"
+        borderColor="border.muted"
+      >
+        <Spinner size="xs" color="blue.fg" />
+        <Text textStyle="xs" color="fg.muted" fontFamily="mono" truncate>
+          Loading span <Text as="span" color="fg">{span.name}</Text>…
+        </Text>
+      </HStack>
+    )}
+    {hasScope && (
+      <Box
+        paddingX={4}
+        paddingY={2}
+        borderBottomWidth="1px"
+        borderColor="border.muted"
+      >
+        <ScopeChip scope={spanScope} />
+      </Box>
+    )}
+    {detailQuery.isLoading ? (
+      <VStack align="stretch" gap={2} padding={4}>
+        <Skeleton height="32px" borderRadius="md" />
+        <Skeleton height="100px" borderRadius="md" />
+        <Skeleton height="64px" borderRadius="md" />
+      </VStack>
+    ) : (
     <AccordionShell value={openSections} onValueChange={setOpenSections}>
       {sections.map((id, idx) => {
         const isFirst = idx === 0;
         if (id === "io") {
           return (
-            <Section key="io" value="io" title="I/O" isFirst={isFirst}>
+            <Section
+              key="io"
+              value="io"
+              title="Input and Output"
+              empty={!detailQuery.isLoading && !hasIO}
+              isFirst={isFirst}
+            >
               {detailQuery.isLoading ? (
                 <EmptyHint>Loading…</EmptyHint>
               ) : hasIO ? (
                 <VStack align="stretch" gap={2}>
-                  {detail?.input && <IOViewer label="Input" content={detail.input} />}
-                  {detail?.output && <IOViewer label="Output" content={detail.output} />}
+                  {detail?.input && <IOViewer label="Input" content={detail.input} mode="input" />}
+                  {detail?.output && <IOViewer label="Output" content={detail.output} mode="output" />}
                 </VStack>
               ) : (
                 <EmptyHint>No I/O captured for this span</EmptyHint>
@@ -490,6 +631,9 @@ function SpanAccordions({
               value="attributes"
               title="Attributes"
               count={attrCount}
+              empty={
+                !hasAttributes && !resources.isLoading && !detailQuery.isLoading
+              }
               isFirst={isFirst}
             >
               {hasAttributes ? (
@@ -585,6 +729,7 @@ function SpanAccordions({
             value="events"
             title="Events"
             count={hasEvents ? detail!.events.length : undefined}
+            empty={!detailQuery.isLoading && !hasEvents}
             isFirst={isFirst}
           >
             {hasEvents ? (
@@ -607,6 +752,8 @@ function SpanAccordions({
         );
       })}
     </AccordionShell>
+    )}
+    </Box>
   );
 }
 
