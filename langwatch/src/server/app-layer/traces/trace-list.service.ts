@@ -163,7 +163,7 @@ export interface CategoricalFacetDescriptor {
   key: string;
   kind: "categorical";
   label: string;
-  group: "trace" | "evaluation" | "span" | "metadata";
+  group: "trace" | "evaluation" | "span" | "metadata" | "prompt";
   topValues: { value: string; label?: string; count: number }[];
   totalDistinct: number;
 }
@@ -172,7 +172,7 @@ export interface RangeFacetDescriptor {
   key: string;
   kind: "range";
   label: string;
-  group: "trace" | "evaluation" | "span" | "metadata";
+  group: "trace" | "evaluation" | "span" | "metadata" | "prompt";
   min: number;
   max: number;
 }
@@ -181,7 +181,7 @@ export interface DynamicKeysFacetDescriptor {
   key: string;
   kind: "dynamic_keys";
   label: string;
-  group: "trace" | "evaluation" | "span" | "metadata";
+  group: "trace" | "evaluation" | "span" | "metadata" | "prompt";
   topKeys: { value: string; count: number }[];
   totalDistinct: number;
 }

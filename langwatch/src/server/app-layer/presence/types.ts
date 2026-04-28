@@ -25,7 +25,12 @@ export const presenceVizTabSchema = z.enum([
   "spanlist",
   "llmspans",
 ]);
-export const presenceDrawerTabSchema = z.enum(["summary", "llm", "span"]);
+export const presenceDrawerTabSchema = z.enum([
+  "summary",
+  "llm",
+  "span",
+  "prompts",
+]);
 
 export const presenceLocationSchema = z.object({
   lens: presenceLensSchema,
