@@ -14,6 +14,14 @@ interface FreshnessSignal {
   setRefreshing: (value: boolean) => void;
   isReplacingData: boolean;
   setReplacingData: (value: boolean) => void;
+  /**
+   * One-shot flag set by the welcome flow before triggering refresh, consumed
+   * by `RefreshProgressBar` on mount to play the dramatic 3x-tall swell entrance
+   * only after Dive in. Cleared after one use so subsequent refreshes use the
+   * mild fade.
+   */
+  welcomeBoom: boolean;
+  setWelcomeBoom: (value: boolean) => void;
 }
 
 export const useFreshnessSignal = create<FreshnessSignal>((set) => ({
@@ -29,4 +37,6 @@ export const useFreshnessSignal = create<FreshnessSignal>((set) => ({
   setRefreshing: (value) => set({ isRefreshing: value }),
   isReplacingData: false,
   setReplacingData: (value) => set({ isReplacingData: value }),
+  welcomeBoom: false,
+  setWelcomeBoom: (value) => set({ welcomeBoom: value }),
 }));

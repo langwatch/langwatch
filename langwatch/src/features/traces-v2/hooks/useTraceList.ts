@@ -126,6 +126,7 @@ export function useTraceList(): TraceListResult {
     >;
     return (query.data.items as TraceListItem[]).map((item) => ({
       ...item,
+      spanCount: item.spanCount ?? 0,
       evaluations: (evalMap[item.traceId] ?? []).map((e) => ({
         evaluatorId: e.evaluatorId,
         evaluatorName: e.evaluatorName,
@@ -148,13 +149,50 @@ export function useTraceList(): TraceListResult {
     setRefreshing(isRefetching);
   }, [isRefetching, setRefreshing]);
 
-  // isPreviousData is true only when the query key changed (filter/sort/page/
-  // time-range edit) and we're still showing the old result — not on background
-  // polls. The table dims to signal the rows are about to be replaced.
+  // Dim the table only when the user explicitly switches view (filter, sort,
+  // page, pageSize, or a non-rolling time range change). isPreviousData fires
+  // on every key change including the rolling-time-range tail update, which
+  // would dim every minute on a live view. Compute a stable "view key" that
+  // ignores from/to drift while a label preset is active.
+  const viewKey = useMemo(
+    () =>
+      JSON.stringify({
+        q: effectiveQuery,
+        s: sort,
+        p: page,
+        ps: pageSize,
+        t: timeRange.label
+          ? { l: timeRange.label }
+          : { f: timeRange.from, to: timeRange.to },
+      }),
+    [
+      effectiveQuery,
+      sort,
+      page,
+      pageSize,
+      timeRange.label,
+      timeRange.from,
+      timeRange.to,
+    ],
+  );
+  const prevViewKeyRef = useRef(viewKey);
+  const [viewSwitching, setViewSwitching] = useState(false);
+  useEffect(() => {
+    if (prevViewKeyRef.current !== viewKey) {
+      prevViewKeyRef.current = viewKey;
+      setViewSwitching(true);
+    }
+  }, [viewKey]);
+  useEffect(() => {
+    if (viewSwitching && !query.isFetching && query.isFetched) {
+      setViewSwitching(false);
+    }
+  }, [viewSwitching, query.isFetching, query.isFetched]);
+
   const setReplacingData = useFreshnessSignal((s) => s.setReplacingData);
   useEffect(() => {
-    setReplacingData(query.isPreviousData);
-  }, [query.isPreviousData, setReplacingData]);
+    setReplacingData(viewSwitching && query.isPreviousData);
+  }, [viewSwitching, query.isPreviousData, setReplacingData]);
 
   return {
     data,

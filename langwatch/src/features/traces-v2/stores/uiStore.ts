@@ -1,24 +1,16 @@
 import { create } from "zustand";
 
-export type Density = "compact" | "comfortable";
-
 interface UIState {
-  density: Density;
   sidebarCollapsed: boolean;
 
-  setDensity: (d: Density) => void;
   toggleSidebar: () => void;
   setSidebarCollapsed: (collapsed: boolean) => void;
 }
 
 const STORAGE_KEY = "langwatch:traces-v2:ui";
-type Persisted = Pick<UIState, "density" | "sidebarCollapsed">;
+type Persisted = Pick<UIState, "sidebarCollapsed">;
 
-const DEFAULT_PERSISTED: Persisted = { density: "compact", sidebarCollapsed: true };
-
-function isDensity(value: unknown): value is Density {
-  return value === "compact" || value === "comfortable";
-}
+const DEFAULT_PERSISTED: Persisted = { sidebarCollapsed: true };
 
 function loadPersistedUI(): Persisted {
   if (typeof window === "undefined") return DEFAULT_PERSISTED;
@@ -27,7 +19,6 @@ function loadPersistedUI(): Persisted {
     if (!stored) return DEFAULT_PERSISTED;
     const parsed = JSON.parse(stored) as Partial<Persisted>;
     return {
-      density: isDensity(parsed.density) ? parsed.density : DEFAULT_PERSISTED.density,
       sidebarCollapsed:
         typeof parsed.sidebarCollapsed === "boolean"
           ? parsed.sidebarCollapsed
@@ -50,22 +41,16 @@ function persistUI(state: Persisted): void {
 const initial = loadPersistedUI();
 
 export const useUIStore = create<UIState>((set, get) => ({
-  density: initial.density,
   sidebarCollapsed: initial.sidebarCollapsed,
-
-  setDensity: (density) => {
-    persistUI({ density, sidebarCollapsed: get().sidebarCollapsed });
-    set({ density });
-  },
 
   toggleSidebar: () => {
     const next = !get().sidebarCollapsed;
-    persistUI({ density: get().density, sidebarCollapsed: next });
+    persistUI({ sidebarCollapsed: next });
     set({ sidebarCollapsed: next });
   },
 
   setSidebarCollapsed: (collapsed) => {
-    persistUI({ density: get().density, sidebarCollapsed: collapsed });
+    persistUI({ sidebarCollapsed: collapsed });
     set({ sidebarCollapsed: collapsed });
   },
 }));

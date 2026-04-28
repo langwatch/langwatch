@@ -9,6 +9,7 @@ import {
   setRangeInQuery,
   removeFieldFromQuery,
   removeFacetValueFromQuery,
+  validateAst,
   ParseError,
 } from "../utils/queryParser";
 
@@ -96,6 +97,10 @@ function safeParseAndSerialize(text: string): ParseResult {
   }
   try {
     const ast = parse(trimmed);
+    const semanticError = validateAst(ast);
+    if (semanticError) {
+      return { ast: EMPTY_AST, queryText: text, parseError: semanticError };
+    }
     const queryText = isEmptyAST(ast) ? "" : serialize(ast);
     return { ast, queryText, parseError: null };
   } catch (e) {
@@ -179,8 +184,10 @@ export const useFilterStore = create<FilterState>((set, get) => ({
     ) {
       return;
     }
+    // Don't commit a query string the server will reject — keep the previous
+    // debounced value so polling/refetches don't re-fire the doomed request.
     set({
-      debouncedQueryText: s.queryText,
+      debouncedQueryText: s.parseError ? s.debouncedQueryText : s.queryText,
       debouncedTimeRange: s.timeRange,
     });
   },

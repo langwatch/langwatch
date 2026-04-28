@@ -12,6 +12,8 @@ export interface FacetLens {
   name: string;
   /** Facet keys in user-customized display order. Empty = use registry order. */
   sectionOrder: string[];
+  /** Group ids in user-customized display order. Empty = use registry order. */
+  groupOrder: string[];
   /** Per-section open/closed overrides. Missing key = fall back to smart default. */
   sectionOpen: Record<string, boolean>;
 }
@@ -19,6 +21,7 @@ export interface FacetLens {
 interface FacetLensState {
   lens: FacetLens;
   setSectionOrder: (order: string[]) => void;
+  setGroupOrder: (order: string[]) => void;
   setSectionOpen: (key: string, open: boolean) => void;
   setAllSectionsOpen: (keys: string[], open: boolean) => void;
 }
@@ -29,6 +32,7 @@ const defaultLens: FacetLens = {
   id: "default",
   name: "Default",
   sectionOrder: [],
+  groupOrder: [],
   sectionOpen: {},
 };
 
@@ -43,6 +47,9 @@ function loadLens(): FacetLens {
       name: parsed.name ?? defaultLens.name,
       sectionOrder: Array.isArray(parsed.sectionOrder)
         ? parsed.sectionOrder.filter((k): k is string => typeof k === "string")
+        : [],
+      groupOrder: Array.isArray(parsed.groupOrder)
+        ? parsed.groupOrder.filter((k): k is string => typeof k === "string")
         : [],
       sectionOpen:
         parsed.sectionOpen && typeof parsed.sectionOpen === "object"
@@ -69,6 +76,13 @@ export const useFacetLensStore = create<FacetLensState>((set) => ({
   setSectionOrder: (order) =>
     set((s) => {
       const next: FacetLens = { ...s.lens, sectionOrder: order };
+      persistLens(next);
+      return { lens: next };
+    }),
+
+  setGroupOrder: (order) =>
+    set((s) => {
+      const next: FacetLens = { ...s.lens, groupOrder: order };
       persistLens(next);
       return { lens: next };
     }),

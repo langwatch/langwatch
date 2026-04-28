@@ -41,6 +41,13 @@ export function useTraceNewCount(): TraceNewCountResult {
   const [intervalMs, setIntervalMs] = useState(FAST_MS);
   const consecutiveZerosRef = useRef(0);
 
+  // SSE is the primary freshness signal. When it's connected, the listener
+  // in useTraceFreshness invalidates this query as soon as data changes,
+  // so polling is unnecessary. We only fall back to polling when SSE is
+  // unavailable (connecting / disconnected / error).
+  const sseConnectionState = useFreshnessSignal((s) => s.sseConnectionState);
+  const sseConnected = sseConnectionState === "connected";
+
   // Reset to fast polling when SSE events signal new data
   const fastPollRequestedAt = useFreshnessSignal((s) => s.fastPollRequestedAt);
   useEffect(() => {
@@ -71,7 +78,7 @@ export function useTraceNewCount(): TraceNewCountResult {
     {
       enabled: !!project?.id,
       staleTime: 0,
-      refetchInterval: isVisible ? intervalMs : false,
+      refetchInterval: isVisible && !sseConnected ? intervalMs : false,
       onSuccess: (data) => {
         if (data.count === 0) {
           consecutiveZerosRef.current += 1;

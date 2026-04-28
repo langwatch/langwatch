@@ -55,11 +55,13 @@ export function useURLSync(): void {
   const allLenses = useViewStore((s) => s.allLenses);
   const sort = useViewStore((s) => s.sort);
   const grouping = useViewStore((s) => s.grouping);
+  const density = useViewStore((s) => s.density);
   const columnOrder = useViewStore((s) => s.columnOrder);
   const hiddenColumns = useViewStore((s) => s.hiddenColumns);
   const selectLens = useViewStore((s) => s.selectLens);
   const setSort = useViewStore((s) => s.setSort);
   const setGrouping = useViewStore((s) => s.setGrouping);
+  const setDensity = useViewStore((s) => s.setDensity);
   const setVisibleColumns = useViewStore((s) => s.setVisibleColumns);
 
   // Initialize from fragment on mount
@@ -95,6 +97,7 @@ export function useURLSync(): void {
     if (overrides.columns) setVisibleColumns(overrides.columns);
     if (overrides.grouping) setGrouping(overrides.grouping);
     if (overrides.sort) setSort(overrides.sort);
+    if (overrides.density) setDensity(overrides.density);
     // Apply page last — applyQueryText/setTimeRange reset it to 1.
     if (overrides.page !== undefined) setPage(overrides.page);
   }, [
@@ -106,6 +109,7 @@ export function useURLSync(): void {
     setVisibleColumns,
     setGrouping,
     setSort,
+    setDensity,
   ]);
 
   // Sync state → fragment (debounced). One effect, one timer; the cleanup
@@ -128,6 +132,7 @@ export function useURLSync(): void {
         columns: visibleColumns,
         grouping,
         sort,
+        density,
       });
 
       // Default lens with no overrides → empty fragment for clean URL.
@@ -151,5 +156,6 @@ export function useURLSync(): void {
     hiddenColumns,
     grouping,
     sort,
+    density,
   ]);
 }

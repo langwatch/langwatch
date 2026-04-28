@@ -29,6 +29,7 @@ function listItemToHeader(item: TraceListItem): TraceHeader {
     ttft: item.ttft,
     rootSpanName: item.rootSpanName ?? null,
     rootSpanType: item.rootSpanType ?? null,
+    scenarioRunId: null,
     attributes: {},
     events: (item.events ?? []).map((e) => ({
       spanId: e.spanId,

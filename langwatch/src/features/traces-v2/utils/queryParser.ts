@@ -11,19 +11,44 @@
  *   model:gpt*                      — wildcard
  *   cost:>0.01                      — comparison
  *   cost:[0.01 TO 1.00]             — range
+ *   spans:>5                        — span count comparison
+ *   spans:[10 TO 50]                — span count range
  *   "refund policy"                 — free-text search
  *   refund                          — unquoted free-text
  */
 
 import {
   parse as liqeParse,
-  serialize as liqeSerialize,
+  serialize as liqeRawSerialize,
   SyntaxError as LiqeSyntaxError,
   type LiqeQuery,
 } from "liqe";
 
 export type { LiqeQuery };
-export { liqeSerialize as serialize };
+
+/**
+ * `liqe`'s serializer occasionally emits queries that its own parser then
+ * rejects — most reliably the range form: `cost:[0.01 TO 1]AND foo:bar` (no
+ * space between `]` and the next boolean operator). It also leaves runs of
+ * whitespace intact when inner clauses are removed. Both round-trip into the
+ * same `Invalid filter syntax` 422 from the backend.
+ *
+ * Normalise post-serialisation: insert a space between `]` / `)` and a
+ * following `AND` / `OR` / `NOT`, and collapse adjacent whitespace.
+ */
+function normalizeQueryString(s: string): string {
+  return s
+    .replace(/([\]\)])(?=(?:AND|OR|NOT)\b)/gi, "$1 ")
+    .replace(/\b(?:AND|OR|NOT)\b\s+/gi, (m) => m.replace(/\s+/g, " "))
+    .replace(/[ \t]{2,}/g, " ")
+    .trim();
+}
+
+export function serialize(ast: LiqeQuery): string {
+  return normalizeQueryString(liqeRawSerialize(ast));
+}
+
+const liqeSerialize = serialize;
 
 const EMPTY_AST: LiqeQuery = {
   type: "EmptyExpression",
@@ -40,8 +65,43 @@ export class ParseError extends Error {
   }
 }
 
+const TOKEN_START_PRECEDERS = new Set([" ", "\t", "\n", "("]);
+
+/**
+ * Strip the `@` autocomplete trigger sigil before parsing. The `@` opens the
+ * suggestion dropdown but is not valid liqe syntax — once the user submits,
+ * any stray triggers need to be removed. Only strip `@` at token-start
+ * positions and outside quoted strings, so a literal `@` inside a value like
+ * `"user@example.com"` is preserved.
+ */
+export function stripAtSigils(text: string): string {
+  let out = "";
+  let inQuotes = false;
+  let quoteChar = "";
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i] as string;
+    if (inQuotes) {
+      out += ch;
+      if (ch === quoteChar) inQuotes = false;
+      continue;
+    }
+    if (ch === '"' || ch === "'") {
+      out += ch;
+      inQuotes = true;
+      quoteChar = ch;
+      continue;
+    }
+    if (ch === "@") {
+      const prev = i === 0 ? undefined : text[i - 1];
+      if (prev === undefined || TOKEN_START_PRECEDERS.has(prev)) continue;
+    }
+    out += ch;
+  }
+  return out;
+}
+
 export function parse(query: string): LiqeQuery {
-  const trimmed = query.trim();
+  const trimmed = stripAtSigils(query).trim();
   if (trimmed.length === 0) return EMPTY_AST;
   try {
     return liqeParse(trimmed);
@@ -57,6 +117,34 @@ export function parse(query: string): LiqeQuery {
 
 export function isEmptyAST(ast: LiqeQuery): boolean {
   return ast.type === "EmptyExpression";
+}
+
+/**
+ * Walk the AST after a successful syntactic parse and reject queries the
+ * server can't execute. Catches `field:` (no value) — liqe parses it as a
+ * `Tag` whose expression is `EmptyExpression`, but the backend rejects with a
+ * 422. Returning the error here lets the SearchBar surface red-border feedback
+ * and prevents the doomed query from being committed and re-fired by polling.
+ */
+export function validateAst(ast: LiqeQuery): string | null {
+  if (ast.type === "Tag") {
+    if (ast.expression.type === "EmptyExpression") {
+      const fieldName =
+        ast.field.type === "ImplicitField" ? "" : ast.field.name;
+      return fieldName
+        ? `Missing value after \`${fieldName}:\``
+        : "Missing value after `:`";
+    }
+    return null;
+  }
+  if (ast.type === "UnaryOperator") return validateAst(ast.operand);
+  if (ast.type === "LogicalExpression") {
+    return validateAst(ast.left) ?? validateAst(ast.right);
+  }
+  if (ast.type === "ParenthesizedExpression") {
+    return validateAst(ast.expression);
+  }
+  return null;
 }
 
 export interface SearchFieldMeta {
@@ -86,6 +174,9 @@ export const SEARCH_FIELDS: Readonly<Record<string, SearchFieldMeta>> = {
   none: { label: "None", hasSidebar: false, valueType: "existence" },
   event: { label: "Event", hasSidebar: false, valueType: "text" },
   eval: { label: "Eval", hasSidebar: false, valueType: "text" },
+  evaluatorStatus: { label: "Evaluator Status", hasSidebar: true, facetField: "evaluatorStatus", valueType: "categorical" },
+  evaluatorPassed: { label: "Evaluator Verdict", hasSidebar: true, facetField: "evaluatorPassed", valueType: "categorical" },
+  evaluatorScore: { label: "Evaluator Score", hasSidebar: true, facetField: "evaluatorScore", valueType: "range" },
   trace: { label: "Trace", hasSidebar: false, valueType: "text" },
 };
 
@@ -130,6 +221,8 @@ export const FIELD_VALUES: Record<string, string[]> = {
     "pending",
     "queued",
   ],
+  evaluatorStatus: ["scheduled", "in_progress", "processed", "skipped", "error"],
+  evaluatorPassed: ["pass", "fail", "unknown"],
 };
 
 export type FacetState = "neutral" | "include" | "exclude";

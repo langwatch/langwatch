@@ -1,4 +1,5 @@
 import type {
+  Density,
   GroupingMode,
   LensConfig,
   SortConfig,
@@ -16,6 +17,7 @@ export interface BarStateOverrides {
   columns?: string[];
   grouping?: GroupingMode;
   sort?: SortConfig;
+  density?: Density;
 }
 
 export interface FragmentState {
@@ -33,6 +35,10 @@ const VALID_GROUPINGS: ReadonlySet<GroupingMode> = new Set([
 
 function isGroupingMode(value: string): value is GroupingMode {
   return VALID_GROUPINGS.has(value as GroupingMode);
+}
+
+function isDensity(value: string): value is Density {
+  return value === "compact" || value === "comfortable";
 }
 
 function parseSort(value: string): SortConfig | undefined {
@@ -110,6 +116,9 @@ export function parseFragment(fragment: string): FragmentState | null {
       const parsed = parseSort(sort);
       if (parsed) overrides.sort = parsed;
     }
+
+    const density = params.get("density");
+    if (density && isDensity(density)) overrides.density = density;
   }
 
   return { lensId, overrides };
@@ -124,6 +133,7 @@ interface ComputeOverridesInput {
   columns: string[];
   grouping: GroupingMode;
   sort: SortConfig;
+  density: Density;
 }
 
 function arraysEqual(a: readonly string[], b: readonly string[]): boolean {
@@ -161,6 +171,9 @@ export function computeOverrides(
   if (!sortsEqual(input.sort, input.activeLens.sort)) {
     overrides.sort = input.sort;
   }
+  if (input.density !== input.activeLens.density) {
+    overrides.density = input.density;
+  }
   return overrides;
 }
 
@@ -185,6 +198,7 @@ export function buildFragment(
   if (overrides.sort) {
     params.set("sort", `${overrides.sort.columnId}:${overrides.sort.direction}`);
   }
+  if (overrides.density) params.set("density", overrides.density);
   const encodedLens = encodeURIComponent(lensId);
   const paramStr = params.toString();
   return paramStr ? `${encodedLens}?${paramStr}` : encodedLens;
