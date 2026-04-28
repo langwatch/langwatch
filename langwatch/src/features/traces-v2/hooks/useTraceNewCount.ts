@@ -17,6 +17,19 @@ interface TraceNewCountResult {
   acknowledge: () => void;
 }
 
+function nextBackoffInterval(
+  consecutiveZeros: number,
+  current: number,
+): number {
+  if (consecutiveZeros >= BACKOFF_THRESHOLD * 2 && current < IDLE_MS) {
+    return IDLE_MS;
+  }
+  if (consecutiveZeros >= BACKOFF_THRESHOLD && current < SLOW_MS) {
+    return SLOW_MS;
+  }
+  return current;
+}
+
 export function useTraceNewCount(): TraceNewCountResult {
   const { project } = useOrganizationTeamProject();
   const timeRange = useFilterStore((s) => s.timeRange);
@@ -29,9 +42,7 @@ export function useTraceNewCount(): TraceNewCountResult {
   const consecutiveZerosRef = useRef(0);
 
   // Reset to fast polling when SSE events signal new data
-  const fastPollRequestedAt = useFreshnessSignal(
-    (s) => s.fastPollRequestedAt,
-  );
+  const fastPollRequestedAt = useFreshnessSignal((s) => s.fastPollRequestedAt);
   useEffect(() => {
     if (fastPollRequestedAt === 0) return;
     consecutiveZerosRef.current = 0;
@@ -64,17 +75,9 @@ export function useTraceNewCount(): TraceNewCountResult {
       onSuccess: (data) => {
         if (data.count === 0) {
           consecutiveZerosRef.current += 1;
-          if (
-            consecutiveZerosRef.current >= BACKOFF_THRESHOLD * 2 &&
-            intervalMs < IDLE_MS
-          ) {
-            setIntervalMs(IDLE_MS);
-          } else if (
-            consecutiveZerosRef.current >= BACKOFF_THRESHOLD &&
-            intervalMs < SLOW_MS
-          ) {
-            setIntervalMs(SLOW_MS);
-          }
+          setIntervalMs((current) =>
+            nextBackoffInterval(consecutiveZerosRef.current, current),
+          );
         } else {
           consecutiveZerosRef.current = 0;
           setIntervalMs(FAST_MS);

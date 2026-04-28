@@ -52,12 +52,30 @@ export function useOpenTraceDrawer() {
   return useCallback(
     (trace: TraceListItem) => {
       if (project?.id) {
+        // Seed both keyed-with-timestamp and keyed-without — the drawer
+        // hook always sends `occurredAtMs` when present in the URL, but
+        // other entry points (back-stack, conversation jumps) don't, so
+        // we keep the bare key seeded as a fallback.
+        const seed = (prev?: TraceHeader) => prev ?? listItemToHeader(trace);
         utils.tracesV2.header.setData(
           { projectId: project.id, traceId: trace.traceId },
-          (prev) => prev ?? listItemToHeader(trace),
+          seed,
+        );
+        utils.tracesV2.header.setData(
+          {
+            projectId: project.id,
+            traceId: trace.traceId,
+            occurredAtMs: trace.timestamp,
+          },
+          seed,
         );
       }
-      openDrawer("traceV2Details", { traceId: trace.traceId });
+      openDrawer("traceV2Details", {
+        traceId: trace.traceId,
+        // `t` (timestamp) is read by useTraceHeader as a partition-pruning
+        // hint when refetching the heavy summary fields.
+        t: String(trace.timestamp),
+      });
     },
     [openDrawer, project?.id, utils],
   );

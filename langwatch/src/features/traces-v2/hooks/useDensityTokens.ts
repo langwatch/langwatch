@@ -28,7 +28,7 @@ export interface DensityTokens {
   errorDetailPaddingBottom: string;
 }
 
-const COMPACT: DensityTokens = {
+const COMPACT: Readonly<DensityTokens> = {
   rowPaddingY: "4px",
   rowFontSize: "12px",
   ioFontSize: "11px",
@@ -40,7 +40,7 @@ const COMPACT: DensityTokens = {
   errorDetailPaddingBottom: "5px",
 };
 
-const COMFORTABLE: DensityTokens = {
+const COMFORTABLE: Readonly<DensityTokens> = {
   rowPaddingY: "12px",
   rowFontSize: "14px",
   ioFontSize: "13px",

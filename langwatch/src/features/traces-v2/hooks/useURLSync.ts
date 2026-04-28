@@ -7,7 +7,7 @@
  * exactly, the fragment collapses to just `#<lensId>`. Deep-link query params
  * (trace, span, viz, mode) are intentionally left untouched.
  */
-import { useCallback, useEffect, useRef } from "react";
+import { useEffect, useRef } from "react";
 import { useFilterStore } from "../stores/filterStore";
 import { useViewStore } from "../stores/viewStore";
 import {
@@ -32,16 +32,15 @@ function writeFragment(fragmentBody: string): void {
   const newHash = fragmentBody ? `#${fragmentBody}` : "";
   const newURL = `${window.location.pathname}${window.location.search}${newHash}`;
   const currentURL = `${window.location.pathname}${window.location.search}${window.location.hash}`;
-  if (newURL !== currentURL) {
-    window.history.replaceState(null, "", newURL || window.location.pathname);
-  }
+  if (newURL === currentURL) return;
+  window.history.replaceState(null, "", newURL || window.location.pathname);
 }
 
 /**
  * Hook that synchronizes bar state with the URL fragment.
  * Call once at the page level (TracesPage).
  */
-export function useURLSync() {
+export function useURLSync(): void {
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isInitialized = useRef(false);
 
@@ -81,12 +80,7 @@ export function useURLSync() {
       const preset = getPresetById(overrides.preset);
       if (preset) {
         const { from, to } = preset.compute();
-        setTimeRange({
-          from,
-          to,
-          label: preset.label,
-          presetId: preset.id,
-        });
+        setTimeRange({ from, to, label: preset.label, presetId: preset.id });
       }
     } else if (
       overrides.timeFrom !== undefined &&
@@ -95,9 +89,7 @@ export function useURLSync() {
       const range = { from: overrides.timeFrom, to: overrides.timeTo };
       const preset = matchPreset(range);
       setTimeRange(
-        preset
-          ? { ...range, label: preset.label, presetId: preset.id }
-          : range,
+        preset ? { ...range, label: preset.label, presetId: preset.id } : range,
       );
     }
     if (overrides.columns) setVisibleColumns(overrides.columns);
@@ -116,10 +108,12 @@ export function useURLSync() {
     setSort,
   ]);
 
-  // Sync state → fragment (debounced)
-  const syncToURL = useCallback(() => {
-    if (debounceTimer.current) clearTimeout(debounceTimer.current);
+  // Sync state → fragment (debounced). One effect, one timer; the cleanup
+  // clears any pending write so the final unmount can't race with replaceState.
+  useEffect(() => {
+    if (!isInitialized.current) return;
 
+    if (debounceTimer.current) clearTimeout(debounceTimer.current);
     debounceTimer.current = setTimeout(() => {
       const activeLens = allLenses.find((l) => l.id === activeLensId);
       if (!activeLens) return;
@@ -143,6 +137,10 @@ export function useURLSync() {
       }
       writeFragment(buildFragment(activeLensId, overrides));
     }, DEBOUNCE_MS);
+
+    return () => {
+      if (debounceTimer.current) clearTimeout(debounceTimer.current);
+    };
   }, [
     activeLensId,
     allLenses,
@@ -154,16 +152,4 @@ export function useURLSync() {
     grouping,
     sort,
   ]);
-
-  useEffect(() => {
-    if (!isInitialized.current) return;
-    syncToURL();
-  }, [syncToURL]);
-
-  // Cleanup
-  useEffect(() => {
-    return () => {
-      if (debounceTimer.current) clearTimeout(debounceTimer.current);
-    };
-  }, []);
 }

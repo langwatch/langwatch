@@ -7,10 +7,32 @@ import { useDrawerStore } from "../stores/drawerStore";
 
 export type RichEval = EvalSummary & {
   evaluatorId: string;
+  evaluatorType?: string;
   spanId?: string;
   spanName?: string;
+  /**
+   * Free-text explanation produced by the evaluator (`details` on the
+   * Evaluation). For pass/fail/warn this is the model's reasoning; for
+   * skipped runs it's the "why we didn't run" message.
+   */
   reasoning?: string;
+  /** Categorical/string label, when the evaluator produces one. */
+  label?: string;
+  /** Boolean pass/fail flag from a numeric/categorical evaluator. */
+  passed?: boolean;
+  /** Inputs the evaluator actually saw — useful for understanding a verdict. */
+  inputs?: Record<string, unknown>;
+  /**
+   * Crash details when the evaluator errored. `message` is human-readable;
+   * `stacktrace` is the full Python/JS trace if the worker captured one.
+   */
+  errorMessage?: string;
+  errorStacktrace?: string[];
+  retries?: number;
   executionTime?: number;
+  evalCost?: number;
+  /** Wall-clock when the evaluator started, ms epoch. Used to order history. */
+  timestamp?: number;
 };
 
 export interface TraceEvaluationsResult {
@@ -21,7 +43,12 @@ export interface TraceEvaluationsResult {
 }
 
 function mapStatus(ev: Evaluation): EvalSummary["status"] {
-  if (ev.status === "error") return "fail";
+  // Preserve the distinction between "evaluator failed to run" and
+  // "evaluator ran and the verdict was fail". Earlier this collapsed
+  // skipped/error into warning/fail, which produced misleading "WARN
+  // 0.00 / 1.00" rows for evaluators that were never configured.
+  if (ev.status === "error") return "error";
+  if (ev.status === "skipped") return "skipped";
   if (ev.status === "processed") {
     if (ev.passed === true) return "pass";
     if (ev.passed === false) return "fail";
@@ -79,13 +106,24 @@ export function useTraceEvaluations(): TraceEvaluationsResult {
 
         return {
           evaluatorId: e.evaluator_id,
+          evaluatorType: e.type ?? undefined,
           name: e.name,
           score: mapScore(e),
           scoreType: mapScoreType(e),
           status: mapStatus(e),
           spanId: e.span_id ?? undefined,
           reasoning: e.details ?? undefined,
+          label: e.label ?? undefined,
+          passed: e.passed ?? undefined,
+          inputs:
+            e.inputs && typeof e.inputs === "object"
+              ? (e.inputs as Record<string, unknown>)
+              : undefined,
+          errorMessage: e.error?.message ?? undefined,
+          errorStacktrace: e.error?.stacktrace ?? undefined,
+          retries: e.retries ?? undefined,
           executionTime,
+          timestamp: started ?? undefined,
         };
       });
 
