@@ -1,20 +1,4 @@
-/**
- * Span-level type used for coloring in drawer views (waterfall, flame, span list).
- * Not associated with TraceListItem — traces no longer carry a top-level spanType.
- */
-export type SpanType =
-  | "llm"
-  | "tool"
-  | "agent"
-  | "chain"
-  | "rag"
-  | "evaluation"
-  | "span"
-  | "module";
-
 export type TraceStatus = "ok" | "error" | "warning";
-
-export type Origin = "application" | "simulation" | "evaluation";
 
 /**
  * Lightweight eval summary for table column rendering.
@@ -24,18 +8,14 @@ export interface EvalSummary {
   name: string;
   score: number | boolean;
   scoreType: "numeric" | "boolean" | "categorical";
-  status: "pass" | "warning" | "fail";
-}
-
-/**
- * Lightweight event summary for table column rendering.
- * Full event detail (attributes, stack traces) is fetched on demand in the drawer.
- */
-export interface EventSummary {
-  name: string;
-  isException: boolean;
-  isFeedback: boolean;
-  feedbackDirection?: "up" | "down";
+  /**
+   * - `pass` / `fail` / `warning` — the evaluator ran and produced a verdict.
+   * - `skipped` — the evaluator wasn't run (e.g. provider not configured,
+   *   preconditions not met). The score is meaningless; don't show it.
+   * - `error` — the evaluator crashed / errored out. Distinct from a "fail"
+   *   verdict — the evaluator never produced a real score.
+   */
+  status: "pass" | "warning" | "fail" | "skipped" | "error";
 }
 
 /**
@@ -86,29 +66,11 @@ export interface TraceListItem {
   errorSpanName?: string;
   conversationId?: string;
   userId?: string;
-  origin: Origin;
+  origin: "application" | "simulation" | "evaluation";
   tokensEstimated?: boolean;
   ttft?: number;
   rootSpanName?: string | null;
   rootSpanType?: string | null;
   evaluations: TraceEvalResult[];
   events: TraceListEvent[];
-}
-
-export interface ConversationTurn {
-  turnNumber: number;
-  trace: TraceListItem;
-}
-
-export interface Conversation {
-  conversationId: string;
-  turns: ConversationTurn[];
-  totalDurationMs: number;
-  totalCost: number;
-  totalTokens: number;
-  firstTimestamp: number;
-  lastTimestamp: number;
-  models: string[];
-  toolCallCount: number;
-  errorCount: number;
 }
