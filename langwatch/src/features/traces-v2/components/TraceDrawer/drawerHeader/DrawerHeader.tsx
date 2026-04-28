@@ -7,7 +7,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import {
   LuArrowLeft,
   LuBraces,
@@ -111,7 +111,7 @@ const HOISTED_AUTO_PINS: Array<{ key: string; label: string }> = [
   { key: "langwatch.labels", label: "Labels" },
 ];
 
-export function DrawerHeader({
+export const DrawerHeader = memo(function DrawerHeader({
   trace,
   isMaximized,
   onSelectSpan,
@@ -692,4 +692,4 @@ export function DrawerHeader({
       />
     </VStack>
   );
-}
+});

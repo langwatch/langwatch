@@ -96,6 +96,12 @@ export const FacetSection: React.FC<FacetSectionProps> = ({
             size="xs"
             colorPalette="blue"
             borderRadius="full"
+            minW="4"
+            height="4"
+            paddingX={1}
+            display="inline-flex"
+            alignItems="center"
+            justifyContent="center"
           >
             {activeCount}
           </Badge>

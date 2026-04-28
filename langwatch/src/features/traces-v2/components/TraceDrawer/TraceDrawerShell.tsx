@@ -1,5 +1,5 @@
 import { Box, Skeleton, VStack } from "@chakra-ui/react";
-import { AnimatePresence, motion } from "motion/react";
+import { motion } from "motion/react";
 import {
   lazy,
   Suspense,
@@ -40,8 +40,15 @@ const ConversationView = lazy(() =>
 );
 import { DrawerHeader } from "./drawerHeader";
 import { KeyboardShortcutsHelp } from "./KeyboardShortcutsHelp";
-import { LlmPanel } from "./LlmPanel";
-import { PromptsPanel } from "./PromptsPanel";
+// LlmPanel + PromptsPanel are only rendered when their tabs are active.
+// Lazy-load so the LLM-tab-only Markdown / Shiki cost (and the Prompts-tab
+// only chip rendering) doesn't bloat the trace drawer's initial bundle.
+const LlmPanel = lazy(() =>
+  import("./LlmPanel").then((m) => ({ default: m.LlmPanel })),
+);
+const PromptsPanel = lazy(() =>
+  import("./PromptsPanel").then((m) => ({ default: m.PromptsPanel })),
+);
 import { SpanTabBar } from "./SpanTabBar";
 import { ScenarioRoleProvider } from "./scenarioRoles";
 import { TraceDrawerEmptyState } from "./TraceDrawerEmptyState";
@@ -265,6 +272,22 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
   // Warm sibling trace headers so navigating between turns is instant.
   useThreadPrefetch(trace?.conversationId ?? null, trace?.traceId ?? null);
 
+  // Lockout for thread navigation: ignore J/K presses while a navigation is
+  // in flight, plus 500ms of grace time after the fetch completes. Stops the
+  // user from queueing up a stack of overlapping nudges if they hammer J.
+  const NAV_GRACE_MS = 500;
+  const navLockedRef = useRef(false);
+  useEffect(() => {
+    if (headerQuery.isFetching) {
+      navLockedRef.current = true;
+      return;
+    }
+    const id = setTimeout(() => {
+      navLockedRef.current = false;
+    }, NAV_GRACE_MS);
+    return () => clearTimeout(id);
+  }, [headerQuery.isFetching]);
+
   // Direction the user is moving in the conversation thread, derived from
   // the change in thread position. Drives the body's slide animation: J
   // (forward) slides left → in, K (backward) slides right → in. -1 = forward,
@@ -385,6 +408,10 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
         case "ArrowRight":
         case "j":
         case "J": {
+          if (navLockedRef.current) {
+            e.preventDefault();
+            break;
+          }
           if (threadContext.next) {
             e.preventDefault();
             navigateToTrace({
@@ -399,6 +426,10 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
         case "ArrowLeft":
         case "k":
         case "K": {
+          if (navLockedRef.current) {
+            e.preventDefault();
+            break;
+          }
           if (threadContext.previous) {
             e.preventDefault();
             navigateToTrace({
@@ -672,58 +703,34 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
                 <Skeleton height="80px" borderRadius="md" />
               </VStack>
             ) : trace ? (
-              /* Bookshelf-style content area — fast & snappy.
-                 AnimatePresence keyed on traceId remounts the body per
-                 trace; the outgoing pane slides one way, the new one
-                 slides in from the opposite side. Stiffness is cranked
-                 high so the spring resolves in ~150ms — feels instant
-                 but you still register direction. Heavy children are
-                 lazy-loaded + memoized elsewhere so per-trace remount
-                 cost is acceptable. */
+              /* Crossfade + tiny direction-nudge during navigation. Single
+                 persistent motion.div (no key change → no remount → heavy
+                 children stay mounted, viz state survives). Opacity dips
+                 and the body offsets a few pixels in the navigation
+                 direction during the fetch; springs back when the new
+                 trace lands. ~140ms total — reads as motion in peripheral
+                 vision without paying the cost of an actual slide. */
               <ScenarioRoleProvider
                 isScenario={
                   !!(trace.scenarioRunId ?? trace.attributes["scenario.run_id"])
                 }
               >
-                <Box
-                  flex={1}
-                  position="relative"
-                  overflow="hidden"
-                  display="flex"
-                  flexDirection="column"
-                >
-                <AnimatePresence
-                  mode="popLayout"
-                  initial={false}
-                  custom={navDirection}
-                >
                 <motion.div
-                  key={trace.traceId}
                   ref={scrollContentRef}
-                  custom={navDirection}
-                  variants={{
-                    enter: (dir: number) => ({
-                      x: dir === 0 ? 0 : dir * 80,
-                      opacity: dir === 0 ? 1 : 0,
-                    }),
-                    center: { x: 0, opacity: 1 },
-                    exit: (dir: number) => ({
-                      x: -dir * 80,
-                      opacity: 0,
-                    }),
+                  animate={{
+                    opacity: headerQuery.isFetching ? 0.55 : 1,
+                    x: headerQuery.isFetching ? navDirection * 12 : 0,
                   }}
-                  initial="enter"
-                  animate="center"
-                  exit="exit"
                   transition={{
                     type: "spring",
-                    stiffness: 600,
-                    damping: 42,
+                    stiffness: 480,
+                    damping: 38,
                     mass: 0.5,
                   }}
                   style={{
                     flex: 1,
                     overflow: "auto",
+                    position: "relative",
                     display: "flex",
                     flexDirection: "column",
                     minHeight: 0,
@@ -804,13 +811,31 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
                       />
 
                       {activeTab === "llm" ? (
-                        <LlmPanel trace={trace} spans={spanTree} />
+                        <Suspense
+                          fallback={
+                            <VStack align="stretch" gap={2} padding={4}>
+                              <Skeleton height="40px" borderRadius="md" />
+                              <Skeleton height="120px" borderRadius="md" />
+                            </VStack>
+                          }
+                        >
+                          <LlmPanel trace={trace} spans={spanTree} />
+                        </Suspense>
                       ) : activeTab === "prompts" ? (
-                        <PromptsPanel
-                          trace={trace}
-                          spans={spanTree}
-                          onSelectSpan={handleSelectSpan}
-                        />
+                        <Suspense
+                          fallback={
+                            <VStack align="stretch" gap={2} padding={4}>
+                              <Skeleton height="40px" borderRadius="md" />
+                              <Skeleton height="60px" borderRadius="md" />
+                            </VStack>
+                          }
+                        >
+                          <PromptsPanel
+                            trace={trace}
+                            spans={spanTree}
+                            onSelectSpan={handleSelectSpan}
+                          />
+                        </Suspense>
                       ) : (
                         <TraceAccordions
                           trace={trace}
@@ -823,9 +848,7 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
                     </VStack>
                   )}
                 </motion.div>
-                </AnimatePresence>
                 <BelowFoldIndicator scrollRef={scrollContentRef} />
-                </Box>
               </ScenarioRoleProvider>
             ) : null}
           </VStack>

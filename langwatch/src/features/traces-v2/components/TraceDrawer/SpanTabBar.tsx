@@ -7,6 +7,7 @@ import {
   Icon,
   Text,
 } from "@chakra-ui/react";
+import { memo } from "react";
 import { LuChevronDown, LuFileText, LuPin, LuPinOff, LuX } from "react-icons/lu";
 import { Kbd } from "~/components/ops/shared/Kbd";
 import { Menu } from "~/components/ui/menu";
@@ -101,7 +102,7 @@ function SpanFocusPresenceDot({
   return <PresenceMarker peers={peers} size={16} tooltipSuffix="this span" />;
 }
 
-export function SpanTabBar({
+export const SpanTabBar = memo(function SpanTabBar({
   activeTab,
   onTabChange,
   selectedSpan,
@@ -314,7 +315,7 @@ export function SpanTabBar({
       )}
     </HStack>
   );
-}
+});
 
 interface SpanTabProps {
   span: SpanTreeNode;

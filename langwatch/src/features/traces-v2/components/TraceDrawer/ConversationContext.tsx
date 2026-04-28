@@ -8,7 +8,15 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { LuArrowLeft, LuArrowRight, LuMessageCircle } from "react-icons/lu";
+import { AnimatePresence, motion } from "motion/react";
+import { memo, useEffect, useRef, useState } from "react";
+import {
+  LuArrowLeft,
+  LuArrowRight,
+  LuCircleDashed,
+  LuFlag,
+  LuMessageCircle,
+} from "react-icons/lu";
 import { Tooltip } from "~/components/ui/tooltip";
 import {
   type ThreadTurn,
@@ -34,6 +42,10 @@ interface ConversationRow {
   /** "previous" / "current" / "next" relative to the visible trace */
   position: "previous" | "current" | "next";
   status: ThreadTurn["status"];
+  /** True when the slot has no real turn — render as a "boundary" hint. */
+  isPlaceholder?: boolean;
+  /** Boundary kind for placeholders: "start" or "end" of conversation. */
+  boundary?: "start" | "end";
 }
 
 const MAX_PREVIEW = 140;
@@ -146,66 +158,104 @@ function buildRows({
   current: ThreadTurn | null;
   next: ThreadTurn | null;
 }): ConversationRow[] {
-  const rows: ConversationRow[] = [];
+  // Always returns exactly 3 rows so the section's height is stable. Missing
+  // prev/next slots become "Start of conversation" / "End of conversation"
+  // placeholders.
+  const placeholder = (
+    pos: "previous" | "next",
+    boundary: "start" | "end",
+  ): ConversationRow => ({
+    key: `${pos}-placeholder`,
+    traceId: "",
+    role: "user",
+    text:
+      boundary === "start"
+        ? "Start of conversation"
+        : "End of conversation",
+    position: pos,
+    status: "ok",
+    isPlaceholder: true,
+    boundary,
+  });
+
+  let prevRow: ConversationRow;
   if (previous) {
-    // For a sibling turn we prefer the user side (what was asked); fall
-    // back to the assistant reply if that side is empty.
     const text =
       extractReadableSnippet(previous.input, "user") ||
-      extractReadableSnippet(previous.output, "assistant");
-    if (text) {
-      rows.push({
-        key: `prev-${previous.traceId}`,
-        traceId: previous.traceId,
-        role: previous.input ? "user" : "assistant",
-        text,
-        position: "previous",
-        status: previous.status,
-      });
-    }
+      extractReadableSnippet(previous.output, "assistant") ||
+      "(empty)";
+    prevRow = {
+      key: `prev-${previous.traceId}`,
+      traceId: previous.traceId,
+      role: previous.input ? "user" : "assistant",
+      text,
+      position: "previous",
+      status: previous.status,
+    };
+  } else {
+    prevRow = placeholder("previous", "start");
   }
+
+  let currRow: ConversationRow | null = null;
   if (current) {
-    // For the current turn we surface the assistant reply (what was said
-    // back) — the user prompt is rendered elsewhere in the drawer.
     const text =
       extractReadableSnippet(current.output, "assistant") ||
-      extractReadableSnippet(current.input, "user");
-    if (text) {
-      rows.push({
-        key: `curr-${current.traceId}`,
-        traceId: current.traceId,
-        role: current.output ? "assistant" : "user",
-        text,
-        position: "current",
-        status: current.status,
-      });
-    }
+      extractReadableSnippet(current.input, "user") ||
+      "(empty)";
+    currRow = {
+      key: `curr-${current.traceId}`,
+      traceId: current.traceId,
+      role: current.output ? "assistant" : "user",
+      text,
+      position: "current",
+      status: current.status,
+    };
   }
+
+  let nextRow: ConversationRow;
   if (next) {
     const text =
       extractReadableSnippet(next.input, "user") ||
-      extractReadableSnippet(next.output, "assistant");
-    if (text) {
-      rows.push({
-        key: `next-${next.traceId}`,
-        traceId: next.traceId,
-        role: next.input ? "user" : "assistant",
-        text,
-        position: "next",
-        status: next.status,
-      });
-    }
+      extractReadableSnippet(next.output, "assistant") ||
+      "(empty)";
+    nextRow = {
+      key: `next-${next.traceId}`,
+      traceId: next.traceId,
+      role: next.input ? "user" : "assistant",
+      text,
+      position: "next",
+      status: next.status,
+    };
+  } else {
+    nextRow = placeholder("next", "end");
   }
-  return rows;
+
+  return currRow ? [prevRow, currRow, nextRow] : [];
 }
 
-export function ConversationContext({
+export const ConversationContext = memo(function ConversationContext({
   conversationId,
   traceId,
 }: ConversationContextProps) {
   const { navigateToTrace } = useTraceDrawerNavigation();
   const viewMode = useDrawerStore((s) => s.viewMode);
   const ctx = useThreadContext(conversationId, traceId);
+
+  // Direction the user is moving in the conversation thread, derived from
+  // change in thread position. Drives the bookshelf slide on the row strip:
+  // -1 = forward (J), +1 = backward (K), 0 = first render / non-thread nav.
+  const prevPosRef = useRef<number | null>(null);
+  const [navDirection, setNavDirection] = useState<-1 | 0 | 1>(0);
+  useEffect(() => {
+    const next = ctx.position;
+    const prev = prevPosRef.current;
+    prevPosRef.current = next;
+    if (prev == null || !next || prev === next) {
+      setNavDirection(0);
+      return;
+    }
+    setNavDirection(next > prev ? -1 : 1);
+  }, [ctx.position, traceId]);
 
   if (!conversationId) return null;
 
@@ -297,28 +347,63 @@ export function ConversationContext({
           </Text>
         </Box>
       ) : (
-        <VStack
-          align="stretch"
-          gap={0}
+        // Bookshelf slide on navigation: the whole 3-row strip slides up
+        // (J / forward) or down (K / backward), exiting one strip while the
+        // new one slides in from the opposite side. Same snappy spring as
+        // the body bookshelf.
+        <Box
+          position="relative"
           borderRadius="md"
           borderWidth="1px"
           borderColor="border.muted"
           bg="bg.panel"
           overflow="hidden"
         >
-          {rows.map((row, i) => (
-            <ConversationRow
-              key={row.key}
-              row={row}
-              isLast={i === rows.length - 1}
-              onClick={() => navigate(row.traceId)}
-            />
-          ))}
-        </VStack>
+          <AnimatePresence
+            mode="popLayout"
+            initial={false}
+            custom={navDirection}
+          >
+            <motion.div
+              key={traceId}
+              custom={navDirection}
+              variants={{
+                enter: (dir: number) => ({
+                  y: dir === 0 ? 0 : dir * 24,
+                  opacity: dir === 0 ? 1 : 0,
+                }),
+                center: { y: 0, opacity: 1 },
+                exit: (dir: number) => ({ y: -dir * 24, opacity: 0 }),
+              }}
+              initial="enter"
+              animate="center"
+              exit="exit"
+              transition={{
+                type: "spring",
+                stiffness: 600,
+                damping: 42,
+                mass: 0.5,
+              }}
+            >
+              <VStack align="stretch" gap={0}>
+                {rows.map((row, i) => (
+                  <ConversationRow
+                    key={row.key}
+                    row={row}
+                    isLast={i === rows.length - 1}
+                    onClick={() =>
+                      row.isPlaceholder ? undefined : navigate(row.traceId)
+                    }
+                  />
+                ))}
+              </VStack>
+            </motion.div>
+          </AnimatePresence>
+        </Box>
       )}
     </Box>
   );
-}
+});
 
 function ConversationRow({
   row,
@@ -330,19 +415,55 @@ function ConversationRow({
   onClick: () => void;
 }) {
   const isCurrent = row.position === "current";
+  const isPlaceholder = !!row.isPlaceholder;
   // Scenario mode swaps icon + accent so the prev/curr/next chips line up
   // with the bubble headers in the body of the drawer.
   const visuals = useDisplayRoleVisuals(row.role);
-  const RoleIcon = visuals.Icon;
-  const iconColor =
-    visuals.displayRole === "assistant" ? "blue.fg" : "fg.muted";
+  const RoleIcon = isPlaceholder
+    ? row.boundary === "start"
+      ? LuFlag
+      : LuCircleDashed
+    : visuals.Icon;
+  const iconColor = isPlaceholder
+    ? "fg.subtle"
+    : visuals.displayRole === "assistant"
+      ? "blue.fg"
+      : "fg.muted";
   const Affordance =
-    row.position === "previous"
+    !isPlaceholder && row.position === "previous"
       ? LuArrowLeft
-      : row.position === "next"
+      : !isPlaceholder && row.position === "next"
         ? LuArrowRight
         : null;
   const statusColor = STATUS_COLORS[row.status] as string;
+
+  if (isPlaceholder) {
+    return (
+      <Flex
+        align="center"
+        gap={2.5}
+        paddingX={3}
+        paddingY={2}
+        borderBottomWidth={isLast ? 0 : "1px"}
+        borderColor="border.muted"
+        opacity={0.55}
+        cursor="default"
+      >
+        <Box width="18px" flexShrink={0} />
+        <Icon as={RoleIcon} boxSize={3.5} color={iconColor} flexShrink={0} />
+        <Text
+          textStyle="xs"
+          color="fg.subtle"
+          fontStyle="italic"
+          truncate
+          flex={1}
+          minWidth={0}
+        >
+          {row.text}
+        </Text>
+      </Flex>
+    );
+  }
 
   return (
     <Tooltip

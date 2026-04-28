@@ -56,29 +56,31 @@ export function ThreadedTurnView({
       {!isLast && (
         <Box
           position="absolute"
-          left="9px"
+          left="7px"
           top="22px"
           bottom={0}
           width="1px"
           bg="border.muted"
         />
       )}
+      {/* A neutral chip with a colored icon — keeps the role signal but
+          drops the loud colored fill that was competing with the row text. */}
       <Flex
         position="absolute"
         left={0}
-        top="4px"
-        width="18px"
-        height="18px"
+        top="6px"
+        width="14px"
+        height="14px"
         borderRadius="full"
-        bg={`${colorBase}.subtle`}
+        bg="bg.subtle"
         borderWidth="1px"
-        borderColor={`${colorBase}.muted`}
+        borderColor="border.subtle"
         align="center"
         justify="center"
         flexShrink={0}
         zIndex={1}
       >
-        <Icon as={RoleIcon} boxSize="10px" color={color} />
+        <Icon as={RoleIcon} boxSize="8px" color={color} />
       </Flex>
 
       <HStack

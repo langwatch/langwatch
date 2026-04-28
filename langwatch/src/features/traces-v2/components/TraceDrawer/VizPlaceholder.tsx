@@ -1,4 +1,12 @@
-import { Box, Flex, HStack, Icon, Text, VStack } from "@chakra-ui/react";
+import {
+  Box,
+  Flex,
+  HStack,
+  Icon,
+  Skeleton,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
 import {
   lazy,
   Suspense,
@@ -458,12 +466,10 @@ export function VizPlaceholder({
   );
 }
 
-const PULSE_KEYFRAMES = {
-  "@keyframes vizPulse": {
-    "0%, 100%": { opacity: 0.55 },
-    "50%": { opacity: 0.85 },
-  },
-} as const;
+// Each skeleton block uses Chakra's <Skeleton> which already provides the
+// built-in shimmer animation. No custom keyframes needed — every block in
+// every viz skeleton inherits the same loading shimmer for a consistent
+// feel.
 
 /**
  * Loading skeleton dispatched by the active viz tab. Each variant mimics
@@ -492,7 +498,7 @@ const WATERFALL_ROWS = [
 
 function WaterfallSkeleton() {
   return (
-    <Flex direction="row" height="full" css={PULSE_KEYFRAMES}>
+    <Flex direction="row" height="full" position="relative">
       <VStack
         align="stretch"
         gap={1.5}
@@ -505,41 +511,20 @@ function WaterfallSkeleton() {
         {WATERFALL_ROWS.map((row, i) => (
           <Flex key={i} height="14px" align="center" gap={2}>
             <Box width={`${row.depth * 10}px`} flexShrink={0} />
-            <Box
-              width="8px"
-              height="8px"
-              borderRadius="full"
-              bg="bg.muted"
-              flexShrink={0}
-              css={{
-                animation: `vizPulse 1.4s ease-in-out ${i * 0.08}s infinite`,
-              }}
-            />
-            <Box
-              height="8px"
-              borderRadius="sm"
-              bg="bg.muted"
-              flex={1}
-              css={{
-                animation: `vizPulse 1.4s ease-in-out ${i * 0.08}s infinite`,
-              }}
-            />
+            <Skeleton width="8px" height="8px" borderRadius="full" />
+            <Skeleton height="8px" borderRadius="sm" flex={1} />
           </Flex>
         ))}
       </VStack>
       <VStack align="stretch" gap={1.5} flex={0.6} paddingX={3} paddingY={3}>
         {WATERFALL_ROWS.map((row, i) => (
           <Flex key={i} height="14px" align="center" position="relative">
-            <Box
+            <Skeleton
               position="absolute"
               left={`${row.barLeft}%`}
               width={`${row.barWidth}%`}
               height="10px"
               borderRadius="sm"
-              bg="blue.muted"
-              css={{
-                animation: `vizPulse 1.4s ease-in-out ${i * 0.08}s infinite`,
-              }}
             />
           </Flex>
         ))}
@@ -577,12 +562,11 @@ function FlameSkeleton() {
       paddingX={3}
       paddingY={3}
       height="full"
-      css={PULSE_KEYFRAMES}
     >
       {FLAME_STRIPS.map((strip, depth) => (
         <Box key={depth} position="relative" height="22px">
           {strip.map((seg, i) => (
-            <Box
+            <Skeleton
               key={i}
               position="absolute"
               top={0}
@@ -590,10 +574,6 @@ function FlameSkeleton() {
               width={`${seg.width}%`}
               height="full"
               borderRadius="sm"
-              bg={depth === 0 ? "purple.muted" : "blue.muted"}
-              css={{
-                animation: `vizPulse 1.4s ease-in-out ${(depth + i) * 0.08}s infinite`,
-              }}
             />
           ))}
         </Box>
@@ -603,50 +583,14 @@ function FlameSkeleton() {
 }
 
 function SpanListSkeleton() {
+  // Minimal: one horizontal bar per row, consistent rhythm. Chakra's
+  // <Skeleton> handles the shimmer.
+  const ROW_WIDTHS = [86, 64, 78, 52, 70, 90, 60, 74, 48, 82];
   return (
-    <VStack align="stretch" gap={0} height="full" css={PULSE_KEYFRAMES}>
-      <Flex
-        gap={3}
-        paddingX={3}
-        paddingY={2}
-        borderBottomWidth="1px"
-        borderColor="border.subtle"
-        bg="bg.subtle/30"
-      >
-        {[16, 24, 12, 18, 14].map((width, i) => (
-          <Box
-            key={i}
-            height="8px"
-            width={`${width}%`}
-            borderRadius="sm"
-            bg="bg.muted"
-            css={{
-              animation: `vizPulse 1.4s ease-in-out ${i * 0.06}s infinite`,
-            }}
-          />
-        ))}
-      </Flex>
-      {Array.from({ length: 9 }).map((_, i) => (
-        <Flex
-          key={i}
-          gap={3}
-          paddingX={3}
-          paddingY={2}
-          borderBottomWidth="1px"
-          borderColor="border.subtle"
-        >
-          {[18, 22, 12, 16, 12].map((width, j) => (
-            <Box
-              key={j}
-              height="10px"
-              width={`${width}%`}
-              borderRadius="sm"
-              bg="bg.muted"
-              css={{
-                animation: `vizPulse 1.4s ease-in-out ${(i + j) * 0.05}s infinite`,
-              }}
-            />
-          ))}
+    <VStack align="stretch" gap={0} height="full" paddingY={2}>
+      {ROW_WIDTHS.map((w, i) => (
+        <Flex key={i} paddingX={4} paddingY={1.5}>
+          <Skeleton height="12px" width={`${w}%`} borderRadius="sm" />
         </Flex>
       ))}
     </VStack>
