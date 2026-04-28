@@ -13,6 +13,7 @@ import { useEffect, useState } from "react";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useReducedMotion } from "~/hooks/useReducedMotion";
 import { aiBrandPalette } from "./aiBrandPalette";
+import { DEFAULT_THINKING_VERBS, useCyclingVerb } from "./useCyclingVerb";
 
 const ICON_GRADIENT_ID = "ai-icon-gradient";
 
@@ -27,32 +28,6 @@ const thinkingShimmerStyles = {
     "0%": { backgroundPosition: "200% 0" },
     "100%": { backgroundPosition: "-200% 0" },
   },
-};
-
-const DEFAULT_THINKING_VERBS = [
-  "Thinking about",
-  "Pondering",
-  "Researching",
-  "Looking into",
-  "Procrastinating about",
-  "Mulling over",
-  "Untangling",
-  "Diving into",
-];
-
-const useCyclingVerb = (active: boolean, verbs: readonly string[]): string => {
-  const reduceMotion = useReducedMotion();
-  const [verb, setVerb] = useState(verbs[0] ?? "");
-  useEffect(() => {
-    if (!active || reduceMotion) return;
-    let i = 0;
-    const id = setInterval(() => {
-      i = (i + 1) % verbs.length;
-      setVerb(verbs[i] ?? "");
-    }, 1800);
-    return () => clearInterval(id);
-  }, [active, reduceMotion, verbs]);
-  return verb;
 };
 
 const TYPING_MS = 70;

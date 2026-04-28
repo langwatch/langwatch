@@ -27,6 +27,40 @@ import { useLatestRef } from "./useLatestRef";
 const TRIGGER_TERMINATOR_REGEX = /[ \t\n()]/;
 const TRIGGER_PRECEDERS = new Set([" ", "\t", "\n", "("]);
 
+function arraysShallowEqual(a: string[], b: string[]): boolean {
+  if (a === b) return true;
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    if (a[i] !== b[i]) return false;
+  }
+  return true;
+}
+
+function suggestionStateEqual(
+  a: SuggestionState,
+  b: SuggestionState,
+): boolean {
+  if (a === b) return true;
+  if (!a.open || !b.open) return a.open === b.open;
+  if (a.mode !== b.mode) return false;
+  if (a.query !== b.query || a.tokenStart !== b.tokenStart) return false;
+  if (a.mode === "value" && b.mode === "value" && a.field !== b.field) {
+    return false;
+  }
+  return true;
+}
+
+function suggestionUIEqual(
+  a: SuggestionUIState,
+  b: SuggestionUIState,
+): boolean {
+  if (a === b) return true;
+  if (a.selectedIndex !== b.selectedIndex) return false;
+  if (a.itemCounts !== b.itemCounts) return false;
+  if (!suggestionStateEqual(a.state, b.state)) return false;
+  return arraysShallowEqual(a.items, b.items);
+}
+
 /**
  * When a trigger anchor is set (`@` was intercepted at this position),
  * derive the suggestion state from the segment after the anchor instead of
@@ -55,6 +89,13 @@ function suggestionFromTrigger(
 interface UseFilterEditorParams {
   queryText: string;
   applyQueryText: (text: string) => void;
+  /**
+   * Notifies the parent when the editor's empty/non-empty state flips. Wired
+   * through directly instead of via a return value + parent effect so the
+   * parent's setState doesn't cause an extra re-render of the editor each
+   * keystroke.
+   */
+  onHasContentChange?: (hasContent: boolean) => void;
 }
 
 export interface DynamicSuggestionItems {
@@ -65,7 +106,6 @@ export interface DynamicSuggestionItems {
 interface FilterEditorApi {
   editor: Editor | null;
   suggestion: SuggestionUIState;
-  hasContent: boolean;
   acceptSuggestion: (label: string) => void;
   reset: () => void;
   /**
@@ -85,8 +125,8 @@ interface FilterEditorApi {
 export function useFilterEditor({
   queryText,
   applyQueryText,
+  onHasContentChange,
 }: UseFilterEditorParams): FilterEditorApi {
-  const [hasContent, setHasContent] = useState(queryText.length > 0);
   const [suggestion, setSuggestion] =
     useState<SuggestionUIState>(CLOSED_SUGGESTION);
   const [dropdownDismissed, setDropdownDismissed] = useState(false);
@@ -96,8 +136,12 @@ export function useFilterEditor({
   const isProgrammaticRef = useRef(false);
   const triggerPosRef = useRef<number | null>(null);
   const applyQueryTextRef = useLatestRef(applyQueryText);
+  const onHasContentChangeRef = useLatestRef(onHasContentChange);
   const suggestionRef = useLatestRef(suggestion);
   const dismissedRef = useLatestRef(dropdownDismissed);
+  // Tracks last reported hasContent so we only fire onHasContentChange when
+  // it actually flips (not on every keystroke that keeps the state).
+  const lastHasContentRef = useRef<boolean>(queryText.length > 0);
   // Defer `applyQueryText` to the next animation frame so the keystroke
   // handler returns immediately. Coalesces multiple keystrokes that land
   // in the same frame into one parse+serialize pass.
@@ -129,8 +173,8 @@ export function useFilterEditor({
   );
 
   const refreshSuggestion = useCallback(
-    (editor: Editor) => {
-      const text = editor.getText();
+    (editor: Editor, prereadText?: string) => {
+      const text = prereadText ?? editor.getText();
       const cursorPos = editor.state.selection.from - PARAGRAPH_OFFSET;
       const trigger = triggerPosRef.current;
 
@@ -149,13 +193,15 @@ export function useFilterEditor({
 
       // Cursor screen position drives the dropdown anchor. Only measure
       // when the dropdown is actually open — `coordsAtPos` forces layout
-      // and isn't worth running when nothing's going to render.
+      // and isn't worth running when nothing's going to render. Round to
+      // whole pixels so sub-pixel jitter doesn't trigger re-renders.
       if (state.open) {
         try {
           const view = editor.view;
           const editorRect = view.dom.getBoundingClientRect();
           const coords = view.coordsAtPos(editor.state.selection.from);
-          setCursorAnchorX(coords.left - editorRect.left);
+          const next = Math.round(coords.left - editorRect.left);
+          setCursorAnchorX((prev) => (prev === next ? prev : next));
         } catch {
           // coordsAtPos can throw if the doc isn't yet mounted; ignore.
         }
@@ -164,12 +210,18 @@ export function useFilterEditor({
       // Escape is sticky for the session — `dismissedRef` only clears on
       // blur, reset, or a fresh `@` trigger.
       if (dismissedRef.current && state.open) {
-        setSuggestion(CLOSED_SUGGESTION);
+        setSuggestion((prev) =>
+          prev === CLOSED_SUGGESTION ? prev : CLOSED_SUGGESTION,
+        );
         return;
       }
-      setSuggestion((prev) =>
-        buildSuggestionUI({ state, previousSelected: prev.selectedIndex }),
-      );
+      setSuggestion((prev) => {
+        const next = buildSuggestionUI({
+          state,
+          previousSelected: prev.selectedIndex,
+        });
+        return suggestionUIEqual(prev, next) ? prev : next;
+      });
     },
     [dismissedRef],
   );
@@ -188,13 +240,18 @@ export function useFilterEditor({
     content: queryText ? buildDocument(queryText) : undefined,
     onUpdate: ({ editor: ed }) => {
       if (isProgrammaticRef.current) return;
-      setHasContent(ed.getText().length > 0);
-      refreshSuggestion(ed);
+      const text = ed.getText();
+      const next = text.length > 0;
+      if (lastHasContentRef.current !== next) {
+        lastHasContentRef.current = next;
+        onHasContentChangeRef.current?.(next);
+      }
+      refreshSuggestion(ed, text);
       // Live-commit, but deferred via rAF so the keystroke handler returns
       // before liqe runs. Multiple keystrokes in one frame coalesce into a
       // single parse+serialize pass. The sync effect below tolerates NBSP/
       // trim differences so the editor's trailing NBSP isn't clobbered.
-      scheduleCommit(ed.getText());
+      scheduleCommit(text);
     },
     onSelectionUpdate: ({ editor: ed }) => {
       if (isProgrammaticRef.current) return;
@@ -343,10 +400,14 @@ export function useFilterEditor({
     if (normalize(editor.getText()) === normalize(queryText)) return;
     isProgrammaticRef.current = true;
     editor.commands.setContent(buildDocument(queryText));
-    setHasContent(queryText.length > 0);
+    const next = queryText.length > 0;
+    if (lastHasContentRef.current !== next) {
+      lastHasContentRef.current = next;
+      onHasContentChangeRef.current?.(next);
+    }
     triggerPosRef.current = null;
     isProgrammaticRef.current = false;
-  }, [editor, queryText]);
+  }, [editor, queryText, onHasContentChangeRef]);
 
   const acceptSuggestion = useCallback(
     (label: string) => {
@@ -365,11 +426,14 @@ export function useFilterEditor({
 
   const reset = useCallback(() => {
     editor?.commands.clearContent();
-    setHasContent(false);
+    if (lastHasContentRef.current) {
+      lastHasContentRef.current = false;
+      onHasContentChangeRef.current?.(false);
+    }
     setSuggestion(CLOSED_SUGGESTION);
     setDropdownDismissed(false);
     triggerPosRef.current = null;
-  }, [editor]);
+  }, [editor, onHasContentChangeRef]);
 
   const overrideSuggestionItems = useCallback(
     (next: DynamicSuggestionItems | null) => {
@@ -399,7 +463,6 @@ export function useFilterEditor({
   return {
     editor,
     suggestion,
-    hasContent,
     acceptSuggestion,
     reset,
     overrideSuggestionItems,

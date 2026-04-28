@@ -138,8 +138,8 @@ const SuggestionRow: React.FC<SuggestionRowProps> = ({
       paddingX={3}
       paddingY={1.5}
       data-selected={isSelected || undefined}
-      _selected={{ bg: "blue.500/12" }}
-      _hover={{ bg: "blue.500/8" }}
+      _selected={{ bg: "blue.solid/12" }}
+      _hover={{ bg: "blue.solid/8" }}
       onMouseDown={(event) => {
         event.preventDefault();
         onSelect(label);

@@ -29,11 +29,10 @@ export const ActiveSearchEditor: React.FC<ActiveSearchEditorProps> = ({
   const {
     editor,
     suggestion,
-    hasContent,
     acceptSuggestion,
     overrideSuggestionItems,
     cursorAnchorX,
-  } = useFilterEditor({ queryText, applyQueryText });
+  } = useFilterEditor({ queryText, applyQueryText, onHasContentChange });
 
   useGlobalSlashFocus(editor);
 
@@ -48,10 +47,6 @@ export const ActiveSearchEditor: React.FC<ActiveSearchEditorProps> = ({
     editor.commands.focus();
     focusedRef.current = true;
   }, [autoFocus, editor]);
-
-  useEffect(() => {
-    onHasContentChange(hasContent);
-  }, [hasContent, onHasContentChange]);
 
   return (
     <>

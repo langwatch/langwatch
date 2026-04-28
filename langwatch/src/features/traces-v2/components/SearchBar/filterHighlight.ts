@@ -1,15 +1,17 @@
 import { Plugin, PluginKey } from "@tiptap/pm/state";
 import { Decoration, DecorationSet } from "@tiptap/pm/view";
 import { Extension } from "@tiptap/react";
-import {
-  type LiqeQuery,
-  type LogicalExpressionToken,
-  parse as liqeParse,
-  type ParenthesizedExpressionToken,
-  type TagToken,
-  type UnaryOperatorToken,
+import type {
+  LiqeQuery,
+  LogicalExpressionToken,
+  ParenthesizedExpressionToken,
+  TagToken,
+  UnaryOperatorToken,
 } from "liqe";
-import { SCENARIO_FIELDS } from "~/server/app-layer/traces/query-language/queryParser";
+import {
+  parse as cachedParse,
+  SCENARIO_FIELDS,
+} from "~/server/app-layer/traces/query-language/queryParser";
 
 // Tolerant fallback for queries that don't yet parse (mid-typing, unmatched
 // quotes, trailing operator). Decorates anything shaped like `field:value`
@@ -43,6 +45,19 @@ interface DecorationPlan {
   leadingWs: number;
 }
 
+/** Fields whose value-shape is a number / range — get a green tint to
+ * distinguish from categorical (blue) and scenario (purple). */
+const NUMERIC_FIELDS = new Set([
+  "duration",
+  "cost",
+  "tokens",
+  "spans",
+  "ttft",
+  "promptTokens",
+  "completionTokens",
+  "tokensPerSecond",
+]);
+
 function tagClassName({
   fieldName,
   negated,
@@ -53,6 +68,8 @@ function tagClassName({
   if (negated) return "filter-token filter-token-exclude";
   if (SCENARIO_FIELDS.has(fieldName))
     return "filter-token filter-token-scenario";
+  if (NUMERIC_FIELDS.has(fieldName))
+    return "filter-token filter-token-numeric";
   return "filter-token";
 }
 
@@ -168,7 +185,7 @@ export function buildDecorationPlan(
   if (!trimmed) return { slots: [], tokens: [], leadingWs: 0 };
   const leadingWs = normalized.length - normalized.trimStart().length;
   try {
-    const ast = liqeParse(trimmed);
+    const ast = cachedParse(trimmed);
     const plan: DecorationPlan = { slots: [], tokens: [], leadingWs };
     walkAst(ast, false, baseOffset + leadingWs, plan);
     return plan;

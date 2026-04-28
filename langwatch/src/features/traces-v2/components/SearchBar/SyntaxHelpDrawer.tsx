@@ -129,7 +129,7 @@ const VALUE_ROWS: ReadonlyArray<{
   {
     form: "Free text",
     example: '"refund policy"',
-    notes: "Searches input/output",
+    notes: "Wrap multi-word phrases in quotes",
   },
 ];
 
@@ -165,18 +165,23 @@ interface SyntaxHelpBodyProps {
   onClose: () => void;
 }
 
-const SyntaxHelpBody: React.FC<SyntaxHelpBodyProps> = ({ onClose }) => {
+const SyntaxHelpBody: React.FC<SyntaxHelpBodyProps> = ({ onClose: _onClose }) => {
   const applyQueryText = useFilterStore((s) => s.applyQueryText);
+  // Append onto whatever is already in the bar so the user can stack
+  // suggestions while learning. Empty bar → first suggestion lands as-is.
+  // Non-empty → joined with AND. The drawer stays open so the user can
+  // keep picking; they close it manually when they're done.
   const apply = (query: string) => {
-    applyQueryText(query);
-    onClose();
+    const current = useFilterStore.getState().queryText.trim();
+    const next = current ? `${current} AND ${query}` : query;
+    applyQueryText(next);
   };
 
   return (
     <VStack align="stretch" gap={6} paddingX={5} paddingY={6}>
       <Section
         title="Cookbook"
-        caption="Click to apply, or copy with the icon."
+        caption="Click to add to your filter — stack as many as you like."
       >
         <ExampleCookbook onApply={apply} />
       </Section>
@@ -234,7 +239,7 @@ const SYNTAX_TIPS: ReadonlyArray<{ label: string; example: string }> = [
   { label: "exclusion", example: "-status:ok" },
   { label: "range", example: "cost:[0.01 TO 1]" },
   { label: "union", example: "status:(error OR warning)" },
-  { label: "free text", example: "refund" },
+  { label: "free text", example: '"refund policy"' },
 ];
 
 const SyntaxTipStrip: React.FC = () => (

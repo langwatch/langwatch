@@ -24,7 +24,7 @@ export const editorStyles: SystemStyleObject = {
     border: "1px solid",
     borderColor: "blue.muted",
     borderRadius: "4px",
-    padding: "0px 4px",
+    padding: "0 16px 0 4px",
     margin: "0 1px",
   },
   "& .filter-token-exclude": {
@@ -34,6 +34,10 @@ export const editorStyles: SystemStyleObject = {
   "& .filter-token-scenario": {
     background: "purple.subtle",
     borderColor: "purple.muted",
+  },
+  "& .filter-token-numeric": {
+    background: "green.subtle",
+    borderColor: "green.muted",
   },
   "& .filter-keyword": {
     color: "fg.muted",
@@ -50,18 +54,17 @@ export const editorStyles: SystemStyleObject = {
     color: "fg.subtle",
     fontWeight: "semibold",
   },
-  // X overlaps the chip's right edge — no reserved padding so neighbouring
-  // text doesn't get pushed around. Absolute-positioned inside the chip's
-  // own bounding box so it visually belongs to the colour blob, can hover
-  // over a following character without affecting layout.
+  // X sits inside the right-edge well reserved by `.filter-token`'s 16px
+  // right padding. Hidden by default, shows on chip hover, intensifies to
+  // a red destructive tint on its own hover.
   "& .filter-token-delete": {
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
     width: "14px",
-    height: "14px",
-    marginLeft: "-14px",
-    marginRight: "0px",
+    height: "16px",
+    marginLeft: "-15px",
+    marginRight: "1px",
     padding: 0,
     border: "none",
     borderTopRightRadius: "3px",
@@ -72,8 +75,8 @@ export const editorStyles: SystemStyleObject = {
     fontWeight: "bold",
     lineHeight: 1,
     cursor: "pointer",
-    opacity: 0,
-    transition: "opacity 80ms ease-out, background 80ms ease-out",
+    opacity: 0.35,
+    transition: "opacity 80ms ease-out, background 80ms ease-out, color 80ms ease-out",
     verticalAlign: "middle",
     userSelect: "none",
     pointerEvents: "auto",
