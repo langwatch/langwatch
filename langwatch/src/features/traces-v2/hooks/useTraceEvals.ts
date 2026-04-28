@@ -15,7 +15,7 @@ export function useTraceEvals() {
     {
       enabled: !!project?.id && !!traceId && evalsExpanded,
       staleTime: 60_000,
-      gcTime: 1_800_000,
+      cacheTime: 1_800_000,
     },
   );
 }

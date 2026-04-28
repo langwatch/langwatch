@@ -21,7 +21,7 @@ export function useSpansFull(enabled: boolean) {
       // Hold the span tree in cache for 30 min after the last observer
       // unmounts. Lets users flip between recently-viewed traces in the
       // conversation strip with no loading flash.
-      gcTime: 1_800_000,
+      cacheTime: 1_800_000,
       // While the new trace's spans are loading, keep showing the previous
       // trace's spans rather than a skeleton. The visualizer panel pops
       // back instantly when navigating between siblings.

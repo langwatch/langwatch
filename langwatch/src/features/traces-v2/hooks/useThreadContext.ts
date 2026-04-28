@@ -57,7 +57,7 @@ export function useThreadContext(
       staleTime: 30_000,
       // Same conversation, same context — keep it warm so jumping in/out
       // of the drawer doesn't re-fetch the thread strip.
-      gcTime: 1_800_000,
+      cacheTime: 1_800_000,
       // While the query refetches for the new traceId (the cache key changes
       // on every J/K press), keep showing the previous turns array. The
       // current/previous/next fields will lag by one render but the strip

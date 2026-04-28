@@ -46,7 +46,7 @@ export function useTraceResources(traceId: string | null | undefined): TraceReso
     {
       enabled,
       staleTime: 60_000,
-      gcTime: 1_800_000,
+      cacheTime: 1_800_000,
       refetchOnWindowFocus: false,
     },
   );

@@ -37,7 +37,7 @@ export function useTraceHeader() {
     {
       enabled: !!project?.id && !!traceId,
       staleTime: 300_000,
-      gcTime: 1_800_000,
+      cacheTime: 1_800_000,
       keepPreviousData: true,
       refetchOnWindowFocus: true,
       refetchInterval: isLive ? LIVE_REFETCH_MS : false,
