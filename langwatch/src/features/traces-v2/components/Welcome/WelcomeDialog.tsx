@@ -1,5 +1,5 @@
 import { Box, Button, Flex, HStack, Icon, Text, VStack } from "@chakra-ui/react";
-import { ArrowRight } from "lucide-react";
+import { ArrowLeft, ArrowRight } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import type React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -32,10 +32,12 @@ export const WelcomeDialog: React.FC<WelcomeDialogProps> = ({
     setStepIndex((s) => Math.min(s + 1, STEPS.length - 1));
   }, []);
 
-  const handleSkip = useCallback(
-    () => onSkip({ remember: dontShowAgain }),
-    [onSkip, dontShowAgain],
-  );
+  const goBack = useCallback(() => {
+    directionRef.current = -1;
+    setStepIndex((s) => Math.max(s - 1, 0));
+  }, []);
+
+  const isFirstStep = stepIndex === 0;
 
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
@@ -52,12 +54,13 @@ export const WelcomeDialog: React.FC<WelcomeDialogProps> = ({
 
   return (
     <VStack gap={6} width="full" align="stretch">
-      <Box position="relative" overflow="hidden">
-        <AnimatePresence
-          mode="popLayout"
-          initial={false}
-          custom={directionRef.current}
-        >
+      {/* HeroBand stays mounted across step changes — its WebGL shader
+          backdrop runs an ongoing animation we don't want to restart. The
+          title/subtitle crossfade lives inside HeroBand. Only the step
+          body slides on step changes. */}
+      <HeroBand title={step.title} subtitle={step.subtitle} />
+      <Box position="relative" overflow="hidden" paddingX={2}>
+        <AnimatePresence mode="popLayout" initial={false} custom={directionRef.current}>
           <motion.div
             key={stepIndex}
             custom={directionRef.current}
@@ -86,17 +89,9 @@ export const WelcomeDialog: React.FC<WelcomeDialogProps> = ({
               }),
             }}
             transition={{ duration: 0.3, ease: [0.32, 0.72, 0, 1] }}
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              gap: 24,
-              width: "100%",
-            }}
+            style={{ width: "100%" }}
           >
-            <HeroBand title={step.title} subtitle={step.subtitle} />
-            <Box paddingX={2}>
-              <StepContent />
-            </Box>
+            <StepContent />
           </motion.div>
         </AnimatePresence>
       </Box>
@@ -121,16 +116,19 @@ export const WelcomeDialog: React.FC<WelcomeDialogProps> = ({
           </Checkbox>
         </HStack>
         <HStack gap={2}>
-          {!isLastStep && (
-            <Button
-              size="sm"
-              variant="ghost"
-              color="fg.muted"
-              onClick={handleSkip}
-            >
-              Skip
-            </Button>
-          )}
+          <Button
+            size="sm"
+            variant="ghost"
+            color="fg.muted"
+            onClick={goBack}
+            disabled={isFirstStep}
+            aria-label="Previous step"
+          >
+            <Icon boxSize={3.5}>
+              <ArrowLeft />
+            </Icon>
+            Back
+          </Button>
           {isLastStep ? (
             <Button size="sm" colorPalette="blue" onClick={onFinish}>
               Dive in

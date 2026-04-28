@@ -1,34 +1,36 @@
 import type React from "react";
 import { useCallback } from "react";
+import { useLocalStorage } from "usehooks-ts";
 import { Dialog } from "~/components/ui/dialog";
-import { useWelcomeSeen } from "../../hooks/useWelcomeSeen";
 import { useFreshnessSignal } from "../../stores/freshnessSignal";
 import { useViewStore } from "../../stores/viewStore";
 import { useWelcomeStore } from "../../stores/welcomeStore";
 import { WelcomeDialog } from "./WelcomeDialog";
 
+const WELCOME_SEEN_KEY = "langwatch:traces-v2:welcome-seen";
+
 export const WelcomeScreen: React.FC = () => {
   const isOpen = useWelcomeStore((s) => s.isOpen);
   const close = useWelcomeStore((s) => s.close);
-  const { markSeen } = useWelcomeSeen();
   const selectLens = useViewStore((s) => s.selectLens);
+  const [, setSeen] = useLocalStorage<boolean>(WELCOME_SEEN_KEY, false);
 
   const handleDismiss = useCallback(
     ({ remember }: { remember: boolean }) => {
-      if (remember) markSeen();
+      if (remember) setSeen(true);
       close();
     },
-    [markSeen, close],
+    [setSeen, close],
   );
 
   const handleFinish = useCallback(() => {
-    markSeen();
+    setSeen(true);
     selectLens("all-traces");
     const freshness = useFreshnessSignal.getState();
     freshness.setWelcomeBoom(true);
     freshness.refresh?.();
     close();
-  }, [markSeen, selectLens, close]);
+  }, [setSeen, selectLens, close]);
 
   return (
     <Dialog.Root
@@ -46,20 +48,22 @@ export const WelcomeScreen: React.FC = () => {
         aria-label="Welcome to Traces"
         maxWidth="820px"
         width="full"
-        bg="bg.panel/50"
+        bg="bg.panel/25"
         borderRadius="2xl"
         borderWidth="1px"
         borderColor="border.muted"
         boxShadow="2xl"
         padding={6}
-        backdropFilter="blur(60px)"
+        backdropFilter="blur(96px) saturate(140%)"
         backdropProps={{
-          style: { position: "absolute", inset: 0 },
-          backdropFilter: "blur(10px)",
-          background: "bg.canvas/50",
+          position: "absolute",
+          inset: 0,
+          backdropFilter: "blur(14px)",
+          background: "blackAlpha.500",
         }}
         positionerProps={{
-          style: { position: "absolute", inset: 0 },
+          position: "absolute",
+          inset: 0,
         }}
       >
         <WelcomeDialog

@@ -27,7 +27,7 @@ export const TryItStep: React.FC = () => (
   <VStack align="stretch" gap={5}>
     <ShortcutsSection />
     <RecallTourSection />
-    <AlphaCallout />
+    <BetaCallout />
   </VStack>
 );
 
@@ -78,7 +78,7 @@ const WhatsNewBadge: React.FC = () => (
   </Box>
 );
 
-const AlphaCallout: React.FC = () => (
+const BetaCallout: React.FC = () => (
   <HStack
     gap={3}
     align="flex-start"
@@ -94,7 +94,7 @@ const AlphaCallout: React.FC = () => (
     </Icon>
     <VStack align="stretch" gap={1}>
       <Text textStyle="xs" fontWeight="semibold" color="purple.fg">
-        This is alpha
+        This is beta
       </Text>
       <Text textStyle="xs" color="fg.muted" lineHeight="1.5">
         Things will change. If you hit something rough, please share feedback

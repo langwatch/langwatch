@@ -1,6 +1,8 @@
 import { useEffect } from "react";
-import { useWelcomeSeen } from "../../hooks/useWelcomeSeen";
+import { useLocalStorage } from "usehooks-ts";
 import { useWelcomeStore } from "../../stores/welcomeStore";
+
+const WELCOME_SEEN_KEY = "langwatch:traces-v2:welcome-seen";
 
 /**
  * Auto-opens the welcome dialog the first time a user lands on traces v2.
@@ -10,9 +12,9 @@ import { useWelcomeStore } from "../../stores/welcomeStore";
 export const useAutoOpenWelcome = (): void => {
   const isOpen = useWelcomeStore((s) => s.isOpen);
   const open = useWelcomeStore((s) => s.open);
-  const { seen, hydrated } = useWelcomeSeen();
+  const [seen] = useLocalStorage<boolean>(WELCOME_SEEN_KEY, false);
 
   useEffect(() => {
-    if (hydrated && !seen && !isOpen) open();
-  }, [hydrated, seen, isOpen, open]);
+    if (!seen && !isOpen) open();
+  }, [seen, isOpen, open]);
 };
