@@ -14,7 +14,6 @@ import {
 } from "lucide-react";
 import { useRouter } from "~/utils/compat/next-router";
 import React, { useState } from "react";
-import { useFeatureFlag } from "../hooks/useFeatureFlag";
 import { useOpsPermission } from "../hooks/useOpsPermission";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import { useFeatureFlag } from "../hooks/useFeatureFlag";
@@ -149,8 +148,8 @@ export const MainMenu = React.memo(function MainMenu({
                 project={project}
                 isActive={router.pathname.includes("/traces")}
                 showLabel={showExpanded}
-                beta="Traces v2 is in alpha — expect rough edges. Share feedback or report issues on Slack, or open one at https://github.com/langwatch/langwatch/issues/new/choose."
-                betaLabel="Alpha"
+                beta="Traces v2 is in beta — expect rough edges. Share feedback or report issues on Slack, or open one at https://github.com/langwatch/langwatch/issues/new/choose."
+                betaLabel="Beta"
               />
             )}
 
@@ -424,9 +423,21 @@ const OpsSection = ({ showExpanded }: { showExpanded: boolean }) => {
   const isOnOpsRoute = router.pathname.startsWith("/ops");
   const shouldShow = hasAccess && (alwaysShow || isOnOpsRoute);
 
+  // Two-tier polling so the always-on global badge doesn't drag the full
+  // dashboard aggregation into every tRPC batch. tRPC's `httpBatchLink`
+  // bundles multiple queries that fire in the same ~10ms window into one
+  // HTTP request and waits on every procedure before responding — so a
+  // slow `getDashboardSnapshot` call running in the background here would
+  // stall every page-level query batched alongside it. Off-route we ask
+  // only for the two integers the badge renders; on-route we lift to the
+  // full snapshot since the user actually wants the data.
+  const opsBadge = api.ops.getBadgeCounts.useQuery(undefined, {
+    enabled: shouldShow && !isOnOpsRoute,
+    refetchInterval: 60000,
+  });
   const opsData = api.ops.getDashboardSnapshot.useQuery(undefined, {
-    enabled: shouldShow,
-    refetchInterval: isOnOpsRoute ? 10000 : 60000,
+    enabled: shouldShow && isOnOpsRoute,
+    refetchInterval: 10000,
   });
 
   // Backoffice is admin-only. `useOpsPermission` already gates the whole
@@ -442,10 +453,15 @@ const OpsSection = ({ showExpanded }: { showExpanded: boolean }) => {
 
   if (!shouldShow) return null;
 
-  const blockedCount =
-    opsData.data?.queues.reduce((sum, q) => sum + q.blockedGroupCount, 0) ?? 0;
-  const dlqCount =
-    opsData.data?.queues.reduce((sum, q) => sum + q.dlqCount, 0) ?? 0;
+  // On-route: derive from the full snapshot the dashboard already loaded.
+  // Off-route: read from the lightweight badge counts. Either way the
+  // badge stays in sync.
+  const blockedCount = isOnOpsRoute
+    ? opsData.data?.queues.reduce((sum, q) => sum + q.blockedGroupCount, 0) ?? 0
+    : opsBadge.data?.blockedCount ?? 0;
+  const dlqCount = isOnOpsRoute
+    ? opsData.data?.queues.reduce((sum, q) => sum + q.dlqCount, 0) ?? 0
+    : opsBadge.data?.dlqCount ?? 0;
 
   return (
     <>

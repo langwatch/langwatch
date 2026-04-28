@@ -23,6 +23,10 @@ const SSE_PUSH_INTERVAL_MS = 2_000;
 const SSE_HEARTBEAT_INTERVAL_MS = 15_000;
 const REDIS_STATE_TTL_SECONDS = 3600;
 const QUEUE_DISCOVERY_INTERVAL_MS = 10_000;
+// Memoize badge counts for 5 seconds. The badge polls every 60s
+// off-route, but this also covers concurrent calls from multiple tabs
+// or layout remounts within the same window.
+const BADGE_CACHE_TTL_MS = 5_000;
 
 const REDIS_STATE_KEY = "ops:metrics:state";
 const KNOWN_PIPELINES_KEY = "ops:known-pipelines";
@@ -244,6 +248,12 @@ class OpsMetricsCollector {
   private latestTotalCompleted = 0;
   private latestTotalFailed = 0;
   private latestQueues: QueueInfo[] = [];
+  // Memoized badge-counts result. See `getBadgeCounts` for rationale.
+  private badgeCountsCache: {
+    blockedCount: number;
+    dlqCount: number;
+    computedAt: Date;
+  } | null = null;
   private latestRedisInfo: RedisInfo = {
     usedMemoryHuman: "?",
     peakMemoryHuman: "?",
@@ -369,6 +379,51 @@ class OpsMetricsCollector {
     } catch (err) {
       logger.warn({ error: err }, "Queue discovery failed, keeping existing names");
     }
+  }
+
+  /**
+   * Lightweight per-call summary used by the global ops badge in the
+   * main menu. Pulls only the two integers the badge renders, so the
+   * global poll doesn't drag the full dashboard aggregation
+   * (pipeline tree, error normalization, etc.) into every tRPC batch.
+   * One slow procedure in a tRPC HTTP batch holds back every other
+   * query that fired in the same window.
+   *
+   * The result is memoized for `BADGE_CACHE_TTL_MS` so any burst of
+   * concurrent callers (multiple browser tabs, layout remounts, etc.)
+   * shares a single computation. `latestQueues` is already a cached
+   * snapshot, so this is mostly defense-in-depth — a future change
+   * that makes the per-call work expensive would otherwise silently
+   * regress the badge poll back into the slow tRPC batch path.
+   *
+   * `computedAt` ships back so the caller (and ops dashboards) can
+   * tell exactly how stale the value is.
+   */
+  getBadgeCounts(): {
+    blockedCount: number;
+    dlqCount: number;
+    computedAt: Date;
+  } {
+    const now = Date.now();
+    if (
+      this.badgeCountsCache &&
+      now - this.badgeCountsCache.computedAt.getTime() < BADGE_CACHE_TTL_MS
+    ) {
+      return this.badgeCountsCache;
+    }
+
+    let blockedCount = 0;
+    let dlqCount = 0;
+    for (const q of this.latestQueues) {
+      blockedCount += q.blockedGroupCount;
+      dlqCount += q.dlqCount;
+    }
+    this.badgeCountsCache = {
+      blockedCount,
+      dlqCount,
+      computedAt: new Date(now),
+    };
+    return this.badgeCountsCache;
   }
 
   getDashboardData(): DashboardData {
