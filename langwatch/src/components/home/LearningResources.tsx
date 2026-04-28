@@ -7,39 +7,68 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { MeshGradient } from "@paper-design/shaders-react";
+import { GrainGradient, MeshGradient } from "@paper-design/shaders-react";
+
+type GrainShape =
+  | "wave"
+  | "dots"
+  | "truchet"
+  | "corners"
+  | "ripple"
+  | "blob"
+  | "sphere";
 import { LuBookOpen, LuCirclePlay, LuExternalLink } from "react-icons/lu";
 import { useReducedMotion } from "~/hooks/useReducedMotion";
 import { useColorModeValue } from "../ui/color-mode";
 import { Link } from "../ui/link";
 
-interface MeshConfig {
-  /** Mesh palette in light mode (lifted highlights). */
+interface ShaderColors {
+  /** Palette in light mode (lifted highlights). */
   colors: string[];
-  /** Mesh palette in dark mode (deeper, original tones). */
+  /** Palette in dark mode (deeper, original tones). */
   colorsDark: string[];
+}
+
+interface MeshConfig extends ShaderColors {
+  kind: "mesh";
   /** How much the mesh deforms — higher = more organic blobs. */
   distortion: number;
   /** Rotational twist around the centre. */
   swirl: number;
-  /** Animation speed (0 disables motion when reducedMotion is on). */
   speed: number;
-  /** Mesh scale — bigger = larger, lazier patches. */
   scale: number;
-  /** Film-grain noise blended into the colour. */
   grainMixer: number;
-  /** Film-grain noise overlaid as luminance. */
   grainOverlay: number;
-  /** Initial mesh offset so the two cards don't share a frame phase. */
   offsetX: number;
   offsetY: number;
 }
+
+interface GrainConfig extends ShaderColors {
+  kind: "grain";
+  /** Pattern primitive — blob/ripple read calmest, dots/truchet most graphic. */
+  shape: GrainShape;
+  /** Edge softness between bands (0 = hard, 1 = smooth). */
+  softness: number;
+  /** Distortion between colour bands (0–1). */
+  intensity: number;
+  /** Grain density (0–1). */
+  noise: number;
+  /** Back fill behind the gradient — keeps card off pure black in dark mode. */
+  colorBack: string;
+  colorBackDark: string;
+  speed: number;
+  scale: number;
+  offsetX: number;
+  offsetY: number;
+}
+
+type ShaderConfig = MeshConfig | GrainConfig;
 
 type ResourceCard = {
   title: string;
   description: string;
   icon: React.ReactNode;
-  mesh: MeshConfig;
+  shader: ShaderConfig;
   href: string;
   cta: string;
 };
@@ -49,18 +78,20 @@ const resources: ResourceCard[] = [
     title: "Documentation",
     description: "Learn how to integrate and use LangWatch effectively",
     icon: <LuBookOpen size={18} />,
-    // Documentation: cool, calm, almost-still. Huge soft blobs that
-    // barely move — reads like wide ocean horizons. Distortion floored,
-    // no swirl, slow speed, anchored at origin.
-    mesh: {
+    // Documentation: cool, calm, almost-still. Grain shader in `blob`
+    // mode — soft cloud forms with a subtle film grain over the top.
+    shader: {
+      kind: "grain",
       colors: ["#0c1c3d", "#1e3a8a", "#3b82f6", "#67e8f9", "#a5f3fc"],
       colorsDark: ["#0c1c3d", "#1e3a8a", "#2563eb", "#06b6d4", "#22d3ee"],
-      distortion: 0.05,
-      swirl: 0.0,
-      speed: 0.08,
-      scale: 2.4,
-      grainMixer: 0.02,
-      grainOverlay: 0.03,
+      shape: "blob",
+      softness: 0.85,
+      intensity: 0.35,
+      noise: 0.18,
+      colorBack: "#1e293b",
+      colorBackDark: "#bfdbfe",
+      speed: 0.1,
+      scale: 1.4,
       offsetX: -0.2,
       offsetY: 0.15,
     },
@@ -75,7 +106,8 @@ const resources: ResourceCard[] = [
     // both maxed — reads like film stock under heat and motion. Tighter
     // scale puts more colour churn on screen; large opposite-direction
     // offset guarantees the two cards never share a frame.
-    mesh: {
+    shader: {
+      kind: "mesh",
       colors: ["#7f1d1d", "#b91c1c", "#ef4444", "#fb923c", "#fde68a"],
       colorsDark: ["#3d0c0c", "#7f1d1d", "#dc2626", "#f97316", "#fbbf24"],
       distortion: 1.0,
@@ -101,9 +133,13 @@ type ResourceCardItemProps = {
  */
 function ResourceCardItem({ resource }: ResourceCardItemProps) {
   const reduceMotion = useReducedMotion();
-  const meshColors = useColorModeValue(
-    resource.mesh.colors,
-    resource.mesh.colorsDark,
+  const shaderColors = useColorModeValue(
+    resource.shader.colors,
+    resource.shader.colorsDark,
+  );
+  const grainColorBack = useColorModeValue(
+    resource.shader.kind === "grain" ? resource.shader.colorBack : "",
+    resource.shader.kind === "grain" ? resource.shader.colorBackDark : "",
   );
   const tintGradient = useColorModeValue(
     "linear-gradient(135deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.1) 100%)",
@@ -128,22 +164,38 @@ function ResourceCardItem({ resource }: ResourceCardItemProps) {
         transition="all 0.2s ease-in-out"
         _hover={{ opacity: 0.92, boxShadow: "0 2px 4px rgba(0,0,0,0.08), 0 12px 32px rgba(0,0,0,0.16)" }}
       >
-        {/* MeshGradient backdrop, scoped to this card. Card-specific
-            palette so each card keeps its accent identity (cool blue for
-            docs, warm red for videos). */}
+        {/* Shader backdrop scoped to this card. Card-specific palette
+            so each card keeps its accent identity (cool blue for docs,
+            warm red for videos). */}
         <Box position="absolute" inset={0} pointerEvents="none">
-          <MeshGradient
-            colors={meshColors}
-            distortion={resource.mesh.distortion}
-            swirl={resource.mesh.swirl}
-            grainMixer={resource.mesh.grainMixer}
-            grainOverlay={resource.mesh.grainOverlay}
-            speed={reduceMotion ? 0 : resource.mesh.speed}
-            scale={resource.mesh.scale}
-            offsetX={resource.mesh.offsetX}
-            offsetY={resource.mesh.offsetY}
-            style={{ width: "100%", height: "100%" }}
-          />
+          {resource.shader.kind === "mesh" ? (
+            <MeshGradient
+              colors={shaderColors}
+              distortion={resource.shader.distortion}
+              swirl={resource.shader.swirl}
+              grainMixer={resource.shader.grainMixer}
+              grainOverlay={resource.shader.grainOverlay}
+              speed={reduceMotion ? 0 : resource.shader.speed}
+              scale={resource.shader.scale}
+              offsetX={resource.shader.offsetX}
+              offsetY={resource.shader.offsetY}
+              style={{ width: "100%", height: "100%" }}
+            />
+          ) : (
+            <GrainGradient
+              colors={shaderColors}
+              colorBack={grainColorBack}
+              shape={resource.shader.shape}
+              softness={resource.shader.softness}
+              intensity={resource.shader.intensity}
+              noise={resource.shader.noise}
+              speed={reduceMotion ? 0 : resource.shader.speed}
+              scale={resource.shader.scale}
+              offsetX={resource.shader.offsetX}
+              offsetY={resource.shader.offsetY}
+              style={{ width: "100%", height: "100%" }}
+            />
+          )}
         </Box>
         {/* Soft tint over the shader so foreground text stays readable
             against the moving mesh. */}
