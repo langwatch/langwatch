@@ -10,6 +10,7 @@ import { revokeOtherSessionsForUser } from "~/server/better-auth/revokeSessions"
 import { rateLimit } from "~/server/rateLimit";
 import { getClientIp } from "~/utils/getClientIp";
 import { isAdmin as checkIsAdmin } from "../../../../ee/admin/isAdmin";
+import { computeExternalProfileId } from "../../../../ee/billing/nurturing/externalProfileId";
 
 export const userRouter = createTRPCRouter({
   /**
@@ -24,6 +25,23 @@ export const userRouter = createTRPCRouter({
     .query(({ ctx }) => {
       const user = ctx.session.user.impersonator ?? ctx.session.user;
       return { isAdmin: checkIsAdmin({ email: user.email }) };
+    }),
+  /**
+   * Returns the HMAC'd external profile ID for the current user.
+   * Used by client-side tracking SDKs (Customer.io, PostHog) as the
+   * identify key instead of the raw userId, preventing cross-user
+   * write attacks via the public CDP write key.
+   */
+  externalProfileId: protectedProcedure
+    .input(z.object({}))
+    .use(skipPermissionCheck)
+    .query(({ ctx }) => {
+      return {
+        externalProfileId: computeExternalProfileId({
+          userId: ctx.session.user.id,
+          hmacSecret: env.EXTERNAL_PROFILE_HMAC_SECRET,
+        }),
+      };
     }),
   register: publicProcedure
     .input(

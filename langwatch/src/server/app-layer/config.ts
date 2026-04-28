@@ -34,6 +34,9 @@ export interface AppConfig {
   customerIoApiKey?: string;
   customerIoRegion?: "us" | "eu";
 
+  // HMAC secret for opaque external profile IDs (tracking/CDP providers)
+  externalProfileHmacSecret?: string;
+
   // SaaS mode
   isSaas?: boolean;
 
@@ -67,6 +70,7 @@ export function createAppConfigFromEnv(overrides?: {
     hubspotFormId: env.HUBSPOT_FORM_ID,
     customerIoApiKey: env.CUSTOMER_IO_API_KEY,
     customerIoRegion: env.CUSTOMER_IO_REGION,
+    externalProfileHmacSecret: env.EXTERNAL_PROFILE_HMAC_SECRET,
     processRole: overrides?.processRole,
     isSaas: env.IS_SAAS,
     skipRedis: env.SKIP_REDIS,

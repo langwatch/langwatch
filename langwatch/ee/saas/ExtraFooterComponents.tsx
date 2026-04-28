@@ -54,17 +54,27 @@ export function SignedInExtraFooterComponents() {
   const hasTracked = useRef(false);
   const hasUpdatedLastLogin = useRef(false);
 
+  // Fetch the HMAC'd external profile ID for client-side identify calls.
+  // The server computes HMAC(secret, userId) so the raw userId is never
+  // sent to the CDP provider from the browser.
+  const { data: profileData } = api.user.externalProfileId.useQuery(
+    {},
+    { enabled: !!session.data?.user, staleTime: Infinity },
+  );
+
   // Customer.io in-app messaging — must be called unconditionally (React
   // hook rules). The hook guards on isImpersonating internally.
   const cioWriteKey = publicEnv.data?.CUSTOMER_IO_API_KEY;
   const cioSiteId = publicEnv.data?.CUSTOMER_IO_SITE_ID;
+  const externalProfileId = profileData?.externalProfileId;
   useCustomerIo({
     writeKey: cioWriteKey ?? "",
     siteId: cioSiteId ?? "",
-    user: session.data?.user ?? { id: "" },
+    externalProfileId: externalProfileId ?? "",
+    user: session.data?.user ?? { email: null, name: null },
     organization: organization ?? undefined,
     isImpersonating: !!session.data?.user?.impersonator,
-    enabled: !!cioWriteKey && !!cioSiteId && !!session.data?.user,
+    enabled: !!cioWriteKey && !!cioSiteId && !!externalProfileId && !!session.data?.user,
   });
 
   useEffect(() => {

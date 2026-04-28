@@ -7,13 +7,14 @@ import { useLocation } from "react-router";
 // The identity tracker ensures reset() fires on cross-session user switch
 // (User A logs out → User B logs in on same browser tab).
 let cioInstance: AnalyticsBrowser | null = null;
-let identifiedUserId: string | null = null;
+let identifiedProfileId: string | null = null;
 
 /**
  * Initializes the Customer.io client-side SDK for in-app messaging.
  *
- * - Identifies the user and tracks SPA page navigations so Customer.io
- *   can target in-app messages by identity and page rules.
+ * - Identifies the user via an HMAC'd external profile ID (not the raw
+ *   userId) to prevent cross-user write attacks via the public CDP key.
+ * - Tracks SPA page navigations for in-app message targeting.
  * - Impersonation-aware: resets identity and stops all tracking when an
  *   admin is impersonating another user.
  * - SaaS-only: the caller (ExtraFooterComponents) gates on IS_SAAS
@@ -22,6 +23,7 @@ let identifiedUserId: string | null = null;
 export function useCustomerIo({
   writeKey,
   siteId,
+  externalProfileId,
   user,
   organization,
   isImpersonating,
@@ -29,7 +31,8 @@ export function useCustomerIo({
 }: {
   writeKey: string;
   siteId: string;
-  user: { id: string; email?: string | null; name?: string | null };
+  externalProfileId: string;
+  user: { email?: string | null; name?: string | null };
   organization?: { id: string; name: string };
   isImpersonating: boolean;
   enabled: boolean;
@@ -52,24 +55,24 @@ export function useCustomerIo({
     );
   }, [writeKey, siteId, isImpersonating, enabled]);
 
-  // 2. Identify user (re-runs on user/org change, handles logout/switch)
+  // 2. Identify user (re-runs on profile ID or org change)
   useEffect(() => {
-    if (!enabled || !cioInstance) return;
+    if (!enabled || !cioInstance || !externalProfileId) return;
 
     if (isImpersonating) {
       cioInstance.reset();
-      identifiedUserId = null;
+      identifiedProfileId = null;
       return;
     }
 
     // Detect user switch (including cross-session: User A logs out,
-    // User B logs in). identifiedUserId is module-scoped so it survives
-    // the component unmount/remount between logout and login.
-    if (identifiedUserId && identifiedUserId !== user.id) {
+    // User B logs in). identifiedProfileId is module-scoped so it
+    // survives the component unmount/remount between logout and login.
+    if (identifiedProfileId && identifiedProfileId !== externalProfileId) {
       cioInstance.reset();
     }
 
-    cioInstance.identify(user.id, {
+    cioInstance.identify(externalProfileId, {
       email: user.email ?? undefined,
       name: user.name ?? undefined,
       ...(organization
@@ -79,9 +82,9 @@ export function useCustomerIo({
           }
         : {}),
     });
-    identifiedUserId = user.id;
+    identifiedProfileId = externalProfileId;
   }, [
-    user.id,
+    externalProfileId,
     user.email,
     user.name,
     organization?.id,
