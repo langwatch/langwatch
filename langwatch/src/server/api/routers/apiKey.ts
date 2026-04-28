@@ -1,4 +1,3 @@
-import type { PrismaClient } from "@prisma/client";
 import { RoleBindingScopeType, TeamUserRole } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
@@ -23,25 +22,11 @@ function mapApiKeyDomainError(error: unknown): never {
         throw new TRPCError({ code: "FORBIDDEN", message: error.message, cause: error });
       case "api_key_already_revoked":
         throw new TRPCError({ code: "CONFLICT", message: error.message, cause: error });
+      default:
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message, cause: error });
     }
   }
   throw error;
-}
-
-async function isOrgAdmin(
-  prisma: PrismaClient,
-  userId: string,
-  organizationId: string,
-): Promise<boolean> {
-  const binding = await prisma.roleBinding.findFirst({
-    where: {
-      userId,
-      organizationId,
-      scopeType: RoleBindingScopeType.ORGANIZATION,
-      role: TeamUserRole.ADMIN,
-    },
-  });
-  return !!binding;
 }
 
 const roleBindingSchema = z.object({
@@ -150,11 +135,10 @@ export const apiKeyRouter = createTRPCRouter({
     )
     .query(async ({ ctx, input }) => {
       const apiKeyService = ApiKeyService.create(ctx.prisma);
-      const callerIsAdmin = await isOrgAdmin(
-        ctx.prisma,
-        ctx.session.user.id,
-        input.organizationId,
-      );
+      const callerIsAdmin = await apiKeyService.isOrgAdmin({
+        userId: ctx.session.user.id,
+        organizationId: input.organizationId,
+      });
 
       const apiKeys = callerIsAdmin
         ? await apiKeyService.listAll({ organizationId: input.organizationId })
@@ -278,15 +262,15 @@ export const apiKeyRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      const apiKeyService = ApiKeyService.create(ctx.prisma);
       const isService = input.keyType === "service";
 
       // Service keys and assigning to another user both require admin
       if (isService || (input.assignedToUserId && input.assignedToUserId !== ctx.session.user.id)) {
-        const callerIsAdmin = await isOrgAdmin(
-          ctx.prisma,
-          ctx.session.user.id,
-          input.organizationId,
-        );
+        const callerIsAdmin = await apiKeyService.isOrgAdmin({
+          userId: ctx.session.user.id,
+          organizationId: input.organizationId,
+        });
         if (!callerIsAdmin) {
           throw new TRPCError({
             code: "FORBIDDEN",
@@ -299,8 +283,6 @@ export const apiKeyRouter = createTRPCRouter({
 
       const targetUserId = isService ? null : (input.assignedToUserId ?? ctx.session.user.id);
       const createdByUserId = ctx.session.user.id;
-
-      const apiKeyService = ApiKeyService.create(ctx.prisma);
       try {
         const { token, apiKey } = await apiKeyService.create({
           name: input.name,
@@ -356,13 +338,12 @@ export const apiKeyRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const callerIsAdmin = await isOrgAdmin(
-        ctx.prisma,
-        ctx.session.user.id,
-        input.organizationId,
-      );
-
       const apiKeyService = ApiKeyService.create(ctx.prisma);
+      const callerIsAdmin = await apiKeyService.isOrgAdmin({
+        userId: ctx.session.user.id,
+        organizationId: input.organizationId,
+      });
+
       try {
         const updated = await apiKeyService.update({
           id: input.apiKeyId,
@@ -409,18 +390,18 @@ export const apiKeyRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const callerIsAdmin = await isOrgAdmin(
-        ctx.prisma,
-        ctx.session.user.id,
-        input.organizationId,
-      );
-
       const apiKeyService = ApiKeyService.create(ctx.prisma);
+      const callerIsAdmin = await apiKeyService.isOrgAdmin({
+        userId: ctx.session.user.id,
+        organizationId: input.organizationId,
+      });
+
       try {
         await apiKeyService.revoke({
           id: input.apiKeyId,
           callerUserId: ctx.session.user.id,
           callerIsAdmin,
+          organizationId: input.organizationId,
         });
 
         void auditLog({
@@ -467,11 +448,11 @@ export const apiKeyRouter = createTRPCRouter({
       }),
     )
     .query(async ({ ctx, input }) => {
-      const callerIsAdmin = await isOrgAdmin(
-        ctx.prisma,
-        ctx.session.user.id,
-        input.organizationId,
-      );
+      const apiKeyService = ApiKeyService.create(ctx.prisma);
+      const callerIsAdmin = await apiKeyService.isOrgAdmin({
+        userId: ctx.session.user.id,
+        organizationId: input.organizationId,
+      });
       if (!callerIsAdmin) return [];
 
       const orgUsers = await ctx.prisma.organizationUser.findMany({

@@ -177,7 +177,8 @@ export function CreateApiKeyDrawer({
       assignedToUserId,
       bindings,
     });
-    resetForm();
+    // resetForm is triggered by useEffect on isOpen change (via parent's onClose)
+    // — not here, so form input is preserved if the mutation fails
   };
 
   const canCreate = name.trim() && !isCreating && !myBindings.isLoading;

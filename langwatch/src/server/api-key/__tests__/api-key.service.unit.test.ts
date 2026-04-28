@@ -297,6 +297,7 @@ describe("ApiKeyService", () => {
           id: "ak_1",
           callerUserId: "user_1",
           callerIsAdmin: false,
+          organizationId: "org_1",
         });
 
         expect(prisma.apiKey.update).toHaveBeenCalledWith(
@@ -317,6 +318,7 @@ describe("ApiKeyService", () => {
             id: "ak_1",
             callerUserId: "other_user",
             callerIsAdmin: false,
+            organizationId: "org_1",
           }),
         ).rejects.toThrow();
       });
@@ -338,6 +340,7 @@ describe("ApiKeyService", () => {
           id: "ak_1",
           callerUserId: "admin_user",
           callerIsAdmin: true,
+          organizationId: "org_1",
         });
 
         expect(prisma.apiKey.update).toHaveBeenCalled();
@@ -356,6 +359,7 @@ describe("ApiKeyService", () => {
             id: "ak_1",
             callerUserId: "user_1",
             callerIsAdmin: false,
+            organizationId: "org_1",
           }),
         ).rejects.toThrow();
       });
@@ -373,6 +377,7 @@ describe("ApiKeyService", () => {
             id: "ak_1",
             callerUserId: "user_1",
             callerIsAdmin: false,
+            organizationId: "org_1",
           }),
         ).rejects.toThrow();
       });

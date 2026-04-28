@@ -14,10 +14,8 @@ import {
 } from "./errors";
 import type { Permission } from "~/server/api/rbac";
 import { checkRoleBindingPermission } from "~/server/rbac/role-binding-resolver";
-import {
-  parseCustomRolePermissions,
-  MalformedCustomRolePermissionsError,
-} from "~/server/rbac/custom-role-permissions";
+import { parseCustomRolePermissions } from "~/server/rbac/custom-role-permissions";
+import { DomainError } from "~/server/app-layer/domain-error";
 import { createLogger } from "~/utils/logger/server";
 
 const logger = createLogger("langwatch:api-key:service");
@@ -341,7 +339,7 @@ export class ApiKeyService {
         permissions: customRole.permissions,
       });
     } catch (err) {
-      if (err instanceof MalformedCustomRolePermissionsError) {
+      if (DomainError.isHandled(err) && err.kind === "malformed_custom_role_permissions") {
         throw new ApiKeyScopeViolationError(
           `Custom role ${customRoleId} has malformed permissions`,
           {
@@ -478,13 +476,18 @@ export class ApiKeyService {
     id,
     callerUserId,
     callerIsAdmin,
+    organizationId,
   }: {
     id: string;
     callerUserId: string;
     callerIsAdmin: boolean;
+    organizationId: string;
   }): Promise<ApiKey> {
     const apiKey = await this.repo.findById({ id });
     if (!apiKey) throw new ApiKeyNotFoundError(id);
+    if (apiKey.organizationId !== organizationId) {
+      throw new ApiKeyNotFoundError(id);
+    }
     if (!callerIsAdmin) {
       if (!apiKey.userId || apiKey.userId !== callerUserId) {
         throw new ApiKeyNotOwnedError(id);
@@ -493,6 +496,27 @@ export class ApiKeyService {
     if (apiKey.revokedAt) throw new ApiKeyAlreadyRevokedError(id);
 
     return this.repo.revoke({ id });
+  }
+
+  /**
+   * Checks whether a user has an ADMIN role binding at the organization scope.
+   */
+  async isOrgAdmin({
+    userId,
+    organizationId,
+  }: {
+    userId: string;
+    organizationId: string;
+  }): Promise<boolean> {
+    const binding = await this.prisma.roleBinding.findFirst({
+      where: {
+        userId,
+        organizationId,
+        scopeType: RoleBindingScopeType.ORGANIZATION,
+        role: TeamUserRole.ADMIN,
+      },
+    });
+    return !!binding;
   }
 
   /**
