@@ -186,9 +186,11 @@ func (e *Engine) runLayer(ctx context.Context, req ExecuteRequest, plan *planner
 			node := state.nodes[nodeID]
 			inputs := state.resolveInputs(plan, nodeID)
 			ns := &NodeState{ID: nodeID, Status: "running", Inputs: inputs}
+			nodeCtx, span := startNodeSpan(ctx, node, req)
 			started := time.Now()
-			outputs, derr := e.dispatch(ctx, req, node, inputs, ns)
+			outputs, derr := e.dispatch(nodeCtx, req, node, inputs, ns)
 			ns.DurationMS = time.Since(started).Milliseconds()
+			endNodeSpan(span, ns, derr)
 			if derr != nil {
 				ns.Status = "error"
 				ns.Error = derr

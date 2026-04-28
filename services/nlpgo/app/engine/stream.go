@@ -110,9 +110,11 @@ func (e *Engine) runLayerStream(ctx context.Context, req ExecuteRequest, plan *p
 			inputs := state.resolveInputs(plan, nodeID)
 			ns := &NodeState{ID: nodeID, Status: "running", Inputs: inputs}
 			emit(ctx, out, stateEvent(traceID, nodeID, ns))
+			nodeCtx, span := startNodeSpan(ctx, node, req)
 			started := time.Now()
-			outputs, derr := e.dispatch(ctx, req, node, inputs, ns)
+			outputs, derr := e.dispatch(nodeCtx, req, node, inputs, ns)
 			ns.DurationMS = time.Since(started).Milliseconds()
+			endNodeSpan(span, ns, derr)
 			if derr != nil {
 				ns.Status = "error"
 				ns.Error = derr
