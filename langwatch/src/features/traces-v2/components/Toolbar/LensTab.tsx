@@ -25,8 +25,6 @@ export const LensTab: React.FC<LensTabProps> = ({
   errorCount,
 }) => {
   const renameLens = useViewStore((s) => s.renameLens);
-  const duplicateLens = useViewStore((s) => s.duplicateLens);
-  const deleteLens = useViewStore((s) => s.deleteLens);
   const canDelete = useViewStore((s) => s.allLenses.length > 1);
 
   const [isRenaming, setIsRenaming] = useState(false);

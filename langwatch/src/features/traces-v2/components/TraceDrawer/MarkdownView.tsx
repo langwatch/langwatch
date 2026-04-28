@@ -87,34 +87,6 @@ interface MarkdownViewProps {
 
 const AI_SPAN_TYPES = new Set(["llm", "agent", "rag", "tool", "evaluation"]);
 
-function indent(text: string, depth: number): string {
-  if (depth === 0) return text;
-  const pad = "  ".repeat(depth);
-  return text
-    .split("\n")
-    .map((line) => (line.length > 0 ? pad + line : line))
-    .join("\n");
-}
-
-/**
- * Render a horizontal bar of fixed width that visually splits two parts.
- * Uses block-shading glyphs so it survives copy-paste into any LLM context.
- */
-function renderSplitBar(left: number, right: number, width: number): string {
-  const total = left + right;
-  if (total <= 0 || width <= 0) return "";
-  const leftCells = Math.max(
-    left > 0 ? 1 : 0,
-    Math.min(width, Math.round((left / total) * width)),
-  );
-  const rightCells = Math.max(0, width - leftCells);
-  return "█".repeat(leftCells) + "▒".repeat(rightCells);
-}
-
-function formatNumber(n: number): string {
-  return n.toLocaleString();
-}
-
 // Attribute keys we always drop from the LLM-optimised output. These add
 // tokens without telling the LLM anything useful for reasoning about the
 // trace.
@@ -603,78 +575,6 @@ function renderSpanTimeline(spans: SpanTreeNode[], width: number): string[] {
 }
 
 /**
- * Minimal asciichart-style line plot — same character set as the terminal
- * dashboards we're modelling after (`╭╮╯╰─│┤┼`). Renders `series` (≥ 2
- * points) into `height` rows with a Y-axis label column. Pure: no DOM, no
- * theme — just text that survives copy-paste.
- */
-function renderLineChart(
-  series: number[],
-  height: number,
-  formatY: (v: number) => string,
-): string[] {
-  if (series.length < 2 || height < 2) return [];
-
-  const max = Math.max(...series);
-  const min = Math.min(...series);
-  const range = max - min || 1;
-  const w = series.length;
-
-  // Build the plot grid (rows[0] is the top of the chart).
-  const grid: string[][] = Array.from({ length: height }, () =>
-    Array.from({ length: w }, () => " "),
-  );
-  const rowFor = (v: number): number =>
-    Math.round((1 - (v - min) / range) * (height - 1));
-
-  for (let x = 0; x < w; x++) {
-    const v = series[x]!;
-    const r = rowFor(v);
-    if (x === 0) {
-      grid[r]![x] = "┤";
-      continue;
-    }
-    const prev = rowFor(series[x - 1]!);
-    if (prev === r) {
-      grid[r]![x] = "─";
-    } else if (prev > r) {
-      // line moves up between cells
-      grid[prev]![x] = "╯";
-      grid[r]![x] = "╭";
-      for (let rr = r + 1; rr < prev; rr++) grid[rr]![x] = "│";
-    } else {
-      // line moves down
-      grid[prev]![x] = "╮";
-      grid[r]![x] = "╰";
-      for (let rr = prev + 1; rr < r; rr++) grid[rr]![x] = "│";
-    }
-  }
-
-  // Y-axis labels on a few rows so it reads like the example chart.
-  const ticks: number[] = [];
-  if (height >= 4) {
-    ticks.push(0, Math.floor(height / 2), height - 1);
-  } else {
-    ticks.push(0, height - 1);
-  }
-  const labelWidth = Math.max(
-    ...ticks.map((r) => formatY(max - (r / (height - 1)) * range).length),
-    1,
-  );
-  const lines: string[] = [];
-  for (let r = 0; r < height; r++) {
-    const isTick = ticks.includes(r);
-    const label = isTick
-      ? formatY(max - (r / (height - 1)) * range).padStart(labelWidth)
-      : " ".repeat(labelWidth);
-    lines.push(`  ${label} ┤${grid[r]!.join("")}`);
-  }
-  // Bottom axis row using ┼ at origin and ─ across.
-  lines.push(`  ${"0".padStart(labelWidth)} ┼${"─".repeat(w)}`);
-  return lines;
-}
-
-/**
  * Unicode flame graph — one row per stack depth, spans positioned and
  * sized along the time axis. Uses block characters so the visual lands
  * intact when pasted. Different shading per row (▓/█/▒/░) makes adjacent
@@ -742,32 +642,6 @@ function renderUnicodeFlame(spans: SpanTreeNode[], width: number): string[] {
   lines.push(
     `    0${mid.padStart(Math.floor(width / 2))}${end.padStart(Math.ceil(width / 2) - mid.length)}`,
   );
-  return lines;
-}
-
-/**
- * Tiny horizontal bar chart of span counts by type. Each row scales to a
- * 30-cell maximum so the layout stays predictable.
- */
-function renderSpanTypeBreakdown(spans: SpanTreeNode[]): string[] {
-  if (spans.length === 0) return [];
-  const counts = new Map<string, number>();
-  for (const s of spans) {
-    const t = (s.type ?? "span").toLowerCase();
-    counts.set(t, (counts.get(t) ?? 0) + 1);
-  }
-  const entries = [...counts.entries()].sort((a, b) => b[1] - a[1]);
-  const max = entries[0]?.[1] ?? 0;
-  if (max === 0) return [];
-  const labelLen = Math.max(...entries.map(([k]) => k.length), 4);
-  const barWidth = 30;
-  const lines: string[] = [];
-  for (const [type, n] of entries) {
-    const cells = Math.max(1, Math.round((n / max) * barWidth));
-    lines.push(
-      `  ${type.padEnd(labelLen)} ┤${"█".repeat(cells)}${" ".repeat(barWidth - cells)} ${n}`,
-    );
-  }
   return lines;
 }
 

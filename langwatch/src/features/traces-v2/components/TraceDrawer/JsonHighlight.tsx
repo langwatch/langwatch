@@ -56,9 +56,7 @@ function tolerantPrettyJson(content: string): string {
 
   const indent = (level: number) => indentUnit.repeat(Math.max(level, 0));
 
-  for (let i = 0; i < content.length; i++) {
-    const ch = content[i];
-
+  for (const ch of content) {
     if (inString) {
       out += ch;
       if (escaped) {

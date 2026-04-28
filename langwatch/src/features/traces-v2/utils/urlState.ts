@@ -128,18 +128,6 @@ interface ComputeOverridesInput {
   sort: SortConfig;
 }
 
-function arraysEqual(a: readonly string[], b: readonly string[]): boolean {
-  if (a.length !== b.length) return false;
-  for (let i = 0; i < a.length; i++) {
-    if (a[i] !== b[i]) return false;
-  }
-  return true;
-}
-
-function sortsEqual(a: SortConfig, b: SortConfig): boolean {
-  return a.columnId === b.columnId && a.direction === b.direction;
-}
-
 export function computeOverrides(
   input: ComputeOverridesInput,
 ): BarStateOverrides {
@@ -193,6 +181,5 @@ export function buildFragment(
 }
 
 export function isOverridesEmpty(overrides: BarStateOverrides): boolean {
-  for (const _ in overrides) return false;
-  return true;
+  return Object.keys(overrides).length === 0;
 }

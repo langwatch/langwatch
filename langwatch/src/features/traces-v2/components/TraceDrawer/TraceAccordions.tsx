@@ -577,7 +577,7 @@ function SpanAccordions({
   const hasSpanAttrs =
     !!detail?.params && Object.keys(detail.params).length > 0;
   const hasAttributes = hasSpanAttrs || hasResourceAttrs;
-  const hasScope = !!(spanScope && spanScope.name);
+  const hasScope = !!spanScope?.name;
   const hasPrompt = !!detail && hasPromptMetadata(detail.params);
   const hasError = span.status === "error" || !!detail?.error;
   const hasEvents = !!detail?.events && detail.events.length > 0;

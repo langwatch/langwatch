@@ -79,7 +79,7 @@ export const WelcomeDialog: React.FC<WelcomeDialogProps> = ({
           title/subtitle crossfade lives inside HeroBand. Only the step
           body slides on step changes. */}
       <HeroBand title={step.title} subtitle={step.subtitle} />
-      <Box position="relative" overflow="hidden" paddingX={2}>
+      <Box position="relative" overflowX="hidden" paddingX={2} paddingY={2}>
         <AnimatePresence
           mode="popLayout"
           initial={false}

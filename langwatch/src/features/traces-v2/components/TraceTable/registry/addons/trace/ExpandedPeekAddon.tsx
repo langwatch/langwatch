@@ -175,7 +175,6 @@ const PeekSkeleton: React.FC = () => (
       { indent: 1, name: "40%" },
     ].map((row, i) => (
       <Flex
-        // biome-ignore lint/suspicious/noArrayIndexKey: skeleton placeholders
         key={`peek-skel-${i}`}
         align="center"
         height="26px"

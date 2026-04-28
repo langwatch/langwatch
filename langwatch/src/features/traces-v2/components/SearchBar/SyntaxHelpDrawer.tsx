@@ -541,7 +541,7 @@ const FieldRow: React.FC<{
 
 function exampleFor(name: string, meta: SearchFieldMeta): string {
   const enumValues = FIELD_VALUES[name];
-  if (enumValues && enumValues[0]) return `${name}:${enumValues[0]}`;
+  if (enumValues?.[0]) return `${name}:${enumValues[0]}`;
   if (meta.valueType === "range") return `${name}:>10`;
   if (meta.valueType === "existence") return `${name}:error`;
   return `${name}:value`;

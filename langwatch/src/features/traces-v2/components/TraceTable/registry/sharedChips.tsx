@@ -21,9 +21,9 @@ const EVAL_CHIP_COLORS: Record<string, string> = {
 
 export function evalChipColor(ev: TraceEvalResult): string {
   if (ev.status === "processed") {
-    if (ev.passed === true) return EVAL_CHIP_COLORS["processed_pass"]!;
-    if (ev.passed === false) return EVAL_CHIP_COLORS["processed_fail"]!;
-    return EVAL_CHIP_COLORS["processed_neutral"]!;
+    if (ev.passed === true) return EVAL_CHIP_COLORS.processed_pass!;
+    if (ev.passed === false) return EVAL_CHIP_COLORS.processed_fail!;
+    return EVAL_CHIP_COLORS.processed_neutral!;
   }
   return EVAL_CHIP_COLORS[ev.status] ?? "gray.400";
 }

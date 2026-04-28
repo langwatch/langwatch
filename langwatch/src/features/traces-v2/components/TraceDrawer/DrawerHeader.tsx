@@ -968,52 +968,6 @@ const PIN_SOURCE_LABEL: Record<PinnedAttribute["source"], string> = {
   resource: "res",
 };
 
-function PinnedAttributesStrip({
-  pins,
-  attributes,
-  resourceAttributes,
-  onUnpin,
-}: {
-  pins: DisplayedPin[];
-  attributes: Record<string, string>;
-  resourceAttributes: Record<string, string>;
-  onUnpin: (source: PinnedAttribute["source"], key: string) => void;
-}) {
-  return (
-    <HStack
-      gap={1.5}
-      flexWrap="wrap"
-      paddingY={1}
-      paddingX={1.5}
-      borderRadius="sm"
-      bg="bg.subtle"
-      borderWidth="1px"
-      borderColor="border.muted"
-    >
-      <Tooltip
-        content="Pinned attributes (auto + team-shared)"
-        positioning={{ placement: "top" }}
-      >
-        <Icon as={LuPin} boxSize={3} color="fg.subtle" />
-      </Tooltip>
-      {pins.map(({ pin, auto }) => {
-        const valueSource =
-          pin.source === "resource" ? resourceAttributes : attributes;
-        const value = resolveAttributeValue(valueSource, pin.key);
-        return (
-          <PinnedPill
-            key={`${pin.source}:${pin.key}`}
-            pin={pin}
-            value={value}
-            auto={auto}
-            onUnpin={onUnpin}
-          />
-        );
-      })}
-    </HStack>
-  );
-}
-
 function PinnedPill({
   pin,
   value,

@@ -105,7 +105,6 @@ export const TraceTableSkeleton: React.FC = () => {
       >
         {Array.from({ length: SKELETON_ROW_COUNT }).map((_, rowIdx) => (
           <Tr
-            // biome-ignore lint/suspicious/noArrayIndexKey: skeleton placeholders have no stable id
             key={`skel-row-${rowIdx}`}
             borderBottomWidth="1px"
             borderBottomColor="border.muted/40"
@@ -135,7 +134,6 @@ export const TraceTableSkeleton: React.FC = () => {
                   >
                     {Array.from({ length: lines }).map((_, lineIdx) => (
                       <SkeletonBar
-                        // biome-ignore lint/suspicious/noArrayIndexKey: deterministic per-line index
                         key={lineIdx}
                         width={widthFor(rowIdx + lineIdx * 3, i)}
                         height={lineIdx === 0 ? "10px" : "7px"}

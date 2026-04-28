@@ -664,7 +664,6 @@ export function WaterfallView({
 
             {virtualizer.getVirtualItems().map((virtualRow) => {
               const row = flatRows[virtualRow.index]!;
-              const i = virtualRow.index;
 
               if (row.kind === "group") {
                 return (

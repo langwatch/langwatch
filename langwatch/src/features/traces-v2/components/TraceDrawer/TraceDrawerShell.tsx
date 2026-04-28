@@ -45,7 +45,7 @@ export interface TraceV2DrawerShellProps {
 }
 
 export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
-  const { closeDrawer, openDrawer } = useDrawer();
+  const { closeDrawer } = useDrawer();
   const params = useDrawerParams();
 
   const traceId = params.traceId;
@@ -243,13 +243,6 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
         .map((id) => spanTree.find((s) => s.spanId === id))
         .filter((s): s is SpanTreeNode => s != null),
     [pinnedSpanIds, spanTree],
-  );
-
-  const handleNavigateToTrace = useCallback(
-    (newTraceId: string) => {
-      openDrawer("traceV2Details", { traceId: newTraceId });
-    },
-    [openDrawer],
   );
 
   // Keyboard shortcuts
