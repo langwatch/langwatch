@@ -1,4 +1,4 @@
-import type { Span, ElasticSearchEvent } from "~/server/tracer/types";
+import type { ElasticSearchEvent, Span } from "~/server/tracer/types";
 import type {
   OccurredAtHint,
   SpanResourceInfo,
@@ -39,11 +39,15 @@ export class SpanStorageService {
     return this.repository.getSpanSummaryByTraceId(params);
   }
 
-  async getSpanResourcesByTraceId(params: ByTraceId): Promise<SpanResourceInfo[]> {
+  async getSpanResourcesByTraceId(
+    params: ByTraceId,
+  ): Promise<SpanResourceInfo[]> {
     return this.repository.findSpanResourcesByTraceId(params);
   }
 
-  async getSpansPaginated(params: Paginated): Promise<{ spans: Span[]; total: number }> {
+  async getSpansPaginated(
+    params: Paginated,
+  ): Promise<{ spans: Span[]; total: number }> {
     return this.repository.findSpansPaginated(params);
   }
 
@@ -51,7 +55,9 @@ export class SpanStorageService {
     return this.repository.findSpansSince(params);
   }
 
-  async getSpanSummariesPaginated(params: Paginated): Promise<{ rows: SpanSummaryRow[]; total: number }> {
+  async getSpanSummariesPaginated(
+    params: Paginated,
+  ): Promise<{ rows: SpanSummaryRow[]; total: number }> {
     return this.repository.findSpanSummariesPaginated(params);
   }
 

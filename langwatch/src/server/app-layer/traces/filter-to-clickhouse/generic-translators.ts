@@ -4,11 +4,11 @@ import { boundedSubquery } from "./subqueries";
 import {
   extractNumericValue,
   extractStringValue,
+  type FieldHandler,
   nextParam,
+  type TranslationContext,
   validateValueLength,
   wrap,
-  type FieldHandler,
-  type TranslationContext,
 } from "./value-helpers";
 
 export function translateNumericField(
@@ -16,7 +16,7 @@ export function translateNumericField(
   tag: TagToken,
   negated: boolean,
   ctx: TranslationContext,
-  name: string = "value",
+  name = "value",
 ): string {
   if (tag.expression.type === "RangeExpression") {
     const min = tag.expression.range.min;
@@ -57,7 +57,7 @@ export function translateStringField(
   tag: TagToken,
   negated: boolean,
   ctx: TranslationContext,
-  name: string = "value",
+  name = "value",
 ): string {
   const value = extractStringValue(tag);
   validateValueLength(value);
@@ -78,7 +78,7 @@ export function crossTableStringEquality(
   table: string,
   timeColumn: string,
   expression: string,
-  name: string = "value",
+  name = "value",
 ): FieldHandler {
   return (tag, negated, ctx) => {
     const value = extractStringValue(tag);
@@ -112,7 +112,7 @@ export function crossTableNumericComparison(
   table: string,
   timeColumn: string,
   expression: string,
-  name: string = "value",
+  name = "value",
 ): FieldHandler {
   return (tag, negated, ctx) => {
     if (tag.expression.type === "RangeExpression") {

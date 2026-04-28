@@ -1,5 +1,5 @@
-import { matchModelCostWithFallbacks } from "~/server/background/workers/collector/cost";
 import type { PrismaClient } from "@prisma/client";
+import { matchModelCostWithFallbacks } from "~/server/background/workers/collector/cost";
 import type { MaybeStoredLLMModelCost } from "~/server/modelProviders/llmModelCost";
 import type { OtlpSpan } from "../../event-sourcing/pipelines/trace-processing/schemas/otlp";
 
@@ -17,7 +17,9 @@ const MODEL_ATTRIBUTE_KEYS = [
  * Dependencies for OtlpSpanCostEnrichmentService that can be injected for testing.
  */
 export interface OtlpSpanCostEnrichmentServiceDependencies {
-  getCustomModelCosts: (projectId: string) => Promise<MaybeStoredLLMModelCost[]>;
+  getCustomModelCosts: (
+    projectId: string,
+  ) => Promise<MaybeStoredLLMModelCost[]>;
 }
 
 /**

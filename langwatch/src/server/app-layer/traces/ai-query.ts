@@ -1,16 +1,16 @@
-import { generateObject, generateText, type CoreMessage } from "ai";
+import { type CoreMessage, generateObject, generateText } from "ai";
 import { z } from "zod";
+import { getApp } from "~/server/app-layer/app";
 import { getVercelAIModel } from "~/server/modelProviders/utils";
+import { createLogger } from "~/utils/logger";
+import { QUERY_SYNTAX_DOC } from "./query-language/grammar";
 import {
   FIELD_VALUES,
-  SEARCH_FIELDS,
-  parse,
-  validateAst,
   isEmptyAST,
+  parse,
+  SEARCH_FIELDS,
+  validateAst,
 } from "./query-language/queryParser";
-import { QUERY_SYNTAX_DOC } from "./query-language/grammar";
-import { getApp } from "~/server/app-layer/app";
-import { createLogger } from "~/utils/logger";
 
 const logger = createLogger("langwatch:ai-query");
 
@@ -63,9 +63,7 @@ const aiActionSchema = z.discriminatedUnion("kind", [
       .string()
       .min(1)
       .max(60)
-      .describe(
-        "Short human-readable lens name (1-3 words). Use Title Case.",
-      ),
+      .describe("Short human-readable lens name (1-3 words). Use Title Case."),
     query: z
       .string()
       .describe(
@@ -289,7 +287,7 @@ function pickSampleValues(
   facetField: string | undefined,
   dynamic: Map<string, string[]>,
 ): string[] {
-  const fromDb = facetField ? dynamic.get(facetField) ?? [] : [];
+  const fromDb = facetField ? (dynamic.get(facetField) ?? []) : [];
   const fromStatic = FIELD_VALUES[fieldName] ?? [];
   const merged = Array.from(new Set([...fromDb, ...fromStatic])).slice(0, 8);
   return merged;

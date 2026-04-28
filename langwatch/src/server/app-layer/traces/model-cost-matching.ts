@@ -1,9 +1,9 @@
 import { ATTR_KEYS } from "~/server/app-layer/traces/canonicalisation/extractors/_constants";
-import type { NormalizedAttributes } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
 import {
   estimateCost,
   matchModelCostWithFallbacks,
 } from "~/server/background/workers/collector/cost";
+import type { NormalizedAttributes } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
 import { getStaticModelCosts } from "~/server/modelProviders/llmModelCost";
 import { coerceToNumber } from "~/utils/coerceToNumber";
 
@@ -36,7 +36,9 @@ export function computeSpanCost({
     attrs[ATTR_KEYS.LANGWATCH_MODEL_OUTPUT_COST_PER_TOKEN],
   );
   if (numInputRate !== null || numOutputRate !== null) {
-    return inputTokens * (numInputRate ?? 0) + outputTokens * (numOutputRate ?? 0);
+    return (
+      inputTokens * (numInputRate ?? 0) + outputTokens * (numOutputRate ?? 0)
+    );
   }
 
   // Priority 2: Static model registry with fallbacks
@@ -50,7 +52,10 @@ export function computeSpanCost({
       : undefined);
 
   if (resolvedModel && (inputTokens > 0 || outputTokens > 0)) {
-    const matched = matchModelCostWithFallbacks(resolvedModel, getStaticModelCosts());
+    const matched = matchModelCostWithFallbacks(
+      resolvedModel,
+      getStaticModelCosts(),
+    );
     if (matched) {
       const computed = estimateCost({
         llmModelCost: matched,
@@ -68,7 +73,11 @@ export function computeSpanCost({
   // Priority 4: Guardrail cost
   if (attrs[ATTR_KEYS.SPAN_TYPE] === "guardrail") {
     const rawOutput = attrs[ATTR_KEYS.LANGWATCH_OUTPUT];
-    if (rawOutput && typeof rawOutput === "object" && !Array.isArray(rawOutput)) {
+    if (
+      rawOutput &&
+      typeof rawOutput === "object" &&
+      !Array.isArray(rawOutput)
+    ) {
       const costObj = (rawOutput as Record<string, unknown>).cost as
         | { amount?: number; currency?: string }
         | undefined;

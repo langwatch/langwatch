@@ -18,10 +18,10 @@
  */
 
 import {
+  type LiqeQuery,
+  SyntaxError as LiqeSyntaxError,
   parse as liqeParse,
   serialize as liqeRawSerialize,
-  SyntaxError as LiqeSyntaxError,
-  type LiqeQuery,
 } from "liqe";
 
 export type { LiqeQuery };
@@ -110,18 +110,52 @@ export function stripAtSigils(text: string): string {
   return out;
 }
 
+// Tiny LRU around `parse`. Per keystroke the SearchBar parses twice — once
+// in `filterStore.applyQueryText` and once in the `filterHighlight`
+// ProseMirror plugin. They pass the same raw text, so caching the last few
+// inputs collapses both calls into a single liqe pass.
+type ParseEntry = { ok: true; ast: LiqeQuery } | { ok: false; error: ParseError };
+const PARSE_CACHE_LIMIT = 8;
+const parseCache = new Map<string, ParseEntry>();
+
+function cacheGet(key: string): ParseEntry | undefined {
+  const entry = parseCache.get(key);
+  if (!entry) return undefined;
+  // Refresh recency.
+  parseCache.delete(key);
+  parseCache.set(key, entry);
+  return entry;
+}
+
+function cacheSet(key: string, entry: ParseEntry): void {
+  if (parseCache.size >= PARSE_CACHE_LIMIT) {
+    const oldest = parseCache.keys().next().value;
+    if (oldest !== undefined) parseCache.delete(oldest);
+  }
+  parseCache.set(key, entry);
+}
+
 export function parse(query: string): LiqeQuery {
   const trimmed = stripAtSigils(query).trim();
   if (trimmed.length === 0) return EMPTY_AST;
+  const hit = cacheGet(trimmed);
+  if (hit) {
+    if (hit.ok) return hit.ast;
+    throw hit.error;
+  }
   try {
-    return liqeParse(trimmed);
+    const ast = liqeParse(trimmed);
+    cacheSet(trimmed, { ok: true, ast });
+    return ast;
   } catch (e) {
-    if (e instanceof LiqeSyntaxError) {
-      throw new ParseError(e.message, (e as { offset?: number }).offset);
-    }
-    throw new ParseError(
-      "Invalid query syntax — check for unmatched quotes or parentheses.",
-    );
+    const error =
+      e instanceof LiqeSyntaxError
+        ? new ParseError(e.message, (e as { offset?: number }).offset)
+        : new ParseError(
+            "Invalid query syntax — check for unmatched quotes or parentheses.",
+          );
+    cacheSet(trimmed, { ok: false, error });
+    throw error;
   }
 }
 
@@ -165,44 +199,181 @@ export interface SearchFieldMeta {
 }
 
 export const SEARCH_FIELDS: Readonly<Record<string, SearchFieldMeta>> = {
-  origin: { label: "Origin", hasSidebar: true, facetField: "origin", valueType: "categorical" },
-  status: { label: "Status", hasSidebar: true, facetField: "status", valueType: "categorical" },
-  model: { label: "Model", hasSidebar: true, facetField: "model", valueType: "categorical" },
-  service: { label: "Service", hasSidebar: true, facetField: "service", valueType: "categorical" },
-  cost: { label: "Cost", hasSidebar: true, facetField: "cost", valueType: "range" },
-  duration: { label: "Duration", hasSidebar: true, facetField: "duration", valueType: "range" },
-  tokens: { label: "Tokens", hasSidebar: true, facetField: "tokens", valueType: "range" },
-  ttlt: { label: "Time to Last Token", hasSidebar: true, facetField: "ttlt", valueType: "range" },
-  promptTokens: { label: "Prompt tokens", hasSidebar: true, facetField: "promptTokens", valueType: "range" },
-  completionTokens: { label: "Completion tokens", hasSidebar: true, facetField: "completionTokens", valueType: "range" },
-  tokensPerSecond: { label: "Tokens / second", hasSidebar: true, facetField: "tokensPerSecond", valueType: "range" },
-  spans: { label: "Span Count", hasSidebar: true, facetField: "spans", valueType: "range" },
-  rootSpanType: { label: "Root span type", hasSidebar: true, facetField: "rootSpanType", valueType: "categorical" },
-  rootSpanName: { label: "Root span name", hasSidebar: true, facetField: "rootSpanName", valueType: "categorical" },
-  guardrail: { label: "Guardrail", hasSidebar: true, facetField: "guardrail", valueType: "categorical" },
-  annotation: { label: "Annotation", hasSidebar: true, facetField: "annotation", valueType: "categorical" },
-  containsAi: { label: "Contains AI", hasSidebar: true, facetField: "containsAi", valueType: "categorical" },
-  errorMessage: { label: "Error message", hasSidebar: true, facetField: "errorMessage", valueType: "categorical" },
-  tokensEstimated: { label: "Tokens estimated", hasSidebar: true, facetField: "tokensEstimated", valueType: "categorical" },
+  origin: {
+    label: "Origin",
+    hasSidebar: true,
+    facetField: "origin",
+    valueType: "categorical",
+  },
+  status: {
+    label: "Status",
+    hasSidebar: true,
+    facetField: "status",
+    valueType: "categorical",
+  },
+  model: {
+    label: "Model",
+    hasSidebar: true,
+    facetField: "model",
+    valueType: "categorical",
+  },
+  service: {
+    label: "Service",
+    hasSidebar: true,
+    facetField: "service",
+    valueType: "categorical",
+  },
+  cost: {
+    label: "Cost",
+    hasSidebar: true,
+    facetField: "cost",
+    valueType: "range",
+  },
+  duration: {
+    label: "Duration",
+    hasSidebar: true,
+    facetField: "duration",
+    valueType: "range",
+  },
+  tokens: {
+    label: "Tokens",
+    hasSidebar: true,
+    facetField: "tokens",
+    valueType: "range",
+  },
+  ttlt: {
+    label: "Time to Last Token",
+    hasSidebar: true,
+    facetField: "ttlt",
+    valueType: "range",
+  },
+  promptTokens: {
+    label: "Prompt tokens",
+    hasSidebar: true,
+    facetField: "promptTokens",
+    valueType: "range",
+  },
+  completionTokens: {
+    label: "Completion tokens",
+    hasSidebar: true,
+    facetField: "completionTokens",
+    valueType: "range",
+  },
+  tokensPerSecond: {
+    label: "Tokens / second",
+    hasSidebar: true,
+    facetField: "tokensPerSecond",
+    valueType: "range",
+  },
+  spans: {
+    label: "Span Count",
+    hasSidebar: true,
+    facetField: "spans",
+    valueType: "range",
+  },
+  rootSpanType: {
+    label: "Root span type",
+    hasSidebar: true,
+    facetField: "rootSpanType",
+    valueType: "categorical",
+  },
+  rootSpanName: {
+    label: "Root span name",
+    hasSidebar: true,
+    facetField: "rootSpanName",
+    valueType: "categorical",
+  },
+  guardrail: {
+    label: "Guardrail",
+    hasSidebar: true,
+    facetField: "guardrail",
+    valueType: "categorical",
+  },
+  annotation: {
+    label: "Annotation",
+    hasSidebar: true,
+    facetField: "annotation",
+    valueType: "categorical",
+  },
+  containsAi: {
+    label: "Contains AI",
+    hasSidebar: true,
+    facetField: "containsAi",
+    valueType: "categorical",
+  },
+  errorMessage: {
+    label: "Error message",
+    hasSidebar: true,
+    facetField: "errorMessage",
+    valueType: "categorical",
+  },
+  tokensEstimated: {
+    label: "Tokens estimated",
+    hasSidebar: true,
+    facetField: "tokensEstimated",
+    valueType: "categorical",
+  },
   prompt: { label: "Prompt ID", hasSidebar: false, valueType: "text" },
-  selectedPrompt: { label: "Selected prompt", hasSidebar: true, facetField: "selectedPrompt", valueType: "categorical" },
-  lastUsedPrompt: { label: "Last used prompt", hasSidebar: true, facetField: "lastUsedPrompt", valueType: "categorical" },
-  promptVersion: { label: "Prompt version", hasSidebar: true, facetField: "promptVersion", valueType: "range" },
+  selectedPrompt: {
+    label: "Selected prompt",
+    hasSidebar: true,
+    facetField: "selectedPrompt",
+    valueType: "categorical",
+  },
+  lastUsedPrompt: {
+    label: "Last used prompt",
+    hasSidebar: true,
+    facetField: "lastUsedPrompt",
+    valueType: "categorical",
+  },
+  promptVersion: {
+    label: "Prompt version",
+    hasSidebar: true,
+    facetField: "promptVersion",
+    valueType: "range",
+  },
   user: { label: "User", hasSidebar: false, valueType: "text" },
   conversation: { label: "Conversation", hasSidebar: false, valueType: "text" },
   scenario: { label: "Scenario", hasSidebar: false, valueType: "text" },
   scenarioRun: { label: "Scenario run", hasSidebar: false, valueType: "text" },
   scenarioSet: { label: "Scenario set", hasSidebar: false, valueType: "text" },
-  scenarioBatch: { label: "Scenario batch", hasSidebar: false, valueType: "text" },
-  scenarioVerdict: { label: "Scenario verdict", hasSidebar: false, valueType: "categorical" },
-  scenarioStatus: { label: "Scenario status", hasSidebar: false, valueType: "categorical" },
+  scenarioBatch: {
+    label: "Scenario batch",
+    hasSidebar: false,
+    valueType: "text",
+  },
+  scenarioVerdict: {
+    label: "Scenario verdict",
+    hasSidebar: false,
+    valueType: "categorical",
+  },
+  scenarioStatus: {
+    label: "Scenario status",
+    hasSidebar: false,
+    valueType: "categorical",
+  },
   has: { label: "Has", hasSidebar: false, valueType: "existence" },
   none: { label: "None", hasSidebar: false, valueType: "existence" },
   event: { label: "Event", hasSidebar: false, valueType: "text" },
   eval: { label: "Eval", hasSidebar: false, valueType: "text" },
-  evaluatorStatus: { label: "Evaluator Status", hasSidebar: true, facetField: "evaluatorStatus", valueType: "categorical" },
-  evaluatorVerdict: { label: "Evaluator Verdict", hasSidebar: true, facetField: "evaluatorVerdict", valueType: "categorical" },
-  evaluatorScore: { label: "Evaluator Score", hasSidebar: true, facetField: "evaluatorScore", valueType: "range" },
+  evaluatorStatus: {
+    label: "Evaluator Status",
+    hasSidebar: true,
+    facetField: "evaluatorStatus",
+    valueType: "categorical",
+  },
+  evaluatorVerdict: {
+    label: "Evaluator Verdict",
+    hasSidebar: true,
+    facetField: "evaluatorVerdict",
+    valueType: "categorical",
+  },
+  evaluatorScore: {
+    label: "Evaluator Score",
+    hasSidebar: true,
+    facetField: "evaluatorScore",
+    valueType: "range",
+  },
   traceId: { label: "Trace ID", hasSidebar: false, valueType: "text" },
   spanId: { label: "Span ID", hasSidebar: false, valueType: "text" },
 };
@@ -248,7 +419,13 @@ export const FIELD_VALUES: Record<string, string[]> = {
     "pending",
     "queued",
   ],
-  evaluatorStatus: ["scheduled", "in_progress", "processed", "skipped", "error"],
+  evaluatorStatus: [
+    "scheduled",
+    "in_progress",
+    "processed",
+    "skipped",
+    "error",
+  ],
   evaluatorVerdict: ["pass", "fail", "unknown"],
 };
 
@@ -290,6 +467,31 @@ export function getFacetValueState(
   if (include.includes(value)) return "include";
   if (exclude.includes(value)) return "exclude";
   return "neutral";
+}
+
+/**
+ * Single AST walk that captures every facet value's state. Returns a flat
+ * lookup keyed by `${field}|${value}`. The sidebar renders dozens of rows,
+ * each of which used to call `getFacetValueState` — meaning N×M walks per
+ * render. With this lookup the walk happens once per AST identity change.
+ */
+export function buildFacetStateLookup(
+  ast: LiqeQuery,
+): ReadonlyMap<string, FacetState> {
+  const map = new Map<string, FacetState>();
+  walkAST(ast, (node, negated) => {
+    if (node.type !== "Tag") return;
+    if (node.field.type === "ImplicitField") return;
+    if (node.expression.type !== "LiteralExpression") return;
+    const key = `${(node.field as { name: string }).name}|${String(
+      node.expression.value,
+    )}`;
+    // Last write wins, matching `getFacetValueState`'s array-includes
+    // semantics (it returns the first match, but for canonical queries
+    // values appear once per field).
+    map.set(key, negated ? "exclude" : "include");
+  });
+  return map;
 }
 
 /**

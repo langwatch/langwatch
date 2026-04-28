@@ -1,8 +1,8 @@
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import type { WithDateWrites } from "~/server/clickhouse/types";
-import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
 import { TRACE_SUMMARY_PROJECTION_VERSION_LATEST } from "~/server/event-sourcing/pipelines/trace-processing/schemas/constants";
 import { IdUtils } from "~/server/event-sourcing/pipelines/trace-processing/utils/id.utils";
+import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
 import { createLogger } from "~/utils/logger/server";
 import type { TraceSummaryData } from "../types";
 import type { TraceSummaryRepository } from "./trace-summary.repository";
@@ -77,7 +77,9 @@ interface ClickHouseSummaryRecord {
   LastEventOccurredAt: number;
 }
 
-export class TraceSummaryClickHouseRepository implements TraceSummaryRepository {
+export class TraceSummaryClickHouseRepository
+  implements TraceSummaryRepository
+{
   constructor(private readonly resolveClient: ClickHouseClientResolver) {}
 
   async upsert(data: TraceSummaryData, tenantId: string): Promise<void> {
@@ -107,7 +109,6 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
         format: "JSONEachRow",
         clickhouse_settings: { async_insert: 1, wait_for_async_insert: 0 },
       });
-
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
@@ -134,7 +135,7 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
     if (mixedTenant) {
       throw new Error(
         `Mixed tenants in upsertBatch: expected ${tenantId}, got ${mixedTenant.tenantId}. ` +
-        `Each batch must contain a single tenant to ensure correct DB routing.`,
+          `Each batch must contain a single tenant to ensure correct DB routing.`,
       );
     }
 
@@ -393,14 +394,23 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
       OccurredAt: new Date(data.occurredAt),
       CreatedAt: new Date(data.createdAt),
       UpdatedAt: new Date(data.updatedAt),
-      LastEventOccurredAt: data.lastEventOccurredAt ? new Date(data.lastEventOccurredAt) : new Date(0),
+      LastEventOccurredAt: data.lastEventOccurredAt
+        ? new Date(data.lastEventOccurredAt)
+        : new Date(0),
       ComputedIOSchemaVersion: data.computedIOSchemaVersion,
       ComputedInput: data.computedInput,
       ComputedOutput: data.computedOutput,
-      TimeToFirstTokenMs: data.timeToFirstTokenMs != null ? Math.round(data.timeToFirstTokenMs) : null,
-      TimeToLastTokenMs: data.timeToLastTokenMs != null ? Math.round(data.timeToLastTokenMs) : null,
+      TimeToFirstTokenMs:
+        data.timeToFirstTokenMs != null
+          ? Math.round(data.timeToFirstTokenMs)
+          : null,
+      TimeToLastTokenMs:
+        data.timeToLastTokenMs != null
+          ? Math.round(data.timeToLastTokenMs)
+          : null,
       TotalDurationMs: Math.round(data.totalDurationMs),
-      TokensPerSecond: data.tokensPerSecond != null ? Math.round(data.tokensPerSecond) : null,
+      TokensPerSecond:
+        data.tokensPerSecond != null ? Math.round(data.tokensPerSecond) : null,
       SpanCount: data.spanCount,
       ContainsErrorStatus: data.containsErrorStatus ? 1 : 0,
       ContainsOKStatus: data.containsOKStatus ? 1 : 0,

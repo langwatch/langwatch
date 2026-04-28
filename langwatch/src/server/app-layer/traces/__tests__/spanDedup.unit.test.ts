@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  RedisSpanDedupeService,
   NullSpanDedupeService,
+  RedisSpanDedupeService,
 } from "../span-dedupe.service";
 
 describe("RedisSpanDedupeService", () => {

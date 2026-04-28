@@ -196,7 +196,8 @@ export const extractUsageTokens = (
   }
 
   if (inTok !== null) ctx.setAttr(ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS, inTok);
-  if (outTok !== null) ctx.setAttr(ATTR_KEYS.GEN_AI_USAGE_OUTPUT_TOKENS, outTok);
+  if (outTok !== null)
+    ctx.setAttr(ATTR_KEYS.GEN_AI_USAGE_OUTPUT_TOKENS, outTok);
   if (inTok !== null || outTok !== null) ctx.recordRule(ruleId);
 };
 
@@ -214,7 +215,9 @@ export const recordValueType = (
   if (Array.isArray(existing) && existing.every((x) => typeof x === "string")) {
     existing.push(`${attrKey}=${type}`);
   } else {
-    ctx.setAttr(ATTR_KEYS.LANGWATCH_RESERVED_VALUE_TYPES, [`${attrKey}=${type}`]);
+    ctx.setAttr(ATTR_KEYS.LANGWATCH_RESERVED_VALUE_TYPES, [
+      `${attrKey}=${type}`,
+    ]);
   }
 };
 

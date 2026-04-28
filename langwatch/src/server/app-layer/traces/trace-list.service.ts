@@ -1,23 +1,20 @@
-import type { TraceSummaryData } from "./types";
-import type {
-  CategoricalFacetResult,
-  TraceListRepository,
-  TraceListSort,
-} from "./repositories/trace-list.repository";
-import {
-  FACET_REGISTRY,
-  TABLE_TIME_COLUMNS,
-} from "./facet-registry";
+import type { EvaluationRunService } from "~/server/app-layer/evaluations/evaluation-run.service";
+import type { EvalSummary } from "~/server/app-layer/evaluations/types";
+import type { TopicService } from "~/server/app-layer/topics/topic.service";
+import { TtlCache } from "~/server/utils/ttlCache";
+import { createLogger } from "~/utils/logger/server";
 import type {
   ExpressionCategoricalDef,
   FacetDefinition,
   RangeFacetDef,
 } from "./facet-registry";
-import { createLogger } from "~/utils/logger/server";
-import { TtlCache } from "~/server/utils/ttlCache";
-import type { EvalSummary } from "~/server/app-layer/evaluations/types";
-import type { EvaluationRunService } from "~/server/app-layer/evaluations/evaluation-run.service";
-import type { TopicService } from "~/server/app-layer/topics/topic.service";
+import { FACET_REGISTRY, TABLE_TIME_COLUMNS } from "./facet-registry";
+import type {
+  CategoricalFacetResult,
+  TraceListRepository,
+  TraceListSort,
+} from "./repositories/trace-list.repository";
+import type { TraceSummaryData } from "./types";
 
 export interface TraceListEvent {
   spanId: string;
@@ -214,7 +211,8 @@ const SORT_COLUMN_MAP: Record<string, TraceListSort["column"]> = {
 
 const FACET_EXPRESSIONS: Record<string, string> = {
   origin: "Attributes['langwatch.origin']",
-  status: "if(ContainsErrorStatus = 1, 'error', if(ContainsOKStatus = 1, 'ok', 'warning'))",
+  status:
+    "if(ContainsErrorStatus = 1, 'error', if(ContainsOKStatus = 1, 'ok', 'warning'))",
   service: "Attributes['service.name']",
 };
 
@@ -269,11 +267,10 @@ export class TraceListService {
     const items = result.rows.map((row) => mapToTraceListItem(row));
     const traceIds = items.map((item) => item.traceId);
 
-    const evaluations =
-      await this.evaluationRunService.findSummariesByTraceIds(
-        params.tenantId,
-        traceIds,
-      );
+    const evaluations = await this.evaluationRunService.findSummariesByTraceIds(
+      params.tenantId,
+      traceIds,
+    );
 
     return {
       items,
@@ -338,9 +335,9 @@ export class TraceListService {
     }
 
     return {
-      origin: facets["origin"] ?? {},
-      status: facets["status"] ?? {},
-      service: facets["service"] ?? {},
+      origin: facets.origin ?? {},
+      status: facets.status ?? {},
+      service: facets.service ?? {},
       model: modelResult.values,
       ranges: {
         tokens: tokensRange,

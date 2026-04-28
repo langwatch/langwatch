@@ -166,9 +166,7 @@ describe("OpenInferenceExtractor", () => {
 
       extractor.apply(ctx);
 
-      expect(ctx.out[ATTR_KEYS.GEN_AI_CONVERSATION_ID]).toBe(
-        "existing-thread",
-      );
+      expect(ctx.out[ATTR_KEYS.GEN_AI_CONVERSATION_ID]).toBe("existing-thread");
     });
   });
 

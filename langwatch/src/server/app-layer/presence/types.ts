@@ -23,13 +23,14 @@ export const presenceVizTabSchema = z.enum([
   "waterfall",
   "flame",
   "spanlist",
-  "llmspans",
+  "sequence",
 ]);
 export const presenceDrawerTabSchema = z.enum([
   "summary",
   "llm",
   "span",
   "prompts",
+  "annotations",
 ]);
 
 export const presenceLocationSchema = z.object({

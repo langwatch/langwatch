@@ -109,9 +109,7 @@ function buildWhereClauseForTable(
   };
 
   if (!isLiveUpperBound(timeRange)) {
-    parts.push(
-      `${timeColumn} <= fromUnixTimestamp64Milli({timeTo:Int64})`,
-    );
+    parts.push(`${timeColumn} <= fromUnixTimestamp64Milli({timeTo:Int64})`);
     params.timeTo = timeRange.to;
   }
 
@@ -411,12 +409,11 @@ export class TraceListClickHouseRepository implements TraceListRepository {
       "TraceListClickHouseRepository.findCategoricalFacet",
     );
 
-    const { sql: whereClause, params: queryParams } =
-      buildWhereClauseForTable(
-        params.tenantId,
-        params.timeRange,
-        params.timeColumn,
-      );
+    const { sql: whereClause, params: queryParams } = buildWhereClauseForTable(
+      params.tenantId,
+      params.timeRange,
+      params.timeColumn,
+    );
 
     const prefixFilter = params.prefix
       ? `AND ${params.facetExpression} ILIKE concat({prefix:String}, '%')`
@@ -522,12 +519,11 @@ export class TraceListClickHouseRepository implements TraceListRepository {
       "TraceListClickHouseRepository.findRangeStatsForTable",
     );
 
-    const { sql: whereClause, params: queryParams } =
-      buildWhereClauseForTable(
-        params.tenantId,
-        params.timeRange,
-        params.timeColumn,
-      );
+    const { sql: whereClause, params: queryParams } = buildWhereClauseForTable(
+      params.tenantId,
+      params.timeRange,
+      params.timeColumn,
+    );
 
     const client = await this.resolveClient(params.tenantId);
     const result = await client.query({

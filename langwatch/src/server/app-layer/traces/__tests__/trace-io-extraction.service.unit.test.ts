@@ -1,12 +1,10 @@
 import { describe, expect, it } from "vitest";
-import {
-  TraceIOExtractionService,
-} from "../trace-io-extraction.service";
 import type { NormalizedSpan } from "../../../event-sourcing/pipelines/trace-processing/schemas/spans";
 import {
   NormalizedSpanKind,
   NormalizedStatusCode,
 } from "../../../event-sourcing/pipelines/trace-processing/schemas/spans";
+import { TraceIOExtractionService } from "../trace-io-extraction.service";
 
 const service = new TraceIOExtractionService();
 
@@ -359,9 +357,7 @@ describe("TraceIOExtractionService", () => {
         // But the caller still gets a stringified fallback rather than null.
         const lastOutput = service.extractLastOutput([span]);
         expect(lastOutput).not.toBeNull();
-        expect(lastOutput!.text).toBe(
-          '{"customWrapper":"the actual answer"}',
-        );
+        expect(lastOutput!.text).toBe('{"customWrapper":"the actual answer"}');
       });
     });
 

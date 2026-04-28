@@ -121,9 +121,7 @@ describe("CanonicalizeSpanAttributesService — chat message coercion", () => {
 
   describe("when input is wrapped in {messages: [...]} object", () => {
     it("unwraps and sets gen_ai.input.messages", () => {
-      const innerMessages = [
-        { role: "user", content: "What time is it?" },
-      ];
+      const innerMessages = [{ role: "user", content: "What time is it?" }];
       const wrapped = JSON.stringify({ messages: innerMessages });
 
       const result = service.canonicalize(
@@ -262,9 +260,7 @@ describe("CanonicalizeSpanAttributesService — chat message coercion", () => {
         stubSpan,
       );
 
-      expect(
-        result.attributes["gen_ai.system_instructions"],
-      ).toBeUndefined();
+      expect(result.attributes["gen_ai.system_instructions"]).toBeUndefined();
     });
   });
 
@@ -299,12 +295,8 @@ describe("CanonicalizeSpanAttributesService — chat message coercion", () => {
     });
 
     it("gen_ai.input.messages already set blocks llm.input_messages extraction", () => {
-      const existingMessages = [
-        { role: "user", content: "Already set" },
-      ];
-      const legacyMessages = [
-        { role: "user", content: "Legacy fallback" },
-      ];
+      const existingMessages = [{ role: "user", content: "Already set" }];
+      const legacyMessages = [{ role: "user", content: "Legacy fallback" }];
 
       const result = service.canonicalize(
         {
@@ -316,7 +308,9 @@ describe("CanonicalizeSpanAttributesService — chat message coercion", () => {
       );
 
       // gen_ai.input.messages was already present, llm.input_messages should not overwrite
-      expect(result.attributes["gen_ai.input.messages"]).toEqual(existingMessages);
+      expect(result.attributes["gen_ai.input.messages"]).toEqual(
+        existingMessages,
+      );
     });
   });
 });

@@ -169,11 +169,7 @@ export class OtlpSpanPiiRedactionService {
 
     // Collect all string values from span attributes, events, and links
     for (const attrs of this.collectAllAttributeSets(span)) {
-      const result = this.collectStringEntries(
-        attrs,
-        entries,
-        totalLength,
-      );
+      const result = this.collectStringEntries(attrs, entries, totalLength);
       anySkipped ||= result.skipped;
       anyRedacted ||= result.collected;
       totalLength = result.totalLength;
@@ -299,7 +295,11 @@ export class OtlpSpanPiiRedactionService {
     const maxLen = this.deps.piiRedactionMaxAttributeLength;
     let totalLength = 0;
 
-    const tryPush = (obj: Record<string, string>, key: string, value: string) => {
+    const tryPush = (
+      obj: Record<string, string>,
+      key: string,
+      value: string,
+    ) => {
       if (totalLength + value.length > maxLen) {
         this.logger.warn(
           { key, valueLength: value.length, totalLength, maxLength: maxLen },
@@ -392,7 +392,11 @@ export class OtlpSpanPiiRedactionService {
     const maxLen = this.deps.piiRedactionMaxAttributeLength;
     let totalLength = 0;
 
-    const tryPush = (obj: Record<string, string>, key: string, value: string) => {
+    const tryPush = (
+      obj: Record<string, string>,
+      key: string,
+      value: string,
+    ) => {
       if (totalLength + value.length > maxLen) {
         this.logger.warn(
           { key, valueLength: value.length, totalLength, maxLength: maxLen },
@@ -413,7 +417,11 @@ export class OtlpSpanPiiRedactionService {
 
     for (const key of Object.keys(metric.resourceAttributes)) {
       if (metric.resourceAttributes[key]) {
-        tryPush(metric.resourceAttributes, key, metric.resourceAttributes[key]!);
+        tryPush(
+          metric.resourceAttributes,
+          key,
+          metric.resourceAttributes[key]!,
+        );
       }
     }
 

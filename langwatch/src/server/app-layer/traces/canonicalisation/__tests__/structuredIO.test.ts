@@ -366,7 +366,9 @@ describe("CanonicalizeSpanAttributesService — structured IO", () => {
         stubSpan,
       );
 
-      expect(result.attributes["langwatch.reserved.value_types"]).toBeUndefined();
+      expect(
+        result.attributes["langwatch.reserved.value_types"],
+      ).toBeUndefined();
     });
   });
 

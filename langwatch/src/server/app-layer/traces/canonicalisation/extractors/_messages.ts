@@ -238,8 +238,6 @@ const isObjectWithNumericKeys = (v: unknown): v is Record<string, unknown> => {
  * preserving index order.
  */
 const numericKeysToArray = (obj: Record<string, unknown>): unknown[] => {
-  const entries = Object.entries(obj).sort(
-    ([a], [b]) => Number(a) - Number(b),
-  );
+  const entries = Object.entries(obj).sort(([a], [b]) => Number(a) - Number(b));
   return entries.map(([, v]) => v);
 };

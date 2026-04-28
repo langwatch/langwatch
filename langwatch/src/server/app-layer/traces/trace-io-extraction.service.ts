@@ -1,11 +1,11 @@
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
+import type { NormalizedSpan } from "../../event-sourcing/pipelines/trace-processing/schemas/spans";
 import { ATTR_KEYS } from "./canonicalisation/extractors/_constants";
 import {
   extractLastUserMessageText,
   extractMessageContentText,
 } from "./canonicalisation/extractors/_messages";
-import type { NormalizedSpan } from "../../event-sourcing/pipelines/trace-processing/schemas/spans";
 
 /**
  * Service for extracting input/output text from spans using tree traversal
@@ -93,7 +93,11 @@ export class TraceIOExtractionService {
         });
         const httpFallback = this.getHttpFallback(orderedSpans);
         return httpFallback
-          ? { raw: httpFallback, text: httpFallback, source: "langwatch" as const }
+          ? {
+              raw: httpFallback,
+              text: httpFallback,
+              source: "langwatch" as const,
+            }
           : null;
       },
     );
@@ -188,7 +192,11 @@ export class TraceIOExtractionService {
         });
         const httpFallback = this.getHttpStatusFallback(tree);
         return httpFallback
-          ? { raw: httpFallback, text: httpFallback, source: "langwatch" as const }
+          ? {
+              raw: httpFallback,
+              text: httpFallback,
+              source: "langwatch" as const,
+            }
           : null;
       },
     );
@@ -492,7 +500,8 @@ function hasMeaningfulLeaf(
   if (typeof value !== "object") return false;
   if (seen.has(value as object)) return false;
   seen.add(value as object);
-  if (Array.isArray(value)) return value.some((v) => hasMeaningfulLeaf(v, seen));
+  if (Array.isArray(value))
+    return value.some((v) => hasMeaningfulLeaf(v, seen));
   return Object.values(value as Record<string, unknown>).some((v) =>
     hasMeaningfulLeaf(v, seen),
   );
@@ -540,10 +549,7 @@ function stringifyForText(value: unknown): string | null {
 function normalizeChatPayload(value: unknown): unknown {
   if (typeof value === "string") {
     const trimmed = value.trim();
-    if (
-      trimmed.startsWith("{") ||
-      trimmed.startsWith("[")
-    ) {
+    if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
       try {
         const parsed = JSON.parse(trimmed);
         return normalizeChatPayload(parsed);
@@ -563,11 +569,7 @@ function normalizeChatPayload(value: unknown): unknown {
     // unwrapped block.
     if (obj.type === "text" && typeof obj.text === "string") {
       const t = obj.text.trim();
-      if (
-        t.startsWith("{") &&
-        t.endsWith("}") &&
-        t.includes('"type":"')
-      ) {
+      if (t.startsWith("{") && t.endsWith("}") && t.includes('"type":"')) {
         try {
           const inner = JSON.parse(t) as Record<string, unknown>;
           if (

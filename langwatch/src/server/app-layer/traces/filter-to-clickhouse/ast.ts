@@ -1,8 +1,8 @@
 import {
-  parse,
   type LiqeQuery,
   type LogicalExpressionToken,
   type ParenthesizedExpressionToken,
+  parse,
   type TagToken,
   type UnaryOperatorToken,
 } from "liqe";
@@ -12,9 +12,9 @@ import {
   ATTRIBUTE_PREFIX,
   extractStringValue,
   nextParam,
+  type TranslationContext,
   validateValueLength,
   wrap,
-  type TranslationContext,
 } from "./value-helpers";
 
 const MAX_NODE_COUNT = 20;
@@ -113,7 +113,9 @@ function translateNode(
     }
 
     default:
-      throw new FilterParseError(`Unsupported query syntax: ${(node as { type: string }).type}`);
+      throw new FilterParseError(
+        `Unsupported query syntax: ${(node as { type: string }).type}`,
+      );
   }
 }
 
@@ -159,10 +161,7 @@ function translateAttributeField(
   const pVal = nextParam(ctx, "attrValue");
   ctx.params[pKey] = attrKey;
   ctx.params[pVal] = value;
-  return wrap(
-    `Attributes[{${pKey}:String}] = {${pVal}:String}`,
-    negated,
-  );
+  return wrap(`Attributes[{${pKey}:String}] = {${pVal}:String}`, negated);
 }
 
 function translateFreeText(

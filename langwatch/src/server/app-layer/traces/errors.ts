@@ -28,10 +28,14 @@ export class QueryTimeoutError extends DomainError {
   declare readonly kind: "query_timeout";
 
   constructor(durationMs: number, hint?: string) {
-    super("query_timeout", `Query timed out (${(durationMs / 1000).toFixed(1)}s)`, {
-      httpStatus: 504,
-      meta: { durationMs, ...(hint ? { hint } : {}) },
-    });
+    super(
+      "query_timeout",
+      `Query timed out (${(durationMs / 1000).toFixed(1)}s)`,
+      {
+        httpStatus: 504,
+        meta: { durationMs, ...(hint ? { hint } : {}) },
+      },
+    );
     this.name = "QueryTimeoutError";
   }
 }
@@ -42,7 +46,10 @@ export class FilterParseError extends DomainError {
   constructor(message: string, position?: number) {
     super("filter_parse_error", message, {
       httpStatus: 422,
-      meta: { ...(position !== undefined ? { position } : {}), expected: message },
+      meta: {
+        ...(position !== undefined ? { position } : {}),
+        expected: message,
+      },
     });
     this.name = "FilterParseError";
   }
@@ -64,10 +71,14 @@ export class TimeRangeTooWideError extends DomainError {
   declare readonly kind: "time_range_too_wide";
 
   constructor(maxDays: number) {
-    super("time_range_too_wide", `Maximum ${maxDays} days. Narrow time range.`, {
-      httpStatus: 422,
-      meta: { maxDays },
-    });
+    super(
+      "time_range_too_wide",
+      `Maximum ${maxDays} days. Narrow time range.`,
+      {
+        httpStatus: 422,
+        meta: { maxDays },
+      },
+    );
     this.name = "TimeRangeTooWideError";
   }
 }

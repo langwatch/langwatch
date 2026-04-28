@@ -1,25 +1,22 @@
 import { z } from "zod";
-import {
-  createTRPCRouter,
-  protectedProcedure,
-} from "~/server/api/trpc";
+import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
-import { TraceNotFoundError } from "~/server/app-layer/traces/errors";
 import {
-  generateTraceQueryFromPrompt,
   generateTraceAction,
+  generateTraceQueryFromPrompt,
 } from "~/server/app-layer/traces/ai-query";
+import { TraceNotFoundError } from "~/server/app-layer/traces/errors";
 import { translateFilterToClickHouse } from "~/server/app-layer/traces/filter-to-clickhouse";
-import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type { SpanSummaryRow } from "~/server/app-layer/traces/repositories/span-storage.repository";
+import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type { Span, SpanInputOutput } from "~/server/tracer/types";
+import { checkProjectPermission } from "../rbac";
 import type {
-  TraceHeader,
-  SpanTreeNode,
   SpanDetail,
+  SpanTreeNode,
+  TraceHeader,
   TraceResourceInfoDto,
 } from "./tracesV2.schemas";
-import { checkProjectPermission } from "../rbac";
 
 // ---------------------------------------------------------------------------
 // Shared input fragments
@@ -42,9 +39,9 @@ const spanReadHintShape = {
   occurredAtMs: z.number().int().optional(),
 } as const;
 
-function occurredAtFromInput(input: { occurredAtMs?: number }):
-  | { occurredAtMs: number }
-  | Record<string, never> {
+function occurredAtFromInput(input: {
+  occurredAtMs?: number;
+}): { occurredAtMs: number } | Record<string, never> {
   return input.occurredAtMs !== undefined
     ? { occurredAtMs: input.occurredAtMs }
     : {};
@@ -66,7 +63,8 @@ function mapTraceSummaryToHeader(summary: TraceSummaryData): TraceHeader {
   return {
     traceId: summary.traceId,
     timestamp: summary.occurredAt,
-    name: summary.attributes["langwatch.span.name"] ?? summary.traceId.slice(0, 8),
+    name:
+      summary.attributes["langwatch.span.name"] ?? summary.traceId.slice(0, 8),
     serviceName: summary.attributes["service.name"] ?? "",
     origin: summary.attributes["langwatch.origin"] ?? "application",
     conversationId:
@@ -120,7 +118,9 @@ function mapSpanSummaryToTreeNode(row: SpanSummaryRow): SpanTreeNode {
   };
 }
 
-function stringifySpanIO(io: SpanInputOutput | null | undefined): string | null {
+function stringifySpanIO(
+  io: SpanInputOutput | null | undefined,
+): string | null {
   if (!io) return null;
   switch (io.type) {
     case "text":
@@ -352,8 +352,9 @@ export const tracesV2Router = createTRPCRouter({
         turns,
         total: turns.length,
         position: idx === -1 ? 0 : idx + 1,
-        previous: idx > 0 ? turns[idx - 1] ?? null : null,
-        next: idx >= 0 && idx < turns.length - 1 ? turns[idx + 1] ?? null : null,
+        previous: idx > 0 ? (turns[idx - 1] ?? null) : null,
+        next:
+          idx >= 0 && idx < turns.length - 1 ? (turns[idx + 1] ?? null) : null,
       };
     }),
 
@@ -519,20 +520,22 @@ export const tracesV2Router = createTRPCRouter({
       }),
     )
     .use(checkProjectPermission("traces:view"))
-    .query(async ({ input }): Promise<{ nodes: SpanTreeNode[]; total: number }> => {
-      const app = getApp();
-      const result = await app.traces.spans.getSpanSummariesPaginated({
-        tenantId: input.projectId,
-        traceId: input.traceId,
-        limit: input.limit,
-        offset: input.offset,
-        ...occurredAtFromInput(input),
-      });
-      return {
-        nodes: result.rows.map(mapSpanSummaryToTreeNode),
-        total: result.total,
-      };
-    }),
+    .query(
+      async ({ input }): Promise<{ nodes: SpanTreeNode[]; total: number }> => {
+        const app = getApp();
+        const result = await app.traces.spans.getSpanSummariesPaginated({
+          tenantId: input.projectId,
+          traceId: input.traceId,
+          limit: input.limit,
+          offset: input.offset,
+          ...occurredAtFromInput(input),
+        });
+        return {
+          nodes: result.rows.map(mapSpanSummaryToTreeNode),
+          total: result.total,
+        };
+      },
+    ),
 
   spanTreeDelta: protectedProcedure
     .input(
@@ -681,8 +684,7 @@ export const tracesV2Router = createTRPCRouter({
       }));
 
       // Pick the root span (no parent) if present; fall back to earliest.
-      const root =
-        rows.find((r) => r.parentSpanId == null) ?? rows[0] ?? null;
+      const root = rows.find((r) => r.parentSpanId == null) ?? rows[0] ?? null;
 
       return {
         rootSpanId: root?.spanId ?? null,
@@ -722,10 +724,6 @@ export const tracesV2Router = createTRPCRouter({
     .use(checkProjectPermission("traces:view"))
     .query(async ({ input }) => {
       const app = getApp();
-      return app.evaluations.runs.findByTraceId(
-        input.projectId,
-        input.traceId,
-      );
+      return app.evaluations.runs.findByTraceId(input.projectId, input.traceId);
     }),
 });
-

@@ -98,11 +98,7 @@ describe("CanonicalizeSpanAttributesService — metadata handling", () => {
         custom_field: "value",
         request_source: "api",
       });
-      const result = service.canonicalize(
-        { metadata },
-        [],
-        stubSpan,
-      );
+      const result = service.canonicalize({ metadata }, [], stubSpan);
 
       // metadata blob is consumed (take), raw blob no longer present
       expect(result.attributes["metadata"]).toBeUndefined();
@@ -117,11 +113,7 @@ describe("CanonicalizeSpanAttributesService — metadata handling", () => {
       const metadata = JSON.stringify({
         nested: { foo: "bar", count: 42 },
       });
-      const result = service.canonicalize(
-        { metadata },
-        [],
-        stubSpan,
-      );
+      const result = service.canonicalize({ metadata }, [], stubSpan);
 
       expect(result.attributes["metadata.nested"]).toBe(
         JSON.stringify({ foo: "bar", count: 42 }),

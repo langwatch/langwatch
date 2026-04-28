@@ -1,5 +1,5 @@
+import type { ElasticSearchEvent, Span } from "~/server/tracer/types";
 import type { SpanInsertData } from "../types";
-import type { Span, ElasticSearchEvent } from "~/server/tracer/types";
 
 export interface SpanSummaryRow {
   spanId: string;
@@ -43,13 +43,21 @@ export interface SpanStorageRepository {
     params: { tenantId: string; traceId: string } & OccurredAtHint,
   ): Promise<Span[]>;
   getSpanByIds(
-    params: { tenantId: string; traceId: string; spanId: string } & OccurredAtHint,
+    params: {
+      tenantId: string;
+      traceId: string;
+      spanId: string;
+    } & OccurredAtHint,
   ): Promise<Span | null>;
   getEventsByTraceId(
     params: { tenantId: string; traceId: string } & OccurredAtHint,
   ): Promise<ElasticSearchEvent[]>;
   getSpanEvents(
-    params: { tenantId: string; traceId: string; spanId: string } & OccurredAtHint,
+    params: {
+      tenantId: string;
+      traceId: string;
+      spanId: string;
+    } & OccurredAtHint,
   ): Promise<ElasticSearchEvent[]>;
   getSpanSummaryByTraceId(
     params: { tenantId: string; traceId: string } & OccurredAtHint,
@@ -100,7 +108,11 @@ export class NullSpanStorageRepository implements SpanStorageRepository {
   }
 
   async getSpanByIds(
-    _params: { tenantId: string; traceId: string; spanId: string } & OccurredAtHint,
+    _params: {
+      tenantId: string;
+      traceId: string;
+      spanId: string;
+    } & OccurredAtHint,
   ): Promise<Span | null> {
     return null;
   }
@@ -112,7 +124,11 @@ export class NullSpanStorageRepository implements SpanStorageRepository {
   }
 
   async getSpanEvents(
-    _params: { tenantId: string; traceId: string; spanId: string } & OccurredAtHint,
+    _params: {
+      tenantId: string;
+      traceId: string;
+      spanId: string;
+    } & OccurredAtHint,
   ): Promise<ElasticSearchEvent[]> {
     return [];
   }

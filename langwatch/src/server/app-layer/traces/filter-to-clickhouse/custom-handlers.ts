@@ -1,10 +1,10 @@
 import { boundedSubquery } from "./subqueries";
 import {
   extractStringValue,
+  type FieldHandler,
   nextParam,
   validateValueLength,
   wrap,
-  type FieldHandler,
 } from "./value-helpers";
 
 export const CUSTOM_FACET_HANDLERS: Record<string, FieldHandler> = {
@@ -15,10 +15,7 @@ export const CUSTOM_FACET_HANDLERS: Record<string, FieldHandler> = {
 
     if (value.includes("*")) {
       ctx.params[p] = value.replace(/\*/g, "%");
-      return wrap(
-        `arrayExists(m -> m LIKE {${p}:String}, Models)`,
-        negated,
-      );
+      return wrap(`arrayExists(m -> m LIKE {${p}:String}, Models)`, negated);
     }
 
     ctx.params[p] = value;

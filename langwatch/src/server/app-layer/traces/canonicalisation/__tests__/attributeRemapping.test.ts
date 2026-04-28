@@ -61,7 +61,10 @@ describe("CanonicalizeSpanAttributesService — take vs preserve semantics", () 
     });
 
     it("removes traceloop.entity.input from output after mapping", () => {
-      const input = JSON.stringify({ role: "user", content: "Traceloop input" });
+      const input = JSON.stringify({
+        role: "user",
+        content: "Traceloop input",
+      });
       const result = service.canonicalize(
         { "traceloop.entity.input": input },
         [],
@@ -117,11 +120,7 @@ describe("CanonicalizeSpanAttributesService — take vs preserve semantics", () 
         user_id: "u1",
         custom_field: "still here",
       });
-      const result = service.canonicalize(
-        { metadata },
-        [],
-        stubSpan,
-      );
+      const result = service.canonicalize({ metadata }, [], stubSpan);
 
       // metadata is consumed via take(), so raw blob is gone
       expect(result.attributes["metadata"]).toBeUndefined();

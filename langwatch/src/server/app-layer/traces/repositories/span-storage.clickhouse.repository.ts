@@ -1,11 +1,13 @@
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import type { WithDateWrites } from "~/server/clickhouse/types";
-import { NormalizedSpanKind } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
-import { NormalizedStatusCode } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
+import {
+  NormalizedSpanKind,
+  NormalizedStatusCode,
+} from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
 import { SecurityError } from "~/server/event-sourcing/services/errorHandling";
 import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
-import { mapNormalizedSpansToSpans } from "~/server/traces/mappers/span.mapper";
 import type { ElasticSearchEvent, Span } from "~/server/tracer/types";
+import { mapNormalizedSpansToSpans } from "~/server/traces/mappers/span.mapper";
 import { createLogger } from "~/utils/logger/server";
 import type { SpanInsertData } from "../types";
 import type {
@@ -39,7 +41,9 @@ interface PartitionFragment {
   params: Record<string, unknown>;
 }
 
-function partitionWindowFor(hint: OccurredAtHint | undefined): PartitionWindow | undefined {
+function partitionWindowFor(
+  hint: OccurredAtHint | undefined,
+): PartitionWindow | undefined {
   if (hint?.occurredAtMs === undefined) return undefined;
   return {
     fromMs: hint.occurredAtMs - PARTITION_WINDOW_MS,
@@ -47,7 +51,9 @@ function partitionWindowFor(hint: OccurredAtHint | undefined): PartitionWindow |
   };
 }
 
-function partitionFragment(window: PartitionWindow | undefined): PartitionFragment {
+function partitionFragment(
+  window: PartitionWindow | undefined,
+): PartitionFragment {
   if (!window) {
     return { sqlAnd: "", sqlAndInner: "", params: {} };
   }
@@ -196,8 +202,10 @@ function mapEventRow(row: EventRow): ElasticSearchEvent {
 
   for (const [key, value] of Object.entries(row.attributes)) {
     const isMetricKey =
-      key === "vote" || key === "score" ||
-      key.startsWith("metrics.") || key.startsWith("event.metrics.");
+      key === "vote" ||
+      key === "score" ||
+      key.startsWith("metrics.") ||
+      key.startsWith("event.metrics.");
     if (isMetricKey) {
       const metricKey = key.replace(/^(event\.)?metrics\./, "");
       metrics.push({ key: metricKey, value: parseFloat(value) || 0 });
@@ -231,19 +239,33 @@ const logger = createLogger(
   "langwatch:app-layer:traces:span-storage-repository",
 );
 
-const VALID_SPAN_KINDS = new Set(Object.values(NormalizedSpanKind).filter((v): v is number => typeof v === "number"));
-const VALID_STATUS_CODES = new Set(Object.values(NormalizedStatusCode).filter((v): v is number => typeof v === "number"));
+const VALID_SPAN_KINDS = new Set(
+  Object.values(NormalizedSpanKind).filter(
+    (v): v is number => typeof v === "number",
+  ),
+);
+const VALID_STATUS_CODES = new Set(
+  Object.values(NormalizedStatusCode).filter(
+    (v): v is number => typeof v === "number",
+  ),
+);
 
 function validateSpanKind(value: number): NormalizedSpanKind {
   if (VALID_SPAN_KINDS.has(value)) return value as NormalizedSpanKind;
-  logger.warn({ value }, "Unknown SpanKind from ClickHouse, defaulting to INTERNAL");
+  logger.warn(
+    { value },
+    "Unknown SpanKind from ClickHouse, defaulting to INTERNAL",
+  );
   return NormalizedSpanKind.INTERNAL;
 }
 
 function validateStatusCode(value: number | null): NormalizedStatusCode | null {
   if (value === null) return null;
   if (VALID_STATUS_CODES.has(value)) return value as NormalizedStatusCode;
-  logger.warn({ value }, "Unknown StatusCode from ClickHouse, defaulting to UNSET");
+  logger.warn(
+    { value },
+    "Unknown StatusCode from ClickHouse, defaulting to UNSET",
+  );
   return NormalizedStatusCode.UNSET;
 }
 
@@ -251,13 +273,18 @@ function validateStatusCode(value: number | null): NormalizedStatusCode | null {
  * Ensures a ClickHouse Map(String, String) value is actually Record<string, string>.
  * Non-string values are dropped with a warning.
  */
-function ensureStringRecord(raw: Record<string, unknown>): Record<string, string> {
+function ensureStringRecord(
+  raw: Record<string, unknown>,
+): Record<string, string> {
   const result: Record<string, string> = {};
   for (const [key, value] of Object.entries(raw)) {
     if (typeof value === "string") {
       result[key] = value;
     } else {
-      logger.warn({ key, type: typeof value }, "Non-string attribute value from ClickHouse");
+      logger.warn(
+        { key, type: typeof value },
+        "Non-string attribute value from ClickHouse",
+      );
     }
   }
   return result;
@@ -276,8 +303,14 @@ export function deserializeAttributes(
   const result: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(attrs)) {
     // Boolean strings
-    if (value === "true") { result[key] = true; continue; }
-    if (value === "false") { result[key] = false; continue; }
+    if (value === "true") {
+      result[key] = true;
+      continue;
+    }
+    if (value === "false") {
+      result[key] = false;
+      continue;
+    }
 
     // JSON objects and arrays
     const trimmed = value.trim();
@@ -297,7 +330,11 @@ export function deserializeAttributes(
     // (e.g. zip codes "90210" → 90210). ClickHouse round-trip for originally-numeric
     // attributes is correct; pure string numerics may lose their string type.
     // Guard: skip conversion for integers beyond Number.MAX_SAFE_INTEGER to avoid precision loss.
-    if (trimmed !== "" && DECIMAL_NUMBER_RE.test(trimmed) && Number.isFinite(Number(trimmed))) {
+    if (
+      trimmed !== "" &&
+      DECIMAL_NUMBER_RE.test(trimmed) &&
+      Number.isFinite(Number(trimmed))
+    ) {
       const num = Number(trimmed);
       if (Number.isInteger(num) && Math.abs(num) > Number.MAX_SAFE_INTEGER) {
         result[key] = value;
@@ -428,8 +465,12 @@ function mapChRowToNormalized(row: FullSpanRow) {
     durationMs: row.DurationMs,
     name: row.SpanName,
     kind: validateSpanKind(row.SpanKind),
-    resourceAttributes: deserializeAttributes(ensureStringRecord(row.ResourceAttributes)),
-    spanAttributes: deserializeAttributes(ensureStringRecord(row.SpanAttributes)),
+    resourceAttributes: deserializeAttributes(
+      ensureStringRecord(row.ResourceAttributes),
+    ),
+    spanAttributes: deserializeAttributes(
+      ensureStringRecord(row.SpanAttributes),
+    ),
     statusCode: validateStatusCode(row.StatusCode),
     statusMessage: row.StatusMessage,
     instrumentationScope: {
@@ -439,12 +480,16 @@ function mapChRowToNormalized(row: FullSpanRow) {
     events: (row.Events_Timestamp ?? []).map((ts, i) => ({
       name: row.Events_Name?.[i] ?? "",
       timeUnixMs: ts,
-      attributes: deserializeAttributes(ensureStringRecord(row.Events_Attributes?.[i] ?? {})),
+      attributes: deserializeAttributes(
+        ensureStringRecord(row.Events_Attributes?.[i] ?? {}),
+      ),
     })),
     links: (row.Links_TraceId ?? []).map((lt, i) => ({
       traceId: lt,
       spanId: row.Links_SpanId?.[i] ?? "",
-      attributes: deserializeAttributes(ensureStringRecord(row.Links_Attributes?.[i] ?? {})),
+      attributes: deserializeAttributes(
+        ensureStringRecord(row.Links_Attributes?.[i] ?? {}),
+      ),
     })),
     droppedAttributesCount: 0 as const,
     droppedEventsCount: 0 as const,
@@ -625,7 +670,9 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
 
           const rows = (await result.json()) as FullSpanRow[];
           if (rows.length === 0) return null;
-          const [span] = mapNormalizedSpansToSpans(rows.map(mapChRowToNormalized));
+          const [span] = mapNormalizedSpansToSpans(
+            rows.map(mapChRowToNormalized),
+          );
           return span ?? null;
         },
       );
@@ -924,7 +971,13 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
               LIMIT {limit:UInt32}
               OFFSET {offset:UInt32}
             `,
-            query_params: { tenantId, traceId, limit, offset, ...partition.params },
+            query_params: {
+              tenantId,
+              traceId,
+              limit,
+              offset,
+              ...partition.params,
+            },
             format: "JSONEachRow",
           }),
           client.query({
@@ -941,7 +994,9 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
         ]);
 
         const pageRows = (await pageResult.json()) as FullSpanRow[];
-        const countRows = (await countResult.json()) as Array<{ Total: number | string }>;
+        const countRows = (await countResult.json()) as Array<{
+          Total: number | string;
+        }>;
         const total = countRows.length > 0 ? Number(countRows[0]!.Total) : 0;
 
         return {
@@ -987,7 +1042,12 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
               AND ${dedupInTuple(innerExtra)}
             ORDER BY StartTime ASC
           `,
-          query_params: { tenantId, traceId, sinceStartTimeMs, ...partition.params },
+          query_params: {
+            tenantId,
+            traceId,
+            sinceStartTimeMs,
+            ...partition.params,
+          },
           format: "JSONEachRow",
         });
 
@@ -1038,7 +1098,13 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
               LIMIT {limit:UInt32}
               OFFSET {offset:UInt32}
             `,
-            query_params: { tenantId, traceId, limit, offset, ...partition.params },
+            query_params: {
+              tenantId,
+              traceId,
+              limit,
+              offset,
+              ...partition.params,
+            },
             format: "JSONEachRow",
           }),
           client.query({
@@ -1055,7 +1121,9 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
         ]);
 
         const pageRows = await pageResult.json<SpanSummaryQueryRow>();
-        const countRows = (await countResult.json()) as Array<{ Total: number | string }>;
+        const countRows = (await countResult.json()) as Array<{
+          Total: number | string;
+        }>;
         const total = countRows.length > 0 ? Number(countRows[0]!.Total) : 0;
 
         return {
@@ -1101,7 +1169,12 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
               AND ${dedupInTuple(innerExtra)}
             ORDER BY StartTimeMs ASC
           `,
-          query_params: { tenantId, traceId, sinceStartTimeMs, ...partition.params },
+          query_params: {
+            tenantId,
+            traceId,
+            sinceStartTimeMs,
+            ...partition.params,
+          },
           format: "JSONEachRow",
         });
 
@@ -1141,10 +1214,14 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
       ScopeVersion: span.instrumentationScope.version ?? null,
       "Events.Timestamp": span.events.map((e) => new Date(e.timeUnixMs)),
       "Events.Name": span.events.map((e) => e.name),
-      "Events.Attributes": span.events.map((e) => serializeAttributes(e.attributes)),
+      "Events.Attributes": span.events.map((e) =>
+        serializeAttributes(e.attributes),
+      ),
       "Links.TraceId": span.links.map((l) => l.traceId),
       "Links.SpanId": span.links.map((l) => l.spanId),
-      "Links.Attributes": span.links.map((l) => serializeAttributes(l.attributes)),
+      "Links.Attributes": span.links.map((l) =>
+        serializeAttributes(l.attributes),
+      ),
       DroppedAttributesCount: 0,
       DroppedEventsCount: 0,
       DroppedLinksCount: 0,

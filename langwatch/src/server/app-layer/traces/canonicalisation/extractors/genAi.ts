@@ -143,7 +143,10 @@ export class GenAIExtractor implements CanonicalAttributesExtractor {
     );
     if (rawSystemInstructions !== undefined) {
       if (typeof rawSystemInstructions === "string") {
-        ctx.setAttr(ATTR_KEYS.GEN_AI_SYSTEM_INSTRUCTIONS, rawSystemInstructions);
+        ctx.setAttr(
+          ATTR_KEYS.GEN_AI_SYSTEM_INSTRUCTIONS,
+          rawSystemInstructions,
+        );
         ctx.recordRule(`${this.id}:system_instructions(string)`);
       } else if (Array.isArray(rawSystemInstructions)) {
         // Array of content blocks: [{ type: "text", content: "..." }]
@@ -180,10 +183,7 @@ export class GenAIExtractor implements CanonicalAttributesExtractor {
       if (Array.isArray(existing)) {
         const sysInstruction = extractSystemInstructionFromMessages(existing);
         if (sysInstruction !== null) {
-          ctx.setAttr(
-            ATTR_KEYS.GEN_AI_SYSTEM_INSTRUCTIONS,
-            sysInstruction,
-          );
+          ctx.setAttr(ATTR_KEYS.GEN_AI_SYSTEM_INSTRUCTIONS, sysInstruction);
           // Strip system messages and re-set
           const stripped = stripSystemMessages(existing);
           attrs.take(ATTR_KEYS.GEN_AI_INPUT_MESSAGES);
@@ -193,8 +193,15 @@ export class GenAIExtractor implements CanonicalAttributesExtractor {
           ctx.recordRule(`${this.id}:system_instruction(existing)`);
         }
         // Annotate existing messages as chat_messages type (only if messages remain)
-        if (ctx.out[ATTR_KEYS.GEN_AI_INPUT_MESSAGES] !== undefined || attrs.has(ATTR_KEYS.GEN_AI_INPUT_MESSAGES)) {
-          recordValueType(ctx, ATTR_KEYS.GEN_AI_INPUT_MESSAGES, "chat_messages");
+        if (
+          ctx.out[ATTR_KEYS.GEN_AI_INPUT_MESSAGES] !== undefined ||
+          attrs.has(ATTR_KEYS.GEN_AI_INPUT_MESSAGES)
+        ) {
+          recordValueType(
+            ctx,
+            ATTR_KEYS.GEN_AI_INPUT_MESSAGES,
+            "chat_messages",
+          );
         }
       }
     }

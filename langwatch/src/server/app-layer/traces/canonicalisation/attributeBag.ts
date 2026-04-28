@@ -38,9 +38,7 @@ export class AttributeBag {
     return this.take(key);
   }
 
-  takeAny(
-    keys: readonly string[],
-  ): { key: string; value: unknown } | null {
+  takeAny(keys: readonly string[]): { key: string; value: unknown } | null {
     for (const k of keys) {
       const v = this.take(k);
       if (v !== undefined) return { key: k, value: v };

@@ -1,7 +1,7 @@
 import type { OtlpSpan } from "../../event-sourcing/pipelines/trace-processing/schemas/otlp";
-import type { TokenizerClient } from "../clients/tokenizer/tokenizer.client";
 import { KILL_SWITCH_CACHE_TTL_MS } from "../../featureFlag/constants";
 import type { FeatureFlagServiceInterface } from "../../featureFlag/types";
+import type { TokenizerClient } from "../clients/tokenizer/tokenizer.client";
 
 /**
  * Attribute keys checked for model name (priority order).
@@ -17,14 +17,8 @@ const MODEL_ATTRIBUTE_KEYS = [
  * Attribute keys that indicate token counts are already present.
  */
 const TOKEN_COUNT_KEYS = {
-  input: [
-    "gen_ai.usage.input_tokens",
-    "gen_ai.usage.prompt_tokens",
-  ],
-  output: [
-    "gen_ai.usage.output_tokens",
-    "gen_ai.usage.completion_tokens",
-  ],
+  input: ["gen_ai.usage.input_tokens", "gen_ai.usage.prompt_tokens"],
+  output: ["gen_ai.usage.output_tokens", "gen_ai.usage.completion_tokens"],
 } as const;
 
 const GLOBAL_KILL_SWITCH_KEY = "token-estimation-killswitch";
@@ -210,8 +204,7 @@ export class OtlpSpanTokenEstimationService {
     const keys = TOKEN_COUNT_KEYS[direction];
     for (const attr of span.attributes) {
       if ((keys as readonly string[]).includes(attr.key)) {
-        const val =
-          attr.value.intValue ?? attr.value.doubleValue;
+        const val = attr.value.intValue ?? attr.value.doubleValue;
         if (val !== undefined && val !== null) return true;
       }
     }

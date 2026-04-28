@@ -1,5 +1,10 @@
 export type FacetTable = "trace_summaries" | "evaluation_runs" | "stored_spans";
-export type FacetGroup = "trace" | "evaluation" | "span" | "metadata" | "prompt";
+export type FacetGroup =
+  | "trace"
+  | "evaluation"
+  | "span"
+  | "metadata"
+  | "prompt";
 
 export interface FacetQueryContext {
   tenantId: string;
@@ -56,9 +61,7 @@ export const TABLE_TIME_COLUMNS: Record<FacetTable, string> = {
   stored_spans: "StartTime",
 };
 
-function buildTimeWhere(
-  timeColumn: string,
-): string {
+function buildTimeWhere(timeColumn: string): string {
   return [
     "TenantId = {tenantId:String}",
     `${timeColumn} >= fromUnixTimestamp64Milli({timeFrom:Int64})`,

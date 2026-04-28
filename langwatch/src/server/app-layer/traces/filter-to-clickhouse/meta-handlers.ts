@@ -4,11 +4,11 @@ import { boundedSubquery, scenarioRunSubquery } from "./subqueries";
 import {
   ATTRIBUTE_PREFIX,
   extractStringValue,
+  type FieldHandler,
   nextParam,
+  type TranslationContext,
   validateValueLength,
   wrap,
-  type FieldHandler,
-  type TranslationContext,
 } from "./value-helpers";
 
 /**
@@ -86,7 +86,9 @@ function translateExistence(
   if (value.startsWith(ATTRIBUTE_PREFIX)) {
     const attrKey = value.slice(ATTRIBUTE_PREFIX.length);
     if (!attrKey) {
-      throw new FilterParseError("attribute.<key> requires a key after the dot");
+      throw new FilterParseError(
+        "attribute.<key> requires a key after the dot",
+      );
     }
     const p = nextParam(ctx, "attrKey");
     ctx.params[p] = attrKey;

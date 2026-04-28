@@ -246,7 +246,9 @@ describe("OTel GenAI Semantic Conventions v1.38.0", () => {
         clientSpan,
       );
 
-      const parsed = result.attributes["gen_ai.input.messages"] as Array<Record<string, unknown>>;
+      const parsed = result.attributes["gen_ai.input.messages"] as Array<
+        Record<string, unknown>
+      >;
       expect(parsed[0].parts).toHaveLength(2);
       expect(parsed[0].parts[1].type).toBe("blob");
       expect(parsed[0].parts[1].modality).toBe("image");
@@ -276,7 +278,9 @@ describe("OTel GenAI Semantic Conventions v1.38.0", () => {
         clientSpan,
       );
 
-      expect(result.attributes["gen_ai.output.messages"]).toEqual(outputMessages);
+      expect(result.attributes["gen_ai.output.messages"]).toEqual(
+        outputMessages,
+      );
     });
 
     it("preserves tool_call output messages", () => {
@@ -305,7 +309,9 @@ describe("OTel GenAI Semantic Conventions v1.38.0", () => {
         clientSpan,
       );
 
-      const parsed = result.attributes["gen_ai.output.messages"] as Array<Record<string, unknown>>;
+      const parsed = result.attributes["gen_ai.output.messages"] as Array<
+        Record<string, unknown>
+      >;
       expect(parsed[0].parts[0].type).toBe("tool_call");
       expect(parsed[0].finish_reason).toBe("tool_call");
     });
@@ -335,7 +341,9 @@ describe("OTel GenAI Semantic Conventions v1.38.0", () => {
         clientSpan,
       );
 
-      const parsed = result.attributes["gen_ai.output.messages"] as Array<Record<string, unknown>>;
+      const parsed = result.attributes["gen_ai.output.messages"] as Array<
+        Record<string, unknown>
+      >;
       expect(parsed).toHaveLength(2);
     });
 
@@ -361,7 +369,9 @@ describe("OTel GenAI Semantic Conventions v1.38.0", () => {
         clientSpan,
       );
 
-      const parsed = result.attributes["gen_ai.output.messages"] as Array<Record<string, unknown>>;
+      const parsed = result.attributes["gen_ai.output.messages"] as Array<
+        Record<string, unknown>
+      >;
       expect(parsed[0].parts[0].type).toBe("reasoning");
       expect(parsed[0].parts[1].type).toBe("text");
     });
@@ -531,9 +541,7 @@ describe("OTel GenAI Semantic Conventions v1.38.0", () => {
         },
         {
           role: "user",
-          parts: [
-            { type: "text", content: "What is the weather in Paris?" },
-          ],
+          parts: [{ type: "text", content: "What is the weather in Paris?" }],
         },
       ];
 
@@ -601,12 +609,12 @@ describe("OTel GenAI Semantic Conventions v1.38.0", () => {
       expect(result.attributes["gen_ai.input.messages"]).toEqual([
         {
           role: "user",
-          parts: [
-            { type: "text", content: "What is the weather in Paris?" },
-          ],
+          parts: [{ type: "text", content: "What is the weather in Paris?" }],
         },
       ]);
-      expect(result.attributes["gen_ai.output.messages"]).toEqual(outputMessages);
+      expect(result.attributes["gen_ai.output.messages"]).toEqual(
+        outputMessages,
+      );
 
       // System instruction extracted from parts-based message
       expect(result.attributes["gen_ai.system_instructions"]).toBe(
@@ -666,7 +674,9 @@ describe("OTel GenAI Semantic Conventions v1.38.0", () => {
         clientSpan,
       );
 
-      expect(result.attributes["gen_ai.output.messages"]).toEqual(outputMessages);
+      expect(result.attributes["gen_ai.output.messages"]).toEqual(
+        outputMessages,
+      );
     });
   });
 

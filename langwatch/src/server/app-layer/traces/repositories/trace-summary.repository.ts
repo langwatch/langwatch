@@ -12,7 +12,9 @@ export interface GetByTraceIdOptions {
 
 export interface TraceSummaryRepository {
   upsert(data: TraceSummaryData, tenantId: string): Promise<void>;
-  upsertBatch?(entries: Array<{ data: TraceSummaryData; tenantId: string }>): Promise<void>;
+  upsertBatch?(
+    entries: Array<{ data: TraceSummaryData; tenantId: string }>,
+  ): Promise<void>;
   getByTraceId(
     tenantId: string,
     traceId: string,

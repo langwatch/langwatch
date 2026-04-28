@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { NormalizedEvent } from "../../../../event-sourcing/pipelines/trace-processing/schemas/spans";
-import { ATTR_KEYS } from "../extractors/_constants";
 import { CanonicalizeSpanAttributesService } from "../canonicalizeSpanAttributesService";
+import { ATTR_KEYS } from "../extractors/_constants";
 import { makeStubSpan } from "./_helpers";
 
 const service = new CanonicalizeSpanAttributesService();
@@ -84,12 +84,12 @@ describe("CanonicalizeSpanAttributesService — evaluation events", () => {
         expect(result.attributes[ATTR_KEYS.GEN_AI_EVALUATION_NAME]).toBe(
           "toxicity",
         );
-        expect(
-          result.attributes[ATTR_KEYS.GEN_AI_EVALUATION_SCORE_VALUE],
-        ).toBe(0.95);
-        expect(
-          result.attributes[ATTR_KEYS.GEN_AI_EVALUATION_SCORE_LABEL],
-        ).toBe("safe");
+        expect(result.attributes[ATTR_KEYS.GEN_AI_EVALUATION_SCORE_VALUE]).toBe(
+          0.95,
+        );
+        expect(result.attributes[ATTR_KEYS.GEN_AI_EVALUATION_SCORE_LABEL]).toBe(
+          "safe",
+        );
         expect(result.appliedRules).toContain("langwatch:evaluation.custom");
       });
     });
