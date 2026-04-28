@@ -3,10 +3,23 @@ package cmd
 import (
 	"context"
 
+	"github.com/langwatch/langwatch/pkg/otelsetup"
 	"github.com/langwatch/langwatch/services/nlpgo/app"
 	"github.com/langwatch/langwatch/services/nlpgo/app/engine"
 	"github.com/langwatch/langwatch/services/nlpgo/app/engine/dsl"
 )
+
+// withWorkflowAPIKey copies the parsed workflow's api_key onto the
+// request context so otelsetup.TenantRouter can attribute every span
+// produced during this run to the right LangWatch project. Empty
+// api_key is a no-op — TenantRouter drops un-authenticated spans
+// rather than risking a wrong-tenant attribution.
+func withWorkflowAPIKey(ctx context.Context, wf *dsl.Workflow) context.Context {
+	if wf == nil || wf.APIKey == "" {
+		return ctx
+	}
+	return context.WithValue(ctx, otelsetup.APIKeyContextKey{}, wf.APIKey)
+}
 
 // engineAdapter satisfies app.WorkflowExecutor by parsing the raw
 // workflow JSON, invoking engine.Engine, and converting the result
@@ -30,6 +43,7 @@ func (a engineAdapter) ExecuteStream(ctx context.Context, req app.WorkflowReques
 		close(ch)
 		return ch, nil
 	}
+	ctx = withWorkflowAPIKey(ctx, wf)
 	in, err := a.eng.ExecuteStream(ctx, engine.ExecuteRequest{
 		Workflow:  wf,
 		Inputs:    req.Inputs,
@@ -71,6 +85,7 @@ func (a engineAdapter) Execute(ctx context.Context, req app.WorkflowRequest) (*a
 			},
 		}, nil
 	}
+	ctx = withWorkflowAPIKey(ctx, wf)
 	res, err := a.eng.Execute(ctx, engine.ExecuteRequest{
 		Workflow:  wf,
 		Inputs:    req.Inputs,
