@@ -1,6 +1,6 @@
 import { Box, Flex, HStack, Icon, Input, Text } from "@chakra-ui/react";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { LuArrowDown, LuArrowUp, LuSearch, LuX } from "react-icons/lu";
 import { Tooltip } from "~/components/ui/tooltip";
 import { SPAN_TYPE_COLORS, truncateId } from "../../../utils/formatters";
@@ -10,7 +10,7 @@ import { FilterChip } from "./FilterChip";
 import type { SortDirection, SortField, SpanListViewProps } from "./types";
 import { compareDerived, deriveSpan, ROW_HEIGHT } from "./utils";
 
-export function SpanListView({
+export const SpanListView = memo(function SpanListView({
   spans,
   selectedSpanId,
   onSelectSpan,
@@ -450,4 +450,4 @@ export function SpanListView({
       )}
     </Flex>
   );
-}
+});

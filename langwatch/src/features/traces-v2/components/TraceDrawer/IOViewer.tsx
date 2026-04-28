@@ -1,5 +1,5 @@
 import { Box, Button, HStack, Icon, Text } from "@chakra-ui/react";
-import { forwardRef, useEffect, useMemo, useRef, useState } from "react";
+import { forwardRef, memo, useEffect, useMemo, useRef, useState } from "react";
 import {
   LuCheck,
   LuChevronDown,
@@ -153,7 +153,7 @@ function CopyButton({ text }: { text: string }) {
   );
 }
 
-export function IOViewer({
+export const IOViewer = memo(function IOViewer({
   label,
   content,
   mode = "input",
@@ -562,4 +562,4 @@ export function IOViewer({
       )}
     </Box>
   );
-}
+});

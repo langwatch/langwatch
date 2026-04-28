@@ -522,4 +522,4 @@ export const WaterfallView = memo(function WaterfallView({
       </Flex>
     </Flex>
   );
-}
+});
