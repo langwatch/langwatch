@@ -10,6 +10,7 @@ export class App {
   readonly config: AppConfig;
 
   readonly broadcast: AppDependencies["broadcast"];
+  readonly presence: AppDependencies["presence"];
   readonly traces: AppDependencies["traces"] & AppCommands["traces"];
   readonly evaluations: AppDependencies["evaluations"] &
     AppCommands["evaluations"];
@@ -59,6 +60,7 @@ export class App {
     this.nurturing = deps.nurturing;
     this.usageLimits = deps.usageLimits;
     this.broadcast = deps.broadcast;
+    this.presence = deps.presence;
     this.traces = { ...deps.traces, ...deps.commands.traces };
     this.evaluations = { ...deps.evaluations, ...deps.commands.evaluations };
     this.experimentRuns = deps.commands.experimentRuns;

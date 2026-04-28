@@ -1,6 +1,7 @@
 import type { EventSourcing } from "../event-sourcing/eventSourcing";
 import type { AppCommands } from "../event-sourcing/pipelineRegistry";
 import type { BroadcastService } from "./broadcast/broadcast.service";
+import type { PresenceService } from "./presence/presence.service";
 import type { AppConfig } from "./config";
 import type { EvaluationExecutionService } from "./evaluations/evaluation-execution.service";
 import type { EvaluationRunService } from "./evaluations/evaluation-run.service";
@@ -44,6 +45,7 @@ export interface AppDependencies {
   config: AppConfig;
 
   broadcast: BroadcastService;
+  presence: PresenceService;
 
   traces: {
     summary: TraceSummaryService;

@@ -8,6 +8,9 @@ import { PipelineRegistry, type AppCommands } from "../event-sourcing/pipelineRe
 import type { ScenarioExecutionReactorHandle } from "../event-sourcing/pipelines/simulation-processing/reactors/scenarioExecution.reactor";
 import { App, getApp, globalForApp, initializeApp } from "./app";
 import { BroadcastService } from "./broadcast/broadcast.service";
+import { PresenceService } from "./presence/presence.service";
+import { RedisPresenceRepository } from "./presence/repositories/presence.redis.repository";
+import { InMemoryPresenceRepository } from "./presence/repositories/presence.memory.repository";
 import { createClickHouseClientFromConfig } from "./clients/clickhouse.factory";
 import { GatewayBudgetRepository } from "~/server/gateway/budget.repository";
 import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
@@ -60,6 +63,7 @@ import { TraceListClickHouseRepository } from "./traces/repositories/trace-list.
 import { NullTraceListRepository } from "./traces/repositories/trace-list.repository";
 import { PrismaTopicRepository } from "./topics/topic.prisma.repository";
 import { NullTopicRepository } from "./topics/null-topic.repository";
+import { TopicService } from "./topics/topic.service";
 import { TraceSummaryService } from "./traces/trace-summary.service";
 import { TraceSummaryClickHouseRepository } from "./traces/repositories/trace-summary.clickhouse.repository";
 import { NullTraceSummaryRepository } from "./traces/repositories/trace-summary.repository";
@@ -149,6 +153,10 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
   });
 
   const broadcast = new BroadcastService(redis);
+  const presence = new PresenceService(
+    redis ? new RedisPresenceRepository(redis) : new InMemoryPresenceRepository(),
+    broadcast,
+  );
   const spanDedup = createSpanDedupeService(redis);
 
   const traceSummary = traced(
@@ -163,11 +171,15 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     ),
     "EvaluationRunService",
   );
+  const topics = traced(
+    new TopicService(new PrismaTopicRepository(prisma)),
+    "TopicService",
+  );
   const traceList = traced(
     new TraceListService(
       clickhouseEnabled ? new TraceListClickHouseRepository(resolveClickHouseClient) : new NullTraceListRepository(),
       evaluationRuns,
-      new PrismaTopicRepository(prisma),
+      topics,
     ),
     "TraceListService",
   );
@@ -494,6 +506,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
   return initializeApp({
     config,
     broadcast,
+    presence,
     traces,
     evaluations,
     experiments,
@@ -541,14 +554,19 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
     "ProjectService",
   );
 
+  const testBroadcast = new BroadcastService(null);
   return new App({
     config,
-    broadcast: new BroadcastService(null),
+    broadcast: testBroadcast,
+    presence: new PresenceService(
+      new InMemoryPresenceRepository(),
+      testBroadcast,
+    ),
     traces: (() => {
       const nullEvalRuns = new EvaluationRunService(new NullEvaluationRunRepository());
       return {
         summary: traced(new TraceSummaryService(new NullTraceSummaryRepository()), "TraceSummaryService"),
-        list: traced(new TraceListService(new NullTraceListRepository(), nullEvalRuns, new NullTopicRepository()), "TraceListService"),
+        list: traced(new TraceListService(new NullTraceListRepository(), nullEvalRuns, new TopicService(new NullTopicRepository())), "TraceListService"),
         spans: traced(new SpanStorageService(new NullSpanStorageRepository()), "SpanStorageService"),
         logRecords: traced(new LogRecordStorageService(new NullLogRecordStorageRepository()), "LogRecordStorageService"),
         metricRecords: traced(new MetricRecordStorageService(new NullMetricRecordStorageRepository()), "MetricRecordStorageService"),
