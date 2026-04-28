@@ -17,6 +17,9 @@
  */
 import type { PrismaClient } from "@prisma/client";
 
+import { getClickHouseClientForOrganization } from "~/server/clickhouse/clickhouseClient";
+import { PROJECT_KIND } from "./governanceProject.service";
+
 export interface GovernanceSetupState {
   hasPersonalVKs: boolean;
   hasRoutingPolicies: boolean;
@@ -97,15 +100,47 @@ export class GovernanceSetupStateService {
     });
   }
 
+  /**
+   * Probes whether any governance-origin trace or log_record has landed
+   * in the last 30 days for the org's hidden Governance Project. Used by
+   * the persona-detection nav-promotion logic so /governance shows up
+   * even if no IngestionSource / AnomalyRule definitions exist yet but
+   * traces are flowing.
+   *
+   * Returns false (and short-circuits before the CH query) when the org
+   * has no Gov Project yet — no governance-origin traffic is possible
+   * before the first IngestionSource is minted.
+   */
   private async probeRecentActivity(
-    _organizationId: string,
+    organizationId: string,
   ): Promise<boolean> {
-    // Recent-activity probe queried `gateway_activity_events` which is
-    // being torn down in the unified-trace branch correction. Returns
-    // false until the next commit wires the probe against
-    // `trace_summaries` filtered by `langwatch.origin.kind = "ingestion_source"`
-    // (or against the hidden Governance Project's recent traces, depending
-    // on which lookup path is cheaper).
-    return false;
+    const govProject = await this.prisma.project.findFirst({
+      where: {
+        kind: PROJECT_KIND.INTERNAL_GOVERNANCE,
+        team: { organizationId },
+        archivedAt: null,
+      },
+      select: { id: true },
+    });
+    if (!govProject) return false;
+
+    const ch = await getClickHouseClientForOrganization(organizationId);
+    if (!ch) return false;
+
+    const since = Date.now() - 30 * 24 * 60 * 60 * 1000;
+    const result = await ch.query({
+      query: `
+        SELECT 1 AS hit
+        FROM trace_summaries ts
+        WHERE ts.TenantId = {tenantId:String}
+          AND ts.OccurredAt >= fromUnixTimestamp64Milli({since:UInt64})
+          AND ts.Attributes['langwatch.origin.kind'] = 'ingestion_source'
+        LIMIT 1
+      `,
+      query_params: { tenantId: govProject.id, since },
+      format: "JSONEachRow",
+    });
+    const rows = (await result.json()) as Array<{ hit: number }>;
+    return rows.length > 0;
   }
 }

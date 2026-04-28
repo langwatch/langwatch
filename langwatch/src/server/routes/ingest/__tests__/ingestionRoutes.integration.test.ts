@@ -176,8 +176,14 @@ function buildOtlpJsonBody(): {
   return { body, spanCount: 1 };
 }
 
-const handleTraceSpy = vi.fn(async () => ({ rejectedSpans: 0 }));
-const handleLogSpy = vi.fn(async () => undefined);
+const handleTraceSpy = vi.fn(
+  async (
+    _tenantId: string,
+    _request: unknown,
+    _piiRedactionLevel?: unknown,
+  ) => ({ rejectedSpans: 0 }),
+);
+const handleLogSpy = vi.fn(async (_args: unknown) => undefined);
 
 vi.mock("~/server/app-layer/app", async () => {
   const actual = await vi.importActual<typeof import("~/server/app-layer/app")>(
