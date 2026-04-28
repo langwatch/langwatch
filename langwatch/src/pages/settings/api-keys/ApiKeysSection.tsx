@@ -16,8 +16,8 @@ import { PageLayout } from "../../../components/ui/layouts/PageLayout";
 import { useState } from "react";
 import { toaster } from "../../../components/ui/toaster";
 import { usePublicEnv } from "../../../hooks/usePublicEnv";
-import { useRequiredSession } from "../../../hooks/useRequiredSession";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
+import { useSession } from "~/utils/auth-client";
 import { api, type RouterOutputs } from "../../../utils/api";
 import { formatTimeAgo } from "../../../utils/formatTimeAgo";
 import { CreateApiKeyDrawer, type CreateApiKeyInput } from "./CreateApiKeyDrawer";
@@ -38,7 +38,8 @@ export function ApiKeysSection({
   organizationId: string;
   projectId?: string;
 }) {
-  useRequiredSession();
+  const session = useSession();
+  const currentUserId = session.data?.user?.id ?? "";
   const publicEnv = usePublicEnv();
   const { project } = useOrganizationTeamProject();
   const endpoint = publicEnv.data?.BASE_HOST ?? "https://app.langwatch.ai";
@@ -46,6 +47,8 @@ export function ApiKeysSection({
   const apiKeys = api.apiKey.list.useQuery({ organizationId });
   const myBindings = api.apiKey.myBindings.useQuery({ organizationId });
   const orgProjects = api.apiKey.orgProjects.useQuery({ organizationId });
+  const orgMembers = api.apiKey.orgMembers.useQuery({ organizationId });
+  const isAdmin = (orgMembers.data?.length ?? 0) > 0;
   const createMutation = api.apiKey.create.useMutation();
   const updateMutation = api.apiKey.update.useMutation();
   const revokeMutation = api.apiKey.revoke.useMutation();
@@ -333,25 +336,28 @@ export function ApiKeysSection({
                       </Text>
                     </Table.Cell>
                     <Table.Cell>
-                      <HStack gap={1}>
-                        <Button
-                          size="xs"
-                          variant="ghost"
-                          aria-label={`Edit API key ${apiKey.name}`}
-                          onClick={() => setApiKeyToEdit(apiKey)}
-                        >
-                          <Pencil size={14} />
-                        </Button>
-                        <Button
-                          size="xs"
-                          variant="ghost"
-                          colorPalette="red"
-                          aria-label={`Revoke API key ${apiKey.name}`}
-                          onClick={() => setApiKeyToRevoke(apiKey.id)}
-                        >
-                          <Trash2 size={14} aria-hidden="true" />
-                        </Button>
-                      </HStack>
+                      {/* Owner or admin can edit/revoke; service keys (no userId) require admin */}
+                      {(isAdmin || apiKey.userId === currentUserId) && (
+                        <HStack gap={1}>
+                          <Button
+                            size="xs"
+                            variant="ghost"
+                            aria-label={`Edit API key ${apiKey.name}`}
+                            onClick={() => setApiKeyToEdit(apiKey)}
+                          >
+                            <Pencil size={14} />
+                          </Button>
+                          <Button
+                            size="xs"
+                            variant="ghost"
+                            colorPalette="red"
+                            aria-label={`Revoke API key ${apiKey.name}`}
+                            onClick={() => setApiKeyToRevoke(apiKey.id)}
+                          >
+                            <Trash2 size={14} aria-hidden="true" />
+                          </Button>
+                        </HStack>
+                      )}
                     </Table.Cell>
                   </Table.Row>
                 ))}

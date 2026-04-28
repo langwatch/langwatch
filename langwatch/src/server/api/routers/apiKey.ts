@@ -5,6 +5,7 @@ import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { DomainError } from "~/server/app-layer/domain-error";
 import { ApiKeyService } from "~/server/api-key/api-key.service";
+import { auditLog } from "~/server/auditLog";
 import { skipPermissionCheck } from "../rbac";
 
 /**
@@ -312,6 +313,19 @@ export const apiKeyRouter = createTRPCRouter({
           bindings: input.bindings,
         });
 
+        void auditLog({
+          userId: ctx.session.user.id,
+          organizationId: input.organizationId,
+          action: "apiKey.create",
+          args: {
+            apiKeyId: apiKey.id,
+            name: input.name,
+            keyType: input.keyType,
+            permissionMode: isService ? "all" : input.permissionMode,
+            assignedToUserId: targetUserId,
+          },
+        });
+
         return {
           token,
           apiKey: {
@@ -361,6 +375,17 @@ export const apiKeyRouter = createTRPCRouter({
           bindings: input.bindings,
         });
 
+        void auditLog({
+          userId: ctx.session.user.id,
+          organizationId: input.organizationId,
+          action: "apiKey.update",
+          args: {
+            apiKeyId: input.apiKeyId,
+            name: input.name,
+            permissionMode: input.permissionMode,
+          },
+        });
+
         return {
           id: updated.id,
           name: updated.name,
@@ -396,6 +421,13 @@ export const apiKeyRouter = createTRPCRouter({
           id: input.apiKeyId,
           callerUserId: ctx.session.user.id,
           callerIsAdmin,
+        });
+
+        void auditLog({
+          userId: ctx.session.user.id,
+          organizationId: input.organizationId,
+          action: "apiKey.revoke",
+          args: { apiKeyId: input.apiKeyId },
         });
       } catch (error) {
         mapApiKeyDomainError(error);

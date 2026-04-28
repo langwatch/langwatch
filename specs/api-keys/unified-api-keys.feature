@@ -1,12 +1,12 @@
 @integration
-Feature: Unified API Keys page
+Feature: Unified API Keys
   As a LangWatch user
-  I want a single API Keys table showing all my keys
-  So that I can manage PATs and service keys in one place without switching tabs
+  I want to manage personal and service API keys from a single page
+  So that I can control access to the platform without switching between tabs
 
   Background:
-    Given I am signed in as an admin user
-    And I have a project with an API key
+    Given I am signed in as a user in an organization
+    And the organization has at least one project
 
   # ── Unified table ──────────────────────────────────────────────
 
@@ -16,8 +16,8 @@ Feature: Unified API Keys page
     And a "+ Create new secret key" button in the header
     And one table with columns: NAME, STATUS, SECRET KEY, CREATED, LAST USED, CREATED BY, PERMISSIONS
 
-  Scenario: PAT rows display in unified table
-    Given I have created a PAT named "CI Pipeline" with "All" permissions
+  Scenario: Personal API key row displays in table
+    Given I have created an API key named "CI Pipeline" with "All" permissions
     When I navigate to Settings > API Keys
     Then the table contains a row with:
       | NAME        | CI Pipeline  |
@@ -26,220 +26,246 @@ Feature: Unified API Keys page
       | PERMISSIONS | All          |
     And the row has an edit icon button and a revoke icon button
 
-  Scenario: Service API key row displays in unified table
+  Scenario: Legacy project key row displays in table
     When I navigate to Settings > API Keys
-    Then the table contains a service key row with:
+    Then the table contains a legacy project key row with:
       | NAME        | Project API Key |
       | STATUS      | Active          |
       | SECRET KEY  | sk-...XXXX      |
       | CREATED BY  | Service         |
       | PERMISSIONS | All             |
-    And the service key row has a regenerate button but no edit button
+    And the legacy project key row has no edit or revoke button
 
-  Scenario: Expired PAT shows expired status
-    Given I have a PAT that has passed its expiration date
+  Scenario: Expired API key shows expired status
+    Given I have an API key that has passed its expiration date
     When I navigate to Settings > API Keys
-    Then that PAT row shows STATUS "Expired"
+    Then that API key row shows STATUS "Expired"
 
-  Scenario: Permissions column shows permission mode
-    Given I have a PAT created with "Restricted" permissions
-    And I have a PAT created with "Read only" permissions
-    And I have a PAT created with "All" permissions
+  Scenario: Non-admin sees own keys plus service keys
+    Given I am a member (not admin)
+    And there are service API keys in the organization
     When I navigate to Settings > API Keys
-    Then the PERMISSIONS column shows "Restricted", "Read only", and "All" respectively
+    Then I see my own API keys and all service keys
+    And I do not see other users' personal keys
 
-  Scenario: All keys display with sk- prefix
-    Given I have created a PAT
-    When I navigate to Settings > API Keys
-    Then the PAT row shows SECRET KEY starting with "sk-"
-    And the service key row also shows SECRET KEY starting with "sk-"
-
-  # ── "Owned by" in create drawer ────────────────────────────────
-
-  Scenario: Create drawer shows "Owned by" toggle
-    When I click "+ Create new secret key"
-    Then the create drawer opens with an "Owned by" toggle: "You" and "Service account"
-
-  Scenario: Admin sees "Other user" option in "Owned by" toggle
+  Scenario: Admin sees all API keys in the organization
     Given I am an organization admin
-    When I click "+ Create new secret key"
-    Then the "Owned by" toggle includes a third option: "Other user"
+    And another user has created a personal API key
+    When I navigate to Settings > API Keys
+    Then I see all API keys including other users' personal keys
+    And the CREATED BY column shows each key's owner
 
-  Scenario: Create key for myself (default)
-    When I select "You" in the "Owned by" toggle
-    And I fill in name "My CI Key"
+  # ── Personal API keys ─────────────────────────────────────────
+
+  Scenario: Non-admin creates personal API key
+    When I click "+ Create new secret key"
+    Then the create drawer opens
+    And there is no "Key type" toggle (non-admins always create personal keys)
+    When I fill in name "My CI Key"
     And I select "All" permissions
     And I click "Create secret key"
-    Then a new PAT is created assigned to me
+    Then a new API key is created assigned to me
     And the token is displayed once for copying
 
-  Scenario: Create service key
-    When I select "Service account" in the "Owned by" toggle
-    Then the form shows "Service Key Name" and "Project" selector
-    And no permissions section (service keys have full project access)
+  Scenario: Personal API key is bounded by user's role binding ceiling
+    Given my role on "Project Alpha" is Member
+    When I create an API key with "All" permissions
+    Then the key's effective permissions are bounded by my Member role on "Project Alpha"
+    And using the key for admin-only operations on "Project Alpha" is denied
 
-  Scenario: Create key for another user (admin only)
-    Given I am an organization admin
-    When I select "Other user" in the "Owned by" toggle
-    Then a user picker appears
-    When I select user "alice@example.com"
-    And I fill in name "Alice CI Key"
-    And I select "All" permissions
-    And I click "Create secret key"
-    Then a new PAT is created with userId = Alice
-    And the ceiling is based on Alice's permissions, not the admin's
-
-  # ── Restricted permissions: project-level ──────────────────────
-
-  Scenario: Restricted mode shows list of projects with role selectors
+  Scenario: Restricted permission mode limits key to selected projects
     When I select "Restricted" in the permission toggle
-    Then I see a flat list of all projects in the organization
-    And each project has a role selector: Admin | Member | Viewer | None
-    And all projects default to "None"
+    Then I see a list of all projects in the organization
+    And each project has a role selector: Admin, Member, Viewer, None
+    When I set "Project Alpha" to "Viewer" and "Project Beta" to "None"
+    And I click "Create secret key"
+    Then the key only grants Viewer access to "Project Alpha"
+    And the key has no access to "Project Beta"
 
   Scenario: Restricted mode respects user ceiling per project
     Given my role on "Project Alpha" is Member
     When I select "Restricted" and look at "Project Alpha"
-    Then the role selector shows: Member | Viewer | None
-    And "Admin" is not available (exceeds my ceiling)
+    Then the role selector does not include "Admin" (exceeds my ceiling)
 
-  # ── Edit PAT permissions ───────────────────────────────────────
+  Scenario: Read only mode sets all bindings to Viewer
+    When I select "Read only" in the permission toggle
+    And I click "Create secret key"
+    Then all role bindings on the key are set to VIEWER
 
-  Scenario: Open edit drawer for a PAT
-    Given I have a PAT named "CI Pipeline"
-    When I click the edit icon on the "CI Pipeline" row
-    Then an edit drawer opens with:
-      | field       | value        |
-      | Name        | CI Pipeline  |
-      | Permissions | current mode |
-    And the drawer has Cancel and Save buttons
+  Scenario: Personal API key is disabled when user is removed from org
+    Given I have created a personal API key
+    When my user is removed from the organization
+    Then the API key no longer authenticates
 
-  Scenario: Update PAT name
-    Given the edit drawer is open for PAT "CI Pipeline"
+  # ── Admin: create for another user ─────────────────────────────
+
+  Scenario: Admin sees key type toggle and user picker
+    Given I am an organization admin
+    When I click "+ Create new secret key"
+    Then the create drawer shows a "Key type" toggle with "Personal" and "Service"
+    And under "Personal" there is a user picker defaulting to myself
+
+  Scenario: Admin creates API key for another user
+    Given I am an organization admin
+    When I select "Personal" key type
+    And I select user "alice@example.com" from the user picker
+    And I fill in name "Alice CI Key" and select "All" permissions
+    And I click "Create secret key"
+    Then the key is created with userId = Alice
+    And the ceiling validation uses Alice's permissions, not the admin's
+    And createdByUserId is set to the admin's userId
+
+  Scenario: Non-admin cannot create API key for another user
+    Given I am a member (not admin)
+    When I call apiKey.create with assignedToUserId = another user
+    Then the request is rejected with a permission error
+
+  # ── Service API keys ───────────────────────────────────────────
+
+  Scenario: Admin creates service API key
+    Given I am an organization admin
+    When I select "Service" key type
+    And I fill in name "CI/CD Pipeline"
+    And I click "Create secret key"
+    Then a service API key is created with userId = null
+    And the key has full organization access (no user ceiling)
+    And the permissions section is not shown (service keys are always "All")
+
+  Scenario: Multiple service keys can coexist
+    Given I am an organization admin
+    When I create service keys named "CI Pipeline" and "Staging Deploy"
+    Then both keys appear in the table
+    And the CREATED BY column shows "Service" for both
+
+  Scenario: Non-admin cannot create service API key
+    Given I am a member (not admin)
+    When I call apiKey.create with keyType = "service"
+    Then the request is rejected with a permission error
+
+  Scenario: Service key survives user removal
+    Given a service API key exists
+    When the admin who created it is removed from the organization
+    Then the service API key still authenticates
+
+  Scenario: Non-admin can see but not edit or revoke service keys
+    Given I am a member (not admin)
+    And a service API key exists
+    When I navigate to Settings > API Keys
+    Then I see the service key in the table
+    But the edit and revoke buttons are disabled or hidden for it
+
+  # ── Legacy project key backward compatibility ──────────────────
+
+  Scenario: Legacy project key (Project.apiKey) continues to work
+    Given a project has the legacy apiKey string attribute set
+    When I authenticate with the legacy sk-lw-{projectKey} token (no underscore)
+    Then authentication succeeds as a legacy project key
+    And the request is scoped to that project
+
+  Scenario: Legacy project key is never deleted by new API key operations
+    When I create, update, or revoke API keys via the new system
+    Then the Project.apiKey string attribute is never modified
+
+  # ── Edit API key ───────────────────────────────────────────────
+
+  Scenario: Edit personal API key name
+    Given I have an API key named "CI Pipeline"
+    When I click the edit icon on "CI Pipeline"
+    Then an edit drawer opens pre-filled with the current name and permissions
     When I change the name to "Production CI"
     And I click Save
-    Then the drawer closes
-    And the table shows the PAT with name "Production CI"
-    And the PAT token value has not changed
+    Then the table shows the key with name "Production CI"
+    And the token value has not changed
 
-  Scenario: Update PAT permissions from All to Restricted
-    Given the edit drawer is open for a PAT with "All" permissions
-    When I select "Restricted" in the permission toggle
+  Scenario: Edit personal API key permissions
+    Given I have an API key with "All" permissions
+    When I open the edit drawer and select "Restricted"
     And I set "Project Alpha" to "Viewer"
     And I click Save
-    Then the table shows PERMISSIONS as "Restricted"
-    And the PAT's effective permissions are updated
+    Then the key's permissions are updated to "Restricted"
+    And the role bindings reflect the new Viewer-on-Alpha scope
 
-  Scenario: Update PAT permissions from Restricted to Read only
-    Given the edit drawer is open for a PAT with "Restricted" permissions
-    When I select "Read only" in the permission toggle
-    And I click Save
-    Then the table shows PERMISSIONS as "Read only"
-    And all bindings are set to VIEWER role
-
-  Scenario: Cannot edit service API key permissions
-    When I navigate to Settings > API Keys
-    Then the service key row does not have an edit icon button
-
-  # ── Admin overview ─────────────────────────────────────────────
-
-  Scenario: Admin sees all API keys in the organization
+  Scenario: Admin can edit another user's personal key
     Given I am an organization admin
-    And another user "bob@example.com" has created a PAT
-    When I navigate to Settings > API Keys
-    Then I see both my keys and Bob's keys in the table
-    And Bob's keys show "bob@example.com" in the CREATED BY column
+    And "bob@example.com" has a personal API key
+    When I edit Bob's key name
+    Then the update succeeds
 
-  Scenario: Admin can revoke another user's PAT
-    Given I am an organization admin
-    And "bob@example.com" has a PAT named "Bob CI"
-    When I click the revoke icon on "Bob CI"
-    And I confirm revocation
-    Then the PAT is revoked
-
-  Scenario: Non-admin sees only their own keys
+  Scenario: Non-admin cannot edit another user's key
     Given I am a member (not admin)
-    When I navigate to Settings > API Keys
-    Then I see only my own PATs and the project service key
+    When I call apiKey.update on another user's key
+    Then the update is rejected with a not-owned error
 
-  # ── Backend: update mutation ───────────────────────────────────
+  Scenario: Cannot edit a revoked API key
+    Given an API key has been revoked
+    When I call apiKey.update on it
+    Then the update is rejected with an already-revoked error
 
-  @unit
-  Scenario: Update PAT name and description
-    Given a PAT exists owned by the current user
-    When I call personalAccessToken.update with a new name
-    Then the PAT record is updated with the new name
-    And the PAT token and lookupId remain unchanged
+  Scenario: Service key can only be edited by admin
+    Given a service API key exists
+    And I am a member (not admin)
+    When I call apiKey.update on the service key
+    Then the update is rejected with a not-owned error
 
-  @unit
-  Scenario: Update PAT bindings within ceiling
-    Given a PAT exists with ADMIN bindings
-    And the user has ADMIN role
-    When I call personalAccessToken.update with VIEWER bindings
-    Then the old role bindings are replaced with new VIEWER bindings
+  # ── Revoke ─────────────────────────────────────────────────────
 
-  @unit
-  Scenario: Update PAT bindings rejects above ceiling
-    Given a PAT exists
-    And the user has MEMBER role
-    When I call personalAccessToken.update with ADMIN bindings
-    Then the update is rejected with a ceiling violation error
+  Scenario: Owner revokes their own API key
+    Given I have a personal API key
+    When I click the revoke icon and confirm
+    Then the key is soft-deleted (revokedAt set)
+    And the key no longer appears in the active list
+    And authenticating with the token fails
 
-  @unit
-  Scenario: Cannot update another user's PAT (non-admin)
-    Given a PAT exists owned by a different user
-    And I am not an admin
-    When I call personalAccessToken.update
-    Then the update is rejected with a not-found error
+  Scenario: Admin revokes another user's API key
+    Given I am an organization admin
+    And "bob@example.com" has a personal API key
+    When I revoke Bob's key
+    Then the revocation succeeds
 
-  @unit
-  Scenario: Admin can update another user's PAT
-    Given a PAT exists owned by a different user
-    And I am an organization admin
-    When I call personalAccessToken.update with a new name
-    Then the PAT record is updated
+  Scenario: Admin revokes a service API key
+    Given I am an organization admin
+    And a service API key exists
+    When I revoke the service key
+    Then the revocation succeeds
 
-  # ── Token prefix ───────────────────────────────────────────────
+  # ── Token format and authentication ────────────────────────────
 
   @unit
-  Scenario: New PATs are minted with sk-lw- prefix
-    When I create a new PAT
+  Scenario: New API keys are minted with sk-lw- prefix
+    When I create a new API key
     Then the token starts with "sk-lw-"
     And the token format is sk-lw-{lookupId}_{secret}
 
   @unit
-  Scenario: Existing pat-lw- tokens still authenticate
-    Given a PAT was created with the old pat-lw- prefix
+  Scenario: Old pat-lw- tokens still authenticate
+    Given an API key was created with the old pat-lw- prefix
     When I authenticate with the pat-lw- token
     Then authentication succeeds
 
   @unit
-  Scenario: New sk-lw- PATs authenticate correctly
-    Given a PAT was created with the new sk-lw- prefix
-    When I authenticate with the sk-lw- token
-    Then authentication succeeds
-    And the token is distinguished from legacy project keys by structure
+  Scenario: Token type detection distinguishes API keys from legacy project keys
+    Given a token "sk-lw-abc123_secretpart" (has underscore)
+    Then it is classified as "apiKey"
+    Given a token "sk-lw-oldprojectkey" (no underscore)
+    Then it is classified as "legacyProjectKey"
 
-  # ── Permission mode persistence ────────────────────────────────
+  # ── Audit logging ──────────────────────────────────────────────
 
-  @unit
-  Scenario: Permission mode stored on PAT
-    When I create a PAT with "Restricted" permission mode
-    Then the PAT record stores permissionMode as "restricted"
-    And the edit drawer pre-selects "Restricted" when opened
+  Scenario: API key creation is audit logged
+    When I create an API key
+    Then an audit log entry is recorded with action "apiKey.create"
+    And the entry includes the key name, permission mode, and key type
 
-  # ── Assign to user ─────────────────────────────────────────────
+  Scenario: API key update is audit logged
+    When I update an API key's name or permissions
+    Then an audit log entry is recorded with action "apiKey.update"
 
-  @unit
-  Scenario: Admin creates PAT for another user
-    Given I am an organization admin
-    When I create a PAT with assignedToUserId = "alice-id"
-    Then the PAT userId is set to "alice-id"
-    And the PAT createdByUserId is set to my userId
-    And ceiling validation uses Alice's permissions
+  Scenario: API key revocation is audit logged
+    When I revoke an API key
+    Then an audit log entry is recorded with action "apiKey.revoke"
+    And the entry includes the revoked key's ID
 
-  @unit
-  Scenario: Non-admin cannot assign PAT to another user
-    Given I am a member (not admin)
-    When I create a PAT with assignedToUserId = "bob-id"
-    Then the create is rejected with a permission error
+  Scenario: API key authentication is logged on use
+    When a request is authenticated via an API key
+    Then the lastUsedAt timestamp is updated on the key
+    And the API key ID is available in the request context for downstream logging
