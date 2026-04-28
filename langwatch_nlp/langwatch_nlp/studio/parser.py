@@ -1,3 +1,4 @@
+import ast
 from contextlib import contextmanager, redirect_stdout
 import copy
 import io
@@ -194,22 +195,41 @@ def _assert_signature_field_types_are_mapped(node: Node) -> None:
             )
 
 
-# Class-declaration regex: captures the name of any class declaration,
-# whether or not it inherits from a base. The base list (parenthesized)
-# is matched via `[^)]*` — a negated character class which includes
-# newlines — so a multi-line base declaration like
-#     class X(
-#         dspy.Module,
-#         SomeMixin,
-#     ):
-# resolves correctly. Used by _resolve_code_class_name below.
-_CLASS_DECL_RE = re.compile(r"class\s+([A-Za-z_]\w*)\s*(?:\([^)]*\))?\s*:")
-# Legacy dspy.Module subclass shape — kept as a fast first-pass match
-# since it covers nearly all in-prod customer code today. Intentionally
-# strict: matches only `class X(dspy.Module):` (no other bases). The
-# `class X(dspy.Module, SomeMixin):` shape is rare in practice and falls
-# through to `_CLASS_DECL_RE` cleanly, returning the same class.
-_DSPY_MODULE_SUBCLASS_RE = re.compile(r"class\s+([A-Za-z_]\w*)\s*\(\s*dspy\.Module\s*\)\s*:")
+def _is_dspy_module_base(base: ast.expr) -> bool:
+    """True if ``base`` is the AST node ``dspy.Module``.
+
+    Used by _resolve_code_class_name to detect the legacy preferred
+    shape via AST instead of regex — regex over raw source can match
+    `class Fake:` inside a comment or docstring and pick the wrong
+    name; AST sees only real class declarations.
+    """
+    return (
+        isinstance(base, ast.Attribute)
+        and isinstance(base.value, ast.Name)
+        and base.value.id == "dspy"
+        and base.attr == "Module"
+    )
+
+
+def _top_level_class_defs(code: str) -> list[ast.ClassDef]:
+    """Return top-level ``ast.ClassDef`` nodes in user-supplied code.
+
+    Returns an empty list on syntax errors so the caller can surface
+    a clean "no class definition found" error rather than letting
+    SyntaxError propagate from this discovery step (the user code
+    will be black-formatted later anyway, which is where actual
+    syntax errors get reported with a nicer message).
+
+    Top-level only: nested classes inside an entry class don't count
+    as candidates — the legacy regex behavior was effectively the
+    same (it picked whatever ``class X:`` line came first), and
+    customer fixtures consistently put the entry class at the top.
+    """
+    try:
+        tree = ast.parse(code)
+    except SyntaxError:
+        return []
+    return [node for node in tree.body if isinstance(node, ast.ClassDef)]
 
 
 def _resolve_code_class_name(
@@ -221,12 +241,13 @@ def _resolve_code_class_name(
     accepts (services/nlpgo/app/engine/blocks/codeblock/runner.py), so
     the same customer code runs identically on FF=on and FF=off:
 
-      1. ``class X(dspy.Module):`` — preferred (legacy default; the
-         dspy.Module wrapper provides cost-tracing + tracking).
+      1. ``class X(dspy.Module):`` (or any class whose bases include
+         ``dspy.Module``) — preferred (legacy default; the dspy.Module
+         wrapper provides cost-tracing + tracking).
       2. ``class X:`` matching the node's display name (after
          normalization to a class identifier) — picks the right class
          when the user defines helpers alongside the entry class.
-      3. First ``class X:`` declaration in the file.
+      3. First top-level ``class X:`` declaration in the file.
 
     The Go runtime ALSO accepts a fourth shape — a top-level ``def
     execute(**inputs)`` callable with no enclosing class — but that
@@ -240,39 +261,44 @@ def _resolve_code_class_name(
 
     Method-level shape within the chosen class (``__call__`` vs
     ``forward`` vs neither) is NOT inspected here because the source
-    is not yet imported; the chosen class is materialized downstream
-    and the caller uses Python's normal instance(...) protocol, which
-    dispatches to ``__call__`` if defined and otherwise falls through
-    to whatever attribute the legacy dspy path expects. A class with
-    neither raises a TypeError at call time — clearer than failing
-    here.
+    is not yet imported. The downstream invoker
+    (``execute_component.py`` / ``execute_flow.py``) handles the
+    dispatch — ``execute_component`` falls back from ``instance(...)``
+    to ``instance.forward(...)`` for plain forward-only classes; see
+    the import-time fallback in those modules.
 
-    Anchors PR #3483's per-shape contract back-compat for FF=off so
-    customers using the new ``class X: def __call__(...)`` template
-    don't error before the FF rolls to them.
+    AST-based discovery (not regex over raw source) so commented-out
+    or docstring text like ``class Fake:`` can't false-match. Anchors
+    PR #3483's per-shape contract back-compat for FF=off so customers
+    using the new ``class X: def __call__(...)`` template don't error
+    before the FF rolls to them.
     """
-    match = _DSPY_MODULE_SUBCLASS_RE.search(code)
-    if match:
-        return match.group(1)
+    class_defs = _top_level_class_defs(code)
 
-    # Fall back to any class declaration. Prefer one whose name matches
-    # the (normalized) node name when there are multiple candidates,
-    # so that helpers defined above the entry class don't get picked
-    # incorrectly.
-    candidates = _CLASS_DECL_RE.findall(code)
-    if not candidates:
+    # Priority 1: any class with `dspy.Module` in its bases (handles
+    # both the strict `class X(dspy.Module):` and the multi-base
+    # `class X(dspy.Module, SomeMixin):` cases).
+    for cls in class_defs:
+        if any(_is_dspy_module_base(base) for base in cls.bases):
+            return cls.name
+
+    if not class_defs:
         raise ValueError(
             f"Could not find a class definition for {kind} {node_name}. "
             f"Supported shapes: dspy.Module subclass, class with __call__, "
             f"or class with forward()."
         )
 
+    # Priority 2: name-disambiguation against the (normalized) node
+    # name when multiple candidate classes exist.
     if node_name:
         target = normalize_name_to_class_name(node_name)
-        for name in candidates:
-            if name == target:
-                return name
-    return candidates[0]
+        for cls in class_defs:
+            if cls.name == target:
+                return cls.name
+
+    # Priority 3: first top-level class declaration.
+    return class_defs[0].name
 
 
 def parse_component(

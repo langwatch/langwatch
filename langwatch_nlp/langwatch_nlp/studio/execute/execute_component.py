@@ -70,7 +70,22 @@ async def execute_component(event: ExecuteComponentPayload):
                         forward_inputs = event.inputs
                     else:
                         forward_inputs = autoparse_fields(node.data.inputs or [], event.inputs)  # type: ignore
-                    result = await dspy.asyncify(instance)(
+                    # PR #3543 back-compat: the parser accepts plain classes
+                    # with `forward(...)` only (no __call__ and no dspy.Module
+                    # base). Such classes aren't directly callable —
+                    # `dspy.asyncify(instance)(...)` would TypeError. Fall back
+                    # to `instance.forward` when `instance` isn't callable;
+                    # mirrors the priority-3 path in the Go runner
+                    # (services/nlpgo/.../codeblock/runner.py). dspy.Module
+                    # subclasses always have __call__ so they hit the fast
+                    # path unchanged.
+                    invoke_target = instance if callable(instance) else getattr(instance, "forward", None)
+                    if invoke_target is None:
+                        raise TypeError(
+                            f"Class '{class_name}' for component {node.data.name} "
+                            f"is not callable and has no forward() method."
+                        )
+                    result = await dspy.asyncify(invoke_target)(
                         **forward_inputs
                     )
 

@@ -409,7 +409,7 @@ class Code(dspy.Module):
         return {"output": "main"}
 """
         )
-        code, class_name, _ = parse_component(node, basic_workflow)
+        _, class_name, _ = parse_component(node, basic_workflow)
         # Despite Helper appearing first, the dspy.Module subclass wins.
         assert class_name == "Code"
 
@@ -426,7 +426,7 @@ class Code:
 """,
             name="Code",
         )
-        code, class_name, _ = parse_component(node, basic_workflow)
+        _, class_name, _ = parse_component(node, basic_workflow)
         assert class_name == "Code"
 
     def test_no_class_in_code_raises_clear_error(self):
@@ -474,8 +474,33 @@ class Code(
         return {"output": "multi-base"}
 """
         )
-        code, class_name, _ = parse_component(node, basic_workflow)
-        # The fast-path dspy regex won't match a multi-base class, so
-        # this exercises the fallback path with name disambiguation —
-        # picks Code (matches the node name) over Mixin.
+        _, class_name, _ = parse_component(node, basic_workflow)
+        # AST-based discovery resolves dspy.Module-as-base correctly
+        # even with additional bases (the priority-1 path matches any
+        # class with dspy.Module among its bases, not only sole-base).
+        assert class_name == "Code"
+
+    def test_class_in_comment_or_docstring_is_not_picked(self):
+        """CodeRabbit-flagged regression on #3543.
+
+        Regex-based discovery would happily pick `class Fake:` if it
+        appeared inside a string or comment, then fail at
+        `getattr(module, 'Fake')` with a confusing AttributeError. The
+        AST-based discovery only sees real top-level class declarations,
+        so the disguised class names are ignored.
+        """
+        node = self._make_code_node(
+            '''
+"""Module docstring with class Fake: nope, not a real class."""
+
+# class Hidden: this is just a comment
+SAMPLE = "class Decoy:\\n    pass"
+
+class Code:
+    def __call__(self, input: str):
+        return {"output": "real"}
+''',
+            name="Code",
+        )
+        _, class_name, _ = parse_component(node, basic_workflow)
         assert class_name == "Code"
