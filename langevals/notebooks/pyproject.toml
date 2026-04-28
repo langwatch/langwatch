@@ -6,14 +6,14 @@ authors = [{name = "Rogerio Chaves", email = "rogerio@langwatch.ai"}]
 license = {text = "MIT"}
 requires-python = ">=3.11,<3.13"
 dependencies = [
-    "pytest>=8.1.2",
+    "pytest>=9.0.3",
     "fastapi>=0.115.11",
     "arize-phoenix>=4.9.0",
     "openinference-instrumentation-dspy>=0.1.9",
     "opentelemetry-exporter-otlp>=1.25.0",
     "hypercorn>=0.16.0",
     "pydantic>=2.4.0",
-    "python-dotenv==1.0.1",
+    "python-dotenv==1.2.2",
     "mangum>=0.17.0",
     "pandas>=2.2.2",
     "matplotlib>=3.8.4",
@@ -40,7 +40,7 @@ dependencies = [
 dev = [
     "toml>=0.10.2",
     "grevillea>=0.0.1",
-    "litellm>=1.79.0",
+    "litellm>=1.83.14",
     "instructor>=1.2.2",
     "pytest-xdist>=3.5.0",
     "flaky>=3.8.1",
