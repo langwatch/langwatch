@@ -1,14 +1,13 @@
 import { Box, Button, Flex, Icon, Text } from "@chakra-ui/react";
-import { EditorContent } from "@tiptap/react";
 import { AlertTriangle, Search, X } from "lucide-react";
 import type React from "react";
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useState } from "react";
+import { Kbd } from "~/components/ops/shared/Kbd";
 import { useFilterStore } from "../../stores/filterStore";
 import { hasCrossFacetOR } from "../../utils/queryParser";
+import { ActiveSearchEditor } from "./ActiveSearchEditor";
 import { editorStyles } from "./editorStyles";
-import { SuggestionDropdown } from "./SuggestionDropdown";
-import { useFilterEditor } from "./useFilterEditor";
-import { useGlobalSlashFocus } from "./useGlobalSlashFocus";
+import { PlaceholderEditor } from "./PlaceholderEditor";
 
 export const SearchBar: React.FC = () => {
   const queryText = useFilterStore((s) => s.queryText);
@@ -18,18 +17,23 @@ export const SearchBar: React.FC = () => {
   const clearAll = useFilterStore((s) => s.clearAll);
   const showCrossFacetWarning = useMemo(() => hasCrossFacetOR(ast), [ast]);
 
-  const { editor, suggestion, hasContent, acceptSuggestion, reset } =
-    useFilterEditor({ queryText, applyQueryText });
+  // Defer TipTap mount until the user actually focuses the search bar — the
+  // ProseMirror init reflow used to dominate LCP.
+  const [editorMounted, setEditorMounted] = useState(false);
+  const [editorHasContent, setEditorHasContent] = useState(false);
 
-  useGlobalSlashFocus(editor);
+  const requestEditor = useCallback(() => setEditorMounted(true), []);
+
+  const hasContent = editorMounted ? editorHasContent : queryText.length > 0;
 
   const handleClear = useCallback(
     (event: React.MouseEvent) => {
       event.preventDefault();
       clearAll();
-      reset();
+      // The active editor's queryText effect will sync the empty state back
+      // into the ProseMirror document on next render.
     },
-    [clearAll, reset],
+    [clearAll],
   );
 
   return (
@@ -51,12 +55,24 @@ export const SearchBar: React.FC = () => {
       </Icon>
 
       <Box flex={1} minWidth={0} position="relative" css={editorStyles}>
-        <EditorContent editor={editor} />
-        <SuggestionDropdown ui={suggestion} onSelect={acceptSuggestion} />
+        {editorMounted ? (
+          <ActiveSearchEditor
+            queryText={queryText}
+            applyQueryText={applyQueryText}
+            autoFocus
+            onHasContentChange={setEditorHasContent}
+          />
+        ) : (
+          <PlaceholderEditor queryText={queryText} onActivate={requestEditor} />
+        )}
       </Box>
 
       {showCrossFacetWarning && <CrossFacetWarning />}
-      {hasContent && <ClearButton onClear={handleClear} />}
+      {hasContent ? (
+        <ClearButton onClear={handleClear} />
+      ) : (
+        <Kbd>{"/"}</Kbd>
+      )}
       {parseError && <ParseErrorBanner message={parseError} />}
     </Flex>
   );

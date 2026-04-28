@@ -17,6 +17,7 @@ describe("getSuggestionState", () => {
           open: true,
           mode: "field",
           query: "",
+          tokenStart: 0,
         });
       });
     });
@@ -27,6 +28,7 @@ describe("getSuggestionState", () => {
           open: true,
           mode: "field",
           query: "mo",
+          tokenStart: 0,
         });
       });
     });
@@ -37,6 +39,7 @@ describe("getSuggestionState", () => {
           open: true,
           mode: "field",
           query: "",
+          tokenStart: 0,
         });
       });
     });
@@ -50,6 +53,7 @@ describe("getSuggestionState", () => {
           mode: "value",
           field: "model",
           query: "",
+          tokenStart: 0,
         });
       });
     });
@@ -61,6 +65,19 @@ describe("getSuggestionState", () => {
           mode: "value",
           field: "model",
           query: "gpt",
+          tokenStart: 0,
+        });
+      });
+    });
+
+    describe("when there is no leading sigil (post-accept state)", () => {
+      it("still opens value mode so reopen-after-accept works", () => {
+        expect(getSuggestionState("model:gpt", 9)).toEqual({
+          open: true,
+          mode: "value",
+          field: "model",
+          query: "gpt",
+          tokenStart: 0,
         });
       });
     });
@@ -98,6 +115,7 @@ describe("getSuggestionState", () => {
           open: true,
           mode: "field",
           query: "mo",
+          tokenStart: 18,
         });
       });
     });
@@ -109,6 +127,7 @@ describe("getSuggestionState", () => {
           mode: "value",
           field: "status",
           query: "error",
+          tokenStart: 0,
         });
       });
     });
@@ -122,8 +141,9 @@ describe("getSuggestionState", () => {
     });
 
     describe("when the cursor sits inside a later @-token but the @ immediately follows another token char (no space)", () => {
-      it("returns closed because the '@' is not at a valid token start", () => {
-        // "foo@bar" — the '@' is preceded by 'o', not whitespace/(/start
+      it("returns closed because the active token has no field/sigil shape", () => {
+        // "foo@bar" — no separator before the @, so the active token is "foo@bar".
+        // The token doesn't start with `@` and has no `:`, so dropdown stays closed.
         expect(getSuggestionState("foo@bar", 7)).toEqual({ open: false });
       });
     });
@@ -131,12 +151,13 @@ describe("getSuggestionState", () => {
 
   describe("given a parenthesised expression", () => {
     describe("when the cursor sits inside a value token wrapped in parens", () => {
-      it("opens because '(' is a valid token-start preceder", () => {
+      it("opens because '(' acts as a token boundary", () => {
         expect(getSuggestionState("(@status:error)", 14)).toEqual({
           open: true,
           mode: "value",
           field: "status",
           query: "error",
+          tokenStart: 1,
         });
       });
     });
@@ -183,19 +204,35 @@ describe("getSuggestionState", () => {
           open: true,
           mode: "field",
           query: "stat",
+          tokenStart: 4,
         });
       });
     });
   });
 
   describe("given the shorthand negation '-' prefix", () => {
-    describe("when the cursor sits inside the negated value token", () => {
-      it("opens in value mode (the '-' is not part of the @-token start logic)", () => {
-        // "-@status:err" — the '@' is preceded by '-', which is not in our preceders set,
-        // so we treat it as not-a-token-start. Closed is the safe default.
-        // This documents current behaviour; if liqe shorthand '-' becomes important we'll revisit.
+    describe("when the cursor sits inside a negated value token with sigil", () => {
+      it("opens in value mode and preserves the `-` prefix in the editor", () => {
+        // tokenStart points after the `-` so accepting only replaces from `@…`
+        // onward, leaving the negation prefix intact.
         expect(getSuggestionState("-@status:err", 12)).toEqual({
-          open: false,
+          open: true,
+          mode: "value",
+          field: "status",
+          query: "err",
+          tokenStart: 1,
+        });
+      });
+    });
+
+    describe("when the cursor sits inside a negated value token without sigil", () => {
+      it("opens in value mode for the post-accept state", () => {
+        expect(getSuggestionState("-status:err", 11)).toEqual({
+          open: true,
+          mode: "value",
+          field: "status",
+          query: "err",
+          tokenStart: 1,
         });
       });
     });

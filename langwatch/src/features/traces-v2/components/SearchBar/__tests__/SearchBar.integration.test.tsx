@@ -10,7 +10,9 @@
  * Why so thin? TipTap/ProseMirror requires DOM APIs that jsdom does not
  * implement (elementFromPoint, getClientRects), so any test that types,
  * clicks, or selects inside the editor crashes. End-to-end keyboard
- * verification lives in the browser-pair task.
+ * verification lives in the browser-pair task. Cold mount goes through the
+ * lightweight placeholder so jsdom-incompatible TipTap code never runs in
+ * these tests.
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
@@ -40,14 +42,17 @@ function renderSearchBar() {
 
 describe("<SearchBar /> wiring smoke", () => {
   describe("when the component mounts with no active query", () => {
-    it("renders the editor with the placeholder", () => {
+    it("renders the placeholder", () => {
       renderSearchBar();
-
-      const editor = document.querySelector(".tiptap");
-      expect(editor).toBeInTheDocument();
 
       const placeholder = document.querySelector("[data-placeholder]");
       expect(placeholder).toBeInTheDocument();
+    });
+
+    it("defers TipTap mount until interaction", () => {
+      renderSearchBar();
+      // Placeholder is in the DOM; the heavy ProseMirror editor is not.
+      expect(document.querySelector(".tiptap")).not.toBeInTheDocument();
     });
 
     it("does not show a clear button (input is empty)", () => {
@@ -57,37 +62,35 @@ describe("<SearchBar /> wiring smoke", () => {
 
     it("does not show a parse error", () => {
       renderSearchBar();
-      // No red parse-error box on initial render.
       const errorBox = document.querySelector('[role="alert"]');
       expect(errorBox).not.toBeInTheDocument();
     });
   });
 
   describe("when the store has an active query", () => {
-    it("renders the query text in the editor", () => {
+    it("renders the query text inside the placeholder", () => {
       useFilterStore.getState().applyQueryText("@status:error");
       renderSearchBar();
 
-      const editor = document.querySelector(".tiptap") as HTMLElement;
-      expect(editor.textContent).toContain("status:error");
+      const placeholder = document.querySelector(
+        "[data-placeholder]",
+      ) as HTMLElement;
+      expect(placeholder.textContent).toContain("status:error");
     });
 
     it("shows the clear button", () => {
       useFilterStore.getState().applyQueryText("@status:error");
       renderSearchBar();
 
-      // The clear control is a button with text "Clear".
       expect(screen.getByText(/clear/i)).toBeInTheDocument();
     });
   });
 
   describe("when the store has a parse error", () => {
-    it("renders the parse error message", () => {
-      // Invalid query — applyQueryText sets parseError on the store.
+    it("records the parse error in the store", () => {
       useFilterStore.getState().applyQueryText('@status:"unclosed');
       renderSearchBar();
 
-      // The exact message comes from the parser; just verify *some* error renders.
       expect(useFilterStore.getState().parseError).not.toBeNull();
     });
   });

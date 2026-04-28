@@ -40,12 +40,17 @@ describe("handleKey", () => {
     });
 
     describe("when the dropdown is open in field mode with a highlight", () => {
-      it("accepts the highlighted field and reopens in value mode", () => {
+      it("accepts the highlighted field and reopens in value mode (no @ in replacement)", () => {
         const action = handleKey(
           ctx({
             text: "@stat",
             cursorPos: 5,
-            suggestion: { open: true, mode: "field", query: "stat" },
+            suggestion: {
+              open: true,
+              mode: "field",
+              query: "stat",
+              tokenStart: 0,
+            },
             highlightedText: "status",
           }),
           "Enter",
@@ -54,19 +59,25 @@ describe("handleKey", () => {
           kind: "accept",
           tokenStart: 0,
           tokenEnd: 5,
-          replacement: "@status:",
+          replacement: "status:",
           reopenInValueMode: true,
         });
       });
     });
 
     describe("when the dropdown is open in value mode with a highlight", () => {
-      it("accepts the highlighted value and inserts a trailing space", () => {
+      it("accepts the highlighted value and inserts a trailing space (no @ in replacement)", () => {
         const action = handleKey(
           ctx({
             text: "@status:err",
             cursorPos: 11,
-            suggestion: { open: true, mode: "value", field: "status", query: "err" },
+            suggestion: {
+              open: true,
+              mode: "value",
+              field: "status",
+              query: "err",
+              tokenStart: 0,
+            },
             highlightedText: "error",
           }),
           "Enter",
@@ -75,7 +86,7 @@ describe("handleKey", () => {
           kind: "accept",
           tokenStart: 0,
           tokenEnd: 11,
-          replacement: "@status:error ",
+          replacement: "status:error ",
           reopenInValueMode: false,
         });
       });
@@ -87,7 +98,12 @@ describe("handleKey", () => {
           ctx({
             text: "@xyz",
             cursorPos: 4,
-            suggestion: { open: true, mode: "field", query: "xyz" },
+            suggestion: {
+              open: true,
+              mode: "field",
+              query: "xyz",
+              tokenStart: 0,
+            },
             highlightedText: null,
           }),
           "Enter",
@@ -97,12 +113,17 @@ describe("handleKey", () => {
     });
 
     describe("when the dropdown is open and the active token is preceded by other clauses", () => {
-      it("computes tokenStart relative to the @ position, not the document start", () => {
+      it("uses the suggestion's tokenStart so only the active token is replaced", () => {
         const action = handleKey(
           ctx({
             text: "@model:gpt-4o AND @stat",
             cursorPos: 23,
-            suggestion: { open: true, mode: "field", query: "stat" },
+            suggestion: {
+              open: true,
+              mode: "field",
+              query: "stat",
+              tokenStart: 18,
+            },
             highlightedText: "status",
           }),
           "Enter",
@@ -111,7 +132,7 @@ describe("handleKey", () => {
           kind: "accept",
           tokenStart: 18,
           tokenEnd: 23,
-          replacement: "@status:",
+          replacement: "status:",
           reopenInValueMode: true,
         });
       });
@@ -132,6 +153,7 @@ describe("handleKey", () => {
               mode: "value",
               field: "status",
               query: "err",
+              tokenStart: 0,
             },
             highlightedText: "error",
           }),
@@ -146,6 +168,7 @@ describe("handleKey", () => {
               mode: "value",
               field: "status",
               query: "err",
+              tokenStart: 0,
             },
             highlightedText: "error",
           }),
@@ -175,7 +198,12 @@ describe("handleKey", () => {
           ctx({
             text: "@stat",
             cursorPos: 5,
-            suggestion: { open: true, mode: "field", query: "stat" },
+            suggestion: {
+              open: true,
+              mode: "field",
+              query: "stat",
+              tokenStart: 0,
+            },
             highlightedText: "status",
           }),
           "Escape",
@@ -204,7 +232,12 @@ describe("handleKey", () => {
           ctx({
             text: "@",
             cursorPos: 1,
-            suggestion: { open: true, mode: "field", query: "" },
+            suggestion: {
+              open: true,
+              mode: "field",
+              query: "",
+              tokenStart: 0,
+            },
             highlightedText: "status",
           }),
           "ArrowDown",
@@ -220,7 +253,12 @@ describe("handleKey", () => {
           ctx({
             text: "@",
             cursorPos: 1,
-            suggestion: { open: true, mode: "field", query: "" },
+            suggestion: {
+              open: true,
+              mode: "field",
+              query: "",
+              tokenStart: 0,
+            },
             highlightedText: "status",
           }),
           "ArrowUp",
@@ -252,7 +290,12 @@ describe("handleKey", () => {
           ctx({
             text: "@stat",
             cursorPos: 5,
-            suggestion: { open: true, mode: "field", query: "stat" },
+            suggestion: {
+              open: true,
+              mode: "field",
+              query: "stat",
+              tokenStart: 0,
+            },
             highlightedText: "status",
           }),
           "a",
@@ -283,6 +326,7 @@ describe("handleKey", () => {
               mode: "value",
               field: "status",
               query: "err",
+              tokenStart: 18,
             },
             highlightedText: "error",
           }),
@@ -292,7 +336,7 @@ describe("handleKey", () => {
           kind: "accept",
           tokenStart: 18,
           tokenEnd: 29,
-          replacement: "@status:error ",
+          replacement: "status:error ",
           reopenInValueMode: false,
         });
       });
