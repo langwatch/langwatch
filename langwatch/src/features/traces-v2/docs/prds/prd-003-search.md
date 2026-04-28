@@ -1,12 +1,12 @@
 # PRD-003: Search & Filter System
 
-Parent: [Design: Trace v2](../design/trace-v2.md)
-Status: DRAFT
-Date: 2026-04-22
+Parent: [Design: Trace v2](../trace-v2.md)
+Status: IMPLEMENTED (revised 2026-04-28)
+Date: 2026-04-22 (original) · 2026-04-28 (AI composer + facet group dot + facet expansion)
 
 ## What This Is
 
-The search and filtering system for traces. Two components that stay in sync: a search/query bar spanning the full width at the top, and a filter column on the left with faceted controls.
+The search and filtering system for traces. Two components that stay in sync: a search/query bar spanning the full width at the top, and a filter column on the left with faceted controls. As of 2026-04-28, the search bar also hosts an AI query composer (sparkles button) — see [PRD-003a](./prd-003a-search-input.md#ai-query-composer-added-2026-04-28) for the action model and validation contract.
 
 ## Layout
 
@@ -62,7 +62,7 @@ The search and filtering system for traces. Two components that stay in sync: a 
 
 ## Time Range Selector
 
-The time range picker sits in the **toolbar strip** (between the grouping selector and density toggle), not in the search bar. This keeps the search bar focused purely on query input.
+The time range picker sits in the **toolbar strip** (right side, between the Live indicator and the columns dropdown), not in the search bar. The full toolbar order, left → right, is: lens tabs · "What's new" · live indicator · time range picker · columns dropdown · grouping selector · density toggle · keyboard-shortcuts button. This keeps the search bar focused purely on query input.
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
@@ -206,8 +206,16 @@ The filter column is a scrollable sidebar. It contains categorical facets (check
 - **Trace Type:** Agent, LLM, RAG, Tool, Chain, Guardrail — with count badges
 - **Model:** Dynamic list from data — with count badges
 - **Service:** Dynamic list from data — with count badges
+- **Root span name** (added 2026-04-28): Dynamic list of `RootSpanName` values — useful for grouping by entry point
 - **User:** Dynamic list from data (if available)
 - **Labels:** Dynamic list from data (if available)
+- **Contains AI** (added 2026-04-28): Boolean facet — does the trace contain at least one LLM/agent span
+- **Annotation presence** (added 2026-04-28): Has annotation / has thumbs up / has thumbs down
+- **Guardrail outcome** (added 2026-04-28): Pass / fail / not run
+- **Error message text** (added 2026-04-28): Free-text contains-match against the trace's error message
+
+**Prompt facets (added 2026-04-28, shipped under PRD-023):**
+- **Selected prompt** (categorical), **Last used prompt** (categorical), **Prompt version** (range) — collapsed by default, only rendered when the trace summary projection has prompt data for the current scope. See [PRD-023](./prd-023-prompt-facets.md) for the projection contract and `prompt.*` search syntax.
 
 **Origin-specific facets (shown when an origin is selected):**
 - **Simulation origin:** adds Scenario facet (list of scenario names), Verdict facet (Pass/Fail)
@@ -240,9 +248,10 @@ Example: checking Error + Warning under Status, and gpt-4o under Model:
 
 ### Range Facets
 
-- **Tokens:** Double-handled slider, 0 to max observed value
+- **Tokens:** Double-handled slider, 0 to max observed value (added 2026-04-28: split into prompt / completion / total tokens)
 - **Cost:** Double-handled slider, $0 to max observed value
 - **Latency:** Double-handled slider, 0s to max observed value
+- **TTLT** (added 2026-04-28, time-to-last-token): Double-handled slider, 0s to max observed value
 
 Adjusting a slider:
 1. Immediately filters the table
@@ -251,6 +260,14 @@ Adjusting a slider:
 ### Counts Update
 
 When any filter is applied, the count badges on ALL other facets update to reflect the filtered dataset. This shows the user how many results they'd get if they added another filter.
+
+### Group "Is Modified" Dot (added 2026-04-28)
+
+Each facet **group header** in the sidebar shows a small dot when any facet inside the group has a non-default value (mirroring the lens draft dot pattern in PRD-017). The dot is purely informational — clicking it does not clear the filter.
+
+- Comparison is against the active lens's saved filter AST: any difference flips the group's `isModified` flag.
+- Locked facets (per built-in lens) never contribute to `isModified` because they cannot be changed.
+- The dot is visible regardless of whether the group is collapsed or expanded.
 
 ### Collapse/Expand
 

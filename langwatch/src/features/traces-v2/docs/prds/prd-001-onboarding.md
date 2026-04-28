@@ -1,97 +1,95 @@
 # PRD-001: Onboarding Empty State
 
-Parent: [Design: Trace v2](../design/trace-v2.md)
-Status: DRAFT
-Date: 2026-04-22
+Parent: [Design: Trace v2](../trace-v2.md)
+Status: IMPLEMENTED (revised 2026-04-28)
+Date: 2026-04-22 (original) · 2026-04-28 (revision)
 
 ## What This Is
 
 The state users see inside the Traces view when no trace data exists for their project. Not a product onboarding flow — the user has already signed up and navigated here. This is a contextual empty state that helps them send their first trace.
 
-## Layout
+## Layout (revised 2026-04-28)
 
-Renders inside the main content area (replacing the trace table). The filter column and nav are still visible but inactive.
+Renders inside the main content area (replacing the trace table) via `TracesEmptyOnboarding`. Filter sidebar and toolbar are still visible but inert until traces exist.
 
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
-│ [LangWatch]  Observe  Live Tail                                     │
-├──────────────────────────────────────────────────────────────────────┤
-│ [@search...]                                                        │
-├────────────┬────────────────────────────────────────────────────────-┤
-│  FILTERS   │                                                        │
-│  (empty/   │          ┌─────────────────────────────┐               │
-│   greyed   │          │                             │               │
-│   out)     │          │      No traces yet          │               │
-│            │          │                             │               │
-│            │          │  Traces show you what your  │               │
-│            │          │  AI agents are doing: every │               │
-│            │          │  LLM call, tool use, and    │               │
-│            │          │  decision they make.        │               │
-│            │          │                             │               │
-│            │          │  ┌─────────┐ ┌───────────┐ │               │
-│            │          │  │  With   │ │  Manual   │ │               │
-│            │          │  │ Skills  │ │Integration│ │               │
-│            │          │  └─────────┘ └───────────┘ │               │
-│            │          │                             │               │
-│            │          │  ── or ──                   │               │
-│            │          │                             │               │
-│            │          │  [Explore with sample data] │               │
-│            │          │                             │               │
-│            │          └─────────────────────────────┘               │
-│            │                                                        │
-└────────────┴────────────────────────────────────────────────────────┘
+│  Send your first trace                                               │
+│  Generate an access token, then pick a setup style.                  │
+│                                                                      │
+│  ┌────────────────────────────────────────────────────────────────┐ │
+│  │  PatIntegrationInfoCard                                        │ │
+│  │  • mints a Personal Access Token inline                        │ │
+│  │  • shows env block (LANGWATCH_API_KEY + LANGWATCH_PROJECT_ID)  │ │
+│  └────────────────────────────────────────────────────────────────┘ │
+│                                                                      │
+│  ┌────────────────────────────────────────────────────────────────┐ │
+│  │  Want to look around first?     [▶ Seed sample traces]         │ │
+│  └────────────────────────────────────────────────────────────────┘ │
+│                                                                      │
+│  [ Via Coding Agent | Via MCP | Manually ]                          │
+│  ┌────────────────────────────────────────────────────────────────┐ │
+│  │  Active tab body — lifted from main onboarding flow:           │ │
+│  │   • Coding Agent → ViaClaudeCodeScreen (showMcpTab=false)      │ │
+│  │   • MCP          → ViaMcpClientScreen                          │ │
+│  │   • Manually     → PlatformGrid + FrameworkGrid + InstallPreview│ │
+│  └────────────────────────────────────────────────────────────────┘ │
+└──────────────────────────────────────────────────────────────────────┘
 ```
+
+The three setup-path tabs render blurred + non-interactive until a PAT has been minted, so the PAT card is the only call-to-action while locked.
 
 ## Content
 
 ### Heading
-"No traces yet"
+"Send your first trace"
 
 ### Description
-1-2 sentences: "Traces show you what your AI agents are doing: every LLM call, tool use, and decision they make."
+"Generate an access token, then pick a setup style. Traces will start appearing here once your app sends them."
 
-### Setup Path 1: Skills (recommended, left card)
-Title: "Set up with Skills"
-Steps:
-1. Create an API key → link to project settings
-2. Set environment variables:
-   ```
-   LANGWATCH_API_KEY=your-key
-   LANGWATCH_ENDPOINT=https://...
-   ```
-3. Run the setup skill in Claude Code (or similar)
+### Step 1: PAT Minting (always visible)
+`PatIntegrationInfoCard` mints a Personal Access Token in-place and surfaces:
+- the freshly minted token (one-time view + copy)
+- env block with `LANGWATCH_API_KEY` and `LANGWATCH_PROJECT_ID`
 
-The card should feel like a quick-start: 3 steps, done. Emphasize that this is the easiest path.
+The token is propagated to every tab through `ActiveProjectProvider`, which overrides the project's `apiKey` so the lifted onboarding screens render with the new credential without needing to be modified.
 
-### Setup Path 2: Manual Integration (right card)
-Title: "Manual integration"
-Links to existing integration docs. Shows supported frameworks/SDKs (Python, TypeScript, LangChain, etc.) as small logos or text badges. Clicking opens the existing integration UI/docs.
+### Sample Data CTA (visible after PAT)
+A subtle row appears under the PAT card once a token exists: "Want to look around first? [Seed sample traces]". Clicking writes a batch of synthetic traces into the project via `useSampleData` (server-side, real ingestion) and pre-seeds the filter to `origin:sample`. The page then strips `?empty` from the URL so the user lands on the live table.
 
-### Demo Data CTA
-Below both cards, separated by a divider ("or").
-Button: "Explore with sample data"
-Clicking this populates the trace table with ~20 realistic mock traces so the user can experience the UI before integrating. Demo data is loaded client-side from a static fixture, not from the API.
+### Setup Paths (tabs, blurred until PAT exists)
+
+1. **Via Coding Agent** — `ViaClaudeCodeScreen` lifted from main onboarding (sub-tabs: Prompts, Skills; MCP sub-tab is hidden because MCP has its own top-level tab here).
+2. **Via MCP** — `ViaMcpClientScreen` lifted from main onboarding (Claude Desktop, ChatGPT, etc.).
+3. **Manually** — `PlatformGrid` + `FrameworkGrid` + `InstallPreview` + `FrameworkIntegrationCode` for direct SDK integration.
+
+Each segment carries a one-liner description above the body explaining what it's for.
 
 ## Behavior
 
-- Renders when the trace count for the current project is zero
-- Filter column is visible but greyed out / empty (no data to filter)
-- Search bar is visible but disabled
-- Nav shows Observe (active) and Live Tail (clickable but shows its own empty state if no data)
-- When demo data is loaded, the empty state disappears and the full trace table renders with the sample data. A banner at the top says "Viewing sample data" with a dismiss/clear button.
+- Renders when the project has zero traces, gated by `useProjectHasTraces` so it does not flash during refreshes (see `freshnessSignal` / `MIN_REFRESH_VISIBLE_MS`).
+- Filter sidebar and toolbar render but cannot fetch — sample data load is the only path that brings the table to life from this state.
+- When sample data is loaded, the empty state disappears and the trace table renders with the sample traces. A `DemoModeBanner` at the top says "Viewing sample data" with a dismiss/clear control.
 
 ### First Real Data Celebration
-When the first real traces arrive (project goes from 0 to >0 real traces):
-- Brief confetti burst animation (CSS particles, ~2 seconds)
+`CelebrationBanner` triggers when the first real traces arrive (project goes from 0 → >0 real traces):
+- Brief confetti burst (CSS particles, ~2 seconds)
 - Banner: "Your first traces are arriving!" with a tada emoji
 - Auto-dismisses after 10 seconds, or dismiss manually
 - Only triggers once per project (flag stored in user preferences)
-- If the user was viewing demo data, the banner switches to "Real data is flowing! Switching from sample data..." and the demo data is replaced.
+- If sample data was active, the banner switches to "Real data is flowing! Switching from sample data..." and the demo data is replaced.
 
 ## Design Notes
 
-- Centered vertically and horizontally in the content area
-- Clean, minimal — no illustrations or complex graphics
-- The two setup cards should be equal weight, side by side
-- Match the product's existing design language (Chakra UI components)
-- The demo data button is secondary/tertiary styling, not competing with the setup paths
+- Centered horizontally with a `1200px` max-width column (`paddingX={{ base: 4, md: 8 }}`).
+- Tabs use Chakra `Tabs.Root` with `variant="line" colorPalette="orange"`.
+- The sample-data row uses `bg.subtle` and is purely secondary — never competes with the PAT card.
+- All copy stays terse. No illustrations.
+
+## Implementation Pointers
+- `components/EmptyState/TracesEmptyOnboarding.tsx`
+- `components/EmptyState/PatIntegrationInfoCard.tsx`
+- `components/EmptyState/useSampleData.ts`
+- `components/EmptyState/DemoModeBanner.tsx`
+- `components/EmptyState/CelebrationBanner.tsx`
+- `hooks/useProjectHasTraces.ts`

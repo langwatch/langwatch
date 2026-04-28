@@ -2,6 +2,50 @@
 
 Changes made to PRDs during review and iteration sessions. These must be carried into tech specs. Sorted by date, most recent first.
 
+## 2026-04-28 (Phase 2 → 3A Bridge: drawer follow-ups, AI on-ramp, prompt rollup)
+
+### TraceDrawer Prompts Tab + Unified ChipBar
+- **Affected:** PRD-004, PRD-010
+- **Change:** TraceDrawer gains a third tab type alongside Trace Summary and ephemeral span tabs: **Prompts**. The tab only renders when the trace touches at least one prompt (`promptCount > 0` from the rollup projection — see PRD-023). Inside the tab: one card per prompt, grouped by selected vs last-used, each linking back to the originating span via the new add-to-filter chip. The header chips collapsed into a single unified `ChipBar` row driving status, scope, scenario, prompt, error, and cost chips with the same render/click contract.
+- **Why:** Prompts are first-class debugging context for agent traces — surfacing them as a tab (not just metadata) lets users jump from "which prompt ran" to "which span used it" in one click. The previous chip-soup header was hard to scan.
+- **Spec note:** `SpanTabBar` decides Prompts tab visibility from the trace-level prompt rollup. `ChipBar` consumes `useTraceHeaderChips` to render an ordered list of chips with consistent click handlers (most chips push a filter into `filterStore` and close the drawer-overlay state).
+
+### AI Query Composer in SearchBar
+- **Affected:** PRD-003, PRD-003a (extension), trace-v2.md (Phase 4 → Phase 3A bring-forward)
+- **Change:** SearchBar grows a sparkles button that opens an **AI query composer** popover. User describes what they want in natural language; server returns a structured action (lens config + filters or filter delta), which the client applies. The composer is the first user-visible AI surface and validates the "ask, don't configure" pillar before the broader Phase 4 intelligence work. Implemented under `components/ai/` and the `tracesV2.aiAction` tRPC procedure.
+- **Why:** We brought a thin AI on-ramp forward from Phase 4+ to dogfood the LensConfig-as-LLM-output approach early, and to give the SearchBar a clear answer to the "I don't know the syntax" failure mode.
+- **Spec note:** Treat `aiQuery` output as untrusted — validate against the LensConfig schema before applying. Failure path falls back to leaving the current lens unchanged with a toast.
+
+### Trace-Level Prompt Rollup Projection (PRD-023 implementation)
+- **Affected:** PRD-023
+- **Change:** Added a projection step that walks span attributes and rolls `langwatch.prompt.selected.id`, `langwatch.prompt.id`, `langwatch.prompt.version.number`, and `langwatch.prompt.version.id` up to the trace summary, keyed to the source `SpanId` so the UI can deep-link from a facet match back to the span that produced it. Powers the new Prompts sidebar group and the `prompt.*` search syntax.
+- **Spec note:** `parsePromptReference` now also surfaces `langwatch.prompt.version.id`. Sidebar Prompts group is collapsed-by-default and only renders when the projection has data for the current filter scope.
+
+### Welcome Dialog Rebrand to Beta + EmptyState Onboarding Rework
+- **Affected:** PRD-001
+- **Change:** Welcome dialog rebranded as the v2 **Beta** announcement with a refined MeshGradient + crossfade. EmptyState replaced with `TracesEmptyOnboarding` — a tabbed flow with three segments (Coding Agent, MCP, Manual) plus an inline `PatIntegrationInfoCard` that mints a PAT inline so users don't bounce to settings. The "explore with sample data" path is preserved but now flows through `useSampleData`.
+- **Why:** The previous two-card layout assumed every user already had a PAT and an integration choice. The tabbed layout matches how new users actually start (pick how they want to integrate, then mint a PAT for that flow).
+- **Spec note:** PRD-001's "Two cards side-by-side" section is superseded by the tabbed flow. Each tab lifts the matching screen from the main onboarding flow rather than reimplementing them. EmptyState gating now reads from `useProjectHasTraces` so the empty view only shows when truly empty.
+
+### Refresh Signal + Empty-State Gating + Drawer↔Table Coherence
+- **Affected:** PRD-002, PRD-004, PRD-022
+- **Change:** Refreshing inside the drawer now also invalidates `tracesV2.list`, so duration/cost/status fields the projection just refreshed don't stay stale on the row underneath the drawer. Refresh progress reworked from a periodic spinner into a **continuous wave** that gates against a `MIN_REFRESH_VISIBLE_MS` floor so flashes don't appear on fast refreshes. Empty-state UI is gated against the same signal, so a "you have no traces" view never flashes during a refresh.
+- **Spec note:** PRD-022's invalidation matrix should call out drawer-refresh → list invalidation. The `freshnessSignal` store and `MIN_REFRESH_VISIBLE_MS` are the single source of truth for "is the list currently mid-refresh."
+
+### FilterSidebar Facet Group "Is Modified" Dot + Expanded Facets
+- **Affected:** PRD-003, PRD-017
+- **Change:** Each facet **group** in the sidebar now shows a small dot when any facet inside it has a non-default value, mirroring the lens draft dot pattern. The sidebar facet inventory expanded with: `rootSpanName`, guardrail evaluations, annotation presence, `containsAi`, error message text, token counts, and `ttlt` (time to last token). Sidebar still respects locked facets per built-in lens.
+- **Why:** Users were missing that "I left a filter on three groups ago" — the dot makes ambient state legible without forcing a sidebar scroll. New facets cover the most-asked questions from internal dogfooding.
+- **Spec note:** Compare each group's facets against the lens's saved filter AST; any difference flips the group's `isModified` flag. Locked facets still render collapsed and non-interactive.
+
+### Density Extracted to Its Own Global Store
+- **Affected:** STANDARDS.md, PRD-002, PRD-017
+- **Change:** Density moved out of `viewStore` into a dedicated `densityStore` (with `DensityProvider` consuming it). Density is no longer part of LensConfig — it's a per-user preference that survives lens switches.
+- **Why:** Treating density as part of LensConfig caused users to lose their preferred density when switching lenses, which they consistently reported as broken.
+- **Spec note:** PRD-017's LensConfig schema should NOT include density. Update STANDARDS.md store list to add `densityStore` and note it persists separately.
+
+---
+
 ## 2026-04-24 (Draft State Reversal)
 
 ### All Lenses Show Draft Dot (Reverses Previous Decision)
@@ -112,7 +156,7 @@ Changes made to PRDs during review and iteration sessions. These must be carried
 - **Spec note:** Each lens's `filters` array defines which facets are locked. Locked facets render as collapsed, non-clickable sections with lock icon.
 
 ### Phase Renumbering
-- **Affected:** trace-v2.md, ADR-002, TODO-PRDS.md
+- **Affected:** trace-v2.md, ADR-002
 - **Change:** Phases restructured: Phase 1 (Foundation UI, this repo) -> Phase 2 (Lens Engine, this repo) -> Phase 3A (App Networking Layer, prod repo) -> Phase 3B (tRPC Backend, prod repo) -> Phase 4+ (Intelligence Features, prod repo). Custom/saved lenses moved from old Phase 5 to new Phase 2. AI features moved from old Phase 3 to new Phase 4+.
 - **Why:** Lens engine is a differentiator on its own. Mock-first approach means Phases 1-2 in test repo, 3+ in production.
 - **Spec note:** All phase references in specs should use the new numbering.

@@ -194,12 +194,49 @@ We do NOT integration-test:
 ### Visual / regression
 - Filter-token highlight unchanged: render `@status:error AND NOT @model:gpt-4o` → blue chip on first, red chip on second.
 
+## AI Query Composer (added 2026-04-28)
+
+The SearchBar grows a sparkles "Ask AI" affordance — `AskAiButton` + `AiPromptInput` from `components/ai/` — that sits next to the editor. Clicking opens a popover where the user describes what they want in natural language. Submission goes through the `tracesV2.aiAction` tRPC mutation, glued to the trace stores by `useAiTraceAction`.
+
+### Action model
+
+`aiAction` returns a discriminated `result` object:
+
+| `kind` | What the client does |
+|---|---|
+| `apply_query` | Calls `filterStore.applyQueryText(result.query)` — same code path as a hand-typed query. |
+| `create_lens` | First applies the query, then calls `viewStore.createLens(result.name)` so the filtered state is captured as a new lens. |
+| `error` (`ok: false`) | Surfaced inline in the composer as "Couldn't understand that. {message}". User keeps their prompt to refine. |
+
+`useAiTraceAction({ mode })` lets each caller restrict the action set:
+- **`filter`** — collapse any `create_lens` into `apply_query`. Used inside the SearchBar so a search-style ask never silently creates a lens.
+- **`lens`** — always wrap the result in `createLens`, even if the model only returned a filter. Used by lens-creation popovers.
+- **`auto`** — let the model pick.
+
+### Validation contract
+
+The client treats the model output as **untrusted**:
+
+1. The mutation result is type-narrowed via the discriminated union before any store call.
+2. `applyQueryText` runs the result through `safeParseAndSerialize`, the same parser the user-typed flow uses. A bad query falls back to a parse error in the existing PRD-003 path; the previous AST is not destroyed.
+3. Lens creation reuses `viewStore.createLens`, so any LensConfig assembled server-side is normalized through the same schema as user-created lenses.
+4. Time range is always passed in from the client (`filterStore.debouncedTimeRange`), never trusted from the model. The model sees the active window so it can talk about "the last hour," but it can't widen it.
+
+### UX contract
+
+- The composer is non-modal — it sits in a Chakra popover anchored to the SearchBar. Submitting calls `onDone` so the popover closes; the resulting query lands in the regular SearchBar input where the user can edit it like any other query.
+- `clearError` runs on every `onPromptChange`, so the error message disappears as soon as the user retypes.
+- While `isPending`, the AskAi button shows a spinner and Enter inside the composer is a no-op.
+- Keyboard focus order: editor → AskAi button → time range picker (existing PRD-003 toolbar order). Tabbing into the composer focuses the prompt textarea.
+
+The composer is the first user-visible AI surface — it intentionally validates the LensConfig-as-LLM-output approach (see Phase 4+ in `trace-v2.md`) before the broader intelligence work lands. Feedback signal: track whether the resulting query is edited before the next list update.
+
 ## Out of scope for this addendum
 
 - Cross-facet OR warning badge (already in PRD-003 §Edge Cases — currently working).
 - Sidebar projection of AST (covered by separate FilterSidebar tests).
 - Time range selector.
-- AI/NLP query parsing (Phase 3).
+- The full Phase 4+ intelligence stack (frustration detection, simulation diff, what-went-wrong diagnosis) — only the action-model on-ramp is in scope here.
 
 ## Implementation sequence
 

@@ -1,8 +1,8 @@
 # PRD-004: Trace Drawer Shell
 
-Parent: [Design: Trace v2](../design/trace-v2.md)
-Status: DRAFT
-Date: 2026-04-22
+Parent: [Design: Trace v2](../trace-v2.md)
+Status: IMPLEMENTED (revised 2026-04-28)
+Date: 2026-04-22 (original) · 2026-04-28 (Prompts tab + ChipBar)
 
 ## What This Is
 
@@ -152,15 +152,16 @@ Span selected:
 
 **Tab behavior:**
 - **Trace Summary tab:** Always present. Shows trace-level data (I/O, Attributes, Exceptions, Events, Evals). Cannot be closed.
+- **Prompts tab (added 2026-04-28):** Appears when the trace touches at least one prompt (`promptCount > 0` from the trace-level prompt rollup projection — see PRD-023). Shows one card per prompt grouped by selected vs last-used, each linking back to the originating span via add-to-filter chips. The tab persists for the lifetime of the drawer for this trace; switching away and back keeps state. Hidden entirely when the trace has no prompts.
 - **Span tab:** Appears when a span is clicked in the visualization. Shows span-level data (I/O, Attributes only — events and evals are hoisted to trace level). Shows span name, type badge, key metrics, and × to close.
 - **Click span in viz:** Opens/activates the span tab. If a different span was already open, the tab updates to the new span.
-- **Click same span again:** Closes the span tab, returns to Trace Summary.
-- **Click × on span tab:** Closes the span tab, returns to Trace Summary.
-- **Click Trace Summary tab:** Switches to Trace Summary. The span tab remains open — you can click back to it. This is a tab switch, not a close action.
-- **Escape:** Closes the span tab (removes it), returns to Trace Summary.
-- **Click empty space in viz:** Closes the span tab, returns to Trace Summary.
+- **Click same span again:** Closes the span tab, returns to the previously active non-span tab (Trace Summary or Prompts).
+- **Click × on span tab:** Closes the span tab, returns to the previously active non-span tab.
+- **Click Trace Summary tab / Prompts tab:** Switches tabs. The span tab remains open — you can click back to it. This is a tab switch, not a close action.
+- **Escape:** Closes the span tab (removes it), returns to the previously active non-span tab.
+- **Click empty space in viz:** Closes the span tab, returns to the previously active non-span tab.
 
-**Important:** The span tab is ephemeral — only one span tab exists at a time. It does not create a history/stack. The Trace Summary tab content never changes based on span selection.
+**Important:** The span tab is ephemeral — only one span tab exists at a time. It does not create a history/stack. Trace Summary and Prompts tab content never changes based on span selection.
 
 **Persistent sections (not affected by tab switching):** The following drawer sections are always visible regardless of which tab is active:
 - **Header** (trace name, metrics, tags) — always visible
@@ -392,12 +393,29 @@ How you enter the drawer determines the initial mode:
 | Section | PRD | All modes? |
 |---|---|---|
 | Header (name, status, metrics, tags) | PRD-008 | Yes (adapts per mode) |
+| ChipBar (status / scope / scenario / prompt / error / cost) | This PRD (below) | Yes — replaces the legacy header pills |
 | Mode Switch (Trace ↔ Conversation toggle) | This PRD | Only when trace has thread |
 | Contextual Alerts | This PRD (below) | Trace mode only |
 | Context Peek (prev/current/next turns) | This PRD | Trace mode with conversation only |
 | Context Area (viz or conversation) | PRD-007, this PRD | Yes (adapts per mode) |
-| Tab Bar (Trace Summary / Span) | This PRD (above) | Trace mode only |
-| Detail Accordions (content depends on tab) | PRD-005, PRD-006, PRD-009 | Yes (adapts per mode) |
+| Tab Bar (Trace Summary / Prompts / Span) | This PRD (above) | Trace mode only |
+| Detail Accordions (content depends on tab) | PRD-005, PRD-006, PRD-009, PRD-010 | Yes (adapts per mode) |
+
+## ChipBar (added 2026-04-28)
+
+The drawer header's "metrics pills" + "key:value labels" rows merged into a single `ChipBar` row directly under the header. The ChipBar is driven by `useTraceHeaderChips` and renders an ordered list of chips with a consistent contract: each chip has an icon, label, optional value, and click behavior.
+
+Chip types currently rendered:
+- **Status chip** — OK / warning / error
+- **Scope chip** — service / scope name
+- **Scenario chip** — scenario id when the trace originates from a scenario run
+- **Prompt chip** — when the trace touches a prompt (selected or last-used). Click to apply a `prompt:` filter or jump to the source span (see PRD-010, PRD-023).
+- **Error chip** — when `containsError` is true; click filters by error message
+- **Cost / token chips** — total cost, input/output tokens
+
+**Chip click behavior:** most chips push a filter into `filterStore` (e.g., `service:foo`, `prompt:bar`, `error.message:"…"`) and close any drawer-overlay state if applicable. The contract is: clicking a chip should answer "show me other traces like this one in this dimension."
+
+This consolidation replaces the previous metrics-pills + label-pairs rows. PRD-008 still owns the underlying metrics; this PRD owns the chip layout + interaction model.
 
 ## Contextual Alerts
 
@@ -468,6 +486,7 @@ Drawer state is reflected in the URL:
 ```
 /observe                                  Observe page, default view
 /observe?trace=abc123                     Drawer open, Trace Summary tab
+/observe?trace=abc123&tab=prompts         Drawer open, Prompts tab (when trace has prompts)
 /observe?trace=abc123&mode=conversation   Drawer open, conversation mode
 /observe?trace=abc123&span=def456         Drawer open, span tab for def456
 /observe?trace=abc123&viz=waterfall       Waterfall visualization active
