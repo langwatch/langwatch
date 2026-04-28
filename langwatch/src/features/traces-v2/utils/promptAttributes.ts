@@ -18,11 +18,59 @@ export interface PromptReference {
   variables: Record<string, string> | null;
 }
 
+/**
+ * Reads a span attribute by dotted path from a `params` object that may
+ * be flat (`{"langwatch.prompt.id": "..."}`), nested (`{langwatch: {prompt:
+ * {id: "..."}}}`), or a mix. The ingestion layer un-flattens dotted OTel
+ * attribute keys into nested objects before storing, so a naïve
+ * `params["langwatch.prompt.id"]` lookup misses real data.
+ */
+function readAttribute(
+  params: Record<string, unknown> | null | undefined,
+  path: string,
+): unknown {
+  if (!params) return undefined;
+  if (params[path] !== undefined) return params[path];
+  const parts = path.split(".");
+  let current: unknown = params;
+  for (const part of parts) {
+    if (current == null || typeof current !== "object") return undefined;
+    current = (current as Record<string, unknown>)[part];
+  }
+  return current;
+}
+
+/**
+ * Walk every leaf path in a (possibly nested) attributes object and yield
+ * its dotted form. Used by `hasPromptMetadata` to detect the prefix on
+ * nested attribute trees.
+ */
+function* iterateLeafPaths(
+  obj: Record<string, unknown>,
+  prefix = "",
+): Generator<string> {
+  for (const [key, value] of Object.entries(obj)) {
+    const path = prefix ? `${prefix}.${key}` : key;
+    if (
+      value !== null &&
+      typeof value === "object" &&
+      !Array.isArray(value)
+    ) {
+      yield* iterateLeafPaths(value as Record<string, unknown>, path);
+    } else {
+      yield path;
+    }
+  }
+}
+
 export function hasPromptMetadata(
   params: Record<string, unknown> | null | undefined,
 ): boolean {
   if (!params) return false;
-  return Object.keys(params).some((key) => key.startsWith(PROMPT_PREFIX));
+  for (const path of iterateLeafPaths(params)) {
+    if (path.startsWith(PROMPT_PREFIX)) return true;
+  }
+  return false;
 }
 
 /**
@@ -100,7 +148,7 @@ export function extractPromptReference(
 
   const variables = parsePromptVariables(params);
 
-  const promptId = params["langwatch.prompt.id"];
+  const promptId = readAttribute(params, "langwatch.prompt.id");
   if (typeof promptId === "string" && promptId.includes(":")) {
     const colonIndex = promptId.lastIndexOf(":");
     const slug = promptId.substring(0, colonIndex);
@@ -119,8 +167,8 @@ export function extractPromptReference(
     }
   }
 
-  const handle = params["langwatch.prompt.handle"];
-  const versionRaw = params["langwatch.prompt.version.number"];
+  const handle = readAttribute(params, "langwatch.prompt.handle");
+  const versionRaw = readAttribute(params, "langwatch.prompt.version.number");
 
   if (typeof handle === "string" && handle.length > 0) {
     if (versionRaw != null) {
@@ -138,28 +186,55 @@ export function extractPromptReference(
 function parsePromptVariables(
   params: Record<string, unknown>,
 ): Record<string, string> | null {
-  const raw = params["langwatch.prompt.variables"];
-  if (typeof raw !== "string") return null;
-
-  try {
-    const parsed: unknown = JSON.parse(raw);
-    if (typeof parsed !== "object" || parsed === null || !("value" in parsed)) {
-      return null;
+  // Two emit shapes seen in the wild:
+  //   1. Wrapped JSON string: `langwatch.prompt.variables = '{"type":"json","value":{...}}'`
+  //   2. Per-key flat attributes: `langwatch.prompt.variables.input = "..."`
+  // The second shape lands as a nested object on the span (`params.langwatch
+  // .prompt.variables = { input: "..." }`) once the ingestion un-flattens
+  // dotted keys. Try both — the first match wins.
+  const wrapped = readAttribute(params, "langwatch.prompt.variables");
+  if (typeof wrapped === "string") {
+    try {
+      const parsed: unknown = JSON.parse(wrapped);
+      if (
+        typeof parsed === "object" &&
+        parsed !== null &&
+        "value" in parsed
+      ) {
+        const value = (parsed as { value: unknown }).value;
+        if (
+          typeof value === "object" &&
+          value !== null &&
+          !Array.isArray(value)
+        ) {
+          const result: Record<string, string> = {};
+          for (const [key, val] of Object.entries(
+            value as Record<string, unknown>,
+          )) {
+            result[key] = String(val);
+          }
+          return result;
+        }
+      }
+    } catch {
+      // fall through to nested-object form
     }
-
-    const value = (parsed as { value: unknown }).value;
-    if (typeof value !== "object" || value === null || Array.isArray(value)) {
-      return null;
-    }
-
-    const result: Record<string, string> = {};
-    for (const [key, val] of Object.entries(value as Record<string, unknown>)) {
-      result[key] = String(val);
-    }
-    return result;
-  } catch {
-    return null;
   }
+
+  if (
+    typeof wrapped === "object" &&
+    wrapped !== null &&
+    !Array.isArray(wrapped)
+  ) {
+    const result: Record<string, string> = {};
+    for (const [key, val] of Object.entries(wrapped as Record<string, unknown>)) {
+      if (val == null) continue;
+      result[key] = typeof val === "string" ? val : JSON.stringify(val);
+    }
+    return Object.keys(result).length > 0 ? result : null;
+  }
+
+  return null;
 }
 
 /**

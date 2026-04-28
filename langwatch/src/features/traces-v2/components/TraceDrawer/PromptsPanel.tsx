@@ -8,8 +8,8 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { useRouter } from "~/utils/compat/next-router";
 import { useMemo } from "react";
+import { useDrawer } from "~/hooks/useDrawer";
 import {
   LuArrowRight,
   LuCircleCheck,
@@ -65,6 +65,12 @@ function aggregatePromptUsage(
   }
 
   const byKey = new Map<string, PromptUsage>();
+  // Index span-derived usages by handle alone too, so a fallback ref with
+  // no version (e.g. `"handle:latest"` from `langwatch.prompt_ids`) can
+  // still match against spans on that handle even when version numbers
+  // differ. Without this, the panel rendered every fallback card with
+  // empty span lists and a bogus "still loading" message.
+  const byHandle = new Map<string, PromptUsage[]>();
   for (const span of spansFull) {
     const ref = extractPromptReference(span.params);
     if (!ref) continue;
@@ -73,6 +79,9 @@ function aggregatePromptUsage(
     if (!usage) {
       usage = { ref, spanIds: [], variables: {} };
       byKey.set(key, usage);
+      const list = byHandle.get(ref.handle) ?? [];
+      list.push(usage);
+      byHandle.set(ref.handle, list);
     }
     usage.spanIds.push(span.spanId);
     if (ref.variables) {
@@ -82,19 +91,31 @@ function aggregatePromptUsage(
     }
   }
 
-  // Preserve fallback order for stability when both sources agree.
   const ordered: PromptUsage[] = [];
   const seen = new Set<string>();
   for (const ref of fallbackRefs) {
     const key = promptReferenceKey(ref);
-    const usage = byKey.get(key);
-    if (usage) {
-      ordered.push(usage);
+    const exact = byKey.get(key);
+    if (exact) {
+      ordered.push(exact);
       seen.add(key);
-    } else {
-      ordered.push({ ref, spanIds: [], variables: {} });
-      seen.add(key);
+      continue;
     }
+    // Permissive match: when the fallback ref doesn't pin a version, fall
+    // back to handle-only and prefer the first span-derived usage for that
+    // handle. Keeps a single ordered card per fallback entry rather than
+    // surfacing both an empty fallback card AND a populated extras card.
+    if (ref.versionNumber == null && !ref.tag) {
+      const candidates = byHandle.get(ref.handle);
+      if (candidates && candidates.length > 0) {
+        const usage = candidates[0]!;
+        ordered.push(usage);
+        seen.add(promptReferenceKey(usage.ref));
+        continue;
+      }
+    }
+    ordered.push({ ref, spanIds: [], variables: {} });
+    seen.add(key);
   }
   for (const [key, usage] of byKey) {
     if (!seen.has(key)) ordered.push(usage);
@@ -104,9 +125,10 @@ function aggregatePromptUsage(
 
 export function PromptsPanel({ trace, spans, onSelectSpan }: PromptsPanelProps) {
   const { project } = useOrganizationTeamProject();
-  const router = useRouter();
-  const projectSlug =
-    typeof router.query.project === "string" ? router.query.project : undefined;
+  const { openDrawer } = useDrawer();
+  const onOpenPromptEditor = (handle: string) => {
+    openDrawer("promptEditor", { promptId: handle });
+  };
 
   const fallbackRefs = useMemo(
     () => parseTracePromptIds(trace.attributes),
@@ -194,7 +216,7 @@ export function PromptsPanel({ trace, spans, onSelectSpan }: PromptsPanelProps) 
             spanNameById={spanNameById}
             isLoadingSpans={isLoading && usage.spanIds.length === 0}
             onSelectSpan={onSelectSpan}
-            projectSlug={projectSlug}
+            onOpenPromptEditor={onOpenPromptEditor}
           />
         ))}
       </VStack>
@@ -410,19 +432,18 @@ function PromptUsageCard({
   spanNameById,
   isLoadingSpans,
   onSelectSpan,
-  projectSlug,
+  onOpenPromptEditor,
 }: {
   usage: PromptUsage;
   spanNameById: Map<string, SpanTreeNode>;
   isLoadingSpans: boolean;
   onSelectSpan: (spanId: string) => void;
-  projectSlug: string | undefined;
+  onOpenPromptEditor: (handle: string) => void;
 }) {
   const { ref, spanIds, variables } = usage;
   const variableEntries = Object.entries(variables).sort(([a], [b]) =>
     a.localeCompare(b),
   );
-  const promptsHref = projectSlug ? `/${projectSlug}/prompts` : null;
 
   return (
     <VStack align="stretch" gap={3} paddingX={4} paddingY={4}>
@@ -448,21 +469,15 @@ function PromptUsageCard({
             </Badge>
           )}
         </HStack>
-        {promptsHref && (
-          <Button
-            as="a"
-            size="xs"
-            variant="ghost"
-            gap={1}
-            // @ts-expect-error chakra `as="a"` widening
-            href={promptsHref}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Icon as={LuExternalLink} boxSize={3} />
-            Open in Prompts
-          </Button>
-        )}
+        <Button
+          size="xs"
+          variant="ghost"
+          gap={1}
+          onClick={() => onOpenPromptEditor(ref.handle)}
+        >
+          <Icon as={LuExternalLink} boxSize={3} />
+          Open prompt
+        </Button>
       </HStack>
 
       {/* Variables */}
@@ -545,7 +560,10 @@ function PromptUsageCard({
           </VStack>
         ) : spanIds.length === 0 ? (
           <Text textStyle="xs" color="fg.subtle">
-            Variables not yet captured for this prompt — span detail still loading.
+            No span on this trace carries data for this prompt. The trace
+            attributes record it, but the spans themselves don&rsquo;t expose
+            the prompt id — likely emitted from a path that bypasses the
+            span attribute.
           </Text>
         ) : (
           <VStack align="stretch" gap={0.5}>

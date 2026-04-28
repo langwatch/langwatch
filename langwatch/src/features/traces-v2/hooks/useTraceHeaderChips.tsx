@@ -9,10 +9,12 @@ import {
   LuTriangleAlert,
 } from "react-icons/lu";
 import type { TraceHeader } from "~/server/api/routers/tracesV2.schemas";
+import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import type { ChipDef } from "../components/TraceDrawer/ChipBar";
 import { useScenarioChipDef } from "../components/TraceDrawer/ScenarioChip";
+import { useFilterStore } from "../stores/filterStore";
 import { parseSdkInfo } from "../utils/sdkInfo";
 
 interface SdkInfoLike {
@@ -78,6 +80,15 @@ export function useTraceHeaderChips(
   { onSelectSpan, onOpenPromptsTab }: UseTraceHeaderChipsOptions,
 ): ChipDef[] {
   const { project } = useOrganizationTeamProject();
+  const toggleFacet = useFilterStore((s) => s.toggleFacet);
+  const { closeDrawer } = useDrawer();
+  // "Add to filter" affordance — pins the value as a facet on the trace
+  // table query and closes the drawer so the user lands on the filtered
+  // result. Used by service / origin / labels chips below.
+  const addToFilter = (field: string, value: string) => () => {
+    toggleFacet(field, value);
+    closeDrawer();
+  };
 
   const scenarioRunId =
     trace.scenarioRunId ?? trace.attributes["scenario.run_id"] ?? null;
@@ -161,6 +172,8 @@ export function useTraceHeaderChips(
           icon: LuServer,
           tone: "neutral",
           priority: 0,
+          onFilter: addToFilter("service", trace.serviceName),
+          filterLabel: `Filter the trace table by service ${trace.serviceName}`,
         }
       : null,
     {
@@ -170,6 +183,8 @@ export function useTraceHeaderChips(
       icon: LuBoxes,
       tone: "neutral",
       priority: 1,
+      onFilter: addToFilter("origin", trace.origin),
+      filterLabel: `Filter the trace table by origin ${trace.origin}`,
     },
     scenarioChip ? { ...scenarioChip, priority: 2 } : null,
     sdkChip ? { ...sdkChip, priority: 3 } : null,

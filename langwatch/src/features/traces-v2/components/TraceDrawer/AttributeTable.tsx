@@ -210,6 +210,12 @@ function FlatRow({
         bg="bg.subtle"
         borderRightWidth="1px"
         borderColor="border.muted"
+        transition="color 0.12s ease, font-weight 0.12s ease"
+        css={{
+          // Strengthen the key column when the row is hovered so the
+          // attribute name reads as the focus, not just a tint change.
+          ".attr-row:hover &": { color: "fg", fontWeight: "semibold" },
+        }}
       >
         {attrKey}
       </Text>

@@ -107,7 +107,7 @@ export const Bubble: React.FC<BubbleProps> = ({
 
   return (
     <Flex
-      align="flex-end"
+      align="center"
       gap={2}
       flexDirection={side === "right" ? "row-reverse" : "row"}
       width="full"
@@ -117,7 +117,6 @@ export const Bubble: React.FC<BubbleProps> = ({
         bg={palette.avatarBg}
         color={palette.avatarFg}
         flexShrink={0}
-        marginBottom="2px"
       >
         <Icon boxSize={compact ? "12px" : "14px"}>{icon}</Icon>
       </Circle>

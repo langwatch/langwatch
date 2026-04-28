@@ -1,6 +1,7 @@
 import { Box, Circle, HStack, Icon, Text } from "@chakra-ui/react";
 import type { ReactNode } from "react";
 import { forwardRef } from "react";
+import { LuFilter } from "react-icons/lu";
 import type { IconType } from "react-icons";
 import { Popover } from "~/components/ui/popover";
 import { Tooltip } from "~/components/ui/tooltip";
@@ -80,6 +81,13 @@ export interface ChipProps {
   maxValueWidth?: string;
   /** Accessible label override. */
   ariaLabel?: string;
+  /**
+   * When set, an "Add to filter" affordance reveals on hover. Stops
+   * propagation so it doesn't compete with the chip's primary onClick.
+   */
+  onFilter?: () => void;
+  /** Tooltip body for the filter affordance — falls back to a sensible default. */
+  filterLabel?: string;
 }
 
 const DEFAULT_VALUE_MAX_WIDTH = "180px";
@@ -101,6 +109,8 @@ export const Chip = forwardRef<HTMLDivElement, ChipProps>(function Chip(
     popover,
     maxValueWidth = DEFAULT_VALUE_MAX_WIDTH,
     ariaLabel,
+    onFilter,
+    filterLabel = "Add to filter on the trace table",
   },
   ref,
 ) {
@@ -124,6 +134,7 @@ export const Chip = forwardRef<HTMLDivElement, ChipProps>(function Chip(
       _hover={isInteractive ? { bg: style.hoverBg } : undefined}
       aria-label={ariaLabel}
       minWidth={0}
+      className="chip-root"
     >
       {dot && <Circle size="6px" bg={dot} flexShrink={0} />}
       {icon && <Icon as={icon} boxSize={3} color={style.fg} flexShrink={0} />}
@@ -160,6 +171,33 @@ export const Chip = forwardRef<HTMLDivElement, ChipProps>(function Chip(
           value
         )}
       </Box>
+      {/* Filter affordance — always visible so the chip clearly advertises
+          that it's a filter handle. Stops propagation so it never triggers
+          the chip's primary onClick (e.g. opening a drawer). */}
+      {onFilter && (
+        <Tooltip content={filterLabel} positioning={{ placement: "top" }}>
+          <Box
+            as="button"
+            onClick={(e: React.MouseEvent) => {
+              e.stopPropagation();
+              onFilter();
+            }}
+            aria-label={filterLabel}
+            display="inline-flex"
+            alignItems="center"
+            justifyContent="center"
+            paddingX={0.5}
+            marginLeft={0.5}
+            borderRadius="sm"
+            cursor="pointer"
+            opacity={0.55}
+            transition="opacity 0.12s ease, background 0.12s ease"
+            _hover={{ opacity: 1, bg: "bg.muted" }}
+          >
+            <Icon as={LuFilter} boxSize={3} color={style.fg} />
+          </Box>
+        </Tooltip>
+      )}
     </HStack>
   );
 

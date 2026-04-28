@@ -14,6 +14,10 @@ import {
   ChevronRight,
   Copy,
   Check,
+  Database,
+  Edit3,
+  Lightbulb,
+  MoreHorizontal,
   Settings2,
 } from "lucide-react";
 import {
@@ -24,6 +28,10 @@ import {
   useRef,
   useState,
 } from "react";
+import { Menu } from "~/components/ui/menu";
+import { Tooltip } from "~/components/ui/tooltip";
+import { useAnnotationCommentStore } from "~/hooks/useAnnotationCommentStore";
+import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { useTraceDrawerNavigation } from "../../hooks/useTraceDrawerNavigation";
@@ -169,7 +177,11 @@ export function ConversationView({
     return buildConversationMarkdown(conversationId, parsedTurns);
   }, [hasViewedMarkdown, conversationId, parsedTurns]);
 
-  if (query.isLoading) {
+  // Only show the skeleton on the very first load. With keepPreviousData
+  // the previous conversation's turns stay rendered while the new query
+  // fetches in the background, so re-clicking a cached conversation no
+  // longer flashes the skeleton.
+  if (query.isLoading && !query.data) {
     return <ConversationSkeleton conversationId={conversationId} />;
   }
 
@@ -562,6 +574,72 @@ const ChatTurnRow = memo<ChatTurnRowProps>(function ChatTurnRow({
   );
 });
 
+const TurnActionsMenu: React.FC<{ turn: TraceListItem }> = ({ turn }) => {
+  const setCommentState = useAnnotationCommentStore((s) => s.setCommentState);
+  const { openDrawer } = useDrawer();
+
+  const stop = (e: React.SyntheticEvent) => e.stopPropagation();
+
+  const handleAnnotate = useCallback(() => {
+    setCommentState({
+      traceId: turn.traceId,
+      action: "new",
+      annotationId: undefined,
+    });
+  }, [setCommentState, turn.traceId]);
+
+  const handleSuggest = useCallback(() => {
+    setCommentState({
+      traceId: turn.traceId,
+      action: "new",
+      annotationId: undefined,
+      expectedOutput: turn.output ?? "",
+      expectedOutputAction: "new",
+    });
+  }, [setCommentState, turn.traceId, turn.output]);
+
+  const handleAddToDataset = useCallback(() => {
+    openDrawer("addDatasetRecord", { traceId: turn.traceId });
+  }, [openDrawer, turn.traceId]);
+
+  return (
+    <Menu.Root>
+      <Tooltip
+        content="Turn actions"
+        positioning={{ placement: "top" }}
+      >
+        <Menu.Trigger asChild>
+          <Button
+            size="2xs"
+            variant="ghost"
+            color="fg.subtle"
+            paddingX={1}
+            minWidth="auto"
+            onClick={stop}
+            aria-label="Turn actions"
+          >
+            <Icon as={MoreHorizontal} boxSize={3} />
+          </Button>
+        </Menu.Trigger>
+      </Tooltip>
+      <Menu.Content minWidth="160px" onClick={stop}>
+        <Menu.Item value="annotate" onClick={handleAnnotate}>
+          <Icon as={Edit3} boxSize={3.5} />
+          Annotate
+        </Menu.Item>
+        <Menu.Item value="suggest" onClick={handleSuggest}>
+          <Icon as={Lightbulb} boxSize={3.5} />
+          Suggest correction
+        </Menu.Item>
+        <Menu.Item value="add-to-dataset" onClick={handleAddToDataset}>
+          <Icon as={Database} boxSize={3.5} />
+          Add to Dataset
+        </Menu.Item>
+      </Menu.Content>
+    </Menu.Root>
+  );
+};
+
 const TurnSeparator: React.FC<{
   index: number;
   turn: TraceListItem;
@@ -674,6 +752,7 @@ const TurnSeparator: React.FC<{
         bg={isCurrent ? "blue.solid" : "border.muted"}
         transition="background 0.12s ease"
       />
+      <TurnActionsMenu turn={turn} />
     </Flex>
   );
 };

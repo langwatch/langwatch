@@ -1,137 +1,84 @@
 import { useMemo } from "react";
-import { Badge, Box, Button, HStack, Icon, Text, VStack } from "@chakra-ui/react";
+import {
+  Badge,
+  Box,
+  Button,
+  HStack,
+  Icon,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
 import { LuCopy, LuExternalLink, LuPencil } from "react-icons/lu";
+import { useDrawer } from "~/hooks/useDrawer";
 import type { SpanDetail } from "~/server/api/routers/tracesV2.schemas";
+import {
+  extractPromptReference,
+  hasPromptMetadata,
+} from "../../utils/promptAttributes";
 
-const PROMPT_PREFIX = "langwatch.prompt.";
-
-export function hasPromptMetadata(
-  params: Record<string, unknown> | null | undefined,
-): boolean {
-  if (!params) return false;
-  return Object.keys(params).some((key) => key.startsWith(PROMPT_PREFIX));
-}
-
-interface PromptData {
-  handle: string | null;
-  versionNumber: number | null;
-  tag: string | null;
-  variables: Record<string, string> | null;
-}
-
-/**
- * Parses prompt reference data from flat span attributes.
- *
- * Supports two formats:
- * 1. Combined: `langwatch.prompt.id = "handle:version_or_tag"`
- * 2. Separate: `langwatch.prompt.handle` + `langwatch.prompt.version.number`
- *
- * Variables use a wrapped JSON format: `{"type":"json","value":{"key":"val"}}`
- */
-function extractPromptData(params: Record<string, unknown>): PromptData {
-  const variables = parsePromptVariables(params);
-
-  // Try combined format first: langwatch.prompt.id = "handle:version_or_tag"
-  const promptId = params["langwatch.prompt.id"];
-  if (typeof promptId === "string" && promptId.includes(":")) {
-    const colonIndex = promptId.lastIndexOf(":");
-    const slug = promptId.substring(0, colonIndex);
-    const suffix = promptId.substring(colonIndex + 1);
-
-    if (slug.length > 0 && suffix.length > 0 && suffix !== "latest") {
-      const parsed = Number(suffix);
-      if (Number.isInteger(parsed) && parsed > 0) {
-        return { handle: slug, versionNumber: parsed, tag: null, variables };
-      }
-      return { handle: slug, versionNumber: null, tag: suffix, variables };
-    }
-
-    if (slug.length > 0) {
-      return { handle: slug, versionNumber: null, tag: null, variables };
-    }
-  }
-
-  // Try old separate format
-  const handle = params["langwatch.prompt.handle"];
-  const versionRaw = params["langwatch.prompt.version.number"];
-
-  if (typeof handle === "string" && handle.length > 0) {
-    if (versionRaw != null) {
-      const version = Number(versionRaw);
-      if (Number.isInteger(version) && version > 0) {
-        return { handle, versionNumber: version, tag: null, variables };
-      }
-    }
-    return { handle, versionNumber: null, tag: null, variables };
-  }
-
-  return { handle: null, versionNumber: null, tag: null, variables };
-}
-
-function parsePromptVariables(
-  params: Record<string, unknown>,
-): Record<string, string> | null {
-  const raw = params["langwatch.prompt.variables"];
-  if (typeof raw !== "string") return null;
-
-  try {
-    const parsed: unknown = JSON.parse(raw);
-    if (typeof parsed !== "object" || parsed === null || !("value" in parsed)) {
-      return null;
-    }
-
-    const value = (parsed as { value: unknown }).value;
-    if (typeof value !== "object" || value === null || Array.isArray(value)) {
-      return null;
-    }
-
-    const result: Record<string, string> = {};
-    for (const [key, val] of Object.entries(value as Record<string, unknown>)) {
-      result[key] = String(val);
-    }
-    return result;
-  } catch {
-    return null;
-  }
-}
+export { hasPromptMetadata };
 
 interface PromptAccordionProps {
   span: SpanDetail;
 }
 
+/**
+ * Span-level prompt panel. Renders whatever's available so the section
+ * pulls its weight even when only some `langwatch.prompt.*` keys made it
+ * onto the span. The trace-level Prompts tab is the rollup view; this is
+ * the per-span deep dive.
+ */
 export function PromptAccordion({ span }: PromptAccordionProps) {
-  const prompt = useMemo(() => {
-    if (!span.params) return null;
-    if (!hasPromptMetadata(span.params)) return null;
-    return extractPromptData(span.params);
-  }, [span]);
+  const { openDrawer } = useDrawer();
+  const ref = useMemo(() => extractPromptReference(span.params), [span]);
 
-  if (!prompt) return null;
-
-  const variableEntries = prompt.variables
-    ? Object.entries(prompt.variables).sort(([a], [b]) => a.localeCompare(b))
+  const variableEntries = ref?.variables
+    ? Object.entries(ref.variables).sort(([a], [b]) => a.localeCompare(b))
     : [];
+
+  // Section visibility is gated upstream by `hasPromptMetadata`, so we
+  // get here whenever any `langwatch.prompt.*` key exists. When the
+  // reference itself didn't parse (variables-only, or a bare slug we
+  // can't parse without a handle key) we still surface the variables —
+  // partial info beats an empty section.
+  if (!ref && variableEntries.length === 0) {
+    return (
+      <Box paddingX={2} paddingY={3}>
+        <Text textStyle="xs" color="fg.muted">
+          Span carries prompt metadata but no parseable handle or variables —
+          likely an incomplete SDK emit.
+        </Text>
+      </Box>
+    );
+  }
+
+  const handle = ref?.handle ?? null;
 
   return (
     <VStack align="stretch" gap={3} paddingY={2}>
-      {/* Header row */}
+      {/* Header */}
       <HStack gap={2} paddingX={2}>
-        <Text textStyle="sm" fontWeight="bold" fontFamily="mono" color="fg">
-          {prompt.handle ?? "Unknown Prompt"}
+        <Text
+          textStyle="sm"
+          fontWeight="bold"
+          fontFamily="mono"
+          color={handle ? "fg" : "fg.muted"}
+        >
+          {handle ?? "Prompt (no handle on span)"}
         </Text>
-        {prompt.versionNumber != null && (
+        {ref?.versionNumber != null && (
           <Badge size="sm" variant="subtle">
-            v{prompt.versionNumber}
+            v{ref.versionNumber}
           </Badge>
         )}
-        {prompt.tag != null && (
+        {ref?.tag != null && (
           <Badge size="sm" variant="outline" colorPalette="blue">
-            {prompt.tag}
+            {ref.tag}
           </Badge>
         )}
       </HStack>
 
-      {/* Variables table */}
+      {/* Variables */}
       {variableEntries.length > 0 && (
         <VStack align="stretch" gap={0}>
           <Text
@@ -171,6 +118,13 @@ export function PromptAccordion({ span }: PromptAccordionProps) {
                   textStyle="xs"
                   fontFamily="mono"
                   color="fg.muted"
+                  transition="color 0.12s ease, font-weight 0.12s ease"
+                  css={{
+                    ".prompt-var-row:hover &": {
+                      color: "fg",
+                      fontWeight: "semibold",
+                    },
+                  }}
                 >
                   {key}
                 </Text>
@@ -203,17 +157,26 @@ export function PromptAccordion({ span }: PromptAccordionProps) {
         </VStack>
       )}
 
-      {/* Actions row */}
-      <HStack gap={1} paddingX={2}>
-        <Button size="xs" variant="ghost" gap={1}>
-          <Icon as={LuExternalLink} boxSize={3} />
-          Open in Playground
-        </Button>
-        <Button size="xs" variant="ghost" gap={1}>
-          <Icon as={LuPencil} boxSize={3} />
-          Edit
-        </Button>
-      </HStack>
+      {/* Actions */}
+      {handle && (
+        <HStack gap={1} paddingX={2}>
+          <Button
+            size="xs"
+            variant="ghost"
+            gap={1}
+            onClick={() => openDrawer("promptEditor", { promptId: handle })}
+          >
+            <Icon as={LuPencil} boxSize={3} />
+            Open prompt
+          </Button>
+          {/* Playground action stays disabled until the playground drawer
+              accepts span input + variables as deep-link params. */}
+          <Button size="xs" variant="ghost" gap={1} disabled>
+            <Icon as={LuExternalLink} boxSize={3} />
+            Open in Playground
+          </Button>
+        </HStack>
+      )}
     </VStack>
   );
 }

@@ -214,6 +214,11 @@ export function DrawerHeader({
         trpcUtils.tracesV2.header.invalidate({ traceId: trace.traceId }),
         trpcUtils.tracesV2.spanTree.invalidate({ traceId: trace.traceId }),
         trpcUtils.tracesV2.evals.invalidate({ traceId: trace.traceId }),
+        // Refreshing inside the drawer should also bring the row in the
+        // underlying table back in sync — without this, fields like
+        // duration / cost / status that the projection just refreshed
+        // stay stale on the table while the drawer shows the latest.
+        trpcUtils.tracesV2.list.invalidate(),
       ]);
     } finally {
       setIsRefreshing(false);
