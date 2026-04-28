@@ -10,6 +10,7 @@ import {
 import { AArrowDown, AArrowUp, ArrowRight, Check } from "lucide-react";
 import { motion } from "motion/react";
 import type React from "react";
+import { useEffect, useRef, useState } from "react";
 import { type Density, useDensityStore } from "../../stores/densityStore";
 import type { WelcomeStepProps } from "./steps";
 
@@ -22,36 +23,64 @@ interface DensityOption {
   rowCount: number;
   rowGap: number;
   rowHeight: number;
+  /** When true, longer content wraps onto a second cramped line below. */
+  wraps: boolean;
 }
 
 const OPTIONS: DensityOption[] = [
   {
     density: "compact",
     label: "Compact",
-    blurb: "Fits more rows on screen.",
+    blurb:
+      "Fits more rows. Long values may wrap or sit tight against the next row.",
     icon: <AArrowDown />,
     accent: "blue",
-    rowCount: 9,
-    rowGap: 4,
+    rowCount: 7,
+    rowGap: 3,
     rowHeight: 6,
+    wraps: true,
   },
   {
     density: "comfortable",
     label: "Comfortable",
-    blurb: "More room around each row.",
+    blurb: "Each row gets a single line and room to breathe.",
     icon: <AArrowUp />,
     accent: "purple",
-    rowCount: 5,
-    rowGap: 10,
+    rowCount: 4,
+    rowGap: 12,
     rowHeight: 10,
+    wraps: false,
   },
 ];
 
 export const DensityChoiceStep: React.FC<WelcomeStepProps> = ({
   markAnswered,
 }) => {
-  const density = useDensityStore((s) => s.density);
+  const initialDensity = useDensityStore((s) => s.density);
   const setDensity = useDensityStore((s) => s.setDensity);
+  const [pending, setPending] = useState<Density>(initialDensity);
+  const pendingRef = useRef(pending);
+  pendingRef.current = pending;
+
+  // The persisted density is already a valid answer — accept it on mount
+  // so a returning user can advance without re-clicking the same option.
+  useEffect(() => {
+    markAnswered();
+  }, [markAnswered]);
+
+  // Commit on unmount so the live view only updates when the user advances
+  // off this step (Next/Dive in/Back), not on every click while choosing.
+  useEffect(
+    () => () => {
+      if (pendingRef.current !== initialDensity) setDensity(pendingRef.current);
+    },
+    [initialDensity, setDensity],
+  );
+
+  const pick = (next: Density) => {
+    setPending(next);
+    markAnswered();
+  };
 
   return (
     <VStack align="stretch" gap={5}>
@@ -60,22 +89,13 @@ export const DensityChoiceStep: React.FC<WelcomeStepProps> = ({
           <DensityCard
             key={option.density}
             option={option}
-            active={density === option.density}
-            onSelect={() => {
-              setDensity(option.density);
-              markAnswered();
-            }}
+            active={pending === option.density}
+            onSelect={() => pick(option.density)}
           />
         ))}
       </SimpleGrid>
 
-      <ToolbarHint
-        density={density}
-        onPick={(next) => {
-          setDensity(next);
-          markAnswered();
-        }}
-      />
+      <ToolbarHint density={pending} onPick={pick} />
     </VStack>
   );
 };
@@ -162,44 +182,64 @@ const DensityCard: React.FC<DensityCardProps> = ({
   </Box>
 );
 
-const DensityPreview: React.FC<{ option: DensityOption }> = ({ option }) => (
-  <Box
-    borderRadius="md"
-    borderWidth="1px"
-    borderColor="border.muted"
-    background="bg.surface"
-    paddingX={3}
-    paddingY={3}
-    height="140px"
-    overflow="hidden"
-  >
-    <VStack align="stretch" gap={`${option.rowGap}px`}>
-      {Array.from({ length: option.rowCount }).map((_, i) => (
-        <HStack key={i} gap={2}>
-          <Box
-            height={`${option.rowHeight}px`}
-            width="22%"
-            borderRadius="sm"
-            bg="border.emphasized"
-            opacity={0.7}
-          />
-          <Box
-            height={`${option.rowHeight}px`}
-            flex={1}
-            borderRadius="sm"
-            bg="border.muted"
-          />
-          <Box
-            height={`${option.rowHeight}px`}
-            width="14%"
-            borderRadius="sm"
-            bg="border.muted"
-          />
-        </HStack>
-      ))}
-    </VStack>
-  </Box>
-);
+const DensityPreview: React.FC<{ option: DensityOption }> = ({ option }) => {
+  // Pick a couple of rows to show as "long content" that wraps in compact mode.
+  const wrapRows = new Set([1, 4]);
+  return (
+    <Box
+      borderRadius="md"
+      borderWidth="1px"
+      borderColor="border.muted"
+      background="bg.surface"
+      paddingX={3}
+      paddingY={3}
+      height="140px"
+      overflow="hidden"
+    >
+      <VStack align="stretch" gap={`${option.rowGap}px`}>
+        {Array.from({ length: option.rowCount }).map((_, i) => {
+          const wraps = option.wraps && wrapRows.has(i);
+          return (
+            <VStack key={i} align="stretch" gap="2px">
+              <HStack gap={2}>
+                <Box
+                  height={`${option.rowHeight}px`}
+                  width="22%"
+                  borderRadius="sm"
+                  bg="border.emphasized"
+                  opacity={0.7}
+                />
+                <Box
+                  height={`${option.rowHeight}px`}
+                  flex={1}
+                  borderRadius="sm"
+                  bg="border.muted"
+                />
+                <Box
+                  height={`${option.rowHeight}px`}
+                  width="14%"
+                  borderRadius="sm"
+                  bg={wraps ? "orange.muted" : "border.muted"}
+                />
+              </HStack>
+              {wraps && (
+                <HStack gap={2} paddingLeft="calc(22% + 8px)">
+                  <Box
+                    height={`${option.rowHeight}px`}
+                    width="55%"
+                    borderRadius="sm"
+                    bg="orange.muted"
+                    opacity={0.6}
+                  />
+                </HStack>
+              )}
+            </VStack>
+          );
+        })}
+      </VStack>
+    </Box>
+  );
+};
 
 interface ToolbarHintProps {
   density: Density;

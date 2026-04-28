@@ -10,12 +10,13 @@ import {
 import {
   AlertTriangle,
   Bot,
+  CheckCircle2,
   Filter,
   LayoutGrid,
   MessageSquare,
   Plus,
-  Server,
-  Users,
+  Sparkles,
+  Timer,
 } from "lucide-react";
 import type React from "react";
 
@@ -32,8 +33,8 @@ const LENSES: Lens[] = [
   {
     icon: <LayoutGrid />,
     accent: "blue",
-    name: "All Traces",
-    desc: "The flat list — no grouping",
+    name: "All",
+    desc: "Flat list of every trace",
   },
   {
     icon: <MessageSquare />,
@@ -45,25 +46,25 @@ const LENSES: Lens[] = [
     icon: <AlertTriangle />,
     accent: "red",
     name: "Errors",
-    desc: "Only traces with errors",
+    desc: "Only traces that errored",
+  },
+  {
+    icon: <Timer />,
+    accent: "orange",
+    name: "Slow requests",
+    desc: "Sorted by duration",
+  },
+  {
+    icon: <CheckCircle2 />,
+    accent: "yellow",
+    name: "Quality review",
+    desc: "Inputs, outputs, and evals",
   },
   {
     icon: <Bot />,
     accent: "purple",
     name: "By Model",
     desc: "Grouped by LLM model",
-  },
-  {
-    icon: <Server />,
-    accent: "cyan",
-    name: "By Service",
-    desc: "Grouped by service name",
-  },
-  {
-    icon: <Users />,
-    accent: "orange",
-    name: "By User",
-    desc: "Grouped by user ID",
   },
 ];
 
@@ -80,6 +81,7 @@ export const WhatAreLensesStep: React.FC<WelcomeStepProps> = () => (
       ))}
     </SimpleGrid>
 
+    <AiLensCallout />
     <BuiltInsCallout />
   </VStack>
 );
@@ -136,6 +138,53 @@ const LensCard: React.FC<Lens> = ({ icon, name, desc, accent }) => (
       </Text>
     </VStack>
   </HStack>
+);
+
+const AiLensCallout: React.FC = () => (
+  <HStack
+    gap={3}
+    align="flex-start"
+    borderRadius="md"
+    paddingX={4}
+    paddingY={3}
+    borderWidth="1px"
+    borderColor="purple.muted"
+    backgroundImage="linear-gradient(135deg, var(--chakra-colors-purple-subtle) 0%, var(--chakra-colors-pink-subtle) 100%)"
+  >
+    <Icon boxSize={4} color="purple.fg" marginTop={0.5}>
+      <Sparkles />
+    </Icon>
+    <VStack align="stretch" gap={1.5}>
+      <Text textStyle="xs" fontWeight="semibold" color="purple.fg">
+        Or describe the lens you want
+      </Text>
+      <Text textStyle="xs" color="fg.muted" lineHeight="1.5">
+        Hit the <InlineSparklesBadge /> in the search bar and ask in plain
+        English — &quot;<i>checkout failures from yesterday, grouped by user</i>
+        &quot;. The AI builds the filter, columns, sort, and grouping; click{" "}
+        <InlineSaveBadge /> to keep it.
+      </Text>
+    </VStack>
+  </HStack>
+);
+
+const InlineSparklesBadge: React.FC = () => (
+  <Box
+    as="span"
+    display="inline-flex"
+    alignItems="center"
+    justifyContent="center"
+    width="18px"
+    height="18px"
+    borderRadius="sm"
+    bg="purple.subtle"
+    color="purple.fg"
+    verticalAlign="middle"
+  >
+    <Icon boxSize={3}>
+      <Sparkles />
+    </Icon>
+  </Box>
 );
 
 const BuiltInsCallout: React.FC = () => (

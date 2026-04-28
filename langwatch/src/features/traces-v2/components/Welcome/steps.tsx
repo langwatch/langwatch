@@ -1,6 +1,7 @@
 import type React from "react";
 import { BetterTogetherStep } from "./BetterTogetherStep";
 import { DensityChoiceStep } from "./DensityChoiceStep";
+import { FilteringStep } from "./FilteringStep";
 import { TryItStep } from "./TryItStep";
 import { WhatAreLensesStep } from "./WhatAreLensesStep";
 import { WhatsChangedStep } from "./WhatsChangedStep";
@@ -30,6 +31,12 @@ export const STEPS: WelcomeStep[] = [
       "Compact fits more rows. Comfortable gives each row more room. You can change it any time.",
     content: DensityChoiceStep,
     requiresAnswer: true,
+  },
+  {
+    title: "Filtering",
+    subtitle:
+      "Tick a facet, type an expression, or just describe it — they all build the same filter.",
+    content: FilteringStep,
   },
   {
     title: "Lenses",

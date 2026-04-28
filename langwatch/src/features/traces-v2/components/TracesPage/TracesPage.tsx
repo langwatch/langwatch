@@ -14,9 +14,15 @@ import { FindBar } from "../FindBar";
 import { SearchBar } from "../SearchBar/SearchBar";
 import { Toolbar } from "../Toolbar/Toolbar";
 import { TraceTable } from "../TraceTable/TraceTable";
+import { PageKeyboardShortcuts } from "./PageKeyboardShortcuts";
 import { useAutoOpenWelcome } from "./useAutoOpenWelcome";
 import { useDebouncedFilterCommit } from "./useDebouncedFilterCommit";
-import { useFindShortcut, useSidebarShortcut } from "./useKeyboardShortcuts";
+import {
+  useDensityToggleShortcut,
+  useFindShortcut,
+  useShortcutsHelpShortcut,
+  useSidebarShortcut,
+} from "./useKeyboardShortcuts";
 
 const SIDEBAR_WIDTH_EXPANDED = "220px";
 const SIDEBAR_WIDTH_COLLAPSED = "40px";
@@ -41,6 +47,8 @@ export const TracesPage: React.FC = () => {
   useAutoOpenWelcome();
   useSidebarShortcut();
   useFindShortcut();
+  useShortcutsHelpShortcut();
+  useDensityToggleShortcut();
 
   const router = useRouter();
   const previewParam = "empty" in router.query;
@@ -80,6 +88,7 @@ export const TracesPage: React.FC = () => {
           <FilterAside dimmed={showEmptyState} />
           {showEmptyState ? <EmptyResultsPane /> : <ResultsPane />}
         </HStack>
+        <PageKeyboardShortcuts />
       </VStack>
     </DensityProvider>
   );

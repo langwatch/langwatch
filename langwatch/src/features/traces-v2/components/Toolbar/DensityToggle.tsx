@@ -1,6 +1,8 @@
-import { Group, IconButton } from "@chakra-ui/react";
+import { Group, HStack, IconButton, Text } from "@chakra-ui/react";
 import { AArrowDown, AArrowUp } from "lucide-react";
 import type React from "react";
+import { Kbd } from "~/components/ops/shared/Kbd";
+import { Tooltip } from "~/components/ui/tooltip";
 import { type Density, useDensityStore } from "../../stores/densityStore";
 
 const OPTIONS: {
@@ -19,22 +21,32 @@ export const DensityToggle: React.FC = () => {
   const setDensity = useDensityStore((s) => s.setDensity);
 
   return (
-    <Group attached>
-      {OPTIONS.map(({ density: value, label, Icon }) => {
-        const isActive = density === value;
-        return (
-          <IconButton
-            key={value}
-            aria-label={label}
-            aria-pressed={isActive}
-            variant={isActive ? "outline" : "solid"}
-            size="xs"
-            onClick={() => setDensity(value)}
-          >
-            <Icon size={12} opacity={isActive ? 1 : INACTIVE_ICON_OPACITY} />
-          </IconButton>
-        );
-      })}
-    </Group>
+    <Tooltip
+      content={
+        <HStack gap={1}>
+          <Text>Density</Text>
+          <Kbd>D</Kbd>
+        </HStack>
+      }
+      positioning={{ placement: "bottom" }}
+    >
+      <Group attached>
+        {OPTIONS.map(({ density: value, label, Icon }) => {
+          const isActive = density === value;
+          return (
+            <IconButton
+              key={value}
+              aria-label={label}
+              aria-pressed={isActive}
+              variant={isActive ? "outline" : "solid"}
+              size="xs"
+              onClick={() => setDensity(value)}
+            >
+              <Icon size={12} opacity={isActive ? 1 : INACTIVE_ICON_OPACITY} />
+            </IconButton>
+          );
+        })}
+      </Group>
+    </Tooltip>
   );
 };

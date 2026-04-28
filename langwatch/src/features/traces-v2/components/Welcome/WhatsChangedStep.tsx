@@ -58,6 +58,8 @@ const PREVIEW_TABS = [
   { label: "All", active: true },
   { label: "Conversations" },
   { label: "Errors" },
+  { label: "Slow requests" },
+  { label: "Quality review" },
   { label: "By Model" },
 ];
 

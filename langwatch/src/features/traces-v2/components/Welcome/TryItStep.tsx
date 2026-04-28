@@ -19,19 +19,60 @@ interface Shortcut {
   label: string;
 }
 
+// Stagger demo kickoffs so the row doesn't flash in unison — each key takes
+// its turn pressing itself.
 const SHORTCUTS: Shortcut[] = [
-  { keys: <Kbd>[</Kbd>, label: "Collapse the filter sidebar" },
+  {
+    keys: (
+      <Kbd demo demoFirstDelayMs={1200}>
+        ?
+      </Kbd>
+    ),
+    label: "Open the nearest shortcut menu",
+  },
+  {
+    keys: (
+      <Kbd demo demoFirstDelayMs={1900}>
+        D
+      </Kbd>
+    ),
+    label: "Toggle compact / comfortable",
+  },
+  {
+    keys: (
+      <Kbd demo demoFirstDelayMs={2600}>
+        [
+      </Kbd>
+    ),
+    label: "Collapse the filter sidebar",
+  },
   {
     keys: (
       <HStack gap={1}>
         <Kbd>⌘</Kbd>
-        <Kbd>F</Kbd>
+        <Kbd demo demoFirstDelayMs={3300}>
+          F
+        </Kbd>
       </HStack>
     ),
     label: "Find inside loaded traces",
   },
-  { keys: <Kbd>O</Kbd>, label: "Open trace in full view" },
-  { keys: <Kbd>Esc</Kbd>, label: "Close the trace drawer" },
+  {
+    keys: (
+      <Kbd demo demoFirstDelayMs={4000}>
+        O
+      </Kbd>
+    ),
+    label: "Open trace in full view",
+  },
+  {
+    keys: (
+      <Kbd demo demoFirstDelayMs={4700}>
+        Esc
+      </Kbd>
+    ),
+    label: "Close the trace drawer",
+  },
 ];
 
 export const TryItStep: React.FC<WelcomeStepProps> = () => (

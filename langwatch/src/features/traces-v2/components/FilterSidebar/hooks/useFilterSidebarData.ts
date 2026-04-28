@@ -1,5 +1,5 @@
 import { useCallback, useMemo } from "react";
-import { getFacetValueState } from "~/server/app-layer/traces/query-language/queryParser";
+import { buildFacetStateLookup } from "~/server/app-layer/traces/query-language/queryParser";
 import { useTraceFacets } from "../../../hooks/useTraceFacets";
 import {
   applyLensOrder,
@@ -40,11 +40,17 @@ export function useFilterSidebarData() {
   const setGroupOrder = useFacetLensStore((s) => s.setGroupOrder);
   const setAllSectionsOpen = useFacetLensStore((s) => s.setAllSectionsOpen);
 
+  // Walk the AST once per identity change to build a flat lookup map.
+  // Every sidebar row used to call `getFacetValueState(ast, field, value)`,
+  // which walked the AST per call → N×M walks per render. With Phase 2's
+  // stable AST identity, this memo only reruns on real query changes.
+  const facetStateLookup = useMemo(() => buildFacetStateLookup(ast), [ast]);
+
   const makeGetValueState = useCallback(
     (field: string) =>
       (value: string): FacetValueState =>
-        getFacetValueState(ast, field, value),
-    [ast],
+        facetStateLookup.get(`${field}|${value}`) ?? "neutral",
+    [facetStateLookup],
   );
 
   const { categoricals, ranges, attributeKeys } = useMemo(

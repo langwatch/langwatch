@@ -10,13 +10,13 @@ import type React from "react";
 import type { TraceEvalResult, TraceListEvent } from "../../../types/trace";
 
 const EVAL_CHIP_COLORS: Record<string, string> = {
-  processed_pass: "green.500",
-  processed_fail: "red.500",
-  processed_neutral: "blue.500",
-  error: "red.500",
-  skipped: "yellow.500",
-  in_progress: "blue.400",
-  scheduled: "gray.400",
+  processed_pass: "green.solid",
+  processed_fail: "red.solid",
+  processed_neutral: "blue.solid",
+  error: "red.solid",
+  skipped: "yellow.solid",
+  in_progress: "blue.solid",
+  scheduled: "gray.solid",
 };
 
 export function evalChipColor(ev: TraceEvalResult): string {
@@ -25,7 +25,7 @@ export function evalChipColor(ev: TraceEvalResult): string {
     if (ev.passed === false) return EVAL_CHIP_COLORS.processed_fail!;
     return EVAL_CHIP_COLORS.processed_neutral!;
   }
-  return EVAL_CHIP_COLORS[ev.status] ?? "gray.400";
+  return EVAL_CHIP_COLORS[ev.status] ?? "gray.solid";
 }
 
 export function formatEvalScore(ev: TraceEvalResult): string | null {
@@ -186,7 +186,7 @@ export const EventBadge: React.FC<{ event: TraceListEvent }> = ({ event }) => (
     bg="bg.panel"
     flexShrink={0}
   >
-    <Circle size="6px" bg="blue.400" flexShrink={0} />
+    <Circle size="6px" bg="blue.solid" flexShrink={0} />
     <Text
       textStyle="2xs"
       fontWeight="medium"

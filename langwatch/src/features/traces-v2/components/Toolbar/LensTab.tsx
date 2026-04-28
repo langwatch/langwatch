@@ -1,7 +1,14 @@
-import { Badge, Box, Input, Tabs } from "@chakra-ui/react";
+import { Box, Input, Tabs } from "@chakra-ui/react";
 import type React from "react";
 import { useState } from "react";
-import { LuCopy, LuPencil, LuSave, LuTrash2, LuUndo2 } from "react-icons/lu";
+import {
+  LuCopy,
+  LuFilePlus,
+  LuPencil,
+  LuSave,
+  LuTrash2,
+  LuUndo2,
+} from "react-icons/lu";
 import { Tooltip } from "~/components/ui/tooltip";
 import {
   MenuContent,
@@ -102,7 +109,7 @@ const DraftDot: React.FC = () => (
     width="6px"
     height="6px"
     borderRadius="full"
-    backgroundColor="blue.500"
+    backgroundColor="orange.solid"
     display="inline-block"
     marginLeft={0.5}
     flexShrink={0}
@@ -110,15 +117,29 @@ const DraftDot: React.FC = () => (
 );
 
 const ErrorBadge: React.FC<{ count: number }> = ({ count }) => (
-  <Badge
-    size="xs"
-    variant="solid"
-    colorPalette="red"
+  <Box
+    as="span"
+    display="inline-flex"
+    alignItems="center"
+    gap={1}
+    marginLeft={1.5}
+    paddingX={1.5}
+    paddingY="1px"
     borderRadius="full"
-    marginLeft={1}
+    bg="red.subtle"
+    color="red.fg"
+    borderWidth="1px"
+    borderColor="red.muted"
+    fontSize="2xs"
+    fontWeight="semibold"
+    lineHeight="1"
+    minWidth="18px"
+    height="16px"
+    justifyContent="center"
+    fontVariantNumeric="tabular-nums"
   >
-    {count}
-  </Badge>
+    {count > 99 ? "99+" : count}
+  </Box>
 );
 
 const RenameInput: React.FC<{
@@ -150,13 +171,35 @@ const RenameInput: React.FC<{
   );
 };
 
+/**
+ * Prompt the user for a new lens name and call `saveAsNewLens` with the
+ * trimmed result. Uses `window.prompt` for now — it sidesteps the awkward
+ * "popover-from-context-menu" interaction and matches the bar of effort the
+ * existing rename flow sets. Replace with a proper inline input later if
+ * we want to polish it.
+ */
+function promptSaveAsNewLens(
+  defaultName: string,
+  saveAsNewLens: (name: string) => string,
+): void {
+  if (typeof window === "undefined") return;
+  const name = window.prompt("Save as new lens — name:", defaultName);
+  if (!name) return;
+  const trimmed = name.trim();
+  if (!trimmed) return;
+  saveAsNewLens(trimmed);
+}
+
 const BuiltInLensMenuItems: React.FC<{
   lensId: string;
   canDelete: boolean;
 }> = ({ lensId, canDelete }) => {
   const isDraft = useViewStore((s) => s.isDraft(lensId));
+  const lensName = useViewStore(
+    (s) => s.allLenses.find((l) => l.id === lensId)?.name ?? "",
+  );
   const revertLens = useViewStore((s) => s.revertLens);
-  const duplicateLens = useViewStore((s) => s.duplicateLens);
+  const saveAsNewLens = useViewStore((s) => s.saveAsNewLens);
   const deleteLens = useViewStore((s) => s.deleteLens);
 
   return (
@@ -169,9 +212,12 @@ const BuiltInLensMenuItems: React.FC<{
         <LuUndo2 />
         Revert
       </MenuItem>
-      <MenuItem value="duplicate" onClick={() => duplicateLens(lensId)}>
-        <LuCopy />
-        Duplicate to save changes
+      <MenuItem
+        value="save-as-new"
+        onClick={() => promptSaveAsNewLens(`${lensName} (copy)`, saveAsNewLens)}
+      >
+        <LuFilePlus />
+        Save as new lens
       </MenuItem>
       <MenuSeparator />
       <MenuItem
@@ -192,8 +238,12 @@ const UserLensMenuItems: React.FC<{
   isDraft: boolean;
   onRename: () => void;
 }> = ({ lensId, isDraft, onRename }) => {
+  const lensName = useViewStore(
+    (s) => s.allLenses.find((l) => l.id === lensId)?.name ?? "",
+  );
   const saveLens = useViewStore((s) => s.saveLens);
   const revertLens = useViewStore((s) => s.revertLens);
+  const saveAsNewLens = useViewStore((s) => s.saveAsNewLens);
   const duplicateLens = useViewStore((s) => s.duplicateLens);
   const deleteLens = useViewStore((s) => s.deleteLens);
 
@@ -219,6 +269,13 @@ const UserLensMenuItems: React.FC<{
       <MenuItem value="rename" onClick={onRename}>
         <LuPencil />
         Rename
+      </MenuItem>
+      <MenuItem
+        value="save-as-new"
+        onClick={() => promptSaveAsNewLens(`${lensName} (copy)`, saveAsNewLens)}
+      >
+        <LuFilePlus />
+        Save as new lens
       </MenuItem>
       <MenuItem value="duplicate" onClick={() => duplicateLens(lensId)}>
         <LuCopy />

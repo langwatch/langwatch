@@ -1,7 +1,7 @@
 import { Box, Circle, Flex, Icon, Text } from "@chakra-ui/react";
 import type React from "react";
 import { Markdown } from "~/components/Markdown";
-import { ReasoningBlock } from "../../../../TraceDrawer/Transcript";
+import { ReasoningBlock } from "../../../../TraceDrawer/transcript";
 
 export type BubbleSide = "left" | "right";
 export type BubbleTone = "user" | "assistant" | "error" | "system";

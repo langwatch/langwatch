@@ -16,14 +16,14 @@ export interface TraceGroup {
 }
 
 export const GROUP_DOT_COLORS = [
-  "blue.400",
-  "green.400",
-  "purple.400",
-  "orange.400",
-  "cyan.400",
-  "pink.400",
-  "teal.400",
-  "yellow.400",
+  "blue.solid",
+  "green.solid",
+  "purple.solid",
+  "orange.solid",
+  "cyan.solid",
+  "pink.solid",
+  "teal.solid",
+  "yellow.solid",
 ] as const;
 
 export function dotColorForIndex(index: number): string {

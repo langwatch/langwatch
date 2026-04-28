@@ -9,10 +9,10 @@ const SSE_STATE_STYLE: Record<
   ConnectionState,
   { dotColor: string; pulse: boolean }
 > = {
-  connected: { dotColor: "green.500", pulse: true },
-  connecting: { dotColor: "yellow.500", pulse: false },
-  error: { dotColor: "red.500", pulse: false },
-  disconnected: { dotColor: "red.500", pulse: false },
+  connected: { dotColor: "green.solid", pulse: true },
+  connecting: { dotColor: "yellow.solid", pulse: false },
+  error: { dotColor: "red.solid", pulse: false },
+  disconnected: { dotColor: "red.solid", pulse: false },
 };
 
 const REFRESH_SPIN_KEYFRAMES = {

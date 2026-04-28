@@ -1,12 +1,9 @@
 import { HStack, Text } from "@chakra-ui/react";
-import {
-  formatCost,
-  formatDuration,
-  formatTokens,
-} from "../../../../../utils/formatters";
+import { formatDuration } from "../../../../../utils/formatters";
 import { MonoCell } from "../../../MonoCell";
 import { StatusDot } from "../../../StatusRow";
 import type { CellDef } from "../../types";
+import { createCostCell, createTokensCell } from "../sharedSummaryCells";
 import type { TraceGroup } from "./types";
 
 export const CountCell: CellDef<TraceGroup> = {
@@ -31,27 +28,9 @@ export const AvgDurationCell: CellDef<TraceGroup> = {
   ),
 };
 
-export const CostCell: CellDef<TraceGroup> = {
-  id: "cost",
-  label: "Cost",
-  render: ({ row }) => <MonoCell>{formatCost(row.totalCost)}</MonoCell>,
-  renderComfortable: ({ row }) => (
-    <Text textStyle="sm" color="fg.muted" textAlign="right">
-      {formatCost(row.totalCost)}
-    </Text>
-  ),
-};
+export const CostCell = createCostCell<TraceGroup>("sm");
 
-export const TokensCell: CellDef<TraceGroup> = {
-  id: "tokens",
-  label: "Tokens",
-  render: ({ row }) => <MonoCell>{formatTokens(row.totalTokens)}</MonoCell>,
-  renderComfortable: ({ row }) => (
-    <Text textStyle="sm" color="fg.muted" textAlign="right">
-      {formatTokens(row.totalTokens)}
-    </Text>
-  ),
-};
+export const TokensCell = createTokensCell<TraceGroup>("sm");
 
 export const ErrorsCell: CellDef<TraceGroup> = {
   id: "errors",

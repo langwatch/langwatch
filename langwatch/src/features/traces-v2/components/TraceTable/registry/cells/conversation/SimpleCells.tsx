@@ -1,15 +1,15 @@
 import { HStack, Text } from "@chakra-ui/react";
 import type { TraceStatus } from "../../../../../types/trace";
-import {
-  abbreviateModel,
-  formatCost,
-  formatDuration,
-  formatTokens,
-} from "../../../../../utils/formatters";
+import { abbreviateModel } from "../../../../../utils/formatters";
 import type { ConversationGroup } from "../../../conversationGroups";
 import { MonoCell } from "../../../MonoCell";
 import { StatusDot, StatusIndicator } from "../../../StatusRow";
 import type { CellDef } from "../../types";
+import {
+  createCostCell,
+  createDurationCell,
+  createTokensCell,
+} from "../sharedSummaryCells";
 
 const STATUS_HEALTH_LABELS: Record<TraceStatus, string> = {
   ok: "Healthy",
@@ -17,38 +17,11 @@ const STATUS_HEALTH_LABELS: Record<TraceStatus, string> = {
   error: "Errors",
 };
 
-export const DurationCell: CellDef<ConversationGroup> = {
-  id: "duration",
-  label: "Duration",
-  render: ({ row }) => <MonoCell>{formatDuration(row.totalDuration)}</MonoCell>,
-  renderComfortable: ({ row }) => (
-    <Text textStyle="xs" color="fg.muted" textAlign="right">
-      {formatDuration(row.totalDuration)}
-    </Text>
-  ),
-};
+export const DurationCell = createDurationCell<ConversationGroup>();
 
-export const CostCell: CellDef<ConversationGroup> = {
-  id: "cost",
-  label: "Cost",
-  render: ({ row }) => <MonoCell>{formatCost(row.totalCost)}</MonoCell>,
-  renderComfortable: ({ row }) => (
-    <Text textStyle="xs" color="fg.muted" textAlign="right">
-      {formatCost(row.totalCost)}
-    </Text>
-  ),
-};
+export const CostCell = createCostCell<ConversationGroup>();
 
-export const TokensCell: CellDef<ConversationGroup> = {
-  id: "tokens",
-  label: "Tokens",
-  render: ({ row }) => <MonoCell>{formatTokens(row.totalTokens)}</MonoCell>,
-  renderComfortable: ({ row }) => (
-    <Text textStyle="xs" color="fg.muted" textAlign="right">
-      {formatTokens(row.totalTokens)}
-    </Text>
-  ),
-};
+export const TokensCell = createTokensCell<ConversationGroup>();
 
 export const ModelCell: CellDef<ConversationGroup> = {
   id: "model",

@@ -155,7 +155,7 @@ export function PatIntegrationInfoCard({
           <Text fontSize="md" fontWeight="semibold" letterSpacing="-0.01em">
             Your access token
           </Text>
-          <Text fontSize="xs" color="orange.500" fontWeight="600">
+          <Text fontSize="xs" color="orange.fg" fontWeight="600">
             Copy this token now. You won&apos;t be able to see it again.
           </Text>
         </VStack>

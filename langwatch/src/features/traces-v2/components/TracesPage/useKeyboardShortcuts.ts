@@ -1,4 +1,6 @@
 import { useEffect } from "react";
+import { useDensityStore } from "../../stores/densityStore";
+import { useDrawerStore } from "../../stores/drawerStore";
 import { useFindStore } from "../../stores/findStore";
 import { useUIStore } from "../../stores/uiStore";
 
@@ -52,4 +54,44 @@ export const useFindShortcut = (): void => {
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [isOpen, open, close]);
+};
+
+/**
+ * `?` toggles the page-level keyboard shortcut help. When the trace drawer is
+ * open, the drawer's own `?` handler owns this key — we bail so the user
+ * always gets the menu closest to whatever they're focused on.
+ */
+export const useShortcutsHelpShortcut = (): void => {
+  const toggle = useUIStore((s) => s.toggleShortcutsHelp);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== "?" || isTextInput(e.target)) return;
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      // Drawer owns `?` while open — its handler will fire first.
+      if (useDrawerStore.getState().isOpen) return;
+      e.preventDefault();
+      toggle();
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [toggle]);
+};
+
+/** `D` flips between compact and comfortable density. */
+export const useDensityToggleShortcut = (): void => {
+  const setDensity = useDensityStore((s) => s.setDensity);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== "d" && e.key !== "D") return;
+      if (isTextInput(e.target)) return;
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      e.preventDefault();
+      const current = useDensityStore.getState().density;
+      setDensity(current === "compact" ? "comfortable" : "compact");
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [setDensity]);
 };

@@ -27,7 +27,7 @@ export function makeEventCellDef(name: string): CellDef<TraceListItem> {
       }
       return (
         <HStack gap={1.5}>
-          <Circle size="8px" bg="blue.400" flexShrink={0} />
+          <Circle size="8px" bg="blue.solid" flexShrink={0} />
           <Text textStyle="sm" color="fg.muted">
             {count}
           </Text>
