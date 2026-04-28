@@ -50,7 +50,8 @@ import {
 
 export type { TraceSummaryData };
 
-const COMPUTED_IO_SCHEMA_VERSION = "2025-12-18" as const;
+// 2026-04-28: trim trailing assistant from chat-shaped input
+const COMPUTED_IO_SCHEMA_VERSION = "2026-04-28" as const;
 
 const AI_SPAN_TYPES = new Set(["llm", "agent", "tool", "rag"]);
 

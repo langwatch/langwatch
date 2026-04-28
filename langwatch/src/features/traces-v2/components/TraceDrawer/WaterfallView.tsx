@@ -237,7 +237,11 @@ export function WaterfallView({
   const isDraggingDivider = useRef(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const treeScrollRef = useRef<HTMLDivElement>(null);
-  const timelineScrollRef = useRef<HTMLDivElement>(null);
+  // Timeline panel does not scroll natively. The tree is the only real scroller;
+  // the timeline content's `transform: translateY(...)` follows it, which keeps
+  // the two sides perfectly synced (no two-scroller fight, no momentum-scroll
+  // race) and avoids the per-frame `scrollTop` write that used to lag.
+  const timelineContentRef = useRef<HTMLDivElement>(null);
 
   const tree = useMemo(() => buildTree(spans), [spans]);
   const flatRows = useMemo(
@@ -328,28 +332,22 @@ export function WaterfallView({
     overscan: 15,
   });
 
-  // Synchronized scrolling: tree drives timeline
-  const syncingScroll = useRef(false);
+  // Tree drives the timeline via a compositor-only `transform`. Writing the
+  // style imperatively here (no React re-render) means the timeline tracks the
+  // tree within the same frame the scroll event fires.
   const handleTreeScroll = useCallback(() => {
-    if (syncingScroll.current) return;
-    syncingScroll.current = true;
-    if (treeScrollRef.current && timelineScrollRef.current) {
-      timelineScrollRef.current.scrollTop = treeScrollRef.current.scrollTop;
-    }
-    requestAnimationFrame(() => {
-      syncingScroll.current = false;
-    });
+    const tree = treeScrollRef.current;
+    const timeline = timelineContentRef.current;
+    if (!tree || !timeline) return;
+    timeline.style.transform = `translateY(${-tree.scrollTop}px)`;
   }, []);
 
-  const handleTimelineScroll = useCallback(() => {
-    if (syncingScroll.current) return;
-    syncingScroll.current = true;
-    if (treeScrollRef.current && timelineScrollRef.current) {
-      treeScrollRef.current.scrollTop = timelineScrollRef.current.scrollTop;
-    }
-    requestAnimationFrame(() => {
-      syncingScroll.current = false;
-    });
+  // The timeline panel itself doesn't scroll. Forward wheel/trackpad gestures
+  // over it to the tree so users can scroll from either side.
+  const handleTimelineWheel = useCallback((e: React.WheelEvent) => {
+    const tree = treeScrollRef.current;
+    if (!tree) return;
+    tree.scrollTop += e.deltaY;
   }, []);
 
   // Resizable divider
@@ -629,24 +627,21 @@ export function WaterfallView({
           })}
         </Flex>
 
-        {/* Timeline rows (virtualized, synced with tree) */}
+        {/* Timeline rows — driven by the tree's scroll position via transform.
+            No native scrollbar here; wheel events delegate to the tree. */}
         <Box
-          ref={timelineScrollRef}
           flex={1}
-          overflowY="auto"
-          overflowX="hidden"
+          overflow="hidden"
           position="relative"
-          onScroll={handleTimelineScroll}
-          css={{
-            "&::-webkit-scrollbar": { width: "4px" },
-            "&::-webkit-scrollbar-thumb": {
-              borderRadius: "4px",
-              background: "var(--chakra-colors-border-muted)",
-            },
-            "&::-webkit-scrollbar-track": { background: "transparent" },
-          }}
+          onWheel={handleTimelineWheel}
         >
-          <Box position="relative" height={`${virtualizer.getTotalSize()}px`} width="full">
+          <Box
+            ref={timelineContentRef}
+            position="relative"
+            height={`${virtualizer.getTotalSize()}px`}
+            width="full"
+            style={{ willChange: "transform" }}
+          >
             {/* Vertical grid lines */}
             <Box position="absolute" inset={0} pointerEvents="none" zIndex={0}>
               {timeMarkers.map((ms, idx) => {
