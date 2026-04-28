@@ -80,6 +80,17 @@ func NewDeps(ctx context.Context, cfg Config) (context.Context, *Deps, error) {
 		HealthURL: cfg.Child.HealthURL,
 		Disabled:  cfg.Child.Bypass,
 		Logger:    logger,
+		// StartTimeout is the wall-clock budget for the python child to
+		// respond 200 to /health from spawn. The default Manager value
+		// (30s) is fine on dev hardware but too tight on AWS Lambda
+		// 1024MB (≈1 vCPU): empirical lw-dev probes show the child
+		// being SIGKILL'd at 30s with the litellm + langwatch_nlp
+		// imports still in flight, leaving the proxy with no upstream
+		// to dial. Bumping to 120s covers Lambda's slower CPU plus any
+		// freeze-during-init interaction; well under the 900s function
+		// timeout. Once the child is healthy this knob is not on the
+		// hot path — it's a one-time cold-start budget.
+		StartTimeout: 120 * time.Second,
 	})
 
 	probes.RegisterReadiness("uvicorn_child", func() (bool, string) {
