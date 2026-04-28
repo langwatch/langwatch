@@ -16,7 +16,7 @@ import { EventBus } from "./event-bus.ts";
 import { startLangevals } from "./langevals.ts";
 import { startLangwatch } from "./langwatch.ts";
 import { startLangwatchWorkers } from "./langwatch-workers.ts";
-import { startLangwatchNlp } from "./langwatch-nlp.ts";
+import { startNlpgo } from "./nlpgo.ts";
 import { runMigrations } from "./migrate.ts";
 import { ensureLangwatchDeps } from "./node-deps.ts";
 import { startPostgres } from "./postgres.ts";
@@ -91,8 +91,14 @@ const runtimeImpl: RuntimeApi = {
     const childEnv = { ...envFromFile, ...ctx.userEnv };
 
     try {
+      // Start aigateway BEFORE nlpgo because both share the same monobinary
+      // (cmd/service dispatcher); with the predep-resolved binary already
+      // exec'd as `aigateway`, nlpgo just spawns the same file with `nlpgo`
+      // arg. They listen on different ports — no collision. Done in one
+      // Promise.all so total wallclock is still bounded by the slowest
+      // service.
       const [nlp, langevals, gw, lw] = await Promise.all([
-        startLangwatchNlp(ctx, bus, childEnv),
+        startNlpgo(ctx, bus, childEnv),
         startLangevals(ctx, bus, childEnv),
         startAigateway(ctx, bus, envFromFile),
         startLangwatch(ctx, bus, childEnv),

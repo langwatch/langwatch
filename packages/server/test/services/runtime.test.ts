@@ -29,7 +29,7 @@ function makeStub(name: string, durationMs = 1) {
 const postgresStub = makeStub("postgres");
 const redisStub = makeStub("redis");
 const clickhouseStub = makeStub("clickhouse");
-const nlpStub = makeStub("langwatch_nlp");
+const nlpStub = makeStub("nlpgo");
 const langevalsStub = makeStub("langevals");
 const gatewayStub = makeStub("aigateway");
 const langwatchStub = makeStub("langwatch");
@@ -50,7 +50,7 @@ const ensureAppDirFn = vi.fn(async () => {
 vi.mock("../../src/services/postgres.ts", () => ({ startPostgres: postgresStub.fn }));
 vi.mock("../../src/services/redis.ts", () => ({ startRedis: redisStub.fn }));
 vi.mock("../../src/services/clickhouse.ts", () => ({ startClickhouse: clickhouseStub.fn }));
-vi.mock("../../src/services/langwatch-nlp.ts", () => ({ startLangwatchNlp: nlpStub.fn }));
+vi.mock("../../src/services/nlpgo.ts", () => ({ startNlpgo: nlpStub.fn }));
 vi.mock("../../src/services/langevals.ts", () => ({ startLangevals: langevalsStub.fn }));
 vi.mock("../../src/services/aigateway.ts", () => ({ startAigateway: gatewayStub.fn }));
 vi.mock("../../src/services/langwatch.ts", () => ({ startLangwatch: langwatchStub.fn }));
@@ -171,7 +171,7 @@ describe("services/runtime", () => {
       // Migrations strictly after infra healthy.
       expect(positions["migrate"]).toBeGreaterThan(infraEnd);
       // App tier strictly after migrations.
-      expect(positions["start:langwatch_nlp"]).toBeGreaterThan(positions["migrate"]!);
+      expect(positions["start:nlpgo"]).toBeGreaterThan(positions["migrate"]!);
       expect(positions["start:langevals"]).toBeGreaterThan(positions["migrate"]!);
       expect(positions["start:aigateway"]).toBeGreaterThan(positions["migrate"]!);
       expect(positions["start:langwatch"]).toBeGreaterThan(positions["migrate"]!);
@@ -197,7 +197,7 @@ describe("services/runtime", () => {
       // First stopped should be langwatch (last started); last stopped should be one of the infra.
       const firstStopped = stopOrder[0]!.replace("stop:", "");
       const lastStopped = stopOrder[stopOrder.length - 1]!.replace("stop:", "");
-      expect(["langwatch", "aigateway", "langevals", "langwatch_nlp"]).toContain(firstStopped);
+      expect(["langwatch", "aigateway", "langevals", "nlpgo"]).toContain(firstStopped);
       expect(["postgres", "redis", "clickhouse"]).toContain(lastStopped);
     });
 
@@ -257,7 +257,7 @@ describe("services/runtime", () => {
           "postgres",
           "redis",
           "clickhouse",
-          "langwatch_nlp",
+          "nlpgo",
           "langevals",
           "aigateway",
           "langwatch",
