@@ -13,6 +13,7 @@ import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-node";
 import { setupObservability } from "langwatch/observability/node";
 
 const explicitEndpoint = process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
+const langwatchTracingEnabled = !!process.env.LANGWATCH_API_KEY;
 
 const spanProcessors = [] as Array<BatchSpanProcessor>;
 const logRecordProcessors = [] as Array<BatchLogRecordProcessor>;
@@ -40,9 +41,13 @@ if (explicitEndpoint) {
 	}
 }
 
-if (spanProcessors.length > 0 || logRecordProcessors.length > 0) {
+if (
+	spanProcessors.length > 0 ||
+	logRecordProcessors.length > 0 ||
+	langwatchTracingEnabled
+) {
 	setupObservability({
-		langwatch: "disabled",
+		langwatch: langwatchTracingEnabled ? undefined : "disabled",
 		attributes: {
 			"service.name": "langwatch-backend",
 			"deployment.environment": process.env.ENVIRONMENT,
