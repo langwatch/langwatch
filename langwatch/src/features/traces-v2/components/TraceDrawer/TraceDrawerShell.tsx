@@ -1,5 +1,5 @@
 import { Box, Skeleton, VStack } from "@chakra-ui/react";
-import { motion } from "motion/react";
+import { AnimatePresence, motion } from "motion/react";
 import {
   lazy,
   Suspense,
@@ -408,12 +408,11 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
         case "ArrowRight":
         case "j":
         case "J": {
-          if (navLockedRef.current) {
-            e.preventDefault();
-            break;
-          }
+          // Always claim the key so it doesn't bubble (otherwise an end-of-
+          // thread press fell through to other handlers / browser nav).
+          e.preventDefault();
+          if (navLockedRef.current) break;
           if (threadContext.next) {
-            e.preventDefault();
             navigateToTrace({
               fromTraceId: trace.traceId,
               fromViewMode: viewMode,
@@ -426,12 +425,9 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
         case "ArrowLeft":
         case "k":
         case "K": {
-          if (navLockedRef.current) {
-            e.preventDefault();
-            break;
-          }
+          e.preventDefault();
+          if (navLockedRef.current) break;
           if (threadContext.previous) {
-            e.preventDefault();
             navigateToTrace({
               fromTraceId: trace.traceId,
               fromViewMode: viewMode,
@@ -810,41 +806,55 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
                         }
                       />
 
-                      {activeTab === "llm" ? (
-                        <Suspense
-                          fallback={
-                            <VStack align="stretch" gap={2} padding={4}>
-                              <Skeleton height="40px" borderRadius="md" />
-                              <Skeleton height="120px" borderRadius="md" />
-                            </VStack>
-                          }
+                      {/* Crossfade between Trace / LLM / Prompts panels.
+                          Quick slip-up + fade — same vocabulary as the
+                          conversation context strip so tab switches feel
+                          like part of the same motion language. */}
+                      <AnimatePresence mode="wait" initial={false}>
+                        <motion.div
+                          key={activeTab}
+                          initial={{ opacity: 0, y: 6 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -4 }}
+                          transition={{ duration: 0.16, ease: "easeOut" }}
                         >
-                          <LlmPanel trace={trace} spans={spanTree} />
-                        </Suspense>
-                      ) : activeTab === "prompts" ? (
-                        <Suspense
-                          fallback={
-                            <VStack align="stretch" gap={2} padding={4}>
-                              <Skeleton height="40px" borderRadius="md" />
-                              <Skeleton height="60px" borderRadius="md" />
-                            </VStack>
-                          }
-                        >
-                          <PromptsPanel
-                            trace={trace}
-                            spans={spanTree}
-                            onSelectSpan={handleSelectSpan}
-                          />
-                        </Suspense>
-                      ) : (
-                        <TraceAccordions
-                          trace={trace}
-                          spans={spanTree}
-                          selectedSpan={selectedSpan}
-                          activeTab={activeTab}
-                          onSelectSpan={handleSelectSpan}
-                        />
-                      )}
+                          {activeTab === "llm" ? (
+                            <Suspense
+                              fallback={
+                                <VStack align="stretch" gap={2} padding={4}>
+                                  <Skeleton height="40px" borderRadius="md" />
+                                  <Skeleton height="120px" borderRadius="md" />
+                                </VStack>
+                              }
+                            >
+                              <LlmPanel trace={trace} spans={spanTree} />
+                            </Suspense>
+                          ) : activeTab === "prompts" ? (
+                            <Suspense
+                              fallback={
+                                <VStack align="stretch" gap={2} padding={4}>
+                                  <Skeleton height="40px" borderRadius="md" />
+                                  <Skeleton height="60px" borderRadius="md" />
+                                </VStack>
+                              }
+                            >
+                              <PromptsPanel
+                                trace={trace}
+                                spans={spanTree}
+                                onSelectSpan={handleSelectSpan}
+                              />
+                            </Suspense>
+                          ) : (
+                            <TraceAccordions
+                              trace={trace}
+                              spans={spanTree}
+                              selectedSpan={selectedSpan}
+                              activeTab={activeTab}
+                              onSelectSpan={handleSelectSpan}
+                            />
+                          )}
+                        </motion.div>
+                      </AnimatePresence>
                     </VStack>
                   )}
                 </motion.div>
