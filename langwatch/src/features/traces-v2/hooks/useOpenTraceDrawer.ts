@@ -30,6 +30,13 @@ function listItemToHeader(item: TraceListItem): TraceHeader {
     rootSpanName: item.rootSpanName ?? null,
     rootSpanType: item.rootSpanType ?? null,
     scenarioRunId: null,
+    containsPrompt: false,
+    selectedPromptId: null,
+    selectedPromptSpanId: null,
+    lastUsedPromptId: null,
+    lastUsedPromptVersionNumber: null,
+    lastUsedPromptVersionId: null,
+    lastUsedPromptSpanId: null,
     attributes: {},
     events: (item.events ?? []).map((e) => ({
       spanId: e.spanId,
