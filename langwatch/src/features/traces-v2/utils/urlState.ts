@@ -23,26 +23,40 @@ export interface FragmentState {
   overrides: BarStateOverrides;
 }
 
-const VALID_GROUPINGS: ReadonlyArray<GroupingMode> = [
+const VALID_GROUPINGS: ReadonlySet<GroupingMode> = new Set([
   "flat",
   "by-session",
   "by-service",
   "by-user",
   "by-model",
-];
+]);
+
+function isGroupingMode(value: string): value is GroupingMode {
+  return VALID_GROUPINGS.has(value as GroupingMode);
+}
 
 function parseSort(value: string): SortConfig | undefined {
-  const [columnId, direction] = value.split(":");
+  const colonAt = value.indexOf(":");
+  if (colonAt < 0) return undefined;
+  const columnId = value.slice(0, colonAt);
+  const direction = value.slice(colonAt + 1);
   if (!columnId || (direction !== "asc" && direction !== "desc")) {
     return undefined;
   }
   return { columnId, direction };
 }
 
-function parseGrouping(value: string): GroupingMode | undefined {
-  return VALID_GROUPINGS.includes(value as GroupingMode)
-    ? (value as GroupingMode)
-    : undefined;
+function safeDecode(value: string): string | null {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return null;
+  }
+}
+
+function parseFinitePositiveInt(value: string): number | undefined {
+  const n = Number(value);
+  return Number.isFinite(n) && n > 0 ? n : undefined;
 }
 
 export function parseFragment(fragment: string): FragmentState | null {
@@ -50,22 +64,18 @@ export function parseFragment(fragment: string): FragmentState | null {
   if (!trimmed) return null;
 
   const [lensIdRaw, paramString] = trimmed.split("?", 2);
-  let lensId: string;
-  try {
-    lensId = decodeURIComponent(lensIdRaw ?? "");
-  } catch {
-    return null;
-  }
+  const lensId = safeDecode(lensIdRaw ?? "");
   if (!lensId) return null;
 
   const overrides: BarStateOverrides = {};
   if (paramString) {
     const params = new URLSearchParams(paramString);
+
     const q = params.get("q");
     if (q !== null) overrides.query = q;
 
     const preset = params.get("preset");
-    if (preset !== null && preset.length > 0) {
+    if (preset) {
       overrides.preset = preset;
     } else {
       const from = params.get("from");
@@ -82,24 +92,18 @@ export function parseFragment(fragment: string): FragmentState | null {
 
     const page = params.get("page");
     if (page !== null) {
-      const pageN = Number(page);
-      if (Number.isFinite(pageN) && pageN > 0) overrides.page = pageN;
+      const parsed = parseFinitePositiveInt(page);
+      if (parsed !== undefined) overrides.page = parsed;
     }
 
     const cols = params.get("cols");
     if (cols !== null) {
-      const list = cols
-        .split(",")
-        .map((c) => c.trim())
-        .filter(Boolean);
+      const list = cols.split(",").map((c) => c.trim()).filter(Boolean);
       if (list.length > 0) overrides.columns = list;
     }
 
     const group = params.get("group");
-    if (group !== null) {
-      const parsed = parseGrouping(group);
-      if (parsed) overrides.grouping = parsed;
-    }
+    if (group && isGroupingMode(group)) overrides.grouping = group;
 
     const sort = params.get("sort");
     if (sort !== null) {
@@ -122,7 +126,7 @@ interface ComputeOverridesInput {
   sort: SortConfig;
 }
 
-function arraysEqual(a: string[], b: string[]): boolean {
+function arraysEqual(a: readonly string[], b: readonly string[]): boolean {
   if (a.length !== b.length) return false;
   for (let i = 0; i < a.length; i++) {
     if (a[i] !== b[i]) return false;
@@ -179,10 +183,7 @@ export function buildFragment(
   if (overrides.columns) params.set("cols", overrides.columns.join(","));
   if (overrides.grouping) params.set("group", overrides.grouping);
   if (overrides.sort) {
-    params.set(
-      "sort",
-      `${overrides.sort.columnId}:${overrides.sort.direction}`,
-    );
+    params.set("sort", `${overrides.sort.columnId}:${overrides.sort.direction}`);
   }
   const encodedLens = encodeURIComponent(lensId);
   const paramStr = params.toString();
@@ -190,5 +191,6 @@ export function buildFragment(
 }
 
 export function isOverridesEmpty(overrides: BarStateOverrides): boolean {
-  return Object.keys(overrides).length === 0;
+  for (const _ in overrides) return false;
+  return true;
 }

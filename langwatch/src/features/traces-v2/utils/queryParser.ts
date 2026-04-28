@@ -20,21 +20,20 @@ import {
   serialize as liqeSerialize,
   SyntaxError as LiqeSyntaxError,
   type LiqeQuery,
-  type TagToken,
-  type UnaryOperatorToken,
-  type LogicalExpressionToken,
-  type ParenthesizedExpressionToken,
 } from "liqe";
 
-export type { LiqeQuery, TagToken, UnaryOperatorToken };
-
-// Re-export parse/serialize with error handling
+export type { LiqeQuery };
 export { liqeSerialize as serialize };
+
+const EMPTY_AST: LiqeQuery = {
+  type: "EmptyExpression",
+  location: { start: 0, end: 0 },
+};
 
 export class ParseError extends Error {
   constructor(
     message: string,
-    public position?: number,
+    public readonly position?: number,
   ) {
     super(message);
     this.name = "ParseError";
@@ -43,9 +42,7 @@ export class ParseError extends Error {
 
 export function parse(query: string): LiqeQuery {
   const trimmed = query.trim();
-  if (trimmed.length === 0) {
-    return { type: "EmptyExpression", location: { start: 0, end: 0 } };
-  }
+  if (trimmed.length === 0) return EMPTY_AST;
   try {
     return liqeParse(trimmed);
   } catch (e) {
@@ -62,8 +59,6 @@ export function isEmptyAST(ast: LiqeQuery): boolean {
   return ast.type === "EmptyExpression";
 }
 
-// ─── Known search fields ──────────────────────────────────────────────────────
-
 export interface SearchFieldMeta {
   label: string;
   hasSidebar: boolean;
@@ -71,51 +66,22 @@ export interface SearchFieldMeta {
   valueType: "categorical" | "range" | "text" | "existence";
 }
 
-export const SEARCH_FIELDS: Record<string, SearchFieldMeta> = {
-  origin: {
-    label: "Origin",
-    hasSidebar: true,
-    facetField: "origin",
-    valueType: "categorical",
-  },
-  status: {
-    label: "Status",
-    hasSidebar: true,
-    facetField: "status",
-    valueType: "categorical",
-  },
-  model: {
-    label: "Model",
-    hasSidebar: true,
-    facetField: "model",
-    valueType: "categorical",
-  },
-  service: {
-    label: "Service",
-    hasSidebar: true,
-    facetField: "service",
-    valueType: "categorical",
-  },
-  cost: {
-    label: "Cost",
-    hasSidebar: true,
-    facetField: "cost",
-    valueType: "range",
-  },
-  duration: {
-    label: "Duration",
-    hasSidebar: true,
-    facetField: "duration",
-    valueType: "range",
-  },
-  tokens: {
-    label: "Tokens",
-    hasSidebar: true,
-    facetField: "tokens",
-    valueType: "range",
-  },
+export const SEARCH_FIELDS: Readonly<Record<string, SearchFieldMeta>> = {
+  origin: { label: "Origin", hasSidebar: true, facetField: "origin", valueType: "categorical" },
+  status: { label: "Status", hasSidebar: true, facetField: "status", valueType: "categorical" },
+  model: { label: "Model", hasSidebar: true, facetField: "model", valueType: "categorical" },
+  service: { label: "Service", hasSidebar: true, facetField: "service", valueType: "categorical" },
+  cost: { label: "Cost", hasSidebar: true, facetField: "cost", valueType: "range" },
+  duration: { label: "Duration", hasSidebar: true, facetField: "duration", valueType: "range" },
+  tokens: { label: "Tokens", hasSidebar: true, facetField: "tokens", valueType: "range" },
   user: { label: "User", hasSidebar: false, valueType: "text" },
   conversation: { label: "Conversation", hasSidebar: false, valueType: "text" },
+  scenario: { label: "Scenario", hasSidebar: false, valueType: "text" },
+  scenarioRun: { label: "Scenario run", hasSidebar: false, valueType: "text" },
+  scenarioSet: { label: "Scenario set", hasSidebar: false, valueType: "text" },
+  scenarioBatch: { label: "Scenario batch", hasSidebar: false, valueType: "text" },
+  scenarioVerdict: { label: "Scenario verdict", hasSidebar: false, valueType: "categorical" },
+  scenarioStatus: { label: "Scenario status", hasSidebar: false, valueType: "categorical" },
   has: { label: "Has", hasSidebar: false, valueType: "existence" },
   none: { label: "None", hasSidebar: false, valueType: "existence" },
   event: { label: "Event", hasSidebar: false, valueType: "text" },
@@ -123,10 +89,19 @@ export const SEARCH_FIELDS: Record<string, SearchFieldMeta> = {
   trace: { label: "Trace", hasSidebar: false, valueType: "text" },
 };
 
-export const FIELD_NAMES = Object.keys(SEARCH_FIELDS);
+/** Field names whose tokens render with the scenario accent in the search bar. */
+export const SCENARIO_FIELDS: ReadonlySet<string> = new Set([
+  "scenario",
+  "scenarioRun",
+  "scenarioSet",
+  "scenarioBatch",
+  "scenarioVerdict",
+  "scenarioStatus",
+]);
 
-/** Known values for autocomplete suggestions */
-const HAS_NONE_VALUES = [
+export const FIELD_NAMES: ReadonlyArray<string> = Object.keys(SEARCH_FIELDS);
+
+const HAS_NONE_VALUES: string[] = [
   "error",
   "eval",
   "feedback",
@@ -138,14 +113,24 @@ const HAS_NONE_VALUES = [
   "label",
 ];
 
+/** Known values for autocomplete suggestions. */
 export const FIELD_VALUES: Record<string, string[]> = {
   status: ["error", "warning", "ok"],
   origin: ["application", "simulation", "evaluation"],
   has: HAS_NONE_VALUES,
   none: HAS_NONE_VALUES,
+  scenarioVerdict: ["success", "failure", "inconclusive"],
+  scenarioStatus: [
+    "running",
+    "success",
+    "failed",
+    "error",
+    "cancelled",
+    "stalled",
+    "pending",
+    "queued",
+  ],
 };
-
-// ─── AST walking utilities ────────────────────────────────────────────────────
 
 export type FacetState = "neutral" | "include" | "exclude";
 
@@ -165,19 +150,17 @@ export function getFacetValues(
     if (node.field.type === "ImplicitField") return;
     if (node.field.name !== fieldName) return;
     if (node.expression.type !== "LiteralExpression") return;
-
-    const val = String(node.expression.value);
+    const value = String(node.expression.value);
     if (negated) {
-      exclude.push(val);
+      exclude.push(value);
     } else {
-      include.push(val);
+      include.push(value);
     }
   });
 
   return { include, exclude };
 }
 
-/** Get the state of a specific facet value */
 export function getFacetValueState(
   ast: LiqeQuery,
   fieldName: string,
@@ -189,7 +172,10 @@ export function getFacetValueState(
   return "neutral";
 }
 
-/** Get a range value from the AST for a field */
+/**
+ * Get a range value for a field. Last matching node wins — the AST is
+ * expected to hold a single range/comparison per field after a setRange call.
+ */
 export function getRangeValue(
   ast: LiqeQuery,
   fieldName: string,
@@ -207,50 +193,41 @@ export function getRangeValue(
         from: node.expression.range.min,
         to: node.expression.range.max,
       };
-    } else if (
-      node.expression.type === "LiteralExpression" &&
-      node.operator.operator !== ":"
-    ) {
-      const val =
-        typeof node.expression.value === "number"
-          ? node.expression.value
-          : parseFloat(String(node.expression.value));
-      if (node.operator.operator === ":>") result = { from: val };
-      if (node.operator.operator === ":<") result = { to: val };
-      if (node.operator.operator === ":>=") result = { from: val };
-      if (node.operator.operator === ":<=") result = { to: val };
+      return;
     }
+
+    if (node.expression.type !== "LiteralExpression") return;
+    const op = node.operator.operator;
+    if (op === ":") return;
+    const raw = node.expression.value;
+    const num = typeof raw === "number" ? raw : parseFloat(String(raw));
+    if (!Number.isFinite(num)) return;
+    if (op === ":>" || op === ":>=") result = { from: num };
+    else if (op === ":<" || op === ":<=") result = { to: num };
   });
 
   return result;
 }
 
-/** Check if there's a cross-facet OR at the top level */
+/** Check if there's a cross-facet OR at the top level (or recursively). */
 export function hasCrossFacetOR(ast: LiqeQuery): boolean {
   if (ast.type !== "LogicalExpression") return false;
-  const logExpr = ast as LogicalExpressionToken;
-  if (logExpr.operator.operator !== "OR") return false;
-
-  const leftField = getTopField(logExpr.left);
-  const rightField = getTopField(logExpr.right);
+  if (ast.operator.operator !== "OR") {
+    return hasCrossFacetOR(ast.left) || hasCrossFacetOR(ast.right);
+  }
+  const leftField = getTopField(ast.left);
+  const rightField = getTopField(ast.right);
   if (leftField && rightField && leftField !== rightField) return true;
-
-  // Recurse
-  return hasCrossFacetOR(logExpr.left) || hasCrossFacetOR(logExpr.right);
+  return hasCrossFacetOR(ast.left) || hasCrossFacetOR(ast.right);
 }
 
 function getTopField(ast: LiqeQuery): string | null {
   if (ast.type === "Tag") {
-    const tag = ast as TagToken;
-    return tag.field.type === "ImplicitField" ? null : tag.field.name;
+    return ast.field.type === "ImplicitField" ? null : ast.field.name;
   }
-  if (ast.type === "UnaryOperator") {
-    return getTopField((ast as UnaryOperatorToken).operand);
-  }
+  if (ast.type === "UnaryOperator") return getTopField(ast.operand);
   return null;
 }
-
-// ─── AST mutation (build query strings, let liqe re-parse) ───────────────────
 
 /**
  * Toggle a facet value through three states: neutral → include → exclude → neutral.
@@ -263,22 +240,16 @@ export function toggleFacetInQuery(
   value: string,
   currentState: FacetState,
 ): string {
-  // Remove the value from the current query first
   const cleaned = removeFacetValueFromQuery(currentQuery, fieldName, value);
-
   if (currentState === "neutral") {
-    // neutral → include: add field:value
     return appendClause(cleaned, `${fieldName}:${escapeValue(value)}`);
   }
   if (currentState === "include") {
-    // include → exclude: add NOT field:value
     return appendClause(cleaned, `NOT ${fieldName}:${escapeValue(value)}`);
   }
-  // exclude → neutral: just return cleaned
   return cleaned;
 }
 
-/** Set a range filter in the query string */
 export function setRangeInQuery(
   currentQuery: string,
   fieldName: string,
@@ -289,23 +260,23 @@ export function setRangeInQuery(
   return appendClause(cleaned, `${fieldName}:[${from} TO ${to}]`);
 }
 
-/** Remove all clauses for a field from the query */
 export function removeFieldFromQuery(
   currentQuery: string,
   fieldName: string,
 ): string {
   if (!currentQuery.trim()) return "";
   try {
-    const ast = parse(currentQuery);
-    const newAst = removeFieldFromAST(ast, fieldName);
-    if (isEmptyAST(newAst)) return "";
-    return liqeSerialize(newAst);
+    const next = filterAST(parse(currentQuery), (node) => {
+      if (node.type !== "Tag") return true;
+      if (node.field.type === "ImplicitField") return true;
+      return node.field.name !== fieldName;
+    });
+    return isEmptyAST(next) ? "" : liqeSerialize(next);
   } catch {
     return currentQuery;
   }
 }
 
-/** Remove a specific value for a field from the query */
 export function removeFacetValueFromQuery(
   currentQuery: string,
   fieldName: string,
@@ -313,10 +284,14 @@ export function removeFacetValueFromQuery(
 ): string {
   if (!currentQuery.trim()) return "";
   try {
-    const ast = parse(currentQuery);
-    const newAst = removeValueFromAST(ast, fieldName, value);
-    if (isEmptyAST(newAst)) return "";
-    return liqeSerialize(newAst);
+    const next = filterAST(parse(currentQuery), (node) => {
+      if (node.type !== "Tag") return true;
+      if (node.field.type === "ImplicitField") return true;
+      if (node.field.name !== fieldName) return true;
+      if (node.expression.type !== "LiteralExpression") return true;
+      return String(node.expression.value) !== value;
+    });
+    return isEmptyAST(next) ? "" : liqeSerialize(next);
   } catch {
     return currentQuery;
   }
@@ -329,36 +304,8 @@ function appendClause(query: string, clause: string): string {
 }
 
 function escapeValue(value: string): string {
-  if (/[\s"()]/.test(value)) {
-    return `"${value}"`;
-  }
+  if (/[\s"()]/.test(value)) return `"${value}"`;
   return value;
-}
-
-// ─── AST tree surgery ─────────────────────────────────────────────────────────
-
-function removeFieldFromAST(ast: LiqeQuery, fieldName: string): LiqeQuery {
-  return filterAST(ast, (node) => {
-    if (node.type !== "Tag") return true;
-    const tag = node as TagToken;
-    if (tag.field.type === "ImplicitField") return true;
-    return tag.field.name !== fieldName;
-  });
-}
-
-function removeValueFromAST(
-  ast: LiqeQuery,
-  fieldName: string,
-  value: string,
-): LiqeQuery {
-  return filterAST(ast, (node) => {
-    if (node.type !== "Tag") return true;
-    const tag = node as TagToken;
-    if (tag.field.type === "ImplicitField") return true;
-    if (tag.field.name !== fieldName) return true;
-    if (tag.expression.type !== "LiteralExpression") return true;
-    return String(tag.expression.value) !== value;
-  });
 }
 
 /**
@@ -370,51 +317,34 @@ function filterAST(
   predicate: (node: LiqeQuery) => boolean,
 ): LiqeQuery {
   if (ast.type === "Tag") {
-    return predicate(ast)
-      ? ast
-      : { type: "EmptyExpression", location: { start: 0, end: 0 } };
+    return predicate(ast) ? ast : EMPTY_AST;
   }
 
   if (ast.type === "UnaryOperator") {
-    const unary = ast as UnaryOperatorToken;
-    const inner = filterAST(unary.operand, predicate);
-    if (isEmptyAST(inner)) {
-      return { type: "EmptyExpression", location: { start: 0, end: 0 } };
-    }
-    // Check if the inner tag should be removed
-    if (!predicate(unary.operand)) {
-      return { type: "EmptyExpression", location: { start: 0, end: 0 } };
-    }
-    return ast;
+    if (!predicate(ast.operand)) return EMPTY_AST;
+    const inner = filterAST(ast.operand, predicate);
+    return isEmptyAST(inner) ? EMPTY_AST : ast;
   }
 
   if (ast.type === "LogicalExpression") {
-    const logExpr = ast as LogicalExpressionToken;
-    const left = filterAST(logExpr.left, predicate);
-    const right = filterAST(logExpr.right, predicate);
-
-    if (isEmptyAST(left) && isEmptyAST(right)) {
-      return { type: "EmptyExpression", location: { start: 0, end: 0 } };
-    }
+    const left = filterAST(ast.left, predicate);
+    const right = filterAST(ast.right, predicate);
+    if (isEmptyAST(left) && isEmptyAST(right)) return EMPTY_AST;
     if (isEmptyAST(left)) return right;
     if (isEmptyAST(right)) return left;
-
-    return { ...logExpr, left, right } as LiqeQuery;
+    return { ...ast, left, right };
   }
 
   if (ast.type === "ParenthesizedExpression") {
-    const paren = ast as ParenthesizedExpressionToken;
-    const inner = filterAST(paren.expression, predicate);
-    if (isEmptyAST(inner)) {
-      return { type: "EmptyExpression", location: { start: 0, end: 0 } };
-    }
-    return { ...paren, expression: inner } as LiqeQuery;
+    const inner = filterAST(ast.expression, predicate);
+    if (isEmptyAST(inner)) return EMPTY_AST;
+    return { ...ast, expression: inner };
   }
 
   return ast;
 }
 
-/** Walk all nodes in the AST, tracking negation context */
+/** Walk all nodes in the AST, tracking negation context. */
 function walkAST(
   ast: LiqeQuery,
   callback: (node: LiqeQuery, negated: boolean) => void,
@@ -424,25 +354,17 @@ function walkAST(
     callback(ast, negated);
     return;
   }
-
   if (ast.type === "UnaryOperator") {
-    const unary = ast as UnaryOperatorToken;
-    const isNeg =
-      unary.operator === "NOT" || unary.operator === "-";
-    walkAST(unary.operand, callback, negated !== isNeg);
+    const isNeg = ast.operator === "NOT" || ast.operator === "-";
+    walkAST(ast.operand, callback, negated !== isNeg);
     return;
   }
-
   if (ast.type === "LogicalExpression") {
-    const logExpr = ast as LogicalExpressionToken;
-    walkAST(logExpr.left, callback, negated);
-    walkAST(logExpr.right, callback, negated);
+    walkAST(ast.left, callback, negated);
+    walkAST(ast.right, callback, negated);
     return;
   }
-
   if (ast.type === "ParenthesizedExpression") {
-    const paren = ast as ParenthesizedExpressionToken;
-    walkAST(paren.expression, callback, negated);
-    return;
+    walkAST(ast.expression, callback, negated);
   }
 }

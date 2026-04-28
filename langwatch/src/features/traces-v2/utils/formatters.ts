@@ -1,14 +1,15 @@
-import type { Tokens } from '@chakra-ui/react';
+import type { Tokens } from "@chakra-ui/react";
 
+const MS_PER_MINUTE = 60_000;
+const MS_PER_HOUR = 60 * MS_PER_MINUTE;
+const MS_PER_DAY = 24 * MS_PER_HOUR;
 
 export function formatRelativeTime(timestamp: number): string {
   const diffMs = Date.now() - timestamp;
-  const diffMin = Math.floor(diffMs / 60_000);
-  if (diffMin < 1) return "now";
-  if (diffMin < 60) return `${diffMin}m`;
-  const diffHr = Math.floor(diffMin / 60);
-  if (diffHr < 24) return `${diffHr}h`;
-  return `${Math.floor(diffHr / 24)}d`;
+  if (diffMs < MS_PER_MINUTE) return "now";
+  if (diffMs < MS_PER_HOUR) return `${Math.floor(diffMs / MS_PER_MINUTE)}m`;
+  if (diffMs < MS_PER_DAY) return `${Math.floor(diffMs / MS_PER_HOUR)}h`;
+  return `${Math.floor(diffMs / MS_PER_DAY)}d`;
 }
 
 export function formatAbsoluteTime(timestamp: number): string {
@@ -33,33 +34,37 @@ export function formatTokens(tokens: number): string {
   return `${tokens}`;
 }
 
+const PROVIDER_ABBREVIATIONS: Readonly<Record<string, string>> = {
+  openai: "oai",
+  anthropic: "ant",
+  google: "ggl",
+};
+
+const MODEL_ABBREVIATIONS: ReadonlyArray<readonly [from: string, to: string]> = [
+  ["gpt-4o-mini", "4o-mini"],
+  ["gpt-4o", "4o"],
+  ["gpt-5-mini", "5-mini"],
+  ["claude-sonnet-4-20250514", "sonnet-4"],
+  ["claude-haiku-4-5-20251001", "haiku-4.5"],
+  ["gemini-2.5-pro", "2.5-pro"],
+  ["text-embedding-3-small", "emb-3-sm"],
+];
+
 export function abbreviateModel(model: string): string {
-  const providerMap: Record<string, string> = {
-    openai: "oai",
-    anthropic: "ant",
-    google: "ggl",
-  };
-
-  const parts = model.split("/");
-  if (parts.length !== 2) return model;
-
-  const [provider, name] = parts as [string, string];
-  const shortProvider = providerMap[provider] ?? provider;
-
-  const shortName = name
-    .replace("gpt-4o-mini", "4o-mini")
-    .replace("gpt-4o", "4o")
-    .replace("gpt-5-mini", "5-mini")
-    .replace("claude-sonnet-4-20250514", "sonnet-4")
-    .replace("claude-haiku-4-5-20251001", "haiku-4.5")
-    .replace("gemini-2.5-pro", "2.5-pro")
-    .replace("text-embedding-3-small", "emb-3-sm");
-
+  const slash = model.indexOf("/");
+  if (slash < 0) return model;
+  const provider = model.slice(0, slash);
+  const name = model.slice(slash + 1);
+  const shortProvider = PROVIDER_ABBREVIATIONS[provider] ?? provider;
+  let shortName = name;
+  for (const [from, to] of MODEL_ABBREVIATIONS) {
+    shortName = shortName.replace(from, to);
+  }
   return `${shortProvider}/${shortName}`;
 }
 
 export function formatWallClock(startMs: number, endMs: number): string {
-  const diff = endMs - startMs;
+  const diff = Math.max(0, endMs - startMs);
   const secs = Math.floor(diff / 1_000);
   const mins = Math.floor(secs / 60);
   const remainSecs = secs % 60;
@@ -72,14 +77,16 @@ export function truncateId(id: string, chars = 8): string {
   return id.slice(0, chars);
 }
 
-export const SPAN_TYPE_BADGE_STYLES: Record<string, { bg: string; color: string }> = {
+export const SPAN_TYPE_BADGE_STYLES: Readonly<
+  Record<string, { bg: string; color: string }>
+> = {
   llm: { bg: "blue.subtle", color: "blue.emphasized" },
   agent: { bg: "purple.subtle", color: "purple.emphasized" },
   workflow: { bg: "teal.subtle", color: "teal.emphasized" },
   span: { bg: "gray.subtle", color: "gray.emphasized" },
 };
 
-export const SPAN_TYPE_COLORS: Record<string, Tokens["colors"]> = {
+export const SPAN_TYPE_COLORS: Readonly<Record<string, Tokens["colors"]>> = {
   llm: "blue.solid",
   tool: "green.solid",
   agent: "purple.solid",
@@ -91,7 +98,7 @@ export const SPAN_TYPE_COLORS: Record<string, Tokens["colors"]> = {
   module: "gray.solid",
 };
 
-export const STATUS_COLORS: Record<string, Tokens["colors"]> = {
+export const STATUS_COLORS: Readonly<Record<string, Tokens["colors"]>> = {
   error: "red.solid",
   warning: "yellow.solid",
   ok: "green.solid",
@@ -105,7 +112,7 @@ export const STATUS_COLORS: Record<string, Tokens["colors"]> = {
  * negative-state semantics elsewhere in the UI (status). Order is fixed so the
  * mapping is stable across deploys.
  */
-const HASH_COLOR_PALETTE: Tokens["colors"][] = [
+const HASH_COLOR_PALETTE: ReadonlyArray<Tokens["colors"]> = [
   "blue.solid",
   "purple.solid",
   "pink.solid",
