@@ -28,6 +28,7 @@ import { onboardingRouter } from "./routers/onboarding/onboarding.router";
 import { optimizationRouter } from "./routers/optimization";
 import { organizationRouter } from "./routers/organization";
 import { planRouter } from "./routers/plan";
+import { presenceRouter } from "./routers/presence";
 import { projectRouter } from "./routers/project";
 import { promptsRouter } from "./routers/prompts";
 import { promptTagsRouter } from "./routers/prompt-tags.trpc-router";
@@ -74,6 +75,7 @@ const coreRouters = {
   monitors: monitorsRouter,
   costs: costsRouter,
   plan: planRouter,
+  presence: presenceRouter,
   topics: topicsRouter,
   dataset: datasetRouter,
   datasetRecord: datasetRecordRouter,
