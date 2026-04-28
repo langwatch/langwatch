@@ -15,7 +15,7 @@ import {
   Copy,
   Settings2,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useConversationTurns } from "../../../hooks/useConversationTurns";
 import { useTraceDrawerNavigation } from "../../../hooks/useTraceDrawerNavigation";
 import type { TraceListItem } from "../../../types/trace";
@@ -36,7 +36,7 @@ interface ConversationViewProps {
   currentTraceId: string;
 }
 
-export function ConversationView({
+export const ConversationView = memo(function ConversationView({
   conversationId,
   currentTraceId,
 }: ConversationViewProps) {
@@ -152,7 +152,7 @@ export function ConversationView({
       )}
     </VStack>
   );
-}
+});
 
 const SKELETON_TURNS: { user: string; assistant: [string, string?] }[] = [
   { user: "62%", assistant: ["88%", "54%"] },

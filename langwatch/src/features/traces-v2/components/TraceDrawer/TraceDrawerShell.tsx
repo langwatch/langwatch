@@ -1,6 +1,14 @@
 import { Box, Skeleton, VStack } from "@chakra-ui/react";
-import { motion } from "motion/react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { AnimatePresence, motion } from "motion/react";
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { Drawer } from "~/components/ui/drawer";
 import { Tooltip } from "~/components/ui/tooltip";
 import {
@@ -25,7 +33,11 @@ import { useDrawerStore } from "../../stores/drawerStore";
 import { parseTracePromptIds } from "../../utils/promptAttributes";
 import { BelowFoldIndicator } from "./BelowFoldIndicator";
 import { ConversationContext } from "./ConversationContext";
-import { ConversationView } from "./conversationView";
+// ConversationView only renders when the user toggles into conversation
+// mode — code-split so the trace-mode initial bundle stays light.
+const ConversationView = lazy(() =>
+  import("./conversationView").then((m) => ({ default: m.ConversationView })),
+);
 import { DrawerHeader } from "./drawerHeader";
 import { KeyboardShortcutsHelp } from "./KeyboardShortcutsHelp";
 import { LlmPanel } from "./LlmPanel";
@@ -64,6 +76,7 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
     rawViz === "waterfall" ||
     rawViz === "flame" ||
     rawViz === "spanlist" ||
+    rawViz === "topology" ||
     rawViz === "sequence"
       ? rawViz
       : "waterfall";
@@ -452,6 +465,11 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
         }
         case "4": {
           e.preventDefault();
+          setVizTab("topology");
+          break;
+        }
+        case "5": {
+          e.preventDefault();
           setVizTab("sequence");
           break;
         }
@@ -654,44 +672,78 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
                 <Skeleton height="80px" borderRadius="md" />
               </VStack>
             ) : trace ? (
-              /* Content area — animated via a single persistent motion.div
-                 (NO key change → no remount → no Mermaid / Shiki / viz-canvas
-                 re-instantiation). The body slides + fades + scales to
-                 communicate navigation direction; once the new trace data
-                 lands it springs back to centre. Heavy children stay mounted
-                 throughout, which is why thread navigation feels snappy. */
+              /* Bookshelf-style content area — fast & snappy.
+                 AnimatePresence keyed on traceId remounts the body per
+                 trace; the outgoing pane slides one way, the new one
+                 slides in from the opposite side. Stiffness is cranked
+                 high so the spring resolves in ~150ms — feels instant
+                 but you still register direction. Heavy children are
+                 lazy-loaded + memoized elsewhere so per-trace remount
+                 cost is acceptable. */
               <ScenarioRoleProvider
                 isScenario={
                   !!(trace.scenarioRunId ?? trace.attributes["scenario.run_id"])
                 }
               >
+                <Box
+                  flex={1}
+                  position="relative"
+                  overflow="hidden"
+                  display="flex"
+                  flexDirection="column"
+                >
+                <AnimatePresence
+                  mode="popLayout"
+                  initial={false}
+                  custom={navDirection}
+                >
                 <motion.div
+                  key={trace.traceId}
                   ref={scrollContentRef}
-                  animate={{
-                    x: headerQuery.isFetching ? navDirection * 16 : 0,
-                    opacity: headerQuery.isFetching ? 0.82 : 1,
-                    scale: headerQuery.isFetching ? 0.994 : 1,
+                  custom={navDirection}
+                  variants={{
+                    enter: (dir: number) => ({
+                      x: dir === 0 ? 0 : dir * 80,
+                      opacity: dir === 0 ? 1 : 0,
+                    }),
+                    center: { x: 0, opacity: 1 },
+                    exit: (dir: number) => ({
+                      x: -dir * 80,
+                      opacity: 0,
+                    }),
                   }}
+                  initial="enter"
+                  animate="center"
+                  exit="exit"
                   transition={{
                     type: "spring",
-                    stiffness: 280,
-                    damping: 30,
-                    mass: 0.7,
+                    stiffness: 600,
+                    damping: 42,
+                    mass: 0.5,
                   }}
                   style={{
                     flex: 1,
                     overflow: "auto",
-                    position: "relative",
                     display: "flex",
                     flexDirection: "column",
                     minHeight: 0,
                   }}
                 >
                   {viewMode === "conversation" && trace.conversationId ? (
-                    <ConversationView
-                      conversationId={trace.conversationId}
-                      currentTraceId={trace.traceId}
-                    />
+                    <Suspense
+                      fallback={
+                        <VStack align="stretch" gap={2} padding={4}>
+                          <Skeleton height="40px" borderRadius="md" />
+                          <Skeleton height="80px" borderRadius="md" />
+                          <Skeleton height="80px" borderRadius="md" />
+                        </VStack>
+                      }
+                    >
+                      <ConversationView
+                        conversationId={trace.conversationId}
+                        currentTraceId={trace.traceId}
+                      />
+                    </Suspense>
                   ) : (
                     <VStack align="stretch" gap={0} flex={1} minHeight={0}>
                       {/* The viz + conversation context are skipped on the
@@ -771,7 +823,9 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
                     </VStack>
                   )}
                 </motion.div>
+                </AnimatePresence>
                 <BelowFoldIndicator scrollRef={scrollContentRef} />
+                </Box>
               </ScenarioRoleProvider>
             ) : null}
           </VStack>

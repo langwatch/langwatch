@@ -16,6 +16,7 @@ import {
   LuList,
   LuMessagesSquare,
   LuMinus,
+  LuNetwork,
 } from "react-icons/lu";
 import { Kbd } from "~/components/ops/shared/Kbd";
 import { Tooltip } from "~/components/ui/tooltip";
@@ -32,6 +33,7 @@ import type {
 import type { VizTab } from "../../stores/drawerStore";
 import { SPAN_TYPE_COLORS } from "../../utils/formatters";
 import { NewSpanFlash } from "./NewSpanFlash";
+import { SequenceSkeleton, TopologySkeleton } from "./sequenceView";
 
 // Each viz lives in its own chunk so the trace drawer's initial JS payload
 // stays small. Only the active tab's chunk is downloaded — and React only
@@ -99,10 +101,16 @@ const TABS: {
   { value: "flame", label: "Flame", icon: LuFlame, shortcut: "2" },
   { value: "spanlist", label: "Span List", icon: LuList, shortcut: "3" },
   {
+    value: "topology",
+    label: "Topology",
+    icon: LuNetwork,
+    shortcut: "4",
+  },
+  {
     value: "sequence",
     label: "Sequence",
     icon: LuMessagesSquare,
-    shortcut: "4",
+    shortcut: "5",
   },
 ];
 
@@ -395,12 +403,21 @@ export function VizPlaceholder({
                       onSelectSpan={onSelectSpan}
                       onClearSpan={onClearSpan}
                     />
+                  ) : vizTab === "topology" ? (
+                    <SequenceView
+                      spans={spans}
+                      selectedSpanId={selectedSpanId}
+                      onSelectSpan={onSelectSpan}
+                      onClearSpan={onClearSpan}
+                      subMode="topology"
+                    />
                   ) : vizTab === "sequence" ? (
                     <SequenceView
                       spans={spans}
                       selectedSpanId={selectedSpanId}
                       onSelectSpan={onSelectSpan}
                       onClearSpan={onClearSpan}
+                      subMode="sequence"
                     />
                   ) : (
                     <SpanListView
@@ -457,6 +474,8 @@ const PULSE_KEYFRAMES = {
 function VizSkeleton({ vizTab }: { vizTab?: VizTab }) {
   if (vizTab === "flame") return <FlameSkeleton />;
   if (vizTab === "spanlist") return <SpanListSkeleton />;
+  if (vizTab === "topology") return <TopologySkeleton />;
+  if (vizTab === "sequence") return <SequenceSkeleton />;
   return <WaterfallSkeleton />;
 }
 

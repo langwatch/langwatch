@@ -13,9 +13,7 @@ import {
   LuCopy,
   LuFilter,
   LuMaximize,
-  LuMessagesSquare,
   LuMinus,
-  LuNetwork,
   LuPlus,
 } from "react-icons/lu";
 import { useColorMode } from "~/components/ui/color-mode";
@@ -30,9 +28,6 @@ import {
   type SequenceViewProps,
 } from "./types";
 
-type SubMode = "topology" | "sequence";
-
-const SUB_MODE_STORAGE_KEY = "langwatch:traces-v2:sequence-submode";
 
 // ── Easter egg ───────────────────────────────────────────────────────────
 // Press ↑ ↑ ↓ ↓ ← → ← → while the sequence view is mounted to swap every
@@ -69,11 +64,6 @@ const EASTER_EGG_IMAGE_URL =
     </svg>`,
   );
 
-function readStoredSubMode(): SubMode {
-  if (typeof window === "undefined") return "topology";
-  const raw = localStorage.getItem(SUB_MODE_STORAGE_KEY);
-  return raw === "topology" || raw === "sequence" ? raw : "topology";
-}
 
 const TYPE_LABELS: Record<SequenceSpanType, string> = {
   agent: "Agents",
@@ -152,6 +142,7 @@ export function SequenceView({
   spans,
   selectedSpanId,
   onSelectSpan,
+  subMode,
 }: SequenceViewProps) {
   const { colorMode } = useColorMode();
 
@@ -175,14 +166,7 @@ export function SequenceView({
   const [selectedTypes, setSelectedTypes] = useState<SequenceSpanType[]>(
     DEFAULT_SEQUENCE_TYPES,
   );
-  const [subMode, setSubMode] = useState<SubMode>(readStoredSubMode);
   const [easterEgg, setEasterEgg] = useState(false);
-
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      localStorage.setItem(SUB_MODE_STORAGE_KEY, subMode);
-    }
-  }, [subMode]);
 
   // Konami listener. Listens at the document level so the user can be
   // anywhere inside the drawer when triggering it. We only consume arrow
@@ -358,18 +342,23 @@ export function SequenceView({
             fontSize: "12px",
           },
           sequence: {
-            diagramMarginX: 12,
-            diagramMarginY: 8,
-            actorMargin: 48,
-            width: 170,
-            height: 32,
-            boxMargin: 4,
-            boxTextMargin: 3,
-            noteMargin: 8,
-            messageMargin: 26,
+            // Generous spacing values prevent label/lifeline overlap when
+            // multiple agents call the same LLM in quick succession or when
+            // participant names get long. wrap=false keeps labels on one
+            // line; instead Mermaid widens the participant box to fit, and
+            // actorMargin keeps adjacent participants from kissing.
+            diagramMarginX: 16,
+            diagramMarginY: 12,
+            actorMargin: 96,
+            width: 200,
+            height: 36,
+            boxMargin: 8,
+            boxTextMargin: 5,
+            noteMargin: 12,
+            messageMargin: 38,
             messageAlign: "center",
             mirrorActors: false,
-            bottomMarginAdj: 4,
+            bottomMarginAdj: 8,
             useMaxWidth: false,
             rightAngles: false,
             showSequenceNumbers: false,
@@ -712,13 +701,6 @@ export function SequenceView({
         bg="bg.subtle/60"
         flexShrink={0}
       >
-        <SubModeToggle value={subMode} onChange={setSubMode} />
-        <Box
-          width="1px"
-          height="14px"
-          bg="border.subtle"
-          flexShrink={0}
-        />
         <Menu.Root>
           <Menu.Trigger asChild>
             <Flex
@@ -996,72 +978,3 @@ function ZoomButton({ label, icon, onClick }: ZoomButtonProps) {
   );
 }
 
-const SUB_MODES: {
-  value: SubMode;
-  label: string;
-  icon: typeof LuNetwork;
-  tooltip: string;
-}[] = [
-  {
-    value: "topology",
-    label: "Topology",
-    icon: LuNetwork,
-    tooltip: "Topology — who calls whom",
-  },
-  {
-    value: "sequence",
-    label: "Sequence",
-    icon: LuMessagesSquare,
-    tooltip: "Sequence — chronological message flow",
-  },
-];
-
-function SubModeToggle({
-  value,
-  onChange,
-}: {
-  value: SubMode;
-  onChange: (mode: SubMode) => void;
-}) {
-  return (
-    <HStack
-      gap={0}
-      bg="bg.muted/60"
-      borderRadius="sm"
-      padding={0.5}
-      flexShrink={0}
-    >
-      {SUB_MODES.map((mode) => {
-        const active = value === mode.value;
-        return (
-          <Tooltip
-            key={mode.value}
-            content={mode.tooltip}
-            positioning={{ placement: "top" }}
-          >
-            <Flex
-              as="button"
-              align="center"
-              gap={1}
-              paddingX={1.5}
-              paddingY={0.5}
-              borderRadius="xs"
-              cursor="pointer"
-              bg={active ? "bg.panel" : "transparent"}
-              color={active ? "fg" : "fg.muted"}
-              boxShadow={active ? "xs" : "none"}
-              _hover={{ color: "fg" }}
-              transition="all 0.12s ease"
-              onClick={() => onChange(mode.value)}
-            >
-              <Icon as={mode.icon} boxSize={3} />
-              <Text textStyle="2xs" lineHeight={1} fontWeight={500}>
-                {mode.label}
-              </Text>
-            </Flex>
-          </Tooltip>
-        );
-      })}
-    </HStack>
-  );
-}

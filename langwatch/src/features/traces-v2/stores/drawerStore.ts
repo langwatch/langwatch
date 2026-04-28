@@ -1,7 +1,12 @@
 import { create } from "zustand";
 
 export type DrawerViewMode = "trace" | "conversation";
-export type VizTab = "waterfall" | "flame" | "spanlist" | "sequence";
+export type VizTab =
+  | "waterfall"
+  | "flame"
+  | "spanlist"
+  | "topology"
+  | "sequence";
 export type DrawerTab = "summary" | "span" | "llm" | "prompts";
 
 type AccordionSection = "events" | "evals" | "conversation";

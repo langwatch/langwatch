@@ -1,3 +1,4 @@
+import { memo } from "react";
 import type {
   SpanTreeNode,
   TraceHeader,
@@ -14,7 +15,7 @@ interface TraceAccordionsProps {
   onSelectSpan?: (spanId: string) => void;
 }
 
-export function TraceAccordions({
+export const TraceAccordions = memo(function TraceAccordions({
   trace,
   spans,
   selectedSpan,
@@ -44,4 +45,4 @@ export function TraceAccordions({
       onSelectSpan={onSelectSpan}
     />
   );
-}
+});

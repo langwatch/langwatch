@@ -75,7 +75,8 @@ const DRAWER_GROUPS: ShortcutGroup[] = [
       { keys: ["1"], label: "Waterfall" },
       { keys: ["2"], label: "Flame graph" },
       { keys: ["3"], label: "Span list" },
-      { keys: ["4"], label: "Sequence diagram" },
+      { keys: ["4"], label: "Topology" },
+      { keys: ["5"], label: "Sequence diagram" },
     ],
   },
   {
