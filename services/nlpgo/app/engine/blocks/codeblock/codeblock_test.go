@@ -45,7 +45,7 @@ func TestCodeBlock_HappyPath(t *testing.T) {
 func TestCodeBlock_StdoutCaptured(t *testing.T) {
 	requirePython(t)
 	res, err := newExec(t).Execute(context.Background(), codeblock.Request{
-		Code: "def execute():\n    print('hello-stdout')\n    return {'ok': True}\n",
+		Code:            "def execute():\n    print('hello-stdout')\n    return {'ok': True}\n",
 		DeclaredOutputs: []string{"ok"},
 	})
 	require.NoError(t, err)
