@@ -262,7 +262,12 @@ export const useOrganizationTeamProject = (
       // Decode: browsers encode [ ] → %5B %5D, so asPath and query.project are in different encodings
       const url = new URL(router.asPath, window.location.origin);
       const oldPrefix = `/${router.query.project as string}`;
-      const decodedPathname = decodeURIComponent(url.pathname);
+      let decodedPathname = url.pathname;
+      try {
+        decodedPathname = decodeURIComponent(url.pathname);
+      } catch {
+        // keep encoded pathname if malformed percent-encoding is present
+      }
       const subPath = decodedPathname.startsWith(oldPrefix)
         ? decodedPathname.slice(oldPrefix.length)
         : "";
