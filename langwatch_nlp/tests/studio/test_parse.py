@@ -430,7 +430,14 @@ class Code:
         assert class_name == "Code"
 
     def test_no_class_in_code_raises_clear_error(self):
-        """Helpful error replaces the misleading 'must inherit dspy.Module'."""
+        """Helpful error replaces the misleading 'must inherit dspy.Module'.
+
+        Note: the Go runner accepts a top-level ``def execute(...)`` shape;
+        the Python parser intentionally does not (it's a class-name
+        extractor, not an instance resolver — see _resolve_code_class_name
+        docstring). The resulting message must point users at the
+        supported shapes so they convert their function into a class.
+        """
         node = self._make_code_node(
             """
 def execute(input: str):
@@ -442,3 +449,33 @@ def execute(input: str):
             match=r"Could not find a class definition.*Supported shapes",
         ):
             parse_component(node, basic_workflow)
+
+    def test_class_with_multi_line_base_list_resolves(self):
+        """Edge case Sarah flagged in #3543 review.
+
+        The class-declaration regex uses ``[^)]*`` for the base list,
+        which (unlike ``.``) matches newlines without re.DOTALL. So a
+        multi-line base list — common when the user pulls in mixins —
+        still resolves the class name correctly without falling through
+        to the no-class branch.
+        """
+        node = self._make_code_node(
+            """
+import dspy
+
+class Mixin:
+    pass
+
+class Code(
+    dspy.Module,
+    Mixin,
+):
+    def forward(self, **kwargs):
+        return {"output": "multi-base"}
+"""
+        )
+        code, class_name, _ = parse_component(node, basic_workflow)
+        # The fast-path dspy regex won't match a multi-base class, so
+        # this exercises the fallback path with name disambiguation —
+        # picks Code (matches the node name) over Mixin.
+        assert class_name == "Code"

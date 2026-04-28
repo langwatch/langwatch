@@ -195,13 +195,20 @@ def _assert_signature_field_types_are_mapped(node: Node) -> None:
 
 
 # Class-declaration regex: captures the name of any class declaration,
-# whether or not it inherits from a base. Used by _resolve_code_class_name
-# below to discover candidate classes in user-provided code; the per-class
-# resolution priority is then re-applied at materialization time (see
-# `materialized_component_class`).
+# whether or not it inherits from a base. The base list (parenthesized)
+# is matched via `[^)]*` — a negated character class which includes
+# newlines — so a multi-line base declaration like
+#     class X(
+#         dspy.Module,
+#         SomeMixin,
+#     ):
+# resolves correctly. Used by _resolve_code_class_name below.
 _CLASS_DECL_RE = re.compile(r"class\s+([A-Za-z_]\w*)\s*(?:\([^)]*\))?\s*:")
 # Legacy dspy.Module subclass shape — kept as a fast first-pass match
-# since it covers nearly all in-prod customer code today.
+# since it covers nearly all in-prod customer code today. Intentionally
+# strict: matches only `class X(dspy.Module):` (no other bases). The
+# `class X(dspy.Module, SomeMixin):` shape is rare in practice and falls
+# through to `_CLASS_DECL_RE` cleanly, returning the same class.
 _DSPY_MODULE_SUBCLASS_RE = re.compile(r"class\s+([A-Za-z_]\w*)\s*\(\s*dspy\.Module\s*\)\s*:")
 
 
@@ -210,9 +217,9 @@ def _resolve_code_class_name(
 ) -> str:
     """Pick the user-defined class to instantiate from ``code``.
 
-    Resolution order matches the Go runtime
-    (services/nlpgo/app/engine/blocks/codeblock/runner.py) so the same
-    customer code runs identically on FF=on and FF=off:
+    Resolution order matches the **class-based** shapes the Go runtime
+    accepts (services/nlpgo/app/engine/blocks/codeblock/runner.py), so
+    the same customer code runs identically on FF=on and FF=off:
 
       1. ``class X(dspy.Module):`` — preferred (legacy default; the
          dspy.Module wrapper provides cost-tracing + tracking).
@@ -221,12 +228,24 @@ def _resolve_code_class_name(
          when the user defines helpers alongside the entry class.
       3. First ``class X:`` declaration in the file.
 
-    Method-level shape (``__call__`` vs ``forward`` vs neither) is NOT
-    inspected here because the source is not yet imported; the chosen
-    class is materialized downstream and the caller uses Python's normal
-    instance(...) protocol, which dispatches to ``__call__`` if defined.
-    A class with neither ``__call__`` nor ``forward`` raises a TypeError
-    at call time — clearer than failing here.
+    The Go runtime ALSO accepts a fourth shape — a top-level ``def
+    execute(**inputs)`` callable with no enclosing class — but that
+    shape is intentionally NOT supported on the Python side. This
+    parser is a class-name extractor (the resolved name is later passed
+    to ``getattr(module, class_name)``); a top-level function has no
+    class to extract. Source with a top-level ``execute`` and no class
+    raises a clear ValueError listing the supported shapes. If parity
+    is ever needed, swap the resolver for an importer-then-inspect flow
+    similar to the Go runner.
+
+    Method-level shape within the chosen class (``__call__`` vs
+    ``forward`` vs neither) is NOT inspected here because the source
+    is not yet imported; the chosen class is materialized downstream
+    and the caller uses Python's normal instance(...) protocol, which
+    dispatches to ``__call__`` if defined and otherwise falls through
+    to whatever attribute the legacy dspy path expects. A class with
+    neither raises a TypeError at call time — clearer than failing
+    here.
 
     Anchors PR #3483's per-shape contract back-compat for FF=off so
     customers using the new ``class X: def __call__(...)`` template
