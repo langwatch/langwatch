@@ -1,9 +1,8 @@
 import chalk from "chalk";
 import ora from "ora";
+import { apiRequest } from "../../utils/apiClient";
 import { checkApiKey } from "../../utils/apiKey";
-import { formatFetchError } from "../../utils/formatFetchError";
 import { failSpinner } from "../../utils/spinnerError";
-import { buildAuthHeaders } from "@/internal/api/auth";
 
 export const createTriggerCommand = async (
   name: string,
@@ -38,29 +37,20 @@ export const createTriggerCommand = async (
     const actionParams: Record<string, unknown> = {};
     if (options.slackWebhook) actionParams.slackWebhook = options.slackWebhook;
 
-    const response = await fetch(`${endpoint}/api/triggers`, {
+    const trigger = (await apiRequest({
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...buildAuthHeaders({ apiKey }),
-      },
-      body: JSON.stringify({
+      path: "/api/triggers",
+      apiKey,
+      endpoint,
+      body: {
         name,
         action: options.action,
         filters,
         actionParams,
         message: options.message,
         alertType: options.alertType,
-      }),
-    });
-
-    if (!response.ok) {
-      const message = await formatFetchError(response);
-      spinner.fail(`Failed to create trigger: ${message}`);
-      process.exit(1);
-    }
-
-    const trigger = await response.json() as { id: string; name: string; action: string; platformUrl?: string };
+      },
+    })) as { id: string; name: string; action: string; platformUrl?: string };
     spinner.succeed(`Trigger "${trigger.name}" created (${trigger.id})`);
 
     if (options.format === "json") {

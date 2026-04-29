@@ -1,10 +1,10 @@
 import chalk from "chalk";
 import ora from "ora";
+import { apiRequest } from "../utils/apiClient";
 import { checkApiKey } from "../utils/apiKey";
 import {
   createLangWatchApiClient,
 } from "@/internal/api/client";
-import { buildAuthHeaders } from "@/internal/api/auth";
 import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
 
 export const statusCommand = async (options?: { format?: string }): Promise<void> => {
@@ -18,20 +18,20 @@ export const statusCommand = async (options?: { format?: string }): Promise<void
   const results: Record<string, { count: number; error?: string; status?: number }> = {};
 
   async function fetchCount(url: string): Promise<{ data: unknown; error?: unknown; status?: number }> {
-    const response = await fetch(`${endpoint}${url}`, {
-      headers: buildAuthHeaders({ apiKey }),
-    });
-    if (!response.ok) {
-      let body: unknown;
-      try {
-        body = await response.json();
-      } catch {
-        body = undefined;
-      }
-      return { data: null, error: body ?? response.statusText, status: response.status };
+    try {
+      const data = await apiRequest({
+        method: "GET",
+        path: url,
+        apiKey,
+        endpoint,
+      });
+      return { data, error: undefined };
+    } catch (err) {
+      // apiRequest attaches the response status to the thrown error so the
+      // downstream auth-detection (`every status === 401 || 403`) keeps working.
+      const status = (err as { status?: number }).status;
+      return { data: null, error: err, status };
     }
-    const data = await response.json();
-    return { data, error: undefined };
   }
 
   // Fetch counts for all major resources in parallel

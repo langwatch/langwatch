@@ -1,10 +1,9 @@
 import chalk from "chalk";
 import ora from "ora";
+import { apiRequest } from "../../utils/apiClient";
 import { checkApiKey } from "../../utils/apiKey";
-import { formatFetchError } from "../../utils/formatFetchError";
 import { failSpinner } from "../../utils/spinnerError";
 import { formatRelativeTime } from "../../utils/formatting";
-import { buildAuthHeaders } from "@/internal/api/auth";
 
 export const listSimulationRunsCommand = async (options: {
   scenarioSetId?: string;
@@ -27,21 +26,12 @@ export const listSimulationRunsCommand = async (options: {
     if (options.batchRunId) params.set("batchRunId", options.batchRunId);
     if (options.limit) params.set("limit", options.limit);
 
-    const response = await fetch(
-      `${endpoint}/api/simulation-runs?${params.toString()}`,
-      {
-        method: "GET",
-        headers: buildAuthHeaders({ apiKey }),
-      },
-    );
-
-    if (!response.ok) {
-      const message = await formatFetchError(response);
-      spinner.fail(`Failed to fetch simulation runs: ${message}`);
-      process.exit(1);
-    }
-
-    const result = await response.json() as {
+    const result = (await apiRequest({
+      method: "GET",
+      path: `/api/simulation-runs?${params.toString()}`,
+      apiKey,
+      endpoint,
+    })) as {
       runs: Array<{
         scenarioRunId: string;
         scenarioId: string;

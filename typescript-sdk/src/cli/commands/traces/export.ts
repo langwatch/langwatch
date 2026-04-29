@@ -1,10 +1,9 @@
 import chalk from "chalk";
 import ora from "ora";
 import fs from "fs";
+import { apiRequest } from "../../utils/apiClient";
 import { checkApiKey } from "../../utils/apiKey";
-import { formatFetchError } from "../../utils/formatFetchError";
 import { failSpinner } from "../../utils/spinnerError";
-import { buildAuthHeaders } from "@/internal/api/auth";
 
 export const exportTracesCommand = async (options: {
   startDate?: string;
@@ -37,28 +36,7 @@ export const exportTracesCommand = async (options: {
   const spinner = ora(`Exporting traces (${format})...`).start();
 
   try {
-    const response = await fetch(`${endpoint}/api/traces/search`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...buildAuthHeaders({ apiKey }),
-      },
-      body: JSON.stringify({
-        query: options.query,
-        startDate,
-        endDate,
-        pageSize: Math.min(limit, 100),
-        format: "json",
-      }),
-    });
-
-    if (!response.ok) {
-      const message = await formatFetchError(response);
-      spinner.fail(`Export failed: ${message}`);
-      process.exit(1);
-    }
-
-    const data = await response.json() as {
+    type ExportData = {
       traces: Array<{
         trace_id: string;
         input?: { value: string };
@@ -69,6 +47,26 @@ export const exportTracesCommand = async (options: {
       }>;
       pagination?: { totalHits?: number };
     };
+    let data: ExportData;
+    try {
+      data = (await apiRequest({
+        method: "POST",
+        path: "/api/traces/search",
+        apiKey,
+        endpoint,
+        body: {
+          query: options.query,
+          startDate,
+          endDate,
+          pageSize: Math.min(limit, 100),
+          format: "json",
+        },
+      })) as ExportData;
+    } catch (httpError) {
+      const message = httpError instanceof Error ? httpError.message : String(httpError);
+      spinner.fail(`Export failed: ${message}`);
+      process.exit(1);
+    }
 
     const traces = data.traces;
     spinner.succeed(`Exported ${traces.length} trace${traces.length !== 1 ? "s" : ""}${data.pagination?.totalHits ? ` (${data.pagination.totalHits} total)` : ""}`);
