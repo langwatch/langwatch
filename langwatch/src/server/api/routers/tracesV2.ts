@@ -13,6 +13,7 @@ import type { Span, SpanInputOutput } from "~/server/tracer/types";
 import { checkProjectPermission } from "../rbac";
 import type {
   SpanDetail,
+  SpanLangwatchSignals,
   SpanTreeNode,
   TraceHeader,
   TraceResourceInfoDto,
@@ -571,6 +572,31 @@ export const tracesV2Router = createTRPCRouter({
         ...occurredAtFromInput(input),
       });
       return rows.map(mapSpanSummaryToTreeNode);
+    }),
+
+  /**
+   * Per-span LangWatch instrumentation signals (prompt, scenario, user,
+   * thread, evaluation, rag, metadata, genai). Fired secondarily by the
+   * waterfall and span-list views so the primary `spanTree` query stays
+   * cheap; UIs render badges + filter once this resolves.
+   */
+  spanLangwatchSignals: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        traceId: z.string(),
+        ...spanReadHintShape,
+      }),
+    )
+    .use(checkProjectPermission("traces:view"))
+    .query(async ({ input }): Promise<SpanLangwatchSignals[]> => {
+      const app = getApp();
+      const rows = await app.traces.spans.getLangwatchSignalsByTraceId({
+        tenantId: input.projectId,
+        traceId: input.traceId,
+        ...occurredAtFromInput(input),
+      });
+      return rows.map((r) => ({ spanId: r.spanId, signals: r.signals }));
     }),
 
   /**

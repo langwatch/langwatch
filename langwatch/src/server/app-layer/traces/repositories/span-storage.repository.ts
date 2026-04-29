@@ -13,6 +13,30 @@ export interface SpanSummaryRow {
 }
 
 /**
+ * The ordered list of LangWatch signal buckets we project per-span. The
+ * shape is a flat array of bucket names so the wire payload stays tiny —
+ * one entry per active bucket, in fixed order. Empty array means the span
+ * carries no LangWatch-instrumented attributes we surface in the UI.
+ */
+export const LANGWATCH_SIGNAL_BUCKETS = [
+  "prompt",
+  "scenario",
+  "user",
+  "thread",
+  "evaluation",
+  "rag",
+  "metadata",
+  "genai",
+] as const;
+
+export type LangwatchSignalBucket = (typeof LANGWATCH_SIGNAL_BUCKETS)[number];
+
+export interface SpanLangwatchSignalsRow {
+  spanId: string;
+  signals: LangwatchSignalBucket[];
+}
+
+/**
  * Raw OTel resource + scope info per span. The mapping to `Span` drops
  * `resourceAttributes` and `instrumentationScope`, so consumers (drawer
  * metadata, scope chip) need this dedicated read path.
@@ -62,6 +86,14 @@ export interface SpanStorageRepository {
   getSpanSummaryByTraceId(
     params: { tenantId: string; traceId: string } & OccurredAtHint,
   ): Promise<SpanSummaryRow[]>;
+  /**
+   * Per-span LangWatch instrumentation signals — projected separately from
+   * the main span tree so the cheap waterfall/list payload doesn't pay for
+   * the attribute scan. Callers fire this in parallel and merge in the UI.
+   */
+  findLangwatchSignalsByTraceId(
+    params: { tenantId: string; traceId: string } & OccurredAtHint,
+  ): Promise<SpanLangwatchSignalsRow[]>;
   findSpanResourcesByTraceId(
     params: { tenantId: string; traceId: string } & OccurredAtHint,
   ): Promise<SpanResourceInfo[]>;
@@ -136,6 +168,12 @@ export class NullSpanStorageRepository implements SpanStorageRepository {
   async getSpanSummaryByTraceId(
     _params: { tenantId: string; traceId: string } & OccurredAtHint,
   ): Promise<SpanSummaryRow[]> {
+    return [];
+  }
+
+  async findLangwatchSignalsByTraceId(
+    _params: { tenantId: string; traceId: string } & OccurredAtHint,
+  ): Promise<SpanLangwatchSignalsRow[]> {
     return [];
   }
 

@@ -122,6 +122,32 @@ export const spanTreeNodeSchema = z.object({
 export type SpanTreeNode = z.infer<typeof spanTreeNodeSchema>;
 
 /**
+ * Per-span LangWatch instrumentation signals — fetched via
+ * `tracesV2.spanLangwatchSignals` as a separate, secondary call so the
+ * primary span tree query stays cheap. Keys correspond to attribute-prefix
+ * buckets (`langwatch.prompt.*`, `gen_ai.*`, etc.) detected server-side.
+ */
+export const langwatchSignalBucketSchema = z.enum([
+  "prompt",
+  "scenario",
+  "user",
+  "thread",
+  "evaluation",
+  "rag",
+  "metadata",
+  "genai",
+]);
+
+export type LangwatchSignalBucket = z.infer<typeof langwatchSignalBucketSchema>;
+
+export const spanLangwatchSignalsSchema = z.object({
+  spanId: z.string(),
+  signals: z.array(langwatchSignalBucketSchema),
+});
+
+export type SpanLangwatchSignals = z.infer<typeof spanLangwatchSignalsSchema>;
+
+/**
  * Span detail: full span data for the accordion when a span is selected.
  * Returned by `tracesV2.spanDetail`.
  */

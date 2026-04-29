@@ -6,11 +6,13 @@ import {
   LuUnlink,
 } from "react-icons/lu";
 import { Tooltip } from "~/components/ui/tooltip";
+import type { LangwatchSignalBucket } from "~/server/api/routers/tracesV2.schemas";
 import {
   abbreviateModel,
   formatDuration,
   SPAN_TYPE_COLORS,
 } from "../../../utils/formatters";
+import { LangwatchSignalBadges } from "../LangwatchSignalBadges";
 import { TipCell } from "./TipCell";
 import {
   INDENT_PX,
@@ -29,6 +31,7 @@ export function TreeRow({
   isCollapsed,
   hasChildren,
   isDimmed,
+  signals,
   onToggleCollapse,
   onSelect,
   onHoverStart,
@@ -42,6 +45,7 @@ export function TreeRow({
   isCollapsed: boolean;
   hasChildren: boolean;
   isDimmed: boolean;
+  signals: readonly LangwatchSignalBucket[];
   onToggleCollapse: () => void;
   onSelect: () => void;
   onHoverStart: () => void;
@@ -223,6 +227,7 @@ export function TreeRow({
               >
                 {span.name}
               </Text>
+              {signals.length > 0 && <LangwatchSignalBadges signals={signals} />}
             </HStack>
             {isLlm && (
               <Text

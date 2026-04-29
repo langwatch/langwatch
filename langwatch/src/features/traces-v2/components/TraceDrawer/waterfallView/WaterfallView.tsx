@@ -1,8 +1,14 @@
 import { Box, Flex, HStack, Icon, Text } from "@chakra-ui/react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { LuChevronsDownUp, LuChevronsUpDown } from "react-icons/lu";
+import {
+  LuChevronsDownUp,
+  LuChevronsUpDown,
+  LuSparkles,
+} from "react-icons/lu";
 import { Tooltip } from "~/components/ui/tooltip";
+import type { SpanTreeNode } from "~/server/api/routers/tracesV2.schemas";
+import { useSpanLangwatchSignals } from "../../../hooks/useSpanLangwatchSignals";
 import { formatDuration } from "../../../utils/formatters";
 import { GroupRow } from "./GroupRow";
 import { GroupTimelineBar, TimelineBar } from "./TimelineBar";
@@ -28,6 +34,11 @@ export const WaterfallView = memo(function WaterfallView({
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [treePct, setTreePct] = useState(DEFAULT_TREE_PCT);
   const [hoveredSpanId, setHoveredSpanId] = useState<string | null>(null);
+  const [showOnlyLangwatch, setShowOnlyLangwatch] = useState(false);
+
+  const { signalsBySpanId, isFetched: signalsFetched } =
+    useSpanLangwatchSignals();
+  const hasAnySignals = signalsBySpanId.size > 0;
 
   const isDraggingDivider = useRef(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -38,14 +49,32 @@ export const WaterfallView = memo(function WaterfallView({
   // race) and avoids the per-frame `scrollTop` write that used to lag.
   const timelineContentRef = useRef<HTMLDivElement>(null);
 
-  const tree = useMemo(() => buildTree(spans), [spans]);
+  // When the toggle is on, keep spans that have signals plus their ancestors
+  // so the tree structure stays meaningful (selecting a leaf shouldn't strand
+  // it under an invisible parent).
+  const filteredSpans = useMemo<SpanTreeNode[]>(() => {
+    if (!showOnlyLangwatch) return spans;
+    const byId = new Map(spans.map((s) => [s.spanId, s]));
+    const kept = new Set<string>();
+    for (const span of spans) {
+      if ((signalsBySpanId.get(span.spanId)?.length ?? 0) === 0) continue;
+      let cursor: SpanTreeNode | undefined = span;
+      while (cursor && !kept.has(cursor.spanId)) {
+        kept.add(cursor.spanId);
+        cursor = cursor.parentSpanId ? byId.get(cursor.parentSpanId) : undefined;
+      }
+    }
+    return spans.filter((s) => kept.has(s.spanId));
+  }, [spans, signalsBySpanId, showOnlyLangwatch]);
+
+  const tree = useMemo(() => buildTree(filteredSpans), [filteredSpans]);
   const flatRows = useMemo(
     () => flattenTree(tree, collapsedIds, expandedGroups),
     [tree, collapsedIds, expandedGroups],
   );
   const { rootStart, rootDuration } = useMemo(
-    () => getTraceRange(spans),
-    [spans],
+    () => getTraceRange(filteredSpans),
+    [filteredSpans],
   );
   const timeMarkers = useMemo(
     () => getTimeMarkers(rootDuration),
@@ -85,13 +114,13 @@ export const WaterfallView = memo(function WaterfallView({
 
   const handleCollapseAll = useCallback(() => {
     const parentIds = new Set<string>();
-    for (const span of spans) {
-      if (spans.some((s) => s.parentSpanId === span.spanId)) {
+    for (const span of filteredSpans) {
+      if (filteredSpans.some((s) => s.parentSpanId === span.spanId)) {
         parentIds.add(span.spanId);
       }
     }
     setCollapsedIds(parentIds);
-  }, [spans]);
+  }, [filteredSpans]);
 
   const handleSelectSpan = useCallback(
     (spanId: string) => {
@@ -227,6 +256,38 @@ export const WaterfallView = memo(function WaterfallView({
             Span
           </Text>
           <HStack gap={0}>
+            {(hasAnySignals || !signalsFetched) && (
+              <Tooltip
+                content={
+                  showOnlyLangwatch
+                    ? "Showing only LangWatch-instrumented spans"
+                    : "Show only LangWatch-instrumented spans"
+                }
+                positioning={{ placement: "top" }}
+              >
+                <Flex
+                  as="button"
+                  align="center"
+                  justify="center"
+                  width="20px"
+                  height="20px"
+                  borderRadius="sm"
+                  cursor="pointer"
+                  color={showOnlyLangwatch ? "purple.fg" : "fg.subtle"}
+                  bg={showOnlyLangwatch ? "purple.subtle" : undefined}
+                  _hover={{
+                    color: showOnlyLangwatch ? "purple.fg" : "fg.muted",
+                    bg: showOnlyLangwatch ? "purple.subtle" : "bg.muted",
+                  }}
+                  disabled={!hasAnySignals}
+                  opacity={hasAnySignals ? 1 : 0.4}
+                  onClick={() => setShowOnlyLangwatch((v) => !v)}
+                  aria-pressed={showOnlyLangwatch}
+                >
+                  <Icon as={LuSparkles} boxSize={3} />
+                </Flex>
+              </Tooltip>
+            )}
             <Tooltip content="Expand all" positioning={{ placement: "top" }}>
               <Flex
                 as="button"
@@ -347,6 +408,7 @@ export const WaterfallView = memo(function WaterfallView({
                       selectedSpanId !== null &&
                       node.span.spanId !== selectedSpanId
                     }
+                    signals={signalsBySpanId.get(node.span.spanId) ?? []}
                     onToggleCollapse={() =>
                       handleToggleCollapse(node.span.spanId)
                     }

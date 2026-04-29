@@ -11,11 +11,14 @@ import { mapNormalizedSpansToSpans } from "~/server/traces/mappers/span.mapper";
 import { createLogger } from "~/utils/logger/server";
 import type { SpanInsertData } from "../types";
 import type {
+  LangwatchSignalBucket,
   OccurredAtHint,
+  SpanLangwatchSignalsRow,
   SpanResourceInfo,
   SpanStorageRepository,
   SpanSummaryRow,
 } from "./span-storage.repository";
+import { LANGWATCH_SIGNAL_BUCKETS } from "./span-storage.repository";
 
 const TABLE_NAME = "stored_spans" as const;
 
@@ -157,6 +160,26 @@ function dedupInTuple(extraInnerWhere: string): string {
     GROUP BY TenantId, TraceId, SpanId
   )`;
 }
+
+/**
+ * Per-bucket key matchers for the LangWatch signals projection. Each entry
+ * compiles to one ClickHouse boolean expression over `mapKeys(SpanAttributes)`.
+ * Order must match `LANGWATCH_SIGNAL_BUCKETS` in span-storage.repository.ts —
+ * we depend on the bucket name list to deserialize back into typed values.
+ */
+const SIGNAL_BUCKET_PREDICATES: Record<LangwatchSignalBucket, string> = {
+  prompt: "arrayExists(k -> startsWith(k, 'langwatch.prompt.'), keys)",
+  scenario:
+    "arrayExists(k -> startsWith(k, 'langwatch.scenario.') OR k = 'scenario.run_id', keys)",
+  user: "arrayExists(k -> k = 'langwatch.user_id' OR startsWith(k, 'langwatch.user.'), keys)",
+  thread:
+    "arrayExists(k -> k = 'gen_ai.conversation.id' OR k = 'langgraph.thread_id' OR startsWith(k, 'langwatch.thread.'), keys)",
+  evaluation:
+    "arrayExists(k -> startsWith(k, 'langwatch.evaluation'), keys)",
+  rag: "arrayExists(k -> startsWith(k, 'langwatch.rag.'), keys)",
+  metadata: "arrayExists(k -> startsWith(k, 'langwatch.metadata.'), keys)",
+  genai: "arrayExists(k -> startsWith(k, 'gen_ai.'), keys)",
+};
 
 interface SpanSummaryQueryRow {
   SpanId: string;
@@ -923,6 +946,74 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
 
         const rows = await result.json<SpanSummaryQueryRow>();
         return rows.map(mapSpanSummaryRow);
+      },
+    );
+  }
+
+  async findLangwatchSignalsByTraceId({
+    tenantId,
+    traceId,
+    occurredAtMs,
+  }: {
+    tenantId: string;
+    traceId: string;
+  } & OccurredAtHint): Promise<SpanLangwatchSignalsRow[]> {
+    EventUtils.validateTenantId(
+      { tenantId },
+      "SpanStorageClickHouseRepository.findLangwatchSignalsByTraceId",
+    );
+
+    return withPartitionHint<SpanLangwatchSignalsRow[]>(
+      { occurredAtMs },
+      (rows) => rows.length === 0,
+      async (window) => {
+        const partition = partitionFragment(window);
+        const client = await this.resolveClient(tenantId);
+        // Reads `mapKeys(SpanAttributes)` once per row into a CTE-style
+        // alias (`keys`) so each bucket predicate doesn't re-materialize
+        // the key array. Heavy attribute *values* are never read — only
+        // their keys — keeping this scan an order of magnitude lighter
+        // than getSpansByTraceId.
+        const result = await client.query({
+          query: `
+            SELECT
+              SpanId,
+              arrayFilter(x -> x != '', [
+                ${LANGWATCH_SIGNAL_BUCKETS.map(
+                  (bucket) =>
+                    `if(${SIGNAL_BUCKET_PREDICATES[bucket]}, '${bucket}', '')`,
+                ).join(",\n                ")}
+              ]) AS Signals
+            FROM (
+              SELECT
+                SpanId,
+                mapKeys(SpanAttributes) AS keys
+              FROM ${TABLE_NAME}
+              WHERE TenantId = {tenantId:String}
+                AND TraceId = {traceId:String}
+                ${partition.sqlAnd}
+                AND ${dedupInTuple(partition.sqlAndInner)}
+            )
+          `,
+          query_params: { tenantId, traceId, ...partition.params },
+          format: "JSONEachRow",
+        });
+
+        const rows = (await result.json()) as Array<{
+          SpanId: string;
+          Signals: string[];
+        }>;
+
+        const validBuckets = new Set<string>(LANGWATCH_SIGNAL_BUCKETS);
+        return rows
+          .filter((r) => Array.isArray(r.Signals) && r.Signals.length > 0)
+          .map((r) => ({
+            spanId: r.SpanId,
+            signals: r.Signals.filter((s): s is LangwatchSignalBucket =>
+              validBuckets.has(s),
+            ),
+          }))
+          .filter((r) => r.signals.length > 0);
       },
     );
   }

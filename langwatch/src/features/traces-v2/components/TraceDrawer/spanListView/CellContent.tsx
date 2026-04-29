@@ -1,6 +1,8 @@
-import { Circle, Text } from "@chakra-ui/react";
+import { Circle, HStack, Text } from "@chakra-ui/react";
 import { Tooltip } from "~/components/ui/tooltip";
+import type { LangwatchSignalBucket } from "~/server/api/routers/tracesV2.schemas";
 import { formatDuration, STATUS_COLORS } from "../../../utils/formatters";
+import { LangwatchSignalBadges } from "../LangwatchSignalBadges";
 import { SpanTypeBadge } from "./SpanTypeBadge";
 import type { DerivedSpan, SortField } from "./types";
 import { formatOffset } from "./utils";
@@ -8,22 +10,29 @@ import { formatOffset } from "./utils";
 export function CellContent({
   col,
   data,
+  signals = [],
 }: {
   col: SortField;
   data: DerivedSpan;
+  signals?: readonly LangwatchSignalBucket[];
 }) {
   switch (col) {
     case "name":
       return (
-        <Text
-          textStyle="xs"
-          fontFamily="mono"
-          truncate
-          title={data.span.name}
-          color="fg"
-        >
-          {data.span.name}
-        </Text>
+        <HStack gap={1.5} minWidth={0} flex={1}>
+          <Text
+            textStyle="xs"
+            fontFamily="mono"
+            truncate
+            title={data.span.name}
+            color="fg"
+            flex={1}
+            minWidth={0}
+          >
+            {data.span.name}
+          </Text>
+          {signals.length > 0 && <LangwatchSignalBadges signals={signals} />}
+        </HStack>
       );
     case "type":
       return <SpanTypeBadge type={data.span.type ?? "span"} />;

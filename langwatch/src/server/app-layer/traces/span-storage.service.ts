@@ -1,6 +1,7 @@
 import type { ElasticSearchEvent, Span } from "~/server/tracer/types";
 import type {
   OccurredAtHint,
+  SpanLangwatchSignalsRow,
   SpanResourceInfo,
   SpanStorageRepository,
   SpanSummaryRow,
@@ -37,6 +38,12 @@ export class SpanStorageService {
 
   async getSpanSummaryByTraceId(params: ByTraceId): Promise<SpanSummaryRow[]> {
     return this.repository.getSpanSummaryByTraceId(params);
+  }
+
+  async getLangwatchSignalsByTraceId(
+    params: ByTraceId,
+  ): Promise<SpanLangwatchSignalsRow[]> {
+    return this.repository.findLangwatchSignalsByTraceId(params);
   }
 
   async getSpanResourcesByTraceId(

@@ -1,9 +1,17 @@
 import { Box, Flex, HStack, Icon, Input, Text } from "@chakra-ui/react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { memo, useEffect, useMemo, useRef, useState } from "react";
-import { LuArrowDown, LuArrowUp, LuSearch, LuX } from "react-icons/lu";
+import {
+  LuArrowDown,
+  LuArrowUp,
+  LuSearch,
+  LuSparkles,
+  LuX,
+} from "react-icons/lu";
 import { Tooltip } from "~/components/ui/tooltip";
+import { useSpanLangwatchSignals } from "../../../hooks/useSpanLangwatchSignals";
 import { SPAN_TYPE_COLORS, truncateId } from "../../../utils/formatters";
+import { LangwatchSignalBadges } from "../LangwatchSignalBadges";
 import { CellContent, FooterCell } from "./CellContent";
 import { COLUMNS } from "./columns";
 import { FilterChip } from "./FilterChip";
@@ -24,6 +32,11 @@ export const SpanListView = memo(function SpanListView({
   const [activeTypes, setActiveTypes] = useState<Set<string>>(
     initialTypeFilter ? new Set([initialTypeFilter]) : new Set(),
   );
+  const [showOnlyLangwatch, setShowOnlyLangwatch] = useState(false);
+
+  const { signalsBySpanId, isFetched: signalsFetched } =
+    useSpanLangwatchSignals();
+  const hasAnySignals = signalsBySpanId.size > 0;
 
   // Sync from props when cross-view navigation triggers a filter update
   useEffect(() => {
@@ -74,8 +87,20 @@ export const SpanListView = memo(function SpanListView({
       const q = searchQuery.trim().toLowerCase();
       result = result.filter((d) => d.span.name.toLowerCase().includes(q));
     }
+    if (showOnlyLangwatch) {
+      result = result.filter(
+        (d) => (signalsBySpanId.get(d.span.spanId)?.length ?? 0) > 0,
+      );
+    }
     return result;
-  }, [allDerived, activeTypes, isTypeFiltered, searchQuery]);
+  }, [
+    allDerived,
+    activeTypes,
+    isTypeFiltered,
+    searchQuery,
+    showOnlyLangwatch,
+    signalsBySpanId,
+  ]);
 
   const sortedDerived = useMemo(() => {
     const sorted = [...filteredDerived].sort((a, b) => {
@@ -87,7 +112,8 @@ export const SpanListView = memo(function SpanListView({
     return sorted;
   }, [filteredDerived, sortField, sortDirection]);
 
-  const isFiltered = isTypeFiltered || searchQuery.trim().length > 0;
+  const isFiltered =
+    isTypeFiltered || searchQuery.trim().length > 0 || showOnlyLangwatch;
 
   const totals = useMemo(() => {
     const source = isFiltered ? filteredDerived : allDerived;
@@ -160,6 +186,7 @@ export const SpanListView = memo(function SpanListView({
   function clearAllFilters() {
     setActiveTypes(new Set());
     setSearchQuery("");
+    setShowOnlyLangwatch(false);
   }
 
   return (
@@ -256,6 +283,50 @@ export const SpanListView = memo(function SpanListView({
               />
             );
           })}
+          {(hasAnySignals || !signalsFetched) && (
+            <Tooltip
+              content="Show only spans with LangWatch instrumentation (prompts, scenarios, evaluations, etc.)"
+              positioning={{ placement: "top" }}
+            >
+              <Flex
+                as="button"
+                align="center"
+                gap={1}
+                paddingX={2}
+                height="20px"
+                borderRadius="full"
+                borderWidth="1px"
+                borderColor={
+                  showOnlyLangwatch ? "purple.solid" : "border.subtle"
+                }
+                bg={showOnlyLangwatch ? "purple.subtle" : "transparent"}
+                color={showOnlyLangwatch ? "purple.fg" : "fg.muted"}
+                cursor={hasAnySignals ? "pointer" : "not-allowed"}
+                opacity={hasAnySignals ? 1 : 0.4}
+                _hover={
+                  hasAnySignals
+                    ? {
+                        bg: showOnlyLangwatch ? "purple.subtle" : "bg.muted",
+                      }
+                    : undefined
+                }
+                disabled={!hasAnySignals}
+                onClick={() => setShowOnlyLangwatch((v) => !v)}
+                aria-pressed={showOnlyLangwatch}
+                marginLeft={1}
+              >
+                <Icon as={LuSparkles} boxSize={3} />
+                <Text textStyle="xs" fontWeight="medium" lineHeight={1}>
+                  LangWatch
+                </Text>
+                {hasAnySignals && (
+                  <Text textStyle="2xs" color="fg.subtle" lineHeight={1}>
+                    {signalsBySpanId.size}
+                  </Text>
+                )}
+              </Flex>
+            </Tooltip>
+          )}
         </HStack>
       </Flex>
 
@@ -401,7 +472,15 @@ export const SpanListView = memo(function SpanListView({
                               : "flex-start"
                         }
                       >
-                        <CellContent col={col.field} data={d} />
+                        <CellContent
+                          col={col.field}
+                          data={d}
+                          signals={
+                            col.field === "name"
+                              ? signalsBySpanId.get(d.span.spanId)
+                              : undefined
+                          }
+                        />
                       </Box>
                     ))}
                   </Flex>
