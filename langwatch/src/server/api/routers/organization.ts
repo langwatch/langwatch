@@ -1037,15 +1037,13 @@ export const organizationRouter = createTRPCRouter({
         });
       });
 
-      try {
-        await getApp().notifications.sendSlackSignupEvent({
+      void getApp()
+        .notifications.sendSlackSignupEvent({
           userName: session.user.name,
           userEmail: session.user.email,
           organizationName: invite.organization.name,
-        });
-      } catch (error) {
-        captureException(error);
-      }
+        })
+        .catch(captureException);
 
       fireInviteAcceptedNurturingCalls({
         userId: session.user.id,

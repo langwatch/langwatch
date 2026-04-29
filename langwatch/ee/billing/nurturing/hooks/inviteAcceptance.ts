@@ -30,7 +30,6 @@ export function fireInviteAcceptedNurturingCalls({
       traits: {
         ...(email ? { email } : {}),
         ...(name ? { name } : {}),
-        createdAt: new Date().toISOString(),
       },
     })
     .catch(captureException);
