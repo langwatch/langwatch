@@ -11,6 +11,7 @@ describe("copyWorkflowWithDatasets", () => {
   const sourceWorkflowId = `test_wf_src_${nanoid(8)}`;
   let userId: string;
   const createdWorkflowIds: string[] = [];
+  const tempSourceWorkflowIds: string[] = [];
 
   beforeAll(async () => {
     const user = await getTestUser();
@@ -77,10 +78,11 @@ describe("copyWorkflowWithDatasets", () => {
   });
 
   afterAll(async () => {
-    for (const id of createdWorkflowIds) {
+    const allIds = [sourceWorkflowId, ...createdWorkflowIds, ...tempSourceWorkflowIds];
+    for (const id of allIds) {
       await prisma.workflow
         .update({
-          where: { id, projectId: targetProjectId },
+          where: { id },
           data: { latestVersionId: null, currentVersionId: null },
         })
         .catch(() => {});
@@ -89,18 +91,6 @@ describe("copyWorkflowWithDatasets", () => {
         .catch(() => {});
       await prisma.workflow.delete({ where: { id } }).catch(() => {});
     }
-    await prisma.workflow
-      .update({
-        where: { id: sourceWorkflowId },
-        data: { latestVersionId: null, currentVersionId: null },
-      })
-      .catch(() => {});
-    await prisma.workflowVersion
-      .deleteMany({ where: { workflowId: sourceWorkflowId } })
-      .catch(() => {});
-    await prisma.workflow
-      .delete({ where: { id: sourceWorkflowId } })
-      .catch(() => {});
   });
 
   const getCtx = () => ({
@@ -145,6 +135,7 @@ describe("copyWorkflowWithDatasets", () => {
   describe("when source workflow is a component", () => {
     it("preserves isComponent on the copied workflow", async () => {
       const componentWorkflowId = `test_wf_comp_${nanoid(8)}`;
+      tempSourceWorkflowIds.push(componentWorkflowId);
       await prisma.workflow.create({
         data: {
           id: componentWorkflowId,
@@ -196,20 +187,6 @@ describe("copyWorkflowWithDatasets", () => {
         sourceProjectId,
       });
       createdWorkflowIds.push(workflowId);
-
-      // Cleanup the component source
-      await prisma.workflow
-        .update({
-          where: { id: componentWorkflowId },
-          data: { latestVersionId: null },
-        })
-        .catch(() => {});
-      await prisma.workflowVersion
-        .deleteMany({ where: { workflowId: componentWorkflowId } })
-        .catch(() => {});
-      await prisma.workflow
-        .delete({ where: { id: componentWorkflowId } })
-        .catch(() => {});
 
       const copied = await prisma.workflow.findUnique({
         where: { id: workflowId },
