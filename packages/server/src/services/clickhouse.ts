@@ -1,4 +1,4 @@
-import { mkdirSync, writeFileSync, existsSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { RuntimeContext } from "../shared/runtime-contract.ts";
 import type { EventBus } from "./event-bus.ts";
@@ -17,7 +17,13 @@ export async function startClickhouse(ctx: RuntimeContext, bus: EventBus): Promi
   const sp = servicePaths(ctx.paths);
   const configFile = join(sp.clickhouseConfigDir, "config.xml");
 
-  if (!existsSync(configFile)) writeClickhouseConfig(configFile, ctx);
+  // Always regenerate — the config is purely derived from ctx.ports +
+  // ctx.paths, both of which can change between runs (auto-port-shift
+  // when the default base is already bound, or LANGWATCH_HOME override).
+  // Skipping when the file exists baked the FIRST run's ports into the
+  // config forever; subsequent ports-shifted runs would try to bind to
+  // the stale port and crash with exit 210 (NETWORK_ERROR).
+  writeClickhouseConfig(configFile, ctx);
 
   const handle = supervise({
     spec: {
@@ -39,7 +45,8 @@ export async function startClickhouse(ctx: RuntimeContext, bus: EventBus): Promi
   });
   if (!ready.ok) {
     await handle.stop();
-    throw new Error(`clickhouse did not become ready: ${ready.reason}`);
+    const hint = diagnoseClickhouseFailure(ctx);
+    throw new Error(`clickhouse did not become ready: ${ready.reason}${hint ? `\n${hint}` : ""}`);
   }
 
   await ensureDatabase(ctx);
@@ -104,4 +111,41 @@ function writeClickhouseConfig(path: string, ctx: RuntimeContext): void {
 </clickhouse>
 `;
   writeFileSync(path, xml);
+}
+
+/**
+ * Inspect the most recent clickhouse-server.err.log lines for known
+ * failure patterns and surface a friendlier hint than the generic
+ * "did not become ready" message.
+ *
+ * The cryptic exit-code-210 ('NETWORK_ERROR') case has bitten dogfood
+ * users multiple times — almost always a zombie clickhouse from a
+ * previous shell session still holding the port (the pre-flight
+ * portsToCheck doesn't always catch tty-detached holders). Surface the
+ * exact port + pkill command instead of leaving the user to grep
+ * server.err.log themselves.
+ */
+function diagnoseClickhouseFailure(ctx: RuntimeContext): string | null {
+  const errLog = join(ctx.paths.logs, "clickhouse-server.err.log");
+  if (!existsSync(errLog)) return null;
+  let tail: string;
+  try {
+    const buf = readFileSync(errLog, "utf8");
+    tail = buf.slice(-4000); // last ~50 lines is plenty
+  } catch {
+    return null;
+  }
+  const portMatch = tail.match(/Listen \[127\.0\.0\.1\]:(\d+) failed: Address already in use/);
+  if (portMatch) {
+    const port = portMatch[1];
+    return (
+      `→ port :${port} is already bound by another process — likely a zombie clickhouse from a previous run.\n` +
+      `  Investigate:  lsof -iTCP:${port} -sTCP:LISTEN\n` +
+      `  Quick fix:    pkill -f langwatch/bin/clickhouse  # then re-run npx`
+    );
+  }
+  if (/Permission denied/.test(tail)) {
+    return `→ permission denied while opening files in ~/.langwatch/data/clickhouse — check directory ownership.`;
+  }
+  return null;
 }

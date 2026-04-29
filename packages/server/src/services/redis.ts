@@ -1,4 +1,4 @@
-import { mkdirSync, writeFileSync, existsSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import type { RuntimeContext } from "../shared/runtime-contract.ts";
 import type { EventBus } from "./event-bus.ts";
@@ -15,7 +15,11 @@ export async function startRedis(ctx: RuntimeContext, bus: EventBus): Promise<Su
   const sp = servicePaths(ctx.paths);
   const conf = sp.redisConf;
 
-  if (!existsSync(conf)) writeRedisConf(conf, ctx.ports.redis, ctx.paths.redisData);
+  // Always regenerate — same reasoning as clickhouse.ts: ports + dataDir
+  // are pure functions of ctx, and skipping when the file exists baked
+  // the FIRST run's port into redis.conf forever, which auto-port-shift
+  // on subsequent runs would leave stale.
+  writeRedisConf(conf, ctx.ports.redis, ctx.paths.redisData);
 
   const handle = supervise({
     spec: {
