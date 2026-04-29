@@ -198,7 +198,7 @@ describe("getManagementApiToken", () => {
 });
 
 describe("updateUserPassword", () => {
-  describe("when the Management API returns 204 OK", () => {
+  describe("when the Management API returns 200 OK", () => {
     it("sends the password + connection and bearer token", async () => {
       handler = (req) => {
         if (
