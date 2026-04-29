@@ -8,6 +8,8 @@ import {
   LuCopy,
   LuEye,
   LuLightbulb,
+  LuList,
+  LuMessageSquare,
   LuPencil,
 } from "react-icons/lu";
 import { Tooltip } from "~/components/ui/tooltip";
@@ -339,44 +341,62 @@ export const IOViewer = memo(function IOViewer({
             </Text>
           )}
         </HStack>
-        {!collapsed && format === "pretty" && isChat && mode !== "output" && (
-          // Output is always a single assistant message — the thread/bubbles
-          // distinction is meaningless there, hide the toggle.
-          <SegmentedToggle
-            value={chatLayout}
-            onChange={(l) => setChatLayout(l as ChatLayout)}
-            options={["thread", "bubbles"]}
-          />
-        )}
         {!collapsed && (
           <SegmentedToggle
             value={format}
             onChange={(f) => setFormat(f as ViewFormat)}
             options={formatOptions.map((opt) => {
-              if (opt !== "markdown") return opt;
-              // When markdown is the active format, the rendered/source
-              // toggles are embedded *inside* the markdown segment — like
-              // the × clear button inside a search-bar token. Same row,
-              // same pill, just two tiny icons after the label.
-              return {
-                value: "markdown",
-                trailing: (
-                  <>
-                    <MarkdownSubmodeIcon
-                      icon={LuEye}
-                      label="Rendered"
-                      active={markdownSubmode === "rendered"}
-                      onClick={() => setMarkdownSubmode("rendered")}
-                    />
-                    <MarkdownSubmodeIcon
-                      icon={LuCode}
-                      label="Source"
-                      active={markdownSubmode === "source"}
-                      onClick={() => setMarkdownSubmode("source")}
-                    />
-                  </>
-                ),
-              };
+              // Output is always a single assistant message, so the
+              // thread/bubbles split has no meaning there — only embed
+              // the layout toggle for input/system chat history.
+              if (opt === "pretty" && isChat && mode !== "output") {
+                return {
+                  value: "pretty",
+                  submodes: {
+                    value: chatLayout,
+                    onChange: (v) => setChatLayout(v as ChatLayout),
+                    options: [
+                      {
+                        value: "thread",
+                        label: "Thread",
+                        icon: LuList,
+                        tooltip: "Thread layout",
+                      },
+                      {
+                        value: "bubbles",
+                        label: "Bubbles",
+                        icon: LuMessageSquare,
+                        tooltip: "Bubble layout",
+                      },
+                    ],
+                  },
+                };
+              }
+              if (opt === "markdown") {
+                return {
+                  value: "markdown",
+                  submodes: {
+                    value: markdownSubmode,
+                    onChange: (v) =>
+                      setMarkdownSubmode(v as "rendered" | "source"),
+                    options: [
+                      {
+                        value: "rendered",
+                        label: "Rendered",
+                        icon: LuEye,
+                        tooltip: "Rendered markdown view",
+                      },
+                      {
+                        value: "source",
+                        label: "Source",
+                        icon: LuCode,
+                        tooltip: "Source markdown view",
+                      },
+                    ],
+                  },
+                };
+              }
+              return opt;
             })}
           />
         )}
@@ -541,57 +561,3 @@ export const IOViewer = memo(function IOViewer({
   );
 });
 
-interface MarkdownSubmodeIconProps {
-  icon: typeof LuEye;
-  label: string;
-  active: boolean;
-  onClick: () => void;
-}
-
-/**
- * Embedded icon control rendered *inside* the markdown segment of the
- * format toggle (like the × clear button inside a search-bar token).
- * Stays compact so the host segment's pill stays the same height; stops
- * click propagation so toggling rendered/source doesn't re-fire the
- * segment's own onClick.
- */
-function MarkdownSubmodeIcon({
-  icon,
-  label,
-  active,
-  onClick,
-}: MarkdownSubmodeIconProps) {
-  return (
-    <Tooltip
-      content={`${label} markdown view`}
-      positioning={{ placement: "top" }}
-    >
-      <Box
-        as="button"
-        onClick={(e: React.MouseEvent) => {
-          e.stopPropagation();
-          onClick();
-        }}
-        aria-label={`${label} markdown view`}
-        aria-pressed={active}
-        display="inline-flex"
-        alignItems="center"
-        justifyContent="center"
-        p={1}
-        height="full"
-        // borderRadius="xs"
-        bg={active ? "blue.solid/16" : "transparent"}
-        color={active ? "blue.fg" : "blue.fg/55"}
-        cursor="pointer"
-        transition="background 0.12s ease, color 0.12s ease"
-        _hover={
-          active
-            ? { bg: "blue.solid/22" }
-            : { color: "blue.fg", bg: "blue.solid/8" }
-        }
-      >
-        <Icon as={icon} boxSize={3} />
-      </Box>
-    </Tooltip>
-  );
-}

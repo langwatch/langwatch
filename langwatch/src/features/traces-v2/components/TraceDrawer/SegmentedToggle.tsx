@@ -1,22 +1,39 @@
 import { Flex, HStack } from "@chakra-ui/react";
 import type { ReactNode } from "react";
+import type { IconType } from "react-icons";
+import { SegmentSubmodeIcon } from "./SegmentSubmodeIcon";
+
+/**
+ * A sub-mode toggle rendered *inside* the parent segment's pill when
+ * that segment is active. Used to expose a secondary axis (e.g.
+ * rendered/source markdown, thread/bubbles chat) without growing a
+ * second standalone toggle row beside it.
+ */
+export interface SegmentSubmode {
+  value: string;
+  label: string;
+  icon: IconType;
+  /** Override default tooltip `${label} view`. */
+  tooltip?: string;
+}
+
+export interface SegmentSubmodeGroup {
+  value: string;
+  onChange: (value: string) => void;
+  options: readonly SegmentSubmode[];
+}
 
 /**
  * One option in a `<SegmentedToggle>`. The string-shorthand form covers
- * the simple case (label === value); the object form lets a segment
- * embed extra controls *inside* its own pill via `trailing` — used by
- * the I/O viewer to inline the rendered/source icon pair into the
- * `[markdown]` segment when it's active, like an X-clear button inside
- * a search-bar token.
+ * the simple case (label === value); the object form opts into either
+ * `submodes` (declarative inline icon pair, the common case) or
+ * `trailing` (escape hatch for arbitrary JSX inside the active pill).
  */
 export interface SegmentedOption {
   value: string;
   label?: string;
-  /**
-   * Rendered inside the segment's pill, after the label, when the
-   * segment is the active one. Click handlers on this content should
-   * stop propagation so they don't bubble into the segment's onClick.
-   */
+  submodes?: SegmentSubmodeGroup;
+  /** Escape hatch — prefer `submodes`. */
   trailing?: ReactNode;
 }
 
@@ -38,15 +55,11 @@ export function SegmentedToggle({
   options,
 }: SegmentedToggleProps) {
   return (
-    <HStack
-      gap={0.5}
-      flexShrink={0}
-      height="26px"
-      padding={0.5}
-    >
+    <HStack gap={0.5} flexShrink={0} height="26px" padding={0.5}>
       {options.map((rawOption) => {
         const option = normalizeOption(rawOption);
         const isActive = value === option.value;
+        const hasInline = option.submodes != null || option.trailing != null;
         return (
           <Flex
             key={option.value}
@@ -58,20 +71,42 @@ export function SegmentedToggle({
             fontWeight="semibold"
             color={isActive ? "blue.fg" : "fg.subtle"}
             bg={isActive ? "blue.subtle" : "transparent"}
-            paddingX={2.5}
-            paddingRight={isActive && option.trailing ? 0 : 2.5}
+            paddingLeft={2.5}
+            paddingRight={isActive && hasInline ? 0 : 2.5}
             overflow="hidden"
             height="full"
             align="center"
-            // Tight gap when trailing icons are embedded so the dividers
-            // read as attached to label + icons rather than floating.
-            gap={option.trailing ? .5 : 0}
+            // Submode icons live flush together; the gap between the
+            // label and the first icon is recreated as a marginRight on
+            // the label below so it visually mirrors the badge's
+            // leading padding.
+            gap={0}
             cursor="pointer"
             borderRadius="sm"
             transition="background 0.12s ease, color 0.12s ease"
             _hover={isActive ? undefined : { color: "fg" }}
           >
-            {option.label ?? option.value}
+            <Flex
+              as="span"
+              align="center"
+              marginRight={isActive && hasInline ? 2.5 : 0}
+            >
+              {option.label ?? option.value}
+            </Flex>
+            {isActive && option.submodes && (
+              <>
+                {option.submodes.options.map((sub) => (
+                  <SegmentSubmodeIcon
+                    key={sub.value}
+                    icon={sub.icon}
+                    label={sub.label}
+                    tooltip={sub.tooltip}
+                    active={option.submodes!.value === sub.value}
+                    onClick={() => option.submodes!.onChange(sub.value)}
+                  />
+                ))}
+              </>
+            )}
             {isActive && option.trailing}
           </Flex>
         );

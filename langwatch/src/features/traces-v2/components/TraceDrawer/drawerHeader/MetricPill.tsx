@@ -1,6 +1,13 @@
 import { Box, HStack, Icon, Text, VStack } from "@chakra-ui/react";
 import { useCallback, useState } from "react";
-import { LuCheck, LuCopy, LuFilter, LuPin, LuSparkles } from "react-icons/lu";
+import {
+  LuArrowUpRight,
+  LuCheck,
+  LuCopy,
+  LuFilter,
+  LuPin,
+  LuSparkles,
+} from "react-icons/lu";
 import { Tooltip } from "~/components/ui/tooltip";
 import type { PinnedAttribute } from "../../../stores/pinnedAttributesStore";
 import { TooltipRow } from "./TooltipRow";
@@ -45,6 +52,8 @@ export function PinnedMetricPill({
   auto,
   onUnpin,
   onFilter,
+  onNavigate,
+  navigateLabel,
 }: {
   pin: PinnedAttribute;
   value: string | null;
@@ -54,6 +63,11 @@ export function PinnedMetricPill({
    * table to this attribute's value. Used for user / conversation / thread
    * pills where filtering is a primary affordance. */
   onFilter?: () => void;
+  /** When provided, the pill grows a "jump" arrow that navigates to the
+   * related thing (conversation view, scenario run drawer, prompts tab,
+   * …). Tooltip uses `navigateLabel` if set, else "Open". */
+  onNavigate?: () => void;
+  navigateLabel?: string;
 }) {
   const [copied, setCopied] = useState(false);
   const display = value ?? "—";
@@ -81,6 +95,9 @@ export function PinnedMetricPill({
       <TooltipRow label="Value" value={display} />
       <Text textStyle="2xs" color="fg.muted" paddingTop={1}>
         Click value to copy
+        {onNavigate
+          ? ` · click arrow to ${navigateLabel?.toLowerCase() ?? "open"}`
+          : ""}
         {onFilter ? " · click filter to scope the table" : ""}
         {auto ? "" : " · click pin to unpin"}
       </Text>
@@ -182,6 +199,30 @@ export function PinnedMetricPill({
             flexShrink={0}
           />
         </Box>
+        {onNavigate && value != null && (
+          <Tooltip
+            content={navigateLabel ?? "Open"}
+            positioning={{ placement: "top" }}
+          >
+            <Box
+              as="button"
+              onClick={(e: React.MouseEvent) => {
+                e.stopPropagation();
+                onNavigate();
+              }}
+              aria-label={navigateLabel ?? `Open ${pin.key}`}
+              cursor="pointer"
+              display="inline-flex"
+              alignItems="center"
+              flexShrink={0}
+              opacity={0.55}
+              _hover={{ opacity: 1 }}
+              transition="opacity 0.12s ease"
+            >
+              <Icon as={LuArrowUpRight} boxSize={2.5} color={fg} />
+            </Box>
+          </Tooltip>
+        )}
         {onFilter && value != null && (
           <Box
             as="button"

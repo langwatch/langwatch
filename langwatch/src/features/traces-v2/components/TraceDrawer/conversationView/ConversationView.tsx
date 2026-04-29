@@ -335,9 +335,6 @@ const ConversationHeader: React.FC<{
       {conversationId}
     </Text>
     <Box flex={1} />
-    <Text textStyle="2xs" color="fg.subtle" fontFamily="mono">
-      {turnCount} turn{turnCount === 1 ? "" : "s"}
-    </Text>
     <SegmentedToggle
       value={mode}
       onChange={(v) => onModeChange(v as Mode)}

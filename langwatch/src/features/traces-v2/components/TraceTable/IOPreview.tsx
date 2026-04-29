@@ -75,6 +75,8 @@ const CompactRow: React.FC<CompactRowProps> = ({
         fontStyle="italic"
         fontWeight="400"
         truncate
+        flex={1}
+        minWidth={0}
       >
         {parsed.text}
       </Text>

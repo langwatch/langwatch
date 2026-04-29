@@ -31,17 +31,14 @@ export interface PromptChipState {
 /** Discriminated chip data used by `<TraceHeaderChips>` to render JSX. */
 export type TraceHeaderChipData =
   | {
-      /**
-       * Combined source chip — service + origin folded into one entry. They
-       * answer the same question ("where did this trace come from?") so we
-       * collapse them into a single pill with both filter actions exposed
-       * via the popover.
-       */
-      kind: "source";
-      service: string | null;
+      kind: "service";
+      service: string;
+      onFilter: () => void;
+    }
+  | {
+      kind: "origin";
       origin: string;
-      onFilterService: (() => void) | null;
-      onFilterOrigin: () => void;
+      onFilter: () => void;
     }
   | { kind: "scenario"; data: ScenarioChipData }
   | { kind: "sdk"; sdk: SdkInfoLike }
@@ -118,16 +115,20 @@ export function useTraceHeaderChips(
 
   const chips: TraceHeaderChipData[] = [];
 
-  // Service + origin merge into one "source" chip — they're both "where did
-  // this come from" and read as a single cluster anyway.
+  // Service and origin are answer different questions — service is the app
+  // that produced the trace, origin is where the SDK call entered the system
+  // (web, batch import, replay, …) — so they get their own chips.
+  if (trace.serviceName) {
+    chips.push({
+      kind: "service",
+      service: trace.serviceName,
+      onFilter: addToFilter("service", trace.serviceName),
+    });
+  }
   chips.push({
-    kind: "source",
-    service: trace.serviceName || null,
+    kind: "origin",
     origin: trace.origin,
-    onFilterService: trace.serviceName
-      ? addToFilter("service", trace.serviceName)
-      : null,
-    onFilterOrigin: addToFilter("origin", trace.origin),
+    onFilter: addToFilter("origin", trace.origin),
   });
   if (scenarioData) {
     chips.push({ kind: "scenario", data: scenarioData });

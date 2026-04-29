@@ -12,7 +12,9 @@ import {
 interface UnsavedLensDialogProps {
   open: boolean;
   lensName: string;
-  onSave: () => void;
+  /** Save the local changes as a brand-new lens (prompts for a name). */
+  onSaveAsNew: () => void;
+  /** Discard local changes — revert to the saved lens definition. */
   onDiscard: () => void;
   onCancel: () => void;
 }
@@ -20,7 +22,7 @@ interface UnsavedLensDialogProps {
 export const UnsavedLensDialog: React.FC<UnsavedLensDialogProps> = ({
   open,
   lensName,
-  onSave,
+  onSaveAsNew,
   onDiscard,
   onCancel,
 }) => (
@@ -33,12 +35,12 @@ export const UnsavedLensDialog: React.FC<UnsavedLensDialogProps> = ({
   >
     <DialogContent>
       <DialogHeader>
-        <DialogTitle>Unsaved changes</DialogTitle>
+        <DialogTitle>Unsaved local changes</DialogTitle>
       </DialogHeader>
       <DialogBody>
         <Text color="fg.muted" fontSize="sm">
-          You have unsaved changes on <strong>{lensName}</strong>. Would you
-          like to save or discard them?
+          You have unsaved local changes on <strong>{lensName}</strong>. Save
+          them as a new lens, or discard and switch?
         </Text>
       </DialogBody>
       <DialogFooter>
@@ -49,8 +51,8 @@ export const UnsavedLensDialog: React.FC<UnsavedLensDialogProps> = ({
           <Button variant="outline" size="sm" onClick={onDiscard}>
             Discard
           </Button>
-          <Button colorPalette="blue" size="sm" onClick={onSave}>
-            Save
+          <Button colorPalette="blue" size="sm" onClick={onSaveAsNew}>
+            Save as new lens…
           </Button>
         </HStack>
       </DialogFooter>

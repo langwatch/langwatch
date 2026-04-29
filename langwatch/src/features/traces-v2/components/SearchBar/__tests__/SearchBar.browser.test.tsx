@@ -13,8 +13,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { userEvent } from "vitest/browser";
 import "@testing-library/jest-dom/vitest";
 
-vi.mock("../useDynamicValueSuggestions", () => ({
-  useDynamicValueSuggestions: () => undefined,
+vi.mock("../../../hooks/useTraceFacets", () => ({
+  useTraceFacets: () => ({ data: [], isLoading: false }),
 }));
 
 import { useFilterStore } from "../../../stores/filterStore";

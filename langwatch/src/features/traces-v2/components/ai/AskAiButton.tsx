@@ -1,7 +1,7 @@
 import { Box, Button, HStack, Text } from "@chakra-ui/react";
 import { MeshGradient } from "@paper-design/shaders-react";
 import { Sparkles } from "lucide-react";
-import type React from "react";
+import React from "react";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useReducedMotion } from "~/hooks/useReducedMotion";
 import { aiBrandPalette } from "./aiBrandPalette";
@@ -23,7 +23,7 @@ interface AskAiButtonProps {
  * switch to the AI input. Same visuals everywhere so the AI surface
  * reads as one consistent feature.
  */
-export const AskAiButton: React.FC<AskAiButtonProps> = ({
+const AskAiButtonImpl: React.FC<AskAiButtonProps> = ({
   onClick,
   tooltip = "Tell us what you want, and let AI make it happen",
   ariaLabel = "Enter AI mode",
@@ -72,3 +72,8 @@ export const AskAiButton: React.FC<AskAiButtonProps> = ({
     </Tooltip>
   );
 };
+
+// Memoised so the WebGL `MeshGradient` doesn't re-reconcile on every parent
+// re-render (the SearchBar re-renders on every keystroke as the query text
+// updates, and the shader is already running its own animation loop).
+export const AskAiButton = React.memo(AskAiButtonImpl);

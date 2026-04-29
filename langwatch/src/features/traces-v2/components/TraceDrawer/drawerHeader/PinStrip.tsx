@@ -20,6 +20,13 @@ export interface CategorizedPin {
    * this attribute's value (e.g. "find traces from this user").
    */
   onFilter?: () => void;
+  /**
+   * If set, the pill grows a "jump" arrow that navigates to the related
+   * thing (conversation view, scenario run drawer, prompts tab, …).
+   */
+  onNavigate?: () => void;
+  /** Tooltip / aria-label for the navigate icon, e.g. "Open conversation". */
+  navigateLabel?: string;
 }
 
 /**
@@ -134,6 +141,8 @@ function renderPinPill(
       auto={p.auto}
       onUnpin={onUnpin}
       onFilter={p.onFilter}
+      onNavigate={p.onNavigate}
+      navigateLabel={p.navigateLabel}
     />
   );
 }

@@ -5,7 +5,6 @@ import {
   LuCopy,
   LuFilePlus,
   LuPencil,
-  LuSave,
   LuTrash2,
   LuUndo2,
 } from "react-icons/lu";
@@ -24,14 +23,23 @@ interface LensTabProps {
   lens: LensConfig;
   isDraft: boolean;
   errorCount: number;
+  /**
+   * When true the tab still mounts (so its `data-value` lives in the DOM
+   * and the overflow measurement loop can keep tracking lens identity)
+   * but is laid out with `display: none` so it occupies no space and
+   * isn't visible. The overflow menu surfaces these instead.
+   */
+  hidden?: boolean;
 }
 
 export const LensTab: React.FC<LensTabProps> = ({
   lens,
   isDraft,
   errorCount,
+  hidden,
 }) => {
   const renameLens = useViewStore((s) => s.renameLens);
+  const revertLens = useViewStore((s) => s.revertLens);
   const canDelete = useViewStore((s) => s.allLenses.length > 1);
 
   const [isRenaming, setIsRenaming] = useState(false);
@@ -42,8 +50,26 @@ export const LensTab: React.FC<LensTabProps> = ({
     setIsRenaming(false);
   };
 
+  // Double-click is a fast "snap back to the saved lens" — clears the local
+  // draft for this lens only. No-op for clean lenses so the gesture is
+  // predictable. Lenses are immutable from the user's perspective: drafts
+  // are local-only, double-click discards them.
+  const handleDoubleClick = (e: React.MouseEvent) => {
+    if (!isDraft) return;
+    e.preventDefault();
+    e.stopPropagation();
+    revertLens(lens.id);
+  };
+
   const trigger = (
-    <Tabs.Trigger value={lens.id} paddingX={2} minWidth="auto" gap={1}>
+    <Tabs.Trigger
+      value={lens.id}
+      paddingX={2}
+      minWidth="auto"
+      gap={1}
+      display={hidden ? "none" : undefined}
+      onDoubleClick={handleDoubleClick}
+    >
       {isRenaming ? (
         <RenameInput
           initialValue={lens.name}
@@ -205,19 +231,20 @@ const BuiltInLensMenuItems: React.FC<{
   return (
     <>
       <MenuItem
+        value="save-as-new"
+        onClick={() => promptSaveAsNewLens(`${lensName} (copy)`, saveAsNewLens)}
+        fontWeight={isDraft ? "semibold" : undefined}
+      >
+        <LuFilePlus />
+        {isDraft ? "Save changes as new lens…" : "Save as new lens…"}
+      </MenuItem>
+      <MenuItem
         value="revert"
         onClick={() => revertLens(lensId)}
         disabled={!isDraft}
       >
         <LuUndo2 />
-        Revert
-      </MenuItem>
-      <MenuItem
-        value="save-as-new"
-        onClick={() => promptSaveAsNewLens(`${lensName} (copy)`, saveAsNewLens)}
-      >
-        <LuFilePlus />
-        Save as new lens
+        Revert local changes
       </MenuItem>
       <MenuSeparator />
       <MenuItem
@@ -241,7 +268,6 @@ const UserLensMenuItems: React.FC<{
   const lensName = useViewStore(
     (s) => s.allLenses.find((l) => l.id === lensId)?.name ?? "",
   );
-  const saveLens = useViewStore((s) => s.saveLens);
   const revertLens = useViewStore((s) => s.revertLens);
   const saveAsNewLens = useViewStore((s) => s.saveAsNewLens);
   const duplicateLens = useViewStore((s) => s.duplicateLens);
@@ -249,13 +275,16 @@ const UserLensMenuItems: React.FC<{
 
   return (
     <>
+      {/* Lenses are immutable — local edits stay local until the user makes
+          a copy. The "Save" overwrite was removed because it conflated
+          "persist my changes" with "rewrite the shared lens definition". */}
       <MenuItem
-        value="save"
-        onClick={() => saveLens(lensId)}
-        disabled={!isDraft}
+        value="save-as-new"
+        onClick={() => promptSaveAsNewLens(`${lensName} (copy)`, saveAsNewLens)}
+        fontWeight={isDraft ? "semibold" : undefined}
       >
-        <LuSave />
-        Save
+        <LuFilePlus />
+        {isDraft ? "Save changes as new lens…" : "Save as new lens…"}
       </MenuItem>
       <MenuItem
         value="revert"
@@ -263,19 +292,12 @@ const UserLensMenuItems: React.FC<{
         disabled={!isDraft}
       >
         <LuUndo2 />
-        Revert
+        Revert local changes
       </MenuItem>
       <MenuSeparator />
       <MenuItem value="rename" onClick={onRename}>
         <LuPencil />
         Rename
-      </MenuItem>
-      <MenuItem
-        value="save-as-new"
-        onClick={() => promptSaveAsNewLens(`${lensName} (copy)`, saveAsNewLens)}
-      >
-        <LuFilePlus />
-        Save as new lens
       </MenuItem>
       <MenuItem value="duplicate" onClick={() => duplicateLens(lensId)}>
         <LuCopy />

@@ -29,6 +29,7 @@ import { TraceTable } from "../TraceTable/TraceTable";
 import { PageKeyboardShortcuts } from "./PageKeyboardShortcuts";
 import { useAutoOpenWelcome } from "./useAutoOpenWelcome";
 import { useDebouncedFilterCommit } from "./useDebouncedFilterCommit";
+import { useTracesPageTitle } from "./usePageTitle";
 import {
   useClearSelectionShortcut,
   useDensityToggleShortcut,
@@ -65,6 +66,7 @@ export const TracesPage: React.FC = () => {
   useDensityToggleShortcut();
   useClearSelectionShortcut();
   useResetSelectionOnViewChange();
+  useTracesPageTitle();
 
   const router = useRouter();
   const previewParam = "empty" in router.query;

@@ -108,15 +108,15 @@ export function ThreadProgressIndicator({
   );
 
   // Without a conversation id there's no popover content worth opening —
-  // fall back to the bare hover tooltip describing J/K navigation.
+  // fall back to the bare hover tooltip describing arrow-key navigation.
   if (!conversationId) {
     return (
       <Tooltip
         content={
           <HStack gap={1}>
             <Text>{isLoading ? "Loading…" : "Navigate thread"}</Text>
-            <Kbd>J</Kbd>
-            <Kbd>K</Kbd>
+            <Kbd>←</Kbd>
+            <Kbd>→</Kbd>
           </HStack>
         }
         positioning={{ placement: "bottom" }}
@@ -167,9 +167,9 @@ export function ThreadProgressIndicator({
 
             <Text textStyle="2xs" color="fg.subtle">
               Turn {safePosition} of {total}. Use{" "}
-              <Kbd>J</Kbd>
+              <Kbd>←</Kbd>
               {" / "}
-              <Kbd>K</Kbd>
+              <Kbd>→</Kbd>
               {" to navigate."}
             </Text>
 

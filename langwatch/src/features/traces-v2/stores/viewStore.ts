@@ -95,7 +95,6 @@ interface ViewState {
 
   isDraft: (lensId: string) => boolean;
   createLens: (name: string) => string;
-  saveLens: (lensId: string) => void;
   saveAsNewLens: (name: string) => string;
   revertLens: (lensId: string) => void;
   renameLens: (lensId: string, name: string) => void;
@@ -534,26 +533,6 @@ export const useViewStore = create<ViewState>((set, get) => ({
     set({ allLenses, activeLensId: id });
     return id;
   },
-
-  saveLens: (lensId) =>
-    set((s) => {
-      const draft = s.draftState.get(lensId);
-      if (!draft) return s;
-      const lens = s.allLenses.find((l) => l.id === lensId);
-      if (!lens || lens.isBuiltIn) return s;
-
-      const updated: LensConfig = {
-        ...lens,
-        sort: draft.sort ?? lens.sort,
-        grouping: draft.grouping ?? lens.grouping,
-        columns: draft.columns ?? lens.columns,
-        filterText: draft.filter ?? lens.filterText,
-      };
-      const allLenses = s.allLenses.map((l) => (l.id === lensId ? updated : l));
-      const nextDraft = clearDraftFor(s.draftState, lensId);
-      persistCustomLenses(allLenses);
-      return { allLenses, draftState: nextDraft };
-    }),
 
   saveAsNewLens: (name) => {
     const id = generateId();

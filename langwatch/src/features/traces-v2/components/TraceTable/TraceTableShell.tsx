@@ -31,6 +31,7 @@ export function TraceTableShell<T>({
       width="full"
       css={{
         borderCollapse: "collapse",
+        tableLayout: "fixed",
         minWidth,
         position: "relative",
         zIndex: 1,

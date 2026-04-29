@@ -61,6 +61,13 @@ interface DrawerState extends DrawerUrlState {
   toggleAccordion: (section: AccordionSection) => void;
   pushTraceHistory: (entry: TraceHistoryEntry) => void;
   popTraceHistory: () => TraceHistoryEntry | null;
+  /**
+   * Drop everything *above* `index` in the back stack and return the
+   * entry at `index` (which becomes the navigation target). Used by the
+   * back-button context menu so the user can jump multiple steps back
+   * in one action without re-traversing the stack.
+   */
+  popTraceHistoryTo: (index: number) => TraceHistoryEntry | null;
   /** Apply URL-derived state to the store (mount hydration, popstate). */
   hydrateUrlState: (next: Partial<DrawerUrlState>) => void;
 }
@@ -254,6 +261,14 @@ export const useDrawerStore = create<DrawerState>((set, get) => ({
     const previous = stack[stack.length - 1] ?? null;
     set({ traceBackStack: stack.slice(0, -1) });
     return previous;
+  },
+
+  popTraceHistoryTo: (index: number) => {
+    const stack = get().traceBackStack;
+    if (index < 0 || index >= stack.length) return null;
+    const target = stack[index] ?? null;
+    set({ traceBackStack: stack.slice(0, index) });
+    return target;
   },
 
   hydrateUrlState: (next) =>

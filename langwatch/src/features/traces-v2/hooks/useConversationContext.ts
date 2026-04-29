@@ -39,9 +39,9 @@ const NULL_RESULT: ConversationContextResult = {
  * fragment server-side (no liqe parsing fragility around weird
  * conversationId chars).
  *
- * The query is keyed only on (projectId, conversationId) so J/K-navigating
- * between sibling traces doesn't churn the cache — `position`, `previous`,
- * and `next` are derived locally from the active `traceId`.
+ * The query is keyed only on (projectId, conversationId) so arrow-key
+ * navigation between sibling traces doesn't churn the cache — `position`,
+ * `previous`, and `next` are derived locally from the active `traceId`.
  */
 export function useConversationContext(
   conversationId: string | null | undefined,

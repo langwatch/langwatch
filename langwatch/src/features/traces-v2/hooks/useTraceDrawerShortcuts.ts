@@ -40,7 +40,7 @@ function isTypingTarget(target: EventTarget | null): boolean {
  * - `1-5`: viz tab.
  * - `O`/`L`/`P`: lower tab bar (summary / LLM-optimized / prompts).
  * - `T`/`C`: drawer view mode (trace / conversation).
- * - `J`/`K` (and arrows): conversation thread navigation.
+ * - Arrow Left/Right: conversation thread navigation.
  * - `B`: back through the in-drawer trace history stack.
  * - `M`: maximize toggle. `R`: refresh. `Y`: copy trace id.
  * - `?`: shortcuts dialog.
@@ -87,9 +87,7 @@ export function useTraceDrawerShortcuts({
           store.setShortcutsOpen(!store.shortcutsOpen);
           return;
         }
-        case "ArrowRight":
-        case "j":
-        case "J": {
+        case "ArrowRight": {
           // Always claim — otherwise an end-of-thread press fell through to
           // browser nav.
           e.preventDefault();
@@ -103,9 +101,7 @@ export function useTraceDrawerShortcuts({
           }
           return;
         }
-        case "ArrowLeft":
-        case "k":
-        case "K": {
+        case "ArrowLeft": {
           e.preventDefault();
           if (prevTraceId) {
             navigateToTrace({

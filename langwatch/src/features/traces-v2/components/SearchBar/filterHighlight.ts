@@ -207,6 +207,7 @@ export function buildDecorationSlots(
 }
 
 const DELETE_DATA_ATTR = "data-filter-delete";
+const SVG_NS = "http://www.w3.org/2000/svg";
 
 function createDeleteWidget(token: TokenRef): HTMLElement {
   const btn = document.createElement("button");
@@ -220,7 +221,30 @@ function createDeleteWidget(token: TokenRef): HTMLElement {
   btn.dataset.locEnd = String(token.end);
   if (token.field) btn.dataset.field = token.field;
   if (token.value !== null) btn.dataset.value = token.value;
-  btn.textContent = "×";
+
+  // Crisp SVG X — the "×" text glyph rendered chunky and uneven at this size.
+  const svg = document.createElementNS(SVG_NS, "svg");
+  svg.setAttribute("width", "10");
+  svg.setAttribute("height", "10");
+  svg.setAttribute("viewBox", "0 0 10 10");
+  svg.setAttribute("fill", "none");
+  svg.setAttribute("stroke", "currentColor");
+  svg.setAttribute("stroke-width", "1.6");
+  svg.setAttribute("stroke-linecap", "round");
+  svg.setAttribute("aria-hidden", "true");
+  const a = document.createElementNS(SVG_NS, "line");
+  a.setAttribute("x1", "2");
+  a.setAttribute("y1", "2");
+  a.setAttribute("x2", "8");
+  a.setAttribute("y2", "8");
+  const b = document.createElementNS(SVG_NS, "line");
+  b.setAttribute("x1", "8");
+  b.setAttribute("y1", "2");
+  b.setAttribute("x2", "2");
+  b.setAttribute("y2", "8");
+  svg.appendChild(a);
+  svg.appendChild(b);
+  btn.appendChild(svg);
   return btn;
 }
 

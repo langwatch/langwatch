@@ -14,6 +14,7 @@ export function useTraceDrawerNavigation() {
   const { openDrawer } = useDrawer();
   const pushTraceHistory = useDrawerStore((s) => s.pushTraceHistory);
   const popTraceHistory = useDrawerStore((s) => s.popTraceHistory);
+  const popTraceHistoryTo = useDrawerStore((s) => s.popTraceHistoryTo);
   const setViewMode = useDrawerStore((s) => s.setViewMode);
   const traceBackStack = useDrawerStore((s) => s.traceBackStack);
 
@@ -66,10 +67,23 @@ export function useTraceDrawerNavigation() {
     openDrawer("traceV2Details", { traceId: previous.traceId });
   }, [openDrawer, popTraceHistory, setViewMode]);
 
+  const goBackTo = useCallback(
+    (index: number) => {
+      const target = popTraceHistoryTo(index);
+      if (!target) return;
+      setViewMode(target.viewMode);
+      useDrawerStore.getState().openTrace(target.traceId);
+      openDrawer("traceV2Details", { traceId: target.traceId });
+    },
+    [openDrawer, popTraceHistoryTo, setViewMode],
+  );
+
   return {
     navigateToTrace,
     goBack,
+    goBackTo,
     canGoBack: traceBackStack.length > 0,
     backStackDepth: traceBackStack.length,
+    backStack: traceBackStack,
   };
 }

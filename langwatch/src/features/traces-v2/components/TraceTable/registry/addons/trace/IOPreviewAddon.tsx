@@ -20,6 +20,7 @@ export const IOPreviewAddon: AddonDef<TraceListItem> = {
         padding={`${density.ioPaddingTop} 8px ${density.ioPaddingBottom} 76px`}
         borderLeftWidth="2px"
         borderLeftColor={style.borderColor}
+        overflow="hidden"
       >
         <IOPreview input={row.input} output={row.output} />
       </Td>

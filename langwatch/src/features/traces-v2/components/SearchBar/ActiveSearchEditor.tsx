@@ -2,8 +2,7 @@ import { EditorContent } from "@tiptap/react";
 import type React from "react";
 import { useEffect, useRef } from "react";
 import { SuggestionDropdown } from "./SuggestionDropdown";
-import { useDynamicValueSuggestions } from "./useDynamicValueSuggestions";
-import { useFilterEditor } from "./useFilterEditor";
+import { useFilterEditor, type ValueResolver } from "./useFilterEditor";
 import { useGlobalSlashFocus } from "./useGlobalSlashFocus";
 
 interface ActiveSearchEditorProps {
@@ -13,6 +12,8 @@ interface ActiveSearchEditorProps {
   autoFocus: boolean;
   /** Bubble up `hasContent` so the parent can swap the Clear/Kbd affordance. */
   onHasContentChange: (hasContent: boolean) => void;
+  /** Synchronous resolver for dynamic value suggestions (model, service, …). */
+  valueResolver?: ValueResolver;
 }
 
 /**
@@ -25,21 +26,17 @@ export const ActiveSearchEditor: React.FC<ActiveSearchEditorProps> = ({
   applyQueryText,
   autoFocus,
   onHasContentChange,
+  valueResolver,
 }) => {
-  const {
-    editor,
-    suggestion,
-    acceptSuggestion,
-    overrideSuggestionItems,
-    cursorAnchorX,
-  } = useFilterEditor({ queryText, applyQueryText, onHasContentChange });
+  const { editor, suggestion, acceptSuggestion, cursorAnchorX } =
+    useFilterEditor({
+      queryText,
+      applyQueryText,
+      onHasContentChange,
+      valueResolver,
+    });
 
   useGlobalSlashFocus(editor);
-
-  useDynamicValueSuggestions({
-    state: suggestion.state,
-    override: overrideSuggestionItems,
-  });
 
   const focusedRef = useRef(false);
   useEffect(() => {

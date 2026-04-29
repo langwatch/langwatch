@@ -1,6 +1,5 @@
 import { Badge, Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
 import { BookOpen } from "lucide-react";
-import { motion } from "motion/react";
 import type React from "react";
 import {
   SEARCH_FIELDS,
@@ -31,23 +30,21 @@ export const SuggestionDropdown: React.FC<SuggestionDropdownProps> = ({
   const { state } = ui;
 
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ duration: 0.12, ease: "easeOut" }}
-      style={{
-        position: "absolute",
-        top: "calc(100% + 6px)",
-        left: anchorX !== undefined ? `${Math.max(0, anchorX)}px` : 0,
-        borderRadius: "var(--chakra-radii-lg)",
-        zIndex: 2050,
-        minWidth: "320px",
-        transformOrigin: "top",
-        // Outer wrapper carries the focus ring + glow. No overflow:hidden here
-        // so the ring is never clipped by the inner content's clipping context.
-        boxShadow:
-          "0 0 0 1px var(--chakra-colors-border), 0 0 0 4px color-mix(in oklab, var(--chakra-colors-blue-solid) 14%, transparent), 0 18px 40px -12px color-mix(in oklab, #000 40%, transparent)",
-        background: "var(--chakra-colors-bg-panel)",
+    <Box
+      position="absolute"
+      top="calc(100% + 6px)"
+      left={anchorX !== undefined ? `${Math.max(0, anchorX)}px` : 0}
+      borderRadius="lg"
+      zIndex={2050}
+      minWidth="320px"
+      bg="bg.panel"
+      boxShadow="0 0 0 1px var(--chakra-colors-border), 0 0 0 4px color-mix(in oklab, var(--chakra-colors-blue-solid) 14%, transparent), 0 18px 40px -12px color-mix(in oklab, #000 40%, transparent)"
+      animation="suggestion-dropdown-fade 120ms ease-out"
+      css={{
+        "@keyframes suggestion-dropdown-fade": {
+          from: { opacity: 0 },
+          to: { opacity: 1 },
+        },
       }}
     >
       <Box
@@ -72,7 +69,7 @@ export const SuggestionDropdown: React.FC<SuggestionDropdownProps> = ({
         </VStack>
         <DropdownFooter />
       </Box>
-    </motion.div>
+    </Box>
   );
 };
 
@@ -129,24 +126,24 @@ const SuggestionRow: React.FC<SuggestionRowProps> = ({
   const fieldMeta = state.mode === "field" ? SEARCH_FIELDS[label] : undefined;
 
   return (
-    <Button
+    <Box
+      as="button"
+      type="button"
+      display="flex"
       alignItems="center"
       justifyContent="space-between"
       width="full"
-      height="auto"
-      minHeight="unset"
       paddingX={3}
       paddingY={1.5}
-      data-selected={isSelected || undefined}
-      _selected={{ bg: "blue.solid/12" }}
+      textAlign="left"
+      bg={isSelected ? "blue.solid/12" : "transparent"}
+      color="fg"
+      cursor="pointer"
       _hover={{ bg: "blue.solid/8" }}
       onMouseDown={(event) => {
         event.preventDefault();
         onSelect(label);
       }}
-      variant="ghost"
-      fontWeight="normal"
-      borderRadius={0}
     >
       <HStack gap={2} minWidth={0} flex={1}>
         <Text textStyle="xs" fontFamily="mono" flexShrink={0}>
@@ -171,7 +168,7 @@ const SuggestionRow: React.FC<SuggestionRowProps> = ({
           {count}
         </Text>
       )}
-    </Button>
+    </Box>
   );
 };
 

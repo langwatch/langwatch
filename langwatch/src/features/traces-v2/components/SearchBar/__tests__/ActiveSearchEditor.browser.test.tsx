@@ -12,15 +12,9 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, waitFor } from "@testing-library/react";
 import { useState } from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { userEvent } from "vitest/browser";
 import "@testing-library/jest-dom/vitest";
-
-// Stub the DB-backed value-suggestions hook so the editor mounts without a
-// tRPC provider. The DB-side fetch is exercised separately.
-vi.mock("../useDynamicValueSuggestions", () => ({
-  useDynamicValueSuggestions: () => undefined,
-}));
 
 import { ActiveSearchEditor } from "../ActiveSearchEditor";
 

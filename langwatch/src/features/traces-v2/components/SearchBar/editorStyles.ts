@@ -5,7 +5,7 @@ export const editorStyles: SystemStyleObject = {
     outline: "none",
     fontFamily: "var(--chakra-fonts-mono)",
     fontSize: "var(--chakra-font-sizes-xs)",
-    lineHeight: "1.5",
+    lineHeight: "24px",
     whiteSpace: "nowrap",
     overflowX: "auto",
     overflowY: "hidden",
@@ -20,11 +20,16 @@ export const editorStyles: SystemStyleObject = {
     pointerEvents: "none",
   },
   "& .filter-token": {
+    display: "inline-flex",
+    alignItems: "center",
+    height: "23px",
+    lineHeight: "22px",
+    verticalAlign: "middle",
     background: "blue.subtle",
     border: "1px solid",
-    borderColor: "blue.muted",
-    borderRadius: "4px",
-    padding: "0 16px 0 4px",
+    borderColor: "blue.solid",
+    borderRadius: "8px",
+    padding: "0 22px 0 4px",
     margin: "0 1px",
   },
   "& .filter-token-exclude": {
@@ -54,29 +59,27 @@ export const editorStyles: SystemStyleObject = {
     color: "fg.subtle",
     fontWeight: "semibold",
   },
-  // X sits inside the right-edge well reserved by `.filter-token`'s 16px
-  // right padding. Hidden by default, shows on chip hover, intensifies to
-  // a red destructive tint on its own hover.
+  // The X tucks into the right-edge well reserved by `.filter-token`'s
+  // 22px right padding. Circular hit target, no border (the previous
+  // half-border made the chip's right corner look frayed), opacity-faded
+  // until the chip is hovered, red wash on its own hover.
   "& .filter-token-delete": {
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
     width: "14px",
-    height: "16px",
-    marginLeft: "-15px",
-    marginRight: "1px",
+    height: "14px",
+    marginLeft: "-18px",
+    marginRight: "4px",
     padding: 0,
     border: "none",
-    borderTopRightRadius: "3px",
-    borderBottomRightRadius: "3px",
+    borderRadius: "999px",
     background: "transparent",
     color: "fg.muted",
-    fontSize: "13px",
-    fontWeight: "bold",
-    lineHeight: 1,
     cursor: "pointer",
-    opacity: 0.35,
-    transition: "opacity 80ms ease-out, background 80ms ease-out, color 80ms ease-out",
+    opacity: 0,
+    transition:
+      "opacity 100ms ease-out, background-color 100ms ease-out, color 100ms ease-out",
     verticalAlign: "middle",
     userSelect: "none",
     pointerEvents: "auto",
@@ -87,6 +90,10 @@ export const editorStyles: SystemStyleObject = {
     },
   "& .filter-token-delete:hover": {
     background: "red.subtle",
+    color: "red.fg",
+  },
+  "& .filter-token-delete:active": {
+    background: "red.muted",
     color: "red.fg",
   },
 };

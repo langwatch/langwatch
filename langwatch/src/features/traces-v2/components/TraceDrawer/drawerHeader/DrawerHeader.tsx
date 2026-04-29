@@ -10,13 +10,18 @@ import {
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import {
   LuArrowLeft,
-  LuCopy,
   LuMaximize2,
   LuMinimize2,
   LuRefreshCw,
   LuX,
 } from "react-icons/lu";
 import { Kbd } from "~/components/ops/shared/Kbd";
+import {
+  MenuContent,
+  MenuContextTrigger,
+  MenuItem,
+  MenuRoot,
+} from "~/components/ui/menu";
 import { Tooltip } from "~/components/ui/tooltip";
 import { TracePresenceAvatars } from "~/features/presence/components/TracePresenceAvatars";
 import { useDejaViewLink } from "~/hooks/useDejaViewLink";
@@ -128,6 +133,36 @@ const HOISTED_AUTO_PINS: HoistedPinDef[] = [
       trace.scenarioRunId ?? trace.attributes["scenario.run_id"],
   },
   { key: "evaluation.run_id", label: "Eval run", category: "run" },
+  // Prompt enrichment lives on top-level summary fields rather than raw
+  // attributes — these synthetic keys never collide with real OTel
+  // attribute keys, so user pins keep a clean namespace.
+  {
+    key: "langwatch.prompt.selected",
+    label: "Prompt",
+    category: "run",
+    resolve: (trace) => trace.selectedPromptId,
+  },
+  {
+    key: "langwatch.prompt.last_used",
+    label: "Last prompt",
+    category: "run",
+    // When selected and last-used are the same, only the "Prompt" pin
+    // shows — duplicating the same handle adds noise to the strip.
+    resolve: (trace) =>
+      trace.lastUsedPromptId &&
+      trace.lastUsedPromptId !== trace.selectedPromptId
+        ? trace.lastUsedPromptId
+        : null,
+  },
+  {
+    key: "langwatch.prompt.version",
+    label: "Prompt version",
+    category: "run",
+    resolve: (trace) =>
+      trace.lastUsedPromptVersionNumber != null
+        ? `v${trace.lastUsedPromptVersionNumber}`
+        : (trace.lastUsedPromptVersionId ?? null),
+  },
   { key: "langwatch.labels", label: "Labels", category: "tag" },
 ];
 
@@ -143,7 +178,8 @@ export const DrawerHeader = memo(function DrawerHeader({
   const toggleMaximized = useDrawerStore((s) => s.toggleMaximized);
   const setShortcutsOpen = useDrawerStore((s) => s.setShortcutsOpen);
 
-  const { canGoBack, goBack, backStackDepth } = useTraceDrawerNavigation();
+  const { canGoBack, goBack, goBackTo, backStackDepth, backStack } =
+    useTraceDrawerNavigation();
   const headerQuery = useTraceHeader();
   const isNavigating = headerQuery.isFetching;
 
@@ -180,7 +216,7 @@ export const DrawerHeader = memo(function DrawerHeader({
   );
   const { pins, removePin } = usePinnedAttributes(project?.id);
   const toggleFacet = useFilterStore((s) => s.toggleFacet);
-  const { closeDrawer } = useDrawer();
+  const { closeDrawer, openDrawer } = useDrawer();
   // When the trace lives in a multi-turn conversation the
   // ThreadProgressIndicator already exposes the conversation id (with copy
   // + filter affordances), so the conversation / thread auto-pins would be
@@ -193,6 +229,49 @@ export const DrawerHeader = memo(function DrawerHeader({
   const categorizedPins = useMemo<CategorizedPin[]>(() => {
     const userKeys = new Set(pins.map((p) => `${p.source}:${p.key}`));
     const out: CategorizedPin[] = [];
+    // Per-key navigation handlers — keep these centralised so user pins
+    // on the same key (e.g. someone manually pinning `scenario.run_id`)
+    // pick up the same affordance for free.
+    const buildNavigate = (
+      key: string,
+      value: string,
+    ): { onNavigate: () => void; navigateLabel: string } | undefined => {
+      switch (key) {
+        case "gen_ai.conversation.id":
+        case "langwatch.thread_id":
+          return {
+            navigateLabel: "Open conversation",
+            onNavigate: () => setViewMode("conversation"),
+          };
+        case "scenario.run_id":
+          return {
+            navigateLabel: "Open scenario run",
+            onNavigate: () =>
+              openDrawer("scenarioRunDetail", {
+                urlParams: { scenarioRunId: value },
+              }),
+          };
+        case "langwatch.prompt.selected":
+        case "langwatch.prompt.last_used":
+        case "langwatch.prompt.version":
+          // Prompt-related pins jump to the Prompts tab — and when we know
+          // which span carried the prompt, focus it so the editor opens
+          // on the right invocation rather than the trace's first span.
+          return {
+            navigateLabel: "Open prompt",
+            onNavigate: () => {
+              const spanId =
+                key === "langwatch.prompt.selected"
+                  ? trace.selectedPromptSpanId
+                  : trace.lastUsedPromptSpanId;
+              if (spanId) selectSpan(spanId);
+              setActiveTab("prompts");
+            },
+          };
+        default:
+          return undefined;
+      }
+    };
     for (const def of HOISTED_AUTO_PINS) {
       if (
         conversationCoveredByIndicator &&
@@ -208,6 +287,7 @@ export const DrawerHeader = memo(function DrawerHeader({
       const value = resolved ?? null;
       if (!value) continue;
       const filterField = FILTERABLE_PIN_FIELDS[def.key];
+      const navigate = buildNavigate(def.key, value);
       out.push({
         pin: { source: "attribute", key: def.key, label: def.label },
         value,
@@ -219,6 +299,8 @@ export const DrawerHeader = memo(function DrawerHeader({
               closeDrawer();
             }
           : undefined,
+        onNavigate: navigate?.onNavigate,
+        navigateLabel: navigate?.navigateLabel,
       });
     }
     for (const p of pins) {
@@ -228,6 +310,7 @@ export const DrawerHeader = memo(function DrawerHeader({
           : trace.attributes;
       const value = resolveAttributeValue(valueSource, p.key);
       const filterField = FILTERABLE_PIN_FIELDS[p.key];
+      const navigate = value ? buildNavigate(p.key, value) : undefined;
       out.push({
         pin: p,
         value,
@@ -240,16 +323,22 @@ export const DrawerHeader = memo(function DrawerHeader({
                 closeDrawer();
               }
             : undefined,
+        onNavigate: navigate?.onNavigate,
+        navigateLabel: navigate?.navigateLabel,
       });
     }
     return out;
   }, [
     pins,
-    trace.attributes,
+    trace,
     resources.resourceAttributes,
     conversationCoveredByIndicator,
     toggleFacet,
     closeDrawer,
+    openDrawer,
+    setViewMode,
+    setActiveTab,
+    selectSpan,
   ]);
 
   const handleCopyTraceId = () => {
@@ -328,29 +417,70 @@ export const DrawerHeader = memo(function DrawerHeader({
       <HStack justify="space-between" align="center" gap={2.5} minWidth={0}>
         <HStack gap={2.5} minWidth={0} flex={1} flexWrap="wrap" align="center">
           {canGoBack && (
-            <Tooltip
-              content={
-                <HStack gap={1}>
-                  <Text>
-                    {backStackDepth > 1
-                      ? `Back (${backStackDepth} traces)`
-                      : "Back to previous trace"}
-                  </Text>
-                  <Kbd>B</Kbd>
-                </HStack>
-              }
-              positioning={{ placement: "bottom" }}
-            >
-              <Button
-                size="xs"
-                variant="ghost"
-                onClick={goBack}
-                aria-label="Back to previous trace"
-                flexShrink={0}
+            <MenuRoot>
+              <Tooltip
+                content={
+                  <HStack gap={1}>
+                    <Text>
+                      {backStackDepth > 1
+                        ? `Back (${backStackDepth} traces) — right-click for full history`
+                        : "Back to previous trace"}
+                    </Text>
+                    <Kbd>B</Kbd>
+                  </HStack>
+                }
+                positioning={{ placement: "bottom" }}
               >
-                <Icon as={LuArrowLeft} boxSize={3.5} />
-              </Button>
-            </Tooltip>
+                <MenuContextTrigger asChild>
+                  <Button
+                    size="xs"
+                    variant="ghost"
+                    onClick={goBack}
+                    aria-label="Back to previous trace"
+                    flexShrink={0}
+                  >
+                    <Icon as={LuArrowLeft} boxSize={3.5} />
+                  </Button>
+                </MenuContextTrigger>
+              </Tooltip>
+              <MenuContent minWidth="240px">
+                {/* Most-recent first so the visual order matches the
+                    direction of "back" — top of menu = one step back. */}
+                {backStack
+                  .map((entry, idx) => ({ entry, idx }))
+                  .reverse()
+                  .map(({ entry, idx }) => {
+                    const stepsBack = backStack.length - idx;
+                    return (
+                      <MenuItem
+                        key={`${entry.traceId}:${idx}`}
+                        value={`${idx}`}
+                        onClick={() => goBackTo(idx)}
+                      >
+                        <Text textStyle="xs" color="fg.muted" minWidth="16px">
+                          {stepsBack === 1 ? "←" : `${stepsBack}↑`}
+                        </Text>
+                        <Text
+                          textStyle="xs"
+                          fontFamily="mono"
+                          flex={1}
+                          truncate
+                        >
+                          {entry.traceId.slice(0, 16)}
+                          <Text
+                            as="span"
+                            textStyle="2xs"
+                            color="fg.subtle"
+                            marginLeft={2}
+                          >
+                            {entry.viewMode}
+                          </Text>
+                        </Text>
+                      </MenuItem>
+                    );
+                  })}
+              </MenuContent>
+            </MenuRoot>
           )}
           {trace.rootSpanType && (
             <Text
@@ -414,7 +544,6 @@ export const DrawerHeader = memo(function DrawerHeader({
         </HStack>
 
         <HStack gap={1} flexShrink={0}>
-          <TracePresenceAvatars traceId={trace.traceId} max={5} size="xs" />
           <Tooltip
             content={
               <HStack gap={1}>
@@ -499,8 +628,13 @@ export const DrawerHeader = memo(function DrawerHeader({
               variant="ghost"
               onClick={onClose}
               aria-label="Close drawer"
+              paddingX={3}
+              minWidth="auto"
+              color="fg.muted"
+              _hover={{ bg: "bg.muted", color: "fg" }}
+              _active={{ bg: "bg.emphasized" }}
             >
-              <Icon as={LuX} boxSize={3.5} />
+              <Icon as={LuX} boxSize={5} strokeWidth={2.25} />
             </Button>
           </Tooltip>
         </HStack>
@@ -642,41 +776,15 @@ export const DrawerHeader = memo(function DrawerHeader({
           traceId={trace.traceId}
           endSlot={
             <HStack gap={2}>
-              <Tooltip
-                content={
-                  <HStack gap={1}>
-                    <Text>Copy trace ID</Text>
-                    <Kbd>Y</Kbd>
-                  </HStack>
-                }
-                positioning={{ placement: "top" }}
-              >
-                <Box
-                  as="button"
-                  onClick={handleCopyTraceId}
-                  aria-label="Copy trace ID"
-                  cursor="pointer"
-                  display="inline-flex"
-                  alignItems="center"
-                  gap={1}
-                  opacity={0.7}
-                  _hover={{ opacity: 1 }}
-                  transition="opacity 0.12s ease"
-                >
-                  <Text
-                    textStyle="2xs"
-                    color="fg.subtle"
-                    fontFamily="mono"
-                    letterSpacing="0.02em"
-                  >
-                    <Text as="span" color="fg.muted" opacity={0.7}>
-                      trace
-                    </Text>{" "}
-                    {trace.traceId.slice(0, 8)}
-                  </Text>
-                  <Icon as={LuCopy} boxSize={2.5} color="fg.subtle" />
-                </Box>
-              </Tooltip>
+              {/* Presence avatars sit at the trailing edge of the mode-tab
+                  row — out of the way of the title and not crowding the
+                  action cluster. Copy trace ID lives in the overflow
+                  menu / `Y` shortcut, so the inline chip is gone. */}
+              <TracePresenceAvatars
+                traceId={trace.traceId}
+                max={5}
+                size="2xs"
+              />
               <Text textStyle="xs" color="fg.subtle">
                 {formatRelativeTime(trace.timestamp)}
               </Text>

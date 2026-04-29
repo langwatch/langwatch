@@ -4,7 +4,7 @@ import {
   LuBookMarked,
   LuCircleDashed,
   LuCode,
-  LuFilter,
+  LuGlobe,
   LuHistory,
   LuMessageSquare,
   LuServer,
@@ -180,8 +180,10 @@ function buildChipDef(
 ): ChipDef | null {
   const priority = index;
   switch (data.kind) {
-    case "source":
-      return buildSourceChipDef(data, priority);
+    case "service":
+      return { ...buildServiceChipDef(data), priority };
+    case "origin":
+      return { ...buildOriginChipDef(data), priority };
     case "scenario":
       return { ...buildScenarioChipDef(data.data), priority };
     case "sdk":
@@ -218,99 +220,34 @@ function buildChipDef(
  * shows both with their own filter buttons so the trace table can be
  * scoped to either independently.
  */
-function buildSourceChipDef(
-  data: Extract<TraceHeaderChipData, { kind: "source" }>,
-  priority: number,
+function buildServiceChipDef(
+  data: Extract<TraceHeaderChipData, { kind: "service" }>,
 ): ChipDef {
-  const primaryValue = data.service ?? data.origin;
   return {
-    id: "source",
-    label: "Source",
-    value: data.service ? (
-      <HStack gap={1.5} minWidth={0}>
-        <Text textStyle="xs" fontWeight="medium" truncate>
-          {data.service}
-        </Text>
-        <Text
-          textStyle="2xs"
-          color="fg.subtle"
-          fontFamily="mono"
-          letterSpacing="0.04em"
-          flexShrink={0}
-        >
-          · {data.origin}
-        </Text>
-      </HStack>
-    ) : (
-      data.origin
-    ),
+    id: "service",
+    label: "Service",
+    value: data.service,
     icon: LuServer,
     tone: "neutral",
-    priority,
-    ariaLabel: `Source: ${primaryValue}`,
-    popover: (
-      <VStack align="stretch" gap={2} padding={3} minWidth="240px">
-        {data.service && (
-          <HStack justify="space-between" gap={3}>
-            <VStack align="start" gap={0} minWidth={0}>
-              <Text textStyle="2xs" color="fg.muted" textTransform="uppercase">
-                Service
-              </Text>
-              <Text textStyle="xs" fontFamily="mono" truncate>
-                {data.service}
-              </Text>
-            </VStack>
-            {data.onFilterService && (
-              <FilterBadge onClick={data.onFilterService} />
-            )}
-          </HStack>
-        )}
-        <HStack justify="space-between" gap={3}>
-          <VStack align="start" gap={0} minWidth={0}>
-            <Text textStyle="2xs" color="fg.muted" textTransform="uppercase">
-              Origin
-            </Text>
-            <Text textStyle="xs" fontFamily="mono">
-              {data.origin}
-            </Text>
-          </VStack>
-          <FilterBadge onClick={data.onFilterOrigin} />
-        </HStack>
-      </VStack>
-    ),
+    ariaLabel: `Service: ${data.service}`,
+    onFilter: data.onFilter,
+    filterLabel: "Filter table by service",
   };
 }
 
-/**
- * Tiny "Filter table" affordance used inside the source-chip popover. The
- * header chip itself stays clickable for the popover; a dedicated button
- * inside lets us expose two filters (service / origin) without overloading
- * the chip's own onFilter slot.
- */
-function FilterBadge({ onClick }: { onClick: () => void }) {
-  return (
-    <Box
-      as="button"
-      onClick={onClick}
-      paddingX={2}
-      paddingY={0.5}
-      borderRadius="sm"
-      borderWidth="1px"
-      borderColor="border.muted"
-      bg="bg.subtle"
-      cursor="pointer"
-      _hover={{ bg: "bg.muted" }}
-      flexShrink={0}
-      aria-label="Filter table by this value"
-    >
-      <HStack gap={1}>
-        <Icon as={LuFilter} boxSize={2.5} color="fg.muted" />
-        <Text textStyle="2xs" color="fg.muted">
-          Filter
-        </Text>
-      </HStack>
-    </Box>
-  );
+function buildOriginChipDef(
+  data: Extract<TraceHeaderChipData, { kind: "origin" }>,
+): ChipDef {
+  return {
+    id: "origin",
+    label: "Origin",
+    value: data.origin,
+    icon: LuGlobe,
+    tone: "neutral",
+    ariaLabel: `Origin: ${data.origin}`,
+    onFilter: data.onFilter,
+    filterLabel: "Filter table by origin",
+  };
 }
 
 function buildSdkChipDef(sdk: SdkInfoLike): ChipDef {

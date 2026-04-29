@@ -86,6 +86,16 @@ function suggestionFromTrigger(
   return { open: true, mode: "field", query: segment, tokenStart: trigger };
 }
 
+export interface DynamicSuggestionItems {
+  items: string[];
+  counts?: Record<string, number>;
+}
+
+export type ValueResolver = (
+  field: string,
+  query: string,
+) => DynamicSuggestionItems | null;
+
 interface UseFilterEditorParams {
   queryText: string;
   applyQueryText: (text: string) => void;
@@ -96,11 +106,14 @@ interface UseFilterEditorParams {
    * keystroke.
    */
   onHasContentChange?: (hasContent: boolean) => void;
-}
-
-export interface DynamicSuggestionItems {
-  items: string[];
-  counts?: Record<string, number>;
+  /**
+   * Synchronously resolves dynamic value suggestions for `field:` autocomplete
+   * (e.g. `model:`, `service:`). Called inline by `refreshSuggestion` so the
+   * dropdown emits a single state update per keystroke — pulling this out of
+   * a `useEffect`-based override eliminated a second render per keystroke.
+   * Return `null` to fall back to the static `FIELD_VALUES` enum.
+   */
+  valueResolver?: ValueResolver;
 }
 
 interface FilterEditorApi {
@@ -108,12 +121,6 @@ interface FilterEditorApi {
   suggestion: SuggestionUIState;
   acceptSuggestion: (label: string) => void;
   reset: () => void;
-  /**
-   * Replace the dropdown's items with a freshly-fetched list (e.g. DB-backed
-   * value suggestions for `model:`). Pass `null` to revert to the static
-   * items computed from `FIELD_VALUES`.
-   */
-  overrideSuggestionItems: (next: DynamicSuggestionItems | null) => void;
   /**
    * Horizontal offset (px) from the search bar's left edge to the cursor's
    * current screen position. Drives the dropdown's anchor so it sits under
@@ -126,6 +133,7 @@ export function useFilterEditor({
   queryText,
   applyQueryText,
   onHasContentChange,
+  valueResolver,
 }: UseFilterEditorParams): FilterEditorApi {
   const [suggestion, setSuggestion] =
     useState<SuggestionUIState>(CLOSED_SUGGESTION);
@@ -139,6 +147,7 @@ export function useFilterEditor({
   const onHasContentChangeRef = useLatestRef(onHasContentChange);
   const suggestionRef = useLatestRef(suggestion);
   const dismissedRef = useLatestRef(dropdownDismissed);
+  const valueResolverRef = useLatestRef(valueResolver);
   // Tracks last reported hasContent so we only fire onHasContentChange when
   // it actually flips (not on every keystroke that keeps the state).
   const lastHasContentRef = useRef<boolean>(queryText.length > 0);
@@ -216,14 +225,41 @@ export function useFilterEditor({
         return;
       }
       setSuggestion((prev) => {
-        const next = buildSuggestionUI({
+        const base = buildSuggestionUI({
           state,
           previousSelected: prev.selectedIndex,
         });
+        // For value-mode autocomplete on facet-backed fields (model, service,
+        // etc.) replace the static items with the dynamic resolver's output
+        // here — same render — instead of via a follow-up effect. Avoids a
+        // second render per keystroke and the brief flash of static items.
+        let next = base;
+        if (
+          base.state.open &&
+          base.state.mode === "value" &&
+          valueResolverRef.current
+        ) {
+          const dynamic = valueResolverRef.current(
+            base.state.field,
+            base.state.query,
+          );
+          if (dynamic && dynamic.items.length > 0) {
+            const selectedIndex = Math.min(
+              base.selectedIndex,
+              dynamic.items.length - 1,
+            );
+            next = {
+              state: base.state,
+              items: dynamic.items,
+              itemCounts: dynamic.counts,
+              selectedIndex,
+            };
+          }
+        }
         return suggestionUIEqual(prev, next) ? prev : next;
       });
     },
-    [dismissedRef],
+    [dismissedRef, valueResolverRef],
   );
 
   const editor = useEditor({
@@ -435,37 +471,11 @@ export function useFilterEditor({
     triggerPosRef.current = null;
   }, [editor, onHasContentChangeRef]);
 
-  const overrideSuggestionItems = useCallback(
-    (next: DynamicSuggestionItems | null) => {
-      setSuggestion((prev) => {
-        if (!prev.state.open) return prev;
-        if (next === null) {
-          return buildSuggestionUI({
-            state: prev.state,
-            previousSelected: prev.selectedIndex,
-          });
-        }
-        const selectedIndex =
-          next.items.length === 0
-            ? 0
-            : Math.min(prev.selectedIndex, next.items.length - 1);
-        return {
-          ...prev,
-          items: next.items,
-          itemCounts: next.counts,
-          selectedIndex,
-        };
-      });
-    },
-    [],
-  );
-
   return {
     editor,
     suggestion,
     acceptSuggestion,
     reset,
-    overrideSuggestionItems,
     cursorAnchorX,
   };
 }
