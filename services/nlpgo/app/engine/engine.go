@@ -164,6 +164,21 @@ func (e *Engine) Execute(ctx context.Context, req ExecuteRequest) (*ExecuteResul
 	state := newRunState(req.Workflow)
 	applyManualInputs(state, req)
 	started := time.Now()
+	// execute_component (req.NodeID set) dispatches ONLY the requested
+	// node — Studio's "Run with manual input" flow on a single
+	// component card. Mirrors Python's execute_component.py which
+	// instantiates and invokes one materialized component, never the
+	// full DAG. Pre-fix the engine walked plan.Layers regardless and
+	// surfaced spurious entry/end/sibling spans in the trace
+	// (rchaves callout 2026-04-29 — clicked Execute on Code, trace
+	// showed entry+code+end+evaluator).
+	if req.NodeID != "" {
+		if _, ok := state.nodes[req.NodeID]; !ok {
+			return nil, fmt.Errorf("engine: execute_component target node %q not in workflow", req.NodeID)
+		}
+		e.runLayer(ctx, req, plan, state, []string{req.NodeID})
+		return finalize(state, traceID, started, nil), nil
+	}
 	for _, layer := range plan.Layers {
 		if err := ctx.Err(); err != nil {
 			return finalize(state, traceID, started, err), nil

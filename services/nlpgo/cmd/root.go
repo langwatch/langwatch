@@ -4,6 +4,8 @@ package cmd
 import (
 	"context"
 	"net/http"
+	"os"
+	"strings"
 
 	"go.uber.org/zap"
 
@@ -70,7 +72,7 @@ func Root(ctx context.Context, _ []string) error {
 	playground := httpapi.NewPlaygroundProxyFromShim(playgroundDispatcherShim{disp: disp})
 
 	// Evaluator + agent-workflow blocks call the LangWatch app's own
-	// HTTP API. Both share the same LangWatchBaseURL (NLPGO_ENGINE_LANGWATCH_BASE_URL).
+	// HTTP API. Both share the same LangWatchBaseURL.
 	// Per-block timeouts default to 12min (Lambda max 15min minus 3min margin).
 	evalExec := evaluatorblock.New(evaluatorblock.Options{})
 	agentWfRunner := agentblock.NewWorkflowRunner(agentblock.WorkflowRunnerOptions{})
@@ -81,7 +83,7 @@ func Root(ctx context.Context, _ []string) error {
 		LLM:              llm,
 		Evaluator:        evalExec,
 		AgentWorkflow:    agentWfRunner,
-		LangWatchBaseURL: cfg.Engine.LangWatchBaseURL,
+		LangWatchBaseURL: resolveLangWatchBaseURL(cfg.Engine.LangWatchBaseURL, os.Getenv),
 	})
 	executor := engineAdapter{eng: eng}
 
@@ -93,6 +95,26 @@ func Root(ctx context.Context, _ []string) error {
 	)
 
 	return nlpgo.Serve(ctx, application, deps, cfg, playground)
+}
+
+// resolveLangWatchBaseURL returns the base URL the evaluator and
+// agent-workflow blocks use to call back into the LangWatch app. The
+// explicit `NLPGO_ENGINE_LANGWATCH_BASE_URL` setting wins so dev /
+// docker-compose can point evaluator callbacks at
+// host.docker.internal:5560 without touching the universal endpoint;
+// otherwise fall back to `LANGWATCH_ENDPOINT` — the same env var
+// configureNLPGoOTel reads in deps.go and the env terraform pins on
+// every Lambda. Pre-fix the evaluator path required the explicit var
+// only and prod set just LANGWATCH_ENDPOINT, so every evaluator
+// dispatch errored with "LangWatchBaseURL is required to call the
+// evaluator API" (rchaves callout 2026-04-29).
+//
+// `getenv` is injected so tests don't need to mutate process env.
+func resolveLangWatchBaseURL(explicit string, getenv func(string) string) string {
+	if explicit != "" {
+		return explicit
+	}
+	return strings.TrimRight(getenv("LANGWATCH_ENDPOINT"), "/")
 }
 
 // splitCSV splits "a,b,c" into ["a","b","c"], trimming whitespace and

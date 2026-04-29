@@ -2,6 +2,7 @@ package engine
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
@@ -52,6 +53,15 @@ func (e *Engine) ExecuteStream(ctx context.Context, req ExecuteRequest, opts Exe
 	}
 	state := newRunState(req.Workflow)
 	applyManualInputs(state, req)
+	// execute_component (req.NodeID set) must dispatch ONLY the
+	// requested node. Validate target exists before starting the
+	// goroutine so callers get a synchronous error instead of an
+	// async error event. See Engine.Execute for the same guard.
+	if req.NodeID != "" {
+		if _, ok := state.nodes[req.NodeID]; !ok {
+			return nil, errInvalidRequest{msg: fmt.Sprintf("engine: execute_component target node %q not in workflow", req.NodeID)}
+		}
+	}
 
 	out := make(chan StreamEvent, 16)
 	go func() {
@@ -78,6 +88,15 @@ func (e *Engine) ExecuteStream(ctx context.Context, req ExecuteRequest, opts Exe
 			close(out)
 		}()
 
+		// execute_component (req.NodeID set) — dispatch only the
+		// requested node, never the full DAG. Same parity rationale as
+		// Engine.Execute: Studio's per-component Run flow on a single
+		// card should not surface entry/end/sibling spans in the trace.
+		if req.NodeID != "" {
+			e.runLayerStream(ctx, req, plan, state, []string{req.NodeID}, traceID, out)
+			emit(ctx, out, doneEvent(traceID, state, started))
+			return
+		}
 		for _, layer := range plan.Layers {
 			if err := ctx.Err(); err != nil {
 				emit(ctx, out, StreamEvent{
