@@ -387,7 +387,9 @@ func (e *Engine) runSignature(ctx context.Context, execReq ExecuteRequest, node 
 		}
 		req.ResponseFormat = composeSignatureResponseFormat(schemaName, node.Data.Outputs)
 	}
-	resp, err := e.llm.Execute(ctx, req)
+	llmCtx, llmSpan := startLLMSpan(ctx, model, provider, messages)
+	resp, err := e.llm.Execute(llmCtx, req)
+	endLLMSpan(llmSpan, resp, err)
 	if err != nil {
 		return nil, &NodeError{Type: "llm_error", Message: err.Error()}
 	}

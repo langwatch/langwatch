@@ -23,6 +23,7 @@ import (
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
 
+	"github.com/langwatch/langwatch/services/nlpgo/app"
 	"github.com/langwatch/langwatch/services/nlpgo/app/engine/dsl"
 )
 
@@ -34,6 +35,11 @@ const (
 	// dispatches" by span name across the Python and Go engines.
 	componentSpanName = "execute_component"
 	componentSpanType = "component"
+
+	// llmSpanType matches the python-sdk reserved value Studio's Trace
+	// Details drawer groups by — see langwatch.span.type=="llm" filtering
+	// in the trace renderer.
+	llmSpanType = "llm"
 )
 
 // startNodeSpan opens a span for one node's dispatch. Span name is
@@ -115,4 +121,85 @@ func encodeJSONAttr(v any) (string, bool) {
 		return "", false
 	}
 	return string(b), true
+}
+
+// startLLMSpan opens a child span for one LLM call, parented at the current
+// component span. Mirrors the Python langwatch_nlp shape — DSPy's adapter
+// emits a `LLM <provider/model>` span with reserved `langwatch.span.type=llm`
+// + standard `gen_ai.*` attrs so Studio's Trace Details drawer renders an
+// LLM row with model name, token counts, and provider.
+//
+// The span is opened BEFORE the gateway call so its duration covers the full
+// network round-trip (including gateway overhead, not just the upstream
+// provider latency). Closed by endLLMSpan, which stamps the response usage
+// + output JSON.
+func startLLMSpan(ctx context.Context, model, provider string, messages []app.ChatMessage) (context.Context, trace.Span) {
+	tracer := otelapi.Tracer(tracerName)
+	displayModel := model
+	if provider != "" && model != "" {
+		displayModel = provider + "/" + model
+	}
+	attrs := []attribute.KeyValue{
+		attribute.String("langwatch.span.type", llmSpanType),
+	}
+	if provider != "" {
+		attrs = append(attrs, attribute.String("gen_ai.system", provider))
+	}
+	if model != "" {
+		attrs = append(attrs, attribute.String("gen_ai.request.model", model))
+	}
+	if v, ok := encodeJSONAttr(messages); ok {
+		attrs = append(attrs, attribute.String("langwatch.input", v))
+	}
+	return tracer.Start(ctx, displayModel,
+		trace.WithSpanKind(trace.SpanKindClient),
+		trace.WithAttributes(attrs...),
+	)
+}
+
+// endLLMSpan stamps the LLM response shape onto the span and closes it.
+// Sets `gen_ai.response.model`, `gen_ai.usage.{input,output}_tokens`,
+// `langwatch.cost`, and `langwatch.output` (JSON-encoded response message
+// for output_source=explicit rendering in the Studio drawer).
+func endLLMSpan(span trace.Span, resp *app.LLMResponse, callErr error) {
+	if callErr != nil {
+		span.SetStatus(codes.Error, callErr.Error())
+		span.SetAttributes(
+			attribute.String("error.message", callErr.Error()),
+		)
+		span.End()
+		return
+	}
+	if resp == nil {
+		span.SetStatus(codes.Ok, "")
+		span.End()
+		return
+	}
+	if resp.Usage.PromptTokens > 0 {
+		span.SetAttributes(attribute.Int("gen_ai.usage.input_tokens", resp.Usage.PromptTokens))
+	}
+	if resp.Usage.CompletionTokens > 0 {
+		span.SetAttributes(attribute.Int("gen_ai.usage.output_tokens", resp.Usage.CompletionTokens))
+	}
+	if resp.Usage.ReasoningTokens > 0 {
+		span.SetAttributes(attribute.Int("gen_ai.usage.reasoning_tokens", resp.Usage.ReasoningTokens))
+	}
+	if resp.Cost > 0 {
+		span.SetAttributes(attribute.Float64("langwatch.cost", resp.Cost))
+	}
+	if resp.DurationMS > 0 {
+		span.SetAttributes(attribute.Int64("langwatch.duration_ms", resp.DurationMS))
+	}
+	// Output: the assistant's reply (matches Python where the LLM span's
+	// langwatch.output is the assistant message JSON, not the full HTTP
+	// body).
+	output := app.ChatMessage{Role: "assistant", Content: resp.Content}
+	if resp.Content == "" && len(resp.Messages) > 0 {
+		output = resp.Messages[len(resp.Messages)-1]
+	}
+	if v, ok := encodeJSONAttr(output); ok {
+		span.SetAttributes(attribute.String("langwatch.output", v))
+	}
+	span.SetStatus(codes.Ok, "")
+	span.End()
 }
