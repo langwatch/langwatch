@@ -397,7 +397,7 @@ func (e *Engine) runSignature(ctx context.Context, execReq ExecuteRequest, node 
 		if node.Data.Name != nil && *node.Data.Name != "" {
 			schemaName = *node.Data.Name + "Outputs"
 		}
-		req.ResponseFormat = composeSignatureResponseFormat(schemaName, node.Data.Outputs)
+		req.ResponseFormat = composeSignatureResponseFormat(sanitizeSchemaName(schemaName), node.Data.Outputs)
 	}
 	llmCtx, llmSpan := startLLMSpan(ctx, model, provider, messages)
 	resp, err := e.llm.Execute(llmCtx, req)
@@ -439,6 +439,43 @@ func signatureNeedsStructuredOutput(outputs []dsl.Field) bool {
 		}
 	}
 	return false
+}
+
+// sanitizeSchemaName normalizes a string to OpenAI's
+// response_format.json_schema.name pattern ^[a-zA-Z0-9_-]{1,64}$.
+// Disallowed characters become underscores; an empty/all-illegal
+// result falls back to "Outputs"; the result is truncated to 64
+// chars. Mirrors Python's behavior implicitly: DSPy generates a
+// Pydantic class name from the node, and Pydantic rejects illegal
+// identifier chars before they reach the LLM. Without this, node
+// names like "LLM Call" or models with "." (e.g. "gpt-5.2") cause
+// OpenAI to reject the request with `Invalid 'response_format.
+// json_schema.name': string does not match pattern '^[a-zA-Z0-9_-]+$'`.
+func sanitizeSchemaName(name string) string {
+	if name == "" {
+		return "Outputs"
+	}
+	var b strings.Builder
+	b.Grow(len(name))
+	for _, r := range name {
+		switch {
+		case r >= 'a' && r <= 'z',
+			r >= 'A' && r <= 'Z',
+			r >= '0' && r <= '9',
+			r == '_', r == '-':
+			b.WriteRune(r)
+		default:
+			b.WriteByte('_')
+		}
+	}
+	out := b.String()
+	if strings.Trim(out, "_") == "" {
+		return "Outputs"
+	}
+	if len(out) > 64 {
+		out = out[:64]
+	}
+	return out
 }
 
 // composeSignatureResponseFormat builds the OpenAI-style response_format
@@ -538,7 +575,18 @@ func (e *Engine) runEvaluator(ctx context.Context, req ExecuteRequest, node *dsl
 		return nil, &NodeError{Type: "evaluator_unauthorized", Message: "workflow.api_key is required for evaluator dispatch"}
 	}
 
-	slug := paramString(node.Data.Parameters, "evaluator")
+	// Evaluator slug lives on the typed `data.evaluator` field in the
+	// canonical Studio shape (langwatch/src/optimization_studio/types/
+	// dsl.ts → `evaluator?: EvaluatorTypes | "custom/<id>" | "evaluators/<id>"`).
+	// Older workflows may have stuffed it into parameters[]; honor both
+	// so existing user workflows keep evaluating.
+	slug := ""
+	if node.Data.Evaluator != nil {
+		slug = *node.Data.Evaluator
+	}
+	if slug == "" {
+		slug = paramString(node.Data.Parameters, "evaluator")
+	}
 	if slug == "" {
 		return nil, &NodeError{Type: "evaluator_missing_slug", Message: "evaluator parameter is required (e.g. langevals/exact_match)"}
 	}
