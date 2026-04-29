@@ -180,8 +180,6 @@ export class AgentService {
           name: string;
           icon: string | null;
           description: string | null;
-          isEvaluator?: boolean;
-          isComponent?: boolean;
           latestVersion: { dsl: unknown } | null;
         };
         targetProjectId: string;
@@ -211,8 +209,6 @@ export class AgentService {
             name: source.workflow.name,
             icon: source.workflow.icon,
             description: source.workflow.description,
-            isEvaluator: source.workflow.isEvaluator,
-            isComponent: source.workflow.isComponent,
             latestVersion: source.workflow.latestVersion,
           },
           targetProjectId: input.targetProjectId,
