@@ -79,8 +79,8 @@ importers:
         specifier: ^4.1.0
         version: 4.1.1
       liquidjs:
-        specifier: ^10.21.1
-        version: 10.25.0
+        specifier: ^10.25.7
+        version: 10.25.7
       open:
         specifier: ^11.0.0
         version: 11.0.0
@@ -2159,8 +2159,8 @@ packages:
   lines-and-columns@1.2.4:
     resolution: {integrity: sha512-7ylylesZQ/PV29jhEDl3Ufjo6ZX7gCqJr5F7PKrqc93v7fzSymt1BpwEU8nAUXs8qzzvqhbjhK5QZg6Mt/HkBg==}
 
-  liquidjs@10.25.0:
-    resolution: {integrity: sha512-XpO7AiGULTG4xcTlwkcTI5JreFG7b6esLCLp+aUSh7YuQErJZEoUXre9u9rbdb0057pfWG4l0VursvLd5Q/eAw==}
+  liquidjs@10.25.7:
+    resolution: {integrity: sha512-rPCjJLiD4eDhQjvv964AeXFC+HbeYBbZrd7Z82Q6hqv1lX7G+5w4SJcKLn9CAAAwHI4aS3dTdo083UB79K3pDA==}
     engines: {node: '>=16'}
     hasBin: true
 
@@ -4906,7 +4906,7 @@ snapshots:
 
   lines-and-columns@1.2.4: {}
 
-  liquidjs@10.25.0:
+  liquidjs@10.25.7:
     dependencies:
       commander: 10.0.1
 
