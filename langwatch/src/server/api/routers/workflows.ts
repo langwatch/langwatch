@@ -1152,6 +1152,8 @@ export const copyWorkflowWithDatasets = async ({
     name: string;
     icon: string | null;
     description: string | null;
+    isEvaluator?: boolean;
+    isComponent?: boolean;
     latestVersion: { dsl: JsonValue } | null;
   };
   targetProjectId: string;
@@ -1247,6 +1249,8 @@ export const copyWorkflowWithDatasets = async ({
       name: workflow.name,
       icon: workflow.icon ?? "",
       description: workflow.description ?? "",
+      isEvaluator: workflow.isEvaluator ?? false,
+      isComponent: workflow.isComponent ?? false,
       copiedFromWorkflowId: copiedFromWorkflowId ?? workflow.id,
     },
   });
