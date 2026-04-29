@@ -281,11 +281,12 @@ export class PatService {
     scope: CreatorScope;
     role: "ADMIN" | "MEMBER" | "VIEWER";
   }): Promise<void> {
+    const isOrgScope = scope.type === "org";
     const representativePermission: Permission =
       role === TeamUserRole.ADMIN
-        ? "project:manage"
+        ? (isOrgScope ? "organization:manage" : "project:manage")
         : role === TeamUserRole.MEMBER
-          ? "project:create"
+          ? (isOrgScope ? "organization:view" : "project:update")
           : "project:view";
 
     const userHasPermission = await checkRoleBindingPermission({
