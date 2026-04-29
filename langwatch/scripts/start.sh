@@ -24,6 +24,19 @@ if [[ "$NODE_ENV" = "development" ]]; then
   else
     echo "  ✓ redis db=${REDIS_DB_INDEX} (explicit)"
   fi
+
+  # Dev-only: when PORT is set (the port-conflict-detector picked a non-default
+  # slot, e.g. PORT=5580), align BASE_HOST and NEXTAUTH_URL to that PORT so OAuth
+  # callback URLs and BetterAuth's trustedOrigins check match the actual listening
+  # port. Without this, any `pnpm dev` on a non-default port hits a
+  # 403 INVALID_ORIGIN on /api/auth/sign-in/social and the Auth0 redirect dies
+  # before it starts. Skipped in production (NEXTAUTH_URL there is the real
+  # public URL, not localhost).
+  if [ -n "$PORT" ]; then
+    export BASE_HOST="http://localhost:${PORT}"
+    export NEXTAUTH_URL="http://localhost:${PORT}"
+    echo "  ✓ BASE_HOST=NEXTAUTH_URL=${BASE_HOST} (auto-aligned to PORT=${PORT})"
+  fi
 fi
 
 RUNTIME_ENV="DEBUG=langwatch:* DEBUG_HIDE_DATE=true DEBUG_COLORS=true"
@@ -31,11 +44,23 @@ if [ -z "$NODE_ENV" ]; then
   RUNTIME_ENV="$RUNTIME_ENV NODE_ENV=production"
 fi
 
-START_APP_COMMAND="pnpm run start:app"
+# In dev, swap to `tsx watch` for the API + workers so backend file edits
+# auto-reload without a manual `pnpm dev` restart. Vite handles the
+# frontend's HMR; this closes the gap on the server side. Production
+# keeps plain `tsx` (single-shot, no watcher overhead).
+if [[ "$NODE_ENV" = "development" ]]; then
+  START_APP_COMMAND="pnpm run start:app:watch"
+else
+  START_APP_COMMAND="pnpm run start:app"
+fi
 
 START_WORKERS_COMMAND=""
 if [[ "$START_WORKERS" = "true" || "$START_WORKERS" = "1" ]]; then
-  START_WORKERS_COMMAND="pnpm run start:workers && exit 1"
+  if [[ "$NODE_ENV" = "development" ]]; then
+    START_WORKERS_COMMAND="pnpm run start:workers:watch && exit 1"
+  else
+    START_WORKERS_COMMAND="pnpm run start:workers && exit 1"
+  fi
 fi
 
 # In development, Vite runs on PORT (default 5560) and proxies /api/* to PORT+1000.
