@@ -791,8 +791,8 @@ importers:
         specifier: ^2.1.72
         version: 2.1.104
       '@eslint/js':
-        specifier: ^9.4.0
-        version: 9.39.4
+        specifier: ^10.0.1
+        version: 10.0.1
       '@langwatch/scenario':
         specifier: ^0.4.6
         version: 0.4.10(e3e52d468b1bbe6fdb236442e827278b)
@@ -2552,6 +2552,15 @@ packages:
   '@eslint/js@9.39.4':
     resolution: {integrity: sha512-nE7DEIchvtiFTwBw4Lfbu59PG+kCofhjsKaCWzxTpt4lfRjRMqG6uMBzKXuEcyXhOHoUp9riAm7/aWYGhXZ9cw==}
     engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
+
+  '@eslint/js@10.0.1':
+    resolution: {integrity: sha512-zeR9k5pd4gxjZ0abRoIaxdc7I3nDktoXZk2qOv9gCNWx3mVwEn32VRhyLaRsDiJjTs0xq/T8mfPtyuXu7GWBcA==}
+    engines: {node: ^20.19.0 || ^22.13.0 || >=24}
+    peerDependencies:
+      eslint: ^10.0.0
+    peerDependenciesMeta:
+      eslint:
+        optional: true
 
   '@eslint/object-schema@3.0.5':
     resolution: {integrity: sha512-vqTaUEgxzm+YDSdElad6PiRoX4t8VGDjCtt05zn4nU810UIx/uNEV7/lZJ6KwFThKZOzOxzXy48da+No7HZaMw==}
@@ -16373,6 +16382,8 @@ snapshots:
       '@types/json-schema': 7.0.15
 
   '@eslint/js@9.39.4': {}
+
+  '@eslint/js@10.0.1': {}
 
   '@eslint/object-schema@3.0.5': {}
 
