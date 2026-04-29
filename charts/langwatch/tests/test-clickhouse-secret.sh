@@ -29,7 +29,6 @@ tmpl() {
 }
 
 PASSED=0
-FAILED=0
 
 assert_renders() {
   local label="$1"; shift
