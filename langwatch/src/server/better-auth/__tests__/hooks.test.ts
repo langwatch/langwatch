@@ -1,5 +1,15 @@
 import type { PrismaClient } from "@prisma/client";
 import { describe, expect, it, vi } from "vitest";
+
+vi.mock("~/server/app-layer/app", () => ({
+  getApp: () => ({
+    notifications: {
+      sendSlackSignupEvent: vi.fn().mockResolvedValue(undefined),
+    },
+    nurturing: null,
+  }),
+}));
+
 import {
   afterAccountCreate,
   afterAccountUpdate,
@@ -92,7 +102,7 @@ describe("afterUserCreate", () => {
 
       await afterUserCreate({
         prisma,
-        user: { id: "user_1", email: "new@acme.com" },
+        user: { id: "user_1", email: "new@acme.com", name: "New User" },
       });
 
       expect(prisma.organization.findUnique).toHaveBeenCalledWith({
@@ -148,7 +158,7 @@ describe("afterUserCreate", () => {
 
       await afterUserCreate({
         prisma,
-        user: { id: "user_1", email: "alice@acme.com" },
+        user: { id: "user_1", email: "alice@acme.com", name: "Alice" },
       });
 
       // Default-branch create must NOT run when invite is applied.
@@ -182,7 +192,7 @@ describe("afterUserCreate", () => {
       const prisma = makePrismaMock();
       await afterUserCreate({
         prisma,
-        user: { id: "user_1", email: "u@other.com" },
+        user: { id: "user_1", email: "u@other.com", name: "User" },
       });
       expect(prisma.organizationUser.create).not.toHaveBeenCalled();
     });
@@ -193,7 +203,7 @@ describe("afterUserCreate", () => {
       const prisma = makePrismaMock();
       await afterUserCreate({
         prisma,
-        user: { id: "user_1", email: "" },
+        user: { id: "user_1", email: "", name: "User" },
       });
       expect(prisma.organization.findUnique).not.toHaveBeenCalled();
     });
@@ -224,7 +234,7 @@ describe("afterUserCreate", () => {
       await expect(
         afterUserCreate({
           prisma,
-          user: { id: "user_1", email: "u@acme.com" },
+          user: { id: "user_1", email: "u@acme.com", name: "User" },
         }),
       ).resolves.toBeUndefined();
     });
