@@ -312,6 +312,10 @@ pipeline) to the unified-trace direction. Honest history:
 | `5c0816bb0` | refactor(governance): extract CliBootstrapService + add /api/auth/cli/bootstrap REST adapter (Lane S) |
 | `d38ba422e` | feat(cli): wire api.user.cliBootstrap into Storyboard Screen 4 ceremony (Lane A 1.5a-cli-1 enrichment) |
 | `3156b9e17` | feat(governance): step 3c-i — per-origin retention TTL on stored_spans + stored_log_records (Lane S — denormalized RetentionClass column + per-class TTL clauses, Option A consensus) |
+| `629c50734` | feat(governance): step 3c-ii — RetentionClass write-side population in CH repositories (Lane S — denormalised from `langwatch.governance.retention_class` span/log attribute, mirrors SPAN_ATTR_MAPPINGS pattern) |
+| `915d8def3` | fix(governance): actionable error message when device-flow approve hits no provider credentials (Lane B — UX bug surfaced + fixed inline during iter27 dogfood) |
+| `8325a5262` | feat(governance): step 3c-iii — extend ttlReconciler to combine cold-storage + per-class DELETE TTL (Lane S — Option Y consensus, single MODIFY TTL clause preserves per-class retention on cold-storage-enabled installs) |
+| `cb3702cd2` | test(governance): step 3c-iv — per-origin retention TTL integration test (Lane S — 7 scenarios covering write-side + table metadata invariants). **3c chain CLOSED end-to-end across both install modes (self-hosted no-cold + SaaS cold).** |
 
 Earlier (pre-correction) commits on the branch are preserved for the audit
 trail. The mechanical delete commit (`f3de1ae07`) is the boundary between
@@ -686,8 +690,8 @@ The Jane at Acme 8-screen storyboard from `gateway.md` is the **trial-wedge demo
 | ✅ | 🅢 | 1.5s: `setupState.hasApplicationTraces` flag — `9d2688c84` (consumed by 1.5b-viii via `api.governance.setupState`) |
 | ✅ | 🅐+🅢 | 1.5a-cli-1: CLI Screen 4 ceremony — `b8b21bb79` (formatLoginCeremony helper, 15 unit tests) + `32cad11ae` (api.user.cliBootstrap tRPC) + `5c0816bb0` (CliBootstrapService extract + REST adapter) + `d38ba422e` (CLI fold-in via getCliBootstrap, 4 new unit tests). End-to-end rich Screen 4 ceremony (providers + budget) live on this branch. |
 | ✅ | 🅐 | 1.5a-cli-2: CLI Screen 8 budget-limit-reached + `langwatch request-increase` (existing — `commands/request-increase.ts` + `utils/governance/budget.ts` `renderBudgetExceeded` + `checkBudget` pre-exec probe + 16 unit tests). *Audit gap caught — was already shipped before Phase 1B.5 fold.* |
-| ⏳ | 🅐 | 1.5a-docs: `docs/getting-started/personal-ide-keys.mdx` reframed as the storyboard walkthrough — gitignored draft at `.monitor-logs/lane-a-personal-ide-keys-storyboard-draft.md` (~270 LOC), folds to public docs once 3c retention TTL chain closes (3c-i ✅ shipped; 3c-ii/iii/iv pending) |
-| ⏳ | 🅐 | 1.5a-marketing: Marketing-page outline for the open-core / personal IDE keys offering (gitignored draft, location TBD per rchaves) |
+| ⏳ | 🅐 | 1.5a-docs: `docs/getting-started/personal-ide-keys.mdx` reframed as the storyboard walkthrough — gitignored draft at `.monitor-logs/lane-a-personal-ide-keys-storyboard-draft.md` (~270 LOC). **3c retention TTL chain CLOSED end-to-end (3c-i + 3c-ii + 3c-iii + 3c-iv all shipped) — fold to public docs is now UNBLOCKED.** Gated next on the 8 ingestion-source pages reframe + new compliance-architecture.mdx + retention.mdx + ocsf-export.mdx + observability/trace-vs-activity-ingestion.mdx flip. |
+| ⏳ | 🅐 | 1.5a-marketing: Marketing-page outline for the open-core / personal IDE keys offering — gitignored draft at `.monitor-logs/lane-a-marketing-outline-draft.md` (~250 LOC, 9-section structure: hero / pain / solution / how-it-works / features / compliance / open-core pitch / pricing / footer CTA). Lives in `.monitor-logs/` until rchaves picks the home (probably the langwatch.ai marketing repo). |
 
 ### Phase 2A — Multi-source ingestion (Direction 2, P1) — UNIFIED SUBSTRATE (mostly Apache 2.0; multi-source fleet `ee/`)
 
@@ -858,7 +862,15 @@ These supersede the iter22 shots that were limited by the pre-3a `$0/0` empty-st
 Profile section with `Managed by test IT` subtitle on email row + Personal API Keys section ("No personal keys yet") + Notifications panel (3 checkboxes for 80% / weekly summary / per-request threshold) + Budget section ("No personal budget set by your admin"). The "managed by your company" chrome is already in place — the storyboard's helper text rendering matches the design.
 ![/me/settings personal-key surface](https://i.img402.dev/ojp13bkmso.png)
 
-CLI Screens 1 / 4 / 5 / 8 (terminal output captures) are queued as the next batch in 1.5b-i — running `langwatch login --device` + `langwatch claude` + budget-exceeded scenario against the running dev server. Will update this section when those land.
+**Screen 1 — `/cli/auth?user_code=...` browser handshake**
+"Authorize the LangWatch CLI" + monospace user code + "Confirm this matches the code in your terminal" + Approve / Deny. The browser side of `langwatch login --device`.
+![/cli/auth browser handshake](https://i.img402.dev/qgiw81w31i.png)
+
+**Negative-case — approval-failed when org has no provider configured (caught + fixed inline)**
+The dogfood pass surfaced a real UX bug: when an admin tries to approve the device-flow before they've configured a ModelProvider, the page returned a generic "Failed to issue key" with no action. **Inline fix shipped in `915d8def3`** updates the message to "Your admin needs to configure a model provider first. Ask them to add one at Settings → Model Providers." This screenshot is the BEFORE state — captured during dogfood, fixed in the same PR.
+![/cli/auth approval-failed BEFORE 915d8def3](https://i.img402.dev/7tgpvbkzmb.png)
+
+CLI terminal-side captures (Screens 1 / 4 / 5 / 8 — `langwatch login --device` ceremony output, `langwatch claude` transparent wrapper, `langwatch claude` budget-limit-reached) are queued for iter28 — Alexis is provisioning a ModelProvider + completing the full device-flow + capturing the budget-exceeded path. Populated `/me` dashboard with real spend numbers depends on the same iter28 path. Will update this section when iter28 lands.
 
 ### Persona-aware home — resolver, not page (Alexis)
 
