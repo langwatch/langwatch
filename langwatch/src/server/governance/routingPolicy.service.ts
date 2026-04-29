@@ -71,6 +71,13 @@ export class RoutingPolicyService {
   }
 
   async create(input: CreateRoutingPolicyInput): Promise<RoutingPolicy> {
+    // Defensive scope normalisation. Typed CreateRoutingPolicyInput
+    // already constrains scope to the lowercase enum at compile time,
+    // but admin/dogfood scripts that call this service via untyped
+    // wrappers can land uppercase variants — and resolveDefaultForUser
+    // queries scope='organization' (lowercase) so any uppercase row
+    // becomes silently invisible. Lowercase here as belt-and-suspenders.
+    const scope = input.scope.toLowerCase() as RoutingPolicyScope;
     await this.assertProviderCredentialsBelongToOrg(
       input.organizationId,
       input.providerCredentialIds,
@@ -82,7 +89,7 @@ export class RoutingPolicyService {
         await tx.routingPolicy.updateMany({
           where: {
             organizationId: input.organizationId,
-            scope: input.scope,
+            scope,
             scopeId: input.scopeId,
             isDefault: true,
           },
@@ -93,7 +100,7 @@ export class RoutingPolicyService {
       return await tx.routingPolicy.create({
         data: {
           organizationId: input.organizationId,
-          scope: input.scope,
+          scope,
           scopeId: input.scopeId,
           name: input.name,
           description: input.description ?? null,
