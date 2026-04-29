@@ -121,6 +121,33 @@ describe("saveOrCommitWorkflowVersion", () => {
     });
   });
 
+  describe("when nodes have execution_state", () => {
+    it("strips execution_state from persisted nodes", async () => {
+      const dsl = buildDsl({
+        instructions: "You are a helpful assistant.",
+        messages: [{ role: "user", content: "{{input}}" }],
+        executionState: {
+          status: "success",
+          trace_id: "trace_123",
+          span_id: "span_456",
+          timestamps: { started_at: 1000, finished_at: 2000 },
+        },
+      });
+
+      const version = await saveOrCommitWorkflowVersion({
+        ctx: getCtx(),
+        input: { projectId, workflowId, dsl },
+        autoSaved: false,
+        commitMessage: "test execution_state stripping",
+      });
+
+      const savedDsl = version.dsl as any;
+      for (const node of savedDsl.nodes) {
+        expect(node.data.execution_state).toBeUndefined();
+      }
+    });
+  });
+
   describe("when a signature node has NO localPromptConfig", () => {
     it("preserves parameters as-is", async () => {
       const dsl = buildDsl({
@@ -158,10 +185,12 @@ function buildDsl({
   instructions,
   messages,
   localPromptConfig,
+  executionState,
 }: {
   instructions: string;
   messages: Array<{ role: string; content: string }>;
   localPromptConfig?: any;
+  executionState?: any;
 }) {
   versionCounter++;
   return {
@@ -203,6 +232,7 @@ function buildDsl({
             },
           ],
           localPromptConfig,
+          execution_state: executionState,
         },
       },
     ],

@@ -1,6 +1,7 @@
 import type { Node } from "@xyflow/react";
 import type { z } from "zod";
-import type { workflowJsonSchema } from "../types/dsl";
+import type { Component, workflowJsonSchema } from "../types/dsl";
+import { mergeLocalConfigsIntoDsl } from "./mergeLocalConfigs";
 
 export const clearDsl = (
   dsl: z.infer<typeof workflowJsonSchema>,
@@ -34,6 +35,26 @@ export const clearDsl = (
     }),
     state: includeExecutionStates ? dsl.state : undefined,
   };
+};
+
+/**
+ * Single chokepoint for all pre-save transforms before persisting a workflow version.
+ * Composes: merge local configs → strip per-node execution_state → clear top-level state → deep clone.
+ */
+export const prepareDslForPersistence = (
+  dsl: z.infer<typeof workflowJsonSchema>,
+): z.infer<typeof workflowJsonSchema> => {
+  const merged = {
+    ...dsl,
+    nodes: mergeLocalConfigsIntoDsl(dsl.nodes as Node<Component>[]) as any,
+    state: {},
+  };
+
+  for (const node of merged.nodes) {
+    delete (node as Node).data.execution_state;
+  }
+
+  return JSON.parse(JSON.stringify(merged));
 };
 
 export const hasDSLChanged = (
