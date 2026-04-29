@@ -44,17 +44,23 @@ export const clearDsl = (
 export const prepareDslForPersistence = (
   dsl: z.infer<typeof workflowJsonSchema>,
 ): z.infer<typeof workflowJsonSchema> => {
-  const merged = {
-    ...dsl,
-    nodes: mergeLocalConfigsIntoDsl(dsl.nodes as Node<Component>[]) as any,
-    state: {},
-  };
+  const mergedNodes = mergeLocalConfigsIntoDsl(
+    dsl.nodes as Node<Component>[],
+  );
 
-  for (const node of merged.nodes) {
-    delete (node as Node).data.execution_state;
-  }
+  const cleanedNodes = mergedNodes.map((node) => {
+    const { execution_state, ...dataRest } =
+      node.data as Record<string, unknown>;
+    return { ...node, data: dataRest };
+  });
 
-  return JSON.parse(JSON.stringify(merged));
+  return JSON.parse(
+    JSON.stringify({
+      ...dsl,
+      nodes: cleanedNodes,
+      state: {},
+    }),
+  );
 };
 
 export const hasDSLChanged = (
