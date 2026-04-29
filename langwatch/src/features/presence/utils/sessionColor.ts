@@ -6,7 +6,7 @@ import type {
 
 /** Display name used as the seed for avatar colours and tooltip labels. */
 export function presenceUserDisplayName(user: PresenceUser): string {
-  return user.name ?? user.email ?? "Someone";
+  return user.name ?? "Someone";
 }
 
 /** Stable colour token for a presence user, matched to the avatar background. */

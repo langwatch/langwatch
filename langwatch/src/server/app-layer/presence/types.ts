@@ -62,10 +62,15 @@ export const presenceLocationSchema = z.object({
 });
 export type PresenceLocation = z.infer<typeof presenceLocationSchema>;
 
+/**
+ * Deliberately excludes `email`. Presence is fanned out to every project
+ * member with `traces:view`, and the UI only needs identity for the
+ * avatar + tooltip — broadcasting addresses would leak them between
+ * teammates for no rendering benefit.
+ */
 export interface PresenceUser {
   id: string;
   name: string | null;
-  email: string | null;
   image: string | null;
 }
 

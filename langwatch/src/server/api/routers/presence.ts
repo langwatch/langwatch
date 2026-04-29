@@ -41,7 +41,6 @@ export const presenceRouter = createTRPCRouter({
         user: {
           id: user.id,
           name: user.name ?? null,
-          email: user.email ?? null,
           image: user.image ?? null,
         },
         location: input.location,
@@ -95,6 +94,23 @@ export const presenceRouter = createTRPCRouter({
             );
             continue;
           }
+          // Defense-in-depth: the per-tenant emitter should already isolate
+          // events, but if a future refactor ever leaks a payload across
+          // tenants, this drops it before it reaches the wire instead of
+          // shipping another project's session metadata to a subscriber.
+          if (
+            (parsed.kind === "join" || parsed.kind === "update") &&
+            parsed.session.projectId !== projectId
+          ) {
+            logger.error(
+              {
+                subscriberProjectId: projectId,
+                eventProjectId: parsed.session.projectId,
+              },
+              "Refusing to relay cross-tenant presence event",
+            );
+            continue;
+          }
           yield parsed;
         }
       } finally {
@@ -122,7 +138,6 @@ export const presenceRouter = createTRPCRouter({
         user: {
           id: user.id,
           name: user.name ?? null,
-          email: user.email ?? null,
           image: user.image ?? null,
         },
         payload: input.payload,
