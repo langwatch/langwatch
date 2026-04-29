@@ -36,27 +36,23 @@ class LangWatchWorkflowModule(ReportingModule):
         class WrappedModule(module):  # type: ignore
             pass
 
-        # Apply autoparsing and reporting to the subclass, not the original
-        wrapped_module = self.with_reporting(with_autoparsing(WrappedModule), node_id)
-
-        # Resolve entrypoint: forward (dspy.Module convention) or __call__ (plain class).
-        # Check via __dict__ on the MRO to avoid picking up type.__call__ (metaclass)
-        # which exists on every class and would give a false positive.
+        # For __call__-only classes (no forward method), bridge __call__ to forward
+        # so the downstream patching chain (with_autoparsing, with_reporting) works.
         def _has_own_method(cls, name):
             return any(name in klass.__dict__ for klass in cls.__mro__ if klass not in (type, object))
 
-        original_method = getattr(wrapped_module, "forward", None) if _has_own_method(wrapped_module, "forward") else None
-        entrypoint_attr = "forward"
-        if not callable(original_method):
-            original_method = getattr(wrapped_module, "__call__", None) if _has_own_method(wrapped_module, "__call__") else None
-            entrypoint_attr = "__call__"
-        if not callable(original_method):
-            raise TypeError(
-                f"Class '{module.__name__}' for node {node_id} has no callable "
-                f"entrypoint. Define forward(self, ...) or __call__(self, ...)."
-            )
+        if not _has_own_method(WrappedModule, "forward"):
+            if _has_own_method(WrappedModule, "__call__"):
+                WrappedModule.forward = WrappedModule.__call__  # type: ignore
+            else:
+                raise TypeError(
+                    f"Class '{module.__name__}' for node {node_id} has no callable "
+                    f"entrypoint. Define forward(self, ...) or __call__(self, ...)."
+                )
 
-        wrapped_module.__forward_before_metadata__ = original_method  # type: ignore
+        # Apply autoparsing and reporting to the subclass, not the original
+        wrapped_module = self.with_reporting(with_autoparsing(WrappedModule), node_id)
+        wrapped_module.__forward_before_metadata__ = wrapped_module.forward  # type: ignore
 
         def forward_with_metadata(instance_self, *args, **kwargs):
             if not run:
@@ -82,7 +78,7 @@ class LangWatchWorkflowModule(ReportingModule):
                 raise e
             return result
 
-        setattr(wrapped_module, entrypoint_attr, forward_with_metadata)
+        wrapped_module.forward = forward_with_metadata  # type: ignore
         return wrapped_module
 
     def run_in_parallel(self, *module_kwargs: Tuple[T, Dict[str, Any]]):
