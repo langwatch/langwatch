@@ -300,6 +300,18 @@ pipeline) to the unified-trace direction. Honest history:
 | `9a5653107` | fix(governance): Layer-1 invariant test cleanup-step organizationId fix |
 | `fd118131c` | feat(governance): step 3a — read-side cutover onto unified trace store (ActivityMonitorService + setupState rewire) |
 | `66c897a08` | test(governance): step 3a — ActivityMonitorService read-side integration test (7 scenarios + cross-org Layer-1) |
+| `e709cfbc8` | test(governance): volume regression integration test — concurrent + cross-org (Lane A) |
+| `769c67395` + `789c5cbb7` + `8073888bd` | feat(governance): step 3b-i — governance_kpis CH migration + ReplacingMergeTree per-trace ORDER BY revisions (Lane S) |
+| `b54696d95` | feat(governance): step 3b-ii — governanceKpisSync reactor + CH repository + pipeline registration (Lane S) |
+| `d2c544ec5` | test(governance): step 3b-iii — governanceKpisSync reactor unit tests (Lane S) |
+| `9d2688c84` | feat(governance): add hasApplicationTraces flag to setupState — Persona-3 detection (Lane S) |
+| `94426716e` (already listed earlier) | + Phase 1B.5 backports — covered above |
+| `e40ee0045` | feat(governance): persona-aware home resolver (Lane B 1.5b-viii — 12 unit tests + BDD spec + tRPC + pages/index.tsx wire + regression invariant) |
+| `b8b21bb79` | feat(cli): Storyboard Screen 4 login ceremony — try-it block + dashboard hint (Lane A 1.5a-cli-1) |
+| `32cad11ae` | feat(governance): add api.user.cliBootstrap — Storyboard Screen 4 ceremony enrichment (Lane S) |
+| `5c0816bb0` | refactor(governance): extract CliBootstrapService + add /api/auth/cli/bootstrap REST adapter (Lane S) |
+| `d38ba422e` | feat(cli): wire api.user.cliBootstrap into Storyboard Screen 4 ceremony (Lane A 1.5a-cli-1 enrichment) |
+| `3156b9e17` | feat(governance): step 3c-i — per-origin retention TTL on stored_spans + stored_log_records (Lane S — denormalized RetentionClass column + per-class TTL clauses, Option A consensus) |
 
 Earlier (pre-correction) commits on the branch are preserved for the audit
 trail. The mechanical delete commit (`f3de1ae07`) is the boundary between
@@ -414,11 +426,8 @@ Plus the internal architecture decision record at [`dev/docs/adr/018-governance-
 The customer journey, captured frame-by-frame against the running dev
 server post-`33a8cf6d0` (full receiver rewire shipped):
 
-1. **`/governance` admin overview** — chrome + KPI strip + IngestionSources
-   panel + Recent anomalies. Org-scoped surface; the top-nav shows the
-   "Organization-scoped — not tied to a project" indicator (iter 19 work)
-   confirming the page is not gated on the active project context.
-   ![Governance dashboard](https://i.img402.dev/sqnfqmiabr.png)
+1. **`/governance` admin overview** — chrome + 3 KPI cards (SPEND 30D / ACTIVE USERS 30D / OPEN ANOMALIES 1) + 6 ingestion sources + 1 anomaly firing in Recent anomalies (live-data dogfood post-3a, post-Sergey ActivityMonitorService rewire). Org-scoped surface; the top-nav shows the "Organization-scoped — not tied to a project" indicator (iter 19 work) confirming the page is not gated on the active project context. **Updated (iter27): replaces the earlier iter22 $0/0 synthetic shot — KPI strip + Recent anomalies now flow from real `recorded_spans` + `log_records` + `governance_kpis` data.**
+   ![Governance dashboard with live data](https://i.img402.dev/j0m3np49vm.png)
 
 2. **`/settings/governance/ingestion-sources` list** — fleet management
    for the per-platform feeds. "+ Add source" CTA opens the composer.
@@ -664,21 +673,21 @@ The Jane at Acme 8-screen storyboard from `gateway.md` is the **trial-wedge demo
 
 | | Owner | Task |
 |---|---|---|
-| ⏳ | 🅑 | 1.5b-i: Live-data Playwright dogfood + screenshots — Screens 1 / 3 / 5 (wireable today) |
+| 🚧 | 🅑 | 1.5b-i: Live-data Playwright dogfood + screenshots — Screens 1 / 3 / 5 wireable today; first batch (3 shots) captured against running dev server |
 | ⏳ | 🅑 | 1.5b-ii: Screen 2 — single-input email-only `/signin-cli` variant (vs full-provider-list /signin) |
 | ⏳ | 🅑 | 1.5b-iii: Screen 4 — "You're in!" ceremony page redesign + close-tab CTA + provider+budget summary |
-| ⏳ | 🅑 | 1.5b-iv: Screen 6 — `/me` layout refresh (3-card KPI top + by-tool stacked bars + recent-activity rows) |
-| ⏳ | 🅑 | 1.5b-v: Screen 7 — `/me/settings` polish (per-device key labelling + notifications panel + "managed by your company" chrome) |
+| ⏳ | 🅑 | 1.5b-iv: Screen 6 — `/me` layout refresh — *scope reduced ~3x post-iter27 audit: layout already production-ready; minor polish only* |
+| ⏳ | 🅑 | 1.5b-v: Screen 7 — `/me/settings` polish — *scope reduced ~3x post-iter27 audit: managed-by-your-company chrome already in place; minor polish only* |
 | ⏳ | 🅑 | 1.5b-vi: Screen 8 — `BudgetExceededBanner` web-side enrichment to match storyboard tone |
 | ⏳ | 🅑 | 1.5b-vii: WorkspaceSwitcher v2 — Personal/Team/Project visual + "managed by your company" indicator |
-| ⏳ | 🅑 | 1.5b-viii: Persona resolver service + `/` redirect + tRPC router + regression test (org without governance / personal-VKs but with projects → still lands on /[project]) |
-| ⏳ | 🅑 | 1.5b-ix: BDD spec `persona-home-resolver.feature` |
+| ✅ | 🅑 | 1.5b-viii: Persona resolver service + `/` redirect + tRPC router + regression test — `e40ee0045` (12/12 unit tests, BDD spec, regression invariant for LLMOps majority locked) |
+| ✅ | 🅑 | 1.5b-ix: BDD spec `persona-home-resolver.feature` (shipped with `e40ee0045`) |
 | ⏳ | 🅑 | 1.5b-x: Live-data dogfood post-resolver — capture all 8 screens in one Playwright run |
-| ⏳ | 🅢 | 1.5s: `setupState.hasApplicationTraces` flag — for persona-3 default-detection (1-method addition, no schema change) |
-| ⏳ | 🅐 | 1.5a-cli-1: CLI Screen 4 — terminal-side `langwatch login` enumerates inherited providers + monthly budget after OAuth completes |
-| ⏳ | 🅐 | 1.5a-cli-2: CLI Screen 8 — `langwatch claude` budget-limit-reached message + `langwatch request-increase` cmd |
-| ⏳ | 🅐 | 1.5a-docs: `docs/getting-started/personal-ide-keys.mdx` reframed as the Jane storyboard walkthrough; Slack onboarding template for IT admins |
-| ⏳ | 🅐 | 1.5a-marketing: Marketing-page outline for the open-core / personal IDE keys offering (lives in `.monitor-logs/` until rchaves picks the home) |
+| ✅ | 🅢 | 1.5s: `setupState.hasApplicationTraces` flag — `9d2688c84` (consumed by 1.5b-viii via `api.governance.setupState`) |
+| ✅ | 🅐+🅢 | 1.5a-cli-1: CLI Screen 4 ceremony — `b8b21bb79` (formatLoginCeremony helper, 15 unit tests) + `32cad11ae` (api.user.cliBootstrap tRPC) + `5c0816bb0` (CliBootstrapService extract + REST adapter) + `d38ba422e` (CLI fold-in via getCliBootstrap, 4 new unit tests). End-to-end rich Screen 4 ceremony (providers + budget) live on this branch. |
+| ✅ | 🅐 | 1.5a-cli-2: CLI Screen 8 budget-limit-reached + `langwatch request-increase` (existing — `commands/request-increase.ts` + `utils/governance/budget.ts` `renderBudgetExceeded` + `checkBudget` pre-exec probe + 16 unit tests). *Audit gap caught — was already shipped before Phase 1B.5 fold.* |
+| ⏳ | 🅐 | 1.5a-docs: `docs/getting-started/personal-ide-keys.mdx` reframed as the storyboard walkthrough — gitignored draft at `.monitor-logs/lane-a-personal-ide-keys-storyboard-draft.md` (~270 LOC), folds to public docs once 3c retention TTL chain closes (3c-i ✅ shipped; 3c-ii/iii/iv pending) |
+| ⏳ | 🅐 | 1.5a-marketing: Marketing-page outline for the open-core / personal IDE keys offering (gitignored draft, location TBD per rchaves) |
 
 ### Phase 2A — Multi-source ingestion (Direction 2, P1) — UNIFIED SUBSTRATE (mostly Apache 2.0; multi-source fleet `ee/`)
 
@@ -834,6 +843,22 @@ A senior engineer (Jane) at a fictional enterprise customer (Acme) joins the com
 **Summary**: 1 ✅ shipped, 2 🟢 wireable today (screenshot achievable), 4 🟡 polish/redesign, 3 🔴 net-new (mostly lane-A CLI surfaces). The polish slice fits inside Phase 1B; full demo-loop dogfood is achievable post-1.5b-x.
 
 **Backend audit (Sergey)**: backend is essentially fully built for the Jane journey. `personalUsage.service.ts` exposes `summary` / `dailyBuckets` / `breakdownByModel` / `recentActivity` (matches Screen 6 layout exactly). `personalVirtualKey.service.ts` handles per-device + revoke (Screen 7). Budget-exceeded wire shape locked: HTTP 402 + JSON `{type: 'budget_exceeded', message, scope, ...}` at `auth-cli.ts:701` + `user.ts:460` (consumed today by web `BudgetExceededBanner` via `usePersonalContext.ts:38`; CLI rendering is the lane-A polish). Only 1 missing backend signal: `setupState.hasApplicationTraces` (1.5s, Sergey, ~30min). Resolver should run in `getServerSideProps` on `pages/index.tsx` (deterministic, avoids client-side flash) and fail-safe to `/[firstProject]/messages` on any signal-lookup error.
+
+**Iter27 dogfood discovery (Alexis)**: `/me` + `/me/settings` are already production-ready against the storyboard layout. 1.5b-iv (`/me` layout refresh) + 1.5b-v (`/me/settings` polish) drop from "biggest slice" to ~0.3 iters each — minor polish only. Live screenshots below.
+
+### Live-data screenshots (iter27, Alexis 1.5b-i)
+
+These supersede the iter22 shots that were limited by the pre-3a `$0/0` empty-state. Captured against `pnpm dev :5570` post-Sergey 3a (`fd118131c`) + 1.5b-viii persona resolver (`e40ee0045`).
+
+**Screen 6 — `/me` personal dashboard** (Storyboard layout match: STRONG)
+3-card top strip (`SPENT THIS MONTH $0.00` / `REQUESTS THIS MONTH 0` / `MOST-USED MODEL —`) + Spending over time chart placeholder + By tool placeholder + Recent activity ("Run `langwatch claude` to get started" empty-state) + WorkspaceSwitcher dropdown header.
+![/me personal dashboard](https://i.img402.dev/7zx4ipvw0w.png)
+
+**Screen 7 — `/me/settings`** (Storyboard layout match: STRONG)
+Profile section with `Managed by test IT` subtitle on email row + Personal API Keys section ("No personal keys yet") + Notifications panel (3 checkboxes for 80% / weekly summary / per-request threshold) + Budget section ("No personal budget set by your admin"). The "managed by your company" chrome is already in place — the storyboard's helper text rendering matches the design.
+![/me/settings personal-key surface](https://i.img402.dev/ojp13bkmso.png)
+
+CLI Screens 1 / 4 / 5 / 8 (terminal output captures) are queued as the next batch in 1.5b-i — running `langwatch login --device` + `langwatch claude` + budget-exceeded scenario against the running dev server. Will update this section when those land.
 
 ### Persona-aware home — resolver, not page (Alexis)
 
