@@ -195,8 +195,12 @@ export async function updateUserPassword(args: {
     | { errorCode?: string; message?: string; error?: string }
     | undefined;
 
+  // Auth0 attaches an explicit `errorCode` on Management API 403s.
+  // Match on that — not just the HTTP status — so unrelated 403s (e.g.
+  // a blocked user, an MFA-required step) don't get mis-labeled with a
+  // scope-misconfiguration message and bad remediation advice.
   const errorCode = body?.errorCode ?? body?.error;
-  if (res.status === 403 || errorCode === "insufficient_scope") {
+  if (errorCode === "insufficient_scope") {
     logger.error(
       { status: res.status, body },
       "Auth0 Management API rejected password update — missing update:users scope",

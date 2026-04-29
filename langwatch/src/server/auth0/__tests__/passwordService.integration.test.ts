@@ -253,6 +253,37 @@ describe("updateUserPassword", () => {
       });
     });
   });
+
+  describe("when the Management API returns 403 with a non-scope errorCode", () => {
+    // E.g. a blocked user. Earlier code matched on status alone and
+    // would have mis-labeled this as `insufficient_scope`. Now it
+    // should fall through to `unknown` so callers don't surface bad
+    // remediation advice ("enable update:users scope") for an
+    // unrelated 403.
+    it("throws Auth0ApiError with code=unknown, not insufficient_scope", async () => {
+      handler = () => ({
+        status: 403,
+        body: {
+          statusCode: 403,
+          error: "Forbidden",
+          errorCode: "unauthorized",
+          message: "User is blocked",
+        },
+      });
+
+      await expect(
+        updateUserPassword({
+          auth0UserId: "auth0|abc",
+          newPassword: "pw12345678",
+          managementToken: "tok",
+        }),
+      ).rejects.toMatchObject({
+        name: "Auth0ApiError",
+        code: "unknown",
+        status: 403,
+      });
+    });
+  });
 });
 
 describe("changeAuth0Password", () => {
