@@ -18,7 +18,7 @@ export const deleteMonitorCommand = async (
   try {
     const result = (await apiRequest({
       method: "DELETE",
-      path: `/api/monitors/${id}`,
+      path: `/api/monitors/${encodeURIComponent(id)}`,
       apiKey,
       endpoint,
     })) as {

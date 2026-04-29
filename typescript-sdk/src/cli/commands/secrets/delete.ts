@@ -18,7 +18,7 @@ export const deleteSecretCommand = async (
   try {
     const result = (await apiRequest({
       method: "DELETE",
-      path: `/api/secrets/${id}`,
+      path: `/api/secrets/${encodeURIComponent(id)}`,
       apiKey,
       endpoint,
     })) as {

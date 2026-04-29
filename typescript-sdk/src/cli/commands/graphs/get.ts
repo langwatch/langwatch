@@ -19,7 +19,7 @@ export const getGraphCommand = async (
   try {
     const graph = (await apiRequest({
       method: "GET",
-      path: `/api/graphs/${id}`,
+      path: `/api/graphs/${encodeURIComponent(id)}`,
       apiKey,
       endpoint,
     })) as {

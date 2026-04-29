@@ -19,7 +19,7 @@ export const updateSecretCommand = async (
   try {
     const secret = (await apiRequest({
       method: "PUT",
-      path: `/api/secrets/${id}`,
+      path: `/api/secrets/${encodeURIComponent(id)}`,
       apiKey,
       endpoint,
       body: { value: options.value },

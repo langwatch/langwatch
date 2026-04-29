@@ -19,7 +19,7 @@ export const getSecretCommand = async (
   try {
     const secret = (await apiRequest({
       method: "GET",
-      path: `/api/secrets/${id}`,
+      path: `/api/secrets/${encodeURIComponent(id)}`,
       apiKey,
       endpoint,
     })) as {

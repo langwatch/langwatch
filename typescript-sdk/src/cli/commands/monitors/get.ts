@@ -19,7 +19,7 @@ export const getMonitorCommand = async (
   try {
     const monitor = (await apiRequest({
       method: "GET",
-      path: `/api/monitors/${id}`,
+      path: `/api/monitors/${encodeURIComponent(id)}`,
       apiKey,
       endpoint,
     })) as {

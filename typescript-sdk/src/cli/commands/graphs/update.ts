@@ -42,7 +42,7 @@ export const updateGraphCommand = async (
 
     const graph = (await apiRequest({
       method: "PATCH",
-      path: `/api/graphs/${id}`,
+      path: `/api/graphs/${encodeURIComponent(id)}`,
       apiKey,
       endpoint,
       body,

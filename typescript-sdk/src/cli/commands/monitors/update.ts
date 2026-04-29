@@ -39,7 +39,7 @@ export const updateMonitorCommand = async (
 
     const monitor = (await apiRequest({
       method: "PATCH",
-      path: `/api/monitors/${id}`,
+      path: `/api/monitors/${encodeURIComponent(id)}`,
       apiKey,
       endpoint,
       body,
