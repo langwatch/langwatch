@@ -112,7 +112,7 @@ async function dispatchEvaluations({
         evaluationId,
         evaluatorId: monitor.id,
         evaluatorType: monitor.checkType,
-        evaluatorName: monitor.name,
+        evaluatorName: monitor.evaluator?.name ?? monitor.name,
         isGuardrail: false,
         occurredAt,
         threadIdleTimeout: monitor.threadIdleTimeout ?? undefined,
