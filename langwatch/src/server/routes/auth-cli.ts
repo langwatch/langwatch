@@ -1060,8 +1060,16 @@ app.post("/approve", async (c: Context) => {
         { err, user_code },
         `[auth-cli] approve failed for ${user_code}`,
       );
+      // Surface the actionable case where the org has no provider
+      // credentials configured yet — admin needs to set one up before
+      // users can issue personal VKs (storyboard Screen 4 prerequisite).
+      // Other errors stay generic to avoid leaking internals.
+      const message =
+        err instanceof Error && /provider credential is required/i.test(err.message)
+          ? "Your admin needs to configure a model provider first. Ask them to add one at Settings → Model Providers."
+          : "Failed to issue key";
       return c.json(
-        { error: "server_error", error_description: "Failed to issue key" },
+        { error: "server_error", error_description: message },
         500,
       );
     }
