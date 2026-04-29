@@ -316,6 +316,8 @@ pipeline) to the unified-trace direction. Honest history:
 | `915d8def3` | fix(governance): actionable error message when device-flow approve hits no provider credentials (Lane B — UX bug surfaced + fixed inline during iter27 dogfood) |
 | `8325a5262` | feat(governance): step 3c-iii — extend ttlReconciler to combine cold-storage + per-class DELETE TTL (Lane S — Option Y consensus, single MODIFY TTL clause preserves per-class retention on cold-storage-enabled installs) |
 | `cb3702cd2` | test(governance): step 3c-iv — per-origin retention TTL integration test (Lane S — 7 scenarios covering write-side + table metadata invariants). **3c chain CLOSED end-to-end across both install modes (self-hosted no-cold + SaaS cold).** |
+| `5fa23f900` | feat(governance): step 3d-i — governance_ocsf_events CH migration (Lane S — OCSF v1.1 / OWASP AOS shape Actor / Action / Target / Time / Severity / Event ID per `siem-export.feature` spec) |
+| `ee5159879` | feat(governance): step 3d-ii — governanceOcsfEventsSync reactor + CH repository + pipeline registration (Lane S — populates the OCSF fold downstream of trace_summary fold; mirrors 3b-ii pattern) |
 
 Earlier (pre-correction) commits on the branch are preserved for the audit
 trail. The mechanical delete commit (`f3de1ae07`) is the boundary between
@@ -866,11 +868,26 @@ Profile section with `Managed by test IT` subtitle on email row + Personal API K
 "Authorize the LangWatch CLI" + monospace user code + "Confirm this matches the code in your terminal" + Approve / Deny. The browser side of `langwatch login --device`.
 ![/cli/auth browser handshake](https://i.img402.dev/qgiw81w31i.png)
 
+**Screen 4 — `/cli/auth` web-side success ceremony (the apache2-floor demo wedge proof)**
+"Authorize the LangWatch CLI" header + green-tick "You're signed in!" message + "LangWatch CLI is now authorized for **<org>** using the `default` personal key. You can close this tab and return to your terminal." That's Jane's first "I'm in" moment captured live. Issued personal Virtual Key carries the org-default `RoutingPolicy`.
+![/cli/auth web-side success ceremony](https://i.img402.dev/e0emfvpzoy.png)
+
 **Negative-case — approval-failed when org has no provider configured (caught + fixed inline)**
 The dogfood pass surfaced a real UX bug: when an admin tries to approve the device-flow before they've configured a ModelProvider, the page returned a generic "Failed to issue key" with no action. **Inline fix shipped in `915d8def3`** updates the message to "Your admin needs to configure a model provider first. Ask them to add one at Settings → Model Providers." This screenshot is the BEFORE state — captured during dogfood, fixed in the same PR.
 ![/cli/auth approval-failed BEFORE 915d8def3](https://i.img402.dev/7tgpvbkzmb.png)
 
-CLI terminal-side captures (Screens 1 / 4 / 5 / 8 — `langwatch login --device` ceremony output, `langwatch claude` transparent wrapper, `langwatch claude` budget-limit-reached) are queued for iter28 — Alexis is provisioning a ModelProvider + completing the full device-flow + capturing the budget-exceeded path. Populated `/me` dashboard with real spend numbers depends on the same iter28 path. Will update this section when iter28 lands.
+**iter28 discoveries** (Alexis post-screenshot pass):
+
+1. **Device-flow happy path is end-to-end functional once provider + default RoutingPolicy are configured.** Setup sequence (committable as a follow-up dogfood utility): `ModelProvider` (scope=ORGANIZATION) → default `RoutingPolicy` (scope=organization, isDefault=true, providerCredentialIds=[modelProvider.id], modelAllowlist=[...]) → device-flow approve succeeds. Without the default RoutingPolicy, `PersonalVirtualKeyService.issue` → `VirtualKeyService.create` → `assertProviderCredentialsBelongToProject` fails with "At least one provider credential is required" — this is the failure path captured in the BEFORE screenshot above.
+
+2. **`RoutingPolicy.scope` case-sensitivity bug found**: seed wrote `scope='ORGANIZATION'` (uppercase) but `routingPolicy.service.ts:resolveDefaultForUser` queries `scope='organization'` (lowercase). Subtle data-shape inconsistency. Tracked as a follow-up bug-fix; one-shot migration utility at `langwatch/scripts/dogfood/fix-policy-scope.ts` is committable.
+
+3. **CLI terminal-side captures (Screens 1 / 4 / 5 / 8) require additional setup**:
+   - Screens 1 + 4 (CLI prints) need `langwatch login --device` against a fully-configured org (provider + default policy + Bearer token persistence)
+   - Screen 5 (`langwatch claude` running) requires Claude Code installed locally + actual gateway-routed LLM call — out of scope for headless Playwright. Will be captured via image-stitching from CLI text output in a code block in the customer-facing docs.
+   - Screen 8 (budget-exceeded terminal) requires hitting the actual budget cap (token-counting + cost-rounding + budget-debit timing).
+
+Populated `/me` + `/me/settings` recapture (with personal-VK row + actual usage data) is pending the hot-reload settle on the iter28 dev server. Will update this section when those land.
 
 ### Persona-aware home — resolver, not page (Alexis)
 
