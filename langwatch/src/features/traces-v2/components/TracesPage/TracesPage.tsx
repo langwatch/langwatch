@@ -1,6 +1,5 @@
 import { Box, Flex, HStack, VStack } from "@chakra-ui/react";
-import type React from "react";
-import { useMemo } from "react";
+import React, { useMemo } from "react";
 import { useTracesV2Presence } from "~/features/presence/hooks/useTracesV2Presence";
 import { useRouter } from "~/utils/compat/next-router";
 import { ExportConfigDialog } from "~/components/messages/ExportConfigDialog";
@@ -112,7 +111,7 @@ export const TracesPage: React.FC = () => {
   );
 };
 
-const FilterAside: React.FC<{ dimmed?: boolean }> = ({ dimmed = false }) => {
+const FilterAside: React.FC<{ dimmed?: boolean }> = React.memo(({ dimmed = false }) => {
   const sidebarCollapsed = useUIStore((s) => s.sidebarCollapsed);
 
   return (
@@ -133,9 +132,10 @@ const FilterAside: React.FC<{ dimmed?: boolean }> = ({ dimmed = false }) => {
       <FilterSidebar />
     </Box>
   );
-};
+});
+FilterAside.displayName = "FilterAside";
 
-const ResultsPane: React.FC = () => {
+const ResultsPane: React.FC = React.memo(() => {
   const { data, totalHits } = useTraceListQuery();
   const pageTraceIds = useMemo(() => data.map((t) => t.traceId), [data]);
   const selectionMode = useSelectionStore((s) => s.mode);
@@ -215,9 +215,10 @@ const ResultsPane: React.FC = () => {
       />
     </Flex>
   );
-};
+});
+ResultsPane.displayName = "ResultsPane";
 
-const EmptyResultsPane: React.FC = () => (
+const EmptyResultsPane: React.FC = React.memo(() => (
   <Flex
     as="main"
     role="main"
@@ -235,4 +236,5 @@ const EmptyResultsPane: React.FC = () => (
       <EmptyState />
     </Box>
   </Flex>
-);
+));
+EmptyResultsPane.displayName = "EmptyResultsPane";
