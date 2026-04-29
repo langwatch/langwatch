@@ -98,9 +98,53 @@ type GatewayHTTPError struct {
 	Headers    map[string]string
 }
 
-// Error implements error.
+// Error implements error. Surfaces the upstream provider's message
+// verbatim (parsed out of the OpenAI-shape response body) so the trace
+// drawer and SSE error frame carry the real reason — "You exceeded your
+// current quota, please check your plan and billing details", "Rate
+// limit reached for gpt-5-mini", "Incorrect API key provided" — instead
+// of an opaque "gateway returned non-2xx status 429" that gives the user
+// zero signal whether the gateway is broken, the key is invalid, the
+// prompt is bad, or the account is out of credits (rchaves dogfood
+// 2026-04-29). Mirrors the LiteLLM behavior the Python path used to
+// expose: pass-through, no nlpgo-side prefix.
+//
+// Falls back to a status-code-only message when the body is missing,
+// not JSON, or doesn't carry a recognizable error envelope — preserves
+// a useful signal for callers that don't ship JSON errors (raw 5xx
+// HTML, future passthrough endpoints).
 func (e *GatewayHTTPError) Error() string {
+	if msg := extractProviderErrorMessage(e.Body); msg != "" {
+		return msg
+	}
 	return fmt.Sprintf("gateway returned non-2xx status %d", e.StatusCode)
+}
+
+// extractProviderErrorMessage pulls a human-readable message out of an
+// OpenAI-shape error response. Tolerant of all real-world variations on
+// the wire today: top-level `error.message`, top-level `message`, the
+// LiteLLM-wrapped "litellm.RateLimitError: ..." string. Returns "" when
+// the body isn't recognizable JSON — caller falls back to the bare
+// status-code message.
+func extractProviderErrorMessage(body []byte) string {
+	if len(body) == 0 {
+		return ""
+	}
+	var envelope struct {
+		Error struct {
+			Message string `json:"message"`
+			Type    string `json:"type"`
+			Code    any    `json:"code"`
+		} `json:"error"`
+		Message string `json:"message"`
+	}
+	if err := json.Unmarshal(body, &envelope); err != nil {
+		return ""
+	}
+	if envelope.Error.Message != "" {
+		return envelope.Error.Message
+	}
+	return envelope.Message
 }
 
 // buildGatewayRequest performs all the shape mapping in one place so the

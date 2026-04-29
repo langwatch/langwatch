@@ -722,3 +722,113 @@ func TestExecute_AbsentReasoningContentLeavesFieldEmpty(t *testing.T) {
 		t.Errorf("non-reasoning response leaked reasoning_content: %q", resp.Messages[0].ReasoningContent)
 	}
 }
+
+// TestGatewayHTTPError_SurfacesProviderMessage pins the upstream-error
+// pass-through Studio's Trace Details drawer renders. Pre-fix
+// `Error()` returned just "gateway returned non-2xx status %d" — the
+// 429 from "rchaves out of OpenAI credits" landed in the trace as a
+// bare status code with no signal about cause. Now the OpenAI message
+// passes through verbatim ("You exceeded your current quota...") so
+// the user can act on it without opening the gateway logs.
+func TestGatewayHTTPError_SurfacesProviderMessage(t *testing.T) {
+	body := []byte(`{"error":{"message":"You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.","type":"insufficient_quota","code":"insufficient_quota"}}`)
+	err := &GatewayHTTPError{StatusCode: 429, Body: body}
+	got := err.Error()
+	want := "You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors."
+	if got != want {
+		t.Errorf("Error() = %q, want %q", got, want)
+	}
+	// Implements error
+	var asErr error = err
+	if asErr.Error() != want {
+		t.Errorf("error interface mismatch: %q", asErr.Error())
+	}
+}
+
+// TestGatewayHTTPError_HandlesAlternativeShapes covers the wire shapes
+// real gateways ship beyond the canonical OpenAI envelope:
+//   - top-level `message` (some LiteLLM passthroughs)
+//   - non-JSON body (raw 5xx HTML, future passthrough endpoints)
+//   - empty body (504 from a misbehaving LB)
+//
+// In each case the helper must either pull the message out OR fall
+// back to the status-code-only string — never panic on bad input.
+func TestGatewayHTTPError_HandlesAlternativeShapes(t *testing.T) {
+	cases := []struct {
+		name string
+		body []byte
+		code int
+		want string
+	}{
+		{
+			name: "top_level_message",
+			body: []byte(`{"message":"Rate limit reached for gpt-5-mini"}`),
+			code: 429,
+			want: "Rate limit reached for gpt-5-mini",
+		},
+		{
+			name: "raw_html_body_falls_back_to_status",
+			body: []byte(`<html><body>502 Bad Gateway</body></html>`),
+			code: 502,
+			want: "gateway returned non-2xx status 502",
+		},
+		{
+			name: "empty_body_falls_back_to_status",
+			body: nil,
+			code: 504,
+			want: "gateway returned non-2xx status 504",
+		},
+		{
+			name: "unrelated_json_falls_back_to_status",
+			body: []byte(`{"foo":"bar"}`),
+			code: 400,
+			want: "gateway returned non-2xx status 400",
+		},
+		{
+			name: "openai_invalid_api_key",
+			body: []byte(`{"error":{"message":"Incorrect API key provided: sk-***. You can find your API key at https://platform.openai.com/account/api-keys.","type":"invalid_request_error","param":null,"code":"invalid_api_key"}}`),
+			code: 401,
+			want: "Incorrect API key provided: sk-***. You can find your API key at https://platform.openai.com/account/api-keys.",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := &GatewayHTTPError{StatusCode: tc.code, Body: tc.body}
+			got := err.Error()
+			if got != tc.want {
+				t.Errorf("Error() = %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
+// TestExecute_PropagatesProviderMessageOnNon2xx is the integration
+// pin: a gateway response with a 429 + OpenAI insufficient-quota body
+// must surface the human-readable message to the engine, which the
+// engine wraps in NodeError.Message → SSE → Studio drawer. Pre-fix
+// "rchaves out of OpenAI credits" rendered as "gateway returned
+// non-2xx status 429" with no signal about cause; post-fix the user
+// sees OpenAI's actionable text.
+func TestExecute_PropagatesProviderMessageOnNon2xx(t *testing.T) {
+	body := []byte(`{"error":{"message":"You exceeded your current quota","type":"insufficient_quota"}}`)
+	gw := &fakeGateway{respStatus: 429, respBody: body}
+	exec := New(gw)
+	_, err := exec.Execute(context.Background(), app.LLMRequest{
+		Model:         "openai/gpt-5-mini",
+		Messages:      []app.ChatMessage{{Role: "user", Content: "hi"}},
+		LiteLLMParams: map[string]any{"api_key": "sk-test"},
+	})
+	if err == nil {
+		t.Fatal("expected error from 429 response")
+	}
+	var httpErr *GatewayHTTPError
+	if !errors.As(err, &httpErr) {
+		t.Fatalf("error chain missing GatewayHTTPError: %v", err)
+	}
+	if !strings.Contains(err.Error(), "You exceeded your current quota") {
+		t.Errorf("error message missing provider message: %q", err.Error())
+	}
+	if strings.Contains(err.Error(), "non-2xx status 429") {
+		t.Errorf("error message still wraps with 'non-2xx status' when provider message is present: %q", err.Error())
+	}
+}

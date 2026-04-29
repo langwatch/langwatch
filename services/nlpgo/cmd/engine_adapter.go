@@ -45,13 +45,18 @@ func (a engineAdapter) ExecuteStream(ctx context.Context, req app.WorkflowReques
 	}
 	ctx = withWorkflowAPIKey(ctx, wf)
 	in, err := a.eng.ExecuteStream(ctx, engine.ExecuteRequest{
-		Workflow:  wf,
-		Inputs:    req.Inputs,
-		Origin:    req.Origin,
-		TraceID:   req.TraceID,
-		ProjectID: req.ProjectID,
-		ThreadID:  req.ThreadID,
-		NodeID:    req.NodeID,
+		Workflow:          wf,
+		Inputs:            req.Inputs,
+		Origin:            req.Origin,
+		TraceID:           req.TraceID,
+		ProjectID:         req.ProjectID,
+		ThreadID:          req.ThreadID,
+		NodeID:            req.NodeID,
+		Type:              req.Type,
+		RunID:             req.RunID,
+		WorkflowVersionID: req.WorkflowVersionID,
+		EvaluateOn:        req.EvaluateOn,
+		DatasetEntry:      req.DatasetEntry,
 	}, engine.ExecuteStreamOptions{Heartbeat: opts.Heartbeat})
 	if err != nil {
 		ch := make(chan app.WorkflowStreamEvent, 1)
@@ -87,13 +92,18 @@ func (a engineAdapter) Execute(ctx context.Context, req app.WorkflowRequest) (*a
 	}
 	ctx = withWorkflowAPIKey(ctx, wf)
 	res, err := a.eng.Execute(ctx, engine.ExecuteRequest{
-		Workflow:  wf,
-		Inputs:    req.Inputs,
-		Origin:    req.Origin,
-		TraceID:   req.TraceID,
-		ProjectID: req.ProjectID,
-		ThreadID:  req.ThreadID,
-		NodeID:    req.NodeID,
+		Workflow:          wf,
+		Inputs:            req.Inputs,
+		Origin:            req.Origin,
+		TraceID:           req.TraceID,
+		ProjectID:         req.ProjectID,
+		ThreadID:          req.ThreadID,
+		NodeID:            req.NodeID,
+		Type:              req.Type,
+		RunID:             req.RunID,
+		WorkflowVersionID: req.WorkflowVersionID,
+		EvaluateOn:        req.EvaluateOn,
+		DatasetEntry:      req.DatasetEntry,
 	})
 	if err != nil {
 		return &app.WorkflowResult{

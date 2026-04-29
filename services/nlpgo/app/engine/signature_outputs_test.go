@@ -2,6 +2,7 @@ package engine
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -145,6 +146,41 @@ func TestJSONSchemaForField_ScalarMappings(t *testing.T) {
 func TestJSONSchemaForField_JSONSchemaWithEmptySchemaFallsBack(t *testing.T) {
 	got := jsonSchemaForField(dsl.Field{Type: dsl.FieldTypeJSONSchema})
 	assert.Equal(t, "string", got["type"])
+}
+
+// TestSanitizeSchemaName pins the OpenAI name-pattern compliance:
+// response_format.json_schema.name must match ^[a-zA-Z0-9_-]+$ and is
+// capped at 64 chars. Without this, node names containing dots or
+// spaces (e.g. "LLM Call") and models with dots (e.g. "gpt-5.2") cause
+// OpenAI to reject the request — observed in rchaves dogfood
+// 2026-04-29 (workflow_qtBZcCf4ch5xfxBm-NIZL): `Invalid
+// 'response_format.json_schema.name': string does not match pattern
+// '^[a-zA-Z0-9_-]+$'`.
+func TestSanitizeSchemaName(t *testing.T) {
+	cases := []struct {
+		name string
+		in   string
+		want string
+	}{
+		{"alphanumeric passthrough", "ClassifyOutputs", "ClassifyOutputs"},
+		{"underscore allowed", "my_node_Outputs", "my_node_Outputs"},
+		{"dash allowed", "node-abc-Outputs", "node-abc-Outputs"},
+		{"space replaced", "LLM Call Outputs", "LLM_Call_Outputs"},
+		{"dot replaced", "gpt-5.2Outputs", "gpt-5_2Outputs"},
+		{"colon replaced", "node:42Outputs", "node_42Outputs"},
+		{"unicode replaced", "résumé_Outputs", "r_sum__Outputs"},
+		{"empty falls back", "", "Outputs"},
+		{"all illegal falls back", "...", "Outputs"},
+		{"truncated to 64", strings.Repeat("a", 100), strings.Repeat("a", 64)},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := sanitizeSchemaName(tc.in)
+			assert.Equal(t, tc.want, got)
+			assert.Regexp(t, `^[a-zA-Z0-9_-]+$`, got, "must satisfy OpenAI name pattern")
+			assert.LessOrEqual(t, len(got), 64, "must be at most 64 chars")
+		})
+	}
 }
 
 // TestComposeSignatureResponseFormat_RoundTripsThroughJSON proves the

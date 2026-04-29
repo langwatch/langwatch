@@ -242,6 +242,52 @@ func TestEvaluatorWorkflow_UpstreamErrorSurfacesAsNodeError(t *testing.T) {
 		"error message should reference the upstream 500 or its body, got %q", res.Error.Message)
 }
 
+// TestEvaluatorWorkflow_TypedEvaluatorFieldShape pins the canonical
+// Studio shape: the evaluator slug lives on `data.evaluator` (typed
+// field), NOT inside `data.parameters[]`. langwatch/src/optimization_
+// studio/types/dsl.ts:243 defines `evaluator?: EvaluatorTypes |
+// "custom/<id>" | "evaluators/<id>"`. Before the fix, runEvaluator
+// only read paramString(parameters, "evaluator") so any node persisted
+// in the canonical shape failed with `evaluator parameter is required`
+// even though the slug was present (rchaves dogfood 2026-04-29 on
+// workflow_qtBZcCf4ch5xfxBm-NIZL with ExactMatch evaluator).
+func TestEvaluatorWorkflow_TypedEvaluatorFieldShape(t *testing.T) {
+	url, _, requests := setupEvaluatorStack(t, func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"status": "processed", "score": 1.0, "passed": true,
+		})
+	})
+
+	body := `{
+	  "workflow": {
+	    "workflow_id":"wf","api_key":"sk-project-token","spec_version":"1.3","name":"x","icon":"x","description":"x","version":"x",
+	    "template_adapter":"default",
+	    "nodes":[
+	      {"id":"entry","type":"entry","data":{"train_size":1.0,"test_size":0.0,"seed":1,
+	        "outputs":[{"identifier":"input","type":"str"},{"identifier":"output","type":"str"}],
+	        "dataset":{"inline":{"records":{"input":["hello"],"output":["hello"]},"count":1}}}},
+	      {"id":"eval","type":"evaluator","data":{
+	        "evaluator":"langevals/exact_match"
+	      }},
+	      {"id":"end","type":"end","data":{}}
+	    ],
+	    "edges":[
+	      {"id":"e1","source":"entry","sourceHandle":"input","target":"eval","targetHandle":"input","type":"default"},
+	      {"id":"e2","source":"entry","sourceHandle":"output","target":"eval","targetHandle":"output","type":"default"},
+	      {"id":"e3","source":"eval","sourceHandle":"any","target":"end","targetHandle":"any","type":"default"}
+	    ],
+	    "state":{}
+	  }
+	}`
+	res := postSync(t, &stack{url: url}, body)
+	require.Equal(t, "success", res.Status, "engine error: %+v", res.Error)
+	require.Len(t, *requests, 1, "exactly one upstream evaluator call expected")
+	rec := (*requests)[0]
+	assert.Equal(t, "/api/evaluations/langevals/exact_match/evaluate", rec["path"],
+		"slug from data.evaluator must drive the upstream URL path")
+}
+
 func TestEvaluatorWorkflow_MissingSlugReturnsTypedError(t *testing.T) {
 	url, _, requests := setupEvaluatorStack(t, func(w http.ResponseWriter, _ *http.Request) {
 		// upstream should never be hit when the slug is missing

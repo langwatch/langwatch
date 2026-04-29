@@ -2,6 +2,7 @@ package engine
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
@@ -52,6 +53,15 @@ func (e *Engine) ExecuteStream(ctx context.Context, req ExecuteRequest, opts Exe
 	}
 	state := newRunState(req.Workflow)
 	applyManualInputs(state, req)
+	// execute_component (req.NodeID set) must dispatch ONLY the
+	// requested node. Validate target exists before starting the
+	// goroutine so callers get a synchronous error instead of an
+	// async error event. See Engine.Execute for the same guard.
+	if req.NodeID != "" {
+		if _, ok := state.nodes[req.NodeID]; !ok {
+			return nil, errInvalidRequest{msg: fmt.Sprintf("engine: execute_component target node %q not in workflow", req.NodeID)}
+		}
+	}
 
 	out := make(chan StreamEvent, 16)
 	go func() {
@@ -78,8 +88,56 @@ func (e *Engine) ExecuteStream(ctx context.Context, req ExecuteRequest, opts Exe
 			close(out)
 		}()
 
+		// execute_component (req.NodeID set) — dispatch only the
+		// requested node, never the full DAG. Same parity rationale as
+		// Engine.Execute: Studio's per-component Run flow on a single
+		// card should not surface entry/end/sibling spans in the trace.
+		//
+		// Studio's component-execution path tracks per-node status via
+		// component_state_change events (set in useComponentExecution.ts),
+		// so execute_component does NOT emit workflow-level
+		// execution_state_change. The 20s component-timeout fires only if
+		// the per-node status doesn't flip — which it does, on every
+		// node dispatch (running → success/error inside runLayerStream).
+		if req.NodeID != "" {
+			e.runLayerStream(ctx, req, plan, state, []string{req.NodeID}, traceID, out)
+			emit(ctx, out, doneEvent(traceID, state, started))
+			return
+		}
+		// execute_flow / execute_evaluation need workflow-level state
+		// events: Studio's startWorkflowExecution / startEvaluation set
+		// the corresponding state slot to {status:"waiting"} and arm a 20s
+		// "Timeout starting workflow execution" toast. Only the right
+		// state-change event family flips that:
+		//
+		//   execute_flow       → execution_state_change → workflow.state.execution
+		//   execute_evaluation → evaluation_state_change → workflow.state.evaluation
+		//
+		// Per-node component_state_change events do NOT update the
+		// workflow-level state — Studio routes them to per-component
+		// state. Without the workflow-level events nlpgo's run completes
+		// successfully on the wire but Studio sees the timeout toast
+		// (rchaves dogfood 2026-04-29 trace_id 60f59f73… for execute_flow;
+		// the eval path has the same shape gap). Mirror
+		// langwatch_nlp/studio/execute/{execute_flow.py,
+		// execute_evaluation.py} — start/end/error event family.
+		isEval := req.Type == "execute_evaluation"
+		// execute_evaluation needs more than the per-run state events:
+		// it iterates dataset entries, runs the workflow per entry,
+		// emits progress events along the way, and posts batches to
+		// /api/evaluations/batch/log_results so the experiment-runs
+		// page populates. Without the batch POST, the SSE frames land
+		// cleanly but the UI never gets data — rchaves dogfood
+		// 2026-04-29 saw run_kM3T... on the wire but no row on
+		// /experiments/<id>. Delegate the whole flow.
+		if isEval {
+			e.executeEvaluationStream(ctx, req, traceID, started, out)
+			return
+		}
+		emit(ctx, out, workflowRunningEvent(req, traceID, started, isEval))
 		for _, layer := range plan.Layers {
 			if err := ctx.Err(); err != nil {
+				emit(ctx, out, workflowErrorEvent(req, traceID, err.Error(), isEval))
 				emit(ctx, out, StreamEvent{
 					Type:    "error",
 					TraceID: traceID,
@@ -89,10 +147,12 @@ func (e *Engine) ExecuteStream(ctx context.Context, req ExecuteRequest, opts Exe
 			}
 			e.runLayerStream(ctx, req, plan, state, layer, traceID, out)
 			if state.firstError != nil {
+				emit(ctx, out, workflowErrorEvent(req, traceID, state.firstError.Message, isEval))
 				emit(ctx, out, doneEvent(traceID, state, started))
 				return
 			}
 		}
+		emit(ctx, out, workflowSuccessEvent(req, traceID, state, started, isEval))
 		emit(ctx, out, doneEvent(traceID, state, started))
 	}()
 	return out, nil
@@ -114,7 +174,6 @@ func (e *Engine) runLayerStream(ctx context.Context, req ExecuteRequest, plan *p
 			started := time.Now()
 			outputs, derr := e.dispatch(nodeCtx, req, node, inputs, ns)
 			ns.DurationMS = time.Since(started).Milliseconds()
-			endNodeSpan(span, ns, derr)
 			if derr != nil {
 				ns.Status = "error"
 				ns.Error = derr
@@ -125,6 +184,9 @@ func (e *Engine) runLayerStream(ctx context.Context, req ExecuteRequest, plan *p
 				ns.Outputs = outputs
 				state.recordOutputs(nodeID, outputs)
 			}
+			// endNodeSpan reads ns.Outputs to stamp langwatch.output;
+			// must run after the success branch sets it (Python parity).
+			endNodeSpan(span, ns, derr)
 			state.recordState(nodeID, ns)
 			emit(ctx, out, stateEvent(traceID, nodeID, ns))
 		}()
@@ -211,6 +273,111 @@ func stateEvent(traceID, nodeID string, ns *NodeState) StreamEvent {
 		Payload: map[string]any{
 			"component_id":    nodeID,
 			"execution_state": es,
+		},
+	}
+}
+
+// workflowRunningEvent / workflowSuccessEvent / workflowErrorEvent emit
+// the workflow-level state transitions Studio's reducer requires to flip
+// workflow.state.execution.status (or workflow.state.evaluation.status
+// for the eval path). Mirror python langwatch_nlp's
+// start_workflow_event / end_workflow_event / error_workflow_event in
+// langwatch_nlp/studio/execute/execute_flow.py and the parallel trio in
+// execute_evaluation.py — same payload shapes so usePostEvent.tsx's
+// case "execution_state_change" / "evaluation_state_change" don't need
+// code changes.
+//
+// `isEval` switches the event family: execute_evaluation → evaluation_state_change
+// (carries run_id), execute_flow → execution_state_change (carries trace_id).
+func workflowRunningEvent(req ExecuteRequest, traceID string, started time.Time, isEval bool) StreamEvent {
+	timestamps := map[string]any{
+		"started_at": started.UnixMilli(),
+	}
+	if isEval {
+		return StreamEvent{
+			Type:    "evaluation_state_change",
+			TraceID: traceID,
+			Payload: map[string]any{
+				"evaluation_state": map[string]any{
+					"status":     "running",
+					"run_id":     req.RunID,
+					"timestamps": timestamps,
+				},
+			},
+		}
+	}
+	return StreamEvent{
+		Type:    "execution_state_change",
+		TraceID: traceID,
+		Payload: map[string]any{
+			"execution_state": map[string]any{
+				"status":     "running",
+				"trace_id":   traceID,
+				"timestamps": timestamps,
+			},
+		},
+	}
+}
+
+func workflowSuccessEvent(req ExecuteRequest, traceID string, state *runState, started time.Time, isEval bool) StreamEvent {
+	timestamps := map[string]any{
+		"started_at":  started.UnixMilli(),
+		"finished_at": time.Now().UnixMilli(),
+	}
+	if isEval {
+		return StreamEvent{
+			Type:    "evaluation_state_change",
+			TraceID: traceID,
+			Payload: map[string]any{
+				"evaluation_state": map[string]any{
+					"status":     "success",
+					"run_id":     req.RunID,
+					"timestamps": timestamps,
+				},
+			},
+		}
+	}
+	res := finalize(state, traceID, started, nil)
+	return StreamEvent{
+		Type:    "execution_state_change",
+		TraceID: traceID,
+		Payload: map[string]any{
+			"execution_state": map[string]any{
+				"status":     "success",
+				"trace_id":   traceID,
+				"timestamps": timestamps,
+				"result":     res.Result,
+			},
+		},
+	}
+}
+
+func workflowErrorEvent(req ExecuteRequest, traceID, message string, isEval bool) StreamEvent {
+	if isEval {
+		return StreamEvent{
+			Type:    "evaluation_state_change",
+			TraceID: traceID,
+			Payload: map[string]any{
+				"evaluation_state": map[string]any{
+					"status": "error",
+					"run_id": req.RunID,
+					"error":  message,
+					"timestamps": map[string]any{
+						"finished_at": time.Now().UnixMilli(),
+					},
+				},
+			},
+		}
+	}
+	return StreamEvent{
+		Type:    "execution_state_change",
+		TraceID: traceID,
+		Payload: map[string]any{
+			"execution_state": map[string]any{
+				"status":   "error",
+				"trace_id": traceID,
+				"error":    message,
+			},
 		},
 	}
 }

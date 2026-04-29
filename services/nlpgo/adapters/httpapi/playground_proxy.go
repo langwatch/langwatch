@@ -18,6 +18,7 @@ import (
 	"github.com/langwatch/langwatch/pkg/herr"
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 	"github.com/langwatch/langwatch/services/nlpgo/adapters/gatewayproxy"
+	"github.com/langwatch/langwatch/services/nlpgo/adapters/litellm"
 	nlpgodomain "github.com/langwatch/langwatch/services/nlpgo/domain"
 )
 
@@ -87,6 +88,48 @@ func playgroundProxyDispatch(proxy PlaygroundProxy) http.HandlerFunc {
 		}
 		bareModel := gatewayproxy.BareModel(model)
 
+		// Rewrite body.model to the BARE id before dispatch. The TS
+		// callsites (Vercel AI SDK in modelProviders/utils.ts, the
+		// playground tRPC route, model.factory.ts) ship the body with
+		// `"model": "openai/gpt-5.2"` because the langwatch-internal
+		// "<provider>/<model>" form is what those callers think in. Bifrost
+		// raw-forwards OpenAI-shape bodies to OpenAI to preserve the
+		// prompt-prefix auto-cache (bifrost_parser.go:50-58), and OpenAI
+		// 400s on a model field with the langwatch prefix
+		// (`{"error":"invalid model ID"}`). The bare id matches what the
+		// internal-only llmexecutor.translatedModelOrInferred path already
+		// puts on the wire for runSignature, which is why runSignature
+		// works and /go/proxy/v1 didn't until this edit.
+		if model != "" && bareModel != model {
+			body, err = rewriteBodyModel(body, bareModel)
+			if err != nil {
+				herr.WriteHTTP(w, herr.New(ctx, nlpgodomain.ErrBadRequest, herr.M{
+					"reason": "rewrite_body_model",
+				}, err))
+				return
+			}
+		}
+
+		// OpenAI's reasoning-class models (gpt-5*, o1/o3/o4) reject
+		// `max_tokens` ("Unsupported parameter: 'max_tokens' is not
+		// supported with this model. Use 'max_completion_tokens'
+		// instead.") and pin temperature to 1.0. The internal
+		// runSignature path already runs the same migration via
+		// litellm.ApplyReasoningOverrides; the playground proxy was
+		// raw-forwarding bodies authored by Vercel AI SDK / playground
+		// callers that emit `max_tokens`. Mirror the executor here so
+		// /go/proxy/v1/chat/completions doesn't 400 on Studio Monaco
+		// code-completion / playground / model.factory.ts traffic.
+		if litellm.IsReasoningModel(bareModel) {
+			body, err = applyReasoningOverridesToBody(body, bareModel)
+			if err != nil {
+				herr.WriteHTTP(w, herr.New(ctx, nlpgodomain.ErrBadRequest, herr.M{
+					"reason": "apply_reasoning_overrides",
+				}, err))
+				return
+			}
+		}
+
 		reqType, httpPath := classifyPath(r.URL.Path)
 
 		// /v1beta/* etc. → RequestTypePassthrough. Wiring it through the
@@ -119,6 +162,46 @@ func playgroundProxyDispatch(proxy PlaygroundProxy) http.HandlerFunc {
 		}
 		handleSync(ctx, w, proxy, req)
 	}
+}
+
+// rewriteBodyModel sets body.model = newModel while preserving every
+// other field, key ordering, and value formatting. We round-trip
+// through encoding/json (decode → re-encode) rather than sjson because
+// the proxy already takes that hit for peekBodyMetadata; an extra
+// in-place rewrite is not worth a new dependency. JSON key ordering
+// changes here are harmless — the prompt-prefix auto-cache hashes the
+// `messages` array, not the surrounding envelope.
+func rewriteBodyModel(body []byte, newModel string) ([]byte, error) {
+	if len(body) == 0 {
+		return body, nil
+	}
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(body, &raw); err != nil {
+		return nil, err
+	}
+	encoded, err := json.Marshal(newModel)
+	if err != nil {
+		return nil, err
+	}
+	raw["model"] = encoded
+	return json.Marshal(raw)
+}
+
+// applyReasoningOverridesToBody migrates max_tokens → max_completion_tokens
+// and pins temperature to 1.0 for OpenAI reasoning-class models, mirroring
+// the in-process llmexecutor path. The actual rewrite logic lives in
+// litellm.ApplyReasoningOverrides (translator.go) — this is the
+// raw-bytes-in / raw-bytes-out wrapper for the playground proxy.
+func applyReasoningOverridesToBody(body []byte, modelID string) ([]byte, error) {
+	if len(body) == 0 {
+		return body, nil
+	}
+	var generic map[string]any
+	if err := json.Unmarshal(body, &generic); err != nil {
+		return nil, err
+	}
+	litellm.ApplyReasoningOverrides(modelID, generic)
+	return json.Marshal(generic)
 }
 
 // peekBodyMetadata reads the body once to extract the OpenAI-shape

@@ -125,8 +125,118 @@ func TestPlaygroundProxy_NonStreamingChatCompletions_ForwardsBodyAndCredential(t
 	if fake.gotRequest.Credential.APIKey != "sk-test" {
 		t.Errorf("APIKey = %q", fake.gotRequest.Credential.APIKey)
 	}
-	if !bytes.Contains(fake.gotRequest.Body, []byte("openai/gpt-5-mini")) {
-		t.Errorf("body should be forwarded verbatim, got: %s", fake.gotRequest.Body)
+	// body.model is rewritten to the bare id before dispatch. OpenAI
+	// rejects the langwatch-internal "openai/gpt-5-mini" prefix in body.model
+	// with `{"error":"invalid model ID"}`, and Bifrost raw-forwards the body
+	// to OpenAI for OpenAI-compatible providers (bifrost_parser.go:50-58),
+	// so the rewrite has to happen at this layer. Caught by Studio Monaco
+	// code-completion 500s on FF=on (2026-04-29 dogfood).
+	if bytes.Contains(fake.gotRequest.Body, []byte("openai/gpt-5-mini")) {
+		t.Errorf("body.model should be rewritten from 'openai/gpt-5-mini' to bare 'gpt-5-mini', got: %s", fake.gotRequest.Body)
+	}
+	if !bytes.Contains(fake.gotRequest.Body, []byte(`"model":"gpt-5-mini"`)) {
+		t.Errorf("body.model should be 'gpt-5-mini' (bare), got: %s", fake.gotRequest.Body)
+	}
+	// Other body fields preserved (key order may shift through json
+	// round-trip; we assert the content via Unmarshal).
+	var roundTripped struct {
+		Messages []struct {
+			Role    string `json:"role"`
+			Content string `json:"content"`
+		} `json:"messages"`
+	}
+	if err := json.Unmarshal(fake.gotRequest.Body, &roundTripped); err != nil {
+		t.Fatalf("forwarded body is not valid JSON: %v\n%s", err, fake.gotRequest.Body)
+	}
+	if len(roundTripped.Messages) != 1 || roundTripped.Messages[0].Role != "user" || roundTripped.Messages[0].Content != "hi" {
+		t.Errorf("messages array contents lost in rewrite, got: %+v", roundTripped.Messages)
+	}
+}
+
+func TestPlaygroundProxy_NonReasoningModelBodyForwardedByteForByte(t *testing.T) {
+	// For non-reasoning models, when the caller already sends a bare
+	// model id (no provider prefix), the body is forwarded byte-for-byte
+	// — preserving OpenAI's prompt-prefix auto-cache hits for the common
+	// playground-tRPC / model.factory.ts callers that already speak the
+	// OpenAI wire format directly. (Reasoning models trigger
+	// ApplyReasoningOverrides and are covered separately below.)
+	fake := &fakeProxy{
+		syncResp: &playgroundProxyResponse{
+			StatusCode: 200,
+			Headers:    http.Header{"Content-Type": []string{"application/json"}},
+			Body:       []byte(`{"id":"chatcmpl-1","choices":[]}`),
+		},
+	}
+	srv := newProxyTestServer(t, fake)
+
+	body := `{"model":"gpt-4o","messages":[{"role":"user","content":"hi"}]}`
+	req, _ := http.NewRequest(http.MethodPost, srv.URL+"/go/proxy/v1/chat/completions", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("x-litellm-model", "openai/gpt-4o")
+	req.Header.Set("x-litellm-api_key", "sk-test")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("Do: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		respBody, _ := io.ReadAll(resp.Body)
+		t.Fatalf("status = %d, body = %s", resp.StatusCode, respBody)
+	}
+	if string(fake.gotRequest.Body) != body {
+		t.Errorf("body should be forwarded byte-for-byte when model is non-reasoning + already bare, got: %s", fake.gotRequest.Body)
+	}
+}
+
+func TestPlaygroundProxy_ReasoningModelMigratesMaxTokensToCompletion(t *testing.T) {
+	// gpt-5* / o1 / o3 / o4 reject `max_tokens` ("Unsupported parameter:
+	// 'max_tokens' is not supported with this model. Use
+	// 'max_completion_tokens' instead.") and pin temperature to 1.0.
+	// llmexecutor.ApplyReasoningOverrides already handles this for the
+	// internal runSignature path; the proxy mirrors it for /go/proxy/v1
+	// callers (Vercel AI SDK in modelProviders/utils.ts emits max_tokens
+	// by default — Studio Monaco code-completion 500'd on this until the
+	// fix shipped 2026-04-29).
+	fake := &fakeProxy{
+		syncResp: &playgroundProxyResponse{
+			StatusCode: 200,
+			Headers:    http.Header{"Content-Type": []string{"application/json"}},
+			Body:       []byte(`{"id":"chatcmpl-1","choices":[{"message":{"role":"assistant","content":"ok"}}]}`),
+		},
+	}
+	srv := newProxyTestServer(t, fake)
+
+	body := `{"model":"openai/gpt-5-mini","max_tokens":64,"temperature":0,"messages":[{"role":"user","content":"hi"}]}`
+	req, _ := http.NewRequest(http.MethodPost, srv.URL+"/go/proxy/v1/chat/completions", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("x-litellm-model", "openai/gpt-5-mini")
+	req.Header.Set("x-litellm-api_key", "sk-test")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("Do: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		respBody, _ := io.ReadAll(resp.Body)
+		t.Fatalf("status = %d, body = %s", resp.StatusCode, respBody)
+	}
+
+	// Old keys gone, new keys present.
+	if bytes.Contains(fake.gotRequest.Body, []byte(`"max_tokens"`)) {
+		t.Errorf("body must NOT contain max_tokens for reasoning model, got: %s", fake.gotRequest.Body)
+	}
+	if !bytes.Contains(fake.gotRequest.Body, []byte(`"max_completion_tokens"`)) {
+		t.Errorf("body must contain max_completion_tokens for reasoning model, got: %s", fake.gotRequest.Body)
+	}
+	// temperature pinned to 1.0 (reasoning models reject other values).
+	if !bytes.Contains(fake.gotRequest.Body, []byte(`"temperature":1`)) {
+		t.Errorf("temperature must be pinned to 1 for reasoning model, got: %s", fake.gotRequest.Body)
+	}
+	// Model still rewritten to bare.
+	if !bytes.Contains(fake.gotRequest.Body, []byte(`"model":"gpt-5-mini"`)) {
+		t.Errorf("body.model must be bare 'gpt-5-mini', got: %s", fake.gotRequest.Body)
 	}
 }
 

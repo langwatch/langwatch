@@ -69,34 +69,51 @@ app.post("/code-completion", async (c) => {
     );
   }
 
-  const model = await getVercelAIModel(projectId);
+  try {
+    const model = await getVercelAIModel(projectId);
 
-  const copilot = new CompletionCopilot(undefined, {
-    model: async (prompt) => {
-      const { text } = await generateText({
-        model,
-        messages: [
-          { role: "system", content: prompt.context },
-          {
-            role: "user",
-            content: `${prompt.instruction}\n\n${prompt.fileContent}`,
+    const copilot = new CompletionCopilot(undefined, {
+      model: async (prompt) => {
+        const { text } = await generateText({
+          model,
+          messages: [
+            { role: "system", content: prompt.context },
+            {
+              role: "user",
+              content: `${prompt.instruction}\n\n${prompt.fileContent}`,
+            },
+          ],
+          maxOutputTokens: 64,
+          temperature: 0,
+          providerOptions: {
+            openai: {
+              reasoningEffort: "low",
+            } satisfies OpenAIResponsesProviderOptions,
           },
-        ],
-        maxOutputTokens: 64,
-        temperature: 0,
-        providerOptions: {
-          openai: {
-            reasoningEffort: "low",
-          } satisfies OpenAIResponsesProviderOptions,
-        },
-      });
+        });
 
-      return { text };
-    },
-  });
-  const completion = await copilot.complete({ body });
+        return { text };
+      },
+    });
+    const completion = await copilot.complete({ body });
 
-  return c.json(completion);
+    return c.json(completion);
+  } catch (error) {
+    logger.error(
+      {
+        err: error,
+        message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        projectId,
+      },
+      "code-completion failed",
+    );
+    captureException(error, { extra: { projectId } });
+    return c.json(
+      { error: error instanceof Error ? error.message : String(error) },
+      { status: 500 },
+    );
+  }
 });
 
 // ── POST /post_event ─────────────────────────────────────────────────
