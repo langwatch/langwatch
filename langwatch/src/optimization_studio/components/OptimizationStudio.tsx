@@ -99,6 +99,7 @@ export default function OptimizationStudio() {
     onEdgesChange,
     onConnect,
     setIsDraggingNode,
+    setClickedNodeId,
     openResultsPanelRequest,
     setOpenResultsPanelRequest,
     executionStatus,
@@ -117,6 +118,7 @@ export default function OptimizationStudio() {
         onEdgesChange: state.onEdgesChange,
         onConnect: state.onConnect,
         setIsDraggingNode: state.setIsDraggingNode,
+        setClickedNodeId: state.setClickedNodeId,
         openResultsPanelRequest: state.openResultsPanelRequest,
         setOpenResultsPanelRequest: state.setOpenResultsPanelRequest,
         executionStatus: state.state.execution?.status,
@@ -321,8 +323,9 @@ export default function OptimizationStudio() {
                             onPaneClick={() => {
                               if (currentDrawer) closeDrawer();
                             }}
-                            onNodeClick={() => {
+                            onNodeClick={(_event, node) => {
                               if (currentDrawer) closeDrawer();
+                              setClickedNodeId(node.id);
                             }}
                             fitView
                             fitViewOptions={{
