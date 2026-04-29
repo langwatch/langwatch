@@ -5,6 +5,7 @@ on:
     paths:
       - "charts/langwatch/**"
       - "charts/clickhouse-serverless/**"
+      - "charts/gateway/**"
       - "charts/lib/**"
       - ".github/workflows/langwatch-chart.yml"
   push:
@@ -12,6 +13,7 @@ on:
     paths:
       - "charts/langwatch/**"
       - "charts/clickhouse-serverless/**"
+      - "charts/gateway/**"
       - "charts/lib/**"
       - ".github/workflows/langwatch-chart.yml"
 
@@ -55,7 +57,13 @@ jobs:
           version: v3.12.0
       - run: helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
       - run: helm repo add langwatch https://langwatch.github.io/langwatch
-      - run: helm dependency build .
+      # `update` instead of `build`: regenerates Chart.lock from current
+      # on-disk Chart.yaml. release-please bumps the local file:// gateway
+      # sub-chart version on every release but cannot recompute the
+      # sha256 digest in Chart.lock — so `build` (strict lock-vs-disk
+      # check) fails on every release-please PR. `update` is equivalent
+      # since prometheus is hard-pinned in Chart.yaml at 25.27.0.
+      - run: helm dependency update .
       - name: "helm template (${{ matrix.name }})"
         run: helm template lw . ${{ matrix.flags }} > /dev/null
 
