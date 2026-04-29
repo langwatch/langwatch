@@ -68,14 +68,20 @@ async function main(): Promise<void> {
     console.log(`[seed-anomaly] created personal budget id=${budget.id} limit=$0.50/month`);
   }
 
-  // spend_spike AnomalyRule — organization scope, $0.10/hour threshold.
+  // spend_spike AnomalyRule — organization scope. Per the schema docstring,
+  // spend_spike shape is { windowSec, ratioVsBaseline, minBaselineUsd }.
+  // Tight thresholds for fast firing in the iter28-followup demo:
+  //   - 1h window
+  //   - fires if spend is >= 1.5x baseline
+  //   - minimum $0.05 baseline so $0 → tiny spike doesn't fire
   const ruleName = "Alexis Dogfood Spend Spike";
   const existingRule = await prisma.anomalyRule.findFirst({
     where: { organizationId: org.id, name: ruleName },
   });
-  const ruleConfig = {
-    thresholdUsd: 0.1,
-    windowMinutes: 60,
+  const thresholdConfig = {
+    windowSec: 3600,
+    ratioVsBaseline: 1.5,
+    minBaselineUsd: 0.05,
   };
   if (existingRule) {
     await prisma.anomalyRule.update({
@@ -83,7 +89,7 @@ async function main(): Promise<void> {
       data: {
         ruleType: "spend_spike",
         severity: "warning",
-        config: ruleConfig,
+        thresholdConfig,
         archivedAt: null,
       },
     });
@@ -95,10 +101,10 @@ async function main(): Promise<void> {
         scope: "organization",
         scopeId: org.id,
         name: ruleName,
-        description: "Fires when org-wide governance spend exceeds $0.10/hour",
+        description: "Fires when org-wide governance spend exceeds 1.5x baseline (60s window)",
         severity: "warning",
         ruleType: "spend_spike",
-        config: ruleConfig,
+        thresholdConfig,
       },
     });
     console.log(`[seed-anomaly] created rule id=${rule.id}`);
