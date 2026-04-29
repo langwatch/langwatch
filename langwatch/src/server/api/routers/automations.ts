@@ -1,4 +1,4 @@
-import { AlertType, TriggerAction } from "@prisma/client";
+import { AlertType, RoleBindingScopeType, TriggerAction } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 import { z } from "zod";
@@ -59,9 +59,11 @@ export const automationRouter = createTRPCRouter({
         throw new Error(`Project with id ${input.projectId} not found`);
       }
 
-      const teamMembers = await ctx.prisma.teamUser.findMany({
+      const teamBindings = await ctx.prisma.roleBinding.findMany({
         where: {
-          teamId: project.teamId,
+          scopeType: RoleBindingScopeType.TEAM,
+          scopeId: project.teamId,
+          userId: { not: null },
         },
         include: {
           user: true,
@@ -87,7 +89,9 @@ export const automationRouter = createTRPCRouter({
           });
         }
       } else if (input.action === TriggerAction.SEND_EMAIL) {
-        const teamEmails = teamMembers.map((user) => user.user.email);
+        const teamEmails = teamBindings
+          .filter((b) => b.user !== null)
+          .map((b) => b.user!.email);
 
         if (input.actionParams.members) {
           input.actionParams.members.map((email: string) => {
