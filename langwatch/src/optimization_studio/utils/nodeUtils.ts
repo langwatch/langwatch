@@ -1,6 +1,38 @@
 import type { Edge, Node } from "@xyflow/react";
 import { camelCaseToSnakeCase } from "../../utils/stringCasing";
 
+/**
+ * Validates a node name for rename operations.
+ * Returns `{ valid: true }` or `{ valid: false, error: string }`.
+ */
+export const validateNodeName = ({
+  name,
+  currentNodeId,
+  existingNodeIds,
+}: {
+  name: string;
+  currentNodeId: string;
+  existingNodeIds: string[];
+}): { valid: true } | { valid: false; error: string } => {
+  const trimmed = name.trim();
+  if (!trimmed) {
+    return { valid: false, error: "Name cannot be empty" };
+  }
+
+  const withUnderscores = trimmed.replace(/ /g, "_");
+
+  if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(withUnderscores)) {
+    return { valid: false, error: "Name must be a valid Python identifier" };
+  }
+
+  const newId = nameToId(trimmed);
+  if (existingNodeIds.some((id) => id !== currentNodeId && id === newId)) {
+    return { valid: false, error: "A node with this name already exists" };
+  }
+
+  return { valid: true };
+};
+
 export const nameToId = (name: string) => {
   return camelCaseToSnakeCase(name)
     .replace(/[\(\)]/g, "")
