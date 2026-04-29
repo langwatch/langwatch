@@ -158,6 +158,14 @@ interface ClickHouseSpanRecord {
   SpanName: string;
   SpanKind: number;
   ServiceName: string;
+  /**
+   * Per-origin retention class denormalised from
+   * `langwatch.governance.retention_class` span attribute. Drives the
+   * per-class TTL clauses on stored_spans (migration 00022).
+   * Empty string for non-governance spans (no TTL applied).
+   * Spec: specs/ai-gateway/governance/retention.feature.
+   */
+  RetentionClass: string;
   ResourceAttributes: Record<string, string>;
   SpanAttributes: Record<string, string>;
   StatusCode: number | null;
@@ -489,6 +497,14 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     const serviceName =
       typeof serviceNameAny === "string" ? serviceNameAny : "unknown";
 
+    // Per-origin retention class — denormalise from the span attribute
+    // stamped by the receiver (ingestionRoutes.ts) for governance ingest.
+    // Empty string for application-origin spans (no TTL applied).
+    const retentionClassAny =
+      span.spanAttributes["langwatch.governance.retention_class"];
+    const retentionClass =
+      typeof retentionClassAny === "string" ? retentionClassAny : "";
+
     return {
       ProjectionId: span.id,
       TenantId: span.tenantId,
@@ -504,6 +520,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
       SpanName: span.name,
       SpanKind: span.kind,
       ServiceName: serviceName,
+      RetentionClass: retentionClass,
       ResourceAttributes: serializeAttributes(span.resourceAttributes),
       SpanAttributes: serializeAttributes(span.spanAttributes),
       StatusCode: span.statusCode,
