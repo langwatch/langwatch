@@ -42,6 +42,7 @@ import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.click
 import { IngestionSourceService } from "~/server/governance/activity-monitor/ingestionSource.service";
 import { ActivityMonitorService } from "~/server/governance/activity-monitor/activityMonitor.service";
 import { GovernanceSetupStateService } from "~/server/governance/setupState.service";
+import { CliBootstrapService } from "~/server/governance/cliBootstrap.service";
 import {
   getClickHouseClientForProject,
   isClickHouseEnabled,
@@ -700,6 +701,34 @@ app.get("/budget/status", async (c: Context) => {
     },
     402,
   );
+});
+
+// ---------------------------------------------------------------------------
+// CLI bootstrap — Storyboard Screen 4 login-completion ceremony data.
+// Returns inherited providers + monthly budget. Wire shape matches
+// the tRPC `api.user.cliBootstrap` procedure byte-for-byte (both
+// surfaces share CliBootstrapService) so typescript-sdk's
+// formatLoginCeremony renders identically regardless of path.
+// ---------------------------------------------------------------------------
+
+app.get("/bootstrap", async (c: Context) => {
+  const tokenRecord = await validateAccessToken(c.req.header("Authorization"));
+  if (!tokenRecord) {
+    return c.json(
+      {
+        error: "unauthorized",
+        error_description:
+          "Bearer access token is missing, malformed, or expired",
+      },
+      401,
+    );
+  }
+  const service = CliBootstrapService.create(prisma);
+  const result = await service.resolve({
+    userId: tokenRecord.user_id,
+    organizationId: tokenRecord.organization_id,
+  });
+  return c.json(result, 200);
 });
 
 // ---------------------------------------------------------------------------
