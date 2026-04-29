@@ -29,12 +29,17 @@ export function CurrentDrawer({ marginTop }: { marginTop?: number }) {
   const router = useRouter();
   const { organizationRole } = useOrganizationTeamProject();
   const queryString = router.asPath.split("?")[1] ?? "";
-  const queryParams = qs.parse(queryString.replaceAll("%2C", ","), {
-    allowDots: true,
-    comma: true,
-    allowEmptyArrays: true,
-  });
-  const queryDrawer = queryParams.drawer as DrawerProps | undefined;
+  // qs.parse + the `drawer.*` slice is recomputed on every render otherwise,
+  // handing the rendered drawer a fresh props object each time and cascading
+  // a re-render through its subtree even when nothing drawer-relevant changed.
+  const queryDrawer = useMemo<DrawerProps | undefined>(() => {
+    const parsed = qs.parse(queryString.replaceAll("%2C", ","), {
+      allowDots: true,
+      comma: true,
+      allowEmptyArrays: true,
+    });
+    return parsed.drawer as DrawerProps | undefined;
+  }, [queryString]);
 
   const drawerType = queryDrawer?.open as DrawerType | undefined;
 

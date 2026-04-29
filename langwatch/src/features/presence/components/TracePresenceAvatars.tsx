@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { useShallow } from "zustand/react/shallow";
 import {
   selectPeersOnTrace,
@@ -16,7 +17,7 @@ interface TracePresenceAvatarsProps {
  * Renders nothing when no peers are present so it can be sprinkled freely
  * inside dense headers and table rows without leaving empty space behind.
  */
-export function TracePresenceAvatars({
+export const TracePresenceAvatars = memo(function TracePresenceAvatars({
   traceId,
   max = 3,
   size = "2xs",
@@ -26,4 +27,4 @@ export function TracePresenceAvatars({
   );
   if (peers.length === 0) return null;
   return <PresenceAvatarStack sessions={peers} max={max} size={size} />;
-}
+});

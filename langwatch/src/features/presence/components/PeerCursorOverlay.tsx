@@ -1,5 +1,5 @@
 import { Box, Text } from "@chakra-ui/react";
-import { useRef } from "react";
+import { memo, useRef } from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useCursorBroadcast } from "../hooks/useCursorBroadcast";
 import { usePeerCursors, type PeerCursor } from "../hooks/usePeerCursors";
@@ -61,7 +61,11 @@ export function PeerCursorOverlay({
   );
 }
 
-function PeerCursor({ cursor }: { cursor: PeerCursor }) {
+const PeerCursor = memo(function PeerCursor({
+  cursor,
+}: {
+  cursor: PeerCursor;
+}) {
   const color = presenceUserColor(cursor.user);
   const name = presenceUserDisplayName(cursor.user);
 
@@ -96,7 +100,7 @@ function PeerCursor({ cursor }: { cursor: PeerCursor }) {
       </Box>
     </Box>
   );
-}
+});
 
 function CursorArrow({ color }: { color: string }) {
   return (
