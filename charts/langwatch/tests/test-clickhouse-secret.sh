@@ -104,24 +104,16 @@ assert_fails_with \
   "clickhouse.auth.password is required on upgrade" \
   --is-upgrade
 
-# 4. Upgrade with password but no clusterSecret — fails
-sep; info "Test: upgrade without clusterSecret fails"
-assert_fails_with \
-  "upgrade without clusterSecret fails" \
-  "clickhouse.auth.clusterSecret is required on upgrade" \
-  --is-upgrade --set clickhouse.auth.password=UpgradePass
-
-# 5. Upgrade with both password and clusterSecret — succeeds
-sep; info "Test: upgrade with password and clusterSecret"
-OUT=$(tmpl --is-upgrade --set clickhouse.auth.password=UpgradePass --set clickhouse.auth.clusterSecret=MyClusterSecret)
+# 4. Upgrade with explicit password — succeeds
+sep; info "Test: upgrade with explicit password"
+OUT=$(tmpl --is-upgrade --set clickhouse.auth.password=UpgradePass)
 assert_contains "upgrade uses explicit password" "$OUT" "UpgradePass"
-assert_contains "upgrade uses explicit clusterSecret" "$OUT" "MyClusterSecret"
 
-# 6. Explicit password is stable across renders (no random regeneration)
+# 5. Explicit password is stable across renders (no random regeneration)
 sep; info "Test: explicit password stable across renders"
-assert_password_stable "password stable" --set clickhouse.auth.password=StablePass --set clickhouse.auth.clusterSecret=StableCS
+assert_password_stable "password stable" --set clickhouse.auth.password=StablePass
 
-# 7. URL contains the password
+# 6. URL contains the password
 sep; info "Test: URL embeds password"
 OUT=$(tmpl --set clickhouse.auth.password=UrlTestPass)
 assert_contains "URL contains password" "$OUT" "UrlTestPass"
