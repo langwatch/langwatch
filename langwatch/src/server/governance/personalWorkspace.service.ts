@@ -84,7 +84,7 @@ export class PersonalWorkspaceService {
       }
 
       // Use the user's display name if available, otherwise their local
-      // email part (jane@miro.com → "jane"), otherwise a fallback. Slug
+      // email part (jane@acme.com → "jane"), otherwise a fallback. Slug
       // gets a nanoid suffix to avoid global slug collisions across orgs.
       const displayLabel =
         displayName?.trim() ||

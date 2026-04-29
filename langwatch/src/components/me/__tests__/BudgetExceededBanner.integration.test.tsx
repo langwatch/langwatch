@@ -74,13 +74,13 @@ describe("BudgetExceededBanner", () => {
 
   describe("when an admin email is provided", () => {
     it("renders the email as a mailto link", () => {
-      renderBanner({ adminEmail: "platform-team@miro.com" });
+      renderBanner({ adminEmail: "platform-team@acme.com" });
 
       const link = screen.getByRole("link", {
-        name: "platform-team@miro.com",
+        name: "platform-team@acme.com",
       });
       expect(link.getAttribute("href")).toBe(
-        "mailto:platform-team@miro.com",
+        "mailto:platform-team@acme.com",
       );
     });
   });
