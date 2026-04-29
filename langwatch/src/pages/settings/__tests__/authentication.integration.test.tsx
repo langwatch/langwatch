@@ -135,6 +135,7 @@ afterEach(() => {
 
 describe("<AuthenticationSettings/>", () => {
   describe("when NEXTAUTH_PROVIDER is auth0 with an Email/Password (auth0 db) identity", () => {
+    /** @scenario Auth0 user with a database identity sees the Change Password link in their linked sign-in row */
     it("does not render the form by default — only a Change Password button next to the linked identity", () => {
       renderPage();
       expect(screen.queryByLabelText(/^New Password$/i)).toBeNull();
@@ -144,6 +145,8 @@ describe("<AuthenticationSettings/>", () => {
     });
 
     describe("when the user clicks Change Password", () => {
+      /** @scenario Auth0 mode dialog asks for new password only */
+      /** @scenario Successful change shows a toast and closes the dialog */
       it("opens the dialog with no Current Password field, calls api.user.changePassword, and closes on success", async () => {
         mockChangePassword.mockResolvedValue({ success: true });
         renderPage();
@@ -198,9 +201,110 @@ describe("<AuthenticationSettings/>", () => {
           expect(screen.queryByLabelText(/^New Password$/i)).toBeNull();
         });
       });
+
+      /** @scenario Server error keeps the dialog open and shows the error */
+      it("keeps the dialog open and shows the error toast when the server rejects", async () => {
+        mockChangePassword.mockRejectedValue(
+          new Error("Auth0 is not authorized to update users."),
+        );
+        renderPage();
+
+        await act(async () => {
+          fireEvent.click(
+            screen.getByRole("button", { name: /Change Password/i }),
+          );
+        });
+        await waitFor(() => {
+          expect(screen.getByLabelText(/^New Password$/i)).toBeTruthy();
+        });
+        fireEvent.change(screen.getByLabelText(/^New Password$/i), {
+          target: { value: "new-pw-123456" },
+        });
+        fireEvent.change(screen.getByLabelText(/Confirm New Password/i), {
+          target: { value: "new-pw-123456" },
+        });
+        await act(async () => {
+          const submitBtns = screen
+            .getAllByRole("button", { name: /Change Password/i })
+            .filter((b) => (b as HTMLButtonElement).type === "submit");
+          fireEvent.click(submitBtns[0]!);
+        });
+
+        await waitFor(() => {
+          expect(mockToasterCreate).toHaveBeenCalledWith(
+            expect.objectContaining({
+              title: "Failed to change password",
+              type: "error",
+            }),
+          );
+        });
+        // Dialog stays open so the user can retry — the form is still in the DOM.
+        expect(screen.getByLabelText(/^New Password$/i)).toBeTruthy();
+      });
+
+      /** @scenario Cancel button closes the dialog without submitting */
+      it("closes the dialog without calling the mutation when Cancel is clicked", async () => {
+        renderPage();
+
+        await act(async () => {
+          fireEvent.click(
+            screen.getByRole("button", { name: /Change Password/i }),
+          );
+        });
+        await waitFor(() => {
+          expect(screen.getByLabelText(/^New Password$/i)).toBeTruthy();
+        });
+        await act(async () => {
+          fireEvent.click(screen.getByRole("button", { name: /Cancel/i }));
+        });
+
+        await waitFor(() => {
+          expect(screen.queryByLabelText(/^New Password$/i)).toBeNull();
+        });
+        expect(mockChangePassword).not.toHaveBeenCalled();
+      });
+
+      /** @scenario Reopening the dialog clears any previously-typed values */
+      it("clears the form when the dialog is reopened", async () => {
+        renderPage();
+
+        await act(async () => {
+          fireEvent.click(
+            screen.getByRole("button", { name: /Change Password/i }),
+          );
+        });
+        await waitFor(() => {
+          expect(screen.getByLabelText(/^New Password$/i)).toBeTruthy();
+        });
+        fireEvent.change(screen.getByLabelText(/^New Password$/i), {
+          target: { value: "leftover-value" },
+        });
+        await act(async () => {
+          fireEvent.click(screen.getByRole("button", { name: /Cancel/i }));
+        });
+        await waitFor(() => {
+          expect(screen.queryByLabelText(/^New Password$/i)).toBeNull();
+        });
+
+        // Reopen
+        await act(async () => {
+          fireEvent.click(
+            screen.getByRole("button", { name: /Change Password/i }),
+          );
+        });
+        await waitFor(() => {
+          expect(screen.getByLabelText(/^New Password$/i)).toBeTruthy();
+        });
+        const newPasswordInput = screen.getByLabelText(
+          /^New Password$/i,
+        ) as HTMLInputElement;
+        expect(newPasswordInput.value).toBe("");
+      });
     });
 
+    /** @scenario Auth0 social-only user (Google via Auth0) does not see Change Password */
     describe("when the linked identity is a social provider via auth0 (e.g. google-oauth2|...)", () => {
+      /** @scenario Auth0 social-only user (Google via Auth0) does not see Change Password */
       it("does not show the Change Password button (no password to update)", () => {
         linkedAccountsRef.current = [
           {
@@ -218,6 +322,7 @@ describe("<AuthenticationSettings/>", () => {
   });
 
   describe("when NEXTAUTH_PROVIDER is email", () => {
+    /** @scenario Email/credential user sees a dedicated Change Password section with just a button */
     it("renders a dedicated Change Password section with a button (no inline form)", () => {
       publicEnvRef.current = { NEXTAUTH_PROVIDER: "email" };
       renderPage();
@@ -229,6 +334,7 @@ describe("<AuthenticationSettings/>", () => {
     });
 
     describe("when the dialog is opened", () => {
+      /** @scenario Email mode dialog asks for current + new password */
       it("shows the Current Password field too", async () => {
         publicEnvRef.current = { NEXTAUTH_PROVIDER: "email" };
         renderPage();

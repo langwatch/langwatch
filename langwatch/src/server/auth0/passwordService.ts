@@ -81,6 +81,42 @@ async function parseJsonSafe(res: Response): Promise<unknown> {
 }
 
 /**
+ * Hard cap on Auth0 HTTP calls. The default is "wait forever," which lets
+ * an upstream stall hold a tRPC mutation hostage. 10s is well above
+ * normal Auth0 latency (typically <300ms) but short enough that the
+ * rate-limited user gets a useful error rather than a hung request.
+ */
+const AUTH0_HTTP_TIMEOUT_MS = 10_000;
+
+/**
+ * Wrap `fetch` so that:
+ *   1. Every Auth0 call has an `AbortSignal.timeout()`.
+ *   2. Transport-layer errors (network, DNS, abort) are normalized to
+ *      `Auth0ApiError` — callers depend on `instanceof Auth0ApiError` to
+ *      surface the right operator message.
+ */
+async function fetchAuth0(
+  url: string,
+  init: Omit<RequestInit, "signal">,
+): Promise<Response> {
+  try {
+    return await fetch(url, {
+      ...init,
+      signal: AbortSignal.timeout(AUTH0_HTTP_TIMEOUT_MS),
+    });
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : String(error);
+    throw new Auth0ApiError({
+      status: 502,
+      code: "unknown",
+      message: `Auth0 request to ${url} failed before receiving a response: ${message}`,
+      body: { transportError: message },
+    });
+  }
+}
+
+/**
  * In-memory cache for the Management API token. Auth0 issues these for the
  * full `expires_in` duration (typically 24h for M2M). We keyed it on the
  * mgmtClientId so a credential rotation invalidates automatically. A 60s
@@ -116,7 +152,7 @@ export async function getManagementApiToken(): Promise<string> {
     return cachedToken.token;
   }
 
-  const res = await fetch(`${config.issuer}/oauth/token`, {
+  const res = await fetchAuth0(`${config.issuer}/oauth/token`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
@@ -177,7 +213,7 @@ export async function updateUserPassword(args: {
   const config = loadConfig();
 
   const url = `${config.issuer}/api/v2/users/${encodeURIComponent(args.auth0UserId)}`;
-  const res = await fetch(url, {
+  const res = await fetchAuth0(url, {
     method: "PATCH",
     headers: {
       "content-type": "application/json",

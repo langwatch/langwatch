@@ -87,14 +87,14 @@ Feature: Change password from /settings/authentication
     And it calls Auth0 Management API PATCH /api/v2/users/{id} with the new password
     And the connection field is "Username-Password-Authentication"
 
-  @integration
+  @integration @unimplemented
   Scenario: Auth0 backend falls back to AUTH0_CLIENT_ID/SECRET when the M2M vars are absent
     Given AUTH0_MGMT_CLIENT_ID and AUTH0_MGMT_CLIENT_SECRET are not set
     And AUTH0_CLIENT_ID and AUTH0_CLIENT_SECRET are set
     When the server processes a successful change-password submission for an Auth0 user
     Then it uses AUTH0_CLIENT_ID/SECRET for the client_credentials grant
 
-  @integration
+  @integration @unimplemented
   Scenario: Rate limit applies to both modes
     Given I have submitted 5 password change attempts in the last 15 minutes
     When I submit another password change attempt
@@ -109,7 +109,7 @@ Feature: Change password from /settings/authentication
     And the server logs the scope error
     And I see an error toast indicating the Auth0 app is not authorized
 
-  @regression @integration
+  @regression @integration @unimplemented
   Scenario: Email-provider mode continues to verify the current password and revoke other sessions
     Given the tenant runs on NEXTAUTH_PROVIDER="email"
     When I submit the dialog with a correct current password and a valid new password

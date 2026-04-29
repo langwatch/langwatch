@@ -178,6 +178,23 @@ describe("getManagementApiToken", () => {
       );
     });
   });
+
+  describe("when the Auth0 host is unreachable (transport error)", () => {
+    // Network-layer failures (DNS, connection refused, AbortError from the
+    // 10s timeout) used to leak as raw Error and break the caller's
+    // `instanceof Auth0ApiError` check. fetchAuth0 normalizes them.
+    it("normalizes network errors to Auth0ApiError", async () => {
+      const original = auth0Issuer;
+      auth0Issuer = "http://127.0.0.1:1"; // closed port
+      try {
+        await expect(getManagementApiToken()).rejects.toBeInstanceOf(
+          Auth0ApiError,
+        );
+      } finally {
+        auth0Issuer = original;
+      }
+    });
+  });
 });
 
 describe("updateUserPassword", () => {
@@ -209,6 +226,7 @@ describe("updateUserPassword", () => {
   });
 
   describe("when the Auth0 app is missing the update:users scope", () => {
+    /** @scenario Surfaces a clear error when the Auth0 Management API scope is missing */
     it("throws Auth0ApiError with code=insufficient_scope", async () => {
       handler = () => ({
         status: 403,
@@ -288,6 +306,7 @@ describe("updateUserPassword", () => {
 
 describe("changeAuth0Password", () => {
   describe("given valid Management API credentials", () => {
+    /** @scenario Auth0 backend uses a separate Machine-to-Machine app for the Management API */
     it("gets a management token and PATCHes the user's password", async () => {
       handler = (req) => {
         if (req.method === "POST" && req.path === "/oauth/token") {
