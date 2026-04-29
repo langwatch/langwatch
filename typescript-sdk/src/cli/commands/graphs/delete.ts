@@ -1,8 +1,7 @@
 import { createSpinner } from "../../utils/spinner";
+import { apiRequest } from "../../utils/apiClient";
 import { checkApiKey } from "../../utils/apiKey";
-import { formatFetchError } from "../../utils/formatFetchError";
 import { failSpinner } from "../../utils/spinnerError";
-import { buildAuthHeaders } from "@/internal/api/auth";
 import type { CommandResult } from "../../utils/output";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
@@ -21,18 +20,12 @@ export const deleteGraphCommand = async (
   const spinner = createSpinner(`Deleting graph "${id}"...`).start();
 
   try {
-    const response = await fetch(`${endpoint}/api/graphs/${encodeURIComponent(id)}`, {
+    const result = (await apiRequest({
       method: "DELETE",
-      headers: buildAuthHeaders({ apiKey }),
-    });
-
-    if (!response.ok) {
-      const message = await formatFetchError(response);
-      failSpinner({ spinner, error: new Error(message), action: `delete graph "${id}"` });
-      process.exit(1);
-    }
-
-    const result = await response.json() as { id: string; deleted: boolean };
+      path: `/api/graphs/${encodeURIComponent(id)}`,
+      apiKey,
+      endpoint,
+    })) as { id: string; deleted: boolean };
     spinner.succeed(`Graph "${id}" deleted`);
 
     return {
@@ -42,7 +35,7 @@ export const deleteGraphCommand = async (
       },
     };
   } catch (error) {
-    failSpinner({ spinner, error, action: "delete graph" });
+    failSpinner({ spinner, error, action: `delete graph "${id}"` });
     process.exit(1);
   }
 };

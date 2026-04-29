@@ -1,10 +1,9 @@
 import chalk from "chalk";
 import { createSpinner } from "../../utils/spinner";
+import { apiRequest } from "../../utils/apiClient";
 import { checkApiKey } from "../../utils/apiKey";
-import { formatFetchError } from "../../utils/formatFetchError";
 import { failSpinner } from "../../utils/spinnerError";
 import { commandValidationError, reportCommandError } from "../../utils/errorOutput";
-import { buildAuthHeaders } from "@/internal/api/auth";
 import type { CommandResult } from "../../utils/output";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
@@ -47,22 +46,13 @@ export const updateGraphCommand = async (
       body.filters = JSON.parse(options.filters) as Record<string, unknown>;
     }
 
-    const response = await fetch(`${endpoint}/api/graphs/${id}`, {
+    const graph = (await apiRequest({
       method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
-        ...buildAuthHeaders({ apiKey }),
-      },
-      body: JSON.stringify(body),
-    });
-
-    if (!response.ok) {
-      const message = await formatFetchError(response);
-      failSpinner({ spinner, error: new Error(message), action: "update graph" });
-      process.exit(1);
-    }
-
-    const graph = (await response.json()) as {
+      path: `/api/graphs/${id}`,
+      apiKey,
+      endpoint,
+      body,
+    })) as {
       id: string;
       name: string;
     };

@@ -1,9 +1,8 @@
 import chalk from "chalk";
 import { createSpinner } from "../../utils/spinner";
+import { apiRequest } from "../../utils/apiClient";
 import { checkApiKey } from "../../utils/apiKey";
-import { formatFetchError } from "../../utils/formatFetchError";
 import { failSpinner } from "../../utils/spinnerError";
-import { buildAuthHeaders } from "@/internal/api/auth";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
 import type { CommandResult } from "../../utils/output";
@@ -27,32 +26,12 @@ export const promptRestoreCommand = async (
   ).start();
 
   try {
-    const response = await fetch(
-      `${endpoint}/api/prompts/${encodeURIComponent(handle)}/versions/${encodeURIComponent(versionId)}/restore`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...buildAuthHeaders({ apiKey }),
-        },
-      }
-    );
-
-    if (!response.ok) {
-      const message = await formatFetchError(response);
-      failSpinner({
-        spinner,
-        error: new Error(message),
-        action: `restore "${handle}" to ${versionId}`,
-      });
-      process.exit(1);
-    }
-
-    const restored = (await response.json()) as {
-      id: string;
-      version: number;
-      commitMessage: string | null;
-    };
+    const restored = (await apiRequest({
+      method: "POST",
+      path: `/api/prompts/${encodeURIComponent(handle)}/versions/${encodeURIComponent(versionId)}/restore`,
+      apiKey,
+      endpoint,
+    })) as { id: string; version: number; commitMessage: string | null };
 
     spinner.succeed(
       `Restored "${handle}" — new version v${restored.version} created`
@@ -72,7 +51,7 @@ export const promptRestoreCommand = async (
       },
     };
   } catch (error) {
-    failSpinner({ spinner, error, action: "restore prompt" });
+    failSpinner({ spinner, error, action: `restore "${handle}" to ${versionId}` });
     process.exit(1);
   }
 };

@@ -1,11 +1,10 @@
 import chalk from "chalk";
 import { createSpinner } from "../../utils/spinner";
+import { apiRequest } from "../../utils/apiClient";
 import { checkApiKey } from "../../utils/apiKey";
-import { formatFetchError } from "../../utils/formatFetchError";
 import { failSpinner } from "../../utils/spinnerError";
 import { commandValidationError } from "../../utils/errorOutput";
 import type { CommandResult } from "../../utils/output";
-import { buildAuthHeaders } from "@/internal/api/auth";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
 /**
@@ -49,22 +48,13 @@ export const updateMonitorCommand = async (
       >;
     }
 
-    const response = await fetch(`${endpoint}/api/monitors/${id}`, {
+    monitor = (await apiRequest({
       method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
-        ...buildAuthHeaders({ apiKey }),
-      },
-      body: JSON.stringify(body),
-    });
-
-    if (!response.ok) {
-      const message = await formatFetchError(response);
-      failSpinner({ spinner, error: new Error(message), action: "update monitor" });
-      process.exit(1);
-    }
-
-    monitor = (await response.json()) as {
+      path: `/api/monitors/${id}`,
+      apiKey,
+      endpoint,
+      body,
+    })) as {
       id: string;
       name: string;
       enabled: boolean;

@@ -1,10 +1,9 @@
 import chalk from "chalk";
 import { createSpinner } from "../../utils/spinner";
+import { apiRequest } from "../../utils/apiClient";
 import { checkApiKey } from "../../utils/apiKey";
-import { formatFetchError } from "../../utils/formatFetchError";
 import { failSpinner } from "../../utils/spinnerError";
 import { commandValidationError, reportCommandError } from "../../utils/errorOutput";
-import { buildAuthHeaders } from "@/internal/api/auth";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
 import type { CommandResult } from "../../utils/output";
@@ -41,22 +40,13 @@ export const createSecretCommand = async (
   const spinner = createSpinner(`Creating secret "${name}"...`).start();
 
   try {
-    const response = await fetch(`${endpoint}/api/secrets`, {
+    const secret = (await apiRequest({
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...buildAuthHeaders({ apiKey }),
-      },
-      body: JSON.stringify({ name, value: options.value }),
-    });
-
-    if (!response.ok) {
-      const message = await formatFetchError(response);
-      failSpinner({ spinner, error: new Error(message), action: "create secret" });
-      process.exit(1);
-    }
-
-    const secret = (await response.json()) as {
+      path: "/api/secrets",
+      apiKey,
+      endpoint,
+      body: { name, value: options.value },
+    })) as {
       id: string;
       name: string;
     };

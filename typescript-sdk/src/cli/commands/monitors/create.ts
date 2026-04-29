@@ -1,11 +1,10 @@
 import chalk from "chalk";
 import { createSpinner } from "../../utils/spinner";
+import { apiRequest } from "../../utils/apiClient";
 import { checkApiKey } from "../../utils/apiKey";
-import { formatFetchError } from "../../utils/formatFetchError";
 import { failSpinner } from "../../utils/spinnerError";
 import { commandValidationError, reportCommandError } from "../../utils/errorOutput";
 import type { CommandResult } from "../../utils/output";
-import { buildAuthHeaders } from "@/internal/api/auth";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
 /**
@@ -54,13 +53,12 @@ export const createMonitorCommand = async (
       parameters = JSON.parse(options.parameters) as Record<string, unknown>;
     }
 
-    const response = await fetch(`${endpoint}/api/monitors`, {
+    monitor = (await apiRequest({
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...buildAuthHeaders({ apiKey }),
-      },
-      body: JSON.stringify({
+      path: "/api/monitors",
+      apiKey,
+      endpoint,
+      body: {
         name,
         checkType: options.checkType,
         executionMode: options.executionMode ?? "ON_MESSAGE",
@@ -69,16 +67,8 @@ export const createMonitorCommand = async (
         level: options.level ?? "trace",
         parameters,
         preconditions: [],
-      }),
-    });
-
-    if (!response.ok) {
-      const message = await formatFetchError(response);
-      failSpinner({ spinner, error: new Error(message), action: "create monitor" });
-      process.exit(1);
-    }
-
-    monitor = (await response.json()) as {
+      },
+    })) as {
       id: string;
       name: string;
       checkType: string;

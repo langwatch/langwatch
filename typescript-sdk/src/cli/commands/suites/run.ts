@@ -1,10 +1,10 @@
 import chalk from "chalk";
 import { createSpinner } from "../../utils/spinner";
 import { SuitesApiService } from "@/client-sdk/services/suites";
+import { apiRequest } from "../../utils/apiClient";
 import { checkApiKey } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
 import { resolveOutputFormat } from "../../utils/errorOutput";
-import { buildAuthHeaders } from "@/internal/api/auth";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
 export const runSuiteCommand = async (
@@ -109,19 +109,12 @@ export const runSuiteCommand = async (
 
       try {
         // Poll the scenario events endpoint for batch status
-        const statusResponse = await fetch(
-          `${endpoint}/api/scenario-events?batchRunId=${encodeURIComponent(result.batchRunId)}`,
-          {
-            method: "GET",
-            headers: buildAuthHeaders({ apiKey }),
-          },
-        );
-
-        if (!statusResponse.ok) {
-          throw new Error(`status endpoint answered ${statusResponse.status}`);
-        }
-
-        const statusData = await statusResponse.json() as {
+        const statusData = (await apiRequest({
+          method: "GET",
+          path: `/api/scenario-events?batchRunId=${encodeURIComponent(result.batchRunId)}`,
+          apiKey,
+          endpoint,
+        })) as {
           totalCount?: number;
           completedCount?: number;
           passedCount?: number;

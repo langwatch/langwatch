@@ -1,8 +1,7 @@
 import { createSpinner } from "../../utils/spinner";
+import { apiRequest } from "../../utils/apiClient";
 import { checkApiKey } from "../../utils/apiKey";
-import { formatFetchError } from "../../utils/formatFetchError";
 import { failSpinner } from "../../utils/spinnerError";
-import { buildAuthHeaders } from "@/internal/api/auth";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
 import type { CommandResult } from "../../utils/output";
@@ -23,18 +22,12 @@ export const deleteSecretCommand = async (
   const spinner = createSpinner(`Deleting secret "${id}"...`).start();
 
   try {
-    const response = await fetch(`${endpoint}/api/secrets/${id}`, {
+    const result = (await apiRequest({
       method: "DELETE",
-      headers: buildAuthHeaders({ apiKey }),
-    });
-
-    if (!response.ok) {
-      const message = await formatFetchError(response);
-      failSpinner({ spinner, error: new Error(message), action: "delete secret" });
-      process.exit(1);
-    }
-
-    const result = (await response.json()) as {
+      path: `/api/secrets/${id}`,
+      apiKey,
+      endpoint,
+    })) as {
       id: string;
       deleted: boolean;
     };
