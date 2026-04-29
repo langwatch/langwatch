@@ -13,6 +13,23 @@ import { api } from "../utils/api";
 import { usePublicEnv } from "./usePublicEnv";
 import { noOrgBouncerRoutes, publicRoutes, useRequiredSession } from "./useRequiredSession";
 
+/** @internal Exported for testing only */
+export function resolveProjectRedirectSubPath(
+  pathname: string,
+  oldProject: string
+): string {
+  const decodedPrefix = `/${oldProject}`;
+  const encodedPrefix = `/${encodeURIComponent(oldProject)}`;
+
+  if (pathname.startsWith(decodedPrefix)) {
+    return pathname.slice(decodedPrefix.length);
+  }
+  if (pathname.startsWith(encodedPrefix)) {
+    return pathname.slice(encodedPrefix.length);
+  }
+  return "";
+}
+
 export const useOrganizationTeamProject = (
   {
     redirectToOnboarding,
@@ -259,18 +276,14 @@ export const useOrganizationTeamProject = (
       finalProject.slug !== router.query.project
     ) {
       // Preserve the sub-path so /bad-slug/messages → /good-slug/messages
-      // Decode: browsers encode [ ] → %5B %5D, so asPath and query.project are in different encodings
+      // query.project is decoded by React Router (%5Bproject%5D → [project]),
+      // but asPath keeps percent-encoding. Match both forms, always slice from
+      // the original encoded pathname to avoid decoding characters in the sub-path.
       const url = new URL(router.asPath, window.location.origin);
-      const oldPrefix = `/${router.query.project as string}`;
-      let decodedPathname = url.pathname;
-      try {
-        decodedPathname = decodeURIComponent(url.pathname);
-      } catch {
-        // keep encoded pathname if malformed percent-encoding is present
-      }
-      const subPath = decodedPathname.startsWith(oldPrefix)
-        ? decodedPathname.slice(oldPrefix.length)
-        : "";
+      const subPath = resolveProjectRedirectSubPath(
+        url.pathname,
+        router.query.project as string
+      );
       void router.push(`/${finalProject.slug}${subPath}${url.search}`);
     }
   }, [
