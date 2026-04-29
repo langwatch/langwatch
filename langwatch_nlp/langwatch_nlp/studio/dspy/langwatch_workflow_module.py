@@ -79,6 +79,15 @@ class LangWatchWorkflowModule(ReportingModule):
             return result
 
         wrapped_module.forward = forward_with_metadata  # type: ignore
+
+        # For non-dspy.Module classes, instance() calls __call__ directly,
+        # bypassing forward. Wire __call__ through forward so the full
+        # patching chain (autoparsing, reporting, metadata) is always hit.
+        if not issubclass(wrapped_module, dspy.Module):
+            def call_via_forward(instance_self, *args, **kwargs):
+                return instance_self.forward(*args, **kwargs)
+            wrapped_module.__call__ = call_via_forward  # type: ignore
+
         return wrapped_module
 
     def run_in_parallel(self, *module_kwargs: Tuple[T, Dict[str, Any]]):
