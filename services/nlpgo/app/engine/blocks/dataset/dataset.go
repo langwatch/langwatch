@@ -114,9 +114,19 @@ func SplitRecords(rows Records, trainSize, testSize float64, seed int64) (*Split
 }
 
 // SelectByEntry returns the row pointed to by entry_selection. The
-// selection may be an int index or a string column name; the string
-// form is delegated to a callback because the column-name interpretation
-// is workflow-specific (some workflows use "id", others use "name").
+// selection may be:
+//   - an int index — direct lookup
+//   - one of the Studio mode keywords "first" / "last" / "random" / "all"
+//     (mirrors Python's get_dataset_entry_selection in
+//     langwatch_nlp/studio/utils.py — Studio's TS DSL pins this set in
+//     optimization_studio/types/dsl.ts)
+//   - any other string — delegated to byString (column-name lookup, which
+//     is workflow-specific so the engine wires the callback per call)
+//
+// "all" returns row 0: the sync execute path pulls a single row, while
+// the SSE batch path iterates rows above this layer; matches Python's
+// execute_sync behavior of falling back to the first record when no
+// per-row index is set.
 func SelectByEntry(rows Records, sel *dsl.EntrySelection, byString func(rows Records, name string) (int, bool)) (map[string]any, error) {
 	if sel == nil || !sel.IsSet() {
 		return nil, &EntrySelectionInvalidError{Reason: "entry_selection_unset"}
@@ -128,6 +138,29 @@ func SelectByEntry(rows Records, sel *dsl.EntrySelection, byString func(rows Rec
 		return rows[i], nil
 	}
 	if s, ok := sel.AsString(); ok {
+		// Studio's default workflows ship with entry_selection: "random".
+		// Mode keywords match BEFORE the byString fallback so a workflow
+		// without a column-name resolver still runs its dataset (M3
+		// dogfood 2026-04-29 trace 60f59f73… caught the regression —
+		// every execute_flow with the default Studio dataset 1ms-failed
+		// on entry with `string_selection_lookup_not_provided`).
+		switch s {
+		case "first", "all":
+			if len(rows) == 0 {
+				return nil, &EntrySelectionInvalidError{Reason: "entry_selection_empty_dataset"}
+			}
+			return rows[0], nil
+		case "last":
+			if len(rows) == 0 {
+				return nil, &EntrySelectionInvalidError{Reason: "entry_selection_empty_dataset"}
+			}
+			return rows[len(rows)-1], nil
+		case "random":
+			if len(rows) == 0 {
+				return nil, &EntrySelectionInvalidError{Reason: "entry_selection_empty_dataset"}
+			}
+			return rows[rand.IntN(len(rows))], nil
+		}
 		if byString == nil {
 			return nil, &EntrySelectionInvalidError{Reason: "string_selection_lookup_not_provided"}
 		}
