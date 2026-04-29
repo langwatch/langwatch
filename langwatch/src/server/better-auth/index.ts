@@ -401,7 +401,7 @@ export const auth = betterAuth({
             user: user as { email: string; deactivatedAt?: Date | null } & Record<string, unknown>,
           }),
         after: async (user) => {
-          await afterUserCreate({ prisma, user: user as { id: string; email: string } });
+          await afterUserCreate({ prisma, user: user as { id: string; email: string; name: string } });
         },
       },
     },

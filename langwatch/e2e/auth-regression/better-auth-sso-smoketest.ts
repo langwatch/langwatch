@@ -120,7 +120,7 @@ async function main() {
   });
   await afterUserCreate({
     prisma,
-    user: { id: "sso_smoke_newuser1", email: "alice@google-corp.test" },
+    user: { id: "sso_smoke_newuser1", email: "alice@google-corp.test", name: "Alice" },
   });
   const alice = await prisma.organizationUser.findFirst({
     where: { userId: "sso_smoke_newuser1" },
@@ -151,7 +151,7 @@ async function main() {
   });
   await afterUserCreate({
     prisma,
-    user: { id: "sso_smoke_newuser2", email: "bob@unrelated.test" },
+    user: { id: "sso_smoke_newuser2", email: "bob@unrelated.test", name: "Bob" },
   });
   const bobOrgs = await prisma.organizationUser.findMany({
     where: { userId: "sso_smoke_newuser2" },
@@ -415,7 +415,7 @@ async function main() {
   });
   await afterUserCreate({
     prisma,
-    user: { id: "sso_smoke_mixedcase", email: "Isaac@GOOGLE-CORP.TEST" },
+    user: { id: "sso_smoke_mixedcase", email: "Isaac@GOOGLE-CORP.TEST", name: "Isaac" },
   });
   const isaacOrg = await prisma.organizationUser.findFirst({
     where: { userId: "sso_smoke_mixedcase" },
@@ -438,7 +438,7 @@ async function main() {
   try {
     await afterUserCreate({
       prisma,
-      user: { id: "sso_smoke_newuser1", email: "alice@google-corp.test" },
+      user: { id: "sso_smoke_newuser1", email: "alice@google-corp.test", name: "Alice" },
     });
   } catch (err) {
     secondAddThrew = true;

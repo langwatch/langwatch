@@ -100,7 +100,9 @@ export type CioEventName =
   | "experiment_ran"
   | "first_prompt_created"
   | "first_simulation_ran"
-  | "joined_via_invite";
+  | "joined_via_invite"
+  | "joined_via_sso";
+>>>>>>> d28dc3ec8 (fix(auth): send Slack and CIO notifications on SSO auto-add signup)
 
 // ---------------------------------------------------------------------------
 // Batch call discriminated union
