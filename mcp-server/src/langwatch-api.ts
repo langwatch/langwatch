@@ -1,4 +1,7 @@
+import packageJson from "../package.json" assert { type: "json" };
 import { getConfig, requireApiKey } from "./config.js";
+
+const USER_AGENT = `langwatch-mcp/${packageJson.version}`;
 
 // --- Response types ---
 
@@ -121,6 +124,7 @@ export async function makeRequest(
   const url = getConfig().endpoint + path;
   const headers: Record<string, string> = {
     "X-Auth-Token": requireApiKey(),
+    "User-Agent": USER_AGENT,
   };
 
   if (body !== undefined) {
