@@ -97,7 +97,7 @@ export const projectRouter = createTRPCRouter({
     .use(skipPermissionCheckProjectCreation)
     .use(({ ctx, input, next }) => {
       if (input.teamId) {
-        return checkTeamPermission("organization:manage")({
+        return checkTeamPermission("project:create")({
           ctx,
           input: { ...input, teamId: input.teamId },
           next,
