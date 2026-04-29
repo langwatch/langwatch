@@ -112,37 +112,56 @@ Feature: AI Gateway Governance — Persona-aware chrome (sidebar + header)
   # ---------------------------------------------------------------------------
 
   @bdd @ui @persona-chrome @persona-4 @gating
-  Scenario: Governance + Gateway visibility = admin role AND feature flag (no data gate)
-    Given the visibility gate for Govern + Gateway sections is two-clause AND:
-      | predicate                                  | required for       |
-      | user has organization:manage permission    | Govern AND Gateway |
-      | release_ui_ai_gateway_menu_enabled = on    | Govern AND Gateway |
+  Scenario: Governance + Gateway visibility = admin permission AND feature flag (no data gate)
+    Given the visibility gate is two-clause AND, with Govern + Gateway each
+        keyed on its own product feature flag (the flags can roll out
+        independently — customers may want Gateway without Governance,
+        Governance without Gateway, or both):
+      | section  | permission predicate                      | feature-flag predicate                  |
+      | Govern   | user has organization:manage permission*  | release_ui_ai_governance_enabled = on   |
+      | Gateway  | user has virtualKeys:view permission      | release_ui_ai_gateway_menu_enabled = on |
     When the user opens any LLMOps page
-    Then the sidebar shows the "Govern" section iff both predicates are true
-    And the sidebar shows the "Gateway" section iff both predicates are true
-    And the sections are NOT additionally gated on hasIngestionSources or other state —
+    Then the sidebar shows the "Govern" section iff both Govern predicates are true
+    And the sidebar shows the "Gateway" section iff both Gateway predicates are true
+    And neither section is additionally gated on hasIngestionSources or other state —
         admins must see Govern to mint their first IngestionSource (bootstrap flow);
         gating on data presence creates a chicken-and-egg discoverability trap.
-    And the FF is the operator's rollout knob; admin role is the audience predicate.
+    And the feature flag is the operator's rollout knob; the permission is the audience predicate.
+
+    # *Note: organization:manage is a temporary stand-in until the dedicated
+    # `governance:view` permission lands (Lane-S RBAC drive-by). Once the new
+    # permission is in the rbac.ts catalog, this row swaps to:
+    #   user has governance:view permission
+    # ADMIN role default-grants governance:view; custom roles via the
+    # CustomRolePermissions JSON column compose any subset.
 
   @bdd @ui @persona-chrome @persona-4
   Scenario: Governance admin lands on /governance with the org-scope chrome
     Given user is org admin on Enterprise plan
     And the org has at least one IngestionSource
-    And `release_ui_ai_gateway_menu_enabled` is enabled
+    And `release_ui_ai_governance_enabled` AND `release_ui_ai_gateway_menu_enabled` are both enabled
     When the user navigates to "/" (fresh sign-in)
     Then `governance.resolveHome` returns destination "/governance"
     And the chrome on /governance renders the org-scope header (org name banner, NOT ProjectSelector)
     And the sidebar shows Home + Observe + Evaluate + Library + Govern + Gateway
 
   @bdd @ui @persona-chrome @persona-4 @ff-off-regression
-  Scenario: Govern + Gateway sections vanish when feature flag flips off
+  Scenario: Govern section vanishes when its feature flag flips off (independent of Gateway)
+    Given user is Persona 4 with both sections visible
+    When `release_ui_ai_governance_enabled` is flipped off org-wide
+    Then on the next page render the "Govern" section is hidden
+    And the "Gateway" section remains visible (its FF — `release_ui_ai_gateway_menu_enabled` — is independent)
+    And no other chrome state changes (LLMOps stack remains intact)
+    And operator-side runbook covers "don't flip flag off for orgs with active governance data"
+
+  @bdd @ui @persona-chrome @persona-4 @ff-off-regression
+  Scenario: Gateway section vanishes when its feature flag flips off (independent of Govern)
     Given user is Persona 4 with both sections visible
     When `release_ui_ai_gateway_menu_enabled` is flipped off org-wide
-    Then on the next page render the "Govern" section is hidden
-    And the "Gateway" section is hidden
-    And no other chrome state changes (LLMOps stack remains intact)
-    And operator-side runbook covers "don't flip flag off for orgs with active gateway data"
+    Then on the next page render the "Gateway" section is hidden
+    And the "Govern" section remains visible (its FF — `release_ui_ai_governance_enabled` — is independent)
+    And the two flags allow independent product-pilot rollout shapes:
+        Gateway-only customers, Governance-only customers, or both
 
   # ---------------------------------------------------------------------------
   # Header chip — single source of context truth
