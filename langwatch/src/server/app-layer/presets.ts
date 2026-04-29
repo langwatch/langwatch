@@ -296,6 +296,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
         config: {
           customerIoApiKey: config.customerIoApiKey,
           customerIoRegion: config.customerIoRegion,
+          externalProfileHmacSecret: config.externalProfileHmacSecret,
         },
       })
     : undefined;

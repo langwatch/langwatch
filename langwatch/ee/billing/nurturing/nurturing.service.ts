@@ -7,6 +7,7 @@ import type {
   CioOrgTraits,
   CioPersonTraits,
 } from "./types";
+import { computeExternalProfileId } from "./externalProfileId";
 
 const logger = createLogger("ee:nurturing-service");
 
@@ -24,7 +25,7 @@ type Region = keyof typeof REGIONAL_ENDPOINTS;
 // ---------------------------------------------------------------------------
 
 export type NurturingServiceOptions = {
-  config: Pick<AppConfig, "customerIoApiKey" | "customerIoRegion">;
+  config: Pick<AppConfig, "customerIoApiKey" | "customerIoRegion" | "externalProfileHmacSecret">;
   fetchFn?: typeof fetch;
 };
 
@@ -41,11 +42,13 @@ export type NurturingServiceOptions = {
  */
 export class NurturingService {
   private readonly apiKey: string | undefined;
+  private readonly hmacSecret: string | undefined;
   private readonly baseUrl: string;
   private readonly fetchFn: typeof fetch;
 
   private constructor(options: NurturingServiceOptions) {
     this.apiKey = options.config.customerIoApiKey;
+    this.hmacSecret = options.config.externalProfileHmacSecret;
     const region = options.config.customerIoRegion;
     this.baseUrl =
       region && region in REGIONAL_ENDPOINTS
@@ -75,7 +78,7 @@ export class NurturingService {
     userId: string;
     traits: Partial<CioPersonTraits>;
   }): Promise<void> {
-    await this.post("/identify", { userId, traits });
+    await this.post("/identify", { userId: this.profileId(userId), traits });
   }
 
   /** Track a named event for a user in Customer.io. */
@@ -88,7 +91,7 @@ export class NurturingService {
     event: CioEventName;
     properties?: Record<string, unknown>;
   }): Promise<void> {
-    await this.post("/track", { userId, event, properties });
+    await this.post("/track", { userId: this.profileId(userId), event, properties });
   }
 
   /** Associate a user with an organization (group) in Customer.io. */
@@ -101,26 +104,27 @@ export class NurturingService {
     groupId: string;
     traits?: Partial<CioOrgTraits>;
   }): Promise<void> {
-    await this.post("/group", { userId, groupId, traits });
+    await this.post("/group", { userId: this.profileId(userId), groupId, traits });
   }
 
   /** Send multiple operations in a single batch request. */
   async batch(calls: CioBatchCall[]): Promise<void> {
     const batchItems = calls.map((call) => {
+      const profileId = this.profileId(call.userId);
       switch (call.type) {
         case "identify":
-          return { type: "identify", userId: call.userId, traits: call.traits };
+          return { type: "identify", userId: profileId, traits: call.traits };
         case "track":
           return {
             type: "track",
-            userId: call.userId,
+            userId: profileId,
             event: call.event,
             properties: call.properties,
           };
         case "group":
           return {
             type: "group",
-            userId: call.userId,
+            userId: profileId,
             groupId: call.groupId,
             traits: call.traits,
           };
@@ -132,6 +136,11 @@ export class NurturingService {
   // -------------------------------------------------------------------------
   // Internal
   // -------------------------------------------------------------------------
+
+  /** Map internal userId → opaque provider profile ID via HMAC. */
+  private profileId(userId: string): string {
+    return computeExternalProfileId({ userId, hmacSecret: this.hmacSecret });
+  }
 
   private async post(path: string, body: unknown): Promise<void> {
     if (!this.apiKey) {

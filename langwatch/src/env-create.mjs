@@ -158,9 +158,18 @@ export function createEnvConfig() {
       HUBSPOT_REACHED_LIMIT_FORM_ID: z.string().optional(),
       HUBSPOT_FORM_ID: z.string().optional(),
 
-      // Customer.io Nurturing
+      // Customer.io CDP write key — used by both the server-side Pipelines
+      // API (NurturingService) and the client-side SDK (in-app messaging).
+      // This is a write-only key safe for browser exposure, same as POSTHOG_KEY.
       CUSTOMER_IO_API_KEY: z.string().optional(),
       CUSTOMER_IO_REGION: z.enum(["us", "eu"]).optional(),
+      // Customer.io In-App Messaging (Track API site ID from workspace settings)
+      CUSTOMER_IO_SITE_ID: z.string().optional(),
+      // HMAC secret for computing opaque external profile IDs sent to
+      // third-party tracking/CDP providers (Customer.io, PostHog, etc.).
+      // When set, userId is never sent raw — providers receive
+      // HMAC-SHA256(secret, userId) base64url instead. 32+ chars.
+      EXTERNAL_PROFILE_HMAC_SECRET: z.string().min(32).optional(),
 
       // Notifications
       SLACK_PLAN_LIMIT_CHANNEL: z.string().optional(),
@@ -273,6 +282,8 @@ export function createEnvConfig() {
       HUBSPOT_FORM_ID: process.env.HUBSPOT_FORM_ID,
       CUSTOMER_IO_API_KEY: process.env.CUSTOMER_IO_API_KEY,
       CUSTOMER_IO_REGION: process.env.CUSTOMER_IO_REGION,
+      CUSTOMER_IO_SITE_ID: process.env.CUSTOMER_IO_SITE_ID,
+      EXTERNAL_PROFILE_HMAC_SECRET: process.env.EXTERNAL_PROFILE_HMAC_SECRET,
       SLACK_PLAN_LIMIT_CHANNEL: process.env.SLACK_PLAN_LIMIT_CHANNEL,
       SLACK_CHANNEL_SIGNUPS: process.env.SLACK_CHANNEL_SIGNUPS,
       SLACK_CHANNEL_SUBSCRIPTIONS: process.env.SLACK_CHANNEL_SUBSCRIPTIONS,

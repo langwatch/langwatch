@@ -35,6 +35,10 @@ export const publicEnvRouter = publicProcedure
         !!env.LANGWATCH_NLP_SERVICE || !!env.LANGWATCH_NLP_LAMBDA_CONFIG,
       HAS_LANGEVALS_ENDPOINT: !!env.LANGEVALS_ENDPOINT,
       STRIPE_LICENSE_PAYMENT_LINK_URL: env.STRIPE_LICENSE_PAYMENT_LINK_URL,
+      // Customer.io CDP write key — write-only, safe for client-side use
+      // (same security model as POSTHOG_KEY). Powers in-app messaging SDK.
+      CUSTOMER_IO_API_KEY: env.CUSTOMER_IO_API_KEY,
+      CUSTOMER_IO_SITE_ID: env.CUSTOMER_IO_SITE_ID,
     };
 
     return publicEnvVars;
