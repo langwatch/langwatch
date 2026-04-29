@@ -1,9 +1,8 @@
 import chalk from "chalk";
 import ora from "ora";
+import { apiRequest } from "../../utils/apiClient";
 import { checkApiKey } from "../../utils/apiKey";
-import { formatFetchError } from "../../utils/formatFetchError";
 import { failSpinner } from "../../utils/spinnerError";
-import { buildAuthHeaders } from "@/internal/api/auth";
 
 export const updateSecretCommand = async (
   id: string,
@@ -18,22 +17,13 @@ export const updateSecretCommand = async (
   const spinner = ora(`Updating secret "${id}"...`).start();
 
   try {
-    const response = await fetch(`${endpoint}/api/secrets/${id}`, {
+    const secret = (await apiRequest({
       method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-        ...buildAuthHeaders({ apiKey }),
-      },
-      body: JSON.stringify({ value: options.value }),
-    });
-
-    if (!response.ok) {
-      const message = await formatFetchError(response);
-      spinner.fail(`Failed to update secret: ${message}`);
-      process.exit(1);
-    }
-
-    const secret = (await response.json()) as {
+      path: `/api/secrets/${id}`,
+      apiKey,
+      endpoint,
+      body: { value: options.value },
+    })) as {
       id: string;
       name: string;
     };

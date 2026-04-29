@@ -1,9 +1,8 @@
 import chalk from "chalk";
 import ora from "ora";
+import { apiRequest } from "../../utils/apiClient";
 import { checkApiKey } from "../../utils/apiKey";
-import { formatFetchError } from "../../utils/formatFetchError";
 import { failSpinner } from "../../utils/spinnerError";
-import { buildAuthHeaders } from "@/internal/api/auth";
 
 export const getGraphCommand = async (
   id: string,
@@ -18,17 +17,12 @@ export const getGraphCommand = async (
   const spinner = ora(`Fetching graph "${id}"...`).start();
 
   try {
-    const response = await fetch(`${endpoint}/api/graphs/${id}`, {
-      headers: buildAuthHeaders({ apiKey }),
-    });
-
-    if (!response.ok) {
-      const message = await formatFetchError(response);
-      spinner.fail(`Failed to fetch graph: ${message}`);
-      process.exit(1);
-    }
-
-    const graph = (await response.json()) as {
+    const graph = (await apiRequest({
+      method: "GET",
+      path: `/api/graphs/${id}`,
+      apiKey,
+      endpoint,
+    })) as {
       id: string;
       name: string;
       dashboardId: string | null;
