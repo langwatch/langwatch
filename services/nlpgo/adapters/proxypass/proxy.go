@@ -58,9 +58,14 @@ type Options struct {
 	// start is dominated by uvicorn process spawn, not import work.
 	ColdStartWait time.Duration
 	// ColdStartProbeInterval is the gap between TCP dial probes during
-	// the wait. Default: 100ms.
+	// the wait. Default: 100ms. Zero or negative values fall back to
+	// the default — unlike ColdStartWait, there is no "negative
+	// disables" sentinel here; a negative interval would CPU-spin the
+	// retry loop.
 	ColdStartProbeInterval time.Duration
-	// ColdStartProbeTimeout caps each individual TCP probe. Default: 200ms.
+	// ColdStartProbeTimeout caps each individual TCP probe. Default:
+	// 200ms. Zero or negative values fall back to the default — a
+	// negative timeout would make every probe return immediately.
 	ColdStartProbeTimeout time.Duration
 }
 
@@ -81,10 +86,16 @@ func New(opts Options) (http.Handler, error) {
 	if opts.ColdStartWait == 0 {
 		opts.ColdStartWait = 90 * time.Second
 	}
-	if opts.ColdStartProbeInterval == 0 {
+	// Probe knobs: <= 0 falls back to default. Unlike ColdStartWait,
+	// negatives have no special "disable" meaning here — a negative
+	// probe interval would make time.After fire instantly and the loop
+	// at line 165 would CPU-spin during outages; a negative probe
+	// timeout would make every net.DialTimeout return immediately.
+	// Treat both as misconfiguration and snap to the default.
+	if opts.ColdStartProbeInterval <= 0 {
 		opts.ColdStartProbeInterval = 100 * time.Millisecond
 	}
-	if opts.ColdStartProbeTimeout == 0 {
+	if opts.ColdStartProbeTimeout <= 0 {
 		opts.ColdStartProbeTimeout = 200 * time.Millisecond
 	}
 	target, err := url.Parse(opts.UpstreamURL)
@@ -93,6 +104,10 @@ func New(opts Options) (http.Handler, error) {
 	}
 	if target.Host == "" {
 		return nil, fmt.Errorf("proxypass: upstream URL %q has no host", opts.UpstreamURL)
+	}
+	probeAddr, err := probeAddress(target)
+	if err != nil {
+		return nil, fmt.Errorf("proxypass: %w", err)
 	}
 
 	rp := &httputil.ReverseProxy{
@@ -114,7 +129,32 @@ func New(opts Options) (http.Handler, error) {
 			http.Error(w, "child upstream unavailable", http.StatusBadGateway)
 		},
 	}
-	return waitForUpstream(rp, target.Host, opts), nil
+	return waitForUpstream(rp, probeAddr, opts), nil
+}
+
+// probeAddress returns the host:port string suitable for net.DialTimeout.
+// url.URL.Host omits the default port when the URL doesn't carry one
+// explicitly (http://example.com → "example.com", no ":80"), so dialing
+// it raw fails with "missing port in address" and our cold-start probe
+// silently returns 503 every time. Resolve the scheme default
+// (80 for http, 443 for https) before joining; an unrecognised scheme
+// without a port is a configuration error and surfaces from New().
+func probeAddress(u *url.URL) (string, error) {
+	host := u.Hostname()
+	if host == "" {
+		return "", fmt.Errorf("upstream URL %q has no host", u.Redacted())
+	}
+	if port := u.Port(); port != "" {
+		return net.JoinHostPort(host, port), nil
+	}
+	switch strings.ToLower(u.Scheme) {
+	case "http":
+		return net.JoinHostPort(host, "80"), nil
+	case "https":
+		return net.JoinHostPort(host, "443"), nil
+	default:
+		return "", fmt.Errorf("upstream URL %q has no port and unsupported scheme %q", u.Redacted(), u.Scheme)
+	}
 }
 
 // waitForUpstream wraps the reverse proxy with a short cold-start

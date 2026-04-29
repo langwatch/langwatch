@@ -249,6 +249,66 @@ func TestReverseProxy_NegativeColdStartWaitDisablesWait(t *testing.T) {
 		"with the wait disabled, request should fail fast — got %s", elapsed)
 }
 
+// TestReverseProxy_NegativeProbeKnobsFallBackToDefaults pins the CR
+// guard for misconfiguration: a negative ColdStartProbeInterval would
+// make time.After fire instantly inside the retry loop and CPU-spin
+// during outages; a negative ColdStartProbeTimeout would make every
+// net.DialTimeout return immediately. Unlike ColdStartWait, neither
+// probe knob has a "negative disables" sentinel — both must clamp to
+// the default. Without this guard, negative values survive into the
+// loop and the proxy degrades into a hot probe storm.
+//
+// Approach: same shape as TestReverseProxy_UpstreamReachableMidWait —
+// upstream comes up after ~150ms — but we pass NEGATIVE probe knobs
+// and a short ColdStartWait. If negatives clamp correctly, the loop
+// runs at the 100ms default interval, sees the upstream a few probes
+// in, and the request succeeds with 200. If negatives leak into the
+// loop, the test would still pass functionally but the loop would
+// CPU-spin during the warmup gap (not directly observable in unit
+// tests; the production cost is wasted CPU on every cold-start).
+// Functional correctness is what we pin here.
+func TestReverseProxy_NegativeProbeKnobsFallBackToDefaults(t *testing.T) {
+	probe, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	addr := probe.Addr().String()
+	require.NoError(t, probe.Close())
+
+	proxy, err := proxypass.New(proxypass.Options{
+		UpstreamURL:            "http://" + addr,
+		ColdStartWait:          1 * time.Second,
+		ColdStartProbeInterval: -1 * time.Second, // negative, must clamp
+		ColdStartProbeTimeout:  -1 * time.Second, // negative, must clamp
+	})
+	require.NoError(t, err,
+		"New must accept negative probe knobs and clamp them; rejecting at startup would be a behavior regression")
+	front := httptest.NewServer(proxy)
+	defer front.Close()
+
+	upstream := http.Server{
+		Addr: addr,
+		Handler: http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(http.StatusOK)
+		}),
+		ReadHeaderTimeout: time.Second,
+	}
+	defer func() { _ = upstream.Close() }()
+	go func() {
+		time.Sleep(150 * time.Millisecond)
+		ln, lerr := net.Listen("tcp", addr)
+		if lerr != nil {
+			t.Errorf("delayed listen: %v", lerr)
+			return
+		}
+		_ = upstream.Serve(ln)
+	}()
+
+	resp, err := http.Get(front.URL + "/studio/execute")
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	assert.Equal(t, http.StatusOK, resp.StatusCode,
+		"with negative probe knobs clamped to defaults, the cold-start wait must still complete the request once the upstream comes up")
+}
+
 // TestReverseProxy_UpstreamReachableMidWaitProxiesThrough pins the
 // happy cold-start path: when the upstream isn't reachable on the
 // first probe but becomes reachable inside the wait window, the proxy
