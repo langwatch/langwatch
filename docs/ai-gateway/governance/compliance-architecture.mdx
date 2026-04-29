@@ -1,0 +1,142 @@
+---
+title: Compliance architecture
+description: How LangWatch AI Gateway governance underwrites SOC 2 Type II, ISO 27001, EU AI Act, GDPR, and HIPAA-most-uses out of the box. One unified observability substrate, five mechanisms, named follow-ups for tamper-evidence.
+sidebarTitle: Compliance architecture
+---
+
+LangWatch AI Gateway governance is built on a **unified observability substrate** — every audit event, OTel span, webhook delivery, and S3 replay row lands in the same trace store that powers the rest of the platform. That single store is what underwrites the compliance posture below: one source of truth, one append-only event log, one set of retention controls, one set of access controls.
+
+This page maps each compliance framework you might need to which mechanisms in LangWatch underwrite it, and names what's deferred (and why).
+
+## The substrate, in one diagram
+
+```
+                  PUBLIC URLS (auth boundary)
+   /api/otel/v1/traces     /api/ingest/otel/:sourceId    /api/ingest/webhook/:sourceId
+       (project key)             (lw_is_* Bearer)              (lw_is_* Bearer)
+              │                          │                            │
+              ▼                          ▼                            ▼
+       ┌──────────────────────────────────────────────────────────────────┐
+       │            SHARED HARDENED OTLP PARSER                           │
+       │   readBody → decompress → parse → normalise (webhook→OTLP)       │
+       │   stamp langwatch.origin.* (governance receivers only)           │
+       │   resolve hidden Governance Project (lazy-ensure on first mint)  │
+       └──────────────────────────────────────────────────────────────────┘
+                                  │
+                                  ▼
+       ┌──────────────────────────────────────────────────────────────────┐
+       │                EXISTING TRACE PIPELINE                           │
+       │      event_log (append-only, durable) → projections              │
+       │              └─→ recorded_spans  +  log_records                  │
+       │                  (single trace store, governance is a tag)       │
+       └──────────────────────────────────────────────────────────────────┘
+                                  │
+                ┌─────────────────┼─────────────────┐
+                ▼                 ▼                 ▼
+     ┌─────────────────┐ ┌─────────────────┐ ┌────────────────────┐
+     │ governance_kpis │ │governance_ocsf  │ │  Trace viewer      │
+     │     (fold)      │ │  _events (fold) │ │  Log detail pane   │
+     └─────────────────┘ └─────────────────┘ │  Existing UI       │
+              │                  │           └────────────────────┘
+              ▼                  ▼
+     ┌─────────────────┐ ┌──────────────────────┐
+     │ Anomaly reactor │ │ OCSF read API        │
+     │ /governance KPI │ │ (SIEM cron-pull,     │
+     │     strip       │ │  Splunk/Datadog/etc.)│
+     └─────────────────┘ └──────────────────────┘
+```
+
+**Governance is origin metadata, not a parallel pipeline.** Two URL surfaces (project-keyed vs IngestionSource-bearer-keyed) share one hardened parser, one trace pipeline, one set of `recorded_spans` + `log_records` tables, one set of compliance controls. The architecture decision is captured in [ADR-018](https://github.com/langwatch/langwatch/blob/main/dev/docs/adr/018-governance-unified-observability-substrate.md).
+
+## Framework coverage
+
+| Framework | Coverage | Mechanisms in LangWatch |
+|---|---|---|
+| **SOC 2 Type II** | ✅ Baseline | Append-only event log; per-origin retention class; RBAC via project membership; access logging; org-tenancy isolation |
+| **ISO 27001** | ✅ Baseline | All of the above; documented control mapping (Annex A.12 logging, A.18 compliance) |
+| **EU AI Act** (general-purpose tier) | ✅ Baseline | Audit trail durable in event_log; retention class meets logging requirements; non-repudiation guarantees |
+| **EU AI Act** (high-risk tier) | ⏳ Pending | Same baseline + cryptographic tamper-evidence (planned follow-up) |
+| **GDPR** | ✅ Baseline | Right-to-be-forgotten honoured at retention boundary; org-tenancy isolation; auditor read-only role for DPO access |
+| **HIPAA** (most uses) | ✅ Baseline | 7-year archive class + RBAC; event_log non-repudiation; org-tenancy isolation |
+| **HIPAA** (covered-entity strict / HITECH cryptographic verification) | ⏳ Pending | Same + tamper-evidence follow-up |
+| **SEC 17a-4** (broker-dealer WORM) | Out of scope | Requires WORM storage layer + cryptographic verification beyond LangWatch's current model |
+
+The follow-up contract for tamper-evidence (Merkle-root publication of event_log digests + customer-rotatable signing keys + verification REST API) is locked in spec form so the design isn't reinvented when a named customer requirement lands. See [Tamper-evidence is named, not abandoned](#tamper-evidence-is-named-not-abandoned) below.
+
+## The five mechanisms
+
+### 1. Append-only event log (non-repudiation)
+
+Every receiver writes a `*Received` event to `event_log` **before** any projection writes its derived view. Folds + projections are derived data, rebuildable from `event_log`. Deleting a derived view (a span row, a fold projection, a SIEM-export row) does NOT delete the `event_log` evidence; the deletion itself is recorded as another event.
+
+This is the foundation that SOC 2 Type II / ISO 27001 / EU AI Act general-purpose / GDPR / HIPAA-most-uses non-repudiation requirements rest on. An auditor asking "show me the audit trail before AND after this row was deleted" gets both.
+
+### 2. Per-origin retention class
+
+Configured at the IngestionSource via `retentionClass`:
+
+| `retentionClass` | Window | Use case |
+|---|---|---|
+| `thirty_days` (default) | 30 days | Day-to-day debugging, dashboards, SOC 2 / ISO 27001 baseline |
+| `one_year` | 1 year | SOC 2 audit window, GDPR right-to-be-forgotten window, EU AI Act |
+| `seven_years` | 7 years | HIPAA-most-uses, financial audit windows |
+
+ClickHouse TTL policy honours the class. The retention class is **system-derived per source**, never user-supplied at OTLP ingest. Org plan ceiling is enforced at the composer / API layer — a free-tier org can't request `seven_years`.
+
+See [Per-origin retention](/ai-gateway/governance/retention) for the full retention contract.
+
+### 3. RBAC via project membership
+
+Two roles at org scope:
+
+- **Org admin** — full read/write on IngestionSource, AnomalyRule, retention config, OCSF export
+- **Auditor** (read-only) — read access across all governance projections + OCSF export, no write
+
+Both roles map onto project-membership of the hidden Governance Project. Members of customer-visible projects do NOT inherit governance read access (governance is an org-wide concern, not a per-project one). Enforced at every tRPC procedure + every REST adapter.
+
+### 4. Org-tenancy isolation
+
+Every governance read filters on the organization's hidden Governance Project. Cross-org reads return 404 — they never leak the existence of another tenant's resources. Tested via integration tests that mint two orgs and try to read across the boundary.
+
+The same isolation applies at every layer: receiver auth, tRPC procedures, REST adapters, fold projections, OCSF read API, retention TTL evaluation.
+
+### 5. Hidden Governance Project (internal routing artifact)
+
+`Project.kind = "application"` for user-visible projects; `"internal_governance"` for the hidden Governance Project. Lazy-ensured on first IngestionSource mint via single `ensureHiddenGovernanceProject(orgId)` helper. Filtered out of every Project consumer at the central org/team/project list query (`PrismaOrganizationRepository.getAllForUser` filters `kind: { not: "internal_governance" }`); covered by a live-data integration regression.
+
+This is **not a customer concept** — it's documented here only because compliance auditors will ask "where does the governance data live?" The answer is: "in our standard trace store, tagged with `langwatch.origin.kind = 'ingestion_source'` origin metadata, scoped to a per-org internal-routing Project that's never user-visible."
+
+## Tamper-evidence is named, not abandoned
+
+Cryptographic verification (Merkle-root publication of `event_log` digests + customer-rotatable signing keys + verification REST API) is needed for:
+
+- **EU AI Act high-risk tier**
+- **HIPAA covered-entity strict (HITECH cryptographic verification)**
+- **SEC 17a-4** (broker-dealer WORM) — likely also needs WORM storage substrate beyond LangWatch's current model
+
+### Why deferred (not in this PR)
+
+1. **The baseline append-only event_log already provides non-repudiation** for SOC 2 / ISO 27001 / EU AI Act general-purpose / GDPR / HIPAA-most-uses without cryptographic publication.
+2. **No named customer requires the strict tier today.** Shipping it half-baked is worse than naming it as a follow-up.
+3. **The follow-up contract is locked in spec.** `specs/ai-gateway/governance/compliance-baseline.feature` describes the Merkle-tree-of-event-log-digests design + customer-rotatable signing keys + verification REST API. The design isn't reinvented when a named customer requirement lands.
+
+### What we don't compromise on
+
+The baseline ships in this PR, fully tested, fully spec'd. Tamper-evidence is the only deferred compliance scope. Every other mechanism on this page (event_log, retention class, RBAC, org-tenancy, hidden Governance Project) ships baseline.
+
+## What this means for an auditor
+
+If a SOC 2 / ISO 27001 / GDPR / HIPAA-most-uses auditor asks LangWatch about your governance data, the answers fit on one page:
+
+- **Where does it live?** In our standard trace store (`recorded_spans` + `log_records`), tagged with `langwatch.origin.kind = 'ingestion_source'`. Same indexes, same backups, same encryption-at-rest as everything else.
+- **How long is it kept?** Per the IngestionSource's `retentionClass` — 30 days / 1 year / 7 years. Set system-side per source, never user-supplied per event.
+- **Who can read it?** Org admins + auditor read-only role. Customer-visible project members cannot.
+- **Is it tamper-evident?** The append-only `event_log` underwrites non-repudiation for SOC 2 / ISO 27001 / EU AI Act general-purpose / GDPR / HIPAA-most-uses. Cryptographic Merkle-root publication is a named follow-up for the strict tier (EU AI Act high-risk, HIPAA covered-entity strict, SEC 17a-4).
+- **Can the data leave the platform?** Via the OCSF v1.1 read API — cursor-paginated, org-tenant-isolated, auth-scoped to org admin or auditor. Six SIEM platforms (Splunk ES, Datadog Security, AWS Security Hub, Microsoft Sentinel, Elastic Security, Sumo Logic CSE) supported as cron-pull targets. See [OCSF / SIEM export](/ai-gateway/governance/ocsf-export).
+
+## Cross-references
+
+- [Per-origin retention](/ai-gateway/governance/retention) — `thirty_days` / `one_year` / `seven_years` retention classes; how the CH TTL policy keys off the origin attribute
+- [OCSF / SIEM export](/ai-gateway/governance/ocsf-export) — how governance feeds your SIEM (Splunk, Datadog, Sentinel, etc.)
+- [Trace vs governance ingestion](/observability/trace-vs-activity-ingestion) — picking the right OTel URL for your scenario
+- [ADR-018: governance unified observability substrate](https://github.com/langwatch/langwatch/blob/main/dev/docs/adr/018-governance-unified-observability-substrate.md) — the architecture decision record (for engineering reviewers)
