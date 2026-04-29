@@ -24,6 +24,19 @@ if [[ "$NODE_ENV" = "development" ]]; then
   else
     echo "  ✓ redis db=${REDIS_DB_INDEX} (explicit)"
   fi
+
+  # Dev-only: when PORT is set (the port-conflict-detector picked a non-default
+  # slot, e.g. PORT=5580), align BASE_HOST and NEXTAUTH_URL to that PORT so OAuth
+  # callback URLs and BetterAuth's trustedOrigins check match the actual listening
+  # port. Without this, any `pnpm dev` on a non-default port hits a
+  # 403 INVALID_ORIGIN on /api/auth/sign-in/social and the Auth0 redirect dies
+  # before it starts. Skipped in production (NEXTAUTH_URL there is the real
+  # public URL, not localhost).
+  if [ -n "$PORT" ]; then
+    export BASE_HOST="http://localhost:${PORT}"
+    export NEXTAUTH_URL="http://localhost:${PORT}"
+    echo "  ✓ BASE_HOST=NEXTAUTH_URL=${BASE_HOST} (auto-aligned to PORT=${PORT})"
+  fi
 fi
 
 RUNTIME_ENV="DEBUG=langwatch:* DEBUG_HIDE_DATE=true DEBUG_COLORS=true"
