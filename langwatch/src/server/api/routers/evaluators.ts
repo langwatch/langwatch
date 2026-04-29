@@ -452,8 +452,6 @@ export const evaluatorsRouter = createTRPCRouter({
             name: source.workflow.name,
             icon: source.workflow.icon,
             description: source.workflow.description,
-            isEvaluator: source.workflow.isEvaluator,
-            isComponent: source.workflow.isComponent,
             latestVersion: source.workflow.latestVersion,
           },
           targetProjectId: input.projectId,
