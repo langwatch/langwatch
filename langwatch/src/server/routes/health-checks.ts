@@ -201,10 +201,17 @@ app.get("/evaluations", async (c) => {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          data: {
-            input:
-              "Hello, my name is John Canary and my email is canary@langwatch.ai.",
-          },
+          // langevals presidio expects `data` as a LIST of items — see the
+          // production caller in workers/collector/piiCheck.ts:293. Sending
+          // a bare object here returns 422 "Input should be a valid list"
+          // from the Lambda, which the route serialises as a 500 to Studio
+          // ("Failed to run sample evaluation: Internal Server Error").
+          data: [
+            {
+              input:
+                "Hello, my name is John Canary and my email is canary@langwatch.ai.",
+            },
+          ],
           settings: {
             entities: {
               email_address: true,
