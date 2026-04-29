@@ -7,6 +7,6 @@ dependencies:
   version: 0.2.0
 - name: langwatch-gateway
   repository: file://../gateway
-  version: 0.1.0
-digest: sha256:ae554b87cd965ed8830817a2ab8b62521230fe2ad4879adf729b73c1dc290625
-generated: "2026-04-25T12:24:43.983023+02:00"
+  version: 3.2.0
+digest: sha256:79a2ab78e76a03da0e35fc3fb33a585924ab3287029460709a906eeccb42e425
+generated: "2026-04-29T22:45:51.423396+02:00"

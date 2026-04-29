@@ -79,10 +79,11 @@ jobs:
           fi
 
           if [ "${{ github.event_name }}" = "release" ]; then
-            # Release-please tag format: langwatch@3.2.0 (component@version,
-            # `tag-separator: @` in release-please-config.json). Strip the
-            # `langwatch@` prefix so what's left matches package.json's version.
-            tag_version="${tag#langwatch@}"
+            # Release-please tag format: langwatch@v3.2.0 (component@vX.Y.Z,
+            # `tag-separator: @` in release-please-config.json — release-please
+            # itself prepends the `v` to semver tags). Strip the
+            # `langwatch@v` prefix so what's left matches package.json's version.
+            tag_version="${tag#langwatch@v}"
             if [ "$tag_version" != "$pkg_version" ]; then
               echo "✗ version mismatch: tag=$tag (parsed=$tag_version) package.json=$pkg_version"
               exit 1
