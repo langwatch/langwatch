@@ -290,6 +290,14 @@ export const userRouter = createTRPCRouter({
         } catch (error) {
           if (error instanceof TRPCError) throw error;
           if (error instanceof Auth0ApiError) {
+            if (error.code === "weak_password") {
+              // Auth0 tenant policy rejected the new password — show its
+              // message verbatim so the user knows what to fix.
+              throw new TRPCError({
+                code: "BAD_REQUEST",
+                message: error.message,
+              });
+            }
             if (error.code === "insufficient_scope") {
               throw new TRPCError({
                 code: "INTERNAL_SERVER_ERROR",

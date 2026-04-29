@@ -273,6 +273,59 @@ describe("updateUserPassword", () => {
     });
   });
 
+  describe("when the new password violates the tenant password policy", () => {
+    // Auth0 surfaces tenant-policy violations as a 400 with
+    // `message: "PasswordStrengthError: ..."`. We map this to a typed
+    // weak_password code so the caller can render the user-facing
+    // reason verbatim instead of the generic "try again later".
+    it("throws Auth0ApiError code=weak_password with the cleaned-up message", async () => {
+      handler = () => ({
+        status: 400,
+        body: {
+          statusCode: 400,
+          error: "Bad Request",
+          message: "PasswordStrengthError: Password is too weak",
+        },
+      });
+
+      await expect(
+        updateUserPassword({
+          auth0UserId: "auth0|abc",
+          newPassword: "short",
+          managementToken: "tok",
+        }),
+      ).rejects.toMatchObject({
+        name: "Auth0ApiError",
+        code: "weak_password",
+        message: expect.stringContaining("Password is too weak"),
+      });
+    });
+
+    it("recognizes PasswordHistoryError too", async () => {
+      handler = () => ({
+        status: 400,
+        body: {
+          statusCode: 400,
+          error: "Bad Request",
+          message:
+            "PasswordHistoryError: Password has previously been used",
+        },
+      });
+
+      await expect(
+        updateUserPassword({
+          auth0UserId: "auth0|abc",
+          newPassword: "short",
+          managementToken: "tok",
+        }),
+      ).rejects.toMatchObject({
+        name: "Auth0ApiError",
+        code: "weak_password",
+        message: expect.stringContaining("previously been used"),
+      });
+    });
+  });
+
   describe("when the Management API returns 403 with a non-scope errorCode", () => {
     // E.g. a blocked user. Earlier code matched on status alone and
     // would have mis-labeled this as `insufficient_scope`. Now it

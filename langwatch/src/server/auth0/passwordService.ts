@@ -14,6 +14,7 @@ export type Auth0ErrorCode =
   | "insufficient_scope"
   | "not_configured"
   | "password_grant_not_enabled"
+  | "weak_password"
   | "unknown";
 
 export class Auth0ApiError extends Error {
@@ -251,6 +252,25 @@ export async function updateUserPassword(args: {
     });
   }
 
+  // Tenant password policy rejected the new password (length, char classes,
+  // history, dictionary, etc). Auth0 returns 400 with a PasswordStrengthError
+  // / PasswordHistoryError / PasswordDictionaryError / PasswordNoUserInfoError
+  // message — surface it directly so the user knows what to fix instead of
+  // seeing "Could not update password. Please try again later."
+  const policyMessage = extractPasswordPolicyMessage(body);
+  if (policyMessage) {
+    logger.warn(
+      { status: res.status, body },
+      "Auth0 Management API rejected new password (tenant policy)",
+    );
+    throw new Auth0ApiError({
+      status: res.status,
+      code: "weak_password",
+      message: policyMessage,
+      body,
+    });
+  }
+
   logger.error(
     { status: res.status, body },
     "Auth0 Management API password update failed",
@@ -264,6 +284,42 @@ export async function updateUserPassword(args: {
       `Auth0 Management API PATCH /users failed with status ${res.status}`,
     body,
   });
+}
+
+/**
+ * Pull the operator-friendly message out of an Auth0 password-policy 400.
+ * Returns null if the body isn't a recognizable policy error.
+ *
+ * Auth0 envelopes:
+ *   { statusCode: 400, error: "Bad Request",
+ *     message: "PasswordStrengthError: Password is too weak" }
+ *   { statusCode: 400, error: "Bad Request",
+ *     message: "PasswordHistoryError: Password has previously been used" }
+ *   { statusCode: 400, error: "Bad Request",
+ *     message: "PasswordDictionaryError: Password is too common" }
+ *   { statusCode: 400, error: "Bad Request",
+ *     message: "PasswordNoUserInfoError: Password contains user information" }
+ */
+function extractPasswordPolicyMessage(
+  body: { errorCode?: string; message?: string; error?: string } | undefined,
+): string | null {
+  const message = body?.message;
+  if (typeof message !== "string") return null;
+  const policyPrefixes = [
+    "PasswordStrengthError",
+    "PasswordHistoryError",
+    "PasswordDictionaryError",
+    "PasswordNoUserInfoError",
+  ];
+  if (!policyPrefixes.some((p) => message.startsWith(p))) return null;
+  // Strip the "PasswordStrengthError: " prefix so the user sees a clean
+  // sentence ("Password is too weak.") instead of the type tag.
+  const colonIdx = message.indexOf(":");
+  const cleaned =
+    colonIdx >= 0 ? message.slice(colonIdx + 1).trim() : message;
+  return cleaned.length > 0
+    ? `${cleaned} Please choose a stronger password (Auth0 tenant policy).`
+    : "Auth0 rejected the new password as too weak. Please choose a stronger one.";
 }
 
 /**
