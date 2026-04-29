@@ -1,5 +1,5 @@
 import type { Row } from "@tanstack/react-table";
-import React from "react";
+import React, { useMemo } from "react";
 import { useDensityTokens } from "../../../hooks/useDensityTokens";
 import { useDensityStore } from "../../../stores/densityStore";
 import type { TraceStatus } from "../../../types/trace";
@@ -33,7 +33,7 @@ interface RegistryRowProps<TRow> {
   "data-index"?: number;
 }
 
-export function RegistryRow<TRow>({
+function RegistryRowComponent<TRow>({
   tanstackRow,
   registry,
   addons,
@@ -58,23 +58,26 @@ export function RegistryRow<TRow>({
   const visibleCells = tanstackRow.getVisibleCells();
   const colCount = visibleCells.length;
 
-  const actions: RowActions = {
-    onSelect,
-    onTogglePeek,
-    onToggleExpand,
-  };
+  const actions = useMemo<RowActions>(
+    () => ({ onSelect, onTogglePeek, onToggleExpand }),
+    [onSelect, onTogglePeek, onToggleExpand],
+  );
 
-  const renderedAddons = addons
-    .map((id) => registry.addons[id])
-    .filter(
-      (def): def is NonNullable<typeof def> =>
-        Boolean(def) &&
-        def!.shouldRender({
-          row: tanstackRow.original,
-          isExpanded,
-          densityMode,
-        }),
-    );
+  const renderedAddons = useMemo(
+    () =>
+      addons
+        .map((id) => registry.addons[id])
+        .filter(
+          (def): def is NonNullable<typeof def> =>
+            Boolean(def) &&
+            def!.shouldRender({
+              row: tanstackRow.original,
+              isExpanded,
+              densityMode,
+            }),
+        ),
+    [addons, registry, tanstackRow.original, isExpanded, densityMode],
+  );
   const hasAddons = renderedAddons.length > 0;
 
   const handleRowClick = () => {
@@ -168,3 +171,33 @@ export function RegistryRow<TRow>({
     </Tbody>
   );
 }
+
+function areRegistryRowPropsEqual<TRow>(
+  prev: RegistryRowProps<TRow>,
+  next: RegistryRowProps<TRow>,
+): boolean {
+  // Skip the three callback props on purpose: parents pass inline closures
+  // that are recreated each render but call into stable handlers, so their
+  // identity doesn't affect what the row paints. Everything that does affect
+  // paint is explicitly compared.
+  return (
+    prev.tanstackRow.original === next.tanstackRow.original &&
+    prev.tanstackRow.id === next.tanstackRow.id &&
+    prev.registry === next.registry &&
+    prev.addons === next.addons &&
+    prev.status === next.status &&
+    prev.hoverScope === next.hoverScope &&
+    prev.isSelected === next.isSelected &&
+    prev.isFocused === next.isFocused &&
+    prev.isExpanded === next.isExpanded &&
+    prev.isNew === next.isNew &&
+    prev.rowDomId === next.rowDomId &&
+    prev.ref === next.ref &&
+    prev["data-index"] === next["data-index"]
+  );
+}
+
+export const RegistryRow = React.memo(
+  RegistryRowComponent,
+  areRegistryRowPropsEqual,
+) as typeof RegistryRowComponent;

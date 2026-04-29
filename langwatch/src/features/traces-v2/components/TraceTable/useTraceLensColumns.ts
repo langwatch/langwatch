@@ -1,10 +1,12 @@
 import type { ColumnDef } from "@tanstack/react-table";
-import { useMemo } from "react";
+import { useMemo, useRef } from "react";
 import { useDensityStore } from "../../stores/densityStore";
 import type { TraceListItem } from "../../types/trace";
 import { buildTraceColumns } from "./columns";
 import { expandTraceColumns, type Registry, traceRegistry } from "./registry";
 import { traceCells } from "./registry/cells/trace";
+import { uniqueEvaluators } from "./registry/cells/trace/dynamicEvalCell";
+import { uniqueEventNames } from "./registry/cells/trace/dynamicEventCell";
 import { traceSelectColumnDef } from "./selectColumn";
 
 const COMPACT_MIN_WIDTH_PX = 1500;
@@ -16,6 +18,23 @@ interface TraceLensColumns {
   minWidth: string;
 }
 
+/**
+ * The shape of the comfortable-density column set is derived from the
+ * traces — but only from the *set of evaluator keys, set of event names,
+ * and presence of any error*. Encoding those as a single string lets us
+ * recompute columns only when the shape actually changes, instead of on
+ * every SSE-driven traces refresh.
+ */
+function computeColumnSignature(traces: TraceListItem[]): string {
+  const evals = uniqueEvaluators(traces)
+    .map((k) => `${k.evaluatorId}:${k.evaluatorName ?? ""}`)
+    .sort()
+    .join("|");
+  const events = uniqueEventNames(traces).slice().sort().join("|");
+  const hasError = traces.some((t) => Boolean(t.error)) ? "1" : "0";
+  return `${hasError}#${evals}#${events}`;
+}
+
 export function useTraceLensColumns({
   logicalColumnIds,
   traces,
@@ -25,12 +44,20 @@ export function useTraceLensColumns({
 }): TraceLensColumns {
   const density = useDensityStore((s) => s.density);
 
+  // expandTraceColumns walks the traces to build dynamic eval/event columns,
+  // but its output only changes when the column-shape signature changes.
+  // We pin traces to a ref so the memo can read the freshest data while
+  // depending only on the signature.
+  const tracesRef = useRef(traces);
+  tracesRef.current = traces;
+  const colSignature = useMemo(() => computeColumnSignature(traces), [traces]);
+
   const expanded = useMemo(
     () =>
       density === "comfortable"
-        ? expandTraceColumns(logicalColumnIds, traces, traceCells)
+        ? expandTraceColumns(logicalColumnIds, tracesRef.current, traceCells)
         : null,
-    [density, logicalColumnIds, traces],
+    [density, logicalColumnIds, colSignature],
   );
 
   const columns = useMemo(() => {
