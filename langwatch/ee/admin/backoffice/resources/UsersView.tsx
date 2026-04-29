@@ -2,37 +2,33 @@ import {
   Badge,
   Box,
   Button,
+  Link as ChakraLink,
   Field,
   HStack,
   Input,
-  Link as ChakraLink,
   Spacer,
   Table,
   Text,
-  Textarea,
   VStack,
   Wrap,
 } from "@chakra-ui/react";
 import { MoreVertical, Pencil, UserCheck } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useDebounce } from "use-debounce";
-import NextLink from "~/utils/compat/next-link";
 import { Dialog } from "~/components/ui/dialog";
 import { Drawer } from "~/components/ui/drawer";
 import { Menu } from "~/components/ui/menu";
 import { Switch } from "~/components/ui/switch";
 import { toaster } from "~/components/ui/toaster";
+import NextLink from "~/utils/compat/next-link";
+import { impersonateUser } from "../adminClient";
 import {
   BackofficeTable,
   EmptyCell,
   formatDate,
   formatDateTime,
 } from "../BackofficeTable";
-import { impersonateUser } from "../adminClient";
-import {
-  useAdminList,
-  useAdminUpdate,
-} from "../useAdminResource";
+import { useAdminList, useAdminUpdate } from "../useAdminResource";
 
 interface OrgRef {
   id: string;
@@ -44,7 +40,7 @@ interface ProjectRef {
   slug: string;
 }
 
-interface AdminUser {
+export interface AdminUser {
   id: string;
   name: string | null;
   email: string | null;
@@ -219,7 +215,7 @@ export default function UsersView() {
   );
 }
 
-function ImpersonateDialog({
+export function ImpersonateDialog({
   user,
   onClose,
 }: {
@@ -290,10 +286,15 @@ function ImpersonateDialog({
             </Text>
             <Field.Root required>
               <Field.Label>Reason</Field.Label>
-              <Textarea
-                rows={3}
+              <Input
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    void submit();
+                  }
+                }}
                 placeholder="e.g. Debugging a stuck trace reported by support ticket #…"
                 disabled={loading}
               />
@@ -404,10 +405,7 @@ function UserEditDrawer({
             <VStack gap={4} align="stretch">
               <Field.Root>
                 <Field.Label>Name</Field.Label>
-                <Input
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                />
+                <Input value={name} onChange={(e) => setName(e.target.value)} />
               </Field.Root>
               <Field.Root>
                 <Field.Label>Email</Field.Label>
