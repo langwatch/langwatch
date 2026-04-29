@@ -1,5 +1,113 @@
 # Changelog
 
+## [3.2.0](https://github.com/langwatch/langwatch/compare/langwatch@v3.1.0...langwatch@v3.2.0) (2026-04-29)
+
+
+### Features
+
+* **ai-gateway:** ship v1 GA — virtual keys, budgets, guardrails, Go data plane ([#3327](https://github.com/langwatch/langwatch/issues/3327)) ([bd6ce5b](https://github.com/langwatch/langwatch/commit/bd6ce5b09492d31471ce2120401dd97751348821))
+* **auth:** in-app change password for Auth0 users on /settings/authentication ([#3478](https://github.com/langwatch/langwatch/issues/3478)) ([b1c9719](https://github.com/langwatch/langwatch/commit/b1c9719e4eeea5daa06e9a102ee56efa0f43fb11))
+* error boundaries and custom 404 page ([#3379](https://github.com/langwatch/langwatch/issues/3379)) ([cb3b660](https://github.com/langwatch/langwatch/commit/cb3b6604e04b54810b1b9a73183e083557b183ab))
+* **evaluators:** unify new-evaluator flow into one sliding drawer ([#3444](https://github.com/langwatch/langwatch/issues/3444)) ([ad5a7f0](https://github.com/langwatch/langwatch/commit/ad5a7f0c1199d4e5bc384d1b4465208a6e9d7ce8))
+* **nlpgo:** go workflow engine + LLM proxy migration from langwatch_nlp to Go ([#3483](https://github.com/langwatch/langwatch/issues/3483)) ([1d61354](https://github.com/langwatch/langwatch/commit/1d6135424043a5cacf28aaa46b2d5d8dbbb6f1f4))
+* **npx-server:** npx @langwatch/server — single-command local LangWatch ([#3486](https://github.com/langwatch/langwatch/issues/3486)) ([0884d31](https://github.com/langwatch/langwatch/commit/0884d3145cd910fcd199e1e70f82f805c9d1c972))
+* **scenarios:** http agent url template interpolation (lw[#3389](https://github.com/langwatch/langwatch/issues/3389)) ([#3390](https://github.com/langwatch/langwatch/issues/3390)) ([b228aab](https://github.com/langwatch/langwatch/commit/b228aabb98e680b05fccfaacd75c4ac8219f062d))
+* **scenarios:** load project secrets for code and workflow agents ([5f393cf](https://github.com/langwatch/langwatch/commit/5f393cf92e6beb355a424c4b0a6e29d83fddb7a2))
+* **scenarios:** project secrets for code/workflow agents + better dataset 400 ([#3414](https://github.com/langwatch/langwatch/issues/3414)) ([5f393cf](https://github.com/langwatch/langwatch/commit/5f393cf92e6beb355a424c4b0a6e29d83fddb7a2))
+* **scenarios:** promote provider setup links to prominent buttons ([#2920](https://github.com/langwatch/langwatch/issues/2920)) ([#3347](https://github.com/langwatch/langwatch/issues/3347)) ([06e5af2](https://github.com/langwatch/langwatch/commit/06e5af23d265732a2b78f0441b2d2738b184040b))
+* **scenarios:** workflow agent input/output mapping layer ([#3201](https://github.com/langwatch/langwatch/issues/3201)) ([#3334](https://github.com/langwatch/langwatch/issues/3334)) ([aef8e64](https://github.com/langwatch/langwatch/commit/aef8e646088ef5988ca5ee3f3560a06b45b0454b))
+* **simulations:** run again navigates to runs list, not nested drawer ([#3449](https://github.com/langwatch/langwatch/issues/3449)) ([fcc7dcc](https://github.com/langwatch/langwatch/commit/fcc7dcc9d6b02665e66cb9b4a9d7e639beff6d0b))
+
+
+### Bug Fixes
+
+* align TS SDK setRAGContexts with backend canonical attribute key ([#3394](https://github.com/langwatch/langwatch/issues/3394)) ([e9b502f](https://github.com/langwatch/langwatch/commit/e9b502f286aec75db62933bf8e9c65dad1500b52))
+* **analytics:** rescue 4 broken dashboard widgets in arrayJoin groupBy path ([#3418](https://github.com/langwatch/langwatch/issues/3418)) ([6839f45](https://github.com/langwatch/langwatch/commit/6839f45f5ef052e1c0f298e8413f289b4dd75927))
+* **audit-log:** address Sergio's post-merge feedback on PR [#3487](https://github.com/langwatch/langwatch/issues/3487) ([#3521](https://github.com/langwatch/langwatch/issues/3521)) ([602626e](https://github.com/langwatch/langwatch/commit/602626ee4143feb7e40a10afbc41bd7bfda8c73e))
+* **auth:** diagnostic logging on auth failure + don't let proxy Authorization headers poison X-Auth-Token fallback ([e0b5549](https://github.com/langwatch/langwatch/commit/e0b5549fd88be0db406eef0cf23bcbb8e615c6aa))
+* **auth:** diagnostic logs on auth-fail + restore X-Auth-Token fallback regression ([#3520](https://github.com/langwatch/langwatch/issues/3520)) ([e0b5549](https://github.com/langwatch/langwatch/commit/e0b5549fd88be0db406eef0cf23bcbb8e615c6aa))
+* **ci:** make docs-ci green — pnpm version pin + skills workspace + Node 24 .cjs rename ([#3549](https://github.com/langwatch/langwatch/issues/3549)) ([2d3160f](https://github.com/langwatch/langwatch/commit/2d3160f4546491fbc7c15ea5e38dd06e57845960))
+* **dev:** run port check before start:prepare:files for faster fail ([#3443](https://github.com/langwatch/langwatch/issues/3443)) ([368d55b](https://github.com/langwatch/langwatch/commit/368d55bb99e05bba5526c1c3996898c6739b1f0c))
+* **evaluations-v3:** mapping + tooltip bugs (sweep for [#3441](https://github.com/langwatch/langwatch/issues/3441)) ([#3457](https://github.com/langwatch/langwatch/issues/3457)) ([eb910f1](https://github.com/langwatch/langwatch/commit/eb910f1534b1c54f5792f073dad799d609839e29))
+* **evaluations:** skip custom evaluators with no DSL so /api/evaluations/*/evaluate stops 500-ing ([#3579](https://github.com/langwatch/langwatch/issues/3579)) ([43489bd](https://github.com/langwatch/langwatch/commit/43489bd510d07ba0c6ca19d13fb1651b59151da9))
+* **evaluators:** isEvaluator copy + evaluator name in traces + WrappedModule __call__ ([#3575](https://github.com/langwatch/langwatch/issues/3575)) ([2168ec5](https://github.com/langwatch/langwatch/commit/2168ec530941ac9131ca2ac7e9ee25d9e713b196))
+* **evaluators:** persist name updates for all evaluator types ([#3446](https://github.com/langwatch/langwatch/issues/3446)) ([e5e8814](https://github.com/langwatch/langwatch/commit/e5e8814dadbe2ff6afc7563108959fe34c0be0ed))
+* **evaluators:** preserve evaluator config when copying workflows ([#3573](https://github.com/langwatch/langwatch/issues/3573)) ([d855536](https://github.com/langwatch/langwatch/commit/d855536e2a8ff04107bfe5c1af2e7a8792fad2b2))
+* **invites:** require PENDING status before accepting invites ([#3372](https://github.com/langwatch/langwatch/issues/3372)) ([3b965cd](https://github.com/langwatch/langwatch/commit/3b965cdb358c06f2d0c06549fab36019d094ef6c))
+* **langwatch_nlp:** code node accepts class with __call__ or forward (FF=off back-compat) ([#3543](https://github.com/langwatch/langwatch/issues/3543)) ([03902ea](https://github.com/langwatch/langwatch/commit/03902eab9651dfe461d14a19bd0d2d3afd30ce3a))
+* **licensing:** include evaluationsCredit for 3.0.0 chart compatibility ([#3435](https://github.com/langwatch/langwatch/issues/3435)) ([3ce82fb](https://github.com/langwatch/langwatch/commit/3ce82fb8d2ae2f29e88beaa4765dcf8f540372c2))
+* **licensing:** include evaluationsCredit in generated licenses for 3.0.0 compatibility ([3ce82fb](https://github.com/langwatch/langwatch/commit/3ce82fb8d2ae2f29e88beaa4765dcf8f540372c2))
+* llm node drawer falls back to inline config when prompt not found ([#2511](https://github.com/langwatch/langwatch/issues/2511)) ([3235297](https://github.com/langwatch/langwatch/commit/32352970b1a7393d27a87b8c23509604b7904827))
+* **llm-config-popover:** always render Max Tokens slider for chat models ([#3522](https://github.com/langwatch/langwatch/issues/3522)) ([c4680c8](https://github.com/langwatch/langwatch/commit/c4680c8efae433af91372a013c976c7d635ff336))
+* **nlpgo:** bind HTTP listener before uvicorn-child to escape Lambda 10s init ceiling ([#3559](https://github.com/langwatch/langwatch/issues/3559)) ([edb2c4f](https://github.com/langwatch/langwatch/commit/edb2c4f45adfcc79f84a1ac8ffe156b7325b1978))
+* **nlpgo:** cold-start wait + 503 retry + Recover-middleware ErrAbortHandler ([#3566](https://github.com/langwatch/langwatch/issues/3566)) ([be59f2c](https://github.com/langwatch/langwatch/commit/be59f2c2ff8875813ef88aa82b54ed26d689b4da))
+* **nlpgo:** trace parity — execute_component span + langwatch.input/output JSON + scope-to-single-node + LANGWATCH_ENDPOINT fallback ([#3569](https://github.com/langwatch/langwatch/issues/3569)) ([b73182e](https://github.com/langwatch/langwatch/commit/b73182e384066b01a92e6d71500b2f4c08f8612a))
+* **npx-server:** post-[#3486](https://github.com/langwatch/langwatch/issues/3486) fallout (CI workflows + Linux postgres RUNPATH + bundled pnpm predep + macOS postgres strip + Go-only nlpgo) ([#3539](https://github.com/langwatch/langwatch/issues/3539)) ([ed68d90](https://github.com/langwatch/langwatch/commit/ed68d90e4c1694e0e0f0926fd2bdcf41070e2825))
+* **otel:** log projectId + customerTraceIds on every /api/otel/v1 error ([#3535](https://github.com/langwatch/langwatch/issues/3535)) ([7d2716e](https://github.com/langwatch/langwatch/commit/7d2716ed5f0666dc454901e1ca617be49d5f3568))
+* **pat:** scope-aware ceiling check — unblock MEMBER PAT creation ([#3580](https://github.com/langwatch/langwatch/issues/3580)) ([7baff26](https://github.com/langwatch/langwatch/commit/7baff269c921bc1fedbf919e68495ff8666c8919))
+* **pat:** use scope-aware representative permissions in ceiling check ([7baff26](https://github.com/langwatch/langwatch/commit/7baff269c921bc1fedbf919e68495ff8666c8919))
+* **rbac:** restore project creation for team members ([#3581](https://github.com/langwatch/langwatch/issues/3581)) ([524d723](https://github.com/langwatch/langwatch/commit/524d723c082fd7d4456c71c52e51f8daa2811ede))
+* **rbac:** restore project creation for team members ([#3585](https://github.com/langwatch/langwatch/issues/3585)) ([524d723](https://github.com/langwatch/langwatch/commit/524d723c082fd7d4456c71c52e51f8daa2811ede))
+* **routing:** preserve sub-path when redirecting URL-encoded project slugs ([#3557](https://github.com/langwatch/langwatch/issues/3557)) ([ac57591](https://github.com/langwatch/langwatch/commit/ac575913cad8f637e71e29503b82bc0ed2f54884))
+* **scenarios:** bump @ai-sdk/* to unify provider on v3.x ([#3413](https://github.com/langwatch/langwatch/issues/3413)) ([695dce1](https://github.com/langwatch/langwatch/commit/695dce17bebe4fae125d916de16d7760370dc3c0))
+* **scenarios:** hydrate llm params for fresh workflow agent runs ([#3277](https://github.com/langwatch/langwatch/issues/3277)) ([f788f27](https://github.com/langwatch/langwatch/commit/f788f27634c8e0aae3a052bf6f76ef0843412cb9))
+* **scenarios:** unify @ai-sdk/provider on v3.x ([#3413](https://github.com/langwatch/langwatch/issues/3413)) ([#3423](https://github.com/langwatch/langwatch/issues/3423)) ([695dce1](https://github.com/langwatch/langwatch/commit/695dce17bebe4fae125d916de16d7760370dc3c0))
+* **skills-publish:** stop sync.sh nuking target repo's .git ([#3425](https://github.com/langwatch/langwatch/issues/3425)) ([72fef44](https://github.com/langwatch/langwatch/commit/72fef447db36d2a820a315d2818df9d6ec381512))
+* **skills:** publish datasets skill to langwatch/skills repo ([#3553](https://github.com/langwatch/langwatch/issues/3553)) ([0e99311](https://github.com/langwatch/langwatch/commit/0e993111e613d0d125ed5000c445b64d1895a302))
+* **studio-lambda:** bump per-project Lambda MemorySize 1024 → 2048 MB ([#3565](https://github.com/langwatch/langwatch/issues/3565)) ([17b2ed4](https://github.com/langwatch/langwatch/commit/17b2ed49b91f28476f8b5fed151ba88d8d2cd476))
+* **studio:** create new dataset without forcing file upload ([#2544](https://github.com/langwatch/langwatch/issues/2544)) ([e43547f](https://github.com/langwatch/langwatch/commit/e43547f4d7342cf8c91c7bc3e7bc03e36e7284c2))
+* **studio:** merge localPromptConfig into parameters on workflow save ([#3447](https://github.com/langwatch/langwatch/issues/3447)) ([1d23eee](https://github.com/langwatch/langwatch/commit/1d23eeee3df9ec45ecf5da423ea36b6997f6b65c))
+* **studio:** strip LWA RESPONSE_STREAM prelude before forwarding SSE chunks ([#3568](https://github.com/langwatch/langwatch/issues/3568)) ([69a779a](https://github.com/langwatch/langwatch/commit/69a779a184b9b31d43c70d5785d9dfb09d2d7eb0))
+* **studio:** support chat_messages signature inputs + preserve multi-turn history ([#3415](https://github.com/langwatch/langwatch/issues/3415)) ([#3416](https://github.com/langwatch/langwatch/issues/3416)) ([cb76144](https://github.com/langwatch/langwatch/commit/cb76144a67460082b7bb2318b13aad55924f1a8f))
+* surface execute_sync Error events instead of generic fallback ([#3275](https://github.com/langwatch/langwatch/issues/3275)) ([e7edb37](https://github.com/langwatch/langwatch/commit/e7edb3766c163a1a7d7a39b928df5f4db0b97f89))
+* **traces:** extract content from wrapped payloads to prevent empty trace output ([#3383](https://github.com/langwatch/langwatch/issues/3383)) ([85197bc](https://github.com/langwatch/langwatch/commit/85197bcac31bced1a9d3311dfb6683ac922a3ca8))
+* **traces:** parse JSON-string langwatch.input when extracting primary I/O ([#3419](https://github.com/langwatch/langwatch/issues/3419)) ([1e87641](https://github.com/langwatch/langwatch/commit/1e87641060b872d9f924e1a583328f33590bd3ca))
+* **traces:** query RoleBinding instead of TeamUser for trace redaction ([#3424](https://github.com/langwatch/langwatch/issues/3424)) ([ed2d32c](https://github.com/langwatch/langwatch/commit/ed2d32c88516ea65165b3b57b944cbccdf8ce3f2))
+* update pnpm lockfile for @eslint/js ^10.0.1 in mcp-server ([#3582](https://github.com/langwatch/langwatch/issues/3582)) ([d59eb8a](https://github.com/langwatch/langwatch/commit/d59eb8adbe464d610f7428a94c954b968a99e1b5))
+* update pnpm lockfile to match @eslint/js ^10.0.1 in mcp-server ([d59eb8a](https://github.com/langwatch/langwatch/commit/d59eb8adbe464d610f7428a94c954b968a99e1b5))
+* use RoleBinding for team memberships in updateMemberRole ([#3387](https://github.com/langwatch/langwatch/issues/3387)) ([c0fc120](https://github.com/langwatch/langwatch/commit/c0fc12001aac786a37898aaecb42432f88b25a5e))
+
+
+### Miscellaneous
+
+* **ai-gateway:** post-merge follow-ups for v1 GA — alias layer, docs sweep, audit consolidation ([#3487](https://github.com/langwatch/langwatch/issues/3487)) ([031961b](https://github.com/langwatch/langwatch/commit/031961bd0b584491553acb543a15e59593ceb4bf))
+* **deps-dev:** bump faiss-cpu from 1.12.0 to 1.13.2 in /python-sdk ([#2096](https://github.com/langwatch/langwatch/issues/2096)) ([636ac8d](https://github.com/langwatch/langwatch/commit/636ac8dcff63fe89836d8d7bf0762885601f4e21))
+* **deps-dev:** bump jest-mock-extended from 4.0.0 to 4.0.1 in /langwatch ([#3517](https://github.com/langwatch/langwatch/issues/3517)) ([47dea0a](https://github.com/langwatch/langwatch/commit/47dea0a8b6c73ef8028e1c88dcdc6f8cdabfa6c1))
+* **deps-dev:** bump jest-mock-extended in /langwatch ([47dea0a](https://github.com/langwatch/langwatch/commit/47dea0a8b6c73ef8028e1c88dcdc6f8cdabfa6c1))
+* **deps:** bump @aws-sdk/client-lambda from 3.1030.0 to 3.1037.0 in /langwatch ([#3516](https://github.com/langwatch/langwatch/issues/3516)) ([82ca4bc](https://github.com/langwatch/langwatch/commit/82ca4bc45b0c1c968c2fd59413f675d7111f1e19))
+* **deps:** bump @aws-sdk/client-lambda in /langwatch ([82ca4bc](https://github.com/langwatch/langwatch/commit/82ca4bc45b0c1c968c2fd59413f675d7111f1e19))
+* **deps:** bump @opentelemetry/sdk-trace-web from 2.0.1 to 2.6.0 in /langwatch ([#2370](https://github.com/langwatch/langwatch/issues/2370)) ([6716569](https://github.com/langwatch/langwatch/commit/6716569fc515ac023cd6d9469fd0d7ca998a997e))
+* **deps:** bump @opentelemetry/sdk-trace-web in /langwatch ([6716569](https://github.com/langwatch/langwatch/commit/6716569fc515ac023cd6d9469fd0d7ca998a997e))
+* **deps:** bump @opentelemetry/semantic-conventions from 1.36.0 to 1.40.0 in /langwatch ([#2112](https://github.com/langwatch/langwatch/issues/2112)) ([fc28f40](https://github.com/langwatch/langwatch/commit/fc28f40e2842f8037288f04c1b1cb77b15c42dd8))
+* **deps:** bump @opentelemetry/semantic-conventions in /langwatch ([fc28f40](https://github.com/langwatch/langwatch/commit/fc28f40e2842f8037288f04c1b1cb77b15c42dd8))
+* **deps:** bump fs-extra from 11.3.3 to 11.3.4 in /langwatch ([#3510](https://github.com/langwatch/langwatch/issues/3510)) ([bf06e00](https://github.com/langwatch/langwatch/commit/bf06e00fcb3ff7502adb6381476330b92ecce8fa))
+* **deps:** bump hono from 4.12.14 to 4.12.15 in /langwatch ([#3512](https://github.com/langwatch/langwatch/issues/3512)) ([cc2c95d](https://github.com/langwatch/langwatch/commit/cc2c95dca4626e1be00da36a42e9e48c46107671))
+* **deps:** bump liquidjs ([21f94c8](https://github.com/langwatch/langwatch/commit/21f94c85e270de949443ccd078bec91238dd62d6))
+* **deps:** bump liquidjs from 10.25.5 to 10.25.7 in /langwatch in the npm_and_yarn group across 1 directory ([#3448](https://github.com/langwatch/langwatch/issues/3448)) ([21f94c8](https://github.com/langwatch/langwatch/commit/21f94c85e270de949443ccd078bec91238dd62d6))
+* **deps:** bump opentelemetry-api from 1.36.0 to 1.40.0 in /python-sdk ([#2090](https://github.com/langwatch/langwatch/issues/2090)) ([9d6bbc3](https://github.com/langwatch/langwatch/commit/9d6bbc37a933ac1842ba25632fffd4dae511d442))
+* **deps:** bump opentelemetry-instrumentation-crewai from 0.47.5 to 0.53.0 in /python-sdk ([#2094](https://github.com/langwatch/langwatch/issues/2094)) ([44dc407](https://github.com/langwatch/langwatch/commit/44dc40742f4ed78040b831a22db31368846676d6))
+* **deps:** bump opentelemetry-instrumentation-crewai in /python-sdk ([44dc407](https://github.com/langwatch/langwatch/commit/44dc40742f4ed78040b831a22db31368846676d6))
+* **deps:** bump orjson ([7dfc44b](https://github.com/langwatch/langwatch/commit/7dfc44bb6c9c550c1b367e069e6573d9cdaa9b2e))
+* **deps:** bump orjson from 3.11.4 to 3.11.5 in /langwatch_nlp in the uv group across 1 directory ([#2001](https://github.com/langwatch/langwatch/issues/2001)) ([7dfc44b](https://github.com/langwatch/langwatch/commit/7dfc44bb6c9c550c1b367e069e6573d9cdaa9b2e))
+* **deps:** bump the npm_and_yarn group across 4 directories with 6 updates ([#3401](https://github.com/langwatch/langwatch/issues/3401)) ([63d21c7](https://github.com/langwatch/langwatch/commit/63d21c734d47dc629db6d3228d39976acf8b06cf))
+* **deps:** bump the npm_and_yarn group across 7 directories with 8 updates ([#3286](https://github.com/langwatch/langwatch/issues/3286)) ([6939c5c](https://github.com/langwatch/langwatch/commit/6939c5cce6112b132a82f0c3105e86aab6568f45))
+* **main:** release skills 0.4.0 ([#3312](https://github.com/langwatch/langwatch/issues/3312)) ([91ef361](https://github.com/langwatch/langwatch/commit/91ef3618d31c4507d426006a147219bf212e096d))
+* **main:** release skills 0.4.1 ([#3427](https://github.com/langwatch/langwatch/issues/3427)) ([0e804a0](https://github.com/langwatch/langwatch/commit/0e804a0d946c5431992408ce3c76469a2a48d64a))
+* **npx-server:** post-[#3539](https://github.com/langwatch/langwatch/issues/3539) cleanup — restore main-only publish guard + reset root → 3.1.0 ([#3567](https://github.com/langwatch/langwatch/issues/3567)) ([2092b52](https://github.com/langwatch/langwatch/commit/2092b5270c781969295690a12a6d11b82ae6a313))
+
+
+### Code Refactoring
+
+* **attribution:** address module review feedback from PR [#3316](https://github.com/langwatch/langwatch/issues/3316) ([#3374](https://github.com/langwatch/langwatch/issues/3374)) ([c7bf398](https://github.com/langwatch/langwatch/commit/c7bf3980d0ffb45e37b348adc4ef21f853fbe713))
+* **evaluations-v3:** rename component-rendering tests to .integration.test.tsx ([#3460](https://github.com/langwatch/langwatch/issues/3460) item 8) ([#3464](https://github.com/langwatch/langwatch/issues/3464)) ([d02d0c1](https://github.com/langwatch/langwatch/commit/d02d0c1fe11aeb6e1596fa8ac61a34f09f4c5390))
+* **pat:** tighten extractCredentials signature to accept getHeader function ([#3370](https://github.com/langwatch/langwatch/issues/3370)) ([b831502](https://github.com/langwatch/langwatch/commit/b83150277ce3aa261c0d1c8fa2c70f0a77839336))
+* **pat:** tighten extractCredentials to accept getHeader function ([b831502](https://github.com/langwatch/langwatch/commit/b83150277ce3aa261c0d1c8fa2c70f0a77839336))
+* route every setFlowCallbacks evaluatorEditor through the shared helper ([#3460](https://github.com/langwatch/langwatch/issues/3460) item 6) ([#3463](https://github.com/langwatch/langwatch/issues/3463)) ([355d99d](https://github.com/langwatch/langwatch/commit/355d99de6fbbd3c3056bc510e54a49969e3613c5))
+* route every setFlowCallbacks evaluatorEditor through the shared helper ([#3460](https://github.com/langwatch/langwatch/issues/3460)) ([355d99d](https://github.com/langwatch/langwatch/commit/355d99de6fbbd3c3056bc510e54a49969e3613c5))
+* **skills:** real MDX with imports + JSX, retire link-as-partial sleight of hand ([#3432](https://github.com/langwatch/langwatch/issues/3432)) ([3141eb8](https://github.com/langwatch/langwatch/commit/3141eb8569071151c9969efa1a12a30401fd7792))
+* standardize thread/trace naming across mapping surfaces ([#3360](https://github.com/langwatch/langwatch/issues/3360)) ([425e43a](https://github.com/langwatch/langwatch/commit/425e43ab5d07f5f8e6cb583f5ddf19cc9305ec1f))
+* standardize thread/trace naming and improve dataset mapping UX ([425e43a](https://github.com/langwatch/langwatch/commit/425e43ab5d07f5f8e6cb583f5ddf19cc9305ec1f)), closes [#3348](https://github.com/langwatch/langwatch/issues/3348)
+
 ## [3.1.0](https://github.com/langwatch/langwatch/compare/langwatch@v3.0.0...langwatch@v3.1.0) (2026-04-22)
 
 

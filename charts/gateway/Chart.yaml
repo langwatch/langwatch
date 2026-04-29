@@ -1,9 +1,11 @@
 apiVersion: v2
 name: langwatch-gateway
-description: LangWatch AI Gateway (Go service). Virtual keys, budgets, guardrails, multi-provider routing via Bifrost.
+description: >-
+  LangWatch AI Gateway (Go service). Virtual keys, budgets, guardrails,
+  multi-provider routing via Bifrost.
 type: application
-version: 0.1.0
-appVersion: "0.1.0"
+version: 3.2.0
+appVersion: 3.2.0
 keywords:
   - langwatch
   - ai-gateway
