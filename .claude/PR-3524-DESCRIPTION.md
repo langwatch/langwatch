@@ -298,6 +298,8 @@ pipeline) to the unified-trace direction. Honest history:
 | `d20a1b403` | test(governance): end-to-end HTTP receiver — unified substrate proof through public API (Lane A) |
 | `f9af3cb79` | fix(governance): TenantId branded-type casts in event_log durability test |
 | `9a5653107` | fix(governance): Layer-1 invariant test cleanup-step organizationId fix |
+| `fd118131c` | feat(governance): step 3a — read-side cutover onto unified trace store (ActivityMonitorService + setupState rewire) |
+| `66c897a08` | test(governance): step 3a — ActivityMonitorService read-side integration test (7 scenarios + cross-org Layer-1) |
 
 Earlier (pre-correction) commits on the branch are preserved for the audit
 trail. The mechanical delete commit (`f3de1ae07`) is the boundary between
@@ -305,19 +307,27 @@ trail. The mechanical delete commit (`f3de1ae07`) is the boundary between
 
 ---
 
-## What's still in flight (step 3/3)
+## What's still in flight
+
+> Detailed atomic-task Gantt with all phases below in **§ Atomic-task Gantt**. This is the short list of "next slices to land before merge."
 
 | Slice | Owner | State |
 |---|---|---|
-| `ActivityMonitorService` rewire onto trace_summaries + log_records with origin filter | Lane S | next slice |
-| `governance_kpis` fold projection on the trace-processing pipeline | Lane S | next slice |
-| `governance_ocsf_events` fold projection | Lane S | next slice |
-| Per-origin retention TTL hook on recorded_spans + log_records | Lane S | next slice |
-| Anomaly reactor rewire onto `governance_kpis` fold | Lane S | next slice |
+| `ActivityMonitorService` rewire onto trace_summaries + log_records with origin filter | Lane S | ✅ shipped `fd118131c` (step 3a) |
+| Step 3a integration test (ingest → trace_summaries → ActivityMonitorService.summary) | Lane S | ✅ shipped `66c897a08` (7 scenarios + cross-org Layer-1) |
+| `governance_kpis` fold projection (step 3b) | Lane S | ⏳ next |
+| Per-origin retention TTL hook on recorded_spans + log_records (step 3c) | Lane S | ⏳ next |
+| `governance_ocsf_events` fold projection (step 3d) | Lane S | ⏳ next |
+| Anomaly reactor rewire onto `governance_kpis` fold (step 3e) | Lane S | ⏳ next |
+| OCSF read tRPC procedure for SIEM forwarding (step 3f) | Lane S | ⏳ next |
 | End-to-end HTTP receiver integration test | Lane A | ✅ shipped `d20a1b403` (13 tests) |
 | Layer-2 per-consumer integration test | Lane B | superseded — Layer-1 + Andre's helper composition + UI dogfood cover the invariant; further per-consumer assertions deferred to post-step-3/3 when the consumer registry has more surfaces to assert against |
-| UI verification screenshots | Lane B | ✅ shipped — 8 screenshots embedded above (iter22 dogfood) |
-| Customer-facing docs flip + dev/docs/ ADR + per-platform mapping page | Lane A | gated on step 3/3 (Andre) |
+| UI verification screenshots | Lane B | ✅ shipped — 8 screenshots embedded below (iter22 + iter23 drawer) |
+| Customer-facing docs flip + per-platform mapping page | Lane A | gated on step 3b/3c |
+| Live-data dashboard dogfood (replace iter22 $0/0 with real numbers post-3a) | Lane B | ⏳ next, unblocked |
+| **License relocation: governance modules → `langwatch/ee/governance/`** (4a) | Lane S+B | ⏳ NEW per rchaves directive 2026-04-28 |
+| **UI gating: enterprise-locked surfaces (3-tier) + service-layer 403 + CLI 402 envelope** (4b) | Lane S+B+A | ⏳ NEW per rchaves directive 2026-04-28 |
+| **License-gate assertion test: non-enterprise org → 403 on every `api.governance.*` proc** (4c) | Lane S | ⏳ NEW per rchaves directive 2026-04-28 |
 
 ---
 
@@ -492,7 +502,350 @@ server post-`33a8cf6d0` (full receiver rewire shipped):
 
 ---
 
-## Caveats / out of scope
+## License model — open-core split (Apache 2.0 + `ee/`)
+
+> Per rchaves directive 2026-04-28: LangWatch is moving from BSL to **Apache 2.0** for the open-core surface, with enterprise modules under `langwatch/ee/` carrying a separate Enterprise license. This section captures the cross-lane consensus on **what stays open** vs **what moves to `ee/`** for the governance pillar this PR introduces. Cross-lane sources: lane-S (Sergey) + lane-B (Alexis at `.monitor-logs/lane-b-license-split-input.md`) + lane-A (Andre, this fold).
+
+### Decision framework
+
+A feature ships **Apache 2.0** when *any* of: (1) solo developer / small team gets standalone value without enterprise admin features; (2) trivial to rebuild (1–2 weeks for a determined competitor); (3) GTM viral surface devs install + tell colleagues about.
+
+A feature ships **`ee/`** when *any* of: (1) compliance / governance is the customer-stated value (SOC2 / HIPAA / EU AI Act framework reports, retention class, SIEM export); (2) cross-source / cross-team / cross-org scale is the value (multi-source ingestion fleet, anomaly detection fleet, org-wide rollups); (3) high enterprise-glue cost (SCIM provisioning, revocation automation against vendor admin APIs); (4) lawsuit risk if a competitor copies it verbatim into their commercial product.
+
+### Apache 2.0 floor — the trial wedge
+
+A self-hosted free-tier user gets:
+
+- One organization, one Personal Team, one Personal Project
+- One personal Virtual Key with default RoutingPolicy
+- **One IngestionSource of type `otel_generic`** with retention `thirty_days`
+- `/governance` dashboard with **basic per-source widgets** (single-source spend, single-source events; no anomaly count, no cross-source rollup, no compliance posture)
+- `langwatch` CLI with login + claude/codex/cursor/gemini/shell wrappers
+- `/api/otel/v1/traces` SDK ingest unchanged
+
+**The open-source demo loop closes end-to-end on Apache 2.0**: install → `langwatch login` → `langwatch claude` → `/governance` shows the basic OTel ingest. Maps to the GitLab CE / Sentry OSS / Grafana OSS pattern.
+
+### What stays Apache 2.0 (open core)
+
+| Feature | Where | Why open |
+|---|---|---|
+| Gateway proxy core (Bifrost-embedded routing/policy/budget) | `services/aigateway/` + `langwatch/src/server/governance/routing-policies/` | Trivial to rebuild; viral surface |
+| Personal Virtual Keys + per-(user/team/project) GatewayBudget primitives | `langwatch/src/server/api/routers/virtualKeys.ts` | Per-dev API key minting; small team value |
+| `langwatch` CLI binary + `login`/`claude`/`codex`/`cursor`/`gemini`/`shell` commands | `typescript-sdk/src/cli/` | Personal IDE-keys experience; the GTM viral surface |
+| OTel SDK ingest via `/api/otel/v1/traces` + `/api/otel/v1/logs` | `langwatch/src/server/routes/otel.ts` | Existing apache2-equivalent; the open trace pipeline |
+| **Governance ingest receivers** (`/api/ingest/{otel,webhook}/:sourceId`) — transport only | `langwatch/src/server/routes/ingest/ingestionRoutes.ts` | The trial wedge needs the receiver itself open. Service layer gates the *features* (multi-source, retention tiers); the HTTP path is just transport. |
+| **`ensureHiddenGovernanceProject` helper** | `langwatch/src/server/governance/governanceProject.service.ts` | Substrate primitive called by the apache2 receiver. No-op for orgs with zero IngestionSources. |
+| **`IngestionSourceService` with service-layer gate** | `langwatch/src/server/governance/activity-monitor/ingestionSource.service.ts` | Service stays apache2; `createSource` enforces: non-enterprise orgs limited to **1 source max**, **`sourceType = otel_generic` only**, **`retentionClass = thirty_days` only**. Single 403 boundary for all gating. |
+| **`ActivityMonitorService` — basic per-source widgets** (`summary`, `ingestionSourcesHealth`, `eventsForSource`) | `langwatch/src/server/governance/activity-monitor/activityMonitor.service.ts` | Cross-source aggregations + anomaly rollups split to `activityMonitor.enterprise.service.ts` in `ee/`; basic surface stays apache2. |
+| `setupState.service.ts` (persona-detection probe) | `langwatch/src/server/governance/setupState.service.ts` | Substrate primitive; drives free-tier nav promotion |
+| Personal "My Usage" dashboard | `langwatch/src/components/dashboard/PersonalUsage*` | Solo-dev value |
+| Single-project trace viewer + log detail pane | `langwatch/src/components/messages/` | Existing core LangWatch |
+| `/governance` dashboard shell + basic-only widgets | `langwatch/src/components/governance/GovernanceDashboard.tsx` | Trial wedge surface |
+| Schema: `Project.kind`, `IngestionSource.retentionClass`, `IngestionSource` model itself, `AnomalyRule`/`AnomalyAlert` models | `langwatch/prisma/schema.prisma` | Schemas are no-op when no rows exist. Service-layer gate, not Prisma multi-schema. |
+| Shared OTLP body parser (`parseOtlpBody.ts`) | `langwatch/src/server/otel/parseOtlpBody.ts` | Used by both `/v1/traces` and governance receivers; single source of truth |
+| `event_log` + projection pipeline (PR #3351) | `langwatch/src/server/event-sourcing/` | Existing core durability foundation |
+| Layer-1 `Project.kind` filter at `getAllForUser` | `langwatch/src/server/app-layer/organizations/repositories/organization.prisma.repository.ts` | Filter is a no-op when no `internal_governance` projects exist; defensive correctness |
+| SPAN_ATTR_MAPPINGS hoisting `langwatch.origin.*` + `langwatch.governance.*` keys | `langwatch/src/server/event-sourcing/pipelines/trace-processing/projections/traceSummary.foldProjection.ts` | Forward-compatible no-op when no governance traffic flows |
+
+### What moves to `ee/governance/` (Enterprise license)
+
+Mirroring the existing `langwatch/ee/{admin,billing,licensing,managed-providers,saas}/` layout. Net relocation: ~6 backend files + their tests + ~8 UI surfaces.
+
+| Feature | From | To | Why enterprise |
+|---|---|---|---|
+| Multi-source-type expansion (`workato` / `claude_cowork` / `s3_custom` / `copilot_studio` / `openai_compliance` / `claude_compliance`) — gated at `IngestionSourceService.createSource` | `langwatch/src/server/governance/activity-monitor/` | `langwatch/ee/governance/ingestion/` | Multi-source fleet is the enterprise pricing axis |
+| `ActivityMonitorService` cross-source aggregations + anomaly rollups | (split from existing) | `langwatch/ee/governance/activity-monitor/activityMonitor.enterprise.service.ts` | Cross-source rollup = enterprise UX |
+| `AnomalyRuleService` + `anomalyRule.router` (composer + reactor + dispatch) | `langwatch/src/server/governance/anomaly/` | `langwatch/ee/governance/anomaly/` | Enterprise muscle |
+| Anomaly dispatch destinations (Slack / PagerDuty / email / webhook) | (planned C3) | `langwatch/ee/governance/anomaly/dispatch/` | Pure enterprise glue |
+| `governance_kpis` + `governance_ocsf_events` fold projections (3b/3d) | (planned) | `langwatch/ee/governance/folds/` | Enterprise read-side primitives |
+| Per-origin retention TTL hook (3c) — `one_year` + `seven_years` tiers | (planned) | `langwatch/ee/governance/retention/` | Compliance-driven retention |
+| OCSF v1.1 read API + thin push wrapper (3f) | (planned) | `langwatch/ee/governance/ocsf-export/` | "Pull governance into your SIEM" pricing axis |
+| Compliance posture report generator (SOC2 / ISO27001 / EU AI Act framework cross-mapping) | (planned) | `langwatch/ee/governance/compliance/` | Compliance reporting = enterprise ask |
+| SCIM provisioning + per-user Anthropic key flow | `langwatch/ee/admin/scim/` | unchanged | Already in ee/ |
+| Revocation automation (vendor admin APIs) | (planned C3+) | `langwatch/ee/governance/revocation/` | Enterprise glue, lawsuit-attractive |
+| Governance dashboard advanced widgets (multi-source rollup, anomaly count, compliance dial) | (split from existing) | `langwatch/ee/governance/dashboard/` | Cross-source rollup view = enterprise UX |
+| AnomalyRule composer + alert-destinations + compliance-posture + ocsf-export pages | `langwatch/src/components/governance/` | `langwatch/ee/governance/dashboard/` | Enterprise UI surfaces |
+| All 8 BDD specs `specs/ai-gateway/governance/*.feature` | unchanged path | unchanged | Specs document the contract; relocation cosmetic — keep where reviewers expect them |
+
+### UI gating pattern — 3 tiers (Alexis)
+
+> Per rchaves directive: "*always just grayed out on the frontend, allowing them to see it exists but being blocked.*"
+
+**Tier UI-1 — visible-but-locked surface (default)**: render the page chrome, table, composer button, empty state. Every interactive control disabled with an "Enterprise" inline badge. Persistent overlay banner: *"This is an Enterprise feature. You can preview it here. Contact sales to unlock."* Component: new `<EnterpriseLockedSurface tier="anomaly-rules">` wrapper, ~1-line per page.
+
+**Tier UI-2 — visible-with-disabled-options (mixed surfaces)**: surfaces where some options are apache2 and some are ee/. Example: IngestionSource composer's Source Type dropdown — `otel_generic` selectable, the other 6 grayed-out with `(Enterprise)` badge + tooltip. Extension to existing Chakra `<Select>` adapter, ~30 LOC.
+
+**Tier UI-3 — hidden (rare)**: low-level ops controls that depend on ee-only data plane and would confuse free-tier users (retention TTL knob, OCSF schema selector, cache rules). Conditional render behind `useActivePlan().isEnterprise`. Use sparingly — UI-1 converts; UI-3 doesn't.
+
+### 18-surface UI license inventory (Alexis)
+
+| URL | License | Tier | Notes |
+|---|---|---|---|
+| `/me` (personal usage) | apache2 | — | Solo-dev wedge |
+| `/me/settings` (PAT + budget readonly + devices) | apache2 | — | Free-tier essential |
+| `/[project]/settings/virtual-keys` | apache2 | — | Per-project VK CRUD |
+| `/[project]/settings/budgets` | apache2 | — | Per-project / per-VK / per-principal budgets |
+| `/[project]/settings/audit` | apache2 | — | Per-project audit log |
+| `/settings/routing-policies` | apache2 | — | Org-default + team-overrides |
+| `/settings/model-providers` | apache2 | — | Org/Team/Project provider scoping |
+| `/settings/usage` (subscription) | apache2 | — | Upgrade-CTA deep-link target |
+| `/governance` (top-level dashboard) | mixed | UI-1 base + UI-2 widgets | Apache2 shell + basic widgets; ee/-gated multi-source rollups + anomaly count |
+| `/settings/governance/setup` | apache2 | — | Free shows OTel + Personal-VK steps; ee/ steps behind "More with Enterprise →" disclosure |
+| `/settings/governance/ingestion-sources` | mixed | UI-2 on composer | List apache2 (1 source); composer source-type dropdown UI-2 |
+| `/settings/governance/anomaly-rules` | ee/ | UI-1 wrap | Visible+locked. Composer schema visible to free user; create disabled |
+| `/settings/governance/alert-destinations` | ee/ | UI-1 wrap | Same |
+| `/settings/governance/compliance-posture` | ee/ | UI-1 wrap | Framework matrix grayed out |
+| `/settings/governance/ocsf-export` | ee/ | UI-1 wrap | OCSF schema preview visible; activation locked |
+| `/settings/governance/retention-policies` | ee/ | UI-3 hidden | Free-tier retention is fixed at `thirty_days`; the knob doesn't exist |
+| `/settings/governance/cache-rules` | ee/ | UI-1 wrap | iter38/iter41 shipped — gate retroactively |
+| `/settings/groups` + `/settings/roles` | ee/ | UI-1 wrap | Existing early-return — refactor candidate |
+| `/settings/scim` | ee/ | UI-1 wrap | When personal-key SCIM ships |
+| `/settings/audit` (org-wide) | ee/ | UI-1 wrap | Per-project audit apache2; org-wide ee/ |
+
+### CLI gating
+
+The `langwatch` CLI binary stays apache2 (single binary; viral install surface). Subcommands that hit enterprise-only endpoints (`langwatch ingest list/health/tail` for ee/-only sources, `langwatch governance status` showing enterprise widgets) get **402 Payment Required** envelopes from `/api/auth/cli/governance/*` for non-enterprise orgs:
+
+```json
+{
+  "error": "enterprise_required",
+  "feature": "governance.multi_source_ingestion",
+  "upsell_url": "https://app.langwatch.ai/settings/usage"
+}
+```
+
+The CLI prints a friendly upsell message + the URL. No CLI binary split.
+
+### License-flip transition
+
+Two votes deferred to rchaves resolution (tagged at end of PM round-up below):
+
+- **Vote D**: Personal-key SSO (SCIM auto-provisioning of personal teams + policies) — apache2 vs `ee/`? Lane-A and lane-B lean apache2; precedent (GitLab CE) puts SAML in CE and SCIM/group-sync in EE. Defer to rchaves's call.
+- **Vote F**: BSL → Apache 2.0 license-flip TIMING — same PR as governance ee/ relocation, or separate prep PR landing first? Defer to rchaves's call (legal/strategy).
+
+---
+
+## Atomic-task Gantt — done / in-flight / next / GA
+
+> Atomic split of all work the team has done and will do, mapped to the gateway.md vision (Directions 1/2/3 + Phases 1A → 3D) and to the new license-relocation phase 4. Cross-lane sources: lane-S backend Gantt (Sergey) + lane-B UI roadmap (Alexis) + lane-A docs/PR/CLI Gantt (Andre).
+
+**Legend**: ✅ shipped · 🚧 in flight · ⏳ next (queued + ready to start) · 📋 backlog (post-GA / larger follow-up)
+**Lane prefix**: 🅐 lane-A (CLI/docs/PM) · 🅢 lane-S (backend) · 🅑 lane-B (UI/dogfood) · 🌐 cross-lane
+
+### Phase 1A — Personal IDE keys (Direction 1, P0) — APACHE 2.0
+
+| | Owner | Task |
+|---|---|---|
+| ✅ | 🅢 | `Project.isPersonal` + `Team.isPersonal` schema |
+| ✅ | 🅢 | `VirtualKey.ownerType` polymorphic owner pattern |
+| ✅ | 🅢 | Auto-create personal Team on user org-join |
+| ✅ | 🅢 | `virtualKey.issuePersonal()` endpoint |
+| ✅ | 🅐 | CLI binary: `langwatch login --device` (device-flow auth) |
+| ✅ | 🅐 | CLI: `langwatch claude` / `codex` / `cursor` / `gemini` wrappers |
+| ✅ | 🅐 | CLI: `langwatch shell` env-var injection + `logout-device` + `me` + `init-shell` |
+| ✅ | 🅑 | "My Usage" personal dashboard |
+| ✅ | 🅐 | Per-CLI-tool docs (claude-code/codex/cursor/gemini-cli with wrapper sections) |
+| ⏳ | 🅐 | Single-binary installers (`curl ... \| sh` / Homebrew tap / PowerShell `iex`) |
+
+### Phase 1B — Polish (Direction 1, P1) — APACHE 2.0
+
+| | Owner | Task |
+|---|---|---|
+| ✅ | 🅐 | Persona fork on `/ai-gateway/quickstart` (developer vs admin) |
+| ✅ | 🅑 | Fresh-admin reachability fix (`99dbc77e8`) |
+| ✅ | 🅑 | GovernanceLayout chrome (org chip + "Organization-scoped" indicator) |
+| ⏳ | 🅢 | Token refresh background job for CLI device-flow tokens |
+| ⏳ | 🅢 | Per-user budget enforcement (cascading strictest-wins) |
+| ⏳ | 🅑 | Admin user-activity report (cross-team) |
+
+### Phase 2A — Multi-source ingestion (Direction 2, P1) — UNIFIED SUBSTRATE (mostly Apache 2.0; multi-source fleet `ee/`)
+
+| | Owner | Task |
+|---|---|---|
+| ✅ | 🌐 | 8 BDD specs locking architecture invariants |
+| ✅ | 🅢 | Mechanical delete of parallel `gateway_activity_events` pipeline (`f3de1ae07`) |
+| ✅ | 🅢 | Shared OTLP parser extracted (`d62fa1c41`) |
+| ✅ | 🅢 | Schema: `Project.kind`, `IngestionSource.retentionClass` (`bdb137e6b`) |
+| ✅ | 🅑 | Layer-1 hidden Gov Project filter at `getAllForUser` (`94426716e`) |
+| ✅ | 🅢 | `ensureHiddenGovernanceProject` helper + composer wire-in (`e2c30961a`) |
+| ✅ | 🅢 | OTel receiver rewire to unified pipeline (`0d07ac371`) |
+| ✅ | 🅢 | Webhook receiver rewire to unified log pipeline (`33a8cf6d0`) |
+| ✅ | 🅑 | Composer drawer migration + screenshot recapture (`746971569` + `bfafe764f`) |
+| ✅ | 🅐 | parseOtlpBody parser-equivalence test, 18 unit (`38106f768`) |
+| ✅ | 🅐 | event_log durability test, 6 integration (`f25d713ab`) |
+| ✅ | 🅐 | `ensureHiddenGovernanceProject` lazy-ensure invariants test, 8 integration (`0a2b7e8d9`) |
+| ✅ | 🅐 | HTTP receiver end-to-end test, 13 integration (`d20a1b403`) |
+| ✅ | 🅐 | ADR-018 governance unified observability substrate (`53a5c4af9`) |
+| ✅ | 🅢 | ActivityMonitorService rewire onto trace_summaries + log_records (step 3a, `fd118131c`) |
+| ✅ | 🅢 | Step 3a integration test — 7 scenarios + cross-org Layer-1 (`66c897a08`) |
+| ⏳ | 🅢 | Step 3b: `governance_kpis` fold projection on trace-processing pipeline (~1d, 2 commits) |
+| ⏳ | 🅢 | Step 3c: Per-origin retention TTL hook on `recorded_spans` + `log_records` (CH TTL keyed off `Attributes['langwatch.governance.retention_class']`) |
+| ⏳ | 🅢 | Step 3d: `governance_ocsf_events` fold projection (Actor / Action / Target / Time / Severity) |
+| ⏳ | 🅢 | Step 3e: Anomaly reactor rewire onto `governance_kpis` fold |
+| ⏳ | 🅢 | Step 3f: OCSF v1.1 read tRPC procedure + REST adapter |
+| ⏳ | 🅑 | Live-data dashboard dogfood pass (post-3a) — replace iter22 $0/0 with real numbers |
+| ⏳ | 🅐 | Customer-facing docs flip (8 ingestion-source pages reframe + new compliance-architecture.mdx + retention.mdx + ocsf-export.mdx + observability/trace-vs-activity-ingestion.mdx flip) |
+
+### Phase 4 — License relocation + UI gating (NEW per rchaves directive 2026-04-28)
+
+| | Owner | Task |
+|---|---|---|
+| 🚧 | 🅐 | This PM proposal (license split + Gantt + product roundup) |
+| 🚧 | 🌐 | Cross-lane review of license-split + Gantt; pushback / consolidation |
+| 🚧 | 🅐 | Fold license-split + Gantt into PR-3524-DESCRIPTION.md (THIS COMMIT) |
+| ⏳ | 🅢 | 4a-1: `git mv` ingestion + helper + activity-monitor (cross-source split) → `langwatch/ee/governance/` |
+| ⏳ | 🅢 | 4a-2: `git mv` anomaly + folds (3b/3d) + retention (3c) + ocsf-export (3f) → `langwatch/ee/governance/` |
+| ⏳ | 🅑 | 4a-3: `git mv` governance UI components → `langwatch/ee/governance/dashboard/` |
+| ⏳ | 🅑 | 4b-1: New `<EnterpriseLockedSurface>` + `<EnterpriseLockedKpi>` components consuming `useActivePlan().isEnterprise` |
+| ⏳ | 🅑 | 4b-2: Wire UI-1 wrap on anomaly-rules / alert-destinations / compliance-posture / ocsf-export / cache-rules / groups / roles / scim / org-wide-audit |
+| ⏳ | 🅑 | 4b-3: Wire UI-2 source-type dropdown gate on IngestionSource composer |
+| ⏳ | 🅢 | 4b-4: Service-layer 403 at `IngestionSourceService.createSource` (1 source / `otel_generic` only / `thirty_days` only for non-enterprise) |
+| ⏳ | 🅢 | 4b-5: Service-layer 403 at every `api.governance.*` proc that reads ee/-only data |
+| ⏳ | 🅐 | 4b-6: CLI 402 Payment Required envelope from `/api/auth/cli/governance/*` for non-enterprise; CLI prints upsell |
+| ⏳ | 🅐 | 4b-7: Docs `docs/ai-gateway/governance/index.mdx` adds "Available on Enterprise plans" callout |
+| ⏳ | 🅢 | 4c-1: License-gate assertion test — non-enterprise org → 403 on every `api.governance.*` proc + receiver service-layer gates respected |
+| ⏳ | 🌐 | 4c-2: License headers — Apache 2.0 in `langwatch/src/`; Enterprise license in `langwatch/ee/` (per existing convention) |
+| ⏳ | 🅐 | 4c-3: Top-level `LICENSE` + `LICENSE-EE` files clarifying the split |
+| ⏳ | 🅐 | 4c-4: README.md update with open-core split + Apache 2.0 / Enterprise badges |
+
+### Phase 2C — Anomaly action layer (Direction 2, P2) — `ee/`
+
+| | Owner | Task |
+|---|---|---|
+| ✅ | 🅢 | `spend_spike` Live rule type |
+| ✅ | 🅑 | Composer trim — Preview-rule-types framing (`c4ea7bd60`) |
+| ⏳ | 🅢 | C3 dispatch: `triggerActionDispatch` (Slack / PagerDuty / SIEM webhook / email) |
+| ⏳ | 🅢 | Structured threshold-config schema per rule type |
+| 📋 | 🅢 | Live: `rate_limit`, `after_hours`, `pii_leak`, `unusual_actor` rule types |
+| 📋 | 🅢 | Revocation automation: Anthropic Admin API |
+| 📋 | 🅢 | Revocation automation: OpenAI Admin API |
+| 📋 | 🅢 | Revocation automation: Microsoft Power Platform |
+| 📋 | 🅢 | Revocation automation: Workato |
+
+### Phase 2D — Pull-mode connectors (Direction 2, P2) — `ee/`
+
+| | Owner | Task |
+|---|---|---|
+| ✅ | 🅢 | `copilot_studio` / `openai_compliance` / `claude_compliance` setup-contract-only |
+| ⏳ | 🅢 | `copilot_studio` puller worker |
+| ⏳ | 🅢 | `openai_compliance` puller worker |
+| ⏳ | 🅢 | `claude_compliance` puller worker |
+| ⏳ | 🅢 | Per-platform deeper webhook adapter: workato job-array unwrapping |
+| ⏳ | 🅢 | Per-platform deeper webhook adapter: s3_custom DSL parsing |
+
+### Phase 5 — GTM & release-readiness (round-up)
+
+| | Owner | Task |
+|---|---|---|
+| ⏳ | 🅢 | Volume regression test: 1k spans/sec sustained for 60s through `/api/ingest/otel/:sourceId` (Sergey-flagged hot-path: `ensureHiddenGovernanceProject` `findFirst` per-request needs cache) |
+| ⏳ | 🅢 | Cross-org concurrency test: 50 orgs × 100 concurrent first-mints |
+| ⏳ | 🅢 | Reactor backpressure test: when 3b/3e land, anomaly + governance_kpis + trace-summary all share trace-processing pipeline |
+| ⏳ | 🅢 | CH retention TTL atomicity test: span without retention attr (bug) defaults to 30d → wrong tier for `seven_years` source. Need TTL-mismatch alarm |
+| ⏳ | 🅢 | Receiver auth rate limiting (per-source Redis-token-bucket RPS limit) |
+| ⏳ | 🅢 | OCSF schema versioning column on the fold for graceful v1.1 → v1.2 upgrade |
+| ⏳ | 🅑 | Browser-QA pass on enterprise-gating: every governance surface verified to gray-out for non-enterprise plan |
+| ⏳ | 🅐 | Self-hosted compliance docs (`docs/self-hosting/compliance.mdx`) — what works in self-hosted Apache 2.0 vs requires Enterprise license |
+| ⏳ | 🅑 | Cross-org isolation smoke at HTTP receiver layer (orgA bearer can't read orgB sources) |
+| ⏳ | 🌐 | End-to-end customer dogfood smoke test (mint org → mint source → POST OTel → trace viewer + dashboard light up + Layer-1 non-leak) — automated in CI |
+| ⏳ | 🌐 | CodeRabbit / reviewer pass on `feat/governance-platform` PR before merge |
+| ⏳ | 🌐 | Squash + merge `feat/governance-platform` to main; tag release |
+
+### Phase 3 — Tamper-evidence + SIEM push (post-GA, named follow-ups)
+
+| | Owner | Task |
+|---|---|---|
+| 📋 | 🅢 | Cryptographic Merkle-root publication of `event_log` digests |
+| 📋 | 🅢 | Customer-rotatable signing keys + verification REST API |
+| 📋 | 🅢 | Per-org SIEM push management UI (Splunk HEC / Datadog / Sentinel) |
+| 📋 | 🅢 | DLQ + replay infrastructure for failed SIEM pushes |
+| 📋 | 🅢 | Tamper-evidence verification UI |
+
+### Critical path to "ship the governance pitch"
+
+The narrowest demo-able slice is now mostly done. Remaining for closed-loop merge:
+
+1. **Step 3b/3c/3d/3e/3f** (Sergey, ~3–5 days): folds + retention TTL + OCSF read API + anomaly reactor rewire
+2. **Phase 4 license relocation + UI gating** (cross-lane, ~2–3 days)
+3. **Live-data dogfood pass** (Alexis, ~half day post-3a) — proof-quality screenshots replacing iter22 $0/0
+4. **Customer-facing docs flip** (Andre, ~half day post-3b/3c)
+5. **Volume regression + cross-org concurrency tests** (Sergey, ~half day) — pre-GA gate
+6. **End-to-end smoke test in CI** (cross-lane, ~half day)
+
+Total to closed loop: **~5–8 working days** with 3 lanes in parallel.
+
+---
+
+## PM round-up — what's missing for production polish
+
+Cross-lane sources: lane-A (Andre), lane-B (Alexis at `.monitor-logs/lane-b-license-split-input.md` §5+§7), lane-S (Sergey backend gaps).
+
+### Customer-facing flow gaps
+
+1. **No first-time-admin tour.** A CTO landing on `/governance` for the first time gets the layout but no walkthrough. Needs a 3-step guided overlay: "1. Add a source 2. Send a test event 3. Watch it appear in your dashboard."
+2. **No "fire test event" button.** SecretModal shows a curl example but no in-product affordance to close the verify loop in 60 seconds.
+3. **No source-health degradation alert.** A source that goes silent for 24h stays "Active" until the rolling window flips. Should fire an internal anomaly: "ingestion-source went silent."
+4. **Onboarding checklist deep-nested.** First-source-mint is 3 clicks (Settings → Governance → Ingestion Sources → +Add). Collapse to single empty-state CTA on `/governance`.
+5. **Workspace switcher v2 (Alexis)**: Personal vs Team visual + chrome context indicator.
+6. **CLI↔Web bridge (Alexis)**: session URL print on `langwatch login` + OTel resource stamp + `langwatch dashboard` cmd.
+7. **No spend forecasting.** Dashboard shows current 7d/30d spend but nothing predicts "you'll hit your budget cap on day 23 of this month at current burn." High-value low-cost addition once ActivityMonitorService has the data.
+
+### UX polish gaps
+
+8. **Empty-state mid-state (Sergey)**: when source exists but no spans flowing → $0/0 with no diagnostic. Need "Source minted X minutes ago — first event expected within Y" hint.
+9. **Source detail page lacks rate-over-time sparkline (Sergey)**. Would help diagnose drops.
+10. **WorkspaceSwitcher Layer-1 invariant invisible to support staff (Sergey)**. `?show_internal=1` debug flag for triaging "missing project" reports.
+11. **CLI ingest commands gated behind `LANGWATCH_GOVERNANCE_PREVIEW=1` env var** — drop the gate when the feature is real; until then docs should call this out.
+12. **OTLP body shape varies subtly per source-type** — per-platform docs need a "Beyond minimum" section per source for vendor-specific attributes.
+13. **AnomalyRule composer drawer width is `lg` — cramped for descriptions**. Lane-B follow-up.
+
+### Backend production-quality gaps (Sergey)
+
+14. **Volume regression missing** — receiver rewire passed 13 unit-shape tests but no `1000 spans/sec for 60s`. Hidden-Gov-Project lazy-ensure does `prisma.findFirst` on EVERY request — needs cache.
+15. **Cross-org concurrency** — Andre's helper has 5-concurrent test for ONE org. Missing: 50 orgs × 100 concurrent first-mints. The slug-based collision check at `governanceProject.service.ts:82` is the linchpin under that load.
+16. **Reactor backpressure** — when 3b/3e land, anomaly reactor + governance_kpis fold + trace-summary fold all share the trace-processing pipeline. Need load test to verify priority ordering.
+17. **CH retention TTL atomicity** — when 3c lands, retention is attribute-keyed. If a span lands without the attribute (bug), it defaults to 30d → wrong tier for `seven_years` sources. Need TTL-mismatch alarm.
+18. **Receiver auth rate limiting** — `/api/ingest/{otel,webhook}/:sourceId` is unbounded. Leaked source secret = firehose. Need per-source Redis-token-bucket RPS limit.
+19. **OCSF schema versioning** — when 3d lands, v1.1 cooked into the fold. v1.2 is in draft. Need `OcsfSchemaVersion` column for graceful upgrade.
+
+### Dogfood gaps
+
+20. **Live-data dashboard screenshot for the PR doc** — iter22 shows $0/0 (pre-3a stub). Post-3a, Alexis re-runs the dogfood script and replaces shot #1 with a real-numbers version.
+21. **End-to-end smoke test in CI** — no CI job currently does the full mint-org → mint-source → POST OTLP → assert-dashboard-shows-it loop.
+22. **Cross-org isolation smoke at HTTP receiver** — tested in store + helper layers but not at the HTTP receiver layer with full request from org-A and verification org-B doesn't see anything.
+23. **No load test / performance assertion** — pre-GA blocker for enterprise sales calls.
+24. **Live `langwatch claude` dogfood GIF for the README/marketing** (Alexis §7).
+25. **No demo-data seed for fresh installs (Alexis §7)** — first-run-experience without dogfood is a $0/0 dashboard.
+
+### Testing gaps
+
+26. **No spec-driven tests yet** — 8 BDD specs describe scenarios; each scenario is implicitly proven by an integration test in another file. Could harden into explicit BDD test runs (probably defer to post-GA).
+27. **No license-split assertion test** — once relocation lands, defensive test in `ee/governance/__tests__/` that asserts non-enterprise org cannot reach `/api/ingest/*` regardless of valid Bearer.
+28. **No tamper-evidence spec test skeleton** — follow-up contract is named in `compliance-baseline.feature` but no skip-but-named scenarios. Pre-shipping the design.
+29. **Anomaly reactor needs idempotency test** — schema-level constraint exists; reactor itself untested under retry.
+30. **No real-world wire-shape fixtures (Sergey)** for non-OTel sources (workato/s3_custom/copilot_studio webhook bodies).
+
+### Documentation gaps
+
+31. **No `dev/docs/architecture/` rollup** of the unified-substrate decision. ADR-018 captures it but no engineering-onboarding-friendly diagram + flow doc.
+32. **No customer-facing migration story** for existing self-hosters from BSL → Apache 2.0 + ee/. What happens to their governance data on upgrade? Do they need a new license key?
+33. **No `LICENSE-EE` reviewable text** — blocker for licensing pivot.
+34. **No marketing-page outline for the open-core split** — public-facing pricing page.
+35. **`ee/` license-header CI check (Alexis §7)** — defensive regression against accidental file moves.
+
+### Deferred decisions for rchaves resolution
+
+- **Vote D**: Personal-key SSO (SCIM auto-provisioning of personal teams + policies) — apache2 vs `ee/`? Lane-A and lane-B lean apache2 (basic SAML in CE per GitLab precedent); SCIM/group-sync in EE. Need rchaves's call.
+- **Vote F**: BSL → Apache 2.0 license-flip TIMING — same PR as governance ee/ relocation, or separate prep PR landing first? Need rchaves's call.
+
+### Top 5 PM-hat recommendations (consolidated)
+
+1. **Land step 3b/3c (folds + retention TTL) before doing the ee/ relocation.** Folds are new code; relocating new code immediately is fine. Retention TTL is the compliance pricing axis; lock it before moving.
+2. **Do the ee/ relocation as 3 commits, one per lane** (4a-1 backend; 4a-2 backend; 4a-3 UI), so each lane reviews their slice independently. No big-bang refactor.
+3. **Block the merge on the live-data dogfood pass** (Alexis post-3a) and the end-to-end smoke test in CI (cross-lane). Without these the PR is shippable in form but not in confidence.
+4. **Defer tamper-evidence + revocation-automation completely** to a follow-up PR. Naming them as filed-not-shipped (already done in spec) is enough.
+5. **Add license-gate assertion test (4c-1)** as a hard gate before merge — defensive correctness against future license-bypass regressions.
+
+---
 
 - **Cryptographic tamper-evidence** (Merkle root publication + signing keys
   + verification REST API): filed-not-shipped. Hardening layer for the
