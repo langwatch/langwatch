@@ -75,7 +75,7 @@ importers:
         version: 6.21.3(@bull-board/ui@6.21.3)
       '@bull-board/hono':
         specifier: ^6.21.3
-        version: 6.21.3(hono@4.12.14)
+        version: 6.21.3(hono@4.12.15)
       '@chakra-ui/react':
         specifier: ^3.34.0
         version: 3.34.0(@emotion/react@11.14.0(@types/react@19.2.14)(react@19.2.5))(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
@@ -117,10 +117,10 @@ importers:
         version: 6.6.0
       '@hono/node-server':
         specifier: ^1.19.14
-        version: 1.19.14(hono@4.12.14)
+        version: 1.19.14(hono@4.12.15)
       '@hono/zod-validator':
         specifier: ^0.4.3
-        version: 0.4.3(hono@4.12.14)(zod@3.25.76)
+        version: 0.4.3(hono@4.12.15)(zod@3.25.76)
       '@hookform/resolvers':
         specifier: ^5.2.2
         version: 5.2.2(react-hook-form@7.72.1(react@19.2.5))
@@ -329,11 +329,11 @@ importers:
         specifier: ^4.7.9
         version: 4.7.9
       hono:
-        specifier: ^4.12.14
-        version: 4.12.14
+        specifier: ^4.12.15
+        version: 4.12.15
       hono-openapi:
         specifier: ^0.4.8
-        version: 0.4.8(@hono/zod-validator@0.4.3(hono@4.12.14)(zod@3.25.76))(hono@4.12.14)(openapi-types@12.1.3)(zod-openapi@4.2.4(zod@3.25.76))(zod@3.25.76)
+        version: 0.4.8(@hono/zod-validator@0.4.3(hono@4.12.15)(zod@3.25.76))(hono@4.12.15)(openapi-types@12.1.3)(zod-openapi@4.2.4(zod@3.25.76))(zod@3.25.76)
       immer:
         specifier: ^10.2.0
         version: 10.2.0
@@ -9324,8 +9324,8 @@ packages:
       zod-openapi:
         optional: true
 
-  hono@4.12.14:
-    resolution: {integrity: sha512-am5zfg3yu6sqn5yjKBNqhnTX7Cv+m00ox+7jbaKkrLMRJ4rAdldd1xPd/JzbBWspqaQv6RSTrgFN95EsfhC+7w==}
+  hono@4.12.15:
+    resolution: {integrity: sha512-qM0jDhFEaCBb4TxoW7f53Qrpv9RBiayUHo0S52JudprkhvpjIrGoU1mnnr29Fvd1U335ZFPZQY1wlkqgfGXyLg==}
     engines: {node: '>=16.9.0'}
 
   hono@4.12.4:
@@ -15270,12 +15270,12 @@ snapshots:
       '@bull-board/ui': 6.21.3
       redis-info: 3.1.0
 
-  '@bull-board/hono@6.21.3(hono@4.12.14)':
+  '@bull-board/hono@6.21.3(hono@4.12.15)':
     dependencies:
       '@bull-board/api': 6.21.3(@bull-board/ui@6.21.3)
       '@bull-board/ui': 6.21.3
       ejs: 5.0.2
-      hono: 4.12.14
+      hono: 4.12.15
 
   '@bull-board/ui@6.21.3':
     dependencies:
@@ -16107,13 +16107,13 @@ snapshots:
     dependencies:
       hono: 4.12.4
 
-  '@hono/node-server@1.19.14(hono@4.12.14)':
+  '@hono/node-server@1.19.14(hono@4.12.15)':
     dependencies:
-      hono: 4.12.14
+      hono: 4.12.15
 
-  '@hono/zod-validator@0.4.3(hono@4.12.14)(zod@3.25.76)':
+  '@hono/zod-validator@0.4.3(hono@4.12.15)(zod@3.25.76)':
     dependencies:
-      hono: 4.12.14
+      hono: 4.12.15
       zod: 3.25.76
 
   '@hookform/resolvers@5.2.2(react-hook-form@7.72.1(react@19.2.5))':
@@ -17035,7 +17035,7 @@ snapshots:
 
   '@modelcontextprotocol/sdk@1.29.0(@cfworker/json-schema@4.1.1)(zod@3.25.76)':
     dependencies:
-      '@hono/node-server': 1.19.14(hono@4.12.14)
+      '@hono/node-server': 1.19.14(hono@4.12.15)
       ajv: 8.18.0
       ajv-formats: 3.0.1(ajv@8.18.0)
       content-type: 1.0.5
@@ -17045,7 +17045,7 @@ snapshots:
       eventsource-parser: 3.0.6
       express: 5.2.1
       express-rate-limit: 8.3.2(express@5.2.1)
-      hono: 4.12.14
+      hono: 4.12.15
       jose: 6.2.2
       json-schema-typed: 8.0.2
       pkce-challenge: 5.0.1
@@ -24709,17 +24709,17 @@ snapshots:
     dependencies:
       react-is: 16.13.1
 
-  hono-openapi@0.4.8(@hono/zod-validator@0.4.3(hono@4.12.14)(zod@3.25.76))(hono@4.12.14)(openapi-types@12.1.3)(zod-openapi@4.2.4(zod@3.25.76))(zod@3.25.76):
+  hono-openapi@0.4.8(@hono/zod-validator@0.4.3(hono@4.12.15)(zod@3.25.76))(hono@4.12.15)(openapi-types@12.1.3)(zod-openapi@4.2.4(zod@3.25.76))(zod@3.25.76):
     dependencies:
       json-schema-walker: 2.0.0
       openapi-types: 12.1.3
     optionalDependencies:
-      '@hono/zod-validator': 0.4.3(hono@4.12.14)(zod@3.25.76)
-      hono: 4.12.14
+      '@hono/zod-validator': 0.4.3(hono@4.12.15)(zod@3.25.76)
+      hono: 4.12.15
       zod: 3.25.76
       zod-openapi: 4.2.4(zod@3.25.76)
 
-  hono@4.12.14: {}
+  hono@4.12.15: {}
 
   hono@4.12.4: {}
 
