@@ -116,6 +116,17 @@ type ExecuteRequest struct {
 	// useEvaluationExecution reducer can match streamed updates to the
 	// run it dispatched.
 	RunID string
+	// WorkflowVersionID identifies the workflow version associated with
+	// this evaluation run. Forwarded on the batch/log_results POST so
+	// the experiment dashboard can pin results to the version.
+	WorkflowVersionID string
+	// EvaluateOn selects the dataset slice ("full"/"test"/"train"/
+	// "specific"). Empty falls back to "full" — the default the Studio
+	// Evaluate button sends.
+	EvaluateOn string
+	// DatasetEntry is the row index for evaluate_on="specific" (single-row
+	// re-runs from the evaluation results table).
+	DatasetEntry *int
 }
 
 // ExecuteResult is what the engine returns. It mirrors the Python

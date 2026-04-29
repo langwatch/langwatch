@@ -85,6 +85,17 @@ type WorkflowRequest struct {
 	// Studio's startEvaluation hook). Unused for non-evaluation event
 	// types.
 	RunID string
+	// WorkflowVersionID is the persisted workflow version that owns this
+	// evaluation run. Used for the batch/log_results POST so the experiment
+	// dashboard can pin results to the version that produced them.
+	WorkflowVersionID string
+	// EvaluateOn selects the dataset slice to iterate ("full"/"test"/
+	// "train"/"specific"). Defaults to "full" when empty (the Studio
+	// Evaluate button's default).
+	EvaluateOn string
+	// DatasetEntry is the row index for evaluate_on="specific". Ignored
+	// otherwise.
+	DatasetEntry *int
 }
 
 // WorkflowResult is the engine's response, ready for JSON serialization.

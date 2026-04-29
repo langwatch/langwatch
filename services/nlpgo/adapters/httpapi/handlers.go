@@ -157,6 +157,11 @@ func decodeStudioClientEvent(r *http.Request, body []byte) (*app.WorkflowRequest
 		// Plumbed through to the engine so evaluation_state_change events
 		// carry the run_id Studio's reducer keys evaluations on.
 		RunID string `json:"run_id,omitempty"`
+		// Evaluation-only fields (execute_evaluation envelope):
+		// langwatch/src/optimization_studio/types/events.ts.
+		WorkflowVersionID string `json:"workflow_version_id,omitempty"`
+		EvaluateOn        string `json:"evaluate_on,omitempty"`
+		DatasetEntry      *int   `json:"dataset_entry,omitempty"`
 	}
 	if err := json.Unmarshal(innerBytes, &inner); err != nil {
 		e := herr.New(r.Context(), domain.ErrBadRequest, herr.M{
@@ -180,16 +185,19 @@ func decodeStudioClientEvent(r *http.Request, body []byte) (*app.WorkflowRequest
 		threadID = r.Header.Get("X-LangWatch-Thread-Id")
 	}
 	return &app.WorkflowRequest{
-		WorkflowJSON: inner.Workflow,
-		Inputs:       normalizeInputs(inner.Inputs),
-		Origin:       origin,
-		TraceID:      inner.TraceID,
-		ProjectID:    inner.ProjectID,
-		ThreadID:     threadID,
-		NodeID:       inner.NodeID,
-		APIKey:       peekWorkflowAPIKey(inner.Workflow),
-		Type:         peek.Type,
-		RunID:        inner.RunID,
+		WorkflowJSON:      inner.Workflow,
+		Inputs:            normalizeInputs(inner.Inputs),
+		Origin:            origin,
+		TraceID:           inner.TraceID,
+		ProjectID:         inner.ProjectID,
+		ThreadID:          threadID,
+		NodeID:            inner.NodeID,
+		APIKey:            peekWorkflowAPIKey(inner.Workflow),
+		Type:              peek.Type,
+		RunID:             inner.RunID,
+		WorkflowVersionID: inner.WorkflowVersionID,
+		EvaluateOn:        inner.EvaluateOn,
+		DatasetEntry:      inner.DatasetEntry,
 	}, nil
 }
 

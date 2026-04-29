@@ -122,6 +122,18 @@ func (e *Engine) ExecuteStream(ctx context.Context, req ExecuteRequest, opts Exe
 		// langwatch_nlp/studio/execute/{execute_flow.py,
 		// execute_evaluation.py} — start/end/error event family.
 		isEval := req.Type == "execute_evaluation"
+		// execute_evaluation needs more than the per-run state events:
+		// it iterates dataset entries, runs the workflow per entry,
+		// emits progress events along the way, and posts batches to
+		// /api/evaluations/batch/log_results so the experiment-runs
+		// page populates. Without the batch POST, the SSE frames land
+		// cleanly but the UI never gets data — rchaves dogfood
+		// 2026-04-29 saw run_kM3T... on the wire but no row on
+		// /experiments/<id>. Delegate the whole flow.
+		if isEval {
+			e.executeEvaluationStream(ctx, req, traceID, started, out)
+			return
+		}
 		emit(ctx, out, workflowRunningEvent(req, traceID, started, isEval))
 		for _, layer := range plan.Layers {
 			if err := ctx.Err(); err != nil {

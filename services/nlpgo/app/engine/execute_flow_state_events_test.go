@@ -160,12 +160,23 @@ func TestExecuteStream_ExecuteComponentDoesNotEmitWorkflowStateEvents(t *testing
 // reducer flips workflow.state.evaluation.status. Without this the eval
 // run hits the same 20s "Timeout starting workflow execution" toast
 // even though the dataset rows complete on the wire.
+//
+// The eval path also iterates the workflow over each dataset entry and
+// emits a per-entry progress event so the running state stays "fresh"
+// for long evaluations (mirrors Python's EvaluationReporting.evaluate_
+// and_report → queue.put_nowait per row).
 func TestExecuteStream_EvaluationEmitsEvaluationStateEvents(t *testing.T) {
 	eng := New(Options{})
 	wf := &dsl.Workflow{
 		WorkflowID: "wf_eval",
+		APIKey:     "k",
 		Nodes: []dsl.Node{
-			{ID: "entry", Type: dsl.ComponentEntry},
+			{ID: "entry", Type: dsl.ComponentEntry, Data: dsl.Component{
+				Outputs: []dsl.Field{{Identifier: "input", Type: dsl.FieldTypeStr}},
+				Dataset: &dsl.NodeDataset{Inline: &dsl.DatasetInline{
+					Records: map[string][]any{"input": {"hello"}},
+				}},
+			}},
 			{ID: "end", Type: dsl.ComponentEnd},
 		},
 		Edges: []dsl.Edge{
@@ -174,12 +185,13 @@ func TestExecuteStream_EvaluationEmitsEvaluationStateEvents(t *testing.T) {
 	}
 
 	events, err := eng.ExecuteStream(context.Background(), ExecuteRequest{
-		Workflow: wf,
-		Inputs:   map[string]any{"input": "hello"},
-		TraceID:  "trace_eval",
-		Type:     "execute_evaluation",
-		RunID:    "run_abc123",
-		Origin:   "evaluation",
+		Workflow:   wf,
+		Inputs:     map[string]any{"input": "hello"},
+		TraceID:    "trace_eval",
+		Type:       "execute_evaluation",
+		RunID:      "run_abc123",
+		Origin:     "evaluation",
+		EvaluateOn: "full",
 	}, ExecuteStreamOptions{})
 	require.NoError(t, err)
 
@@ -193,8 +205,8 @@ func TestExecuteStream_EvaluationEmitsEvaluationStateEvents(t *testing.T) {
 		"execute_evaluation must NOT emit execution_state_change — that slot is the workflow-flow reducer, not the evaluation reducer")
 
 	evalEvents := filterByType(collected, "evaluation_state_change")
-	require.Len(t, evalEvents, 2,
-		"execute_evaluation emits running → success on a clean run, just like execute_flow's parallel pair")
+	require.GreaterOrEqual(t, len(evalEvents), 3,
+		"execute_evaluation emits at least running → progress(per row) → success — got %d", len(evalEvents))
 
 	first := evalEvents[0]
 	firstES, ok := first.Payload["evaluation_state"].(map[string]any)
@@ -203,32 +215,46 @@ func TestExecuteStream_EvaluationEmitsEvaluationStateEvents(t *testing.T) {
 	assert.Equal(t, "run_abc123", firstES["run_id"],
 		"run_id round-trips so Studio's useEvaluationExecution.scheduleTimeout can match the streamed update to the run it dispatched")
 
-	second := evalEvents[1]
-	secondES, ok := second.Payload["evaluation_state"].(map[string]any)
+	last := evalEvents[len(evalEvents)-1]
+	lastES, ok := last.Payload["evaluation_state"].(map[string]any)
 	require.True(t, ok)
-	assert.Equal(t, "success", secondES["status"])
-	assert.Equal(t, "run_abc123", secondES["run_id"])
-	ts, ok := secondES["timestamps"].(map[string]any)
+	assert.Equal(t, "success", lastES["status"])
+	assert.Equal(t, "run_abc123", lastES["run_id"])
+	ts, ok := lastES["timestamps"].(map[string]any)
 	require.True(t, ok)
 	assert.Contains(t, ts, "started_at")
 	assert.Contains(t, ts, "finished_at")
+
+	// Middle event must carry the progress/total counters Studio
+	// renders the per-row spinner from.
+	mid := evalEvents[len(evalEvents)-2]
+	midES, ok := mid.Payload["evaluation_state"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "running", midES["status"])
+	assert.EqualValues(t, 1, midES["progress"], "progress must be incremented per row")
+	assert.EqualValues(t, 1, midES["total"], "total must equal the row count")
 }
 
 // TestExecuteStream_EvaluationErrorEmitsEvaluationErrorEvent pins the
-// eval-path error contract — running → error with run_id stamped so
-// Studio can match the failure to the run it dispatched and surface
-// the message via alertOnError().
+// eval-path error contract — when the evaluation can't even start
+// (here: entry node has no inline dataset, the error path before
+// per-row iteration), Studio's reducer still gets running → error
+// with run_id so it can render the alertOnError toast. Per-row engine
+// errors do NOT abort the whole eval (Python parity: DSPy Evaluate's
+// provide_traceback=True continues past row failures).
 func TestExecuteStream_EvaluationErrorEmitsEvaluationErrorEvent(t *testing.T) {
 	eng := New(Options{})
 	wf := &dsl.Workflow{
 		WorkflowID: "wf_eval_error",
+		APIKey:     "k",
 		Nodes: []dsl.Node{
+			// Entry node missing the inline dataset — selectEvaluationEntries
+			// rejects this up-front so the eval can't iterate.
 			{ID: "entry", Type: dsl.ComponentEntry},
-			// code node with no Code executor wired — deterministic failure
-			{ID: "code-1", Type: dsl.ComponentCode},
+			{ID: "end", Type: dsl.ComponentEnd},
 		},
 		Edges: []dsl.Edge{
-			{Source: "entry", SourceHandle: "outputs.input", Target: "code-1", TargetHandle: "inputs.input"},
+			{Source: "entry", SourceHandle: "outputs.input", Target: "end", TargetHandle: "inputs.input"},
 		},
 	}
 
@@ -244,7 +270,12 @@ func TestExecuteStream_EvaluationErrorEmitsEvaluationErrorEvent(t *testing.T) {
 
 	collected := drain(events)
 	evalEvents := filterByType(collected, "evaluation_state_change")
-	require.Len(t, evalEvents, 2, "running → error: still 2 eval-state events on the failure path")
+	require.Len(t, evalEvents, 2, "running → error: still 2 eval-state events on the dataset-misconfigured failure path")
+
+	first := evalEvents[0]
+	firstES, ok := first.Payload["evaluation_state"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "running", firstES["status"])
 
 	last := evalEvents[len(evalEvents)-1]
 	es, ok := last.Payload["evaluation_state"].(map[string]any)
