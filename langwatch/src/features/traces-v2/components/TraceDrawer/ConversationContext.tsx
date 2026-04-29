@@ -8,8 +8,8 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { AnimatePresence, motion } from "motion/react";
-import { memo, useEffect, useRef, useState } from "react";
+import { AnimatePresence, motion, type Variants } from "motion/react";
+import { memo, useCallback, useEffect, useMemo, useRef } from "react";
 import {
   LuArrowLeft,
   LuArrowRight,
@@ -19,9 +19,9 @@ import {
 } from "react-icons/lu";
 import { Tooltip } from "~/components/ui/tooltip";
 import {
-  type ThreadTurn,
-  useThreadContext,
-} from "../../hooks/useThreadContext";
+  type ConversationTurn,
+  useConversationContext,
+} from "../../hooks/useConversationContext";
 import { useTraceDrawerNavigation } from "../../hooks/useTraceDrawerNavigation";
 import { useDrawerStore } from "../../stores/drawerStore";
 import { STATUS_COLORS } from "../../utils/formatters";
@@ -41,7 +41,7 @@ interface ConversationRow {
   text: string;
   /** "previous" / "current" / "next" relative to the visible trace */
   position: "previous" | "current" | "next";
-  status: ThreadTurn["status"];
+  status: ConversationTurn["status"];
   /** True when the slot has no real turn — render as a "boundary" hint. */
   isPlaceholder?: boolean;
   /** Boundary kind for placeholders: "start" or "end" of conversation. */
@@ -49,6 +49,20 @@ interface ConversationRow {
 }
 
 const MAX_PREVIEW = 140;
+
+// Hoisted so each render of ConversationContext doesn't re-allocate the
+// variants object (and so `motion` doesn't see fresh references and
+// re-evaluate variants resolution unnecessarily).
+const SLIDE_VARIANTS: Variants = {
+  enter: (dir: number) => ({ y: dir * 16, opacity: 0 }),
+  center: { y: 0, opacity: 1 },
+  exit: (dir: number) => ({ y: -dir * 16, opacity: 0 }),
+};
+
+// Quick tween instead of a spring — tested settle was 250-350ms with the
+// spring config; a 160ms ease-out reads as much snappier without losing
+// the bookshelf direction cue.
+const SLIDE_TRANSITION = { duration: 0.16, ease: "easeOut" as const };
 
 function truncate(s: string): string {
   const flat = s.replace(/\s+/g, " ").trim();
@@ -154,9 +168,9 @@ function buildRows({
   current,
   next,
 }: {
-  previous: ThreadTurn | null;
-  current: ThreadTurn | null;
-  next: ThreadTurn | null;
+  previous: ConversationTurn | null;
+  current: ConversationTurn | null;
+  next: ConversationTurn | null;
 }): ConversationRow[] {
   // Always returns exactly 3 rows so the section's height is stable. Missing
   // prev/next slots become "Start of conversation" / "End of conversation"
@@ -239,43 +253,59 @@ export const ConversationContext = memo(function ConversationContext({
 }: ConversationContextProps) {
   const { navigateToTrace } = useTraceDrawerNavigation();
   const viewMode = useDrawerStore((s) => s.viewMode);
-  const ctx = useThreadContext(conversationId, traceId);
+  const ctx = useConversationContext(conversationId, traceId);
 
   // Direction the user is moving in the conversation thread, derived from
   // change in thread position. Drives the bookshelf slide on the row strip:
-  // -1 = forward (J), +1 = backward (K), 0 = first render / non-thread nav.
+  // +1 = forward (J), -1 = backward (K). The sign feeds AnimatePresence's
+  // `custom`, which the variants use as: enter at y = dir*24 (forward
+  // means new content enters from below, sliding up into place; backward
+  // means it enters from above).
   const prevPosRef = useRef<number | null>(null);
-  const [navDirection, setNavDirection] = useState<-1 | 0 | 1>(0);
-  useEffect(() => {
-    const next = ctx.position;
+  const lastDirectionRef = useRef<-1 | 1>(1);
+  const navDirection: -1 | 1 = (() => {
     const prev = prevPosRef.current;
-    prevPosRef.current = next;
+    const next = ctx.position;
     if (prev == null || !next || prev === next) {
-      setNavDirection(0);
-      return;
+      return lastDirectionRef.current;
     }
-    setNavDirection(next > prev ? -1 : 1);
-  }, [ctx.position, traceId]);
-
-  if (!conversationId) return null;
-
-  const current = ctx.turns.find((t) => t.traceId === traceId) ?? null;
-  const rows = buildRows({
-    previous: ctx.previous,
-    current,
-    next: ctx.next,
+    return next > prev ? 1 : -1;
+  })();
+  // Commit refs after the render so the next render's compute sees them.
+  useEffect(() => {
+    prevPosRef.current = ctx.position;
+    lastDirectionRef.current = navDirection;
   });
 
-  const navigate = (id: string) => {
-    if (id === traceId) return;
-    const turn = ctx.turns.find((t) => t.traceId === id);
-    navigateToTrace({
-      fromTraceId: traceId,
-      fromViewMode: viewMode,
-      toTraceId: id,
-      toTimestamp: turn?.timestamp,
-    });
-  };
+  // Memo before the early `null` return so the hook order stays stable
+  // when this component goes from "no conversation" → "conversation".
+  const current = useMemo(
+    () => ctx.turns.find((t) => t.traceId === traceId) ?? null,
+    [ctx.turns, traceId],
+  );
+  // `buildRows` runs `extractReadableSnippet` up to 6 times — each one a
+  // potential JSON parse on the input/output payload. Cache the result so
+  // re-renders during the transition don't re-parse.
+  const rows = useMemo(
+    () => buildRows({ previous: ctx.previous, current, next: ctx.next }),
+    [ctx.previous, current, ctx.next],
+  );
+
+  const navigate = useCallback(
+    (id: string) => {
+      if (id === traceId) return;
+      const turn = ctx.turns.find((t) => t.traceId === id);
+      navigateToTrace({
+        fromTraceId: traceId,
+        fromViewMode: viewMode,
+        toTraceId: id,
+        toTimestamp: turn?.timestamp,
+      });
+    },
+    [traceId, ctx.turns, navigateToTrace, viewMode],
+  );
+
+  if (!conversationId) return null;
 
   return (
     <Box paddingX={4}>
@@ -367,23 +397,11 @@ export const ConversationContext = memo(function ConversationContext({
             <motion.div
               key={traceId}
               custom={navDirection}
-              variants={{
-                enter: (dir: number) => ({
-                  y: dir === 0 ? 0 : dir * 24,
-                  opacity: dir === 0 ? 1 : 0,
-                }),
-                center: { y: 0, opacity: 1 },
-                exit: (dir: number) => ({ y: -dir * 24, opacity: 0 }),
-              }}
+              variants={SLIDE_VARIANTS}
               initial="enter"
               animate="center"
               exit="exit"
-              transition={{
-                type: "spring",
-                stiffness: 600,
-                damping: 42,
-                mass: 0.5,
-              }}
+              transition={SLIDE_TRANSITION}
             >
               <VStack align="stretch" gap={0}>
                 {rows.map((row, i) => (
@@ -391,9 +409,7 @@ export const ConversationContext = memo(function ConversationContext({
                     key={row.key}
                     row={row}
                     isLast={i === rows.length - 1}
-                    onClick={() =>
-                      row.isPlaceholder ? undefined : navigate(row.traceId)
-                    }
+                    onSelect={navigate}
                   />
                 ))}
               </VStack>
@@ -405,17 +421,22 @@ export const ConversationContext = memo(function ConversationContext({
   );
 });
 
-function ConversationRow({
+const ConversationRow = memo(function ConversationRow({
   row,
   isLast,
-  onClick,
+  onSelect,
 }: {
   row: ConversationRow;
   isLast: boolean;
-  onClick: () => void;
+  /** Stable callback from the parent — the row decides if it fires. */
+  onSelect: (traceId: string) => void;
 }) {
   const isCurrent = row.position === "current";
   const isPlaceholder = !!row.isPlaceholder;
+  const handleClick = useCallback(() => {
+    if (isPlaceholder || isCurrent) return;
+    onSelect(row.traceId);
+  }, [isPlaceholder, isCurrent, onSelect, row.traceId]);
   // Scenario mode swaps icon + accent so the prev/curr/next chips line up
   // with the bubble headers in the body of the drawer.
   const visuals = useDisplayRoleVisuals(row.role);
@@ -476,11 +497,11 @@ function ConversationRow({
         gap={2.5}
         paddingX={3}
         paddingY={2}
-        bg={isCurrent ? "bg.emphasized" : "transparent"}
+        bg={isCurrent ? "blue.subtle" : "transparent"}
         borderBottomWidth={isLast ? 0 : "1px"}
         borderColor="border.muted"
         cursor={isCurrent ? "default" : "pointer"}
-        onClick={isCurrent ? undefined : onClick}
+        onClick={isCurrent ? undefined : handleClick}
         _hover={isCurrent ? undefined : { bg: "bg.muted" }}
         transition="background 0.12s ease"
         textAlign="left"
@@ -500,7 +521,7 @@ function ConversationRow({
                       "inset 0 0 0 1px color-mix(in srgb, var(--chakra-colors-blue-500) 35%, transparent)",
                   },
                   "100%": {
-                    backgroundColor: "var(--chakra-colors-bg-emphasized)",
+                    backgroundColor: "var(--chakra-colors-blue-subtle)",
                     boxShadow: "inset 0 0 0 1px transparent",
                   },
                 },
@@ -536,4 +557,4 @@ function ConversationRow({
       </Flex>
     </Tooltip>
   );
-}
+});

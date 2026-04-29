@@ -16,14 +16,28 @@ interface TraceHistoryEntry {
   viewMode: DrawerViewMode;
 }
 
-interface DrawerState {
-  isOpen: boolean;
-  isMaximized: boolean;
-  traceId: string | null;
-  selectedSpanId: string | null;
+/**
+ * The slice of drawer state that is mirrored into the URL. Owning these in
+ * one shape keeps the URL ↔ store sync hook to a single diff + push.
+ */
+export interface DrawerUrlState {
   viewMode: DrawerViewMode;
   vizTab: VizTab;
   activeTab: DrawerTab;
+  selectedSpanId: string | null;
+}
+
+interface DrawerState extends DrawerUrlState {
+  isOpen: boolean;
+  isMaximized: boolean;
+  shortcutsOpen: boolean;
+  traceId: string | null;
+  /**
+   * Trace's approximate occurredAt (ms epoch). Threaded into per-trace
+   * queries as a partition-pruning hint on `stored_spans`.
+   */
+  occurredAtMs: number | null;
+  pinnedSpanIds: string[];
 
   eventsExpanded: boolean;
   evalsExpanded: boolean;
@@ -31,63 +45,146 @@ interface DrawerState {
 
   traceBackStack: TraceHistoryEntry[];
 
-  openTrace: (traceId: string) => void;
+  openTrace: (traceId: string, occurredAtMs?: number | null) => void;
   closeDrawer: () => void;
-  toggleTrace: (traceId: string) => void;
   selectSpan: (spanId: string) => void;
   clearSpan: () => void;
   setViewMode: (mode: DrawerViewMode) => void;
   setVizTab: (tab: VizTab) => void;
   setActiveTab: (tab: DrawerTab) => void;
+  setMaximized: (value: boolean) => void;
   toggleMaximized: () => void;
+  setShortcutsOpen: (value: boolean) => void;
+  pinSpan: (spanId: string) => void;
+  unpinSpan: (spanId: string) => void;
+  clearPinnedSpans: () => void;
   toggleAccordion: (section: AccordionSection) => void;
   pushTraceHistory: (entry: TraceHistoryEntry) => void;
   popTraceHistory: () => TraceHistoryEntry | null;
-  clearTraceHistory: () => void;
+  /** Apply URL-derived state to the store (mount hydration, popstate). */
+  hydrateUrlState: (next: Partial<DrawerUrlState>) => void;
 }
 
+interface InitialFromURL extends DrawerUrlState {
+  traceId: string | null;
+  occurredAtMs: number | null;
+  isOpen: boolean;
+}
+
+function isViewMode(value: string | null): value is DrawerViewMode {
+  return value === "trace" || value === "conversation";
+}
+
+function isVizTab(value: string | null): value is VizTab {
+  return (
+    value === "waterfall" ||
+    value === "flame" ||
+    value === "spanlist" ||
+    value === "topology" ||
+    value === "sequence"
+  );
+}
+
+function isDrawerTab(value: string | null): value is DrawerTab {
+  return (
+    value === "summary" ||
+    value === "span" ||
+    value === "llm" ||
+    value === "prompts"
+  );
+}
+
+/**
+ * Read drawer state out of the URL synchronously at module load. Without
+ * this, a hard reload onto `?drawer.open=traceV2Details&drawer.traceId=…`
+ * would render the drawer once with `traceId === null` and any consumer
+ * reading from the store gets a "trace not found" flash before the URL
+ * sync effect fires.
+ */
+function readInitialFromURL(): InitialFromURL {
+  const fallback: InitialFromURL = {
+    traceId: null,
+    occurredAtMs: null,
+    selectedSpanId: null,
+    viewMode: "trace",
+    vizTab: "waterfall",
+    activeTab: "summary",
+    isOpen: false,
+  };
+  if (typeof window === "undefined") return fallback;
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const isOpen = params.get("drawer.open") === "traceV2Details";
+    const traceId = params.get("drawer.traceId");
+    const tRaw = params.get("drawer.t");
+    const t = tRaw ? Number(tRaw) : NaN;
+    const occurredAtMs = Number.isFinite(t) && t > 0 ? t : null;
+    const selectedSpanId = params.get("drawer.span");
+    const mode = params.get("drawer.mode");
+    const vizRaw = params.get("drawer.viz");
+    const tabRaw = params.get("drawer.tab");
+
+    const viewMode: DrawerViewMode = isViewMode(mode) ? mode : "trace";
+    const vizTab: VizTab = isVizTab(vizRaw) ? vizRaw : "waterfall";
+    const activeTab: DrawerTab = isDrawerTab(tabRaw)
+      ? tabRaw
+      : selectedSpanId
+        ? "span"
+        : "summary";
+
+    return {
+      traceId,
+      occurredAtMs,
+      selectedSpanId,
+      viewMode,
+      vizTab,
+      activeTab,
+      isOpen: isOpen && !!traceId,
+    };
+  } catch {
+    return fallback;
+  }
+}
+
+const initial = readInitialFromURL();
+
 export const useDrawerStore = create<DrawerState>((set, get) => ({
-  isOpen: false,
+  isOpen: initial.isOpen,
   isMaximized: false,
-  traceId: null,
-  selectedSpanId: null,
-  viewMode: "trace",
-  vizTab: "waterfall",
-  activeTab: "summary",
+  shortcutsOpen: false,
+  traceId: initial.traceId,
+  occurredAtMs: initial.occurredAtMs,
+  selectedSpanId: initial.selectedSpanId,
+  viewMode: initial.viewMode,
+  vizTab: initial.vizTab,
+  activeTab: initial.activeTab,
+  pinnedSpanIds: [],
   eventsExpanded: false,
   evalsExpanded: false,
   conversationExpanded: false,
 
   traceBackStack: [],
 
-  openTrace: (traceId) =>
+  openTrace: (traceId, occurredAtMs) =>
     set({
       isOpen: true,
       traceId,
+      occurredAtMs: occurredAtMs ?? null,
       selectedSpanId: null,
       activeTab: "summary",
+      pinnedSpanIds: [],
     }),
 
   closeDrawer: () =>
     set({
       isOpen: false,
       isMaximized: false,
+      shortcutsOpen: false,
       traceId: null,
+      occurredAtMs: null,
       selectedSpanId: null,
+      pinnedSpanIds: [],
       traceBackStack: [],
-    }),
-
-  toggleTrace: (traceId) =>
-    set((s) => {
-      if (s.isOpen && s.traceId === traceId) {
-        return { isOpen: false, traceId: null, selectedSpanId: null };
-      }
-      return {
-        isOpen: true,
-        traceId,
-        selectedSpanId: null,
-        activeTab: "summary",
-      };
     }),
 
   selectSpan: (spanId) => set({ selectedSpanId: spanId, activeTab: "span" }),
@@ -97,7 +194,34 @@ export const useDrawerStore = create<DrawerState>((set, get) => ({
   setViewMode: (mode) => set({ viewMode: mode }),
   setVizTab: (tab) => set({ vizTab: tab }),
   setActiveTab: (tab) => set({ activeTab: tab }),
+  setMaximized: (value) => set({ isMaximized: value }),
   toggleMaximized: () => set((s) => ({ isMaximized: !s.isMaximized })),
+  setShortcutsOpen: (value) => set({ shortcutsOpen: value }),
+
+  pinSpan: (spanId) =>
+    set((s) =>
+      s.pinnedSpanIds.includes(spanId)
+        ? s
+        : { pinnedSpanIds: [...s.pinnedSpanIds, spanId] },
+    ),
+
+  unpinSpan: (spanId) =>
+    set((s) => {
+      if (!s.pinnedSpanIds.includes(spanId)) return s;
+      const next: Partial<DrawerState> = {
+        pinnedSpanIds: s.pinnedSpanIds.filter((id) => id !== spanId),
+      };
+      // Unpinning the active span tab clears the selection so we don't
+      // leave a hanging "ghost" tab pointing at a span that's no longer
+      // part of the strip.
+      if (s.selectedSpanId === spanId) {
+        next.selectedSpanId = null;
+        next.activeTab = "summary";
+      }
+      return next;
+    }),
+
+  clearPinnedSpans: () => set({ pinnedSpanIds: [] }),
 
   toggleAccordion: (section) =>
     set((s) => {
@@ -132,5 +256,26 @@ export const useDrawerStore = create<DrawerState>((set, get) => ({
     return previous;
   },
 
-  clearTraceHistory: () => set({ traceBackStack: [] }),
+  hydrateUrlState: (next) =>
+    set((s) => {
+      const patch: Partial<DrawerState> = {};
+      if (next.viewMode !== undefined && next.viewMode !== s.viewMode) {
+        patch.viewMode = next.viewMode;
+      }
+      if (next.vizTab !== undefined && next.vizTab !== s.vizTab) {
+        patch.vizTab = next.vizTab;
+      }
+      if (next.activeTab !== undefined && next.activeTab !== s.activeTab) {
+        patch.activeTab = next.activeTab;
+      }
+      if (
+        next.selectedSpanId !== undefined &&
+        next.selectedSpanId !== s.selectedSpanId
+      ) {
+        patch.selectedSpanId = next.selectedSpanId;
+      }
+      return Object.keys(patch).length === 0 ? s : patch;
+    }),
 }));
+
+export { isViewMode, isVizTab, isDrawerTab };

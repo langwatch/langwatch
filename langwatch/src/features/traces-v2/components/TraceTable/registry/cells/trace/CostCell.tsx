@@ -4,7 +4,7 @@ import { formatCost } from "../../../../../utils/formatters";
 import { MonoCell } from "../../../MonoCell";
 import type { CellDef } from "../../types";
 
-export const CostCell: CellDef<TraceListItem> = {
+export const CostCell = {
   id: "cost",
   label: "Cost",
   render: ({ row }) => (
@@ -15,4 +15,4 @@ export const CostCell: CellDef<TraceListItem> = {
       {formatCost(row.totalCost, row.tokensEstimated)}
     </Text>
   ),
-};
+} as const satisfies CellDef<TraceListItem>;

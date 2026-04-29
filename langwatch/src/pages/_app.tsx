@@ -17,7 +17,7 @@ const interFontFamily = "'Inter', sans-serif";
 export const system = createSystem(defaultConfig, {
   globalCss: {
     body: {
-      background: { _light: "{colors.gray.100}", _dark: "{colors.gray.900}" },
+      background: { _light: "{colors.gray.100}", _dark: "{colors.zinc.900}" },
       fontSize: "14px",
       color: { _light: "{colors.gray.900}", _dark: "{colors.gray.50}" },
     },
@@ -68,22 +68,22 @@ export const system = createSystem(defaultConfig, {
         // Palette-specific semantic tokens
         gray: {
           solid: {
-            value: { _light: "{colors.gray.200}", _dark: "{colors.gray.700}" },
+            value: { _light: "{colors.gray.200}", _dark: "{colors.zinc.700}" },
           },
           hover: {
-            value: { _light: "{colors.gray.300}", _dark: "{colors.gray.600}" },
+            value: { _light: "{colors.gray.300}", _dark: "{colors.zinc.600}" },
           },
           contrast: {
             value: { _light: "{colors.gray.800}", _dark: "{colors.gray.100}" },
           },
           subtle: {
-            value: { _light: "{colors.gray.50}", _dark: "{colors.gray.800}" },
+            value: { _light: "{colors.gray.50}", _dark: "{colors.zinc.800}" },
           },
           muted: {
-            value: { _light: "{colors.gray.100}", _dark: "{colors.gray.700}" },
+            value: { _light: "{colors.gray.100}", _dark: "{colors.zinc.700}" },
           },
           emphasized: {
-            value: { _light: "{colors.gray.400}", _dark: "{colors.gray.600}" },
+            value: { _light: "{colors.gray.400}", _dark: "{colors.zinc.600}" },
           },
           fg: {
             value: { _light: "{colors.gray.700}", _dark: "{colors.gray.200}" },
@@ -381,10 +381,10 @@ export const system = createSystem(defaultConfig, {
             value: { _light: "{colors.gray.600}", _dark: "{colors.gray.400}" },
           },
           bgActive: {
-            value: { _light: "{colors.gray.200}", _dark: "{colors.gray.800}" },
+            value: { _light: "{colors.gray.200}", _dark: "{colors.zinc.700}" },
           },
           bgHover: {
-            value: { _light: "{colors.gray.200}", _dark: "{colors.gray.800}" },
+            value: { _light: "{colors.gray.200}", _dark: "{colors.zinc.800}" },
           },
         },
 
@@ -402,43 +402,48 @@ export const system = createSystem(defaultConfig, {
         bg: {
           // Page/sidebar background
           page: {
-            value: { _light: "{colors.gray.100}", _dark: "{colors.gray.900}" },
+            value: { _light: "{colors.gray.100}", _dark: "{colors.zinc.900}" },
           },
           // Main content area - deepest in dark mode
-          surface: { value: { _light: "white", _dark: "{colors.gray.950}" } },
+          surface: { value: { _light: "white", _dark: "{colors.zinc.950}" } },
           // Cards and panels - float above surface
-          panel: { value: { _light: "white", _dark: "{colors.gray.900}" } },
+          panel: { value: { _light: "white", _dark: "{colors.zinc.800}" } },
           // Muted background for hover states, selections
           muted: {
-            value: { _light: "{colors.gray.100}", _dark: "{colors.gray.700}" },
+            value: { _light: "{colors.gray.100}", _dark: "{colors.zinc.850}" },
           },
           // Emphasized background for active states
           emphasized: {
-            value: { _light: "{colors.gray.200}", _dark: "{colors.gray.600}" },
+            value: { _light: "{colors.gray.200}", _dark: "{colors.zinc.600}" },
           },
           // Subtle background for table headers, zebra rows
           subtle: {
-            value: { _light: "{colors.gray.50}", _dark: "{colors.gray.900}" },
+            value: { _light: "{colors.gray.50}", _dark: "{colors.zinc.900}" },
           },
-          // Form inputs - blend into container
+          // Softer hover/open lift — sits between subtle and muted, used when
+          // bg.muted reads too heavy (e.g. accordion triggers).
+          softHover: {
+            value: { _light: "{colors.gray.100}", _dark: "{colors.zinc.850}" },
+          },
+          // Form inputs - sunken below panel in dark
           input: {
-            value: { _light: "{colors.gray.200}", _dark: "{colors.gray.800}" },
+            value: { _light: "{colors.gray.200}", _dark: "{colors.zinc.900}" },
           },
           inputHover: {
-            value: { _light: "white", _dark: "{colors.gray.700}" },
+            value: { _light: "white", _dark: "{colors.zinc.800}" },
           },
         },
 
         // Foreground semantic tokens - proper contrast in dark mode
         fg: {
           DEFAULT: {
-            value: { _light: "{colors.gray.900}", _dark: "{colors.gray.50}" },
+            value: { _light: "{colors.gray.900}", _dark: "{colors.gray.100}" },
           },
           muted: {
-            value: { _light: "{colors.gray.600}", _dark: "{colors.gray.400}" },
+            value: { _light: "{colors.gray.600}", _dark: "{colors.gray.300}" },
           },
           subtle: {
-            value: { _light: "{colors.gray.500}", _dark: "{colors.gray.450}" },
+            value: { _light: "{colors.gray.500}", _dark: "{colors.gray.400}" },
           },
           inverted: { value: { _light: "white", _dark: "{colors.gray.950}" } },
         },
@@ -446,16 +451,16 @@ export const system = createSystem(defaultConfig, {
         // Border semantic tokens - visible in dark mode
         border: {
           DEFAULT: {
-            value: { _light: "{colors.gray.200}", _dark: "{colors.gray.700}" },
+            value: { _light: "{colors.gray.200}", _dark: "{colors.zinc.600}" },
           },
           muted: {
-            value: { _light: "{colors.gray.100}", _dark: "{colors.gray.800}" },
+            value: { _light: "{colors.gray.100}", _dark: "{colors.zinc.700}" },
           },
           subtle: {
-            value: { _light: "{colors.gray.100}", _dark: "{colors.gray.900}" },
+            value: { _light: "{colors.gray.100}", _dark: "{colors.zinc.800}" },
           },
           emphasized: {
-            value: { _light: "{colors.gray.300}", _dark: "{colors.gray.600}" },
+            value: { _light: "{colors.gray.300}", _dark: "{colors.zinc.500}" },
           },
         },
       },

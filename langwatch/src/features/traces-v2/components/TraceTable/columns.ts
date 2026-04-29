@@ -37,7 +37,7 @@ export const traceAtomicColumnDefs: Record<
     id: "input",
     header: "Input",
     size: 9999,
-    minSize: 200,
+    minSize: 320,
     meta: flex,
     enableSorting: false,
   }),
@@ -45,7 +45,7 @@ export const traceAtomicColumnDefs: Record<
     id: "output",
     header: "Output",
     size: 9999,
-    minSize: 200,
+    minSize: 320,
     meta: flex,
     enableSorting: false,
   }),
@@ -314,18 +314,26 @@ function buildGroupColumnDefs(
   };
 }
 
+// Cast at the index site: column ids fed in here are user-controlled
+// (lens config, URL fragment) so we treat them as `string` and accept that
+// some values may not be a known column.
+const traceColumnDefsByString = traceColumnDefs as Record<
+  string,
+  ColumnDef<TraceListItem, any> | undefined
+>;
+
 export function buildTraceColumns(
   ids: string[],
 ): Array<ColumnDef<TraceListItem, any>> {
   return ids
-    .map((id) => traceColumnDefs[id])
+    .map((id) => traceColumnDefsByString[id])
     .filter((def): def is ColumnDef<TraceListItem, any> => Boolean(def));
 }
 
 export function getTraceColumnDef(
   id: string,
 ): ColumnDef<TraceListItem, any> | undefined {
-  return traceColumnDefs[id] ?? traceAtomicColumnDefs[id];
+  return traceColumnDefsByString[id] ?? traceAtomicColumnDefs[id];
 }
 
 export function makeEvalColumnDef(

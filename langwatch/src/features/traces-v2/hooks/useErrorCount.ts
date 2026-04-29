@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
-import { useFreshnessSignal } from "../stores/freshnessSignal";
+import { useSseStatusStore } from "../stores/sseStatusStore";
 
 const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
 const FALLBACK_INTERVAL_MS = 60_000;
@@ -18,7 +18,7 @@ export function useErrorCount(): number {
 
   // SSE invalidates `tracesV2.newCount` (all args) on trace_summary_updated,
   // so this query is kept fresh without polling whenever SSE is healthy.
-  const sseConnectionState = useFreshnessSignal((s) => s.sseConnectionState);
+  const sseConnectionState = useSseStatusStore((s) => s.sseConnectionState);
   const sseConnected = sseConnectionState === "connected";
 
   const query = api.tracesV2.newCount.useQuery(

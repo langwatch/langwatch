@@ -14,9 +14,15 @@ import { api } from "~/utils/api";
 export function useConversationTurns(conversationId: string | null) {
   const { project } = useOrganizationTeamProject();
 
+  // 90-day window: enough headroom for long-running conversations without
+  // forcing ClickHouse to scan year-old (cold-tier) partitions on every
+  // drawer open. `to` is rounded down to the current hour so re-opening the
+  // same conversation within the hour reuses the cached query (raw
+  // Date.now() makes every mount a fresh key and forces a refetch flash).
   const timeRange = useMemo(() => {
-    const now = Date.now();
-    return { from: now - 365 * 24 * 60 * 60 * 1000, to: now };
+    const HOUR_MS = 60 * 60 * 1000;
+    const to = Math.floor(Date.now() / HOUR_MS) * HOUR_MS;
+    return { from: to - 90 * 24 * HOUR_MS, to };
   }, [project?.id, conversationId]);
 
   return api.tracesV2.list.useQuery(

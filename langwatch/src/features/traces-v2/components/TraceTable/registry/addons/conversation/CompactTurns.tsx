@@ -5,7 +5,6 @@ import {
   HStack,
   Icon,
   Text,
-  VStack,
 } from "@chakra-ui/react";
 import { AlertTriangle, Bot, Clock, GitBranch, User, Zap } from "lucide-react";
 import type React from "react";
@@ -161,7 +160,7 @@ const ConversationTurnRow: React.FC<ConversationTurnRowProps> = ({
           borderLeftWidth="2px"
           borderLeftColor={style.borderColor}
         >
-          <HStack gap={2} textStyle="sm">
+          <HStack gap={2} textStyle="xs">
             <TraceIdPeek traceId={trace.traceId} />
             <Badge size="xs" variant="outline" fontFamily="mono" flexShrink={0}>
               T{turnIndex + 1}
@@ -278,7 +277,7 @@ const InlineMessage: React.FC<{
     <Icon boxSize="12px" color={iconColor} flexShrink={0}>
       {icon}
     </Icon>
-    <Text color={textColor} truncate textStyle={textStyleOverride}>
+    <Text  color={textColor} truncate textStyle={textStyleOverride}>
       {truncateText({ text, limit })}
     </Text>
   </HStack>

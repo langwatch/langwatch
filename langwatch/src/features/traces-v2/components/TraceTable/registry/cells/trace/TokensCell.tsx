@@ -4,7 +4,7 @@ import { formatTokens } from "../../../../../utils/formatters";
 import { MonoCell } from "../../../MonoCell";
 import type { CellDef } from "../../types";
 
-export const TokensCell: CellDef<TraceListItem> = {
+export const TokensCell = {
   id: "tokens",
   label: "Tokens",
   render: ({ row }) => <MonoCell>{formatTokens(row.totalTokens)}</MonoCell>,
@@ -13,4 +13,4 @@ export const TokensCell: CellDef<TraceListItem> = {
       {formatTokens(row.totalTokens)}
     </Text>
   ),
-};
+} as const satisfies CellDef<TraceListItem>;

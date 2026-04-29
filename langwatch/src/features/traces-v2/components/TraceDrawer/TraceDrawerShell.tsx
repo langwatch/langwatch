@@ -1,58 +1,31 @@
 import { Box, Skeleton, VStack } from "@chakra-ui/react";
-import { AnimatePresence, motion } from "motion/react";
-import {
-  lazy,
-  Suspense,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { motion } from "motion/react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import { Drawer } from "~/components/ui/drawer";
 import { Tooltip } from "~/components/ui/tooltip";
-import {
-  useDrawer,
-  useDrawerParams,
-  useUpdateDrawerParams,
-} from "~/hooks/useDrawer";
-import type { SpanTreeNode } from "~/server/api/routers/tracesV2.schemas";
+import { useDrawer, useDrawerParams } from "~/hooks/useDrawer";
+import { useConversationContext } from "../../hooks/useConversationContext";
+import { useConversationPrefetch } from "../../hooks/useConversationPrefetch";
+import { useDrawerUrlSync } from "../../hooks/useDrawerUrlSync";
 import { usePrefetchSpanDetail } from "../../hooks/usePrefetchSpanDetail";
-import { useSpanTree } from "../../hooks/useSpanSummary";
-import { useThreadContext } from "../../hooks/useThreadContext";
-import { useThreadPrefetch } from "../../hooks/useThreadPrefetch";
+import { useSpanTree } from "../../hooks/useSpanTree";
 import { useTraceDrawerNavigation } from "../../hooks/useTraceDrawerNavigation";
+import { useTraceDrawerShortcuts } from "../../hooks/useTraceDrawerShortcuts";
 import { useTraceHeader } from "../../hooks/useTraceHeader";
 import { useTraceRefresh } from "../../hooks/useTraceRefresh";
-import type {
-  DrawerTab,
-  DrawerViewMode,
-  VizTab,
-} from "../../stores/drawerStore";
 import { useDrawerStore } from "../../stores/drawerStore";
 import { parseTracePromptIds } from "../../utils/promptAttributes";
 import { BelowFoldIndicator } from "./BelowFoldIndicator";
 import { ConversationContext } from "./ConversationContext";
-// ConversationView only renders when the user toggles into conversation
-// mode — code-split so the trace-mode initial bundle stays light.
-const ConversationView = lazy(() =>
-  import("./conversationView").then((m) => ({ default: m.ConversationView })),
-);
+import { ConversationView } from "./conversationView";
+import { LlmPanel } from "./LlmPanel";
+import { PromptsPanel } from "./PromptsPanel";
 import { DrawerHeader } from "./drawerHeader";
 import { KeyboardShortcutsHelp } from "./KeyboardShortcutsHelp";
-// LlmPanel + PromptsPanel are only rendered when their tabs are active.
-// Lazy-load so the LLM-tab-only Markdown / Shiki cost (and the Prompts-tab
-// only chip rendering) doesn't bloat the trace drawer's initial bundle.
-const LlmPanel = lazy(() =>
-  import("./LlmPanel").then((m) => ({ default: m.LlmPanel })),
-);
-const PromptsPanel = lazy(() =>
-  import("./PromptsPanel").then((m) => ({ default: m.PromptsPanel })),
-);
-import { SpanTabBar } from "./SpanTabBar";
 import { ScenarioRoleProvider } from "./scenarioRoles";
-import { TraceDrawerEmptyState } from "./TraceDrawerEmptyState";
+import { SpanTabBar } from "./SpanTabBar";
 import { TraceAccordions } from "./traceAccordions";
+import { TraceDrawerEmptyState } from "./TraceDrawerEmptyState";
 import { VizPlaceholder } from "./VizPlaceholder";
 
 export interface TraceV2DrawerShellProps {
@@ -75,110 +48,73 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
   const params = useDrawerParams();
 
   const traceId = params.traceId;
-  const spanParam = params.span ?? null;
-  // Coerce legacy "markdown" URL value to "waterfall" — that view moved to
-  // the lower SpanTabBar as a "LLM" tab and is no longer a viz option.
-  const rawViz = params.viz as string | undefined;
-  const vizParam: VizTab =
-    rawViz === "waterfall" ||
-    rawViz === "flame" ||
-    rawViz === "spanlist" ||
-    rawViz === "topology" ||
-    rawViz === "sequence"
-      ? rawViz
-      : "waterfall";
+  const occurredAtMsParam = useMemo(() => {
+    if (!params.t) return null;
+    const n = Number(params.t);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  }, [params.t]);
 
-  const rawTab = params.tab as string | undefined;
-  const tabParam: DrawerTab | null =
-    rawTab === "summary" ||
-    rawTab === "span" ||
-    rawTab === "llm" ||
-    rawTab === "prompts"
-      ? rawTab
-      : null;
-
-  const rawMode = params.mode as string | undefined;
-  const modeParam: DrawerViewMode =
-    rawMode === "trace" || rawMode === "conversation" ? rawMode : "trace";
-
-  const updateDrawerParams = useUpdateDrawerParams();
-
-  // Sync URL params → zustand store so hooks can read from it
-  const storeOpenTrace = useDrawerStore((s) => s.openTrace);
-  const storeSelectSpan = useDrawerStore((s) => s.selectSpan);
-  const storeClearSpan = useDrawerStore((s) => s.clearSpan);
-
+  // Hydrate the per-trace identity into the store so the data hooks
+  // (header, span tree, evaluations, …) can read it via selector. We skip
+  // the call when the store already matches the URL — without that guard,
+  // a hard reload onto `?traceId=X&span=Y` would call `openTrace` and
+  // wipe the span the URL just hydrated.
+  const openTraceInStore = useDrawerStore((s) => s.openTrace);
   useEffect(() => {
-    if (traceId) {
-      storeOpenTrace(traceId);
-    }
-  }, [traceId, storeOpenTrace]);
+    if (!traceId) return;
+    const { traceId: storeTraceId, occurredAtMs } = useDrawerStore.getState();
+    if (storeTraceId === traceId && occurredAtMs === occurredAtMsParam) return;
+    openTraceInStore(traceId, occurredAtMsParam);
+  }, [traceId, occurredAtMsParam, openTraceInStore]);
 
-  useEffect(() => {
-    if (spanParam) {
-      storeSelectSpan(spanParam);
-    } else {
-      storeClearSpan();
-    }
-  }, [spanParam, storeSelectSpan, storeClearSpan]);
+  // Single source of truth — the drawer store. Url is just a serialization.
+  useDrawerUrlSync();
 
-  // Fetch real data from ClickHouse via tRPC
+  const viewMode = useDrawerStore((s) => s.viewMode);
+  const vizTab = useDrawerStore((s) => s.vizTab);
+  const activeTab = useDrawerStore((s) => s.activeTab);
+  const selectedSpanId = useDrawerStore((s) => s.selectedSpanId);
+  const isMaximized = useDrawerStore((s) => s.isMaximized);
+  const shortcutsOpen = useDrawerStore((s) => s.shortcutsOpen);
+
+  const setVizTab = useDrawerStore((s) => s.setVizTab);
+  const selectSpan = useDrawerStore((s) => s.selectSpan);
+  const clearSpan = useDrawerStore((s) => s.clearSpan);
+  const toggleMaximized = useDrawerStore((s) => s.toggleMaximized);
+  const setMaximized = useDrawerStore((s) => s.setMaximized);
+  const setShortcutsOpen = useDrawerStore((s) => s.setShortcutsOpen);
+
+  // Data
   const headerQuery = useTraceHeader();
   const spanTreeQuery = useSpanTree();
-
   const trace = headerQuery.data ?? null;
   const spanTree = spanTreeQuery.data ?? [];
-  // Show the full-shell skeleton whenever we have a traceId in the URL
-  // but no result yet — including the moment before the project context
-  // has loaded and the query is still disabled. Without this guard, hard
+  // Show the full-shell skeleton whenever we have a traceId in the URL but
+  // no result yet — including the moment before the project context has
+  // loaded and the query is still disabled. Without this guard, hard
   // reloading a drawer URL renders the 404 page for one frame before the
-  // refetch even runs. Once data (or an error) arrives we drop into the
-  // normal shell or empty state respectively.
+  // refetch even runs.
   const isLoading = traceId ? !trace && !headerQuery.error : false;
 
-  // Local UI state
-  const [isMaximized, setIsMaximized] = useState(false);
-  const [vizTab, setVizTab] = useState<VizTab>(vizParam);
-  const [selectedSpanId, setSelectedSpanId] = useState<string | null>(
-    spanParam,
+  const conversationContext = useConversationContext(
+    trace?.conversationId ?? null,
+    trace?.traceId ?? null,
   );
-  const [activeTab, setActiveTab] = useState<DrawerTab>(
-    tabParam ?? (spanParam ? "span" : "summary"),
+  // Warm sibling trace headers so navigating between turns is instant.
+  useConversationPrefetch(
+    trace?.conversationId ?? null,
+    trace?.traceId ?? null,
   );
-  const [pinnedSpanIds, setPinnedSpanIds] = useState<string[]>([]);
-  const [viewMode, setViewModeLocal] = useState<DrawerViewMode>(modeParam);
-  const setStoreViewMode = useDrawerStore((s) => s.setViewMode);
-  const setViewMode = useCallback(
-    (mode: DrawerViewMode) => {
-      setViewModeLocal(mode);
-      setStoreViewMode(mode);
-    },
-    [setStoreViewMode],
-  );
-  const setStoreVizTab = useDrawerStore((s) => s.setVizTab);
-  const setStoreActiveTab = useDrawerStore((s) => s.setActiveTab);
 
-  // Mirror local drawer UI state into the global drawerStore so that
-  // out-of-tree consumers (multiplayer presence, in particular) can read
-  // the active panel/tab without threading it through props.
-  useEffect(() => {
-    setStoreVizTab(vizTab);
-  }, [vizTab, setStoreVizTab]);
-
-  useEffect(() => {
-    setStoreActiveTab(activeTab);
-  }, [activeTab, setStoreActiveTab]);
   const {
     navigateToTrace,
     goBack: goBackInTraceHistory,
     canGoBack,
-    backStackDepth,
   } = useTraceDrawerNavigation();
 
-  // Same hook DrawerHeader's refresh button uses — we re-instantiate
-  // it here so the `R` shortcut can fire even if the header is in a
-  // refreshing-spinner state. The hook is memoized per traceId so
-  // duplicating it does not mean duplicate work.
+  // Same hook DrawerHeader's refresh button uses — re-instantiated here so
+  // the `R` shortcut can fire even if the header is in a refreshing-spinner
+  // state. The hook is memoized per traceId, so duplicating it is free.
   const { refresh: refreshActiveTrace } = useTraceRefresh(traceId ?? "");
 
   const selectedSpan = useMemo(
@@ -190,8 +126,7 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
   );
 
   // Prefetch the previous + next span's detail whenever a span is selected
-  // so [/] navigation feels instantaneous. Without this, switching with the
-  // arrow shortcuts shows the loading skeleton on every step.
+  // so [/] navigation feels instantaneous.
   const prefetchSpan = usePrefetchSpanDetail();
   useEffect(() => {
     if (!selectedSpanId || spanTree.length === 0) return;
@@ -203,114 +138,17 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
     if (next) prefetchSpan(next.spanId);
   }, [selectedSpanId, spanTree, prefetchSpan]);
 
-  // ── URL ↔ state bidirectional sync ──────────────────────────────────────
-  // Reading: when URL params change (browser back/forward, paste-in URL,
-  // tab restore), pull the values back into local state.
-  useEffect(() => {
-    setVizTab(vizParam);
-  }, [vizParam]);
-
-  useEffect(() => {
-    if (tabParam && tabParam !== activeTab) setActiveTab(tabParam);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tabParam]);
-
-  useEffect(() => {
-    if (modeParam !== viewMode) setViewMode(modeParam);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [modeParam]);
-
-  // Writing: when local state diverges from URL params, push a history
-  // entry so back/forward walks the user's tab navigation. The push only
-  // fires when state ≠ URL, so the URL → state effect above never causes
-  // a feedback loop.
-  useEffect(() => {
-    if (vizTab !== vizParam) updateDrawerParams({ viz: vizTab });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [vizTab]);
-
-  useEffect(() => {
-    if (activeTab !== tabParam) updateDrawerParams({ tab: activeTab });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab]);
-
-  useEffect(() => {
-    if (viewMode !== modeParam) updateDrawerParams({ mode: viewMode });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [viewMode]);
-
-  useEffect(() => {
-    setSelectedSpanId(spanParam);
-    setActiveTab(spanParam ? "span" : "summary");
-  }, [spanParam]);
-
-  // Reset transient span state when the trace changes. We deliberately do
-  // NOT bump `contentKey` here — that would unmount the whole content tree
-  // on every J/K press, which is what made rapid back-and-forth feel laggy.
-  // The "current row" pop in ConversationContext already gives a per-press
-  // visual cue without the cost of remounting the visualizer + accordions.
-  useEffect(() => {
-    setSelectedSpanId(spanParam);
-    setActiveTab(spanParam ? "span" : "summary");
-    setPinnedSpanIds([]);
-  }, [traceId, spanParam]);
-
   const handleClose = useCallback(() => {
-    setIsMaximized(false);
+    setMaximized(false);
     closeDrawer();
-  }, [closeDrawer]);
+  }, [closeDrawer, setMaximized]);
 
-  const [shortcutsOpen, setShortcutsOpen] = useState(false);
-
-  // Sibling navigation in conversation thread (J / K shortcuts)
-  const threadContext = useThreadContext(
-    trace?.conversationId ?? null,
-    trace?.traceId ?? null,
-  );
-
-  // Warm sibling trace headers so navigating between turns is instant.
-  useThreadPrefetch(trace?.conversationId ?? null, trace?.traceId ?? null);
-
-  // Lockout for thread navigation: ignore J/K presses while a navigation is
-  // in flight, plus 500ms of grace time after the fetch completes. Stops the
-  // user from queueing up a stack of overlapping nudges if they hammer J.
-  const NAV_GRACE_MS = 500;
-  const navLockedRef = useRef(false);
-  useEffect(() => {
-    if (headerQuery.isFetching) {
-      navLockedRef.current = true;
-      return;
-    }
-    const id = setTimeout(() => {
-      navLockedRef.current = false;
-    }, NAV_GRACE_MS);
-    return () => clearTimeout(id);
-  }, [headerQuery.isFetching]);
-
-  // Direction the user is moving in the conversation thread, derived from
-  // the change in thread position. Drives the body's slide animation: J
-  // (forward) slides left → in, K (backward) slides right → in. -1 = forward,
-  // +1 = backward, 0 = no slide (initial / non-thread navigation).
-  const prevThreadPosRef = useRef<number | null>(null);
-  const [navDirection, setNavDirection] = useState<-1 | 0 | 1>(0);
-  useEffect(() => {
-    const next = threadContext.position;
-    const prev = prevThreadPosRef.current;
-    prevThreadPosRef.current = next;
-    if (prev == null || next == null || prev === next) {
-      setNavDirection(0);
-      return;
-    }
-    setNavDirection(next > prev ? -1 : 1);
-    const id = setTimeout(() => setNavDirection(0), 360);
-    return () => clearTimeout(id);
-  }, [threadContext.position, traceId]);
-
-  // Double-click anywhere outside the drawer panel to close. Single clicks are
-  // intentionally ignored — the drawer is non-modal so users can interact with
-  // the underlying page; only an explicit double-click means "I'm done with this
-  // trace, get the panel out of my way."
+  // Double-click anywhere outside the drawer panel to close. Single clicks
+  // are intentionally ignored — the drawer is non-modal so users can
+  // interact with the underlying page; only an explicit double-click means
+  // "I'm done with this trace."
   const drawerContentRef = useRef<HTMLDivElement>(null);
+  const drawerBodyRef = useRef<HTMLDivElement>(null);
   const scrollContentRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const handleDoubleClick = (e: MouseEvent) => {
@@ -324,269 +162,20 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
     return () => document.removeEventListener("dblclick", handleDoubleClick);
   }, [handleClose]);
 
-  const handleToggleMaximized = useCallback(() => {
-    setIsMaximized((prev) => !prev);
-  }, []);
-
-  const handleSelectSpan = useCallback(
-    (spanId: string) => {
-      setSelectedSpanId(spanId);
-      setActiveTab("span");
-      storeSelectSpan(spanId);
-    },
-    [storeSelectSpan],
-  );
-
-  const handleClearSpan = useCallback(() => {
-    setSelectedSpanId(null);
-    setActiveTab("summary");
-    storeClearSpan();
-  }, [storeClearSpan]);
-
-  const handlePinSpan = useCallback((spanId: string) => {
-    setPinnedSpanIds((prev) =>
-      prev.includes(spanId) ? prev : [...prev, spanId],
-    );
-  }, []);
-
-  const handleUnpinSpan = useCallback(
-    (spanId: string) => {
-      setPinnedSpanIds((prev) => prev.filter((id) => id !== spanId));
-      if (selectedSpanId === spanId) {
-        setSelectedSpanId(null);
-        setActiveTab("summary");
-        storeClearSpan();
-      }
-    },
-    [selectedSpanId, storeClearSpan],
-  );
-
-  const pinnedSpans = useMemo(
-    () =>
-      pinnedSpanIds
-        .map((id) => spanTree.find((s) => s.spanId === id))
-        .filter((s): s is SpanTreeNode => s != null),
-    [pinnedSpanIds, spanTree],
-  );
-
-  // Keyboard shortcuts
-  useEffect(() => {
-    if (!trace) return;
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement;
-      const isInputFocused =
-        target.tagName === "INPUT" ||
-        target.tagName === "TEXTAREA" ||
-        target.isContentEditable;
-
-      if (isInputFocused) return;
-
-      // Don't hijack OS chords. Without this guard, Ctrl/Cmd+C (copy) was
-      // landing in the `case "c"` branch and switching to the conversation
-      // tab instead of copying the selection. Same risk for Ctrl+V/X/T etc.
-      if (e.ctrlKey || e.metaKey || e.altKey) return;
-
-      switch (e.key) {
-        case "Escape": {
-          e.preventDefault();
-          if (shortcutsOpen) {
-            setShortcutsOpen(false);
-          } else if (selectedSpanId) {
-            handleClearSpan();
-          } else {
-            handleClose();
-          }
-          break;
-        }
-        case "?": {
-          e.preventDefault();
-          setShortcutsOpen((v) => !v);
-          break;
-        }
-        case "ArrowRight":
-        case "j":
-        case "J": {
-          // Always claim the key so it doesn't bubble (otherwise an end-of-
-          // thread press fell through to other handlers / browser nav).
-          e.preventDefault();
-          if (navLockedRef.current) break;
-          if (threadContext.next) {
-            navigateToTrace({
-              fromTraceId: trace.traceId,
-              fromViewMode: viewMode,
-              toTraceId: threadContext.next.traceId,
-              toTimestamp: threadContext.next.timestamp,
-            });
-          }
-          break;
-        }
-        case "ArrowLeft":
-        case "k":
-        case "K": {
-          e.preventDefault();
-          if (navLockedRef.current) break;
-          if (threadContext.previous) {
-            navigateToTrace({
-              fromTraceId: trace.traceId,
-              fromViewMode: viewMode,
-              toTraceId: threadContext.previous.traceId,
-              toTimestamp: threadContext.previous.timestamp,
-            });
-          }
-          break;
-        }
-        case "]": {
-          if (spanTree.length > 0) {
-            e.preventDefault();
-            const idx = selectedSpanId
-              ? spanTree.findIndex((s) => s.spanId === selectedSpanId)
-              : -1;
-            const next = spanTree[Math.min(idx + 1, spanTree.length - 1)];
-            if (next) {
-              setSelectedSpanId(next.spanId);
-              setActiveTab("span");
-              storeSelectSpan(next.spanId);
-            }
-          }
-          break;
-        }
-        case "[": {
-          if (spanTree.length > 0) {
-            e.preventDefault();
-            const idx = selectedSpanId
-              ? spanTree.findIndex((s) => s.spanId === selectedSpanId)
-              : 0;
-            const prev = spanTree[Math.max(idx - 1, 0)];
-            if (prev) {
-              setSelectedSpanId(prev.spanId);
-              setActiveTab("span");
-              storeSelectSpan(prev.spanId);
-            }
-          }
-          break;
-        }
-        case "b":
-        case "B": {
-          if (canGoBack) {
-            e.preventDefault();
-            goBackInTraceHistory();
-          }
-          break;
-        }
-        case "1": {
-          e.preventDefault();
-          setVizTab("waterfall");
-          break;
-        }
-        case "2": {
-          e.preventDefault();
-          setVizTab("flame");
-          break;
-        }
-        case "3": {
-          e.preventDefault();
-          setVizTab("spanlist");
-          break;
-        }
-        case "4": {
-          e.preventDefault();
-          setVizTab("topology");
-          break;
-        }
-        case "5": {
-          e.preventDefault();
-          setVizTab("sequence");
-          break;
-        }
-        case "o":
-        case "O": {
-          if (selectedSpanId) {
-            e.preventDefault();
-            setActiveTab("summary");
-          }
-          break;
-        }
-        case "l":
-        case "L": {
-          e.preventDefault();
-          setViewMode("trace");
-          setActiveTab("llm");
-          break;
-        }
-        case "p":
-        case "P": {
-          // Only available when this trace touched a managed prompt — same
-          // gate as the tab visibility in SpanTabBar.
-          if (
-            trace.containsPrompt ||
-            (trace.attributes["langwatch.prompt_ids"] ?? "").length > 0
-          ) {
-            e.preventDefault();
-            setViewMode("trace");
-            setActiveTab("prompts");
-          }
-          break;
-        }
-        case "t":
-        case "T": {
-          e.preventDefault();
-          setViewMode("trace");
-          break;
-        }
-        case "c":
-        case "C": {
-          if (trace.conversationId) {
-            e.preventDefault();
-            setViewMode("conversation");
-          }
-          break;
-        }
-        case "m":
-        case "M": {
-          e.preventDefault();
-          setIsMaximized((prev) => !prev);
-          break;
-        }
-        case "r":
-        case "R": {
-          e.preventDefault();
-          void refreshActiveTrace();
-          break;
-        }
-        case "y":
-        case "Y": {
-          e.preventDefault();
-          void navigator.clipboard.writeText(trace.traceId);
-          break;
-        }
-      }
-    };
-
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [
+  useTraceDrawerShortcuts({
     trace,
-    traceId,
-    selectedSpanId,
-    viewMode,
-    handleClearSpan,
-    handleClose,
-    setViewMode,
-    threadContext.next,
-    threadContext.previous,
     spanTree,
+    conversationContext,
     navigateToTrace,
-    storeSelectSpan,
+    goBack: goBackInTraceHistory,
     canGoBack,
-    goBackInTraceHistory,
-    shortcutsOpen,
     refreshActiveTrace,
-  ]);
+    onClose: handleClose,
+  });
 
-  // Error state: trace not found, network failure, or no selection.
-  // The dedicated empty-state component differentiates 404 vs load-failed
-  // and surfaces the trace ID + retry path.
+  // Error state: trace not found, network failure, or no selection. The
+  // dedicated empty-state component differentiates 404 vs load-failed and
+  // surfaces the trace ID + retry path.
   if (!isLoading && !trace) {
     return (
       <Drawer.Root
@@ -624,72 +213,33 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
         maxWidth={isMaximized ? undefined : "45%"}
         transition="max-width 0.2s ease"
       >
-        <Tooltip
-          content="Double-click to expand · click again to restore"
-          positioning={{ placement: "right" }}
-          openDelay={500}
+        <ResizeEdgeGrip onDoubleClick={toggleMaximized} />
+        <Drawer.Body
+          ref={drawerBodyRef}
+          paddingY={0}
+          paddingX={0}
+          overflowY="auto"
+          // The drawer body is also a scroll container alongside the inner
+          // panel scroller. Without this, the browser's scroll-anchoring
+          // grabs whatever element it finds when the panel's chrome (viz +
+          // conversation context) is conditionally hidden on the LLM tab,
+          // and slams scrollTop to the bottom of the new layout.
+          style={{ overflowAnchor: "none" }}
         >
-          <Box
-            position="absolute"
-            top={0}
-            bottom={0}
-            left={0}
-            width="6px"
-            cursor="ew-resize"
-            zIndex={2}
-            onDoubleClick={handleToggleMaximized}
-            _hover={{
-              "& > [data-edge-grip]": { opacity: 1 },
-            }}
-            aria-label="Drag edge to resize, double-click to toggle"
-          >
-            <Box
-              data-edge-grip
-              position="absolute"
-              top="50%"
-              left="2px"
-              transform="translateY(-50%)"
-              width="2px"
-              height="32px"
-              borderRadius="full"
-              bg="border.emphasized"
-              opacity={0.35}
-              transition="opacity 120ms ease"
-              pointerEvents="none"
-            />
-          </Box>
-        </Tooltip>
-        <Drawer.Body paddingY={0} paddingX={0} overflowY="auto">
           <VStack align="stretch" gap={0} height="full">
-            {/* Header — always visible, renders first */}
             {isLoading || !trace ? (
               <VStack align="stretch" gap={2} padding={4}>
                 <Skeleton height="40px" borderRadius="md" />
                 <Skeleton height="24px" borderRadius="md" />
               </VStack>
             ) : (
-              <Box onDoubleClick={handleToggleMaximized}>
-                <DrawerHeader
-                  trace={trace}
-                  isMaximized={isMaximized}
-                  onSelectSpan={handleSelectSpan}
-                  onOpenPromptsTab={() => setActiveTab("prompts")}
-                  viewMode={viewMode}
-                  onViewModeChange={setViewMode}
-                  onToggleMaximized={handleToggleMaximized}
-                  onClose={handleClose}
-                  onShowShortcuts={() => setShortcutsOpen(true)}
-                  canGoBack={canGoBack}
-                  onGoBack={goBackInTraceHistory}
-                  backStackDepth={backStackDepth}
-                  isNavigating={headerQuery.isFetching}
-                />
+              <Box onDoubleClick={toggleMaximized}>
+                <DrawerHeader trace={trace} onClose={handleClose} />
               </Box>
             )}
 
             <Box borderBottomWidth="1px" borderColor="border" />
 
-            {/* Loading skeleton state */}
             {isLoading ? (
               <VStack align="stretch" gap={2} padding={4}>
                 <Skeleton height="120px" borderRadius="md" />
@@ -698,33 +248,28 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
                 <Skeleton height="80px" borderRadius="md" />
               </VStack>
             ) : trace ? (
-              /* Crossfade + tiny direction-nudge during navigation. Single
-                 persistent motion.div (no key change → no remount → heavy
-                 children stay mounted, viz state survives). Opacity dips
-                 and the body offsets a few pixels in the navigation
-                 direction during the fetch; springs back when the new
-                 trace lands. ~140ms total — reads as motion in peripheral
-                 vision without paying the cost of an actual slide. */
               <ScenarioRoleProvider
                 isScenario={
                   !!(trace.scenarioRunId ?? trace.attributes["scenario.run_id"])
                 }
               >
+                {/* Single persistent body wrapper — no key change → no
+                    remount → heavy children stay mounted, viz state
+                    survives. A short opacity dip on fetch reads as
+                    "loading new content" without choreography. */}
                 <motion.div
                   ref={scrollContentRef}
-                  animate={{
-                    opacity: headerQuery.isFetching ? 0.55 : 1,
-                    x: headerQuery.isFetching ? navDirection * 12 : 0,
-                  }}
-                  transition={{
-                    type: "spring",
-                    stiffness: 480,
-                    damping: 38,
-                    mass: 0.5,
-                  }}
+                  animate={{ opacity: headerQuery.isFetching ? 0.55 : 1 }}
+                  transition={{ duration: 0.12, ease: "easeOut" }}
                   style={{
                     flex: 1,
                     overflow: "auto",
+                    // Tab switches conditionally remove the viz/conversation
+                    // chrome above the panel. Without this, the browser's
+                    // CSS scroll-anchoring picks an element that's about to
+                    // be unmounted and compensates by jumping scrollTop —
+                    // landing the user at the bottom of the new tab.
+                    overflowAnchor: "none",
                     position: "relative",
                     display: "flex",
                     flexDirection: "column",
@@ -732,132 +277,87 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
                   }}
                 >
                   {viewMode === "conversation" && trace.conversationId ? (
-                    <Suspense
-                      fallback={
-                        <VStack align="stretch" gap={2} padding={4}>
-                          <Skeleton height="40px" borderRadius="md" />
-                          <Skeleton height="80px" borderRadius="md" />
-                          <Skeleton height="80px" borderRadius="md" />
-                        </VStack>
-                      }
-                    >
-                      <ConversationView
-                        conversationId={trace.conversationId}
-                        currentTraceId={trace.traceId}
-                      />
-                    </Suspense>
+                    <ConversationView
+                      conversationId={trace.conversationId}
+                      currentTraceId={trace.traceId}
+                    />
                   ) : (
-                    <VStack align="stretch" gap={0} flex={1} minHeight={0}>
-                      {/* The viz + conversation context are skipped on the
-                        LLM tab — that view is a self-contained markdown
-                        document for copying, so the chrome above it would
-                        just push the prose down without adding signal. */}
-                      {activeTab !== "llm" && (
-                        <>
-                          {trace.conversationId && (
-                            <Box
-                              data-section-label="Conversation context"
-                              bg="bg.subtle"
-                              borderTopWidth="1px"
-                              borderBottomWidth="1px"
-                              borderColor="border.muted"
-                              paddingY={4}
-                            >
-                              <ConversationContext
-                                conversationId={trace.conversationId}
-                                traceId={trace.traceId}
-                              />
-                            </Box>
-                          )}
-
-                          <Box
-                            data-section-label="Visualisation"
-                            paddingTop={2}
-                          >
-                            <VizPlaceholder
-                              vizTab={vizTab}
-                              onVizTabChange={setVizTab}
-                              trace={trace}
-                              spans={spanTree}
-                              isLoading={spanTreeQuery.isLoading}
-                              selectedSpanId={selectedSpanId}
-                              onSelectSpan={handleSelectSpan}
-                              onClearSpan={handleClearSpan}
-                            />
-                          </Box>
-
-                          <Box borderBottomWidth="1px" borderColor="border" />
-                        </>
+                    <VStack align="stretch" gap={0}>
+                      {trace.conversationId && (
+                        <Box
+                          data-section-label="Conversation context"
+                          bg="bg.subtle"
+                          borderTopWidth="1px"
+                          borderBottomWidth="1px"
+                          borderColor="border.muted"
+                          paddingY={2}
+                        >
+                          <ConversationContext
+                            conversationId={trace.conversationId}
+                            traceId={trace.traceId}
+                          />
+                        </Box>
                       )}
 
-                      <SpanTabBar
-                        activeTab={activeTab}
-                        onTabChange={setActiveTab}
-                        selectedSpan={selectedSpan}
-                        onCloseSpanTab={handleClearSpan}
-                        pinnedSpans={pinnedSpans}
-                        onSelectSpan={handleSelectSpan}
-                        onPinSpan={handlePinSpan}
-                        onUnpinSpan={handleUnpinSpan}
-                        traceId={trace?.traceId}
-                        promptCount={
-                          parseTracePromptIds(trace.attributes).length
-                        }
-                      />
+                      <Box data-section-label="Visualisation">
+                        <VizPlaceholder
+                          vizTab={vizTab}
+                          onVizTabChange={setVizTab}
+                          trace={trace}
+                          spans={spanTree}
+                          isLoading={spanTreeQuery.isLoading}
+                          selectedSpanId={selectedSpanId}
+                          onSelectSpan={selectSpan}
+                          onClearSpan={clearSpan}
+                        />
+                      </Box>
 
-                      {/* Crossfade between Trace / LLM / Prompts panels.
-                          Quick slip-up + fade — same vocabulary as the
-                          conversation context strip so tab switches feel
-                          like part of the same motion language. */}
-                      <AnimatePresence mode="wait" initial={false}>
-                        <motion.div
-                          key={activeTab}
-                          initial={{ opacity: 0, y: 6 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, y: -4 }}
-                          transition={{ duration: 0.16, ease: "easeOut" }}
-                        >
-                          {activeTab === "llm" ? (
-                            <Suspense
-                              fallback={
-                                <VStack align="stretch" gap={2} padding={4}>
-                                  <Skeleton height="40px" borderRadius="md" />
-                                  <Skeleton height="120px" borderRadius="md" />
-                                </VStack>
-                              }
-                            >
-                              <LlmPanel trace={trace} spans={spanTree} />
-                            </Suspense>
-                          ) : activeTab === "prompts" ? (
-                            <Suspense
-                              fallback={
-                                <VStack align="stretch" gap={2} padding={4}>
-                                  <Skeleton height="40px" borderRadius="md" />
-                                  <Skeleton height="60px" borderRadius="md" />
-                                </VStack>
-                              }
-                            >
-                              <PromptsPanel
-                                trace={trace}
-                                spans={spanTree}
-                                onSelectSpan={handleSelectSpan}
-                              />
-                            </Suspense>
-                          ) : (
-                            <TraceAccordions
-                              trace={trace}
-                              spans={spanTree}
-                              selectedSpan={selectedSpan}
-                              activeTab={activeTab}
-                              onSelectSpan={handleSelectSpan}
-                            />
-                          )}
-                        </motion.div>
-                      </AnimatePresence>
+                      <Box borderBottomWidth="1px" borderColor="border" />
+
+                      <Box
+                        position="sticky"
+                        top={0}
+                        zIndex={2}
+                        bg="bg.panel"
+                      >
+                        <SpanTabBar
+                          spanTree={spanTree}
+                          promptCount={
+                            parseTracePromptIds(trace.attributes).length
+                          }
+                        />
+                      </Box>
+
+                      {/* `minHeight: 100vh` reserves room for the active
+                          panel so a tab swap can't briefly collapse the
+                          body — `overflowAnchor: none` is set on the
+                          scrollers but a sudden height drop would still
+                          let the browser snap scrollTop. */}
+                      <Box minHeight="100vh">
+                        {activeTab === "llm" ? (
+                          <LlmPanel trace={trace} spans={spanTree} />
+                        ) : activeTab === "prompts" ? (
+                          <PromptsPanel
+                            trace={trace}
+                            spans={spanTree}
+                            onSelectSpan={selectSpan}
+                          />
+                        ) : (
+                          <TraceAccordions
+                            trace={trace}
+                            spans={spanTree}
+                            selectedSpan={selectedSpan}
+                            activeTab={activeTab}
+                            onSelectSpan={selectSpan}
+                          />
+                        )}
+                      </Box>
                     </VStack>
                   )}
                 </motion.div>
-                <BelowFoldIndicator scrollRef={scrollContentRef} />
+                {(activeTab === "summary" || activeTab === "span") && (
+                  <BelowFoldIndicator scrollRef={scrollContentRef} />
+                )}
               </ScenarioRoleProvider>
             ) : null}
           </VStack>
@@ -868,5 +368,43 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
         onClose={() => setShortcutsOpen(false)}
       />
     </Drawer.Root>
+  );
+}
+
+function ResizeEdgeGrip({ onDoubleClick }: { onDoubleClick: () => void }) {
+  return (
+    <Tooltip
+      content="Double-click to expand · click again to restore"
+      positioning={{ placement: "right" }}
+      openDelay={500}
+    >
+      <Box
+        position="absolute"
+        top={0}
+        bottom={0}
+        left={0}
+        width="6px"
+        cursor="ew-resize"
+        zIndex={2}
+        onDoubleClick={onDoubleClick}
+        _hover={{ "& > [data-edge-grip]": { opacity: 1 } }}
+        aria-label="Drag edge to resize, double-click to toggle"
+      >
+        <Box
+          data-edge-grip
+          position="absolute"
+          top="50%"
+          left="2px"
+          transform="translateY(-50%)"
+          width="2px"
+          height="32px"
+          borderRadius="full"
+          bg="border.emphasized"
+          opacity={0.35}
+          transition="opacity 120ms ease"
+          pointerEvents="none"
+        />
+      </Box>
+    </Tooltip>
   );
 }

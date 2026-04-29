@@ -4,10 +4,13 @@ import {
   LuCheck,
   LuChevronDown,
   LuChevronRight,
+  LuCode,
   LuCopy,
+  LuEye,
   LuLightbulb,
   LuPencil,
 } from "react-icons/lu";
+import { Tooltip } from "~/components/ui/tooltip";
 import { useColorMode } from "~/components/ui/color-mode";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { AnnotationPopover } from "./conversationView/AnnotationPopover";
@@ -20,16 +23,13 @@ import {
   type ChatLayout,
   type ChatMessage,
   type ConversationTurn,
+  ConversationTurnsList,
   coerceToChatMessages,
   extractInlineBlocks,
   groupMessagesIntoTurns,
-  LONG_THREAD_THRESHOLD,
   parseContentBlocks,
-  ThreadedTurnView,
-  TurnView,
   tryParseJSON,
   VIRTUALIZE_AT,
-  VirtualizedChatList,
 } from "./transcript";
 
 const COPY_FEEDBACK_MS = 1500;
@@ -325,16 +325,16 @@ export const IOViewer = memo(function IOViewer({
           onClick={() => setCollapsed((c) => !c)}
         >
           <Text
-            textStyle="xs"
-            fontWeight="semibold"
-            color="fg.muted"
+            textStyle="2xs"
+            fontWeight="bold"
+            color="fg"
             letterSpacing="wide"
             textTransform="uppercase"
           >
             {label}
           </Text>
           {collapsed && (
-            <Text textStyle="xs" color="fg.muted">
+            <Text textStyle="2xs" color="fg.muted">
               {collapsedSummary}
             </Text>
           )}
@@ -348,18 +348,36 @@ export const IOViewer = memo(function IOViewer({
             options={["thread", "bubbles"]}
           />
         )}
-        {!collapsed && format === "markdown" && (
-          <SegmentedToggle
-            value={markdownSubmode}
-            onChange={(m) => setMarkdownSubmode(m as "rendered" | "source")}
-            options={["rendered", "source"]}
-          />
-        )}
         {!collapsed && (
           <SegmentedToggle
             value={format}
             onChange={(f) => setFormat(f as ViewFormat)}
-            options={formatOptions}
+            options={formatOptions.map((opt) => {
+              if (opt !== "markdown") return opt;
+              // When markdown is the active format, the rendered/source
+              // toggles are embedded *inside* the markdown segment — like
+              // the × clear button inside a search-bar token. Same row,
+              // same pill, just two tiny icons after the label.
+              return {
+                value: "markdown",
+                trailing: (
+                  <>
+                    <MarkdownSubmodeIcon
+                      icon={LuEye}
+                      label="Rendered"
+                      active={markdownSubmode === "rendered"}
+                      onClick={() => setMarkdownSubmode("rendered")}
+                    />
+                    <MarkdownSubmodeIcon
+                      icon={LuCode}
+                      label="Source"
+                      active={markdownSubmode === "source"}
+                      onClick={() => setMarkdownSubmode("source")}
+                    />
+                  </>
+                ),
+              };
+            })}
           />
         )}
         {!collapsed && traceId && (
@@ -432,57 +450,16 @@ export const IOViewer = memo(function IOViewer({
                 />
               )
             ) : format === "pretty" && isChat ? (
-              conversationTurns.length >= VIRTUALIZE_AT ? (
-                <VirtualizedChatList
-                  turns={conversationTurns}
-                  maxHeightPx={
-                    isLong && !expanded
-                      ? COMPACT_MAX_HEIGHT_PX
-                      : EXPANDED_MAX_HEIGHT_PX
-                  }
-                  layout={chatLayout}
-                  collapseTools={mode === "output"}
-                />
-              ) : chatLayout === "thread" ? (
-                <Box>
-                  {conversationTurns.map((turn, i) => {
-                    // Default-collapse user turns — they're usually the prompt
-                    // we already know we sent. Auto-expand assistant/system
-                    // turns and the trailing pair so the response is visible
-                    // at a glance without users having to click into every
-                    // user bubble in long conversations. Once the convo gets
-                    // long, collapse aggressively: only the last turn opens.
-                    const isLong =
-                      conversationTurns.length > LONG_THREAD_THRESHOLD;
-                    const isLastTwo = i >= conversationTurns.length - 2;
-                    const defaultExpanded = isLong
-                      ? i === conversationTurns.length - 1
-                      : turn.kind === "user"
-                        ? false
-                        : isLastTwo;
-                    return (
-                      <ThreadedTurnView
-                        key={i}
-                        turn={turn}
-                        index={i}
-                        isLast={i === conversationTurns.length - 1}
-                        defaultExpanded={defaultExpanded}
-                        collapseTools={mode === "output"}
-                      />
-                    );
-                  })}
-                </Box>
-              ) : (
-                <Box>
-                  {conversationTurns.map((turn, i) => (
-                    <TurnView
-                      key={i}
-                      turn={turn}
-                      collapseTools={mode === "output"}
-                    />
-                  ))}
-                </Box>
-              )
+              <ConversationTurnsList
+                turns={conversationTurns}
+                layout={chatLayout}
+                collapseTools={mode === "output"}
+                maxHeightPx={
+                  isLong && !expanded
+                    ? COMPACT_MAX_HEIGHT_PX
+                    : EXPANDED_MAX_HEIGHT_PX
+                }
+              />
             ) : format === "pretty" && hasInlineRichContent ? (
               // Plain-string content with inline typed blocks (e.g. a flattened
               // agent transcript). Render under a single assistant turn card so
@@ -563,3 +540,58 @@ export const IOViewer = memo(function IOViewer({
     </Box>
   );
 });
+
+interface MarkdownSubmodeIconProps {
+  icon: typeof LuEye;
+  label: string;
+  active: boolean;
+  onClick: () => void;
+}
+
+/**
+ * Embedded icon control rendered *inside* the markdown segment of the
+ * format toggle (like the × clear button inside a search-bar token).
+ * Stays compact so the host segment's pill stays the same height; stops
+ * click propagation so toggling rendered/source doesn't re-fire the
+ * segment's own onClick.
+ */
+function MarkdownSubmodeIcon({
+  icon,
+  label,
+  active,
+  onClick,
+}: MarkdownSubmodeIconProps) {
+  return (
+    <Tooltip
+      content={`${label} markdown view`}
+      positioning={{ placement: "top" }}
+    >
+      <Box
+        as="button"
+        onClick={(e: React.MouseEvent) => {
+          e.stopPropagation();
+          onClick();
+        }}
+        aria-label={`${label} markdown view`}
+        aria-pressed={active}
+        display="inline-flex"
+        alignItems="center"
+        justifyContent="center"
+        p={1}
+        height="full"
+        // borderRadius="xs"
+        bg={active ? "blue.solid/16" : "transparent"}
+        color={active ? "blue.fg" : "blue.fg/55"}
+        cursor="pointer"
+        transition="background 0.12s ease, color 0.12s ease"
+        _hover={
+          active
+            ? { bg: "blue.solid/22" }
+            : { color: "blue.fg", bg: "blue.solid/8" }
+        }
+      >
+        <Icon as={icon} boxSize={3} />
+      </Box>
+    </Tooltip>
+  );
+}

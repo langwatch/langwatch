@@ -38,11 +38,12 @@ export const DensityToggle: React.FC = () => {
               key={value}
               aria-label={label}
               aria-pressed={isActive}
-              variant={isActive ? "outline" : "solid"}
-              size="xs"
+              variant={isActive ? "outline" : "outline"}
+              bg={isActive ? "transparent" : "bg.emphasized"}
+              size="2xs"
               onClick={() => setDensity(value)}
             >
-              <Icon size={12} opacity={isActive ? 1 : INACTIVE_ICON_OPACITY} />
+              <Icon size={16} opacity={isActive ? 1 : INACTIVE_ICON_OPACITY} />
             </IconButton>
           );
         })}

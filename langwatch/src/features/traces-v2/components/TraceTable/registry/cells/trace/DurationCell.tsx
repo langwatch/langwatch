@@ -6,7 +6,7 @@ import type { CellDef } from "../../types";
 
 const MAX_DURATION_MS = 25_000;
 
-export const DurationCell: CellDef<TraceListItem> = {
+export const DurationCell = {
   id: "duration",
   label: "Duration",
   render: ({ row }) => {
@@ -43,4 +43,4 @@ export const DurationCell: CellDef<TraceListItem> = {
       </VStack>
     );
   },
-};
+} as const satisfies CellDef<TraceListItem>;

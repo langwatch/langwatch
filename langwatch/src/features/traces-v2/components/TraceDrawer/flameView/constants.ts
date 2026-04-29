@@ -1,8 +1,8 @@
 export const ROW_HEIGHT = 22;
 export const ROW_GAP = 2;
 export const MIN_BLOCK_PX = 2;
-export const DEPTH_FADE_STEP = 0.06;
-export const DEPTH_FADE_FLOOR = 0.45;
+export const DEPTH_FADE_STEP = 0.04;
+export const DEPTH_FADE_FLOOR = 0.7;
 export const MINIMAP_WIDTH = 280;
 export const MINIMAP_HEIGHT = 72;
 export const MINIMAP_HANDLE_PX = 10;

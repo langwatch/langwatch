@@ -3,7 +3,7 @@ import type { TraceListItem } from "../../../../../types/trace";
 import type { CellDef } from "../../types";
 import { SpanTypeBadge } from "./SpanTypeBadge";
 
-export const SpanTypeCell: CellDef<TraceListItem> = {
+export const SpanTypeCell = {
   id: "span-type",
   label: "Type",
   render: ({ row }) => {
@@ -23,4 +23,4 @@ export const SpanTypeCell: CellDef<TraceListItem> = {
       />
     );
   },
-};
+} as const satisfies CellDef<TraceListItem>;

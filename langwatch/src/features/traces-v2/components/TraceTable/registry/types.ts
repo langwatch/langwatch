@@ -1,7 +1,7 @@
 import type { Row } from "@tanstack/react-table";
 import type { ReactNode } from "react";
 import type { DensityTokens } from "../../../hooks/useDensityTokens";
-import type { Density } from "../../../stores/viewStore";
+import type { Density } from "../../../stores/densityStore";
 import type { RowStyle } from "../StatusRow";
 
 export type RowKind = "trace" | "conversation" | "group";
@@ -22,8 +22,8 @@ export interface CellRenderContext<TRow> {
   actions: RowActions;
 }
 
-export interface CellDef<TRow> {
-  id: string;
+export interface CellDef<TRow, TId extends string = string> {
+  id: TId;
   label: string;
   render: (ctx: CellRenderContext<TRow>) => ReactNode;
   renderCompact?: (ctx: CellRenderContext<TRow>) => ReactNode;

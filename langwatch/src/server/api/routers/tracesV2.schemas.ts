@@ -168,7 +168,7 @@ export type SpanDetail = z.infer<typeof spanDetailSchema>;
  * Lightweight thread/conversation context — adjacent turns plus position info,
  * for the "previous / next turn" affordance at the top of the drawer.
  */
-export const threadTurnSchema = z.object({
+export const conversationTurnSchema = z.object({
   traceId: z.string(),
   timestamp: z.number(),
   name: z.string(),
@@ -177,17 +177,15 @@ export const threadTurnSchema = z.object({
   output: z.string().nullish(),
 });
 
-export type ThreadTurn = z.infer<typeof threadTurnSchema>;
+export type ConversationTurn = z.infer<typeof conversationTurnSchema>;
 
-export const threadContextSchema = z.object({
+export const conversationContextSchema = z.object({
   conversationId: z.string(),
   total: z.number(),
-  position: z.number(),
-  previous: threadTurnSchema.nullable(),
-  next: threadTurnSchema.nullable(),
+  turns: z.array(conversationTurnSchema),
 });
 
-export type ThreadContext = z.infer<typeof threadContextSchema>;
+export type ConversationContext = z.infer<typeof conversationContextSchema>;
 
 /**
  * OTel resource info per span — separate read path because the standard

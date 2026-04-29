@@ -22,6 +22,17 @@ export const colorSystem = {
     100: { value: "#f1f5f9" },
     50: { value: "#f8fafc" },
   },
+  // Used on _dark sides only; near-neutral with the smallest indigo tint.
+  zinc: {
+    500: { value: "#565664" },
+    600: { value: "#3a3a44" },
+    700: { value: "#282832" },
+    750: { value: "#20202a" },
+    800: { value: "#1a1a24" },
+    850: { value: "#15151e" },
+    900: { value: "#10101a" },
+    950: { value: "#080812" },
+  },
   red: {
     50: { value: "#FFF5F5" },
     100: { value: "#FED7D7" },

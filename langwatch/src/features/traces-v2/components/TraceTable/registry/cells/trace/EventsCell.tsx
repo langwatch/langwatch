@@ -3,7 +3,7 @@ import type { TraceListItem } from "../../../../../types/trace";
 import { EventBadge } from "../../sharedChips";
 import type { CellDef } from "../../types";
 
-export const EventsCell: CellDef<TraceListItem> = {
+export const EventsCell = {
   id: "events",
   label: "Events",
   render: ({ row }) => {
@@ -38,4 +38,4 @@ export const EventsCell: CellDef<TraceListItem> = {
       </HStack>
     );
   },
-};
+} as const satisfies CellDef<TraceListItem>;

@@ -3,7 +3,9 @@ import { RefreshCw, Wifi, WifiOff } from "lucide-react";
 import type React from "react";
 import { Tooltip } from "~/components/ui/tooltip";
 import type { ConnectionState } from "~/hooks/useSSESubscription";
-import { useFreshnessSignal } from "../../stores/freshnessSignal";
+import { useTraceListRefresh } from "../../hooks/useTraceListRefresh";
+import { useRefreshUIStore } from "../../stores/refreshUIStore";
+import { useSseStatusStore } from "../../stores/sseStatusStore";
 
 const SSE_STATE_STYLE: Record<
   ConnectionState,
@@ -26,10 +28,10 @@ const REFRESH_SPIN_KEYFRAMES = {
 };
 
 export const LiveIndicator: React.FC = () => {
-  const sseState = useFreshnessSignal((s) => s.sseConnectionState);
-  const lastEventAt = useFreshnessSignal((s) => s.lastEventAt);
-  const isRefreshing = useFreshnessSignal((s) => s.isRefreshing);
-  const refresh = useFreshnessSignal((s) => s.refresh);
+  const sseState = useSseStatusStore((s) => s.sseConnectionState);
+  const lastEventAt = useSseStatusStore((s) => s.lastEventAt);
+  const isRefreshing = useRefreshUIStore((s) => s.isRefreshing);
+  const refresh = useTraceListRefresh();
 
   const { dotColor, pulse } = SSE_STATE_STYLE[sseState];
   const isConnected = sseState === "connected";
@@ -60,7 +62,7 @@ export const LiveIndicator: React.FC = () => {
           aria-label="Refresh traces"
           variant="ghost"
           size="xs"
-          onClick={refresh ?? undefined}
+          onClick={refresh}
           disabled={isRefreshing}
           css={isRefreshing ? REFRESH_SPIN_KEYFRAMES : undefined}
         >

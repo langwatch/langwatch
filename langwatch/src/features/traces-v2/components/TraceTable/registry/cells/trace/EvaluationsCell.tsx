@@ -23,7 +23,7 @@ function dedupeLatest(evals: TraceEvalResult[]): TraceEvalResult[] {
   return result;
 }
 
-export const EvaluationsCell: CellDef<TraceListItem> = {
+export const EvaluationsCell = {
   id: "evaluations",
   label: "Evals",
   render: ({ row }) => {
@@ -66,7 +66,7 @@ export const EvaluationsCell: CellDef<TraceListItem> = {
       </HStack>
     );
   },
-};
+} as const satisfies CellDef<TraceListItem>;
 
 function MoreEvalsPill({ count }: { count: number }) {
   return (

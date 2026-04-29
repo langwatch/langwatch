@@ -3,7 +3,7 @@ import type { TraceListItem } from "../../../../../types/trace";
 import { contentToText } from "../../../chatContent";
 import type { CellDef } from "../../types";
 
-export const InputCell: CellDef<TraceListItem> = {
+export const InputCell = {
   id: "input",
   label: "Input",
   render: ({ row }) => {
@@ -21,4 +21,4 @@ export const InputCell: CellDef<TraceListItem> = {
       </Text>
     );
   },
-};
+} as const satisfies CellDef<TraceListItem>;

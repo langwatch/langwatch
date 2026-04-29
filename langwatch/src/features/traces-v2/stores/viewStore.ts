@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import type { RowKind } from "../components/TraceTable/registry";
-import { useFilterStore } from "./filterStore";
+import { getCurrentFilterText, useFilterStore } from "./filterStore";
 
 export type GroupingMode =
   | "flat"
@@ -8,12 +8,6 @@ export type GroupingMode =
   | "by-service"
   | "by-user"
   | "by-model";
-
-// Density is no longer a per-lens or per-view setting — it's a global user
-// preference managed by `densityStore.ts`. The `recommendedDensity` field
-// on a lens is advisory only (future "use the recommended density?" prompt).
-import type { Density } from "./densityStore";
-export type { Density };
 
 export interface SortConfig {
   columnId: string;
@@ -38,22 +32,8 @@ export interface LensConfig {
   addons: string[];
   grouping: GroupingMode;
   sort: SortConfig;
-  /**
-   * Saved filter expression (Liqe query text). Optional for back-compat with
-   * lenses persisted before filter capture was wired up — read as `""` when
-   * absent. Built-in lenses leave this empty; their structural intent is
-   * encoded via `lockedFilters` instead.
-   */
-  filterText?: string;
-  /**
-   * Optional density hint — purely advisory. Density is a global user
-   * preference (see `densityStore`); this field never overrides it.
-   * Lenses created before this change may still have a `density` field in
-   * localStorage; it's read into `recommendedDensity` for back-compat.
-   */
-  recommendedDensity?: Density;
-  lockedFilters: string[];
-  lockedGrouping?: boolean;
+  /** Saved filter expression (Liqe query text). */
+  filterText: string;
 }
 
 export function getEffectiveLens(state: {
@@ -103,7 +83,6 @@ interface ViewState {
   sort: SortConfig;
   grouping: GroupingMode;
   columnOrder: string[];
-  hiddenColumns: Set<string>;
   draftState: Map<string, DraftLensState>;
 
   selectLens: (id: string) => void;
@@ -145,10 +124,6 @@ function migrateGrouping(value: unknown): GroupingMode | undefined {
   return isGroupingMode(value) ? value : undefined;
 }
 
-function isDensity(value: unknown): value is Density {
-  return value === "compact" || value === "comfortable";
-}
-
 function loadCustomLenses(): LensConfig[] {
   if (typeof window === "undefined") return [];
   try {
@@ -156,31 +131,16 @@ function loadCustomLenses(): LensConfig[] {
     if (!raw) return [];
     const parsed = JSON.parse(raw) as Array<Partial<LensConfig>>;
     if (!Array.isArray(parsed)) return [];
-    return parsed.map((lens) => {
-      // Back-compat: pre-migration lenses had a required `density` field.
-      // Read it as a recommendation only; the global density store wins.
-      const legacyDensity = (lens as { density?: unknown }).density;
-      const recommended = isDensity(legacyDensity)
-        ? legacyDensity
-        : isDensity(lens.recommendedDensity)
-          ? lens.recommendedDensity
-          : undefined;
-      return {
-        id: lens.id ?? "",
-        name: lens.name ?? "Untitled",
-        isBuiltIn: false,
-        columns: Array.isArray(lens.columns) ? lens.columns : [],
-        addons: Array.isArray(lens.addons) ? lens.addons : [],
-        grouping: migrateGrouping(lens.grouping) ?? "flat",
-        sort: lens.sort ?? DEFAULT_SORT,
-        filterText: typeof lens.filterText === "string" ? lens.filterText : "",
-        recommendedDensity: recommended,
-        lockedFilters: Array.isArray(lens.lockedFilters)
-          ? lens.lockedFilters
-          : [],
-        lockedGrouping: lens.lockedGrouping,
-      };
-    });
+    return parsed.map((lens) => ({
+      id: lens.id ?? "",
+      name: lens.name ?? "Untitled",
+      isBuiltIn: false,
+      columns: Array.isArray(lens.columns) ? lens.columns : [],
+      addons: Array.isArray(lens.addons) ? lens.addons : [],
+      grouping: migrateGrouping(lens.grouping) ?? "flat",
+      sort: lens.sort ?? DEFAULT_SORT,
+      filterText: typeof lens.filterText === "string" ? lens.filterText : "",
+    }));
   } catch {
     return [];
   }
@@ -287,8 +247,7 @@ const builtInLenses: LensConfig[] = [
     addons: ["io-preview", "expanded-peek"],
     grouping: "flat",
     sort: DEFAULT_SORT,
-
-    lockedFilters: [],
+    filterText: "",
   },
   {
     id: "conversations",
@@ -307,9 +266,7 @@ const builtInLenses: LensConfig[] = [
     addons: ["conversation-turns"],
     grouping: "by-conversation",
     sort: DEFAULT_SORT,
-    recommendedDensity: "comfortable",
-    lockedFilters: ["metadata.thread_id"],
-    lockedGrouping: true,
+    filterText: "",
   },
   {
     id: "errors",
@@ -328,8 +285,7 @@ const builtInLenses: LensConfig[] = [
     addons: ["error-detail", "expanded-peek"],
     grouping: "flat",
     sort: DEFAULT_SORT,
-
-    lockedFilters: ["traces.error"],
+    filterText: "status:error",
   },
   {
     id: "slow-requests",
@@ -347,8 +303,7 @@ const builtInLenses: LensConfig[] = [
     addons: ["error-detail", "io-preview"],
     grouping: "flat",
     sort: { columnId: "duration", direction: "desc" },
-
-    lockedFilters: [],
+    filterText: "",
   },
   {
     id: "quality-review",
@@ -358,8 +313,7 @@ const builtInLenses: LensConfig[] = [
     addons: ["io-preview"],
     grouping: "flat",
     sort: DEFAULT_SORT,
-    recommendedDensity: "comfortable",
-    lockedFilters: ["evaluations.status"],
+    filterText: "",
   },
   {
     id: "by-model",
@@ -369,9 +323,7 @@ const builtInLenses: LensConfig[] = [
     addons: ["group-traces"],
     grouping: "by-model",
     sort: { columnId: "count", direction: "desc" },
-
-    lockedFilters: [],
-    lockedGrouping: true,
+    filterText: "",
   },
 ];
 
@@ -386,10 +338,11 @@ const defaultColumnOrder: string[] = [
   "model",
 ];
 
-let idCounter = 0;
 function generateId(): string {
-  idCounter += 1;
-  return `custom-${Date.now()}-${idCounter}`;
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return `custom-${crypto.randomUUID()}`;
+  }
+  return `custom-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
 function setDraft(
@@ -415,15 +368,12 @@ function clearDraftFor(
   return next;
 }
 
-function getCurrentFilterText(): string {
-  try {
-    return useFilterStore.getState().queryText;
-  } catch {
-    return "";
-  }
-}
-
-function applyFilterTextSilently(text: string): void {
+/**
+ * Push a lens's saved filter into the filter store without surfacing a
+ * parse error if the saved text is corrupt (falls back to empty). Imperative
+ * one-way write — viewStore never subscribes to filterStore.
+ */
+function applyFilterTextFromLens(text: string): void {
   try {
     useFilterStore.getState().setFilterFromLens(text);
   } catch {
@@ -456,7 +406,6 @@ export const useViewStore = create<ViewState>((set, get) => ({
     initialActiveDraft?.columns ??
     initialActiveLens?.columns ??
     defaultColumnOrder,
-  hiddenColumns: new Set<string>(),
   draftState: initialDrafts,
 
   selectLens: (id) => {
@@ -467,14 +416,13 @@ export const useViewStore = create<ViewState>((set, get) => ({
       // Apply the lens's filter (or its draft override) to filterStore via
       // the silent setter — `applyQueryText` would loop back through
       // `setFilterDraft` and immediately mark the lens dirty.
-      const nextFilter = draft?.filter ?? lens.filterText ?? "";
-      applyFilterTextSilently(nextFilter);
+      const nextFilter = draft?.filter ?? lens.filterText;
+      applyFilterTextFromLens(nextFilter);
       return {
         activeLensId: id,
         sort: draft?.sort ?? lens.sort,
         grouping: draft?.grouping ?? lens.grouping,
         columnOrder: draft?.columns ?? lens.columns,
-        hiddenColumns: new Set<string>(),
       };
     });
   },
@@ -499,20 +447,12 @@ export const useViewStore = create<ViewState>((set, get) => ({
 
   toggleColumn: (columnId) =>
     set((s) => {
-      // columnOrder is the only thing the lens bodies read. hiddenColumns
-      // was a parallel "soft hide" state but nothing rendered against it,
-      // so toggling it never actually showed or hid columns. Operate on
-      // columnOrder directly: present → remove; absent → append.
       const order = s.columnOrder.includes(columnId)
         ? s.columnOrder.filter((id) => id !== columnId)
         : [...s.columnOrder, columnId];
 
-      const nextHidden = new Set(s.hiddenColumns);
-      nextHidden.delete(columnId);
-
       return {
         columnOrder: order,
-        hiddenColumns: nextHidden,
         draftState: setDraft(s.draftState, s.activeLensId, { columns: order }),
       };
     }),
@@ -542,7 +482,6 @@ export const useViewStore = create<ViewState>((set, get) => ({
   setVisibleColumns: (columns) =>
     set((s) => ({
       columnOrder: columns,
-      hiddenColumns: new Set<string>(),
       draftState: setDraft(s.draftState, s.activeLensId, { columns }),
     })),
 
@@ -589,7 +528,6 @@ export const useViewStore = create<ViewState>((set, get) => ({
       grouping: state.grouping,
       sort: { ...state.sort },
       filterText: getCurrentFilterText(),
-      lockedFilters: [],
     };
     const allLenses = [...state.allLenses, newLens];
     persistCustomLenses(allLenses);
@@ -609,7 +547,7 @@ export const useViewStore = create<ViewState>((set, get) => ({
         sort: draft.sort ?? lens.sort,
         grouping: draft.grouping ?? lens.grouping,
         columns: draft.columns ?? lens.columns,
-        filterText: draft.filter ?? lens.filterText ?? getCurrentFilterText(),
+        filterText: draft.filter ?? lens.filterText,
       };
       const allLenses = s.allLenses.map((l) => (l.id === lensId ? updated : l));
       const nextDraft = clearDraftFor(s.draftState, lensId);
@@ -629,7 +567,6 @@ export const useViewStore = create<ViewState>((set, get) => ({
       grouping: state.grouping,
       sort: { ...state.sort },
       filterText: getCurrentFilterText(),
-      lockedFilters: [],
     };
     const allLenses = [...state.allLenses, newLens];
     persistCustomLenses(allLenses);
@@ -646,13 +583,12 @@ export const useViewStore = create<ViewState>((set, get) => ({
       set({ draftState: nextDraft });
       return;
     }
-    applyFilterTextSilently(lens.filterText ?? "");
+    applyFilterTextFromLens(lens.filterText);
     set({
       draftState: nextDraft,
       sort: lens.sort,
       grouping: lens.grouping,
       columnOrder: lens.columns,
-      hiddenColumns: new Set<string>(),
     });
   },
 
@@ -679,18 +615,16 @@ export const useViewStore = create<ViewState>((set, get) => ({
       id,
       name: `${lens.name} (copy)`,
       isBuiltIn: false,
-      filterText: lens.filterText ?? "",
     };
     const allLenses = [...state.allLenses, newLens];
     persistCustomLenses(allLenses);
-    applyFilterTextSilently(newLens.filterText ?? "");
+    applyFilterTextFromLens(newLens.filterText);
     set({
       allLenses,
       activeLensId: id,
       sort: { ...newLens.sort },
       grouping: newLens.grouping,
       columnOrder: [...newLens.columns],
-      hiddenColumns: new Set<string>(),
     });
     return id;
   },
@@ -715,7 +649,7 @@ export const useViewStore = create<ViewState>((set, get) => ({
     }
     const firstLens = allLenses[0];
     if (!firstLens) return;
-    applyFilterTextSilently(firstLens.filterText ?? "");
+    applyFilterTextFromLens(firstLens.filterText);
     set({
       allLenses,
       draftState: nextDraft,
@@ -723,7 +657,6 @@ export const useViewStore = create<ViewState>((set, get) => ({
       sort: firstLens.sort,
       grouping: firstLens.grouping,
       columnOrder: firstLens.columns,
-      hiddenColumns: new Set<string>(),
     });
   },
 }));

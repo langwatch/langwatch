@@ -3,6 +3,7 @@ import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { TraceHeader } from "~/server/api/routers/tracesV2.schemas";
 import { api } from "~/utils/api";
+import { useDrawerStore } from "../stores/drawerStore";
 import type { TraceListItem } from "../types/trace";
 
 function listItemToHeader(item: TraceListItem): TraceHeader {
@@ -78,6 +79,9 @@ export function useOpenTraceDrawer() {
           seed,
         );
       }
+      // Push into the store before route change so drawer hooks render
+      // with the right traceId/occurredAtMs on the very next frame.
+      useDrawerStore.getState().openTrace(trace.traceId, trace.timestamp);
       openDrawer("traceV2Details", {
         traceId: trace.traceId,
         // `t` (timestamp) is read by useTraceHeader as a partition-pruning

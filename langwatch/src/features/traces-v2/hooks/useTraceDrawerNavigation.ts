@@ -45,6 +45,11 @@ export function useTraceDrawerNavigation() {
       }
       pushTraceHistory({ traceId: fromTraceId, viewMode: fromViewMode });
       if (toViewMode) setViewMode(toViewMode);
+      // Push into the store immediately so drawer hooks render with the
+      // right traceId/occurredAtMs before the URL change settles.
+      useDrawerStore
+        .getState()
+        .openTrace(toTraceId, toTimestamp ?? null);
       openDrawer("traceV2Details", {
         traceId: toTraceId,
         ...(toTimestamp !== undefined ? { t: String(toTimestamp) } : {}),
@@ -57,6 +62,7 @@ export function useTraceDrawerNavigation() {
     const previous = popTraceHistory();
     if (!previous) return;
     setViewMode(previous.viewMode);
+    useDrawerStore.getState().openTrace(previous.traceId);
     openDrawer("traceV2Details", { traceId: previous.traceId });
   }, [openDrawer, popTraceHistory, setViewMode]);
 

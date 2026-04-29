@@ -1,7 +1,12 @@
-import type { GroupingMode, LensConfig, SortConfig } from "../stores/viewStore";
+import type { LensConfig } from "../stores/viewStore";
 
 // Density is intentionally NOT serialised into the URL — it's a personal
 // preference, not a shareable view setting. Lives in `densityStore.ts`.
+//
+// Column / grouping / sort drafts are also NOT serialised — they're per-user
+// view tweaks, not shareable query state. They live in `viewStore`'s
+// `draftState`; the lens tab shows an "unsaved" dot when any are active.
+// To persist them across reloads, the user saves them into a (custom) lens.
 
 export interface BarStateOverrides {
   query?: string;
@@ -12,40 +17,11 @@ export interface BarStateOverrides {
   timeFrom?: number;
   timeTo?: number;
   page?: number;
-  columns?: string[];
-  grouping?: GroupingMode;
-  sort?: SortConfig;
 }
 
 export interface FragmentState {
   lensId: string;
   overrides: BarStateOverrides;
-}
-
-const VALID_GROUPINGS: ReadonlySet<GroupingMode> = new Set([
-  "flat",
-  "by-conversation",
-  "by-service",
-  "by-user",
-  "by-model",
-]);
-
-function normalizeGrouping(value: string): GroupingMode | undefined {
-  if (value === "by-session") return "by-conversation";
-  return VALID_GROUPINGS.has(value as GroupingMode)
-    ? (value as GroupingMode)
-    : undefined;
-}
-
-function parseSort(value: string): SortConfig | undefined {
-  const colonAt = value.indexOf(":");
-  if (colonAt < 0) return undefined;
-  const columnId = value.slice(0, colonAt);
-  const direction = value.slice(colonAt + 1);
-  if (!columnId || (direction !== "asc" && direction !== "desc")) {
-    return undefined;
-  }
-  return { columnId, direction };
 }
 
 function safeDecode(value: string): string | null {
@@ -97,27 +73,6 @@ export function parseFragment(fragment: string): FragmentState | null {
       const parsed = parseFinitePositiveInt(page);
       if (parsed !== undefined) overrides.page = parsed;
     }
-
-    const cols = params.get("cols");
-    if (cols !== null) {
-      const list = cols
-        .split(",")
-        .map((c) => c.trim())
-        .filter(Boolean);
-      if (list.length > 0) overrides.columns = list;
-    }
-
-    const group = params.get("group");
-    if (group) {
-      const normalized = normalizeGrouping(group);
-      if (normalized) overrides.grouping = normalized;
-    }
-
-    const sort = params.get("sort");
-    if (sort !== null) {
-      const parsed = parseSort(sort);
-      if (parsed) overrides.sort = parsed;
-    }
   }
 
   return { lensId, overrides };
@@ -129,9 +84,6 @@ interface ComputeOverridesInput {
   timeRange: { from: number; to: number; presetId?: string };
   defaultPresetId: string;
   page: number;
-  columns: string[];
-  grouping: GroupingMode;
-  sort: SortConfig;
 }
 
 export function computeOverrides(
@@ -148,12 +100,6 @@ export function computeOverrides(
     overrides.timeTo = input.timeRange.to;
   }
   if (input.page !== 1) overrides.page = input.page;
-  // Column / grouping / sort drafts are intentionally NOT serialised into
-  // the URL — they're per-user view tweaks, not shareable query state.
-  // They live in `viewStore`'s `draftState` map; the lens tab shows a
-  // "unsaved" dot when any are active. To persist them across reloads,
-  // the user saves them into a (custom) lens. Older URLs that still
-  // carry `cols`/`group`/`sort` are honoured on parse for back-compat.
   return overrides;
 }
 
@@ -173,14 +119,6 @@ export function buildFragment(
     params.set("to", String(overrides.timeTo));
   }
   if (overrides.page !== undefined) params.set("page", String(overrides.page));
-  if (overrides.columns) params.set("cols", overrides.columns.join(","));
-  if (overrides.grouping) params.set("group", overrides.grouping);
-  if (overrides.sort) {
-    params.set(
-      "sort",
-      `${overrides.sort.columnId}:${overrides.sort.direction}`,
-    );
-  }
   const encodedLens = encodeURIComponent(lensId);
   const paramStr = params.toString();
   return paramStr ? `${encodedLens}?${paramStr}` : encodedLens;

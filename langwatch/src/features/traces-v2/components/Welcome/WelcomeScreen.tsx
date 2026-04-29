@@ -2,7 +2,7 @@ import type React from "react";
 import { useCallback } from "react";
 import { useLocalStorage } from "usehooks-ts";
 import { Dialog } from "~/components/ui/dialog";
-import { useFreshnessSignal } from "../../stores/freshnessSignal";
+import { useTraceListRefresh } from "../../hooks/useTraceListRefresh";
 import { useViewStore } from "../../stores/viewStore";
 import { useWelcomeStore } from "../../stores/welcomeStore";
 import { WelcomeDialog } from "./WelcomeDialog";
@@ -13,6 +13,7 @@ export const WelcomeScreen: React.FC = () => {
   const isOpen = useWelcomeStore((s) => s.isOpen);
   const close = useWelcomeStore((s) => s.close);
   const selectLens = useViewStore((s) => s.selectLens);
+  const refresh = useTraceListRefresh();
   const [, setSeen] = useLocalStorage<boolean>(WELCOME_SEEN_KEY, false);
 
   const handleDismiss = useCallback(
@@ -26,11 +27,10 @@ export const WelcomeScreen: React.FC = () => {
   const handleFinish = useCallback(() => {
     setSeen(true);
     selectLens("all-traces");
-    const freshness = useFreshnessSignal.getState();
-    freshness.setWelcomeBoom(true);
-    freshness.refresh?.();
+    useWelcomeStore.getState().setWelcomeBoom(true);
+    refresh();
     close();
-  }, [setSeen, selectLens, close]);
+  }, [setSeen, selectLens, close, refresh]);
 
   return (
     <Dialog.Root

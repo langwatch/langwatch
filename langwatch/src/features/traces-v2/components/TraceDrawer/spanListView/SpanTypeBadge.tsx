@@ -1,8 +1,19 @@
 import { Box, Text } from "@chakra-ui/react";
-import { SPAN_TYPE_COLORS } from "../../../utils/formatters";
+
+const SPAN_TYPE_PALETTE: Record<string, string> = {
+  llm: "blue",
+  tool: "green",
+  agent: "purple",
+  rag: "teal",
+  guardrail: "orange",
+  evaluation: "pink",
+  chain: "cyan",
+  span: "gray",
+  module: "gray",
+};
 
 export function SpanTypeBadge({ type }: { type: string }) {
-  const color = (SPAN_TYPE_COLORS[type] as string) ?? "gray.solid";
+  const palette = SPAN_TYPE_PALETTE[type] ?? "gray";
   const label =
     type.length <= 5 ? type.toUpperCase() : type.slice(0, 5).toUpperCase();
 
@@ -17,7 +28,12 @@ export function SpanTypeBadge({ type }: { type: string }) {
       borderWidth="1px"
       borderColor="border.subtle"
     >
-      <Text textStyle="xs" fontWeight="semibold" color={color} lineHeight={1}>
+      <Text
+        textStyle="xs"
+        fontWeight="semibold"
+        color={`${palette}.fg`}
+        lineHeight={1}
+      >
         {label}
       </Text>
     </Box>

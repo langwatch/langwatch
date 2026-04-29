@@ -3,7 +3,7 @@ import type { TraceListItem } from "../../../../../types/trace";
 import { MonoCell } from "../../../MonoCell";
 import type { CellDef } from "../../types";
 
-export const ServiceCell: CellDef<TraceListItem> = {
+export const ServiceCell = {
   id: "service",
   label: "Service",
   render: ({ row }) => (
@@ -16,4 +16,4 @@ export const ServiceCell: CellDef<TraceListItem> = {
       {row.serviceName || "—"}
     </Text>
   ),
-};
+} as const satisfies CellDef<TraceListItem>;

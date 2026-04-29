@@ -1,4 +1,6 @@
-import { Box } from "@chakra-ui/react";
+import { Box, chakra } from "@chakra-ui/react";
+
+const ChakraButton = chakra("button");
 import type React from "react";
 import { Checkbox } from "~/components/ui/checkbox";
 import type { TraceListItem } from "../../../../types/trace";
@@ -39,8 +41,7 @@ const RowCheckbox: React.FC<RowCheckboxProps> = ({ traceIds, ariaLabel }) => {
   // inner pointer-events:none wrapper makes sure clicks land on the button
   // and not on the label that wraps the hidden input.
   return (
-    <Box
-      as="button"
+    <ChakraButton
       type="button"
       aria-label={ariaLabel}
       aria-checked={
@@ -65,11 +66,11 @@ const RowCheckbox: React.FC<RowCheckboxProps> = ({ traceIds, ariaLabel }) => {
       <Box pointerEvents="none" display="inline-flex">
         <Checkbox size="sm" checked={checked} />
       </Box>
-    </Box>
+    </ChakraButton>
   );
 };
 
-export const TraceSelectCell: CellDef<TraceListItem> = {
+export const TraceSelectCell = {
   id: SELECT_COLUMN_ID,
   label: "Select",
   render: ({ row }) => (
@@ -78,9 +79,9 @@ export const TraceSelectCell: CellDef<TraceListItem> = {
       ariaLabel={`Select trace ${row.traceId}`}
     />
   ),
-};
+} as const satisfies CellDef<TraceListItem>;
 
-export const ConversationSelectCell: CellDef<ConversationGroup> = {
+export const ConversationSelectCell = {
   id: SELECT_COLUMN_ID,
   label: "Select",
   render: ({ row }) => (
@@ -89,9 +90,9 @@ export const ConversationSelectCell: CellDef<ConversationGroup> = {
       ariaLabel={`Select conversation ${row.conversationId}`}
     />
   ),
-};
+} as const satisfies CellDef<ConversationGroup>;
 
-export const GroupSelectCell: CellDef<TraceGroup> = {
+export const GroupSelectCell = {
   id: SELECT_COLUMN_ID,
   label: "Select",
   render: ({ row }) => (
@@ -100,4 +101,4 @@ export const GroupSelectCell: CellDef<TraceGroup> = {
       ariaLabel={`Select group ${row.label}`}
     />
   ),
-};
+} as const satisfies CellDef<TraceGroup>;

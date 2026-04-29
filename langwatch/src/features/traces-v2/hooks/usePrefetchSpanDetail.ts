@@ -1,9 +1,7 @@
 import { useCallback } from "react";
-import { useDrawerParams } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { useDrawerStore } from "../stores/drawerStore";
-import { parseOccurredAtMs } from "./useTraceOccurredAt";
 
 /**
  * Returns a callback that prefetches span detail for a given span id under
@@ -14,7 +12,7 @@ import { parseOccurredAtMs } from "./useTraceOccurredAt";
 export function usePrefetchSpanDetail() {
   const { project } = useOrganizationTeamProject();
   const traceId = useDrawerStore((s) => s.traceId);
-  const occurredAtMs = parseOccurredAtMs(useDrawerParams().t);
+  const occurredAtMs = useDrawerStore((s) => s.occurredAtMs);
   const utils = api.useUtils();
 
   return useCallback(
@@ -25,7 +23,7 @@ export function usePrefetchSpanDetail() {
           projectId: project.id,
           traceId,
           spanId,
-          ...(occurredAtMs !== undefined ? { occurredAtMs } : {}),
+          ...(occurredAtMs !== null ? { occurredAtMs } : {}),
         },
         { staleTime: 300_000 },
       );

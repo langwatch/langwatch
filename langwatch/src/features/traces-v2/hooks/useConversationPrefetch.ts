@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
-import { useThreadContext } from "./useThreadContext";
+import { useConversationContext } from "./useConversationContext";
 
 /** How long to wait after a trace settles before warming siblings. */
 const PREFETCH_DELAY_MS = 600;
@@ -16,12 +16,12 @@ const RADIUS = 5;
  * Runs after `PREFETCH_DELAY_MS` so the active trace's own queries finish
  * first; cancels if the user navigates away before the timer fires.
  */
-export function useThreadPrefetch(
+export function useConversationPrefetch(
   conversationId: string | null | undefined,
   currentTraceId: string | null | undefined,
 ): void {
   const { project } = useOrganizationTeamProject();
-  const { turns } = useThreadContext(conversationId, currentTraceId);
+  const { turns } = useConversationContext(conversationId, currentTraceId);
   const utils = api.useContext();
   const projectId = project?.id;
 

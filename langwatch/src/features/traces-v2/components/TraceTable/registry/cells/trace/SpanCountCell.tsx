@@ -3,7 +3,7 @@ import type { TraceListItem } from "../../../../../types/trace";
 import { MonoCell } from "../../../MonoCell";
 import type { CellDef } from "../../types";
 
-export const SpanCountCell: CellDef<TraceListItem> = {
+export const SpanCountCell = {
   id: "spans",
   label: "Spans",
   render: ({ row }) => <MonoCell>{row.spanCount.toLocaleString()}</MonoCell>,
@@ -12,4 +12,4 @@ export const SpanCountCell: CellDef<TraceListItem> = {
       {row.spanCount.toLocaleString()}
     </Text>
   ),
-};
+} as const satisfies CellDef<TraceListItem>;

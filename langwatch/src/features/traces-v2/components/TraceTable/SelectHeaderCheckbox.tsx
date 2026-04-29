@@ -1,4 +1,6 @@
-import { Box } from "@chakra-ui/react";
+import { Box, chakra } from "@chakra-ui/react";
+
+const ChakraButton = chakra("button");
 import type React from "react";
 import { Checkbox } from "~/components/ui/checkbox";
 import { useSelectionStore } from "../../stores/selectionStore";
@@ -31,8 +33,7 @@ export const SelectHeaderCheckbox: React.FC<SelectHeaderCheckboxProps> = ({
         : "indeterminate";
 
   return (
-    <Box
-      as="button"
+    <ChakraButton
       type="button"
       aria-label="Select all on this page"
       aria-checked={
@@ -57,6 +58,6 @@ export const SelectHeaderCheckbox: React.FC<SelectHeaderCheckboxProps> = ({
       <Box pointerEvents="none" display="inline-flex">
         <Checkbox size="sm" checked={checked} />
       </Box>
-    </Box>
+    </ChakraButton>
   );
 };

@@ -291,8 +291,8 @@ function AttrSection({
     <Box marginBottom={3}>
       {title && (
         <Text
-          textStyle="xs"
-          fontWeight="semibold"
+          textStyle="2xs"
+          fontWeight="bold"
           color="fg.muted"
           textTransform="uppercase"
           letterSpacing="0.08em"

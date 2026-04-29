@@ -1,27 +1,23 @@
-import { useDrawerParams } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
+import { LIVE_REFETCH_MS, LIVE_WINDOW_MS } from "../constants/freshness";
 import { useDrawerStore } from "../stores/drawerStore";
-import { parseOccurredAtMs } from "./useTraceOccurredAt";
-
-const LIVE_WINDOW_MS = 3 * 60 * 1000;
-const LIVE_REFETCH_MS = 10_000;
 
 export function useSpanTree() {
   const { project } = useOrganizationTeamProject();
   const traceId = useDrawerStore((s) => s.traceId);
-  const occurredAtMs = parseOccurredAtMs(useDrawerParams().t);
+  const occurredAtMs = useDrawerStore((s) => s.occurredAtMs);
 
   // Match useTraceHeader's liveness behaviour so spans + header refresh
   // together as new spans arrive on a recent trace.
   const isLive =
-    occurredAtMs !== undefined && Date.now() - occurredAtMs < LIVE_WINDOW_MS;
+    occurredAtMs !== null && Date.now() - occurredAtMs < LIVE_WINDOW_MS;
 
   return api.tracesV2.spanTree.useQuery(
     {
       projectId: project?.id ?? "",
       traceId: traceId ?? "",
-      ...(occurredAtMs !== undefined ? { occurredAtMs } : {}),
+      ...(occurredAtMs !== null ? { occurredAtMs } : {}),
     },
     {
       enabled: !!project?.id && !!traceId,

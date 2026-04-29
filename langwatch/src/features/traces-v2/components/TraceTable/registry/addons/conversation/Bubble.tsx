@@ -1,4 +1,5 @@
-import { Box, Circle, Flex, Icon, Text } from "@chakra-ui/react";
+import { Box, Circle, Flex, HStack, Icon, Text } from "@chakra-ui/react";
+import { Lightbulb, MessageSquare } from "lucide-react";
 import type React from "react";
 import { Markdown } from "~/components/Markdown";
 import { ReasoningBlock } from "../../../../TraceDrawer/transcript";
@@ -63,6 +64,13 @@ interface BubbleProps {
   size?: BubbleSize;
   /** Truncate the text body to N characters. 0 disables. */
   maxChars?: number;
+  /**
+   * When set, marks the bubble as carrying annotations. The amber accent
+   * stripe lights up so a long thread is scannable for noted turns;
+   * `hasCorrection` upgrades the inline badge to the lightbulb tone used
+   * elsewhere for "suggested output".
+   */
+  annotation?: { count: number; hasCorrection: boolean };
 }
 
 const DEFAULT_MAX_CHARS = 320;
@@ -100,10 +108,12 @@ export const Bubble: React.FC<BubbleProps> = ({
   onClick,
   size = "regular",
   maxChars = DEFAULT_MAX_CHARS,
+  annotation,
 }) => {
   const palette = BUBBLE_TONES[tone];
   const compact = size === "compact";
   const display = truncateMarkdown({ text, maxChars });
+  const hasAnnotation = !!annotation && annotation.count > 0;
 
   return (
     <Flex
@@ -132,6 +142,12 @@ export const Bubble: React.FC<BubbleProps> = ({
         borderTopRightRadius={side === "right" ? "sm" : "2xl"}
         cursor={onClick ? "pointer" : "default"}
         transition="background 0.15s ease, transform 0.15s ease"
+        position="relative"
+        boxShadow={
+          hasAnnotation
+            ? `inset ${side === "right" ? "-3px" : "3px"} 0 0 var(--chakra-colors-amber-solid)`
+            : undefined
+        }
         _hover={
           onClick
             ? { bg: palette.selectedBg, transform: "translateY(-1px)" }
@@ -143,15 +159,37 @@ export const Bubble: React.FC<BubbleProps> = ({
           onClick();
         }}
       >
-        <Text
-          textStyle="2xs"
-          fontWeight="600"
-          color={palette.accent}
-          marginBottom={1}
-          letterSpacing="0.02em"
-        >
-          {label}
-        </Text>
+        <HStack gap={1.5} marginBottom={1} align="center">
+          <Text
+            textStyle="2xs"
+            fontWeight="600"
+            color={palette.accent}
+            letterSpacing="0.02em"
+          >
+            {label}
+          </Text>
+          {hasAnnotation && (
+            <HStack
+              gap={0.5}
+              paddingX={1.5}
+              paddingY={0.5}
+              borderRadius="sm"
+              bg="amber.subtle"
+              color="amber.fg"
+              aria-label={`${annotation!.count} annotation${
+                annotation!.count === 1 ? "" : "s"
+              }${annotation!.hasCorrection ? ", includes correction" : ""}`}
+            >
+              <Icon as={MessageSquare} boxSize="10px" />
+              <Text textStyle="2xs" fontWeight="600" lineHeight="1">
+                {annotation!.count}
+              </Text>
+              {annotation!.hasCorrection && (
+                <Icon as={Lightbulb} boxSize="10px" color="yellow.fg" />
+              )}
+            </HStack>
+          )}
+        </HStack>
         {reasoning && (
           <Box
             mb={text ? "3" : "0"}

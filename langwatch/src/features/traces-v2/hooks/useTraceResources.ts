@@ -1,12 +1,11 @@
 import { useMemo } from "react";
-import { useDrawerParams } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type {
   InstrumentationScope,
   SpanResourceInfoDto,
 } from "~/server/api/routers/tracesV2.schemas";
 import { api } from "~/utils/api";
-import { parseOccurredAtMs } from "./useTraceOccurredAt";
+import { useDrawerStore } from "../stores/drawerStore";
 
 export interface TraceResourcesResult {
   rootSpanId: string | null;
@@ -36,14 +35,14 @@ export function useTraceResources(
   traceId: string | null | undefined,
 ): TraceResourcesResult {
   const { project } = useOrganizationTeamProject();
+  const occurredAtMs = useDrawerStore((s) => s.occurredAtMs);
   const enabled = !!project?.id && !!traceId;
-  const occurredAtMs = parseOccurredAtMs(useDrawerParams().t);
 
   const query = api.tracesV2.resourceInfo.useQuery(
     {
       projectId: project?.id ?? "",
       traceId: traceId ?? "",
-      ...(occurredAtMs !== undefined ? { occurredAtMs } : {}),
+      ...(occurredAtMs !== null ? { occurredAtMs } : {}),
     },
     {
       enabled,

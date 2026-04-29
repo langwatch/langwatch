@@ -1,6 +1,7 @@
-import { Button, Flex, Icon } from "@chakra-ui/react";
+import { Button, Flex, Icon, IconButton } from "@chakra-ui/react";
 import { Download, Search, Sparkles } from "lucide-react";
 import type React from "react";
+import { Tooltip } from "~/components/ui/tooltip";
 import { useFindStore } from "../../stores/findStore";
 import { useWelcomeStore } from "../../stores/welcomeStore";
 import { ColumnsDropdown } from "./ColumnsDropdown";
@@ -49,30 +50,38 @@ export const Toolbar: React.FC<ToolbarProps> = ({ onExportAll }) => {
         <ColumnsDropdown />
         <GroupingSelector />
         <DensityToggle />
-        <Button
-          size="xs"
-          variant={findIsOpen ? "subtle" : "ghost"}
-          onClick={() => (findIsOpen ? closeFind() : openFind())}
-          aria-label="Find in loaded traces"
-          aria-pressed={findIsOpen}
+        <Tooltip
+          content="Search within currently loaded traces"
+          positioning={{ placement: "bottom" }}
         >
-          <Icon boxSize={3.5}>
-            <Search />
-          </Icon>
-          Find
-        </Button>
-        {onExportAll && (
-          <Button
+          <IconButton
             size="xs"
-            variant="ghost"
-            onClick={onExportAll}
-            aria-label="Export traces"
+            variant={findIsOpen ? "subtle" : "ghost"}
+            onClick={() => (findIsOpen ? closeFind() : openFind())}
+            aria-label="Find in loaded traces"
+            aria-pressed={findIsOpen}
           >
             <Icon boxSize={3.5}>
-              <Download />
+              <Search />
             </Icon>
-            Export
-          </Button>
+          </IconButton>
+        </Tooltip>
+        {onExportAll && (
+          <Tooltip
+            content="Export the current view to CSV or JSON"
+            positioning={{ placement: "bottom" }}
+          >
+            <IconButton
+              size="xs"
+              variant="ghost"
+              onClick={onExportAll}
+              aria-label="Export traces"
+            >
+              <Icon boxSize={3.5}>
+                <Download />
+              </Icon>
+            </IconButton>
+          </Tooltip>
         )}
         <KeyboardShortcutsButton />
       </Flex>

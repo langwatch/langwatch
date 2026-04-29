@@ -9,8 +9,7 @@ const DEFAULT_DENSITY: Density = "compact";
  * Density is a personal preference, not a per-lens or per-URL setting.
  * Lives in its own zustand store backed by `localStorage` so the user's
  * choice persists across sessions and lens switches without leaking into
- * shared/URL state. Lenses may carry a `recommendedDensity` hint, but it's
- * advisory — the user's global pref always wins.
+ * shared/URL state.
  */
 function load(): Density {
   if (typeof window === "undefined") return DEFAULT_DENSITY;

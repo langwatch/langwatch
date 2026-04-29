@@ -15,6 +15,9 @@ import {
   useRef,
   useState,
 } from "react";
+import { FlameView } from "./flameView";
+import { SpanListView } from "./spanListView";
+import { WaterfallView } from "./waterfallView";
 import {
   LuChartGantt,
   LuChevronDown,
@@ -43,18 +46,9 @@ import { SPAN_TYPE_COLORS } from "../../utils/formatters";
 import { NewSpanFlash } from "./NewSpanFlash";
 import { SequenceSkeleton, TopologySkeleton } from "./sequenceView";
 
-// Each viz lives in its own chunk so the trace drawer's initial JS payload
-// stays small. Only the active tab's chunk is downloaded — and React only
-// mounts the active viz, so non-active ones cost nothing at runtime either.
-const WaterfallView = lazy(() =>
-  import("./waterfallView").then((m) => ({ default: m.WaterfallView })),
-);
-const FlameView = lazy(() =>
-  import("./flameView").then((m) => ({ default: m.FlameView })),
-);
-const SpanListView = lazy(() =>
-  import("./spanListView").then((m) => ({ default: m.SpanListView })),
-);
+// SequenceView pulls in `mermaid` (~1MB+ — d3, dagre, several parsers).
+// That's the only viz heavy enough to keep code-split — the others are
+// statically imported so tab switches stay synchronous.
 const SequenceView = lazy(() =>
   import("./sequenceView").then((m) => ({ default: m.SequenceView })),
 );
@@ -76,7 +70,6 @@ const DEFAULT_HEIGHT = 250;
 const EXPANDED_HEIGHT = 480;
 const MAX_HEIGHT = 700;
 const STORAGE_KEY = "langwatch:traces-v2:viz-height";
-const VIZ_TAB_STORAGE_KEY = "langwatch:traces-v2:viz-tab";
 
 function VizTabPresenceDot({
   traceId,
@@ -104,21 +97,53 @@ const TABS: {
   label: string;
   icon: typeof LuChartGantt;
   shortcut: string;
+  palette: string;
+  description: string;
 }[] = [
-  { value: "waterfall", label: "Waterfall", icon: LuChartGantt, shortcut: "1" },
-  { value: "flame", label: "Flame", icon: LuFlame, shortcut: "2" },
-  { value: "spanlist", label: "Span List", icon: LuList, shortcut: "3" },
+  {
+    value: "waterfall",
+    label: "Waterfall",
+    icon: LuChartGantt,
+    shortcut: "1",
+    palette: "blue",
+    description:
+      "Spans laid out by start time with parent/child indentation — best for tracing causality top-down.",
+  },
+  {
+    value: "flame",
+    label: "Flame",
+    icon: LuFlame,
+    shortcut: "2",
+    palette: "orange",
+    description:
+      "Stacked depth-first view showing where time is spent — best for spotting hotspots and deep call stacks.",
+  },
+  {
+    value: "spanlist",
+    label: "Span List",
+    icon: LuList,
+    shortcut: "3",
+    palette: "cyan",
+    description:
+      "Flat, sortable list of every span with type, duration, and tokens — best for searching and filtering.",
+  },
   {
     value: "topology",
     label: "Topology",
     icon: LuNetwork,
     shortcut: "4",
+    palette: "purple",
+    description:
+      "Service/agent graph showing what calls what — best for understanding system structure at a glance.",
   },
   {
     value: "sequence",
     label: "Sequence",
     icon: LuMessagesSquare,
     shortcut: "5",
+    palette: "teal",
+    description:
+      "Chat-style turn order between actors — best for replaying multi-agent conversations.",
   },
 ];
 
@@ -152,6 +177,27 @@ export function VizPlaceholder({
   const isDragging = useRef(false);
   const dragStartY = useRef(0);
   const dragStartHeight = useRef(0);
+
+  // Click-to-interact: viz panels capture wheel/drag events that would
+  // otherwise scroll the drawer body. Same pattern as IOViewer — overlay
+  // sits on top until the user opts in by clicking; clicking outside the
+  // viz disengages it. Switching tabs resets engagement.
+  const [vizEngaged, setVizEngaged] = useState(false);
+  const vizEngagedRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    setVizEngaged(false);
+  }, [vizTab]);
+  useEffect(() => {
+    if (!vizEngaged) return;
+    const onPointerDown = (e: MouseEvent) => {
+      const target = e.target as Node | null;
+      if (!target || !vizEngagedRef.current) return;
+      if (vizEngagedRef.current.contains(target)) return;
+      setVizEngaged(false);
+    };
+    document.addEventListener("mousedown", onPointerDown);
+    return () => document.removeEventListener("mousedown", onPointerDown);
+  }, [vizEngaged]);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const isMinimized = height === 0;
@@ -173,11 +219,6 @@ export function VizPlaceholder({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hasData]);
-
-  // Persist viz tab preference
-  useEffect(() => {
-    localStorage.setItem(VIZ_TAB_STORAGE_KEY, vizTab);
-  }, [vizTab]);
 
   // Handle cross-view navigation: waterfall group → span list
   const handleSwitchToSpanList = useCallback(
@@ -289,8 +330,9 @@ export function VizPlaceholder({
               return (
                 <Tooltip
                   key={tab.value}
-                  content={tab.label}
+                  content={tab.description}
                   positioning={{ placement: "top" }}
+                  openDelay={400}
                 >
                   <Flex
                     as="button"
@@ -300,13 +342,15 @@ export function VizPlaceholder({
                     paddingY={1}
                     borderRadius="md"
                     cursor="pointer"
-                    bg={isActive ? "bg.emphasized" : "transparent"}
-                    color={isActive ? "fg" : "fg.muted"}
+                    bg={isActive ? `${tab.palette}.subtle` : "transparent"}
+                    color={`${tab.palette}.fg`}
                     _hover={{
-                      bg: isActive ? "bg.emphasized" : "bg.muted",
-                      color: "fg",
+                      bg: isActive
+                        ? `${tab.palette}.subtle`
+                        : `${tab.palette}.subtle/40`,
                     }}
-                    transition="background 0.15s ease, color 0.15s ease"
+                    _active={{ transform: "scale(0.96)" }}
+                    transition="background 0.15s ease, transform 0.1s ease"
                     onClick={() => handleVizTabChange(tab.value)}
                     fontWeight="medium"
                   >
@@ -369,6 +413,7 @@ export function VizPlaceholder({
         {/* Visualization content */}
         {!isMinimized && (
           <Box
+            ref={vizEngagedRef}
             height={`${height}px`}
             overflow="hidden"
             transition={isDragging.current ? "none" : "height 0.2s ease"}
@@ -394,52 +439,70 @@ export function VizPlaceholder({
                 </Flex>
               ) : isCollapsed ? (
                 <CollapsedOverview spans={spans} />
-              ) : (
+              ) : vizTab === "waterfall" ? (
+                <WaterfallView
+                  spans={spans}
+                  selectedSpanId={selectedSpanId}
+                  onSelectSpan={onSelectSpan}
+                  onClearSpan={onClearSpan}
+                  onSwitchToSpanList={handleSwitchToSpanList}
+                />
+              ) : vizTab === "flame" ? (
+                <FlameView
+                  spans={spans}
+                  selectedSpanId={selectedSpanId}
+                  onSelectSpan={onSelectSpan}
+                  onClearSpan={onClearSpan}
+                />
+              ) : vizTab === "topology" || vizTab === "sequence" ? (
                 <Suspense fallback={<VizSkeleton vizTab={vizTab} />}>
-                  {vizTab === "waterfall" ? (
-                    <WaterfallView
-                      spans={spans}
-                      selectedSpanId={selectedSpanId}
-                      onSelectSpan={onSelectSpan}
-                      onClearSpan={onClearSpan}
-                      onSwitchToSpanList={handleSwitchToSpanList}
-                    />
-                  ) : vizTab === "flame" ? (
-                    <FlameView
-                      spans={spans}
-                      selectedSpanId={selectedSpanId}
-                      onSelectSpan={onSelectSpan}
-                      onClearSpan={onClearSpan}
-                    />
-                  ) : vizTab === "topology" ? (
-                    <SequenceView
-                      spans={spans}
-                      selectedSpanId={selectedSpanId}
-                      onSelectSpan={onSelectSpan}
-                      onClearSpan={onClearSpan}
-                      subMode="topology"
-                    />
-                  ) : vizTab === "sequence" ? (
-                    <SequenceView
-                      spans={spans}
-                      selectedSpanId={selectedSpanId}
-                      onSelectSpan={onSelectSpan}
-                      onClearSpan={onClearSpan}
-                      subMode="sequence"
-                    />
-                  ) : (
-                    <SpanListView
-                      spans={spans}
-                      selectedSpanId={selectedSpanId}
-                      onSelectSpan={onSelectSpan}
-                      onClearSpan={onClearSpan}
-                      initialSearch={spanListSearch}
-                      initialTypeFilter={spanListTypeFilter}
-                    />
-                  )}
+                  <SequenceView
+                    spans={spans}
+                    selectedSpanId={selectedSpanId}
+                    onSelectSpan={onSelectSpan}
+                    onClearSpan={onClearSpan}
+                    subMode={vizTab}
+                  />
                 </Suspense>
+              ) : (
+                <SpanListView
+                  spans={spans}
+                  selectedSpanId={selectedSpanId}
+                  onSelectSpan={onSelectSpan}
+                  onClearSpan={onClearSpan}
+                  initialSearch={spanListSearch}
+                  initialTypeFilter={spanListTypeFilter}
+                />
               )}
             </PeerCursorOverlay>
+            {!isCollapsed && !vizEngaged && spans.length > 0 && !isLoading && (
+              <Box
+                position="absolute"
+                inset={0}
+                cursor="zoom-in"
+                onClick={() => setVizEngaged(true)}
+                display="flex"
+                alignItems="flex-end"
+                justifyContent="center"
+                paddingBottom={2}
+                background="linear-gradient(to bottom, transparent 70%, var(--chakra-colors-bg-subtle) 100%)"
+                zIndex={5}
+              >
+                <Text
+                  textStyle="2xs"
+                  color="fg.muted"
+                  fontWeight="medium"
+                  bg="bg.surface"
+                  paddingX={2}
+                  paddingY={0.5}
+                  borderRadius="full"
+                  borderWidth="1px"
+                  borderColor="border"
+                >
+                  Click to interact
+                </Text>
+              </Box>
+            )}
           </Box>
         )}
 

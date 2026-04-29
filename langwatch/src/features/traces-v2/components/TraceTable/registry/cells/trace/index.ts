@@ -41,7 +41,7 @@ type RequiredTraceCells = Record<
   CellDef<TraceListItem>
 >;
 
-export const traceCells: RequiredTraceCells & Record<string, CellDef<TraceListItem>> = {
+export const traceCells = {
   [TraceSelectCell.id]: TraceSelectCell,
   [TimeCell.id]: TimeCell,
   [TraceCell.id]: TraceCell,
@@ -66,4 +66,4 @@ export const traceCells: RequiredTraceCells & Record<string, CellDef<TraceListIt
   [InputCell.id]: InputCell,
   [OutputCell.id]: OutputCell,
   [ErrorTextCell.id]: ErrorTextCell,
-};
+} satisfies RequiredTraceCells & Record<string, CellDef<TraceListItem>>;

@@ -446,11 +446,10 @@ const routes: RouteObject[] = [
     ...page(() => import("./pages/@project/[...path]/index")),
   },
 
-  // Catch-all 404 — must stay last. Replaces the React Router dev fallback
-  // (the raw "Hey developer 👋" string) with a styled page.
+  // Catch-all 404 — must stay last.
   {
     path: "*",
-    ...page(() => import("./pages/_not-found")),
+    ...page(() => import("./pages/not-found")),
   },
 ];
 

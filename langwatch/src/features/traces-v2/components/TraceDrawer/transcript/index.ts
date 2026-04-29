@@ -10,4 +10,4 @@ export * from "./TurnView";
 export * from "./turns";
 export * from "./types";
 export * from "./UserTurnBubble";
-export * from "./VirtualizedChatList";
+export * from "./ConversationTurnsList";

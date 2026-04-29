@@ -1,5 +1,5 @@
-import { Button, Text } from "@chakra-ui/react";
-import { Columns3 } from "lucide-react";
+import { Box, Button, Text } from "@chakra-ui/react";
+import { ChevronDown, Columns3 } from "lucide-react";
 import type React from "react";
 import {
   MenuCheckboxItem,
@@ -13,7 +13,7 @@ import type { ColumnConfig } from "../../stores/viewStore";
 import { useViewStore } from "../../stores/viewStore";
 
 const SECTIONS: { key: ColumnConfig["section"]; title: string }[] = [
-  { key: "standard", title: "Standard" },
+  { key: "standard", title: "" },
   { key: "evaluations", title: "Evaluations" },
   { key: "events", title: "Events" },
 ];
@@ -38,18 +38,40 @@ export const ColumnsDropdown: React.FC = () => {
   return (
     <MenuRoot closeOnSelect={false}>
       <MenuTrigger asChild>
-        <Button size="xs" variant="outline" fontWeight="normal">
-          <Columns3 size={12} />
-          Columns
+        <Button
+          size="xs"
+          variant="outline"
+          aria-label="Show or hide columns in the table"
+          gap={1}
+          paddingX={2}
+        >
+          <Columns3 size={14} />
+          <ChevronDown size={12} />
         </Button>
       </MenuTrigger>
       <MenuContent
-        minWidth="160px"
+        minWidth="180px"
         maxHeight="320px"
         overflowY="auto"
         textStyle="xs"
         paddingY={1}
       >
+        <Box
+          paddingX={3}
+          paddingY={2}
+          borderBottomWidth="1px"
+          borderColor="border.subtle"
+        >
+          <Text
+            textStyle="2xs"
+            fontWeight="semibold"
+            color="fg.muted"
+            textTransform="uppercase"
+            letterSpacing="0.06em"
+          >
+            Columns
+          </Text>
+        </Box>
         {SECTIONS.map(({ key, title }) => {
           const columns = STANDARD_COLUMNS.filter((c) => c.section === key);
           if (columns.length === 0) return null;
@@ -82,6 +104,10 @@ const ColumnCheckbox: React.FC<{
       value={column.id}
       checked={checked}
       disabled={isPinned}
+      // Ark splits closeOnSelect at the item level, not the root, so the
+      // MenuRoot-level setting doesn't reach MenuCheckboxItem. Set it here
+      // so toggling stays open for multi-column changes.
+      closeOnSelect={false}
       fontSize="xs"
       paddingY={1}
       onCheckedChange={() => {

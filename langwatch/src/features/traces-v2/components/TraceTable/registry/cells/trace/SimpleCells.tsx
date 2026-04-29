@@ -7,13 +7,13 @@ import type { CellDef } from "../../types";
 
 const dash = "—";
 
-export const StatusCell: CellDef<TraceListItem> = {
+export const StatusCell = {
   id: "status",
   label: "Status",
   render: ({ row }) => <StatusIndicator status={row.status} />,
-};
+} as const satisfies CellDef<TraceListItem>;
 
-export const TtftCell: CellDef<TraceListItem> = {
+export const TtftCell = {
   id: "ttft",
   label: "TTFT",
   render: ({ row }) => (
@@ -24,9 +24,9 @@ export const TtftCell: CellDef<TraceListItem> = {
       {row.ttft != null ? formatDuration(row.ttft) : dash}
     </Text>
   ),
-};
+} as const satisfies CellDef<TraceListItem>;
 
-export const UserIdCell: CellDef<TraceListItem> = {
+export const UserIdCell = {
   id: "userId",
   label: "User ID",
   render: ({ row }) => (
@@ -39,9 +39,9 @@ export const UserIdCell: CellDef<TraceListItem> = {
       {row.userId || dash}
     </Text>
   ),
-};
+} as const satisfies CellDef<TraceListItem>;
 
-export const ConversationIdCell: CellDef<TraceListItem> = {
+export const ConversationIdCell = {
   id: "conversationId",
   label: "Conversation ID",
   render: ({ row }) => (
@@ -54,7 +54,7 @@ export const ConversationIdCell: CellDef<TraceListItem> = {
       {row.conversationId || dash}
     </Text>
   ),
-};
+} as const satisfies CellDef<TraceListItem>;
 
 const ORIGIN_LABEL: Record<TraceListItem["origin"], string> = {
   application: "App",
@@ -62,7 +62,7 @@ const ORIGIN_LABEL: Record<TraceListItem["origin"], string> = {
   evaluation: "Eval",
 };
 
-export const OriginCell: CellDef<TraceListItem> = {
+export const OriginCell = {
   id: "origin",
   label: "Origin",
   render: ({ row }) => (
@@ -70,9 +70,9 @@ export const OriginCell: CellDef<TraceListItem> = {
       {ORIGIN_LABEL[row.origin] ?? row.origin}
     </Text>
   ),
-};
+} as const satisfies CellDef<TraceListItem>;
 
-export const TokensInCell: CellDef<TraceListItem> = {
+export const TokensInCell = {
   id: "tokensIn",
   label: "Tokens In",
   render: ({ row }) => (
@@ -83,9 +83,9 @@ export const TokensInCell: CellDef<TraceListItem> = {
       {row.inputTokens != null ? formatTokens(row.inputTokens) : dash}
     </Text>
   ),
-};
+} as const satisfies CellDef<TraceListItem>;
 
-export const TokensOutCell: CellDef<TraceListItem> = {
+export const TokensOutCell = {
   id: "tokensOut",
   label: "Tokens Out",
   render: ({ row }) => (
@@ -96,4 +96,4 @@ export const TokensOutCell: CellDef<TraceListItem> = {
       {row.outputTokens != null ? formatTokens(row.outputTokens) : dash}
     </Text>
   ),
-};
+} as const satisfies CellDef<TraceListItem>;

@@ -7,7 +7,7 @@ import {
   Icon,
   Text,
 } from "@chakra-ui/react";
-import { memo } from "react";
+import { memo, useMemo } from "react";
 import { LuChevronDown, LuFileText, LuPin, LuPinOff, LuX } from "react-icons/lu";
 import { Kbd } from "~/components/ops/shared/Kbd";
 import { Menu } from "~/components/ui/menu";
@@ -19,7 +19,7 @@ import {
 } from "~/features/presence/stores/presenceStore";
 import type { SpanTreeNode } from "~/server/api/routers/tracesV2.schemas";
 import { usePrefetchSpanDetail } from "../../hooks/usePrefetchSpanDetail";
-import type { DrawerTab } from "../../stores/drawerStore";
+import { type DrawerTab, useDrawerStore } from "../../stores/drawerStore";
 import {
   abbreviateModel,
   formatDuration,
@@ -49,17 +49,9 @@ const SPAN_TYPE_PALETTE: Record<string, string> = {
 };
 
 interface SpanTabBarProps {
-  activeTab: DrawerTab;
-  onTabChange: (tab: DrawerTab) => void;
-  selectedSpan: SpanTreeNode | null;
-  onCloseSpanTab: () => void;
-  pinnedSpans: SpanTreeNode[];
-  onSelectSpan: (spanId: string) => void;
-  onPinSpan: (spanId: string) => void;
-  onUnpinSpan: (spanId: string) => void;
-  traceId?: string;
+  spanTree: SpanTreeNode[];
   /** Distinct prompt references on this trace — drives the Prompts tab. */
-  promptCount?: number;
+  promptCount: number;
 }
 
 function DrawerTabPresenceDot({
@@ -103,21 +95,46 @@ function SpanFocusPresenceDot({
 }
 
 export const SpanTabBar = memo(function SpanTabBar({
-  activeTab,
-  onTabChange,
-  selectedSpan,
-  onCloseSpanTab,
-  pinnedSpans,
-  onSelectSpan,
-  onPinSpan,
-  onUnpinSpan,
-  traceId,
-  promptCount = 0,
+  spanTree,
+  promptCount,
 }: SpanTabBarProps) {
+  const traceId = useDrawerStore((s) => s.traceId);
+  const activeTab = useDrawerStore((s) => s.activeTab);
+  const selectedSpanId = useDrawerStore((s) => s.selectedSpanId);
+  const pinnedSpanIds = useDrawerStore((s) => s.pinnedSpanIds);
+  const setActiveTab = useDrawerStore((s) => s.setActiveTab);
+  const selectSpan = useDrawerStore((s) => s.selectSpan);
+  const clearSpan = useDrawerStore((s) => s.clearSpan);
+  const pinSpan = useDrawerStore((s) => s.pinSpan);
+  const unpinSpan = useDrawerStore((s) => s.unpinSpan);
+  const prefetchSpan = usePrefetchSpanDetail();
+
+  const selectedSpan = useMemo(
+    () =>
+      selectedSpanId
+        ? (spanTree.find((s) => s.spanId === selectedSpanId) ?? null)
+        : null,
+    [selectedSpanId, spanTree],
+  );
+
+  const pinnedSpans = useMemo(
+    () =>
+      pinnedSpanIds
+        .map((id) => spanTree.find((s) => s.spanId === id))
+        .filter((s): s is SpanTreeNode => s != null),
+    [pinnedSpanIds, spanTree],
+  );
+
   const isSelectedPinned = selectedSpan
     ? pinnedSpans.some((s) => s.spanId === selectedSpan.spanId)
     : false;
-  const prefetchSpan = usePrefetchSpanDetail();
+
+  const overflowing = pinnedSpans.length > MAX_INLINE_PINNED;
+  const inlineCount = overflowing
+    ? INLINE_KEEP_WHEN_OVERFLOW
+    : pinnedSpans.length;
+  const inlinePinned = pinnedSpans.slice(0, inlineCount);
+  const overflowPinned = overflowing ? pinnedSpans.slice(inlineCount) : [];
 
   return (
     <HStack
@@ -129,180 +146,97 @@ export const SpanTabBar = memo(function SpanTabBar({
       flexShrink={0}
       align="stretch"
       minHeight="38px"
+      bg="bg.panel"
       css={{ "&::-webkit-scrollbar": { display: "none" } }}
     >
-      <Tooltip
-        content={
-          <HStack gap={1}>
-            <Text>Show trace summary</Text>
-            <Kbd>O</Kbd>
-          </HStack>
-        }
-        positioning={{ placement: "bottom" }}
-      >
-        <Button
-          size="sm"
-          variant="ghost"
-          borderRadius={0}
-          borderBottomWidth="2px"
-          borderBottomColor={
-            activeTab === "summary" ? "blue.solid" : "transparent"
-          }
-          color={activeTab === "summary" ? "fg" : "fg.muted"}
-          fontWeight={activeTab === "summary" ? "semibold" : "medium"}
-          onClick={() => onTabChange("summary")}
-          paddingX={3}
-          paddingY={0}
-          height="38px"
-          flexShrink={0}
-          gap={1.5}
-        >
-          Trace
-          <Kbd>O</Kbd>
-          {traceId ? (
-            <DrawerTabPresenceDot traceId={traceId} tab="summary" />
-          ) : null}
-        </Button>
-      </Tooltip>
+      <DrawerTabButton
+        label="Summary"
+        shortcut="O"
+        tooltip="Show trace summary"
+        active={activeTab === "summary"}
+        activeColorPalette="blue"
+        onClick={() => setActiveTab("summary")}
+        traceId={traceId}
+        tab="summary"
+      />
 
-      <Tooltip
-        content={
-          <HStack gap={1}>
-            <Text>Token-efficient summary for an LLM</Text>
-            <Kbd>L</Kbd>
-          </HStack>
-        }
-        positioning={{ placement: "bottom" }}
-      >
-        <Button
-          size="sm"
-          variant="ghost"
-          borderRadius={0}
-          borderBottomWidth="2px"
-          borderBottomColor={
-            activeTab === "llm" ? "purple.solid" : "transparent"
-          }
-          color={activeTab === "llm" ? "purple.fg" : "fg.muted"}
-          fontWeight={activeTab === "llm" ? "semibold" : "medium"}
-          onClick={() => onTabChange("llm")}
-          paddingX={3}
-          paddingY={0}
-          height="38px"
-          flexShrink={0}
-          gap={1.5}
-        >
-          LLM
-          <Kbd>L</Kbd>
-          {traceId ? (
-            <DrawerTabPresenceDot traceId={traceId} tab="llm" />
-          ) : null}
-        </Button>
-      </Tooltip>
+      <DrawerTabButton
+        label="LLM-Optimized"
+        shortcut="L"
+        tooltip="Token-efficient summary for an LLM"
+        active={activeTab === "llm"}
+        activeColorPalette="purple"
+        onClick={() => setActiveTab("llm")}
+        traceId={traceId}
+        tab="llm"
+      />
 
-      {/* Prompts tab — only when this trace used managed prompts. The
-          chip in the header is the lightweight peek; this tab is the full
+      {/* Prompts tab — only when this trace used managed prompts. The chip
+          in the header is the lightweight peek; this tab is the full
           rollup grouped by prompt + version. */}
       {promptCount > 0 && (
-        <Tooltip
-          content={
-            <HStack gap={1}>
-              <Text>Prompts used in this trace</Text>
-              <Kbd>P</Kbd>
-            </HStack>
-          }
-          positioning={{ placement: "bottom" }}
-        >
-          <Button
-            size="sm"
-            variant="ghost"
-            borderRadius={0}
-            borderBottomWidth="2px"
-            borderBottomColor={
-              activeTab === "prompts" ? "blue.solid" : "transparent"
-            }
-            color={activeTab === "prompts" ? "fg" : "fg.muted"}
-            fontWeight={activeTab === "prompts" ? "semibold" : "medium"}
-            onClick={() => onTabChange("prompts")}
-            paddingX={3}
-            paddingY={0}
-            height="38px"
-            flexShrink={0}
-            gap={1.5}
-          >
-            <Icon as={LuFileText} boxSize={3.5} />
-            Prompts
-            <Kbd>P</Kbd>
+        <DrawerTabButton
+          label="Prompts"
+          shortcut="P"
+          tooltip="Prompts used in this trace"
+          icon={<Icon as={LuFileText} boxSize={3.5} />}
+          active={activeTab === "prompts"}
+          activeColorPalette="blue"
+          onClick={() => setActiveTab("prompts")}
+          traceId={traceId}
+          tab="prompts"
+          badge={
             <Badge size="xs" variant="subtle" colorPalette="blue">
               {promptCount}
             </Badge>
-            {traceId ? (
-              <DrawerTabPresenceDot traceId={traceId} tab="prompts" />
-            ) : null}
-          </Button>
-        </Tooltip>
+          }
+        />
       )}
 
-      {/* Pinned span tabs — first N inline, the rest collapse into a dropdown
-          to keep the strip readable when many spans are pinned. */}
-      {(() => {
-        const overflowing = pinnedSpans.length > MAX_INLINE_PINNED;
-        const inlineCount = overflowing
-          ? INLINE_KEEP_WHEN_OVERFLOW
-          : pinnedSpans.length;
-        const inline = pinnedSpans.slice(0, inlineCount);
-        const overflow = overflowing ? pinnedSpans.slice(inlineCount) : [];
-        return (
-          <>
-            {inline.map((span) => {
-              const isActive =
-                activeTab === "span" && selectedSpan?.spanId === span.spanId;
-              return (
-                <SpanTab
-                  key={span.spanId}
-                  span={span}
-                  isActive={isActive}
-                  onClick={() => onSelectSpan(span.spanId)}
-                  onHover={() => prefetchSpan(span.spanId)}
-                  actionIcon={<Icon as={LuPinOff} boxSize={3} />}
-                  actionLabel="Unpin span tab"
-                  onAction={() => onUnpinSpan(span.spanId)}
-                  presence={
-                    traceId ? (
-                      <SpanFocusPresenceDot
-                        traceId={traceId}
-                        spanId={span.spanId}
-                      />
-                    ) : null
-                  }
-                />
-              );
-            })}
-            {overflow.length > 0 && (
-              <PinnedSpanOverflowMenu
-                spans={overflow}
-                activeSpanId={
-                  activeTab === "span" ? (selectedSpan?.spanId ?? null) : null
-                }
-                onSelectSpan={onSelectSpan}
-                onUnpinSpan={onUnpinSpan}
-              />
-            )}
-          </>
-        );
-      })()}
+      {/* Pinned span tabs — first N inline, the rest collapse into a
+          dropdown to keep the strip readable when many spans are pinned. */}
+      {inlinePinned.map((span) => (
+        <SpanTab
+          key={span.spanId}
+          span={span}
+          isActive={
+            activeTab === "span" && selectedSpan?.spanId === span.spanId
+          }
+          onClick={() => selectSpan(span.spanId)}
+          onHover={() => prefetchSpan(span.spanId)}
+          actionIcon={<Icon as={LuPinOff} boxSize={3} />}
+          actionLabel="Unpin span tab"
+          onAction={() => unpinSpan(span.spanId)}
+          presence={
+            traceId ? (
+              <SpanFocusPresenceDot traceId={traceId} spanId={span.spanId} />
+            ) : null
+          }
+        />
+      ))}
+      {overflowPinned.length > 0 && (
+        <PinnedSpanOverflowMenu
+          spans={overflowPinned}
+          activeSpanId={
+            activeTab === "span" ? (selectedSpan?.spanId ?? null) : null
+          }
+          onSelectSpan={selectSpan}
+          onUnpinSpan={unpinSpan}
+        />
+      )}
 
       {/* Ephemeral span tab — only if selected span is not pinned */}
       {selectedSpan && !isSelectedPinned && (
         <SpanTab
           span={selectedSpan}
           isActive={activeTab === "span"}
-          onClick={() => onTabChange("span")}
+          onClick={() => setActiveTab("span")}
           actionIcon={<Icon as={LuPin} boxSize={3} />}
           actionLabel="Pin span tab"
-          onAction={() => onPinSpan(selectedSpan.spanId)}
+          onAction={() => pinSpan(selectedSpan.spanId)}
           secondaryActionIcon={<Icon as={LuX} boxSize={3} />}
           secondaryActionLabel="Close span tab"
-          onSecondaryAction={onCloseSpanTab}
+          onSecondaryAction={clearSpan}
           presence={
             traceId ? (
               <SpanFocusPresenceDot
@@ -316,6 +250,68 @@ export const SpanTabBar = memo(function SpanTabBar({
     </HStack>
   );
 });
+
+interface DrawerTabButtonProps {
+  label: string;
+  shortcut: string;
+  tooltip: string;
+  active: boolean;
+  activeColorPalette: "blue" | "purple";
+  onClick: () => void;
+  icon?: React.ReactNode;
+  badge?: React.ReactNode;
+  traceId: string | null;
+  tab: DrawerTab;
+}
+
+function DrawerTabButton({
+  label,
+  shortcut,
+  tooltip,
+  active,
+  activeColorPalette,
+  onClick,
+  icon,
+  badge,
+  traceId,
+  tab,
+}: DrawerTabButtonProps) {
+  const activeBorder = activeColorPalette === "purple" ? "purple.solid" : "blue.solid";
+  const activeColor = activeColorPalette === "purple" ? "purple.fg" : "fg";
+  return (
+    <Tooltip
+      content={
+        <HStack gap={1}>
+          <Text>{tooltip}</Text>
+          <Kbd>{shortcut}</Kbd>
+        </HStack>
+      }
+      positioning={{ placement: "bottom" }}
+    >
+      <Button
+        size="sm"
+        variant="ghost"
+        borderRadius={0}
+        borderBottomWidth="2px"
+        borderBottomColor={active ? activeBorder : "transparent"}
+        color={active ? activeColor : "fg.muted"}
+        fontWeight={active ? "semibold" : "medium"}
+        onClick={onClick}
+        paddingX={3}
+        paddingY={0}
+        height="38px"
+        flexShrink={0}
+        gap={1.5}
+      >
+        {icon}
+        {label}
+        <Kbd>{shortcut}</Kbd>
+        {badge}
+        {traceId ? <DrawerTabPresenceDot traceId={traceId} tab={tab} /> : null}
+      </Button>
+    </Tooltip>
+  );
+}
 
 interface SpanTabProps {
   span: SpanTreeNode;
@@ -472,8 +468,8 @@ interface PinnedSpanOverflowMenuProps {
 
 /**
  * Dropdown picker for pinned spans that overflowed the inline tab strip.
- * Each menu item behaves like a tab row: clicking the body selects the span,
- * the unpin button on the right removes it without closing the menu.
+ * Each menu item behaves like a tab row: clicking the body selects the
+ * span, the unpin button on the right removes it without closing the menu.
  */
 function PinnedSpanOverflowMenu({
   spans,

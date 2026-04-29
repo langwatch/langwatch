@@ -12,7 +12,6 @@ import {
   toggleFacetInQuery,
   validateAst,
 } from "~/server/app-layer/traces/query-language/queryParser";
-import { useViewStore } from "./viewStore";
 
 export interface TimeRange {
   from: number;
@@ -44,9 +43,9 @@ interface FilterState {
   /** Set query text and AST together */
   setQuery: (text: string, ast: LiqeQuery) => void;
   /**
-   * Apply a saved lens's filter expression without notifying viewStore.
-   * Used when activating/reverting a lens — bypasses the dirty-tracking
-   * round-trip so loading a lens doesn't immediately mark it dirty.
+   * Apply a saved lens's filter expression. Identical to `applyQueryText`
+   * except a parse error in saved data falls back to empty silently
+   * rather than surfacing the error to the user.
    */
   setFilterFromLens: (text: string) => void;
 
@@ -125,21 +124,10 @@ function applyMutation(state: FilterState, mutate: (text: string) => string) {
 }
 
 /**
- * Notify the lens/view store that the filter expression changed so it can
- * mark the active lens as dirty (drives the unsaved-dot in the lens tab).
- *
- * Called imperatively from filter actions — this is a one-way edge
- * (filterStore → viewStore). viewStore never subscribes to filterStore;
- * when it needs the current query text it reads `getState()` on demand.
+ * Pure store. The lens dirty-tracking is handled by `useLensFilterDirtySync`
+ * (mounted in TracesPage), which subscribes to `queryText` and updates the
+ * active lens's draft. filterStore never reaches into viewStore.
  */
-function notifyViewStoreFilterChanged(text: string): void {
-  try {
-    useViewStore.getState().setFilterDraft(text);
-  } catch {
-    // viewStore not initialised yet (e.g. during HMR boot) — safe to ignore.
-  }
-}
-
 export const useFilterStore = create<FilterState>((set, get) => ({
   ast: EMPTY_AST,
   queryText: "",
@@ -150,7 +138,7 @@ export const useFilterStore = create<FilterState>((set, get) => ({
   debouncedQueryText: "",
   debouncedTimeRange: INITIAL_TIME_RANGE,
 
-  applyQueryText: (text) => {
+  applyQueryText: (text) =>
     set((state) => {
       const result = safeParseAndSerialize(text);
       if (result.parseError) {
@@ -172,19 +160,15 @@ export const useFilterStore = create<FilterState>((set, get) => ({
         return state;
       }
       return { ...result, page: 1 };
-    });
-    notifyViewStoreFilterChanged(get().queryText);
-  },
+    }),
 
-  setQuery: (text, ast) => {
+  setQuery: (text, ast) =>
     set({
       ast,
       queryText: text,
       parseError: null,
       page: 1,
-    });
-    notifyViewStoreFilterChanged(text);
-  },
+    }),
 
   setFilterFromLens: (text) =>
     set(() => {
@@ -202,7 +186,7 @@ export const useFilterStore = create<FilterState>((set, get) => ({
       return { ...result, page: 1 };
     }),
 
-  toggleFacet: (field, value) => {
+  toggleFacet: (field, value) =>
     set((s) =>
       applyMutation(s, (q) =>
         toggleFacetInQuery(
@@ -212,54 +196,36 @@ export const useFilterStore = create<FilterState>((set, get) => ({
           getFacetValueState(s.ast, field, value),
         ),
       ),
-    );
-    notifyViewStoreFilterChanged(get().queryText);
-  },
+    ),
 
-  removeFacet: (field, value) => {
+  removeFacet: (field, value) =>
     set((s) =>
       applyMutation(s, (q) => removeFacetValueFromQuery(q, field, value)),
-    );
-    notifyViewStoreFilterChanged(get().queryText);
-  },
+    ),
 
-  removeField: (field) => {
-    set((s) => applyMutation(s, (q) => removeFieldFromQuery(q, field)));
-    notifyViewStoreFilterChanged(get().queryText);
-  },
+  removeField: (field) =>
+    set((s) => applyMutation(s, (q) => removeFieldFromQuery(q, field))),
 
-  setRange: (field, from, to) => {
-    set((s) => applyMutation(s, (q) => setRangeInQuery(q, field, from, to)));
-    notifyViewStoreFilterChanged(get().queryText);
-  },
+  setRange: (field, from, to) =>
+    set((s) => applyMutation(s, (q) => setRangeInQuery(q, field, from, to))),
 
-  removeRange: (field) => {
-    set((s) => applyMutation(s, (q) => removeFieldFromQuery(q, field)));
-    notifyViewStoreFilterChanged(get().queryText);
-  },
+  removeRange: (field) =>
+    set((s) => applyMutation(s, (q) => removeFieldFromQuery(q, field))),
 
   setTimeRange: (range) => set({ timeRange: range, page: 1 }),
   rollTimeRange: (range) => set({ timeRange: range }),
   setPage: (page) => set({ page }),
   setPageSize: (size) => set({ pageSize: size, page: 1 }),
-  clearAll: () => {
+  clearAll: () =>
     set({
       ast: EMPTY_AST,
       queryText: "",
       parseError: null,
       page: 1,
-    });
-    notifyViewStoreFilterChanged("");
-  },
+    }),
 
   commitDebounced: () => {
     const s = get();
-    if (
-      s.queryText === s.debouncedQueryText &&
-      s.timeRange === s.debouncedTimeRange
-    ) {
-      return;
-    }
     // Don't commit a query string the server will reject — keep the previous
     // debounced value so polling/refetches don't re-fire the doomed request.
     set({
@@ -268,3 +234,13 @@ export const useFilterStore = create<FilterState>((set, get) => ({
     });
   },
 }));
+
+// Allow other modules to read the canonical filter text without importing
+// the React hook (used by `useLensStore` actions like create/save).
+export function getCurrentFilterText(): string {
+  try {
+    return useFilterStore.getState().queryText;
+  } catch {
+    return "";
+  }
+}

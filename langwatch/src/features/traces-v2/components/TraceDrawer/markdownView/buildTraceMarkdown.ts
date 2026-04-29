@@ -850,3 +850,44 @@ export function buildTraceMarkdown(
 
   return lines.join("\n").trim();
 }
+
+export interface TraceMarkdownChunk {
+  /** Stable key for virtualization. */
+  id: string;
+  /** Markdown source for this section. */
+  markdown: string;
+}
+
+/**
+ * Split a trace markdown blob into chunks at top-level heading boundaries
+ * (`# `) so a virtualized list can mount one section at a time. The first
+ * chunk is the preamble (title + subtitle + metric strip + detail block);
+ * each subsequent chunk carries one `# section` heading + its body.
+ *
+ * The Copy button still uses the full string — chunking is purely a
+ * rendering optimisation for very long traces.
+ */
+export function splitTraceMarkdown(markdown: string): TraceMarkdownChunk[] {
+  if (!markdown) return [];
+  const lines = markdown.split("\n");
+  const chunks: TraceMarkdownChunk[] = [];
+  let current: string[] = [];
+  let currentId = "preamble";
+  let counter = 0;
+  const flush = () => {
+    if (current.length === 0) return;
+    const body = current.join("\n").replace(/\s+$/, "");
+    if (body.length > 0) chunks.push({ id: currentId, markdown: body });
+    current = [];
+  };
+  for (const line of lines) {
+    if (line.startsWith("# ")) {
+      flush();
+      counter += 1;
+      currentId = `${counter}-${line.slice(2).trim() || "section"}`;
+    }
+    current.push(line);
+  }
+  flush();
+  return chunks;
+}

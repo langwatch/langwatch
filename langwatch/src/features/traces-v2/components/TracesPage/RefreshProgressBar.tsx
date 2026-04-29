@@ -1,7 +1,8 @@
 import { motion } from "motion/react";
 import type React from "react";
 import { useEffect, useState } from "react";
-import { useFreshnessSignal } from "../../stores/freshnessSignal";
+import { useRefreshUIStore } from "../../stores/refreshUIStore";
+import { useWelcomeStore } from "../../stores/welcomeStore";
 import { AuroraSvg } from "./AuroraSvg";
 
 const FADE_MASK =
@@ -17,16 +18,16 @@ const WELCOME_BOOM_DURATION_MS = 1500;
 export const RefreshProgressBar: React.FC<RefreshProgressBarProps> = ({
   forceVisible,
 }) => {
-  const isRefreshing = useFreshnessSignal((s) => s.isRefreshing);
+  const isRefreshing = useRefreshUIStore((s) => s.isRefreshing);
 
   // Capture the welcome-boom flag once when the bar mounts and clear it,
   // so the dramatic swell only plays for the welcome flow. Every subsequent
   // refresh gets the mild fade. Holding `boomActive` true for a fixed
   // duration keeps the bar visible even if the underlying refetch resolves
   // sooner — otherwise the aurora vanishes mid-swell.
-  const [boomed] = useState(() => useFreshnessSignal.getState().welcomeBoom);
+  const [boomed] = useState(() => useWelcomeStore.getState().welcomeBoom);
   const [boomActive, setBoomActive] = useState(boomed);
-  const setWelcomeBoom = useFreshnessSignal((s) => s.setWelcomeBoom);
+  const setWelcomeBoom = useWelcomeStore((s) => s.setWelcomeBoom);
   useEffect(() => {
     if (!boomed) return;
     setWelcomeBoom(false);

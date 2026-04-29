@@ -310,12 +310,11 @@ export const tracesV2Router = createTRPCRouter({
    * query language so conversationIds with arbitrary characters work
    * unconditionally — builds a typed WHERE fragment server-side.
    */
-  threadContext: protectedProcedure
+  conversationContext: protectedProcedure
     .input(
       z.object({
         projectId: z.string(),
         conversationId: z.string().min(1),
-        traceId: z.string().min(1),
       }),
     )
     .use(checkProjectPermission("traces:view"))
@@ -346,15 +345,12 @@ export const tracesV2Router = createTRPCRouter({
         input: t.input ?? null,
         output: t.output ?? null,
       }));
-      const idx = turns.findIndex((t) => t.traceId === input.traceId);
+      // Position/previous/next are derived client-side from the active
+      // traceId so the cache key doesn't churn on J/K navigation.
       return {
         conversationId: input.conversationId,
         turns,
         total: turns.length,
-        position: idx === -1 ? 0 : idx + 1,
-        previous: idx > 0 ? (turns[idx - 1] ?? null) : null,
-        next:
-          idx >= 0 && idx < turns.length - 1 ? (turns[idx + 1] ?? null) : null,
       };
     }),
 

@@ -3,7 +3,8 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useTraceUpdateListener } from "~/hooks/useTraceUpdateListener";
 import { api } from "~/utils/api";
 import { useDrawerStore } from "../stores/drawerStore";
-import { useFreshnessSignal } from "../stores/freshnessSignal";
+import { useRefreshUIStore } from "../stores/refreshUIStore";
+import { useSseStatusStore } from "../stores/sseStatusStore";
 
 /**
  * Coordinator hook that bridges SSE trace events into TanStack Query
@@ -19,15 +20,20 @@ import { useFreshnessSignal } from "../stores/freshnessSignal";
 export function useTraceFreshness() {
   const { project } = useOrganizationTeamProject();
   const trpcUtils = api.useContext();
-  const requestFastPoll = useFreshnessSignal((s) => s.requestFastPoll);
-  const setSseConnectionState = useFreshnessSignal(
+  const requestFastPoll = useSseStatusStore((s) => s.requestFastPoll);
+  const setSseConnectionState = useSseStatusStore(
     (s) => s.setSseConnectionState,
   );
-  const setLastEventAt = useFreshnessSignal((s) => s.setLastEventAt);
-  const setRefresh = useFreshnessSignal((s) => s.setRefresh);
+  const setLastEventAt = useSseStatusStore((s) => s.setLastEventAt);
+  const pulse = useRefreshUIStore((s) => s.pulse);
 
   const onTraceSummaryUpdated = useCallback(
     (traceIds: string[]) => {
+      // Spin the refresh icon for every update event — invalidations that
+      // resolve from cache wouldn't otherwise flip isFetching long enough
+      // for the user to notice anything happened.
+      pulse();
+
       // Table-level invalidation — TQ only refetches mounted queries
       void trpcUtils.tracesV2.list.invalidate();
       void trpcUtils.tracesV2.discover.invalidate();
@@ -46,7 +52,7 @@ export function useTraceFreshness() {
         void trpcUtils.tracesV2.evals.invalidate({ traceId: openTraceId });
       }
     },
-    [trpcUtils, requestFastPoll],
+    [trpcUtils, requestFastPoll, pulse],
   );
 
   const onSpanStored = useCallback(
@@ -82,14 +88,4 @@ export function useTraceFreshness() {
       setLastEventAt(lastEventAt);
     }
   }, [lastEventAt, setLastEventAt]);
-
-  const refresh = useCallback(() => {
-    void trpcUtils.tracesV2.list.invalidate();
-    void trpcUtils.tracesV2.discover.invalidate();
-    void trpcUtils.tracesV2.newCount.invalidate();
-  }, [trpcUtils]);
-
-  useEffect(() => {
-    setRefresh(refresh);
-  }, [refresh, setRefresh]);
 }

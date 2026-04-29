@@ -16,6 +16,12 @@ interface ModeSwitchProps {
   hasConversation?: boolean;
   /** Trace id used to scope the per-mode peer presence dots. */
   traceId?: string;
+  /**
+   * Right-aligned trailing content for this row — typically the trace ID
+   * + relative timestamp. Sits in the same horizontal band as the tabs so
+   * the meta tucks neatly into the corner.
+   */
+  endSlot?: ReactNode;
 }
 
 interface TabProps {
@@ -115,6 +121,7 @@ export function ModeSwitch({
   turnLabel,
   hasConversation = true,
   traceId,
+  endSlot,
 }: ModeSwitchProps) {
   const presenceFor = (mode: DrawerViewMode) =>
     traceId ? <ModePresenceDot traceId={traceId} mode={mode} /> : null;
@@ -123,8 +130,6 @@ export function ModeSwitch({
     <HStack
       paddingX={4}
       gap={4}
-      borderBottomWidth="1px"
-      borderColor="border.muted"
       align="center"
     >
       <ModeTab
@@ -151,6 +156,14 @@ export function ModeSwitch({
         <Text textStyle="xs" color="fg.muted" marginLeft="auto">
           {turnLabel}
         </Text>
+      )}
+      {endSlot && (
+        <HStack
+          marginLeft={turnLabel && viewMode === "trace" ? undefined : "auto"}
+          flexShrink={0}
+        >
+          {endSlot}
+        </HStack>
       )}
     </HStack>
   );

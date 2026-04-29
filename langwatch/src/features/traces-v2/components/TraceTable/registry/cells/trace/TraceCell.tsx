@@ -6,7 +6,7 @@ import { TraceIdPeek } from "../../../../TraceIdPeek";
 import type { CellDef } from "../../types";
 import { SpanTypeBadge } from "./SpanTypeBadge";
 
-export const TraceCell: CellDef<TraceListItem> = {
+export const TraceCell = {
   id: "trace",
   label: "Trace",
   render: ({ row }) => (
@@ -27,7 +27,7 @@ export const TraceCell: CellDef<TraceListItem> = {
       <TracePresenceAvatars traceId={row.traceId} max={3} size="xs" />
     </HStack>
   ),
-};
+} as const satisfies CellDef<TraceListItem>;
 
 const TraceContent: React.FC<{
   trace: TraceListItem;

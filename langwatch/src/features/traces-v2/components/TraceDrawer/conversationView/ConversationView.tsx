@@ -8,6 +8,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import {
   Check,
   ChevronDown,
@@ -16,6 +17,8 @@ import {
   Settings2,
 } from "lucide-react";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { api, type RouterOutputs } from "~/utils/api";
 import { useConversationTurns } from "../../../hooks/useConversationTurns";
 import { useTraceDrawerNavigation } from "../../../hooks/useTraceDrawerNavigation";
 import type { TraceListItem } from "../../../types/trace";
@@ -30,6 +33,18 @@ import {
   parseLastUserText,
   parseSystemPrompt,
 } from "./utils";
+
+type AnnotationItem = RouterOutputs["annotation"]["getByTraceIds"][number];
+export type AnnotationsByTrace = Map<string, AnnotationItem[]>;
+const EMPTY_ANNOTATION_ITEMS: AnnotationItem[] = [];
+
+/**
+ * Below this turn count it's cheaper to render every row inline than to
+ * mount a scrolling virtualizer + measureElement refs.
+ */
+const VIRTUALIZE_AT = 12;
+/** Estimated row height for the virtualizer; refined by measureElement. */
+const ESTIMATED_TURN_HEIGHT = 220;
 
 interface ConversationViewProps {
   conversationId: string;
@@ -46,6 +61,28 @@ export const ConversationView = memo(function ConversationView({
 
   const turns =
     (query.data?.items as TraceListItem[] | undefined) ?? EMPTY_TURNS;
+
+  const traceIds = useMemo(() => turns.map((t) => t.traceId), [turns]);
+  const { project, hasPermission } = useOrganizationTeamProject();
+  const annotationsQuery = api.annotation.getByTraceIds.useQuery(
+    { projectId: project?.id ?? "", traceIds },
+    {
+      enabled:
+        !!project?.id &&
+        traceIds.length > 0 &&
+        hasPermission("annotations:view"),
+      keepPreviousData: true,
+    },
+  );
+  const annotationsByTrace = useMemo<AnnotationsByTrace>(() => {
+    const map: AnnotationsByTrace = new Map();
+    for (const a of annotationsQuery.data ?? []) {
+      const list = map.get(a.traceId);
+      if (list) list.push(a);
+      else map.set(a.traceId, [a]);
+    }
+    return map;
+  }, [annotationsQuery.data]);
 
   // Single pass over `turns`: pre-parse the latest user message and the
   // wall-clock gap to the previous turn. Without this, every ChatTurnRow
@@ -141,6 +178,7 @@ export const ConversationView = memo(function ConversationView({
           systemPromptInput={turns[0]?.input}
           currentTraceId={currentTraceId}
           onSelectTurn={handleSelectTurn}
+          annotationsByTrace={annotationsByTrace}
         />
       ) : mode === "annotations" ? (
         <AnnotationsView
@@ -313,11 +351,30 @@ const BubblesView: React.FC<{
   systemPromptInput: string | null | undefined;
   currentTraceId: string;
   onSelectTurn: (traceId: string) => void;
-}> = ({ parsedTurns, systemPromptInput, currentTraceId, onSelectTurn }) => {
+  annotationsByTrace: AnnotationsByTrace;
+}> = ({
+  parsedTurns,
+  systemPromptInput,
+  currentTraceId,
+  onSelectTurn,
+  annotationsByTrace,
+}) => {
   const systemPrompt = useMemo(
     () => parseSystemPrompt(systemPromptInput),
     [systemPromptInput],
   );
+
+  if (parsedTurns.length >= VIRTUALIZE_AT) {
+    return (
+      <VirtualizedBubblesView
+        parsedTurns={parsedTurns}
+        systemPrompt={systemPrompt}
+        currentTraceId={currentTraceId}
+        onSelectTurn={onSelectTurn}
+        annotationsByTrace={annotationsByTrace}
+      />
+    );
+  }
 
   return (
     <VStack align="stretch" gap={5} paddingX={5} paddingY={4} overflow="auto">
@@ -334,9 +391,90 @@ const BubblesView: React.FC<{
           index={i + 1}
           isCurrent={p.turn.traceId === currentTraceId}
           onSelect={onSelectTurn}
+          annotationItems={
+            annotationsByTrace.get(p.turn.traceId) ?? EMPTY_ANNOTATION_ITEMS
+          }
         />
       ))}
     </VStack>
+  );
+};
+
+/**
+ * Virtualized rendering path for long conversations. Mirrors the threshold +
+ * shape used by `ConversationTurnsList` so we share a mental model across the
+ * codebase. The system-prompt banner stays sticky at the top, outside the
+ * virtual range, so it doesn't get measured + remeasured every scroll.
+ */
+const VirtualizedBubblesView: React.FC<{
+  parsedTurns: ParsedTurn[];
+  systemPrompt: string | null;
+  currentTraceId: string;
+  onSelectTurn: (traceId: string) => void;
+  annotationsByTrace: AnnotationsByTrace;
+}> = ({
+  parsedTurns,
+  systemPrompt,
+  currentTraceId,
+  onSelectTurn,
+  annotationsByTrace,
+}) => {
+  const parentRef = useRef<HTMLDivElement>(null);
+  const virtualizer = useVirtualizer({
+    count: parsedTurns.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => ESTIMATED_TURN_HEIGHT,
+    overscan: 4,
+    measureElement: (el) => el.getBoundingClientRect().height,
+    getItemKey: (index) => parsedTurns[index]!.turn.traceId,
+  });
+
+  return (
+    <Box ref={parentRef} flex={1} overflow="auto" paddingX={5} paddingY={4}>
+      {systemPrompt && (
+        <Box marginBottom={5}>
+          <SystemPromptBanner text={systemPrompt} />
+        </Box>
+      )}
+      <Box
+        height={`${virtualizer.getTotalSize()}px`}
+        width="full"
+        position="relative"
+      >
+        {virtualizer.getVirtualItems().map((row) => {
+          const p = parsedTurns[row.index]!;
+          return (
+            <Box
+              key={row.key}
+              ref={virtualizer.measureElement}
+              data-index={row.index}
+              position="absolute"
+              top={0}
+              left={0}
+              width="full"
+              transform={`translateY(${row.start}px)`}
+              paddingBottom={5}
+            >
+              <ChatTurnRow
+                turn={p.turn}
+                userText={p.userText}
+                assistantText={p.assistantText}
+                assistantReasoning={p.assistantReasoning}
+                gapSecs={p.gapSecs}
+                showGap={p.showGap}
+                index={row.index + 1}
+                isCurrent={p.turn.traceId === currentTraceId}
+                onSelect={onSelectTurn}
+                annotationItems={
+                  annotationsByTrace.get(p.turn.traceId) ??
+                  EMPTY_ANNOTATION_ITEMS
+                }
+              />
+            </Box>
+          );
+        })}
+      </Box>
+    </Box>
   );
 };
 

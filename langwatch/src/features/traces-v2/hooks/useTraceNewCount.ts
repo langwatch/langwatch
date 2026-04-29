@@ -3,7 +3,8 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { usePageVisibility } from "~/hooks/usePageVisibility";
 import { api } from "~/utils/api";
 import { useFilterStore } from "../stores/filterStore";
-import { useFreshnessSignal } from "../stores/freshnessSignal";
+import { useSseStatusStore } from "../stores/sseStatusStore";
+import { useTraceListRefresh } from "./useTraceListRefresh";
 
 const FAST_MS = 5_000;
 const SLOW_MS = 30_000;
@@ -35,7 +36,7 @@ export function useTraceNewCount(): TraceNewCountResult {
   const timeRange = useFilterStore((s) => s.debouncedTimeRange);
   const queryText = useFilterStore((s) => s.debouncedQueryText);
   const [since, setSince] = useState(() => Date.now());
-  const refresh = useFreshnessSignal((s) => s.refresh);
+  const refresh = useTraceListRefresh();
 
   const isVisible = usePageVisibility();
   const [intervalMs, setIntervalMs] = useState(FAST_MS);
@@ -45,11 +46,11 @@ export function useTraceNewCount(): TraceNewCountResult {
   // in useTraceFreshness invalidates this query as soon as data changes,
   // so polling is unnecessary. We only fall back to polling when SSE is
   // unavailable (connecting / disconnected / error).
-  const sseConnectionState = useFreshnessSignal((s) => s.sseConnectionState);
+  const sseConnectionState = useSseStatusStore((s) => s.sseConnectionState);
   const sseConnected = sseConnectionState === "connected";
 
   // Reset to fast polling when SSE events signal new data
-  const fastPollRequestedAt = useFreshnessSignal((s) => s.fastPollRequestedAt);
+  const fastPollRequestedAt = useSseStatusStore((s) => s.fastPollRequestedAt);
   useEffect(() => {
     if (fastPollRequestedAt === 0) return;
     consecutiveZerosRef.current = 0;
@@ -63,7 +64,7 @@ export function useTraceNewCount(): TraceNewCountResult {
     if (isVisible && !prevVisibleRef.current) {
       consecutiveZerosRef.current = 0;
       setIntervalMs(FAST_MS);
-      refresh?.();
+      refresh();
     }
     prevVisibleRef.current = isVisible;
   }, [isVisible, refresh]);
@@ -101,7 +102,7 @@ export function useTraceNewCount(): TraceNewCountResult {
     setSince(Date.now());
     consecutiveZerosRef.current = 0;
     setIntervalMs(FAST_MS);
-    refresh?.();
+    refresh();
   }, [refresh]);
 
   return {

@@ -1,13 +1,13 @@
 /**
  * URL fragment synchronization for traces-v2 bar state.
  *
- * The bar state (active lens + query + timeRange + page + draft column /
- * grouping / sort overrides) is encoded into the URL fragment so it survives
- * refresh and is shareable. When the in-memory state matches a built-in lens
- * exactly, the fragment collapses to just `#<lensId>`. Deep-link query params
- * (trace, span, viz, mode) are intentionally left untouched.
+ * The bar state (active lens + query + timeRange + page) is encoded into the
+ * URL fragment so it survives refresh and is shareable. When the in-memory
+ * state matches a built-in lens exactly, the fragment collapses to just
+ * `#<lensId>`. Deep-link query params (trace, span, viz, mode) are
+ * intentionally left untouched.
  */
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { useFilterStore } from "../stores/filterStore";
 import { useViewStore } from "../stores/viewStore";
 import { getPresetById, matchPreset } from "../utils/timeRangePresets";
@@ -52,20 +52,15 @@ export function useURLSync(): void {
   const activeLensId = useViewStore((s) => s.activeLensId);
   const allLenses = useViewStore((s) => s.allLenses);
   const selectLens = useViewStore((s) => s.selectLens);
-  // Setters are only used to apply legacy URL fragments on mount (back-compat
-  // with shared URLs that still carry `cols`/`group`/`sort`). The URL-write
-  // path no longer reads any of these from the store.
-  const setSort = useViewStore((s) => s.setSort);
-  const setGrouping = useViewStore((s) => s.setGrouping);
-  const setVisibleColumns = useViewStore((s) => s.setVisibleColumns);
 
-  // Initialize from fragment on mount
-  useEffect(() => {
-    if (isInitialized.current) return;
-    isInitialized.current = true;
-
+  const applyFromFragment = useCallback(() => {
     const parsed = parseFragment(readFragment());
-    if (!parsed) return;
+    if (!parsed) {
+      // Fragment was cleared (e.g. user navigated to a default-state URL).
+      // Reset to the default lens so the page matches what's in the bar.
+      selectLens(DEFAULT_LENS_ID);
+      return;
+    }
 
     const lensExists = allLenses.some((l) => l.id === parsed.lensId);
     const targetLensId = lensExists ? parsed.lensId : DEFAULT_LENS_ID;
@@ -89,21 +84,24 @@ export function useURLSync(): void {
         preset ? { ...range, label: preset.label, presetId: preset.id } : range,
       );
     }
-    if (overrides.columns) setVisibleColumns(overrides.columns);
-    if (overrides.grouping) setGrouping(overrides.grouping);
-    if (overrides.sort) setSort(overrides.sort);
     // Apply page last — applyQueryText/setTimeRange reset it to 1.
     if (overrides.page !== undefined) setPage(overrides.page);
-  }, [
-    allLenses,
-    selectLens,
-    applyQueryText,
-    setTimeRange,
-    setPage,
-    setVisibleColumns,
-    setGrouping,
-    setSort,
-  ]);
+  }, [allLenses, selectLens, applyQueryText, setTimeRange, setPage]);
+
+  // Initialize from fragment on mount
+  useEffect(() => {
+    if (isInitialized.current) return;
+    isInitialized.current = true;
+    applyFromFragment();
+  }, [applyFromFragment]);
+
+  // Restore state on browser back/forward navigation within the page.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const onPopState = () => applyFromFragment();
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, [applyFromFragment]);
 
   // Coalesce URL writes on a 150ms timer. `replaceState` itself is cheap,
   // but `computeOverrides`/`buildFragment` allocate per char, and effect
@@ -122,9 +120,6 @@ export function useURLSync(): void {
         timeRange,
         defaultPresetId: DEFAULT_PRESET_ID,
         page,
-        columns: activeLens.columns,
-        grouping: activeLens.grouping,
-        sort: activeLens.sort,
       });
 
       if (activeLensId === DEFAULT_LENS_ID && isOverridesEmpty(overrides)) {

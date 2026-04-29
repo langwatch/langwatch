@@ -32,7 +32,7 @@ function ExtraModelsBadge({
   );
 }
 
-export const ModelCell: CellDef<TraceListItem> = {
+export const ModelCell = {
   id: "model",
   label: "Model",
   render: ({ row }) => {
@@ -73,4 +73,4 @@ export const ModelCell: CellDef<TraceListItem> = {
       </HStack>
     );
   },
-};
+} as const satisfies CellDef<TraceListItem>;

@@ -1,6 +1,7 @@
 import { Box, Flex, HStack, Text, VStack } from "@chakra-ui/react";
 import { AlertTriangle } from "lucide-react";
-import { memo, useCallback } from "react";
+import { memo, useCallback, useMemo } from "react";
+import type { RouterOutputs } from "~/utils/api";
 import type { TraceListItem } from "../../../types/trace";
 import {
   abbreviateModel,
@@ -14,6 +15,9 @@ import { getDisplayRoleVisuals, useIsScenarioRole } from "../scenarioRoles";
 import { TurnActionRow, TurnAnnotationBadges } from "./TurnAnnotations";
 import { formatGap } from "./utils";
 
+type AnnotationItem = RouterOutputs["annotation"]["getByTraceIds"][number];
+const EMPTY_ANNOTATIONS: AnnotationItem[] = [];
+
 interface ChatTurnRowProps {
   turn: TraceListItem;
   userText: string;
@@ -24,6 +28,12 @@ interface ChatTurnRowProps {
   index: number;
   isCurrent: boolean;
   onSelect: (traceId: string) => void;
+  /**
+   * Annotations for this turn, prefetched at the conversation level so each
+   * row doesn't fire its own `getByTraceId`. Drives the bubble's annotation
+   * marker and seeds the inline badge popover.
+   */
+  annotationItems?: AnnotationItem[];
 }
 
 export const ChatTurnRow = memo<ChatTurnRowProps>(function ChatTurnRow({
@@ -36,11 +46,20 @@ export const ChatTurnRow = memo<ChatTurnRowProps>(function ChatTurnRow({
   index,
   isCurrent,
   onSelect,
+  annotationItems = EMPTY_ANNOTATIONS,
 }) {
   const handleSelect = useCallback(
     () => onSelect(turn.traceId),
     [onSelect, turn.traceId],
   );
+
+  const annotationSummary = useMemo(() => {
+    if (annotationItems.length === 0) return undefined;
+    return {
+      count: annotationItems.length,
+      hasCorrection: annotationItems.some((a) => !!a.expectedOutput),
+    };
+  }, [annotationItems]);
 
   // Scenario-aware visual mapping. The text fields stay role-faithful
   // (`userText` is whatever the source `user` message said), but the
@@ -79,6 +98,8 @@ export const ChatTurnRow = memo<ChatTurnRowProps>(function ChatTurnRow({
         turn={turn}
         isCurrent={isCurrent}
         onSelect={handleSelect}
+        assistantSide={assistantSide}
+        annotationItems={annotationItems}
       />
 
       {userText && (
@@ -107,6 +128,7 @@ export const ChatTurnRow = memo<ChatTurnRowProps>(function ChatTurnRow({
           onClick={handleSelect}
           size="compact"
           maxChars={500}
+          annotation={annotationSummary}
         />
       ) : turn.error ? (
         <Bubble
@@ -120,6 +142,7 @@ export const ChatTurnRow = memo<ChatTurnRowProps>(function ChatTurnRow({
           onClick={handleSelect}
           size="compact"
           maxChars={500}
+          annotation={annotationSummary}
         />
       ) : assistantReasoning ? (
         <Bubble
@@ -133,6 +156,7 @@ export const ChatTurnRow = memo<ChatTurnRowProps>(function ChatTurnRow({
           onClick={handleSelect}
           size="compact"
           maxChars={500}
+          annotation={annotationSummary}
         />
       ) : null}
 
@@ -145,7 +169,9 @@ const TurnSeparator: React.FC<{
   turn: TraceListItem;
   isCurrent: boolean;
   onSelect: () => void;
-}> = ({ index, turn, isCurrent, onSelect }) => {
+  assistantSide: "left" | "right";
+  annotationItems: AnnotationItem[];
+}> = ({ index, turn, isCurrent, onSelect, assistantSide, annotationItems }) => {
   // Pick the bits worth showing per turn — model, duration, latency, token
   // load, cost, error state — so the separator reads as a per-turn ledger
   // rather than just "Turn N · Xs". Skips fields that don't apply (no cost
@@ -161,6 +187,7 @@ const TurnSeparator: React.FC<{
     </Text>
   );
 
+  const annotationsOnLeft = assistantSide === "left";
   return (
     <Flex
       align="center"
@@ -170,6 +197,16 @@ const TurnSeparator: React.FC<{
       role="group"
       _hover={{ "& > .turn-line": { bg: "border.emphasized" } }}
     >
+      {annotationsOnLeft && (
+        <>
+          <TurnAnnotationBadges
+            traceId={turn.traceId}
+            output={turn.output}
+            prefetchedItems={annotationItems}
+          />
+          <TurnActionRow traceId={turn.traceId} output={turn.output} />
+        </>
+      )}
       <Box
         className="turn-line"
         height="1px"
@@ -252,8 +289,16 @@ const TurnSeparator: React.FC<{
         bg={isCurrent ? "blue.solid" : "border.muted"}
         transition="background 0.12s ease"
       />
-      <TurnAnnotationBadges traceId={turn.traceId} output={turn.output} />
-      <TurnActionRow traceId={turn.traceId} output={turn.output} />
+      {!annotationsOnLeft && (
+        <>
+          <TurnAnnotationBadges
+            traceId={turn.traceId}
+            output={turn.output}
+            prefetchedItems={annotationItems}
+          />
+          <TurnActionRow traceId={turn.traceId} output={turn.output} />
+        </>
+      )}
     </Flex>
   );
 };

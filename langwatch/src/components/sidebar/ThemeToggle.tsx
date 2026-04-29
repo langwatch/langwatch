@@ -84,7 +84,7 @@ export const ThemeToggle = ({ showLabel = true }: ThemeToggleProps) => {
           height="32px"
           marginTop="-16px"
           borderRadius="full"
-          bg="bg.muted"
+          bg="bg.emphasized"
           boxShadow={pillShadow}
           transition="transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)"
           transform={`translateX(${safeIndex * 100}%)`}

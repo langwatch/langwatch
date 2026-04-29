@@ -58,7 +58,12 @@ export type ConversationTurn =
     };
 
 export type ChatLayout = "thread" | "bubbles";
-export const VIRTUALIZE_AT = 20;
+/**
+ * Above this turn count `ConversationTurnsList` switches into virtualized
+ * mode. Below it the inline render is cheaper than spinning up a scroll
+ * container + measureElement refs.
+ */
+export const VIRTUALIZE_AT = 8;
 
 /**
  * Above this turn count we collapse everything except the last turn by

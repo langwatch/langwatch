@@ -47,6 +47,7 @@ export const FacetGroupHeader: React.FC<FacetGroupHeaderProps> = ({
   return (
     <Box
       ref={setNodeRef}
+      role="group"
       style={{
         transform: CSS.Transform.toString(transform),
         transition,
@@ -98,6 +99,8 @@ export const FacetGroupHeader: React.FC<FacetGroupHeaderProps> = ({
           color="fg.subtle"
           textTransform="uppercase"
           letterSpacing="0.1em"
+          transition="color 120ms ease"
+          _groupHover={{ color: "fg" }}
         >
           {label}
         </Text>

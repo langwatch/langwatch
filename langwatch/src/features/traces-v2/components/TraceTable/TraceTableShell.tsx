@@ -89,6 +89,10 @@ function HeaderCell<T>({
       left={isStickyFirst ? 0 : undefined}
       zIndex={isStickyFirst ? 3 : undefined}
       bg={isStickyFirst ? "bg.surface" : undefined}
+      borderRightWidth="1px"
+      borderRightColor="border.subtle"
+      paddingX={canSort ? 0 : 2}
+      paddingY={canSort ? 0 : 1}
     >
       {canSort ? (
         <SortableHeaderButton
@@ -170,6 +174,8 @@ export function cellPropsFor(
   minWidth: string;
   borderLeftWidth?: string;
   borderLeftColor?: Color;
+  borderRightWidth: string;
+  borderRightColor: Color;
 } {
   const meta = cell.column.columnDef.meta as ColumnMeta | undefined;
   const size = cell.column.getSize();
@@ -177,6 +183,8 @@ export function cellPropsFor(
     textAlign: meta?.align ?? "left",
     width: meta?.flex ? undefined : `${size}px`,
     minWidth: `${cell.column.columnDef.minSize ?? 0}px`,
+    borderRightWidth: "1px",
+    borderRightColor: "border.subtle",
     ...(index === 0 && leftBorderColor
       ? { borderLeftWidth: "2px", borderLeftColor: leftBorderColor }
       : {}),

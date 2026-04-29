@@ -39,24 +39,54 @@ export function ChipBar({
   maxVisible = DEFAULT_MAX_VISIBLE,
   endSlot,
 }: ChipBarProps) {
+  const { primary, overflowChip } = splitChipsForOverflow(chips, maxVisible);
+
+  return (
+    <HStack gap={1.5} flexWrap="wrap" align="center" width="full">
+      {primary.map((c) => (
+        <Chip key={c.id} {...c} />
+      ))}
+      {overflowChip}
+      {endSlot && (
+        <HStack marginLeft="auto" flexShrink={0}>
+          {endSlot}
+        </HStack>
+      )}
+    </HStack>
+  );
+}
+
+/**
+ * Lower-level helper exposing ChipBar's overflow logic so callers can
+ * compose the primary chips inline with other content (e.g. metrics + pins
+ * + chips in one wrapped strip) and still get the "+N more" affordance.
+ *
+ * Returns `primary` (chips to render in document order) and `overflowChip`
+ * (a single ready-to-render `<Chip>` whose popover lists the dropped chips,
+ * or `null` when nothing overflows).
+ */
+export function splitChipsForOverflow(
+  chips: ChipDef[],
+  maxVisible: number = DEFAULT_MAX_VISIBLE,
+): { primary: ChipDef[]; overflowChip: ReactElement | null } {
   const visibleChips = chips
     .filter((c) => !c.hidden)
     .map((c, i) => ({ ...c, priority: c.priority ?? i }));
 
   const overflowing = visibleChips.length > maxVisible;
-  const primary = overflowing
+  const primaryPicks = overflowing
     ? [...visibleChips]
         .sort((a, b) => a.priority - b.priority)
         .slice(0, maxVisible - 1)
     : visibleChips;
   const overflow = overflowing
-    ? visibleChips.filter((c) => !primary.some((p) => p.id === c.id))
+    ? visibleChips.filter((c) => !primaryPicks.some((p) => p.id === c.id))
     : [];
 
-  // Preserve original insertion order for the visible row so the eye
-  // sees a stable layout — only the dropped-out ones move into +N.
-  const primaryById = new Set(primary.map((c) => c.id));
-  const orderedPrimary = visibleChips.filter((c) => primaryById.has(c.id));
+  // Preserve original insertion order for the visible row so the eye sees
+  // a stable layout — only the dropped-out ones move into "+N".
+  const primaryById = new Set(primaryPicks.map((c) => c.id));
+  const primary = visibleChips.filter((c) => primaryById.has(c.id));
 
   const overflowChip: ReactElement | null =
     overflow.length > 0 ? (
@@ -78,17 +108,5 @@ export function ChipBar({
       />
     ) : null;
 
-  return (
-    <HStack gap={1.5} flexWrap="wrap" align="center" width="full">
-      {orderedPrimary.map((c) => (
-        <Chip key={c.id} {...c} />
-      ))}
-      {overflowChip}
-      {endSlot && (
-        <HStack marginLeft="auto" flexShrink={0}>
-          {endSlot}
-        </HStack>
-      )}
-    </HStack>
-  );
+  return { primary, overflowChip };
 }

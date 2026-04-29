@@ -10,19 +10,13 @@ import {
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import {
   LuArrowLeft,
-  LuBraces,
   LuCopy,
-  LuExternalLink,
-  LuKeyboard,
   LuMaximize2,
   LuMinimize2,
   LuRefreshCw,
-  LuScanSearch,
-  LuShare2,
   LuX,
 } from "react-icons/lu";
 import { Kbd } from "~/components/ops/shared/Kbd";
-import { Link } from "~/components/ui/link";
 import { Tooltip } from "~/components/ui/tooltip";
 import { TracePresenceAvatars } from "~/features/presence/components/TracePresenceAvatars";
 import { useDejaViewLink } from "~/hooks/useDejaViewLink";
@@ -30,10 +24,12 @@ import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { TraceHeader } from "~/server/api/routers/tracesV2.schemas";
 import { usePinnedAttributes } from "../../../hooks/usePinnedAttributes";
-import { useThreadContext } from "../../../hooks/useThreadContext";
+import { useConversationContext } from "../../../hooks/useConversationContext";
+import { useTraceDrawerNavigation } from "../../../hooks/useTraceDrawerNavigation";
+import { useTraceHeader } from "../../../hooks/useTraceHeader";
 import { useTraceRefresh } from "../../../hooks/useTraceRefresh";
 import { useTraceResources } from "../../../hooks/useTraceResources";
-import type { DrawerViewMode } from "../../../stores/drawerStore";
+import { useDrawerStore } from "../../../stores/drawerStore";
 import { useFilterStore } from "../../../stores/filterStore";
 import type { PinnedAttribute } from "../../../stores/pinnedAttributesStore";
 import {
@@ -47,50 +43,27 @@ import {
 } from "../../../utils/formatters";
 import { ModeSwitch } from "../ModeSwitch";
 import { RawJsonDialog } from "../RawJsonDialog";
-import { TraceHeaderChips } from "../TraceHeaderChips";
-import { MetricPill, PinnedMetricPill } from "./MetricPill";
+import { Chip } from "../Chip";
+import { splitChipsForOverflow } from "../ChipBar";
+import { useTraceHeaderChipDefs } from "../TraceHeaderChips";
+import { MetricPill } from "./MetricPill";
+import {
+  type CategorizedPin,
+  type PinCategory,
+  PinDivider,
+  renderPinPills,
+} from "./PinStrip";
 import { ThreadProgressIndicator } from "./ThreadProgressIndicator";
 import { TooltipRow } from "./TooltipRow";
-import { TraceActionsMenu } from "./TraceActionsMenu";
+import { TraceOverflowMenu } from "./TraceOverflowMenu";
 import { readNumberAttribute, resolveAttributeValue } from "./utils";
 
 interface DrawerHeaderProps {
   trace: TraceHeader;
-  isMaximized: boolean;
-  /**
-   * Threaded down to the chip bar so the latest-prompt chip can deep-link
-   * to its source span via the same path as visualization clicks.
-   */
-  onSelectSpan: (spanId: string) => void;
-  /** Switches the lower tab bar to the Prompts panel. */
-  onOpenPromptsTab: () => void;
-  viewMode: DrawerViewMode;
-  onViewModeChange: (mode: DrawerViewMode) => void;
-  onToggleMaximized: () => void;
+  /** Parent's drawer-close handler (URL teardown). */
   onClose: () => void;
-  onShowShortcuts: () => void;
-  canGoBack: boolean;
-  onGoBack: () => void;
-  backStackDepth: number;
-  /**
-   * True while the trace header query is fetching (initial load or refetch
-   * after thread navigation). Drives the inline spinner in the thread
-   * progress indicator so the user knows J/K is doing something.
-   */
-  isNavigating?: boolean;
 }
 
-interface DisplayedPin {
-  pin: PinnedAttribute;
-  auto: boolean;
-}
-
-/**
- * Curated hoisted attribute keys we know are valuable enough to surface
- * in the pinned strip whenever they're present on a trace. The user can
- * still pin/unpin their own — auto-pins just bootstrap the strip so it
- * isn't empty out of the box.
- */
 /**
  * Pin attribute keys that map to a filter-store facet field. When a pinned
  * attribute is one of these, the pill shows a filter icon that scopes the
@@ -102,30 +75,78 @@ const FILTERABLE_PIN_FIELDS: Record<string, string> = {
   "langwatch.user_id": "user",
 };
 
-const HOISTED_AUTO_PINS: Array<{ key: string; label: string }> = [
-  { key: "scenario.run_id", label: "Scenario run" },
-  { key: "evaluation.run_id", label: "Eval run" },
-  { key: "gen_ai.conversation.id", label: "Conversation" },
-  { key: "langwatch.thread_id", label: "Thread" },
-  { key: "langwatch.user_id", label: "User" },
-  { key: "langwatch.labels", label: "Labels" },
+/**
+ * Curated hoisted attribute keys we always surface when present on a trace.
+ * `category` controls grouping in the pin strip — identity (who/where), run
+ * (which scenario/eval invocation), tag (labels). User pins fall into the
+ * "custom" bucket.
+ */
+interface HoistedPinDef {
+  key: string;
+  label: string;
+  category: PinCategory;
+  /**
+   * Resolve the value for this pin. Defaults to a plain attribute lookup,
+   * but pins backed by a top-level `TraceHeader` field (conversation, user,
+   * scenario run …) override this so the pill still renders when the
+   * trace-summary projection populates the top-level column but not the
+   * raw attribute.
+   */
+  resolve?: (trace: TraceHeader) => string | null | undefined;
+}
+
+const HOISTED_AUTO_PINS: HoistedPinDef[] = [
+  // Conversation / thread are surfaced via the clickable
+  // ThreadProgressIndicator in row 2 when this trace lives in a multi-turn
+  // conversation. The auto-pins below stay as the fallback for single-turn
+  // traces — the resolution logic skips them when the indicator is showing.
+  {
+    key: "gen_ai.conversation.id",
+    label: "Conversation",
+    category: "identity",
+    resolve: (trace) =>
+      trace.conversationId ?? trace.attributes["gen_ai.conversation.id"],
+  },
+  {
+    key: "langwatch.thread_id",
+    label: "Thread",
+    category: "identity",
+    resolve: (trace) =>
+      trace.attributes["langwatch.thread_id"] ?? trace.conversationId,
+  },
+  {
+    key: "langwatch.user_id",
+    label: "User",
+    category: "identity",
+    resolve: (trace) => trace.userId ?? trace.attributes["langwatch.user_id"],
+  },
+  {
+    key: "scenario.run_id",
+    label: "Scenario run",
+    category: "run",
+    resolve: (trace) =>
+      trace.scenarioRunId ?? trace.attributes["scenario.run_id"],
+  },
+  { key: "evaluation.run_id", label: "Eval run", category: "run" },
+  { key: "langwatch.labels", label: "Labels", category: "tag" },
 ];
 
 export const DrawerHeader = memo(function DrawerHeader({
   trace,
-  isMaximized,
-  onSelectSpan,
-  onOpenPromptsTab,
-  viewMode,
-  onViewModeChange,
-  onToggleMaximized,
   onClose,
-  onShowShortcuts,
-  canGoBack,
-  onGoBack,
-  backStackDepth,
-  isNavigating = false,
 }: DrawerHeaderProps) {
+  const isMaximized = useDrawerStore((s) => s.isMaximized);
+  const viewMode = useDrawerStore((s) => s.viewMode);
+  const setViewMode = useDrawerStore((s) => s.setViewMode);
+  const setActiveTab = useDrawerStore((s) => s.setActiveTab);
+  const selectSpan = useDrawerStore((s) => s.selectSpan);
+  const toggleMaximized = useDrawerStore((s) => s.toggleMaximized);
+  const setShortcutsOpen = useDrawerStore((s) => s.setShortcutsOpen);
+
+  const { canGoBack, goBack, backStackDepth } = useTraceDrawerNavigation();
+  const headerQuery = useTraceHeader();
+  const isNavigating = headerQuery.isFetching;
+
   const statusColor = STATUS_COLORS[trace.status] as string;
   const { project } = useOrganizationTeamProject();
   const dejaView = useDejaViewLink({
@@ -153,31 +174,83 @@ export const DrawerHeader = memo(function DrawerHeader({
     (trace.inputTokens > 0 || trace.outputTokens > 0);
 
   const resources = useTraceResources(trace.traceId);
-  const threadContext = useThreadContext(
+  const conversationContext = useConversationContext(
     trace.conversationId ?? null,
     trace.traceId,
   );
   const { pins, removePin } = usePinnedAttributes(project?.id);
-  // Render hoisted attributes that are present on this trace as auto-pins
-  // so users see them out of the gate. They sit before user pins and are
-  // skipped if the user has already pinned them explicitly.
-  const allPins = useMemo<DisplayedPin[]>(() => {
+  const toggleFacet = useFilterStore((s) => s.toggleFacet);
+  const { closeDrawer } = useDrawer();
+  // When the trace lives in a multi-turn conversation the
+  // ThreadProgressIndicator already exposes the conversation id (with copy
+  // + filter affordances), so the conversation / thread auto-pins would be
+  // redundant. Skip them in that case to keep the strip lean.
+  const conversationCoveredByIndicator = conversationContext.total > 1;
+  // Resolve auto + user pins into a single array with category buckets so the
+  // strip can group them with subtle dividers between identity / run / tag /
+  // custom. Auto-pins are skipped when the user has already pinned the same
+  // key explicitly so we never show the same row twice.
+  const categorizedPins = useMemo<CategorizedPin[]>(() => {
     const userKeys = new Set(pins.map((p) => `${p.source}:${p.key}`));
-    const auto: DisplayedPin[] = [];
+    const out: CategorizedPin[] = [];
     for (const def of HOISTED_AUTO_PINS) {
+      if (
+        conversationCoveredByIndicator &&
+        (def.key === "gen_ai.conversation.id" ||
+          def.key === "langwatch.thread_id")
+      ) {
+        continue;
+      }
       if (userKeys.has(`attribute:${def.key}`)) continue;
-      const value = trace.attributes[def.key];
+      const resolved = def.resolve
+        ? def.resolve(trace)
+        : trace.attributes[def.key];
+      const value = resolved ?? null;
       if (!value) continue;
-      auto.push({
+      const filterField = FILTERABLE_PIN_FIELDS[def.key];
+      out.push({
         pin: { source: "attribute", key: def.key, label: def.label },
+        value,
         auto: true,
+        category: def.category,
+        onFilter: filterField
+          ? () => {
+              toggleFacet(filterField, value);
+              closeDrawer();
+            }
+          : undefined,
       });
     }
-    return [
-      ...auto,
-      ...pins.map<DisplayedPin>((p) => ({ pin: p, auto: false })),
-    ];
-  }, [pins, trace.attributes]);
+    for (const p of pins) {
+      const valueSource =
+        p.source === "resource"
+          ? resources.resourceAttributes
+          : trace.attributes;
+      const value = resolveAttributeValue(valueSource, p.key);
+      const filterField = FILTERABLE_PIN_FIELDS[p.key];
+      out.push({
+        pin: p,
+        value,
+        auto: false,
+        category: "custom",
+        onFilter:
+          filterField && value
+            ? () => {
+                toggleFacet(filterField, value);
+                closeDrawer();
+              }
+            : undefined,
+      });
+    }
+    return out;
+  }, [
+    pins,
+    trace.attributes,
+    resources.resourceAttributes,
+    conversationCoveredByIndicator,
+    toggleFacet,
+    closeDrawer,
+  ]);
 
   const handleCopyTraceId = () => {
     void navigator.clipboard.writeText(trace.traceId);
@@ -209,8 +282,6 @@ export const DrawerHeader = memo(function DrawerHeader({
   }, []);
 
   const applyQueryText = useFilterStore((s) => s.applyQueryText);
-  const toggleFacet = useFilterStore((s) => s.toggleFacet);
-  const { closeDrawer } = useDrawer();
   // Build a query string from the highest-signal axes available on this trace.
   // Service + status are usually present; root span name is a strong cluster
   // signal. We quote bare strings to keep liqe happy with spaces/dashes.
@@ -233,11 +304,29 @@ export const DrawerHeader = memo(function DrawerHeader({
     trace.traceId,
   );
 
+  const chipDefs = useTraceHeaderChipDefs(trace, {
+    onSelectSpan: selectSpan,
+    onOpenPromptsTab: () => setActiveTab("prompts"),
+  });
+  // Source chips: cap inline at 6 — anything beyond rolls into the "+N more"
+  // popover so the strip stays scannable for traces with many capabilities.
+  const { primary: primaryChips, overflowChip: chipsOverflow } =
+    splitChipsForOverflow(chipDefs, 6);
+  // Pins: auto-pins (identity/run/tag) always inline, custom pins capped at
+  // 3 inline with the rest in a "+N pinned" popover. Anyone can pin
+  // arbitrary attributes, so this keeps the row from running away.
+  const pinResult = renderPinPills(categorizedPins, removePin, {
+    maxCustomInline: 3,
+  });
+
   return (
-    <VStack align="stretch" gap={2} paddingX={4} paddingY={3}>
-      {/* Row 1: Trace ID + Actions */}
-      <HStack justify="space-between" align="center">
-        <HStack gap={1} minWidth={0}>
+    <VStack align="stretch" gap={2} paddingX={4} paddingTop={3}>
+      {/* Row 1: Title (back button + type badge + name + status) on the
+          left, presence + actions on the right — collapsed from two rows so
+          the trace name sits at the very top instead of after a near-empty
+          peer/actions strip. */}
+      <HStack justify="space-between" align="center" gap={2.5} minWidth={0}>
+        <HStack gap={2.5} minWidth={0} flex={1} flexWrap="wrap" align="center">
           {canGoBack && (
             <Tooltip
               content={
@@ -255,7 +344,7 @@ export const DrawerHeader = memo(function DrawerHeader({
               <Button
                 size="xs"
                 variant="ghost"
-                onClick={onGoBack}
+                onClick={goBack}
                 aria-label="Back to previous trace"
                 flexShrink={0}
               >
@@ -263,136 +352,69 @@ export const DrawerHeader = memo(function DrawerHeader({
               </Button>
             </Tooltip>
           )}
-          <Text
-            textStyle="2xs"
-            color="fg.subtle"
-            fontFamily="mono"
-            cursor="default"
-            truncate
-            letterSpacing="0.02em"
-          >
-            <Text as="span" color="fg.muted" opacity={0.7}>
-              trace
-            </Text>{" "}
-            {trace.traceId}
-          </Text>
-          <Tooltip
-            content={
-              <HStack gap={1}>
-                <Text>Copy trace ID</Text>
-                <Kbd>Y</Kbd>
-              </HStack>
-            }
-            positioning={{ placement: "bottom" }}
-          >
-            <Button
-              size="xs"
-              variant="ghost"
-              onClick={handleCopyTraceId}
-              aria-label="Copy trace ID"
-              padding={0}
-              minWidth="auto"
-              height="auto"
+          {trace.rootSpanType && (
+            <Text
+              textStyle="2xs"
+              fontWeight="semibold"
+              color={
+                (SPAN_TYPE_COLORS[trace.rootSpanType] as string) ?? "gray.solid"
+              }
+              paddingX={1.5}
+              paddingY={0.5}
+              borderRadius="sm"
+              borderWidth="1px"
+              borderColor={
+                (SPAN_TYPE_COLORS[trace.rootSpanType] as string) ?? "gray.solid"
+              }
+              letterSpacing="0.04em"
               flexShrink={0}
             >
-              <Icon as={LuCopy} boxSize={3} color="fg.subtle" />
-            </Button>
-          </Tooltip>
+              {trace.rootSpanType.toUpperCase()}
+            </Text>
+          )}
+          <Text
+            fontWeight="semibold"
+            textStyle="md"
+            truncate
+            fontFamily="mono"
+            letterSpacing="-0.005em"
+            minWidth={0}
+          >
+            {trace.rootSpanName ?? trace.name}
+          </Text>
+          <HStack gap={1} flexShrink={0}>
+            <Circle size="8px" bg={statusColor} flexShrink={0} />
+            {trace.status !== "ok" && (
+              <Text
+                textStyle="xs"
+                fontWeight="medium"
+                color={statusColor}
+                textTransform="capitalize"
+              >
+                {trace.status}
+              </Text>
+            )}
+          </HStack>
+          {conversationContext.total > 1 && (
+            <ThreadProgressIndicator
+              position={conversationContext.position}
+              total={conversationContext.total}
+              conversationId={trace.conversationId}
+              onFilterByConversation={
+                trace.conversationId
+                  ? () => {
+                      toggleFacet("conversation", trace.conversationId!);
+                      closeDrawer();
+                    }
+                  : undefined
+              }
+              isLoading={isNavigating}
+            />
+          )}
         </HStack>
 
         <HStack gap={1} flexShrink={0}>
-          <TracePresenceAvatars traceId={trace.traceId} max={3} size="2xs" />
-          {findSimilarQuery && (
-            <Tooltip
-              content={
-                <VStack align="stretch" gap={0.5} maxWidth="280px">
-                  <Text textStyle="xs" fontWeight="semibold">
-                    Find similar traces
-                  </Text>
-                  <Text textStyle="2xs" color="fg.muted">
-                    Closes the drawer and prefills the search with{" "}
-                    <Text as="span" fontFamily="mono">
-                      {findSimilarQuery}
-                    </Text>
-                  </Text>
-                </VStack>
-              }
-              positioning={{ placement: "bottom" }}
-            >
-              <Button
-                size="xs"
-                variant="ghost"
-                onClick={handleFindSimilar}
-                aria-label="Find similar traces"
-              >
-                <Icon as={LuScanSearch} boxSize={3.5} />
-              </Button>
-            </Tooltip>
-          )}
-          <TraceActionsMenu
-            traceId={trace.traceId}
-            conversationId={trace.conversationId}
-          />
-          <Tooltip
-            content="Sharing is coming soon"
-            positioning={{ placement: "bottom" }}
-          >
-            <Button size="xs" variant="ghost" disabled aria-label="Share trace">
-              <Icon as={LuShare2} boxSize={3.5} />
-            </Button>
-          </Tooltip>
-          {dejaView.href && (
-            <Tooltip
-              content="Open in DejaView"
-              positioning={{ placement: "bottom" }}
-            >
-              <Link
-                href={dejaView.href}
-                isExternal
-                aria-label="Open in DejaView"
-              >
-                <Button size="xs" variant="ghost">
-                  <Icon as={LuExternalLink} boxSize={3.5} />
-                </Button>
-              </Link>
-            </Tooltip>
-          )}
-          <Tooltip
-            content={
-              <HStack gap={1}>
-                <Text>View raw JSON for trace + spans</Text>
-                <Kbd>\</Kbd>
-              </HStack>
-            }
-            positioning={{ placement: "bottom" }}
-          >
-            <Button
-              size="xs"
-              variant="ghost"
-              onClick={() => setRawOpen(true)}
-              aria-label="View raw JSON"
-            >
-              <Icon as={LuBraces} boxSize={3.5} />
-            </Button>
-          </Tooltip>
-          <Tooltip
-            content={
-              <HStack gap={1}>
-                <Text>Keyboard shortcuts</Text>
-                <Kbd>?</Kbd>
-              </HStack>
-            }
-            positioning={{ placement: "bottom" }}
-          >
-            <Button
-              size="xs"
-              variant="ghost"
-              onClick={onShowShortcuts}
-              aria-label="Show keyboard shortcuts"
-            >
-              <Icon as={LuKeyboard} boxSize={3.5} />
-            </Button>
-          </Tooltip>
+          <TracePresenceAvatars traceId={trace.traceId} max={5} size="xs" />
           <Tooltip
             content={
               <HStack gap={1}>
@@ -438,7 +460,7 @@ export const DrawerHeader = memo(function DrawerHeader({
             <Button
               size="xs"
               variant="ghost"
-              onClick={onToggleMaximized}
+              onClick={toggleMaximized}
               aria-label={isMaximized ? "Restore drawer" : "Maximize drawer"}
             >
               <Icon
@@ -447,6 +469,15 @@ export const DrawerHeader = memo(function DrawerHeader({
               />
             </Button>
           </Tooltip>
+          <TraceOverflowMenu
+            traceId={trace.traceId}
+            conversationId={trace.conversationId}
+            onCopyTraceId={handleCopyTraceId}
+            onFindSimilar={findSimilarQuery ? handleFindSimilar : null}
+            dejaViewHref={dejaView.href ?? null}
+            onOpenRawJson={() => setRawOpen(true)}
+            onShowShortcuts={() => setShortcutsOpen(true)}
+          />
           <Box
             width="1px"
             height="16px"
@@ -475,63 +506,13 @@ export const DrawerHeader = memo(function DrawerHeader({
         </HStack>
       </HStack>
 
-      {/* Row 2: Root span name + type badge + status — primary visual
-          anchor of the header. The name reads at md so it dominates the
-          metadata above and the metric pills below. */}
-      <HStack gap={2.5} minWidth={0} flexWrap="wrap" align="center">
-        {trace.rootSpanType && (
-          <Text
-            textStyle="2xs"
-            fontWeight="semibold"
-            color={
-              (SPAN_TYPE_COLORS[trace.rootSpanType] as string) ?? "gray.solid"
-            }
-            paddingX={1.5}
-            paddingY={0.5}
-            borderRadius="sm"
-            borderWidth="1px"
-            borderColor={
-              (SPAN_TYPE_COLORS[trace.rootSpanType] as string) ?? "gray.solid"
-            }
-            letterSpacing="0.04em"
-            flexShrink={0}
-          >
-            {trace.rootSpanType.toUpperCase()}
-          </Text>
-        )}
-        <Text
-          fontWeight="semibold"
-          textStyle="md"
-          truncate
-          fontFamily="mono"
-          letterSpacing="-0.005em"
-        >
-          {trace.rootSpanName ?? trace.name}
-        </Text>
-        <HStack gap={1}>
-          <Circle size="8px" bg={statusColor} flexShrink={0} />
-          {trace.status !== "ok" && (
-            <Text
-              textStyle="xs"
-              fontWeight="medium"
-              color={statusColor}
-              textTransform="capitalize"
-            >
-              {trace.status}
-            </Text>
-          )}
-        </HStack>
-        {threadContext.total > 1 && (
-          <ThreadProgressIndicator
-            position={threadContext.position}
-            total={threadContext.total}
-            isLoading={isNavigating}
-          />
-        )}
-      </HStack>
-
-      {/* Row 3: Metric pills */}
-      <HStack gap={1.5} flexWrap="wrap">
+      {/* Row 2: Unified context strip. Three logical sections — performance
+          metrics, pinned context, source/tools chips — flow into one wrapped
+          row separated by thin vertical dividers. The right end slot anchors
+          the trace ID + relative timestamp. Collapsing what used to be three
+          separate rows keeps the header dense without losing categorisation. */}
+      <HStack gap={1.5} flexWrap="wrap" align="center">
+        {/* Section 1: Performance metrics */}
         <MetricPill label="Duration" value={formatDuration(trace.durationMs)} />
         {trace.spanCount > 0 && (
           <MetricPill label="Spans" value={trace.spanCount.toLocaleString()} />
@@ -627,62 +608,80 @@ export const DrawerHeader = memo(function DrawerHeader({
         {trace.models.length > 0 && (
           <MetricPill label="Model" value={abbreviateModel(trace.models[0]!)} />
         )}
-        {/* Pinned attribute pills sit inline with the metrics — they're
-            the same kind of "scannable badge" affordance, just driven by
-            user choice + auto-hoist instead of fixed metrics. */}
-        {allPins.map(({ pin, auto }) => {
-          const valueSource =
-            pin.source === "resource"
-              ? resources.resourceAttributes
-              : trace.attributes;
-          const value = resolveAttributeValue(valueSource, pin.key);
-          // High-signal identity attributes get a "filter table by this"
-          // affordance — clicking the filter icon scopes the trace list
-          // to traces sharing this user / conversation / thread.
-          const filterField = FILTERABLE_PIN_FIELDS[pin.key];
-          const onFilter =
-            filterField && value
-              ? () => {
-                  toggleFacet(filterField, value);
-                  closeDrawer();
-                }
-              : undefined;
-          return (
-            <PinnedMetricPill
-              key={`${pin.source}:${pin.key}`}
-              pin={pin}
-              value={value}
-              auto={auto}
-              onUnpin={removePin}
-              onFilter={onFilter}
-            />
-          );
-        })}
+
+        {/* Section 2: Source / tools chips (service, origin, scenario, sdk,
+            prompts, annotations). Capped at 6 inline; surplus rolls into
+            the standard "+N more" popover. */}
+        {(primaryChips.length > 0 || chipsOverflow) && <PinDivider />}
+        {primaryChips.map((c) => (
+          <Chip key={c.id} {...c} />
+        ))}
+        {chipsOverflow}
       </HStack>
 
-      {/* Row 4: Metadata chip strip — adding a new chip (prompt, eval,
-          env, …) is a one-line entry in `useTraceHeaderChips` (data) plus
-          one switch case in `TraceHeaderChips` (JSX), not a JSX edit
-          here. */}
-      <TraceHeaderChips
-        trace={trace}
-        onSelectSpan={onSelectSpan}
-        onOpenPromptsTab={onOpenPromptsTab}
-        endSlot={
-          <Text textStyle="xs" color="fg.subtle">
-            {formatRelativeTime(trace.timestamp)}
-          </Text>
-        }
-      />
+      {/* Row 4: Dedicated pinned-context strip — auto-pins (identity / run /
+          tag) inline with intra-category dividers, custom pins capped at 3
+          inline with the rest in a "+N pinned" overflow popover. Lives on
+          its own row so the categorisation stays scannable; renders nothing
+          when there's no pinned context. */}
+      {(pinResult.inline.length > 0 || pinResult.overflow) && (
+        <HStack gap={1.5} flexWrap="wrap" align="center">
+          {pinResult.inline}
+          {pinResult.overflow}
+        </HStack>
+      )}
 
-      {/* Row 5: Inline mode tabs — Trace / Conversation. Scenario is a
-          link-out chip in row 4, so it isn't a third tab here. */}
+      {/* Row 5: Inline mode tabs — Trace / Conversation. Trace ID + relative
+          timestamp tuck into the right corner of the same row, so they
+          aren't claiming a slot in the chip strip above. */}
       <Box marginX={-4}>
         <ModeSwitch
           viewMode={viewMode}
-          onViewModeChange={onViewModeChange}
+          onViewModeChange={setViewMode}
           hasConversation={!!trace.conversationId}
           traceId={trace.traceId}
+          endSlot={
+            <HStack gap={2}>
+              <Tooltip
+                content={
+                  <HStack gap={1}>
+                    <Text>Copy trace ID</Text>
+                    <Kbd>Y</Kbd>
+                  </HStack>
+                }
+                positioning={{ placement: "top" }}
+              >
+                <Box
+                  as="button"
+                  onClick={handleCopyTraceId}
+                  aria-label="Copy trace ID"
+                  cursor="pointer"
+                  display="inline-flex"
+                  alignItems="center"
+                  gap={1}
+                  opacity={0.7}
+                  _hover={{ opacity: 1 }}
+                  transition="opacity 0.12s ease"
+                >
+                  <Text
+                    textStyle="2xs"
+                    color="fg.subtle"
+                    fontFamily="mono"
+                    letterSpacing="0.02em"
+                  >
+                    <Text as="span" color="fg.muted" opacity={0.7}>
+                      trace
+                    </Text>{" "}
+                    {trace.traceId.slice(0, 8)}
+                  </Text>
+                  <Icon as={LuCopy} boxSize={2.5} color="fg.subtle" />
+                </Box>
+              </Tooltip>
+              <Text textStyle="xs" color="fg.subtle">
+                {formatRelativeTime(trace.timestamp)}
+              </Text>
+            </HStack>
+          }
         />
       </Box>
       <RawJsonDialog

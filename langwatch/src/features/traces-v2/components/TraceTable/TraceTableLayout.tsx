@@ -1,7 +1,7 @@
 import { Box, Flex } from "@chakra-ui/react";
 import type React from "react";
 import { useRef } from "react";
-import { useFreshnessSignal } from "../../stores/freshnessSignal";
+import { useRefreshUIStore } from "../../stores/refreshUIStore";
 import { RefreshProgressBar } from "../TracesPage/RefreshProgressBar";
 import { NewTracesScrollUpIndicator } from "./NewTracesScrollUpIndicator";
 import { Pagination } from "./Pagination";
@@ -17,7 +17,7 @@ export const TraceTableLayout: React.FC<TraceTableLayoutProps> = ({
   children,
 }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
-  const isReplacingData = useFreshnessSignal((s) => s.isReplacingData);
+  const isReplacingData = useRefreshUIStore((s) => s.isReplacingData);
   useRegisterTraceTableScrollRef(scrollRef);
 
   return (

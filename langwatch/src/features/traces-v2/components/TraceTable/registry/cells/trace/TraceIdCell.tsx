@@ -2,7 +2,7 @@ import { Text } from "@chakra-ui/react";
 import type { TraceListItem } from "../../../../../types/trace";
 import type { CellDef } from "../../types";
 
-export const TraceIdCell: CellDef<TraceListItem> = {
+export const TraceIdCell = {
   id: "trace-id",
   label: "Trace ID",
   render: ({ row }) => (
@@ -16,4 +16,4 @@ export const TraceIdCell: CellDef<TraceListItem> = {
       {row.traceId}
     </Text>
   ),
-};
+} as const satisfies CellDef<TraceListItem>;

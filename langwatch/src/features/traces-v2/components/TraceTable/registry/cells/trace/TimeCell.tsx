@@ -10,7 +10,7 @@ import {
 import { MonoCell } from "../../../MonoCell";
 import type { CellDef } from "../../types";
 
-export const TimeCell: CellDef<TraceListItem> = {
+export const TimeCell = {
   id: "time",
   label: "Time",
   render: ({ row, isExpanded, actions }) => (
@@ -37,7 +37,7 @@ export const TimeCell: CellDef<TraceListItem> = {
       </Tooltip>
     </HStack>
   ),
-};
+} as const satisfies CellDef<TraceListItem>;
 
 const PeekButton: React.FC<{
   isExpanded: boolean;

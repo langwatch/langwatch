@@ -58,18 +58,20 @@ export function Section({
         width="100%"
         paddingX={4}
         paddingY={2}
-        bg="bg.subtle"
+        bg="transparent"
+        color="fg.muted"
         borderTopWidth={isFirst ? "0" : "1px"}
         borderColor="border.muted"
-        _hover={{ bg: "bg.muted" }}
-        _open={{ bg: "bg.muted" }}
+        transition="background 120ms ease, color 120ms ease"
+        _hover={{ bg: "bg.softHover", color: "fg" }}
+        _open={{ bg: "bg.softHover", color: "fg" }}
         cursor="pointer"
       >
         <HStack flex={1} gap={2}>
           <Text
             textStyle="2xs"
             fontWeight="semibold"
-            color="fg.muted"
+            color="inherit"
             textTransform="uppercase"
             letterSpacing="wider"
           >
@@ -93,7 +95,7 @@ export function Section({
             />
           ) : null}
         </HStack>
-        <Accordion.ItemIndicator color="fg.muted" />
+        <Accordion.ItemIndicator color="inherit" />
       </Accordion.ItemTrigger>
       <Accordion.ItemContent>
         {trackPresence ? (

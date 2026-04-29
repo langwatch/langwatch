@@ -3,7 +3,7 @@ import { AlertTriangle } from "lucide-react";
 import type { TraceListItem } from "../../../../../types/trace";
 import type { CellDef } from "../../types";
 
-export const ErrorTextCell: CellDef<TraceListItem> = {
+export const ErrorTextCell = {
   id: "error-text",
   label: "Error",
   render: ({ row }) => {
@@ -25,4 +25,4 @@ export const ErrorTextCell: CellDef<TraceListItem> = {
       </HStack>
     );
   },
-};
+} as const satisfies CellDef<TraceListItem>;

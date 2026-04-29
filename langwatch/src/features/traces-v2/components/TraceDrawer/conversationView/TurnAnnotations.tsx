@@ -5,8 +5,10 @@ import { Popover } from "~/components/ui/popover";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { api } from "~/utils/api";
+import { api, type RouterOutputs } from "~/utils/api";
 import { AnnotationPopover } from "./AnnotationPopover";
+
+type AnnotationItem = RouterOutputs["annotation"]["getByTraceIds"][number];
 
 interface TurnAnnotationProps {
   traceId: string;
@@ -121,6 +123,12 @@ const ActionButton = forwardRef<
 interface TurnAnnotationBadgesProps {
   traceId: string;
   output?: string | null;
+  /**
+   * Annotations sourced from the conversation-level `getByTraceIds` query.
+   * When provided, this badge skips its own per-trace fetch — avoids N
+   * queries for an N-turn conversation.
+   */
+  prefetchedItems?: AnnotationItem[];
 }
 
 /**
@@ -132,16 +140,22 @@ interface TurnAnnotationBadgesProps {
 export function TurnAnnotationBadges({
   traceId,
   output,
+  prefetchedItems,
 }: TurnAnnotationBadgesProps) {
   const { project, hasPermission } = useOrganizationTeamProject();
   const [listOpen, setListOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const annotations = api.annotation.getByTraceId.useQuery(
     { projectId: project?.id ?? "", traceId },
-    { enabled: !!project?.id && hasPermission("annotations:view") },
+    {
+      enabled:
+        !!project?.id &&
+        hasPermission("annotations:view") &&
+        prefetchedItems === undefined,
+    },
   );
 
-  const items = annotations.data ?? [];
+  const items = prefetchedItems ?? annotations.data ?? [];
   const annotationCount = items.length;
   const hasCorrection = items.some((a) => a.expectedOutput);
   const canEdit = hasPermission("annotations:manage");

@@ -82,7 +82,14 @@ export const SidebarSection: React.FC<SidebarSectionProps> = ({
       open={effectiveOpen}
       onOpenChange={(e) => handleOpenChange(e.open)}
     >
-      <VStack align="stretch" paddingX={3} paddingY={2} gap={1} data-group>
+      <VStack
+        align="stretch"
+        paddingX={3}
+        paddingY={2}
+        gap={1}
+        role="group"
+        data-group
+      >
         <HStack gap={1} width="full" align="center">
           {dragHandleProps && (
             <Box
@@ -133,7 +140,7 @@ export const SidebarSection: React.FC<SidebarSectionProps> = ({
             >
               <HStack gap={1.5} paddingRight="5px">
                 {SectionIcon && (
-                  <Icon boxSize="12px" color={hasActive ? "fg" : "fg.subtle"}>
+                  <Icon boxSize="12px" color={hasActive ? "fg" : "fg.subtle"} _hover={{ fill: 'fg' }}>
                     <SectionIcon />
                   </Icon>
                 )}
@@ -144,20 +151,20 @@ export const SidebarSection: React.FC<SidebarSectionProps> = ({
                   textTransform="uppercase"
                   letterSpacing="0.08em"
                   transition="color 100ms ease"
-                  _groupHover={{ color: "fg" }}
+                  _hover={{ color: 'fg' }}
                 >
                   {title}
                 </Text>
                 {!effectiveOpen &&
                   valueCount !== undefined &&
                   valueCount > 0 && (
-                    <Text textStyle="2xs" color="fg.subtle" fontFamily="mono">
+                    <Text textStyle="2xs" color="fg.subtle" fontFamily="mono" _hover={{ color: 'fg' }}>
                       {valueCount}
                     </Text>
                   )}
                 {activeIndicator}
               </HStack>
-              <Icon color="fg.subtle" boxSize="12px" mr={2}>
+              <Icon color="fg.subtle" boxSize="12px" mr={2} _hover={{ fill: 'fg' }}>
                 {effectiveOpen ? <ChevronUp /> : <ChevronDown />}
               </Icon>
             </Button>

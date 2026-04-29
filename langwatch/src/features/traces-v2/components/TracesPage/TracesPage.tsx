@@ -1,15 +1,17 @@
 import { Box, Flex, HStack, VStack } from "@chakra-ui/react";
 import type React from "react";
+import { useMemo } from "react";
 import { useTracesV2Presence } from "~/features/presence/hooks/useTracesV2Presence";
 import { useRouter } from "~/utils/compat/next-router";
 import { ExportConfigDialog } from "~/components/messages/ExportConfigDialog";
 import { ExportProgress } from "~/components/messages/ExportProgress";
 import { useProjectHasTraces } from "../../hooks/useProjectHasTraces";
+import { useLensFilterDirtySync } from "../../hooks/useLensFilterDirtySync";
 import { useResetSelectionOnViewChange } from "../../hooks/useResetSelectionOnViewChange";
 import { useRollingTimeRange } from "../../hooks/useRollingTimeRange";
 import { useTraceFreshness } from "../../hooks/useTraceFreshness";
 import { useTraceListExport } from "../../hooks/useTraceListExport";
-import { useTraceListSnapshot } from "../../hooks/useTraceListSnapshot";
+import { useTraceListQuery } from "../../hooks/useTraceListQuery";
 import { useURLSync } from "../../hooks/useURLSync";
 import {
   SELECT_ALL_MATCHING_CAP,
@@ -55,6 +57,7 @@ export const TracesPage: React.FC = () => {
   useTraceFreshness();
   useTracesV2Presence();
   useDebouncedFilterCommit();
+  useLensFilterDirtySync();
   useAutoOpenWelcome();
   useSidebarShortcut();
   useFindShortcut();
@@ -131,7 +134,8 @@ const FilterAside: React.FC<{ dimmed?: boolean }> = ({ dimmed = false }) => {
 };
 
 const ResultsPane: React.FC = () => {
-  const { pageTraceIds, totalHits } = useTraceListSnapshot();
+  const { data, totalHits } = useTraceListQuery();
+  const pageTraceIds = useMemo(() => data.map((t) => t.traceId), [data]);
   const selectionMode = useSelectionStore((s) => s.mode);
   const explicitCount = useSelectionStore((s) => s.traceIds.size);
   const clearSelection = useSelectionStore((s) => s.clear);
@@ -176,7 +180,7 @@ const ResultsPane: React.FC = () => {
         }}
       />
       <Box flex={1} minHeight={0} position="relative">
-        <Box height="full" overflow="auto" bg="bg.panel">
+        <Box height="full" overflow="auto" bg="bg.muted">
           <TraceTable />
         </Box>
         <FindBar />
