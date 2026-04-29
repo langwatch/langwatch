@@ -36,7 +36,7 @@ None — no events flow until the poller ships.
 ## What is still envelope-only / follow-up work
 
 - **Compliance API poller worker.** A cron job that authenticates with the workspace API key, calls Anthropic's compliance feed (`/v1/compliance/...`), and walks the response for new events since the last watermark.
-- **Compliance event → ActivityEvent mapping.** Anthropic's compliance feed has its own JSON schema (organisation ID, workspace ID, model, message metadata, content classification). Mapping into Actor / Action / Target is pending and will live in a `claude-compliance.ts` normaliser.
+- **Compliance event → governance event mapping.** Anthropic's compliance feed has its own JSON schema (organisation ID, workspace ID, model, message metadata, content classification). Mapping into Actor / Action / Target is pending and will live in a `claude-compliance.ts` normaliser.
 - **Watermark + dedup.** The poller will track the last seen event timestamp / cursor in `IngestionSource.payloadConfig.watermark` to avoid replays.
 
 When the poller ships, this page is updated with the real event shape, the CLI verification flow, and the per-source detail behaviour.

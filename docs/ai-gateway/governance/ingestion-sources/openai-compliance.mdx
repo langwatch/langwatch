@@ -47,8 +47,8 @@ None — no events flow until the puller ships.
 ## What is still envelope-only / follow-up work
 
 - **S3 puller worker.** A cron job that assumes the configured `roleArn`, lists objects under `s3://<bucket>/<prefix>/` newer than the last watermark, fetches them, gunzips, and walks line-by-line.
-- **JSONL → ActivityEvent mapping.** OpenAI Enterprise Compliance JSONL has a documented schema (event type, user ID, model, prompt + completion tokens, content classification flags). Mapping into Actor / Action / Target / cost / token fields is pending and will live in an `openai-compliance.ts` normaliser.
-- **Cost reconciliation.** OpenAI's compliance feed includes per-event token counts but not USD cost. The cost-enrichment pipeline already handles this for `gateway_activity_events` once the puller lands — no extra work needed on the receiver side.
+- **JSONL → governance event mapping.** OpenAI Enterprise Compliance JSONL has a documented schema (event type, user ID, model, prompt + completion tokens, content classification flags). Mapping into Actor / Action / Target / cost / token fields is pending and will live in an `openai-compliance.ts` normaliser.
+- **Cost reconciliation.** OpenAI's compliance feed includes per-event token counts but not USD cost. The cost-enrichment pipeline already handles this for `recorded_spans + log_records` once the puller lands — no extra work needed on the receiver side.
 - **Watermark + dedup.** S3 keys are timestamped; the worker tracks high-water key in `IngestionSource.payloadConfig.watermark` to avoid replays.
 
 When the puller ships, this page is updated with the real event shape, the CLI verification flow, and the per-source detail behaviour.

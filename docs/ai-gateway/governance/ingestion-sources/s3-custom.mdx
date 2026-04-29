@@ -16,7 +16,7 @@ Today, only the **callback mode** is wired. The S3 puller and the DSL parser are
 - **Receiver (callback mode):** `POST /api/ingest/webhook/:sourceId`.
 - **Auth:** `Authorization: Bearer lw_is_<secret>`.
 - **Body:** any JSON payload — typically one log line per request.
-- **Persistence:** envelope-only. One ActivityEvent with `eventType: agent.action`, the verbatim payload in `rawPayload`, and `actor` / `target` / `costUsd` / token counts unset (parser pending).
+- **Persistence:** envelope-only. One governance event with `eventType: agent.action`, the verbatim payload in `rawPayload`, and `actor` / `target` / `costUsd` / token counts unset (parser pending).
 - **Status flip:** flips `awaiting_first_event` → `active` after the first callback.
 
 ## What the admin configures upstream

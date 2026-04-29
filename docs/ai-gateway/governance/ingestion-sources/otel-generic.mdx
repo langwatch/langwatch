@@ -1,10 +1,10 @@
 ---
 title: Generic OTel
-description: OTLP/HTTP push — the fully proven Activity Monitor path.
+description: OTLP/HTTP push — the production-ready governance ingest path. Spans land in the unified trace store with origin metadata stamped at the receiver edge.
 sidebarTitle: Generic OTel
 ---
 
-`otel_generic` is the production-ready Activity Monitor path. Anything that speaks OTLP/HTTP — your own agents, third-party SDKs, tracing libraries — points at the source's URL with the source's bearer secret and events flow end-to-end into the admin oversight dashboard, the per-source detail page, and the [`langwatch ingest tail`](/ai-gateway/governance/cli-debug) CLI.
+`otel_generic` is the production-ready governance ingest path. Anything that speaks OTLP/HTTP — your own agents, third-party SDKs, tracing libraries — points at the source's URL with the source's bearer secret and events flow end-to-end into the [governance dashboard](/ai-gateway/governance/control-plane), the per-source detail page, and the [`langwatch ingest tail`](/ai-gateway/governance/cli-debug) CLI.
 
 <Note>**Not sending your own app's traces here.** This endpoint is for *third-party* OTel feeds your org wants in the governance audit trail. For your own application's LLM traces, use [`/api/otel/v1/traces`](/integration/quick-start) with your project API key — see [Choosing the right OTel endpoint](/observability/trace-vs-activity-ingestion) for the full comparison.</Note>
 
@@ -13,7 +13,8 @@ sidebarTitle: Generic OTel
 - **Receiver:** `POST /api/ingest/otel/:sourceId` (also accepts `claude_cowork` sources, see [Anthropic Cowork](/ai-gateway/governance/ingestion-sources/claude-cowork)).
 - **Auth:** `Authorization: Bearer lw_is_<secret>`.
 - **Body:** OTLP/HTTP JSON envelope (`resource_spans` / `scope_spans` / `spans`). `snake_case` and `camelCase` both accepted.
-- **Normaliser:** [`normalizeOtlpJson`](https://github.com/langwatch/langwatch/blob/main/langwatch/src/server/governance/activity-monitor/normalizers/otel.ts) — emits one `ActivityEvent` per span. The full path with cost / token / actor / target extraction is wired up.
+- **OTLP shape:** Spans (parent-child + duration). Lands in `recorded_spans`.
+- **Pipeline:** Receiver lazy-ensures the hidden Governance Project, stamps `langwatch.origin.*` + `langwatch.governance.retention_class` on every span, hands off to the existing trace pipeline (same `traces.collection.handleOtlpTraceRequest` that powers `/api/otel/v1/traces`). No parallel write path.
 - **Status flip:** receiver calls `recordEventReceived(sourceId)` after any successful 202; source flips from `awaiting_first_event` → `active`.
 
 ## What the admin configures upstream
@@ -57,28 +58,24 @@ exporter = OTLPSpanExporter(
 
 ## Event shape we accept today
 
-The normaliser maps OTLP attributes onto the ActivityEvent contract using the precedence below. Span resource attributes are merged with span-level attributes (span-level wins on collision):
+OTLP spans land in `recorded_spans` with `langwatch.origin.kind = "ingestion_source"` stamped at the receiver edge. The governance fold projection (`governance_kpis` + `governance_ocsf_events`) extracts the canonical KPI + OCSF dimensions from these attribute precedences. Span resource attributes are merged with span-level attributes (span-level wins on collision):
 
-| ActivityEvent field | OTLP attribute precedence |
+| Governance dimension | OTLP attribute precedence |
 |---|---|
-| `eventId` | `span.spanId` ▸ `span.traceId` ▸ random UUID |
-| `eventType` | Heuristic on `span.name` + attrs: `api.call` (if `chat`/`messages`/`completion`), `tool.invocation` (if `tool.name` set or name matches `/tool|function/`), `auth.action` (if name matches `/auth|signin|signout|login/`), else `agent.action` |
-| `action` | `span.name` |
-| `actor` | `langwatch.user.id` ▸ `user.email` ▸ `user.id` ▸ `enduser.id` |
-| `target` | `llm.model` ▸ `gen_ai.request.model` ▸ `model` ▸ `tool.name` |
-| `costUsd` | `llm.cost.usd` ▸ `gen_ai.usage.cost` ▸ `gen_ai.usage.cost_usd` ▸ `langwatch.cost.usd` |
-| `tokensInput` | `llm.token_count.prompt` ▸ `gen_ai.usage.prompt_tokens` ▸ `gen_ai.usage.input_tokens` ▸ `input_tokens` |
-| `tokensOutput` | `llm.token_count.completion` ▸ `gen_ai.usage.completion_tokens` ▸ `gen_ai.usage.output_tokens` ▸ `output_tokens` |
-| `eventTimestamp` | `span.startTimeUnixNano` (parsed as nanoseconds) ▸ now |
-| `rawPayload` | The verbatim request body — kept for debug + future re-normalisation. |
+| Actor (OCSF / KPI user) | `langwatch.user.id` ▸ `user.email` ▸ `user.id` ▸ `enduser.id` |
+| Action (OCSF) | `gen_ai.operation.name` ▸ `span.name` |
+| Target (OCSF / KPI model) | `gen_ai.request.model` ▸ `gen_ai.response.model` ▸ `llm.model` ▸ `model` ▸ `tool.name` |
+| Cost USD (KPI spend) | `gen_ai.usage.cost_usd` ▸ `gen_ai.usage.cost` ▸ `llm.cost.usd` ▸ `langwatch.cost.usd` |
+| Input tokens | `gen_ai.usage.input_tokens` ▸ `gen_ai.usage.prompt_tokens` ▸ `llm.token_count.prompt` ▸ `input_tokens` |
+| Output tokens | `gen_ai.usage.output_tokens` ▸ `gen_ai.usage.completion_tokens` ▸ `llm.token_count.completion` ▸ `output_tokens` |
+| Event time | `span.startTimeUnixNano` (parsed as nanoseconds) ▸ ingest time |
 
-If a field doesn't resolve from the precedence list, the event row stores an empty string / 0 — the row is still persisted and visible in the CLI tail.
+If a field doesn't resolve from the precedence list, the fold projection stores an empty string / 0 — the span is still persisted and queryable in the trace viewer.
 
 ## What is still envelope-only / follow-up work
 
-- **Resource log records.** The receiver currently only walks `resource_spans`. OTLP `resource_logs` payloads are accepted (returned 202) but produce zero ActivityEvents. If you push log-only data, the source still flips to `active` (because `recordEventReceived` is called regardless) but `langwatch ingest tail` will stay empty. Adapter on the roadmap.
-- **gRPC.** Only OTLP/HTTP JSON is implemented. OTLP/HTTP protobuf and gRPC are not yet wired. Use the JSON exporter on the upstream side.
-- **Span events / span links.** Not extracted into separate ActivityEvent rows in this slice; surface only the parent span's data.
+- **gRPC.** Only OTLP/HTTP JSON + protobuf is implemented (gzip / deflate / brotli accepted via the shared parser). OTLP/gRPC is not yet wired. Use the JSON or protobuf HTTP exporter on the upstream side.
+- **Span events / span links.** Not extracted into separate fold dimensions in this slice; the parent span's data is surfaced. Span events appear in the trace viewer's drill-down.
 
 ## Verify with CLI + web
 

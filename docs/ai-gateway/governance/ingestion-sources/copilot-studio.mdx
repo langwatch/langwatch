@@ -53,7 +53,7 @@ secret, events will land here.
 Everything below is the adapter slice that has not yet shipped:
 
 - **Purview poller worker.** A cron job that authenticates as the app registration, calls `https://manage.office.com/api/v1.0/<tenantId>/activity/feed/subscriptions/content` to pull new content blobs, and walks them for Copilot Studio activity (`RecordType` = Copilot* operations).
-- **Purview event → ActivityEvent mapping.** Purview's audit JSON has `Operation`, `UserId`, `RecordType`, `ResultStatus` etc. The mapping into Actor / Action / Target / `eventType` is pending and will live in a `purview.ts` normaliser alongside `otel.ts`.
+- **Purview event → governance event mapping.** Purview's audit JSON has `Operation`, `UserId`, `RecordType`, `ResultStatus` etc. The mapping into Actor / Action / Target / `eventType` is pending and will live in a `purview.ts` normaliser alongside `otel.ts`.
 - **Subscription bootstrap.** Purview audit feed subscriptions need to be created via API on first connect (`PUT /subscriptions/start?contentType=Audit.General`). The bootstrap will live in the poller worker on first run, idempotent.
 - **Watermark + dedup.** Purview content blobs have stable IDs; the worker will track high-water content IDs in `IngestionSource.payloadConfig.watermark` to avoid replays.
 

@@ -1,50 +1,59 @@
 ---
 title: Ingestion sources
-description: Per-platform integration matrix for LangWatch governance Activity Monitor receivers.
+description: Per-platform integration matrix for LangWatch governance receivers. Each source picks an OTLP wire shape (spans for span-shaped feeds, logs for flat audit feeds) and lands in the same unified trace store that powers the rest of LangWatch.
 sidebarTitle: Ingestion sources
 ---
 
-The Activity Monitor pillar normalises events from upstream agent and audit-log platforms into a single OCSF Actor / Action / Target schema, dedupes by `eventId`, and surfaces them in the [admin oversight dashboard](/ai-gateway/governance/control-plane), the per-source detail page, and the [`langwatch ingest tail`](/ai-gateway/governance/cli-debug) CLI.
+LangWatch governance ingest accepts events from upstream agent and audit-log platforms and lands them in the **same `recorded_spans` + `log_records` tables** that power the rest of LangWatch — distinguished by `langwatch.origin.kind = "ingestion_source"` origin metadata stamped at the receiver edge. Same trace viewer, same compliance + RBAC + retention machinery, surfaced in the [governance dashboard](/ai-gateway/governance/control-plane), the per-source detail page, and the [`langwatch ingest tail`](/ai-gateway/governance/cli-debug) CLI.
 
-<Note>**Activity ingestion is for third-party AI platforms your org runs.** If you want to send your *own application's* LLM traces to LangWatch, use [`/api/otel/v1/traces`](/integration/quick-start) with your project API key — that's the right home for traces from systems you own. See [Choosing the right OTel endpoint](/observability/trace-vs-activity-ingestion) for the full comparison.</Note>
+<Note>**Governance ingestion is for third-party AI platforms your org runs.** If you want to send your *own application's* LLM traces to LangWatch, use [`/api/otel/v1/traces`](/integration/quick-start) with your project API key — that's the right home for traces from systems you own. See [Choosing the right OTel endpoint](/observability/trace-vs-activity-ingestion) for the full comparison.</Note>
 
 This section documents each supported `sourceType` honestly: what's wired up today, what's still envelope-only, and what's a configuration contract awaiting an adapter.
 
 ## State of each receiver — at a glance
 
-| Source type | Mode | Receiver wired | Normaliser depth | State |
-|-------------|------|----------------|-------------------|--------|
-| [`otel_generic`](/ai-gateway/governance/ingestion-sources/otel-generic) | push (OTLP) | `POST /api/ingest/otel/:id` | Full — span → Actor/Action/Target/cost/tokens | **Production-ready** |
-| [`claude_cowork`](/ai-gateway/governance/ingestion-sources/claude-cowork) | push (OTLP) | `POST /api/ingest/otel/:id` | Generic OTel — Cowork-specific extraction pending | **Receiver works, attribute-mapping pending** |
-| [`workato`](/ai-gateway/governance/ingestion-sources/workato) | push (webhook) | `POST /api/ingest/webhook/:id` | Envelope-only — raw payload retained | **Receiver works, audit-shape parser pending** |
-| [`s3_custom`](/ai-gateway/governance/ingestion-sources/s3-custom) | s3 + webhook callback | `POST /api/ingest/webhook/:id` (callback mode) | Envelope-only — DSL parser pending | **Callback-mode works, S3 puller pending** |
-| [`copilot_studio`](/ai-gateway/governance/ingestion-sources/copilot-studio) | pull (Purview Audit API) | None | None — Azure AD app config persisted, poller pending | **Setup contract only** |
-| [`openai_compliance`](/ai-gateway/governance/ingestion-sources/openai-compliance) | s3 (Enterprise Compliance JSONL) | None | None — S3 + role config persisted, puller pending | **Setup contract only** |
-| [`claude_compliance`](/ai-gateway/governance/ingestion-sources/claude-compliance) | pull (Anthropic compliance API) | None | None — workspace API key persisted, poller pending | **Setup contract only** |
+| Source type | Delivery | OTLP shape | Storage | State |
+|---|---|---|---|---|
+| [`otel_generic`](/ai-gateway/governance/ingestion-sources/otel-generic) | Push (HTTP/OTLP) | Spans | `recorded_spans` | **Production-ready** |
+| [`claude_cowork`](/ai-gateway/governance/ingestion-sources/claude-cowork) | Push (HTTP/OTLP) | Spans | `recorded_spans` | **Receiver works**, Cowork-specific attribute mapping pending |
+| [`workato`](/ai-gateway/governance/ingestion-sources/workato) | Webhook → OTLP logs | Logs | `log_records` | **Receiver works**, deeper audit-shape parser pending |
+| [`s3_custom`](/ai-gateway/governance/ingestion-sources/s3-custom) | S3 replay + callback webhook | Logs | `log_records` | **Callback-mode works**, S3 puller + DSL parser pending |
+| [`copilot_studio`](/ai-gateway/governance/ingestion-sources/copilot-studio) | Pull (Purview Audit API) | Logs | `log_records` | **Setup-contract-only** — Azure AD app config persisted, puller worker pending |
+| [`openai_compliance`](/ai-gateway/governance/ingestion-sources/openai-compliance) | Pull (Enterprise Compliance JSONL) | Logs | `log_records` | **Setup-contract-only** — S3 + role config persisted, puller worker pending |
+| [`claude_compliance`](/ai-gateway/governance/ingestion-sources/claude-compliance) | Pull (Anthropic Compliance API) | Logs | `log_records` | **Setup-contract-only** — workspace API key persisted, puller worker pending |
 
-**Production-ready** = receiver accepts traffic, normaliser maps to ActivityEvent fields, web detail page + CLI tail render with cost/token deltas.
+**Production-ready** = receiver accepts traffic, lands in unified store, web detail page + CLI tail render with full payload + cost / token deltas, drill-down opens the trace viewer (span-shape) or log-detail pane (log-shape).
 
-**Receiver works** = endpoint accepts and ack's traffic, source flips to `active`, but attribute extraction beyond the OCSF defaults is pending. The CLI tail will show events with `eventType: agent.action` and the raw payload in `rawPayload`.
+**Receiver works** = endpoint accepts and ack's traffic, source flips to `active`, the unified store has the event with origin metadata stamped — but per-platform deeper attribute extraction beyond the default OTLP/JSON shape is pending. Drill-down still works, but column displays may show generic labels until the platform-specific adapter ships.
 
-**Setup contract only** = the source can be created via the admin composer and persists the per-platform fields the eventual adapter will use, but no traffic flows yet. Creating a source flips no flag and `langwatch ingest health` will show zeros indefinitely.
+**Setup-contract-only** = the source can be created via the admin composer and persists the per-platform fields the eventual puller worker will use, but no traffic flows yet. Creating a source mints the credential + persists the config, but `langwatch ingest health` will show zeros indefinitely until the worker ships.
+
+## Why two OTLP shapes (spans vs logs)
+
+Different upstreams emit different event shapes:
+
+- **Span-shaped sources** (`otel_generic`, `claude_cowork`) emit native OTLP spans with parent-child relationships, durations, and span kind. They benefit from drill-down in the trace viewer (showing the multi-step agent activity tree).
+- **Flat-event sources** (`workato`, `s3_custom`, `copilot_studio`, `openai_compliance`, `claude_compliance`) emit one event = one row, no span tree. Forcing them into the span shape requires synthetic `traceId` / `spanId` / duration that carry no information. They land naturally as OTLP `log_records` and drill into the log detail pane.
+
+**One internal pipeline either way** — both shapes pass through the same hardened OTLP parser (`parseOtlpBody.ts`) and the same trace pipeline downstream. Both are queryable from the same governance dashboard, both pull into the OCSF v1.1 read API, both honour the per-origin retention class.
 
 ## How a source becomes "active"
 
 Independent of source type, the lifecycle is:
 
-1. Admin opens `/governance/ingestion-sources`, picks a source type, fills the per-type config form, clicks Create.
+1. Admin opens `/governance/ingestion-sources`, picks a source type, fills the per-type config form (including the [retention class](/ai-gateway/governance/retention)), clicks Create.
 2. Backend mints a `lw_is_<base64url>` ingest secret, hashes it, persists the source with status `awaiting_first_event`. The secret is shown **once** in a one-time-reveal modal — it's never returned by the list/get endpoints again.
-3. Admin pastes the secret + per-source endpoint into the upstream platform (OTLP exporter, webhook destination URL, Azure app secret, S3 bucket policy, etc).
-4. First event arrives at the receiver → service calls `recordEventReceived(sourceId)` → status flips to `active` and `lastEventAt` updates.
-5. Web detail page polls every 10s, CLI tail polls every 3s in `--follow` mode — both see the flip and the new event simultaneously.
+3. Admin pastes the secret + per-source endpoint into the upstream platform (OTLP exporter URL, webhook destination, Azure app secret, S3 bucket policy, etc.).
+4. First event arrives at the receiver → receiver lazy-ensures the hidden Governance Project for the org (if not already), stamps `langwatch.origin.*` + `langwatch.governance.retention_class` attributes, hands off to the existing trace pipeline. Source status flips to `active` + `lastEventAt` updates.
+5. Web detail page polls every 10s, CLI tail polls every 3s in `--follow` mode — both see the flip + the new event simultaneously.
 
-For source types where the receiver is not yet wired (the three "setup contract only" rows above), step 4 won't fire; the source stays at `awaiting_first_event` until the adapter for that source type lands.
+For source types where the puller worker is not yet wired (the three "setup-contract-only" rows above), step 4 won't fire; the source stays at `awaiting_first_event` until the adapter ships.
 
 ## Auth contract — same shape across every receiver
 
-All push-mode receivers use `Authorization: Bearer lw_is_<secret>` (the same shape the gateway uses for its `lw_vk_` virtual keys, just a different prefix). Mismatched `:sourceId` path vs. resolved-secret source ID returns `401 unauthorized` without leaking which one exists. The 24-hour rotation grace window is documented in [Architecture → IngestionSource lifecycle](/ai-gateway/governance/architecture).
+All push-mode + webhook receivers use `Authorization: Bearer lw_is_<secret>` (the same shape the gateway uses for its `lw_vk_` virtual keys, just a different prefix). Mismatched `:sourceId` path vs. resolved-secret source ID returns `401 unauthorized` without leaking which one exists. The 24-hour rotation grace window is documented in the IngestionSource lifecycle architecture.
 
-## Verification — same loop for every push-mode source
+## Verification — same loop for every active source
 
 Once a source is active, verify with the [governance CLI debug helpers](/ai-gateway/governance/cli-debug):
 
@@ -59,16 +68,38 @@ langwatch ingest health <sourceId>
 langwatch ingest tail <sourceId> --follow
 ```
 
-The CLI hits the same backend the web detail page hits, byte-for-byte (`--json` mode is contract-stable against `api.activityMonitor.eventsForSource` and `api.activityMonitor.sourceHealthMetrics`).
+The CLI hits the same backend the web detail page hits, byte-for-byte (`--json` mode is contract-stable against `api.governance.eventsForSource` and `api.ingestionSources.healthMetrics`).
+
+## Origin metadata — what every event carries
+
+Every governance-ingested span / log_record is stamped at the receiver edge with reserved attribute namespaces (rejected if found in user-supplied OTLP):
+
+| Attribute | Purpose |
+|---|---|
+| `langwatch.origin.kind` | Always `"ingestion_source"` for governance traffic — discriminator |
+| `langwatch.ingestion_source.id` | Source identity (matches the `lw_is_*` Bearer's resolved IngestionSource) |
+| `langwatch.ingestion_source.organization_id` | Org tenancy for cross-source roll-ups |
+| `langwatch.ingestion_source.source_type` | Source type (`otel_generic`, `workato`, etc.) for filtering |
+| `langwatch.governance.retention_class` | `thirty_days` / `one_year` / `seven_years` — drives ClickHouse TTL |
+
+These appear as read-only system metadata in the trace viewer / log detail pane; users cannot supply or edit them.
 
 ## Adapter roadmap
 
-The order in which adapters land depends on customer pull. The current priority is:
+The order in which deeper per-platform adapters land depends on customer pull. The current priority order:
 
-1. **Cowork attribute extraction** — Cowork pushes OTLP today; we already accept it but the spans haven't been mapped to Cowork's `tool_use` taxonomy. This is the smallest gap to close.
-2. **Workato audit-shape parser** — Workato has a stable JSON envelope for job-completed events; mapping to Actor/Action/Target is straightforward but isn't done yet.
-3. **Microsoft Copilot Studio (Purview Audit) poller** — needs an Azure AD app + cron worker; the config is persisted but the worker isn't.
+1. **Cowork attribute extraction** — Cowork pushes OTLP today; receiver accepts but spans aren't mapped to Cowork's `tool_use` taxonomy yet. Smallest gap to close.
+2. **Workato audit-shape parser** — Workato has a stable JSON envelope for job-completed events; the default mapper retains the raw envelope; deeper Actor / Action / Target extraction is the follow-up.
+3. **Microsoft Copilot Studio (Purview Audit) puller** — needs an Azure AD app + cron worker; the config is persisted but the worker isn't.
 4. **OpenAI / Anthropic Enterprise Compliance pullers** — S3 + Anthropic compliance API respectively; config persisted, pullers pending.
 5. **`s3_custom` DSL parser** — generic-shape parser for homegrown audit logs; the customer-facing DSL design is in flight.
 
-If you have a need for one of the unwired adapters that's blocking a deployment, file an issue tagged `governance/activity-monitor/adapter-roadmap` and we'll sequence accordingly.
+If you need an unwired adapter, file an issue tagged `governance/ingestion/adapter-roadmap` and we'll sequence accordingly.
+
+## Cross-references
+
+- [Trace vs governance ingestion](/observability/trace-vs-activity-ingestion) — picking the right OTel URL
+- [Compliance architecture](/ai-gateway/governance/compliance-architecture) — how the unified substrate underwrites SOC 2 / ISO 27001 / EU AI Act / GDPR / HIPAA-most-uses
+- [Per-origin retention](/ai-gateway/governance/retention) — `thirty_days` / `one_year` / `seven_years` classes
+- [OCSF / SIEM export](/ai-gateway/governance/ocsf-export) — pulling governance events into Splunk, Datadog Security, etc.
+- [Governance CLI debug](/ai-gateway/governance/cli-debug) — `langwatch ingest list/health/tail` commands
