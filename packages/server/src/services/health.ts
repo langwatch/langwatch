@@ -78,11 +78,15 @@ export function httpGetCheck(
   };
 }
 
-export function execCheck(command: string, args: string[], opts: { expectStdoutContains?: string } = {}): HealthCheck {
+export function execCheck(
+  command: string,
+  args: string[],
+  opts: { expectStdoutContains?: string; env?: NodeJS.ProcessEnv } = {},
+): HealthCheck {
   return async () => {
     const start = Date.now();
     try {
-      const { exitCode, stdout } = await execa(command, args, { reject: false });
+      const { exitCode, stdout } = await execa(command, args, { reject: false, env: opts.env });
       if (exitCode !== 0) {
         return { ok: false, durationMs: Date.now() - start, reason: `exit ${exitCode}` };
       }

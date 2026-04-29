@@ -61,7 +61,7 @@ import {
 import { deserializeMappingStateToUI } from "./utils/deserializeMappingStateToUI";
 import { serializeMappingsToMappingState } from "./utils/serializeMappingsToMappingState";
 import { api } from "~/utils/api";
-import type { EvaluatorMappingsConfig } from "../evaluators/EvaluatorEditorDrawer";
+import type { EvaluatorMappingsConfig } from "../evaluators/EvaluatorEditorShared";
 import { HorizontalFormControl } from "../HorizontalFormControl";
 import { SmallLabel } from "../SmallLabel";
 import { Tooltip } from "../ui/tooltip";

@@ -34,6 +34,14 @@ vi.mock("../../../../../server/featureFlag/featureFlag.service", () => ({
   },
 }));
 
+// `isNlpGoEnabled` resolves the project's organization via Prisma. Unit
+// shards have no DB, so the live import throws PrismaClientInitializationError
+// before the FF mock above is ever consulted. Stub the gate directly to
+// keep this a pure routing test.
+vi.mock("../../../../../server/nlpgo/nlpgoFetch", () => ({
+  isNlpGoEnabled: vi.fn().mockResolvedValue(true),
+}));
+
 vi.mock("../../../../../optimization_studio/server/addEnvs", async () => {
   const actual = await vi.importActual<
     typeof import("../../../../../optimization_studio/server/addEnvs")

@@ -122,10 +122,18 @@ def main() -> int:
             exec(compile(code, "<code-block>", "exec"), module_globals)
             result = _invoke_user_entrypoint(module_globals, inputs)
             result = _coerce_result(result)
+            # Validate declared outputs are present (these are wired to
+            # downstream nodes; missing them is a contract violation).
             for name in declared_outputs:
                 if name not in result:
                     raise KeyError(f"missing_output: {name}")
-                outputs[name] = result[name]
+            # Pass ALL keys through, not just the declared ones. The
+            # Studio UI surfaces extra keys ad-hoc — operator-debug
+            # returns like `{"output": ..., "dspy": repr(dspy)}` need
+            # the diagnostic key visible in the panel even when only
+            # "output" is on the node's declared outputs. Filtering
+            # would silently drop them.
+            outputs = dict(result)
     except Exception as exc:  # noqa: BLE001 — sandbox runner intentionally catches every user-code exception so Go can render a structured error in Studio
         error = {
             "type": type(exc).__name__,

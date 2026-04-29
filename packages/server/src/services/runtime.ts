@@ -16,7 +16,7 @@ import { EventBus } from "./event-bus.ts";
 import { startLangevals } from "./langevals.ts";
 import { startLangwatch } from "./langwatch.ts";
 import { startLangwatchWorkers } from "./langwatch-workers.ts";
-import { startLangwatchNlp } from "./langwatch-nlp.ts";
+import { startNlpgo } from "./nlpgo.ts";
 import { runMigrations } from "./migrate.ts";
 import { ensureLangwatchDeps } from "./node-deps.ts";
 import { startPostgres } from "./postgres.ts";
@@ -56,7 +56,7 @@ const runtimeImpl: RuntimeApi = {
     // when its lockfile hash matches the previous run.
     await Promise.all([
       syncVenvs(ctx, bus),
-      ensureLangwatchDeps(bus),
+      ensureLangwatchDeps(ctx, bus),
     ]);
   },
 
@@ -91,8 +91,14 @@ const runtimeImpl: RuntimeApi = {
     const childEnv = { ...envFromFile, ...ctx.userEnv };
 
     try {
+      // Start aigateway BEFORE nlpgo because both share the same monobinary
+      // (cmd/service dispatcher); with the predep-resolved binary already
+      // exec'd as `aigateway`, nlpgo just spawns the same file with `nlpgo`
+      // arg. They listen on different ports — no collision. Done in one
+      // Promise.all so total wallclock is still bounded by the slowest
+      // service.
       const [nlp, langevals, gw, lw] = await Promise.all([
-        startLangwatchNlp(ctx, bus, childEnv),
+        startNlpgo(ctx, bus, childEnv),
         startLangevals(ctx, bus, childEnv),
         startAigateway(ctx, bus, envFromFile),
         startLangwatch(ctx, bus, childEnv),
@@ -103,9 +109,10 @@ const runtimeImpl: RuntimeApi = {
       // share the same boot env (Redis + Prisma already migrated, app
       // listening). Without these, the BullMQ collector/evaluations/
       // track-event/topic-clustering queues fill up with no consumer and
-      // the UI sits forever on "Waiting for first trace…". Sync spawn —
-      // no port to health-probe; lifecycle inferred from process state.
-      const workers = startLangwatchWorkers(ctx, bus, childEnv);
+      // the UI sits forever on "Waiting for first trace…". The await is
+      // for resolvePnpm() inside startLangwatchWorkers — the spawn itself
+      // is non-blocking; lifecycle is inferred from process state.
+      const workers = await startLangwatchWorkers(ctx, bus, childEnv);
       handles.push(workers);
     } catch (err) {
       await stopHandles(handles);

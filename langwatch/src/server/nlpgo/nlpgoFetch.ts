@@ -1,4 +1,5 @@
 import { featureFlagService } from "../featureFlag/featureFlag.service";
+import { resolveOrganizationId } from "../organizations/resolveOrganizationId";
 import { lambdaFetch } from "../../utils/lambdaFetch";
 import { getProjectLambdaArn } from "../../optimization_studio/server/lambda";
 
@@ -103,13 +104,25 @@ export async function nlpgoFetch<T = unknown>(
  *   - the studio UI to hide the (now-defunct) Optimize button
  *   - the optimize REST endpoint to return 410
  *   - tRPC procedures that want to surface the engine choice to the UI
+ *
+ * If `organizationId` isn't supplied, we look it up from the project so
+ * PostHog rules that target the `organization_id` person property
+ * (org-level rollouts) match correctly. Caught when an org-level enable
+ * in PostHog wasn't reaching projects under that org because every call
+ * site passed only `projectId` — PostHog's `release_nlp_go_engine_enabled`
+ * rule can't match `organization_id` if we never send it.
+ *
+ * `resolveOrganizationId` has its own 10-minute TTL cache and silently
+ * returns undefined for orphan projects, so this stays fast and safe.
  */
 export async function isNlpGoEnabled(
   opts: Pick<NLPGOFetchOptions, "projectId" | "organizationId">,
 ): Promise<boolean> {
+  const organizationId =
+    opts.organizationId ?? (await resolveOrganizationId(opts.projectId));
   return featureFlagService.isEnabled(NLP_GO_FLAG, opts.projectId, false, {
     projectId: opts.projectId,
-    organizationId: opts.organizationId,
+    organizationId,
   });
 }
 

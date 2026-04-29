@@ -59,3 +59,59 @@ func TestExecuteStream_HeartbeatExitDoesNotRaceWithClose(t *testing.T) {
 		wg.Wait()
 	}
 }
+
+// TestStateEvent_TimestampsHaveBothStartedAndFinished pins both
+// timestamps on the per-component finished event so Studio's
+// ExecutionOutputPanel can render the duration line.
+//
+// ExecutionOutputPanel.tsx gates "<duration>ms · Full Trace" on:
+//
+//	const hasTiming = executionState.timestamps?.started_at &&
+//	                  executionState.timestamps?.finished_at;
+//
+// Both must be present or the line goes silent.
+func TestStateEvent_TimestampsHaveBothStartedAndFinished(t *testing.T) {
+	ns := &NodeState{
+		ID:         "code",
+		Status:     "success",
+		DurationMS: 250,
+	}
+	ev := stateEvent("trace-x", "code", ns)
+	payload, ok := ev.Payload["execution_state"].(map[string]any)
+	if !ok {
+		t.Fatalf("execution_state missing or wrong type")
+	}
+	ts, ok := payload["timestamps"].(map[string]any)
+	if !ok {
+		t.Fatalf("timestamps map missing — UI uses it to gate the duration line")
+	}
+	startedRaw, hasStarted := ts["started_at"]
+	finishedRaw, hasFinished := ts["finished_at"]
+	if !hasStarted || !hasFinished {
+		t.Fatalf("expected both started_at and finished_at; got %v", ts)
+	}
+	started, ok := startedRaw.(int64)
+	if !ok {
+		t.Fatalf("started_at must be int64; got %T", startedRaw)
+	}
+	finished, ok := finishedRaw.(int64)
+	if !ok {
+		t.Fatalf("finished_at must be int64; got %T", finishedRaw)
+	}
+	if got := finished - started; got != ns.DurationMS {
+		t.Errorf("finished - started = %dms; want %dms (DurationMS round-trip)", got, ns.DurationMS)
+	}
+}
+
+// TestStateEvent_NoTimestampsWhenDurationZero pins the inverse: the
+// running event (status=running, DurationMS still zero) must NOT emit a
+// timestamps map, otherwise the UI's hasTiming gate would render a
+// negative duration.
+func TestStateEvent_NoTimestampsWhenDurationZero(t *testing.T) {
+	ns := &NodeState{ID: "code", Status: "running", DurationMS: 0}
+	ev := stateEvent("trace-x", "code", ns)
+	payload := ev.Payload["execution_state"].(map[string]any)
+	if _, ok := payload["timestamps"]; ok {
+		t.Errorf("running event must not include timestamps; got %v", payload["timestamps"])
+	}
+}

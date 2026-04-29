@@ -36,7 +36,7 @@ describe("port allocation", () => {
       const checks = portsToCheck(a);
       expect(checks.map((c) => c.label)).toEqual([
         "langwatch",
-        "langwatch_nlp",
+        "nlpgo",
         "langevals",
         "ai gateway",
         "postgres",

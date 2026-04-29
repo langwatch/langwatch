@@ -41,10 +41,20 @@ export const postgresPredep: Predep = {
   required: true,
 
   async detect(paths) {
+    // LANGWATCH_FORCE_BUNDLED_POSTGRES=1 skips system-postgres detection so
+    // the bundled tarball path is exercised. Use case: dogfooding the
+    // bundled binary on machines that have brew/apt postgres on PATH (mac
+    // dev machines, GitHub runners) — without this we'd always reuse the
+    // host install and never test the bundled lifecycle. Empty / unset /
+    // "0" / "false" all mean default behavior.
+    const forceBundled = /^(1|true|yes)$/i.test(process.env.LANGWATCH_FORCE_BUNDLED_POSTGRES ?? "");
     const bundled = join(paths.bin, "postgres", "bin", "postgres");
     if (existsSync(bundled)) {
       const v = await resolveVersion(bundled);
       if (v) return { installed: true, version: v, resolvedPath: bundled };
+    }
+    if (forceBundled) {
+      return { installed: false, reason: "LANGWATCH_FORCE_BUNDLED_POSTGRES=1 — skipping system postgres; bundled tarball will be downloaded" };
     }
     try {
       const { stdout } = await execa("which", ["postgres"], { reject: false });

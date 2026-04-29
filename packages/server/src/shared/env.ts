@@ -95,6 +95,19 @@ export function buildEnv({ ports, baseHost, overrides = {} }: EnvScaffoldInput):
   sectionBreak("ENVIRONMENT");
   set("ENVIRONMENT", "local");
 
+  sectionBreak("FEATURE FLAGS");
+  // Force-enable the Go NLP engine for every project. npx-server runs
+  // nlpgo in Go-only mode (NLPGO_CHILD_BYPASS=true, no Python uvicorn),
+  // so any code path that would fall back to legacy Python has to be
+  // routed to /go/* instead — that's what `release_nlp_go_engine_enabled`
+  // gates inside the langwatch app. Without this, nlpgoFetch checks
+  // PostHog (default: off) and sends to /studio/execute_sync (Python) →
+  // nlpgo's proxypass returns a self-explaining 502 because there's no
+  // upstream. With this on, traffic goes to /go/studio/execute_sync.
+  // FEATURE_FLAG_FORCE_ENABLE is a comma-separated list; see
+  // langwatch/src/server/featureFlag/featureFlag.service.ts.
+  set("FEATURE_FLAG_FORCE_ENABLE", "release_nlp_go_engine_enabled");
+
   sectionBreak("MODELS — fill in any provider you want to evaluate against");
   set("OPENAI_API_KEY", "");
   set("ANTHROPIC_API_KEY", "");

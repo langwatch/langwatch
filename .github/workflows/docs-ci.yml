@@ -66,22 +66,27 @@ jobs:
 
       - name: Install pnpm
         uses: pnpm/action-setup@v4
-        with:
-          version: 10
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
         working-directory: langwatch
 
+      # `--ignore-workspace`: same gotcha as agentic-e2e-tests in e2e-ci.yml.
+      # The repo-root pnpm-workspace.yaml introduced by @langwatch/server in
+      # packages/ shadows skills/ unless we tell pnpm to ignore it. Without
+      # this, `pnpm install` here does "Scope: all N workspace projects"
+      # (only `packages/*`) and skills/node_modules never gets `unified`,
+      # `tsx` deps, etc. — the next sync-prompts.sh step then dies with
+      # ERR_MODULE_NOT_FOUND on `unified` from skills/_lib/mdx-inline.ts.
       - name: Install skill tooling
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --ignore-workspace
         working-directory: skills
 
       - name: Regenerate prompts-data.jsx
         run: bash docs/scripts/sync-prompts.sh
 
       - name: Regenerate llms.txt
-        run: cd docs && node llms.txt.sh
+        run: cd docs && node llms.txt.cjs
 
       - name: Check for stale generated files
         run: |
@@ -89,7 +94,7 @@ jobs:
             echo ""
             echo "ERROR: Generated files are stale. Please run:"
             echo "  bash docs/scripts/sync-prompts.sh"
-            echo "  cd docs && node llms.txt.sh"
+            echo "  cd docs && node llms.txt.cjs"
             echo "Then commit the updated files."
             exit 1
           fi

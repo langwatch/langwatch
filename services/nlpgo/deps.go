@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/oklog/ulid/v2"
@@ -17,6 +18,35 @@ import (
 	"github.com/langwatch/langwatch/services/nlpgo/adapters/proxypass"
 	"github.com/langwatch/langwatch/services/nlpgo/adapters/uvicornchild"
 )
+
+// configureNLPGoOTel installs nlpgo's OTel provider in multi-tenant
+// mode: every span is routed to a per-tenant exporter keyed by the
+// inbound `workflow.api_key`, so spans from project A and project B
+// can't end up in one another's traces even when the same Lambda
+// container handles both.
+//
+// Endpoint resolution mirrors the legacy Python service: read
+// `LANGWATCH_ENDPOINT` (the universal LangWatch URL env var), append
+// the OTLP traces path. Falls back to the generic `OTEL_OTLP_ENDPOINT`
+// only when LANGWATCH_ENDPOINT is unset, for environments that wire
+// OTel via the standard OTel env vars.
+func configureNLPGoOTel(ctx context.Context, cfg Config, nodeID string) (*otelsetup.Provider, error) {
+	endpoint := strings.TrimSpace(os.Getenv("LANGWATCH_ENDPOINT"))
+	if endpoint != "" {
+		endpoint = strings.TrimRight(endpoint, "/") + "/api/otel/v1/traces"
+	} else {
+		endpoint = cfg.OTel.OTLPEndpoint
+		if endpoint != "" && !strings.HasSuffix(endpoint, "/v1/traces") {
+			endpoint = strings.TrimRight(endpoint, "/") + "/v1/traces"
+		}
+	}
+	return otelsetup.New(ctx, otelsetup.Options{
+		NodeID:       nodeID,
+		OTLPEndpoint: endpoint,
+		SampleRatio:  cfg.OTel.SampleRatio,
+		MultiTenant:  true,
+	})
+}
 
 // Deps holds nlpgo's infrastructure adapters.
 type Deps struct {
@@ -37,7 +67,7 @@ func NewDeps(ctx context.Context, cfg Config) (context.Context, *Deps, error) {
 	ctx = clog.Set(ctx, logger)
 	nodeID := resolveNodeID(ctx, logger)
 
-	otelProvider, err := cfg.OTel.Configure(ctx, nodeID)
+	otelProvider, err := configureNLPGoOTel(ctx, cfg, nodeID)
 	if err != nil {
 		return ctx, nil, fmt.Errorf("otel init: %w", err)
 	}
@@ -50,6 +80,17 @@ func NewDeps(ctx context.Context, cfg Config) (context.Context, *Deps, error) {
 		HealthURL: cfg.Child.HealthURL,
 		Disabled:  cfg.Child.Bypass,
 		Logger:    logger,
+		// StartTimeout is the wall-clock budget for the python child to
+		// respond 200 to /health from spawn. The default Manager value
+		// (30s) is fine on dev hardware but too tight on AWS Lambda
+		// 1024MB (≈1 vCPU): empirical lw-dev probes show the child
+		// being SIGKILL'd at 30s with the litellm + langwatch_nlp
+		// imports still in flight, leaving the proxy with no upstream
+		// to dial. Bumping to 120s covers Lambda's slower CPU plus any
+		// freeze-during-init interaction; well under the 900s function
+		// timeout. Once the child is healthy this knob is not on the
+		// hot path — it's a one-time cold-start budget.
+		StartTimeout: 120 * time.Second,
 	})
 
 	probes.RegisterReadiness("uvicorn_child", func() (bool, string) {

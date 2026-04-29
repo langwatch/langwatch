@@ -209,6 +209,12 @@ export const startApp = async (dir = path.dirname(__dirname)) => {
 ███████╗██║  ██║██║ ╚████║╚██████╔╝╚███╔███╔╝██║  ██║   ██║   ╚██████╗██║  ██║
 ╚══════╝╚═╝  ╚═╝╚═╝  ╚═══╝ ╚═════╝  ╚══╝╚══╝ ╚═╝  ╚═╝   ╚═╝    ╚═════╝╚═╝  ╚═╝
 `;
+    // Print the banner via raw stdout instead of through pino — pino
+    // would JSON-encode the multi-line art into a single escaped `msg`
+    // string, which is unreadable when piped through prefixed log streams
+    // (npx-server, docker logs with prefixes, etc.). Metadata still goes
+    // through the structured logger for log aggregators downstream.
+    process.stdout.write(asciiArt);
     logger.info(
       {
         hostname,
@@ -216,7 +222,7 @@ export const startApp = async (dir = path.dirname(__dirname)) => {
         fullUrl: `http://${hostname === "0.0.0.0" ? "localhost" : hostname}:${port}`,
         mode: dev ? `development (API only — Vite on :${basePort})` : "production",
       },
-      asciiArt
+      "langwatch listening",
     );
   });
 

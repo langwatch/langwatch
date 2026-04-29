@@ -1,3 +1,4 @@
+import ast
 from contextlib import contextmanager, redirect_stdout
 import copy
 import io
@@ -194,6 +195,112 @@ def _assert_signature_field_types_are_mapped(node: Node) -> None:
             )
 
 
+def _is_dspy_module_base(base: ast.expr) -> bool:
+    """True if ``base`` is the AST node ``dspy.Module``.
+
+    Used by _resolve_code_class_name to detect the legacy preferred
+    shape via AST instead of regex — regex over raw source can match
+    `class Fake:` inside a comment or docstring and pick the wrong
+    name; AST sees only real class declarations.
+    """
+    return (
+        isinstance(base, ast.Attribute)
+        and isinstance(base.value, ast.Name)
+        and base.value.id == "dspy"
+        and base.attr == "Module"
+    )
+
+
+def _top_level_class_defs(code: str) -> list[ast.ClassDef]:
+    """Return top-level ``ast.ClassDef`` nodes in user-supplied code.
+
+    Returns an empty list on syntax errors so the caller can surface
+    a clean "no class definition found" error rather than letting
+    SyntaxError propagate from this discovery step (the user code
+    will be black-formatted later anyway, which is where actual
+    syntax errors get reported with a nicer message).
+
+    Top-level only: nested classes inside an entry class don't count
+    as candidates — the legacy regex behavior was effectively the
+    same (it picked whatever ``class X:`` line came first), and
+    customer fixtures consistently put the entry class at the top.
+    """
+    try:
+        tree = ast.parse(code)
+    except SyntaxError:
+        return []
+    return [node for node in tree.body if isinstance(node, ast.ClassDef)]
+
+
+def _resolve_code_class_name(
+    code: str, node_name: str | None, kind: str = "component"
+) -> str:
+    """Pick the user-defined class to instantiate from ``code``.
+
+    Resolution order matches the **class-based** shapes the Go runtime
+    accepts (services/nlpgo/app/engine/blocks/codeblock/runner.py), so
+    the same customer code runs identically on FF=on and FF=off:
+
+      1. ``class X(dspy.Module):`` (or any class whose bases include
+         ``dspy.Module``) — preferred (legacy default; the dspy.Module
+         wrapper provides cost-tracing + tracking).
+      2. ``class X:`` matching the node's display name (after
+         normalization to a class identifier) — picks the right class
+         when the user defines helpers alongside the entry class.
+      3. First top-level ``class X:`` declaration in the file.
+
+    The Go runtime ALSO accepts a fourth shape — a top-level ``def
+    execute(**inputs)`` callable with no enclosing class — but that
+    shape is intentionally NOT supported on the Python side. This
+    parser is a class-name extractor (the resolved name is later passed
+    to ``getattr(module, class_name)``); a top-level function has no
+    class to extract. Source with a top-level ``execute`` and no class
+    raises a clear ValueError listing the supported shapes. If parity
+    is ever needed, swap the resolver for an importer-then-inspect flow
+    similar to the Go runner.
+
+    Method-level shape within the chosen class (``__call__`` vs
+    ``forward`` vs neither) is NOT inspected here because the source
+    is not yet imported. The downstream invoker
+    (``execute_component.py`` / ``execute_flow.py``) handles the
+    dispatch — ``execute_component`` falls back from ``instance(...)``
+    to ``instance.forward(...)`` for plain forward-only classes; see
+    the import-time fallback in those modules.
+
+    AST-based discovery (not regex over raw source) so commented-out
+    or docstring text like ``class Fake:`` can't false-match. Anchors
+    PR #3483's per-shape contract back-compat for FF=off so customers
+    using the new ``class X: def __call__(...)`` template don't error
+    before the FF rolls to them.
+    """
+    class_defs = _top_level_class_defs(code)
+
+    # Priority 1: any class with `dspy.Module` in its bases (handles
+    # both the strict `class X(dspy.Module):` and the multi-base
+    # `class X(dspy.Module, SomeMixin):` cases).
+    for cls in class_defs:
+        if any(_is_dspy_module_base(base) for base in cls.bases):
+            return cls.name
+
+    if not class_defs:
+        raise ValueError(
+            f"Could not find a class definition for {kind} {node_name}. "
+            f"Supported shapes: dspy.Module subclass, class with __call__, "
+            f"or class with forward()."
+        )
+
+    # Priority 2: name-disambiguation against the (normalized) node
+    # name when multiple candidate classes exist.
+    if node_name:
+        target = normalize_name_to_class_name(node_name)
+        for cls in class_defs:
+            if cls.name == target:
+                return cls.name
+
+    # Priority 3: first top-level class declaration.
+    return class_defs[0].name
+
+
 def parse_component(
     node: Node, workflow: Workflow, standalone=False, format=False, debug_level=0
 ) -> Tuple[str, str, Dict[str, Any]]:
@@ -280,14 +387,7 @@ def parse_component(
                     f"Code node has no source content for component {node.data.name}"
                 )
 
-            pattern = r"class (.*?)\(dspy\.Module\):"
-            match = re.search(pattern, code)
-            if not match:
-                raise ValueError(
-                    f"Could not find a class that inherits from dspy.Module for component {node.data.name}"
-                )
-
-            class_name = match.group(1)
+            class_name = _resolve_code_class_name(code, node.data.name)
             try:
                 code = black.format_str(code, mode=black.Mode())
             except Exception as e:
@@ -366,13 +466,9 @@ def parse_component(
                         raise ValueError(
                             f"Code not specified for agent {node.data.name}"
                         )
-                    pattern = r"class (.*?)\(dspy\.Module\):"
-                    match_result = re.search(pattern, code)
-                    if not match_result:
-                        raise ValueError(
-                            f"Could not find a class that inherits from dspy.Module for agent {node.data.name}"
-                        )
-                    class_name = match_result.group(1)
+                    class_name = _resolve_code_class_name(
+                        code, node.data.name, kind="agent"
+                    )
                     try:
                         code = black.format_str(code, mode=black.Mode())
                     except Exception as e:
@@ -403,7 +499,16 @@ def parse_component(
 @contextmanager
 def materialized_component_class(
     component_code: str, class_name: str
-) -> Generator[Type[dspy.Module], None, None]:
+) -> Generator[Type[Any], None, None]:
+    """Materialize a user-defined class from ``component_code`` and yield it.
+
+    Return type is ``Type[Any]`` (was ``Type[dspy.Module]``) because the
+    Code node now also accepts plain ``class X: def __call__(...)`` and
+    ``class X: def forward(...)`` shapes — the caller uses Python's
+    normal ``instance(**inputs)`` invocation, which dispatches to
+    ``__call__`` if defined and otherwise hits whatever Module subclass
+    the legacy dspy path expects.
+    """
     temp_folder = tempfile.mkdtemp()
     sys.path.insert(0, temp_folder)
 

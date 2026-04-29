@@ -1,6 +1,6 @@
 import type { RuntimeContext } from "../shared/runtime-contract.ts";
 import type { EventBus } from "./event-bus.ts";
-import { locateLangwatchDir } from "./node-deps.ts";
+import { locateLangwatchDir, resolvePnpm } from "./node-deps.ts";
 import { execAndPipe } from "./_pipe-to-bus.ts";
 
 /**
@@ -48,8 +48,14 @@ export async function runMigrations(
     SKIP_CLICKHOUSE_MIGRATE: "false",
   };
 
-  await execAndPipe(bus, "migrate:prisma", "pnpm", ["run", "prisma:migrate"], { cwd: langwatchDir, env });
-  await execAndPipe(bus, "migrate:clickhouse", "pnpm", ["run", "clickhouse:migrate"], { cwd: langwatchDir, env });
+  // resolvePnpm(paths) prefers the bundled <bin>/pnpm (installed by the
+  // pnpm predep), so both the OUTER `pnpm run prisma:migrate` AND the
+  // INNER `pnpm prisma migrate deploy` (inside the package.json's `sh -c`)
+  // resolve to the same binary — the inner one finds it via PATH, which
+  // the env block above already prepends with ctx.paths.bin.
+  const pnpm = await resolvePnpm(ctx.paths);
+  await execAndPipe(bus, "migrate:prisma", pnpm.command, [...pnpm.args, "run", "prisma:migrate"], { cwd: langwatchDir, env });
+  await execAndPipe(bus, "migrate:clickhouse", pnpm.command, [...pnpm.args, "run", "clickhouse:migrate"], { cwd: langwatchDir, env });
 
   bus.emit({ type: "healthy", service: "postgres", durationMs: Date.now() - start });
 }

@@ -69,6 +69,54 @@ const parseLambdaConfig = (): LangWatchLambdaConfig => {
   }
 };
 
+// SDK default is 3 retries for retryable errors (incl. TooManyRequestsException
+// which surfaces as "Rate Exceeded."). When the per-project Lambda fleet is
+// cold-starting under a fresh image, a transient ConcurrentExecutions burst
+// can cause 3-retry windows to all land inside the saturation. Bumped to 6
+// to ride out a ~30-60s burst without surfacing the error to Studio.
+const LAMBDA_CLIENT_MAX_ATTEMPTS = 6;
+
+// Lambda Web Adapter RESPONSE_STREAM mode delimits the JSON prelude
+// from the response body with 8 zero bytes. Exposed for testing.
+export const LWA_PRELUDE_SEPARATOR_LEN = 8;
+
+/** Returns the index of the first 8-zero-byte run in `buf`, or -1 if
+ *  not present. Used to locate the LWA RESPONSE_STREAM prelude/body
+ *  boundary; see invokeLambda's prelude-strip block. SSE response
+ *  bodies are text and never contain runs of 8 NULs, so a false-
+ *  positive on the body side is not a practical concern. The buffer
+ *  parameter is typed as Uint8Array<ArrayBufferLike> so AWS SDK
+ *  PayloadChunk.Payload values flow through without an extra copy. */
+export function findLWAPreludeSeparator(
+  buf: Uint8Array<ArrayBufferLike>,
+): number {
+  for (let i = 0; i + LWA_PRELUDE_SEPARATOR_LEN <= buf.length; i++) {
+    let allZero = true;
+    for (let j = 0; j < LWA_PRELUDE_SEPARATOR_LEN; j++) {
+      if (buf[i + j] !== 0) {
+        allZero = false;
+        break;
+      }
+    }
+    if (allZero) return i;
+  }
+  return -1;
+}
+
+/** Allocates a new Uint8Array containing `a` followed by `b`. The
+ *  output owns a fresh ArrayBuffer (Uint8Array<ArrayBuffer>) so
+ *  ReadableStreamDefaultController.enqueue and other strict consumers
+ *  accept it without a buffer-type mismatch. */
+export function concatBytes(
+  a: Uint8Array<ArrayBufferLike>,
+  b: Uint8Array<ArrayBufferLike>,
+): Uint8Array<ArrayBuffer> {
+  const out = new Uint8Array(a.length + b.length);
+  out.set(a, 0);
+  out.set(b, a.length);
+  return out;
+}
+
 export const createLambdaClient = (): LambdaClient => {
   const config = parseLambdaConfig();
   return new LambdaClient({
@@ -77,6 +125,7 @@ export const createLambdaClient = (): LambdaClient => {
       accessKeyId: config.AWS_ACCESS_KEY_ID,
       secretAccessKey: config.AWS_SECRET_ACCESS_KEY,
     },
+    maxAttempts: LAMBDA_CLIENT_MAX_ATTEMPTS,
   });
 };
 
@@ -175,7 +224,18 @@ const createProjectLambda = async (
     },
     PackageType: "Image",
     Timeout: 900, // 15 minutes
-    MemorySize: 1024,
+    // 2048 MB (was 1024) gives Python multiprocessing.fork() enough RSS
+    // headroom when the bundled image runs nlpgo + uvicorn + litellm in
+    // the same container. At 1024 MB observed Max Memory Used hit
+    // 805/1024 MB mid-request on lw-dev (TEST H, 2026-04-28); fork()
+    // would fail to clone parent pages and the uvicorn worker pool
+    // crashed, cascading to /studio/* 502s. 2048 MB also doubles
+    // Lambda's allocated CPU (Lambda allocates CPU proportional to
+    // memory; ~0.58 vCPU at 1024 → ~1.17 vCPU at 2048), shaving cold-
+    // start init time too. Existing per-project Lambdas keep 1024 until
+    // a one-shot migration runs `aws lambda update-function-configuration
+    // --memory-size 2048` over each.
+    MemorySize: 2048,
     Architectures: ["arm64"],
     VpcConfig: {
       SubnetIds: config.subnet_ids,
@@ -409,23 +469,56 @@ export const invokeLambda = async (
         try {
           let statusCode = 200;
           let errorMessage = "";
+          // Lambda Web Adapter in RESPONSE_STREAM mode prepends every
+          // streamed response with a JSON prelude (`{"statusCode":...,
+          // "headers":{...},"cookies":[]}`) followed by 8 zero bytes,
+          // and only then the body. AWS often delivers the prelude and
+          // the first body bytes inside a SINGLE PayloadChunk, so if we
+          // forward chunks raw the downstream SSE parser in
+          // post_event/post-event.ts splits on `\n\n`, sees the first
+          // segment start with `{` instead of `data: `, and silently
+          // drops it. For the Go control path
+          // (services/nlpgo/adapters/httpapi/handlers.go
+          // emitStudioControlEvent) the dropped frame IS
+          // `is_alive_response`, so Studio's heartbeat hook
+          // (usePostEvent.tsx) never flips socketStatus to "connected"
+          // and stays "Connecting…" until fetchSSE's 20s timeout fires
+          // with `name: "Timeout"` (errors.ts FetchSSETimeoutError).
+          // Strip the prelude before enqueueing — buffer across chunks
+          // in case AWS splits the prelude itself across multiple
+          // PayloadChunks (uncommon but possible).
+          let preludeStripped = false;
+          let preludeBuffer = new Uint8Array(0);
 
           for await (const chunk of EventStream) {
             if (chunk.PayloadChunk?.Payload) {
-              const payloadText = new TextDecoder().decode(
-                chunk.PayloadChunk.Payload,
-              );
-              if (statusCode < 200 || statusCode >= 300) {
-                errorMessage += payloadText;
-              }
-              if (payloadText.includes('{"statusCode":')) {
+              let payloadBytes = chunk.PayloadChunk.Payload;
+              if (!preludeStripped) {
+                const merged = concatBytes(preludeBuffer, payloadBytes);
+                const sepIdx = findLWAPreludeSeparator(merged);
+                if (sepIdx === -1) {
+                  preludeBuffer = merged;
+                  continue;
+                }
                 try {
-                  statusCode = parseInt(JSON.parse(payloadText).statusCode);
+                  const preludeText = new TextDecoder().decode(
+                    merged.slice(0, sepIdx),
+                  );
+                  statusCode = parseInt(JSON.parse(preludeText).statusCode);
                 } catch {
-                  /* this is just a safe json parse fallback */
+                  /* safe json parse fallback — keep default 200 */
+                }
+                payloadBytes = merged.slice(sepIdx + LWA_PRELUDE_SEPARATOR_LEN);
+                preludeStripped = true;
+                preludeBuffer = new Uint8Array(0);
+                if (payloadBytes.length === 0) {
+                  continue;
                 }
               }
-              controller.enqueue(chunk.PayloadChunk.Payload);
+              if (statusCode < 200 || statusCode >= 300) {
+                errorMessage += new TextDecoder().decode(payloadBytes);
+              }
+              controller.enqueue(payloadBytes);
             }
             if (chunk.InvokeComplete?.ErrorCode) {
               const error = new Error(

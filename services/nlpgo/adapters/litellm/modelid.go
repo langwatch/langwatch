@@ -18,10 +18,10 @@ import (
 // pointing to langwatch_nlp/studio/utils.py; this Go module is the third
 // echo and the TS file is the source of truth.)
 var modelAliases = map[string]string{
-	"anthropic/claude-sonnet-4":    "anthropic/claude-sonnet-4-20250514",
-	"anthropic/claude-opus-4":      "anthropic/claude-opus-4-20250514",
-	"anthropic/claude-3.5-haiku":   "anthropic/claude-3-5-haiku-20241022",
-	"anthropic/claude-3.5-sonnet":  "anthropic/claude-3-5-sonnet-20240620",
+	"anthropic/claude-sonnet-4":   "anthropic/claude-sonnet-4-20250514",
+	"anthropic/claude-opus-4":     "anthropic/claude-opus-4-20250514",
+	"anthropic/claude-3.5-haiku":  "anthropic/claude-3-5-haiku-20241022",
+	"anthropic/claude-3.5-sonnet": "anthropic/claude-3-5-sonnet-20240620",
 }
 
 // providersNeedingDotToDash is the allowlist for the dot→dash rewrite. Only
