@@ -44,22 +44,7 @@ if [ -z "$NODE_ENV" ]; then
   RUNTIME_ENV="$RUNTIME_ENV NODE_ENV=production"
 fi
 
-# In dev, swap to `tsx watch` for the API ONLY so backend file edits
-# auto-reload without a manual `pnpm dev` restart. Vite handles the
-# frontend's HMR (it's a separate process under concurrently — the API
-# watch reload doesn't touch it). Production keeps plain `tsx`
-# (single-shot, no watcher overhead).
-#
-# Workers stay on plain `tsx` even in dev: they boot heavy state
-# (BullMQ connections, model registries, scenarios runtime) so a
-# restart on every backend save would be costly and disruptive. If
-# you're iterating on worker code specifically, restart `pnpm dev`
-# manually.
-if [[ "$NODE_ENV" = "development" ]]; then
-  START_APP_COMMAND="pnpm run start:app:watch"
-else
-  START_APP_COMMAND="pnpm run start:app"
-fi
+START_APP_COMMAND="pnpm run start:app"
 
 START_WORKERS_COMMAND=""
 if [[ "$START_WORKERS" = "true" || "$START_WORKERS" = "1" ]]; then
