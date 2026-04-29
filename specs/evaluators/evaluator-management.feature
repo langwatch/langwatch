@@ -8,6 +8,7 @@ Feature: Evaluator management
   # Evaluator types
   # ============================================================================
 
+  @unimplemented
   Scenario: Evaluator types available
     When I create a new evaluator
     Then I can choose from the following types:
@@ -19,6 +20,7 @@ Feature: Evaluator management
   # Evaluator categories (for built-in evaluators)
   # ============================================================================
 
+  @unimplemented
   Scenario: Evaluator categories displayed
     When I start creating a built-in evaluator
     Then I see the following categories:
@@ -28,6 +30,7 @@ Feature: Evaluator management
       | RAG Quality      | Evaluate retrieval and generation        |
       | Safety           | Check for harmful content                |
 
+  @unimplemented
   Scenario: Each category contains specific evaluators
     When I select category "Expected Answer"
     Then I see evaluators like:
@@ -41,6 +44,7 @@ Feature: Evaluator management
   # Evaluator CRUD - Create
   # ============================================================================
 
+  @unimplemented
   Scenario: Create built-in evaluator with settings
     Given I am on the evaluators page
     When I click "New Evaluator"
@@ -54,6 +58,7 @@ Feature: Evaluator management
     Then the evaluator "Correctness Check" is saved to the database
     And the evaluator appears in the evaluators list
 
+  @unimplemented
   Scenario: Create workflow-based custom evaluator
     Given I am on the evaluators page
     And workflow "Custom Scorer" exists with evaluator output
@@ -66,6 +71,7 @@ Feature: Evaluator management
     Then the evaluator is saved with workflowId reference
     And the evaluator appears in the evaluators list
 
+  @unimplemented
   Scenario: Evaluator settings vary by type
     When I select evaluator type "Exact Match"
     Then I see settings for case sensitivity and trimming
@@ -76,18 +82,21 @@ Feature: Evaluator management
   # Evaluator CRUD - Read/List
   # ============================================================================
 
+  @unimplemented
   Scenario: View evaluators list
     Given evaluators "Exact Match", "LLM Judge", and "Custom Scorer" exist
     When I navigate to the evaluators page
     Then I see a list of evaluators
     And each evaluator shows its name, type, and last updated date
 
+  @unimplemented
   Scenario: Empty state when no evaluators
     Given no evaluators exist in the project
     When I navigate to the evaluators page
     Then I see an empty state message
     And I see a "Create your first evaluator" call to action
 
+  @unimplemented
   Scenario: Evaluators are project-scoped
     Given I am in project "Project A"
     And evaluator "My Evaluator" exists in "Project A"
@@ -100,6 +109,7 @@ Feature: Evaluator management
   # Evaluator CRUD - Update
   # ============================================================================
 
+  @unimplemented
   Scenario: Edit evaluator settings
     Given evaluator "Exact Match" exists with case_sensitive=true
     When I click on evaluator "Exact Match"
@@ -109,6 +119,7 @@ Feature: Evaluator management
     Then the evaluator is updated in the database
     And the updatedAt timestamp is refreshed
 
+  @unimplemented
   Scenario: Edit evaluator name
     Given evaluator "Old Name" exists
     When I click on evaluator "Old Name"
@@ -120,6 +131,7 @@ Feature: Evaluator management
   # Evaluator CRUD - Delete (soft delete)
   # ============================================================================
 
+  @unimplemented
   Scenario: Archive evaluator
     Given evaluator "Old Evaluator" exists
     When I click the delete button for "Old Evaluator"
@@ -127,6 +139,7 @@ Feature: Evaluator management
     Then the evaluator is soft-deleted (archivedAt is set)
     And "Old Evaluator" no longer appears in the evaluators list
 
+  @unimplemented
   Scenario: Archived evaluators are excluded from list
     Given evaluator "Active Evaluator" exists
     And evaluator "Archived Evaluator" was archived
@@ -138,6 +151,7 @@ Feature: Evaluator management
   # Evaluator config storage
   # ============================================================================
 
+  @unimplemented
   Scenario: Built-in evaluator config stored as JSON
     Given I create an "Exact Match" evaluator with:
       | name            | My Exact Match |
@@ -146,6 +160,7 @@ Feature: Evaluator management
     Then the evaluator record has type "evaluator"
     And the config JSON contains the evaluator type and settings
 
+  @unimplemented
   Scenario: Workflow evaluator has workflowId at top level
     Given I create a workflow-based evaluator referencing workflow "Scorer"
     Then the evaluator record has type "workflow"
@@ -156,18 +171,21 @@ Feature: Evaluator management
   # Evaluator selection drawer (for use in Evaluations V3)
   # ============================================================================
 
+  @unimplemented
   Scenario: EvaluatorListDrawer shows available evaluators
     Given evaluators "Exact Match", "LLM Judge", and "Custom Scorer" exist
     When the EvaluatorListDrawer opens
     Then I see all three evaluators listed
     And I see a "New Evaluator" button at the top
 
+  @unimplemented
   Scenario: EvaluatorListDrawer empty state
     Given no evaluators exist
     When the EvaluatorListDrawer opens
     Then I see "Create your first evaluator" message
     And I see a "New Evaluator" button
 
+  @unimplemented
   Scenario: Select evaluator from drawer
     Given the EvaluatorListDrawer is open
     And evaluator "Exact Match" exists
@@ -179,34 +197,40 @@ Feature: Evaluator management
   # Evaluator creation flow from drawer
   # ============================================================================
 
+  @unimplemented
   Scenario: Create new evaluator from drawer flow
     Given the EvaluatorListDrawer is open
     When I click "New Evaluator"
     Then the EvaluatorCategorySelectorDrawer opens
 
+  @unimplemented
   Scenario: EvaluatorCategorySelectorDrawer shows categories
     When the EvaluatorCategorySelectorDrawer opens
     Then I see all evaluator categories listed
     And each category shows its name and description
     And I see a "Custom (from Workflow)" option at the bottom
 
+  @unimplemented
   Scenario: Select category opens type selector
     Given the EvaluatorCategorySelectorDrawer is open
     When I select category "Expected Answer"
     Then the EvaluatorTypeSelectorDrawer opens
     And it shows evaluators in the "Expected Answer" category
 
+  @unimplemented
   Scenario: EvaluatorTypeSelectorDrawer shows evaluators in category
     Given the EvaluatorTypeSelectorDrawer is open for "Expected Answer"
     Then I see evaluators like "Exact Match", "Contains", "Semantic Similarity"
     And each evaluator shows its name and brief description
 
+  @unimplemented
   Scenario: Select evaluator type opens editor
     Given the EvaluatorTypeSelectorDrawer is open for "Expected Answer"
     When I select "Exact Match"
     Then the EvaluatorEditorDrawer opens
     And I see the settings form for "Exact Match"
 
+  @unimplemented
   Scenario: EvaluatorEditorDrawer renders dynamic form
     Given I am creating an "LLM as Judge" evaluator
     When the EvaluatorEditorDrawer opens
@@ -214,6 +238,7 @@ Feature: Evaluator management
     And required fields are marked
     And I can enter values for all settings
 
+  @unimplemented
   Scenario: Custom workflow evaluator skips category/type selection
     Given the EvaluatorCategorySelectorDrawer is open
     When I select "Custom (from Workflow)"
@@ -224,6 +249,7 @@ Feature: Evaluator management
   # Evaluator mappings (stored in evaluation state, not evaluator DB)
   # ============================================================================
 
+  @unimplemented
   Scenario: Evaluator input mappings are per-evaluation
     Given evaluator "Exact Match" exists in the database
     And I use "Exact Match" in evaluation A with agent "GPT-4"
@@ -232,6 +258,7 @@ Feature: Evaluator management
     And evaluation B has its own input mappings for "Exact Match"
     And these mappings are NOT stored in the evaluator database record
 
+  @unimplemented
   Scenario: Mappings stored in evaluation state only
     Given I add evaluator "Exact Match" to agent "GPT-4" in an evaluation
     When I configure the input mapping: output -> agent.response

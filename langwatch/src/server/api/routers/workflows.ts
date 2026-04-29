@@ -11,6 +11,7 @@ import {
   type Workflow,
   workflowJsonSchema,
 } from "../../../optimization_studio/types/dsl";
+import { mergeLocalConfigsIntoDsl } from "../../../optimization_studio/utils/mergeLocalConfigs";
 import { migrateDSLVersion } from "../../../optimization_studio/types/migrate";
 import {
   clearDsl,
@@ -20,6 +21,7 @@ import type { Unpacked } from "../../../utils/types";
 import { DatasetService } from "../../datasets/dataset.service";
 import { enforceLicenseLimit } from "../../license-enforcement";
 import { getVercelAIModel } from "../../modelProviders/utils";
+import { isNlpGoEnabled } from "../../nlpgo/nlpgoFetch";
 import { checkProjectPermission, hasProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { fireWorkflowCreatedNurturing } from "~/../ee/billing/nurturing/hooks/featureAdoption";
@@ -30,6 +32,23 @@ import { createLogger } from "../../../utils/logger/server";
 const autoComputeLogger = createLogger("langwatch:workflows:auto-compute");
 
 export const workflowRouter = createTRPCRouter({
+  // Returns which NLP engine is active for the current project. Used by the
+  // Studio UI to hide the (now-defunct) Optimize button when the project is
+  // routed to the Go engine: optimization was DSPy-only, and the Go engine
+  // does not include DSPy. The UI rendering the button is the only place
+  // that needs this; the studio websocket handlers also enforce the kill
+  // server-side. See specs/nlp-go/feature-flag.feature.
+  engineMode: protectedProcedure
+    .input(z.object({ projectId: z.string() }))
+    .use(checkProjectPermission("workflows:view"))
+    .query(async ({ input }) => {
+      const goEnabled = await isNlpGoEnabled({ projectId: input.projectId });
+      return {
+        engineMode: goEnabled ? ("go" as const) : ("python" as const),
+        optimizeEnabled: !goEnabled,
+      };
+    }),
+
   create: protectedProcedure
     .input(
       z.object({
@@ -1133,6 +1152,8 @@ export const copyWorkflowWithDatasets = async ({
     name: string;
     icon: string | null;
     description: string | null;
+    isEvaluator?: boolean;
+    isComponent?: boolean;
     latestVersion: { dsl: JsonValue } | null;
   };
   targetProjectId: string;
@@ -1228,6 +1249,8 @@ export const copyWorkflowWithDatasets = async ({
       name: workflow.name,
       icon: workflow.icon ?? "",
       description: workflow.description ?? "",
+      isEvaluator: workflow.isEvaluator ?? false,
+      isComponent: workflow.isComponent ?? false,
       copiedFromWorkflowId: copiedFromWorkflowId ?? workflow.id,
     },
   });
@@ -1287,12 +1310,16 @@ export const saveOrCommitWorkflowVersion = async ({
   const [versionMajor] = (latestVersion?.version ?? "0.0").split(".");
   const nextVersion = `${parseInt(versionMajor ?? "0") + 1}`;
 
-  const dslWithoutStates = JSON.parse(
-    JSON.stringify({
-      ...input.dsl,
-      state: {},
-    }),
-  );
+  // Cast required: input.dsl.nodes is z.array(z.any()) from the Zod schema,
+  // while mergeLocalConfigsIntoDsl expects Node<Component>[]. The Zod schema
+  // uses z.any() for nodes because the DSL node types are too polymorphic
+  // for a single Zod discriminated union.
+  const dslWithMergedConfigs = {
+    ...input.dsl,
+    nodes: mergeLocalConfigsIntoDsl(input.dsl.nodes as any) as any,
+    state: {},
+  };
+  const dslWithoutStates = JSON.parse(JSON.stringify(dslWithMergedConfigs));
   const data = {
     commitMessage,
     authorId: ctx.session.user.id,

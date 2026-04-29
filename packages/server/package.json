@@ -1,0 +1,34 @@
+{
+  "name": "@langwatch/server-cli",
+  "version": "3.1.0",
+  "private": true,
+  "description": "CLI source for the @langwatch/server npm package. Built into a single bundled file at dist/cli.cjs and re-exposed through the root package's bin field.",
+  "type": "module",
+  "main": "dist/cli.cjs",
+  "scripts": {
+    "build": "tsx scripts/build.ts",
+    "dev": "tsx src/cli.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "chalk": "^5.4.1",
+    "commander": "^14.0.0",
+    "concurrently": "^9.1.2",
+    "execa": "^9.6.0",
+    "listr2": "^9.0.4",
+    "ora": "^9.0.0",
+    "prompts": "^2.4.2",
+    "tar": "^7.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.7",
+    "@types/prompts": "^2.4.9",
+    "@types/tar": "^6.1.13",
+    "esbuild": "^0.27.7",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3",
+    "vitest": "^2.1.8"
+  }
+}

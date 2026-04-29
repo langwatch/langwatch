@@ -18,6 +18,7 @@ import { loggerMiddleware } from "~/app/api/middleware/logger";
 import { tracerMiddleware } from "~/app/api/middleware/tracer";
 import { addEnvs } from "~/optimization_studio/server/addEnvs";
 import { loadDatasets } from "~/optimization_studio/server/loadDatasets";
+import { isNlpGoEnabled } from "~/server/nlpgo/nlpgoFetch";
 import {
   type StudioClientEvent,
   type StudioServerEvent,
@@ -161,6 +162,22 @@ app.post(
           { error: `Unknown event type on server: ${message.type}` },
           { status: 400 },
         );
+    }
+
+    // Optimization is DSPy-only; the Go engine intentionally drops it.
+    // Stop events still pass so a previously-started run can be cancelled.
+    if (message.type === "execute_optimization") {
+      const goEnabled = await isNlpGoEnabled({ projectId });
+      if (goEnabled) {
+        return c.json(
+          {
+            type: "optimize_disabled",
+            message:
+              "Optimization is no longer supported on the Go engine. The Optimize feature relied on DSPy, which has been removed.",
+          },
+          { status: 410 },
+        );
+      }
     }
 
     return streamSSE(c, async (stream) => {

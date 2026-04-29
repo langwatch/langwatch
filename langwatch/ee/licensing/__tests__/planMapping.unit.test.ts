@@ -41,6 +41,7 @@ describe("mapToPlanInfo", () => {
     expect(result.name).toBe("Enterprise Plan");
   });
 
+  /** @scenario Maps all numeric limits correctly */
   it("maps all numeric limits correctly", () => {
     const licenseData = createLicenseData({
       maxMembers: 5,
@@ -64,6 +65,7 @@ describe("mapToPlanInfo", () => {
     expect(result.maxScenarios).toBe(40);
   });
 
+  /** @scenario Maps canPublish flag correctly when true */
   it("maps canPublish flag correctly when true", () => {
     const licenseData = createLicenseData({ canPublish: true });
 
@@ -72,6 +74,7 @@ describe("mapToPlanInfo", () => {
     expect(result.canPublish).toBe(true);
   });
 
+  /** @scenario Maps canPublish flag correctly when false */
   it("maps canPublish flag correctly when false", () => {
     const licenseData = createLicenseData({ canPublish: false });
 
@@ -80,6 +83,7 @@ describe("mapToPlanInfo", () => {
     expect(result.canPublish).toBe(false);
   });
 
+  /** @scenario Sets free flag to false for licensed plans */
   it("sets free flag to false for licensed plans", () => {
     const licenseData = createLicenseData();
 
@@ -88,6 +92,7 @@ describe("mapToPlanInfo", () => {
     expect(result.free).toBe(false);
   });
 
+  /** @scenario Sets overrideAddingLimitations to false */
   it("sets overrideAddingLimitations to false", () => {
     const licenseData = createLicenseData();
 
@@ -96,6 +101,7 @@ describe("mapToPlanInfo", () => {
     expect(result.overrideAddingLimitations).toBe(false);
   });
 
+  /** @scenario Sets prices to zero for self-hosted */
   it("sets prices to zero for self-hosted", () => {
     const licenseData = createLicenseData();
 

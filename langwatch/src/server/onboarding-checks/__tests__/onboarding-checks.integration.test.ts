@@ -76,8 +76,12 @@ describe("OnboardingChecksService Integration", () => {
         data: {
           id: `test-provider-${Date.now()}`,
           projectId,
+          name: "OpenAI",
           provider: "openai",
           enabled: true,
+          scopes: {
+            create: [{ scopeType: "PROJECT", scopeId: projectId }],
+          },
         },
       });
       createdEntityIds.modelProviders.push(modelProvider.id);
@@ -94,8 +98,12 @@ describe("OnboardingChecksService Integration", () => {
         data: {
           id: `test-disabled-provider-${Date.now()}`,
           projectId,
+          name: "Anthropic",
           provider: "anthropic",
           enabled: false,
+          scopes: {
+            create: [{ scopeType: "PROJECT", scopeId: projectId }],
+          },
         },
       });
       createdEntityIds.modelProviders.push(disabledProvider.id);

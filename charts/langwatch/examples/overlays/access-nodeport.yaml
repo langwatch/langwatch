@@ -17,3 +17,11 @@ app:
   http:
     baseHost: "http://localhost:30560"
     publicUrl: "http://localhost:30560"
+
+# Gateway subchart defaults to Ingress; disable it under nodeport mode so the
+# overlay's intent (no Ingress on the cluster) is consistent across all pods.
+# Operators who want external gateway access via NodePort can override
+# `gateway.service.type: NodePort` separately.
+gateway:
+  ingress:
+    enabled: false

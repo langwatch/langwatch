@@ -9,8 +9,8 @@ import {
 import { ErrorBoundary } from "react-error-boundary";
 import NProgress from "nprogress";
 import { InnerProviders } from "./AppProviders";
-import { PageErrorFallback } from "./components/ui/PageErrorFallback";
-import { NotFoundPage } from "./pages/not-found";
+import NotFoundOrErrorPage from "./pages/_not-found";
+import { PageErrorFallback } from "~/components/ui/PageErrorFallback";
 
 /**
  * Root layout — wraps all routes.
@@ -196,6 +196,38 @@ const routes: RouteObject[] = [
   {
     path: "/:project/automations",
     ...page(() => import("./pages/[project]/automations")),
+  },
+  {
+    path: "/:project/gateway",
+    ...page(() => import("./pages/[project]/gateway/index")),
+  },
+  {
+    path: "/:project/gateway/virtual-keys",
+    ...page(() => import("./pages/[project]/gateway/virtual-keys")),
+  },
+  {
+    path: "/:project/gateway/virtual-keys/:id",
+    ...page(() => import("./pages/[project]/gateway/virtual-keys/[id]")),
+  },
+  {
+    path: "/:project/gateway/budgets",
+    ...page(() => import("./pages/[project]/gateway/budgets")),
+  },
+  {
+    path: "/:project/gateway/budgets/:id",
+    ...page(() => import("./pages/[project]/gateway/budgets/[id]")),
+  },
+  {
+    path: "/:project/gateway/providers",
+    ...page(() => import("./pages/[project]/gateway/providers")),
+  },
+  {
+    path: "/:project/gateway/usage",
+    ...page(() => import("./pages/[project]/gateway/usage")),
+  },
+  {
+    path: "/:project/gateway/cache-rules",
+    ...page(() => import("./pages/[project]/gateway/cache-rules")),
   },
   {
     path: "/:project/datasets",
@@ -410,41 +442,20 @@ const routes: RouteObject[] = [
     ...page(() => import("./pages/@project/[...path]/index")),
   },
 
-  // Dev-only error test page
-  ...(process.env.NODE_ENV === "development"
-    ? [
-        {
-          path: "/dev/error-test",
-          ...page(() => import("./pages/dev/error-test")),
-        },
-      ]
-    : []),
-
-  // Reserved top-level namespaces — prevent falling into the project catch-all
-  { path: "/auth/*", Component: NotFoundPage },
-  { path: "/invite/*", Component: NotFoundPage },
-  { path: "/mcp/*", Component: NotFoundPage },
-  { path: "/onboarding/*", Component: NotFoundPage },
-  { path: "/settings/*", Component: NotFoundPage },
-  { path: "/share/*", Component: NotFoundPage },
-  { path: "/ops/*", Component: NotFoundPage },
-  { path: "/dev/*", Component: NotFoundPage },
-
-  // Unknown sub-path under a project — renders inside DashboardLayout so the
-  // project redirect logic in useOrganizationTeamProject kicks in, then shows
-  // 404 inside the shell if the project is valid but the path isn't.
+  // Catch-all 404 — must stay last. Replaces the React Router dev fallback
+  // (the raw "Hey developer 👋" string) with a styled page.
   {
-    path: "/:project/*",
-    ...page(() => import("./pages/[project]/not-found")),
+    path: "*",
+    ...page(() => import("./pages/_not-found")),
   },
-
-  // 404 catch-all — must be last
-  { path: "*", Component: NotFoundPage },
 ];
 
 export const router = createBrowserRouter([
   {
     Component: RootLayout,
+    // ErrorBoundary catches render + loader throws anywhere below this node
+    // and renders the same fallback used by the catch-all 404 route.
+    ErrorBoundary: NotFoundOrErrorPage,
     children: routes,
   },
 ]);

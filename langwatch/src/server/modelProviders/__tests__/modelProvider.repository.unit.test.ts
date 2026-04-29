@@ -10,8 +10,11 @@ vi.mock("../../../utils/encryption", () => ({
   }),
 }));
 
-import type { ModelProvider, PrismaClient } from "@prisma/client";
-import { ModelProviderRepository } from "../modelProvider.repository";
+import type { ModelProvider, ModelProviderScope, PrismaClient } from "@prisma/client";
+import {
+  ModelProviderRepository,
+  type ModelProviderWithScopes,
+} from "../modelProvider.repository";
 import { encrypt, decrypt } from "../../../utils/encryption";
 
 function createMockPrisma() {
@@ -24,15 +27,56 @@ function createMockPrisma() {
       delete: vi.fn(),
       deleteMany: vi.fn(),
     },
+    modelProviderScope: {
+      create: vi.fn(),
+      createMany: vi.fn(),
+      deleteMany: vi.fn(),
+      findMany: vi.fn(),
+    },
+    project: {
+      findUnique: vi.fn(),
+      findMany: vi.fn(),
+    },
+    team: {
+      findMany: vi.fn(),
+    },
+    $transaction: vi.fn(async (cb: any) =>
+      typeof cb === "function" ? cb(prismaForTxRef) : cb,
+    ),
   } as unknown as PrismaClient;
 }
 
-function createModelProvider(
-  overrides: Partial<ModelProvider> = {},
-): ModelProvider {
+// Trick so the mocked $transaction can pass back a "tx client" shape.
+// Each createMockPrisma() call replaces prismaForTxRef via the factory
+// used by the repository test harness below.
+let prismaForTxRef: PrismaClient;
+
+function createScope(
+  scopeType: "PROJECT" | "TEAM" | "ORGANIZATION",
+  scopeId: string,
+  modelProviderId: string,
+): ModelProviderScope {
   return {
-    id: "mp_test123",
-    projectId: "proj_test",
+    id: `mps_${scopeType}_${scopeId}`,
+    modelProviderId,
+    scopeType,
+    scopeId,
+    createdAt: new Date(),
+  };
+}
+
+function createModelProvider(
+  overrides: Partial<ModelProviderWithScopes> & {
+    scopes?: ModelProviderScope[];
+  } = {},
+): ModelProviderWithScopes {
+  const { scopes, ...rest } = overrides;
+  const id = rest.id ?? "mp_test123";
+  const projectId = rest.projectId ?? "proj_test";
+  return {
+    id,
+    projectId,
+    name: "OpenAI",
     provider: "openai",
     enabled: true,
     customKeys: null,
@@ -42,7 +86,8 @@ function createModelProvider(
     extraHeaders: [],
     createdAt: new Date(),
     updatedAt: new Date(),
-    ...overrides,
+    scopes: scopes ?? [createScope("PROJECT", projectId, id)],
+    ...rest,
   };
 }
 
@@ -53,6 +98,7 @@ describe("ModelProviderRepository", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     prisma = createMockPrisma();
+    prismaForTxRef = prisma as unknown as PrismaClient;
     repository = new ModelProviderRepository(prisma);
   });
 
@@ -163,6 +209,7 @@ describe("ModelProviderRepository", () => {
 
         expect(prisma.modelProvider.findFirst).toHaveBeenCalledWith({
           where: { id: "mp_test123", projectId: "proj_test" },
+          include: { scopes: true },
         });
       });
     });
@@ -253,6 +300,167 @@ describe("ModelProviderRepository", () => {
     });
   });
 
+  describe("findAllAccessibleForProject()", () => {
+    // Gates the multi-scope access resolver: a credential is visible
+    // whenever its ModelProviderScope set intersects the project's
+    // membership tuple (project, team, org). Unlike iter 107/108 we
+    // NO LONGER dedup at the repository layer — same-provider collisions
+    // are legitimate data (multi-instance). The consuming service picks
+    // the narrowest scope for legacy `Record<provider, …>` callers.
+    const projectId = "proj_test";
+    const teamId = "team_alpha";
+    const orgId = "org_acme";
+
+    const projectRow = {
+      id: projectId,
+      teamId,
+      team: { organizationId: orgId },
+    };
+
+    describe("when the project has rows at every scope level", () => {
+      it("returns every accessible row without deduplication", async () => {
+        (prisma.project.findUnique as any).mockResolvedValue(projectRow);
+
+        const orgOpenAI = createModelProvider({
+          id: "mp_org_openai",
+          provider: "openai",
+          projectId: "proj_sibling",
+          scopes: [createScope("ORGANIZATION", orgId, "mp_org_openai")],
+        });
+        const teamOpenAI = createModelProvider({
+          id: "mp_team_openai",
+          provider: "openai",
+          projectId: "proj_sibling2",
+          scopes: [createScope("TEAM", teamId, "mp_team_openai")],
+        });
+        const projectOpenAI = createModelProvider({
+          id: "mp_project_openai",
+          provider: "openai",
+          projectId,
+          scopes: [createScope("PROJECT", projectId, "mp_project_openai")],
+        });
+        const teamAnthropic = createModelProvider({
+          id: "mp_team_anthropic",
+          provider: "anthropic",
+          projectId: "proj_sibling",
+          scopes: [createScope("TEAM", teamId, "mp_team_anthropic")],
+        });
+
+        (prisma.modelProvider.findMany as any).mockResolvedValue([
+          orgOpenAI,
+          teamOpenAI,
+          projectOpenAI,
+          teamAnthropic,
+        ]);
+
+        const results = await repository.findAllAccessibleForProject(projectId);
+
+        expect(results).toHaveLength(4);
+        const ids = results.map((r) => r.id).sort();
+        expect(ids).toEqual(
+          [
+            "mp_org_openai",
+            "mp_project_openai",
+            "mp_team_anthropic",
+            "mp_team_openai",
+          ].sort(),
+        );
+        // Each returned row carries its scope set — the repo never
+        // collapses them.
+        const openaiRows = results.filter((r) => r.provider === "openai");
+        expect(openaiRows.map((r) => r.scopes[0]!.scopeType).sort()).toEqual([
+          "ORGANIZATION",
+          "PROJECT",
+          "TEAM",
+        ]);
+      });
+    });
+
+    describe("when only an ORGANIZATION row exists", () => {
+      it("the project inherits the ORGANIZATION row", async () => {
+        (prisma.project.findUnique as any).mockResolvedValue(projectRow);
+
+        const orgOpenAI = createModelProvider({
+          id: "mp_org_openai",
+          provider: "openai",
+          projectId: "proj_sibling",
+          scopes: [createScope("ORGANIZATION", orgId, "mp_org_openai")],
+        });
+        (prisma.modelProvider.findMany as any).mockResolvedValue([orgOpenAI]);
+
+        const results = await repository.findAllAccessibleForProject(projectId);
+
+        expect(results).toHaveLength(1);
+        expect(results[0]!.id).toBe("mp_org_openai");
+        expect(results[0]!.scopes[0]!.scopeType).toBe("ORGANIZATION");
+      });
+    });
+
+    describe("when the project does not exist", () => {
+      it("returns an empty array without querying modelProvider", async () => {
+        (prisma.project.findUnique as any).mockResolvedValue(null);
+
+        const results = await repository.findAllAccessibleForProject(
+          "proj_missing",
+        );
+
+        expect(results).toEqual([]);
+        expect(prisma.modelProvider.findMany).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when a TEAM row and PROJECT row coexist for the same provider", () => {
+      it("returns both — repo no longer dedupes, service layer picks winner", async () => {
+        (prisma.project.findUnique as any).mockResolvedValue(projectRow);
+
+        const teamOpenAI = createModelProvider({
+          id: "mp_team_openai",
+          provider: "openai",
+          projectId: "proj_sibling",
+          scopes: [createScope("TEAM", teamId, "mp_team_openai")],
+        });
+        const projectOpenAI = createModelProvider({
+          id: "mp_project_openai",
+          provider: "openai",
+          projectId,
+          scopes: [createScope("PROJECT", projectId, "mp_project_openai")],
+        });
+        (prisma.modelProvider.findMany as any).mockResolvedValue([
+          teamOpenAI,
+          projectOpenAI,
+        ]);
+
+        const results = await repository.findAllAccessibleForProject(projectId);
+
+        expect(results).toHaveLength(2);
+        expect(results.map((r) => r.id).sort()).toEqual([
+          "mp_project_openai",
+          "mp_team_openai",
+        ]);
+      });
+    });
+
+    describe("when the query filters via the ModelProviderScope join", () => {
+      it("uses { scopes: { some: { OR: [...] } } } with all three scope predicates", async () => {
+        (prisma.project.findUnique as any).mockResolvedValue(projectRow);
+        (prisma.modelProvider.findMany as any).mockResolvedValue([]);
+
+        await repository.findAllAccessibleForProject(projectId);
+
+        const findManyCall = (prisma.modelProvider.findMany as any).mock
+          .calls[0][0];
+        expect(findManyCall.where.scopes.some.OR).toEqual(
+          expect.arrayContaining([
+            { scopeType: "PROJECT", scopeId: projectId },
+            { scopeType: "TEAM", scopeId: teamId },
+            { scopeType: "ORGANIZATION", scopeId: orgId },
+          ]),
+        );
+        expect(findManyCall.include).toEqual({ scopes: true });
+      });
+    });
+  });
+
   describe("create()", () => {
     describe("when customKeys are provided", () => {
       it("encrypts customKeys before storing", async () => {
@@ -263,6 +471,7 @@ describe("ModelProviderRepository", () => {
 
         await repository.create({
           projectId: "proj_test",
+          name: "OpenAI",
           provider: "openai",
           enabled: true,
           customKeys: keys,
@@ -285,6 +494,7 @@ describe("ModelProviderRepository", () => {
 
         await repository.create({
           projectId: "proj_test",
+          name: "OpenAI",
           provider: "openai",
           enabled: true,
           customKeys: null,

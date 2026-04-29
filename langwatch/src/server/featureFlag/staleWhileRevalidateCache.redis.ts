@@ -24,18 +24,55 @@ interface CacheEntry {
 export class StaleWhileRevalidateCache {
   private readonly staleThresholdMs: number;
   private readonly refreshThresholdMs: number;
+  private readonly maxTtlMs: number;
   private readonly cache: TtlCache<CacheEntry>;
 
-  constructor(staleThresholdMs: number, refreshThresholdMs: number) {
+  /**
+   * @param staleThresholdMs default staleness threshold (returned to callers
+   *   that don't pass an override). Frontend flags use this.
+   * @param refreshThresholdMs background refresh threshold.
+   * @param maxTtlMs underlying storage TTL — must be >= the longest
+   *   per-call ttlOverrideMs any caller might pass, so Redis doesn't evict
+   *   the entry before the override window expires. Defaults to staleThresholdMs.
+   */
+  constructor(
+    staleThresholdMs: number,
+    refreshThresholdMs: number,
+    maxTtlMs: number = staleThresholdMs,
+  ) {
     this.staleThresholdMs = staleThresholdMs;
     this.refreshThresholdMs = refreshThresholdMs;
-    this.cache = new TtlCache<CacheEntry>(staleThresholdMs, "feature_flag:");
+    this.maxTtlMs = Math.max(staleThresholdMs, maxTtlMs);
+    this.cache = new TtlCache<CacheEntry>(this.maxTtlMs, "feature_flag:");
   }
 
-  async get(key: string): Promise<CacheEntry | undefined> {
+  /**
+   * @param key cache key
+   * @param ttlOverrideMs optional caller-provided staleness threshold. Used by
+   *   hot-path callers (kill switches) to extend the cache window without
+   *   changing the global default that user-facing flags rely on.
+   *
+   * Eviction rule: physically delete only when the absolute storage TTL
+   * (maxTtlMs) is exceeded. For shorter per-caller thresholds, return
+   * `undefined` silently — that way a short-window caller hitting a still-
+   * valid entry doesn't evict it from under a long-window caller. This
+   * matters if the same cache key is read from both a 5 s consumer and a
+   * 60 s consumer; without it, the short-window read would defeat the
+   * override the long-window caller asked for.
+   */
+  async get(
+    key: string,
+    ttlOverrideMs?: number,
+  ): Promise<CacheEntry | undefined> {
     const entry = await this.cache.get(key);
-    if (entry && this.isStale(entry)) {
+    if (!entry) return undefined;
+    const age = Date.now() - entry.timestamp;
+    if (age > this.maxTtlMs) {
       await this.cache.delete(key);
+      return undefined;
+    }
+    const threshold = ttlOverrideMs ?? this.staleThresholdMs;
+    if (age > threshold) {
       return undefined;
     }
     return entry;

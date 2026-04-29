@@ -87,7 +87,6 @@ describe("migrateCustomModelsRow()", () => {
           maxTokens: 8192,
           supportedParameters: [
             "temperature",
-            "max_tokens",
           ],
         },
       ]);
@@ -175,7 +174,6 @@ describe("migrateCustomModelsRow()", () => {
           maxTokens: 8192,
           supportedParameters: [
             "temperature",
-            "max_tokens",
           ],
         },
       ]);

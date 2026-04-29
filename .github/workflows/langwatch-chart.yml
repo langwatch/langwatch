@@ -50,7 +50,7 @@ jobs:
             flags: "-f examples/values-scalable-prod.yaml"
     steps:
       - uses: actions/checkout@v4
-      - uses: azure/setup-helm@v4
+      - uses: azure/setup-helm@v5
         with:
           version: v3.12.0
       - run: helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
@@ -80,7 +80,7 @@ jobs:
         working-directory: charts/langwatch
     steps:
       - uses: actions/checkout@v4
-      - uses: azure/setup-helm@v4
+      - uses: azure/setup-helm@v5
         with:
           version: v3.12.0
       - name: Build clickhouse-serverless image
@@ -88,12 +88,18 @@ jobs:
       - name: Build app image
         if: matrix.build_app
         run: docker build -t langwatch/langwatch:2.6.0 ../..
+      # The gateway image isn't published to ghcr yet — build it locally so
+      # the chart e2e can install. values-e2e.yaml overrides
+      # gateway.image.{repository,tag,pullPolicy} to match.
+      - name: Build gateway image
+        run: docker build -t langwatch/ai-gateway:e2e -f ../../Dockerfile.go_service ../..
       - uses: helm/kind-action@v1
         with:
           cluster_name: ${{ matrix.cluster }}
       - name: Load images into Kind
         run: |
           kind load docker-image langwatch/clickhouse-serverless:next --name ${{ matrix.cluster }}
+          kind load docker-image langwatch/ai-gateway:e2e --name ${{ matrix.cluster }}
           if [ "${{ matrix.build_app }}" = "true" ]; then
             kind load docker-image langwatch/langwatch:2.6.0 --name ${{ matrix.cluster }}
           fi

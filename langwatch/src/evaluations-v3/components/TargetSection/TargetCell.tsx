@@ -30,6 +30,7 @@ import {
   convertFromUIMapping,
   convertToUIMapping,
 } from "../../utils/fieldMappingConverters";
+import { createEvaluatorEditorCallbacks } from "../../utils/evaluatorEditorCallbacks";
 import { evaluatorHasMissingMappings } from "../../utils/mappingValidation";
 import { EvaluatorChip } from "../TargetSection/EvaluatorChip";
 
@@ -170,12 +171,11 @@ export function TargetCellContent({
     return missing;
   }, [evaluators, activeDatasetId, target.id]);
 
-  // Helper to create mappingsConfig for an evaluator
-  const createMappingsConfig = useCallback(
+  // Build the serializable `mappingsConfig` for an evaluator. Stays
+  // serializable because it goes through the drawer's ephemeral complexProps
+  // path (cleared on ErrorBoundary remount — see issue #3087).
+  const buildMappingsConfig = useCallback(
     (evaluator: EvaluatorConfig) => {
-      const datasetIds = new Set(datasets.map((d) => d.id));
-      const isDatasetSource = (sourceId: string) => datasetIds.has(sourceId);
-
       // Build available sources
       const activeDataset = datasets.find((d) => d.id === activeDatasetId);
       const availableSources = [];
@@ -210,37 +210,42 @@ export function TargetCellContent({
         initialMappings[key] = convertToUIMapping(mapping);
       }
 
-      return {
-        availableSources,
-        initialMappings,
-        onMappingChange: (
-          identifier: string,
-          mapping: UIFieldMapping | undefined,
-        ) => {
-          if (mapping) {
-            const storeMapping = convertFromUIMapping(mapping, isDatasetSource);
-            setEvaluatorMapping(
-              evaluator.id,
-              activeDatasetId,
-              target.id,
-              identifier,
-              storeMapping,
-            );
-          } else {
-            removeEvaluatorMapping(
-              evaluator.id,
-              activeDatasetId,
-              target.id,
-              identifier,
-            );
-          }
-        },
+      return { availableSources, initialMappings };
+    },
+    [datasets, activeDatasetId, target, targetName],
+  );
+
+  // Build the durable `onMappingChange` callback for an evaluator. Lives
+  // separately from `mappingsConfig` because it must survive the drawer's
+  // complexProps clears — registered via `setFlowCallbacks` instead (#3441).
+  const buildOnMappingChange = useCallback(
+    (evaluator: EvaluatorConfig) => {
+      const datasetIds = new Set(datasets.map((d) => d.id));
+      const isDatasetSource = (sourceId: string) => datasetIds.has(sourceId);
+      return (identifier: string, mapping: UIFieldMapping | undefined) => {
+        if (mapping) {
+          const storeMapping = convertFromUIMapping(mapping, isDatasetSource);
+          setEvaluatorMapping(
+            evaluator.id,
+            activeDatasetId,
+            target.id,
+            identifier,
+            storeMapping,
+          );
+        } else {
+          removeEvaluatorMapping(
+            evaluator.id,
+            activeDatasetId,
+            target.id,
+            identifier,
+          );
+        }
       };
     },
     [
       datasets,
       activeDatasetId,
-      target,
+      target.id,
       setEvaluatorMapping,
       removeEvaluatorMapping,
     ],
@@ -397,21 +402,29 @@ export function TargetCellContent({
           hasAnyTargetOutputs={hasAnyTargetOutputs}
           targetType={target.type}
           onEdit={() => {
-            const mappingsConfig = createMappingsConfig(evaluator);
-
-            // Set up local state callbacks for the evaluator editor
-            setFlowCallbacks("evaluatorEditor", {
-              onLocalConfigChange: (config: unknown) => {
-                updateEvaluator(evaluator.id, {
-                  localEvaluatorConfig: config as EvaluatorConfig["localEvaluatorConfig"],
-                });
-              },
-            });
+            // Route all non-serializable callbacks through setFlowCallbacks.
+            // onMappingChange + onLocalConfigChange must live here (not in
+            // mappingsConfig) so the drawer's mappings section renders — see
+            // issue #3441.
+            //
+            // We use the direct `onLocalConfigChange` form (not the
+            // target-bound `targetId + updateTarget` convenience) because
+            // the chip's local config persists onto the evaluator, not the
+            // target.
+            setFlowCallbacks(
+              "evaluatorEditor",
+              createEvaluatorEditorCallbacks({
+                onLocalConfigChange: (localEvaluatorConfig) => {
+                  updateEvaluator(evaluator.id, { localEvaluatorConfig });
+                },
+                onMappingChange: buildOnMappingChange(evaluator),
+              }),
+            );
 
             openDrawer("evaluatorEditor", {
               evaluatorId: evaluator.dbEvaluatorId,
               evaluatorType: evaluator.evaluatorType,
-              mappingsConfig,
+              mappingsConfig: buildMappingsConfig(evaluator),
               initialLocalConfig: evaluator.localEvaluatorConfig,
             });
           }}

@@ -7,7 +7,7 @@ Feature: TypeScript SDK Experiment.printSummary for CI/CD parity
     Given a LangWatch client initialized with a valid API key
     And an experiment instance created via langwatch.experiments.init("ci-quality-check")
 
-  @unit
+  @unit @unimplemented
   Scenario: printSummary prints a CI-friendly summary after run completes
     Given the experiment has run over a dataset and recorded evaluations
     When I call experiment.printSummary({ exitOnFailure: false })
@@ -17,20 +17,20 @@ Feature: TypeScript SDK Experiment.printSummary for CI/CD parity
     And stdout contains the run URL
     And the process does not exit
 
-  @unit
+  @unit @unimplemented
   Scenario: printSummary exits with code 1 when any evaluation failed and exitOnFailure is true
     Given the experiment has at least one failed evaluation
     When I call experiment.printSummary({ exitOnFailure: true })
     Then process.exit is called with code 1
 
-  @unit
+  @unit @unimplemented
   Scenario: printSummary does not exit when exitOnFailure is false even with failures
     Given the experiment has at least one failed evaluation
     When I call experiment.printSummary({ exitOnFailure: false })
     Then process.exit is not called
     And stdout still reports the failure count
 
-  @unit
+  @unit @unimplemented
   Scenario: printSummary does not exit when all evaluations passed
     Given every evaluation in the experiment passed
     When I call experiment.printSummary({ exitOnFailure: true })

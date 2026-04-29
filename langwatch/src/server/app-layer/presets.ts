@@ -9,6 +9,8 @@ import type { ScenarioExecutionReactorHandle } from "../event-sourcing/pipelines
 import { App, getApp, globalForApp, initializeApp } from "./app";
 import { BroadcastService } from "./broadcast/broadcast.service";
 import { createClickHouseClientFromConfig } from "./clients/clickhouse.factory";
+import { GatewayBudgetRepository } from "~/server/gateway/budget.repository";
+import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
 import { NullLangevalsClient } from "./clients/langevals/langevals.client";
 import { LangEvalsHttpClient } from "./clients/langevals/langevals.http.client";
 import { createRedisConnectionFromConfig } from "./clients/redis.factory";
@@ -331,6 +333,16 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     ),
   };
 
+  const gatewayBudgetSync = clickhouseEnabled
+    ? {
+        prisma,
+        budgetRepository: new GatewayBudgetRepository(prisma),
+        budgetCHRepository: new GatewayBudgetClickHouseRepository(
+          resolveClickHouseClient,
+        ),
+      }
+    : undefined;
+
   const registry = new PipelineRegistry({
     eventSourcing: es,
     repositories,
@@ -345,6 +357,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     costRecorder: new PrismaEvaluationCostRecorder(prisma),
     billingCheckpoints: new PrismaBillingCheckpointService(prisma),
     usageReportingService,
+    gatewayBudgetSync,
   });
   const commands = registry.registerAll();
   (globalForApp as any).__scenarioExecutionHandle = commands.scenarioExecutionHandle;

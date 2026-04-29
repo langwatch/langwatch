@@ -299,6 +299,7 @@ test_external_clickhouse() {
     -f "$CHART_DIR/tests/values-e2e.yaml" \
     --set clickhouse.chartManaged=false \
     --set clickhouse.external.url.value="http://fake-ch:8123/default" \
+    --set gateway.chartManaged=false \
     --create-namespace --wait --atomic --timeout "${TIMEOUT}s"
   pass "helm install with external ClickHouse"
 
@@ -370,6 +371,7 @@ test_workers() {
   hc upgrade "$RELEASE" "$CHART_DIR" \
     -f "$CHART_DIR/tests/values-e2e.yaml" \
     --set app.replicaCount=1 \
+    --set workers.enabled=true \
     --set workers.replicaCount=1 \
     --wait --timeout "${TIMEOUT}s"
   pass "helm upgrade (workers deployed)"
@@ -429,11 +431,19 @@ RUSTFS_EOF
   kc wait pod rustfs --for=condition=Ready --timeout=120s
   pass "RustFS ready"
 
-  # Create the S3 bucket via a job
+  # Create the S3 bucket. The amazon/aws-cli image has ENTRYPOINT=aws,
+  # so the previous `kubectl run -- sh -c '...'` form was actually running
+  # `aws sh -c '...'` and failing with "Invalid choice: sh". The bash
+  # `2>/dev/null; echo done` + `|| true` then silently masked the error and
+  # falsely reported PASS, leaving the cold-storage suite to fail later
+  # when ClickHouse hit the missing bucket. Pass creds via --env, drop
+  # the shell wrapper, and let any non-zero exit fail loud (no `|| true`).
   kc run create-bucket --rm -i --restart=Never \
-    --image=amazon/aws-cli:2.27.31 -- \
-    sh -c 'AWS_ACCESS_KEY_ID=admin AWS_SECRET_ACCESS_KEY=adminpass aws --endpoint-url http://rustfs:9000 s3 mb s3://clickhouse 2>/dev/null; echo done' \
-    || true
+    --image=amazon/aws-cli:2.27.31 \
+    --env=AWS_ACCESS_KEY_ID=admin \
+    --env=AWS_SECRET_ACCESS_KEY=adminpass \
+    -- --endpoint-url http://rustfs:9000 s3 mb s3://clickhouse \
+    || fail "S3 bucket creation failed (RustFS unreachable or aws-cli incompatible)"
   pass "S3 bucket created"
 
   # Install chart with cold storage + backup enabled, pointing at RustFS

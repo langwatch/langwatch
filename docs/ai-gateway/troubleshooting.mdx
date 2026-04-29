@@ -1,0 +1,504 @@
+---
+title: Troubleshooting
+description: Diagnostic paths for the most common LangWatch AI Gateway failure modes.
+sidebarTitle: Troubleshooting
+---
+
+When the gateway misbehaves, this page is the first stop. Each symptom below points to the diagnostic you'd run first and, where possible, the single log line or metric that nails the root cause.
+
+Every gateway response carries `X-LangWatch-Request-Id`. Grab it from your client's error output and paste into the LangWatch search bar — the full trace gives you attempts, upstream latency, cache outcome, and guardrail decisions in one view. **Do this before anything else** for a specific broken request.
+
+## `401 invalid_api_key`
+
+**Symptoms:**
+- Every request from one client returns 401.
+- A VK that worked yesterday suddenly doesn't.
+
+**Diagnose:**
+
+```bash
+# 1. Is the VK format right?
+echo "$LANGWATCH_VK" | grep -E '^lw_vk_(live|test)_[0-9A-HJKMNP-TV-Z]{26}$' || echo "malformed"
+
+# 2. Is it actually getting through?
+curl -sD- -o/dev/null -H "Authorization: Bearer $LANGWATCH_VK" \
+  https://gateway.langwatch.ai/v1/models
+```
+
+**Root causes, most to least common:**
+1. Env var expansion failed — `$LANGWATCH_VK` is empty at runtime. Check your deploy config.
+2. VK was rotated; client still holds the old secret. Update to the new one.
+3. VK was revoked. Status in UI → Gateway → Virtual Keys.
+4. You pasted the prefix (`lw_vk_live_01HZX...`) instead of the full secret. The secret is always 40 chars total.
+5. Rare: the gateway's auth cache is stale. Should resolve within 30 s via `/changes`. If persistent, check control-plane `/api/internal/gateway/changes` is reachable.
+
+## `403 model_not_allowed`
+
+**Symptoms:**
+- Specific models return 403, others work.
+- New model you just added to the provider account is rejected.
+
+**Diagnose:**
+
+```bash
+curl -s -H "Authorization: Bearer $LANGWATCH_VK" \
+  https://gateway.langwatch.ai/v1/models | jq -r '.data[].id' | sort
+```
+
+If the model's not in the list, it's either (a) blocked by `models_allowed` on the VK, (b) blocked by `policy_rules.models` (regex policy — different from the static allowlist), or (c) not exposed by any of the VK's provider bindings.
+
+**Fix:** `langwatch virtual-keys update <id> --config-json '{"models_allowed": null}'` to remove the allowlist, or add the model to it. For the regex policy, edit `policy_rules.models.deny` / `.allow` — see [Policy Rules → Models dimension vs models_allowed](/ai-gateway/policy-rules#models-dimension-vs-models_allowed) for when to use which. Or attach a provider credential that actually serves the model.
+
+## `402 budget_exceeded`
+
+**Symptoms:**
+- Requests start failing mid-day after working all morning.
+- Only specific users see it; others don't.
+
+**Diagnose:**
+
+```bash
+langwatch gateway-budgets list --format json | \
+  jq '.[] | select((.spent_usd | tonumber) >= (.limit_usd | tonumber) * 0.9)'
+```
+
+The response payload's `error.message` names the scope that breached — `project:month` or `principal:day` etc. That's your target budget.
+
+**Fix options:**
+- Raise the cap: `langwatch gateway-budgets update <id> --limit 1000`.
+- Switch the VK to a bigger-headroom scope.
+- Change `on_breach` from `block` to `warn` if you just want visibility, not enforcement (but then spend is uncapped — be sure).
+
+## `429 rate_limit_exceeded`
+
+**Symptoms:**
+- Bursty traffic 429s; steady traffic succeeds.
+- Rate-limit headers in the response body mention `tpm`/`rpm`.
+
+**Diagnose:**
+
+Check whether the 429 came from your VK's rate-limit config OR from the upstream provider. The response headers tell you:
+
+- `error.type = rate_limit_exceeded` + `X-LangWatch-RateLimit-Dimension: rpm|rpd` + `Retry-After: <seconds>` — gateway-level VK cap. The dimension header names which ceiling fired so dashboards can filter.
+- `type: rate_limit_exceeded` WITH `X-LangWatch-Provider: openai` and no `X-LangWatch-RateLimit-Dimension` — upstream quota hit.
+
+Gateway-level enforcement runs **before** guardrails / budget / bifrost so rejected requests don't count upstream tokens. Cross-dimension accounting: if RPM denies, RPD isn't burned (and vice versa) — raising one ceiling doesn't blow through the other.
+
+Upstream 429s will trigger fallback if the VK has a chain configured. Check `X-LangWatch-Fallback-Count` on the next success to see if fallback is working.
+
+**Fix:**
+- If gateway-level: `langwatch virtual-keys update <id> --config-json '{"rate_limits": {"rpm": 60, "rpd": 100000}}'` to raise the cap, or `{"rpm": null, "rpd": null}` to disable. Ceiling changes take effect on the next request (limiter invalidates on every bundle refresh).
+- If upstream: add a fallback provider to the VK chain, or request quota from the upstream.
+
+<Warning>
+**Rate-limit changes look broken when the `/changes` long-poll is
+unreachable.** The gateway's cached VK bundle only refreshes when the
+control-plane's `/api/internal/gateway/changes` endpoint is reachable
+and responding within the gateway's `GATEWAY_LONG_POLL_TIMEOUT + 5s`
+deadline. If long-polls are timing out (look for `changes long-poll
+error` in the gateway log), bundles stay stale indefinitely — a fresh
+`langwatch virtual-keys update` that tightens `rpm` will appear to
+have no effect. Verify connectivity and client timeout headroom before
+concluding the limiter itself is broken.
+</Warning>
+
+<Note>**TPM (tokens-per-minute) deferred to v1.1.** Token counts aren't known until the provider replies, so pre-estimation can't be a hard cap. TPM will ship with Redis-coordinated cluster-wide counters in v1.1.</Note>
+
+## `403 tool_not_allowed`
+
+**Symptoms:**
+- Agent suddenly can't run `shell.exec` / `filesystem.write` / specific tools.
+- Was working; now isn't.
+
+**Diagnose:** check `error.message` — it names the blocked pattern and which list (`tools`/`mcp`/`urls`) it matched.
+
+**Fix:**
+- Intended policy — agent must not have this tool. Stop using it.
+- Policy added in error — edit `policy_rules.tools.deny` on the VK.
+
+See [Policy Rules](/ai-gateway/policy-rules) for the regex syntax reference.
+
+## `503 service_unavailable` / `504 upstream_timeout`
+
+**Symptoms:**
+- Intermittent 503/504 but NOT from upstream (no `X-LangWatch-Provider` header).
+- Gateway `/readyz` starts flapping.
+
+**Diagnose:**
+
+```bash
+curl -s https://gateway.langwatch.ai/readyz | jq
+```
+
+Non-`ok` checks pinpoint the layer:
+- `control_plane: error: timeout ...` → control-plane degraded; gateway is refusing traffic correctly.
+- `auth_cache_bootstrap: error: ...` → startup failed; pod will be restarted.
+- `outbox_writer: stale ...` → budget debits aren't flushing; budgets are stale.
+
+**Fix:**
+- If control plane is down, wait / investigate control plane.
+- If single pod, rolling-restart that pod — scheduler will replace.
+- If fleet-wide, check LB + DNS before assuming gateway fault.
+
+## `502 provider_error` after fallback exhaustion
+
+**Symptoms:**
+- `X-LangWatch-Fallback-Count` ≥ chain length.
+- Multiple providers all failing at once.
+
+**Diagnose:** expand the LangWatch trace — each attempt is a child span with `langwatch.fallback.reason`. If every attempt shows `5xx:503` on a different provider, your chain providers are all down (real multi-cloud incident) or your credentials are all wrong (e.g. expired IAM role).
+
+**Fix:**
+- Real multi-provider incident: wait it out, post status page, shed traffic to queues.
+- Credential issue: rotate the failing provider credentials (Gateway → Providers).
+
+## Cache-discount not applying (Anthropic)
+
+**Symptoms:**
+- `cache_read_input_tokens` is always `0` on `/v1/messages` responses.
+- Anthropic bill doesn't show 90% cache discount.
+
+**Diagnose:**
+
+```bash
+# Is VK cache.mode set to 'respect'?
+langwatch virtual-keys get <id> --format json | jq '.config.cache'
+```
+
+If `mode: disable`, that's the problem — `disable` strips `cache_control` blocks before upstream.
+
+**Fix:** `langwatch virtual-keys update <id> --config-json '{"cache":{"mode":"respect"}}'`.
+
+Also check your client is actually sending `cache_control: {type: "ephemeral"}` blocks in the system prompt. Many SDKs don't emit these by default; you often have to pass the system field as a content-blocks array, not a string. See [Caching Passthrough](/ai-gateway/caching-passthrough).
+
+## Request succeeded but no trace in my inbox
+
+**Symptoms:**
+- `/v1/chat/completions` returned `200` with a real model response.
+- Response carried `X-LangWatch-Request-Id`.
+- But the LangWatch **Traces** screen in your project is empty (or doesn't show this request).
+
+**Diagnose:**
+
+```bash
+# 1. Is the gateway configured to export spans at all?
+# In the gateway pod:
+echo "$GATEWAY_OTEL_DEFAULT_ENDPOINT"   # must be non-empty
+echo "$GATEWAY_OTEL_DEFAULT_AUTH_TOKEN" # must be non-empty when endpoint is LangWatch's /api/otel
+
+# 2. Is the exporter reaching the ingest?
+kubectl logs <gateway-pod> | grep -E 'otlp|exporter'
+# Look for:
+#   - "exporter: export succeeded"                 -> spans left the gateway
+#   - "status=401"                                 -> auth-token rejected at ingest
+#   - "status=404"                                 -> endpoint URL is wrong (missing /v1/traces suffix — recent fix)
+#   - "no endpoint configured"                     -> env var wasn't picked up
+```
+
+**Root causes, most to least common:**
+
+1. **You're still on a static token instead of the per-project resolver.** The gateway resolves the X-Auth-Token from the VK's owning project on every bundle refresh — each tenant's spans route to their own inbox automatically. If you've hand-set `GATEWAY_OTEL_DEFAULT_AUTH_TOKEN` in your pod env, it takes precedence over the per-project token and every project's spans land in whatever project that static token points at. Unset it and let the resolver do its job.
+
+   <Info>**Default dev setup needs no config.** The gateway defaults `GATEWAY_OTEL_DEFAULT_ENDPOINT` to `http://localhost:5560/api/otel` and uses the per-project token from the bundle. `pnpm dev` and `make run-dev` Just Work — no env override needed. Override the endpoint only for prod/self-hosted.</Info>
+
+2. **Endpoint is empty.** `GATEWAY_OTEL_DEFAULT_ENDPOINT` unset = no exporter wired. Spans are created in-pod and flushed to a no-op channel. Helm umbrella chart defaults this to `http://langwatch-app:5560/api/otel` — if you've overridden to empty, you've disabled trace export.
+
+3. **Auth token 401s at the ingest.** `/api/otel` rejects unauthenticated or expired tokens with 401; the gateway exporter logs the rejection but the hot path is already done. Rotate the token, update the Secret, roll the gateway pod.
+
+   <Note>**OTLP 401/403 noise during the first 30s of startup is suppressed by design.** The gateway's OTel startup-error handler swallows transient transport errors (401, 403, connection-refused, no-such-host) for a 30-second grace window OR until the first successful export — whichever comes first. This avoids logspam during cold-boot races where the gateway is up before the control plane has minted the OTLP token. **If you see OTLP 401 floods AFTER that grace window, the control-plane auth pipeline isn't minting tokens** — first-line check is `LW_GATEWAY_INTERNAL_SECRET` parity between the gateway and control plane (mismatched HMAC secret silently breaks the `/resolve-key` handshake that mints the OTLP token).</Note>
+
+4. **Endpoint URL 404s.** Before the auto-suffix fix, an endpoint like `http://langwatch-app:5560/api/otel` was treated as the full URL; the Go OTLP exporter hit `/api/otel` and got 404 (the receiver is at `/api/otel/v1/traces`). Recent gateway builds append `/v1/traces` automatically when missing. Bump to the latest image.
+
+5. **Sampler dropped the span.** Gateway spans are sampled at 1.0 by default — if you've tuned `GATEWAY_OTEL_SAMPLER_ARG` below 1.0 for cost, spot-checks will miss by design.
+
+6. **Trace landed but under a different project filter.** Check that the **Traces** screen is scoped to the same project as the auth token's project and that the `Origin = Gateway` quick-filter is either off or explicitly selected (the default view excludes non-Gateway origins when "Gateway" is active — and vice-versa).
+
+**Quick sanity check:** filter **Traces** for the last 5 minutes with **Origin = Gateway** and search for your `X-LangWatch-Request-Id`. If the row is there, you were looking at the wrong filter/project. If not, the export path dropped the span — diagnose via the log grep above.
+
+## `auth_cache_refresh_transport_failure` WARN spew in logs
+
+**Symptoms:**
+- Sustained WARN-level lines reading `auth_cache_refresh_transport_failure vk_id=... error=... error_class=transport new_soft_expires_at=...`.
+- Optionally accompanied by INFO `auth_cache_serve_stale` lines on the same `vk_id`s.
+- Customers report no rejection — traffic flows normally.
+
+This is the gateway's **stale-while-error** path running on a transient control-plane outage. Each cached auth bundle that crosses its JWT expiry while the control plane is unreachable is bumped by `LW_GATEWAY_AUTH_CACHE_SOFT_BUMP` (default `5m`) and continues to serve, up to a hard cap of `LW_GATEWAY_AUTH_CACHE_HARD_GRACE` (default `6h`). Customers don't see 401s during this window; the WARN line is informational, not page-worthy.
+
+**What to do:**
+
+1. Check whether the control plane is actually unreachable (Kubernetes events, control-plane pod logs, `/api/health` from inside the gateway pod).
+2. If it is, no operator action on the gateway side — wait for control-plane recovery and the WARN spew will stop on the next successful refresh (followed by a DEBUG `auth_cache_refresh_success` line per VK).
+3. If you start seeing `auth_cache_hard_evict reason=hard_cap_exceeded` ERROR lines, **the grace cap has been crossed and customers are now being rejected** — see [Production runbook → Recipe 8](/ai-gateway/cookbooks/production-runbook#recipe-8--control-plane-outage--stale-while-error) for the operator playbook + how to extend the cap if the outage is ongoing.
+4. To disable stale-while-error entirely (regulated deployments where stale-served bundles are unacceptable), set `LW_GATEWAY_AUTH_CACHE_HARD_GRACE=0s`. Refresh failures past JWT exp will then evict immediately and customers will see 401 `invalid_api_key` for the duration of the outage.
+
+**What this is NOT:** an HMAC mismatch, a misconfigured `LW_GATEWAY_INTERNAL_SECRET`, or a credential issue. Auth-class failures (401/403/404 from `/resolve-key`) bypass the grace window entirely and emit `auth_cache_hard_evict reason=auth_rejection` instead.
+
+## Trace-id propagation not working
+
+**Symptoms:**
+- `X-LangWatch-Trace-Id` on response doesn't match the `traceparent` you sent.
+- Gateway spans show up as new root traces instead of children of your app trace.
+
+**Diagnose:**
+
+```bash
+curl -sD- -o/dev/null \
+  -H "Authorization: Bearer $LANGWATCH_VK" \
+  -H "traceparent: 00-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-1111111111111111-01" \
+  -H "Content-Type: application/json" \
+  -X POST https://gateway.langwatch.ai/v1/chat/completions \
+  -d '{"model":"gpt-5-mini","messages":[{"role":"user","content":"ping"}],"max_tokens":4}' | \
+  grep -i x-langwatch-trace-id
+```
+
+Expected: `x-langwatch-trace-id: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa`.
+
+**Root causes:**
+- SDK isn't forwarding the `traceparent` header. Check `default_headers` / `defaultHeaders` in your client.
+- Your trace propagator isn't active. Use `langwatch.get_gateway_headers()` / `getGatewayHeaders()`.
+- Proxy / LB between client and gateway is stripping the header. Curl directly to the gateway DNS to bypass.
+
+See [Observability → trace-id handshake](/ai-gateway/observability#trace-id-propagation--concrete-handshake).
+
+## Streaming hangs / drops mid-response
+
+**Symptoms:**
+- Chat assistant produces half a response then nothing.
+- No error, just silence; client eventually times out.
+
+**Diagnose:** check the LangWatch trace for the request. Look at:
+- `langwatch.stream.chunk_count` — how many chunks reached the gateway.
+- `langwatch.stream.terminated_at_chunk` — present when gateway observed mid-stream failure.
+
+If the gateway saw a terminal `event: error`, your client isn't parsing SSE correctly (should have surfaced the error). If `chunk_count` abruptly stops at 20-ish, the upstream connection dropped — gateway won't silent-switch mid-stream, so the client receives the partial response plus a terminal error event.
+
+See [Streaming](/ai-gateway/streaming).
+
+## "My config override isn't taking effect"
+
+**Symptoms:**
+- You set an env var via Helm or `values.yaml`, deployed, but the gateway behaves as if the default were still in effect.
+- `kubectl exec` + `env` shows the var is set, but the behaviour doesn't match.
+
+**Diagnose:** the gateway validates its configuration on boot. Required env vars missing → the process exits with a clear error naming the unset field (struct-tag `validate:"required"`). If the pod reached `Running` state, every required field was set.
+
+Inspect the running pod's effective env:
+
+```bash
+POD=$(kubectl get pod -n langwatch -l app=langwatch-gateway -o jsonpath='{.items[0].metadata.name}')
+
+# Dump the env the pod sees — anything set via Helm, ConfigMap, or Secret refs
+kubectl exec -n langwatch "$POD" -- env | grep -E '^(LW_GATEWAY|CUSTOMER_TRACE_BRIDGE|OTEL|SERVER|LOG)_' | sort
+```
+
+The config struct has six groups, each rooted at an env prefix: `LW_GATEWAY_*` (control plane + secrets), `CUSTOMER_TRACE_BRIDGE_*` (per-tenant OTLP export), `OTEL_*` (gateway-side OTel), `SERVER_*` (bind addr + graceful shutdown), `LOG_*`, plus `ENVIRONMENT`.
+
+**Common causes when the env shows the expected value but behaviour differs:**
+
+1. Stale pods — you bumped values.yaml but haven't restarted. `kubectl rollout restart deploy/langwatch-gateway`.
+2. The VK's bundled config overrides the pod-level default (e.g. VK has its own `cache.mode`). Check the VK config via `langwatch vk get <id>`.
+3. The control plane hasn't propagated the bundle change. Wait 30 s for the `/changes` long-poll cycle, or restart gateway pods.
+
+**Common causes when the env shows the DEFAULT despite an override:**
+
+1. The env var is set on the wrong container in the deployment (e.g. on an init container).
+2. Helm value was set on the wrong key (`gateway.env.X` vs `gateway.X`).
+3. ConfigMap rendered the value as a YAML scientific-notation number (a known gotcha for int64 fields) — check `kubectl describe configmap`.
+
+## `413 payload_too_large`
+
+**Symptoms:**
+- A request with a large prompt / large base64 image / long tool-call argument list returns 413.
+- Response body: `{"error":{"type":"payload_too_large","message":"request body exceeds 33554432 bytes"}}`.
+
+**Root cause:** the request body exceeded the gateway's request-body cap (default **32 MiB**). The cap is enforced at the edge — before auth, before upstream dispatch — so this is always a client-side payload-size issue, not an auth or provider issue.
+
+32 MiB covers the 1M-context + multi-image-vision worst case with headroom; truly-huge workloads can raise it, edge-public deployments can lower it.
+
+**Tuning:** set `SERVER_MAX_REQUEST_BODY_BYTES` (bytes) on the gateway container, or the corresponding Helm value. Set to 0 to fall back to the 32 MiB default. Never disable the cap entirely on a public endpoint — a body-cap-less endpoint is drive-by-scan-able.
+
+**Fix, in increasing order of effort:**
+
+1. Compress / resize large base64 images on the client before including them in the payload. A 4K image base64-encoded is ~6 MB on its own; multiple full-res images plus a big system prompt can push past 32 MiB.
+2. Trim long tool-call argument lists or chunk the request across multiple completions.
+3. If your traffic legitimately exceeds 32 MiB (multi-image vision with 1M-context models), raise `SERVER_MAX_REQUEST_BODY_BYTES` on the gateway deployment. Coordinate with ops — raising the cap reduces attack-surface cheapness, so the higher value should be deliberate and scoped to the impacted deployment.
+
+**What NOT to do:** disabling the cap at the LB / ingress layer. A public endpoint with no body cap is drive-by-scan-able; an attacker discovers your endpoint and sends a few GB to see if the pod crashes.
+
+## Pod never becomes ready after a deploy
+
+**Symptoms:**
+- `kubectl rollout status` hangs, pod cycles through `CrashLoopBackOff` or stays in `Running` with `/startupz` returning 503.
+- First customer request would have failed, but you're catching it at deploy.
+
+**Diagnose:**
+
+```bash
+POD=$(kubectl get pod -n langwatch -l app=langwatch-gateway -o jsonpath='{.items[0].metadata.name}')
+kubectl logs -n langwatch "$POD" | grep -E 'dns resolution failed|tcp dial failed'
+```
+
+**Root causes (the startup netcheck distinguishes these explicitly):**
+
+- `dns resolution failed: lookup api.openai.com: no such host` — the `NetworkPolicy` is blocking kube-system :53 egress. Check the DNS rule is FIRST in `spec.egress` (order matters in some CNIs) and the `kube-system` selector matches your cluster's DNS namespace (some clusters use `kube-dns`, others a custom namespace).
+- `tcp dial failed: dial tcp <ip>:443: connect: connection refused` — DNS works but provider egress is blocked. Your `egressToProviders` override is too narrow; check the resolved IP is in an allowed CIDR, or widen back to the default (any-IP except RFC1918).
+- `tcp dial failed: i/o timeout` — firewall (VPC security group / on-prem) is dropping the packet silently. DNS worked, `NetworkPolicy` allowed it, but an upstream network layer did not. Check your cloud provider's security groups / NAT gateway rules.
+
+**Fix:** correct the policy or firewall rule, `helm upgrade`, rollout. If you need to deploy immediately without fixing the root cause, temporarily set `gateway.startup.netcheckHosts: []` to disable the probe (but then the first customer request will fail instead — prefer fixing the root cause).
+
+## First-request latency spike
+
+**Symptoms:**
+- First request after pod scale-up takes 3-5 s; subsequent requests take 200 ms.
+- Autoscaler adds replicas during traffic bursts.
+
+**Root cause:** cold start + auth cache miss. New replica's L1 cache is empty; first unknown-VK request triggers a `/resolve-key` round-trip.
+
+**Fix:**
+- Enable Redis L2 (`GATEWAY_REDIS_URL`) — new replicas warm from Redis instead of control plane.
+- Ensure pod readiness probe waits for the long-poll loop to be running (`/readyz` handles this correctly by default).
+- `GATEWAY_CACHE_BOOTSTRAP_ALL_KEYS=true` is a planned v1.1 enhancement that would pre-warm the L1 LRU with every active VK on startup; the flag is reserved in env wiring but currently has no Go-side implementation, so setting it does not help today.
+
+## Debug checklist — common patterns
+
+When you don't know where to start:
+
+1. Take the `X-LangWatch-Request-Id` from the failing request → LangWatch search.
+2. Compare `X-LangWatch-Provider` to the VK's configured primary — if different, fallback fired.
+3. Check `X-LangWatch-Cache` response header: `hit` / `miss` / `bypass` / `force` (the last is v1.1 — deferred in v1).
+4. Gateway pod logs filtered on `request_id=grq_...` for structured entries.
+5. Control-plane logs filtered on `vk_id` for authorization decisions.
+
+If none of the above narrows it: post in `#ai-gateway-support` with the request id and the full response headers. LangWatch oncall will trace it within an hour.
+
+## `503 service_unavailable` — guardrail upstream
+
+**Symptoms:**
+- Requests that previously worked return 503 with `type=service_unavailable` when a guardrail evaluator fails and the VK is fail-closed (the default).
+- The LangWatch evaluator dashboard shows errors or timeouts on evaluators attached to the VK.
+- Metric `gateway_guardrail_verdicts_total{verdict="block"}` climbs on the affected direction (request / response) — or `{verdict="fail_open"}` if the VK opts in.
+
+**Root cause:** a `pre` or `post` guardrail's evaluator service (LangEvals, custom webhook evaluator, etc.) is unreachable or erroring, and the VK's fail-open toggle is `false`. The gateway's default is **fail closed** — if policy can't be evaluated, the request is refused rather than passed through ungoverned.
+
+**Diagnose:**
+
+```bash
+# Which guardrails are attached to the VK?
+langwatch virtual-keys get <vk_id> --format json | jq '.config.guardrails'
+
+# Is the fail-open toggle set (per direction)?
+langwatch virtual-keys get <vk_id> --format json | \
+  jq '{req: .config.guardrails.request_fail_open, resp: .config.guardrails.response_fail_open}'
+```
+
+**Fix, in order of preference:**
+1. Restore the evaluator service. Check LangEvals pod / webhook endpoint health. The most common causes are (a) evaluator service OOM-killed by a long-running evaluator, (b) evaluator secret (LLM API key) expired.
+2. If the evaluator is optional (best-effort redaction, nice-to-have), flip fail-open for that direction:
+   ```bash
+   langwatch virtual-keys update <vk_id> --config-json \
+     '{"guardrails": {"response_fail_open": true}}'
+   ```
+   Warning: fail-open means requests pass through ungoverned when evaluators are down. Only do this for low-stakes traffic.
+3. For `stream_chunk` guardrails, the 50 ms per-chunk budget is **fail-open by contract** (no opt-in needed) — blocking the user's stream on a slow policy service is worse than pass-through. Check `langwatch.guardrail.stream_chunk_fail_open=<reason>` trace attributes for why chunks are being passed through.
+
+See [Guardrails → fail-open vs fail-closed](/ai-gateway/guardrails#fail-open-vs-fail-closed).
+
+## `503 service_unavailable` — policy_rules compile failure
+
+**Symptoms:**
+- All requests through one VK return 503 with `type=service_unavailable`.
+- Gateway WARN log line `policy_rules_compile_failed` (dispatcher.go:253) — names the dimension (`tools`, `mcp`, `urls`, `models`) and the broken pattern.
+- Follow-up WARN line `policy_rules_broken` on every subsequent request until the policy is fixed.
+
+**Root cause:** one of the RE2 patterns on the VK's `policy_rules` failed to compile. The gateway fails **closed** on invalid regex — silent bypass is not an option, because an invalid-regex rule would effectively disable an intended block.
+
+**Diagnose:**
+
+```bash
+langwatch virtual-keys get <vk_id> --format json | jq '.config.policy_rules'
+```
+
+Look for patterns with common regex mistakes:
+- Unescaped parentheses — use `\\(` `\\)`
+- Unterminated character classes — `[abc` missing `]`
+- Backrefs `\1` — RE2 doesn't support backreferences (by design, for O(n) guarantees). Use alternation `(a|b)` instead.
+
+**Fix:** update the offending list with a valid pattern. Test the regex with Go's `regexp` package (same RE2 flavour) before saving:
+
+```bash
+# Quick RE2 syntax check
+echo 'test' | docker run -i --rm golang:1.22 go run -e 'package main
+import ("fmt"; "os"; "regexp")
+func main() { _, err := regexp.Compile(os.Args[1]); if err != nil { fmt.Println(err); os.Exit(1) }; fmt.Println("ok") }' '<your_pattern>'
+```
+
+See [Policy Rules → RE2 syntax](/ai-gateway/policy-rules).
+
+## `504 provider is required`
+
+**Symptoms:**
+- Requests intermittently return `504 provider is required` for a VK that worked fine seconds before.
+- Direct curl with a known-good model name fails the same way.
+
+**Root cause:** the gateway's bundle cache went stale and resolved the VK with an empty provider type. Bifrost's `validateRequest` rejects when `req.Provider == ""`. Most often hits after rapid pnpm-dev / control-plane restarts or after long-running gateway processes.
+
+**Fix:**
+- Restart the gateway pod (`kubectl rollout restart deploy/langwatch-gateway` in prod, `pkill -f "service aigateway" && make service svc=aigateway` in dev). A fresh bundle fetch resolves it.
+- If recurring under steady load, file the gateway log line + repro shape — it points at a Bundle resolver TTL/refresh bug.
+
+**How to disambiguate from a model-name issue**: this same error fires when the model name in the request body isn't recognized by Bifrost's registry. `gpt-5-mini` (alias) and `claude-haiku-4-5` (alias) currently return "provider is required" because Bifrost only resolves concrete dated names like `gpt-4o-mini` or `claude-haiku-4-5-20251001`. Pin to a dated name (or set up a VK alias) and the error goes away. If both the model name is concrete AND the gateway was just restarted, it's a real bundle bug — escalate.
+
+## `504 HTML response received from provider`
+
+**Symptoms:**
+- 504 with the body containing `event: response.created\ndata: {…}` or just plain HTML fragments.
+- Affects coding-agent CLIs (codex, claude-code) more than direct API clients.
+
+**Root causes:**
+
+1. **Body too large for the upstream's edge.** Some providers return HTML 4xx pages instead of JSON when the request body exceeds their per-request tolerance. Coding agents can balloon request bodies past 50 KiB with rich tool schemas + system prompts. **Fix**: reduce body — use `claude --bare --disable-slash-commands` to strip parent skills + plugins; for codex, lower `model_reasoning_effort` and avoid stuffing large `instructions` blocks.
+2. **Upstream auth failure.** Provider returned an HTML 401/403 page rather than JSON. Verify the gateway VK's underlying provider credential is valid (see Settings → Model Providers).
+3. **Upstream API rate limit / outage.** Provider is degraded; falls back via the VK chain if configured.
+4. **The streaming response was misclassified as non-streaming.** Was historically the cause for codex 0.122+ on `/v1/responses` — `stream:true` lived past the gateway's 32 KiB peek window and `PeekStream(peek)` returned false. Fixed by widening the peek window for `/v1/responses` to 256 KiB.
+
+## `504 failed to unmarshal response from provider API`
+
+**Symptoms:**
+- Gateway returns generic 504 with "failed to unmarshal response from provider API".
+- The actual upstream error from the provider is hidden behind the generic message.
+
+**Root cause (largely fixed):** an older version of the gateway's raw-forward error-passthrough helper used a `case []byte:` type switch that didn't match `json.RawMessage` (distinct named type in Go), so the upstream response bytes that Bifrost stashed on `ExtraFields.RawResponse` got dropped and the 504 fell through with the generic message. Fixed in `df37575c4`. If you still see this on a current build, the upstream may be sending an unanticipated response shape — capture with `LW_LOG_MESSAGE_BODY=1` + `LW_GATEWAY_OUTBOUND_PROXY` (see [Self-hosting → Config → Debug knobs](/ai-gateway/self-hosting/config#debug-development-env-knobs)) to surface the bytes.
+
+## Boot fails with `AI Gateway secrets partial config`
+
+**Symptoms:**
+- Any LangWatch entry point (`pnpm dev`, `pnpm start`, workers, `prisma:*`, CLI scripts) refuses to start.
+- Loud banner in the boot log naming a subset of `LW_VIRTUAL_KEY_PEPPER`, `LW_GATEWAY_INTERNAL_SECRET`, `LW_GATEWAY_JWT_SECRET` as missing.
+
+**Root cause:** the three AI-Gateway secrets are an all-or-none group. Setting one or two without the third is always a misconfig — the missing secret will fail at first request rather than at boot, often with cryptic errors like `/resolve-key` HMAC mismatches or VK secrets that can't be hashed. The boot validator (`assertGatewaySecretsAllOrNone`) catches this at import time so every entry point fails the same way at the same place. Added in `3941b5239`, hardened in a follow-up to skip the client bundle entirely.
+
+<Note>**Browser blank-page on a partial-secret config (legacy)** — between `3941b5239` and the client-skip follow-up, the validator ran inside `createEnvConfig()` and touched the secret keys off the t3-env proxy. The Vite client bundle includes that module, so any browser nav to `/` triggered `@t3-oss/env-core`'s server-leak guard and the page never hydrated (blank screen + a single `Attempted to access a server-side environment variable on the client` console error). Pull to current `feat/ai-gateway` if you see that — the validator now `typeof window === 'undefined'`-gates and reads `process.env` directly, so the client bundle doesn't trip the guard.</Note>
+
+**Fix — generate the missing one(s):**
+
+```bash
+# Whichever the banner names as missing
+echo "LW_VIRTUAL_KEY_PEPPER=$(openssl rand -hex 32)" >> langwatch/.env
+echo "LW_GATEWAY_INTERNAL_SECRET=$(openssl rand -hex 32)" >> langwatch/.env
+echo "LW_GATEWAY_JWT_SECRET=$(openssl rand -hex 32)" >> langwatch/.env
+```
+
+Restart the entry point (the validator runs at import time, so no incremental refresh).
+
+**If you don't run the AI Gateway at all**, leave all three unset — the validator only fires when at least one is set. The control plane runs cleanly without them; the AI Gateway routes return `503` until the secrets are populated and the gateway pod boots.
+
+**Related dev hint** (warning, not failure): if `FEATURE_FLAG_FORCE_ENABLE` lists `release_ui_ai_gateway_menu_enabled` AND all three secrets are missing, the dev server logs a one-time WARN that the AI Gateway menu will be visible but non-functional until the secrets are populated. This is intentional — it lets you preview the UI without wiring the gateway yet.
+
+## See also
+
+- [API: Errors](/ai-gateway/api/errors) — full error-type enum and HTTP status mapping.
+- [Observability](/ai-gateway/observability) — what every span attribute means.
+- [Health Checks](/ai-gateway/self-hosting/health-checks) — interpreting `/readyz` output.
+- [Cookbook: CI smoke test](/ai-gateway/cookbooks/ci-smoke-test) — automate validation.
+- [Cookbook: Production runbook](/ai-gateway/cookbooks/production-runbook) — on-call playbook (graceful drain, outbox backlog, pprof diagnostics).
+- [Cookbook: Grafana dashboard](/ai-gateway/cookbooks/grafana-dashboard) — importable JSON to visualise every metric referenced on this page.

@@ -9,37 +9,37 @@ Feature: Internal Set ID Namespace
   # Pure logic for detecting and generating internal set IDs.
   # Pattern: __internal__${projectId}__on-platform-scenarios
 
-  @unit
+  @unit @unimplemented
   Scenario: Detect internal set ID by prefix
     Given a set ID "__internal__proj_abc123__on-platform-scenarios"
     When isInternalSetId is called
     Then it returns true
 
-  @unit
+  @unit @unimplemented
   Scenario: Reject non-internal set ID
     Given a set ID "my-custom-scenarios"
     When isInternalSetId is called
     Then it returns false
 
-  @unit
+  @unit @unimplemented
   Scenario: Detect on-platform set by suffix
     Given a set ID "__internal__proj_abc123__on-platform-scenarios"
     When isOnPlatformSet is called
     Then it returns true
 
-  @unit
+  @unit @unimplemented
   Scenario: Reject set without on-platform suffix
     Given a set ID "__internal__proj_abc123__custom-scenarios"
     When isOnPlatformSet is called
     Then it returns false
 
-  @unit
+  @unit @unimplemented
   Scenario: Reject user-created set ending in on-platform suffix
     Given a set ID "user-set__on-platform-scenarios"
     When isOnPlatformSet is called
     Then it returns false
 
-  @unit
+  @unit @unimplemented
   Scenario: Generate on-platform set ID for project
     Given a project ID "proj_abc123"
     When getOnPlatformSetId is called
@@ -50,14 +50,14 @@ Feature: Internal Set ID Namespace
   # ============================================================================
   # When running scenarios on-platform, the set ID is generated from project ID.
 
-  @integration
+  @integration @unimplemented
   Scenario: On-platform scenario run uses internal set ID
     Given project "proj_abc123" exists
     And scenario "Test Scenario" exists in the project
     When the scenario is run on-platform without explicit set ID
     Then the run is associated with set "__internal__proj_abc123__on-platform-scenarios"
 
-  @integration
+  @integration @unimplemented
   Scenario: External SDK run preserves user-provided set ID
     Given project "proj_abc123" exists
     And scenario "Test Scenario" exists in the project
@@ -70,20 +70,20 @@ Feature: Internal Set ID Namespace
   # ============================================================================
   # Internal sets display a friendly name and visual distinction.
 
-  @integration
+  @integration @unimplemented
   Scenario: Display friendly name for internal set
     Given set card receives set ID "__internal__proj_abc123__on-platform-scenarios"
     When the SetCard renders
     Then it displays "On-Platform Scenarios" as the name
     And it does not display the raw internal ID
 
-  @integration
+  @integration @unimplemented
   Scenario: Display system icon for internal set
     Given set card receives set ID "__internal__proj_abc123__on-platform-scenarios"
     When the SetCard renders
     Then it displays a system/settings icon instead of the default icon
 
-  @integration
+  @integration @unimplemented
   Scenario: Display user set name for non-internal set
     Given set card receives set ID "my-production-tests"
     When the SetCard renders
@@ -95,7 +95,7 @@ Feature: Internal Set ID Namespace
   # ============================================================================
   # Internal sets are pinned to top of the list.
 
-  @integration
+  @integration @unimplemented
   Scenario: Pin internal set to top of list
     Given the following sets exist:
       | setId                                           | lastRunAt           |
@@ -111,7 +111,7 @@ Feature: Internal Set ID Namespace
   # ============================================================================
   # Full user journey seeing internal set on the simulations page.
 
-  @e2e
+  @e2e @unimplemented
   Scenario: View on-platform scenarios in simulations list
     Given I am logged into project "my-project"
     And scenarios have been run on-platform

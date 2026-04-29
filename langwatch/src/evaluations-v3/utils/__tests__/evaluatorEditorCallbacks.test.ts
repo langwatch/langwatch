@@ -74,6 +74,38 @@ describe("createEvaluatorEditorCallbacks()", () => {
         expect(callbacks.onLocalConfigChange).toBeUndefined();
       });
     });
+
+    describe("when onLocalConfigChange is provided directly", () => {
+      it("uses the provided callback verbatim (no target shim)", () => {
+        const onLocalConfigChange = vi.fn();
+        const callbacks = createEvaluatorEditorCallbacks({
+          onLocalConfigChange,
+        });
+
+        const config: LocalEvaluatorConfig = { name: "Direct" };
+        callbacks.onLocalConfigChange?.(config);
+
+        expect(onLocalConfigChange).toHaveBeenCalledWith(config);
+      });
+
+      it("takes precedence over targetId + updateTarget when both are provided", () => {
+        // The direct path wins so callers (e.g. evaluator chip) can persist
+        // local config to an evaluator instead of a target without needing
+        // to thread a fake targetId through the helper.
+        const onLocalConfigChange = vi.fn();
+        const updateTarget = vi.fn();
+        const callbacks = createEvaluatorEditorCallbacks({
+          onLocalConfigChange,
+          targetId: "target-1",
+          updateTarget,
+        });
+
+        callbacks.onLocalConfigChange?.({ name: "Direct wins" });
+
+        expect(onLocalConfigChange).toHaveBeenCalledWith({ name: "Direct wins" });
+        expect(updateTarget).not.toHaveBeenCalled();
+      });
+    });
   });
 
   describe("onMappingChange()", () => {

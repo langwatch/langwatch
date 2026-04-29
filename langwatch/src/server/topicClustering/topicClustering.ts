@@ -24,6 +24,7 @@ import { prisma } from "../db";
 import { esClient, TRACE_INDEX, traceIndexId } from "../elasticsearch";
 import { getProjectEmbeddingsModel } from "../embeddings";
 import { getPayloadSizeHistogram } from "../metrics";
+import { isNlpGoEnabled } from "../nlpgo/nlpgoFetch";
 import type { ElasticSearchTrace, Trace } from "../tracer/types";
 import type {
   BatchClusteringParams,
@@ -827,11 +828,34 @@ export const storeResults = async (
   }
 };
 
+/**
+ * Resolve which service hosts topic clustering for the given project. When
+ * `release_nlp_go_engine_enabled` is on, route to langevals (the new
+ * workspace member at langevals/evaluators/topic_clustering — see
+ * specs/nlp-go/_shared/contract.md §11). When off, the legacy langwatch_nlp
+ * path is used unchanged.
+ *
+ * Returns `null` if neither endpoint is configured for the resolved engine —
+ * caller should warn-and-skip in that case.
+ */
+const resolveTopicClusteringEndpoint = async (
+  projectId: string,
+): Promise<{ baseUrl: string; engine: "langevals" | "langwatch_nlp" } | null> => {
+  const goEnabled = await isNlpGoEnabled({ projectId });
+  if (goEnabled) {
+    if (!env.LANGEVALS_ENDPOINT) return null;
+    return { baseUrl: env.LANGEVALS_ENDPOINT, engine: "langevals" };
+  }
+  if (!env.TOPIC_CLUSTERING_SERVICE) return null;
+  return { baseUrl: env.TOPIC_CLUSTERING_SERVICE, engine: "langwatch_nlp" };
+};
+
 export const fetchTopicsBatchClustering = async (
   projectId: string,
   params: BatchClusteringParams,
 ): Promise<TopicClusteringResponse | undefined> => {
-  if (!env.TOPIC_CLUSTERING_SERVICE) {
+  const endpoint = await resolveTopicClusteringEndpoint(projectId);
+  if (!endpoint) {
     logger.warn(
       { projectId },
       "Topic clustering service URL not set, skipping topic clustering",
@@ -843,12 +867,12 @@ export const fetchTopicsBatchClustering = async (
   getPayloadSizeHistogram("topic_clustering_batch").observe(size);
 
   logger.info(
-    { sizeMb: size / 125000, projectId },
+    { sizeMb: size / 125000, projectId, engine: endpoint.engine },
     "uploading traces data for project",
   );
 
   const response = await fetchHTTP2(
-    `${env.TOPIC_CLUSTERING_SERVICE}/topics/batch_clustering`,
+    `${endpoint.baseUrl}/topics/batch_clustering`,
     { method: "POST", json: params },
   );
 
@@ -863,7 +887,7 @@ export const fetchTopicsBatchClustering = async (
       /* this is just a safe json parse fallback */
     }
     throw new Error(
-      `Failed to fetch topics batch clustering: ${response.statusText}\n\n${body}`,
+      `Failed to fetch topics batch clustering (${endpoint.engine}): ${response.statusText}\n\n${body}`,
     );
   }
 
@@ -876,7 +900,8 @@ export const fetchTopicsIncrementalClustering = async (
   projectId: string,
   params: IncrementalClusteringParams,
 ): Promise<TopicClusteringResponse | undefined> => {
-  if (!env.TOPIC_CLUSTERING_SERVICE) {
+  const endpoint = await resolveTopicClusteringEndpoint(projectId);
+  if (!endpoint) {
     logger.warn(
       { projectId },
       "Topic clustering service URL not set, skipping topic clustering",
@@ -888,12 +913,12 @@ export const fetchTopicsIncrementalClustering = async (
   getPayloadSizeHistogram("topic_clustering_incremental").observe(size);
 
   logger.info(
-    { sizeMb: size / 125000, projectId },
+    { sizeMb: size / 125000, projectId, engine: endpoint.engine },
     "uploading traces data for project",
   );
 
   const response = await fetchHTTP2(
-    `${env.TOPIC_CLUSTERING_SERVICE}/topics/incremental_clustering`,
+    `${endpoint.baseUrl}/topics/incremental_clustering`,
     { method: "POST", json: params },
   );
 
@@ -909,7 +934,7 @@ export const fetchTopicsIncrementalClustering = async (
     }
 
     throw new Error(
-      `Failed to fetch topics incremental clustering: ${response.statusText}\n\n${body}`,
+      `Failed to fetch topics incremental clustering (${endpoint.engine}): ${response.statusText}\n\n${body}`,
     );
   }
 

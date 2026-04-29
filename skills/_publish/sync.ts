@@ -22,6 +22,7 @@ const FEATURE_SKILLS = [
   "prompts",
   "analytics",
   "level-up",
+  "datasets",
 ];
 
 function cleanTarget(targetDir: string): void {

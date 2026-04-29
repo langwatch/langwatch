@@ -2,6 +2,7 @@ import {
   Badge,
   Box,
   Button,
+  Card,
   EmptyState,
   Heading,
   HStack,
@@ -12,11 +13,11 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { BrainCircuit, Edit, MoreVertical, Plus, Trash2 } from "lucide-react";
+import { ProviderScopeChips } from "../../components/settings/ProviderScopeChips";
 import { useEffect, useMemo, useState } from "react";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { useDrawer } from "~/hooks/useDrawer";
 import { api } from "~/utils/api";
-import { ProjectSelector } from "../../components/DashboardLayout";
 import { HorizontalFormControl } from "../../components/HorizontalFormControl";
 import {
   ModelSelector,
@@ -43,7 +44,7 @@ import {
 } from "../../utils/modelProviderHelpers";
 
 export default function ModelsPage() {
-  const { project, organization, organizations, hasPermission } =
+  const { project, organization, hasPermission } =
     useOrganizationTeamProject();
   const hasModelProvidersManagePermission = hasPermission("project:manage");
   const { providers, isLoading, refetch } = useModelProvidersSettings({
@@ -64,23 +65,23 @@ export default function ModelsPage() {
     return Object.values(providers).filter((provider) => provider.enabled);
   }, [providers]);
 
-  const notEnabledProviders = useMemo(() => {
-    return Object.keys(modelProvidersRegistry)
-      .filter((providerKey) => {
-        const providerData = providers?.[providerKey as keyof typeof providers];
-        return !providerData?.enabled;
-      })
-      .map((providerKey) => ({
-        provider: providerKey as keyof typeof modelProvidersRegistry,
-        name:
-          modelProvidersRegistry[
-            providerKey as keyof typeof modelProvidersRegistry
-          ]?.name ?? providerKey,
-        icon: modelProviderIcons[
-          providerKey as keyof typeof modelProviderIcons
-        ],
-      }));
-  }, [providers]);
+  // Every registry provider is always addable — iter 109 allows multiple
+  // rows per provider type so users can configure "OpenAI" at org scope
+  // plus another "OpenAI" at project scope (say, a production override).
+  // The prior behavior of hiding already-configured providers prevented
+  // the very multi-instance flow the scope picker exists to support.
+  const addableProviders = useMemo(() => {
+    return Object.keys(modelProvidersRegistry).map((providerKey) => ({
+      provider: providerKey as keyof typeof modelProvidersRegistry,
+      name:
+        modelProvidersRegistry[
+          providerKey as keyof typeof modelProvidersRegistry
+        ]?.name ?? providerKey,
+      icon: modelProviderIcons[
+        providerKey as keyof typeof modelProviderIcons
+      ],
+    }));
+  }, []);
 
   // Check if provider is used for the Default Model only (badge display)
   // When there's only one enabled provider, it is the default by definition
@@ -114,9 +115,15 @@ export default function ModelsPage() {
         <HStack width="full" marginTop={2}>
           <Heading as="h2">Model Providers</Heading>
           <Spacer />
-          {organizations && project && (
-            <ProjectSelector organizations={organizations} project={project} />
-          )}
+          {/*
+            iter 109 #63: ProjectSelector is gone — Model Providers is now
+            an org-level surface. Scope is set per-row via the drawer's
+            Scope picker (Organization / Team / Project), and each row's
+            scope chips below show where it's accessible. Switching
+            projects from this page used to silently rebind the
+            credential to a different project, which the new scope
+            picker makes explicit instead.
+          */}
           <Menu.Root>
             <Tooltip
               content="You need model provider manage permissions to add new providers."
@@ -124,26 +131,27 @@ export default function ModelsPage() {
             >
               <Menu.Trigger asChild>
                 <PageLayout.HeaderButton
-                  disabled={
-                    !hasModelProvidersManagePermission ||
-                    notEnabledProviders.length === 0
-                  }
+                  disabled={!hasModelProvidersManagePermission}
                 >
                   <Plus /> Add Model Provider
                 </PageLayout.HeaderButton>
               </Menu.Trigger>
             </Tooltip>
             <Menu.Content>
-              {notEnabledProviders.map((provider) => (
+              {addableProviders.map((provider) => (
                 <Menu.Item
                   key={provider.provider}
                   value={provider.provider}
                   onClick={() => {
                     if (!project?.id) return;
+                    // Always open a blank form — lets users configure
+                    // a second (or third…) instance of an already-
+                    // configured provider at a different scope.
                     openDrawer("editModelProvider", {
                       projectId: project.id,
                       organizationId: organization?.id,
                       providerKey: provider.provider,
+                      modelProviderId: "new",
                     });
                   }}
                 >
@@ -176,10 +184,13 @@ export default function ModelsPage() {
             </EmptyState.Content>
           </EmptyState.Root>
         ) : (
-          <Table.Root width="full">
+          <Card.Root width="full" overflow="hidden">
+            <Card.Body paddingY={0} paddingX={0}>
+          <Table.Root variant="line" size="md" width="full">
             <Table.Header>
               <Table.Row>
                 <Table.ColumnHeader>Provider</Table.ColumnHeader>
+                <Table.ColumnHeader>Scope</Table.ColumnHeader>
                 <Table.ColumnHeader />
               </Table.Row>
             </Table.Header>
@@ -201,11 +212,21 @@ export default function ModelsPage() {
                         <Box width="24px" height="24px">
                           {providerIcon}
                         </Box>
-                        <Text>{providerSpec?.name ?? provider.provider}</Text>
+                        <Text>
+                          {(provider as any).name ??
+                            providerSpec?.name ??
+                            provider.provider}
+                        </Text>
                         {isDefaultProvider(provider.provider) && (
                           <Badge colorPalette="blue">Default Model</Badge>
                         )}
                       </HStack>
+                    </Table.Cell>
+                    <Table.Cell>
+                      <ProviderScopeChips
+                        scopes={(provider as any).scopes}
+                        fallbackScopeType={(provider as any).scopeType}
+                      />
                     </Table.Cell>
                     <Table.Cell textAlign="right">
                       <Menu.Root>
@@ -266,6 +287,8 @@ export default function ModelsPage() {
               })}
             </Table.Body>
           </Table.Root>
+            </Card.Body>
+          </Card.Root>
         )}
 
         <Dialog.Root

@@ -1,0 +1,139 @@
+---
+title: Observability
+description: Every gateway request emits a per-tenant LangWatch trace — what attributes, how routing works, how to use them.
+sidebarTitle: Observability
+---
+
+The LangWatch AI Gateway is a shared multi-tenant service, but observability is per-tenant: tenant A's traces land in tenant A's LangWatch project, tenant B's land in tenant B's, and no cross-tenant data leaks in either direction.
+
+## Per-tenant OTel routing — how it works
+
+Every request passing through the gateway emits an OTLP trace. The pattern is borrowed from Bifrost's `ObservabilityPlugin.Inject(ctx, trace)` primitive, adapted for LangWatch's attribution model:
+
+1. At auth resolution the gateway knows `vk_id → project_id → team_id → org_id → principal_id`.
+2. Every span in the request's trace is tagged with these as `langwatch.*` attributes.
+3. The bundle returned by `/api/internal/gateway/config/:vk_id` carries `project_id` — the gateway uses it to tag every span on the trace.
+4. The gateway ships all traces to a single endpoint (`OTEL_DEFAULT_EXPORT_ENDPOINT`, default `https://app.langwatch.ai/otel/v1/traces`).
+5. LangWatch's ingest pipeline reads `langwatch.project_id` off each span and stores the trace under the owning project — the attribution happens at ingest, not at export.
+
+So the gateway has a single egress path, but attribution is still per-tenant: tenant A's traces file under tenant A's project, tenant B's under tenant B's. There is no customer-facing override — we sell observability, so everything routes to the LangWatch pipeline by design.
+
+## Self-hosted
+
+On self-hosted deployments, set `OTEL_DEFAULT_EXPORT_ENDPOINT` to your in-cluster OTel collector (or LangWatch ingestion endpoint for hybrid setups). Attribution works the same way: per-project span attributes are filed at ingest.
+
+## Attributes on every gateway span
+
+Source of truth: `services/aigateway/adapters/gatewaytracer/attrs.go`. The gateway emits these attributes on every span (via the `*chi.Context` helper and the dispatch handlers):
+
+| Attribute | Meaning |
+|---|---|
+| `langwatch.virtual_key_id` | Virtual key id that authed this request. |
+| `langwatch.project_id` | Owning project. |
+| `langwatch.team_id` | Owning team. |
+| `langwatch.organization_id` | Owning organisation. |
+| `langwatch.principal_id` | User or service account that made the call. |
+| `langwatch.vk_display_prefix` | First 16 chars of the VK's display form (for correlation with 401 traces where the full VK isn't known). |
+| `langwatch.gateway_request_id` | The value of the `X-LangWatch-Request-Id` response header. |
+| `langwatch.model` | Final resolved model name dispatched to the provider. |
+| `langwatch.provider` | Provider name (`openai` / `anthropic` / `gemini` / etc.). |
+| `langwatch.model_source` | How the model was resolved: `alias` / `explicit_slash` / `implicit`. |
+| `langwatch.streaming` | `true` when the request opted into SSE. |
+| `langwatch.usage.input_tokens` / `langwatch.usage.output_tokens` | Regular input/output tokens. |
+| `gen_ai.usage.cache_read.input_tokens` / `gen_ai.usage.cache_creation.input_tokens` | Cache-read and cache-creation counters, following the OTel GenAI semconv. |
+| `langwatch.cost_usd` | Computed cost for this request. |
+| `langwatch.duration_ms` | Wall-clock time the gateway spent on the request. |
+| `langwatch.status` | Final status: `success` / `provider_error` / `blocked_by_guardrail` / `budget_exceeded` / etc. |
+| `langwatch.budget.decision` | Budget precheck outcome: `allowed` / `soft_warn` / `blocked`. |
+
+## Per-feature attributes (when applicable)
+
+- `langwatch.cache.rule_id` / `langwatch.cache.rule_priority` / `langwatch.cache.mode_applied` — emitted when a bundle-baked cache-control rule matches and determines the final effective cache mode (post header-vs-rule-vs-default precedence). See [Cache control](/ai-gateway/cache-control#rules-engine).
+- `langwatch.guardrail.verdict` — aggregate verdict from pre/post guardrail evaluation.
+- `langwatch.fallback.attempts_count` — total attempts before success (1 = no fallback).
+- `langwatch.fallback.winning_provider` — provider that ultimately served the request.
+- `langwatch.fallback.winning_credential` — credential ID of the winning provider slot.
+- `langwatch.thread_id` — thread/conversation ID when provided via `X-LangWatch-Thread-Id` header.
+
+<Info>The following attributes are **not yet emitted** (tracked for v1.1): `langwatch.policy.blocked`, `langwatch.budget.breached_scope` / `.warnings`, `langwatch.stream.*`, `langwatch.client.name`, `langwatch.cache.outcome` / `.forced_injected`. Operators looking for these signals should use the Prometheus counters documented below. Request-id correlation via the `X-LangWatch-Request-Id` header lets operators join metric spikes back to individual traces.</Info>
+
+## Filtering in the LangWatch UI
+
+Attribute-based filters in the Messages view compose into dashboards:
+
+- "All gateway traffic this week": `attr.langwatch.endpoint != ""`.
+- "Claude Code usage by engineer": `attr.langwatch.client.name = "claude-code"`, group by `principal_id`.
+- "Cache-economics dashboard": sum `gen_ai.usage.cache_read.input_tokens` / `gen_ai.usage.input_tokens` over 7 days.
+- "Fallback incidents": `attr.langwatch.fallback.attempt > 0`, group by `fallback.reason`.
+- "Blocked by policy": `attr.langwatch.policy.blocked != ""`.
+
+## Metrics (Prometheus)
+
+The gateway exposes `/metrics` for Prometheus:
+
+- `gateway_requests_total{provider, model, status}` — request counts.
+- `gateway_request_duration_seconds` — end-to-end latency histogram.
+- `gateway_provider_duration_seconds{provider}` — upstream latency histogram.
+- `gateway_cache_hits_total{outcome}` — cache outcome counts.
+- `gateway_budget_blocks_total{scope}` — budget rejections.
+- `gateway_guardrail_blocks_total{direction}` — guardrail rejections.
+- `gateway_circuit_state{provider}` — 0 closed / 1 half-open / 2 open.
+- `gateway_auth_cache_size{layer=l1|l2}`.
+- `gateway_auth_cache_hits_total{layer}`.
+- `gateway_internal_rtt_seconds{endpoint}` — control-plane round-trip times.
+
+Scrape with a `ServiceMonitor` (Prometheus Operator) or standard scrape config — see [Self-Hosting → Helm](/ai-gateway/self-hosting/helm#monitoring).
+
+## When OTel and metrics disagree
+
+OTel traces are sampled (configurable at the collector level), metrics are exact counters. If your metrics show 1k requests but the LangWatch UI only has 100 traces for a given window, check the OTel sampling rate on your collector.
+
+The gateway itself exports all spans — sampling is applied downstream at the collector or ingest layer.
+
+## Debugging a single request
+
+From a log line or an error at the client, grab the `X-LangWatch-Request-Id` (`grq_01HZX9K3M…`). Paste into the LangWatch search bar and you land on the full trace: every attempt span, upstream latency, guardrail decisions, cache outcome, budget deltas. No digging through provider-side logs.
+
+## Trace-id propagation — concrete handshake
+
+Every gateway response carries the following headers for W3C traceparent propagation and per-tenant OTel routing:
+
+| Response header | Format | Semantics |
+|---|---|---|
+| `X-LangWatch-Trace-Id` | 32 hex chars | Equals the incoming `traceparent` trace id when the caller supplied one; otherwise a freshly-minted trace id |
+| `X-LangWatch-Span-Id` | 16 hex chars | The gateway's own span id for this request |
+| `traceparent` | `00-<trace-id>-<span-id>-01` | W3C traceparent re-injected for downstream stitching — forward to any further hop you call |
+| `X-LangWatch-Request-Id` | `grq_<ULID>` | Gateway-scoped id; use this in support tickets |
+| `X-LangWatch-Gateway-Version` | semver or git-sha | Version of the gateway pod that handled this request. Present on every response — success and error — so "which deploy returned this 500?" is answerable without access-log correlation. SDKs can also version-gate on header presence |
+
+### Client already has a trace
+
+Set `traceparent` on the outbound request (OpenAI/Anthropic SDKs do this automatically when OTel instrumentation is active, or pass `default_headers={"traceparent": ...}`). The gateway:
+
+1. Extracts the trace id from `traceparent`.
+2. Creates its gateway span as a **child** of that trace id with a fresh span id.
+3. Returns `X-LangWatch-Trace-Id` equal to the caller's trace id (no new trace is created — no double cost attribution).
+4. Re-injects `traceparent` on the response with the gateway's span id so you can chain further hops.
+
+### Client has no trace
+
+No `traceparent` sent. The gateway mints a new trace and returns its id via `X-LangWatch-Trace-Id`. The response `traceparent` carries that id; propagate it to downstream services to stitch everything into one trace.
+
+### Verifying the handshake end-to-end
+
+```bash
+# With an existing trace context
+curl -sD- -o/dev/null \
+  -H "Authorization: Bearer $VK" \
+  -H "traceparent: 00-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-1111111111111111-01" \
+  -H "Content-Type: application/json" \
+  -X POST https://gateway.langwatch.ai/v1/chat/completions \
+  -d '{"model":"gpt-5-mini","messages":[{"role":"user","content":"ping"}],"max_tokens":4}' | \
+  grep -iE '^(x-langwatch-(trace|span|request)-id|traceparent)'
+```
+
+Expect `x-langwatch-trace-id: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa` (same 32-hex as input) and a new 16-hex `x-langwatch-span-id`. The `traceparent` on the response will chain under that same trace id.
+
+Without the incoming `traceparent` you'll get a fresh 32-hex trace id instead.
+
+See [SDKs → trace propagation](/ai-gateway/sdks/python#trace-propagation) for language-specific recipes.

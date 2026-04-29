@@ -166,6 +166,7 @@ export const licenseRouter = createTRPCRouter({
           maxTeams: plan.maxTeams,
           maxProjects: plan.maxProjects,
           maxMessagesPerMonth: plan.maxMessagesPerMonth,
+          evaluationsCredit: 0,
           maxWorkflows: plan.maxWorkflows,
           maxPrompts: plan.maxPrompts,
           maxEvaluators: plan.maxEvaluators,

@@ -33,6 +33,7 @@ const mockPrisma = {
   },
   teamUser: {
     findFirst: vi.fn(),
+    findMany: vi.fn(),
   },
   teamUserCustomRole: {
     findFirst: vi.fn(),
@@ -66,6 +67,7 @@ describe("RBAC Integration Tests", () => {
     mockPrisma.groupMembership.findMany.mockResolvedValue([]);
     mockPrisma.roleBinding.findMany.mockResolvedValue([]);
     mockPrisma.teamUser.findFirst.mockResolvedValue(null);
+    mockPrisma.teamUser.findMany.mockResolvedValue([]);
   });
 
   describe("hasProjectPermission", () => {
@@ -369,6 +371,140 @@ describe("RBAC Integration Tests", () => {
       );
 
       expect(result).toBe(true);
+    });
+
+    describe("when user is OrgUser+TeamUser ADMIN but has no RoleBindings (legacy migration)", () => {
+      // Finding #28: /gateway/audit + /gateway/budgets.list + cache-rules.list
+      // all 401 for legacy ADMINs because hasOrganizationPermission had no
+      // TeamUser fallback for org-scoped permission checks.
+      beforeEach(() => {
+        mockPrisma.organizationUser.findFirst.mockResolvedValue({
+          role: OrganizationUserRole.ADMIN,
+        });
+        mockPrisma.roleBinding.findMany.mockResolvedValue([]);
+        mockPrisma.teamUser.findMany.mockResolvedValue([
+          { role: TeamUserRole.ADMIN, assignedRoleId: null },
+        ]);
+      });
+
+      it("grants gatewayLogs:view (was 401 before the fallback)", async () => {
+        const result = await hasOrganizationPermission(
+          { prisma: mockPrisma, session: mockSession },
+          "org-123",
+          "gatewayLogs:view" as Permission,
+        );
+        expect(result).toBe(true);
+      });
+
+      it("grants gatewayBudgets:view", async () => {
+        const result = await hasOrganizationPermission(
+          { prisma: mockPrisma, session: mockSession },
+          "org-123",
+          "gatewayBudgets:view" as Permission,
+        );
+        expect(result).toBe(true);
+      });
+
+      it("grants gatewayCacheRules:create", async () => {
+        const result = await hasOrganizationPermission(
+          { prisma: mockPrisma, session: mockSession },
+          "org-123",
+          "gatewayCacheRules:create" as Permission,
+        );
+        expect(result).toBe(true);
+      });
+
+      // Regression coverage for the audit consolidation: the unified
+      // /settings/audit-log page is gated on auditLog:view (was
+      // gatewayLogs:view + organization:manage pre-consolidation). Legacy
+      // admins must keep their access via the same TeamUser fallback path
+      // that grants gatewayBudgets:view / gatewayCacheRules:create above.
+      it("grants auditLog:view (post-consolidation /settings/audit-log)", async () => {
+        const result = await hasOrganizationPermission(
+          { prisma: mockPrisma, session: mockSession },
+          "org-123",
+          "auditLog:view" as Permission,
+        );
+        expect(result).toBe(true);
+      });
+
+      it("does NOT grant organization:manage (org-admin-only perm)", async () => {
+        const result = await hasOrganizationPermission(
+          { prisma: mockPrisma, session: mockSession },
+          "org-123",
+          "organization:manage" as Permission,
+        );
+        expect(result).toBe(false);
+      });
+    });
+
+    describe("when user has only TeamUser MEMBER role (no RoleBindings, no admin)", () => {
+      beforeEach(() => {
+        mockPrisma.organizationUser.findFirst.mockResolvedValue({
+          role: OrganizationUserRole.MEMBER,
+        });
+        mockPrisma.roleBinding.findMany.mockResolvedValue([]);
+        mockPrisma.teamUser.findMany.mockResolvedValue([
+          { role: TeamUserRole.MEMBER, assignedRoleId: null },
+        ]);
+      });
+
+      it("grants gatewayLogs:view (MEMBER team role includes it)", async () => {
+        const result = await hasOrganizationPermission(
+          { prisma: mockPrisma, session: mockSession },
+          "org-123",
+          "gatewayLogs:view" as Permission,
+        );
+        expect(result).toBe(true);
+      });
+
+      it("grants auditLog:view (MEMBER team role includes it)", async () => {
+        const result = await hasOrganizationPermission(
+          { prisma: mockPrisma, session: mockSession },
+          "org-123",
+          "auditLog:view" as Permission,
+        );
+        expect(result).toBe(true);
+      });
+
+      it("does NOT grant gatewayBudgets:delete (MEMBER cannot delete)", async () => {
+        const result = await hasOrganizationPermission(
+          { prisma: mockPrisma, session: mockSession },
+          "org-123",
+          "gatewayBudgets:delete" as Permission,
+        );
+        expect(result).toBe(false);
+      });
+    });
+
+    describe("when user has only TeamUser VIEWER role (no RoleBindings, no admin)", () => {
+      beforeEach(() => {
+        mockPrisma.organizationUser.findFirst.mockResolvedValue({
+          role: OrganizationUserRole.MEMBER,
+        });
+        mockPrisma.roleBinding.findMany.mockResolvedValue([]);
+        mockPrisma.teamUser.findMany.mockResolvedValue([
+          { role: TeamUserRole.VIEWER, assignedRoleId: null },
+        ]);
+      });
+
+      it("grants auditLog:view (VIEWER team role includes it)", async () => {
+        const result = await hasOrganizationPermission(
+          { prisma: mockPrisma, session: mockSession },
+          "org-123",
+          "auditLog:view" as Permission,
+        );
+        expect(result).toBe(true);
+      });
+
+      it("does NOT grant gatewayBudgets:delete (VIEWER cannot delete)", async () => {
+        const result = await hasOrganizationPermission(
+          { prisma: mockPrisma, session: mockSession },
+          "org-123",
+          "gatewayBudgets:delete" as Permission,
+        );
+        expect(result).toBe(false);
+      });
     });
   });
 

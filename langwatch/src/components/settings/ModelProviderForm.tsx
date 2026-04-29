@@ -1,4 +1,5 @@
-import { Button, Field, HStack, VStack } from "@chakra-ui/react";
+import { Box, Button, Field, HStack, Input, VStack } from "@chakra-ui/react";
+import { SmallLabel } from "../SmallLabel";
 import { useCallback, useMemo, useState } from "react";
 import { z } from "zod";
 import { useDrawer } from "../../hooks/useDrawer";
@@ -20,6 +21,7 @@ import { CredentialsSection } from "./ModelProviderCredentialsSection";
 import { CustomModelInputSection } from "./ModelProviderCustomModelInput";
 import { DefaultProviderSection } from "./ModelProviderDefaultSection";
 import { ExtraHeadersSection } from "./ModelProviderExtraHeadersSection";
+import { ProviderScopeSection } from "./ModelProviderScopeSection";
 
 export type EditModelProviderFormProps = {
   projectId?: string | undefined;
@@ -38,7 +40,9 @@ export const EditModelProviderForm = ({
     projectId: projectId,
   });
   const { closeDrawer } = useDrawer();
-  const { project } = useOrganizationTeamProject();
+  const { project, team, organization, hasPermission } = useOrganizationTeamProject();
+  const canManageOrganization = hasPermission("organization:manage");
+  const canManageTeam = hasPermission("team:manage");
 
   // Count enabled providers to determine if this is the only one
   // Include the current provider being edited since it will be enabled when saved
@@ -57,9 +61,15 @@ export const EditModelProviderForm = ({
 
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
-  // Get provider - first try by ID, then fallback to provider key
+  // Get provider - first try by ID, then fallback to provider key.
+  // The `modelProviderId === "new"` sentinel forces a blank form even
+  // when the same providerKey is already configured — that's the
+  // multi-instance flow (iter 109): a user can have multiple OpenAI
+  // rows at different scopes, and the "Add Model Provider" menu routes
+  // through this path.
   const provider: MaybeStoredModelProvider = useMemo(() => {
-    if (providers) {
+    const isExplicitNew = modelProviderId === "new";
+    if (providers && !isExplicitNew) {
       // First try to find by ID
       if (modelProviderId) {
         const existing = Object.values(providers).find(
@@ -99,6 +109,10 @@ export const EditModelProviderForm = ({
     project,
     enabledProvidersCount,
     isUsingEnvVars,
+    teamId: team?.id,
+    organizationId: organization?.id,
+    canManageOrganization,
+    canManageTeam,
     onSuccess: () => {
       closeDrawer();
     },
@@ -198,6 +212,27 @@ export const EditModelProviderForm = ({
   return (
     <VStack gap={4} align="start" width="full">
       <VStack align="start" width="full" gap={4}>
+        <Field.Root width="full" required>
+          <SmallLabel>
+            Name
+            <Field.RequiredIndicator />
+          </SmallLabel>
+          <Box width="full">
+            <Input
+              value={state.name}
+              onChange={(e) => actions.setName(e.target.value)}
+              placeholder={provider.provider}
+              width="full"
+              maxLength={128}
+            />
+          </Box>
+          <Field.HelperText>
+            Distinguish multiple instances (e.g. "OpenAI – EU prod" vs
+            "OpenAI – Dev"). Shown in the provider list and model
+            selectors.
+          </Field.HelperText>
+        </Field.Root>
+
         {isLlmProvider && provider.provider === "azure" && (
           <Field.Root>
             <Switch
@@ -221,6 +256,30 @@ export const EditModelProviderForm = ({
           organizationId={organizationId}
           apiKeyValidationError={apiKeyValidationError}
           onApiKeyValidationClear={clearApiKeyError}
+        />
+
+        <ProviderScopeSection
+          state={state}
+          actions={actions}
+          provider={provider}
+          teamId={team?.id}
+          teamName={team?.name}
+          organizationId={organization?.id}
+          organizationName={organization?.name}
+          projectId={project?.id}
+          projectName={project?.name}
+          availableTeams={
+            organization?.teams?.map((t) => ({ id: t.id, name: t.name })) ?? []
+          }
+          availableProjects={
+            organization?.teams?.flatMap((t) =>
+              t.projects.map((p) => ({
+                id: p.id,
+                name: `${p.name} · ${t.name}`,
+                teamId: t.id,
+              })),
+            ) ?? []
+          }
         />
 
         <ExtraHeadersSection

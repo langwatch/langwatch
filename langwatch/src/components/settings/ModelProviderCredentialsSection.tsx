@@ -4,7 +4,10 @@ import type {
   UseModelProviderFormActions,
   UseModelProviderFormState,
 } from "../../hooks/useModelProviderForm";
-import type { MaybeStoredModelProvider } from "../../server/modelProviders/registry";
+import {
+  modelProviders as modelProvidersRegistry,
+  type MaybeStoredModelProvider,
+} from "../../server/modelProviders/registry";
 import { KEY_CHECK } from "../../utils/constants";
 import { SmallLabel } from "../SmallLabel";
 import { ManagedModelProviderAlert } from "../../../ee/managed-providers/ManagedModelProviderAlert";
@@ -53,6 +56,13 @@ export const CredentialsSection = ({
     );
   const isManaged = managedProviderData?.managed ?? false;
 
+  const providerDefinition = modelProvidersRegistry[
+    provider.provider as keyof typeof modelProvidersRegistry
+  ] as { optionalKeys?: readonly string[] } | undefined;
+  const optionalKeySet = providerDefinition?.optionalKeys
+    ? new Set(providerDefinition.optionalKeys)
+    : undefined;
+
   useEffect(() => {
     if (isManaged) {
       actions.setManaged(true);
@@ -73,9 +83,15 @@ export const CredentialsSection = ({
     <>
       <VStack align="stretch" gap={3} width="full">
         {Object.keys(state.displayKeys).map((key) => {
-          // Check if field is optional using Zod's public API
+          // Prefer the provider's explicit optionalKeys list (ground truth
+          // for UI affordance). Fall back to Zod introspection for
+          // providers that haven't declared it yet — `.nullable().optional()`
+          // is used on the schemas for env-var fallback, so `.isOptional()`
+          // alone over-reports "optional".
           const zodSchema = state.displayKeys[key];
-          const isOptional = zodSchema?.isOptional?.() ?? false;
+          const isOptional = optionalKeySet
+            ? optionalKeySet.has(key)
+            : (zodSchema?.isOptional?.() ?? false);
           const isPassword = KEY_CHECK.some((k) => key.includes(k));
           const isInvalid = Boolean(fieldErrors[key]);
 

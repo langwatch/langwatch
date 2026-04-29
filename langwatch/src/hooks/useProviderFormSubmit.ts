@@ -15,6 +15,8 @@ import type { ExtraHeader } from "./useExtraHeaders";
 /** Snapshot of all form state needed at submission time. */
 export type FormSnapshot = {
   provider: MaybeStoredModelProvider;
+  /** Human-readable label the user typed (or the humanized default). */
+  name: string;
   projectId: string | undefined;
   isUsingEnvVars: boolean | undefined;
   customKeys: Record<string, string>;
@@ -27,6 +29,17 @@ export type FormSnapshot = {
   projectDefaultModel: string | null;
   projectTopicClusteringModel: string | null;
   projectEmbeddingsModel: string | null;
+  /**
+   * Multi-scope selection (iter 109). When present this is the
+   * canonical shape the tRPC layer consumes; `scopeType`/`scopeId`
+   * remain for transitional compat.
+   */
+  scopes?: Array<{
+    scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
+    scopeId: string;
+  }>;
+  scopeType?: "ORGANIZATION" | "TEAM" | "PROJECT";
+  scopeId?: string;
 };
 
 export type UseProviderFormSubmitState = {
@@ -110,6 +123,10 @@ export function useProviderFormSubmit({
       projectDefaultModel,
       projectTopicClusteringModel,
       projectEmbeddingsModel,
+      name,
+      scopes,
+      scopeType,
+      scopeId,
     } = snapshot;
 
     try {
@@ -174,15 +191,23 @@ export function useProviderFormSubmit({
         .filter((h) => h.key?.trim())
         .map(({ key, value }) => ({ key, value }));
 
+      const trimmedName = (name ?? "").trim();
       await updateMutation.mutateAsync({
         id: provider.id,
         projectId: projectId ?? "",
         provider: provider.provider,
+        name: trimmedName === "" ? undefined : trimmedName,
         enabled: true,
         customKeys: customKeysToSend,
         customModels,
         customEmbeddingsModels,
         extraHeaders: extraHeadersToSend,
+        // Send the full scope array when it's populated; the router
+        // falls back to legacy scopeType/scopeId for callers still
+        // writing through the single-tier path.
+        scopes: scopes && scopes.length > 0 ? scopes : undefined,
+        scopeType,
+        scopeId,
       });
 
       // Update project default models if useAsDefaultProvider is enabled

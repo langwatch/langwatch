@@ -15,7 +15,7 @@ Feature: Archived Dependency Exclusion from Suite Runs
   # E2E: Happy Path — Suite runs skip archived dependencies
   # ============================================================================
 
-  @e2e
+  @e2e @unimplemented
   Scenario: Run a suite that contains archived scenarios and targets
     When I trigger a run for "My Test Suite"
     Then the run starts without errors
@@ -27,7 +27,7 @@ Feature: Archived Dependency Exclusion from Suite Runs
   # Integration: Archived Scenario Filtering
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: Suite run excludes archived scenarios from job scheduling
     Given I am authenticated in project "test-project"
     And suite "Mixed Suite" references scenarios "Active A", "Active B", and "Archived C"
@@ -37,14 +37,14 @@ Feature: Archived Dependency Exclusion from Suite Runs
     Then jobs are scheduled only for "Active A" and "Active B"
     And no job is scheduled for "Archived C"
 
-  @integration
+  @integration @unimplemented
   Scenario: Suite run fails when all scenarios are archived
     Given I am authenticated in project "test-project"
     And suite "All Archived Suite" references only archived scenarios
     When the suite run is triggered
     Then the run fails with an error indicating all scenarios are archived
 
-  @integration
+  @integration @unimplemented
   Scenario: Deleted scenarios still cause validation errors
     Given I am authenticated in project "test-project"
     And suite "Broken Suite" references scenario "deleted-scenario" that no longer exists
@@ -55,7 +55,7 @@ Feature: Archived Dependency Exclusion from Suite Runs
   # Integration: Archived Target Filtering
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: Suite run excludes archived targets from job scheduling
     Given I am authenticated in project "test-project"
     And suite "Target Suite" has 2 active scenarios
@@ -65,7 +65,7 @@ Feature: Archived Dependency Exclusion from Suite Runs
     Then jobs are scheduled only against "Active Target"
     And no job is scheduled against "Archived Target"
 
-  @integration
+  @integration @unimplemented
   Scenario: Suite run fails when all targets are archived
     Given I am authenticated in project "test-project"
     And suite "No Targets Suite" references only archived targets
@@ -77,7 +77,7 @@ Feature: Archived Dependency Exclusion from Suite Runs
   # Integration: Warning Notice
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: Suite run reports skipped archived scenarios
     Given I am authenticated in project "test-project"
     And suite "Partial Suite" references scenarios "Active" and "Archived"
@@ -85,7 +85,7 @@ Feature: Archived Dependency Exclusion from Suite Runs
     When the suite run is triggered
     Then the run result includes a notice listing skipped archived scenarios
 
-  @integration
+  @integration @unimplemented
   Scenario: Suite run reports skipped archived targets
     Given I am authenticated in project "test-project"
     And suite "Partial Target Suite" references targets "Active Target" and "Archived Target"
@@ -97,31 +97,31 @@ Feature: Archived Dependency Exclusion from Suite Runs
   # Unit: Filtering Logic
   # ============================================================================
 
-  @unit
+  @unit @unimplemented
   Scenario: Filters out archived scenarios from a reference list
     Given a suite with three scenarios where one is archived
     When the active scenarios are resolved
     Then only the two non-archived scenarios are returned
 
-  @unit
+  @unit @unimplemented
   Scenario: Returns empty list when all scenarios are archived
     Given a suite with two scenarios that are both archived
     When the active scenarios are resolved
     Then an empty list is returned
 
-  @unit
+  @unit @unimplemented
   Scenario: Returns all scenarios when none are archived
     Given a suite with two scenarios that are both active
     When the active scenarios are resolved
     Then both scenarios are returned
 
-  @unit
+  @unit @unimplemented
   Scenario: Filters out archived targets from a reference list
     Given a suite with two targets where one is archived
     When the active targets are resolved
     Then only the non-archived target is returned
 
-  @unit
+  @unit @unimplemented
   Scenario: Job count reflects only active scenarios and targets
     Given a suite with 3 scenarios, 2 targets, and repeat count 1
     And 1 scenario is archived and 1 target is archived

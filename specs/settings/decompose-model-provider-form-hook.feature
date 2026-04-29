@@ -7,7 +7,7 @@ Feature: Decompose useModelProviderForm hook into focused sub-hooks
     Given the useModelProviderForm hook returns [state, actions]
     And two consumer components depend on the public API
 
-  @refactor @integration
+  @refactor @integration @unimplemented
   Scenario: Public API remains unchanged after decomposition
     When the hook is decomposed into sub-hooks
     Then the UseModelProviderFormParams type is unchanged
@@ -15,7 +15,7 @@ Feature: Decompose useModelProviderForm hook into focused sub-hooks
     And the UseModelProviderFormActions type is unchanged
     And both consumer components work without modification
 
-  @refactor @integration
+  @refactor @integration @unimplemented
   Scenario: All existing integration tests pass without modification
     When the hook is decomposed into sub-hooks
     Then all tests in useModelProviderForm.integration.test.tsx pass

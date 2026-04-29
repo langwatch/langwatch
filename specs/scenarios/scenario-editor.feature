@@ -10,14 +10,14 @@ Feature: Scenario Editor
   # Create Scenario
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: Navigate to create form
     Given I am on the scenarios list page
     When I click "New Scenario"
     Then I navigate to the scenario editor
     And I see an empty scenario form
 
-  @integration
+  @integration @unimplemented
   Scenario: View scenario form fields
     When I am on the create scenario page
     Then I see the following fields:
@@ -27,7 +27,7 @@ Feature: Scenario Editor
       | Criteria  | list (add/remove) |
       | Labels    | tag input         |
 
-  @e2e
+  @e2e @unimplemented
   Scenario: Save new scenario
     Given I am on the create scenario page
     When I fill in "Name" with "Refund Request Test"
@@ -42,7 +42,7 @@ Feature: Scenario Editor
   # Edit Scenario
   # ============================================================================
 
-  @e2e
+  @e2e @unimplemented
   Scenario: Load existing scenario for editing
     Given scenario "Refund Flow" exists with:
       | name      | Refund Flow                |
@@ -51,7 +51,7 @@ Feature: Scenario Editor
     When I navigate to edit "Refund Flow"
     Then the form is populated with the existing data
 
-  @e2e
+  @e2e @unimplemented
   Scenario: Update scenario name
     Given I am editing scenario "Refund Flow"
     When I change the name to "Refund Flow (Updated)"
@@ -62,7 +62,7 @@ Feature: Scenario Editor
   # Criteria Management
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: Add criterion to list
     Given I am on the scenario editor
     When I type criterion "Agent must apologize"
@@ -70,13 +70,13 @@ Feature: Scenario Editor
     Then the criterion appears in the criteria list
     And I can add more criteria
 
-  @integration
+  @integration @unimplemented
   Scenario: Remove criterion from list
     Given criteria ["Criterion A", "Criterion B"] exist in the form
     When I click remove on "Criterion A"
     Then only "Criterion B" remains in the list
 
-  @integration
+  @integration @unimplemented
   Scenario: Criteria list validates empty input
     Given I am on the scenario editor
     When I try to add an empty criterion
@@ -87,14 +87,14 @@ Feature: Scenario Editor
   # Target Configuration
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: Configure prompt as target
     Given I am on the scenario editor
     And prompts exist in the project
     When I open the target selector
     Then I can select an existing prompt config
 
-  @integration
+  @integration @unimplemented
   Scenario: Configure HTTP agent as target
     Given I am on the scenario editor
     When I open the target selector

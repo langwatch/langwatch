@@ -12,6 +12,7 @@ Feature: Batch Evaluation Results Visualization
   # Data Display - Dataset Columns
   # ============================================================================
 
+  @unimplemented
   Scenario: Display dataset columns in the table
     Given the evaluation was run on a dataset with columns "input", "expected_output"
     When the results table renders
@@ -19,12 +20,14 @@ Feature: Batch Evaluation Results Visualization
     And the "input" column shows the original dataset values
     And the "expected_output" column shows the expected values
 
+  @unimplemented
   Scenario: Display images in dataset columns
     Given the dataset has a column with image URLs
     When the results table renders
     Then images are rendered inline in the dataset cells
     And images have appropriate max dimensions for the table
 
+  @unimplemented
   Scenario: Truncate long text in dataset cells
     Given a dataset cell contains text longer than 10000 characters
     When the results table renders
@@ -35,6 +38,7 @@ Feature: Batch Evaluation Results Visualization
   # Data Display - Target Columns
   # ============================================================================
 
+  @unimplemented
   Scenario: Display target output columns
     Given the evaluation has 2 targets "GPT-4o" and "Claude"
     When the results table renders
@@ -42,18 +46,21 @@ Feature: Batch Evaluation Results Visualization
     And the column header shows the target name
     And each row shows the output from that target
 
+  @unimplemented
   Scenario: Display target output with cost and duration
     Given a target produced output with cost $0.001 and latency 1.2s
     When I hover over the target cell
     Then I see the latency displayed
     And I can access cost information
 
+  @unimplemented
   Scenario: Display error state in target cell
     Given a target execution failed with error "Rate limit exceeded"
     When the results table renders
     Then the target cell shows an error indicator
     And the error message "Rate limit exceeded" is visible
 
+  @unimplemented
   Scenario: Expand long target output
     Given a target output is longer than the cell max height (120px)
     When the results table renders
@@ -66,6 +73,7 @@ Feature: Batch Evaluation Results Visualization
   # Evaluator Results Display
   # ============================================================================
 
+  @unimplemented
   Scenario: Display evaluator chips below target output
     Given a target has 2 evaluators "Exact Match" and "LLM as Judge"
     And both evaluators have completed
@@ -73,24 +81,28 @@ Feature: Batch Evaluation Results Visualization
     Then I see evaluator chips below the target output
     And each chip shows the evaluator name and result
 
+  @unimplemented
   Scenario: Evaluator chip shows pass status
     Given an evaluator "Exact Match" passed with score 1.0
     When the results table renders
     Then the evaluator chip shows a green indicator
     And the chip displays "passed"
 
+  @unimplemented
   Scenario: Evaluator chip shows fail status
     Given an evaluator "Exact Match" failed with score 0.0
     When the results table renders
     Then the evaluator chip shows a red indicator
     And the chip displays "failed"
 
+  @unimplemented
   Scenario: Evaluator chip shows error status
     Given an evaluator execution failed with an error
     When the results table renders
     Then the evaluator chip shows an error indicator
     And hovering shows the error details
 
+  @unimplemented
   Scenario: Evaluator chip hover shows details
     Given an evaluator "LLM as Judge" completed with score 0.75 and details
     When I hover over the evaluator chip
@@ -101,6 +113,7 @@ Feature: Batch Evaluation Results Visualization
   # Trace Links
   # ============================================================================
 
+  @unimplemented
   Scenario: View trace for a target execution
     Given a target execution has an associated trace_id
     When I hover over the target cell
@@ -108,6 +121,7 @@ Feature: Batch Evaluation Results Visualization
     When I click the "View Trace" button
     Then a trace drawer opens showing execution details
 
+  @unimplemented
   Scenario: No trace link when no trace_id
     Given a target execution has no trace_id
     When the results table renders
@@ -117,6 +131,7 @@ Feature: Batch Evaluation Results Visualization
   # Run Selection Sidebar
   # ============================================================================
 
+  @unimplemented
   Scenario: Display list of evaluation runs
     Given there are 3 completed evaluation runs
     When I view the experiment page
@@ -124,6 +139,7 @@ Feature: Batch Evaluation Results Visualization
     And runs are ordered by timestamp (most recent first)
     And the most recent run is selected by default
 
+  @unimplemented
   Scenario: Run shows summary information
     Given an evaluation run completed with 2 evaluators
     When I view the runs sidebar
@@ -131,6 +147,7 @@ Feature: Batch Evaluation Results Visualization
     And each run shows a summary of evaluator scores
     And each run shows the total cost
 
+  @unimplemented
   Scenario: Select a different run
     Given I am viewing run 1
     And run 2 exists in the sidebar
@@ -138,12 +155,14 @@ Feature: Batch Evaluation Results Visualization
     Then the results table updates to show run 2 results
     And run 2 is highlighted as selected
 
+  @unimplemented
   Scenario: Show running indicator for in-progress run
     Given an evaluation is currently running
     When I view the runs sidebar
     Then the running evaluation shows a spinner
     And results update in real-time as they arrive
 
+  @unimplemented
   Scenario: Show stopped indicator for stopped run
     Given an evaluation was manually stopped
     When I view the runs sidebar
@@ -154,12 +173,14 @@ Feature: Batch Evaluation Results Visualization
   # CSV Export
   # ============================================================================
 
+  @unimplemented
   Scenario: Export results to CSV
     Given I am viewing an evaluation run with results
     When I click the "Export to CSV" button
     Then a CSV file is downloaded
     And the filename includes the experiment name and date
 
+  @unimplemented
   Scenario: CSV contains all columns
     Given the evaluation has dataset columns, target outputs, and evaluator results
     When I export to CSV
@@ -168,6 +189,7 @@ Feature: Batch Evaluation Results Visualization
     And the CSV contains cost and duration columns
     And the CSV contains evaluator result columns (score, passed, details)
 
+  @unimplemented
   Scenario: CSV handles special characters
     Given the dataset contains text with commas, quotes, and newlines
     When I export to CSV
@@ -178,17 +200,20 @@ Feature: Batch Evaluation Results Visualization
   # Empty and Loading States
   # ============================================================================
 
+  @unimplemented
   Scenario: Show loading skeleton while fetching results
     Given the results are still loading
     When the page renders
     Then I see skeleton placeholders for the table
     And I see skeleton placeholders for the tabs
 
+  @unimplemented
   Scenario: Show empty state when no results
     Given the evaluation has no results yet
     When the page renders
     Then I see a message "Waiting for the first results to arrive..."
 
+  @unimplemented
   Scenario: Handle error loading results
     Given the API returns an error when fetching results
     When the page renders
@@ -199,6 +224,7 @@ Feature: Batch Evaluation Results Visualization
   # Backward Compatibility
   # ============================================================================
 
+  @unimplemented
   Scenario: Display V2 evaluations without targets
     Given an evaluation was run with the old V2 system (no targets)
     When the results table renders
@@ -206,6 +232,7 @@ Feature: Batch Evaluation Results Visualization
     And evaluator results are displayed correctly
     And all existing functionality works
 
+  @unimplemented
   Scenario: Display V3 evaluations with multiple targets
     Given an evaluation was run with V3 system having 3 targets
     When the results table renders
@@ -217,6 +244,7 @@ Feature: Batch Evaluation Results Visualization
   # Optimization Studio Integration
   # ============================================================================
 
+  @unimplemented
   Scenario: View results in optimization studio panel
     Given I am in the optimization studio
     And I have run an evaluation from a workflow
@@ -225,6 +253,7 @@ Feature: Batch Evaluation Results Visualization
     And I can switch between runs
     And I can export to CSV
 
+  @unimplemented
   Scenario: Open full experiment page from studio
     Given I am viewing results in the optimization studio panel
     When I click "Open Experiment Full Page"

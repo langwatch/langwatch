@@ -46,6 +46,10 @@ import type { SuiteRunStateRepository } from "./pipelines/suite-run-processing/r
 import { createTraceProcessingPipeline } from "./pipelines/trace-processing/pipeline";
 import { createSimulationMetricsSyncReactor } from "./pipelines/trace-processing/reactors/simulationMetricsSync.reactor";
 import { createExperimentMetricsSyncReactor } from "./pipelines/trace-processing/reactors/experimentMetricsSync.reactor";
+import {
+  createGatewayBudgetSyncReactor,
+  type GatewayBudgetSyncReactorDeps,
+} from "./pipelines/trace-processing/reactors/gatewayBudgetSync.reactor";
 import type { ComputeExperimentRunMetricsCommandData } from "./pipelines/experiment-run-processing/schemas/commands";
 
 import { createElasticsearchBatchEvaluationRepository } from "../evaluations-v3/repositories/elasticsearchBatchEvaluation.repository";
@@ -164,6 +168,7 @@ export interface PipelineRegistryDeps {
   costRecorder: EvaluationCostRecorder;
   billingCheckpoints: BillingCheckpointService;
   usageReportingService?: UsageReportingService;
+  gatewayBudgetSync?: GatewayBudgetSyncReactorDeps;
 }
 
 /**
@@ -306,6 +311,10 @@ export class PipelineRegistry {
       },
     });
 
+    const gatewayBudgetSyncReactor = this.deps.gatewayBudgetSync
+      ? createGatewayBudgetSyncReactor(this.deps.gatewayBudgetSync)
+      : undefined;
+
     const tracePipeline = this.deps.eventSourcing.register(
       createTraceProcessingPipeline({
         spanAppendStore: new SpanAppendStore(this.deps.traces.spans.repository),
@@ -320,6 +329,7 @@ export class PipelineRegistry {
         simulationMetricsSyncReactor,
         experimentMetricsSyncReactor,
         spanStorageBroadcastReactor,
+        gatewayBudgetSyncReactor,
       }),
     );
 

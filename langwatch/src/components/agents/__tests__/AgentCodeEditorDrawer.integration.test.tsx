@@ -324,4 +324,44 @@ describe("AgentCodeEditorDrawer", () => {
       });
     });
   });
+
+  // Per owner directive on PR #3483 (nlp-go-migration): the Code Agent
+  // editor's default template must NOT reference dspy. Caught during
+  // workbench dogfood by ash — a reviewer landing on the editor and
+  // seeing `import dspy` reasonably concludes the migration didn't
+  // happen, even though the runtime would still execute via fake_dspy.
+  // The matching workflow-studio Code block already has this
+  // regression test in optimization_studio/__tests__/registry.test.ts;
+  // this pins the standalone agent editor side.
+  describe("default code template (nlp-go-migration regression)", () => {
+    it("ships without any dspy reference", async () => {
+      renderDrawer();
+
+      const textarea = await waitFor(() =>
+        screen.getByTestId("code-textarea"),
+      );
+      const value = (textarea as HTMLTextAreaElement).value;
+
+      expect(value).not.toContain("import dspy");
+      expect(value).not.toContain("dspy.Module");
+      expect(value).not.toContain("(dspy.");
+    });
+
+    it("uses a plain Python class with a __call__ method", async () => {
+      renderDrawer();
+
+      const textarea = await waitFor(() =>
+        screen.getByTestId("code-textarea"),
+      );
+      const value = (textarea as HTMLTextAreaElement).value;
+
+      // Default template uses Python's idiomatic `__call__` (instances
+      // are callable) instead of torch/dspy's `forward` convention.
+      // Existing customer code with `forward` still resolves via the
+      // runner's fallback rules — this only pins the new default shape.
+      expect(value).toMatch(/^class\s+\w+\s*:/m);
+      expect(value).toContain("def __call__(self");
+      expect(value).not.toContain("def forward");
+    });
+  });
 });

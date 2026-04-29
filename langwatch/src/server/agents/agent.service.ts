@@ -180,6 +180,8 @@ export class AgentService {
           name: string;
           icon: string | null;
           description: string | null;
+          isEvaluator?: boolean;
+          isComponent?: boolean;
           latestVersion: { dsl: unknown } | null;
         };
         targetProjectId: string;
@@ -209,6 +211,8 @@ export class AgentService {
             name: source.workflow.name,
             icon: source.workflow.icon,
             description: source.workflow.description,
+            isEvaluator: source.workflow.isEvaluator,
+            isComponent: source.workflow.isComponent,
             latestVersion: source.workflow.latestVersion,
           },
           targetProjectId: input.targetProjectId,
@@ -337,7 +341,11 @@ export class AgentService {
       take: 100,
     });
 
-    const userIds = [...new Set(logs.map((l) => l.userId))];
+    const userIds = [
+      ...new Set(
+        logs.map((l) => l.userId).filter((id): id is string => !!id),
+      ),
+    ];
     const users = await this.prisma.user.findMany({
       where: { id: { in: userIds } },
       select: { id: true, name: true, email: true },
@@ -349,7 +357,7 @@ export class AgentService {
       action: log.action,
       createdAt: log.createdAt,
       args: log.args,
-      user: usersById[log.userId] ?? null,
+      user: log.userId ? (usersById[log.userId] ?? null) : null,
     }));
   }
 

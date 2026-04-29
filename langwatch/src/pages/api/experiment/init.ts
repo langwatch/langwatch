@@ -17,22 +17,6 @@ import { captureException } from "~/utils/posthogErrorCapture";
 import { slugify } from "~/utils/slugify";
 import { createLogger } from "../../../utils/logger/server";
 
-/**
- * Adapts a Next.js pages-router request to the minimal Hono-shaped surface
- * consumed by `extractCredentials` (`{ req: { header: (name) => string | undefined } }`).
- * Header names are normalised to lowercase because Node gives us a mixed-case
- * record and `extractCredentials` looks up by the canonical lowercase name.
- */
-const toHonoHeaderAdapter = (req: NextApiRequest) => ({
-  req: {
-    header: (name: string): string | undefined => {
-      const value = req.headers[name.toLowerCase()];
-      if (Array.isArray(value)) return value[0];
-      return value ?? undefined;
-    },
-  },
-});
-
 const logger = createLogger("langwatch:dspy:init");
 
 const dspyInitParamsSchema = z
@@ -62,7 +46,11 @@ export default async function handler(
     return res.status(405).end(); // Only accept POST requests
   }
 
-  const credentials = extractCredentials(toHonoHeaderAdapter(req));
+  const credentials = extractCredentials((name) => {
+    const value = req.headers[name.toLowerCase()];
+    if (Array.isArray(value)) return value[0];
+    return value ?? undefined;
+  });
   if (!credentials) {
     return res.status(401).json({
       message:

@@ -82,6 +82,16 @@ jobs:
             platform: linux/arm64/v8
             runner: ubuntu-24.04-arm
             arch: arm64
+          - image: ai-gateway
+            dockerfile: Dockerfile.go_service
+            platform: linux/amd64
+            runner: ubuntu-latest
+            arch: amd64
+          - image: ai-gateway
+            dockerfile: Dockerfile.go_service
+            platform: linux/arm64/v8
+            runner: ubuntu-24.04-arm
+            arch: arm64
     runs-on: ${{ matrix.runner }}
 
     steps:
@@ -98,7 +108,7 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Build and push ${{ matrix.image }} (${{ matrix.arch }})
-        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        uses: docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f # v7.1.0
         with:
           context: .
           file: ${{ matrix.dockerfile }}
@@ -123,7 +133,7 @@ jobs:
       - name: Create multi-arch manifests (short hash)
         run: |
           HASH="${{ needs.extract-version.outputs.short_hash }}"
-          for IMAGE in langwatch langwatch_nlp langevals; do
+          for IMAGE in langwatch langwatch_nlp langevals ai-gateway; do
             docker buildx imagetools create -t langwatch/${IMAGE}:${HASH} \
               langwatch/${IMAGE}:${HASH}-amd64 \
               langwatch/${IMAGE}:${HASH}-arm64
@@ -135,7 +145,7 @@ jobs:
           TAG: ${{ inputs.tag || 'next' }}
           HASH: ${{ needs.extract-version.outputs.short_hash }}
         run: |
-          for IMAGE in langwatch langwatch_nlp langevals; do
+          for IMAGE in langwatch langwatch_nlp langevals ai-gateway; do
             docker buildx imagetools create -t langwatch/${IMAGE}:${TAG} \
               langwatch/${IMAGE}:${HASH}-amd64 \
               langwatch/${IMAGE}:${HASH}-arm64
@@ -147,7 +157,7 @@ jobs:
           VERSION="${{ needs.extract-version.outputs.version }}"
           HASH="${{ needs.extract-version.outputs.short_hash }}"
 
-          for IMAGE in langwatch langwatch_nlp langevals; do
+          for IMAGE in langwatch langwatch_nlp langevals ai-gateway; do
             # Version tag
             docker buildx imagetools create -t langwatch/${IMAGE}:${VERSION} \
               langwatch/${IMAGE}:${HASH}-amd64 \
@@ -168,7 +178,7 @@ jobs:
             https://hub.docker.com/v2/users/login/ | jq -r .token)
 
           HASH="${{ needs.extract-version.outputs.short_hash }}"
-          for IMAGE in langwatch langwatch_nlp langevals; do
+          for IMAGE in langwatch langwatch_nlp langevals ai-gateway; do
             for ARCH in amd64 arm64; do
               curl -s -X DELETE \
                 -H "Authorization: JWT ${TOKEN}" \

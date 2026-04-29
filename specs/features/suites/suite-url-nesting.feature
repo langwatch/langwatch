@@ -7,19 +7,19 @@ Feature: Suite URL path nested under simulations
     Given a project with slug "my-project"
 
   # Navigation and routing
-  @integration
+  @integration @unimplemented
   Scenario: Suite route path is nested under simulations
     Given I am logged in as a user in the "my-project" project
     When I navigate to Suites
     Then the URL contains "/my-project/simulations/suites"
 
-  @integration
+  @integration @unimplemented
   Scenario: Navigation link points to the new suite URL
     Given I am viewing the project sidebar
     When I look at the Suites link under Simulations
     Then the link href includes "/simulations/suites"
 
-  @integration
+  @integration @unimplemented
   Scenario: Only Suites is active in sidebar when viewing suites page
     Given I am on the suites page at "/my-project/simulations/suites"
     When I look at the sidebar
@@ -27,7 +27,7 @@ Feature: Suite URL path nested under simulations
     And the Runs menu item is not active
 
   # Happy path - full system flow
-  @e2e
+  @e2e @unimplemented
   Scenario: User navigates to suites via simulations menu
     Given I am logged in
     When I open the Simulations section in the sidebar

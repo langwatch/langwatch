@@ -1,0 +1,44 @@
+# Trims python-sdk/ for the @langwatch/server tarball. langwatch_nlp's
+# pyproject pins langwatch via `editable = true` against ../python-sdk/,
+# so at runtime uv needs nothing more than pyproject.toml + src/. Tests,
+# examples, specs, and docs are dropped here to keep the tarball lean.
+#
+# Same gotcha as elsewhere: when an .npmignore exists at this level,
+# npm/pnpm IGNORE the sibling .gitignore — so the few things from
+# .gitignore that we still want excluded must be re-stated.
+
+# Heavy non-runtime trees.
+tests/
+examples/
+specs/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+.venv/
+.tmp/
+local_cache/
+.files/
+.chainlit/
+chainlit.md
+dist/
+build/
+
+# Artifacts + dev-only config.
+*.tsbuildinfo
+*.egg-info/
+htmlcov/
+.coverage
+.coverage.*
+
+# Editor + OS detritus.
+.DS_Store
+.vscode/
+.idea/
+
+# Local secrets / env.
+.env
+.env*.local
+
+# Docs/changelog (optional — keep README + CHANGELOG since they're fine).
+AGENTS.md
+Makefile

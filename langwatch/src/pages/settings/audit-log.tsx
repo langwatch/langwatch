@@ -1,5 +1,6 @@
 import {
   Alert,
+  Badge,
   Box,
   Button,
   Card,
@@ -14,7 +15,8 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { formatDistanceToNow } from "date-fns";
-import { Download, Search } from "lucide-react";
+import { ArrowLeft, Download, Search } from "lucide-react";
+import { Link } from "~/components/ui/link";
 import { useRouter } from "~/utils/compat/next-router";
 import Parse from "papaparse";
 import { useState } from "react";
@@ -31,7 +33,25 @@ import { InputGroup } from "../../components/ui/input-group";
 import { withPermissionGuard } from "../../components/WithPermissionGuard";
 import { useActivePlan } from "../../hooks/useActivePlan";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
+import type { EnrichedAuditLog } from "~/server/app-layer/organizations/repositories/organization.repository";
 import { api } from "../../utils/api";
+
+// CSV-cell cap for JSON columns (args / before / after). 4 KB is enough
+// to capture typical gateway-shape diffs while staying well under the
+// per-cell limits of common spreadsheet tools (Excel: 32K chars).
+// `slice` counts UTF-16 code units, so the byte size can be up to ~16 KB
+// for fully non-ASCII payloads — acceptable upper bound.
+const CSV_JSON_CAP = 4096;
+
+// Stringify + cap a JSON-shaped value for inclusion in a CSV cell.
+// When the JSON exceeds the cap, append an explicit truncation marker so
+// downstream consumers can tell the cell was clipped vs. just empty.
+function truncateJsonForCsv(value: unknown): string {
+  if (value == null) return "";
+  const s = JSON.stringify(value);
+  if (s.length <= CSV_JSON_CAP) return s;
+  return `${s.slice(0, CSV_JSON_CAP)}…[truncated ${s.length - CSV_JSON_CAP} chars]`;
+}
 
 function AuditLogPage() {
   const { organization, project, organizations } = useOrganizationTeamProject();
@@ -70,6 +90,16 @@ function AuditLogPage() {
   const [actionFilter, setActionFilter] = useState(
     (router.query.actionFilter as string) ?? "",
   );
+  // Gateway deep-link filters: when a VK or budget detail page links
+  // to /settings/audit-log?targetKind=virtual_key&targetId=vk_xxx the
+  // filters are read straight from the URL and sent to the backend so
+  // the user lands on a pre-filtered history of that resource.
+  const urlTargetKind =
+    typeof router.query.targetKind === "string"
+      ? router.query.targetKind
+      : "";
+  const urlTargetId =
+    typeof router.query.targetId === "string" ? router.query.targetId : "";
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(
     project?.id ?? null,
   );
@@ -116,6 +146,8 @@ function AuditLogPage() {
         action: actionFilter || undefined,
         startDate: startDate.getTime(),
         endDate: endDate.getTime(),
+        targetKind: urlTargetKind || undefined,
+        targetId: urlTargetId || undefined,
       },
       {
         enabled: !!organization && isEnterprise,
@@ -141,8 +173,11 @@ function AuditLogPage() {
             <Alert.Content>
               <Alert.Title>Enterprise Feature</Alert.Title>
               <Alert.Description>
-                Audit logs are available on Enterprise plans. Contact sales to
-                upgrade.
+                Organisation-wide audit logs — including AI Gateway events
+                (virtual-key / budget / provider / cache-rule mutations)
+                alongside logins, member changes, settings, RBAC, and
+                billing — are available on Enterprise plans. Contact sales
+                to upgrade.
               </Alert.Description>
             </Alert.Content>
           </Alert.Root>
@@ -212,7 +247,11 @@ function AuditLogPage() {
   };
 
   const totalHits = auditLogsData?.totalCount ?? 0;
-  const auditLogs = auditLogsData?.auditLogs ?? [];
+  // Single cast at the source so the rest of the page consumes the proper
+  // EnrichedAuditLog union (source / targetKind / before / after) without
+  // per-field `as any` casts. tRPC's inference loses the discriminator.
+  const auditLogs: EnrichedAuditLog[] =
+    (auditLogsData?.auditLogs as EnrichedAuditLog[] | undefined) ?? [];
 
   const downloadCSV = async () => {
     if (!organization) return;
@@ -224,16 +263,25 @@ function AuditLogPage() {
       const batchSize = 5000;
       let totalCount = 0;
 
-      // Fetch first batch to get total count
-      const initialBatch = await queryClient.organization.getAuditLogs.fetch({
+      // Mirror the on-screen table filters exactly so an export from a
+      // pre-filtered deep-link (`?targetKind=virtual_key&targetId=…`) does
+      // not silently widen to the whole org's audit history.
+      const baseFilters = {
         organizationId: organization.id,
         projectId: selectedProjectId ?? undefined,
         userId: searchUserId,
-        pageOffset: 0,
-        pageSize: batchSize,
         action: actionFilter || undefined,
         startDate: startDate.getTime(),
         endDate: endDate.getTime(),
+        targetKind: urlTargetKind || undefined,
+        targetId: urlTargetId || undefined,
+      };
+
+      // Fetch first batch to get total count
+      const initialBatch = await queryClient.organization.getAuditLogs.fetch({
+        ...baseFilters,
+        pageOffset: 0,
+        pageSize: batchSize,
       });
 
       allAuditLogs.push(...(initialBatch.auditLogs ?? []));
@@ -243,14 +291,9 @@ function AuditLogPage() {
       // Loop through remaining pages
       while (currentOffset < totalCount) {
         const batch = await queryClient.organization.getAuditLogs.fetch({
-          organizationId: organization.id,
-          projectId: selectedProjectId ?? undefined,
-          userId: searchUserId,
+          ...baseFilters,
           pageOffset: currentOffset,
           pageSize: batchSize,
-          action: actionFilter || undefined,
-          startDate: startDate.getTime(),
-          endDate: endDate.getTime(),
         });
 
         if (!batch.auditLogs || batch.auditLogs.length === 0) break;
@@ -259,30 +302,46 @@ function AuditLogPage() {
         currentOffset += batchSize;
       }
 
-      // Define CSV fields
+      // Define CSV fields. Source/Target/Before/After mirror the on-screen
+      // gateway-shape columns so a downloaded report carries the diffs.
       const fields = [
         "Timestamp",
+        "Source",
         "User Name",
         "User Email",
         "Action",
+        "Target Kind",
+        "Target Id",
         "Project",
         "IP Address",
         "User Agent",
         "Error",
         "Args",
+        "Before",
+        "After",
       ];
 
       // Convert audit logs to CSV rows
       const csvData = allAuditLogs.map((log) => [
         new Date(log.createdAt).toISOString(),
-        (log as any).user?.name ?? "",
-        (log as any).user?.email ?? "",
+        log.source ?? "platform",
+        log.user?.name ?? "",
+        log.user?.email ?? "",
         log.action,
-        (log as any).project?.name ?? log.projectId ?? "",
+        log.targetKind ?? "",
+        log.targetId ?? "",
+        log.project?.name ?? log.projectId ?? "",
         log.ipAddress ?? "",
         log.userAgent ?? "",
         log.error ?? "",
-        log.args ? JSON.stringify(log.args) : "",
+        // Cap JSON columns so a single oversized diff (large request
+        // payload, full provider config) can't blow up the exported
+        // file size or break Excel/Sheets row parsing. Truncated cells
+        // carry an explicit "…[truncated N chars]" marker so consumers
+        // can tell clipped JSON from empty values.
+        truncateJsonForCsv(log.args),
+        truncateJsonForCsv(log.before),
+        truncateJsonForCsv(log.after),
       ]);
 
       // Generate CSV
@@ -310,16 +369,63 @@ function AuditLogPage() {
     }
   };
 
+  const clearTargetFilter = () => {
+    const { targetKind: _tk, targetId: _tid, ...rest } = router.query;
+    void router.replace({ pathname: router.pathname, query: rest });
+  };
+
+  // Derive a return URL back to the originating detail page when the
+  // operator arrived via a deep-link. Only kinds that have a real
+  // `[id]` detail route are mapped — provider_binding and cache_rule
+  // are list-only today, so we skip them rather than render a link
+  // that 404s.
+  const backToResource = (() => {
+    if (!urlTargetKind || !urlTargetId || !project?.slug) return null;
+    const kindMap: Record<string, { path: string; label: string }> = {
+      virtual_key: { path: "gateway/virtual-keys", label: "Virtual key" },
+      budget: { path: "gateway/budgets", label: "Budget" },
+    };
+    const entry = kindMap[urlTargetKind];
+    if (!entry) return null;
+    return {
+      href: `/${project.slug}/${entry.path}/${urlTargetId}`,
+      label: entry.label,
+    };
+  })();
+
   return (
     <SettingsLayout>
       <VStack gap={6} width="full" align="start">
         <HStack width="full" marginTop={2}>
           <VStack align="start" gap={1}>
+            {backToResource && (
+              <Link
+                href={backToResource.href}
+                color="fg.muted"
+                fontSize="sm"
+              >
+                <HStack gap={1}>
+                  <ArrowLeft size={14} /> {backToResource.label}
+                </HStack>
+              </Link>
+            )}
             <Heading as="h2">Audit Log</Heading>
             <Text color="fg.muted">
               View all audit logs for your organization. Filter by project,
               user, action type, or date range.
             </Text>
+            {urlTargetKind && urlTargetId && (
+              <Badge
+                colorPalette="orange"
+                variant="surface"
+                gap={1}
+                cursor="pointer"
+                onClick={clearTargetFilter}
+                title="Clear target filter"
+              >
+                {urlTargetKind} = {urlTargetId.slice(0, 24)}… ×
+              </Badge>
+            )}
           </VStack>
           <Spacer />
           {organizations && project && (
@@ -451,8 +557,10 @@ function AuditLogPage() {
               <Table.Header>
                 <Table.Row>
                   <Table.ColumnHeader>Timestamp</Table.ColumnHeader>
+                  <Table.ColumnHeader>Source</Table.ColumnHeader>
                   <Table.ColumnHeader>User</Table.ColumnHeader>
                   <Table.ColumnHeader>Action</Table.ColumnHeader>
+                  <Table.ColumnHeader>Target</Table.ColumnHeader>
                   <Table.ColumnHeader>Project</Table.ColumnHeader>
                   <Table.ColumnHeader>IP Address</Table.ColumnHeader>
                   <Table.ColumnHeader>Error</Table.ColumnHeader>
@@ -474,6 +582,17 @@ function AuditLogPage() {
                       </VStack>
                     </Table.Cell>
                     <Table.Cell>
+                      <Badge
+                        size="sm"
+                        variant="subtle"
+                        colorPalette={
+                          log.source === "gateway" ? "purple" : "gray"
+                        }
+                      >
+                        {log.source === "gateway" ? "Gateway" : "Platform"}
+                      </Badge>
+                    </Table.Cell>
+                    <Table.Cell>
                       {log.user ? (
                         <VStack align="start" gap={0}>
                           <Text fontSize="sm" fontWeight="medium">
@@ -493,6 +612,22 @@ function AuditLogPage() {
                       <Text fontSize="sm" fontFamily="mono">
                         {log.action}
                       </Text>
+                    </Table.Cell>
+                    <Table.Cell>
+                      {log.targetKind && log.targetId ? (
+                        <VStack align="start" gap={0}>
+                          <Text fontSize="xs" color="fg.muted">
+                            {log.targetKind}
+                          </Text>
+                          <Text fontSize="xs" fontFamily="mono">
+                            {log.targetId.slice(0, 16)}…
+                          </Text>
+                        </VStack>
+                      ) : (
+                        <Text fontSize="sm" color="fg.subtle">
+                          —
+                        </Text>
+                      )}
                     </Table.Cell>
                     <Table.Cell>
                       {log.projectId ? (
@@ -557,6 +692,6 @@ function AuditLogPage() {
   );
 }
 
-export default withPermissionGuard("organization:manage", {
+export default withPermissionGuard("auditLog:view", {
   layoutComponent: SettingsLayout,
 })(AuditLogPage);

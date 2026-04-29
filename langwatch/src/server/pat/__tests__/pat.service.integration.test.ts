@@ -24,6 +24,8 @@ import {
 } from "../errors";
 import { PatService } from "../pat.service";
 import { splitPatToken } from "../pat-token.utils";
+import { generate } from "@langwatch/ksuid";
+import { KSUID_RESOURCES } from "~/utils/constants";
 
 // Skip when running in testcontainers-only mode (no full PostgreSQL)
 const isTestcontainersOnly = !!process.env.TEST_CLICKHOUSE_URL;
@@ -33,8 +35,9 @@ describe.skipIf(isTestcontainersOnly)("PatService integration", () => {
 
   let service: PatService;
 
-  // Primary org: an admin user (creator) and a viewer user (low-ceiling)
+  // Primary org: an admin user (creator), a member user, and a viewer user (low-ceiling)
   let adminUserId: string;
+  let memberUserId: string;
   let viewerUserId: string;
   let outsiderUserId: string;
   let organizationId: string;
@@ -83,6 +86,14 @@ describe.skipIf(isTestcontainersOnly)("PatService integration", () => {
     });
     adminUserId = adminUser.id;
 
+    const memberUser = await prisma.user.create({
+      data: {
+        name: "Member User",
+        email: `member-${ns}@example.com`,
+      },
+    });
+    memberUserId = memberUser.id;
+
     const viewerUser = await prisma.user.create({
       data: {
         name: "Viewer User",
@@ -107,6 +118,11 @@ describe.skipIf(isTestcontainersOnly)("PatService integration", () => {
           role: OrganizationUserRole.ADMIN,
         },
         {
+          userId: memberUserId,
+          organizationId: org.id,
+          role: OrganizationUserRole.MEMBER,
+        },
+        {
           userId: viewerUserId,
           organizationId: org.id,
           role: OrganizationUserRole.MEMBER,
@@ -122,9 +138,59 @@ describe.skipIf(isTestcontainersOnly)("PatService integration", () => {
           role: TeamUserRole.ADMIN,
         },
         {
+          userId: memberUserId,
+          teamId: team.id,
+          role: TeamUserRole.MEMBER,
+        },
+        {
           userId: viewerUserId,
           teamId: team.id,
           role: TeamUserRole.VIEWER,
+        },
+      ],
+    });
+
+    await prisma.roleBinding.createMany({
+      data: [
+        {
+          id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+          organizationId: org.id,
+          userId: adminUserId,
+          role: TeamUserRole.ADMIN,
+          scopeType: RoleBindingScopeType.ORGANIZATION,
+          scopeId: org.id,
+        },
+        {
+          id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+          organizationId: org.id,
+          userId: adminUserId,
+          role: TeamUserRole.ADMIN,
+          scopeType: RoleBindingScopeType.TEAM,
+          scopeId: team.id,
+        },
+        {
+          id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+          organizationId: org.id,
+          userId: memberUserId,
+          role: TeamUserRole.MEMBER,
+          scopeType: RoleBindingScopeType.ORGANIZATION,
+          scopeId: org.id,
+        },
+        {
+          id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+          organizationId: org.id,
+          userId: memberUserId,
+          role: TeamUserRole.MEMBER,
+          scopeType: RoleBindingScopeType.TEAM,
+          scopeId: team.id,
+        },
+        {
+          id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+          organizationId: org.id,
+          userId: viewerUserId,
+          role: TeamUserRole.VIEWER,
+          scopeType: RoleBindingScopeType.TEAM,
+          scopeId: team.id,
         },
       ],
     });
@@ -192,7 +258,7 @@ describe.skipIf(isTestcontainersOnly)("PatService integration", () => {
     }).catch(() => {});
     await prisma.user.deleteMany({
       where: {
-        id: { in: [adminUserId, viewerUserId, outsiderUserId] },
+        id: { in: [adminUserId, memberUserId, viewerUserId, outsiderUserId] },
       },
     }).catch(() => {});
   });
@@ -234,6 +300,59 @@ describe.skipIf(isTestcontainersOnly)("PatService integration", () => {
           bindings: [
             {
               role: TeamUserRole.VIEWER,
+              scopeType: RoleBindingScopeType.ORGANIZATION,
+              scopeId: organizationId,
+            },
+          ],
+        }),
+      ).rejects.toBeInstanceOf(PatScopeViolationError);
+    });
+
+    it("allows a member to create a PAT with member permissions at org scope", async () => {
+      const result = await service.create({
+        name: `Member PAT ${nanoid(6)}`,
+        userId: memberUserId,
+        organizationId,
+        bindings: [
+          {
+            role: TeamUserRole.MEMBER,
+            scopeType: RoleBindingScopeType.ORGANIZATION,
+            scopeId: organizationId,
+          },
+        ],
+      });
+
+      expect(result.token).toMatch(/^pat-lw-/);
+      expect(result.pat.userId).toBe(memberUserId);
+    });
+
+    it("allows a member to create a PAT with member permissions at team scope", async () => {
+      const result = await service.create({
+        name: `Member Team PAT ${nanoid(6)}`,
+        userId: memberUserId,
+        organizationId,
+        bindings: [
+          {
+            role: TeamUserRole.MEMBER,
+            scopeType: RoleBindingScopeType.TEAM,
+            scopeId: teamId,
+          },
+        ],
+      });
+
+      expect(result.token).toMatch(/^pat-lw-/);
+      expect(result.pat.userId).toBe(memberUserId);
+    });
+
+    it("rejects when a member tries to mint an ADMIN PAT (ceiling)", async () => {
+      await expect(
+        service.create({
+          name: "Member-escalation PAT",
+          userId: memberUserId,
+          organizationId,
+          bindings: [
+            {
+              role: TeamUserRole.ADMIN,
               scopeType: RoleBindingScopeType.ORGANIZATION,
               scopeId: organizationId,
             },

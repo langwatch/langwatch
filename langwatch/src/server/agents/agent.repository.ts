@@ -469,6 +469,8 @@ export type AgentWithWorkflow = Agent & {
     name: string;
     icon: string | null;
     description: string | null;
+    isEvaluator: boolean;
+    isComponent: boolean;
     latestVersion: { dsl: unknown } | null;
   } | null;
 };

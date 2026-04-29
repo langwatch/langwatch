@@ -8,6 +8,7 @@ Feature: Project List Refresh After Creation
     Given I am logged in as an authenticated user
     And I have permission to create projects
 
+  @unimplemented
   Scenario: New project appears in settings projects list immediately
     Given I am on the settings/projects page
     And I see my existing projects listed
@@ -15,6 +16,7 @@ Feature: Project List Refresh After Creation
     Then "Fresh Project" appears in the projects list
     And I did not need to refresh the page
 
+  @unimplemented
   Scenario: New project appears in navbar project selector immediately
     Given I am viewing the project selector dropdown
     And I see my existing projects
@@ -22,28 +24,33 @@ Feature: Project List Refresh After Creation
     And I open the project selector dropdown again
     Then "Quick Bot" appears in the dropdown list
 
+  @unimplemented
   Scenario: Project count updates after creation
     Given my organization has 3 projects
     When I create a new project
     Then the project count reflects 4 projects
 
+  @unimplemented
   Scenario: Query invalidation triggers on successful creation
     Given the CreateProjectDrawer is open with valid data
     When I successfully submit the form
     Then organization.getAll query is invalidated
     And limits.getUsage query is invalidated
 
+  @unimplemented
   Scenario: Project appears in correct team section
     Given I create a project under team "Engineering"
     When I view the settings/projects page
     Then the new project appears under the "Engineering" team section
 
+  @unimplemented
   Scenario: New team appears with its project
     Given I create a project with a new team "New Team"
     When I view the settings/projects page
     Then "New Team" section appears in the list
     And the new project appears under "New Team"
 
+  @unimplemented
   Scenario: Multiple rapid creations all appear
     Given I create project "Project A"
     And I create project "Project B"
@@ -51,6 +58,7 @@ Feature: Project List Refresh After Creation
     When I view the projects list
     Then all three projects appear in the list
 
+  @unimplemented
   Scenario: Project list stays consistent after drawer close
     Given I created a project and the drawer closed
     When I navigate away and come back to settings/projects

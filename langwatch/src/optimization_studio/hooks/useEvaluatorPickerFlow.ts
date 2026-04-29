@@ -1,4 +1,5 @@
 import { useCallback, useRef } from "react";
+import { createEvaluatorEditorCallbacks } from "~/evaluations-v3/utils/evaluatorEditorCallbacks";
 import { setFlowCallbacks, useDrawer } from "~/hooks/useDrawer";
 import type { Component, Field } from "../types/dsl";
 import type { NodeWithOptionalPosition } from "~/types";
@@ -143,7 +144,10 @@ export function useEvaluatorPickerFlow() {
             }
           };
           // Both built-in and workflow evaluator creation paths
-          setFlowCallbacks("evaluatorEditor", { onSave: onEvaluatorSaved });
+          setFlowCallbacks(
+            "evaluatorEditor",
+            createEvaluatorEditorCallbacks({ onSave: onEvaluatorSaved }),
+          );
           setFlowCallbacks("workflowSelectorForEvaluator", { onSave: onEvaluatorSaved });
           openDrawer("evaluatorCategorySelector");
         },

@@ -14,12 +14,14 @@ Feature: Evaluation history and versioning
   # Auto-save workflow version on run
   # ============================================================================
 
+  @unimplemented
   Scenario: Running evaluation auto-saves a new workflow version
     When I click the "Evaluate" button
     Then a new workflow version is automatically created
     And the version has an auto-generated name like "Run 1" or timestamp
     And the version includes the current dataset, agents, and evaluators configuration
 
+  @unimplemented
   Scenario: Each evaluation run creates a distinct version
     When I run the evaluation
     And the evaluation completes
@@ -32,6 +34,7 @@ Feature: Evaluation history and versioning
   # History panel
   # ============================================================================
 
+  @unimplemented
   Scenario: Open history panel
     Given at least one evaluation has been run
     When I click the "History" button
@@ -39,6 +42,7 @@ Feature: Evaluation history and versioning
     And I see a list of previous evaluation runs
     And each run shows the version name and timestamp
 
+  @unimplemented
   Scenario: History panel shows run summary
     Given 2 evaluations have been run previously
     When I open the history panel
@@ -50,6 +54,7 @@ Feature: Evaluation history and versioning
   # View historical results
   # ============================================================================
 
+  @unimplemented
   Scenario: Select a previous version from history
     Given I ran an evaluation with evaluator "Exact Match"
     And I added evaluator "LLM as Judge" and ran again
@@ -60,6 +65,7 @@ Feature: Evaluation history and versioning
     And only "Exact Match" evaluator column is visible
     And the results display exactly as they did when that run completed
 
+  @unimplemented
   Scenario: Current unsaved changes indicator
     Given I ran an evaluation
     And I modified the prompt after the run
@@ -71,6 +77,7 @@ Feature: Evaluation history and versioning
   # Restore and edit from history
   # ============================================================================
 
+  @unimplemented
   Scenario: Restore a previous version for editing
     Given I have 2 versions in history
     And I'm viewing the older version
@@ -79,6 +86,7 @@ Feature: Evaluation history and versioning
     And I can modify the dataset, agents, or evaluators
     And running a new evaluation creates a new version (not overwrite the old one)
 
+  @unimplemented
   Scenario: Edit dataset in restored version
     Given I restored a previous version
     When I double-click a dataset cell
@@ -87,6 +95,7 @@ Feature: Evaluation history and versioning
     And the results show as stale or clear
     And I can run a new evaluation with the modified data
 
+  @unimplemented
   Scenario: Add evaluator to restored version
     Given I restored a previous version with 1 evaluator
     When I add a new evaluator "Semantic Similarity"
@@ -98,6 +107,7 @@ Feature: Evaluation history and versioning
   # History state management
   # ============================================================================
 
+  @unimplemented
   Scenario: Switching between history versions preserves current work
     Given I have unsaved changes to the current configuration
     When I view a previous version in history
@@ -105,12 +115,14 @@ Feature: Evaluation history and versioning
     Then my unsaved changes are still present
     And I haven't lost any work
 
+  @unimplemented
   Scenario: Clear indication of viewing historical version
     Given I selected a previous version from history
     Then a banner or indicator shows "Viewing version from [timestamp]"
     And it's clear this is read-only historical data
     And there's an option to "Restore" or "Edit from here"
 
+  @unimplemented
   Scenario: History versions are immutable
     Given I'm viewing a previous version
     Then the dataset cells are read-only

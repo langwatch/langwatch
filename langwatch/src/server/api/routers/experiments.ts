@@ -1026,6 +1026,8 @@ export const experimentsRouter = createTRPCRouter({
           name: experiment.workflow.name,
           icon: experiment.workflow.icon,
           description: experiment.workflow.description,
+          isEvaluator: experiment.workflow.isEvaluator,
+          isComponent: experiment.workflow.isComponent,
           latestVersion: experiment.workflow.latestVersion,
         },
         targetProjectId: input.projectId,

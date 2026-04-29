@@ -57,12 +57,13 @@ describe("SavedViews Endpoints", () => {
     it("seeds views on first access for a project", async () => {
       const result = await caller.savedViews.getAll({ projectId });
 
-      expect(result).toHaveLength(4);
+      expect(result).toHaveLength(5);
       expect(result.map((v) => v.name)).toEqual([
         "Application",
         "Evaluations",
         "Simulations",
         "Playground",
+        "Gateway",
       ]);
     });
 
@@ -224,11 +225,15 @@ describe("SavedViews Endpoints", () => {
       });
 
       const result = await caller.savedViews.getAll({ projectId });
-      expect(result.map((v) => v.name)).toEqual([
-        "View C",
-        "View A",
-        "View B",
-      ]);
+      // The first call to getAll after the deleteMany above triggers
+      // backfillMissingSeedViews, which appends the 5 default views
+      // (Application/Evaluations/Simulations/Playground/Gateway) at the
+      // end. We're only asserting the reorder logic for the views we
+      // actually reordered — filter to those.
+      const reordered = result
+        .map((v) => v.name)
+        .filter((name) => ["View A", "View B", "View C"].includes(name));
+      expect(reordered).toEqual(["View C", "View A", "View B"]);
     });
 
     it("throws NOT_FOUND if any view ID does not belong to project", async () => {

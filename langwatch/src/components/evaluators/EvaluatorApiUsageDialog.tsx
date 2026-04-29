@@ -311,7 +311,10 @@ EOF
     }
   };
 
-  const apiKeyLink = project ? `/${project.slug}/settings` : "/settings";
+  // Settings are global (org-scoped), not project-scoped — prefixing
+  // with the project slug yields a 404. The API key lives on the
+  // API Keys tab of the global Settings area.
+  const apiKeyLink = "/settings/api-keys";
   const docsLink =
     usageMode === "experiment"
       ? "https://docs.langwatch.ai/evaluations/experiments/overview"

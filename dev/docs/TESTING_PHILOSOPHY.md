@@ -185,6 +185,42 @@ Scenario: Analytics chart shows error state when ClickHouse query fails
   Then the chart displays an error badge with a retry option
 ```
 
+### Binding scenarios to tests
+
+The parity checker (`langwatch/scripts/check-feature-parity.ts`, run in CI as `pnpm check:feature-parity`) matches every `@unit` / `@integration` scenario to at least one test via a `@scenario "<title>"` JSDoc annotation placed directly above an `it(...)` / `test(...)` call:
+
+```ts
+/** @scenario Analytics chart shows error state when ClickHouse query fails */
+it("renders error badge on ClickHouse memory limit", () => {
+  // ...
+});
+```
+
+Titles must match verbatim. Annotations that reference a title not present in any feature file fail CI as `unknownAnnotations` — typos and stale bindings are caught immediately rather than silently rotting.
+
+### Polarity: enforce-all, with `LEGACY_UNBOUND`
+
+Every `.feature` file under `specs/**` is enforced by default. A small `LEGACY_UNBOUND` deny-list in the checker tolerates files whose scenarios are still being bound as part of the parity migration — those files still parse and surface in the `legacy` block of `--json` output and in the CI log, but unbound scenarios do not fail CI.
+
+The direction is one-way: drive `LEGACY_UNBOUND` to empty. Every removal from the list means one of:
+
+- A new `@scenario` binding was added to a test.
+- The scenario was flagged `@unimplemented` in the feature file (tracking issue filed for the missing test).
+- The scenario was removed from the feature file as aspirational.
+
+Two invariants prevent the list from rotting:
+
+- **Stale entries fail CI.** If a file in `LEGACY_UNBOUND` no longer has any unbound scenarios (because bindings were added), CI fails until the entry is removed. Fully-bound files must not sit on the deny-list.
+- **Unknown paths fail CI.** Every entry must resolve to an existing `.feature` file under `specs/`. Rename or delete a feature, update the list in the same commit.
+
+Adding a new entry to `LEGACY_UNBOUND` should require justification — prefer binding, flagging, or removing over widening the deny-list.
+
+### `@unimplemented`
+
+When a scenario in a legacy feature file describes behavior that has no matching test *and* the test has not yet been written, tag the scenario `@unimplemented` alongside its pyramid tag (`@unit` / `@integration`) and file a tracking issue for the missing test. The parity checker treats `@unimplemented` as a non-binding signal — scenarios so tagged are not expected to resolve to a `@scenario` annotation.
+
+`@unimplemented` is a lightweight promise that the gap is tracked, not ignored. Every removal of an `@unimplemented` tag must land with either a new `@scenario` binding or a feature-file edit that removes the scenario entirely.
+
 ## Workflow
 
 See `specs/README.md` for detailed BDD guidance.

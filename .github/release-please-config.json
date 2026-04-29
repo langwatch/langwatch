@@ -310,8 +310,23 @@
         },
         "charts/langwatch/values.yaml",
         {
+          "type": "yaml",
+          "path": "charts/gateway/Chart.yaml",
+          "jsonpath": "$.version"
+        },
+        {
+          "type": "yaml",
+          "path": "charts/gateway/Chart.yaml",
+          "jsonpath": "$.appVersion"
+        },
+        {
           "type": "json",
           "path": "langwatch/package.json",
+          "jsonpath": "$.version"
+        },
+        {
+          "type": "json",
+          "path": "package.json",
           "jsonpath": "$.version"
         }
       ]

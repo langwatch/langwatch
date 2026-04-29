@@ -18,3 +18,28 @@ dependencies:
     version: 0.2.0
     repository: file://../clickhouse-serverless
     condition: clickhouse.chartManaged
+  # The AI gateway is an additive subchart. Installing the umbrella
+  # `langwatch` chart lifts the gateway pod alongside langwatch-app in
+  # the same release — so customers running `helm install langwatch ...`
+  # get the gateway by default. Self-hosters who don't want the gateway
+  # surface can opt out via `gateway.chartManaged: false`.
+  #
+  # Auth is shared: LW_GATEWAY_INTERNAL_SECRET + LW_GATEWAY_JWT_SECRET
+  # are materialised once by the umbrella and injected into both the
+  # langwatch-app Deployment AND the gateway Deployment via
+  # valueFrom.secretKeyRef.
+  #
+  # Versioning: gateway Chart.yaml `$.version` + `$.appVersion` are
+  # bumped in lockstep with the umbrella `langwatch` package by
+  # release-please (.github/release-please-config.json `.` package
+  # extra-files), so both sub-chart and umbrella always carry the
+  # same release version. The `>= 0.0.0` constraint here accepts
+  # whatever local-file version the gateway sub-chart currently
+  # carries — it intentionally does NOT pin a fixed version, since
+  # release-please bumps the sub-chart's Chart.yaml directly and a
+  # hard-pinned constraint would need a separate update path.
+  - name: langwatch-gateway
+    alias: gateway
+    version: ">= 0.0.0"
+    repository: file://../gateway
+    condition: gateway.chartManaged

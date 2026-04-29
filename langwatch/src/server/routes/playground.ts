@@ -13,6 +13,7 @@ import { loggerMiddleware } from "~/app/api/middleware/logger";
 import { tracerMiddleware } from "~/app/api/middleware/tracer";
 import { env } from "~/env.mjs";
 import { hasProjectPermission } from "~/server/api/rbac";
+import { nlpgoProxyBaseURL } from "~/server/nlpgo/nlpgoFetch";
 import {
   getProjectModelProviders,
   prepareLitellmParams,
@@ -60,9 +61,17 @@ app.post("/playground", async (c) => {
     return c.json({ error: "Missing model header" }, { status: 400 });
   }
 
-  const providerKey = model.split("/")[0] as string;
+  // Accept either the canonical `{mpId}/{model}` wire format or the
+  // legacy `{provider}/{model}`. For mp-id values we look up the MP by
+  // id; for legacy values we resolve to the single accessible MP for
+  // that provider (today always narrowest-wins) exactly as before.
   const modelProviders = await getProjectModelProviders(projectId);
-  const modelProvider = (modelProviders as Record<string, any>)[providerKey];
+  const providerKey = model.split("/")[0] as string;
+  const modelProvider = providerKey.startsWith("mp_")
+    ? (Object.values(modelProviders as Record<string, any>).find(
+        (mp) => (mp as any).id === providerKey,
+      ) as any)
+    : (modelProviders as Record<string, any>)[providerKey];
   if (!modelProvider) {
     return c.json(
       { error: `Provider not configured: ${providerKey}` },
@@ -97,9 +106,18 @@ app.post("/playground", async (c) => {
     ]),
   );
 
+  // FF-gated proxy: when release_nlp_go_engine_enabled is on for this
+  // project, route through nlpgo's /go/proxy/v1/* (in-process AI Gateway,
+  // no LiteLLM); otherwise stay on the legacy /proxy/v1/* (Python LiteLLM
+  // proxy). Wire shape (x-litellm-* headers + OpenAI body) is identical
+  // either way.
+  const baseURL = await nlpgoProxyBaseURL({
+    projectId,
+    baseURL: env.LANGWATCH_NLP_SERVICE,
+  });
   const vercelProvider = createOpenAI({
     apiKey: litellmParams.api_key,
-    baseURL: `${env.LANGWATCH_NLP_SERVICE}/proxy/v1`,
+    baseURL,
     headers,
   });
 

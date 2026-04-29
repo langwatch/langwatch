@@ -7,6 +7,7 @@ import { initializeWebApp } from "./server/app-layer/presets";
 import { getWorkerMetricsPort } from "./server/background/config";
 import { createMcpHandler } from "./mcp/handler";
 import { shutdownPostHog } from "./server/posthog";
+import { verifyRedisReady } from "./server/redis";
 import { createLogger } from "./utils/logger/server";
 
 // Hono — unified API router
@@ -56,6 +57,36 @@ export const startApp = async (dir = path.dirname(__dirname)) => {
   // Initialize the app-layer (services, repositories, event sourcing, etc.)
   // This was previously done by Next.js instrumentation hook.
   initializeWebApp();
+
+  // Fail fast if Redis is unreachable — better-auth uses it as secondary
+  // session store, and without it every request ends in a "Redirecting to
+  // Sign in…" loop with no actionable error for the developer.
+  await verifyRedisReady();
+
+  // Partial-config assertion on LW_VIRTUAL_KEY_PEPPER /
+  // LW_GATEWAY_INTERNAL_SECRET / LW_GATEWAY_JWT_SECRET now lives in
+  // env-create.mjs so workers.ts, CLI scripts, and every other entry
+  // point that imports env get it at import time (was server-only here).
+  //
+  // Server-only dev hint: if the AI Gateway menu is force-flagged on but
+  // no secrets are set at all, the UI renders but /api/internal/gateway/*
+  // returns 503. That's an onboarding confusion that's specific to
+  // running `pnpm dev` with the flag, so the warning stays here.
+  const gatewayFlagForced = (process.env.FEATURE_FLAG_FORCE_ENABLE ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .includes("release_ui_ai_gateway_menu_enabled");
+  const gwSecretsUnset =
+    !process.env.LW_VIRTUAL_KEY_PEPPER &&
+    !process.env.LW_GATEWAY_INTERNAL_SECRET &&
+    !process.env.LW_GATEWAY_JWT_SECRET;
+  if (gatewayFlagForced && gwSecretsUnset) {
+    logger.warn(
+      "AI Gateway menu forced on via FEATURE_FLAG_FORCE_ENABLE, but no " +
+        "gateway secrets are set. The UI will render but /api/internal/gateway/* " +
+        "will return 503. See langwatch/.env.example for the required block.",
+    );
+  }
 
   // Dev: API server on PORT+1000 (default 6560).
   //      Vite dev server runs separately on PORT (default 5560) and proxies /api/* here.
@@ -178,6 +209,12 @@ export const startApp = async (dir = path.dirname(__dirname)) => {
 ███████╗██║  ██║██║ ╚████║╚██████╔╝╚███╔███╔╝██║  ██║   ██║   ╚██████╗██║  ██║
 ╚══════╝╚═╝  ╚═╝╚═╝  ╚═══╝ ╚═════╝  ╚══╝╚══╝ ╚═╝  ╚═╝   ╚═╝    ╚═════╝╚═╝  ╚═╝
 `;
+    // Print the banner via raw stdout instead of through pino — pino
+    // would JSON-encode the multi-line art into a single escaped `msg`
+    // string, which is unreadable when piped through prefixed log streams
+    // (npx-server, docker logs with prefixes, etc.). Metadata still goes
+    // through the structured logger for log aggregators downstream.
+    process.stdout.write(asciiArt);
     logger.info(
       {
         hostname,
@@ -185,7 +222,7 @@ export const startApp = async (dir = path.dirname(__dirname)) => {
         fullUrl: `http://${hostname === "0.0.0.0" ? "localhost" : hostname}:${port}`,
         mode: dev ? `development (API only — Vite on :${basePort})` : "production",
       },
-      asciiArt
+      "langwatch listening",
     );
   });
 

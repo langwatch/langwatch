@@ -70,7 +70,31 @@ async def execute_component(event: ExecuteComponentPayload):
                         forward_inputs = event.inputs
                     else:
                         forward_inputs = autoparse_fields(node.data.inputs or [], event.inputs)  # type: ignore
-                    result = await dspy.asyncify(instance)(
+                    # PR #3543 back-compat: the parser accepts plain classes
+                    # with `forward(...)` only (no __call__ and no dspy.Module
+                    # base). Such classes aren't directly callable —
+                    # `dspy.asyncify(instance)(...)` would TypeError. Fall back
+                    # to `instance.forward` when `instance` isn't callable;
+                    # mirrors the priority-3 path in the Go runner
+                    # (services/nlpgo/.../codeblock/runner.py). dspy.Module
+                    # subclasses always have __call__ so they hit the fast
+                    # path unchanged.
+                    #
+                    # `callable(invoke_target)` covers both legs of the failure
+                    # surface: missing-attribute (`getattr` default = None,
+                    # `callable(None)` is False) AND non-callable-attribute
+                    # (e.g. a string class attribute named `forward`). Either
+                    # case raises a typed error here so the operator sees a
+                    # message naming the class instead of asyncify's
+                    # less-informative 'object is not callable'.
+                    invoke_target = instance if callable(instance) else getattr(instance, "forward", None)
+                    if not callable(invoke_target):
+                        raise TypeError(
+                            f"Class '{class_name}' for component {node.data.name} "
+                            f"has no callable entrypoint. Define __call__(self, ...) "
+                            f"or forward(self, ...) on the class."
+                        )
+                    result = await dspy.asyncify(invoke_target)(
                         **forward_inputs
                     )
 

@@ -11,13 +11,13 @@ Feature: Suite run validation uses repository classes
   # Scenario validation
   # ---------------------------------------------------------------------------
 
-  @unit
+  @unit @unimplemented
   Scenario: Suite run succeeds when all scenarios exist
     Given a suite referencing existing scenarios
     When the suite run is triggered
     Then the run schedules jobs successfully
 
-  @unit
+  @unit @unimplemented
   Scenario: Suite run fails when a scenario does not exist
     Given a suite referencing a nonexistent scenario
     When the suite run is triggered
@@ -27,13 +27,13 @@ Feature: Suite run validation uses repository classes
   # HTTP target validation
   # ---------------------------------------------------------------------------
 
-  @unit
+  @unit @unimplemented
   Scenario: Suite run succeeds when HTTP target agent exists
     Given a suite with an HTTP target referencing an existing agent
     When the suite run is triggered
     Then the run schedules jobs successfully
 
-  @unit
+  @unit @unimplemented
   Scenario: Suite run fails when HTTP target agent does not exist
     Given a suite with an HTTP target referencing a nonexistent agent
     When the suite run is triggered
@@ -43,25 +43,25 @@ Feature: Suite run validation uses repository classes
   # Prompt target validation
   # ---------------------------------------------------------------------------
 
-  @unit
+  @unit @unimplemented
   Scenario: Suite run succeeds when prompt config exists in project
     Given a suite with a prompt target referencing an existing project-level config
     When the suite run is triggered
     Then the run schedules jobs successfully
 
-  @unit
+  @unit @unimplemented
   Scenario: Suite run succeeds when prompt config is org-scoped
     Given a suite with a prompt target referencing an org-scoped config
     When the suite run is triggered
     Then the run schedules jobs successfully
 
-  @unit
+  @unit @unimplemented
   Scenario: Suite run fails when prompt config is soft-deleted
     Given a suite with a prompt target referencing a soft-deleted config
     When the suite run is triggered
     Then the run fails with an invalid target references error
 
-  @unit
+  @unit @unimplemented
   Scenario: Suite run fails when prompt config belongs to another organization
     Given a suite with a prompt target referencing a config from another organization
     When the suite run is triggered
@@ -71,7 +71,7 @@ Feature: Suite run validation uses repository classes
   # Unknown target type
   # ---------------------------------------------------------------------------
 
-  @unit
+  @unit @unimplemented
   Scenario: Suite run fails for targets with unknown type
     Given a suite with a target of unknown type
     When the suite run is triggered
@@ -81,13 +81,13 @@ Feature: Suite run validation uses repository classes
   # Organization resolution
   # ---------------------------------------------------------------------------
 
-  @unit
+  @unit @unimplemented
   Scenario: Organization ID is resolved from project for suite run
     Given a project with an associated organization
     When the suite run endpoint is called
     Then the organization ID is resolved and passed to the service
 
-  @unit
+  @unit @unimplemented
   Scenario: Suite run fails when organization cannot be resolved
     Given a project with no associated organization
     When the suite run endpoint is called

@@ -50,6 +50,7 @@ import type {
 } from "../types";
 import { convertInlineToRowRecords } from "../utils/datasetConversion";
 import { isRowEmpty } from "../utils/emptyRowDetection";
+import { createEvaluatorEditorCallbacks } from "../utils/evaluatorEditorCallbacks";
 import { isCellInExecution } from "../utils/executionScope";
 import {
   convertFromUIMapping,
@@ -70,7 +71,7 @@ import { TargetSuperHeader } from "./TargetSuperHeader";
 import { VirtualizedTableBody } from "./VirtualizedTableBody";
 
 // Max rows for expanded mode (disable virtualization above this)
-const MAX_ROWS_FOR_EXPANDED_MODE = 100;
+const MAX_ROWS_FOR_FIT_MODE = 100;
 
 // Default percentage widths for columns (stored as numbers, e.g., 16 means 16%)
 const CHECKBOX_WIDTH_PX = 40; // Checkbox is fixed pixels
@@ -511,21 +512,24 @@ export function EvaluationsV3Table({
     // 1. Fetch the newly created evaluator from DB
     // 2. Add it to the workbench
     // 3. Close the drawer
-    setFlowCallbacks("evaluatorEditor", {
-      onSave: async (savedEvaluator: { id: string; name: string }) => {
-        // Fetch the full evaluator data from DB
-        const evaluator = await trpcUtils.evaluators.getById.fetch({
-          id: savedEvaluator.id,
-          projectId: project?.id ?? "",
-        });
+    setFlowCallbacks(
+      "evaluatorEditor",
+      createEvaluatorEditorCallbacks({
+        onSave: async (savedEvaluator: { id: string; name: string }) => {
+          // Fetch the full evaluator data from DB
+          const evaluator = await trpcUtils.evaluators.getById.fetch({
+            id: savedEvaluator.id,
+            projectId: project?.id ?? "",
+          });
 
-        if (evaluator) {
-          addEvaluatorToWorkbench(evaluator);
-        }
-        closeDrawer(); // Close drawer after adding evaluator to workbench
-        return true; // Indicate navigation was handled to prevent default back behavior
-      },
-    });
+          if (evaluator) {
+            addEvaluatorToWorkbench(evaluator);
+          }
+          closeDrawer(); // Close drawer after adding evaluator to workbench
+          return true; // Indicate navigation was handled to prevent default back behavior
+        },
+      }),
+    );
 
     openDrawer("evaluatorList");
   }, [
@@ -673,24 +677,27 @@ export function EvaluationsV3Table({
     });
     // Set up flow callback for when a NEW evaluator is created during the target flow
     // This handles: add comparison > evaluator > create new > category > fill form > create
-    setFlowCallbacks("evaluatorEditor", {
-      onSave: async (savedEvaluator: { id: string; name: string }) => {
-        // Fetch the full evaluator data from DB to get computed fields
-        const evaluator = await trpcUtils.evaluators.getById.fetch({
-          id: savedEvaluator.id,
-          projectId: project?.id ?? "",
-        });
+    setFlowCallbacks(
+      "evaluatorEditor",
+      createEvaluatorEditorCallbacks({
+        onSave: async (savedEvaluator: { id: string; name: string }) => {
+          // Fetch the full evaluator data from DB to get computed fields
+          const evaluator = await trpcUtils.evaluators.getById.fetch({
+            id: savedEvaluator.id,
+            projectId: project?.id ?? "",
+          });
 
-        if (!evaluator) {
-          closeDrawer();
-          return true;
-        }
+          if (!evaluator) {
+            closeDrawer();
+            return true;
+          }
 
-        // Use handleSelectEvaluatorAsTarget to add the target with proper fields
-        handleSelectEvaluatorAsTarget(evaluator);
-        return true; // Indicate navigation was handled to prevent default back behavior
-      },
-    });
+          // Use handleSelectEvaluatorAsTarget to add the target with proper fields
+          handleSelectEvaluatorAsTarget(evaluator);
+          return true; // Indicate navigation was handled to prevent default back behavior
+        },
+      }),
+    );
     openDrawer("targetTypeSelector");
   }, [
     buildAvailableSources,
@@ -863,7 +870,7 @@ export function EvaluationsV3Table({
   // - Disable virtualization in expanded mode for datasets <= 100 rows
   const rowHeightMode = ui.rowHeightMode;
   const shouldVirtualize =
-    rowHeightMode === "compact" || rowCount > MAX_ROWS_FOR_EXPANDED_MODE;
+    rowHeightMode === "compact" || rowCount > MAX_ROWS_FOR_FIT_MODE;
 
   const selectedRows = ui.selectedRows;
   const allSelected = selectedRows.size === rowCount && rowCount > 0;
@@ -913,12 +920,14 @@ export function EvaluationsV3Table({
         ]),
       );
 
-      // Check if this row is empty - empty rows don't get executed
-      const _rowIsEmpty = isRowEmpty(datasetValues);
+      // Empty rows (the Excel-style trailing phantom row) don't get executed
+      // and shouldn't render target outputs / evaluator chips.
+      const rowIsEmpty = isRowEmpty(datasetValues);
 
       return {
         rowIndex: index,
         dataset: datasetValues,
+        isEmpty: rowIsEmpty,
         targets: Object.fromEntries(
           targets.map((target) => [
             target.id,
@@ -1145,6 +1154,10 @@ export function EvaluationsV3Table({
             <TargetHeaderFromMeta targetId={targetId} context={context} />
           ),
           cell: (info) => {
+            // Phantom empty rows render nothing in target columns — the
+            // dataset side keeps the click-to-add affordance, but there's
+            // no input to run a target against.
+            if (info.row.original.isEmpty) return null;
             const data = info.getValue() as {
               output: unknown;
               evaluators: Record<string, unknown>;

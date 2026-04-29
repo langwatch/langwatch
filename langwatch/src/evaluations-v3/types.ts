@@ -355,7 +355,7 @@ export type CellPosition = {
   columnId: string;
 };
 
-export type RowHeightMode = "compact" | "expanded";
+export type RowHeightMode = "compact" | "fit";
 
 export type AutosaveState = "idle" | "saving" | "saved" | "error";
 
@@ -583,6 +583,18 @@ export type EvaluationsV3Store = EvaluationsV3State & EvaluationsV3Actions;
 export type TableRowData = {
   rowIndex: number;
   dataset: Record<string, string>;
+  /**
+   * True when the dataset row contains no user-entered values. The table
+   * always renders a trailing empty row for Excel-style "click to add,"
+   * but that phantom row must not show target outputs or evaluator chips.
+   *
+   * Required (non-optional) — every TableRowData built by the rowData
+   * builder in EvaluationsV3Table.tsx sets this. Was briefly optional during
+   * the #3441 sweep because DatasetSection/TableCell.tsx carried a parallel
+   * RowData shape without the field; that parallel shape has been unified
+   * with this type (#3460 item 5), so the optional can go.
+   */
+  isEmpty: boolean;
   targets: Record<
     string,
     {

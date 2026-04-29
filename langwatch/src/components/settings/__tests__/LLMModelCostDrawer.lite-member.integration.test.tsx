@@ -153,6 +153,7 @@ describe("Feature: LLM model cost drawer save errors", () => {
 
   describe("<LLMModelCostDrawer/>", () => {
     describe("when the save error was already handled globally", () => {
+      /** @scenario LLM model cost drawer skips the generic error toast after a primary error UI is shown */
       it("LLM model cost drawer skips the generic error toast after a primary error UI is shown", async () => {
         const error = new Error("Lite member restricted");
         mockMutationError.current = error;
@@ -169,6 +170,7 @@ describe("Feature: LLM model cost drawer save errors", () => {
     });
 
     describe("when the save error was not handled globally", () => {
+      /** @scenario LLM model cost drawer shows the generic error toast when no primary error UI is shown */
       it("LLM model cost drawer shows the generic error toast when no primary error UI is shown", async () => {
         mockMutationError.current = new Error("Network error");
 

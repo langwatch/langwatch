@@ -523,3 +523,60 @@ class TestUnmappedFieldTypeRaisesStructuredError:
             "regression: parser still surfaces raw Jinja UndefinedError — "
             "issue #3415 AC 5"
         )
+
+
+# --- AC 6: Every Studio-exposed input/output type parses cleanly ----------------------------
+
+
+class TestEveryStudioExposedTypeParses:
+    """
+    AC 6 — each input type the Studio UI exposes in the signature Variables panel must
+    survive workflow parsing (no Jinja UndefinedError, generated code contains the field).
+    Types enumerated from `langwatch/src/optimization_studio/types/dsl.ts::FIELD_TYPES` and
+    `langwatch/src/types.ts::LlmConfigInputTypes`. Parameter-only types (signature, llm,
+    prompting_technique, dataset, code) are excluded — they never reach the input path
+    that AC 6 covers. `image` is excluded because `dspy.Image` requires a runtime URL.
+    """
+
+    @pytest.mark.parametrize(
+        "field_type",
+        [
+            FieldType.str,
+            FieldType.int,
+            FieldType.float,
+            FieldType.bool,
+            FieldType.list,
+            FieldType.list_str,
+            FieldType.list_int,
+            FieldType.list_float,
+            FieldType.list_bool,
+            FieldType.dict,
+            FieldType.chat_messages,
+        ],
+    )
+    def test_signature_input_parses_for_every_studio_exposed_type(
+        self, field_type: FieldType
+    ):
+        workflow = _build_parrot_workflow(messages_type=FieldType.str)
+        # Replace the first input's type with the parameterized one.
+        workflow.nodes[1].data.inputs[0].type = field_type  # type: ignore
+
+        _, code, _ = parse_workflow(workflow, format=False, debug_level=0)
+
+        assert FIELD_TYPE_TO_DSPY_TYPE[field_type] in code, (
+            f"generated signature must reference DSPy type "
+            f"{FIELD_TYPE_TO_DSPY_TYPE[field_type]!r} for FieldType.{field_type.name}"
+        )
+        # No raw Jinja undefineds should leak into the generated Python.
+        assert "Undefined" not in code
+
+
+# --- AC 4: no escaped-JSON leak + turn count preserved ------------------------------------
+
+
+# AC 4 multi-turn role preservation is covered end-to-end at the TS adapter layer
+# (see langwatch/src/server/scenarios/execution/serialized-adapters/__tests__/
+# workflow-agent.adapter.integration.test.ts). A duplicate Python-side unit would
+# have to poke dspy.Signature's private `_messages` attribute to construct a matching
+# fixture, which couples the test to a non-public contract — the e2e coverage is the
+# correct level for this AC.

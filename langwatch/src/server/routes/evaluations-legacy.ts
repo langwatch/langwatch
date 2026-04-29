@@ -98,7 +98,7 @@ async function authenticateRequest(
     }
   | { error: string; status: 401 | 403 }
 > {
-  const credentials = extractCredentials(c);
+  const credentials = extractCredentials((name) => c.req.header(name));
   if (!credentials) {
     return {
       error:
@@ -564,23 +564,32 @@ export const getEvaluatorIncludingCustom = async (
     projectId,
   });
 
+  const customEntries: [string, { name: string; requiredFields: string[] }][] =
+    [];
+  for (const evaluator of availableCustomEvaluators ?? []) {
+    const dsl = evaluator.versions[0]?.dsl;
+    if (!dsl) {
+      continue;
+    }
+    const cloned = JSON.parse(JSON.stringify(dsl)) as
+      | { edges?: Edge[]; nodes?: unknown[] }
+      | undefined;
+    const { inputs } = getInputsOutputs(
+      (cloned?.edges ?? []) as Edge[],
+      (cloned?.nodes ?? []) as JsonArray as unknown[] as Node[],
+    );
+    const requiredFields = inputs
+      .map((input) => input.identifier)
+      .filter((id): id is string => typeof id === "string");
+    customEntries.push([
+      `custom/${evaluator.id}`,
+      { name: evaluator.name, requiredFields },
+    ]);
+  }
+
   const availableEvaluators = {
     ...AVAILABLE_EVALUATORS,
-    ...Object.fromEntries(
-      (availableCustomEvaluators ?? []).map((evaluator) => {
-        const { inputs } = getInputsOutputs(
-          JSON.parse(JSON.stringify(evaluator.versions[0]?.dsl))
-            ?.edges as Edge[],
-          JSON.parse(JSON.stringify(evaluator.versions[0]?.dsl))
-            ?.nodes as JsonArray as unknown[] as Node[],
-        );
-        const requiredFields = inputs.map((input) => input.identifier);
-        return [
-          `custom/${evaluator.id}`,
-          { name: evaluator.name, requiredFields },
-        ];
-      }),
-    ),
+    ...Object.fromEntries(customEntries),
   };
 
   return availableEvaluators[checkType];

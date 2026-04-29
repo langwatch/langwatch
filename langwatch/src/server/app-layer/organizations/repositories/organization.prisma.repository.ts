@@ -924,59 +924,90 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
       andConditions.push({ createdAt: dateFilter });
     }
 
+    // Gateway-resource deep-link filter (`/settings/audit-log?targetKind=…
+    // &targetId=…`). Both columns live on `AuditLog` post-consolidation —
+    // see migration 20260425000000_consolidate_gateway_audit_into_audit_log.
+    // targetId is only honored when paired with targetKind so a stray
+    // `?targetId=` from a typo'd URL cannot match across kinds.
+    if (filters.targetKind) {
+      andConditions.push({ targetKind: filters.targetKind });
+      if (filters.targetId) {
+        andConditions.push({ targetId: filters.targetId });
+      }
+    }
+
     if (andConditions.length > 1) {
       where.AND = andConditions;
     } else {
       Object.assign(where, andConditions[0]);
     }
 
-    const totalCount = await this.prisma.auditLog.count({ where });
+    const [totalCount, rows] = await Promise.all([
+      this.prisma.auditLog.count({ where }),
+      this.prisma.auditLog.findMany({
+        where,
+        skip: pageOffset,
+        take: pageSize,
+        orderBy: { createdAt: "desc" },
+      }),
+    ]);
 
-    const auditLogs = await this.prisma.auditLog.findMany({
-      where,
-      take: pageSize,
-      skip: pageOffset,
-      orderBy: { createdAt: "desc" },
-    });
-
-    const userIds = [...new Set(auditLogs.map((log) => log.userId))];
+    // userId is nullable post-consolidation (system-actor writes) — filter
+    // null out before passing to the Prisma `IN` predicate, which rejects
+    // null array members at runtime.
+    const userIds = [
+      ...new Set(
+        rows.map((r) => r.userId).filter((id): id is string => !!id),
+      ),
+    ];
     const projectIds = [
       ...new Set(
-        auditLogs
-          .map((log) => log.projectId)
-          .filter((id): id is string => !!id),
+        rows.map((r) => r.projectId).filter((id): id is string => !!id),
       ),
     ];
 
-    const users = await this.prisma.user.findMany({
-      where: { id: { in: userIds } },
-      select: { id: true, name: true, email: true },
-    });
-
-    const projects = await this.prisma.project.findMany({
-      where: { id: { in: projectIds } },
-      select: { id: true, name: true },
-    });
-
+    const [users, projects] = await Promise.all([
+      this.prisma.user.findMany({
+        where: { id: { in: userIds } },
+        select: { id: true, name: true, email: true },
+      }),
+      this.prisma.project.findMany({
+        where: { id: { in: projectIds } },
+        select: { id: true, name: true },
+      }),
+    ]);
     const userMap = new Map(users.map((u) => [u.id, u]));
     const projectMap = new Map(projects.map((p) => [p.id, p]));
 
-    const enrichedAuditLogs: EnrichedAuditLog[] = auditLogs.map((log) => ({
-      id: log.id,
-      createdAt: log.createdAt,
-      userId: log.userId,
-      organizationId: log.organizationId,
-      projectId: log.projectId,
-      action: log.action,
-      payload: log.args,
-      ipAddress: log.ipAddress,
-      userAgent: log.userAgent,
-      error: log.error,
-      args: log.args,
-      user: userMap.get(log.userId) ?? null,
-      project: log.projectId ? (projectMap.get(log.projectId) ?? null) : null,
-    }));
+    const auditLogs: EnrichedAuditLog[] = rows.map((log) => {
+      // Gateway-shape rows are emitted under the `gateway.<resource>.<verb>`
+      // dotted naming convention; the `gateway.` prefix is the load-bearing
+      // discriminator (also documented for SIEM scoping via LIKE 'gateway.%').
+      // Presence of targetKind alone is not a safe signal — platform features
+      // could in principle add their own target tracking later.
+      const isGateway = log.action.startsWith("gateway.");
+      return {
+        id: log.id,
+        createdAt: log.createdAt,
+        userId: log.userId,
+        organizationId: log.organizationId,
+        projectId: log.projectId,
+        action: log.action,
+        payload: isGateway ? (log.after ?? log.before ?? null) : log.args,
+        ipAddress: log.ipAddress,
+        userAgent: log.userAgent,
+        error: log.error,
+        args: isGateway ? { before: log.before, after: log.after } : log.args,
+        user: log.userId ? (userMap.get(log.userId) ?? null) : null,
+        project: log.projectId ? (projectMap.get(log.projectId) ?? null) : null,
+        source: isGateway ? "gateway" : "platform",
+        targetKind: log.targetKind,
+        targetId: log.targetId,
+        before: log.before,
+        after: log.after,
+      };
+    });
 
-    return { auditLogs: enrichedAuditLogs, totalCount };
+    return { auditLogs, totalCount };
   }
 }

@@ -31,6 +31,33 @@ const baseAzureProvider = {
 };
 
 describe("prepareLitellmParams", () => {
+  describe("when the caller passes the new canonical mp-id wire format", () => {
+    it("normalises params.model to provider-prefixed form using the resolved MP", async () => {
+      // iter 109 wire format: callers can ship `{mpId}/{model}`, which
+      // LiteLLM doesn't understand. prepareLitellmParams must translate
+      // using modelProvider.provider so LiteLLM still routes correctly.
+      const params = await prepareLitellmParams({
+        model: "mp_abc_123/my-gpt4-deployment",
+        modelProvider: baseAzureProvider,
+        projectId: "project-123",
+      });
+
+      expect(params.model).toBe("azure/my-gpt4-deployment");
+    });
+  });
+
+  describe("when the caller passes the legacy provider-prefixed format", () => {
+    it("keeps params.model as provider/model", async () => {
+      const params = await prepareLitellmParams({
+        model: "azure/my-gpt4-deployment",
+        modelProvider: baseAzureProvider,
+        projectId: "project-123",
+      });
+
+      expect(params.model).toBe("azure/my-gpt4-deployment");
+    });
+  });
+
   describe("when provider is azure", () => {
     it("preserves azure deployment model ID in params.model", async () => {
       const params = await prepareLitellmParams({

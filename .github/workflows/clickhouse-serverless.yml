@@ -46,7 +46,7 @@ jobs:
         with:
           go-version: "1.26"
           cache-dependency-path: clickhouse-serverless/go.sum
-      - uses: azure/setup-helm@v4
+      - uses: azure/setup-helm@v5
         with:
           version: v3.12.0
       - run: make test

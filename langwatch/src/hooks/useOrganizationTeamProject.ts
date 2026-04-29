@@ -259,10 +259,17 @@ export const useOrganizationTeamProject = (
       finalProject.slug !== router.query.project
     ) {
       // Preserve the sub-path so /bad-slug/messages → /good-slug/messages
+      // Decode: browsers encode [ ] → %5B %5D, so asPath and query.project are in different encodings
       const url = new URL(router.asPath, window.location.origin);
       const oldPrefix = `/${router.query.project as string}`;
-      const subPath = url.pathname.startsWith(oldPrefix)
-        ? url.pathname.slice(oldPrefix.length)
+      let decodedPathname = url.pathname;
+      try {
+        decodedPathname = decodeURIComponent(url.pathname);
+      } catch {
+        // keep encoded pathname if malformed percent-encoding is present
+      }
+      const subPath = decodedPathname.startsWith(oldPrefix)
+        ? decodedPathname.slice(oldPrefix.length)
         : "";
       void router.push(`/${finalProject.slug}${subPath}${url.search}`);
     }

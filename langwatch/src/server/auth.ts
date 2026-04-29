@@ -191,7 +191,18 @@ export const getServerAuthSession = async (ctx: {
 
     return baseSession;
   } catch (error) {
-    logger.error({ error }, "getServerAuthSession failed");
+    // Most common cause: Redis (better-auth secondary store) is down and the
+    // session lookup times out. Symptom for the user is an endless
+    // "Redirecting to Sign in..." loop. Log with a clear hint so the first
+    // server-log line the developer reads points at the real root cause.
+    const message = error instanceof Error ? error.message : String(error);
+    logger.error(
+      { error },
+      `getServerAuthSession failed: ${message}\n` +
+        `  If the session store (Redis) is down, the app will silently ` +
+        `redirect-loop on every protected page. Check 'docker compose ps redis' ` +
+        `(or your REDIS_URL target).`,
+    );
     return null;
   }
 };
