@@ -12,6 +12,7 @@ import { createClickHouseClientFromConfig } from "./clients/clickhouse.factory";
 import { GatewayBudgetRepository } from "~/server/gateway/budget.repository";
 import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
 import { GovernanceKpisClickHouseRepository } from "~/server/governance/governanceKpis.clickhouse.repository";
+import { GovernanceOcsfEventsClickHouseRepository } from "~/server/governance/governanceOcsfEvents.clickhouse.repository";
 import { NullLangevalsClient } from "./clients/langevals/langevals.client";
 import { LangEvalsHttpClient } from "./clients/langevals/langevals.http.client";
 import { createRedisConnectionFromConfig } from "./clients/redis.factory";
@@ -352,6 +353,13 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
       }
     : undefined;
 
+  const governanceOcsfEventsSync = clickhouseEnabled
+    ? {
+        governanceOcsfEventsRepository:
+          new GovernanceOcsfEventsClickHouseRepository(resolveClickHouseClient),
+      }
+    : undefined;
+
   const registry = new PipelineRegistry({
     eventSourcing: es,
     repositories,
@@ -368,6 +376,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     usageReportingService,
     gatewayBudgetSync,
     governanceKpisSync,
+    governanceOcsfEventsSync,
   });
   const commands = registry.registerAll();
   (globalForApp as any).__scenarioExecutionHandle = commands.scenarioExecutionHandle;
