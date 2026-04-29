@@ -18,6 +18,7 @@ import (
 	"github.com/langwatch/langwatch/pkg/herr"
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 	"github.com/langwatch/langwatch/services/nlpgo/adapters/gatewayproxy"
+	"github.com/langwatch/langwatch/services/nlpgo/adapters/litellm"
 	nlpgodomain "github.com/langwatch/langwatch/services/nlpgo/domain"
 )
 
@@ -109,6 +110,26 @@ func playgroundProxyDispatch(proxy PlaygroundProxy) http.HandlerFunc {
 			}
 		}
 
+		// OpenAI's reasoning-class models (gpt-5*, o1/o3/o4) reject
+		// `max_tokens` ("Unsupported parameter: 'max_tokens' is not
+		// supported with this model. Use 'max_completion_tokens'
+		// instead.") and pin temperature to 1.0. The internal
+		// runSignature path already runs the same migration via
+		// litellm.ApplyReasoningOverrides; the playground proxy was
+		// raw-forwarding bodies authored by Vercel AI SDK / playground
+		// callers that emit `max_tokens`. Mirror the executor here so
+		// /go/proxy/v1/chat/completions doesn't 400 on Studio Monaco
+		// code-completion / playground / model.factory.ts traffic.
+		if litellm.IsReasoningModel(bareModel) {
+			body, err = applyReasoningOverridesToBody(body, bareModel)
+			if err != nil {
+				herr.WriteHTTP(w, herr.New(ctx, nlpgodomain.ErrBadRequest, herr.M{
+					"reason": "apply_reasoning_overrides",
+				}, err))
+				return
+			}
+		}
+
 		reqType, httpPath := classifyPath(r.URL.Path)
 
 		// /v1beta/* etc. → RequestTypePassthrough. Wiring it through the
@@ -164,6 +185,23 @@ func rewriteBodyModel(body []byte, newModel string) ([]byte, error) {
 	}
 	raw["model"] = encoded
 	return json.Marshal(raw)
+}
+
+// applyReasoningOverridesToBody migrates max_tokens → max_completion_tokens
+// and pins temperature to 1.0 for OpenAI reasoning-class models, mirroring
+// the in-process llmexecutor path. The actual rewrite logic lives in
+// litellm.ApplyReasoningOverrides (translator.go) — this is the
+// raw-bytes-in / raw-bytes-out wrapper for the playground proxy.
+func applyReasoningOverridesToBody(body []byte, modelID string) ([]byte, error) {
+	if len(body) == 0 {
+		return body, nil
+	}
+	var generic map[string]any
+	if err := json.Unmarshal(body, &generic); err != nil {
+		return nil, err
+	}
+	litellm.ApplyReasoningOverrides(modelID, generic)
+	return json.Marshal(generic)
 }
 
 // peekBodyMetadata reads the body once to extract the OpenAI-shape
