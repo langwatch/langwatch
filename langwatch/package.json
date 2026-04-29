@@ -33,7 +33,6 @@
     "generate:sdk-versions": "bash scripts/generate-sdk-versions.sh",
     "start:prepare:db": "pnpm run prisma:migrate && pnpm run clickhouse:migrate",
     "start:workers": "tsx --tsconfig tsconfig.workers.json src/workers.ts",
-    "start:workers:watch": "tsx watch --clear-screen=false --tsconfig tsconfig.workers.json src/workers.ts",
     "typecheck:legacy": "./node_modules/.bin/tsc --noEmit --project ./tsconfig.json",
     "typecheck": "./node_modules/.bin/tsgo --noEmit --project ./tsconfig.tsgo.json",
     "test:unit": "NODE_ENV=test PINO_LOG_LEVEL=warn vitest",
