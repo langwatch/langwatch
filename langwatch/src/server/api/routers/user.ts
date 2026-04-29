@@ -198,10 +198,12 @@ export const userRouter = createTRPCRouter({
   changePassword: protectedProcedure
     .input(
       z.object({
-        // Optional because the Auth0 path doesn't verify current password
-        // against Auth0 (modern tenants phase out the Resource Owner
-        // Password Grant). The email/credential path still requires it.
-        currentPassword: z.string().optional(),
+        // Required for both modes — the user must re-confirm their
+        // current password to change it. Defends against a stolen
+        // session lock-out: even with a valid session cookie, an
+        // attacker can't change the password without knowing the
+        // existing one.
+        currentPassword: z.string().min(1, "Current password is required"),
         newPassword: z
           .string()
           .min(8, "Password must be at least 8 characters"),
@@ -265,25 +267,48 @@ export const userRouter = createTRPCRouter({
           });
         }
 
+        if (!ctx.session.user.email) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Authenticated session is missing an email",
+          });
+        }
+
         try {
-          await changeAuth0Password({
+          const result = await changeAuth0Password({
+            email: ctx.session.user.email,
             auth0UserId: auth0Account.providerAccountId,
+            currentPassword: input.currentPassword,
             newPassword: input.newPassword,
           });
+          if (!result.ok) {
+            throw new TRPCError({
+              code: "UNAUTHORIZED",
+              message: "Current password is incorrect",
+            });
+          }
         } catch (error) {
+          if (error instanceof TRPCError) throw error;
           if (error instanceof Auth0ApiError) {
             if (error.code === "insufficient_scope") {
               throw new TRPCError({
                 code: "INTERNAL_SERVER_ERROR",
                 message:
-                  "Auth0 is not authorized to update users. Ask an administrator to enable the update:users scope on the Auth0 application.",
+                  "Auth0 is not authorized to update users. Ask an administrator to enable the update:users scope on the Auth0 Management M2M application.",
+              });
+            }
+            if (error.code === "password_grant_not_enabled") {
+              throw new TRPCError({
+                code: "INTERNAL_SERVER_ERROR",
+                message:
+                  "Auth0 Password grant is not enabled on the Management M2M application. Ask an administrator to enable it under that application's Advanced Settings → Grant Types.",
               });
             }
             if (error.code === "not_configured") {
               throw new TRPCError({
                 code: "INTERNAL_SERVER_ERROR",
                 message:
-                  "Auth0 is not configured on the server. Set AUTH0_ISSUER, AUTH0_CLIENT_ID, and AUTH0_CLIENT_SECRET.",
+                  "Auth0 is not configured on the server. Set AUTH0_ISSUER plus AUTH0_MGMT_CLIENT_ID/SECRET (or AUTH0_CLIENT_ID/SECRET).",
               });
             }
             throw new TRPCError({
@@ -322,13 +347,6 @@ export const userRouter = createTRPCRouter({
         throw new TRPCError({
           code: "NOT_FOUND",
           message: "User not found or password not set",
-        });
-      }
-
-      if (!input.currentPassword) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "Current password is required",
         });
       }
 

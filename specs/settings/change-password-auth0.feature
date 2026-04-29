@@ -8,7 +8,9 @@ Feature: Change password from /settings/authentication
   #                  Linked Sign-in Methods list. Hidden for social-only users.
   #   * Email mode:  a dedicated "Change Password" section (since email-mode
   #                  doesn't render a Linked Sign-in Methods list).
-  # In both modes, clicking the entry point opens the same dialog.
+  # In both modes, clicking the entry point opens the same dialog. The dialog
+  # always asks for the current password — required for both modes — to defend
+  # against a stolen session being used to lock the real owner out.
 
   Background:
     Given I am signed in
@@ -34,16 +36,7 @@ Feature: Change password from /settings/authentication
     And the section shows a "Change Password" button but no inline form
 
   @integration
-  Scenario: Auth0 mode dialog asks for new password only
-    Given the tenant runs on NEXTAUTH_PROVIDER="auth0"
-    When I click the Change Password entry point
-    Then a dialog opens
-    And the dialog shows New Password and Confirm New Password fields
-    And the dialog does not show a Current Password field
-
-  @integration
-  Scenario: Email mode dialog asks for current + new password
-    Given the tenant runs on NEXTAUTH_PROVIDER="email"
+  Scenario: The dialog asks for current + new password in both modes
     When I click the Change Password entry point
     Then a dialog opens
     And the dialog shows Current Password, New Password, and Confirm New Password fields
@@ -51,15 +44,23 @@ Feature: Change password from /settings/authentication
   @integration
   Scenario: Successful change shows a toast and closes the dialog
     When I open the dialog
-    And I submit a valid new password and matching confirmation
+    And I submit a valid current password and a valid new password with matching confirmation
     Then the server changes my password
     And I see a "Password changed successfully" toast
     And the dialog closes
 
   @integration
+  Scenario: Wrong current password keeps the dialog open and shows an error
+    When I open the dialog
+    And I submit an incorrect current password
+    Then the server returns "Current password is incorrect"
+    And I see a "Failed to change password" toast with that message
+    And the dialog stays open so I can retry
+
+  @integration
   Scenario: Server error keeps the dialog open and shows the error
     When I open the dialog
-    And the server returns an error on submit
+    And the server returns an unexpected error on submit
     Then I see a "Failed to change password" toast with the server's message
     And the dialog stays open so I can retry
 
@@ -80,12 +81,22 @@ Feature: Change password from /settings/authentication
   # Backend (Auth0 mode)
 
   @integration
-  Scenario: Auth0 backend uses a separate Machine-to-Machine app for the Management API
+  Scenario: Auth0 backend verifies the current password via Resource Owner Password Grant before updating
     Given AUTH0_MGMT_CLIENT_ID and AUTH0_MGMT_CLIENT_SECRET are set
-    When the server processes a successful change-password submission for an Auth0 user
-    Then it requests a Management API token via client_credentials using the M2M credentials
+    And the Management M2M application has the "Password" grant type enabled
+    When the server processes a change-password submission for an Auth0 user
+    Then it calls Auth0 /oauth/token with grant_type=password using the M2M credentials
+    And on a 200 it requests a Management API token via client_credentials
     And it calls Auth0 Management API PATCH /api/v2/users/{id} with the new password
     And the connection field is "Username-Password-Authentication"
+
+  @integration
+  Scenario: Auth0 backend returns 401 UNAUTHORIZED when the current password is wrong
+    Given AUTH0_MGMT_CLIENT_ID and AUTH0_MGMT_CLIENT_SECRET are set
+    When the server submits the wrong current password to Auth0
+    Then Auth0 responds with error=invalid_grant
+    And the server does NOT call the Management API
+    And the tRPC mutation throws UNAUTHORIZED with message "Current password is incorrect"
 
   @integration @unimplemented
   Scenario: Auth0 backend falls back to AUTH0_CLIENT_ID/SECRET when the M2M vars are absent
@@ -104,10 +115,18 @@ Feature: Change password from /settings/authentication
   @integration
   Scenario: Surfaces a clear error when the Auth0 Management API scope is missing
     Given the M2M application is missing the "update:users" Management API scope
-    When I submit a valid new password in Auth0 mode
+    When I submit a valid current and new password in Auth0 mode
     Then the Management API PATCH call returns 403 "insufficient_scope"
     And the server logs the scope error
     And I see an error toast indicating the Auth0 app is not authorized
+
+  @integration
+  Scenario: Surfaces a clear error when the Auth0 Password grant is missing on the M2M app
+    Given the Management M2M application does not have the "Password" grant enabled
+    When I submit a current and new password in Auth0 mode
+    Then Auth0 /oauth/token returns unauthorized_client
+    And the server logs the grant-misconfig error
+    And I see an error toast telling an administrator to enable the Password grant
 
   @regression @integration @unimplemented
   Scenario: Email-provider mode continues to verify the current password and revoke other sessions

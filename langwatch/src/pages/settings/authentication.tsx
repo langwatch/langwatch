@@ -80,11 +80,6 @@ export default function AuthenticationSettings() {
     return null;
   }
 
-  // Auth0 mode trusts the authenticated session as proof of identity (modern
-  // Auth0 tenants don't expose the Resource Owner Password Grant required to
-  // verify the current password server-side). Email/credential mode still
-  // requires the current password.
-  const requireCurrentPassword = isAuthProvider !== "auth0";
   const canChangePassword =
     isAuthProvider === "email" || isAuthProvider === "auth0";
 
@@ -244,7 +239,6 @@ export default function AuthenticationSettings() {
         <ChangePasswordDialog
           open={changePasswordOpen}
           onClose={() => setChangePasswordOpen(false)}
-          requireCurrentPassword={requireCurrentPassword}
         />
       )}
     </SettingsLayout>

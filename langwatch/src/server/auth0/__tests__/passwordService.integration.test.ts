@@ -42,6 +42,7 @@ import {
   changeAuth0Password,
   getManagementApiToken,
   updateUserPassword,
+  verifyCurrentPassword,
 } from "../passwordService";
 
 interface CapturedRequest {
@@ -304,13 +305,111 @@ describe("updateUserPassword", () => {
   });
 });
 
-describe("changeAuth0Password", () => {
-  describe("given valid Management API credentials", () => {
-    /** @scenario Auth0 backend uses a separate Machine-to-Machine app for the Management API */
-    it("gets a management token and PATCHes the user's password", async () => {
+describe("verifyCurrentPassword", () => {
+  describe("when Auth0 accepts the password (200)", () => {
+    /** @scenario Auth0 backend verifies the current password via Resource Owner Password Grant before updating */
+    it("returns true and sends a Resource Owner Password Grant request", async () => {
       handler = (req) => {
         if (req.method === "POST" && req.path === "/oauth/token") {
-          return { status: 200, body: { access_token: "mgmt-tok" } };
+          return {
+            status: 200,
+            body: { access_token: "user-access-token", id_token: "id-token" },
+          };
+        }
+        return { status: 404 };
+      };
+
+      const ok = await verifyCurrentPassword({
+        email: "user@example.com",
+        password: "hunter2",
+      });
+
+      expect(ok).toBe(true);
+      expect(captured).toHaveLength(1);
+      expect(captured[0]?.body).toEqual({
+        grant_type: "password",
+        username: "user@example.com",
+        password: "hunter2",
+        audience: `${auth0Issuer}/api/v2/`,
+        scope: "openid",
+        client_id: "test-client-id",
+        client_secret: "test-client-secret",
+      });
+    });
+  });
+
+  describe("when the current password is wrong", () => {
+    it("returns false on invalid_grant", async () => {
+      handler = () => ({
+        status: 403,
+        body: {
+          error: "invalid_grant",
+          error_description: "Wrong email or password.",
+        },
+      });
+
+      const ok = await verifyCurrentPassword({
+        email: "user@example.com",
+        password: "wrong",
+      });
+      expect(ok).toBe(false);
+    });
+  });
+
+  describe("when the M2M app does not have the Password grant enabled", () => {
+    /** @scenario Surfaces a clear error when the Auth0 Password grant is missing on the M2M app */
+    it("throws Auth0ApiError with code=password_grant_not_enabled", async () => {
+      handler = () => ({
+        status: 403,
+        body: {
+          error: "unauthorized_client",
+          error_description:
+            "Grant type 'password' not allowed for the client.",
+        },
+      });
+
+      await expect(
+        verifyCurrentPassword({ email: "u@example.com", password: "x" }),
+      ).rejects.toMatchObject({
+        name: "Auth0ApiError",
+        code: "password_grant_not_enabled",
+      });
+    });
+  });
+
+  describe("when Auth0 returns an unmapped error", () => {
+    it("throws Auth0ApiError with code=unknown", async () => {
+      handler = () => ({
+        status: 500,
+        body: { error: "server_error", error_description: "boom" },
+      });
+
+      await expect(
+        verifyCurrentPassword({ email: "u@example.com", password: "x" }),
+      ).rejects.toMatchObject({
+        name: "Auth0ApiError",
+        code: "unknown",
+      });
+    });
+  });
+});
+
+describe("changeAuth0Password", () => {
+  describe("given a correct current password and valid M2M credentials", () => {
+    /** @scenario Auth0 backend uses a separate Machine-to-Machine app for the Management API */
+    it("verifies, gets management token, and PATCHes the user's password", async () => {
+      handler = (req) => {
+        if (req.method === "POST" && req.path === "/oauth/token") {
+          const body = req.body as { grant_type?: string } | undefined;
+          if (body?.grant_type === "password") {
+            return { status: 200, body: { access_token: "user-tok" } };
+          }
+          if (body?.grant_type === "client_credentials") {
+            return {
+              status: 200,
+              body: { access_token: "mgmt-tok", expires_in: 3600 },
+            };
+          }
         }
         if (req.method === "PATCH" && req.path.startsWith("/api/v2/users/")) {
           return { status: 200, body: {} };
@@ -318,21 +417,54 @@ describe("changeAuth0Password", () => {
         return { status: 404 };
       };
 
-      await changeAuth0Password({
+      const result = await changeAuth0Password({
+        email: "user@example.com",
         auth0UserId: "auth0|abc",
+        currentPassword: "old-pw-1",
         newPassword: "new-pw-12345",
       });
 
-      expect(captured).toHaveLength(2);
+      expect(result).toEqual({ ok: true });
+      // 1) ROPG verify, 2) client_credentials, 3) PATCH
+      expect(captured).toHaveLength(3);
       expect(
         (captured[0]?.body as { grant_type?: string }).grant_type,
+      ).toBe("password");
+      expect(
+        (captured[1]?.body as { grant_type?: string }).grant_type,
       ).toBe("client_credentials");
-      expect(captured[1]?.method).toBe("PATCH");
-      expect(captured[1]?.headers.authorization).toBe("Bearer mgmt-tok");
-      expect(captured[1]?.body).toEqual({
+      expect(captured[2]?.method).toBe("PATCH");
+      expect(captured[2]?.headers.authorization).toBe("Bearer mgmt-tok");
+      expect(captured[2]?.body).toEqual({
         password: "new-pw-12345",
         connection: "Username-Password-Authentication",
       });
+    });
+  });
+
+  describe("given the wrong current password", () => {
+    /** @scenario Auth0 backend returns 401 UNAUTHORIZED when the current password is wrong */
+    it("returns { ok: false, reason: 'wrong_password' } and never touches the Management API", async () => {
+      handler = (req) => {
+        if (req.method === "POST" && req.path === "/oauth/token") {
+          return {
+            status: 403,
+            body: { error: "invalid_grant" },
+          };
+        }
+        // Anything else is a bug — fail loudly.
+        return { status: 500 };
+      };
+
+      const result = await changeAuth0Password({
+        email: "user@example.com",
+        auth0UserId: "auth0|abc",
+        currentPassword: "wrong",
+        newPassword: "new-pw-12345",
+      });
+
+      expect(result).toEqual({ ok: false, reason: "wrong_password" });
+      expect(captured).toHaveLength(1); // ONLY the verify call
     });
   });
 
@@ -340,7 +472,14 @@ describe("changeAuth0Password", () => {
     it("propagates Auth0ApiError so the caller can show a config error", async () => {
       handler = (req) => {
         if (req.method === "POST" && req.path === "/oauth/token") {
-          return { status: 200, body: { access_token: "mgmt-tok" } };
+          const body = req.body as { grant_type?: string } | undefined;
+          if (body?.grant_type === "password") {
+            return { status: 200, body: { access_token: "user-tok" } };
+          }
+          return {
+            status: 200,
+            body: { access_token: "mgmt-tok", expires_in: 3600 },
+          };
         }
         return {
           status: 403,
@@ -355,7 +494,9 @@ describe("changeAuth0Password", () => {
 
       await expect(
         changeAuth0Password({
+          email: "user@example.com",
           auth0UserId: "auth0|abc",
+          currentPassword: "old-pw",
           newPassword: "new-pw-12345",
         }),
       ).rejects.toMatchObject({

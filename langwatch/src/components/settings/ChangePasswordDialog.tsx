@@ -1,57 +1,39 @@
 import { Button, Field, HStack, Input, Stack, Text } from "@chakra-ui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useEffect, useMemo } from "react";
+import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { Dialog } from "../ui/dialog";
 import { toaster } from "../ui/toaster";
 import { api } from "../../utils/api";
 
-const buildSchema = (requireCurrent: boolean) =>
-  z
-    .object({
-      currentPassword: requireCurrent
-        ? z.string().min(1, "Current password is required")
-        : z.string().optional(),
-      newPassword: z.string().min(8, "Password must be at least 8 characters"),
-      confirmPassword: z
-        .string()
-        .min(8, "Password must be at least 8 characters"),
-    })
-    .refine((data) => data.newPassword === data.confirmPassword, {
-      message: "Passwords don't match",
-      path: ["confirmPassword"],
-    });
+const changePasswordSchema = z
+  .object({
+    currentPassword: z.string().min(1, "Current password is required"),
+    newPassword: z.string().min(8, "Password must be at least 8 characters"),
+    confirmPassword: z
+      .string()
+      .min(8, "Password must be at least 8 characters"),
+  })
+  .refine((data) => data.newPassword === data.confirmPassword, {
+    message: "Passwords don't match",
+    path: ["confirmPassword"],
+  });
 
-type ChangePasswordFormValues = z.infer<ReturnType<typeof buildSchema>>;
+type ChangePasswordFormValues = z.infer<typeof changePasswordSchema>;
 
 interface ChangePasswordDialogProps {
   open: boolean;
   onClose: () => void;
-  /**
-   * When true, the dialog asks for the current password and sends it to the
-   * server. When false (e.g. Auth0 mode), the current-password field is
-   * hidden and the server trusts the authenticated session.
-   */
-  requireCurrentPassword: boolean;
 }
 
 export function ChangePasswordDialog({
   open,
   onClose,
-  requireCurrentPassword,
 }: ChangePasswordDialogProps) {
   const changePasswordMutation = api.user.changePassword.useMutation();
-  // Memoize the resolver so we're not building a fresh Zod schema +
-  // ZodEffects instance on every render. `requireCurrentPassword` is
-  // effectively static per dialog mount but RHF's stable-resolver
-  // contract is cheaper this way.
-  const resolver = useMemo(
-    () => zodResolver(buildSchema(requireCurrentPassword)),
-    [requireCurrentPassword],
-  );
   const form = useForm<ChangePasswordFormValues>({
-    resolver,
+    resolver: zodResolver(changePasswordSchema),
     defaultValues: {
       currentPassword: "",
       newPassword: "",
@@ -73,14 +55,8 @@ export function ChangePasswordDialog({
 
   const onSubmit = async (values: ChangePasswordFormValues) => {
     try {
-      // Only forward `currentPassword` when the server actually needs it
-      // (email/credential mode). In Auth0 mode the dialog doesn't render
-      // the field; sending an empty string would obscure that and could
-      // bite us if the server-side schema is later tightened.
       await changePasswordMutation.mutateAsync({
-        ...(requireCurrentPassword
-          ? { currentPassword: values.currentPassword }
-          : {}),
+        currentPassword: values.currentPassword,
         newPassword: values.newPassword,
       });
       toaster.create({
@@ -122,23 +98,21 @@ export function ChangePasswordDialog({
               <Text fontSize="sm" color="fg.muted">
                 Password must be at least 8 characters long.
               </Text>
-              {requireCurrentPassword && (
-                <Field.Root
-                  invalid={!!form.formState.errors.currentPassword}
-                >
-                  <Field.Label>Current Password</Field.Label>
-                  <Input
-                    type="password"
-                    autoComplete="current-password"
-                    {...form.register("currentPassword")}
-                  />
-                  {form.formState.errors.currentPassword && (
-                    <Field.ErrorText>
-                      {form.formState.errors.currentPassword.message}
-                    </Field.ErrorText>
-                  )}
-                </Field.Root>
-              )}
+              <Field.Root
+                invalid={!!form.formState.errors.currentPassword}
+              >
+                <Field.Label>Current Password</Field.Label>
+                <Input
+                  type="password"
+                  autoComplete="current-password"
+                  {...form.register("currentPassword")}
+                />
+                {form.formState.errors.currentPassword && (
+                  <Field.ErrorText>
+                    {form.formState.errors.currentPassword.message}
+                  </Field.ErrorText>
+                )}
+              </Field.Root>
               <Field.Root invalid={!!form.formState.errors.newPassword}>
                 <Field.Label>New Password</Field.Label>
                 <Input

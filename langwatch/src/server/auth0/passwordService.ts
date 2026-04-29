@@ -13,6 +13,7 @@ const AUTH0_DB_CONNECTION = "Username-Password-Authentication";
 export type Auth0ErrorCode =
   | "insufficient_scope"
   | "not_configured"
+  | "password_grant_not_enabled"
   | "unknown";
 
 export class Auth0ApiError extends Error {
@@ -266,24 +267,113 @@ export async function updateUserPassword(args: {
 }
 
 /**
- * Set a user's Auth0 password directly via the Management API. The user's
- * authenticated app session is trusted as proof of identity — current
- * password is NOT verified against Auth0 (modern Auth0 tenants phase out
- * the Resource Owner Password Grant required for that, and dashboard
- * configuration of Password grant is not exposed in newer Auth0 UIs).
+ * Verify the user's current Auth0 password using Resource Owner Password
+ * Grant against the Management M2M client. Returns:
+ *   - `true`  on 200 (Auth0 minted a token, so the credentials are valid).
+ *   - `false` if Auth0 returns `invalid_grant` (wrong email or password).
+ * Throws Auth0ApiError for everything else — most importantly
+ * `password_grant_not_enabled` when the M2M app's allowed grant types
+ * doesn't include "Password", which is the operator-fixable misconfig.
  *
- * Caller protections:
- *   - Authenticated session required (enforced by tRPC `protectedProcedure`).
- *   - 5 attempts per 15 min per user rate limit (enforced in the router).
+ * Why the M2M client and not the user-login (SPA) one: the SPA is a
+ * public client (no secret) and Auth0 routes its grant types through
+ * Universal Login by design. The M2M client is confidential and we
+ * already use it for the Management API, so it's the natural place to
+ * authorize the Password grant.
+ */
+export async function verifyCurrentPassword(args: {
+  email: string;
+  password: string;
+}): Promise<boolean> {
+  const config = loadConfig();
+
+  const res = await fetchAuth0(`${config.issuer}/oauth/token`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      grant_type: "password",
+      username: args.email,
+      password: args.password,
+      audience: config.audience,
+      scope: "openid",
+      client_id: config.mgmtClientId,
+      client_secret: config.mgmtClientSecret,
+    }),
+  });
+
+  if (res.ok) return true;
+
+  const body = (await parseJsonSafe(res)) as
+    | { error?: string; error_description?: string }
+    | undefined;
+
+  // Wrong email or password — Auth0 returns 403 with error=invalid_grant.
+  if (body?.error === "invalid_grant") return false;
+
+  // The M2M app doesn't have the Password grant enabled. Surface a
+  // setup-fixable error so callers don't show "wrong password" when
+  // the real problem is configuration.
+  if (
+    body?.error === "unauthorized_client" &&
+    typeof body.error_description === "string" &&
+    body.error_description.toLowerCase().includes("password")
+  ) {
+    logger.error(
+      { status: res.status, body },
+      "Auth0 Password grant is not enabled on the Management M2M application",
+    );
+    throw new Auth0ApiError({
+      status: res.status,
+      code: "password_grant_not_enabled",
+      message:
+        "Auth0 Password grant type is not enabled on the Management M2M application. Enable 'Password' under that application's Advanced Settings → Grant Types.",
+      body,
+    });
+  }
+
+  throw new Auth0ApiError({
+    status: res.status,
+    code: "unknown",
+    message:
+      body?.error_description ??
+      body?.error ??
+      `Auth0 /oauth/token (password) failed with status ${res.status}`,
+    body,
+  });
+}
+
+/**
+ * Verify the user's current Auth0 password, then update it via the
+ * Management API.
+ *
+ * Returns `{ ok: true }` on success, `{ ok: false, reason: "wrong_password" }`
+ * when verification fails. Throws Auth0ApiError for non-credential failures
+ * (config, scope, transport).
+ *
+ * Caller protections that backstop this:
+ *   - Authenticated session (enforced by tRPC `protectedProcedure`).
+ *   - 5 attempts per 15min per user rate limit (enforced in the router) —
+ *     also guards against brute-forcing the current password through this
+ *     entry point.
  */
 export async function changeAuth0Password(args: {
+  email: string;
   auth0UserId: string;
+  currentPassword: string;
   newPassword: string;
-}): Promise<void> {
+}): Promise<{ ok: true } | { ok: false; reason: "wrong_password" }> {
+  const verified = await verifyCurrentPassword({
+    email: args.email,
+    password: args.currentPassword,
+  });
+  if (!verified) return { ok: false, reason: "wrong_password" };
+
   const token = await getManagementApiToken();
   await updateUserPassword({
     auth0UserId: args.auth0UserId,
     newPassword: args.newPassword,
     managementToken: token,
   });
+
+  return { ok: true };
 }

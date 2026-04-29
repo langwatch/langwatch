@@ -145,9 +145,9 @@ describe("<AuthenticationSettings/>", () => {
     });
 
     describe("when the user clicks Change Password", () => {
-      /** @scenario Auth0 mode dialog asks for new password only */
+      /** @scenario The dialog asks for current + new password in both modes */
       /** @scenario Successful change shows a toast and closes the dialog */
-      it("opens the dialog with no Current Password field, calls api.user.changePassword, and closes on success", async () => {
+      it("opens the dialog with Current + New + Confirm, calls api.user.changePassword with both passwords, and closes on success", async () => {
         mockChangePassword.mockResolvedValue({ success: true });
         renderPage();
 
@@ -156,20 +156,23 @@ describe("<AuthenticationSettings/>", () => {
             screen.getByRole("button", { name: /Change Password/i }),
           );
         });
-        // Dialog now visible
+        // Dialog now visible — and includes Current Password (re-verified
+        // server-side via Auth0 ROPG).
         await waitFor(() => {
-          expect(screen.getByLabelText(/^New Password$/i)).toBeTruthy();
+          expect(screen.getByLabelText(/Current Password/i)).toBeTruthy();
         });
-        expect(screen.queryByLabelText(/Current Password/i)).toBeNull();
+        expect(screen.getByLabelText(/^New Password$/i)).toBeTruthy();
+        expect(screen.getByLabelText(/Confirm New Password/i)).toBeTruthy();
 
+        fireEvent.change(screen.getByLabelText(/Current Password/i), {
+          target: { value: "old-pw-123" },
+        });
         fireEvent.change(screen.getByLabelText(/^New Password$/i), {
           target: { value: "new-pw-123456" },
         });
         fireEvent.change(screen.getByLabelText(/Confirm New Password/i), {
           target: { value: "new-pw-123456" },
         });
-        // Click the submit button inside the dialog (the only "Change
-        // Password" button visible while the dialog is open).
         await act(async () => {
           const submitBtns = screen
             .getAllByRole("button", { name: /Change Password/i })
@@ -177,17 +180,13 @@ describe("<AuthenticationSettings/>", () => {
           fireEvent.click(submitBtns[0]!);
         });
 
-        // Tight assertion — Auth0 mode must NOT leak currentPassword in
-        // the mutation payload (see related CodeRabbit finding).
         await waitFor(() => {
           expect(mockChangePassword).toHaveBeenCalledTimes(1);
         });
-        const payload = mockChangePassword.mock.calls[0]?.[0] as Record<
-          string,
-          unknown
-        >;
-        expect(payload).toEqual({ newPassword: "new-pw-123456" });
-        expect(payload).not.toHaveProperty("currentPassword");
+        expect(mockChangePassword.mock.calls[0]?.[0]).toEqual({
+          currentPassword: "old-pw-123",
+          newPassword: "new-pw-123456",
+        });
         await waitFor(() => {
           expect(mockToasterCreate).toHaveBeenCalledWith(
             expect.objectContaining({
@@ -202,8 +201,52 @@ describe("<AuthenticationSettings/>", () => {
         });
       });
 
+      /** @scenario Wrong current password keeps the dialog open and shows an error */
+      it("keeps the dialog open and shows the error toast when the server rejects the current password", async () => {
+        mockChangePassword.mockRejectedValue(
+          new Error("Current password is incorrect"),
+        );
+        renderPage();
+
+        await act(async () => {
+          fireEvent.click(
+            screen.getByRole("button", { name: /Change Password/i }),
+          );
+        });
+        await waitFor(() => {
+          expect(screen.getByLabelText(/Current Password/i)).toBeTruthy();
+        });
+        fireEvent.change(screen.getByLabelText(/Current Password/i), {
+          target: { value: "wrong-pw" },
+        });
+        fireEvent.change(screen.getByLabelText(/^New Password$/i), {
+          target: { value: "new-pw-123456" },
+        });
+        fireEvent.change(screen.getByLabelText(/Confirm New Password/i), {
+          target: { value: "new-pw-123456" },
+        });
+        await act(async () => {
+          const submitBtns = screen
+            .getAllByRole("button", { name: /Change Password/i })
+            .filter((b) => (b as HTMLButtonElement).type === "submit");
+          fireEvent.click(submitBtns[0]!);
+        });
+
+        await waitFor(() => {
+          expect(mockToasterCreate).toHaveBeenCalledWith(
+            expect.objectContaining({
+              title: "Failed to change password",
+              description: "Current password is incorrect",
+              type: "error",
+            }),
+          );
+        });
+        // Dialog stays open so the user can retry — the form is still in the DOM.
+        expect(screen.getByLabelText(/^New Password$/i)).toBeTruthy();
+      });
+
       /** @scenario Server error keeps the dialog open and shows the error */
-      it("keeps the dialog open and shows the error toast when the server rejects", async () => {
+      it("keeps the dialog open and shows the error toast on a generic server error", async () => {
         mockChangePassword.mockRejectedValue(
           new Error("Auth0 is not authorized to update users."),
         );
@@ -215,7 +258,10 @@ describe("<AuthenticationSettings/>", () => {
           );
         });
         await waitFor(() => {
-          expect(screen.getByLabelText(/^New Password$/i)).toBeTruthy();
+          expect(screen.getByLabelText(/Current Password/i)).toBeTruthy();
+        });
+        fireEvent.change(screen.getByLabelText(/Current Password/i), {
+          target: { value: "old-pw-123" },
         });
         fireEvent.change(screen.getByLabelText(/^New Password$/i), {
           target: { value: "new-pw-123456" },
@@ -238,7 +284,6 @@ describe("<AuthenticationSettings/>", () => {
             }),
           );
         });
-        // Dialog stays open so the user can retry — the form is still in the DOM.
         expect(screen.getByLabelText(/^New Password$/i)).toBeTruthy();
       });
 
@@ -334,8 +379,7 @@ describe("<AuthenticationSettings/>", () => {
     });
 
     describe("when the dialog is opened", () => {
-      /** @scenario Email mode dialog asks for current + new password */
-      it("shows the Current Password field too", async () => {
+      it("shows Current + New + Confirm Password fields", async () => {
         publicEnvRef.current = { NEXTAUTH_PROVIDER: "email" };
         renderPage();
         await act(async () => {
@@ -347,6 +391,7 @@ describe("<AuthenticationSettings/>", () => {
           expect(screen.getByLabelText(/Current Password/i)).toBeTruthy();
         });
         expect(screen.getByLabelText(/^New Password$/i)).toBeTruthy();
+        expect(screen.getByLabelText(/Confirm New Password/i)).toBeTruthy();
       });
     });
   });
