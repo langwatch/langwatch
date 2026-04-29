@@ -14,6 +14,7 @@ import {
   loadConfig,
   saveConfig,
 } from "@/cli/utils/governance/config";
+import { formatLoginCeremony } from "@/cli/utils/governance/login-ceremony";
 
 const updateEnvFile = (
   apiKey: string,
@@ -229,12 +230,22 @@ async function loginDeviceFlow(opts: { browser?: string }): Promise<void> {
     }
     saveConfig(cfg);
 
+    // Storyboard Screen 4 ceremony — provides the next-step affordance
+    // for fresh CLI users (try-it commands + dashboard hint). Provider
+    // list + budget enrichment is queued as a follow-up backend
+    // endpoint (api.user.cliBootstrap or similar) — when present, fold
+    // the providers + monthly-budget arrays in here.
     console.log();
-    if (cfg.organization?.name) {
-      console.log(`  Organization: ${cfg.organization.name}`);
+    const ceremonyLines = formatLoginCeremony({
+      email: cfg.user?.email ?? result.user.email,
+      organizationName: cfg.organization?.name,
+    });
+    for (const line of ceremonyLines) {
+      console.log(line);
     }
-    console.log(`  Gateway:      ${cfg.gateway_url}`);
-    console.log(`  Dashboard:    ${cfg.control_plane_url}`);
+    console.log();
+    console.log(chalk.gray(`  Gateway:   ${cfg.gateway_url}`));
+    console.log(chalk.gray(`  Dashboard: ${cfg.control_plane_url}`));
   } catch (err) {
     spinner.fail();
     if (err instanceof DeviceFlowError) {
