@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	otelapi "go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/codes"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -108,6 +109,36 @@ func TestEndLLMSpan_ErrorPathDoesNotStampOutput(t *testing.T) {
 	assert.NotContains(t, attrs, "langwatch.output")
 	assert.Contains(t, attrs, "error.message")
 	assert.Equal(t, "gateway returned non-2xx status 401", attrs["error.message"])
+}
+
+// TestEndLLMSpan_NilResponseNilErrorIsTreatedAsError pins the
+// (nil, nil) case: an LLM executor that returns no response and no
+// error is breaking its contract. Marking the span Ok would hide the
+// upstream bug in the trace; mark it Error so the LLM row in Studio
+// surfaces the contract break (CodeRabbit major on PR #3569).
+func TestEndLLMSpan_NilResponseNilErrorIsTreatedAsError(t *testing.T) {
+	rec := withRecorder(t)
+
+	tracer := otelapi.Tracer(tracerName)
+	parentCtx, parent := tracer.Start(context.Background(), componentSpanName)
+	defer parent.End()
+
+	_, llmSpan := startLLMSpan(parentCtx, "gpt-5-mini", "openai", []app.ChatMessage{
+		{Role: "user", Content: "hi"},
+	})
+	endLLMSpan(llmSpan, nil, nil)
+
+	spans := rec.Ended()
+	require.Len(t, spans, 1)
+	got := spans[0]
+	assert.Equal(t, codes.Error, got.Status().Code,
+		"nil response with nil error must be flagged as Error — Ok would hide the upstream contract break in the trace")
+	assert.NotEmpty(t, got.Status().Description,
+		"error description must surface the contract break to operators")
+	attrs := attrMap(got.Attributes())
+	assert.Contains(t, attrs, "error.message")
+	assert.NotContains(t, attrs, "langwatch.output",
+		"no output to stamp — there's no real assistant reply on a contract break")
 }
 
 // toFloat coerces an attribute value (recorder serializes numbers as

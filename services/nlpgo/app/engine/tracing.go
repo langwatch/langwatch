@@ -171,7 +171,13 @@ func endLLMSpan(span trace.Span, resp *app.LLMResponse, callErr error) {
 		return
 	}
 	if resp == nil {
-		span.SetStatus(codes.Ok, "")
+		// (nil, nil) is a contract break — the executor said "no error"
+		// but produced no response. Marking it Ok would hide the bug
+		// in the trace; flag it as an error so the LLM row in Studio
+		// surfaces it.
+		const msg = "llm executor returned no response and no error"
+		span.SetStatus(codes.Error, msg)
+		span.SetAttributes(attribute.String("error.message", msg))
 		span.End()
 		return
 	}
