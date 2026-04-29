@@ -84,11 +84,12 @@ describe.skip("OnlineEvaluationDrawer - Features", () => {
       user: ReturnType<typeof userEvent.setup>,
       level: "trace" | "thread" = "trace",
     ) => {
-      const levelLabel = level === "trace" ? /Trace Level/i : /Thread Level/i;
+      const levelName = level === "trace" ? /Trace Level/i : /Thread Level/i;
       await waitFor(() => {
-        expect(screen.getByLabelText(levelLabel)).toBeInTheDocument();
+        expect(screen.getByRole("radio", { name: levelName })).toBeInTheDocument();
       });
-      await user.click(screen.getByLabelText(levelLabel));
+      const radio = screen.getByRole("radio", { name: levelName });
+      await user.click(radio.closest("label") ?? radio);
     };
 
     it("does not show thread idle timeout dropdown for trace level", async () => {
@@ -337,7 +338,8 @@ describe.skip("OnlineEvaluationDrawer - Features", () => {
       });
 
       // Switch to trace level
-      await user.click(screen.getByLabelText(/Trace Level/i));
+      const traceRadio = screen.getByRole("radio", { name: /Trace Level/i });
+      await user.click(traceRadio.closest("label") ?? traceRadio);
 
       // Dropdown should now be hidden
       await waitFor(() => {
@@ -357,11 +359,12 @@ describe.skip("OnlineEvaluationDrawer - Features", () => {
       user: ReturnType<typeof userEvent.setup>,
       level: "trace" | "thread" = "trace",
     ) => {
-      const levelLabel = level === "trace" ? /Trace Level/i : /Thread Level/i;
+      const levelName = level === "trace" ? /Trace Level/i : /Thread Level/i;
       await waitFor(() => {
-        expect(screen.getByLabelText(levelLabel)).toBeInTheDocument();
+        expect(screen.getByRole("radio", { name: levelName })).toBeInTheDocument();
       });
-      await user.click(screen.getByLabelText(levelLabel));
+      const radio = screen.getByRole("radio", { name: levelName });
+      await user.click(radio.closest("label") ?? radio);
       await vi.advanceTimersByTimeAsync(50);
     };
 
