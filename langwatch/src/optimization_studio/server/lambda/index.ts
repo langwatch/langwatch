@@ -183,7 +183,18 @@ const createProjectLambda = async (
     },
     PackageType: "Image",
     Timeout: 900, // 15 minutes
-    MemorySize: 1024,
+    // 2048 MB (was 1024) gives Python multiprocessing.fork() enough RSS
+    // headroom when the bundled image runs nlpgo + uvicorn + litellm in
+    // the same container. At 1024 MB observed Max Memory Used hit
+    // 805/1024 MB mid-request on lw-dev (TEST H, 2026-04-28); fork()
+    // would fail to clone parent pages and the uvicorn worker pool
+    // crashed, cascading to /studio/* 502s. 2048 MB also doubles
+    // Lambda's allocated CPU (Lambda allocates CPU proportional to
+    // memory; ~0.58 vCPU at 1024 → ~1.17 vCPU at 2048), shaving cold-
+    // start init time too. Existing per-project Lambdas keep 1024 until
+    // a one-shot migration runs `aws lambda update-function-configuration
+    // --memory-size 2048` over each.
+    MemorySize: 2048,
     Architectures: ["arm64"],
     VpcConfig: {
       SubnetIds: config.subnet_ids,
