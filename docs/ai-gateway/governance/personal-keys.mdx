@@ -1,6 +1,6 @@
 ---
-title: Personal IDE keys
-description: Sign in with your company SSO and get a per-user virtual key your IDE tools can use. No raw provider keys on your laptop, ever.
+title: Personal IDE keys — your AI tools, governed by your company
+description: Install LangWatch, run `langwatch login`, and use Claude Code / Cursor / Codex with org-attributed spend, a personal monthly budget, and zero per-tool config.
 sidebarTitle: Personal keys
 ---
 
@@ -13,6 +13,22 @@ This page is the **end-user** flow. If you're an admin setting it up
 for your organization, see [Admin setup](/ai-gateway/governance/admin-setup).
 
 <Note>**Governance is currently a preview**. The CLI side gates the `governance` and `ingest` subcommands behind `LANGWATCH_GOVERNANCE_PREVIEW=1`; if you don't see them in `langwatch --help`, export that env var first (and ask your admin to confirm the LangWatch web flag `release_ui_ai_governance_enabled` is on for your org).</Note>
+
+## Why this exists (40-second pitch)
+
+You're an engineer at an enterprise. Your IT/platform team gives you
+Claude Code, Cursor, Codex, Gemini CLI — and asks for a few things
+in return:
+
+- **Per-user spend attribution** so finance can stop staring at unnamed Anthropic invoices
+- **A personal monthly budget** so a runaway recursive prompt at 3 AM Saturday doesn't burn $10k overnight
+- **Audit trail** for SOC 2 / ISO 27001 / HIPAA / EU AI Act
+- **Zero-config provider setup** — your IT team wired up Anthropic + OpenAI + Gemini at the org level; you inherit them
+
+LangWatch sits above all of it. One `langwatch login`, one
+`langwatch claude`, and you're productive — with everything routed
+through the gateway, attributed to you, governed by your company's
+policy.
 
 ## What you get
 
@@ -73,22 +89,38 @@ If your browser doesn't open, paste the URL above and enter code: ABCD-EFGH
 Your browser opens to a LangWatch page that asks for your work email,
 then redirects to your company's IdP (Okta, Azure AD, Auth0,
 whatever). After you complete SSO + MFA, control returns to the
-CLI:
+CLI with your inherited providers + budget already populated:
 
-```bash
-✓ Logged in as you@your-company.com
-  Organization: your-company
-  Gateway: https://gateway.langwatch.ai
+```text
+✓ Logged in as jane@your-company.com @ your-company
+
+Your AI tools are ready:
+  • anthropic  (Claude — Sonnet, Haiku)
+  • openai     (GPT-5, GPT-5-mini)
+  • gemini     (2.5 Pro, 2.5 Flash)
+
+Monthly budget: $500   |   Used: $0.00
 
 Try it:
-  langwatch claude         # use Claude Code
-  langwatch codex          # use Codex
-  langwatch cursor         # use Cursor
+  $ langwatch claude   # use Claude Code
+  $ langwatch codex    # use Codex
+  $ langwatch cursor   # use Cursor
+
+Or open your dashboard:
+  $ langwatch dashboard
+
+  Gateway:   https://gateway.langwatch.ai
+  Dashboard: https://app.langwatch.ai
 ```
 
-Behind the scenes, the CLI persisted your access + refresh tokens at
-`~/.langwatch/config.json` (mode 0600) and a personal virtual key
-your gateway-bound tools will use as their auth.
+Behind the scenes:
+
+1. The CLI ran an [RFC 8628 device-flow OAuth](https://datatracker.ietf.org/doc/html/rfc8628) handshake against the LangWatch control plane.
+2. Your browser ran the SSO flow your IT admin configured (Okta, Google Workspace, Azure AD, or password-only).
+3. LangWatch minted a **personal virtual key** scoped to your user identity — signed by the gateway, bound to your monthly budget, audit-trailed per-request.
+4. The CLI fetched your inheritable providers + budget from `/api/auth/cli/bootstrap` and rendered the ceremony you see above.
+
+Tokens persisted at `~/.langwatch/config.json` (mode 0600).
 
 <Note>You did **not** pick a model provider during setup. Your
 admin already wired up Anthropic, OpenAI, Gemini, etc. at the
@@ -98,8 +130,8 @@ organization level. You just inherit them.</Note>
 
 ```bash
 $ langwatch claude
-▲  Claude Code v2.x.x
-✓  Connected via LangWatch (you@your-company.com)
+▲  Claude Code v2.1.0
+✓  Connected via LangWatch (jane@your-company.com)
 > help me refactor this auth middleware
 ```
 
@@ -167,15 +199,22 @@ clear message:
 $ langwatch claude
 ⚠  Budget limit reached
 
-   You've used $500.00 of your $500.00 monthly budget. To
-   continue, ask your team admin to raise your limit.
+   You've used $500.00 of your $500.00 monthly budget.
+   To continue, ask your team admin to raise your limit.
 
    Admin: platform-team@your-company.com
+
+   Need urgent access? Run:
+     langwatch request-increase
 ```
 
-Budgets reset on the period your admin configured (monthly or
-weekly). If you need an urgent increase, your admin can adjust your
+`langwatch request-increase` opens your dashboard at the budget-request
+page (the URL carries the user / limit / spent params HMAC-signed) so
+the admin sees the request with full context and can adjust your
 budget in real time — no token re-issuance required.
+
+Budgets reset on the period your admin configured (monthly or
+weekly).
 
 ## Security
 
@@ -200,3 +239,17 @@ refresh token at the server, so leaked-state can't be reused. The
 `-device` suffix disambiguates from the older `langwatch login` API-
 key flow (which has its own logout via clearing the env var or
 re-running `langwatch login`).
+
+## What's behind the scenes
+
+If you're curious about the platform side:
+
+- [Compliance architecture](/ai-gateway/governance/compliance-architecture) — how the unified observability substrate underwrites SOC 2 / ISO 27001 / EU AI Act / GDPR / HIPAA-most-uses
+- [Per-origin retention](/ai-gateway/governance/retention) — `thirty_days` / `one_year` / `seven_years` retention classes; your IT admin picks the class for each ingest source
+- [OCSF / SIEM export](/ai-gateway/governance/ocsf-export) — your security team's SIEM (Splunk, Datadog, Sentinel) pulls these events on a cron via the OCSF v1.1 read API
+- [Ingestion sources](/ai-gateway/governance/ingestion-sources) — the broader picture of what other AI platforms feed into the same governance dashboard
+
+## For admins setting this up
+
+- [Admin setup](/ai-gateway/governance/admin-setup) — SSO, gateway provider keys, org-wide monthly budget ceiling
+- [Control plane](/ai-gateway/governance/control-plane) — the full Tier 1-5 governance dashboard architecture
