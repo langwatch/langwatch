@@ -7,6 +7,7 @@ Feature: Usage limit 429 message includes upgrade instructions
   # Free tier counts "events", paid TIERED counts "traces".
   # The message must reflect the actual usage unit being counted.
 
+  @unimplemented
   Scenario: Free-tier org on SaaS told to upgrade with correct unit
     Given a free-tier organization that has exceeded 50000 events
     And the platform is running in SaaS mode
@@ -14,6 +15,7 @@ Feature: Usage limit 429 message includes upgrade instructions
     Then the message contains "Free limit of 50000 events reached"
     And the message contains "upgrade your plan at https://app.langwatch.ai/settings/subscription"
 
+  @unimplemented
   Scenario: Free-tier org on self-hosted told to buy a license
     Given a free-tier organization that has exceeded 50000 events
     And the platform is running in self-hosted mode
@@ -22,6 +24,7 @@ Feature: Usage limit 429 message includes upgrade instructions
     Then the message contains "Free limit of 50000 events reached"
     And the message contains "buy a license at https://my-langwatch.example.com/settings/license"
 
+  @unimplemented
   Scenario: Paid TIERED org on SaaS told to upgrade with traces unit
     Given a paid TIERED organization that has exceeded 10000 traces
     And the platform is running in SaaS mode
@@ -29,6 +32,7 @@ Feature: Usage limit 429 message includes upgrade instructions
     Then the message contains "Monthly limit of 10000 traces reached"
     And the message contains "upgrade your plan at https://app.langwatch.ai/settings/subscription"
 
+  @unimplemented
   Scenario: Paid TIERED org on self-hosted told to buy a license
     Given a paid TIERED organization that has exceeded 10000 traces
     And the platform is running in self-hosted mode

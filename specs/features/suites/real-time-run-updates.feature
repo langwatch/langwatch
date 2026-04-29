@@ -8,7 +8,7 @@ Feature: Real-time run updates via SSE and adaptive polling
 
   # --- SSE-driven invalidation (RunHistoryList) ---
 
-  @integration
+  @integration @unimplemented
   Scenario: New run appears immediately in suite run history when SSE event fires
     Given the RunHistoryList is mounted for a suite
     And the SSE subscription is active
@@ -16,7 +16,7 @@ Feature: Real-time run updates via SSE and adaptive polling
     Then the run data query is refetched
     And the new run appears without waiting for the next polling interval
 
-  @integration
+  @integration @unimplemented
   Scenario: SSE events for a different suite do not trigger refetch
     Given the RunHistoryList is mounted for suite A
     And the SSE subscription is active
@@ -25,7 +25,7 @@ Feature: Real-time run updates via SSE and adaptive polling
 
   # --- SSE-driven invalidation (AllRunsPanel) ---
 
-  @integration
+  @integration @unimplemented
   Scenario: New run appears immediately in All Runs when SSE event fires
     Given the AllRunsPanel is mounted
     And the SSE subscription is active
@@ -33,7 +33,7 @@ Feature: Real-time run updates via SSE and adaptive polling
     Then the All Runs data query is refetched
     And the new run appears at the top of the list
 
-  @integration
+  @integration @unimplemented
   Scenario: SSE subscription stays active after Load More in All Runs
     Given the AllRunsPanel is mounted and showing paginated results
     When the user clicks Load More
@@ -43,19 +43,19 @@ Feature: Real-time run updates via SSE and adaptive polling
 
   # --- Adaptive polling (RunHistoryList) ---
 
-  @unit
+  @unit @unimplemented
   Scenario: Polling interval is fast when runs are in progress
     Given the run data contains rows with PENDING or IN_PROGRESS status
     When the polling interval is computed
     Then it is between 2 and 3 seconds
 
-  @unit
+  @unit @unimplemented
   Scenario: Polling interval is slow when all runs are settled
     Given the run data contains only SUCCESS, FAILED, or ERROR rows
     When the polling interval is computed
     Then it is between 15 and 30 seconds
 
-  @unit
+  @unit @unimplemented
   Scenario: Polling interval returns to fast when a new run starts
     Given the run data previously contained only settled rows
     When a row transitions to IN_PROGRESS status
@@ -63,13 +63,13 @@ Feature: Real-time run updates via SSE and adaptive polling
 
   # --- Adaptive polling (AllRunsPanel) ---
 
-  @unit
+  @unit @unimplemented
   Scenario: All Runs polling interval is fast when any run is active
     Given the All Runs data contains at least one PENDING or IN_PROGRESS row
     When the polling interval is computed
     Then it is between 2 and 3 seconds
 
-  @unit
+  @unit @unimplemented
   Scenario: All Runs polling interval is slow when all runs are settled
     Given the All Runs data contains only settled rows
     When the polling interval is computed
@@ -77,13 +77,13 @@ Feature: Real-time run updates via SSE and adaptive polling
 
   # --- Debounce and coalescing ---
 
-  @unit
+  @unit @unimplemented
   Scenario: First SSE event triggers immediate refetch
     Given no SSE event has fired recently
     When an onSimulationUpdate event fires
     Then the refetch happens immediately without debounce delay
 
-  @unit
+  @unit @unimplemented
   Scenario: Rapid SSE events are coalesced into a single refetch
     Given an SSE event just fired and triggered a refetch
     When three more events fire within the debounce window
@@ -91,13 +91,13 @@ Feature: Real-time run updates via SSE and adaptive polling
 
   # --- Page visibility ---
 
-  @integration
+  @integration @unimplemented
   Scenario: SSE events are ignored when the browser tab is hidden
     Given the RunHistoryList is mounted and the browser tab is hidden
     When an onSimulationUpdate event fires
     Then the run data query is not refetched
 
-  @integration
+  @integration @unimplemented
   Scenario: Pending updates are applied when the tab becomes visible again
     Given the browser tab was hidden and SSE events were received
     When the user switches back to the tab

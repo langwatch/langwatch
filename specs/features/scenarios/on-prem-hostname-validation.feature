@@ -4,33 +4,33 @@ Feature: On-prem hostname validation bypass for scenario runner
   So that I can run evaluations against agents hosted on my private network
 
   # --- Private hostname validation depends on IS_SAAS ---
-  @unit
+  @unit @unimplemented
   Scenario: Scenario runner reaches a private hostname when IS_SAAS is false
     Given IS_SAAS is false
     When the scenario runner validates a URL with a private hostname
     Then the validation passes
 
-  @unit
+  @unit @unimplemented
   Scenario: Scenario runner blocks a private hostname when IS_SAAS is true
     Given IS_SAAS is true
     When the scenario runner validates a URL with a private hostname
     Then the validation fails with an SSRF error
 
   # --- Self-signed TLS behavior depends on IS_SAAS ---
-  @unit
+  @unit @unimplemented
   Scenario: Scenario runner allows self-signed certificates when IS_SAAS is false
     Given IS_SAAS is false
     When the scenario runner builds a fetch request
     Then TLS certificate validation is disabled
 
-  @unit
+  @unit @unimplemented
   Scenario: Scenario runner enforces TLS certificates when IS_SAAS is true
     Given IS_SAAS is true
     When the scenario runner builds a fetch request
     Then TLS certificate validation is enabled
 
   # --- Cloud metadata always blocked, even on-prem ---
-  @unit
+  @unit @unimplemented
   Scenario Outline: Cloud metadata endpoints are blocked even when IS_SAAS is <saas_value>
     Given IS_SAAS is <saas_value>
     When the scenario runner validates a cloud metadata endpoint
@@ -42,7 +42,7 @@ Feature: On-prem hostname validation bypass for scenario runner
       | false      |
 
   # --- Cloud internal domains always blocked ---
-  @unit
+  @unit @unimplemented
   Scenario Outline: Cloud provider internal domains are blocked even when IS_SAAS is <saas_value>
     Given IS_SAAS is <saas_value>
     When the scenario runner validates a cloud provider internal domain
@@ -54,13 +54,13 @@ Feature: On-prem hostname validation bypass for scenario runner
       | false      |
 
   # --- Private IP literals ---
-  @unit
+  @unit @unimplemented
   Scenario: Private IP literals are allowed when IS_SAAS is false
     Given IS_SAAS is false
     When the scenario runner validates a private IP literal like 10.0.0.5
     Then the validation passes
 
-  @unit
+  @unit @unimplemented
   Scenario: Private IP literals are blocked when IS_SAAS is true
     Given IS_SAAS is true
     When the scenario runner validates a private IP literal like 10.0.0.5

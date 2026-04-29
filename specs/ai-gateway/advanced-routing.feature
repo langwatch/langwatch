@@ -35,7 +35,7 @@ Feature: Advanced routing — weighted, canary, sticky-session, composable
   # Weighted distribution
   # ============================================================================
 
-  @integration @routing
+  @integration @routing @unimplemented
   Scenario: 80/20 cost-optimization between mini and full
     Given "vk_cost_opt" has routing config:
       """
@@ -55,13 +55,13 @@ Feature: Advanced routing — weighted, canary, sticky-session, composable
     And every response has `X-LangWatch-Provider-Credential` set to the chosen slot
     And every OTel span has `langwatch.routing.slot` attribute
 
-  @unit @routing
+  @unit @routing @unimplemented
   Scenario: Weights normalize regardless of scale
     When routing slots use weights `[5, 3, 1]`
     Then the normalized weights are `[0.555, 0.333, 0.111]`
     And a slot with weight `0` is a valid way to temporarily disable it
 
-  @unit @routing
+  @unit @routing @unimplemented
   Scenario: Zero total weight is an error
     When a VK has routing slots all with `weight: 0`
     Then `virtual-keys update` returns 400 with error.code = "validation_error"
@@ -71,7 +71,7 @@ Feature: Advanced routing — weighted, canary, sticky-session, composable
   # Canary deployment
   # ============================================================================
 
-  @integration @routing @canary
+  @integration @routing @canary @unimplemented
   Scenario: 5% canary traffic to a new model
     Given "vk_cost_opt" rolled out a new model via config:
       """
@@ -88,7 +88,7 @@ Feature: Advanced routing — weighted, canary, sticky-session, composable
     And approximately 9,500 ± 50 hit the default
     And the UI's /gateway/usage page shows a "canary" filter that isolates canary spend
 
-  @integration @routing @canary
+  @integration @routing @canary @unimplemented
   Scenario: Rolling a canary weight from 5% → 50% → 100%
     Given a VK currently serves 5% canary
     When an operator updates `routing.canary.weight` to 50
@@ -101,7 +101,7 @@ Feature: Advanced routing — weighted, canary, sticky-session, composable
   # Sticky sessions
   # ============================================================================
 
-  @integration @routing @sticky
+  @integration @routing @sticky @unimplemented
   Scenario: Same user consistently hits the same slot
     Given "vk_cost_opt" has:
       """
@@ -121,7 +121,7 @@ Feature: Advanced routing — weighted, canary, sticky-session, composable
     When 100 requests come from session id `session_xyz`
     Then all 100 hit some slot consistently (may be the same or different from session_abc)
 
-  @integration @routing @sticky
+  @integration @routing @sticky @unimplemented
   Scenario: Sticky by metadata field
     Given routing sticky is `"by": "metadata.user_id"`
     When requests carry `X-LangWatch-Trace-Metadata: {"user_id": "alice"}`
@@ -129,7 +129,7 @@ Feature: Advanced routing — weighted, canary, sticky-session, composable
     And a different user bob can land on a different slot
     And the assignment is stable across gateway replicas (deterministic hash)
 
-  @unit @routing @sticky
+  @unit @routing @sticky @unimplemented
   Scenario: Sticky fallback to even distribution when key is absent
     Given routing sticky is `"by": "X-LangWatch-Session-Id"`
     When a request has no `X-LangWatch-Session-Id` header
@@ -140,7 +140,7 @@ Feature: Advanced routing — weighted, canary, sticky-session, composable
   # Composition with fallback
   # ============================================================================
 
-  @integration @routing @fallback
+  @integration @routing @fallback @unimplemented
   Scenario: Weighted primary + failure-driven fallback
     Given "vk_cost_opt" has:
       """
@@ -170,7 +170,7 @@ Feature: Advanced routing — weighted, canary, sticky-session, composable
   # Observability
   # ============================================================================
 
-  @integration @routing @observability
+  @integration @routing @observability @unimplemented
   Scenario: Routing decisions are visible in traces + metrics
     When a request is dispatched with weighted routing
     Then the OTel span has:

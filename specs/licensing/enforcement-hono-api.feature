@@ -12,7 +12,7 @@ Feature: Resource limit enforcement on API endpoints
   # Creating resources is blocked when limits are reached
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario Outline: Creating a <resource> via API is blocked when at limit
     Given the organization allows 3 <resource>
     And the organization has 3 <resource>
@@ -25,7 +25,7 @@ Feature: Resource limit enforcement on API endpoints
       | scenario   |
       | evaluator  |
 
-  @integration
+  @integration @unimplemented
   Scenario Outline: Creating a <resource> via API succeeds when under limit
     Given the organization allows 10 <resource>
     And the organization has 3 <resource>
@@ -42,20 +42,20 @@ Feature: Resource limit enforcement on API endpoints
   # Non-create operations are never blocked
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: Listing prompts succeeds even at limit
     Given the organization has reached its prompt limit
     When I list prompts via the API
     Then the prompt list is returned
 
-  @integration
+  @integration @unimplemented
   Scenario: Updating an evaluator succeeds even at limit
     Given the organization has reached its evaluator limit
     And an evaluator exists
     When I update the evaluator via the API
     Then the evaluator is updated
 
-  @integration
+  @integration @unimplemented
   Scenario: Deleting a scenario succeeds even at limit
     Given the organization has reached its scenario limit
     And a scenario exists
@@ -66,28 +66,28 @@ Feature: Resource limit enforcement on API endpoints
   # Customer-facing messages vary by plan source
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: Free SaaS user receives upgrade guidance when blocked
     Given the organization is on a free SaaS plan
     And the organization has reached its prompt limit
     When I create a prompt via the API
     Then the response tells me to upgrade my plan
 
-  @integration
+  @integration @unimplemented
   Scenario: Paid SaaS user receives upgrade guidance when blocked
     Given the organization is on a paid SaaS subscription
     And the organization has reached its prompt limit
     When I create a prompt via the API
     Then the response tells me to upgrade my plan
 
-  @integration
+  @integration @unimplemented
   Scenario: Self-hosted user without license receives license guidance when blocked
     Given the organization is self-hosted without a license
     And the organization has reached its prompt limit
     When I create a prompt via the API
     Then the response tells me to get a license
 
-  @integration
+  @integration @unimplemented
   Scenario: Self-hosted user with license receives license upgrade guidance when blocked
     Given the organization is self-hosted with a license
     And the organization has reached its prompt limit
@@ -98,21 +98,21 @@ Feature: Resource limit enforcement on API endpoints
   # Internal notifications when limits are hit
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: Team is notified when a resource limit is hit on SaaS
     Given the organization is on a SaaS plan
     And the organization has reached its prompt limit
     When I create a prompt via the API
     Then the team is notified about the limit being reached
 
-  @integration
+  @integration @unimplemented
   Scenario: Notification is suppressed on self-hosted
     Given the organization is self-hosted
     And the organization has reached its prompt limit
     When I create a prompt via the API
     Then no notification is sent
 
-  @integration
+  @integration @unimplemented
   Scenario: Repeated blocked requests suppress duplicate notifications
     Given the organization has reached its prompt limit
     And a notification was already sent recently
@@ -123,7 +123,7 @@ Feature: Resource limit enforcement on API endpoints
   # Parity with dashboard
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: Second create is rejected after reaching limit via API
     Given the organization allows 3 prompts
     And the organization has 2 prompts

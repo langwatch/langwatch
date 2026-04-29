@@ -15,7 +15,7 @@ Feature: Guardrails wrap every gateway dispatch
 
   Rule: Request-direction guardrails run pre-dispatch
 
-    @integration
+    @integration @unimplemented
     Scenario: request with PII is blocked before reaching the provider
       When I POST /v1/chat/completions with a message containing "SSN: 123-45-6789"
       Then the gateway calls POST /internal/gateway/guardrail/check with direction=request
@@ -25,7 +25,7 @@ Feature: Guardrails wrap every gateway dispatch
       And the upstream provider is NOT called
       And budget-debit is called with status="blocked_by_guardrail" and actual_cost_usd=0
 
-    @integration
+    @integration @unimplemented
     Scenario: request with modify verdict redacts content before dispatch
       Given the guardrail returns verdict=modify with a redacted message
       When I POST /v1/chat/completions with "email is foo@bar.com"
@@ -34,14 +34,14 @@ Feature: Guardrails wrap every gateway dispatch
 
   Rule: Response-direction guardrails can block or flag
 
-    @integration
+    @integration @unimplemented
     Scenario: response with hallucination flag records attribute but does not alter body
       Given the guardrail returns verdict=allow with policies_triggered: ["hallucination"]
       When the provider returns a completion
       Then the client receives the completion unchanged
       And the OTel trace has `langwatch.guardrail.post_flag=["hallucination"]`
 
-    @integration
+    @integration @unimplemented
     Scenario: response-direction block replaces body with a safe error envelope
       Given the post-guardrail returns verdict=block for the response
       When the upstream returns a completion
@@ -50,7 +50,7 @@ Feature: Guardrails wrap every gateway dispatch
       And the budget-debit captures input tokens (provider cost) but nobody saw the output
       And a zero-cost `blocked_by_guardrail` debit is recorded so dashboards still count the attempt
 
-    @integration
+    @integration @unimplemented
     Scenario: response-direction modify rewrites the assistant text in place
       Given the post-guardrail returns verdict=modify for the response
       When the upstream returns a completion
@@ -58,7 +58,7 @@ Feature: Guardrails wrap every gateway dispatch
       And the redaction is transparent to the client (no error, no warning header)
       And the OTel trace has `langwatch.guardrail.post.verdict=modify`
 
-    @integration
+    @integration @unimplemented
     Scenario: content-block responses skip post-evaluation
       Given the upstream returns a tool_calls response (no text)
       When the post-guardrail would otherwise run
@@ -67,7 +67,7 @@ Feature: Guardrails wrap every gateway dispatch
       # Deny / modify decisions on structured output go through `pre` or a
       # dedicated content-aware guardrail; post-response only evaluates text.
 
-    @integration
+    @integration @unimplemented
     Scenario: post-guardrail fires on /v1/chat/completions AND /v1/messages
       When the post-guardrail returns block on either endpoint
       Then the client receives 403 guardrail_blocked on both surfaces
@@ -75,14 +75,14 @@ Feature: Guardrails wrap every gateway dispatch
 
   Rule: Response-direction fail-open opt-in
 
-    @integration
+    @integration @unimplemented
     Scenario: response-guardrail upstream 503 -> fail-closed by default
       Given POST /internal/gateway/guardrail/check returns 503 on the post-direction run
       When the upstream has already returned a completion
       Then the gateway returns 503 with error.type "guardrail_upstream_unavailable"
       And the client NEVER sees the ungoverned completion text
 
-    @integration
+    @integration @unimplemented
     Scenario: response-direction fail-open via VK opt-in
       Given the VK has `guardrails.response_fail_open: true`
       When the post-guardrail upstream returns 503
@@ -92,7 +92,7 @@ Feature: Guardrails wrap every gateway dispatch
 
   Rule: Guardrail latency budget is enforced
 
-    @integration
+    @integration @unimplemented
     Scenario: pre-guardrail exceeding 800ms times out and the request fails closed
       Given the request-direction guardrail is slower than 800ms
       When a request arrives
@@ -102,7 +102,7 @@ Feature: Guardrails wrap every gateway dispatch
 
   Rule: Multiple guardrails run in parallel
 
-    @integration
+    @integration @unimplemented
     Scenario: 3 request-direction guardrails run concurrently; fastest block wins
       Given three guardrails attached (pii, toxicity, promptinjection)
       When a request arrives
@@ -112,7 +112,7 @@ Feature: Guardrails wrap every gateway dispatch
 
   Rule: Guardrail results appear in gateway logs and Observability
 
-    @integration
+    @integration @unimplemented
     Scenario: guardrail verdicts ship with the trace
       When a request is blocked by a guardrail
       Then the OTel trace has spans for each guardrail call
@@ -121,7 +121,7 @@ Feature: Guardrails wrap every gateway dispatch
 
   Rule: If guardrail service is entirely offline
 
-    @integration
+    @integration @unimplemented
     Scenario: guardrail upstream 503 -> fail-closed by default
       Given POST /internal/gateway/guardrail/check returns 503
       When a request with a required guardrail arrives
@@ -129,7 +129,7 @@ Feature: Guardrails wrap every gateway dispatch
       And the message mentions "guardrail service unreachable"
       And the request does NOT reach the upstream provider
 
-    @integration
+    @integration @unimplemented
     Scenario: fail-open override per VK for non-sensitive tenants
       Given the VK has `guardrail_fail_open: true` flag set
       When guardrail upstream returns 503
@@ -139,7 +139,7 @@ Feature: Guardrails wrap every gateway dispatch
 
   Rule: stream_chunk guardrails terminate (not modify) on block in v1
 
-    @integration
+    @integration @unimplemented
     Scenario: only chunks with visible delta text invoke the guardrail
       Given a VK with a stream_chunk guardrail attached
       When the upstream emits a role-only frame, a tool-call delta, and a terminal usage frame
@@ -148,14 +148,14 @@ Feature: Guardrails wrap every gateway dispatch
       # ~95% of stream frames carry no visible delta; skipping them keeps stream
       # latency at near-zero overhead.
 
-    @integration
+    @integration @unimplemented
     Scenario: visible delta text triggers the stream_chunk guardrail with a 50ms budget
       Given a VK with a stream_chunk guardrail attached
       When the upstream emits a visible assistant text delta
       Then the guardrail is called with that chunk's text
       And the call is bounded to 50ms per chunk
 
-    @integration
+    @integration @unimplemented
     Scenario: stream_chunk block emits the byte-locked guardrail terminator
       Given the stream_chunk guardrail returns verdict=block with reason "pii_detected"
       When a visible delta chunk is being emitted
@@ -169,7 +169,7 @@ Feature: Guardrails wrap every gateway dispatch
       And subsequent upstream chunks are discarded
       And `gateway_guardrail_verdicts_total{direction=stream_chunk,verdict=block}` increments
 
-    @integration
+    @integration @unimplemented
     Scenario: stream_chunk timeout falls open (does NOT block the user's stream)
       Given the stream_chunk guardrail exceeds the 50ms budget
       When a visible delta chunk is being emitted
@@ -179,14 +179,14 @@ Feature: Guardrails wrap every gateway dispatch
       # Failing the user's stream on a slow policy service is worse than
       # occasional pass-through — but the metric surfaces degraded services.
 
-    @integration
+    @integration @unimplemented
     Scenario: stream_chunk upstream error falls open (same policy as timeout)
       Given POST /internal/gateway/guardrail/check returns 500 during a chunk check
       When a visible delta chunk is being emitted
       Then the chunk is emitted to the client unchanged
       And the trace records `langwatch.guardrail.stream_chunk_fail_open=upstream_error`
 
-    @integration
+    @integration @unimplemented
     Scenario: stream_chunk modify verdict is treated as block in v1
       Given the stream_chunk guardrail returns verdict=modify with edited_text
       When a visible delta chunk is being emitted

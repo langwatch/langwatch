@@ -28,7 +28,7 @@ Feature: AI Gateway — Budgets
   # Budget creation and scoping
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: Create a project-scope monthly budget
     When I open the "AI Gateway → Budgets" section
     And I click "New budget"
@@ -41,7 +41,7 @@ Feature: AI Gateway — Budgets
     Then the budget is persisted
     And it appears under project "gateway-demo" with reset date set to the next month-start
 
-  @integration
+  @integration @unimplemented
   Scenario: Budget scopes supported
     When I open the "new budget" drawer
     Then the scope field offers: org, team, project, virtual_key, principal
@@ -52,7 +52,7 @@ Feature: AI Gateway — Budgets
   # Enforcement — pre-request gate
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: Hard-block budget returns 402 when spent >= limit
     Given project "gateway-demo" has a monthly budget with limit $100 and on_breach "block"
     And 99.50 USD of spend has been attributed to this project this month
@@ -61,7 +61,7 @@ Feature: AI Gateway — Budgets
     And the error envelope is { error: { type: "budget_exceeded", code: "budget.project.exceeded", ... } }
     And no upstream provider is called
 
-  @integration
+  @integration @unimplemented
   Scenario: Soft budget emits warning header but allows the call
     Given project "gateway-demo" has a monthly budget with limit $100 and on_breach "warn"
     And 95.00 USD of spend has been attributed this month
@@ -70,7 +70,7 @@ Feature: AI Gateway — Budgets
     And the response includes header "X-LangWatch-Budget-Warning: project:95%"
     And the response body is the provider's response unchanged
 
-  @integration
+  @integration @unimplemented
   Scenario: Most restrictive budget wins when multiple apply
     Given virtual key "prod-key" has limit $10 (block) for today
     And its project has limit $1000 (block) for today
@@ -80,7 +80,7 @@ Feature: AI Gateway — Budgets
     Then the request is blocked with scope "virtual_key"
     And the error code indicates which scope was exceeded
 
-  @integration
+  @integration @unimplemented
   Scenario: Sum-of-breaches rule — any block-breach blocks
     Given project has limit $10 (warn) for today, 9.99 spent
     And its virtual key has limit $100 (block) for today, 99 spent
@@ -91,7 +91,7 @@ Feature: AI Gateway — Budgets
   # Ledger — trace-driven fold in ClickHouse
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: Gateway trace lands one row per applicable budget in ClickHouse
     Given a gateway request is completed with gateway_request_id "grq_01H..."
     And the emitted span carries langwatch.virtual_key_id, gen_ai.usage.input_tokens,
@@ -103,14 +103,14 @@ Feature: AI Gateway — Budgets
     And each row's AmountUSD equals the enriched cost for the span
     And gateway_budget_scope_totals reflects the increment under the matching PeriodStart
 
-  @integration
+  @integration @unimplemented
   Scenario: Trace replay does not double-count spend (idempotency by gateway_request_id)
     Given a trace with gateway_request_id "grq_01H..." has already produced a debit row
     When the same trace is re-ingested (OTel replay, retry, or dev replay tooling)
     Then gateway_budget_ledger_events collapses the duplicate via ReplacingMergeTree
     And gateway_budget_scope_totals does NOT double-count the spend
 
-  @integration
+  @integration @unimplemented
   Scenario: Cost attribution uses provider-reported tokens × pricing catalog
     Given a gateway request completes with provider-reported usage
       { prompt_tokens: 1000, completion_tokens: 500 }
@@ -120,7 +120,7 @@ Feature: AI Gateway — Budgets
     And the gateway's pre-request cost estimate is used only for pre-flight
       budget-check gating, never for the ledger
 
-  @integration
+  @integration @unimplemented
   Scenario: /budget/check reads from the CH materialised view
     Given project "gateway-demo" has a monthly budget with limit $100
     And 42.00 USD of spend has been attributed to this project this month via traces
@@ -134,7 +134,7 @@ Feature: AI Gateway — Budgets
   # Window resets
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: Monthly budget resets at month start
     Given project has limit $100 for window "month" with last reset on 2026-04-01T00:00Z
     When the wall clock crosses 2026-05-01T00:00Z
@@ -142,7 +142,7 @@ Feature: AI Gateway — Budgets
     And the next_reset_at is advanced to 2026-06-01T00:00Z
     And a "budget.window.reset" event is recorded
 
-  @integration
+  @integration @unimplemented
   Scenario: Daily and weekly windows honor org-configured timezone
     Given organization "acme" has timezone "Europe/Amsterdam"
     When the daily budget resets
@@ -197,14 +197,14 @@ Feature: AI Gateway — Budgets
   # Permissions (RBAC)
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: Only users with gatewayBudgets:manage can create or edit
     Given I am a Member with gatewayBudgets:view but not gatewayBudgets:manage
     When I open the Budgets section
     Then the "New budget" button is disabled
     And the API rejects creation with "forbidden"
 
-  @integration
+  @integration @unimplemented
   Scenario: Viewing your own spend requires gatewayBudgets:view
     Given I am a Viewer with no gatewayBudgets:* permissions
     When I open the AI Gateway section

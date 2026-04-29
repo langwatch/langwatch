@@ -18,21 +18,21 @@ Feature: Child drawers open as nested overlays instead of navigating
   # Case 1: Suite editor -> Create new scenario
   # ---------------------------------------------------------------------------
 
-  @integration
+  @integration @unimplemented
   Scenario: Creating a new scenario from suite editor opens as a child drawer
     Given the suite editor drawer is open
     When I click "Create New" in the scenario picker
     Then the scenario editor opens as a child drawer on top of the suite editor
     And the suite editor remains mounted underneath
 
-  @integration
+  @integration @unimplemented
   Scenario: Closing the scenario editor child drawer returns to the suite editor
     Given the suite editor drawer is open
     And I opened the scenario editor as a child drawer
     When I close the scenario editor
     Then the suite editor drawer is visible with my previous form state intact
 
-  @e2e
+  @e2e @unimplemented
   Scenario: New scenario created in child drawer appears in suite editor's picker
     Given the suite editor drawer is open with 2 scenarios selected
     When I open the scenario editor as a child drawer
@@ -44,14 +44,14 @@ Feature: Child drawers open as nested overlays instead of navigating
   # Case 2: Suite editor -> Create new agent (HTTP editor)
   # ---------------------------------------------------------------------------
 
-  @integration
+  @integration @unimplemented
   Scenario: Creating a new agent from suite editor opens as a child drawer
     Given the suite editor drawer is open
     When I click "New Agent" in the target picker
     Then the agent HTTP editor opens as a child drawer on top of the suite editor
     And the suite editor remains mounted underneath
 
-  @integration
+  @integration @unimplemented
   Scenario: Closing the agent editor child drawer returns to the suite editor
     Given the suite editor drawer is open
     And I opened the agent HTTP editor as a child drawer
@@ -63,14 +63,14 @@ Feature: Child drawers open as nested overlays instead of navigating
   # Already works via local state - these verify no regression.
   # ---------------------------------------------------------------------------
 
-  @integration
+  @integration @unimplemented
   Scenario: Viewing a trace from scenario run detail opens as a child drawer
     Given the scenario run detail drawer is open for a completed run with a trace
     When I click "Open Thread"
     Then the trace details drawer opens as a child drawer
     And the scenario run detail drawer remains mounted underneath
 
-  @integration
+  @integration @unimplemented
   Scenario: Closing the trace child drawer returns to the scenario run detail
     Given the scenario run detail drawer is open
     And I opened the trace details as a child drawer
@@ -81,7 +81,7 @@ Feature: Child drawers open as nested overlays instead of navigating
   # Non-drawer contexts remain unaffected
   # ---------------------------------------------------------------------------
 
-  @integration
+  @integration @unimplemented
   Scenario: Opening a drawer from a page (non-drawer context) works normally
     Given I am on the suites list page with no drawer open
     When I click to open the suite editor
@@ -92,7 +92,7 @@ Feature: Child drawers open as nested overlays instead of navigating
   # Parent state preservation
   # ---------------------------------------------------------------------------
 
-  @integration
+  @integration @unimplemented
   Scenario: Suite editor form state survives a child drawer round-trip
     Given the suite editor drawer is open
     And I have entered "My Suite" as the suite name
@@ -106,7 +106,7 @@ Feature: Child drawers open as nested overlays instead of navigating
   # Keyboard interaction with stacked drawers
   # ---------------------------------------------------------------------------
 
-  @integration
+  @integration @unimplemented
   Scenario: Pressing Escape closes only the topmost child drawer
     Given the suite editor drawer is open
     And I opened the scenario editor as a child drawer

@@ -25,7 +25,7 @@ Feature: AI Gateway — Virtual Keys
   # VK creation — secret show-once, format, default config
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: Create a virtual key with default config
     When I open the "AI Gateway" section
     And I click "New virtual key"
@@ -39,7 +39,7 @@ Feature: AI Gateway — Virtual Keys
     And after dismissal the full secret can never be retrieved again
     And only the key prefix "lw_vk_live_xxxx…" is visible in the list
 
-  @integration
+  @integration @unimplemented
   Scenario: Virtual key secret is stored as peppered HMAC-SHA256 hash
     Given I created a virtual key "demo-key" with secret "lw_vk_live_01HZX9K3M…"
     When the database row for "demo-key" is inspected
@@ -81,7 +81,7 @@ Feature: AI Gateway — Virtual Keys
   # while still advertising what the gateway offers.
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: Create drawer shows capability preview with post-create defaults
     When I open the "New virtual key" drawer
     Then a "What else you get (configurable after create)" section is visible
@@ -95,7 +95,7 @@ Feature: AI Gateway — Virtual Keys
     And no inputs are shown for these capabilities in the create drawer
     And the preview is labelled as a "preview" badge to signal read-only
 
-  @integration
+  @integration @unimplemented
   Scenario: Capability preview cache-control default is provider-agnostic
     When I open the "New virtual key" drawer
     Then the "Cache control" preview row reads "respect" as the default
@@ -111,7 +111,7 @@ Feature: AI Gateway — Virtual Keys
   # cache hints so provider responses are never cached).
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: Edit drawer shows three cache-control modes with provider-agnostic helper
     Given I am editing virtual key "prod-key"
     When I expand the "Cache control" section
@@ -121,7 +121,7 @@ Feature: AI Gateway — Virtual Keys
       OpenAI/Azure (automatic), and Gemini (cachedContent) without
       anchoring the feature to any single provider
 
-  @integration
+  @integration @unimplemented
   Scenario: Force cache mode is documented as no-op on providers that do not honour it
     Given I am editing virtual key "prod-key"
     When I select cache mode "force"
@@ -133,7 +133,7 @@ Feature: AI Gateway — Virtual Keys
   # Provider credential wiring — reuses existing ModelProvider rows
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: Virtual key references existing project ModelProvider credentials
     Given project "gateway-demo" has ModelProvider "openai" with key "sk-existing"
     When I create virtual key "demo-key" and select "openai"
@@ -142,7 +142,7 @@ Feature: AI Gateway — Virtual Keys
     And updating the ModelProvider's API key reflects for the virtual key on next
       gateway cache refresh
 
-  @integration
+  @integration @unimplemented
   Scenario: Virtual key cannot select a provider not configured on its project
     Given project "gateway-demo" does not have "bedrock" configured
     When I open the "new virtual key" drawer
@@ -152,7 +152,7 @@ Feature: AI Gateway — Virtual Keys
   # Fallback chain configuration
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: Ordered fallback chain is persisted and retrieved
     Given I am editing virtual key "prod-key"
     When I set the fallback chain to ["anthropic", "openai", "azure"]
@@ -160,7 +160,7 @@ Feature: AI Gateway — Virtual Keys
     Then the virtual key config returns fallback_chain in that order
     And the gateway config endpoint returns matching provider_credentials_ref ordering
 
-  @integration
+  @integration @unimplemented
   Scenario: Fallback trigger conditions are configurable per VK
     Given I am editing virtual key "prod-key"
     When I enable fallback on "5xx", "429", and "timeout"
@@ -174,7 +174,7 @@ Feature: AI Gateway — Virtual Keys
   # Model aliases
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: Alias overrides provider-prefixed model
     Given I am editing virtual key "prod-key"
     When I add model alias "fast" => "openai/gpt-5-mini"
@@ -186,7 +186,7 @@ Feature: AI Gateway — Virtual Keys
   # Rotation, revocation, restore
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: Rotate virtual key issues a new secret and invalidates the previous one
     Given virtual key "prod-key" has secret "lw_vk_live_01HZX9K3MA…"
     When I click "Rotate secret" on "prod-key"
@@ -195,7 +195,7 @@ Feature: AI Gateway — Virtual Keys
     And the previous secret stays valid for 24 hours (grace window) so clients can roll over
     And an audit log entry "gateway.virtual_key.rotated" is recorded
 
-  @integration
+  @integration @unimplemented
   Scenario: Rotate secret-reveal dialog surfaces the 24h grace window
     Given I rotated virtual key "prod-key" and the reveal dialog opens
     Then I see a blue info alert titled "24-hour grace window active"
@@ -203,7 +203,7 @@ Feature: AI Gateway — Virtual Keys
     And the alert is in addition to the orange warning "You will only see this secret once"
     And the dialog title reads "Save your rotated secret" (not the create flow's "Save your virtual key secret")
 
-  @integration
+  @integration @unimplemented
   Scenario: Revoke virtual key disables authentication immediately
     Given virtual key "prod-key" is active
     When I click "Revoke" and confirm
@@ -211,7 +211,7 @@ Feature: AI Gateway — Virtual Keys
     And the gateway returns error type "virtual_key_revoked" (401)
     And the change propagates within the configured auth-cache TTL (default 60s)
 
-  @integration
+  @integration @unimplemented
   Scenario: Revoked virtual key cannot be restored (must mint new)
     Given virtual key "prod-key" is revoked
     When I look at its row in the list
@@ -222,7 +222,7 @@ Feature: AI Gateway — Virtual Keys
   # Environment scoping (live vs test)
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: Test-scoped keys cannot call live providers if live-only flag is set
     Given project "gateway-demo" has providers set to "live-only" mode
     When I create virtual key "scratch" with environment "test"
@@ -233,14 +233,14 @@ Feature: AI Gateway — Virtual Keys
   # Permissions (RBAC)
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: Viewer cannot create virtual keys
     Given I am a Viewer on project "gateway-demo"
     When I open the "AI Gateway" section
     Then the "New virtual key" button is disabled
     And the API rejects virtual key creation with "forbidden"
 
-  @integration
+  @integration @unimplemented
   Scenario: Member with virtualKeys:create can create but not delete
     Given I have "virtualKeys:create" but not "virtualKeys:delete"
     When I open an existing virtual key
@@ -251,13 +251,13 @@ Feature: AI Gateway — Virtual Keys
   # Audit and attribution
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: Every VK mutation writes an audit log entry
     When I create, rotate, edit, or revoke a virtual key
     Then an audit log row is written with actor, action, target vk_id,
       before and after config snapshots, and timestamp
 
-  @integration
+  @integration @unimplemented
   Scenario: VK detail has a deep-link Audit history button that pre-filters the log
     Given virtual key "prod-key" has 4 audit entries (created, updated, rotated, revoked)
     When I open the VK detail page and click "Audit history"
@@ -265,14 +265,14 @@ Feature: AI Gateway — Virtual Keys
     And the audit page shows only the 4 entries for that VK
     And I see a clickable "target = vk_…" chip that clears the filter when ×-tapped
 
-  @integration
+  @integration @unimplemented
   Scenario: Audit history button stays reachable even for revoked VKs
     Given virtual key "prod-key" has status "revoked"
     When I open the VK detail page
     Then the Edit / Rotate / Revoke buttons are hidden
     But the "Audit history" button is still visible so I can investigate the revocation trail
 
-  @integration
+  @integration @unimplemented
   Scenario: VK detail Usage section renders populated ledger data
     Given virtual key "prod-openai" has 629 completed requests over the last 30 days
     When I open the VK detail page and scroll to "Usage (last 30 days)"
@@ -281,7 +281,7 @@ Feature: AI Gateway — Virtual Keys
     And I see Spend-by-model badges ordered by total spend desc
     And I see a Recent-debits table with When (relative-time + exact on hover), Model, Tokens in→out, Amount, Latency ms
 
-  @integration
+  @integration @unimplemented
   Scenario: Request attribution includes VK principal on every trace
     Given I have virtual key "prod-key" owned by user "alice@acme"
     When a request hits the gateway with "prod-key"
@@ -292,7 +292,7 @@ Feature: AI Gateway — Virtual Keys
   # Internal gateway endpoints (contract tests)
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: POST /internal/gateway/resolve-key returns tiny JWT
     Given virtual key "prod-key" exists
     When the gateway calls "POST /internal/gateway/resolve-key" with the raw secret
@@ -300,7 +300,7 @@ Feature: AI Gateway — Virtual Keys
       { vk_id, project_id, team_id, org_id, principal_id, revision, exp }
     And no provider credentials, no budget totals, no guardrail policies are in the JWT
 
-  @integration
+  @integration @unimplemented
   Scenario: GET /internal/gateway/config/:vk_id returns full config
     Given the gateway has verified a JWT for vk_id "vk_123"
     When the gateway calls "GET /internal/gateway/config/vk_123" with "If-None-Match: 42"
@@ -311,7 +311,7 @@ Feature: AI Gateway — Virtual Keys
     And the payload includes providers, fallback_chain, model_aliases, cache,
       guardrails, policy_rules, budgets, rate_limits, and a new revision
 
-  @integration
+  @integration @unimplemented
   Scenario: GET /internal/gateway/changes?since=N long-polls for mutations
     Given the gateway has seen revision 100
     When the gateway calls "GET /internal/gateway/changes?since=100&timeout=25"

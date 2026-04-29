@@ -24,6 +24,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       relevant: ${{ steps.detect.outputs.relevant }}
+      feature-parity: ${{ steps.detect.outputs.feature-parity }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
       - uses: ./.github/actions/detect-changes
@@ -35,6 +36,10 @@ jobs:
               - '.github/workflows/langwatch-app-ci.yml'
               - '.github/.release-please-manifest.json'
               - '.github/scripts/**'
+            feature-parity:
+              - 'langwatch/**'
+              - 'specs/**'
+              - '.github/workflows/langwatch-app-ci.yml'
 
   typecheck:
     needs: changes
@@ -294,6 +299,30 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: bash .github/scripts/notify-slack-job-failure.sh lint
 
+  feature-parity:
+    needs: changes
+    if: needs.changes.outputs.feature-parity == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - uses: ./.github/actions/setup-pnpm-node
+        with:
+          cache-dependency-path: "langwatch/pnpm-lock.yaml"
+          install-dir: langwatch
+
+      - name: Check feature-file parity
+        working-directory: langwatch
+        run: pnpm check:feature-parity
+
+      - name: Notify Slack on failure
+        if: failure() && github.ref == 'refs/heads/main'
+        env:
+          SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL: ${{ secrets.SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL }}
+          GH_TOKEN: ${{ github.token }}
+        run: bash .github/scripts/notify-slack-job-failure.sh feature-parity
+
   build:
     needs: changes
     if: needs.changes.outputs.relevant == 'true'
@@ -435,11 +464,11 @@ jobs:
           cat langwatch/test-failures.txt
 
   langwatch-app-complete:
-    needs: [changes, typecheck, test-unit, test-integration, lint, build, ci-scripts-test, ci-self-test]
+    needs: [changes, typecheck, test-unit, test-integration, lint, feature-parity, build, ci-scripts-test, ci-self-test]
     if: always()
     runs-on: ubuntu-latest
     steps:
       - uses: re-actors/alls-green@05ac9388f0aebcb5727afa17fcccfecd6f8ec5fe # v1.2.2
         with:
           jobs: ${{ toJSON(needs) }}
-          allowed-skips: typecheck, test-unit, test-integration, lint, build, ci-scripts-test, ci-self-test
+          allowed-skips: typecheck, test-unit, test-integration, lint, feature-parity, build, ci-scripts-test, ci-self-test

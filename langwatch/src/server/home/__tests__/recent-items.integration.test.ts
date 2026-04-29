@@ -72,6 +72,7 @@ describe("Recent Items Integration", () => {
   });
 
   describe("home.getRecentItems", () => {
+    /** @scenario Returns empty array when user has no recent activity */
     it("returns empty array when user has no recent activity", async () => {
       const result = await caller.home.getRecentItems({
         projectId,
@@ -221,6 +222,7 @@ describe("Recent Items Integration", () => {
       expect(deletedItem).toBeUndefined();
     });
 
+    /** @scenario Excludes archived workflows from results */
     it("excludes archived workflows from results", async () => {
       // Create an archived workflow
       const archivedWorkflow = await prisma.workflow.create({

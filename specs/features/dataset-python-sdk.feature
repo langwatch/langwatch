@@ -43,7 +43,7 @@ Feature: Dataset Python SDK
 
   # ── List Datasets ──────────────────────────────────────────────
 
-  @integration
+  @integration @unimplemented
   Scenario: List datasets returns first page for the project
     Given the project has 3 datasets
     When I call langwatch.dataset.list_datasets()
@@ -51,21 +51,21 @@ Feature: Dataset Python SDK
     And each DatasetInfo includes id, name, slug, and columnTypes
     And the result includes .pagination with total, page, limit, and totalPages
 
-  @integration
+  @integration @unimplemented
   Scenario: List datasets with explicit pagination
     Given the project has 15 datasets
     When I call langwatch.dataset.list_datasets(page=2, limit=5)
     Then I receive 5 DatasetInfo objects from the second page
     And .pagination.total is 15
 
-  @integration
+  @integration @unimplemented
   Scenario: List datasets returns empty result when project has no datasets
     Given the project has no datasets
     When I call langwatch.dataset.list_datasets()
     Then .data is an empty list
     And .pagination.total is 0
 
-  @integration
+  @integration @unimplemented
   Scenario: List datasets propagates authentication errors
     Given the SDK is initialized with an invalid API key
     When I call langwatch.dataset.list_datasets()
@@ -73,159 +73,159 @@ Feature: Dataset Python SDK
 
   # ── Create Dataset ─────────────────────────────────────────────
 
-  @integration
+  @integration @unimplemented
   Scenario: Create a dataset with name and column types
     When I call langwatch.dataset.create_dataset(name="User Feedback", columns=[{"name": "input", "type": "string"}, {"name": "output", "type": "string"}])
     Then a DatasetInfo is returned with name "User Feedback" and slug "user-feedback"
     And the DatasetInfo has the specified column types
 
-  @integration
+  @integration @unimplemented
   Scenario: Create a dataset with only a name returns no column types
     When I call langwatch.dataset.create_dataset(name="Simple Dataset")
     Then a DatasetInfo is returned with name "Simple Dataset"
     And columnTypes is an empty list
 
-  @integration
+  @integration @unimplemented
   Scenario: Create a dataset with a conflicting name raises an error
     Given a dataset named "Existing" already exists
     When I call langwatch.dataset.create_dataset(name="Existing")
     Then a DatasetApiError is raised indicating a conflict
 
-  @unit
+  @unit @unimplemented
   Scenario: Create dataset validates that name is not empty
     When I call langwatch.dataset.create_dataset(name="")
     Then a ValueError is raised indicating name is required
 
   # ── Get Dataset (existing) ─────────────────────────────────────
 
-  @integration
+  @integration @unimplemented
   Scenario: Get dataset returns dataset with entries
     Given a dataset "my-dataset" exists with 5 records
     When I call langwatch.dataset.get_dataset("my-dataset")
     Then a Dataset object is returned with 5 entries
     And each entry has an id and an entry dict
 
-  @integration
+  @integration @unimplemented
   Scenario: Get dataset by ID works the same as by slug
     Given a dataset with slug "my-data" and id "dataset_xyz" exists
     When I call langwatch.dataset.get_dataset("dataset_xyz")
     Then a Dataset object for "my-data" is returned
 
-  @integration
+  @integration @unimplemented
   Scenario: Get non-existent dataset raises an error
     When I call langwatch.dataset.get_dataset("does-not-exist")
     Then a DatasetNotFoundError is raised
 
   # ── Update Dataset ─────────────────────────────────────────────
 
-  @integration
+  @integration @unimplemented
   Scenario: Update a dataset name
     Given a dataset with slug "old-name" exists
     When I call langwatch.dataset.update_dataset("old-name", name="New Name")
     Then the returned DatasetInfo has name "New Name" and slug "new-name"
 
-  @integration
+  @integration @unimplemented
   Scenario: Update a dataset column types
     Given a dataset "my-dataset" exists
     When I call langwatch.dataset.update_dataset("my-dataset", columns=[{"name": "question", "type": "string"}])
     Then the returned DatasetInfo has the updated column types
 
-  @integration
+  @integration @unimplemented
   Scenario: Update a non-existent dataset raises an error
     When I call langwatch.dataset.update_dataset("ghost", name="Whatever")
     Then a DatasetNotFoundError is raised
 
   # ── Delete Dataset ─────────────────────────────────────────────
 
-  @integration
+  @integration @unimplemented
   Scenario: Delete a dataset archives it
     Given a dataset "to-delete" exists
     When I call langwatch.dataset.delete_dataset("to-delete")
     Then the operation completes without error
 
-  @integration
+  @integration @unimplemented
   Scenario: Delete a non-existent dataset raises an error
     When I call langwatch.dataset.delete_dataset("nope")
     Then a DatasetNotFoundError is raised
 
   # ── List Records ──────────────────────────────────────────────
 
-  @integration
+  @integration @unimplemented
   Scenario: List records returns paginated records for a dataset
     Given a dataset "my-dataset" exists with 10 records
     When I call langwatch.dataset.list_records("my-dataset")
     Then I receive a PaginatedResult with DatasetRecord items in .data
     And the result includes .pagination with total, page, limit, and totalPages
 
-  @integration
+  @integration @unimplemented
   Scenario: List records with explicit pagination
     Given a dataset "my-dataset" exists with 100 records
     When I call langwatch.dataset.list_records("my-dataset", page=2, limit=20)
     Then I receive 20 DatasetRecord items from the second page
 
-  @integration
+  @integration @unimplemented
   Scenario: List records for non-existent dataset raises an error
     When I call langwatch.dataset.list_records("ghost")
     Then a DatasetNotFoundError is raised
 
   # ── Create Records (Batch Add) ─────────────────────────────────
 
-  @integration
+  @integration @unimplemented
   Scenario: Add records to an existing dataset
     Given a dataset "my-dataset" exists with columns [{"name": "input", "type": "string"}, {"name": "output", "type": "string"}]
     When I call langwatch.dataset.create_records("my-dataset", entries=[{"input": "hello", "output": "hi"}, {"input": "bye", "output": "goodbye"}])
     Then a list of 2 DatasetRecord objects is returned with generated IDs
 
-  @integration
+  @integration @unimplemented
   Scenario: Add records to a non-existent dataset raises an error
     When I call langwatch.dataset.create_records("ghost", entries=[{"input": "x"}])
     Then a DatasetNotFoundError is raised
 
-  @unit
+  @unit @unimplemented
   Scenario: Create records validates entries is not empty
     When I call langwatch.dataset.create_records("my-dataset", entries=[])
     Then a ValueError is raised indicating entries must not be empty
 
   # ── Update Record ───────────────────────────────────────────────
 
-  @integration
+  @integration @unimplemented
   Scenario: Update a single record
     Given a dataset "my-dataset" has a record "rec-1" with entry {"input": "old"}
     When I call langwatch.dataset.update_record("my-dataset", "rec-1", entry={"input": "updated"})
     Then the returned DatasetRecord has entry {"input": "updated"}
 
-  @integration
+  @integration @unimplemented
   Scenario: Update a non-existent record creates it
     Given a dataset "my-dataset" exists
     When I call langwatch.dataset.update_record("my-dataset", "rec-new", entry={"input": "new"})
     Then a DatasetRecord is returned with id "rec-new" and the given entry
 
-  @integration
+  @integration @unimplemented
   Scenario: Update a record for non-existent dataset raises an error
     When I call langwatch.dataset.update_record("ghost", "rec-1", entry={"input": "x"})
     Then a DatasetNotFoundError is raised
 
   # ── Delete Records (Batch) ─────────────────────────────────────
 
-  @integration
+  @integration @unimplemented
   Scenario: Delete records by IDs
     Given a dataset "my-dataset" has records "rec-1", "rec-2", "rec-3"
     When I call langwatch.dataset.delete_records("my-dataset", record_ids=["rec-1", "rec-2"])
     Then the result indicates 2 records were deleted
 
-  @integration
+  @integration @unimplemented
   Scenario: Delete records for non-existent dataset raises an error
     When I call langwatch.dataset.delete_records("ghost", record_ids=["rec-1"])
     Then a DatasetNotFoundError is raised
 
-  @unit
+  @unit @unimplemented
   Scenario: Delete records validates record_ids is not empty
     When I call langwatch.dataset.delete_records("my-dataset", record_ids=[])
     Then a ValueError is raised indicating record_ids must not be empty
 
   # ── Upload File ─────────────────────────────────────────────────
 
-  @integration
+  @integration @unimplemented
   Scenario: Upload creates dataset when it does not exist
     Given no dataset "new-data" exists
     And a local CSV file "data.csv" with 3 rows
@@ -233,14 +233,14 @@ Feature: Dataset Python SDK
     Then a new dataset "new-data" is created with the file contents
     And the result indicates 3 records were created
 
-  @integration
+  @integration @unimplemented
   Scenario: Upload appends to existing dataset by default
     Given a dataset "my-dataset" exists with 5 records
     And a local CSV file "more.csv" with 2 rows
     When I call langwatch.dataset.upload("my-dataset", file_path="more.csv")
     Then the 2 rows are appended to the existing 5 records
 
-  @integration
+  @integration @unimplemented
   Scenario: Upload with if_exists=replace removes existing records first
     Given a dataset "my-dataset" exists with 5 records
     And a local CSV file "fresh.csv" with 3 rows
@@ -248,46 +248,46 @@ Feature: Dataset Python SDK
     Then all existing records are removed
     And the dataset now has only the 3 new records
 
-  @integration
+  @integration @unimplemented
   Scenario: Upload with if_exists=error raises when dataset exists
     Given a dataset "my-dataset" exists
     And a local CSV file "data.csv" with 1 row
     When I call langwatch.dataset.upload("my-dataset", file_path="data.csv", if_exists="error")
     Then a DatasetApiError is raised indicating the dataset already exists
 
-  @integration
+  @integration @unimplemented
   Scenario: Upload supports JSON files
     Given a dataset "my-dataset" exists
     And a local JSON file "data.json" with 2 records
     When I call langwatch.dataset.upload("my-dataset", file_path="data.json")
     Then the result indicates records were created
 
-  @integration
+  @integration @unimplemented
   Scenario: Upload supports JSONL files
     Given a dataset "my-dataset" exists
     And a local JSONL file "data.jsonl" with 2 records
     When I call langwatch.dataset.upload("my-dataset", file_path="data.jsonl")
     Then the result indicates records were created
 
-  @unit
+  @unit @unimplemented
   Scenario: Upload validates that file exists
     When I call langwatch.dataset.upload("my-dataset", file_path="nonexistent.csv")
     Then a FileNotFoundError is raised
 
-  @unit
+  @unit @unimplemented
   Scenario: Upload validates supported file extensions
     Given a local file "data.parquet" exists
     When I call langwatch.dataset.upload("my-dataset", file_path="data.parquet")
     Then a ValueError is raised indicating the file format is not supported
 
-  @unit
+  @unit @unimplemented
   Scenario: Upload validates if_exists parameter
     When I call langwatch.dataset.upload("my-dataset", file_path="data.csv", if_exists="invalid")
     Then a ValueError is raised indicating invalid if_exists value
 
   # ── SDK Initialization ──────────────────────────────────────────
 
-  @integration
+  @integration @unimplemented
   Scenario: SDK auto-initializes from environment variables
     Given LANGWATCH_API_KEY is set in the environment
     And the SDK has not been explicitly initialized
@@ -295,7 +295,7 @@ Feature: Dataset Python SDK
     Then the SDK initializes automatically using the environment API key
     And the method executes successfully
 
-  @integration
+  @integration @unimplemented
   Scenario: SDK raises error when no API key is available
     Given LANGWATCH_API_KEY is not set in the environment
     And the SDK has not been explicitly initialized
@@ -304,27 +304,27 @@ Feature: Dataset Python SDK
 
   # ── Return Types ────────────────────────────────────────────────
 
-  @unit
+  @unit @unimplemented
   Scenario: Dataset object exposes entries as list of DatasetEntry
     Given a raw API response with 3 records
     When the response is converted to a Dataset object
     Then the Dataset has 3 DatasetEntry items
     And each DatasetEntry has id and entry attributes
 
-  @unit
+  @unit @unimplemented
   Scenario: Dataset.to_pandas converts entries to a DataFrame
     Given a Dataset object with 2 entries having keys "input" and "output"
     When I call dataset.to_pandas()
     Then I receive a pandas DataFrame with 2 rows and columns "input" and "output"
 
-  @unit
+  @unit @unimplemented
   Scenario: DatasetInfo object exposes dataset metadata without records
     Given a raw list/create/update API response
     When the response is converted to a DatasetInfo object
     Then it has id, name, slug, and columnTypes attributes
     And it does not contain record entries
 
-  @unit
+  @unit @unimplemented
   Scenario: PaginatedResult exposes data list and pagination metadata
     Given a raw paginated API response with 3 items and total 10
     When the response is converted to a PaginatedResult

@@ -13,14 +13,14 @@ Feature: Model → provider routing via VK config
 
   Rule: Aliases always win over explicit names
 
-    @integration
+    @integration @unimplemented
     Scenario: alias "chat" resolves to configured provider, ignoring explicit slash form
       When I POST /v1/chat/completions with {"model": "chat", ...}
       Then the gateway dispatches to OpenAI with model "gpt-5-mini"
       And the response header "X-LangWatch-Provider: openai" is set
       And the response header "X-LangWatch-Model: gpt-5-mini" is set
 
-    @integration
+    @integration @unimplemented
     Scenario: alias redirects across providers
       When I POST /v1/chat/completions with {"model": "thinking", ...}
       Then the gateway dispatches to Anthropic with model "claude-haiku-4-5-20251001"
@@ -28,7 +28,7 @@ Feature: Model → provider routing via VK config
 
   Rule: Explicit provider/model form bypasses aliases
 
-    @integration
+    @integration @unimplemented
     Scenario: explicit openai/gpt-5-mini dispatches to OpenAI directly
       When I POST /v1/chat/completions with {"model": "openai/gpt-5-mini", ...}
       Then the gateway dispatches to OpenAI using the pc_openai_primary credential
@@ -36,7 +36,7 @@ Feature: Model → provider routing via VK config
 
   Rule: models_allowed allowlist blocks disallowed models
 
-    @integration
+    @integration @unimplemented
     Scenario: model not in allowlist returns model_not_allowed
       Given the VK has models_allowed ["gpt-5-mini"]
       When I POST /v1/chat/completions with {"model": "gpt-4o"}
@@ -46,7 +46,7 @@ Feature: Model → provider routing via VK config
 
   Rule: Policy-rules enforcement at pre-dispatch
 
-    @integration
+    @integration @unimplemented
     Scenario: deny-listed tool name returns tool_not_allowed before dispatch
       Given the VK policy_rules.tools.deny includes "^shell\\."
       When I POST /v1/chat/completions with tools [{"function": {"name": "shell.exec"}}]
@@ -54,7 +54,7 @@ Feature: Model → provider routing via VK config
       And the error envelope type is "tool_not_allowed"
       And no upstream provider is called
 
-    @integration
+    @integration @unimplemented
     Scenario: MCP allow-list excludes unknown MCP
       Given the VK policy_rules.mcp.allow includes "^mcp-safe-.*$"
       And the request declares mcp_servers: [{"name": "mcp-safe-search"}, {"name": "mcp-unverified-x"}]
@@ -65,7 +65,7 @@ Feature: Model → provider routing via VK config
 
   Rule: Provider credentials are resolved from pc_* references, not duplicated
 
-    @integration
+    @integration @unimplemented
     Scenario: VK references existing ModelProvider via pc_* ref
       Given the org already has a ModelProvider row for OpenAI (used by evaluators)
       And the VK's providers[0].credentials_ref = the matching pc_* entry
@@ -75,7 +75,7 @@ Feature: Model → provider routing via VK config
 
   Rule: Listed models endpoint reflects effective allowlist
 
-    @integration
+    @integration @unimplemented
     Scenario: GET /v1/models returns aliases + allowed models
       When I GET /v1/models
       Then the response includes "chat" and "thinking" (aliases)

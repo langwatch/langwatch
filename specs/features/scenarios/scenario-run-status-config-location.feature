@@ -7,13 +7,13 @@ Feature: Scenario run status config lives with UI components
     The scenario run status config maps each status to its display properties
     (color, label, icon) and is consumed by simulation UI components.
 
-  @unit
+  @unit @unimplemented
   Scenario: Lucide-react icon mapping is colocated with the status config
     Given the scenario run status config module
     Then it exports a status-to-icon mapping for every ScenarioRunStatus value
     And the icon mapping uses lucide-react icon components
 
-  @unit
+  @unit @unimplemented
   Scenario: Config covers every ScenarioRunStatus value
     Given the ScenarioRunStatus enum
     When looking up the status config for each enum value

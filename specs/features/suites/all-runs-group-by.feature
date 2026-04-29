@@ -6,7 +6,7 @@ Feature: All Runs page group-by selector
   Background:
     Given a project with scenario runs across multiple suites, scenarios, and targets
 
-  @e2e
+  @e2e @unimplemented
   Scenario: User groups All Runs results by scenario
     When I open the All Runs page
     Then results are grouped by batch run by default
@@ -15,21 +15,21 @@ Feature: All Runs page group-by selector
     Then results are grouped by scenario
     And each scenario group header shows the scenario name, pass rate, and run count
 
-  @integration
+  @integration @unimplemented
   Scenario: All Runs page displays group-by selector with correct options and default
     When I open the All Runs page
     Then I see a group-by selector in the filter bar
     And the selector has options "None", "Scenario", and "Target"
     And "None" is selected by default
 
-  @integration
+  @integration @unimplemented
   Scenario: None grouping on All Runs preserves batch run layout
     Given run data with multiple batch runs across suites
     When I select "None" from the group-by selector
     Then results are grouped by batch run
     And each group shows the batch run timestamp, pass rate, and trigger type
 
-  @integration
+  @integration @unimplemented
   Scenario: Grouped results include runs from all suites
     Given runs from suite "Suite A" and suite "Suite B"
     When I select "Scenario" from the group-by selector

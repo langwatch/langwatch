@@ -271,6 +271,7 @@ describe("LicenseHandler Integration", () => {
       }
     });
 
+    /** @scenario Returns error for expired license */
     it("returns error for expired license", async () => {
       const result = await handler.validateAndStoreLicense(
         organizationId,

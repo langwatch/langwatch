@@ -11,7 +11,7 @@ Feature: SSE streaming — exact byte preservation post-first-chunk
 
   Rule: Pre-first-chunk mutations allowed, post-first-chunk strict passthrough
 
-    @integration
+    @integration @unimplemented
     Scenario: response headers are injected before streaming starts
       When I POST /v1/chat/completions with stream=true
       Then the response status is 200
@@ -19,13 +19,13 @@ Feature: SSE streaming — exact byte preservation post-first-chunk
       And the response headers include "X-LangWatch-Provider"
       And the first SSE chunk is the upstream provider's first chunk verbatim
 
-    @integration
+    @integration @unimplemented
     Scenario: every SSE chunk after the first is byte-equivalent to upstream
       When I POST /v1/chat/completions with stream=true against OpenAI
       Then each data: line forwarded to the client SHA-256 matches the upstream data: line
       And no chunk is merged, split, or re-chunked
 
-    @integration
+    @integration @unimplemented
     Scenario: Anthropic /v1/messages stream preserves tool-call deltas exactly
       Given the upstream stream contains tool_use / input_json_delta events
       When the client reads the stream
@@ -34,7 +34,7 @@ Feature: SSE streaming — exact byte preservation post-first-chunk
 
   Rule: Mid-stream failure terminates, never silently switches provider
 
-    @integration
+    @integration @unimplemented
     Scenario: upstream drops mid-stream -> terminal error event, connection closes
       Given upstream emits 3 SSE chunks then connection drops
       When the client reads
@@ -45,7 +45,7 @@ Feature: SSE streaming — exact byte preservation post-first-chunk
 
   Rule: Post-response guardrails are non-blocking on streaming
 
-    @integration
+    @integration @unimplemented
     Scenario: post guardrail flags the assembled response without altering the stream
       Given a VK with a post-guardrail "pii-check" configured
       When I POST /v1/chat/completions with stream=true
@@ -57,14 +57,14 @@ Feature: SSE streaming — exact byte preservation post-first-chunk
 
   Rule: Stream-chunk guardrails gate each chunk with a 50ms budget
 
-    @integration
+    @integration @unimplemented
     Scenario: chunk guardrail blocks a forbidden chunk
       Given a VK with a `direction: stream_chunk` guardrail that blocks on "SECRET:"
       When upstream emits a chunk containing "here is the SECRET: abc"
       Then the gateway emits a terminal `event: error` with error.type "guardrail_blocked"
       And the subsequent upstream chunks are NOT forwarded
 
-    @integration
+    @integration @unimplemented
     Scenario: chunk guardrail exceeds 50ms -> gateway falls through, logs warning
       Given a stream_chunk guardrail that takes 120ms
       When a chunk is processed
@@ -72,7 +72,7 @@ Feature: SSE streaming — exact byte preservation post-first-chunk
       And the OTel trace has `langwatch.guardrail.stream_chunk.timeout` attribute set
       And a warning log is emitted
 
-    @integration
+    @integration @unimplemented
     Scenario: chunk guardrail modifies chunk text (PII redaction)
       Given a `direction: stream_chunk` guardrail that redacts emails
       When upstream emits a chunk containing "contact me at foo@bar.com"
@@ -81,14 +81,14 @@ Feature: SSE streaming — exact byte preservation post-first-chunk
 
   Rule: Bifrost streaming channel mapped directly to SSE writer
 
-    @unit
+    @unit @unimplemented
     Scenario: each BifrostStreamChunk becomes one SSE data: line
       Given a bifrost.ChatCompletionStreamRequest that yields 5 chunks
       When the gateway proxies the channel to the client
       Then the client sees 5 `data: {...}` lines plus a trailing `data: [DONE]`
       And no additional heartbeats / buffering is introduced
 
-    @unit
+    @unit @unimplemented
     Scenario: Flush is called after every chunk so CLI gets bytes promptly
       When each chunk arrives
       Then the HTTP ResponseWriter's Flusher.Flush() is invoked
@@ -105,7 +105,7 @@ Feature: SSE streaming — exact byte preservation post-first-chunk
     # Vertex, and Bedrock emit usage natively in their stream deltas, so
     # this injection is skipped for those providers.
 
-    @unit
+    @unit @unimplemented
     Scenario: OpenAI stream without stream_options gets include_usage injected
       Given an inbound /v1/chat/completions body with "stream":true and no "stream_options"
       And the resolved provider is OpenAI
@@ -113,7 +113,7 @@ Feature: SSE streaming — exact byte preservation post-first-chunk
       Then the forwarded body contains "stream_options":{"include_usage":true}
       And the rest of the body is byte-identical to the input (no re-ordering of messages)
 
-    @unit
+    @unit @unimplemented
     Scenario: OpenAI stream with stream_options.include_usage=false is left untouched
       Given an inbound /v1/chat/completions body with "stream_options":{"include_usage":false}
       And the resolved provider is OpenAI
@@ -121,26 +121,26 @@ Feature: SSE streaming — exact byte preservation post-first-chunk
       Then the forwarded body still has "include_usage":false
       And the gateway accepts the caller's override without complaint
 
-    @unit
+    @unit @unimplemented
     Scenario: OpenAI stream with caller-provided stream_options.include_usage=true is left intact
       Given an inbound /v1/chat/completions body with "stream_options":{"include_usage":true}
       When the gateway prepares the upstream request
       Then the body is forwarded verbatim (no double-set)
 
-    @unit
+    @unit @unimplemented
     Scenario: non-OpenAI providers are NOT mutated — Anthropic / Gemini / Bedrock emit usage natively
       Given an inbound /v1/chat/completions body with "stream":true against an Anthropic-bound VK
       When the gateway prepares the upstream request
       Then the body does NOT gain "stream_options"
       And Bifrost's Anthropic translator handles usage via native message_delta
 
-    @unit
+    @unit @unimplemented
     Scenario: non-streaming requests are NOT mutated
       Given an inbound /v1/chat/completions body with "stream":false or "stream" absent
       When the gateway prepares the upstream request
       Then the body does NOT gain "stream_options"
 
-    @integration
+    @integration @unimplemented
     Scenario: a real OpenAI streaming call without stream_options yields non-zero tokens on the trace
       Given a VK bound to OpenAI
       When the caller POSTs /v1/chat/completions with "stream":true and no stream_options

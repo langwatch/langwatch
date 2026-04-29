@@ -37,7 +37,7 @@ Feature: Scenario tests for skills quality assurance
   # Tracing skill tests
   # ──────────────────────────────────────────────────
 
-  @tracing @integration
+  @tracing @integration @unimplemented
   Scenario: Tracing skill works for Python + OpenAI
     Given the fixture "python-openai" is copied to a temp directory
     And the skill "tracing" is loaded
@@ -47,7 +47,7 @@ Feature: Scenario tests for skills quality assurance
     And the file contains "autotrack_openai_calls" or equivalent
     And the agent used the `langwatch docs` CLI to read documentation
 
-  @tracing @integration
+  @tracing @integration @unimplemented
   Scenario: Tracing skill works for TypeScript + Vercel AI
     Given the fixture "typescript-vercel" is copied to a temp directory
     And the skill "tracing" is loaded
@@ -56,7 +56,7 @@ Feature: Scenario tests for skills quality assurance
     And the file imports from "langwatch"
     And the agent used the `langwatch docs` CLI to read documentation
 
-  @tracing @integration
+  @tracing @integration @unimplemented
   Scenario: Tracing skill works for Python + LangGraph
     Given the fixture "python-langgraph" is copied to a temp directory
     And the skill "tracing" is loaded
@@ -68,7 +68,7 @@ Feature: Scenario tests for skills quality assurance
   # Evaluations skill tests
   # ──────────────────────────────────────────────────
 
-  @evaluations @integration
+  @evaluations @integration @unimplemented
   Scenario: Evaluations skill creates a Jupyter notebook for Python
     Given the fixture "python-openai" is copied to a temp directory
     And the skill "evaluations" is loaded
@@ -79,7 +79,7 @@ Feature: Scenario tests for skills quality assurance
     And the agent generates a dataset tailored to the fixture's domain
     And the notebook includes at least one evaluator
 
-  @evaluations @integration
+  @evaluations @integration @unimplemented
   Scenario: Evaluations skill creates a script for TypeScript
     Given the fixture "typescript-vercel" is copied to a temp directory
     And the skill "evaluations" is loaded
@@ -92,7 +92,7 @@ Feature: Scenario tests for skills quality assurance
   # Scenarios skill tests
   # ──────────────────────────────────────────────────
 
-  @scenarios @integration
+  @scenarios @integration @unimplemented
   Scenario: Scenarios skill creates tests without hallucinating a framework
     Given the fixture "python-openai" is copied to a temp directory
     And the skill "scenarios" is loaded
@@ -102,7 +102,7 @@ Feature: Scenario tests for skills quality assurance
     And the agent did NOT invent its own testing framework
     And the agent used the `langwatch scenario-docs` CLI to read Scenario docs
 
-  @scenarios @integration
+  @scenarios @integration @unimplemented
   Scenario: Scenarios skill creates TypeScript tests with vitest
     Given the fixture "typescript-vercel" is copied to a temp directory
     And the skill "scenarios" is loaded
@@ -111,7 +111,7 @@ Feature: Scenario tests for skills quality assurance
     And the file imports from "@langwatch/scenario"
     And the file uses vitest (describe, it, expect)
 
-  @scenarios @integration
+  @scenarios @integration @unimplemented
   Scenario: Scenarios skill creates red team tests for Python
     Given the fixture "python-openai" is copied to a temp directory
     And the skill "scenarios" is loaded
@@ -119,14 +119,14 @@ Feature: Scenario tests for skills quality assurance
     Then the agent creates scenario test files using RedTeamAgent
     And the agent used the `langwatch scenario-docs` CLI to read Scenario red teaming docs
 
-  @scenarios @integration
+  @scenarios @integration @unimplemented
   Scenario: Scenarios skill creates red team tests for TypeScript
     Given the fixture "typescript-vercel" is copied to a temp directory
     And the skill "scenarios" is loaded
     When Claude Code receives "red team my agent for vulnerabilities"
     Then the agent creates scenario test files using RedTeamAgent
 
-  @scenarios @platform @integration
+  @scenarios @platform @integration @unimplemented
   Scenario: Scenarios skill creates scenarios via the CLI when there is no codebase
     Given an empty temporary directory (no codebase)
     And the skill "scenarios" is loaded
@@ -139,7 +139,7 @@ Feature: Scenario tests for skills quality assurance
   # Prompts skill tests
   # ──────────────────────────────────────────────────
 
-  @prompts @integration
+  @prompts @integration @unimplemented
   Scenario: Prompts skill uses CLI, not hardcoded prompts
     Given the fixture "python-openai" is copied to a temp directory
     And the skill "prompts" is loaded
@@ -151,7 +151,7 @@ Feature: Scenario tests for skills quality assurance
     And the agent updates application code to use langwatch.prompts.get()
     And the agent does NOT duplicate prompt text as a fallback
 
-  @prompts @tags @integration
+  @prompts @tags @integration @unimplemented
   Scenario: Prompts skill guides tag-based deployment workflow
     Given the fixture "python-openai" is copied to a temp directory
     And the skill "prompts" is loaded
@@ -161,7 +161,7 @@ Feature: Scenario tests for skills quality assurance
     And the agent uses `langwatch prompt tag assign` to assign production/staging tags
     And the agent does NOT hardcode version numbers in application code
 
-  @prompts @tags @cli @integration
+  @prompts @tags @cli @integration @unimplemented
   Scenario: CLI supports prompt tag operations end-to-end
     Given an empty temporary directory (no codebase)
     When the agent runs `langwatch prompt create my-prompt` to create a prompt YAML
@@ -175,7 +175,7 @@ Feature: Scenario tests for skills quality assurance
   # Level-up meta-skill tests
   # ──────────────────────────────────────────────────
 
-  @level-up @integration
+  @level-up @integration @unimplemented
   Scenario: Level-up skill orchestrates all sub-skills for Python
     Given the fixture "python-openai" is copied to a temp directory
     And the skill "level-up" is loaded
@@ -186,7 +186,7 @@ Feature: Scenario tests for skills quality assurance
     And the agent creates scenario tests
     And each step verifies its output before proceeding
 
-  @level-up @integration
+  @level-up @integration @unimplemented
   Scenario: Level-up skill orchestrates all sub-skills for TypeScript
     Given the fixture "typescript-vercel" is copied to a temp directory
     And the skill "level-up" is loaded
@@ -200,7 +200,7 @@ Feature: Scenario tests for skills quality assurance
   # Platform skill tests (no codebase — simulating claude web)
   # ──────────────────────────────────────────────────
 
-  @platform @analytics @integration
+  @platform @analytics @integration @unimplemented
   Scenario: Analytics skill uses the CLI to query performance
     Given an empty temporary directory (no codebase)
     And the skill "analytics" is loaded

@@ -67,6 +67,7 @@ describe("ScenarioInputMappingSection", () => {
 
   describe("given a code agent with inputs 'query' and 'context'", () => {
     describe("when the section renders", () => {
+      /** @scenario Scenario Mappings section renders for a multi-input code agent */
       it("shows the 'Scenario Mappings' section header", () => {
         renderSection();
 
@@ -75,6 +76,7 @@ describe("ScenarioInputMappingSection", () => {
         ).toBeInTheDocument();
       });
 
+      /** @scenario Scenario Mappings section shows a row for each scenario field */
       it("shows a row for each scenario field", () => {
         renderSection();
 
@@ -97,6 +99,7 @@ describe("ScenarioInputMappingSection", () => {
 
   describe("given the mapping UI with agent inputs 'query' and 'context'", () => {
     describe("when the user opens the input mapping dropdown", () => {
+      /** @scenario Mapping dropdown offers the agent's inputs as targets */
       it("offers 'query' as a target", async () => {
         const user = userEvent.setup();
         renderSection();
@@ -127,6 +130,7 @@ describe("ScenarioInputMappingSection", () => {
 
   describe("given the mapping UI for input", () => {
     describe("when the user selects 'query' from the dropdown", () => {
+      /** @scenario Selecting an agent input emits a stored-format mapping */
       it("calls onMappingChange with stored format: query → input", async () => {
         const user = userEvent.setup();
         const onMappingChange = vi.fn();
@@ -220,6 +224,7 @@ describe("ScenarioInputMappingSection", () => {
 
   describe("given stored mappings with a static value for 'context'", () => {
     describe("when the section renders", () => {
+      /** @scenario Stored static value renders as read-only text */
       it("displays the stored static value text in the context row", () => {
         const mappings: Record<string, FieldMapping> = {
           context: { type: "value", value: "Use the KB" },

@@ -15,7 +15,7 @@ Feature: Suite Archiving
   # E2E: Happy Paths — Full User Workflows
   # ============================================================================
 
-  @e2e
+  @e2e @unimplemented
   Scenario: Archive a suite via the context menu
     When I right-click on "Regression Suite" in the sidebar
     And I click "Archive"
@@ -24,7 +24,7 @@ Feature: Suite Archiving
     Then "Regression Suite" no longer appears in the sidebar
     And the remaining 2 suites are still visible
 
-  @e2e
+  @e2e @unimplemented
   Scenario: Archived suite runs remain visible in All Runs
     Given "Regression Suite" has been archived
     When I navigate to the All Runs view
@@ -34,26 +34,26 @@ Feature: Suite Archiving
   # Integration: Context Menu — Archive replaces Delete
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: Archive confirmation modal displays suite name
     When I right-click on "Smoke Tests" in the sidebar
     And I click "Archive"
     Then I see a confirmation modal with title "Archive suite?"
     And the modal displays the suite name "Smoke Tests"
 
-  @integration
+  @integration @unimplemented
   Scenario: Archive confirmation modal explains preservation
     When I right-click on "Smoke Tests" in the sidebar
     And I click "Archive"
     Then the modal shows "Archived suites will no longer appear in the sidebar. Test runs are preserved."
 
-  @integration
+  @integration @unimplemented
   Scenario: Archive confirmation modal has Cancel and Archive buttons
     When I right-click on "Smoke Tests" in the sidebar
     And I click "Archive"
     Then the modal has "Cancel" and "Archive" buttons
 
-  @integration
+  @integration @unimplemented
   Scenario: Cancel archive dismisses modal without archiving
     When I right-click on "Smoke Tests" in the sidebar
     And I click "Archive"
@@ -65,7 +65,7 @@ Feature: Suite Archiving
   # Integration: Archived Suites Hidden from Default Views
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: Archived suite does not appear in sidebar search results
     Given "Edge Case Suite" has been archived
     When I search for "Edge Case" in the sidebar
@@ -75,21 +75,21 @@ Feature: Suite Archiving
   # Integration: Soft Archive Backend Behavior
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: Archived suite is hidden from the active list
     Given I am authenticated in project "test-project"
     And suite "To Archive" exists
     When I archive "To Archive"
     Then "To Archive" does not appear when listing active suites
 
-  @integration
+  @integration @unimplemented
   Scenario: Archived suite preserves associated test runs
     Given I am authenticated in project "test-project"
     And suite "To Archive" exists with 3 completed runs
     When I archive "To Archive"
     Then I can still see all 3 runs for "To Archive" in the runs list
 
-  @integration
+  @integration @unimplemented
   Scenario: Archiving frees up the suite name for reuse
     Given I am authenticated in project "test-project"
     And suite "My Suite" exists
@@ -100,21 +100,21 @@ Feature: Suite Archiving
   # Integration: Negative Paths
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: Archiving an already-archived suite succeeds without error
     Given I am authenticated in project "test-project"
     And suite "Already Archived" has been archived
     When I archive "Already Archived"
     Then the request succeeds without error
 
-  @integration
+  @integration @unimplemented
   Scenario: Cannot archive a suite from a different project
     Given I am authenticated in project "project-a"
     And suite "Foreign Suite" exists in project "project-b"
     When I archive "Foreign Suite"
     Then I receive a not found error
 
-  @integration
+  @integration @unimplemented
   Scenario: Archiving a non-existent suite returns not found
     Given I am authenticated in project "test-project"
     When I archive "nonexistent-id"

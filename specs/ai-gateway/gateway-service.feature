@@ -10,12 +10,12 @@ Feature: Gateway service — public HTTP surface and operational basics
 
   Rule: Every request gets a request id
 
-    @unit
+    @unit @unimplemented
     Scenario: gateway generates request id when client omits it
       When I POST /v1/chat/completions with a valid VK and no X-LangWatch-Gateway-Request-Id header
       Then the response has header "X-LangWatch-Gateway-Request-Id" set to a value matching `^req_[0-9a-f]{30}$`
 
-    @unit
+    @unit @unimplemented
     Scenario: gateway echoes client-supplied request id
       When I POST with "X-LangWatch-Gateway-Request-Id: abc-correlated-123"
       Then the response echoes exactly "X-LangWatch-Gateway-Request-Id: abc-correlated-123"
@@ -23,7 +23,7 @@ Feature: Gateway service — public HTTP surface and operational basics
 
   Rule: Public HTTP surface shape
 
-    @integration
+    @integration @unimplemented
     Scenario Outline: public routes respond with the expected content-type
       When I <method> <path> with a valid VK
       Then the response content-type is <content_type>
@@ -41,7 +41,7 @@ Feature: Gateway service — public HTTP surface and operational basics
         | GET    | /readyz                      | application/json               |
         | GET    | /startupz                    | application/json               |
 
-    @integration
+    @integration @unimplemented
     Scenario: /v1/models reflects effective VK allowlist
       Given the VK has model_aliases {"chat": "openai/gpt-5-mini"} and models_allowed ["gpt-5-mini"]
       When I GET /v1/models
@@ -50,7 +50,7 @@ Feature: Gateway service — public HTTP surface and operational basics
 
   Rule: Panics are caught and converted to 500 error envelopes
 
-    @unit
+    @unit @unimplemented
     Scenario: a panic in a handler produces a JSON error, not a broken connection
       Given a test handler that panics with "divide by zero"
       When I GET the test route
@@ -60,7 +60,7 @@ Feature: Gateway service — public HTTP surface and operational basics
 
   Rule: Graceful shutdown drains in-flight requests
 
-    @integration
+    @integration @unimplemented
     Scenario: SIGTERM waits up to 15s for in-flight requests
       Given the gateway is processing a slow streaming request that takes 10s
       When kubernetes sends SIGTERM
@@ -71,7 +71,7 @@ Feature: Gateway service — public HTTP surface and operational basics
 
   Rule: Structured JSON logs
 
-    @unit
+    @unit @unimplemented
     Scenario: every request produces one access log line with the core fields
       When I POST /v1/chat/completions
       Then stdout contains one JSON log line with fields:
@@ -84,7 +84,7 @@ Feature: Gateway service — public HTTP surface and operational basics
 
   Rule: Configuration is validated on startup
 
-    @unit
+    @unit @unimplemented
     Scenario: missing GATEWAY_CONTROL_PLANE_SECRET fails fast in prod mode
       Given env GATEWAY_ALLOW_INSECURE is unset
       And env GATEWAY_CONTROL_PLANE_SECRET is unset
@@ -92,7 +92,7 @@ Feature: Gateway service — public HTTP surface and operational basics
       Then the process exits with code 2
       And stderr contains "GATEWAY_CONTROL_PLANE_SECRET is required"
 
-    @unit
+    @unit @unimplemented
     Scenario: dev mode allows insecure startup for local dev
       Given env GATEWAY_ALLOW_INSECURE=1
       When the gateway starts

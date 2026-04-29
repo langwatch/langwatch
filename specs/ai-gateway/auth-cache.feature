@@ -13,7 +13,7 @@ Feature: Gateway auth cache — hot path is zero RTT after first hit
 
   Rule: First request for a new VK pays the resolve-key round trip
 
-    @integration
+    @integration @unimplemented
     Scenario: cold cache -> control plane -> cached for next request
       Given the auth cache is empty
       And the control plane will sign a JWT for "lw_vk_live_01HZX9K3M000000000000001" with revision 42
@@ -25,7 +25,7 @@ Feature: Gateway auth cache — hot path is zero RTT after first hit
 
   Rule: Cached JWT survives control-plane outage until it expires
 
-    @integration
+    @integration @unimplemented
     Scenario: control plane down, cached JWT still valid -> request succeeds
       Given the cache holds a JWT with exp = now + 10 minutes for "lw_vk_live_..."
       And the control plane returns 503 on all endpoints
@@ -35,7 +35,7 @@ Feature: Gateway auth cache — hot path is zero RTT after first hit
       And no /resolve-key or /config call is made
       And /readyz still reports control_plane_reachable as degraded but /healthz is 200
 
-    @integration
+    @integration @unimplemented
     Scenario: control plane down and cached JWT near expiry -> proactive refresh bumps soft expiry
       Given the cache holds a JWT with exp = now + 30 seconds
       And the control plane is unreachable
@@ -58,7 +58,7 @@ Feature: Gateway auth cache — hot path is zero RTT after first hit
     (401/403/404 from /resolve-key), the entry is evicted immediately and
     the request is rejected — bad credentials must never get a grace window.
 
-    @unit
+    @unit @unimplemented
     Scenario Outline: expired entry + transport failure -> serve stale, bump soft
       Given the cache holds an entry whose JWT expired 30 seconds ago
       And the control plane is failing with <failure>
@@ -81,7 +81,7 @@ Feature: Gateway auth cache — hot path is zero RTT after first hit
         | unparseable JWT response body      |
         | JWT signature verification failure |
 
-    @unit
+    @unit @unimplemented
     Scenario Outline: expired entry + auth rejection -> evict and reject (no grace window)
       Given the cache holds an entry whose JWT expired 30 seconds ago
       And the control plane returns <status>
@@ -96,7 +96,7 @@ Feature: Gateway auth cache — hot path is zero RTT after first hit
         | 404 Not Found         | invalid_api_key       |
         | 403 Forbidden         | virtual_key_revoked   |
 
-    @unit
+    @unit @unimplemented
     Scenario: hard expiry cap stops the stale-while-error chain
       Given the cache holds an entry stale-extended past the LW_GATEWAY_AUTH_CACHE_HARD_GRACE cap (default 6h)
       And the control plane is still unreachable
@@ -106,7 +106,7 @@ Feature: Gateway auth cache — hot path is zero RTT after first hit
       And no further soft-bump is applied
       And the failure is logged with level=error (operator must investigate)
 
-    @unit
+    @unit @unimplemented
     Scenario: successful refresh resets soft expiry to fresh JWT exp
       Given the cache holds an entry stale-extended by 10 minutes past its JWT exp
       And the control plane recovers and signs a fresh JWT
@@ -115,7 +115,7 @@ Feature: Gateway auth cache — hot path is zero RTT after first hit
       And the soft expiry tracks the new JWT's exp
       And the hard expiry cap is recomputed relative to the new bundle
 
-    @unit
+    @unit @unimplemented
     Scenario: background refresh near soft-expiry on transport failure bumps the entry
       Given the cache holds an entry whose JWT is 30 seconds from expiring
       And the control plane is unreachable
@@ -123,7 +123,7 @@ Feature: Gateway auth cache — hot path is zero RTT after first hit
       Then the entry's soft expiry is bumped by 5 minutes
       And the failure is logged with level=warn
 
-    @unit
+    @unit @unimplemented
     Scenario: background refresh near soft-expiry on auth rejection evicts the entry
       Given the cache holds an entry whose JWT is 30 seconds from expiring
       And the control plane returns 403 Forbidden
@@ -133,7 +133,7 @@ Feature: Gateway auth cache — hot path is zero RTT after first hit
 
   Rule: Short-lived JWT is refreshed before expiry
 
-    @unit
+    @unit @unimplemented
     Scenario: JWT at 10 minutes triggers async refresh
       Given the cache holds a JWT with exp = now + 5 minutes (TTL 15m, refresh threshold 5m)
       When I send a request with that VK
@@ -143,7 +143,7 @@ Feature: Gateway auth cache — hot path is zero RTT after first hit
 
   Rule: Revocation propagates within 60 seconds via long-poll /changes
 
-    @integration
+    @integration @unimplemented
     Scenario: revoked VK stops working within 60s without restart
       Given "lw_vk_live_01HZX9K3M000000000000002" is cached with a valid JWT
       When the platform revokes that VK
@@ -154,7 +154,7 @@ Feature: Gateway auth cache — hot path is zero RTT after first hit
       And the gateway returns 401 with error.type "virtual_key_revoked"
       And the whole propagation completes in under 60 seconds
 
-    @integration
+    @integration @unimplemented
     Scenario: config update propagates via /changes without dropping traffic
       Given a cached bundle for vk with revision 42
       When the platform updates the VK config to revision 43
@@ -164,7 +164,7 @@ Feature: Gateway auth cache — hot path is zero RTT after first hit
       And the cache entry is updated in place
       And in-flight requests already dispatched are unaffected
 
-    @integration
+    @integration @unimplemented
     Scenario: /changes long-poll survives a 25s no-op cycle
       Given no VK mutations happen during a 25s window
       When the /changes poll runs
@@ -174,7 +174,7 @@ Feature: Gateway auth cache — hot path is zero RTT after first hit
 
   Rule: L2 Redis cache warms new gateway nodes
 
-    @integration
+    @integration @unimplemented
     Scenario: new gateway pod reads a cached bundle from Redis instead of calling /resolve-key
       Given Redis is configured and pod A has cached VK "lw_vk_live_..." for 3 minutes
       When pod B receives its first request with that VK
@@ -185,7 +185,7 @@ Feature: Gateway auth cache — hot path is zero RTT after first hit
 
   Rule: Bootstrap-pull enables gateway to serve when control plane is cold
 
-    @integration
+    @integration @unimplemented
     Scenario: enterprise bootstrap-all pulls every non-revoked VK on startup
       Given GATEWAY_CACHE_BOOTSTRAP_ALL_KEYS=true
       And the control plane has 250 active VKs
@@ -197,7 +197,7 @@ Feature: Gateway auth cache — hot path is zero RTT after first hit
 
   Rule: L1 key material is never persisted to disk
 
-    @unit
+    @unit @unimplemented
     Scenario: cache keys are SHA-256 hashes, not raw VK bytes
       Given a VK "lw_vk_live_01HZX9K3M000000000000001" is resolved
       When I inspect the cache keyset

@@ -8,12 +8,14 @@ Feature: Code Block Editor component
   # Component structure
   # ============================================================================
 
+  @unimplemented
   Scenario: CodeBlockEditor displays code preview
     Given I render a CodeBlockEditor with code "def hello(): pass"
     Then I see a syntax-highlighted preview of the code
     And the preview uses Python syntax highlighting
     And the preview has a dark background
 
+  @unimplemented
   Scenario: CodeBlockEditor shows edit overlay on hover
     Given I render a CodeBlockEditor with code
     When I hover over the code preview
@@ -24,18 +26,21 @@ Feature: Code Block Editor component
   # Code editing modal
   # ============================================================================
 
+  @unimplemented
   Scenario: Click opens code editor modal
     Given I render a CodeBlockEditor with code
     When I click on the code preview
     Then a full-screen code editor modal opens
     And I see the code in an editable Monaco editor
 
+  @unimplemented
   Scenario: Modal provides syntax highlighting
     Given the code editor modal is open
     And the language is set to "python"
     Then the editor provides Python syntax highlighting
     And the editor shows line numbers
 
+  @unimplemented
   Scenario: Save changes from modal
     Given the code editor modal is open
     And I modify the code
@@ -44,6 +49,7 @@ Feature: Code Block Editor component
     And the onChange callback is called with the new code
     And the preview updates to show the new code
 
+  @unimplemented
   Scenario: Cancel changes from modal
     Given the code editor modal is open
     And I modify the code
@@ -56,6 +62,7 @@ Feature: Code Block Editor component
   # Component props
   # ============================================================================
 
+  @unimplemented
   Scenario: Required props
     When I use CodeBlockEditor
     Then the following props are required:
@@ -63,12 +70,14 @@ Feature: Code Block Editor component
       | code     | string                  | The code to display/edit   |
       | onChange | (code: string) => void  | Callback when code changes |
 
+  @unimplemented
   Scenario: Optional props
     When I use CodeBlockEditor
     Then the following props are optional:
       | prop     | type   | default  | description              |
       | language | string | "python" | Syntax highlighting lang |
 
+  @unimplemented
   Scenario: Controlled component behavior
     Given I render CodeBlockEditor with code="initial"
     When I edit the code to "modified"
@@ -80,6 +89,7 @@ Feature: Code Block Editor component
   # Usage in BasePropertiesPanel
   # ============================================================================
 
+  @unimplemented
   Scenario: BasePropertiesPanel uses CodeBlockEditor for code fields
     Given a workflow node has a field of type "code"
     When I render the BasePropertiesPanel for this node
@@ -87,6 +97,7 @@ Feature: Code Block Editor component
     And the code preview is visible
     And clicking opens the code editor modal
 
+  @unimplemented
   Scenario: Changes in CodeBlockEditor update node parameters
     Given I am editing a code field in BasePropertiesPanel
     When I modify the code and save
@@ -97,6 +108,7 @@ Feature: Code Block Editor component
   # Usage in Agent drawers
   # ============================================================================
 
+  @unimplemented
   Scenario: AgentCodeEditorDrawer uses CodeBlockEditor
     When I open the AgentCodeEditorDrawer
     Then it contains a CodeBlockEditor component

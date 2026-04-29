@@ -31,7 +31,7 @@ Feature: Studio Local State for Evaluators and Agents
 
   # --- Local State Tracking ---
 
-  @integration
+  @integration @unimplemented
   Scenario: Editing evaluator settings creates local state without saving to DB
     When I open the evaluator node drawer
     And I change a setting value
@@ -39,14 +39,14 @@ Feature: Studio Local State for Evaluators and Agents
     And the DB evaluator record is not modified
     And the evaluator node on the canvas shows an unsaved changes indicator
 
-  @integration
+  @integration @unimplemented
   Scenario: Editing evaluator name creates local state
     When I open the evaluator node drawer
     And I change the evaluator name
     Then the name change is stored as local state on the workflow node
     And the DB evaluator record retains its original name
 
-  @integration
+  @integration @unimplemented
   Scenario: Local state persists when closing and reopening the drawer
     Given I have made unsaved changes to the evaluator settings
     And I close the drawer
@@ -55,7 +55,7 @@ Feature: Studio Local State for Evaluators and Agents
 
   # --- Apply Button ---
 
-  @integration
+  @integration @unimplemented
   Scenario: Apply button closes drawer and keeps local changes
     Given I have made unsaved changes to the evaluator settings
     When I click the "Apply" button in the drawer footer
@@ -65,7 +65,7 @@ Feature: Studio Local State for Evaluators and Agents
 
   # --- Save Button ---
 
-  @integration
+  @integration @unimplemented
   Scenario: Save button persists changes to DB and clears local state
     Given I have made unsaved changes to the evaluator settings
     When I click the "Save" button in the drawer
@@ -75,7 +75,7 @@ Feature: Studio Local State for Evaluators and Agents
 
   # --- Discard Button ---
 
-  @integration
+  @integration @unimplemented
   Scenario: Discard button reverts to saved DB version
     Given I have made unsaved changes to the evaluator settings
     When I click the "Discard changes" button
@@ -85,7 +85,7 @@ Feature: Studio Local State for Evaluators and Agents
 
   # --- Unsaved Changes Indicator (Orange Dot) ---
 
-  @integration
+  @integration @unimplemented
   Scenario: Orange dot appears on canvas node when local changes exist
     Given I have no unsaved changes to the evaluator
     Then the evaluator node on the canvas does not show an orange dot
@@ -94,13 +94,13 @@ Feature: Studio Local State for Evaluators and Agents
     Then the evaluator node on the canvas shows an orange dot
     And hovering over the dot shows "Unsaved changes" tooltip
 
-  @unit
+  @unit @unimplemented
   Scenario: Orange dot disappears after saving
     Given the evaluator node has local unsaved changes
     When I save the changes to DB
     Then the orange dot disappears from the canvas node
 
-  @unit
+  @unit @unimplemented
   Scenario: Orange dot disappears after discarding
     Given the evaluator node has local unsaved changes
     When I discard the changes
@@ -108,14 +108,14 @@ Feature: Studio Local State for Evaluators and Agents
 
   # --- Execution Uses Local State ---
 
-  @integration
+  @integration @unimplemented
   Scenario: Running a node with local changes uses the local config
     Given I have unsaved changes to the evaluator settings
     When I execute the workflow
     Then the frontend merges localConfig into the node data before sending to the executor
     And the evaluator runs with the local (unsaved) settings
 
-  @integration
+  @integration @unimplemented
   Scenario: Running a node without local changes uses the DB config
     Given I have no unsaved changes to the evaluator
     When I execute the workflow
@@ -123,7 +123,7 @@ Feature: Studio Local State for Evaluators and Agents
 
   # --- Drawer Close Without Apply ---
 
-  @integration
+  @integration @unimplemented
   Scenario: Closing drawer without clicking Apply auto-applies local changes
     Given I have made changes to evaluator settings in the drawer
     When I click on the canvas background to close the drawer
@@ -133,7 +133,7 @@ Feature: Studio Local State for Evaluators and Agents
 
   # --- Agent Nodes (Same Pattern) ---
 
-  @integration
+  @integration @unimplemented
   Scenario: Agent node local state follows the same pattern as evaluators
     Given there is an agent node on the canvas referencing a saved DB agent
     When I open the agent node drawer and make changes
@@ -144,7 +144,7 @@ Feature: Studio Local State for Evaluators and Agents
 
   # --- Workflow Persistence ---
 
-  @integration
+  @integration @unimplemented
   Scenario: Local state is saved as part of the workflow
     Given I have unsaved changes to an evaluator node
     When the workflow is saved

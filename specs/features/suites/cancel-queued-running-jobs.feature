@@ -13,21 +13,21 @@ Feature: Cancel queued and running suite jobs
   # Event-sourcing: cancel_requested event lifecycle
   # ---------------------------------------------------------------------------
 
-  @unit
+  @unit @unimplemented
   Scenario: Cancel request produces a cancel_requested event
     Given a simulation run is in progress
     When the user requests cancellation
     Then a "lw.simulation_run.cancel_requested" event is stored in the event log
     And the event contains the scenarioRunId
 
-  @unit
+  @unit @unimplemented
   Scenario: Fold projection sets CancellationRequestedAt without changing Status
     Given a simulation run has Status "IN_PROGRESS"
     When a cancel_requested event is applied to the fold projection
     Then the state has CancellationRequestedAt set to the event timestamp
     And the Status remains "IN_PROGRESS"
 
-  @unit
+  @unit @unimplemented
   Scenario: Cancel request is idempotent
     Given a simulation run already has CancellationRequestedAt set
     When a second cancel_requested event is applied
@@ -37,7 +37,7 @@ Feature: Cancel queued and running suite jobs
   # Reactor: broadcast cancel signal to workers
   # ---------------------------------------------------------------------------
 
-  @integration
+  @integration @unimplemented
   Scenario: Cancel reactor broadcasts to Redis on cancel_requested event
     Given the cancellation broadcast reactor is registered
     When a cancel_requested event is processed by the pipeline
@@ -48,7 +48,7 @@ Feature: Cancel queued and running suite jobs
   # Worker: cancel signal reaches the right worker
   # ---------------------------------------------------------------------------
 
-  @integration
+  @integration @unimplemented
   Scenario: Worker kills its own child process on cancel broadcast
     Given worker A is running scenario X as a child process
     And worker A is subscribed to the "scenario:cancel" Redis channel
@@ -56,14 +56,14 @@ Feature: Cancel queued and running suite jobs
     Then worker A terminates the child process for scenario X
     And a finished event with status CANCELLED is dispatched
 
-  @integration
+  @integration @unimplemented
   Scenario: Worker ignores cancel broadcast for scenarios it does not own
     Given worker B is running scenario Y
     When a cancel broadcast arrives for scenario X
     Then worker B takes no action
     And scenario Y continues running
 
-  @integration
+  @integration @unimplemented
   Scenario: Cancellation reaches a worker on a different pod
     Given scenario X is running on worker pod 4
     And the cancel_requested event is processed by worker pod 1
@@ -75,7 +75,7 @@ Feature: Cancel queued and running suite jobs
   # Pre-spawn check: cancel before execution starts
   # ---------------------------------------------------------------------------
 
-  @integration
+  @integration @unimplemented
   Scenario: Worker skips execution if cancel was already requested
     Given a simulation run has CancellationRequestedAt set in the projection
     When a worker picks up the job for that run
@@ -86,7 +86,7 @@ Feature: Cancel queued and running suite jobs
   # Queued job cancellation
   # ---------------------------------------------------------------------------
 
-  @unit
+  @unit @unimplemented
   Scenario: Cancelling a queued run writes both cancel and finished events
     Given a simulation run has Status "QUEUED"
     When the user requests cancellation
@@ -98,14 +98,14 @@ Feature: Cancel queued and running suite jobs
   # Batch cancellation
   # ---------------------------------------------------------------------------
 
-  @integration
+  @integration @unimplemented
   Scenario: Batch cancel dispatches cancel events for all non-terminal runs
     Given a batch run has 3 runs: one QUEUED, one IN_PROGRESS, one SUCCESS
     When the user cancels the entire batch
     Then cancel_requested events are dispatched for the QUEUED and IN_PROGRESS runs
     And no cancel event is dispatched for the SUCCESS run
 
-  @integration
+  @integration @unimplemented
   Scenario: Batch cancel across multiple workers terminates all active runs
     Given worker A runs scenario X and worker B runs scenario Y in the same batch
     When the user cancels the entire batch
@@ -117,21 +117,21 @@ Feature: Cancel queued and running suite jobs
   # UI: cancel eligibility and status display
   # ---------------------------------------------------------------------------
 
-  @integration
+  @integration @unimplemented
   Scenario: User cancels a single running job from the run card
     Given a suite run has running jobs
     When the user clicks cancel on a running job
     Then the job status changes to cancelled
     And the UI reflects the cancelled state
 
-  @integration
+  @integration @unimplemented
   Scenario: User cancels all remaining jobs for a batch run
     Given a suite run has multiple queued and running jobs
     When the user clicks cancel all on the batch run
     Then all non-terminal jobs are cancelled
     And the UI reflects the cancelled state for each job
 
-  @integration
+  @integration @unimplemented
   Scenario: Cancel button is hidden for jobs that already completed
     Given a suite run has a job with a terminal status
     When the user views the run card
@@ -141,7 +141,7 @@ Feature: Cancel queued and running suite jobs
   # Race conditions
   # ---------------------------------------------------------------------------
 
-  @unit
+  @unit @unimplemented
   Scenario Outline: Cancellation does not overwrite terminal results
     Given a simulation run has already finished with status <status>
     When a cancel_requested event arrives
@@ -154,7 +154,7 @@ Feature: Cancel queued and running suite jobs
       | FAILED  |
       | ERROR   |
 
-  @unit
+  @unit @unimplemented
   Scenario: Late finish does not overwrite cancelled status
     Given a simulation run has been marked as CANCELLED via a finished event
     When a late finished event arrives with status SUCCESS

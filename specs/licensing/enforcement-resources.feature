@@ -14,14 +14,14 @@ Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators, Scenarios, 
   # Workflows: Backend Enforcement
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: Allows workflow creation when under limit
     Given the organization has a license with maxWorkflows 5
     And the organization has 3 workflows across all projects
     When I create a workflow in project "proj-789"
     Then the workflow is created successfully
 
-  @integration
+  @integration @unimplemented
   Scenario: Blocks workflow creation when at limit
     Given the organization has a license with maxWorkflows 3
     And the organization has 3 workflows across all projects
@@ -29,7 +29,7 @@ Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators, Scenarios, 
     Then the request fails with FORBIDDEN
     And the error message contains "maximum number of workflows"
 
-  @integration
+  @integration @unimplemented
   Scenario: Counts workflows across all projects in organization
     Given the organization has a license with maxWorkflows 3
     And project "proj-A" has 2 workflows
@@ -37,7 +37,7 @@ Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators, Scenarios, 
     When I create a workflow in project "proj-789"
     Then the request fails with FORBIDDEN
 
-  @integration
+  @integration @unimplemented
   Scenario: Counts only non-archived workflows toward limit
     Given the organization has a license with maxWorkflows 3
     And the organization has 2 active workflows
@@ -45,7 +45,7 @@ Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators, Scenarios, 
     When I create a workflow in project "proj-789"
     Then the workflow is created successfully
 
-  @integration
+  @integration @unimplemented
   Scenario: Workflow copy enforces limit
     Given the organization has a license with maxWorkflows 3
     And the organization has 3 workflows across all projects
@@ -56,7 +56,7 @@ Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators, Scenarios, 
   # Workflows: Database Query Compatibility
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: Workflow count query bypasses multi-tenancy protection
     Given the organization has a license with maxWorkflows 5
     And the organization has 2 workflows in project "proj-A"
@@ -76,7 +76,7 @@ Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators, Scenarios, 
     When I create a prompt in project "proj-789"
     Then the prompt is created successfully
 
-  @integration
+  @integration @unimplemented
   Scenario: Blocks prompt creation when at limit
     Given the organization has a license with maxPrompts 3
     And the organization has 3 prompts across all projects
@@ -84,7 +84,7 @@ Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators, Scenarios, 
     Then the request fails with FORBIDDEN
     And the error message contains "maximum number of prompts"
 
-  @integration
+  @integration @unimplemented
   Scenario: Counts prompts across all projects in organization
     Given the organization has a license with maxPrompts 3
     And project "proj-A" has 2 prompts
@@ -96,14 +96,14 @@ Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators, Scenarios, 
   # Evaluators: Backend Enforcement
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: Allows evaluator creation when under limit
     Given the organization has a license with maxEvaluators 5
     And the organization has 3 evaluators across all projects
     When I create an evaluator in project "proj-789"
     Then the evaluator is created successfully
 
-  @integration
+  @integration @unimplemented
   Scenario: Blocks evaluator creation when at limit
     Given the organization has a license with maxEvaluators 3
     And the organization has 3 evaluators across all projects
@@ -111,7 +111,7 @@ Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators, Scenarios, 
     Then the request fails with FORBIDDEN
     And the error message contains "maximum number of evaluators"
 
-  @integration
+  @integration @unimplemented
   Scenario: Counts evaluators across all projects in organization
     Given the organization has a license with maxEvaluators 3
     And project "proj-A" has 2 evaluators
@@ -119,7 +119,7 @@ Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators, Scenarios, 
     When I create an evaluator in project "proj-789"
     Then the request fails with FORBIDDEN
 
-  @integration
+  @integration @unimplemented
   Scenario: Counts only non-archived evaluators toward limit
     Given the organization has a license with maxEvaluators 3
     And the organization has 2 active evaluators
@@ -131,14 +131,14 @@ Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators, Scenarios, 
   # Scenarios: Backend Enforcement
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: Allows scenario creation when under limit
     Given the organization has a license with maxScenarios 5
     And the organization has 3 scenarios across all projects
     When I create a scenario in project "proj-789"
     Then the scenario is created successfully
 
-  @integration
+  @integration @unimplemented
   Scenario: Blocks scenario creation when at limit
     Given the organization has a license with maxScenarios 3
     And the organization has 3 scenarios across all projects
@@ -146,7 +146,7 @@ Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators, Scenarios, 
     Then the request fails with FORBIDDEN
     And the error message contains "maximum number of scenarios"
 
-  @integration
+  @integration @unimplemented
   Scenario: Counts scenarios across all projects in organization
     Given the organization has a license with maxScenarios 3
     And project "proj-A" has 2 scenarios
@@ -158,14 +158,14 @@ Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators, Scenarios, 
   # Teams: Backend Enforcement
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: Allows team creation when under limit
     Given the organization has a license with maxTeams 5
     And the organization has 3 teams
     When I create a team in the organization
     Then the team is created successfully
 
-  @integration
+  @integration @unimplemented
   Scenario: Blocks team creation when at limit
     Given the organization has a license with maxTeams 3
     And the organization has 3 teams
@@ -173,7 +173,7 @@ Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators, Scenarios, 
     Then the request fails with FORBIDDEN
     And the error message contains "maximum number of teams"
 
-  @integration
+  @integration @unimplemented
   Scenario: Blocks team creation when over limit
     Given the organization has a license with maxTeams 2
     And the organization has 3 teams
@@ -184,7 +184,7 @@ Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators, Scenarios, 
   # UI: Click-then-Modal Pattern (All Resources)
   # ============================================================================
 
-  @unit
+  @unit @unimplemented
   Scenario: Create Workflow button is always clickable
     Given the organization has a license with maxWorkflows 3
     And the organization has 3 workflows (at limit)
@@ -192,7 +192,7 @@ Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators, Scenarios, 
     Then the "Create Workflow" button is enabled
     And the "Create Workflow" button is not visually disabled
 
-  @unit
+  @unit @unimplemented
   Scenario: Clicking Create Workflow at limit shows upgrade modal
     Given the organization has a license with maxWorkflows 3
     And the organization has 3 workflows (at limit)
@@ -201,7 +201,7 @@ Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators, Scenarios, 
     And the modal shows "Workflows: 3 / 3"
     And the modal includes an upgrade call-to-action
 
-  @unit
+  @unit @unimplemented
   Scenario: Create Prompt button is always clickable
     Given the organization has a license with maxPrompts 3
     And the organization has 3 prompts (at limit)
@@ -209,7 +209,7 @@ Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators, Scenarios, 
     Then the "Create Prompt" button is enabled
     And the "Create Prompt" button is not visually disabled
 
-  @unit
+  @unit @unimplemented
   Scenario: Clicking Create Prompt at limit shows upgrade modal
     Given the organization has a license with maxPrompts 3
     And the organization has 3 prompts (at limit)
@@ -218,7 +218,7 @@ Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators, Scenarios, 
     And the modal shows "Prompts: 3 / 3"
     And the modal includes an upgrade call-to-action
 
-  @unit
+  @unit @unimplemented
   Scenario: Clicking Save Prompt in PromptEditorDrawer at limit shows upgrade modal
     Given the organization has a license with maxPrompts 3
     And the organization has 3 prompts (at limit)
@@ -230,7 +230,7 @@ Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators, Scenarios, 
     And the modal includes an upgrade call-to-action
     And the API request is NOT made
 
-  @unit
+  @unit @unimplemented
   Scenario: Creating prompt from scenario editor at limit shows upgrade modal
     Given the organization has a license with maxPrompts 3
     And the organization has 3 prompts (at limit)
@@ -243,7 +243,7 @@ Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators, Scenarios, 
     And the modal shows "Prompts: 3 / 3"
     And the API request is NOT made
 
-  @unit
+  @unit @unimplemented
   Scenario: Editing existing prompt bypasses limit check
     Given the organization has a license with maxPrompts 3
     And the organization has 3 prompts (at limit)
@@ -253,7 +253,7 @@ Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators, Scenarios, 
     Then the prompt is updated successfully
     And no upgrade modal is shown
 
-  @unit
+  @unit @unimplemented
   Scenario: Create Evaluator button is always clickable
     Given the organization has a license with maxEvaluators 3
     And the organization has 3 evaluators (at limit)
@@ -261,7 +261,7 @@ Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators, Scenarios, 
     Then the "Create Evaluator" button is enabled
     And the "Create Evaluator" button is not visually disabled
 
-  @unit
+  @unit @unimplemented
   Scenario: Clicking Create Evaluator at limit shows upgrade modal
     Given the organization has a license with maxEvaluators 3
     And the organization has 3 evaluators (at limit)
@@ -270,7 +270,7 @@ Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators, Scenarios, 
     And the modal shows "Evaluators: 3 / 3"
     And the modal includes an upgrade call-to-action
 
-  @unit
+  @unit @unimplemented
   Scenario: Create Scenario button is always clickable
     Given the organization has a license with maxScenarios 3
     And the organization has 3 scenarios (at limit)
@@ -278,7 +278,7 @@ Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators, Scenarios, 
     Then the "New Scenario" button is enabled
     And the "New Scenario" button is not visually disabled
 
-  @unit
+  @unit @unimplemented
   Scenario: Clicking Create Scenario at limit shows upgrade modal
     Given the organization has a license with maxScenarios 3
     And the organization has 3 scenarios (at limit)
@@ -287,7 +287,7 @@ Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators, Scenarios, 
     And the modal shows "Scenarios: 3 / 3"
     And the modal includes an upgrade call-to-action
 
-  @unit
+  @unit @unimplemented
   Scenario: Create Team button is always clickable
     Given the organization has a license with maxTeams 3
     And the organization has 3 teams (at limit)
@@ -295,7 +295,7 @@ Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators, Scenarios, 
     Then the "Create team" button is enabled
     And the "Create team" button is not visually disabled
 
-  @unit
+  @unit @unimplemented
   Scenario: Clicking Create Team at limit shows upgrade modal on submit
     Given the organization has a license with maxTeams 3
     And the organization has 3 teams (at limit)
@@ -310,7 +310,7 @@ Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators, Scenarios, 
   # UI: Allowed State Behavior
   # ============================================================================
 
-  @unit
+  @unit @unimplemented
   Scenario: Clicking Create Workflow when allowed opens creation modal
     Given the organization has a license with maxWorkflows 5
     And the organization has 3 workflows (under limit)
@@ -318,7 +318,7 @@ Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators, Scenarios, 
     Then the new workflow modal is displayed
     And no upgrade modal is shown
 
-  @unit
+  @unit @unimplemented
   Scenario: Clicking Create Prompt when allowed opens creation form
     Given the organization has a license with maxPrompts 5
     And the organization has 3 prompts (under limit)
@@ -326,7 +326,7 @@ Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators, Scenarios, 
     Then the prompt creation flow starts
     And no upgrade modal is shown
 
-  @unit
+  @unit @unimplemented
   Scenario: Clicking Create Evaluator when allowed opens creation form
     Given the organization has a license with maxEvaluators 5
     And the organization has 3 evaluators (under limit)
@@ -334,7 +334,7 @@ Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators, Scenarios, 
     Then the evaluator creation flow starts
     And no upgrade modal is shown
 
-  @unit
+  @unit @unimplemented
   Scenario: Clicking Create Scenario when allowed opens creation form
     Given the organization has a license with maxScenarios 5
     And the organization has 3 scenarios (under limit)
@@ -342,7 +342,7 @@ Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators, Scenarios, 
     Then the scenario creation drawer is displayed
     And no upgrade modal is shown
 
-  @unit
+  @unit @unimplemented
   Scenario: Clicking Create Team when allowed creates the team
     Given the organization has a license with maxTeams 5
     And the organization has 3 teams (under limit)
@@ -355,7 +355,7 @@ Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators, Scenarios, 
   # useLicenseEnforcement Hook Behavior
   # ============================================================================
 
-  @unit
+  @unit @unimplemented
   Scenario: Hook returns isAllowed true when under limit
     Given the organization has a license with maxWorkflows 5
     And the organization has 3 workflows
@@ -363,7 +363,7 @@ Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators, Scenarios, 
     Then isAllowed returns true
     And checkAndProceed executes the callback
 
-  @unit
+  @unit @unimplemented
   Scenario: Hook returns isAllowed false when at limit
     Given the organization has a license with maxWorkflows 3
     And the organization has 3 workflows
@@ -372,7 +372,7 @@ Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators, Scenarios, 
     And checkAndProceed does not execute the callback
     And checkAndProceed triggers the upgrade modal
 
-  @unit
+  @unit @unimplemented
   Scenario: Hook handles loading state optimistically
     Given the license check query is still loading
     When checkAndProceed is called
@@ -383,7 +383,7 @@ Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators, Scenarios, 
   # UI: Form Error Handling (Backend FORBIDDEN Response)
   # ============================================================================
 
-  @unit
+  @unit @unimplemented
   Scenario: Workflow form shows upgrade modal on FORBIDDEN error
     Given the organization has a license with maxWorkflows 3
     And the organization reached the limit after the form was opened
@@ -393,7 +393,7 @@ Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators, Scenarios, 
     And the modal shows the current and max limit from the error
     And no generic "Failed to create workflow" toast is shown
 
-  @unit
+  @unit @unimplemented
   Scenario: Prompt creation shows upgrade modal on FORBIDDEN error
     Given the organization has a license with maxPrompts 3
     And the organization reached the limit after the action started
@@ -401,7 +401,7 @@ Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators, Scenarios, 
     Then an upgrade modal is displayed
     And the modal shows the current and max limit from the error
 
-  @unit
+  @unit @unimplemented
   Scenario: Evaluator creation shows upgrade modal on FORBIDDEN error
     Given the organization has a license with maxEvaluators 3
     And the organization reached the limit after the action started
@@ -409,7 +409,7 @@ Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators, Scenarios, 
     Then an upgrade modal is displayed
     And the modal shows the current and max limit from the error
 
-  @unit
+  @unit @unimplemented
   Scenario: Form handles non-limit FORBIDDEN errors normally
     Given the server returns FORBIDDEN for permission denied
     When I submit the new workflow form
@@ -420,35 +420,35 @@ Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators, Scenarios, 
   # Invalid/Expired License Falls to FREE Tier
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: Expired license enforces FREE tier workflow limit
     Given the organization has an expired license
     And the organization has 3 workflows
     When I create a workflow in project "proj-789"
     Then the request fails with FORBIDDEN
 
-  @integration
+  @integration @unimplemented
   Scenario: Expired license enforces FREE tier prompt limit
     Given the organization has an expired license
     And the organization has 5 prompts
     When I create a prompt in project "proj-789"
     Then the request fails with FORBIDDEN
 
-  @integration
+  @integration @unimplemented
   Scenario: Expired license enforces FREE tier evaluator limit
     Given the organization has an expired license
     And the organization has 5 evaluators
     When I create an evaluator in project "proj-789"
     Then the request fails with FORBIDDEN
 
-  @integration
+  @integration @unimplemented
   Scenario: Expired license enforces FREE tier scenario limit
     Given the organization has an expired license
     And the organization has 5 scenarios
     When I create a scenario in project "proj-789"
     Then the request fails with FORBIDDEN
 
-  @integration
+  @integration @unimplemented
   Scenario: Expired license enforces FREE tier team limit
     Given the organization has an expired license
     And the organization has 2 teams
@@ -459,14 +459,14 @@ Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators, Scenarios, 
   # Experiments: Backend Enforcement
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: Allows experiment creation when under limit
     Given the organization has a license with maxExperiments 3
     And the organization has 2 experiments across all projects
     When I create an experiment in project "proj-789"
     Then the experiment is created successfully
 
-  @integration
+  @integration @unimplemented
   Scenario: Blocks experiment creation when at limit
     Given the organization has a license with maxExperiments 3
     And the organization has 3 experiments across all projects
@@ -474,7 +474,7 @@ Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators, Scenarios, 
     Then the request fails with FORBIDDEN
     And the error message contains "maximum number of experiments"
 
-  @integration
+  @integration @unimplemented
   Scenario: Counts experiments across all projects in organization
     Given the organization has a license with maxExperiments 3
     And project "proj-A" has 2 experiments
@@ -482,14 +482,14 @@ Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators, Scenarios, 
     When I create an experiment in project "proj-789"
     Then the request fails with FORBIDDEN
 
-  @integration
+  @integration @unimplemented
   Scenario: Experiment copy enforces limit
     Given the organization has a license with maxExperiments 3
     And the organization has 3 experiments across all projects
     When I copy an experiment to project "proj-789"
     Then the request fails with FORBIDDEN
 
-  @integration
+  @integration @unimplemented
   Scenario: Updating existing experiment does not enforce limit
     Given the organization has a license with maxExperiments 3
     And the organization has 3 experiments across all projects
@@ -501,14 +501,14 @@ Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators, Scenarios, 
   # Experiments: UI Enforcement
   # ============================================================================
 
-  @unit
+  @unit @unimplemented
   Scenario: Create Experiment menu item is always clickable
     Given the organization has a license with maxExperiments 3
     And the organization has 3 experiments (at limit)
     When I view the evaluations dashboard
     Then the "Create Experiment" menu item is enabled
 
-  @unit
+  @unit @unimplemented
   Scenario: Clicking Create Experiment at limit shows upgrade modal
     Given the organization has a license with maxExperiments 3
     And the organization has 3 experiments (at limit)
@@ -516,7 +516,7 @@ Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators, Scenarios, 
     Then an upgrade modal is displayed
     And the modal shows "Experiments: 3 / 3"
 
-  @integration
+  @integration @unimplemented
   Scenario: Expired license enforces FREE tier experiment limit
     Given the organization has an expired license
     And the organization has 3 experiments
@@ -527,14 +527,14 @@ Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators, Scenarios, 
   # Agents: Backend Enforcement
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: Allows agent creation when under limit
     Given the organization has a license with maxAgents 5
     And the organization has 3 agents across all projects
     When I create an agent in project "proj-789"
     Then the agent is created successfully
 
-  @integration
+  @integration @unimplemented
   Scenario: Blocks agent creation when at limit
     Given the organization has a license with maxAgents 3
     And the organization has 3 agents across all projects
@@ -542,7 +542,7 @@ Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators, Scenarios, 
     Then the request fails with FORBIDDEN
     And the error message contains "maximum number of agents"
 
-  @integration
+  @integration @unimplemented
   Scenario: Counts agents across all projects in organization
     Given the organization has a license with maxAgents 3
     And project "proj-A" has 2 agents
@@ -550,7 +550,7 @@ Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators, Scenarios, 
     When I create an agent in project "proj-789"
     Then the request fails with FORBIDDEN
 
-  @integration
+  @integration @unimplemented
   Scenario: Counts only non-archived agents toward limit
     Given the organization has a license with maxAgents 3
     And the organization has 2 active agents
@@ -558,7 +558,7 @@ Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators, Scenarios, 
     When I create an agent in project "proj-789"
     Then the agent is created successfully
 
-  @integration
+  @integration @unimplemented
   Scenario: Updating existing agent does not enforce limit
     Given the organization has a license with maxAgents 3
     And the organization has 3 agents across all projects
@@ -570,7 +570,7 @@ Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators, Scenarios, 
   # Agents: UI Enforcement (Save-time Modal)
   # ============================================================================
 
-  @unit
+  @unit @unimplemented
   Scenario: Agent creation drawer opens regardless of limit
     Given the organization has a license with maxAgents 3
     And the organization has 3 agents (at limit)
@@ -578,7 +578,7 @@ Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators, Scenarios, 
     Then the agent type selector drawer opens
     And no upgrade modal is shown yet
 
-  @unit
+  @unit @unimplemented
   Scenario: Clicking Save Agent at limit shows upgrade modal
     Given the organization has a license with maxAgents 3
     And the organization has 3 agents (at limit)
@@ -590,7 +590,7 @@ Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators, Scenarios, 
     And the modal includes an upgrade call-to-action
     And the API request is NOT made
 
-  @unit
+  @unit @unimplemented
   Scenario: Clicking Save Agent when allowed creates the agent
     Given the organization has a license with maxAgents 5
     And the organization has 3 agents (under limit)
@@ -600,7 +600,7 @@ Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators, Scenarios, 
     Then the agent is created successfully
     And no upgrade modal is shown
 
-  @unit
+  @unit @unimplemented
   Scenario: Editing existing agent bypasses limit check
     Given the organization has a license with maxAgents 3
     And the organization has 3 agents (at limit)
@@ -610,7 +610,7 @@ Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators, Scenarios, 
     Then the agent is updated successfully
     And no upgrade modal is shown
 
-  @integration
+  @integration @unimplemented
   Scenario: Expired license enforces FREE tier agent limit
     Given the organization has an expired license
     And the organization has 3 agents
@@ -621,14 +621,14 @@ Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators, Scenarios, 
   # Online Evaluations: Backend Enforcement
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: Allows online evaluation creation when under limit
     Given the organization has a license with maxOnlineEvaluations 5
     And the organization has 3 online evaluations across all projects
     When I create an online evaluation in project "proj-789"
     Then the online evaluation is created successfully
 
-  @integration
+  @integration @unimplemented
   Scenario: Blocks online evaluation creation when at limit
     Given the organization has a license with maxOnlineEvaluations 3
     And the organization has 3 online evaluations across all projects
@@ -636,7 +636,7 @@ Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators, Scenarios, 
     Then the request fails with FORBIDDEN
     And the error message contains "maximum number of online evaluations"
 
-  @integration
+  @integration @unimplemented
   Scenario: Counts online evaluations across all projects in organization
     Given the organization has a license with maxOnlineEvaluations 3
     And project "proj-A" has 2 online evaluations
@@ -644,7 +644,7 @@ Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators, Scenarios, 
     When I create an online evaluation in project "proj-789"
     Then the request fails with FORBIDDEN
 
-  @integration
+  @integration @unimplemented
   Scenario: Counts only enabled online evaluations toward limit
     Given the organization has a license with maxOnlineEvaluations 3
     And the organization has 2 enabled online evaluations
@@ -652,7 +652,7 @@ Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators, Scenarios, 
     When I create an online evaluation in project "proj-789"
     Then the online evaluation is created successfully
 
-  @integration
+  @integration @unimplemented
   Scenario: Updating existing online evaluation does not enforce limit
     Given the organization has a license with maxOnlineEvaluations 3
     And the organization has 3 online evaluations across all projects
@@ -664,7 +664,7 @@ Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators, Scenarios, 
   # Online Evaluations: UI Enforcement (Save-time Modal)
   # ============================================================================
 
-  @unit
+  @unit @unimplemented
   Scenario: Online evaluation drawer opens regardless of limit
     Given the organization has a license with maxOnlineEvaluations 3
     And the organization has 3 online evaluations (at limit)
@@ -672,7 +672,7 @@ Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators, Scenarios, 
     Then the OnlineEvaluationDrawer opens
     And no upgrade modal is shown yet
 
-  @unit
+  @unit @unimplemented
   Scenario: Clicking Save Online Evaluation at limit shows upgrade modal
     Given the organization has a license with maxOnlineEvaluations 3
     And the organization has 3 online evaluations (at limit)
@@ -684,7 +684,7 @@ Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators, Scenarios, 
     And the modal includes an upgrade call-to-action
     And the API request is NOT made
 
-  @unit
+  @unit @unimplemented
   Scenario: Clicking Save Online Evaluation when allowed creates the online evaluation
     Given the organization has a license with maxOnlineEvaluations 5
     And the organization has 3 online evaluations (under limit)
@@ -694,7 +694,7 @@ Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators, Scenarios, 
     Then the online evaluation is created successfully
     And no upgrade modal is shown
 
-  @unit
+  @unit @unimplemented
   Scenario: Editing existing online evaluation bypasses limit check
     Given the organization has a license with maxOnlineEvaluations 3
     And the organization has 3 online evaluations (at limit)
@@ -704,7 +704,7 @@ Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators, Scenarios, 
     Then the online evaluation is updated successfully
     And no upgrade modal is shown
 
-  @integration
+  @integration @unimplemented
   Scenario: Expired license enforces FREE tier online evaluation limit
     Given the organization has an expired license
     And the organization has 3 online evaluations

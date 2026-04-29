@@ -10,7 +10,7 @@ Feature: Provider setup links from "provider not set up" warnings in Scenario su
   # Surface 1: AICreateModal footer (primary action)
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: AICreateModal footer shows primary Configure model provider button when no providers are enabled
     Given I have no enabled model providers
     When I open the Scenario Create modal
@@ -18,13 +18,13 @@ Feature: Provider setup links from "provider not set up" warnings in Scenario su
     And the button links to "/settings/model-providers"
     And the button opens the link in a new tab
 
-  @integration
+  @integration @unimplemented
   Scenario: AICreateModal footer button preserves noopener noreferrer on the new-tab link
     Given I have no enabled model providers
     When I open the Scenario Create modal
     Then the footer "Configure model provider" button uses rel "noopener noreferrer"
 
-  @integration
+  @integration @unimplemented
   Scenario: AICreateModal footer renders no primary action when providers are configured
     Given I have at least one enabled model provider
     When I open the Scenario Create modal
@@ -34,7 +34,7 @@ Feature: Provider setup links from "provider not set up" warnings in Scenario su
   # Surface 2: Sidebar "AI Generation" panel — no-providers card
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: Scenario editor sidebar shows Configure model provider button when no providers are enabled
     Given I am on the scenario editor
     And I have no enabled model providers
@@ -42,7 +42,7 @@ Feature: Provider setup links from "provider not set up" warnings in Scenario su
     And the button links to "/settings/model-providers"
     And the button opens the link in a new tab
 
-  @integration
+  @integration @unimplemented
   Scenario: Sidebar "Model Provider Required" card keeps its inline explanatory text alongside the button
     Given I am on the scenario editor
     And I have no enabled model providers
@@ -54,7 +54,7 @@ Feature: Provider setup links from "provider not set up" warnings in Scenario su
   # Surface 3: Sidebar default-model banners (no-default / stale-default)
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: Sidebar no-default banner shows Configure default model button
     Given I am on the scenario editor
     And I have at least one enabled model provider
@@ -63,7 +63,7 @@ Feature: Provider setup links from "provider not set up" warnings in Scenario su
     And the button links to "/settings/model-providers"
     And the button opens the link in a new tab
 
-  @integration
+  @integration @unimplemented
   Scenario: Sidebar stale-default banner shows Configure default model button
     Given I am on the scenario editor
     And the project's default model points to a provider that is no longer enabled
@@ -75,7 +75,7 @@ Feature: Provider setup links from "provider not set up" warnings in Scenario su
   # Surface 4: useRunScenario toast — uses toaster action slot
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: Run-scenario toast exposes the settings link via the toaster action slot
     Given I am on the scenario editor
     And I have no enabled model providers
@@ -86,7 +86,7 @@ Feature: Provider setup links from "provider not set up" warnings in Scenario su
     And activating the action navigates to "/settings/model-providers"
     And the action opens the link in a new tab
 
-  @integration
+  @integration @unimplemented
   Scenario: Run-scenario toast action pattern matches the existing "View failed run" action idiom
     Given the useRunScenario hook already renders a "View failed run" action on run failure
     When the "No model provider configured" toast is rendered
@@ -97,7 +97,7 @@ Feature: Provider setup links from "provider not set up" warnings in Scenario su
   # Cross-cutting: link target and new-tab behavior preserved across all surfaces
   # ============================================================================
 
-  @unit
+  @unit @unimplemented
   Scenario Outline: All four surfaces point at /settings/model-providers and open in a new tab
     Given the <surface> renders its "provider not set up" warning
     Then its primary action links to "/settings/model-providers"
@@ -111,7 +111,7 @@ Feature: Provider setup links from "provider not set up" warnings in Scenario su
       | Scenario editor sidebar stale-default banner |
       | useRunScenario toast                       |
 
-  @unit
+  @unit @unimplemented
   Scenario: Existing href assertions for inline links continue to pass
     Given tests that assert `href="/settings/model-providers"` on the AICreateModal inline link
     And tests that assert the same href on the sidebar inline link
@@ -123,7 +123,7 @@ Feature: Provider setup links from "provider not set up" warnings in Scenario su
   # Explicit out-of-scope guard
   # ============================================================================
 
-  @unit
+  @unit @unimplemented
   Scenario: Orchestrator runtime failure strings are not modified
     Given the runtime orchestrator error messages "provider_not_found", "provider_not_enabled", and "missing_params"
     When this feature is implemented

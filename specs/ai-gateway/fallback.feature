@@ -19,7 +19,7 @@ Feature: Provider fallback chain
 
   Rule: Fallback triggers on 5xx
 
-    @integration
+    @integration @unimplemented
     Scenario: primary 503 triggers fallback to secondary
       Given "pc_openai_primary" returns 503 Service Unavailable
       And "pc_anthropic_secondary" returns 200 with a valid completion
@@ -29,7 +29,7 @@ Feature: Provider fallback chain
       And the response header "X-LangWatch-Fallback-Count: 1" is set
       And the OTel trace has two child spans tagged langwatch.fallback.attempt=0 and =1
 
-    @integration
+    @integration @unimplemented
     Scenario: primary timeout triggers fallback
       Given "pc_openai_primary" exceeds timeout_ms
       And "pc_anthropic_secondary" returns 200
@@ -37,7 +37,7 @@ Feature: Provider fallback chain
       Then the client receives 200 from anthropic
       And the timeout_ms limit is enforced per attempt, not across attempts
 
-    @integration
+    @integration @unimplemented
     Scenario: 429 from primary triggers fallback
       Given "pc_openai_primary" returns 429 with Retry-After: 60
       When I POST /v1/chat/completions
@@ -45,7 +45,7 @@ Feature: Provider fallback chain
 
   Rule: Fallback does NOT trigger on client-fault errors
 
-    @integration
+    @integration @unimplemented
     Scenario: primary 400 returns as-is without fallback
       Given "pc_openai_primary" returns 400 with {"error": {"message": "invalid model parameter"}}
       When I POST /v1/chat/completions
@@ -54,7 +54,7 @@ Feature: Provider fallback chain
       And the error envelope type is "bad_request"
       And the response includes the upstream error message for debugging
 
-    @integration
+    @integration @unimplemented
     Scenario: primary 401 (provider creds bad) returns as-is
       Given "pc_openai_primary" returns 401 from OpenAI (invalid provider API key)
       When I POST /v1/chat/completions
@@ -62,7 +62,7 @@ Feature: Provider fallback chain
       And the error.message hints at a provider credential issue (so the customer fixes their pc_*)
       And "pc_anthropic_secondary" is NOT called
 
-    @integration
+    @integration @unimplemented
     Scenario: primary 404 (model unknown at provider) returns as-is
       When the request uses a model that does not exist at the primary provider
       Then fallback does NOT trigger
@@ -70,7 +70,7 @@ Feature: Provider fallback chain
 
   Rule: All attempts exhausted returns the last error
 
-    @integration
+    @integration @unimplemented
     Scenario: all providers 503 returns provider_error
       Given every provider in the chain returns 503
       When I POST /v1/chat/completions
@@ -80,14 +80,14 @@ Feature: Provider fallback chain
 
   Rule: Circuit breaker preempts hopeless attempts
 
-    @integration
+    @integration @unimplemented
     Scenario: consecutive failures open the circuit for primary
       Given "pc_openai_primary" has returned 5xx for the last 10 requests in the last 30s
       When I POST /v1/chat/completions with {"model": "chat"}
       Then the gateway skips primary (circuit open) and dispatches directly to secondary
       And the circuit-open state is logged with span attribute langwatch.provider.circuit=open
 
-    @integration
+    @integration @unimplemented
     Scenario: circuit half-opens after cool-down
       Given primary's circuit has been open for 60s
       When a new request is attempted
@@ -97,7 +97,7 @@ Feature: Provider fallback chain
 
   Rule: Streaming respects the first-chunk-commit rule
 
-    @integration
+    @integration @unimplemented
     Scenario: primary fails before first chunk, fallback is transparent
       Given the client sends stream=true
       And primary returns 503 before any SSE chunk
@@ -106,7 +106,7 @@ Feature: Provider fallback chain
       And the client sees a clean SSE stream from secondary (no partial data from primary)
       And response headers indicate X-LangWatch-Provider: anthropic
 
-    @integration
+    @integration @unimplemented
     Scenario: primary fails mid-stream, gateway terminates (no silent switch)
       Given the client sends stream=true
       And primary sent 3 SSE chunks then connection drops
@@ -118,7 +118,7 @@ Feature: Provider fallback chain
 
   Rule: Fallback is not retry (avoid double-spend on non-idempotent calls)
 
-    @integration
+    @integration @unimplemented
     Scenario: gateway does not retry a POST once headers were sent upstream
       Given primary's TCP connection dropped after headers were sent
       When the gateway detects the drop
