@@ -78,7 +78,7 @@ function createDeps(
   return {
     monitors: {
       getEnabledOnMessageMonitors: vi.fn().mockResolvedValue([
-        { id: "mon-1", checkType: "llm/boolean", name: "Test Monitor" },
+        { id: "mon-1", checkType: "llm/boolean", name: "Test Monitor", evaluator: null },
       ]),
     } as unknown as EvaluationTriggerReactorDeps["monitors"],
     evaluation: vi.fn().mockResolvedValue(undefined),

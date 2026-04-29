@@ -3,6 +3,7 @@ export interface MonitorSummary {
   checkType: string;
   name: string;
   threadIdleTimeout: number | null;
+  evaluator: { name: string } | null;
 }
 
 /**
