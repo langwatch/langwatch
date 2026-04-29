@@ -69,7 +69,7 @@ async function confirmUvInstallPrompt(): Promise<void> {
     { onCancel: () => process.exit(130) }
   );
   if (!ok) {
-    console.error(chalk.red("Aborted — `uv` is required to run langwatch_nlp + langevals."));
+    console.error(chalk.red("Aborted — `uv` is required to run langevals."));
     process.exit(1);
   }
 }

@@ -4,7 +4,7 @@ import { join } from "node:path";
 import type { RuntimeContext } from "../shared/runtime-contract.ts";
 import type { EventBus } from "./event-bus.ts";
 import { httpGetCheck, pollUntilHealthy } from "./health.ts";
-import { locateLangwatchDir } from "./node-deps.ts";
+import { locateLangwatchDir, resolvePnpm } from "./node-deps.ts";
 import { servicePaths } from "./paths.ts";
 import { supervise, type SupervisedHandle } from "./spawn.ts";
 
@@ -24,18 +24,24 @@ export async function startLangwatch(
 
   const langwatchDir = locateLangwatchDir();
   if (!langwatchDir) throw new Error("langwatch app dir not found");
-  await ensureNodeModules(langwatchDir, bus);
+  await ensureNodeModules(langwatchDir, ctx, bus);
 
   const sp = servicePaths(ctx.paths);
+  const pnpm = await resolvePnpm(ctx.paths);
   const handle = supervise({
     spec: {
       name: "langwatch",
-      command: "pnpm",
-      args: ["run", "start:app"],
+      command: pnpm.command,
+      args: [...pnpm.args, "run", "start:app"],
       cwd: langwatchDir,
       env: {
         ...process.env,
         ...envFromFile,
+        // Prepend ctx.paths.bin so the bundled pnpm is reachable to any
+        // nested pnpm calls inside langwatch's own scripts. Without this,
+        // `sh -c '... pnpm ...'` subshells can't find pnpm on bare-Linux
+        // boxes that have no global pnpm install.
+        PATH: `${ctx.paths.bin}:${process.env.PATH ?? ""}`,
         NODE_ENV: "production",
         PORT: String(ctx.ports.langwatch),
         START_WORKERS: "true",
@@ -63,10 +69,15 @@ export async function startLangwatch(
   return handle;
 }
 
-async function ensureNodeModules(langwatchDir: string, bus: EventBus): Promise<void> {
+async function ensureNodeModules(langwatchDir: string, ctx: RuntimeContext, bus: EventBus): Promise<void> {
   if (existsSync(join(langwatchDir, "node_modules"))) return;
   bus.emit({ type: "log", service: "langwatch", stream: "stdout", line: "installing node_modules (one-time setup)..." });
-  await execa("pnpm", ["install", "--prod=false", "--frozen-lockfile"], {
+  // Defensive fallback for upgrade flows where node_modules went missing
+  // but the runtime was already started — ensureLangwatchDeps is the
+  // primary path. resolvePnpm(paths) prefers the bundled <bin>/pnpm
+  // installed by the pnpm predep.
+  const pnpm = await resolvePnpm(ctx.paths);
+  await execa(pnpm.command, [...pnpm.args, "install", "--prod=false", "--frozen-lockfile"], {
     cwd: langwatchDir,
     stdio: "inherit",
   });

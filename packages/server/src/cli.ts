@@ -1,5 +1,6 @@
 import { Command } from "commander";
 import chalk from "chalk";
+import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import prompts from "prompts";
 import { printBanner } from "./animation/banner.ts";
@@ -74,6 +75,20 @@ program
     const base = Number.parseInt(opts.portBase, 10);
     const { base: resolvedBase } = await resolvePortConflicts({ base, yes: opts.yes });
     const ports = allocatePorts(resolvedBase);
+
+    // First-run signpost — predep tarballs + langwatch app deps are cached
+    // after the initial install, so warm starts complete in <30s. Cold
+    // first-run can take 3-5 min (clickhouse 178MB download, uv venv
+    // builds, pnpm install). Tell the user up front so the wait isn't
+    // silent. Both gates have to be empty: paths.bin holds the predep
+    // binaries, install-manifest.json is written after the langwatch app
+    // relocation completes.
+    if (!existsSync(paths.bin) && !existsSync(paths.installManifest)) {
+      console.log("");
+      console.log(chalk.dim("Setting up ~/.langwatch for the first time, this may take a few minutes."));
+      console.log(chalk.dim("Next runs will be much faster."));
+      console.log("");
+    }
 
     const predeps = await runPredeps({ yes: opts.yes, version: VERSION });
 

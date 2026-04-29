@@ -4,8 +4,7 @@ import type { RuntimeEvent } from "../shared/runtime-contract.ts";
 const COLORS: Record<string, (s: string) => string> = {
   langwatch: chalk.green,
   workers: chalk.bold.green,
-  langwatch_nlp: chalk.cyan,
-  nlp: chalk.cyan,
+  nlpgo: chalk.cyan,
   langevals: chalk.magenta,
   aigateway: chalk.yellow,
   postgres: chalk.dim,
@@ -14,14 +13,13 @@ const COLORS: Record<string, (s: string) => string> = {
   bullboard: chalk.gray,
   "prepare:app": chalk.blue,
   "prepare:langwatch": chalk.green,
-  "prepare:langwatch_nlp": chalk.cyan,
   "prepare:langevals": chalk.magenta,
   "migrate:prisma": chalk.dim,
   "migrate:clickhouse": chalk.dim,
 };
 
-// Wide enough to fit `prepare:langwatch_nlp` (21) without breaking alignment
-// when the install phase falls back to the prefixed-line renderer (no TTY,
+// Wide enough to fit `prepare:langevals` without breaking alignment when
+// the install phase falls back to the prefixed-line renderer (no TTY,
 // non-interactive shells, etc).
 const LABEL_WIDTH = 22;
 

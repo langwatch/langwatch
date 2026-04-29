@@ -8,7 +8,7 @@ import { servicePaths } from "./paths.ts";
 import { execAndPipe } from "./_pipe-to-bus.ts";
 
 type VenvSpec = {
-  name: "langwatch_nlp" | "langevals";
+  name: "langevals";
   projectDir: string;
   lockFile: string;
   extras?: string[];
@@ -62,12 +62,12 @@ export async function syncVenvs(ctx: RuntimeContext, bus: EventBus): Promise<voi
 
 function resolveVenvSpecs(): VenvSpec[] {
   const root = appRoot();
+  // langwatch_nlp's uv venv is no longer built — npx-server runs nlpgo
+  // (Go) in Go-only mode (NLPGO_CHILD_BYPASS=true), so the legacy uvicorn
+  // never starts. The langwatch_nlp Python project still exists in the
+  // npm tarball for the source-of-truth runner.py codeblock harness, but
+  // its dependencies are not needed at npx runtime.
   return [
-    {
-      name: "langwatch_nlp",
-      projectDir: join(root, "langwatch_nlp"),
-      lockFile: join(root, "langwatch_nlp", "uv.lock"),
-    },
     {
       name: "langevals",
       projectDir: join(root, "langevals"),

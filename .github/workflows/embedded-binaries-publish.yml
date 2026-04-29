@@ -216,7 +216,15 @@ jobs:
             done
           fi
           # Strip debug info from the executables to halve the tarball size.
-          find "$install_prefix/bin" -type f -exec strip {} + 2>/dev/null || true
+          # `-S` (strip debug only) is portable across GNU strip (Linux) and
+          # BSD strip (macOS) and preserves global symbols on both. Default
+          # `strip` on macOS removes ALL symbols including globals, which
+          # breaks postgres modules (.dylib's like dict_snowball) that
+          # dlopen against the postgres binary's exported symbols
+          # (CurrentMemoryContext etc.). Repro: bundled postgres on darwin
+          # fails initdb post-bootstrap with `dlopen: Symbol not found:
+          # _CurrentMemoryContext`.
+          find "$install_prefix/bin" -type f -exec strip -S {} + 2>/dev/null || true
           # Pack contents of _install (bin/, lib/, share/, include/) at the
           # tarball root — predep extracts directly into <paths.bin>/postgres.
           tar czf "../postgres-${PG_VERSION}-${{ matrix.target.platform }}.tar.gz" -C "$install_prefix" .

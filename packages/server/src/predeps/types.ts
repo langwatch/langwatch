@@ -1,7 +1,7 @@
 import type { SupportedPlatform } from "../shared/platform.ts";
 import type { LangwatchPaths } from "../shared/paths.ts";
 
-export type PredepId = "uv" | "postgres" | "redis" | "clickhouse" | "goose" | "aigateway";
+export type PredepId = "pnpm" | "uv" | "postgres" | "redis" | "clickhouse" | "goose" | "aigateway";
 
 export type DetectionResult =
   | { installed: true; version: string; resolvedPath: string }
