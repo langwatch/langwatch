@@ -14,7 +14,7 @@ Feature: AI Gateway Governance — CLI ↔ Dashboard deep-links + request-increa
 
   Background:
     Given the langwatch CLI is installed
-    And user "jane@miro.com" is logged in (config at ~/.langwatch/config.json)
+    And user "jane@acme.com" is logged in (config at ~/.langwatch/config.json)
     And her config has:
       | gateway_url       | http://gateway.langwatch.example.com  |
       | control_plane_url | http://app.langwatch.example.com      |

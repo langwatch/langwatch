@@ -1,7 +1,7 @@
 Feature: IngestionSource — admin configuration of cross-platform feeds
   An IngestionSource is the configuration unit that connects a closed
   SaaS platform's audit / OTel / S3 stream to LangWatch's Activity
-  Monitor. One source = one platform fleet (e.g. "Miro Cowork" or
+  Monitor. One source = one platform fleet (e.g. "Acme Cowork" or
   "Acme Workato production"). The admin configures the connection
   once per platform; the runtime then ingests events on whatever
   cadence the source supports (push for OTel/webhook/S3, pull for

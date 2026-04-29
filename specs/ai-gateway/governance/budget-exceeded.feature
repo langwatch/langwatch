@@ -13,7 +13,7 @@ Feature: AI Gateway Governance — Personal budget exceeded surfaces (CLI + dash
   CLI/SDK can render its own message.
 
   Background:
-    Given user "jane@miro.com" has a USD 500/month personal budget
+    Given user "jane@acme.com" has a USD 500/month personal budget
     And jane has spent USD 500.00 in the current month
     And the gateway budget-fold from ClickHouse confirms the spend total
     And the gateway's `/budget/check` endpoint will return `blocked_by: "personal"`
@@ -36,7 +36,7 @@ Feature: AI Gateway Governance — Personal budget exceeded surfaces (CLI + dash
           "spent_usd": "500.00",
           "period": "month",
           "request_increase_url": "https://app.langwatch.example.com/me/budget/request",
-          "admin_email": "platform-team@miro.com"
+          "admin_email": "platform-team@acme.com"
         }
       }
       """
@@ -58,7 +58,7 @@ Feature: AI Gateway Governance — Personal budget exceeded surfaces (CLI + dash
          You've used $500.00 of your $500.00 monthly budget.
          To continue, ask your team admin to raise your limit.
 
-         Admin: platform-team@miro.com
+         Admin: platform-team@acme.com
 
          Need urgent access? Run:
            langwatch request-increase
@@ -91,7 +91,7 @@ Feature: AI Gateway Governance — Personal budget exceeded surfaces (CLI + dash
     Then a Chakra `colorPalette="red"` banner is rendered above the cards
     And the banner reads "Budget limit reached — $500.00 of $500.00 spent this month."
     And the banner has a primary button "Request more"
-    And the banner has a secondary link "Email your admin (platform-team@miro.com)"
+    And the banner has a secondary link "Email your admin (platform-team@acme.com)"
     And clicking "Request more" opens "/me/budget/request"
 
   @bdd @ui @budget-exceeded @cards

@@ -14,14 +14,14 @@ Feature: AI Gateway Governance — Admin RoutingPolicies (decoupled from VK)
     *override* mechanism for production agents that need explicit chains.
 
   Background:
-    Given organization "miro" exists
-    And admin "carol@miro.com" has the `routingPolicy:*` permission at organization scope
+    Given organization "acme" exists
+    And admin "carol@acme.com" has the `routingPolicy:*` permission at organization scope
     And the org has connected provider credentials:
       | id           | provider  | scope | label                 |
-      | mp_anth_prod | anthropic | ORG   | "Miro Anthropic Prod" |
-      | mp_oai_prod  | openai    | ORG   | "Miro OpenAI Prod"    |
-      | mp_gem_prod  | gemini    | ORG   | "Miro Gemini Prod"    |
-      | mp_brk_prod  | bedrock   | ORG   | "Miro Bedrock Prod"   |
+      | mp_anth_prod | anthropic | ORG   | "Acme Anthropic Prod" |
+      | mp_oai_prod  | openai    | ORG   | "Acme OpenAI Prod"    |
+      | mp_gem_prod  | gemini    | ORG   | "Acme Gemini Prod"    |
+      | mp_brk_prod  | bedrock   | ORG   | "Acme Bedrock Prod"   |
 
   # ---------------------------------------------------------------------------
   # CRUD
@@ -32,7 +32,7 @@ Feature: AI Gateway Governance — Admin RoutingPolicies (decoupled from VK)
     When carol calls `routingPolicy.upsert` with:
       | field                  | value                                                            |
       | scope                  | ORGANIZATION                                                     |
-      | scopeId                | "miro"                                                           |
+      | scopeId                | "acme"                                                           |
       | name                   | "developer-default"                                              |
       | strategy               | "priority"                                                       |
       | providerCredentialIds  | ["mp_anth_prod", "mp_oai_prod", "mp_gem_prod"]                   |
@@ -44,7 +44,7 @@ Feature: AI Gateway Governance — Admin RoutingPolicies (decoupled from VK)
 
   @bdd @routing-policy @update
   Scenario: Admin updates an existing RoutingPolicy
-    Given the policy "developer-default" exists at ORG scope for "miro"
+    Given the policy "developer-default" exists at ORG scope for "acme"
     When carol calls `routingPolicy.upsert` with the same id and a new modelAllowlist
     Then the existing row is updated (not duplicated)
     And the change is reflected in any new VK config materialised after the update
@@ -53,9 +53,9 @@ Feature: AI Gateway Governance — Admin RoutingPolicies (decoupled from VK)
 
   @bdd @routing-policy @set-default
   Scenario: Admin can swap the default policy at org scope
-    Given org "miro" has policies "developer-default" (isDefault=true) and "experimental" (isDefault=false)
+    Given org "acme" has policies "developer-default" (isDefault=true) and "experimental" (isDefault=false)
     When carol calls `routingPolicy.setOrgDefault({ id: "experimental" })`
-    Then "experimental" becomes isDefault=true at ORG scope for "miro"
+    Then "experimental" becomes isDefault=true at ORG scope for "acme"
     And "developer-default" automatically becomes isDefault=false (atomic swap in a transaction)
     And new personal VK issuances reference "experimental" going forward
     And existing personal VKs continue to reference whatever policy they were issued against (snapshot, not live ref) until re-bound
@@ -66,22 +66,22 @@ Feature: AI Gateway Governance — Admin RoutingPolicies (decoupled from VK)
 
   @bdd @routing-policy @hierarchy
   Scenario: When a user has a team-default policy and an org-default, team wins
-    Given org "miro" has default policy "developer-default"
+    Given org "acme" has default policy "developer-default"
     And team "Sales Engineering" has default policy "sales-eng-stricter"
-    And user "jane@miro.com" is a member of team "Sales Engineering"
+    And user "jane@acme.com" is a member of team "Sales Engineering"
     When jane completes the device-code flow
     Then her personal VK references "sales-eng-stricter", not "developer-default"
     And `user.personalContext` returns the resolved policy id
 
   @bdd @routing-policy @hierarchy
   Scenario: When a user is in NO team with a default policy, the org-default wins
-    Given user "ben@miro.com" is in no team that has a default policy
+    Given user "ben@acme.com" is in no team that has a default policy
     When ben completes the device-code flow
     Then his personal VK references the org-level "developer-default"
 
   @bdd @routing-policy @hierarchy
   Scenario: When neither team nor org has a default policy, personal-key issuance fails (see personal-keys.feature)
-    Given org "miro" has no isDefault policy at any scope
+    Given org "acme" has no isDefault policy at any scope
     When ben tries to login
     Then issuance fails with `no_default_routing_policy` (cross-ref personal-keys.feature)
 
@@ -91,17 +91,17 @@ Feature: AI Gateway Governance — Admin RoutingPolicies (decoupled from VK)
 
   @bdd @routing-policy @authz
   Scenario: A non-admin cannot create or update RoutingPolicies
-    Given user "jane@miro.com" has role MEMBER (no routingPolicy permissions)
+    Given user "jane@acme.com" has role MEMBER (no routingPolicy permissions)
     When she tries to call `routingPolicy.upsert(...)`
     Then the response is 403 FORBIDDEN
     And no row is created
 
   @bdd @routing-policy @authz
   Scenario: A team admin can publish a policy at TEAM scope only
-    Given user "alex@miro.com" has the `routingPolicy:*` permission scoped to team "Sales Engineering"
+    Given user "alex@acme.com" has the `routingPolicy:*` permission scoped to team "Sales Engineering"
     When she calls `routingPolicy.upsert` with scope=TEAM, scopeId="sales-engineering"
     Then the row is created
-    But when she calls `routingPolicy.upsert` with scope=ORGANIZATION, scopeId="miro"
+    But when she calls `routingPolicy.upsert` with scope=ORGANIZATION, scopeId="acme"
     Then the response is 403 FORBIDDEN
 
   # ---------------------------------------------------------------------------
@@ -110,7 +110,7 @@ Feature: AI Gateway Governance — Admin RoutingPolicies (decoupled from VK)
 
   @bdd @ui @routing-policy @admin-page
   Scenario: Admin RoutingPolicies page lists all policies grouped by scope
-    Given org "miro" has 3 RoutingPolicies across ORG / TEAM / PROJECT scopes
+    Given org "acme" has 3 RoutingPolicies across ORG / TEAM / PROJECT scopes
     When carol navigates to "/settings/routing-policies"
     Then she sees a list grouped by scope: "Organization defaults", "Team defaults", "Project defaults"
     And each group can be expanded to show its policies with name, strategy, allowlist preview, providerCredential count

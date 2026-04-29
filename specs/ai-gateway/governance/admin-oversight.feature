@@ -22,7 +22,7 @@ Feature: AI Gateway Governance — Admin Oversight Dashboard
   rollup queries.
 
   Background:
-    Given user "platform-admin@miro.com" is signed in to organization "miro"
+    Given user "platform-admin@acme.com" is signed in to organization "acme"
     And the user has the "organization:manage" permission
     And the feature flag "release_ui_ai_governance_enabled" is enabled
 
@@ -32,7 +32,7 @@ Feature: AI Gateway Governance — Admin Oversight Dashboard
 
   @bdd @ui @admin-oversight @permission
   Scenario: A non-admin user is redirected away from the dashboard
-    Given user "engineer@miro.com" is signed in but does NOT have
+    Given user "engineer@acme.com" is signed in but does NOT have
       "organization:manage"
     When she navigates to "/settings/governance"
     Then she is redirected (or shown the existing settings-permission
@@ -97,9 +97,9 @@ Feature: AI Gateway Governance — Admin Oversight Dashboard
 
   @bdd @ui @admin-oversight @per-user @permissions
   Scenario: Per-user rows respect the admin's RBAC scope
-    Given the admin has "organization:manage" but only on org "miro"
+    Given the admin has "organization:manage" but only on org "acme"
     When the dashboard renders
-    Then only users in "miro" appear in the table
+    Then only users in "acme" appear in the table
     And users from sibling orgs (where the admin has no permission) are
       not listed
 
@@ -137,7 +137,7 @@ Feature: AI Gateway Governance — Admin Oversight Dashboard
     When the dashboard renders
     Then a horizontal strip shows one chip per source with:
       | field        | description                              |
-      | name         | "Miro Cowork", "Workato Production", etc. |
+      | name         | "Acme Cowork", "Workato Production", etc. |
       | sourceType   | otel_generic / workato / claude_cowork ... |
       | status       | "healthy" / "degraded" / "stale" / "down"  |
       | last event   | relative timestamp                         |

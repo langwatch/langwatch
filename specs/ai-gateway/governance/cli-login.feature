@@ -16,9 +16,9 @@ Feature: AI Gateway Governance — CLI login (RFC 8628 device-code flow)
 
   Background:
     Given the LangWatch app is running at "https://app.langwatch.example.com"
-    And organization "miro" has SAML SSO configured against "miro.okta.com"
-    And user "jane@miro.com" exists in organization "miro" with role MEMBER
-    And user "jane@miro.com" has a personal team and personal project auto-created
+    And organization "acme" has SAML SSO configured against "acme.okta.com"
+    And user "jane@acme.com" exists in organization "acme" with role MEMBER
+    And user "jane@acme.com" has a personal team and personal project auto-created
 
   # ---------------------------------------------------------------------------
   # Device authorization — happy path
@@ -51,12 +51,12 @@ Feature: AI Gateway Governance — CLI login (RFC 8628 device-code flow)
   Scenario: User completes browser SSO and approves the device
     Given the CLI is polling with a valid device_code
     And the verification page shows the user_code "ABCD-EFGH"
-    When user "jane@miro.com" enters her email at "/cli/auth"
-    And LangWatch redirects to "miro.okta.com" for SAML authentication
+    When user "jane@acme.com" enters her email at "/cli/auth"
+    And LangWatch redirects to "acme.okta.com" for SAML authentication
     And Jane completes the Okta SSO + MFA prompt
-    And LangWatch resolves Jane to user_id "user_jane_123" + organization "miro"
+    And LangWatch resolves Jane to user_id "user_jane_123" + organization "acme"
     And Jane confirms the device prompt showing user_code "ABCD-EFGH"
-    Then the device is marked APPROVED for user_jane_123 + organization "miro"
+    Then the device is marked APPROVED for user_jane_123 + organization "acme"
 
   @bdd @cli @device-flow @poll
   Scenario: CLI exchange returns tokens once user has approved
@@ -69,9 +69,9 @@ Feature: AI Gateway Governance — CLI login (RFC 8628 device-code flow)
       | refresh_token            | opaque ≥40-char string                      |
       | expires_in               | integer seconds                             |
       | user.id                  | "user_jane_123"                             |
-      | user.email               | "jane@miro.com"                             |
+      | user.email               | "jane@acme.com"                             |
       | user.name                | non-empty string                            |
-      | organization.id          | "miro"                                      |
+      | organization.id          | "acme"                                      |
       | organization.name        | non-empty string                            |
       | default_personal_vk      | the personal VK that was auto-issued at login |
 
@@ -156,7 +156,7 @@ Feature: AI Gateway Governance — CLI login (RFC 8628 device-code flow)
 
   @bdd @cli @multi-org @future
   Scenario: User in multiple orgs is asked to pick a default during exchange
-    Given user "jane@miro.com" is a member of organizations ["miro", "personal-side-project"]
+    Given user "jane@acme.com" is a member of organizations ["acme", "personal-side-project"]
     When she completes the SSO flow
     Then the device confirmation page asks her to pick a default organization
     And the chosen organization is bound to the issued access_token

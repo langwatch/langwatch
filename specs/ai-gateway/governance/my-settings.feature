@@ -7,19 +7,19 @@ Feature: AI Gateway Governance — My Settings (personal API keys + budget reado
   what is centrally managed vs. what I control myself
 
   Per gateway.md "screen 7": the page has sections
-    - Profile (read-only — name, email "managed by Miro IT", join date)
+    - Profile (read-only — name, email "managed by Acme IT", join date)
     - Personal API Keys (list with last-used + revoke; can issue new device key)
     - Notifications (budget threshold alerts, weekly summary, per-request thresholds)
-    - Budget (readonly — "set by your Miro admin · cannot edit")
+    - Budget (readonly — "set by your Acme admin · cannot edit")
 
   The principle: anything the admin governs is read-only and clearly marked
   "managed by your company". Anything the user owns is editable.
 
   Background:
-    Given user "jane@miro.com" is signed in to organization "miro"
+    Given user "jane@acme.com" is signed in to organization "acme"
     And jane has a personal team "Jane's Workspace" and personal project "personal-default"
     And jane has 2 personal VKs: "jane-laptop" (last used 2 min ago) and "jane-desktop" (last used 4d ago)
-    And admin "carol@miro.com" set jane's user-scope budget to USD 500/month
+    And admin "carol@acme.com" set jane's user-scope budget to USD 500/month
 
   # ---------------------------------------------------------------------------
   # Profile section
@@ -31,7 +31,7 @@ Feature: AI Gateway Governance — My Settings (personal API keys + budget reado
     Then I see a "Profile" section showing:
       | field   | value                                  | editable |
       | Name    | "Jane Doe"                             | no       |
-      | Email   | "jane@miro.com (managed by Miro IT)"   | no       |
+      | Email   | "jane@acme.com (managed by Acme IT)"   | no       |
       | Joined  | "Apr 24, 2026"                         | no       |
     And no field is editable
     And the email field carries an inline tooltip "Your email is provisioned by your company SSO and can only be changed by an admin."
@@ -84,12 +84,12 @@ Feature: AI Gateway Governance — My Settings (personal API keys + budget reado
 
   @bdd @ui @settings @budget @readonly
   Scenario: Budget section shows the admin-set cap with a clear "managed by company" label
-    Given admin "carol@miro.com" set jane's user-scope budget to USD 500/month
+    Given admin "carol@acme.com" set jane's user-scope budget to USD 500/month
     When I navigate to "/me/settings"
     Then I see a "Budget" section showing:
       | field            | value                                          |
       | Monthly limit    | "$500 / month"                                 |
-      | Managed by       | "Your Miro admin · cannot edit"                |
+      | Managed by       | "Your Acme admin · cannot edit"                |
       | Current spend    | from the same source as /me's "Spent this mo." |
     And there is no edit affordance
 

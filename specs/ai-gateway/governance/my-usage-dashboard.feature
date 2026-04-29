@@ -13,7 +13,7 @@ Feature: AI Gateway Governance — My Usage personal dashboard
     - workspace switcher in header lets the user switch context to a team or project
 
   Background:
-    Given user "jane@miro.com" is signed in to organization "miro"
+    Given user "jane@acme.com" is signed in to organization "acme"
     And jane has a personal team "Jane's Workspace" and personal project "personal-default"
     And jane has 1 personal VK with label "jane-laptop"
     And the workspace switcher is set to "My Workspace"
@@ -120,7 +120,7 @@ Feature: AI Gateway Governance — My Usage personal dashboard
   @bdd @ui @dashboard @authz
   Scenario: One user cannot view another user's /me page directly
     Given the API has `user.personalContext` keyed by current session
-    When jane@miro.com is signed in and navigates to "/me"
+    When jane@acme.com is signed in and navigates to "/me"
     Then she only sees her own personal team / project / VKs / spend
     And there is no URL parameter that would let her render someone else's /me
 

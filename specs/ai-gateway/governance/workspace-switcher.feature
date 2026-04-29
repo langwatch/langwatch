@@ -20,7 +20,7 @@ Feature: AI Gateway Governance — Workspace Switcher (top-left context dropdown
   via cookie or query param, so refreshing a page doesn't reset the context.
 
   Background:
-    Given user "jane@miro.com" is signed in to organization "miro"
+    Given user "jane@acme.com" is signed in to organization "acme"
     And jane has a personal team "Jane's Workspace" + personal project
     And jane is a member of teams ["Sales Engineering", "Growth Experiments"]
     And jane is a contributor on projects ["30-Agent Sales System", "growth-funnels-eval"]
@@ -103,7 +103,7 @@ Feature: AI Gateway Governance — Workspace Switcher (top-left context dropdown
 
   @bdd @ui @workspace-switcher @empty
   Scenario: A user in no teams sees only the "My Workspace" entry plus a hint
-    Given user "newhire@miro.com" is in zero teams and zero projects
+    Given user "newhire@acme.com" is in zero teams and zero projects
     When she opens the switcher
     Then she sees only the "My Workspace" entry
     And below it a hint reads "Ask your admin to add you to a team to see more contexts here."
