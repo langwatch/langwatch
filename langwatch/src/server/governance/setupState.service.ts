@@ -27,6 +27,14 @@ export interface GovernanceSetupState {
   hasAnomalyRules: boolean;
   /** Any normalised activity event in the last 30 days. */
   hasRecentActivity: boolean;
+  /**
+   * True iff the org has at least one application-kind Project that has
+   * ever ingested a span (lastEventAt is not null). Drives the
+   * persona-aware home resolver's Persona-3 detection (project-only
+   * LLMOps majority — the existing customer base, MUST NOT be
+   * regressed by the persona-aware home redirect).
+   */
+  hasApplicationTraces: boolean;
   /** OR of the above — the single persona-detection signal. */
   governanceActive: boolean;
 }
@@ -39,12 +47,13 @@ export class GovernanceSetupStateService {
   }
 
   async resolve(organizationId: string): Promise<GovernanceSetupState> {
-    // Five cheap PG counts in parallel.
+    // Six cheap PG counts in parallel.
     const [
       personalVkCount,
       routingPolicyCount,
       ingestionSourceCount,
       anomalyRuleCount,
+      applicationProjectWithTracesCount,
     ] = await Promise.all([
       // Personal VKs — VirtualKey rows whose project is personal.
       this.countPersonalVks(organizationId),
@@ -57,6 +66,19 @@ export class GovernanceSetupStateService {
       this.prisma.anomalyRule.count({
         where: { organizationId, archivedAt: null },
       }),
+      // Persona-3 detection: any application-kind project with at least
+      // one span ingested. Cheap PG query (Project.lastEventAt is
+      // already maintained by the trace pipeline). Excludes
+      // internal_governance projects so a freshly-minted Gov Project
+      // alone does not flip persona-3 to true.
+      this.prisma.project.count({
+        where: {
+          team: { organizationId },
+          archivedAt: null,
+          kind: { not: PROJECT_KIND.INTERNAL_GOVERNANCE },
+          lastEventAt: { not: null },
+        },
+      }),
     ]);
 
     const hasRecentActivity = await this.probeRecentActivity(organizationId);
@@ -65,6 +87,7 @@ export class GovernanceSetupStateService {
     const hasRoutingPolicies = routingPolicyCount > 0;
     const hasIngestionSources = ingestionSourceCount > 0;
     const hasAnomalyRules = anomalyRuleCount > 0;
+    const hasApplicationTraces = applicationProjectWithTracesCount > 0;
 
     return {
       hasPersonalVKs,
@@ -72,6 +95,7 @@ export class GovernanceSetupStateService {
       hasIngestionSources,
       hasAnomalyRules,
       hasRecentActivity,
+      hasApplicationTraces,
       governanceActive:
         hasPersonalVKs ||
         hasRoutingPolicies ||
