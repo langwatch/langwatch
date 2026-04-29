@@ -15,6 +15,10 @@ import {
   saveConfig,
 } from "@/cli/utils/governance/config";
 import { formatLoginCeremony } from "@/cli/utils/governance/login-ceremony";
+import {
+  getCliBootstrap,
+  type CliBootstrapResponse,
+} from "@/cli/utils/governance/cli-api";
 
 const updateEnvFile = (
   apiKey: string,
@@ -231,14 +235,26 @@ async function loginDeviceFlow(opts: { browser?: string }): Promise<void> {
     saveConfig(cfg);
 
     // Storyboard Screen 4 ceremony — provides the next-step affordance
-    // for fresh CLI users (try-it commands + dashboard hint). Provider
-    // list + budget enrichment is queued as a follow-up backend
-    // endpoint (api.user.cliBootstrap or similar) — when present, fold
-    // the providers + monthly-budget arrays in here.
+    // for fresh CLI users (try-it commands + dashboard hint). When the
+    // backend exposes /api/auth/cli/bootstrap (REST adapter over
+    // api.user.cliBootstrap, Sergey 32cad11ae), the ceremony also lists
+    // inherited providers + monthly budget. On older self-hosted
+    // servers without the REST endpoint, fetchBootstrapSafely returns
+    // null and the ceremony gracefully degrades to header + try-it
+    // block + dashboard hint.
+    const bootstrap = await fetchBootstrapSafely(cfg);
     console.log();
     const ceremonyLines = formatLoginCeremony({
       email: cfg.user?.email ?? result.user.email,
       organizationName: cfg.organization?.name,
+      providers: bootstrap?.providers,
+      budget: bootstrap?.budget && bootstrap.budget.monthlyLimitUsd !== null
+        ? {
+            period: bootstrap.budget.period,
+            limitUsd: bootstrap.budget.monthlyLimitUsd,
+            usedUsd: bootstrap.budget.monthlyUsedUsd,
+          }
+        : undefined,
     });
     for (const line of ceremonyLines) {
       console.log(line);
@@ -259,6 +275,23 @@ async function loginDeviceFlow(opts: { browser?: string }): Promise<void> {
       }
     }
     throw err;
+  }
+}
+
+/**
+ * Best-effort fetch of the CLI bootstrap data (provider list + budget)
+ * for Storyboard Screen 4 ceremony enrichment. Never throws — login
+ * must succeed even if the backend is older / endpoint flaky / network
+ * jitter. Returns null on any failure; the ceremony degrades to the
+ * basic header + try-it block.
+ */
+async function fetchBootstrapSafely(
+  cfg: ReturnType<typeof loadConfig>,
+): Promise<CliBootstrapResponse | null> {
+  try {
+    return await getCliBootstrap(cfg);
+  } catch {
+    return null;
   }
 }
 

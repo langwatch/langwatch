@@ -172,3 +172,50 @@ export async function getGovernanceStatus(
 ): Promise<{ setup: GovernanceSetupState }> {
   return getJSON(cfg, `/api/auth/cli/governance/status`, options);
 }
+
+export interface CliBootstrapProvider {
+  name: string;
+  displayName: string;
+  models: string[];
+}
+
+export interface CliBootstrapBudget {
+  monthlyLimitUsd: number | null;
+  monthlyUsedUsd: number;
+  period: string;
+}
+
+export interface CliBootstrapResponse {
+  providers: CliBootstrapProvider[];
+  budget: CliBootstrapBudget;
+}
+
+/**
+ * Fetch the Storyboard Screen 4 ceremony enrichment data —
+ * inheritable providers + the user's effective monthly budget.
+ *
+ * Backend tRPC source: `api.user.cliBootstrap` (Sergey 32cad11ae).
+ * REST adapter: `/api/auth/cli/bootstrap` (queued backend follow-up).
+ *
+ * Graceful degrade: returns null on 404 (older self-hosted server
+ * without the REST endpoint) so the CLI ceremony falls back to the
+ * basic header + try-it block. Other errors still throw so they can
+ * be logged at the call site.
+ */
+export async function getCliBootstrap(
+  cfg: GovernanceConfig,
+  options: CliApiOptions = {},
+): Promise<CliBootstrapResponse | null> {
+  try {
+    return await getJSON<CliBootstrapResponse>(
+      cfg,
+      `/api/auth/cli/bootstrap`,
+      options,
+    );
+  } catch (err) {
+    if (err instanceof GovernanceCliError && err.status === 404) {
+      return null;
+    }
+    throw err;
+  }
+}

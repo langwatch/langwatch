@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 
 import {
   GovernanceCliError,
+  getCliBootstrap,
   getEventsForSource,
   getGovernanceStatus,
   getSourceHealth,
@@ -279,6 +280,57 @@ describe("cli-api — request shape", () => {
         "http://app.example/api/auth/cli/governance/status",
       );
       expect(out).toEqual(fixture);
+    });
+  });
+
+  describe("getCliBootstrap", () => {
+    it("hits /api/auth/cli/bootstrap and returns the {providers, budget} payload", async () => {
+      const fixture = {
+        providers: [
+          {
+            name: "anthropic",
+            displayName: "Anthropic",
+            models: ["claude-sonnet-4", "claude-haiku-4-5"],
+          },
+          {
+            name: "openai",
+            displayName: "OpenAI",
+            models: ["gpt-5", "gpt-5-mini"],
+          },
+        ],
+        budget: {
+          monthlyLimitUsd: 500,
+          monthlyUsedUsd: 0,
+          period: "MONTHLY",
+        },
+      };
+      const { fetchImpl, seen } = spyFetch(ok(fixture));
+      const out = await getCliBootstrap(baseCfg(), { fetchImpl });
+      expect(seen[0]!.url).toBe(
+        "http://app.example/api/auth/cli/bootstrap",
+      );
+      expect(seen[0]!.authHeader).toBe("Bearer at_x");
+      expect(out).toEqual(fixture);
+    });
+
+    it("returns null on 404 — graceful degrade for older self-hosters without the REST adapter", async () => {
+      const { fetchImpl } = spyFetch(status(404, { error_description: "Not found" }));
+      const out = await getCliBootstrap(baseCfg(), { fetchImpl });
+      expect(out).toBeNull();
+    });
+
+    it("propagates 401 unauthorized errors so the caller can surface a re-login hint", async () => {
+      const { fetchImpl } = spyFetch(status(401));
+      await expect(getCliBootstrap(baseCfg(), { fetchImpl })).rejects.toThrow(
+        GovernanceCliError,
+      );
+    });
+
+    it("propagates 5xx errors with the status in the message", async () => {
+      const { fetchImpl } = spyFetch(status(500, { msg: "boom" }));
+      await expect(getCliBootstrap(baseCfg(), { fetchImpl })).rejects.toThrow(
+        /500/,
+      );
     });
   });
 });
