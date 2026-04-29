@@ -20,6 +20,11 @@ import {
   getClickHouseClientForProject,
   isClickHouseEnabled,
 } from "~/server/clickhouse/clickhouseClient";
+import { ModelProviderService } from "~/server/modelProviders/modelProvider.service";
+import {
+  modelProviders as modelProviderRegistry,
+  getProviderModelOptions,
+} from "~/server/modelProviders/registry";
 
 export const userRouter = createTRPCRouter({
   /**
@@ -551,6 +556,153 @@ export const userRouter = createTRPCRouter({
           spentUsd: blocker.spentUsd,
         }),
         adminEmail,
+      };
+    }),
+
+  /**
+   * CLI bootstrap data for the Storyboard Screen 4 login-completion
+   * ceremony. Returns inherited providers (with display name + model
+   * list) + monthly budget (limit + used). Powers the
+   * `formatLoginCeremony({ providers, budget })` rich-enrichment
+   * variant in typescript-sdk.
+   *
+   * Wire shape — every field always populated:
+   *   {
+   *     providers: Array<{ name, displayName, models[] }>;
+   *     budget: { monthlyLimitUsd: number | null, monthlyUsedUsd: number, period: string };
+   *   }
+   *
+   * Empty-state safe: returns providers=[] + budget={null, 0, MONTHLY}
+   * when the user has no personal workspace yet (fresh login,
+   * no admin VK provisioning yet).
+   *
+   * Per @ai_gateway_andre b8b21bb79 (1.5a-cli-1 ceremony) +
+   * Phase 1B.5 fold (5be9a5004).
+   */
+  cliBootstrap: protectedProcedure
+    .input(z.object({ organizationId: z.string() }))
+    .use(checkOrganizationPermission("organization:view"))
+    .query(async ({ ctx, input }) => {
+      const userId = ctx.session.user.id;
+
+      const workspaceService = new PersonalWorkspaceService(ctx.prisma);
+      const workspace = await workspaceService.findExisting({
+        userId,
+        organizationId: input.organizationId,
+      });
+      if (!workspace) {
+        return {
+          providers: [],
+          budget: {
+            monthlyLimitUsd: null as number | null,
+            monthlyUsedUsd: 0,
+            period: "MONTHLY",
+          },
+        };
+      }
+
+      // Providers — accessible at the personal project's scope ladder
+      // (PROJECT, TEAM, ORGANIZATION). Filter to enabled LLM providers.
+      const providerService = ModelProviderService.create(ctx.prisma);
+      const accessibleProviders = await providerService.getProjectModelProviders(
+        workspace.project.id,
+      );
+      const providers = Object.entries(accessibleProviders)
+        .filter(([providerKey, mp]) => {
+          const def =
+            modelProviderRegistry[
+              providerKey as keyof typeof modelProviderRegistry
+            ];
+          if (!def || def.type !== "llm") return false;
+          return mp.enabled;
+        })
+        .map(([providerKey]) => {
+          const def =
+            modelProviderRegistry[
+              providerKey as keyof typeof modelProviderRegistry
+            ];
+          const models = getProviderModelOptions(providerKey, "chat").map(
+            (m) => m.value,
+          );
+          return {
+            name: providerKey,
+            displayName: def?.name ?? providerKey,
+            models,
+          };
+        })
+        .sort((a, b) => a.displayName.localeCompare(b.displayName));
+
+      // Budget — find the user's personal VK + check budgets across the
+      // applicable scope ladder. Pick the narrowest-scope budget with
+      // a positive limit (principal user > virtual_key > project >
+      // team > organization).
+      const vkService = PersonalVirtualKeyService.create(ctx.prisma);
+      const vks = await vkService.list({
+        userId,
+        organizationId: input.organizationId,
+      });
+      const personalVk = vks[0];
+
+      let monthlyLimitUsd: number | null = null;
+      let monthlyUsedUsd = 0;
+      let period = "MONTHLY";
+
+      if (personalVk && isClickHouseEnabled()) {
+        const chRepo = new GatewayBudgetClickHouseRepository(
+          async (projectId) => {
+            const client = await getClickHouseClientForProject(projectId);
+            if (!client) {
+              throw new Error(
+                `ClickHouse enabled but no client for project ${projectId}`,
+              );
+            }
+            return client;
+          },
+        );
+        const budgetService = GatewayBudgetService.create(ctx.prisma, chRepo);
+        const decision = await budgetService.check({
+          organizationId: input.organizationId,
+          teamId: workspace.team.id,
+          projectId: workspace.project.id,
+          virtualKeyId: personalVk.id,
+          principalUserId: userId,
+          projectedCostUsd: 0,
+        });
+        // Pick the narrowest-scope budget with a positive limit, ranked
+        // PRINCIPAL > VIRTUAL_KEY > PROJECT > TEAM > ORGANIZATION. The
+        // narrowest one is what the user perceives as "their budget".
+        const scopeRank: Record<string, number> = {
+          PRINCIPAL: 0,
+          VIRTUAL_KEY: 1,
+          PROJECT: 2,
+          TEAM: 3,
+          ORGANIZATION: 4,
+        };
+        const ranked = decision.scopes
+          .map((s) => ({
+            scope: s.scope,
+            spent: Number.parseFloat(s.spentUsd) || 0,
+            limit: Number.parseFloat(s.limitUsd) || 0,
+            window: s.window,
+            rank: scopeRank[s.scope] ?? 99,
+          }))
+          .filter((s) => s.limit > 0)
+          .sort((a, b) => a.rank - b.rank);
+        const chosen = ranked[0];
+        if (chosen) {
+          monthlyLimitUsd = chosen.limit;
+          monthlyUsedUsd = chosen.spent;
+          period = chosen.window;
+        }
+      }
+
+      return {
+        providers,
+        budget: {
+          monthlyLimitUsd,
+          monthlyUsedUsd,
+          period,
+        },
       };
     }),
 });
