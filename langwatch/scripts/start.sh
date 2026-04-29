@@ -44,11 +44,23 @@ if [ -z "$NODE_ENV" ]; then
   RUNTIME_ENV="$RUNTIME_ENV NODE_ENV=production"
 fi
 
-START_APP_COMMAND="pnpm run start:app"
+# In dev, swap to `tsx watch` for the API + workers so backend file edits
+# auto-reload without a manual `pnpm dev` restart. Vite handles the
+# frontend's HMR; this closes the gap on the server side. Production
+# keeps plain `tsx` (single-shot, no watcher overhead).
+if [[ "$NODE_ENV" = "development" ]]; then
+  START_APP_COMMAND="pnpm run start:app:watch"
+else
+  START_APP_COMMAND="pnpm run start:app"
+fi
 
 START_WORKERS_COMMAND=""
 if [[ "$START_WORKERS" = "true" || "$START_WORKERS" = "1" ]]; then
-  START_WORKERS_COMMAND="pnpm run start:workers && exit 1"
+  if [[ "$NODE_ENV" = "development" ]]; then
+    START_WORKERS_COMMAND="pnpm run start:workers:watch && exit 1"
+  else
+    START_WORKERS_COMMAND="pnpm run start:workers && exit 1"
+  fi
 fi
 
 # In development, Vite runs on PORT (default 5560) and proxies /api/* to PORT+1000.
