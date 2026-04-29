@@ -152,6 +152,11 @@ func decodeStudioClientEvent(r *http.Request, body []byte) (*app.WorkflowRequest
 		// Absent for execute_flow / execute_evaluation.
 		NodeID    string `json:"node_id,omitempty"`
 		ProjectID string `json:"project_id,omitempty"`
+		// RunID is present only on execute_evaluation envelopes
+		// (langwatch/src/optimization_studio/hooks/useEvaluationExecution.ts).
+		// Plumbed through to the engine so evaluation_state_change events
+		// carry the run_id Studio's reducer keys evaluations on.
+		RunID string `json:"run_id,omitempty"`
 	}
 	if err := json.Unmarshal(innerBytes, &inner); err != nil {
 		e := herr.New(r.Context(), domain.ErrBadRequest, herr.M{
@@ -183,6 +188,8 @@ func decodeStudioClientEvent(r *http.Request, body []byte) (*app.WorkflowRequest
 		ThreadID:     threadID,
 		NodeID:       inner.NodeID,
 		APIKey:       peekWorkflowAPIKey(inner.Workflow),
+		Type:         peek.Type,
+		RunID:        inner.RunID,
 	}, nil
 }
 

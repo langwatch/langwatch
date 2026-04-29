@@ -125,8 +125,55 @@ func TestPlaygroundProxy_NonStreamingChatCompletions_ForwardsBodyAndCredential(t
 	if fake.gotRequest.Credential.APIKey != "sk-test" {
 		t.Errorf("APIKey = %q", fake.gotRequest.Credential.APIKey)
 	}
-	if !bytes.Contains(fake.gotRequest.Body, []byte("openai/gpt-5-mini")) {
-		t.Errorf("body should be forwarded verbatim, got: %s", fake.gotRequest.Body)
+	// body.model is rewritten to the bare id before dispatch. OpenAI
+	// rejects the langwatch-internal "openai/gpt-5-mini" prefix in body.model
+	// with `{"error":"invalid model ID"}`, and Bifrost raw-forwards the body
+	// to OpenAI for OpenAI-compatible providers (bifrost_parser.go:50-58),
+	// so the rewrite has to happen at this layer. Caught by Studio Monaco
+	// code-completion 500s on FF=on (2026-04-29 dogfood).
+	if bytes.Contains(fake.gotRequest.Body, []byte("openai/gpt-5-mini")) {
+		t.Errorf("body.model should be rewritten from 'openai/gpt-5-mini' to bare 'gpt-5-mini', got: %s", fake.gotRequest.Body)
+	}
+	if !bytes.Contains(fake.gotRequest.Body, []byte(`"model":"gpt-5-mini"`)) {
+		t.Errorf("body.model should be 'gpt-5-mini' (bare), got: %s", fake.gotRequest.Body)
+	}
+	// Other body fields preserved.
+	if !bytes.Contains(fake.gotRequest.Body, []byte(`"messages":[{"role":"user","content":"hi"}]`)) {
+		t.Errorf("messages array should be preserved verbatim, got: %s", fake.gotRequest.Body)
+	}
+}
+
+func TestPlaygroundProxy_BareModelInBodyPassedThroughUnchanged(t *testing.T) {
+	// When the caller already sends a bare model id (no provider prefix),
+	// the rewrite is a no-op and the original body is forwarded byte-for-byte
+	// — preserving OpenAI's prompt-prefix auto-cache hits for the common
+	// case where someone is already speaking the OpenAI wire format directly.
+	fake := &fakeProxy{
+		syncResp: &playgroundProxyResponse{
+			StatusCode: 200,
+			Headers:    http.Header{"Content-Type": []string{"application/json"}},
+			Body:       []byte(`{"id":"chatcmpl-1","choices":[]}`),
+		},
+	}
+	srv := newProxyTestServer(t, fake)
+
+	body := `{"model":"gpt-5-mini","messages":[{"role":"user","content":"hi"}]}`
+	req, _ := http.NewRequest(http.MethodPost, srv.URL+"/go/proxy/v1/chat/completions", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("x-litellm-model", "openai/gpt-5-mini")
+	req.Header.Set("x-litellm-api_key", "sk-test")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("Do: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		respBody, _ := io.ReadAll(resp.Body)
+		t.Fatalf("status = %d, body = %s", resp.StatusCode, respBody)
+	}
+	if string(fake.gotRequest.Body) != body {
+		t.Errorf("body should be forwarded byte-for-byte when model is already bare, got: %s", fake.gotRequest.Body)
 	}
 }
 

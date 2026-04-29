@@ -104,23 +104,28 @@ func (e *Engine) ExecuteStream(ctx context.Context, req ExecuteRequest, opts Exe
 			emit(ctx, out, doneEvent(traceID, state, started))
 			return
 		}
-		// execute_flow needs workflow-level execution_state_change events:
-		// Studio's startWorkflowExecution sets workflow.state.execution =
-		// {status:"waiting"} and arms a 20s "Timeout starting workflow
-		// execution" toast. Only an execution_state_change with
-		// status:"running" flips that to "running" (usePostEvent.tsx
-		// case "execution_state_change" → setWorkflowExecutionState).
+		// execute_flow / execute_evaluation need workflow-level state
+		// events: Studio's startWorkflowExecution / startEvaluation set
+		// the corresponding state slot to {status:"waiting"} and arm a 20s
+		// "Timeout starting workflow execution" toast. Only the right
+		// state-change event family flips that:
+		//
+		//   execute_flow       → execution_state_change → workflow.state.execution
+		//   execute_evaluation → evaluation_state_change → workflow.state.evaluation
+		//
 		// Per-node component_state_change events do NOT update the
 		// workflow-level state — Studio routes them to per-component
-		// state. Without these workflow-level events nlpgo's execute_flow
-		// completes successfully on the wire but Studio sees the toast
-		// (rchaves dogfood 2026-04-29 trace_id 60f59f73…). Mirror
-		// langwatch_nlp/studio/execute/execute_flow.py
-		// start_workflow_event / end_workflow_event / error_workflow_event.
-		emit(ctx, out, workflowRunningEvent(traceID, started))
+		// state. Without the workflow-level events nlpgo's run completes
+		// successfully on the wire but Studio sees the timeout toast
+		// (rchaves dogfood 2026-04-29 trace_id 60f59f73… for execute_flow;
+		// the eval path has the same shape gap). Mirror
+		// langwatch_nlp/studio/execute/{execute_flow.py,
+		// execute_evaluation.py} — start/end/error event family.
+		isEval := req.Type == "execute_evaluation"
+		emit(ctx, out, workflowRunningEvent(req, traceID, started, isEval))
 		for _, layer := range plan.Layers {
 			if err := ctx.Err(); err != nil {
-				emit(ctx, out, workflowErrorEvent(traceID, err.Error()))
+				emit(ctx, out, workflowErrorEvent(req, traceID, err.Error(), isEval))
 				emit(ctx, out, StreamEvent{
 					Type:    "error",
 					TraceID: traceID,
@@ -130,12 +135,12 @@ func (e *Engine) ExecuteStream(ctx context.Context, req ExecuteRequest, opts Exe
 			}
 			e.runLayerStream(ctx, req, plan, state, layer, traceID, out)
 			if state.firstError != nil {
-				emit(ctx, out, workflowErrorEvent(traceID, state.firstError.Message))
+				emit(ctx, out, workflowErrorEvent(req, traceID, state.firstError.Message, isEval))
 				emit(ctx, out, doneEvent(traceID, state, started))
 				return
 			}
 		}
-		emit(ctx, out, workflowSuccessEvent(traceID, state, started))
+		emit(ctx, out, workflowSuccessEvent(req, traceID, state, started, isEval))
 		emit(ctx, out, doneEvent(traceID, state, started))
 	}()
 	return out, nil
@@ -262,47 +267,96 @@ func stateEvent(traceID, nodeID string, ns *NodeState) StreamEvent {
 
 // workflowRunningEvent / workflowSuccessEvent / workflowErrorEvent emit
 // the workflow-level state transitions Studio's reducer requires to flip
-// workflow.state.execution.status. Mirror python langwatch_nlp's
+// workflow.state.execution.status (or workflow.state.evaluation.status
+// for the eval path). Mirror python langwatch_nlp's
 // start_workflow_event / end_workflow_event / error_workflow_event in
-// langwatch_nlp/studio/execute/execute_flow.py — same payload shape so
-// usePostEvent.tsx's case "execution_state_change" doesn't need a code
-// change.
-func workflowRunningEvent(traceID string, started time.Time) StreamEvent {
+// langwatch_nlp/studio/execute/execute_flow.py and the parallel trio in
+// execute_evaluation.py — same payload shapes so usePostEvent.tsx's
+// case "execution_state_change" / "evaluation_state_change" don't need
+// code changes.
+//
+// `isEval` switches the event family: execute_evaluation → evaluation_state_change
+// (carries run_id), execute_flow → execution_state_change (carries trace_id).
+func workflowRunningEvent(req ExecuteRequest, traceID string, started time.Time, isEval bool) StreamEvent {
+	timestamps := map[string]any{
+		"started_at": started.UnixMilli(),
+	}
+	if isEval {
+		return StreamEvent{
+			Type:    "evaluation_state_change",
+			TraceID: traceID,
+			Payload: map[string]any{
+				"evaluation_state": map[string]any{
+					"status":     "running",
+					"run_id":     req.RunID,
+					"timestamps": timestamps,
+				},
+			},
+		}
+	}
 	return StreamEvent{
 		Type:    "execution_state_change",
 		TraceID: traceID,
 		Payload: map[string]any{
 			"execution_state": map[string]any{
-				"status":   "running",
-				"trace_id": traceID,
-				"timestamps": map[string]any{
-					"started_at": started.UnixMilli(),
-				},
+				"status":     "running",
+				"trace_id":   traceID,
+				"timestamps": timestamps,
 			},
 		},
 	}
 }
 
-func workflowSuccessEvent(traceID string, state *runState, started time.Time) StreamEvent {
+func workflowSuccessEvent(req ExecuteRequest, traceID string, state *runState, started time.Time, isEval bool) StreamEvent {
+	timestamps := map[string]any{
+		"started_at":  started.UnixMilli(),
+		"finished_at": time.Now().UnixMilli(),
+	}
+	if isEval {
+		return StreamEvent{
+			Type:    "evaluation_state_change",
+			TraceID: traceID,
+			Payload: map[string]any{
+				"evaluation_state": map[string]any{
+					"status":     "success",
+					"run_id":     req.RunID,
+					"timestamps": timestamps,
+				},
+			},
+		}
+	}
 	res := finalize(state, traceID, started, nil)
 	return StreamEvent{
 		Type:    "execution_state_change",
 		TraceID: traceID,
 		Payload: map[string]any{
 			"execution_state": map[string]any{
-				"status":   "success",
-				"trace_id": traceID,
-				"timestamps": map[string]any{
-					"started_at":  started.UnixMilli(),
-					"finished_at": time.Now().UnixMilli(),
-				},
-				"result": res.Result,
+				"status":     "success",
+				"trace_id":   traceID,
+				"timestamps": timestamps,
+				"result":     res.Result,
 			},
 		},
 	}
 }
 
-func workflowErrorEvent(traceID, message string) StreamEvent {
+func workflowErrorEvent(req ExecuteRequest, traceID, message string, isEval bool) StreamEvent {
+	if isEval {
+		return StreamEvent{
+			Type:    "evaluation_state_change",
+			TraceID: traceID,
+			Payload: map[string]any{
+				"evaluation_state": map[string]any{
+					"status": "error",
+					"run_id": req.RunID,
+					"error":  message,
+					"timestamps": map[string]any{
+						"finished_at": time.Now().UnixMilli(),
+					},
+				},
+			},
+		}
+	}
 	return StreamEvent{
 		Type:    "execution_state_change",
 		TraceID: traceID,

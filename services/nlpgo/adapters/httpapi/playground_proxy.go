@@ -87,6 +87,28 @@ func playgroundProxyDispatch(proxy PlaygroundProxy) http.HandlerFunc {
 		}
 		bareModel := gatewayproxy.BareModel(model)
 
+		// Rewrite body.model to the BARE id before dispatch. The TS
+		// callsites (Vercel AI SDK in modelProviders/utils.ts, the
+		// playground tRPC route, model.factory.ts) ship the body with
+		// `"model": "openai/gpt-5.2"` because the langwatch-internal
+		// "<provider>/<model>" form is what those callers think in. Bifrost
+		// raw-forwards OpenAI-shape bodies to OpenAI to preserve the
+		// prompt-prefix auto-cache (bifrost_parser.go:50-58), and OpenAI
+		// 400s on a model field with the langwatch prefix
+		// (`{"error":"invalid model ID"}`). The bare id matches what the
+		// internal-only llmexecutor.translatedModelOrInferred path already
+		// puts on the wire for runSignature, which is why runSignature
+		// works and /go/proxy/v1 didn't until this edit.
+		if model != "" && bareModel != model {
+			body, err = rewriteBodyModel(body, bareModel)
+			if err != nil {
+				herr.WriteHTTP(w, herr.New(ctx, nlpgodomain.ErrBadRequest, herr.M{
+					"reason": "rewrite_body_model",
+				}, err))
+				return
+			}
+		}
+
 		reqType, httpPath := classifyPath(r.URL.Path)
 
 		// /v1beta/* etc. → RequestTypePassthrough. Wiring it through the
@@ -119,6 +141,29 @@ func playgroundProxyDispatch(proxy PlaygroundProxy) http.HandlerFunc {
 		}
 		handleSync(ctx, w, proxy, req)
 	}
+}
+
+// rewriteBodyModel sets body.model = newModel while preserving every
+// other field, key ordering, and value formatting. We round-trip
+// through encoding/json (decode → re-encode) rather than sjson because
+// the proxy already takes that hit for peekBodyMetadata; an extra
+// in-place rewrite is not worth a new dependency. JSON key ordering
+// changes here are harmless — the prompt-prefix auto-cache hashes the
+// `messages` array, not the surrounding envelope.
+func rewriteBodyModel(body []byte, newModel string) ([]byte, error) {
+	if len(body) == 0 {
+		return body, nil
+	}
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(body, &raw); err != nil {
+		return nil, err
+	}
+	encoded, err := json.Marshal(newModel)
+	if err != nil {
+		return nil, err
+	}
+	raw["model"] = encoded
+	return json.Marshal(raw)
 }
 
 // peekBodyMetadata reads the body once to extract the OpenAI-shape

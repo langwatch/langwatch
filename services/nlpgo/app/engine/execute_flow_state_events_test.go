@@ -153,6 +153,107 @@ func TestExecuteStream_ExecuteComponentDoesNotEmitWorkflowStateEvents(t *testing
 		"execute_component path must not emit workflow-level execution_state_change — Studio tracks per-component state only")
 }
 
+// TestExecuteStream_EvaluationEmitsEvaluationStateEvents pins the eval
+// counterpart: when Studio's `useEvaluationExecution` dispatches an
+// `execute_evaluation` event, nlpgo must emit `evaluation_state_change`
+// events (carrying run_id) — not `execution_state_change` — so the
+// reducer flips workflow.state.evaluation.status. Without this the eval
+// run hits the same 20s "Timeout starting workflow execution" toast
+// even though the dataset rows complete on the wire.
+func TestExecuteStream_EvaluationEmitsEvaluationStateEvents(t *testing.T) {
+	eng := New(Options{})
+	wf := &dsl.Workflow{
+		WorkflowID: "wf_eval",
+		Nodes: []dsl.Node{
+			{ID: "entry", Type: dsl.ComponentEntry},
+			{ID: "end", Type: dsl.ComponentEnd},
+		},
+		Edges: []dsl.Edge{
+			{Source: "entry", SourceHandle: "outputs.input", Target: "end", TargetHandle: "inputs.output"},
+		},
+	}
+
+	events, err := eng.ExecuteStream(context.Background(), ExecuteRequest{
+		Workflow: wf,
+		Inputs:   map[string]any{"input": "hello"},
+		TraceID:  "trace_eval",
+		Type:     "execute_evaluation",
+		RunID:    "run_abc123",
+		Origin:   "evaluation",
+	}, ExecuteStreamOptions{})
+	require.NoError(t, err)
+
+	collected := drain(events)
+
+	// No execution_state_change events on the eval path — those flip
+	// the wrong reducer slot. evaluation_state_change is the only
+	// state-change family Studio's eval reducer reads.
+	executionEvents := filterByType(collected, "execution_state_change")
+	assert.Empty(t, executionEvents,
+		"execute_evaluation must NOT emit execution_state_change — that slot is the workflow-flow reducer, not the evaluation reducer")
+
+	evalEvents := filterByType(collected, "evaluation_state_change")
+	require.Len(t, evalEvents, 2,
+		"execute_evaluation emits running → success on a clean run, just like execute_flow's parallel pair")
+
+	first := evalEvents[0]
+	firstES, ok := first.Payload["evaluation_state"].(map[string]any)
+	require.True(t, ok, "first eval event must carry evaluation_state payload (matches python EvaluationStateChangePayload shape)")
+	assert.Equal(t, "running", firstES["status"])
+	assert.Equal(t, "run_abc123", firstES["run_id"],
+		"run_id round-trips so Studio's useEvaluationExecution.scheduleTimeout can match the streamed update to the run it dispatched")
+
+	second := evalEvents[1]
+	secondES, ok := second.Payload["evaluation_state"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "success", secondES["status"])
+	assert.Equal(t, "run_abc123", secondES["run_id"])
+	ts, ok := secondES["timestamps"].(map[string]any)
+	require.True(t, ok)
+	assert.Contains(t, ts, "started_at")
+	assert.Contains(t, ts, "finished_at")
+}
+
+// TestExecuteStream_EvaluationErrorEmitsEvaluationErrorEvent pins the
+// eval-path error contract — running → error with run_id stamped so
+// Studio can match the failure to the run it dispatched and surface
+// the message via alertOnError().
+func TestExecuteStream_EvaluationErrorEmitsEvaluationErrorEvent(t *testing.T) {
+	eng := New(Options{})
+	wf := &dsl.Workflow{
+		WorkflowID: "wf_eval_error",
+		Nodes: []dsl.Node{
+			{ID: "entry", Type: dsl.ComponentEntry},
+			// code node with no Code executor wired — deterministic failure
+			{ID: "code-1", Type: dsl.ComponentCode},
+		},
+		Edges: []dsl.Edge{
+			{Source: "entry", SourceHandle: "outputs.input", Target: "code-1", TargetHandle: "inputs.input"},
+		},
+	}
+
+	events, err := eng.ExecuteStream(context.Background(), ExecuteRequest{
+		Workflow: wf,
+		Inputs:   map[string]any{"input": "boom"},
+		TraceID:  "trace_eval_error",
+		Type:     "execute_evaluation",
+		RunID:    "run_failing",
+		Origin:   "evaluation",
+	}, ExecuteStreamOptions{})
+	require.NoError(t, err)
+
+	collected := drain(events)
+	evalEvents := filterByType(collected, "evaluation_state_change")
+	require.Len(t, evalEvents, 2, "running → error: still 2 eval-state events on the failure path")
+
+	last := evalEvents[len(evalEvents)-1]
+	es, ok := last.Payload["evaluation_state"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "error", es["status"])
+	assert.Equal(t, "run_failing", es["run_id"])
+	assert.Contains(t, es, "error", "error event must carry the message Studio surfaces in the alertOnError toast")
+}
+
 func drain(events <-chan StreamEvent) []StreamEvent {
 	var out []StreamEvent
 	timeout := time.After(5 * time.Second)

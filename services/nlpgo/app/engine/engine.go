@@ -104,6 +104,18 @@ type ExecuteRequest struct {
 	// outputs and propagate via edges. Mirrors Python's
 	// `ExecuteComponentPayload.node_id` (langwatch_nlp/studio/app.py).
 	NodeID string
+	// Type is the StudioClientEvent discriminator. Routes the engine
+	// between the parallel state-event families Studio's reducer
+	// expects (`execution_state_change` for execute_flow,
+	// `evaluation_state_change` for execute_evaluation). Empty defaults
+	// to execute_flow shape — the legacy behavior for flat-payload
+	// callers (tests + curl) that predate the type field.
+	Type string
+	// RunID is the evaluation run identifier from execute_evaluation's
+	// payload. Stamped on evaluation_state_change events so Studio's
+	// useEvaluationExecution reducer can match streamed updates to the
+	// run it dispatched.
+	RunID string
 }
 
 // ExecuteResult is what the engine returns. It mirrors the Python

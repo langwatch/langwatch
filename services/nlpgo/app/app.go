@@ -69,6 +69,22 @@ type WorkflowRequest struct {
 	// api_key in context yet and drops the span. Engine-internal spans
 	// also use it for sibling-trace correlation.
 	APIKey string
+	// Type is the discriminator from the inbound StudioClientEvent
+	// envelope ("execute_flow" / "execute_component" / "execute_evaluation").
+	// Determines which workflow-level state-change family the engine emits:
+	// execute_flow → execution_state_change, execute_evaluation →
+	// evaluation_state_change, execute_component → no workflow-level
+	// state events (per-node only). Empty falls back to execute_flow
+	// behavior — the historical default for flat (non-discriminated)
+	// payloads from tests + curl.
+	Type string
+	// RunID identifies the evaluation run on `execute_evaluation` events.
+	// Stamped into evaluation_state_change payloads so Studio's reducer
+	// can match streamed updates to the run it dispatched (the reducer
+	// keys evaluations on workflow.state.evaluation.run_id, set by
+	// Studio's startEvaluation hook). Unused for non-evaluation event
+	// types.
+	RunID string
 }
 
 // WorkflowResult is the engine's response, ready for JSON serialization.
