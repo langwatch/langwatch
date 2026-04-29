@@ -29,6 +29,7 @@ const mockPrisma = {
     update: vi.fn(),
   },
   roleBinding: {
+    findFirst: vi.fn(),
     deleteMany: vi.fn(),
     create: vi.fn(),
   },
@@ -315,7 +316,7 @@ describe("RoleService Tests", () => {
       mockPrisma.customRole.findUnique.mockResolvedValue(mockCustomRole);
       mockPrisma.team.findUnique.mockResolvedValue(mockTeam);
       mockPrisma.team.findUniqueOrThrow.mockResolvedValue(mockTeam);
-      mockPrisma.teamUser.findUnique.mockResolvedValue(mockTeamUser);
+      mockPrisma.roleBinding.findFirst.mockResolvedValue(mockTeamUser);
       mockPrisma.roleBinding.deleteMany.mockResolvedValue({ count: 0 });
       mockPrisma.roleBinding.create.mockResolvedValue({});
       mockPrisma.teamUser.update.mockResolvedValue({});
@@ -392,7 +393,7 @@ describe("RoleService Tests", () => {
 
       mockPrisma.customRole.findUnique.mockResolvedValue(mockCustomRole);
       mockPrisma.team.findUnique.mockResolvedValue(mockTeam);
-      mockPrisma.teamUser.findUnique.mockResolvedValue(null);
+      mockPrisma.roleBinding.findFirst.mockResolvedValue(null);
 
       await expect(
         roleService.assignRoleToUser("user-123", "team-123", "role-123"),
