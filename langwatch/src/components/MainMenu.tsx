@@ -59,30 +59,20 @@ export const MainMenu = React.memo(function MainMenu({
     { projectId: project?.id, enabled: !!project },
   );
 
-  // Governance menu entry is gated on (a) the governance preview flag,
-  // (b) the user's `organization:manage` permission, AND (c) the org
-  // having actual governance state (any of personal VKs / RoutingPolicy
-  // / IngestionSource / AnomalyRule / recent activity). The setup-state
-  // check honours the no-auto-redirect rule: vast-majority current
-  // LLMOps admins → governanceActive=false → entry hidden.
+  // Governance + AI Gateway sections are gated symmetrically on:
+  //   (a) the user holds `organization:manage` permission, AND
+  //   (b) the relevant feature flag is enabled
+  // No additional gating on hasIngestionSources / hasPersonalVKs / etc.
+  // Admins must see Govern to bootstrap their first IngestionSource —
+  // gating on data presence creates a chicken-and-egg discoverability
+  // trap. The feature flag is the operator's rollout knob.
+  // Spec: specs/ai-gateway/governance/persona-aware-chrome.feature
   const { enabled: governancePreviewEnabled } = useFeatureFlag(
     "release_ui_ai_governance_enabled",
     { projectId: project?.id, enabled: !!project },
   );
-  const setupStateQuery = api.governance.setupState.useQuery(
-    { organizationId: organization?.id ?? "" },
-    {
-      enabled:
-        !!organization &&
-        governancePreviewEnabled &&
-        hasPermission("organization:manage"),
-      refetchOnWindowFocus: false,
-    },
-  );
   const showGovernanceEntry =
-    governancePreviewEnabled &&
-    hasPermission("organization:manage") &&
-    setupStateQuery.data?.governanceActive === true;
+    governancePreviewEnabled && hasPermission("organization:manage");
 
   // In compact mode, show expanded view on hover
   const showExpanded = !isCompact || isHovered;

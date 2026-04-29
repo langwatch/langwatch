@@ -47,7 +47,10 @@ import { FullLogo } from "./icons/FullLogo";
 import { LogoIcon } from "./icons/LogoIcon";
 import { LoadingScreen } from "./LoadingScreen";
 import { MainMenu, MENU_WIDTH_COMPACT, MENU_WIDTH_EXPANDED } from "./MainMenu";
+import { PersonalSidebar } from "./PersonalSidebar";
 import { ProjectAvatar } from "./ProjectAvatar";
+import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
+import { useWorkspaceData } from "./useWorkspaceData";
 import { Link } from "./ui/link";
 import { Menu } from "./ui/menu";
 import { CommandBarTrigger } from "../features/command-bar";
@@ -90,6 +93,19 @@ const Breadcrumbs = ({ currentRoute }: { currentRoute: Route | undefined }) => {
     </HStack>
   );
 };
+
+/**
+ * Header chip rendered on personal-scope routes (`/me`, `/me/settings`).
+ * Replaces the legacy `<ProjectSelector>` so the user sees ONE workspace
+ * chip — the unified `WorkspaceSwitcher` with Personal + Teams + Projects
+ * groups — not two competing context indicators.
+ *
+ * Spec: specs/ai-gateway/governance/persona-aware-chrome.feature
+ */
+const PersonalScopeHeaderSwitcher = React.memo(function PersonalScopeHeaderSwitcher() {
+  const data = useWorkspaceData();
+  return <WorkspaceSwitcher {...data} current={{ kind: "personal" }} />;
+});
 
 export const ProjectSelector = React.memo(function ProjectSelector({
   organizations,
@@ -517,6 +533,10 @@ export const DashboardLayout = ({
                 </Text>
               </HStack>
             </HStack>
+          ) : isPersonalScopeRoute && organizations ? (
+            <HStack gap={0} alignItems="center" paddingLeft={2}>
+              <PersonalScopeHeaderSwitcher />
+            </HStack>
           ) : organizations && project ? (
             <HStack gap={0} alignItems="center">
               <ProjectSelector
@@ -644,7 +664,11 @@ export const DashboardLayout = ({
         gap={0}
         minHeight="calc(100vh - 60px)"
       >
-        <MainMenu isCompact={compactMenu} />
+        {isPersonalScopeRoute ? (
+          <PersonalSidebar isCompact={compactMenu} />
+        ) : (
+          <MainMenu isCompact={compactMenu} />
+        )}
 
         <Box
           width="full"
