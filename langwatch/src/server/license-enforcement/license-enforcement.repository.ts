@@ -3,6 +3,7 @@ import {
   OrganizationUserRole,
   type Prisma,
   type PrismaClient,
+  RoleBindingScopeType,
 } from "@prisma/client";
 import { getCurrentMonthStart } from "../utils/dateUtils";
 import {
@@ -245,21 +246,23 @@ export class LicenseEnforcementRepository
       return new Map();
     }
 
-    const teamUsers = await this.prisma.teamUser.findMany({
+    const teamIds = teams.map((t) => t.id);
+    const bindings = await this.prisma.roleBinding.findMany({
       where: {
-        teamId: { in: teams.map((t) => t.id) },
+        scopeType: RoleBindingScopeType.TEAM,
+        scopeId: { in: teamIds },
         userId: { in: externalUserIds },
       },
-      select: { userId: true, assignedRoleId: true },
+      select: { userId: true, customRoleId: true },
     });
 
     const userPermissionsMap = new Map<string, string[]>();
-    for (const tu of teamUsers) {
-      if (tu.assignedRoleId) {
-        const permissions = customRoleMap.get(tu.assignedRoleId);
+    for (const binding of bindings) {
+      if (binding.customRoleId && binding.userId) {
+        const permissions = customRoleMap.get(binding.customRoleId);
         if (permissions) {
-          const existing = userPermissionsMap.get(tu.userId) ?? [];
-          userPermissionsMap.set(tu.userId, [...existing, ...permissions]);
+          const existing = userPermissionsMap.get(binding.userId) ?? [];
+          userPermissionsMap.set(binding.userId, [...existing, ...permissions]);
         }
       }
     }

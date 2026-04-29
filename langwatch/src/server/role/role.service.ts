@@ -1,4 +1,4 @@
-import type { PrismaClient } from "@prisma/client";
+import { type PrismaClient, RoleBindingScopeType } from "@prisma/client";
 import {
   RoleDuplicateNameError,
   RoleInUseError,
@@ -97,18 +97,17 @@ export class RoleService {
 
   async assignRoleToUser(userId: string, teamId: string, customRoleId: string) {
     // Business rule: Validate all entities exist and belong together
-    const [customRole, team, teamUser] = await Promise.all([
+    const [customRole, team, binding] = await Promise.all([
       this.repository.findById(customRoleId),
       this.prisma.team.findUnique({
         where: { id: teamId },
         select: { organizationId: true },
       }),
-      this.prisma.teamUser.findUnique({
+      this.prisma.roleBinding.findFirst({
         where: {
-          userId_teamId: {
-            userId,
-            teamId,
-          },
+          userId,
+          scopeType: RoleBindingScopeType.TEAM,
+          scopeId: teamId,
         },
       }),
     ]);
@@ -125,7 +124,7 @@ export class RoleService {
       throw new RoleOrganizationMismatchError();
     }
 
-    if (!teamUser) {
+    if (!binding) {
       throw new UserNotTeamMemberError();
     }
 

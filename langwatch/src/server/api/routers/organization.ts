@@ -1149,20 +1149,19 @@ export const organizationRouter = createTRPCRouter({
             });
           }
 
-          const currentTeamUser = await prisma.teamUser.findUnique({
+          const currentBinding = await prisma.roleBinding.findFirst({
             where: {
-              userId_teamId: {
-                userId: input.userId,
-                teamId: input.teamId,
-              },
+              userId: input.userId,
+              scopeType: RoleBindingScopeType.TEAM,
+              scopeId: input.teamId,
             },
-            select: { assignedRoleId: true },
+            select: { customRoleId: true },
           });
 
-          const oldPermissions = currentTeamUser?.assignedRoleId
+          const oldPermissions = currentBinding?.customRoleId
             ? await (async () => {
                 const role = await prisma.customRole.findUnique({
-                  where: { id: currentTeamUser.assignedRoleId! },
+                  where: { id: currentBinding.customRoleId! },
                   select: { permissions: true },
                 });
                 return role?.permissions as string[] | undefined;

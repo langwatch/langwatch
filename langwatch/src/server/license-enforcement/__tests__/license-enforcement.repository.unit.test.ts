@@ -51,6 +51,9 @@ const createMockPrisma = () => ({
   teamUser: {
     findMany: vi.fn().mockResolvedValue([]),
   },
+  roleBinding: {
+    findMany: vi.fn().mockResolvedValue([]),
+  },
   customRole: {
     findMany: vi.fn().mockResolvedValue([]),
   },
@@ -229,8 +232,8 @@ describe("LicenseEnforcementRepository", () => {
         { userId: "u1", role: OrganizationUserRole.EXTERNAL },
       ]);
       mockPrisma.team.findMany.mockResolvedValue([{ id: "team-1" }]);
-      mockPrisma.teamUser.findMany.mockResolvedValue([
-        { userId: "u1", assignedRoleId: "role-1" },
+      mockPrisma.roleBinding.findMany.mockResolvedValue([
+        { userId: "u1", customRoleId: "role-1" },
       ]);
       mockPrisma.customRole.findMany.mockResolvedValue([
         { id: "role-1", permissions: ["project:view", "project:manage"] },
@@ -247,8 +250,8 @@ describe("LicenseEnforcementRepository", () => {
         { userId: "u1", role: OrganizationUserRole.EXTERNAL },
       ]);
       mockPrisma.team.findMany.mockResolvedValue([{ id: "team-1" }]);
-      mockPrisma.teamUser.findMany.mockResolvedValue([
-        { userId: "u1", assignedRoleId: "role-1" },
+      mockPrisma.roleBinding.findMany.mockResolvedValue([
+        { userId: "u1", customRoleId: "role-1" },
       ]);
       mockPrisma.customRole.findMany.mockResolvedValue([
         { id: "role-1", permissions: ["project:view", "analytics:view"] },
@@ -351,7 +354,7 @@ describe("LicenseEnforcementRepository", () => {
         { userId: "u1", role: OrganizationUserRole.EXTERNAL },
       ]);
       mockPrisma.team.findMany.mockResolvedValue([{ id: "team-1" }]);
-      mockPrisma.teamUser.findMany.mockResolvedValue([]); // No team assignment
+      mockPrisma.roleBinding.findMany.mockResolvedValue([]); // No team assignment
       mockPrisma.customRole.findMany.mockResolvedValue([]);
       mockPrisma.organizationInvite.findMany.mockResolvedValue([]);
 
@@ -406,8 +409,8 @@ describe("LicenseEnforcementRepository", () => {
         { userId: "u1", role: OrganizationUserRole.EXTERNAL },
       ]);
       mockPrisma.team.findMany.mockResolvedValue([{ id: "team-1" }]);
-      mockPrisma.teamUser.findMany.mockResolvedValue([
-        { userId: "u1", assignedRoleId: null },
+      mockPrisma.roleBinding.findMany.mockResolvedValue([
+        { userId: "u1", customRoleId: null },
       ]);
       mockPrisma.customRole.findMany.mockResolvedValue([]);
       mockPrisma.organizationInvite.findMany.mockResolvedValue([]);
@@ -422,8 +425,8 @@ describe("LicenseEnforcementRepository", () => {
         { userId: "u1", role: OrganizationUserRole.EXTERNAL },
       ]);
       mockPrisma.team.findMany.mockResolvedValue([{ id: "team-1" }]);
-      mockPrisma.teamUser.findMany.mockResolvedValue([
-        { userId: "u1", assignedRoleId: "role-1" },
+      mockPrisma.roleBinding.findMany.mockResolvedValue([
+        { userId: "u1", customRoleId: "role-1" },
       ]);
       mockPrisma.customRole.findMany.mockResolvedValue([
         { id: "role-1", permissions: ["project:view", "analytics:view"] },
@@ -440,8 +443,8 @@ describe("LicenseEnforcementRepository", () => {
         { userId: "u1", role: OrganizationUserRole.EXTERNAL },
       ]);
       mockPrisma.team.findMany.mockResolvedValue([{ id: "team-1" }]);
-      mockPrisma.teamUser.findMany.mockResolvedValue([
-        { userId: "u1", assignedRoleId: "role-1" },
+      mockPrisma.roleBinding.findMany.mockResolvedValue([
+        { userId: "u1", customRoleId: "role-1" },
       ]);
       mockPrisma.customRole.findMany.mockResolvedValue([
         { id: "role-1", permissions: ["project:view", "project:manage"] },
@@ -557,7 +560,7 @@ describe("LicenseEnforcementRepository", () => {
         { userId: "u1", role: OrganizationUserRole.EXTERNAL },
       ]);
       mockPrisma.team.findMany.mockResolvedValue([{ id: "team-1" }]);
-      mockPrisma.teamUser.findMany.mockResolvedValue([]); // No team assignment
+      mockPrisma.roleBinding.findMany.mockResolvedValue([]); // No team assignment
       mockPrisma.customRole.findMany.mockResolvedValue([]);
       mockPrisma.organizationInvite.findMany.mockResolvedValue([]);
 
@@ -571,8 +574,8 @@ describe("LicenseEnforcementRepository", () => {
         { userId: "u1", role: OrganizationUserRole.EXTERNAL },
       ]);
       mockPrisma.team.findMany.mockResolvedValue([{ id: "team-1" }]);
-      mockPrisma.teamUser.findMany.mockResolvedValue([
-        { userId: "u1", assignedRoleId: null },
+      mockPrisma.roleBinding.findMany.mockResolvedValue([
+        { userId: "u1", customRoleId: null },
       ]);
       mockPrisma.customRole.findMany.mockResolvedValue([]);
       mockPrisma.organizationInvite.findMany.mockResolvedValue([
