@@ -12,11 +12,16 @@
 -- the unified store). Per CLAUDE.md, every CH query MUST include
 -- TenantId; this fold inherits that contract.
 --
--- Engine: ReplacingMergeTree(UpdatedAt) — the fold projection is
--- load-mutate-store per event, so each (TenantId, SourceId, HourBucket)
--- row is re-written with the accumulated state on every event in that
--- hour bucket. ReplacingMergeTree dedup-by-key matches the same pattern
--- used by trace_summaries.
+-- Engine: SummingMergeTree — the populating reactor (3b-iii) inserts a
+-- delta row per event (e.g. {SpendUsd=0.42, EventCount=1, ...}) and
+-- CH merges them additively on background merges. Reads aggregate via
+-- `sum(...)` for correctness regardless of merge state. This avoids the
+-- cross-aggregate fold-projection race where two spans for the same
+-- (SourceId, HourBucket) but different traceIds would load-modify-store
+-- the same key concurrently.
+--
+-- The same delta-insert + SummingMergeTree pattern is used elsewhere
+-- in LangWatch for additive rollups (see PR #3168 for reference).
 --
 -- Partition: toYYYYMM(HourBucket) — coarser than trace_summaries'
 -- toYearWeek because rollup data has lower cardinality and benefits
@@ -46,9 +51,10 @@ CREATE TABLE IF NOT EXISTS ${CLICKHOUSE_DATABASE}.governance_kpis
     PromptTokens UInt64 CODEC(Delta(8), ZSTD(1)),
     CompletionTokens UInt64 CODEC(Delta(8), ZSTD(1)),
 
-    -- timestamps
+    -- timestamps (informational — LastEventOccurredAt is the meaningful
+    -- one for staleness checks; CreatedAt/UpdatedAt are insert times,
+    -- not aggregated)
     CreatedAt DateTime64(3) DEFAULT now64(3) CODEC(Delta(8), ZSTD(1)),
-    UpdatedAt DateTime64(3) DEFAULT now64(3) CODEC(Delta(8), ZSTD(1)),
     LastEventOccurredAt DateTime64(3) CODEC(Delta(8), ZSTD(1)),
 
     -- indexes
@@ -57,7 +63,7 @@ CREATE TABLE IF NOT EXISTS ${CLICKHOUSE_DATABASE}.governance_kpis
     INDEX idx_hour_bucket HourBucket TYPE minmax GRANULARITY 1,
     INDEX idx_tenant_source (TenantId, SourceId) TYPE bloom_filter(0.001) GRANULARITY 1
 )
-ENGINE = ${CLICKHOUSE_ENGINE_REPLACING_PREFIX:-ReplacingMergeTree(}UpdatedAt)
+ENGINE = SummingMergeTree((EventCount, SpendUsd, PromptTokens, CompletionTokens))
 PARTITION BY toYYYYMM(HourBucket)
 ORDER BY (TenantId, SourceId, HourBucket)
 SETTINGS index_granularity = 8192${CLICKHOUSE_STORAGE_POLICY_SETTING};
