@@ -1,10 +1,11 @@
 -- +goose Up
 -- +goose ENVSUB ON
 --
--- governance_kpis fold projection — per-(TenantId, SourceId, HourBucket)
--- rollup of spend / tokens / event counts for governance-origin events
+-- governance_kpis fold projection — per-trace contribution to the
+-- per-(TenantId, SourceId, HourBucket) rollup of spend / tokens /
+-- event counts for governance-origin events
 -- (langwatch.origin.kind = "ingestion_source"). Powers the /governance
--- dashboard KPI strip + the spend_spike anomaly reactor without
+-- dashboard KPI strip + the spend_spike anomaly reactor (3e) without
 -- scanning recorded_spans / log_records partitions at read time.
 --
 -- TenantId is the org's hidden internal_governance Project ID (the
@@ -12,16 +13,29 @@
 -- the unified store). Per CLAUDE.md, every CH query MUST include
 -- TenantId; this fold inherits that contract.
 --
--- Engine: SummingMergeTree — the populating reactor (3b-iii) inserts a
--- delta row per event (e.g. {SpendUsd=0.42, EventCount=1, ...}) and
--- CH merges them additively on background merges. Reads aggregate via
--- `sum(...)` for correctness regardless of merge state. This avoids the
--- cross-aggregate fold-projection race where two spans for the same
--- (SourceId, HourBucket) but different traceIds would load-modify-store
--- the same key concurrently.
+-- Engine: ReplacingMergeTree(LastEventOccurredAt) with TraceId in the
+-- ORDER BY. Each trace contributes ONE row per (SourceId, HourBucket).
+-- Replays of the same trace collapse at merge time
+-- (ReplacingMergeTree dedup-by-key keeps the latest version), so the
+-- populating reactor (3b-iii) can replay safely without double-counting.
 --
--- The same delta-insert + SummingMergeTree pattern is used elsewhere
--- in LangWatch for additive rollups (see PR #3168 for reference).
+-- Reads aggregate via `sum(...)` / `count(...)` over the (SourceId,
+-- HourBucket) group with the standard IN-tuple dedup pattern when
+-- pre-merge state matters. The pattern matches trace_summaries' own
+-- dedup discipline.
+--
+-- Why not SummingMergeTree: SummingMergeTree sums rows that share the
+-- primary key. Reactor replay would double-count. Including TraceId in
+-- the key with SummingMergeTree wouldn't help — same trace replayed
+-- creates new rows summed independently. Replay-safety needs structural
+-- dedup, which is what ReplacingMergeTree provides.
+--
+-- Why not a fold projection (load-mutate-store): the fold-projection
+-- framework partitions work by aggregateId (= traceId in the trace
+-- pipeline), so two traces emitting deltas for the same (SourceId,
+-- HourBucket) would race on load-mutate-store. The reactor + per-trace
+-- key pattern side-steps that race entirely — every trace becomes one
+-- independent row.
 --
 -- Partition: toYYYYMM(HourBucket) — coarser than trace_summaries'
 -- toYearWeek because rollup data has lower cardinality and benefits
@@ -37,23 +51,22 @@
 -- +goose StatementBegin
 CREATE TABLE IF NOT EXISTS ${CLICKHOUSE_DATABASE}.governance_kpis
 (
-    -- identity
+    -- identity (per-trace contribution)
     TenantId String CODEC(ZSTD(1)),
     SourceId String CODEC(ZSTD(1)),
     HourBucket DateTime CODEC(Delta(4), ZSTD(1)),
+    TraceId String CODEC(ZSTD(1)),
 
     -- denormalised dimensions (filtered cheaply at read time)
     SourceType LowCardinality(String),
 
-    -- aggregates (all additive across events in the hour bucket)
-    EventCount UInt64 CODEC(Delta(8), ZSTD(1)),
+    -- per-trace contribution (sum at read time across the HourBucket
+    -- group to get the rollup; count(DISTINCT TraceId) for trace count)
     SpendUsd Float64 CODEC(ZSTD(1)),
     PromptTokens UInt64 CODEC(Delta(8), ZSTD(1)),
     CompletionTokens UInt64 CODEC(Delta(8), ZSTD(1)),
 
-    -- timestamps (informational — LastEventOccurredAt is the meaningful
-    -- one for staleness checks; CreatedAt/UpdatedAt are insert times,
-    -- not aggregated)
+    -- timestamps
     CreatedAt DateTime64(3) DEFAULT now64(3) CODEC(Delta(8), ZSTD(1)),
     LastEventOccurredAt DateTime64(3) CODEC(Delta(8), ZSTD(1)),
 
@@ -63,9 +76,9 @@ CREATE TABLE IF NOT EXISTS ${CLICKHOUSE_DATABASE}.governance_kpis
     INDEX idx_hour_bucket HourBucket TYPE minmax GRANULARITY 1,
     INDEX idx_tenant_source (TenantId, SourceId) TYPE bloom_filter(0.001) GRANULARITY 1
 )
-ENGINE = SummingMergeTree((EventCount, SpendUsd, PromptTokens, CompletionTokens))
+ENGINE = ${CLICKHOUSE_ENGINE_REPLACING_PREFIX:-ReplacingMergeTree(}LastEventOccurredAt)
 PARTITION BY toYYYYMM(HourBucket)
-ORDER BY (TenantId, SourceId, HourBucket)
+ORDER BY (TenantId, SourceId, HourBucket, TraceId)
 SETTINGS index_granularity = 8192${CLICKHOUSE_STORAGE_POLICY_SETTING};
 -- +goose StatementEnd
 
