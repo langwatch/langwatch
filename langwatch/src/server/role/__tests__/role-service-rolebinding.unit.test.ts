@@ -1,10 +1,7 @@
 import { RoleBindingScopeType, TeamUserRole } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { RoleService } from "../role.service";
-import {
-  RoleOrganizationMismatchError,
-  UserNotTeamMemberError,
-} from "../errors";
+import { UserNotTeamMemberError } from "../errors";
 
 const mockTx = {
   roleBinding: {
