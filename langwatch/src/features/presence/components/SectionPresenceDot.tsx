@@ -1,3 +1,4 @@
+import { useShallow } from "zustand/react/shallow";
 import {
   selectPeersMatching,
   usePresenceStore,
@@ -22,13 +23,15 @@ export function SectionPresenceDot({
   tab,
   section,
 }: SectionPresenceDotProps) {
-  const peers = usePresenceStore((s) =>
-    selectPeersMatching(
-      s,
-      (sess) =>
-        sess.location.route.traceId === traceId &&
-        sess.location.view?.tab === tab &&
-        sess.location.view?.section === section,
+  const peers = usePresenceStore(
+    useShallow((s) =>
+      selectPeersMatching(
+        s,
+        (sess) =>
+          sess.location.route.traceId === traceId &&
+          sess.location.view?.tab === tab &&
+          sess.location.view?.section === section,
+      ),
     ),
   );
   if (peers.length === 0) return null;

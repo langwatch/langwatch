@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useSSESubscription } from "~/hooks/useSSESubscription";
 import type { PresenceCursorEvent } from "~/server/app-layer/presence/types";
 import { api } from "~/utils/api";
@@ -90,5 +90,8 @@ export function usePeerCursors({
     return () => clearInterval(timer);
   }, [subscriptionEnabled]);
 
-  return Array.from(cursors.values());
+  // The Map identity is replaced inside applyEvent on every change; deriving
+  // the array via useMemo on that identity keeps the consumer's prop stable
+  // across parent re-renders and lets PeerCursorOverlay short-circuit.
+  return useMemo(() => Array.from(cursors.values()), [cursors]);
 }

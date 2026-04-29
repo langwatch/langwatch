@@ -1,3 +1,4 @@
+import { useShallow } from "zustand/react/shallow";
 import {
   selectPeersOnTrace,
   usePresenceStore,
@@ -20,7 +21,9 @@ export function TracePresenceAvatars({
   max = 3,
   size = "2xs",
 }: TracePresenceAvatarsProps) {
-  const peers = usePresenceStore((s) => selectPeersOnTrace(s, traceId));
+  const peers = usePresenceStore(
+    useShallow((s) => selectPeersOnTrace(s, traceId)),
+  );
   if (peers.length === 0) return null;
   return <PresenceAvatarStack sessions={peers} max={max} size={size} />;
 }

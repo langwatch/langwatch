@@ -9,6 +9,7 @@ import {
 } from "@chakra-ui/react";
 import { memo, useMemo } from "react";
 import { LuChevronDown, LuFileText, LuPin, LuPinOff, LuX } from "react-icons/lu";
+import { useShallow } from "zustand/react/shallow";
 import { Kbd } from "~/components/ops/shared/Kbd";
 import { Menu } from "~/components/ui/menu";
 import { Tooltip } from "~/components/ui/tooltip";
@@ -61,12 +62,14 @@ function DrawerTabPresenceDot({
   traceId: string;
   tab: DrawerTab;
 }) {
-  const peers = usePresenceStore((s) =>
-    selectPeersMatching(
-      s,
-      (session) =>
-        session.location.route.traceId === traceId &&
-        session.location.view?.tab === tab,
+  const peers = usePresenceStore(
+    useShallow((s) =>
+      selectPeersMatching(
+        s,
+        (session) =>
+          session.location.route.traceId === traceId &&
+          session.location.view?.tab === tab,
+      ),
     ),
   );
   if (peers.length === 0) return null;
@@ -82,12 +85,14 @@ function SpanFocusPresenceDot({
   traceId: string;
   spanId: string;
 }) {
-  const peers = usePresenceStore((s) =>
-    selectPeersMatching(
-      s,
-      (session) =>
-        session.location.route.traceId === traceId &&
-        session.location.route.spanId === spanId,
+  const peers = usePresenceStore(
+    useShallow((s) =>
+      selectPeersMatching(
+        s,
+        (session) =>
+          session.location.route.traceId === traceId &&
+          session.location.route.spanId === spanId,
+      ),
     ),
   );
   if (peers.length === 0) return null;

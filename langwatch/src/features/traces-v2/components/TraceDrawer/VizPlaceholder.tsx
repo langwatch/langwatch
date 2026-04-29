@@ -29,6 +29,7 @@ import {
   LuMinus,
   LuNetwork,
 } from "react-icons/lu";
+import { useShallow } from "zustand/react/shallow";
 import { Kbd } from "~/components/ops/shared/Kbd";
 import { Tooltip } from "~/components/ui/tooltip";
 import { PeerCursorOverlay } from "~/features/presence/components/PeerCursorOverlay";
@@ -78,12 +79,14 @@ function VizTabPresenceDot({
   traceId: string;
   panel: VizTab;
 }) {
-  const peers = usePresenceStore((s) =>
-    selectPeersMatching(
-      s,
-      (session) =>
-        session.location.route.traceId === traceId &&
-        session.location.view?.panel === panel,
+  const peers = usePresenceStore(
+    useShallow((s) =>
+      selectPeersMatching(
+        s,
+        (session) =>
+          session.location.route.traceId === traceId &&
+          session.location.view?.panel === panel,
+      ),
     ),
   );
   if (peers.length === 0) return null;

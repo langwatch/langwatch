@@ -1,5 +1,6 @@
 import { Box, Flex, HStack, Text } from "@chakra-ui/react";
 import type { ReactNode } from "react";
+import { useShallow } from "zustand/react/shallow";
 import { Kbd } from "~/components/ops/shared/Kbd";
 import { Tooltip } from "~/components/ui/tooltip";
 import { PresenceMarker } from "~/features/presence/components/PresenceMarker";
@@ -41,12 +42,14 @@ function ModePresenceDot({
   traceId: string;
   mode: DrawerViewMode;
 }) {
-  const peers = usePresenceStore((s) =>
-    selectPeersMatching(
-      s,
-      (session) =>
-        session.location.route.traceId === traceId &&
-        session.location.view?.mode === mode,
+  const peers = usePresenceStore(
+    useShallow((s) =>
+      selectPeersMatching(
+        s,
+        (session) =>
+          session.location.route.traceId === traceId &&
+          session.location.view?.mode === mode,
+      ),
     ),
   );
   if (peers.length === 0) return null;
