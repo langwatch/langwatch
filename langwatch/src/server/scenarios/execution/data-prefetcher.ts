@@ -126,6 +126,12 @@ export interface DataPrefetcherDependencies {
   agentFetcher: AgentFetcher;
   workflowVersionFetcher: WorkflowVersionFetcher;
   projectFetcher: ProjectFetcher;
+  /**
+   * Resolves the effective default model for a project, including env-fallback
+   * providers. Injected so callers can wire in ProjectService.resolveDefaultModel.
+   * When provided, overrides the project.defaultModel ?? DEFAULT_MODEL fallback.
+   */
+  defaultModelResolver?: (projectId: string) => Promise<string | null>;
   modelParamsProvider: ModelParamsProvider;
   projectSecretsFetcher: ProjectSecretsFetcher;
 }
@@ -177,7 +183,11 @@ export async function prefetchScenarioData(
     return { success: false, error: `Scenario ${context.scenarioId} not found` };
   }
 
-  const projectResult = await fetchProject(context.projectId, deps.projectFetcher);
+  const projectResult = await fetchProject(
+    context.projectId,
+    deps.projectFetcher,
+    deps.defaultModelResolver,
+  );
   if (!projectResult.success) {
     logger.warn({ projectId: context.projectId, error: projectResult.error }, "Project fetch failed");
     return { success: false, error: projectResult.error };
@@ -247,11 +257,11 @@ export async function prefetchScenarioData(
       scenario,
       adapterData,
       modelParams,
-      nlpServiceUrl: env.LANGWATCH_NLP_SERVICE ?? "http://localhost:8080",
+      nlpServiceUrl: env.LANGWATCH_NLP_SERVICE ?? "",
       target,
     },
     telemetry: {
-      endpoint: process.env.LANGWATCH_ENDPOINT!,
+      endpoint: env.LANGWATCH_ENDPOINT ?? "",
       apiKey: project.apiKey,
     },
   };
@@ -284,6 +294,7 @@ type FetchProjectResult =
 async function fetchProject(
   projectId: string,
   fetcher: ProjectFetcher,
+  defaultModelResolver?: (projectId: string) => Promise<string | null>,
 ): Promise<FetchProjectResult> {
   const project = await fetcher.findUnique(projectId);
   if (!project) {
@@ -292,12 +303,16 @@ async function fetchProject(
   if (!project.apiKey) {
     return { success: false, error: `Project ${projectId} missing API key` };
   }
-  // Fall back to DEFAULT_MODEL like the rest of the app does
+  // Prefer the resolver (considers env-fallback providers for new projects);
+  // fall back to project.defaultModel ?? DEFAULT_MODEL for backwards compat.
+  const resolvedModel = defaultModelResolver
+    ? await defaultModelResolver(projectId)
+    : null;
   return {
     success: true,
     data: {
       apiKey: project.apiKey,
-      defaultModel: project.defaultModel ?? DEFAULT_MODEL,
+      defaultModel: resolvedModel ?? project.defaultModel ?? DEFAULT_MODEL,
     },
   };
 }

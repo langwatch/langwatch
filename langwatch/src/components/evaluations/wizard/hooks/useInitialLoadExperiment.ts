@@ -54,6 +54,9 @@ export const useInitialLoadExperiment = () => {
       },
       {
         enabled: !!project && !!initialLoadExperimentSlug,
+        // One-shot bootstrap: result is hydrated into the Zustand wizard store
+        // (setDSL/setExperimentId/setExperimentSlug below) and the user edits
+        // from there. A background refetch would clobber unsaved edits.
         refetchOnMount: false,
         refetchOnWindowFocus: false,
         refetchOnReconnect: false,
