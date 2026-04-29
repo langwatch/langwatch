@@ -7,9 +7,11 @@
  * Procedures:
  *   - setupState   — persona-detection signal for nav promotion
  *   - resolveHome  — picks the right `/` destination per persona
+ *   - ocsfExport   — cursor-paginated SIEM forwarding pull
  *
  * Spec: specs/ai-gateway/governance/feature-flag-gating.feature
  *       specs/ai-gateway/governance/persona-home-resolver.feature
+ *       specs/ai-gateway/governance/siem-export.feature
  */
 import { z } from "zod";
 
@@ -19,6 +21,7 @@ import {
   type PersonaResolution,
 } from "~/server/governance/personaResolver.service";
 import { UsageStatsService } from "~/server/license-enforcement/usage-stats.service";
+import { GovernanceOcsfExportService } from "~/server/governance/governanceOcsfExport.service";
 
 import {
   checkOrganizationPermission,
@@ -106,6 +109,46 @@ export const governanceRouter = createTRPCRouter({
         hasOrganizationManagePermission: hasManage,
         isEnterprise,
         firstProjectSlug: firstProject?.slug ?? null,
+      });
+    }),
+
+  /**
+   * SIEM forwarding pull — cursor-paginated OCSF v1.1 / OWASP AOS
+   * events for security teams. Per spec: read-only, paginated by
+   * EventTime, returns rows since cursor T.
+   *
+   * Designed for cron-based pulls from Splunk HEC / Datadog Cloud
+   * SIEM / Microsoft Sentinel / AWS Security Hub / Elastic Security /
+   * Sumo Logic CSE / Google Chronicle. Returns up to N rows; client
+   * passes back the last EventTime as the next cursor.
+   *
+   * Permission: organization:manage (security team's role binding).
+   * Restricted because OCSF events expose actor identities + tool
+   * names — should not leak to read-only org members.
+   *
+   * Empty-state safe: returns events=[] + nextCursor=null when the
+   * org has no Gov Project (no governance ingest) or when no events
+   * exist past the cursor.
+   *
+   * Spec: specs/ai-gateway/governance/siem-export.feature
+   */
+  ocsfExport: protectedProcedure
+    .input(
+      z.object({
+        organizationId: z.string(),
+        /** Inclusive lower bound — return events with eventTime > sinceMs. */
+        sinceMs: z.number().int().nonnegative().optional(),
+        /** Page size — soft cap at 1000 to keep responses bounded. */
+        limit: z.number().int().min(1).max(1000).default(500),
+      }),
+    )
+    .use(checkOrganizationPermission("organization:manage"))
+    .query(async ({ ctx, input }) => {
+      const service = GovernanceOcsfExportService.create(ctx.prisma);
+      return await service.list({
+        organizationId: input.organizationId,
+        sinceMs: input.sinceMs ?? 0,
+        limit: input.limit,
       });
     }),
 });
