@@ -14,20 +14,26 @@ import { usePublicEnv } from "./usePublicEnv";
 import { noOrgBouncerRoutes, publicRoutes, useRequiredSession } from "./useRequiredSession";
 
 /** @internal Exported for testing only */
-export function resolveProjectRedirectSubPath(
-  pathname: string,
-  oldProject: string
-): string {
+export function resolveProjectRedirectSubPath({
+  pathname,
+  oldProject,
+}: {
+  pathname: string;
+  oldProject: string;
+}): string {
   const decodedPrefix = `/${oldProject}`;
   const encodedPrefix = `/${encodeURIComponent(oldProject)}`;
 
-  if (pathname.startsWith(decodedPrefix)) {
-    return pathname.slice(decodedPrefix.length);
-  }
-  if (pathname.startsWith(encodedPrefix)) {
-    return pathname.slice(encodedPrefix.length);
-  }
-  return "";
+  const matchSegmentPrefix = (prefix: string): string | null => {
+    if (!pathname.startsWith(prefix)) return null;
+    const rest = pathname.slice(prefix.length);
+    if (rest !== "" && !rest.startsWith("/")) return null;
+    return rest;
+  };
+
+  return matchSegmentPrefix(decodedPrefix)
+    ?? matchSegmentPrefix(encodedPrefix)
+    ?? "";
 }
 
 export const useOrganizationTeamProject = (
@@ -280,10 +286,10 @@ export const useOrganizationTeamProject = (
       // but asPath keeps percent-encoding. Match both forms, always slice from
       // the original encoded pathname to avoid decoding characters in the sub-path.
       const url = new URL(router.asPath, window.location.origin);
-      const subPath = resolveProjectRedirectSubPath(
-        url.pathname,
-        router.query.project as string
-      );
+      const subPath = resolveProjectRedirectSubPath({
+        pathname: url.pathname,
+        oldProject: router.query.project as string,
+      });
       void router.push(`/${finalProject.slug}${subPath}${url.search}`);
     }
   }, [
