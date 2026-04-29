@@ -40,3 +40,13 @@ export const USAGE_STATS_QUEUE = {
   JOB: "usage_stats",
 } as const;
 
+/**
+ * Anomaly detection queue - evaluates active AnomalyRules against the
+ * governance_kpis fold (3b) on a scheduled tick (every 5 minutes by
+ * default). Spec: anomaly-rules.feature + anomaly-detection.feature.
+ */
+export const ANOMALY_DETECTION_QUEUE = {
+  NAME: makeQueueName("anomaly_detection"),
+  JOB: "anomaly_detection",
+} as const;
+
