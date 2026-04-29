@@ -658,9 +658,9 @@ Two votes deferred to rchaves resolution (tagged at end of PM round-up below):
 | ⏳ | 🅢 | Per-user budget enforcement (cascading strictest-wins) |
 | ⏳ | 🅑 | Admin user-activity report (cross-team) |
 
-#### Phase 1B.5 — Jane-at-Miro storyboard polish + persona-aware home (NEW per rchaves directive 2026-04-29)
+#### Phase 1B.5 — Jane-at-Acme storyboard polish + persona-aware home (NEW per rchaves directive 2026-04-29)
 
-The Jane Doe / Miro 8-screen storyboard from `gateway.md` is the **trial-wedge demo loop** that closes enterprise sales. Most surfaces are already shipped; this slice is polish + the persona-aware `/` redirect + screenshots. **Full storyboard + per-screen audit + persona-home model below in §Personal-Key Journey.**
+The Jane at Acme 8-screen storyboard from `gateway.md` is the **trial-wedge demo loop** that closes enterprise sales. Most surfaces are already shipped; this slice is polish + the persona-aware `/` redirect + screenshots. **Full storyboard + per-screen audit + persona-home model below in §Personal-Key Journey.**
 
 | | Owner | Task |
 |---|---|---|
@@ -797,13 +797,13 @@ Total to closed loop: **~5–8 working days** with 3 lanes in parallel.
 
 ---
 
-## Personal-Key Journey — Jane at Miro storyboard + persona-aware home
+## Personal-Key Journey — Jane at Acme storyboard + persona-aware home
 
-> Per rchaves directive 2026-04-29: the Jane Doe / Miro 8-screen storyboard from `gateway.md` is the **trial-wedge demo loop** — the apache2-floor experience that closes enterprise sales bottom-up. It was missing as an explicit deliverable until this section. Cross-lane sources: lane-A audit (Andre, kanban) + lane-B UI inventory delta (Alexis at `.monitor-logs/lane-b-jane-storyboard-ui-delta.md`) + lane-S backend audit (Sergey, kanban). Atomic tasks are tracked in **§Phase 1B.5** of the Gantt above.
+> Per rchaves directive 2026-04-29: the Jane at Acme 8-screen storyboard from `gateway.md` is the **trial-wedge demo loop** — the apache2-floor experience that closes enterprise sales bottom-up. It was missing as an explicit deliverable until this section. Cross-lane sources: lane-A audit (Andre, kanban) + lane-B UI inventory delta (Alexis at `.monitor-logs/lane-b-jane-storyboard-ui-delta.md`) + lane-S backend audit (Sergey, kanban). Atomic tasks are tracked in **§Phase 1B.5** of the Gantt above.
 
 ### The 8-screen storyboard (from gateway.md)
 
-A senior engineer at Miro joins the company. IT pings her in Slack. By the end of the day she's productive in Claude Code with org-attributed spend, a personal monthly budget set by her admin, no manual provider config, and a personal usage dashboard.
+A senior engineer (Jane) at a fictional enterprise customer (Acme) joins the company. IT pings her in Slack. By the end of the day she's productive in Claude Code with org-attributed spend, a personal monthly budget set by her admin, no manual provider config, and a personal usage dashboard.
 
 | Screen | Storyboard intent |
 |---|---|
@@ -811,10 +811,10 @@ A senior engineer at Miro joins the company. IT pings her in Slack. By the end o
 | 1 | Terminal: `langwatch login` opens browser at `app.langwatch.com/cli/<code>` |
 | 2 | Browser: focused single-input "Sign in to LangWatch" with email autodetect → routes to org SSO |
 | 3 | Company SSO bounce (Okta/SAML — LangWatch is just the kicker) |
-| 4 | Browser: "You're signed in!" + close-tab CTA. Terminal: prints `✓ Logged in as jane@miro.com` + inherited providers (anthropic / openai / gemini) + monthly budget (`$500`, used `$0`) + try-it commands |
+| 4 | Browser: "You're signed in!" + close-tab CTA. Terminal: prints `✓ Logged in as jane@acme.com` + inherited providers (anthropic / openai / gemini) + monthly budget (`$500`, used `$0`) + try-it commands |
 | 5 | `langwatch claude` opens Claude Code transparently routed through the gateway with Jane's personal VK |
 | 6 | `/me` personal dashboard: 3-card KPI top (spend / requests / most-used model) + spending-over-time chart + by-tool stacked bars + recent-activity row list. WorkspaceSwitcher (Personal / Team / Project flip) at top-left |
-| 7 | `/me/settings`: profile (managed by IT) + Personal API Keys per-device with Revoke + Notifications panel + Budget read-only ("$500 / month — set by your Miro admin · cannot edit") |
+| 7 | `/me/settings`: profile (managed by IT) + Personal API Keys per-device with Revoke + Notifications panel + Budget read-only ("$500 / month — set by your Acme admin · cannot edit") |
 | 8 | Budget-limit reached: `langwatch claude` prints `⚠ Budget limit reached — ask your team admin to raise your limit`. Admin contact + `langwatch request-increase` command |
 
 ### Per-screen current-vs-target audit (Alexis)
@@ -832,6 +832,8 @@ A senior engineer at Miro joins the company. IT pings her in Slack. By the end o
 | 8 | Web-side `BudgetExceededBanner` shipped (iter5); CLI doesn't render formatted budget-limit-reached message | 🟡 Polish (web) + 🔴 Net-new (CLI) | 🅑 (web) + 🅐 (CLI rendering) |
 
 **Summary**: 1 ✅ shipped, 2 🟢 wireable today (screenshot achievable), 4 🟡 polish/redesign, 3 🔴 net-new (mostly lane-A CLI surfaces). The polish slice fits inside Phase 1B; full demo-loop dogfood is achievable post-1.5b-x.
+
+**Backend audit (Sergey)**: backend is essentially fully built for the Jane journey. `personalUsage.service.ts` exposes `summary` / `dailyBuckets` / `breakdownByModel` / `recentActivity` (matches Screen 6 layout exactly). `personalVirtualKey.service.ts` handles per-device + revoke (Screen 7). Budget-exceeded wire shape locked: HTTP 402 + JSON `{type: 'budget_exceeded', message, scope, ...}` at `auth-cli.ts:701` + `user.ts:460` (consumed today by web `BudgetExceededBanner` via `usePersonalContext.ts:38`; CLI rendering is the lane-A polish). Only 1 missing backend signal: `setupState.hasApplicationTraces` (1.5s, Sergey, ~30min). Resolver should run in `getServerSideProps` on `pages/index.tsx` (deterministic, avoids client-side flash) and fail-safe to `/[firstProject]/messages` on any signal-lookup error.
 
 ### Persona-aware home — resolver, not page (Alexis)
 
