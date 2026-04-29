@@ -33,6 +33,7 @@ export interface TraceProcessingPipelineDeps {
   spanStorageBroadcastReactor: ReactorDefinition<TraceProcessingEvent>;
   customerIoTraceSyncReactor?: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
   gatewayBudgetSyncReactor?: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
+  governanceKpisSyncReactor?: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
 }
 
 /**
@@ -80,6 +81,14 @@ export function createTraceProcessingPipeline(deps: TraceProcessingPipelineDeps)
       "traceSummary",
       "gatewayBudgetSync",
       deps.gatewayBudgetSyncReactor,
+    );
+  }
+
+  if (deps.governanceKpisSyncReactor) {
+    builder = builder.withReactor(
+      "traceSummary",
+      "governanceKpisSync",
+      deps.governanceKpisSyncReactor,
     );
   }
 

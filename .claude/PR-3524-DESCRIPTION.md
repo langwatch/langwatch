@@ -658,6 +658,28 @@ Two votes deferred to rchaves resolution (tagged at end of PM round-up below):
 | ⏳ | 🅢 | Per-user budget enforcement (cascading strictest-wins) |
 | ⏳ | 🅑 | Admin user-activity report (cross-team) |
 
+#### Phase 1B.5 — Jane-at-Miro storyboard polish + persona-aware home (NEW per rchaves directive 2026-04-29)
+
+The Jane Doe / Miro 8-screen storyboard from `gateway.md` is the **trial-wedge demo loop** that closes enterprise sales. Most surfaces are already shipped; this slice is polish + the persona-aware `/` redirect + screenshots. **Full storyboard + per-screen audit + persona-home model below in §Personal-Key Journey.**
+
+| | Owner | Task |
+|---|---|---|
+| ⏳ | 🅑 | 1.5b-i: Live-data Playwright dogfood + screenshots — Screens 1 / 3 / 5 (wireable today) |
+| ⏳ | 🅑 | 1.5b-ii: Screen 2 — single-input email-only `/signin-cli` variant (vs full-provider-list /signin) |
+| ⏳ | 🅑 | 1.5b-iii: Screen 4 — "You're in!" ceremony page redesign + close-tab CTA + provider+budget summary |
+| ⏳ | 🅑 | 1.5b-iv: Screen 6 — `/me` layout refresh (3-card KPI top + by-tool stacked bars + recent-activity rows) |
+| ⏳ | 🅑 | 1.5b-v: Screen 7 — `/me/settings` polish (per-device key labelling + notifications panel + "managed by your company" chrome) |
+| ⏳ | 🅑 | 1.5b-vi: Screen 8 — `BudgetExceededBanner` web-side enrichment to match storyboard tone |
+| ⏳ | 🅑 | 1.5b-vii: WorkspaceSwitcher v2 — Personal/Team/Project visual + "managed by your company" indicator |
+| ⏳ | 🅑 | 1.5b-viii: Persona resolver service + `/` redirect + tRPC router + regression test (org without governance / personal-VKs but with projects → still lands on /[project]) |
+| ⏳ | 🅑 | 1.5b-ix: BDD spec `persona-home-resolver.feature` |
+| ⏳ | 🅑 | 1.5b-x: Live-data dogfood post-resolver — capture all 8 screens in one Playwright run |
+| ⏳ | 🅢 | 1.5s: `setupState.hasApplicationTraces` flag — for persona-3 default-detection (1-method addition, no schema change) |
+| ⏳ | 🅐 | 1.5a-cli-1: CLI Screen 4 — terminal-side `langwatch login` enumerates inherited providers + monthly budget after OAuth completes |
+| ⏳ | 🅐 | 1.5a-cli-2: CLI Screen 8 — `langwatch claude` budget-limit-reached message + `langwatch request-increase` cmd |
+| ⏳ | 🅐 | 1.5a-docs: `docs/getting-started/personal-ide-keys.mdx` reframed as the Jane storyboard walkthrough; Slack onboarding template for IT admins |
+| ⏳ | 🅐 | 1.5a-marketing: Marketing-page outline for the open-core / personal IDE keys offering (lives in `.monitor-logs/` until rchaves picks the home) |
+
 ### Phase 2A — Multi-source ingestion (Direction 2, P1) — UNIFIED SUBSTRATE (mostly Apache 2.0; multi-source fleet `ee/`)
 
 | | Owner | Task |
@@ -775,6 +797,101 @@ Total to closed loop: **~5–8 working days** with 3 lanes in parallel.
 
 ---
 
+## Personal-Key Journey — Jane at Miro storyboard + persona-aware home
+
+> Per rchaves directive 2026-04-29: the Jane Doe / Miro 8-screen storyboard from `gateway.md` is the **trial-wedge demo loop** — the apache2-floor experience that closes enterprise sales bottom-up. It was missing as an explicit deliverable until this section. Cross-lane sources: lane-A audit (Andre, kanban) + lane-B UI inventory delta (Alexis at `.monitor-logs/lane-b-jane-storyboard-ui-delta.md`) + lane-S backend audit (Sergey, kanban). Atomic tasks are tracked in **§Phase 1B.5** of the Gantt above.
+
+### The 8-screen storyboard (from gateway.md)
+
+A senior engineer at Miro joins the company. IT pings her in Slack. By the end of the day she's productive in Claude Code with org-attributed spend, a personal monthly budget set by her admin, no manual provider config, and a personal usage dashboard.
+
+| Screen | Storyboard intent |
+|---|---|
+| 0 | Slack message from IT bot: "Welcome Jane! Install LangWatch: `curl -sSL get.langwatch.com \| sh`" |
+| 1 | Terminal: `langwatch login` opens browser at `app.langwatch.com/cli/<code>` |
+| 2 | Browser: focused single-input "Sign in to LangWatch" with email autodetect → routes to org SSO |
+| 3 | Company SSO bounce (Okta/SAML — LangWatch is just the kicker) |
+| 4 | Browser: "You're signed in!" + close-tab CTA. Terminal: prints `✓ Logged in as jane@miro.com` + inherited providers (anthropic / openai / gemini) + monthly budget (`$500`, used `$0`) + try-it commands |
+| 5 | `langwatch claude` opens Claude Code transparently routed through the gateway with Jane's personal VK |
+| 6 | `/me` personal dashboard: 3-card KPI top (spend / requests / most-used model) + spending-over-time chart + by-tool stacked bars + recent-activity row list. WorkspaceSwitcher (Personal / Team / Project flip) at top-left |
+| 7 | `/me/settings`: profile (managed by IT) + Personal API Keys per-device with Revoke + Notifications panel + Budget read-only ("$500 / month — set by your Miro admin · cannot edit") |
+| 8 | Budget-limit reached: `langwatch claude` prints `⚠ Budget limit reached — ask your team admin to raise your limit`. Admin contact + `langwatch request-increase` command |
+
+### Per-screen current-vs-target audit (Alexis)
+
+| Screen | Today | Bucket | Owner |
+|---|---|---|---|
+| 0 | get.langwatch.com installer queued in Phase 1A; no desktop app | 🔴 Net-new | 🅐 (CLI distro) |
+| 1 | `langwatch login --device` shipped + `pages/auth/cli/[code].tsx` exists | 🟢 Wireable | 🅑 (screenshot) |
+| 2 | `/signin` shows full provider list — not the focused single-input variant | 🟡 Polish | 🅑 (`/signin-cli`) |
+| 3 | Existing `/api/auth` flow handles SAML/OIDC for SSO-configured orgs | 🟢 Wireable | 🅑 (screenshot) |
+| 4 | Bounce-back to generic success page; no provider+budget ceremony; CLI does not enumerate inherited providers/budget | 🟡 Polish (web) + 🔴 Net-new (CLI) | 🅑 (web) + 🅐 (CLI print) |
+| 5 | typescript-sdk wrapper shipped | ✅ Shipped | — |
+| 6 | `/me` exists with `<MyUsageDashboard>` (sparkline + budget meter); missing 3-card top + by-tool stacked bars + recent-activity rows | 🟡 Polish | 🅑 (layout refresh) |
+| 7 | `/me/settings` exists (PAT list + budget readonly); missing per-device labels + notifications panel + "managed by your company" chrome | 🟡 Polish + small Net-new | 🅑 |
+| 8 | Web-side `BudgetExceededBanner` shipped (iter5); CLI doesn't render formatted budget-limit-reached message | 🟡 Polish (web) + 🔴 Net-new (CLI) | 🅑 (web) + 🅐 (CLI rendering) |
+
+**Summary**: 1 ✅ shipped, 2 🟢 wireable today (screenshot achievable), 4 🟡 polish/redesign, 3 🔴 net-new (mostly lane-A CLI surfaces). The polish slice fits inside Phase 1B; full demo-loop dogfood is achievable post-1.5b-x.
+
+### Persona-aware home — resolver, not page (Alexis)
+
+rchaves's 4-persona model:
+
+| Persona | Trigger | Default home |
+|---|---|---|
+| 1 — Personal-only (just CLI users) | Has personal VK + zero project memberships | `/me` |
+| 2 — Personal + Project (mixed) | Has personal VK + ≥1 project membership | `/me` (with "Switch to project view" CTA inline; WorkspaceSwitcher fallback) |
+| 3 — **Project-only LLMOps (CURRENT default — most existing customers)** | No personal VK + ≥1 project membership | `/[firstProject]/messages` (today's behavior — must NOT change) |
+| 4 — Super-admin governance | Org has governance ingest AND user has organizationManage permission AND plan = enterprise | `/governance` |
+
+**Decision: route resolver, not a new `/home` page.** Server-side redirect at `pages/index.tsx` `getServerSideProps` consuming `api.governance.setupState` (already exposed in iter15) + role bindings + plan tier. New `personaResolver.service.ts` (~80 LOC) plus a tRPC procedure that returns the resolved path. Override mechanism: persist user's last-visited home in user settings so explicit navigation sticks across sessions.
+
+**Critical constraint (rchaves)**: most current LangWatch users are LLMOps admins NOT in any AI Gateway flow. Persona-3 (project-only) MUST stay on `/[project]/messages` exactly as today. Locked as a regression test in 1.5b-viii: org with no governance + no personal VKs + with projects → resolver returns `/[firstProject]/messages`. Sergey's `setupState.hasApplicationTraces` flag (1.5s) is the substrate signal for this default-detection.
+
+**Detection logic** (proposed at `langwatch/src/server/governance/personaResolver.service.ts` — Alexis):
+
+```typescript
+function resolvePersonaHome({ user, organizationId, setupState, plan }) {
+  // Persona 4 — super-admin governance (combo guard prevents
+  // accidental /governance default for LLMOps-only admins)
+  if (
+    setupState.hasGovernanceIngest &&
+    user.hasOrganizationManagePermission &&
+    plan.isEnterprise
+  ) return "/governance";
+
+  // Persona 1 — personal-only
+  if (setupState.hasPersonalVirtualKey && user.projectMemberships.length === 0)
+    return "/me";
+
+  // Persona 2 — mixed (defaults to /me; WorkspaceSwitcher flips to project)
+  if (setupState.hasPersonalVirtualKey && user.projectMemberships.length > 0)
+    return "/me";
+
+  // Persona 3 — project-only LLMOps (DEFAULT for current customers)
+  return defaultProjectHome(user); // typically /[firstProject]/messages
+}
+```
+
+### Atomic-task split (also tracked in §Phase 1B.5 of the Gantt)
+
+**Lane-B (Alexis)** — 10 atomic UI tasks, ~6 iters:
+1.5b-i screenshots Screens 1/3/5 · 1.5b-ii Screen 2 single-input email variant · 1.5b-iii Screen 4 "You're in!" ceremony · 1.5b-iv Screen 6 /me layout refresh (biggest slice) · 1.5b-v Screen 7 /me/settings polish · 1.5b-vi Screen 8 BudgetExceededBanner enrichment · 1.5b-vii WorkspaceSwitcher v2 · 1.5b-viii Persona resolver service + / redirect + tRPC + regression test (~300 LOC + migration) · 1.5b-ix BDD spec `persona-home-resolver.feature` · 1.5b-x Live-data Playwright dogfood capturing all 8 screens
+
+**Lane-S (Sergey)** — 1 atomic backend task:
+1.5s `setupState.hasApplicationTraces` flag for persona-3 default-detection (1-method addition, no schema change)
+
+**Lane-A (Andre)** — 4 atomic tasks (CLI + docs):
+1.5a-cli-1 CLI Screen 4 provider+budget enumeration on login completion · 1.5a-cli-2 CLI Screen 8 budget-limit message + `langwatch request-increase` · 1.5a-docs `docs/getting-started/personal-ide-keys.mdx` storyboard walkthrough + Slack onboarding template · 1.5a-marketing open-core marketing-page outline
+
+### Deferred decisions for rchaves (3 votes)
+
+- **Vote G — Phase 1B.5 sequencing**: parallel with Phase 4 (license relocation), or sequential (1B.5 first, then Phase 4)? Lane-B + Lane-S vote **parallel** (zero merge-conflict surface; 1B.5 touches `/me`, `/me/settings`, persona resolver; Phase 4 touches `ee/governance/*` relocation). Need rchaves's call.
+- **Vote H — In-this-PR vs follow-up PR**: ship 1B.5 inside `feat/governance-platform`, or as a separate follow-up PR? Lane-B votes **SPLIT**: block this PR on the demo-loop critical path (1.5b-i + ii + iii + iv + v + viii + 1.5s + 1.5a-cli-1 + 1.5a-cli-2); follow-up PR for polish (1.5b-vi + vii + ix + x + 1.5a-docs + 1.5a-marketing). Lane-A leans the same; lane-S agnostic. Need rchaves's call.
+- **Vote I — Rollout shape**: feature-flagged gradual rollout (e.g. `release_persona_home_resolver_default_on`) vs default-on launch? Lane-B + Lane-S vote **feature flag** — default-on for orgs created post-merge, default-off for existing orgs with explicit `/me/settings` opt-in. Locks the LLMOps-customer-majority safety. Need rchaves's call.
+
+---
+
 ## PM round-up — what's missing for production polish
 
 Cross-lane sources: lane-A (Andre), lane-B (Alexis at `.monitor-logs/lane-b-license-split-input.md` §5+§7), lane-S (Sergey backend gaps).
@@ -834,8 +951,11 @@ Cross-lane sources: lane-A (Andre), lane-B (Alexis at `.monitor-logs/lane-b-lice
 
 ### Deferred decisions for rchaves resolution
 
-- **Vote D**: Personal-key SSO (SCIM auto-provisioning of personal teams + policies) — apache2 vs `ee/`? Lane-A and lane-B lean apache2 (basic SAML in CE per GitLab precedent); SCIM/group-sync in EE. Need rchaves's call.
-- **Vote F**: BSL → Apache 2.0 license-flip TIMING — same PR as governance ee/ relocation, or separate prep PR landing first? Need rchaves's call.
+- **Vote D** (license): Personal-key SSO (SCIM auto-provisioning of personal teams + policies) — apache2 vs `ee/`? Lane-A and lane-B lean apache2 (basic SAML in CE per GitLab precedent); SCIM/group-sync in EE. Need rchaves's call.
+- **Vote F** (license-flip timing): BSL → Apache 2.0 license-flip — same PR as governance ee/ relocation, or separate prep PR landing first? Need rchaves's call.
+- **Vote G** (Phase 1B.5 sequencing — see § Personal-Key Journey): parallel with Phase 4 (license relocation), or sequential (1B.5 first, then Phase 4)? Lane-B + Lane-S vote **parallel** (zero merge-conflict surface). Need rchaves's call.
+- **Vote H** (in-this-PR vs follow-up): ship Phase 1B.5 inside `feat/governance-platform`, or as a separate follow-up PR? Lane-B votes **SPLIT**: block this PR on the demo-loop critical path (1.5b-i+ii+iii+iv+v+viii + 1.5s + 1.5a-cli-1+2); follow-up PR for polish (1.5b-vi+vii+ix+x + 1.5a-docs + 1.5a-marketing). Lane-A leans the same; lane-S agnostic. Need rchaves's call.
+- **Vote I** (rollout shape): feature-flagged gradual rollout (e.g. `release_persona_home_resolver_default_on`) vs default-on launch for the persona-aware `/` redirect? Lane-B + Lane-S vote **feature flag** — default-on for orgs created post-merge, default-off for existing orgs with explicit `/me/settings` opt-in. Locks the LLMOps-customer-majority safety. Need rchaves's call.
 
 ### Top 5 PM-hat recommendations (consolidated)
 
