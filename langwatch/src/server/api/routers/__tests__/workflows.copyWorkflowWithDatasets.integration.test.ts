@@ -87,6 +87,9 @@ describe("copyWorkflowWithDatasets", () => {
         })
         .catch(() => {});
       await prisma.workflowVersion
+        .updateMany({ where: { workflowId: id }, data: { parentId: null } })
+        .catch(() => {});
+      await prisma.workflowVersion
         .deleteMany({ where: { workflowId: id } })
         .catch(() => {});
       await prisma.workflow.delete({ where: { id } }).catch(() => {});
