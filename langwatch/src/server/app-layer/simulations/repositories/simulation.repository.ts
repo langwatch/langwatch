@@ -86,9 +86,10 @@ export interface SimulationRepository {
     sinceTimestamp?: number;
   }): Promise<AllSuitesRunDataResult>;
 
-  getAllRunIdsForProject(params: {
+  getRunIdsForSet(params: {
     projectId: string;
-  }): Promise<string[]>;
+    scenarioSetId: string;
+  }): Promise<{ runIds: string[]; reachedCap: boolean }>;
 
   /**
    * Returns distinct external (non-internal) scenario set IDs across the given projects.
@@ -144,8 +145,8 @@ export class NullSimulationRepository implements SimulationRepository {
     return { changed: true, lastUpdatedAt: 0, runs: [], scenarioSetIds: {}, hasMore: false };
   }
 
-  async getAllRunIdsForProject(): Promise<string[]> {
-    return [];
+  async getRunIdsForSet(): Promise<{ runIds: string[]; reachedCap: boolean }> {
+    return { runIds: [], reachedCap: false };
   }
 
   async getDistinctExternalSetIds(): Promise<Set<string>> {
