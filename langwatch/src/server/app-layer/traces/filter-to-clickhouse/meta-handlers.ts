@@ -2,10 +2,10 @@ import type { TagToken } from "liqe";
 import { FilterParseError } from "../errors";
 import { boundedSubquery, scenarioRunSubquery } from "./subqueries";
 import {
-  ATTRIBUTE_PREFIX,
   extractStringValue,
   type FieldHandler,
   nextParam,
+  TRACE_ATTRIBUTE_PREFIX_LEGACY,
   type TranslationContext,
   validateValueLength,
   wrap,
@@ -48,6 +48,22 @@ const SCENARIO_VERDICT_BY_LABEL: Record<string, string> = {
   inconclusive: "INCONCLUSIVE",
 };
 
+/**
+ * Returns the trailing key for either `trace.attribute.<k>` (canonical) or
+ * the legacy single-namespace `attribute.<k>`, or `null` when the value
+ * isn't a trace-attribute reference at all. Folds the back-compat alias
+ * into one call so callers don't have to branch on the prefix flavour.
+ */
+function stripTraceAttributePrefix(value: string): string | null {
+  if (value.startsWith("trace.attribute.")) {
+    return value.slice("trace.attribute.".length);
+  }
+  if (value.startsWith(TRACE_ATTRIBUTE_PREFIX_LEGACY)) {
+    return value.slice(TRACE_ATTRIBUTE_PREFIX_LEGACY.length);
+  }
+  return null;
+}
+
 function translateTraceId(
   tag: TagToken,
   negated: boolean,
@@ -82,16 +98,18 @@ function translateExistence(
   const value = extractStringValue(tag);
   validateValueLength(value);
 
-  // Dynamic per-attribute existence: `has:attribute.langwatch.user_id`
-  if (value.startsWith(ATTRIBUTE_PREFIX)) {
-    const attrKey = value.slice(ATTRIBUTE_PREFIX.length);
-    if (!attrKey) {
+  // Dynamic per-attribute existence — accepts the legacy `attribute.<k>`
+  // form here. The `has:trace.attribute.<k>` namespaced form is handled
+  // alongside it so both surfaces work without a saved-query migration.
+  const traceAttrKey = stripTraceAttributePrefix(value);
+  if (traceAttrKey !== null) {
+    if (!traceAttrKey) {
       throw new FilterParseError(
         "attribute.<key> requires a key after the dot",
       );
     }
     const p = nextParam(ctx, "attrKey");
-    ctx.params[p] = attrKey;
+    ctx.params[p] = traceAttrKey;
     return wrap(`Attributes[{${p}:String}] != ''`, negated);
   }
 
@@ -123,6 +141,9 @@ function translateExistence(
 
     case "user":
       return wrap("Attributes['langwatch.user_id'] != ''", negated);
+
+    case "customer":
+      return wrap("Attributes['langwatch.customer_id'] != ''", negated);
 
     case "topic":
       return wrap("ifNull(TopicId, '') != ''", negated);

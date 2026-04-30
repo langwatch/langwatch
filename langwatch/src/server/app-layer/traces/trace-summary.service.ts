@@ -1,6 +1,6 @@
 import { TraceNotFoundError } from "./errors";
 import type {
-  GetByTraceIdOptions,
+  FindByTraceIdOptions,
   TraceSummaryRepository,
 } from "./repositories/trace-summary.repository";
 import type { TraceSummaryData } from "./types";
@@ -15,9 +15,9 @@ export class TraceSummaryService {
   async getByTraceId(
     tenantId: string,
     traceId: string,
-    options?: GetByTraceIdOptions,
+    options?: FindByTraceIdOptions,
   ): Promise<TraceSummaryData> {
-    const result = await this.repository.getByTraceId(
+    const result = await this.repository.findByTraceId(
       tenantId,
       traceId,
       options,

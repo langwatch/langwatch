@@ -124,14 +124,14 @@ export class TraceSummaryClickHouseRepository
     }
   }
 
-  async getByTraceId(
+  async findByTraceId(
     tenantId: string,
     traceId: string,
     options?: { occurredAtMs?: number },
   ): Promise<TraceSummaryData | null> {
     EventUtils.validateTenantId(
       { tenantId },
-      "TraceSummaryClickHouseRepository.getByTraceId",
+      "TraceSummaryClickHouseRepository.findByTraceId",
     );
 
     // First attempt: when the caller has a rough timestamp, narrow the

@@ -1,3 +1,14 @@
+import {
+  EVALUATOR_FACET,
+  EVENT_ATTRIBUTE_KEYS_FACET,
+  EVENT_FACET,
+  LABEL_FACET,
+  METADATA_KEYS_FACET,
+  SPAN_ATTRIBUTE_KEYS_FACET,
+  SPAN_NAME_FACET,
+  SPAN_STATUS_FACET,
+} from "./facets";
+
 export type FacetTable = "trace_summaries" | "evaluation_runs" | "stored_spans";
 export type FacetGroup =
   | "trace"
@@ -61,147 +72,6 @@ export const TABLE_TIME_COLUMNS: Record<FacetTable, string> = {
   stored_spans: "StartTime",
 };
 
-function buildTimeWhere(timeColumn: string): string {
-  return [
-    "TenantId = {tenantId:String}",
-    `${timeColumn} >= fromUnixTimestamp64Milli({timeFrom:Int64})`,
-    `${timeColumn} <= fromUnixTimestamp64Milli({timeTo:Int64})`,
-  ].join(" AND ");
-}
-
-function baseParams(ctx: FacetQueryContext): Record<string, unknown> {
-  return {
-    tenantId: ctx.tenantId,
-    timeFrom: ctx.timeRange.from,
-    timeTo: ctx.timeRange.to,
-    limit: ctx.limit,
-    offset: ctx.offset,
-  };
-}
-
-function buildLabelFacetQuery(ctx: FacetQueryContext): FacetQuery {
-  const where = buildTimeWhere("OccurredAt");
-  const prefixFilter = ctx.prefix
-    ? "AND lower(trim(BOTH '\"' FROM label)) ILIKE concat({prefix:String}, '%')"
-    : "";
-
-  return {
-    sql: `
-      SELECT
-        trim(BOTH '"' FROM label) AS facet_value,
-        count() AS cnt,
-        count() OVER () AS total_distinct
-      FROM (
-        SELECT arrayJoin(JSONExtractArrayRaw(Attributes['langwatch.labels'])) AS label
-        FROM trace_summaries
-        WHERE ${where}
-          AND Attributes['langwatch.labels'] != ''
-          AND Attributes['langwatch.labels'] != '[]'
-      )
-      WHERE label != '' AND label != 'null'
-        ${prefixFilter}
-      GROUP BY facet_value
-      ORDER BY cnt DESC
-      LIMIT {limit:UInt32} OFFSET {offset:UInt32}
-    `,
-    params: {
-      ...baseParams(ctx),
-      ...(ctx.prefix ? { prefix: ctx.prefix } : {}),
-    },
-  };
-}
-
-function buildMetadataKeysFacetQuery(ctx: FacetQueryContext): FacetQuery {
-  const where = buildTimeWhere("OccurredAt");
-  const prefixFilter = ctx.prefix
-    ? "AND lower(key) ILIKE concat({prefix:String}, '%')"
-    : "";
-
-  return {
-    sql: `
-      SELECT
-        key AS facet_value,
-        count() AS cnt,
-        count() OVER () AS total_distinct
-      FROM (
-        SELECT arrayJoin(mapKeys(Attributes)) AS key
-        FROM trace_summaries
-        WHERE ${where}
-      )
-      WHERE key != ''
-        ${prefixFilter}
-      GROUP BY key
-      ORDER BY cnt DESC
-      LIMIT {limit:UInt32} OFFSET {offset:UInt32}
-    `,
-    params: {
-      ...baseParams(ctx),
-      ...(ctx.prefix ? { prefix: ctx.prefix } : {}),
-    },
-  };
-}
-
-function buildEventsFacetQuery(ctx: FacetQueryContext): FacetQuery {
-  const where = buildTimeWhere("StartTime");
-  const prefixFilter = ctx.prefix
-    ? "AND lower(name) ILIKE concat({prefix:String}, '%')"
-    : "";
-  return {
-    sql: `
-      SELECT
-        name AS facet_value,
-        count() AS cnt,
-        count() OVER () AS total_distinct
-      FROM (
-        SELECT arrayJoin(\`Events.Name\`) AS name
-        FROM stored_spans
-        WHERE ${where}
-          AND length(\`Events.Name\`) > 0
-      )
-      WHERE name != ''
-        ${prefixFilter}
-      GROUP BY name
-      ORDER BY cnt DESC
-      LIMIT {limit:UInt32} OFFSET {offset:UInt32}
-    `,
-    params: {
-      ...baseParams(ctx),
-      ...(ctx.prefix ? { prefix: ctx.prefix } : {}),
-    },
-  };
-}
-
-function buildEvaluatorFacetQuery(ctx: FacetQueryContext): FacetQuery {
-  const where = buildTimeWhere("ScheduledAt");
-  const prefixFilter = ctx.prefix
-    ? "AND lower(ifNull(EvaluatorName, '')) ILIKE concat({prefix:String}, '%')"
-    : "";
-
-  return {
-    sql: `
-      SELECT
-        EvaluatorId AS facet_value,
-        if(ifNull(EvaluatorName, '') != '',
-           concat('[', EvaluatorType, '] ', EvaluatorName),
-           concat('[', EvaluatorType, '] ', EvaluatorId)
-        ) AS facet_label,
-        count() AS cnt,
-        count() OVER () AS total_distinct
-      FROM evaluation_runs
-      WHERE ${where}
-        AND ifNull(EvaluatorId, '') != ''
-        ${prefixFilter}
-      GROUP BY EvaluatorId, EvaluatorType, EvaluatorName
-      ORDER BY cnt DESC
-      LIMIT {limit:UInt32} OFFSET {offset:UInt32}
-    `,
-    params: {
-      ...baseParams(ctx),
-      ...(ctx.prefix ? { prefix: ctx.prefix } : {}),
-    },
-  };
-}
-
 export const FACET_REGISTRY: readonly FacetDefinition[] = [
   // trace_summaries: simple expression facets
   {
@@ -252,6 +122,29 @@ export const FACET_REGISTRY: readonly FacetDefinition[] = [
     group: "trace",
     table: "trace_summaries",
     expression: "Attributes['gen_ai.conversation.id']",
+  },
+  {
+    // The same key the analytics layer aliases as `metadata.customer_id`.
+    // SDKs hoist it onto `trace_summaries.Attributes` at ingest, so this is
+    // a cheap expression facet — no subquery, no join.
+    key: "customer",
+    kind: "categorical",
+    label: "Customer",
+    group: "trace",
+    table: "trace_summaries",
+    expression: "Attributes['langwatch.customer_id']",
+  },
+  {
+    // Simulator-produced traces stamp the run id onto `Attributes` at
+    // ingest (see `meta-handlers.ts`'s scenarioRun translator). Surfacing
+    // it as a facet lets users scope the list to "all traces from this
+    // scenario run" without hand-typing the prefix.
+    key: "scenarioRun",
+    kind: "categorical",
+    label: "Scenario run",
+    group: "trace",
+    table: "trace_summaries",
+    expression: "Attributes['scenario.run_id']",
   },
   {
     key: "topic",
@@ -353,14 +246,7 @@ export const FACET_REGISTRY: readonly FacetDefinition[] = [
   },
 
   // trace_summaries: queryBuilder facets
-  {
-    key: "label",
-    kind: "categorical",
-    label: "Label",
-    group: "trace",
-    table: "trace_summaries",
-    queryBuilder: buildLabelFacetQuery,
-  },
+  LABEL_FACET,
 
   // trace_summaries: range facets
   {
@@ -374,7 +260,9 @@ export const FACET_REGISTRY: readonly FacetDefinition[] = [
   {
     key: "duration",
     kind: "range",
-    label: "Duration (ms)",
+    // Cells humanise the value (`7.0s`), so the unit doesn't need to live
+    // in the label.
+    label: "Duration",
     group: "trace",
     table: "trace_summaries",
     expression: "TotalDurationMs",
@@ -382,7 +270,7 @@ export const FACET_REGISTRY: readonly FacetDefinition[] = [
   {
     key: "tokens",
     kind: "range",
-    label: "Total Tokens",
+    label: "Total tokens",
     group: "trace",
     table: "trace_summaries",
     expression: "TotalPromptTokenCount + TotalCompletionTokenCount",
@@ -390,7 +278,7 @@ export const FACET_REGISTRY: readonly FacetDefinition[] = [
   {
     key: "ttft",
     kind: "range",
-    label: "Time to First Token (ms)",
+    label: "Time to first token",
     group: "trace",
     table: "trace_summaries",
     expression: "TimeToFirstTokenMs",
@@ -398,7 +286,7 @@ export const FACET_REGISTRY: readonly FacetDefinition[] = [
   {
     key: "ttlt",
     kind: "range",
-    label: "Time to Last Token (ms)",
+    label: "Time to last token",
     group: "trace",
     table: "trace_summaries",
     expression: "TimeToLastTokenMs",
@@ -430,35 +318,21 @@ export const FACET_REGISTRY: readonly FacetDefinition[] = [
   {
     key: "spans",
     kind: "range",
-    label: "Span Count",
+    label: "Span count",
     group: "trace",
     table: "trace_summaries",
     expression: "SpanCount",
   },
 
   // metadata: dynamic keys
-  {
-    key: "metadataKeys",
-    kind: "dynamic_keys",
-    label: "Metadata Keys",
-    group: "metadata",
-    table: "trace_summaries",
-    queryBuilder: buildMetadataKeysFacetQuery,
-  },
+  METADATA_KEYS_FACET,
 
   // evaluation_runs: cross-table
-  {
-    key: "evaluator",
-    kind: "categorical",
-    label: "Evaluator",
-    group: "evaluation",
-    table: "evaluation_runs",
-    queryBuilder: buildEvaluatorFacetQuery,
-  },
+  EVALUATOR_FACET,
   {
     key: "evaluatorStatus",
     kind: "categorical",
-    label: "Evaluator Status",
+    label: "Evaluator status",
     group: "evaluation",
     table: "evaluation_runs",
     expression: "Status",
@@ -466,7 +340,7 @@ export const FACET_REGISTRY: readonly FacetDefinition[] = [
   {
     key: "evaluatorVerdict",
     kind: "categorical",
-    label: "Evaluator Verdict",
+    label: "Evaluator verdict",
     group: "evaluation",
     table: "evaluation_runs",
     // Surface a 3-way label so users can pick pass / fail / unknown without
@@ -476,7 +350,7 @@ export const FACET_REGISTRY: readonly FacetDefinition[] = [
   {
     key: "evaluatorScore",
     kind: "range",
-    label: "Evaluator Score",
+    label: "Evaluator score",
     group: "evaluation",
     table: "evaluation_runs",
     expression: "Score",
@@ -486,19 +360,14 @@ export const FACET_REGISTRY: readonly FacetDefinition[] = [
   {
     key: "spanType",
     kind: "categorical",
-    label: "Span Type",
+    label: "Span type",
     group: "span",
     table: "stored_spans",
     expression: "SpanAttributes['langwatch.span.type']",
   },
-  {
-    // Surfaces span event names from the `Events.Name` array.
-    // Key matches the `event:` filter handler so toggles round-trip cleanly.
-    key: "event",
-    kind: "categorical",
-    label: "Event",
-    group: "span",
-    table: "stored_spans",
-    queryBuilder: buildEventsFacetQuery,
-  },
+  EVENT_FACET,
+  EVENT_ATTRIBUTE_KEYS_FACET,
+  SPAN_NAME_FACET,
+  SPAN_STATUS_FACET,
+  SPAN_ATTRIBUTE_KEYS_FACET,
 ];

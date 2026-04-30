@@ -1,6 +1,6 @@
 import type { TraceSummaryData } from "../types";
 
-export interface GetByTraceIdOptions {
+export interface FindByTraceIdOptions {
   /**
    * Approximate trace timestamp (ms since epoch). When provided, the repo
    * narrows the scan to a window around it so ClickHouse can prune
@@ -15,20 +15,20 @@ export interface TraceSummaryRepository {
   upsertBatch?(
     entries: Array<{ data: TraceSummaryData; tenantId: string }>,
   ): Promise<void>;
-  getByTraceId(
+  findByTraceId(
     tenantId: string,
     traceId: string,
-    options?: GetByTraceIdOptions,
+    options?: FindByTraceIdOptions,
   ): Promise<TraceSummaryData | null>;
 }
 
 export class NullTraceSummaryRepository implements TraceSummaryRepository {
   async upsert(_data: TraceSummaryData, _tenantId: string): Promise<void> {}
 
-  async getByTraceId(
+  async findByTraceId(
     _tenantId: string,
     _traceId: string,
-    _options?: GetByTraceIdOptions,
+    _options?: FindByTraceIdOptions,
   ): Promise<TraceSummaryData | null> {
     return null;
   }

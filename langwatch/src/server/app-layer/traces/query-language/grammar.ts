@@ -66,12 +66,29 @@ freeText  = literal | quoted
 | Quoted | \`user:"alice@example.com"\` | Required if the value contains spaces or special characters. |
 | Free text | \`refund\` · \`"refund policy"\` | Searches trace input/output. |
 
+## Attributes
+
+Two open-ended namespaces let you query arbitrary OTel attributes without
+adding them to the static fields table:
+
+| Form | Matches | Example |
+| --- | --- | --- |
+| \`attribute.<key>:value\` | trace-level attribute equality (\`Attributes[key]\`) | \`attribute.langwatch.user_id:alice\` |
+| \`event.<key>:value\` | per-event attribute across every span event in the trace | \`event.exception.type:TimeoutError\` |
+| \`event:<name>\` | bare event-name filter (no dot in the field) | \`event:tool_call\` |
+| \`has:attribute.<key>\` | trace has *any* value at \`Attributes[key]\` | \`has:attribute.gen_ai.conversation.id\` |
+| \`none:attribute.<key>\` | trace has no value at \`Attributes[key]\` | \`none:attribute.langwatch.user_id\` |
+
+The dot is the disambiguator — \`event:foo\` matches an event *name*, and
+\`event.foo:bar\` matches an event *attribute*. Same shape applies on the
+trace side via \`attribute.foo:bar\`.
+
 ## Limitations & gotchas
 
 - Operators must be uppercase. \`status:error and model:gpt-4o\` is **invalid** — write \`AND\`.
 - A trailing colon with no value (\`status:\`) is a syntax error. Provide a value or remove the clause.
 - Mixing \`OR\` across different fields (\`status:error OR model:gpt-4o\`) works but bypasses the sidebar facets — prefer staying within one field per \`OR\` chain.
-- Only the fields listed below are queryable. Other attribute keys are not exposed yet.
+- Attribute matching is exact equality only — wildcards (\`attribute.foo:*ar\`) and ranges (\`attribute.tokens:>10\`) aren't yet supported on the dynamic namespaces.
 `;
 
 /**

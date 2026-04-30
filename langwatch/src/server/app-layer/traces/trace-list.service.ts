@@ -123,9 +123,18 @@ const ATTRIBUTE_KEY_REGEX = /^[a-zA-Z0-9_.\-]+$/;
  * the next hit. This gives instant responses always, with a soft staleness
  * bound of TTL_MS and an effective freshness of REFRESH_AFTER_MS once a key
  * is being read regularly.
+ *
+ * Why such a long TTL? The discover queries scan the *whole* tenant time
+ * window (~125MB of `stored_spans` for `spanAttributeKeys` etc.) — paying
+ * that cost on every request is what made the slow-query log light up.
+ * Attribute key sets and top values turn over slowly, so a 30-min ceiling
+ * with a 2-min background refresh is the right trade: the user almost
+ * always gets a cached answer, and active sessions still see fresh data
+ * within ~2 minutes of ingest. Cache keys include `tenantId`, so this is
+ * tenant-isolated by construction.
  */
-const FACET_VALUES_TTL_MS = 5 * 60 * 1000; // cache lives up to 5 minutes
-const FACET_VALUES_REFRESH_AFTER_MS = 30_000; // background refresh if older than 30s
+const FACET_VALUES_TTL_MS = 30 * 60 * 1000; // cache lives up to 30 minutes
+const FACET_VALUES_REFRESH_AFTER_MS = 2 * 60 * 1000; // background refresh after 2 min
 
 interface CachedFacetValues {
   value: FacetValuesResult;
@@ -142,9 +151,15 @@ const FACET_VALUES_CACHE = new TtlCache<CachedFacetValues>(
  * on every time-range change for every viewer; caching by tenant + bucketed
  * window collapses concurrent viewers and rapid-refetches onto a single
  * ClickHouse run.
+ *
+ * TTL is generous (30 min) for the same reason as `FACET_VALUES_*`: the
+ * underlying ClickHouse scans are ~125MB+ on busy tenants, the result
+ * turns over slowly (top values + key sets), and the SWR pattern means
+ * users still get a background refresh every ~2 min of actual reads.
+ * Cache keys are tenant-scoped — see `discoverCacheKey`.
  */
-const DISCOVER_TTL_MS = 2 * 60 * 1000;
-const DISCOVER_REFRESH_AFTER_MS = 30_000;
+const DISCOVER_TTL_MS = 30 * 60 * 1000;
+const DISCOVER_REFRESH_AFTER_MS = 2 * 60 * 1000;
 
 interface CachedDiscover {
   value: FacetDescriptor[];
@@ -502,52 +517,82 @@ export class TraceListService {
       | { kind: "standalone"; key: string; descriptor: FacetDescriptor };
 
     const tasks: Promise<Outcome>[] = [];
+    // Per-task wall-clock so a slow discover surfaces which query is at fault.
+    const taskTimings: Array<{ label: string; durationMs: number }> = [];
+    const startedAt = Date.now();
+    const wrap = <T>(label: string, p: Promise<T>): Promise<T> => {
+      const t0 = Date.now();
+      return p.finally(() => {
+        taskTimings.push({ label, durationMs: Date.now() - t0 });
+      });
+    };
 
     for (const [table, slot] of batched) {
       tasks.push(
-        this.repository
-          .findBatchedFacets({
-            tenantId: params.tenantId,
-            timeRange: params.timeRange,
-            table,
-            timeColumn: TABLE_TIME_COLUMNS[table],
-            categoricalSpecs: slot.categoricals.map((d) => ({
-              key: d.key,
-              expression: d.expression,
-            })),
-            rangeSpecs: slot.ranges.map((d) => ({
-              key: d.key,
-              expression: d.expression,
-            })),
-            topN: TOP_N,
-          })
-          .then(
-            (result): Outcome => ({ kind: "batch", table, result }),
-          ),
+        wrap(
+          `batch:${table}`,
+          this.repository
+            .findBatchedFacets({
+              tenantId: params.tenantId,
+              timeRange: params.timeRange,
+              table,
+              timeColumn: TABLE_TIME_COLUMNS[table],
+              categoricalSpecs: slot.categoricals.map((d) => ({
+                key: d.key,
+                expression: d.expression,
+              })),
+              rangeSpecs: slot.ranges.map((d) => ({
+                key: d.key,
+                expression: d.expression,
+              })),
+              topN: TOP_N,
+            })
+            .then((result): Outcome => ({ kind: "batch", table, result })),
+        ),
       );
     }
 
     for (const def of standalone) {
       tasks.push(
-        (async (): Promise<Outcome> => {
-          let descriptor: FacetDescriptor;
-          switch (def.kind) {
-            case "categorical":
-              descriptor = await this.discoverCategorical(def, params, TOP_N);
-              break;
-            case "range":
-              descriptor = await this.discoverRange(def, params);
-              break;
-            case "dynamic_keys":
-              descriptor = await this.discoverDynamicKeys(def, params, TOP_N);
-              break;
-          }
-          return { kind: "standalone", key: def.key, descriptor };
-        })(),
+        wrap(
+          `standalone:${def.kind}:${def.key}`,
+          (async (): Promise<Outcome> => {
+            let descriptor: FacetDescriptor;
+            switch (def.kind) {
+              case "categorical":
+                descriptor = await this.discoverCategorical(def, params, TOP_N);
+                break;
+              case "range":
+                descriptor = await this.discoverRange(def, params);
+                break;
+              case "dynamic_keys":
+                descriptor = await this.discoverDynamicKeys(
+                  def,
+                  params,
+                  TOP_N,
+                );
+                break;
+            }
+            return { kind: "standalone", key: def.key, descriptor };
+          })(),
+        ),
       );
     }
 
     const settled = await Promise.allSettled(tasks);
+    const totalMs = Date.now() - startedAt;
+    if (totalMs > 1500) {
+      taskTimings.sort((a, b) => b.durationMs - a.durationMs);
+      discoverLogger.info(
+        {
+          tenantId: params.tenantId,
+          totalMs,
+          breakdown: taskTimings.slice(0, 20),
+          taskCount: tasks.length,
+        },
+        "Discover wall-clock exceeded 1.5s — per-task breakdown",
+      );
+    }
 
     const batchByTable = new Map<FacetTable, BatchedFacetResult>();
     const standaloneByKey = new Map<string, FacetDescriptor>();

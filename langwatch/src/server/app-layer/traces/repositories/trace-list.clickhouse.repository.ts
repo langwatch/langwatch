@@ -530,6 +530,21 @@ export class TraceListClickHouseRepository implements TraceListRepository {
       params.timeColumn,
     );
 
+    // Match the dedup behaviour of findCategoricalFacet/findBatchedFacets:
+    // trace_summaries is a ReplacingMergeTree projection, so without the
+    // IN-tuple dedup older versions of a trace widen the discovered
+    // min/max envelope until merges run. Other facet tables keep one row
+    // per logical entity (eval/span) and don't need it.
+    const needsDedup = params.table === "trace_summaries";
+    const dedupFilter = needsDedup
+      ? `AND (TenantId, TraceId, UpdatedAt) IN (
+            SELECT TenantId, TraceId, max(UpdatedAt)
+            FROM ${params.table}
+            WHERE ${whereClause}
+            GROUP BY TenantId, TraceId
+          )`
+      : "";
+
     const client = await this.resolveClient(params.tenantId);
     const result = await client.query({
       query: `
@@ -538,6 +553,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
           max(${params.column}) AS max_val
         FROM ${params.table}
         WHERE ${whereClause}
+          ${dedupFilter}
       `,
       query_params: queryParams,
       format: "JSONEachRow",

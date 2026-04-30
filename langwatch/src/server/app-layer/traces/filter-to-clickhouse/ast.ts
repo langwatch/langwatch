@@ -8,11 +8,17 @@ import {
 } from "liqe";
 import { FilterFieldUnknownError, FilterParseError } from "../errors";
 import { FIELD_HANDLERS, KNOWN_FIELDS } from "./build-handlers";
+import { boundedSubquery } from "./subqueries";
 import {
-  ATTRIBUTE_PREFIX,
+  EVENT_ATTRIBUTE_PREFIX,
+  EVENT_ATTRIBUTE_PREFIX_LEGACY,
   extractStringValue,
   nextParam,
+  SPAN_ATTRIBUTE_PREFIX,
+  TRACE_ATTRIBUTE_PREFIX,
+  TRACE_ATTRIBUTE_PREFIX_LEGACY,
   type TranslationContext,
+  validateAttributeKey,
   validateValueLength,
   wrap,
 } from "./value-helpers";
@@ -130,10 +136,35 @@ function translateTag(
 
   const fieldName = tag.field.name;
 
-  // attribute.<key> — dynamic per-attribute filtering, can't be enumerated
-  // up front so it bypasses the static handler map.
-  if (fieldName.startsWith(ATTRIBUTE_PREFIX)) {
-    return translateAttributeField(fieldName, tag, negated, ctx);
+  // Namespaced attribute prefixes — unique root keeps autocomplete clean.
+  // `trace.attribute.<k>` and `span.attribute.<k>` are the canonical
+  // forms; `attribute.<k>` and `event.<k>` (one dot) are kept as aliases
+  // so saved queries from the previous schema still translate cleanly.
+  if (fieldName.startsWith(TRACE_ATTRIBUTE_PREFIX)) {
+    const key = fieldName.slice(TRACE_ATTRIBUTE_PREFIX.length);
+    return translateTraceAttribute(key, tag, negated, ctx);
+  }
+  if (fieldName.startsWith(SPAN_ATTRIBUTE_PREFIX)) {
+    const key = fieldName.slice(SPAN_ATTRIBUTE_PREFIX.length);
+    return translateSpanAttribute(key, tag, negated, ctx);
+  }
+  if (fieldName.startsWith(EVENT_ATTRIBUTE_PREFIX)) {
+    const key = fieldName.slice(EVENT_ATTRIBUTE_PREFIX.length);
+    return translateEventAttribute(key, tag, negated, ctx);
+  }
+  // Legacy alias — `attribute.<k>`. Identical SQL to `trace.attribute.<k>`.
+  if (fieldName.startsWith(TRACE_ATTRIBUTE_PREFIX_LEGACY)) {
+    const key = fieldName.slice(TRACE_ATTRIBUTE_PREFIX_LEGACY.length);
+    return translateTraceAttribute(key, tag, negated, ctx);
+  }
+  // Legacy alias — `event.<k>` (single-dot form). Skips the bare `event`
+  // field so `event:<name>` still routes to the static handler map.
+  if (
+    fieldName.startsWith(EVENT_ATTRIBUTE_PREFIX_LEGACY) &&
+    fieldName !== "event"
+  ) {
+    const key = fieldName.slice(EVENT_ATTRIBUTE_PREFIX_LEGACY.length);
+    return translateEventAttribute(key, tag, negated, ctx);
   }
 
   const handler = FIELD_HANDLERS[fieldName];
@@ -145,16 +176,18 @@ function translateTag(
   return handler(tag, negated, ctx);
 }
 
-function translateAttributeField(
-  fieldName: string,
+function translateTraceAttribute(
+  attrKey: string,
   tag: TagToken,
   negated: boolean,
   ctx: TranslationContext,
 ): string {
-  const attrKey = fieldName.slice(ATTRIBUTE_PREFIX.length);
   if (!attrKey) {
-    throw new FilterParseError("attribute.<key> requires a key after the dot");
+    throw new FilterParseError(
+      "trace.attribute.<key> requires a key after the dot",
+    );
   }
+  validateAttributeKey(attrKey);
   const value = extractStringValue(tag);
   validateValueLength(value);
   const pKey = nextParam(ctx, "attrKey");
@@ -162,6 +195,78 @@ function translateAttributeField(
   ctx.params[pKey] = attrKey;
   ctx.params[pVal] = value;
   return wrap(`Attributes[{${pKey}:String}] = {${pVal}:String}`, negated);
+}
+
+/**
+ * `event.attribute.<attr_key>:value` — match if any span event in the trace
+ * has an `Attributes[<attr_key>] = <value>` entry. Events live on
+ * `stored_spans`, so this is answered by a partition-pruned subquery over
+ * that table. `Events.Attributes` is `Array(Map(LowCardinality(String),
+ * String))` — `arrayExists` short-circuits on the first match, cheap
+ * relative to materialising the nested column for each row.
+ */
+function translateEventAttribute(
+  attrKey: string,
+  tag: TagToken,
+  negated: boolean,
+  ctx: TranslationContext,
+): string {
+  if (!attrKey) {
+    throw new FilterParseError(
+      "event.attribute.<key> requires a key after the dot",
+    );
+  }
+  validateAttributeKey(attrKey);
+  const value = extractStringValue(tag);
+  validateValueLength(value);
+  const pKey = nextParam(ctx, "eventAttrKey");
+  const pVal = nextParam(ctx, "eventAttrValue");
+  ctx.params[pKey] = attrKey;
+  ctx.params[pVal] = value;
+  return wrap(
+    boundedSubquery(
+      "stored_spans",
+      "StartTime",
+      `arrayExists(attrs -> attrs[{${pKey}:String}] = {${pVal}:String}, \`Events.Attributes\`)`,
+    ),
+    negated,
+  );
+}
+
+/**
+ * `span.attribute.<attr_key>:value` — match if any span in the trace has
+ * `SpanAttributes[<attr_key>] = <value>`. Same partition-pruned subquery
+ * shape as the event-attribute form, scoped against the `SpanAttributes`
+ * map directly. Filtering only — we never SELECT the heavy attribute
+ * payloads, so this stays cheap even on traces with megabyte-class
+ * `gen_ai.input.messages` blobs.
+ */
+function translateSpanAttribute(
+  attrKey: string,
+  tag: TagToken,
+  negated: boolean,
+  ctx: TranslationContext,
+): string {
+  if (!attrKey) {
+    throw new FilterParseError(
+      "span.attribute.<key> requires a key after the dot",
+    );
+  }
+  validateAttributeKey(attrKey);
+  const value = extractStringValue(tag);
+  validateValueLength(value);
+  const pKey = nextParam(ctx, "spanAttrKey");
+  const pVal = nextParam(ctx, "spanAttrValue");
+  ctx.params[pKey] = attrKey;
+  ctx.params[pVal] = value;
+  return wrap(
+    boundedSubquery(
+      "stored_spans",
+      "StartTime",
+      `SpanAttributes[{${pKey}:String}] = {${pVal}:String}`,
+    ),
+    negated,
+  );
 }
 
 function translateFreeText(
