@@ -1177,14 +1177,14 @@ func buildMessages(node *dsl.Node, inputs map[string]any) []app.ChatMessage {
 		return msgs
 	}
 	if instr := paramString(node.Data.Parameters, "instructions"); instr != "" {
-		// Render Liquid-subset placeholders against the upstream
-		// inputs so {{ var }} / {{ x.y }} / {{ x[0] }} in the system
-		// prompt resolve like they do on the Python path. Unresolved
-		// keys come back as warnings — non-fatal here, the engine
-		// still emits the partially-rendered string. Full Liquid
-		// (loops, ifs, filters) intentionally not supported yet:
-		// see specs/nlp-go/llm-block.feature.
-		rendered, _ := template.Render(instr, inputs)
+		// Render Liquid placeholders + control flow + filters against
+		// the upstream inputs. Mirrors langwatch_nlp's
+		// dspy/template_adapter.py — DSPy templates with loops over
+		// chat history (`{% for m in messages %}{{ m.content }}{% endfor %}`)
+		// or branches on input shape now render correctly on the Go
+		// path. Pure `{{ var }}` templates fall back to the simple
+		// JSON-escaping interpolator so HTTP-block parity stays.
+		rendered, _ := template.RenderFull(instr, inputs)
 		return []app.ChatMessage{
 			{Role: "system", Content: rendered},
 			{Role: "user", Content: composeUserPrompt(inputs)},

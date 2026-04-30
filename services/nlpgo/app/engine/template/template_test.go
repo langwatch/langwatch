@@ -187,3 +187,101 @@ func TestRender_MissingVariableEmitsWarningButNotPanic(t *testing.T) {
 	assert.NotContains(t, out, "{{ ghost }}",
 		"missing variable should be substituted with empty, not survive verbatim")
 }
+
+// TestRenderFull_FallsBackToSimpleRenderForVarOnly proves that
+// templates without Liquid-extended syntax (`{% %}` tags or pipe
+// filters) take the same path as Render — preserving the
+// JSON-escape semantics that the HTTP block + signature happy path
+// rely on, and that template_test.go pins case-by-case above.
+func TestRenderFull_FallsBackToSimpleRenderForVarOnly(t *testing.T) {
+	cases := []struct {
+		name string
+		tmpl string
+		in   map[string]any
+		want string
+	}{
+		{"plain string var", "Hi {{ name }}", map[string]any{"name": "Alice"}, "Hi Alice"},
+		{"dotted path", "Got {{ user.name }}", map[string]any{"user": map[string]any{"name": "Bob"}}, "Got Bob"},
+		{"object as JSON", "Profile: {{ profile }}", map[string]any{"profile": map[string]any{"k": "v"}}, `Profile: {"k":"v"}`},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			out, warnings := RenderFull(tc.tmpl, tc.in)
+			assert.Empty(t, warnings)
+			assert.Equal(t, tc.want, out)
+		})
+	}
+}
+
+// TestRenderFull_LiquidForLoopIteratesNativeList pins the load-bearing
+// new feature: DSPy templates with `{% for m in messages %}` over a
+// chat-history list now render every message instead of leaving the
+// literal `{% for %}` tag in the output. Mirrors Python's
+// liquid.render(template, messages=[...]).
+func TestRenderFull_LiquidForLoopIteratesNativeList(t *testing.T) {
+	out, warnings := RenderFull(
+		"{% for m in messages %}- {{ m.content }}\n{% endfor %}",
+		map[string]any{
+			"messages": []any{
+				map[string]any{"role": "user", "content": "hello"},
+				map[string]any{"role": "assistant", "content": "hi back"},
+			},
+		},
+	)
+	assert.Empty(t, warnings)
+	assert.Equal(t, "- hello\n- hi back\n", out)
+}
+
+// TestRenderFull_LiquidIfBranchesOnInputShape pins control-flow
+// support — customers branching on whether an input is set was
+// silently broken before (the literal `{% if x %}` survived in the
+// rendered output and confused the LLM).
+func TestRenderFull_LiquidIfBranchesOnInputShape(t *testing.T) {
+	tmpl := "{% if context %}Context: {{ context }}{% else %}No context{% endif %}"
+	withContext, _ := RenderFull(tmpl, map[string]any{"context": "RAG snippet"})
+	assert.Equal(t, "Context: RAG snippet", withContext)
+	withoutContext, _ := RenderFull(tmpl, map[string]any{})
+	assert.Equal(t, "No context", withoutContext)
+}
+
+// TestRenderFull_LiquidPipeFilters covers the third Liquid feature
+// surface — `{{ x | upcase }}`, `{{ x | downcase }}`, `{{ x | size }}`.
+// Pre-fix these survived as literals; now they apply.
+func TestRenderFull_LiquidPipeFilters(t *testing.T) {
+	out, warnings := RenderFull(
+		"{{ name | upcase }} ({{ tags | size }} tags)",
+		map[string]any{
+			"name": "alice",
+			"tags": []any{"go", "liquid"},
+		},
+	)
+	assert.Empty(t, warnings)
+	assert.Equal(t, "ALICE (2 tags)", out)
+}
+
+// TestRenderFull_CoercesJSONStringToNativeForLiquid pins the parity
+// detail from langwatch_nlp's _coerce_for_liquid: when a chat history
+// arrives as a JSON-stringified value (TS↔NLP wire convention), we
+// must JSON.parse it back into a native list so `{% for %}` works.
+// Without this the loop would silently iterate over no rows.
+func TestRenderFull_CoercesJSONStringToNativeForLiquid(t *testing.T) {
+	out, warnings := RenderFull(
+		"{% for m in messages %}{{ m.role }}={{ m.content }};{% endfor %}",
+		map[string]any{
+			"messages": `[{"role":"user","content":"q"},{"role":"assistant","content":"a"}]`,
+		},
+	)
+	assert.Empty(t, warnings)
+	assert.Equal(t, "user=q;assistant=a;", out)
+}
+
+// TestRenderFull_BadTemplateSurfacesAsWarningNotPanic pins the
+// fault-tolerance contract — a malformed template should NOT crash
+// the workflow run; the engine surfaces the parse error as a warning
+// so operators see the bad syntax in the trace log.
+func TestRenderFull_BadTemplateSurfacesAsWarningNotPanic(t *testing.T) {
+	_, warnings := RenderFull("{% for m in xs %}no end tag", map[string]any{"xs": []any{1}})
+	if assert.Len(t, warnings, 1) {
+		assert.Contains(t, warnings[0], "liquid")
+	}
+}

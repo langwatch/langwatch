@@ -111,6 +111,17 @@ func newEvaluationReporter(req ExecuteRequest, total int, baseURL string, logRes
 	}
 }
 
+// progressCount returns the current number of recorded entries under
+// the same mutex `recordEntry` writes with. Callers in different
+// goroutines (the worker pool emits per-row progress events) MUST go
+// through this helper rather than reading `r.progress` directly to
+// avoid a data race.
+func (r *evaluationReporter) progressCount() int {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.progress
+}
+
 // recordEntry appends one dataset entry's predicted outputs + per-node
 // evaluator results to the rolling batch. Mirrors EvaluationReporting.
 // add_to_batch (Python) — the dataset list captures workflow predictions,
@@ -365,13 +376,20 @@ func (e *Engine) executeEvaluationStream(ctx context.Context, req ExecuteRequest
 					}
 				}
 				reporter.recordEntry(j.index, j.entry, entryRes, entryTraceID, duration)
-				emit(ctx, out, evaluationProgressEvent(req, traceID, reporter.progress, total, started))
+				// Read progress through the synchronized helper —
+				// reporter.progress lives behind the same mutex
+				// recordEntry uses; reading the field directly across
+				// goroutines is a data race (CodeRabbit critical on
+				// PR #3607).
+				emit(ctx, out, evaluationProgressEvent(req, traceID, reporter.progressCount(), total, started))
 			}
 		}()
 	}
+	canceled := false
 	for i, entry := range entries {
 		if ctx.Err() != nil {
 			emit(ctx, out, workflowErrorEvent(req, traceID, ctx.Err().Error(), true))
+			canceled = true
 			break
 		}
 		jobs <- job{index: i, entry: entry}
@@ -381,9 +399,22 @@ func (e *Engine) executeEvaluationStream(ctx context.Context, req ExecuteRequest
 
 	// Final flush carries finished_at — the same call mirrors Python's
 	// EvaluationReporting.wait_for_completion (which calls send_batch
-	// with finished=True before joining the worker threads).
-	if err := reporter.flush(ctx, true); err != nil {
+	// with finished=True before joining the worker threads). Use
+	// context.Background() so a canceled ctx doesn't abort the final
+	// POST; the partial-results flush is still valuable.
+	finalFlushCtx := ctx
+	if canceled {
+		finalFlushCtx = context.Background()
+	}
+	if err := reporter.flush(finalFlushCtx, true); err != nil {
 		e.logger.Warn("evaluation: final batch post failed — experiment row may stay incomplete", "err", err)
+	}
+	if canceled {
+		// Don't emit a success state after the cancellation error
+		// (CodeRabbit major on PR #3607: producing two terminal
+		// states for one run confuses Studio's reducer).
+		emit(ctx, out, doneEvent(traceID, newRunState(req.Workflow), started))
+		return
 	}
 	emit(ctx, out, workflowSuccessEvent(req, traceID, newRunState(req.Workflow), started, true))
 	emit(ctx, out, doneEvent(traceID, newRunState(req.Workflow), started))
