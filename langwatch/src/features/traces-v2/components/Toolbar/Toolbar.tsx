@@ -1,10 +1,9 @@
 import { Button, Flex, Icon, IconButton } from "@chakra-ui/react";
-import { Compass, Download, Search, Sparkles } from "lucide-react";
+import { Compass, Download, Search } from "lucide-react";
 import type React from "react";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useTourEntryPoints } from "../../onboarding";
 import { useFindStore } from "../../stores/findStore";
-import { useWelcomeStore } from "../../stores/welcomeStore";
 import { ColumnsDropdown } from "./ColumnsDropdown";
 import { DensityToggle } from "./DensityToggle";
 import { GroupingSelector } from "./GroupingSelector";
@@ -18,17 +17,15 @@ interface ToolbarProps {
 }
 
 export const Toolbar: React.FC<ToolbarProps> = ({ onExportAll }) => {
-  const openWelcome = useWelcomeStore((s) => s.open);
   const findIsOpen = useFindStore((s) => s.isOpen);
   const openFind = useFindStore((s) => s.open);
   const closeFind = useFindStore((s) => s.close);
-  // Tour entry point — this is the toolbar's hook for "let me see the
-  // empty-state journey" (existing customers + replay). The hook
-  // handles flipping `tourActive` so the journey runs over the real
-  // data table, and clears any prior dismissal. The `What's-new`
-  // button stays separate for now — it'll be absorbed into the tour's
-  // OutroPanel as part of Step 10 of the onboarding migration plan,
-  // and only then does its own button retire.
+  // Tour entry point — the toolbar's only onboarding affordance. The
+  // What's-new dialog used to live next to this button; it retired
+  // when the tour outro absorbed its content (release notes,
+  // multiplayer hint, shortcuts, beta note). Replaying the tour
+  // takes the user past the OutroPanel, which is now the only
+  // surface for that information.
   const { onLaunchTour } = useTourEntryPoints();
 
   return (
@@ -59,17 +56,6 @@ export const Toolbar: React.FC<ToolbarProps> = ({ onExportAll }) => {
             Tour
           </Button>
         </Tooltip>
-        <Button
-          size="xs"
-          variant="ghost"
-          onClick={openWelcome}
-          aria-label="What's new in traces"
-        >
-          <Icon boxSize={3.5} color="purple.fg">
-            <Sparkles />
-          </Icon>
-          What&apos;s new
-        </Button>
         <LiveIndicator />
         <TimeRangePicker />
         <ColumnsDropdown />

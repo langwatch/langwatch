@@ -7,24 +7,20 @@ import type { StageId } from "./onboardingJourneyConfig";
  * want to talk to the user about *progress* (BeadStrip, returning-
  * user hub) should think in chapters.
  *
- * Arc per the §14 design discussion:
+ * Arc per the §14 design discussion (drawer-as-finale):
  *
- *   welcome → density → arrivals → drawer → slice → outroPanel
+ *   welcome → density → slice → arrivals → drawer → outro
  *
- * (Note: the §14 plan calls for `slice` to come *before* `arrivals`
- * and `drawer` — putting filtering first, then arrivals, then drawer
- * as the finale. That reorder is a separate design move tracked
- * under Step 10; the chapter index here reflects the *current*
- * stage order so the BeadStrip reads correctly today. When the
- * reorder lands, only `STAGE_TO_CHAPTER` and `CHAPTERS` need to
- * change; the rest of the chapter machinery stays the same.)
+ * Cosmetic → structural → temporal → diagnostic → close. Reads like
+ * a sentence: greet, match prefs, teach filtering, watch data land,
+ * dig into one trace, wrap up.
  */
 export type ChapterId =
   | "welcome"
   | "density"
+  | "slice"
   | "arrivals"
   | "drawer"
-  | "slice"
   | "outro";
 
 export interface Chapter {
@@ -49,16 +45,16 @@ export const CHAPTERS: Chapter[] = [
   { id: "welcome", label: "Welcome", hint: "Meet the trace explorer." },
   { id: "density", label: "Density", hint: "Match your vibe." },
   {
+    id: "slice",
+    label: "Slice",
+    hint: "Filter and group with lenses and facets.",
+  },
+  {
     id: "arrivals",
     label: "Arrivals",
     hint: "Watch new traces land in real time.",
   },
   { id: "drawer", label: "Drawer", hint: "See one trace in detail." },
-  {
-    id: "slice",
-    label: "Slice",
-    hint: "Filter and group with facets and lenses.",
-  },
   { id: "outro", label: "Done", hint: "All yours." },
 ];
 
@@ -72,13 +68,12 @@ export const STAGE_TO_CHAPTER: Record<StageId, ChapterId> = {
   welcome: "welcome",
   trace_explorer: "welcome",
   densityIntro: "density",
+  serviceSegue: "slice",
+  facetsReveal: "slice",
   arrivalPrep: "arrivals",
   auroraArrival: "arrivals",
   postArrival: "arrivals",
-  tourGate: "drawer",
   drawerOverview: "drawer",
-  serviceSegue: "slice",
-  facetsReveal: "slice",
   outro: "outro",
   complete: "outro",
 };

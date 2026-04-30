@@ -21,8 +21,9 @@ attribute, aurora ribbon).
   hook (`useSamplePreview`) but isn't itself onboarding-specific.
 - General UI prefs (sidebar collapsed, syntax help, shortcuts dialog) —
   stay in `traces-v2/stores/uiStore.ts`.
-- The What's-new dialog — being retired and absorbed into the Tour's
-  outro panel; will be deleted from `welcomeStore.ts` once that lands.
+- The What's-new dialog — retired and absorbed into the Tour's
+  `OutroPanel`. The standalone `welcomeStore`, `WelcomeScreen`, and
+  `useAutoOpenWelcome` are gone.
 
 ## Public API
 
@@ -131,14 +132,17 @@ Done:
   a render slot or a portal anchor. Calling it from
   `EmptyResultsPane` keeps the structural placement intact while
   ownership stays inside the onboarding module.
-
-In progress:
-- [ ] Step 9 — delete obsolete files (`welcomeStore`,
-  `useAutoOpenWelcome`, `WelcomeScreen`, the `welcomeBoom` plumbing
-  in `RefreshProgressBar`). Blocked on Step 10 — the OutroPanel must
-  absorb the What's-new content first; deleting earlier loses
-  release-note copy.
-- [ ] Step 10 — new chapter content (drawer-as-finale arc per §14:
-  welcome → density → slice → arrivals → drawer → outroPanel,
-  lenses + facets merged into one `slice` chapter, `BeadStrip` for
-  progress, `OutroPanel` absorbing What's-new).
+- [x] Step 9 — `welcomeStore.ts`, `WelcomeScreen.tsx` (+ the
+  `Welcome/` dir), `useAutoOpenWelcome.ts`, the `welcomeBoom`
+  plumbing in `RefreshProgressBar.tsx`, and the `WELCOME_SEEN_KEY`
+  shim in `SampleDataBanner.tsx` are all gone. Toolbar's What's-new
+  button removed. `DashboardLayout` no longer mounts `WelcomeScreen`.
+  All post-tour content lives in the `OutroPanel`.
+- [x] Step 10 — drawer-as-finale arc per §14. Chapters are now
+  `welcome → density → slice → arrivals → drawer → outro`. The
+  `tourGate` stage is gone (drawer is the climax, not an optional
+  detour). `serviceSegue` + `facetsReveal` make the `slice`
+  chapter, presented before arrivals so the user understands "I can
+  filter this" before data lands. `BeadStrip` shows progress.
+  `OutroPanel` is the terminal chapter and absorbs the What's-new
+  content (multiplayer, shortcuts, integrate).

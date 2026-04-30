@@ -1,5 +1,5 @@
 import { Button, HStack, Icon, Text, VStack } from "@chakra-ui/react";
-import { ArrowRight, BookOpen, Compass, Wrench } from "lucide-react";
+import { BookOpen, Wrench } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import type React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -26,6 +26,7 @@ import { BeadStrip } from "./BeadStrip";
 import { DensitySpotlight } from "./DensitySpotlight";
 import { HotkeyBindings } from "./HotkeyBindings";
 import { IntegrateDrawer } from "./IntegrateDrawer";
+import { OutroPanel } from "./OutroPanel";
 import { ReturningUserHub } from "./ReturningUserHub";
 import { StaticHero } from "./StaticHero";
 import { TypewriterHero } from "./TypewriterHero";
@@ -185,55 +186,55 @@ export function TracesEmptyOnboarding(): React.ReactElement {
 
   // When the trace drawer opens during postArrival (whether via the
   // user clicking the highlighted row or our auto-open timer firing)
-  // advance the journey to `tourGate` so the hero re-anchors to the
-  // left column and offers the tour-or-skip choice.
+  // advance the journey straight to the `drawerOverview` chapter —
+  // the drawer is the climax of the journey now, not an optional
+  // detour, so there's no tour gate in the middle.
   const { currentDrawer, closeDrawer } = useDrawer();
   useEffect(() => {
     if (stage !== "postArrival") return;
     if (currentDrawer === "traceV2Details") {
-      setStage("tourGate");
+      setStage("drawerOverview");
     }
   }, [stage, currentDrawer, setStage]);
 
-  // If the user lands on `tourGate` and then closes the trace drawer
-  // (Esc, X, click outside) without picking either CTA, drop them
-  // back to postArrival rather than leaving the "Want a quick tour?"
-  // hero floating with no context. The highlighted row pulses again
-  // and the user can re-engage on their own terms — re-opening any
-  // sample row will land them back here naturally.
+  // If the user closes the trace drawer mid-`drawerOverview` (Esc /
+  // X / click outside), drop them back to `postArrival` so the
+  // highlighted row pulses again — re-opening any sample row lands
+  // them back in `drawerOverview`. Without this, closing the drawer
+  // would strand the user on a hero pointing at "the substance"
+  // with nothing on the right.
   useEffect(() => {
-    if (stage !== "tourGate") return;
+    if (stage !== "drawerOverview") return;
     if (currentDrawer !== "traceV2Details") {
       setStage("postArrival");
     }
   }, [stage, currentDrawer, setStage]);
 
-  // Once the journey shifts the user's focus away from the drawer
-  // (facetsReveal points at the left sidebar, outro is the victory
-  // lap), close the drawer so the hero isn't clipped behind it.
-  // Skipping the tour also lands at outro and that path never opens
-  // the drawer, so this is a no-op there.
+  // Once the journey reaches the outro, close the drawer so the
+  // hero isn't clipped behind it. The outro is the victory-lap
+  // chapter and renders the OutroPanel on a centred hero.
   useEffect(() => {
-    if (stage !== "facetsReveal" && stage !== "outro") return;
+    if (stage !== "outro") return;
     if (currentDrawer === "traceV2Details") {
       closeDrawer();
     }
   }, [stage, currentDrawer, closeDrawer]);
 
-  // facetsReveal points at the facet sidebar — the actual store
-  // needs to be uncollapsed (not just the visual width), otherwise
-  // FilterSidebar renders its icon-only mode and the user sees a
-  // strip of unclickable icons. We drive setSidebarCollapsed
-  // directly so every consumer (toggle button, keyboard shortcut,
-  // FilterSidebar internals) sees a consistent state. We track
-  // whether *we* uncollapsed it so we only restore on exit when we
-  // were the cause; if the user had it expanded already, we leave
-  // it alone.
+  // The slice chapter (serviceSegue + facetsReveal) points at the
+  // facet sidebar — the store needs to be uncollapsed (not just the
+  // visual width), otherwise FilterSidebar renders icon-only mode
+  // and the user sees a strip of unclickable icons. We drive
+  // setSidebarCollapsed directly so every consumer (toggle button,
+  // keyboard shortcut, FilterSidebar internals) sees a consistent
+  // state. We track whether *we* uncollapsed it so we only restore
+  // on exit when we were the cause; if the user had it expanded
+  // already, we leave it alone.
   const setSidebarCollapsed = useUIStore((s) => s.setSidebarCollapsed);
   const sidebarUncollapsedByJourney = useRef(false);
+  const isSliceStage = stage === "serviceSegue" || stage === "facetsReveal";
   useEffect(() => {
     const wasOpenedByJourney = sidebarUncollapsedByJourney.current;
-    if (stage === "facetsReveal") {
+    if (isSliceStage) {
       const collapsedNow = useUIStore.getState().sidebarCollapsed;
       if (collapsedNow && !wasOpenedByJourney) {
         sidebarUncollapsedByJourney.current = true;
@@ -243,7 +244,7 @@ export function TracesEmptyOnboarding(): React.ReactElement {
       sidebarUncollapsedByJourney.current = false;
       setSidebarCollapsed(true);
     }
-  }, [stage, setSidebarCollapsed]);
+  }, [isSliceStage, setSidebarCollapsed]);
   useEffect(() => {
     return () => {
       if (sidebarUncollapsedByJourney.current) {
@@ -367,52 +368,27 @@ export function TracesEmptyOnboarding(): React.ReactElement {
           </motion.div>
         )}
 
-        {/* Tour gate — `tourGate` stage offers an explicit
-            opt-in choice: take the drawer tour, or skip straight
-            to the outro. Renders two CTAs side by side instead of
-            the regular single-CTA footer. */}
+        {/* Outro panel — terminal chapter. Replaces the old "That's
+            the tour." typewriter hero with a compact panel of three
+            highlight cards (multiplayer, shortcuts, integrate) plus
+            the exit CTAs. Absorbs the role the standalone "What's-
+            new" dialog used to play, so all post-tour content lives
+            in one place at the end of the journey. */}
         <AnimatePresence>
-          {stage === "tourGate" && (
+          {stage === "outro" && (
             <motion.div
-              key="tour-gate"
+              key="outro-panel"
               initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -4 }}
-              transition={{ duration: 0.32, ease: [0.16, 1, 0.3, 1] }}
+              transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+              style={{ width: "100%" }}
             >
-              {/* `flexWrap="nowrap"` keeps the two CTAs on one line
-                  even in the narrow `left` hero column during the
-                  drawer-tour stages — wrapping reads as broken
-                  because the container is already a tight 380px and
-                  splitting "Show me around" across two lines makes
-                  it look like an afterthought. Both CTAs get matched
-                  icons so the visual weight is balanced. */}
-              <HStack gap={3} flexWrap="nowrap" justify="center">
-                <Button
-                  size="md"
-                  variant="solid"
-                  colorPalette="orange"
-                  whiteSpace="nowrap"
-                  onClick={() => setStage("drawerOverview")}
-                >
-                  <Compass size={14} />
-                  Show me around
-                </Button>
-                {/* Skip drops the user straight into facets — they
-                    land in a populated, filtered table with the
-                    sidebar live. Faster path to the real product
-                    for users who don't want hand-holding. */}
-                <Button
-                  size="md"
-                  variant="ghost"
-                  colorPalette="gray"
-                  whiteSpace="nowrap"
-                  onClick={() => setStage("facetsReveal")}
-                >
-                  I'll explore myself
-                  <ArrowRight size={14} />
-                </Button>
-              </HStack>
+              <OutroPanel
+                onIntegrate={() => setDrawerOpen(true)}
+                onDone={handleHideForNow}
+                onRewatch={resetStage}
+              />
             </motion.div>
           )}
         </AnimatePresence>

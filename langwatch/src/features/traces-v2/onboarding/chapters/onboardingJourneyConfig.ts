@@ -21,13 +21,12 @@ export type StageId =
   | "welcome"
   | "trace_explorer"
   | "densityIntro"
+  | "serviceSegue"
+  | "facetsReveal"
   | "arrivalPrep"
   | "auroraArrival"
   | "postArrival"
-  | "tourGate"
   | "drawerOverview"
-  | "serviceSegue"
-  | "facetsReveal"
   | "outro"
   | "complete";
 
@@ -160,11 +159,43 @@ export const ONBOARDING_JOURNEY: StageDef[] = [
     heading: "Firstly, let's match your vibe.",
     subhead: "Pick a density. Swap any time from the toolbar, or press D.",
     cta: "Continue",
-    next: "arrivalPrep",
+    next: "serviceSegue",
     showDensitySpotlight: true,
     showIntegrateCta: false,
   },
   {
+    // ---- SLICE chapter (renamed from the old "filter the table"
+    // detour). Slice now comes BEFORE arrivals so the user
+    // understands "I can filter this" before data lands. Drawer is
+    // the climax (after arrivals), not a navigation gate. See
+    // `chapters.ts` and the §14 design discussion for the arc
+    // rationale.
+    id: "serviceSegue",
+    heading: "Lenses + facets.",
+    subhead:
+      "Lens tabs above shape the whole table. Facets in the sidebar slice it.",
+    typewriter: true,
+    cta: "Show me",
+    next: "facetsReveal",
+    showIntegrateCta: false,
+    heroLayout: "centre",
+  },
+  {
+    id: "facetsReveal",
+    heading: "Click any facet to slice.",
+    subhead:
+      "Same chips you'll see inside a trace, lifted to the sidebar so they apply to the whole table. Filter bar up top takes a query if you'd rather type.",
+    typewriter: true,
+    cta: "Got it",
+    next: "arrivalPrep",
+    showIntegrateCta: false,
+    heroLayout: "centre",
+  },
+  {
+    // ---- ARRIVALS chapter (aurora + click-the-row). Comes after
+    // slice, so when the rows arrive the user already knows they
+    // can filter them. Click-the-row leads directly into the
+    // drawer chapter — no tour gate.
     id: "arrivalPrep",
     heading: "Watch out for the aurora...\nNew traces tend to follow it.",
     typewriter: true,
@@ -206,7 +237,10 @@ export const ONBOARDING_JOURNEY: StageDef[] = [
     id: "postArrival",
     // Direct + neutral — points at the row without telegraphing the
     // content of the trace. The juicy bit is what's *inside* the
-    // drawer; this just opens the door.
+    // drawer; this just opens the door. Clicking the row advances
+    // straight to drawerOverview — there's no tour gate any more,
+    // because the drawer is now the finale of the journey rather
+    // than an optional detour.
     heading: "There's a juicy one.",
     subhead:
       "Click the highlighted row to see how the agent worked through it.",
@@ -215,86 +249,33 @@ export const ONBOARDING_JOURNEY: StageDef[] = [
     highlightRichRow: true,
   },
   {
-    id: "tourGate",
-    heading: "Want a quick tour?",
-    subhead: "30 seconds, we'll point at the bits that matter.",
-    typewriter: true,
-    showArrivals: true,
-    showIntegrateCta: false,
-    heroLayout: "left",
-  },
-  {
+    // ---- DRAWER chapter — the climax. The trace drawer opens via
+    // the postArrival row click; this stage anchors the hero to the
+    // left so it doesn't get clipped by the drawer, and walks the
+    // user through what's inside.
     id: "drawerOverview",
-    heading: "Everything's here.",
-    // Subhead nudges actual exploration before the user clicks Continue.
-    // The drawer is the densest information surface in the product, and
-    // the previous wording ("poke around, then continue") read as
-    // permission to skim. "Take your time" makes lingering the default;
-    // Continue stays available the whole time for users who want to
-    // press on.
+    heading: "And here's the substance.",
+    // The drawer is the densest information surface in the product.
+    // "Take your time" frames lingering as the default; Continue
+    // sits there for users who want to press on.
     subhead:
-      "Conversation, spans, evals — it's all in here. Take your time, then continue.",
+      "Conversation, spans, evals — it's all in here. Take your time, then we'll wrap up.",
     typewriter: true,
-    cta: "Continue",
-    next: "serviceSegue",
-    showArrivals: true,
-    showIntegrateCta: false,
-    heroLayout: "left",
-  },
-  {
-    id: "serviceSegue",
-    heading: "Same chips, but in a sidebar.",
-    // Connects the chips the user just saw inside the trace drawer
-    // (service / model / status badges) to the facet sidebar — same
-    // values, same filtering, just lifted to the rail so they apply
-    // to the whole table at once.
-    subhead:
-      "Click any chip in a trace to filter the table by it. Or do it from the sidebar.",
-    typewriter: true,
-    cta: "Show me",
-    next: "facetsReveal",
-    showArrivals: true,
-    showIntegrateCta: false,
-    heroLayout: "left",
-  },
-  {
-    id: "facetsReveal",
-    heading: "These are facets.",
-    // Light touch: name the sibling filter bar (above the table) but
-    // don't onboard it. The query language is too rich to introduce in
-    // a tour beat; mentioning it is enough for the user to remember
-    // it exists when they need it.
-    subhead:
-      "Click to slice the table. Need something more specific? The filter bar up top takes a query.",
-    typewriter: true,
-    cta: "Got it",
+    cta: "Wrap up",
     next: "outro",
     showArrivals: true,
     showIntegrateCta: false,
-    // `centre` keeps the hero within the masked band on any
-    // viewport. We previously tried `bottomCentre` to leave the
-    // top half clear for the user's eye to land on the now-
-    // expanded sidebar, but on tall viewports that anchored the
-    // hero to the very bottom of the screen — well below the
-    // masking band — and the copy ended up sitting unmasked over
-    // table rows. The sidebar is on the left rail anyway, so a
-    // centred hero coexists with it without competing.
-    heroLayout: "centre",
+    heroLayout: "left",
   },
   {
     id: "outro",
-    // Outro is terminal — typewriter finishes and the hero just sits.
-    // Previously read as abrupt ("That's the lot. Now send your own.")
-    // because the journey *did* feel like it was ending mid-thought.
-    // The new copy lands the journey: it acknowledges the tour is done,
-    // points at what happens next (real traces will land here live), and
-    // invites the user to keep poking — the table behind them is fully
-    // interactive at this point. The "Watch this space" line gives the
-    // closing beat warmth instead of a curt sign-off.
-    heading: "That's the tour.",
-    subhead:
-      "Real traces will land here the moment your code calls the SDK. Keep poking the table — it's all live.",
-    typewriter: true,
+    // Terminal chapter — renders as the OutroPanel (highlight cards
+    // + integrate / done CTAs) instead of a typewriter hero. The
+    // panel absorbs the role the standalone "What's-new" dialog
+    // used to play, so all the post-tour content (multiplayer,
+    // shortcuts, integrate) lives in one place at the end of the
+    // journey rather than as a separate dialog the user has to
+    // re-open.
     showArrivals: true,
     heroLayout: "centre",
   },

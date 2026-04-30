@@ -23,7 +23,6 @@ import { useRouter } from "~/utils/compat/next-router";
 import { ImpersonationBanner } from "../../ee/admin/ImpersonationBanner";
 import { ImpersonationSwitchBackMenuItem } from "../../ee/admin/ImpersonationSwitchBackMenuItem";
 import { CommandBarTrigger } from "../features/command-bar";
-import { WelcomeScreen } from "../features/traces-v2/components/Welcome";
 import { useDrawer } from "../hooks/useDrawer";
 import { useLiteMemberGuard } from "../hooks/useLiteMemberGuard";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
@@ -591,7 +590,6 @@ export const DashboardLayout = ({
           maxHeight="calc(100vh - 56px)"
           position="relative"
         >
-          <WelcomeScreen />
           <VStack width="full" gap={0} {...props}>
             {/* Alert banners */}
             {publicEnv.data &&

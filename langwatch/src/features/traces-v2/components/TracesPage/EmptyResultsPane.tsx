@@ -69,13 +69,13 @@ export const EmptyResultsPane: React.FC = React.memo(() => {
             ? // Fully clickable during postArrival — the table takes
               // the whole canvas and the user gets to explore. Any
               // sample row opens the drawer (and advances the journey
-              // to tourGate via the same path); the highlighted rich
-              // row is just the visually obvious target, not the only
-              // one. setupDisengaged is the post-onboarding state
-              // where preview data is still rendering. The row glow
-              // itself is a global stylesheet rule injected by
-              // `OnboardingHost`'s `<RichRowGlow>` effect — see
-              // `onboarding/effects/RichRowGlow.tsx`.
+              // straight to drawerOverview, the finale chapter); the
+              // highlighted rich row is just the visually obvious
+              // target, not the only one. setupDisengaged is the
+              // post-onboarding state where preview data is still
+              // rendering. The row glow itself is a global stylesheet
+              // rule injected by `OnboardingHost`'s `<RichRowGlow>`
+              // effect — see `onboarding/effects/RichRowGlow.tsx`.
               {}
             : ({
                 pointerEvents: "none",

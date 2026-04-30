@@ -1,16 +1,9 @@
 import { Button, Flex, Icon, Text } from "@chakra-ui/react";
 import { Sparkles } from "lucide-react";
 import type React from "react";
-import { useLocalStorage } from "usehooks-ts";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { useOnboardingStore } from "../store/onboardingStore";
-
-// Match the key used by `useAutoOpenWelcome` so dismissing the sample
-// flow also marks What's-new as seen — otherwise the user finishes
-// their empty-state tour, clicks Done, and gets *another* tour
-// auto-opened immediately. One onboarding moment per visit.
-const WELCOME_SEEN_KEY = "langwatch:traces-v2:welcome-seen";
 
 /**
  * Persistent banner across the top of the table while the trace list
@@ -43,7 +36,6 @@ export const SampleDataBanner: React.FC = () => {
   );
   const utils = api.useUtils();
   const setTourActive = useOnboardingStore((s) => s.setTourActive);
-  const [, setWelcomeSeen] = useLocalStorage<boolean>(WELCOME_SEEN_KEY, false);
 
   const handleDone = () => {
     if (!project) return;
@@ -54,7 +46,6 @@ export const SampleDataBanner: React.FC = () => {
     // `tourActive=true` keeps `showEmptyState` true regardless of
     // dismissal.
     setTourActive(false);
-    setWelcomeSeen(true);
     void utils.tracesV2.list.invalidate({ projectId: project.id });
   };
 

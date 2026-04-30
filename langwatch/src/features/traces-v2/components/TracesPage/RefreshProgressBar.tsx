@@ -1,8 +1,6 @@
 import { motion } from "motion/react";
 import type React from "react";
-import { useEffect, useState } from "react";
 import { useRefreshUIStore } from "../../stores/refreshUIStore";
-import { useWelcomeStore } from "../../stores/welcomeStore";
 import { AuroraSvg } from "./AuroraSvg";
 
 const FADE_MASK =
@@ -13,47 +11,19 @@ interface RefreshProgressBarProps {
   forceVisible?: boolean;
 }
 
-const WELCOME_BOOM_DURATION_MS = 1500;
-
 export const RefreshProgressBar: React.FC<RefreshProgressBarProps> = ({
   forceVisible,
 }) => {
   const isRefreshing = useRefreshUIStore((s) => s.isRefreshing);
-
-  // Capture the welcome-boom flag once when the bar mounts and clear it,
-  // so the dramatic swell only plays for the welcome flow. Every subsequent
-  // refresh gets the mild fade. Holding `boomActive` true for a fixed
-  // duration keeps the bar visible even if the underlying refetch resolves
-  // sooner — otherwise the aurora vanishes mid-swell.
-  const [boomed] = useState(() => useWelcomeStore.getState().welcomeBoom);
-  const [boomActive, setBoomActive] = useState(boomed);
-  const setWelcomeBoom = useWelcomeStore((s) => s.setWelcomeBoom);
-  useEffect(() => {
-    if (!boomed) return;
-    setWelcomeBoom(false);
-    const timer = window.setTimeout(
-      () => setBoomActive(false),
-      WELCOME_BOOM_DURATION_MS,
-    );
-    return () => window.clearTimeout(timer);
-  }, [boomed, setWelcomeBoom]);
-
-  const active = (forceVisible ?? isRefreshing) || boomActive;
+  const active = forceVisible ?? isRefreshing;
   if (!active) return null;
 
   return (
     <motion.div
       aria-hidden="true"
-      initial={{ opacity: 0, height: boomed ? 600 : 200 }}
+      initial={{ opacity: 0, height: 200 }}
       animate={{ opacity: 1, height: 200 }}
-      transition={
-        boomed
-          ? {
-              opacity: { duration: 0.35, ease: "easeOut" },
-              height: { duration: 1.3, ease: [0.16, 1, 0.3, 1] },
-            }
-          : { opacity: { duration: 0.4, ease: "easeOut" } }
-      }
+      transition={{ opacity: { duration: 0.4, ease: "easeOut" } }}
       style={{
         position: "absolute",
         top: "-90px",

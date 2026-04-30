@@ -28,7 +28,6 @@ import { Toolbar } from "../Toolbar/Toolbar";
 import { TraceTable } from "../TraceTable/TraceTable";
 import { EmptyResultsPane } from "./EmptyResultsPane";
 import { PageKeyboardShortcuts } from "./PageKeyboardShortcuts";
-import { useAutoOpenWelcome } from "./useAutoOpenWelcome";
 import { useDebouncedFilterCommit } from "./useDebouncedFilterCommit";
 import {
   useClearSelectionShortcut,
@@ -80,10 +79,14 @@ export const TracesPage: React.FC = () => {
     : false;
   // Read the onboarding stage at the top level so we can decide
   // whether to surface the FilterSidebar even while the empty
-  // state is technically "active" — the `facetsReveal` and `outro`
-  // stages are *meant* to show the sidebar.
+  // state is technically "active". The slice chapter
+  // (`serviceSegue` + `facetsReveal`) and the `outro` chapter want
+  // the sidebar visible — slice teaches it, outro is the
+  // victory-lap chapter where the user is dropping into the real
+  // product.
   const topLevelOnboardingStage = useOnboardingStore((s) => s.stage);
   const sidebarVisibleDuringEmpty =
+    topLevelOnboardingStage === "serviceSegue" ||
     topLevelOnboardingStage === "facetsReveal" ||
     topLevelOnboardingStage === "outro";
   // Empty state shows when the project hasn't received a real trace
@@ -100,12 +103,6 @@ export const TracesPage: React.FC = () => {
   // the journey would only ever fire for genuinely-empty projects.
   const showEmptyState =
     !setupDismissed && (hasAnyTraces === false || tourActive);
-  // The empty-state journey is its own onboarding tour, so the
-  // What's-new dialog must not auto-open on top of it. New users
-  // get one tour at a time; once they've sent a real trace and the
-  // empty state retires, the What's-new auto-open returns to its
-  // normal first-visit behaviour.
-  useAutoOpenWelcome({ enabled: !showEmptyState });
   // Dim the surrounding chrome only while the card is *active*. The
   // moment the user clicks any exit action (Load sample / Skip / Learn)
   // `setupDisengaged` flips and the dim lifts — even if the card itself
