@@ -34,7 +34,7 @@ Changes made to PRDs during review and iteration sessions. These must be carried
 
 ### FilterSidebar Facet Group "Is Modified" Dot + Expanded Facets
 - **Affected:** PRD-003, PRD-017
-- **Change:** Each facet **group** in the sidebar now shows a small dot when any facet inside it has a non-default value, mirroring the lens draft dot pattern. The sidebar facet inventory expanded with: `rootSpanName`, guardrail evaluations, annotation presence, `containsAi`, error message text, token counts, and `ttlt` (time to last token). Sidebar still respects locked facets per built-in lens.
+- **Change:** Each facet **group** in the sidebar now shows a small dot when any facet inside it has a non-default value, mirroring the lens draft dot pattern. The sidebar facet inventory expanded with: `traceName`, guardrail evaluations, annotation presence, `containsAi`, error message text, token counts, and `ttlt` (time to last token). Sidebar still respects locked facets per built-in lens.
 - **Why:** Users were missing that "I left a filter on three groups ago" — the dot makes ambient state legible without forcing a sidebar scroll. New facets cover the most-asked questions from internal dogfooding.
 - **Spec note:** Compare each group's facets against the lens's saved filter AST; any difference flips the group's `isModified` flag. Locked facets still render collapsed and non-interactive.
 

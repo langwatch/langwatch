@@ -19,7 +19,7 @@ function buildSearchableText(trace: TraceListItem): string {
     trace.errorSpanName,
     trace.conversationId,
     trace.userId,
-    trace.rootSpanName,
+    trace.traceName,
     trace.models.join(" "),
     evaluationText,
     eventText,

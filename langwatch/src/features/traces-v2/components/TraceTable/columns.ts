@@ -19,7 +19,7 @@ export const traceAtomicColumnDefs: Record<
   // covers only the numeric/time columns. UI sorting is disabled here for
   // columns the backend silently falls back to `OccurredAt` on — clicking
   // those headers used to look like a no-op.
-  "span-name": traceCol.accessor((row) => row.rootSpanName ?? row.name, {
+  "span-name": traceCol.accessor((row) => row.traceName || row.name, {
     id: "span-name",
     header: "Name",
     size: 200,

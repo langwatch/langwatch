@@ -206,7 +206,7 @@ The filter column is a scrollable sidebar. It contains categorical facets (check
 - **Trace Type:** Agent, LLM, RAG, Tool, Chain, Guardrail — with count badges
 - **Model:** Dynamic list from data — with count badges
 - **Service:** Dynamic list from data — with count badges
-- **Root span name** (added 2026-04-28): Dynamic list of `RootSpanName` values — useful for grouping by entry point
+- **Root span name** (added 2026-04-28): Dynamic list of `TraceName` values — useful for grouping by entry point
 - **User:** Dynamic list from data (if available)
 - **Labels:** Dynamic list from data (if available)
 - **Contains AI** (added 2026-04-28): Boolean facet — does the trace contain at least one LLM/agent span

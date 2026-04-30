@@ -51,7 +51,6 @@ function makeContext(
       totalCompletionTokens: 0,
       occurredAt: Date.now(),
       blockedByGuardrail: false,
-      rootSpanName: null,
       rootSpanType: null,
       containsAi: false,
       attributes: attributeOverrides,

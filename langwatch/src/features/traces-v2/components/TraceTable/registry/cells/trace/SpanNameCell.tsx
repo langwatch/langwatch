@@ -7,7 +7,7 @@ export const SpanNameCell = {
   label: "Name",
   render: ({ row }) => (
     <Text textStyle="sm" color="fg" fontWeight="500" truncate>
-      {row.rootSpanName ?? row.name ?? "—"}
+      {row.traceName || row.name || "—"}
     </Text>
   ),
 } as const satisfies CellDef<TraceListItem>;

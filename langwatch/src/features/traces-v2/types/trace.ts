@@ -69,7 +69,7 @@ export interface TraceListItem {
   origin: "application" | "simulation" | "evaluation";
   tokensEstimated?: boolean;
   ttft?: number;
-  rootSpanName?: string | null;
+  traceName?: string;
   rootSpanType?: string | null;
   evaluations: TraceEvalResult[];
   events: TraceListEvent[];

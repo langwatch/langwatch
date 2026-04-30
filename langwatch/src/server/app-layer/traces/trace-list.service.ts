@@ -45,7 +45,7 @@ export interface TraceListItem {
   origin: string;
   tokensEstimated: boolean;
   ttft: number | null;
-  rootSpanName: string | null;
+  traceName: string;
   rootSpanType: string | null;
   events: TraceListEvent[];
 }
@@ -924,7 +924,7 @@ function mapToTraceListItem(row: TraceSummaryData): TraceListItem {
     origin: row.attributes["langwatch.origin"] ?? "application",
     tokensEstimated: row.tokensEstimated,
     ttft: row.timeToFirstTokenMs,
-    rootSpanName: row.rootSpanName,
+    traceName: row.traceName,
     rootSpanType: row.rootSpanType,
     events,
   };

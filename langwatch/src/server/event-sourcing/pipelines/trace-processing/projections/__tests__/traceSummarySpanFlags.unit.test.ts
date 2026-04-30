@@ -6,61 +6,6 @@ import {
 } from "./fixtures/trace-summary-test.fixtures";
 
 describe("traceSummary span flags", () => {
-  describe("rootSpanName", () => {
-    describe("when a root span arrives", () => {
-      it("captures the root span name", () => {
-        const state = createInitState();
-        const span = createTestSpan({
-          parentSpanId: null,
-          name: "POST /api/chat",
-        });
-
-        const result = applySpanToSummary({ state, span });
-
-        expect(result.rootSpanName).toBe("POST /api/chat");
-      });
-    });
-
-    describe("when a second root span arrives", () => {
-      it("keeps the first root span name (first-write-wins)", () => {
-        let state = createInitState();
-        state = applySpanToSummary({
-          state,
-          span: createTestSpan({
-            spanId: "root-1",
-            parentSpanId: null,
-            name: "first-root",
-          }),
-        });
-
-        const result = applySpanToSummary({
-          state,
-          span: createTestSpan({
-            spanId: "root-2",
-            parentSpanId: null,
-            name: "second-root",
-          }),
-        });
-
-        expect(result.rootSpanName).toBe("first-root");
-      });
-    });
-
-    describe("when only child spans arrive", () => {
-      it("leaves rootSpanName as null", () => {
-        const state = createInitState();
-        const span = createTestSpan({
-          parentSpanId: "some-parent",
-          name: "child-span",
-        });
-
-        const result = applySpanToSummary({ state, span });
-
-        expect(result.rootSpanName).toBeNull();
-      });
-    });
-  });
-
   describe("rootSpanType", () => {
     describe("when a root span has a span type", () => {
       it("captures the root span type", () => {
@@ -206,7 +151,7 @@ describe("traceSummary span flags", () => {
 
         const result = applySpanToSummary({ state, span });
 
-        expect(result.rootSpanName).toBeNull();
+        expect(result.rootSpanType).toBeNull();
         expect(result.containsAi).toBe(false);
         expect(result.spanCount).toBe(0);
       });

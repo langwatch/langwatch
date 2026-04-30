@@ -163,12 +163,12 @@ export const FACET_REGISTRY: readonly FacetDefinition[] = [
     expression: "SubTopicId",
   },
   {
-    key: "rootSpanName",
+    key: "traceName",
     kind: "categorical",
-    label: "Root span name",
+    label: "Trace name",
     group: "trace",
     table: "trace_summaries",
-    expression: "RootSpanName",
+    expression: "TraceName",
   },
   {
     key: "rootSpanType",

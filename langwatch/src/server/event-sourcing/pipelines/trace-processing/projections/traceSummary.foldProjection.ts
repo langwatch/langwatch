@@ -116,40 +116,37 @@ export function applySpanToSummary({
     span,
   });
 
-  // Trace name: use the root span's name. Precedence:
-  // 1. Named roots win over empty-named roots (empty = "not set")
-  // 2. Among multiple named roots, earliest startTimeUnixMs wins
-  // After checkpoint reload, rootSpanStartTimeMs is undefined so first root wins.
+  // Pick the canonical root span. Precedence:
+  //   1. Named roots win over empty-named roots ("" = not set yet)
+  //   2. Among multiple named roots, earliest startTimeUnixMs wins
+  // After checkpoint reload, rootSpanStartTimeMs is undefined so the first
+  // root we see post-reload wins on tie. `traceName`, `rootSpanType`, and
+  // `rootSpanStartTimeMs` move together — they all describe the same span.
   const isRootSpan = span.parentSpanId === null;
   const spanStartMs = span.startTimeUnixMs;
+  const spanType = String(span.spanAttributes[ATTR_KEYS.SPAN_TYPE] ?? "");
+
   let traceName = state.traceName;
+  let rootSpanType = state.rootSpanType;
   let rootSpanStartTimeMs = state.rootSpanStartTimeMs;
   if (isRootSpan) {
-    const hasNoName = traceName === "";
+    const haveNamedRoot = traceName !== "";
     const isEarlierNamedRoot =
       span.name !== "" &&
       rootSpanStartTimeMs !== undefined &&
       spanStartMs < rootSpanStartTimeMs;
-    if (hasNoName || isEarlierNamedRoot) {
+    if (!haveNamedRoot || isEarlierNamedRoot) {
       traceName = span.name;
+      rootSpanType = spanType || null;
       rootSpanStartTimeMs = spanStartMs;
     }
   }
 
+  const containsAi = state.containsAi || AI_SPAN_TYPES.has(spanType);
+
   const events = accumulateEvents({ state, span });
 
   const promptRollup = tracePromptAccumulationService.accumulate({ state, span });
-
-  const isRoot = span.parentSpanId === null;
-  const spanType = String(span.spanAttributes[ATTR_KEYS.SPAN_TYPE] ?? "");
-
-  const rootSpanName =
-    isRoot && state.rootSpanName === null ? span.name : state.rootSpanName;
-  const rootSpanType =
-    isRoot && state.rootSpanType === null
-      ? spanType || null
-      : state.rootSpanType;
-  const containsAi = state.containsAi || AI_SPAN_TYPES.has(spanType);
 
   return {
     ...state,
@@ -168,7 +165,6 @@ export function applySpanToSummary({
     outputFromRootSpan: io.outputFromRootSpan,
     outputSpanEndTimeMs: io.outputSpanEndTimeMs,
     blockedByGuardrail: io.blockedByGuardrail,
-    rootSpanName,
     rootSpanType,
     containsAi,
     ...promptRollup,
@@ -235,7 +231,6 @@ export class TraceSummaryFoldProjection
       outputFromRootSpan: false,
       outputSpanEndTimeMs: 0,
       blockedByGuardrail: false,
-      rootSpanName: null,
       rootSpanType: null,
       containsAi: false,
       containsPrompt: false,

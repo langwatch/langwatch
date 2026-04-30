@@ -33,7 +33,7 @@ function listItemToHeader(item: TraceListItem): TraceHeader {
     outputTokens: item.outputTokens ?? null,
     tokensEstimated: item.tokensEstimated ?? false,
     ttft: item.ttft,
-    rootSpanName: item.rootSpanName ?? null,
+    traceName: item.traceName ?? "",
     rootSpanType: item.rootSpanType ?? null,
     scenarioRunId: null,
     containsPrompt: false,

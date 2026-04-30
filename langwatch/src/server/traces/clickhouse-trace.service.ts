@@ -1523,7 +1523,6 @@ export class ClickHouseTraceService {
       outputFromRootSpan: row.ts_OutputFromRootSpan ?? false,
       outputSpanEndTimeMs: row.ts_OutputSpanEndTimeMs ?? 0,
       blockedByGuardrail: false,
-      rootSpanName: null,
       rootSpanType: null,
       containsAi: false,
       containsPrompt: false,
@@ -1818,7 +1817,6 @@ export class ClickHouseTraceService {
       outputFromRootSpan: row.ts_OutputFromRootSpan ?? false,
       outputSpanEndTimeMs: row.ts_OutputSpanEndTimeMs ?? 0,
       blockedByGuardrail: false,
-      rootSpanName: null,
       rootSpanType: null,
       containsAi: false,
       containsPrompt: false,
@@ -2095,7 +2093,7 @@ interface JoinedTraceSpanRow extends TraceSummaryRow {
  * Transform traces to include guardrail information
  */
 function transformTracesWithGuardrails(
-  traces: (Trace & { rootSpanName?: string | null })[],
+  traces: Trace[],
 ): TraceWithGuardrail[] {
   return traces.map((trace) => {
     return {

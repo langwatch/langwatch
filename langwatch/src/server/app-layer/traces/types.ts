@@ -64,7 +64,6 @@ export const traceSummaryDataSchema = z.object({
   outputFromRootSpan: z.boolean(),
   outputSpanEndTimeMs: z.number(),
   blockedByGuardrail: z.boolean(),
-  rootSpanName: z.string().nullable(),
   rootSpanType: z.string().nullable(),
   containsAi: z.boolean(),
   containsPrompt: z.boolean(),

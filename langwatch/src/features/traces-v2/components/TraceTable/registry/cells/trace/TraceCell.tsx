@@ -36,7 +36,7 @@ const TraceContent: React.FC<{
   const comfortable = size === "comfortable";
   const nameStyle = comfortable ? "sm" : "xs";
   const idStyle = comfortable ? "xs" : "2xs";
-  const hasName = Boolean(trace.rootSpanName);
+  const hasName = Boolean(trace.traceName);
 
   return (
     <HStack gap={comfortable ? 2 : 1.5} minWidth={0}>
@@ -53,7 +53,7 @@ const TraceContent: React.FC<{
             flexShrink={1}
             minWidth={0}
           >
-            {trace.rootSpanName}
+            {trace.traceName}
           </Text>
           <Box
             width="4px"

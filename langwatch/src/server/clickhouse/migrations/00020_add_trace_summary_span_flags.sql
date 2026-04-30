@@ -1,12 +1,9 @@
 -- +goose Up
 -- +goose ENVSUB ON
 
--- Root span identification
--- +goose StatementBegin
-ALTER TABLE ${CLICKHOUSE_DATABASE}.trace_summaries
-  ADD COLUMN IF NOT EXISTS RootSpanName Nullable(String) CODEC(ZSTD(1));
--- +goose StatementEnd
-
+-- Root span type. The root span's *name* is captured by TraceName from
+-- 00018_add_trace_summaries_trace_name; this migration only adds the
+-- type plus the AI-containment flag.
 -- +goose StatementBegin
 ALTER TABLE ${CLICKHOUSE_DATABASE}.trace_summaries
   ADD COLUMN IF NOT EXISTS RootSpanType LowCardinality(Nullable(String)) CODEC(ZSTD(1));
@@ -41,10 +38,6 @@ ALTER TABLE ${CLICKHOUSE_DATABASE}.trace_summaries
 
 -- +goose StatementBegin
 -- ALTER TABLE ${CLICKHOUSE_DATABASE}.trace_summaries DROP COLUMN IF EXISTS RootSpanType;
--- +goose StatementEnd
-
--- +goose StatementBegin
--- ALTER TABLE ${CLICKHOUSE_DATABASE}.trace_summaries DROP COLUMN IF EXISTS RootSpanName;
 -- +goose StatementEnd
 
 -- +goose ENVSUB OFF

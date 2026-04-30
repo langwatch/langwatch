@@ -33,7 +33,6 @@ export interface TraceSummaryFieldsBase {
   OutputFromRootSpan: number;
   OutputSpanEndTimeMs: number;
   BlockedByGuardrail: number;
-  RootSpanName: string | null;
   RootSpanType: string | null;
   ContainsAi: number;
   TraceName: string;

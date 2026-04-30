@@ -382,11 +382,11 @@ export const DrawerHeader = memo(function DrawerHeader({
     const parts: string[] = [];
     if (trace.serviceName) parts.push(`service:"${trace.serviceName}"`);
     if (trace.status === "error") parts.push("status:error");
-    if (trace.rootSpanName) {
-      parts.push(`"${trace.rootSpanName.replace(/"/g, '\\"')}"`);
+    if (trace.traceName) {
+      parts.push(`"${trace.traceName.replace(/"/g, '\\"')}"`);
     }
     return parts.join(" ");
-  }, [trace.serviceName, trace.status, trace.rootSpanName]);
+  }, [trace.serviceName, trace.status, trace.traceName]);
   const handleFindSimilar = useCallback(() => {
     if (!findSimilarQuery) return;
     applyQueryText(findSimilarQuery);
@@ -514,7 +514,7 @@ export const DrawerHeader = memo(function DrawerHeader({
             letterSpacing="-0.005em"
             minWidth={0}
           >
-            {trace.rootSpanName ?? trace.name}
+            {trace.traceName || trace.name}
           </Text>
           <HStack gap={1} flexShrink={0}>
             <Circle size="8px" bg={statusColor} flexShrink={0} />

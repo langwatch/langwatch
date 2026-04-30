@@ -30,7 +30,7 @@ const traceListItemSchema = z.object({
   origin: z.string(),
   tokensEstimated: z.boolean().optional(),
   ttft: z.number().nullable().optional(),
-  rootSpanName: z.string().nullable().optional(),
+  traceName: z.string().optional(),
   rootSpanType: z.string().nullable().optional(),
   events: z
     .array(
@@ -70,7 +70,7 @@ const traceHeaderSchema = z.object({
   outputTokens: z.number().nullable(),
   tokensEstimated: z.boolean(),
   ttft: z.number().nullish(),
-  rootSpanName: z.string().nullable(),
+  traceName: z.string(),
   rootSpanType: z.string().nullable(),
   scenarioRunId: z.string().nullable(),
   /**

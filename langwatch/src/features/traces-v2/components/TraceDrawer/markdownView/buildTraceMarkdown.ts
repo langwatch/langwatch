@@ -596,7 +596,7 @@ export function buildTraceMarkdown(
   // title, a subtitle strapline (origin · service · status), then the
   // metadata as bold-key lines. Two-space line endings keep adjacent
   // fields on visually-grouped lines without forcing blank gaps.
-  const name = trace.rootSpanName ?? trace.name ?? trace.traceId;
+  const name = (trace.traceName || undefined) ?? trace.name ?? trace.traceId;
   lines.push(`# ${name}`);
   lines.push("");
 

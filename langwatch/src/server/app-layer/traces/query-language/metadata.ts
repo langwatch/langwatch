@@ -141,12 +141,12 @@ export const SEARCH_FIELDS: Readonly<Record<string, SearchFieldMeta>> = {
     valueType: "categorical",
     group: "span",
   },
-  rootSpanName: {
-    label: "Root span name",
+  traceName: {
+    label: "Trace name",
     hasSidebar: true,
-    facetField: "rootSpanName",
+    facetField: "traceName",
     valueType: "categorical",
-    group: "span",
+    group: "trace",
   },
   guardrail: {
     label: "Guardrail",

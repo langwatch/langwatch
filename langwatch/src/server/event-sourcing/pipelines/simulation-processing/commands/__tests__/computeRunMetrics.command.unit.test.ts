@@ -55,7 +55,6 @@ function makeTraceSummary(overrides: Partial<TraceSummaryData> = {}): TraceSumma
     outputFromRootSpan: false,
     outputSpanEndTimeMs: 0,
     blockedByGuardrail: false,
-    rootSpanName: null,
     rootSpanType: null,
     containsAi: false,
     topicId: null,

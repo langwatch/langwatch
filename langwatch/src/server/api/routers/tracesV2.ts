@@ -105,7 +105,7 @@ function mapTraceSummaryToHeader(summary: TraceSummaryData): TraceHeader {
     outputTokens: summary.totalCompletionTokenCount,
     tokensEstimated: summary.tokensEstimated,
     ttft: summary.timeToFirstTokenMs,
-    rootSpanName: summary.rootSpanName,
+    traceName: summary.traceName,
     rootSpanType: summary.rootSpanType,
     scenarioRunId: summary.attributes["scenario.run_id"] ?? null,
     containsPrompt: summary.containsPrompt ?? false,
@@ -344,7 +344,7 @@ export const tracesV2Router = createTRPCRouter({
       const turns = page.items.map((t) => ({
         traceId: t.traceId,
         timestamp: t.timestamp,
-        name: t.rootSpanName ?? t.name,
+        name: t.traceName || t.name,
         rootSpanType: t.rootSpanType ?? null,
         status: t.status,
         input: t.input ?? null,

@@ -122,7 +122,7 @@ function PeekPopoverContent({ traceId }: { traceId: string }) {
       <HStack padding={3} gap={2}>
         <Circle size="8px" bg={statusColor} flexShrink={0} />
         <Text textStyle="sm" fontWeight="semibold" truncate flex={1}>
-          {trace.rootSpanName ?? trace.name}
+          {trace.traceName || trace.name}
         </Text>
       </HStack>
 

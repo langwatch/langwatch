@@ -19,7 +19,7 @@ Phase 1 + 2 mock UI is done. Phase 3A real-data wiring (tRPC routers, app-layer 
 | 2026-04-23 | Phase 2 lens engine: 5 PRDs written (017–021), mock implemented. Sidebar/toolbar polish pass. |
 | 2026-04-23 | PRD-022 (Data Layer) and PRD-023 (Prompt Facets) drafted to bridge into Phase 3A. |
 | 2026-04-27 | Trace explorer page wired to tRPC: `tracesV2.list/header/spanTree/evals`. Drawer surfaces instrumentation scope + resource attributes; conversation context + back-stack + keyboard shortcuts; refresh progress bar reworked as a continuous wave. |
-| 2026-04-28 | Lens-engine polish + AI on-ramp: ChipBar + Prompts tab in TraceDrawer, AI query composer + SearchBar UX polish, trace-level prompt rollup projection (PRD-023), Welcome dialog rebrand to Beta, EmptyState onboarding rework with PAT minting + sample data, refresh signal + empty-state gating, FilterSidebar facet group "is modified" dot, density extracted into its own global store, expanded sidebar facets (rootSpanName, guardrail, annotation, containsAi, errorMessage, tokens, ttlt, …), TraceDrawer follow-ups (add-to-filter chips, drawer↔table cache coherence). |
+| 2026-04-28 | Lens-engine polish + AI on-ramp: ChipBar + Prompts tab in TraceDrawer, AI query composer + SearchBar UX polish, trace-level prompt rollup projection (PRD-023), Welcome dialog rebrand to Beta, EmptyState onboarding rework with PAT minting + sample data, refresh signal + empty-state gating, FilterSidebar facet group "is modified" dot, density extracted into its own global store, expanded sidebar facets (traceName, guardrail, annotation, containsAi, errorMessage, tokens, ttlt, …), TraceDrawer follow-ups (add-to-filter chips, drawer↔table cache coherence). |
 
 ## Phase Roadmap
 

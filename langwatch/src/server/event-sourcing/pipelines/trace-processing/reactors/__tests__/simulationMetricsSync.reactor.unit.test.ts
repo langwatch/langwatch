@@ -41,7 +41,6 @@ function createTraceSummaryState(overrides: Partial<TraceSummaryData> = {}): Tra
     outputFromRootSpan: true,
     outputSpanEndTimeMs: 1000,
     blockedByGuardrail: false,
-    rootSpanName: null,
     rootSpanType: null,
     containsAi: false,
     topicId: null,
