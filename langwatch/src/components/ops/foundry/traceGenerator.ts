@@ -316,21 +316,182 @@ function makeGuardrailSpan(includeEvents?: boolean): SpanConfig {
  * - Fill children until we approach the target budget
  * - Recurse into children that can hold more children
  */
-function buildSubtree({
-  budget,
-  depth,
-  maxDepth,
-  genaiRatio,
-  prompts,
-  includeEvents,
-}: {
+interface SubtreeArgs {
   budget: number;
   depth: number;
   maxDepth: number;
   genaiRatio: number;
   prompts?: PromptRef[];
   includeEvents?: boolean;
-}): { spans: SpanConfig[]; used: number } {
+}
+
+interface StepResult {
+  span: SpanConfig;
+  used: number;
+}
+
+function appendLeafStep(
+  isGenai: boolean,
+  args: SubtreeArgs,
+): StepResult {
+  const { prompts, includeEvents } = args;
+  if (!isGenai) return { span: makeInfraSpan(includeEvents), used: 1 };
+  const leafType = Math.random();
+  if (leafType < 0.4) return { span: makeLlmSpan(prompts, includeEvents), used: 1 };
+  if (leafType < 0.6) return { span: makeToolSpan(includeEvents), used: 1 };
+  if (leafType < 0.8) return { span: makeRagSpan(), used: 1 };
+  return { span: makeGuardrailSpan(includeEvents), used: 1 };
+}
+
+function appendAgentLoopStep(remaining: number, args: SubtreeArgs): StepResult {
+  const { depth, maxDepth, genaiRatio, prompts, includeEvents } = args;
+  const agentName = pick(AGENT_NAMES);
+  const loopIterations = Math.min(randInt(1, 4), Math.floor((remaining - 1) / 3));
+  const agent: SpanConfig = {
+    id: shortId(),
+    name: agentName,
+    type: "agent",
+    durationMs: 0, // computed after children
+    offsetMs: 0,
+    status: "ok",
+    children: [],
+    attributes: {},
+    input: { type: "text", value: pick(USER_MESSAGES) },
+    output: { type: "text", value: pick(ASSISTANT_RESPONSES) },
+  };
+  let used = 1;
+
+  let childBudget = Math.min(remaining - 1, randInt(3, Math.max(3, Math.floor(remaining * 0.4))));
+
+  for (let i = 0; i < loopIterations && childBudget > 0; i++) {
+    // LLM call
+    agent.children.push(makeLlmSpan(prompts, includeEvents));
+    childBudget--;
+    used++;
+
+    // Tool calls (1-3)
+    const toolCount = Math.min(randInt(1, 3), childBudget);
+    for (let t = 0; t < toolCount; t++) {
+      agent.children.push(makeToolSpan(includeEvents));
+      childBudget--;
+      used++;
+    }
+  }
+
+  // Possibly recurse sub-agents or deeper structures
+  if (childBudget > 2 && depth < maxDepth - 2) {
+    const sub = buildSubtree({
+      budget: childBudget,
+      depth: depth + 1,
+      maxDepth,
+      genaiRatio,
+      prompts,
+      includeEvents,
+    });
+    agent.children.push(...sub.spans);
+    used += sub.used;
+  }
+
+  // Compute agent duration from children
+  agent.durationMs = agent.children.reduce((sum, c) => sum + c.durationMs, 0) + randInt(10, 50);
+  return { span: agent, used };
+}
+
+function appendRagPipelineStep(remaining: number, args: SubtreeArgs): StepResult {
+  const { depth, maxDepth, genaiRatio, prompts, includeEvents } = args;
+  const chain: SpanConfig = {
+    id: shortId(),
+    name: "rag-pipeline",
+    type: "chain",
+    durationMs: 0,
+    offsetMs: 0,
+    status: "ok",
+    children: [],
+    attributes: {},
+    input: { type: "text", value: pick(USER_MESSAGES) },
+    output: { type: "text", value: pick(ASSISTANT_RESPONSES) },
+  };
+  let used = 1;
+
+  chain.children.push(makeRagSpan());
+  used++;
+
+  // Optional guardrail before generation
+  if (Math.random() < 0.3 && remaining > 4) {
+    chain.children.push(makeGuardrailSpan(includeEvents));
+    used++;
+  }
+
+  chain.children.push(makeLlmSpan(prompts, includeEvents));
+  used++;
+
+  const childBudget = Math.min(remaining - used, randInt(0, 5));
+  if (childBudget > 0 && depth < maxDepth - 1) {
+    const sub = buildSubtree({
+      budget: childBudget,
+      depth: depth + 1,
+      maxDepth,
+      genaiRatio,
+      prompts,
+      includeEvents,
+    });
+    chain.children.push(...sub.spans);
+    used += sub.used;
+  }
+
+  chain.durationMs = chain.children.reduce((sum, c) => sum + c.durationMs, 0) + randInt(5, 20);
+  return { span: chain, used };
+}
+
+function appendWorkflowStep(remaining: number, args: SubtreeArgs): StepResult {
+  const { depth, maxDepth, genaiRatio, prompts, includeEvents } = args;
+  const workflow: SpanConfig = {
+    id: shortId(),
+    name: pick(["process_request", "handle_query", "run_pipeline", "execute_workflow"]),
+    type: "workflow",
+    durationMs: 0,
+    offsetMs: 0,
+    status: "ok",
+    children: [],
+    attributes: {},
+  };
+  let used = 1;
+
+  const childBudget = Math.min(remaining - 1, randInt(2, Math.max(2, Math.floor(remaining * 0.3))));
+  const sub = buildSubtree({
+    budget: childBudget,
+    depth: depth + 1,
+    maxDepth,
+    genaiRatio,
+    prompts,
+    includeEvents,
+  });
+  workflow.children = sub.spans;
+  used += sub.used;
+
+  workflow.durationMs = workflow.children.reduce((sum, c) => sum + c.durationMs, 0) + randInt(5, 30);
+  return { span: workflow, used };
+}
+
+function appendSingleLeafStep(isGenai: boolean, args: SubtreeArgs): StepResult {
+  const { prompts, includeEvents } = args;
+  if (!isGenai) return { span: makeInfraSpan(includeEvents), used: 1 };
+  const leafType = Math.random();
+  if (leafType < 0.5) return { span: makeLlmSpan(prompts, includeEvents), used: 1 };
+  if (leafType < 0.75) return { span: makeToolSpan(includeEvents), used: 1 };
+  return { span: makeRagSpan(), used: 1 };
+}
+
+/**
+ * Recursively builds a span tree targeting a specific span count.
+ *
+ * Strategy:
+ * - At each level, pick a "pattern" (agent loop, rag pipeline, workflow, etc.)
+ * - Fill children until we approach the target budget
+ * - Recurse into children that can hold more children
+ */
+function buildSubtree(args: SubtreeArgs): { spans: SpanConfig[]; used: number } {
+  const { budget, depth, maxDepth, genaiRatio } = args;
   if (budget <= 0 || depth >= maxDepth) return { spans: [], used: 0 };
 
   const spans: SpanConfig[] = [];
@@ -344,165 +505,26 @@ function buildSubtree({
     const atMaxDepth = depth >= maxDepth - 1;
 
     if (!isGenai || atMaxDepth) {
-      // Leaf-level: infra span, llm, tool, guardrail, or rag
-      if (!isGenai) {
-        spans.push(makeInfraSpan(includeEvents));
-        used++;
-      } else {
-        const leafType = Math.random();
-        if (leafType < 0.4) {
-          spans.push(makeLlmSpan(prompts, includeEvents));
-        } else if (leafType < 0.6) {
-          spans.push(makeToolSpan(includeEvents));
-        } else if (leafType < 0.8) {
-          spans.push(makeRagSpan());
-        } else {
-          spans.push(makeGuardrailSpan(includeEvents));
-        }
-        used++;
-      }
+      const step = appendLeafStep(isGenai, args);
+      spans.push(step.span);
+      used += step.used;
       continue;
     }
 
     // Pick a pattern for this branch
     const pattern = Math.random();
-
+    let step: StepResult;
     if (pattern < 0.35 && remaining >= 5) {
-      // Agent loop: agent → (llm → tool)* pattern
-      const agentName = pick(AGENT_NAMES);
-      const loopIterations = Math.min(randInt(1, 4), Math.floor((remaining - 1) / 3));
-      const agent: SpanConfig = {
-        id: shortId(),
-        name: agentName,
-        type: "agent",
-        durationMs: 0, // computed after children
-        offsetMs: 0,
-        status: "ok",
-        children: [],
-        attributes: {},
-        input: { type: "text", value: pick(USER_MESSAGES) },
-        output: { type: "text", value: pick(ASSISTANT_RESPONSES) },
-      };
-      used++;
-
-      let childBudget = Math.min(remaining - 1, randInt(3, Math.max(3, Math.floor(remaining * 0.4))));
-
-      for (let i = 0; i < loopIterations && childBudget > 0; i++) {
-        // LLM call
-        agent.children.push(makeLlmSpan(prompts, includeEvents));
-        childBudget--;
-        used++;
-
-        // Tool calls (1-3)
-        const toolCount = Math.min(randInt(1, 3), childBudget);
-        for (let t = 0; t < toolCount; t++) {
-          agent.children.push(makeToolSpan(includeEvents));
-          childBudget--;
-          used++;
-        }
-      }
-
-      // Possibly recurse sub-agents or deeper structures
-      if (childBudget > 2 && depth < maxDepth - 2) {
-        const sub = buildSubtree({
-          budget: childBudget,
-          depth: depth + 1,
-          maxDepth,
-          genaiRatio,
-          prompts,
-          includeEvents,
-        });
-        agent.children.push(...sub.spans);
-        used += sub.used;
-      }
-
-      // Compute agent duration from children
-      agent.durationMs = agent.children.reduce((sum, c) => sum + c.durationMs, 0) + randInt(10, 50);
-      spans.push(agent);
+      step = appendAgentLoopStep(remaining, args);
     } else if (pattern < 0.55 && remaining >= 4) {
-      // RAG pipeline: chain → rag + llm
-      const chain: SpanConfig = {
-        id: shortId(),
-        name: "rag-pipeline",
-        type: "chain",
-        durationMs: 0,
-        offsetMs: 0,
-        status: "ok",
-        children: [],
-        attributes: {},
-        input: { type: "text", value: pick(USER_MESSAGES) },
-        output: { type: "text", value: pick(ASSISTANT_RESPONSES) },
-      };
-      used++;
-
-      chain.children.push(makeRagSpan());
-      used++;
-
-      // Optional guardrail before generation
-      if (Math.random() < 0.3 && remaining > 4) {
-        chain.children.push(makeGuardrailSpan(includeEvents));
-        used++;
-      }
-
-      chain.children.push(makeLlmSpan(prompts, includeEvents));
-      used++;
-
-      const childBudget = Math.min(remaining - used, randInt(0, 5));
-      if (childBudget > 0 && depth < maxDepth - 1) {
-        const sub = buildSubtree({
-          budget: childBudget,
-          depth: depth + 1,
-          maxDepth,
-          genaiRatio,
-          prompts,
-          includeEvents,
-        });
-        chain.children.push(...sub.spans);
-        used += sub.used;
-      }
-
-      chain.durationMs = chain.children.reduce((sum, c) => sum + c.durationMs, 0) + randInt(5, 20);
-      spans.push(chain);
+      step = appendRagPipelineStep(remaining, args);
     } else if (pattern < 0.7 && remaining >= 3) {
-      // Workflow with mixed children
-      const workflow: SpanConfig = {
-        id: shortId(),
-        name: pick(["process_request", "handle_query", "run_pipeline", "execute_workflow"]),
-        type: "workflow",
-        durationMs: 0,
-        offsetMs: 0,
-        status: "ok",
-        children: [],
-        attributes: {},
-      };
-      used++;
-
-      const childBudget = Math.min(remaining - 1, randInt(2, Math.max(2, Math.floor(remaining * 0.3))));
-      const sub = buildSubtree({
-        budget: childBudget,
-        depth: depth + 1,
-        maxDepth,
-        genaiRatio,
-        prompts,
-        includeEvents,
-      });
-      workflow.children = sub.spans;
-      used += sub.used;
-
-      workflow.durationMs = workflow.children.reduce((sum, c) => sum + c.durationMs, 0) + randInt(5, 30);
-      spans.push(workflow);
+      step = appendWorkflowStep(remaining, args);
     } else {
-      // Single leaf span
-      if (isGenai) {
-        const leafType = Math.random();
-        if (leafType < 0.5) spans.push(makeLlmSpan(prompts, includeEvents));
-        else if (leafType < 0.75) spans.push(makeToolSpan(includeEvents));
-        else spans.push(makeRagSpan());
-      } else {
-        spans.push(makeInfraSpan(includeEvents));
-      }
-      used++;
+      step = appendSingleLeafStep(isGenai, args);
     }
+    spans.push(step.span);
+    used += step.used;
   }
 
   return { spans, used };
