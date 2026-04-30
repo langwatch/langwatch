@@ -54,13 +54,14 @@ export class ScenarioExecutionOrchestrator {
         return this.notFound("Project", context.projectId);
       }
 
-      if (!project.defaultModel) {
+      const resolvedModel = await this.deps.defaultModelResolver(context.projectId);
+      if (!resolvedModel) {
         return this.failure("Project default model is not configured");
       }
 
       const modelParamsResult = await this.prepareModelParams(
         context.projectId,
-        project.defaultModel,
+        resolvedModel,
       );
       if (!modelParamsResult.success) {
         logger.warn(

@@ -8,6 +8,7 @@ import { isHandledByGlobalHandler } from "~/utils/trpcError";
 import { generateScenarioWithAI } from "./services/scenarioGeneration";
 import type { ScenarioFormData, ScenarioInitialData } from "./ScenarioForm";
 import { getDefaultModelState } from "./utils/defaultModelState";
+import { api } from "~/utils/api";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -64,10 +65,18 @@ export function ScenarioCreateModal({ open, onClose }: ScenarioCreateModalProps)
     projectId: project?.id,
   });
 
+  // Use server-resolved default model so env-fallback providers are considered
+  // (new self-host / dev projects where project.defaultModel may be null).
+  const { data: resolvedModelData } = api.project.getResolvedDefaultModel.useQuery(
+    { projectId: project?.id ?? "" },
+    { enabled: !!project?.id },
+  );
+  const resolvedDefaultModel = resolvedModelData?.resolvedDefaultModel;
+
   const defaultModelState = getDefaultModelState({
     hasEnabledProviders,
     providers,
-    defaultModel: project?.defaultModel,
+    defaultModel: resolvedDefaultModel ?? project?.defaultModel,
   });
 
   const openEditorWithData = useCallback(

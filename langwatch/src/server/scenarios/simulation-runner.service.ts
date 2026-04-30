@@ -1,11 +1,13 @@
 import ScenarioRunner, { type AgentAdapter } from "@langwatch/scenario";
 import type { PrismaClient } from "@prisma/client";
 import { env } from "~/env.mjs";
-import { DEFAULT_MODEL } from "~/utils/constants";
 import { createLogger } from "~/utils/logger/server";
 import type { SimulationTarget } from "../api/routers/scenarios";
 import { getVercelAIModel } from "../modelProviders/utils";
+import { ModelProviderService } from "../modelProviders/modelProvider.service";
 import { PromptService } from "../prompt-config/prompt.service";
+import { PrismaProjectRepository } from "../app-layer/projects/repositories/project.prisma.repository";
+import { ProjectService } from "../app-layer/projects/project.service";
 import { HttpAgentAdapter } from "./adapters/http-agent.adapter";
 import { PromptConfigAdapter } from "./adapters/prompt-config.adapter";
 import { bridgeTraceIdFromAdapterToJudge } from "./execution/bridge-trace-id";
@@ -55,20 +57,26 @@ export class SimulationRunnerService {
       }
 
       // 2. Fetch project config
-      // TODO: We should use the project service or repository instead of prisma directly
+      const projectService = new ProjectService(
+        new PrismaProjectRepository(this.prisma),
+        ModelProviderService.create(this.prisma),
+      );
       const project = await this.prisma.project.findUnique({
         where: { id: projectId },
-        select: { apiKey: true, defaultModel: true },
+        select: { apiKey: true },
       });
 
       if (!project?.apiKey) {
         throw new Error(`Project ${projectId} not found or has no API key`);
       }
 
-      // 3. Get project's default model for simulator and judge agents
-      const defaultModel = project.defaultModel ?? DEFAULT_MODEL;
-      const simulatorModel = await getVercelAIModel(projectId, defaultModel);
-      const judgeModel = await getVercelAIModel(projectId, defaultModel);
+      // 3. Get project's default model for simulator and judge agents using
+      //    the resolver so env-fallback providers are considered.
+      const defaultModel = await projectService.resolveDefaultModel(projectId);
+      // null means no usable provider — getVercelAIModel will throw with a
+      // clear error message if it can't find a provider for the resolved model.
+      const simulatorModel = await getVercelAIModel(projectId, defaultModel ?? undefined);
+      const judgeModel = await getVercelAIModel(projectId, defaultModel ?? undefined);
 
       // 4. Resolve target to adapter
       logger.debug(
@@ -108,7 +116,7 @@ export class SimulationRunnerService {
 
       // For HTTP targets, use remote span judge to collect spans from the
       // user's agent. For other targets, use standard in-process judge.
-      const langwatchEndpoint = this.getLangWatchEndpoint();
+      const langwatchEndpoint = env.LANGWATCH_ENDPOINT ?? "";
       let remoteSpanJudge: RemoteSpanJudgeAgent | undefined;
       const judgeAgentInstance =
         target.type === "http"
@@ -172,14 +180,6 @@ export class SimulationRunnerService {
         "Scenario execution failed",
       );
     }
-  }
-
-  private getLangWatchEndpoint(): string {
-    const endpoint = process.env.LANGWATCH_ENDPOINT;
-    if (!endpoint) {
-      throw new Error("LANGWATCH_ENDPOINT env var is required but not set");
-    }
-    return endpoint;
   }
 
   private resolveAdapter(
