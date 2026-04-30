@@ -65,6 +65,9 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = ["langevals"]
 
+[tool.uv]
+constraint-dependencies = ["authlib>=1.6.9"]
+
 [tool.uv.workspace]
 members = [
     "langevals_core",
