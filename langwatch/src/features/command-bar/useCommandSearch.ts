@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { useDebounceValue } from "usehooks-ts";
 import { Bot, BookText, Percent, Table, Workflow } from "lucide-react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { useFeatureFlag } from "~/hooks/useFeatureFlag";
 import { api } from "~/utils/api";
 import type { SearchResult } from "./types";
 import { SEARCH_DEBOUNCE_MS, MIN_SEARCH_QUERY_LENGTH } from "./constants";
@@ -15,11 +16,20 @@ import {
 /**
  * Detect if the query is an entity ID and return navigation info.
  * Exported for testing.
+ *
+ * `tracesV2Enabled` routes trace/span hits to the v2 page so command-bar
+ * destinations match whichever traces UI the user is actually using.
+ * Direct in-app navigation (table click, menu) stays separate by design.
  */
-export function detectEntityId(
-  query: string,
-  projectSlug: string
-): SearchResult | null {
+export function detectEntityId({
+  query,
+  projectSlug,
+  tracesV2Enabled = false,
+}: {
+  query: string;
+  projectSlug: string;
+  tracesV2Enabled?: boolean;
+}): SearchResult | null {
   const trimmedQuery = query.trim();
   if (!trimmedQuery || !projectSlug) return null;
 
@@ -38,6 +48,19 @@ export function detectEntityId(
 
   // Check for trace ID patterns
   if (isTraceId(trimmedQuery)) {
+    if (tracesV2Enabled) {
+      // v2 drawer hydrates from `drawer.*` URL params on the /traces page.
+      // We navigate (rather than `openDrawer` in place) so the underlying
+      // page context matches what the drawer was designed against.
+      return {
+        id: `trace-${trimmedQuery}`,
+        label: "Open trace",
+        description: trimmedQuery,
+        icon: traceIcon,
+        path: `/${projectSlug}/traces?drawer.open=traceV2Details&drawer.traceId=${trimmedQuery}`,
+        type: "trace",
+      };
+    }
     return {
       id: `trace-${trimmedQuery}`,
       label: "Open trace",
@@ -54,12 +77,18 @@ export function detectEntityId(
 
   // Check for span ID patterns
   if (isSpanId(trimmedQuery)) {
+    // v2 stores filter state in the URL fragment as `#<lensId>?q=<query>`,
+    // and uses a small query language (`spanId:<id>`) for field lookups.
+    // The default lens id matches `useURLSync`'s DEFAULT_LENS_ID.
+    const path = tracesV2Enabled
+      ? `/${projectSlug}/traces#all-traces?q=${encodeURIComponent(`spanId:${trimmedQuery}`)}`
+      : `/${projectSlug}/messages?query=${encodeURIComponent(trimmedQuery)}`;
     return {
       id: `span-${trimmedQuery}`,
       label: "Find span in traces",
       description: trimmedQuery,
       icon: traceIcon,
-      path: `/${projectSlug}/messages?query=${encodeURIComponent(trimmedQuery)}`,
+      path,
       type: "trace",
     };
   }
@@ -75,6 +104,11 @@ export function useCommandSearch(query: string, isOpen: boolean) {
   const { project } = useOrganizationTeamProject();
   const projectId = project?.id ?? "";
   const projectSlug = project?.slug ?? "";
+
+  const { enabled: tracesV2Enabled } = useFeatureFlag(
+    "release_ui_traces_v2_enabled",
+    { projectId, enabled: !!projectId },
+  );
 
   // Debounce the query to prevent excessive filtering
   const [debouncedQuery] = useDebounceValue(query, SEARCH_DEBOUNCE_MS);
@@ -113,8 +147,8 @@ export function useCommandSearch(query: string, isOpen: boolean) {
   // Detect ID-based navigation (immediate, no debounce needed)
   const idResult = useMemo<SearchResult | null>(() => {
     if (query.trim().length < MIN_SEARCH_QUERY_LENGTH) return null;
-    return detectEntityId(query, projectSlug);
-  }, [query, projectSlug]);
+    return detectEntityId({ query, projectSlug, tracesV2Enabled });
+  }, [query, projectSlug, tracesV2Enabled]);
 
   // Filter and transform results
   const searchResults = useMemo<SearchResult[]>(() => {
