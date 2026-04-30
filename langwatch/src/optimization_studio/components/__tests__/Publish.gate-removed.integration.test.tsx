@@ -236,6 +236,8 @@ describe("studio Publish menu", () => {
       mockCanPublish.current = false;
     });
 
+    /** @scenario Free SaaS user can open the publish menu without a paywall */
+    /** @scenario Self-hosted user without a paid license can open the publish menu without a paywall */
     it("does not render a 'Subscribe to unlock publishing' tooltip", () => {
       renderPublish();
       const tooltips = document.querySelectorAll("[data-tooltip-content]");
@@ -253,6 +255,7 @@ describe("studio Publish menu", () => {
       expect(publishItem).toBeDefined();
     });
 
+    /** @scenario Publish.tsx does not query plan.canPublish to gate the menu */
     it("does not redirect to plan management or fire subscription tracking when Publish is clicked", () => {
       renderPublish();
       const publishButton = screen.getByText(/Publish workflow/i)
@@ -279,6 +282,7 @@ describe("studio Publish menu", () => {
       mockCanPublish.current = true;
     });
 
+    /** @scenario Paid SaaS user can publish without a paywall (regression) */
     it("still renders the Publish menu without paywall (regression)", () => {
       renderPublish();
       expect(screen.getByText(/Publish workflow/i)).toBeDefined();

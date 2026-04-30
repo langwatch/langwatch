@@ -449,7 +449,7 @@ describe("verifyCurrentPassword", () => {
 
 describe("changeAuth0Password", () => {
   describe("given a correct current password and valid M2M credentials", () => {
-    /** @scenario Auth0 backend uses a separate Machine-to-Machine app for the Management API */
+    /** @scenario Auth0 backend verifies the current password via Resource Owner Password Grant before updating */
     it("verifies, gets management token, and PATCHes the user's password", async () => {
       handler = (req) => {
         if (req.method === "POST" && req.path === "/oauth/token") {
