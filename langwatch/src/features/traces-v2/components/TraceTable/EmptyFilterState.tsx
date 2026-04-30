@@ -12,8 +12,7 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useProjectHasTraces } from "../../hooks/useProjectHasTraces";
 import type { TimeRange } from "../../stores/filterStore";
 import { useFilterStore } from "../../stores/filterStore";
-import { useOnboardingStageStore } from "../../stores/onboardingStageStore";
-import { useUIStore } from "../../stores/uiStore";
+import { useOnboardingStore } from "../../onboarding/store/onboardingStore";
 import { useViewStore } from "../../stores/viewStore";
 
 const LangWatchMark: React.FC = () => (
@@ -129,13 +128,13 @@ export const EmptyFilterState: React.FC = () => {
   const selectLens = useViewStore((s) => s.selectLens);
   const { project } = useOrganizationTeamProject();
   const { hasAnyTraces } = useProjectHasTraces();
-  const setupDismissed = !!useUIStore((s) =>
+  const setupDismissed = !!useOnboardingStore((s) =>
     project ? s.setupDismissedByProject[project.id] : false,
   );
-  const setSetupDismissedForProject = useUIStore(
+  const setSetupDismissedForProject = useOnboardingStore(
     (s) => s.setSetupDismissedForProject,
   );
-  const resetOnboardingStage = useOnboardingStageStore((s) => s.reset);
+  const resetOnboardingStage = useOnboardingStore((s) => s.reset);
   // Only offer the rewatch link in the "real, but empty" state — the
   // user dismissed the onboarding card (`setupDismissed`) and the
   // project hasn't received a real trace yet. Once any real trace

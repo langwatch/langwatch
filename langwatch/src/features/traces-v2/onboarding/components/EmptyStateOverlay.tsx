@@ -1,9 +1,12 @@
 import { Box, Flex } from "@chakra-ui/react";
 import { OnboardingMeshBackground } from "~/features/onboarding/components/OnboardingMeshBackground";
-import { useOnboardingStageStore } from "../../stores/onboardingStageStore";
-import { findStageDef, type HeroLayout } from "./onboardingJourneyConfig";
+import {
+  findStageDef,
+  type HeroLayout,
+} from "../chapters/onboardingJourneyConfig";
+import { useEdgeGripAnchor } from "../hooks/useEdgeGripAnchor";
+import { useOnboardingStore } from "../store/onboardingStore";
 import { TracesEmptyOnboarding } from "./TracesEmptyOnboarding";
-import { useEdgeGripAnchor } from "./useEdgeGripAnchor";
 
 /**
  * Onboarding overlay rendered above the populated trace preview when
@@ -18,8 +21,8 @@ import { useEdgeGripAnchor } from "./useEdgeGripAnchor";
  * Density toggles visibly reflow the rows above and below the band
  * in real time — that's the demo.
  */
-export const EmptyState = () => {
-  const stage = useOnboardingStageStore((s) => s.stage);
+export const EmptyStateOverlay = () => {
+  const stage = useOnboardingStore((s) => s.stage);
   const stageDef = findStageDef(stage);
   const heroLayout: HeroLayout = stageDef.heroLayout ?? "centre";
   // While the drawer is open (left layout) we anchor the hero
@@ -30,91 +33,13 @@ export const EmptyState = () => {
   const drawerLeftX = useEdgeGripAnchor(heroLayout === "left");
   const heroFlexProps = layoutFlexProps(heroLayout, drawerLeftX);
 
+  // The drawer/sidebar glow `<style>` and the body data attribute
+  // that drives it both used to live in this component. They're now
+  // mounted by `OnboardingHost` so they're applied once per visit
+  // (rather than per overlay render) and don't ship to users who
+  // aren't in the journey at all.
   return (
     <>
-      {/* Global CSS hook for the drawer-overview tour stage. The
-          drawer is portaled to <body>, so we can't scope a glow
-          rule to it via a normal Chakra css prop on the parent.
-          `TracesEmptyOnboarding` toggles `body.data-traces-tour-stage`
-          live; this style only matches during `drawerOverview`. */}
-      <style>{`
-        /* Light-mode glows. We crank the alpha higher than the
-           dark variant because indigo-blue at .25 alpha disappears
-           against a white surface; .5+ is needed for the ring to
-           read as a ring. The sidebar tour glow shares the same
-           palette as the drawer glow on purpose — same tour, same
-           visual language — but tunes the spread to fit the
-           narrower aside. We use html.dark for the dark-mode
-           override (Chakra v3's class-based color mode), not a
-           prefers-color-scheme media query, so the glow follows
-           the user's *theme* choice rather than their OS pref. */
-        @keyframes tracesTourDrawerGlow {
-          0%, 100% {
-            box-shadow:
-              inset 0 0 0 1px rgba(59, 130, 246, 0.5),
-              0 0 28px rgba(59, 130, 246, 0.32),
-              0 0 64px rgba(99, 102, 241, 0.22);
-          }
-          50% {
-            box-shadow:
-              inset 0 0 0 2px rgba(59, 130, 246, 0.7),
-              0 0 44px rgba(59, 130, 246, 0.45),
-              0 0 96px rgba(99, 102, 241, 0.32);
-          }
-        }
-        @keyframes tracesTourSidebarGlow {
-          0%, 100% {
-            box-shadow:
-              inset 0 0 0 1px rgba(59, 130, 246, 0.5),
-              0 0 22px rgba(59, 130, 246, 0.3);
-          }
-          50% {
-            box-shadow:
-              inset 0 0 0 2px rgba(59, 130, 246, 0.7),
-              0 0 44px rgba(59, 130, 246, 0.45);
-          }
-        }
-        body[data-traces-tour-stage="drawerOverview"] [data-tour-target="drawer"] {
-          animation: tracesTourDrawerGlow 2.6s ease-in-out infinite;
-        }
-        body[data-traces-tour-stage="facetsReveal"] [data-tour-target="sidebar"] {
-          animation: tracesTourSidebarGlow 2.4s ease-in-out infinite;
-          position: relative;
-          z-index: 1;
-        }
-        html.dark body[data-traces-tour-stage="drawerOverview"] [data-tour-target="drawer"] {
-          animation: tracesTourDrawerGlowDark 2.6s ease-in-out infinite;
-        }
-        html.dark body[data-traces-tour-stage="facetsReveal"] [data-tour-target="sidebar"] {
-          animation: tracesTourSidebarGlowDark 2.4s ease-in-out infinite;
-        }
-        @keyframes tracesTourDrawerGlowDark {
-          0%, 100% {
-            box-shadow:
-              inset 0 0 0 1px rgba(125, 211, 252, 0.32),
-              0 0 28px rgba(125, 211, 252, 0.22),
-              0 0 64px rgba(165, 180, 252, 0.16);
-          }
-          50% {
-            box-shadow:
-              inset 0 0 0 2px rgba(125, 211, 252, 0.55),
-              0 0 44px rgba(125, 211, 252, 0.4),
-              0 0 96px rgba(165, 180, 252, 0.3);
-          }
-        }
-        @keyframes tracesTourSidebarGlowDark {
-          0%, 100% {
-            box-shadow:
-              inset 0 0 0 1px rgba(125, 211, 252, 0.3),
-              0 0 22px rgba(125, 211, 252, 0.22);
-          }
-          50% {
-            box-shadow:
-              inset 0 0 0 2px rgba(125, 211, 252, 0.55),
-              0 0 44px rgba(125, 211, 252, 0.4);
-          }
-        }
-      `}</style>
       {/* Settle: no mesh, no mask. The user sees the spans and the
           surrounding chrome as-is for ~1.4s, so the page reads as a
           real product they're looking at — not a marketing

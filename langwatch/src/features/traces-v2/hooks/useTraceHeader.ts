@@ -1,6 +1,6 @@
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
-import { isPreviewTraceId } from "../components/EmptyState/samplePreviewTraces";
+import { isPreviewTraceId } from "../onboarding/data/samplePreviewTraces";
 import { LIVE_REFETCH_MS, LIVE_WINDOW_MS } from "../constants/freshness";
 import { useDrawerStore } from "../stores/drawerStore";
 

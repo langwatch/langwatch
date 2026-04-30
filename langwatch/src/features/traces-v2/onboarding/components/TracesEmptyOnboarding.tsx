@@ -1,26 +1,5 @@
-import {
-  Box,
-  Button,
-  chakra,
-  HStack,
-  Heading,
-  Icon,
-  SimpleGrid,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
-import {
-  AArrowDown,
-  AArrowUp,
-  ArrowRight,
-  BookOpen,
-  Check,
-  Compass,
-  Filter,
-  PanelRightOpen,
-  Sparkles,
-  Wrench,
-} from "lucide-react";
+import { Button, HStack, Icon, Text, VStack } from "@chakra-ui/react";
+import { ArrowRight, BookOpen, Compass, Wrench } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import type React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -29,21 +8,26 @@ import { Link } from "~/components/ui/link";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useOpenTraceDrawer } from "../../hooks/useOpenTraceDrawer";
-import { type Density, useDensityStore } from "../../stores/densityStore";
+import { type Density } from "../../stores/densityStore";
+import { useUIStore } from "../../stores/uiStore";
+import { findStageDef } from "../chapters/onboardingJourneyConfig";
+import {
+  ARRIVAL_PREVIEW_TRACES,
+  RICH_ARRIVAL_TRACE_ID,
+} from "../data/samplePreviewTraces";
 import {
   hasCompletedJourney,
   hasDensityBeenConfirmed,
   markDensityConfirmed,
   markJourneyCompleted,
-  useOnboardingStageStore,
-} from "../../stores/onboardingStageStore";
-import { useUIStore } from "../../stores/uiStore";
+  useOnboardingStore,
+} from "../store/onboardingStore";
+import { DensitySpotlight } from "./DensitySpotlight";
+import { HotkeyBindings } from "./HotkeyBindings";
 import { IntegrateDrawer } from "./IntegrateDrawer";
-import { findStageDef, type StageId } from "./onboardingJourneyConfig";
-import {
-  ARRIVAL_PREVIEW_TRACES,
-  RICH_ARRIVAL_TRACE_ID,
-} from "./samplePreviewTraces";
+import { ReturningUserHub } from "./ReturningUserHub";
+import { StaticHero } from "./StaticHero";
+import { TypewriterHero } from "./TypewriterHero";
 
 // Was 8s — too punchy. The highlighted row is *the* invitation moment of
 // the whole journey, and 8s reads as "tap or we'll do it for you" rather
@@ -55,25 +39,6 @@ const POST_ARRIVAL_AUTO_OPEN_MS = 14000;
 
 const INTEGRATE_KEY = "I";
 const SKIP_KEY = "K";
-
-// Typewriter cadence — paced slow enough that the preamble beats
-// (welcome, aurora warning) don't fly in faster than the user can
-// notice they exist. The earlier "fast" pass (26/14) made the heading
-// arrive almost instantly on a fresh refresh, which read as the page
-// grabbing at attention; pushing back to ~36/18 keeps each beat
-// deliberate without dragging. Linger is the more important knob for
-// individual stage hold — most stages set their own `holdMs`.
-const TYPEWRITER_HEADING_MS = 36;
-const TYPEWRITER_SUBHEAD_MS = 18;
-const TYPEWRITER_GAP_MS = 280;
-const TYPEWRITER_LINGER_MS = 900;
-
-function isTypingTarget(target: EventTarget | null): boolean {
-  const t = target as HTMLElement | null;
-  if (!t) return false;
-  if (t.tagName === "INPUT" || t.tagName === "TEXTAREA") return true;
-  return t.isContentEditable;
-}
 
 /**
  * Empty-state onboarding for the new Traces page.
@@ -99,14 +64,14 @@ export function TracesEmptyOnboarding(): React.ReactElement {
    */
   const [pickedDensityThisStage, setPickedDensityThisStage] =
     useState<Density | null>(null);
-  const setSetupDismissedForProject = useUIStore(
+  const setSetupDismissedForProject = useOnboardingStore(
     (s) => s.setSetupDismissedForProject,
   );
-  const setSetupDisengaged = useUIStore((s) => s.setSetupDisengaged);
-  const setTourActive = useUIStore((s) => s.setTourActive);
-  const stage = useOnboardingStageStore((s) => s.stage);
-  const setStage = useOnboardingStageStore((s) => s.setStage);
-  const resetStage = useOnboardingStageStore((s) => s.reset);
+  const setSetupDisengaged = useOnboardingStore((s) => s.setSetupDisengaged);
+  const setTourActive = useOnboardingStore((s) => s.setTourActive);
+  const stage = useOnboardingStore((s) => s.stage);
+  const setStage = useOnboardingStore((s) => s.setStage);
+  const resetStage = useOnboardingStore((s) => s.reset);
   const stageDef = findStageDef(stage);
 
   // Clear the density-picked flag whenever we leave the
@@ -182,18 +147,8 @@ export function TracesEmptyOnboarding(): React.ReactElement {
     setStage(stageDef.next);
   }, [stage, stageDef.showDensitySpotlight, stageDef.next, setStage]);
 
-  // Tag `<body>` with the current stage so global CSS rules can
-  // react — specifically the drawer-overview glow that highlights
-  // the trace drawer while that stage is active. The drawer is
-  // portaled to body, so a parent-scoped CSS rule wouldn't reach
-  // it; a body-level data attribute is the simplest hook.
-  useEffect(() => {
-    if (typeof document === "undefined") return;
-    document.body.dataset.tracesTourStage = stage;
-    return () => {
-      delete document.body.dataset.tracesTourStage;
-    };
-  }, [stage]);
+  // (The body data attribute that drives the drawer/sidebar glow
+  // CSS now lives in `OnboardingHost` via `BodyStageAttribute`.)
 
   // Mark the journey completed the first time the user reaches the
   // outro beat. That flag flips the welcome screen on subsequent
@@ -325,6 +280,8 @@ export function TracesEmptyOnboarding(): React.ReactElement {
     <>
       <HotkeyBindings
         drawerOpen={drawerOpen}
+        integrateKey={INTEGRATE_KEY}
+        skipKey={SKIP_KEY}
         onIntegrate={() => setDrawerOpen(true)}
         onSkip={handleHideForNow}
       />
@@ -621,639 +578,5 @@ export function TracesEmptyOnboarding(): React.ReactElement {
 
       <IntegrateDrawer open={drawerOpen} onOpenChange={setDrawerOpen} />
     </>
-  );
-}
-
-interface StaticHeroProps {
-  stage: StageId;
-  heading: string;
-  subhead?: string;
-}
-
-function StaticHero({
-  stage,
-  heading,
-  subhead,
-}: StaticHeroProps): React.ReactElement {
-  return (
-    <VStack align="center" gap={4} maxWidth="58ch" textAlign="center">
-      <Heading
-        fontSize={{ base: "3xl", md: "4xl" }}
-        letterSpacing="-0.035em"
-        fontWeight={400}
-        lineHeight="1.05"
-        color="fg"
-        whiteSpace="pre-line"
-      >
-        {renderHeading(stage, heading)}
-      </Heading>
-      {subhead && (
-        <Text
-          color="fg.muted"
-          textStyle="md"
-          lineHeight="1.65"
-          maxWidth="48ch"
-        >
-          {subhead}
-        </Text>
-      )}
-    </VStack>
-  );
-}
-
-interface TypewriterHeroProps {
-  heading: string;
-  subhead?: string;
-  /**
-   * How long to hold the fully-typed text on screen before calling
-   * `onDone`. The journey config exposes this via the stage's
-   * `holdMs` field — different beats want different breathing room
-   * (the aurora-arrival stage wants a longer linger so the aurora
-   * has time to actually play, for example).
-   */
-  lingerMs?: number;
-  onDone: () => void;
-  /**
-   * When true, freeze the typing/linger machine in place — used while
-   * the IntegrateDrawer is open so the marquee beats don't tick past
-   * behind it. Resumes from wherever it was paused once `paused`
-   * flips back to false.
-   */
-  paused?: boolean;
-}
-
-/**
- * Two-stage typewriter — heading types char-by-char, then a brief
- * pause, then subhead types char-by-char. Once everything is on
- * screen we linger for `TYPEWRITER_LINGER_MS` and call `onDone`
- * (which advances the journey to the next stage). A blinking
- * cursor sits at the active typing position.
- */
-function TypewriterHero({
-  heading,
-  subhead,
-  lingerMs = TYPEWRITER_LINGER_MS,
-  onDone,
-  paused = false,
-}: TypewriterHeroProps): React.ReactElement {
-  type Phase = "heading" | "gap" | "subhead" | "linger" | "done";
-  const [headingShown, setHeadingShown] = useState(0);
-  const [subheadShown, setSubheadShown] = useState(0);
-  const [phase, setPhase] = useState<Phase>("heading");
-
-  // Reset on prop change so a stage swap restarts the animation.
-  useEffect(() => {
-    setHeadingShown(0);
-    setSubheadShown(0);
-    setPhase("heading");
-  }, [heading, subhead]);
-
-  useEffect(() => {
-    if (paused) return;
-    if (phase === "heading") {
-      if (headingShown >= heading.length) {
-        setPhase(subhead ? "gap" : "linger");
-        return;
-      }
-      const t = setTimeout(
-        () => setHeadingShown((s) => s + 1),
-        TYPEWRITER_HEADING_MS,
-      );
-      return () => clearTimeout(t);
-    }
-    if (phase === "gap") {
-      const t = setTimeout(() => setPhase("subhead"), TYPEWRITER_GAP_MS);
-      return () => clearTimeout(t);
-    }
-    if (phase === "subhead") {
-      if (!subhead || subheadShown >= subhead.length) {
-        setPhase("linger");
-        return;
-      }
-      const t = setTimeout(
-        () => setSubheadShown((s) => s + 1),
-        TYPEWRITER_SUBHEAD_MS,
-      );
-      return () => clearTimeout(t);
-    }
-    if (phase === "linger") {
-      const t = setTimeout(() => setPhase("done"), lingerMs);
-      return () => clearTimeout(t);
-    }
-    if (phase === "done") {
-      onDone();
-    }
-  }, [
-    phase,
-    headingShown,
-    subheadShown,
-    heading,
-    subhead,
-    lingerMs,
-    onDone,
-    paused,
-  ]);
-
-  const headingTyping = phase === "heading";
-  const subheadTyping = phase === "subhead";
-
-  return (
-    <VStack align="center" gap={4} maxWidth="58ch" textAlign="center">
-      <Heading
-        fontSize={{ base: "3xl", md: "4xl" }}
-        letterSpacing="-0.035em"
-        fontWeight={400}
-        lineHeight="1.05"
-        color="fg"
-        whiteSpace="pre-line"
-      >
-        {applyAuroraTextShimmer(heading.slice(0, headingShown))}
-        {headingTyping && <BlinkingCursor />}
-      </Heading>
-      {subhead && (
-        <Text
-          color="fg.muted"
-          textStyle="md"
-          lineHeight="1.65"
-          maxWidth="48ch"
-          minHeight="1.65em"
-        >
-          {applyAuroraTextShimmer(subhead.slice(0, subheadShown))}
-          {subheadTyping && <BlinkingCursor color="fg.muted" />}
-        </Text>
-      )}
-    </VStack>
-  );
-}
-
-const BlinkingCursor: React.FC<{ color?: string }> = ({ color = "fg" }) => (
-  <Box
-    as="span"
-    aria-hidden
-    display="inline-block"
-    width="0.55ch"
-    height="0.95em"
-    marginLeft="0.05em"
-    verticalAlign="-0.12em"
-    backgroundColor={color}
-    css={{
-      animation: "tracesV2TypewriterBlink 1.05s steps(1) infinite",
-      "@keyframes tracesV2TypewriterBlink": {
-        "0%, 50%": { opacity: 1 },
-        "50.01%, 100%": { opacity: 0 },
-      },
-    }}
-  />
-);
-
-/**
- * Most stages render their heading verbatim. A few do special
- * inline treatments:
- *  - postArrival prepends a coloured `↑` glyph as a directional cue.
- *  - any heading that mentions the word *aurora* gets the word
- *    itself shimmered with the platform's aurora gradient — same
- *    sky/blue/cyan/indigo palette as `AuroraSvg`, animated across
- *    the text via `background-clip: text`. Reinforces the visual
- *    word the copy is teaching.
- */
-function renderHeading(stage: StageId, heading: string): React.ReactNode {
-  if (stage === "postArrival") {
-    return (
-      <>
-        <Text
-          as="span"
-          color="blue.fg"
-          fontWeight={500}
-          marginRight={2}
-          aria-hidden
-        >
-          ↑
-        </Text>
-        {applyAuroraTextShimmer(heading.replace(/^↑\s*/, ""))}
-      </>
-    );
-  }
-  return applyAuroraTextShimmer(heading);
-}
-
-/**
- * Wraps every standalone occurrence of `aurora` (case-insensitive)
- * in a span that animates a multi-stop gradient across the
- * background-clipped text. The original word and casing are
- * preserved; only the appearance changes.
- */
-function applyAuroraTextShimmer(text: string): React.ReactNode {
-  const parts = text.split(/(\baurora\b)/i);
-  return parts.map((part, i) => {
-    if (/^aurora$/i.test(part)) {
-      return <AuroraTextShimmer key={i}>{part}</AuroraTextShimmer>;
-    }
-    return <span key={i}>{part}</span>;
-  });
-}
-
-const AuroraTextShimmer: React.FC<{ children: React.ReactNode }> = ({
-  children,
-}) => (
-  <Box
-    as="span"
-    display="inline-block"
-    css={{
-      backgroundImage:
-        "linear-gradient(90deg, #7dd3fc, #3b82f6, #6366f1, #22d3ee, #818cf8, #7dd3fc)",
-      backgroundSize: "300% 100%",
-      WebkitBackgroundClip: "text",
-      backgroundClip: "text",
-      color: "transparent",
-      WebkitTextFillColor: "transparent",
-      animation: "tracesV2AuroraTextShimmer 5s linear infinite",
-      "@keyframes tracesV2AuroraTextShimmer": {
-        "0%": { backgroundPosition: "0% 50%" },
-        "100%": { backgroundPosition: "300% 50%" },
-      },
-    }}
-  >
-    {children}
-  </Box>
-);
-
-interface HotkeyBindingsProps {
-  drawerOpen: boolean;
-  onIntegrate: () => void;
-  onSkip: () => void;
-}
-
-/**
- * `I` opens the integrate drawer, `K` dismisses the card. Gated on
- * `!drawerOpen` so the drawer's own S/M/P/I tab letters can claim the
- * keyboard once the user is in the integrate flow.
- */
-function HotkeyBindings({
-  drawerOpen,
-  onIntegrate,
-  onSkip,
-}: HotkeyBindingsProps): null {
-  useEffect(() => {
-    if (drawerOpen) return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.ctrlKey || e.metaKey || e.altKey) return;
-      if (isTypingTarget(e.target)) return;
-      const key = e.key.toLowerCase();
-      if (key === SKIP_KEY.toLowerCase()) {
-        e.preventDefault();
-        onSkip();
-        return;
-      }
-      if (key === INTEGRATE_KEY.toLowerCase()) {
-        e.preventDefault();
-        onIntegrate();
-      }
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [drawerOpen, onIntegrate, onSkip]);
-  return null;
-}
-
-interface DensityChoice {
-  value: Density;
-  label: string;
-  hint: string;
-  icon: typeof AArrowDown;
-  /** Vertical gap between bars in the multi-row preview. */
-  rowGap: string;
-  /** Height of each preview bar — proxies "row height" visually. */
-  rowHeight: string;
-  /** How many bars to stack inside the preview. */
-  rowCount: number;
-}
-
-const DENSITY_CHOICES: DensityChoice[] = [
-  {
-    value: "compact",
-    label: "Compact",
-    hint: "More rows on screen.",
-    icon: AArrowDown,
-    rowGap: "3px",
-    rowHeight: "6px",
-    rowCount: 5,
-  },
-  {
-    value: "comfortable",
-    label: "Comfortable",
-    hint: "Room to breathe.",
-    icon: AArrowUp,
-    rowGap: "9px",
-    rowHeight: "9px",
-    rowCount: 3,
-  },
-];
-
-const DensityCardButton = chakra("button", {
-  base: {
-    textAlign: "left",
-    cursor: "pointer",
-    transition: "all 160ms ease",
-    width: "full",
-  },
-});
-
-/**
- * Side-by-side density preview cards. Each card stacks N bars at
- * its target spacing so the per-row contrast reads at a glance —
- * "Compact" packs more rows tighter, "Comfortable" gives each row
- * breathing room. Clicking a card commits the density to the
- * global store; the live table behind reflows in real time.
- */
-interface DensitySpotlightProps {
-  /**
-   * The density value the user has clicked during the spotlight
-   * stage, or `null` if they haven't engaged yet. Click-to-pick
-   * sets this; clicking the *same* card again triggers
-   * `onContinue`. Lifted to the parent so the spotlight knows
-   * which card to render with the `Continue →` chip.
-   */
-  pickedValue: Density | null;
-  onPick: (value: Density) => void;
-  onContinue: () => void;
-}
-
-function DensitySpotlight({
-  pickedValue,
-  onPick,
-  onContinue,
-}: DensitySpotlightProps): React.ReactElement {
-  const density = useDensityStore((s) => s.density);
-  const setDensity = useDensityStore((s) => s.setDensity);
-
-  const handleCardClick = (value: Density) => {
-    if (value === pickedValue) {
-      // Second click on the already-picked card: advance.
-      onContinue();
-      return;
-    }
-    setDensity(value);
-    onPick(value);
-  };
-
-  return (
-    <SimpleGrid columns={{ base: 1, md: 2 }} gap={2.5} width="full">
-      {DENSITY_CHOICES.map((choice) => {
-        const isActive = density === choice.value;
-        const isPicked = pickedValue === choice.value;
-        return (
-          <DensityCardButton
-            key={choice.value}
-            type="button"
-            aria-pressed={isActive}
-            onClick={() => handleCardClick(choice.value)}
-            padding={3}
-            borderRadius="lg"
-            borderWidth="1px"
-            borderColor={isActive ? "orange.solid" : "border.muted"}
-            background={isActive ? "orange.subtle" : "bg.panel/60"}
-            _hover={
-              isActive
-                ? undefined
-                : {
-                    borderColor: "border.emphasized",
-                    background: "bg.panel",
-                  }
-            }
-          >
-            <VStack align="stretch" gap={2}>
-              <HStack justify="space-between" align="center">
-                <HStack gap={2}>
-                  <Icon
-                    boxSize={3.5}
-                    color={isActive ? "orange.fg" : "fg.muted"}
-                  >
-                    <choice.icon />
-                  </Icon>
-                  <Text textStyle="sm" fontWeight={500} color="fg">
-                    {choice.label}
-                  </Text>
-                </HStack>
-                {isPicked ? (
-                  <HStack
-                    gap={1}
-                    paddingX={1.5}
-                    paddingY={0.5}
-                    borderRadius="full"
-                    background="orange.solid"
-                    color="orange.contrast"
-                  >
-                    <Text textStyle="2xs" fontWeight={600}>
-                      Continue
-                    </Text>
-                    <Text aria-hidden as="span" textStyle="2xs">
-                      →
-                    </Text>
-                  </HStack>
-                ) : isActive ? (
-                  <HStack
-                    gap={1}
-                    paddingX={1.5}
-                    paddingY={0.5}
-                    borderRadius="full"
-                    background="orange.subtle"
-                    color="orange.fg"
-                    borderWidth="1px"
-                    borderColor="orange.muted"
-                  >
-                    <Icon boxSize={2.5}>
-                      <Check />
-                    </Icon>
-                    <Text textStyle="2xs" fontWeight={600}>
-                      Current
-                    </Text>
-                  </HStack>
-                ) : null}
-              </HStack>
-
-              <DensityRowsPreview choice={choice} active={isActive} />
-
-              <Text textStyle="2xs" color="fg.muted" lineHeight={1.4}>
-                {choice.hint}
-              </Text>
-            </VStack>
-          </DensityCardButton>
-        );
-      })}
-    </SimpleGrid>
-  );
-}
-
-interface DensityRowsPreviewProps {
-  choice: DensityChoice;
-  active: boolean;
-}
-
-/**
- * Multi-row preview using `FauxLine`-style bars (same visual idiom
- * as `WhatsChangedStep`). Each card uses fixed spacing per its
- * density so the side-by-side comparison is honest — Compact's
- * card shows 6 tight rows, Comfortable's shows 4 spaced rows, in
- * roughly the same vertical envelope.
- */
-const DensityRowsPreview: React.FC<DensityRowsPreviewProps> = ({
-  choice,
-  active,
-}) => (
-  <Box
-    borderRadius="md"
-    borderWidth="1px"
-    borderColor={active ? "orange.muted" : "border.muted"}
-    background="bg.surface"
-    paddingX={2.5}
-    paddingY={2.5}
-    height="92px"
-    overflow="hidden"
-  >
-    <VStack align="stretch" gap={choice.rowGap}>
-      {Array.from({ length: choice.rowCount }).map((_, i) => (
-        <HStack key={i} gap={2} align="center">
-          <Box
-            height={choice.rowHeight}
-            width="22%"
-            borderRadius="sm"
-            bg="border.emphasized"
-            opacity={0.7}
-          />
-          <Box
-            height={choice.rowHeight}
-            flex={1}
-            borderRadius="sm"
-            bg="border.muted"
-          />
-          <Box
-            height={choice.rowHeight}
-            width="14%"
-            borderRadius="sm"
-            bg="border.muted"
-          />
-        </HStack>
-      ))}
-    </VStack>
-  </Box>
-);
-
-interface HubOption {
-  label: string;
-  description: string;
-  icon: typeof Sparkles;
-  /**
-   * Stage to jump into when this option is picked. We aim at the
-   * *narrative entry point* rather than the climax — e.g. picking the
-   * drawer tour lands at `postArrival` so the user clicks the highlighted
-   * row themselves and the rest of the drawer beats fall out
-   * naturally, exactly like a first-time visit. That keeps the wiring
-   * (drawer-open → tourGate, tourGate-CTA → drawerOverview, etc.) on a
-   * single code path; the hub just chooses which beat to start from.
-   */
-  target: StageId;
-}
-
-const RETURNING_USER_HUB_OPTIONS: HubOption[] = [
-  {
-    label: "How traces arrive",
-    description: "The aurora ribbon and the live-update feel.",
-    icon: Sparkles,
-    target: "arrivalPrep",
-  },
-  {
-    label: "The trace drawer",
-    description: "Conversation, spans, evals — see one in detail.",
-    icon: PanelRightOpen,
-    target: "postArrival",
-  },
-  {
-    label: "Filters and facets",
-    description: "Slice the table by service, model, status, more.",
-    icon: Filter,
-    target: "facetsReveal",
-  },
-];
-
-interface ReturningUserHubProps {
-  onJump: (stage: StageId) => void;
-}
-
-/**
- * Welcome screen for users who've already completed the onboarding
- * journey at least once (`hasCompletedJourney()` is true). Instead of
- * making them sit through the linear narrative again, we offer a small
- * hub of "help me with that bit" jumps. Each option targets the
- * narrative entry point of the relevant beat so the rest of the journey
- * machinery stays on its existing code path.
- *
- * `Run me through the whole thing` is a fall-through to the first
- * post-`Welcome.` beat so we don't repeat the bare welcome line they
- * just saw — `trace_explorer` is the proper start of the substantive
- * tour.
- */
-function ReturningUserHub({
-  onJump,
-}: ReturningUserHubProps): React.ReactElement {
-  return (
-    <VStack align="center" gap={4} maxWidth="58ch" textAlign="center">
-      <Heading
-        fontSize={{ base: "3xl", md: "4xl" }}
-        letterSpacing="-0.035em"
-        fontWeight={400}
-        lineHeight="1.05"
-        color="fg"
-      >
-        Welcome back.
-      </Heading>
-      <Text color="fg.muted" textStyle="md" lineHeight="1.65" maxWidth="48ch">
-        Want a hand with a specific bit? Pick one — or click around the
-        table.
-      </Text>
-      <VStack gap={2} width="full" maxWidth="380px" align="stretch">
-        {RETURNING_USER_HUB_OPTIONS.map((opt) => (
-          <Button
-            key={opt.target}
-            onClick={() => onJump(opt.target)}
-            variant="outline"
-            colorPalette="gray"
-            justifyContent="flex-start"
-            width="full"
-            height="auto"
-            paddingY={2.5}
-            paddingX={3}
-            _hover={{ borderColor: "border.emphasized", bg: "bg.panel" }}
-          >
-            <Icon boxSize={4} color="orange.fg">
-              <opt.icon />
-            </Icon>
-            <VStack align="start" gap={0} flex={1}>
-              <Text textStyle="sm" fontWeight={500} color="fg">
-                {opt.label}
-              </Text>
-              <Text textStyle="xs" color="fg.muted" fontWeight={400}>
-                {opt.description}
-              </Text>
-            </VStack>
-            <Icon boxSize={3.5} color="fg.subtle">
-              <ArrowRight />
-            </Icon>
-          </Button>
-        ))}
-      </VStack>
-      <Button
-        size="xs"
-        variant="ghost"
-        colorPalette="gray"
-        color="fg.muted"
-        onClick={() => onJump("trace_explorer")}
-        _hover={{ color: "fg" }}
-      >
-        <Icon boxSize={3.5}>
-          <Compass />
-        </Icon>
-        Run me through the whole thing
-      </Button>
-    </VStack>
   );
 }

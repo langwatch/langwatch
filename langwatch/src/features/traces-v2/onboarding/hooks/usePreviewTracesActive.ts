@@ -1,6 +1,6 @@
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { useUIStore } from "../stores/uiStore";
-import { useProjectHasTraces } from "./useProjectHasTraces";
+import { useProjectHasTraces } from "../../hooks/useProjectHasTraces";
+import { useOnboardingStore } from "../store/onboardingStore";
 
 /**
  * Sample preview is active when:
@@ -22,7 +22,9 @@ import { useProjectHasTraces } from "./useProjectHasTraces";
 export function usePreviewTracesActive(): boolean {
   const { project } = useOrganizationTeamProject();
   const { hasAnyTraces } = useProjectHasTraces();
-  const setupDismissedByProject = useUIStore((s) => s.setupDismissedByProject);
+  const setupDismissedByProject = useOnboardingStore(
+    (s) => s.setupDismissedByProject,
+  );
   if (!project) return false;
   if (hasAnyTraces !== false) return false;
   if (setupDismissedByProject[project.id]) return false;

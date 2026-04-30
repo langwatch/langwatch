@@ -4,7 +4,7 @@ import type React from "react";
 import { useLocalStorage } from "usehooks-ts";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
-import { useUIStore } from "../../stores/uiStore";
+import { useOnboardingStore } from "../store/onboardingStore";
 
 // Match the key used by `useAutoOpenWelcome` so dismissing the sample
 // flow also marks What's-new as seen — otherwise the user finishes
@@ -38,11 +38,11 @@ const WELCOME_SEEN_KEY = "langwatch:traces-v2:welcome-seen";
  */
 export const SampleDataBanner: React.FC = () => {
   const { project } = useOrganizationTeamProject();
-  const setSetupDismissedForProject = useUIStore(
+  const setSetupDismissedForProject = useOnboardingStore(
     (s) => s.setSetupDismissedForProject,
   );
   const utils = api.useUtils();
-  const setTourActive = useUIStore((s) => s.setTourActive);
+  const setTourActive = useOnboardingStore((s) => s.setTourActive);
   const [, setWelcomeSeen] = useLocalStorage<boolean>(
     WELCOME_SEEN_KEY,
     false,

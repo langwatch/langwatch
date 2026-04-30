@@ -17,13 +17,14 @@ import {
   SELECT_ALL_MATCHING_CAP,
   useSelectionStore,
 } from "../../stores/selectionStore";
-import { useOnboardingStageStore } from "../../stores/onboardingStageStore";
+import { useOnboardingStore } from "../../onboarding/store/onboardingStore";
+import { shouldShowAurora } from "../../onboarding/chapters/onboardingJourneyConfig";
+import { RICH_ARRIVAL_TRACE_ID } from "../../onboarding/data/samplePreviewTraces";
 import { useUIStore } from "../../stores/uiStore";
 import { DensityProvider } from "../DensityProvider";
-import { EmptyState } from "../EmptyState";
-import { shouldShowAurora } from "../EmptyState/onboardingJourneyConfig";
-import { RICH_ARRIVAL_TRACE_ID } from "../EmptyState/samplePreviewTraces";
-import { SampleDataBanner } from "../EmptyState/SampleDataBanner";
+import { OnboardingHost } from "../../onboarding";
+import { EmptyStateOverlay } from "../../onboarding/components/EmptyStateOverlay";
+import { SampleDataBanner } from "../../onboarding/components/SampleDataBanner";
 import { FilterSidebar } from "../FilterSidebar/FilterSidebar";
 import { AuroraSvg } from "./AuroraSvg";
 import { FindBar } from "../FindBar";
@@ -74,15 +75,17 @@ export const TracesPage: React.FC = () => {
 
   const { project } = useOrganizationTeamProject();
   const { hasAnyTraces } = useProjectHasTraces();
-  const setupDismissedByProject = useUIStore((s) => s.setupDismissedByProject);
-  const setupDisengaged = useUIStore((s) => s.setupDisengaged);
-  const tourActive = useUIStore((s) => s.tourActive);
+  const setupDismissedByProject = useOnboardingStore(
+    (s) => s.setupDismissedByProject,
+  );
+  const setupDisengaged = useOnboardingStore((s) => s.setupDisengaged);
+  const tourActive = useOnboardingStore((s) => s.tourActive);
   const setupDismissed = project ? !!setupDismissedByProject[project.id] : false;
   // Read the onboarding stage at the top level so we can decide
   // whether to surface the FilterSidebar even while the empty
   // state is technically "active" — the `facetsReveal` and `outro`
   // stages are *meant* to show the sidebar.
-  const topLevelOnboardingStage = useOnboardingStageStore((s) => s.stage);
+  const topLevelOnboardingStage = useOnboardingStore((s) => s.stage);
   const sidebarVisibleDuringEmpty =
     topLevelOnboardingStage === "facetsReveal" ||
     topLevelOnboardingStage === "outro";
@@ -114,6 +117,11 @@ export const TracesPage: React.FC = () => {
 
   return (
     <DensityProvider>
+      {/* OnboardingHost lazy-mounts the body stage attribute + the
+          drawer/sidebar glow `<style>` only while onboarding is
+          active. When inactive it returns its children verbatim so
+          users not in the journey ship zero onboarding DOM nodes. */}
+      <OnboardingHost>
       <VStack
         width="full"
         height="full"
@@ -164,6 +172,7 @@ export const TracesPage: React.FC = () => {
         </HStack>
         <PageKeyboardShortcuts />
       </VStack>
+      </OnboardingHost>
     </DensityProvider>
   );
 };
@@ -288,8 +297,8 @@ const EmptyResultsPane: React.FC = React.memo(() => {
   // behind is always populated with interactive rows. The dim lifts
   // the moment the user commits to an exit action (`setupDisengaged`)
   // — sample data is already on screen, no waiting for ingestion.
-  const setupDisengaged = useUIStore((s) => s.setupDisengaged);
-  const onboardingStage = useOnboardingStageStore((s) => s.stage);
+  const setupDisengaged = useOnboardingStore((s) => s.setupDisengaged);
+  const onboardingStage = useOnboardingStore((s) => s.stage);
   const showAuroraStrip = shouldShowAurora(onboardingStage);
   const isPostArrival = onboardingStage === "postArrival";
 
@@ -471,7 +480,7 @@ const EmptyResultsPane: React.FC = React.memo(() => {
           )}
         </AnimatePresence>
         <Box position="absolute" inset={0} overflow="auto" zIndex={1}>
-          <EmptyState />
+          <EmptyStateOverlay />
         </Box>
       </Box>
     </Flex>

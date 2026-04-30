@@ -7,7 +7,7 @@ import {
   RICH_ARRIVAL_TRACE_ID,
   buildRichArrivalTraceDetail,
   isPreviewTraceId,
-} from "../components/EmptyState/samplePreviewTraces";
+} from "../onboarding/data/samplePreviewTraces";
 import { useDrawerStore } from "../stores/drawerStore";
 import type { TraceListItem } from "../types/trace";
 

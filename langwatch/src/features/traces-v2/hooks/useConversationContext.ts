@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
-import { isPreviewTraceId } from "../components/EmptyState/samplePreviewTraces";
+import { isPreviewTraceId } from "../onboarding/data/samplePreviewTraces";
 import type { TraceListItem } from "../types/trace";
 
 export interface ConversationTurn {
