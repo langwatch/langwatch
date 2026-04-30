@@ -11,6 +11,7 @@ import (
 
 	"github.com/langwatch/langwatch/pkg/contexts"
 	"github.com/langwatch/langwatch/services/aigateway/dispatcher"
+	"github.com/langwatch/langwatch/services/aigateway/domain"
 	"github.com/langwatch/langwatch/services/nlpgo"
 	"github.com/langwatch/langwatch/services/nlpgo/adapters/dispatcheradapter"
 	"github.com/langwatch/langwatch/services/nlpgo/adapters/httpapi"
@@ -179,6 +180,63 @@ func (s playgroundDispatcherShim) DispatchStream(ctx context.Context, req httpap
 		Model:      req.Model,
 		Body:       req.Body,
 		Credential: req.Credential,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return iter, nil
+}
+
+// Passthrough plumbs an /v1beta/*-style raw-forward request through the
+// dispatcher's typed Passthrough API. The httpapi package keeps its
+// PassthroughDispatchRequest free of the dispatcher.PassthroughRequest
+// shape so it doesn't take a transitive aigateway import; this shim
+// does the field-by-field copy.
+func (s playgroundDispatcherShim) Passthrough(ctx context.Context, req httpapi.PassthroughDispatchRequest) (*httpapi.DispatchResponse, error) {
+	resp, err := s.disp.Passthrough(ctx, dispatcher.PassthroughRequest{
+		Request: dispatcher.Request{
+			Type:       req.Type,
+			Model:      req.Model,
+			Body:       req.Body,
+			Credential: req.Credential,
+		},
+		HTTP: domain.PassthroughRequest{
+			Method:   req.HTTPMethod,
+			Path:     req.HTTPPath,
+			RawQuery: req.HTTPRawQuery,
+			Headers:  req.HTTPHeaders,
+			Stream:   req.Stream,
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+	hdr := http.Header{}
+	for k, v := range resp.Headers {
+		hdr.Set(k, v)
+	}
+	return &httpapi.DispatchResponse{
+		StatusCode: resp.StatusCode,
+		Body:       resp.Body,
+		Headers:    hdr,
+	}, nil
+}
+
+func (s playgroundDispatcherShim) PassthroughStream(ctx context.Context, req httpapi.PassthroughDispatchRequest) (httpapi.DispatchStream, error) {
+	iter, err := s.disp.PassthroughStream(ctx, dispatcher.PassthroughRequest{
+		Request: dispatcher.Request{
+			Type:       req.Type,
+			Model:      req.Model,
+			Body:       req.Body,
+			Credential: req.Credential,
+		},
+		HTTP: domain.PassthroughRequest{
+			Method:   req.HTTPMethod,
+			Path:     req.HTTPPath,
+			RawQuery: req.HTTPRawQuery,
+			Headers:  req.HTTPHeaders,
+			Stream:   req.Stream,
+		},
 	})
 	if err != nil {
 		return nil, err
