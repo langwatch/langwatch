@@ -20,6 +20,7 @@ import { isTeamRoleAllowedForOrganizationRole, type TeamRoleValue } from "~/util
 import { getApp } from "~/server/app-layer/app";
 import { trackServerEvent } from "~/server/posthog";
 import { fireTeamMemberInvitedNurturing } from "~/../ee/billing/nurturing/hooks/featureAdoption";
+import { fireInviteAcceptedNurturingCalls } from "~/../ee/billing/nurturing/hooks/inviteAcceptance";
 import { elasticsearchMigrate } from "../../../tasks/elasticMigrate";
 import {
   InviteService,
@@ -1034,6 +1035,22 @@ export const organizationRouter = createTRPCRouter({
           userId: session.user.id,
           invite,
         });
+      });
+
+      void getApp()
+        .notifications.sendSlackSignupEvent({
+          userName: session.user.name,
+          userEmail: session.user.email,
+          organizationName: invite.organization.name,
+        })
+        .catch(captureException);
+
+      fireInviteAcceptedNurturingCalls({
+        userId: session.user.id,
+        email: session.user.email,
+        name: session.user.name,
+        organizationId: invite.organization.id,
+        organizationName: invite.organization.name,
       });
 
       const inviteService = InviteService.create(prisma);

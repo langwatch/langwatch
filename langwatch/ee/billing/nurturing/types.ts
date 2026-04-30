@@ -99,7 +99,8 @@ export type CioEventName =
   | "workflow_created"
   | "experiment_ran"
   | "first_prompt_created"
-  | "first_simulation_ran";
+  | "first_simulation_ran"
+  | "joined_via_invite";
 
 // ---------------------------------------------------------------------------
 // Batch call discriminated union

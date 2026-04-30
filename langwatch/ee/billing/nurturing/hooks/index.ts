@@ -1,4 +1,5 @@
 export { fireSignupNurturingCalls } from "./signupIdentification";
+export { fireInviteAcceptedNurturingCalls } from "./inviteAcceptance";
 export {
   fireTeamMemberInvitedNurturing,
   fireWorkflowCreatedNurturing,
