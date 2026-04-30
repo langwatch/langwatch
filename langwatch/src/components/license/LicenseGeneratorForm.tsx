@@ -137,7 +137,7 @@ interface NumberFieldProps {
  * or equals DEFAULT_LIMIT (Number.MAX_SAFE_INTEGER).
  */
 function NumberField({ label, value, onChange }: NumberFieldProps) {
-  const displayValue = value === null || value === Number.MAX_SAFE_INTEGER ? "" : value;
+  const displayValue = value === null || value === DEFAULT_LIMIT ? "" : value;
 
   return (
     <Field.Root flex={1}>
@@ -145,11 +145,17 @@ function NumberField({ label, value, onChange }: NumberFieldProps) {
       <Input
         value={displayValue}
         onChange={(e) => {
-          const parsed = parseInt(e.target.value);
+          if (e.currentTarget.value === "") {
+            onChange(null);
+            return;
+          }
+          const parsed = e.currentTarget.valueAsNumber;
           onChange(Number.isNaN(parsed) ? null : parsed);
         }}
         placeholder="Unlimited"
         type="number"
+        min={1}
+        step={1}
       />
     </Field.Root>
   );
