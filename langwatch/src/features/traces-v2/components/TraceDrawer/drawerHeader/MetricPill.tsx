@@ -10,34 +10,19 @@ import {
 } from "react-icons/lu";
 import { Tooltip } from "~/components/ui/tooltip";
 import type { PinnedAttribute } from "../../../stores/pinnedAttributesStore";
+import { Chip } from "../Chip";
 import { TooltipRow } from "./TooltipRow";
 
+/**
+ * Thin wrapper around `<Chip>` for the duration / spans / cost / tokens /
+ * model row in the drawer header. The pre-existing `MetricPill` was a
+ * one-off pill with its own padding, font sizing, and colour choices —
+ * which left the header reading as two distinct visual designs (these
+ * pills next to the source/origin Chip strip). Routing through Chip
+ * collapses them into one design language; callers keep the same API.
+ */
 export function MetricPill({ label, value }: { label: string; value: string }) {
-  return (
-    <HStack
-      gap={1.5}
-      paddingX={2.5}
-      paddingY={0.5}
-      borderRadius="full"
-      borderWidth="1px"
-      borderColor="border.muted"
-      bg="bg.subtle"
-    >
-      <Text
-        textStyle="2xs"
-        color="fg.subtle"
-        fontFamily="mono"
-        textTransform="uppercase"
-        letterSpacing="0.04em"
-        fontWeight="medium"
-      >
-        {label}
-      </Text>
-      <Text textStyle="xs" color="fg" fontFamily="mono" fontWeight="medium">
-        {value}
-      </Text>
-    </HStack>
-  );
+  return <Chip label={label} value={value} tone="neutral" />;
 }
 
 /**

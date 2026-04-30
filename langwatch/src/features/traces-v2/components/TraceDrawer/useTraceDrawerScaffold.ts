@@ -10,6 +10,7 @@ import type {
   SpanTreeNode,
   TraceHeader,
 } from "~/server/api/routers/tracesV2.schemas";
+import { api } from "~/utils/api";
 import { useConversationContext } from "../../hooks/useConversationContext";
 import { useConversationPrefetch } from "../../hooks/useConversationPrefetch";
 import { useDrawerUrlSync } from "../../hooks/useDrawerUrlSync";
@@ -125,20 +126,34 @@ export function useTraceDrawerScaffold(): TraceDrawerScaffold {
     if (next) prefetchSpan(next.spanId);
   }, [selectedSpanId, spanTree, prefetchSpan]);
 
+  const trpcUtils = api.useUtils();
   const handleClose = useCallback(() => {
+    // Cancel any in-flight per-trace queries so closing during a slow
+    // load doesn't leave the request running in the background, racing
+    // against a future re-open of the same drawer (or a different
+    // trace) and burning bandwidth/CH cycles for a result nobody is
+    // waiting on. React Query rolls cancellation through the AbortController
+    // we plumb through tRPC, so this is a no-op when the request has
+    // already settled.
+    if (traceId) {
+      void trpcUtils.tracesV2.header.cancel();
+      void trpcUtils.tracesV2.spanTree.cancel();
+    }
     setMaximized(false);
     closeDrawer();
-  }, [closeDrawer, setMaximized]);
+  }, [closeDrawer, setMaximized, trpcUtils, traceId]);
 
   const drawerContentRef = useRef<HTMLDivElement>(null);
   const drawerBodyRef = useRef<HTMLDivElement>(null);
   const scrollContentRef = useRef<HTMLDivElement>(null);
 
-  // Double-click anywhere outside the drawer panel to close. Single clicks
-  // are intentionally ignored — the drawer is non-modal so users can
-  // interact with the underlying page; only an explicit double-click means
-  // "I'm done with this trace."
+  // Double-click anywhere outside the drawer panel to close. Only relevant
+  // in the *pinned* mode — when unpinned, the drawer is modal and a single
+  // click outside already dismisses it, so the dblclick gesture would just
+  // be a redundant second close path that fights the modal backdrop.
+  const pinned = useDrawerStore((s) => s.pinned);
   useEffect(() => {
+    if (!pinned) return;
     const handleDoubleClick = (e: MouseEvent) => {
       const content = drawerContentRef.current;
       if (!content) return;
@@ -148,7 +163,7 @@ export function useTraceDrawerScaffold(): TraceDrawerScaffold {
     };
     document.addEventListener("dblclick", handleDoubleClick);
     return () => document.removeEventListener("dblclick", handleDoubleClick);
-  }, [handleClose]);
+  }, [handleClose, pinned]);
 
   useTraceDrawerShortcuts({
     trace,

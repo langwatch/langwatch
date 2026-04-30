@@ -15,6 +15,7 @@ import {
 import { LangwatchSignalBadges } from "../LangwatchSignalBadges";
 import { TipCell } from "./TipCell";
 import {
+  getSpanPalette,
   INDENT_PX,
   LLM_ROW_HEIGHT,
   ROW_HEIGHT,
@@ -57,7 +58,8 @@ export function TreeRow({
     (SPAN_TYPE_COLORS[span.type ?? "span"] as string) ?? "gray.solid";
   const isLlm = span.type === "llm" && span.model != null;
   const rowH = isLlm ? LLM_ROW_HEIGHT : ROW_HEIGHT;
-  const icon = SPAN_TYPE_ICONS[span.type ?? "span"] ?? "○";
+  const TypeIcon = SPAN_TYPE_ICONS[span.type ?? "span"] ?? SPAN_TYPE_ICONS.span!;
+  const palette = getSpanPalette(span.type);
   const duration = span.durationMs;
   const isZeroDuration = duration === 0;
   const offsetMs = Math.max(0, span.startTimeMs - rootStart);
@@ -176,23 +178,20 @@ export function TreeRow({
             />
           </Flex>
 
-          {/* Type icon */}
+          {/* Type icon — rendered inside a colored chip so the span type
+              reads at a glance even before the row text. */}
           <Flex
             width="18px"
             height="18px"
             align="center"
             justify="center"
             flexShrink={0}
-            marginRight={1}
+            marginRight={1.5}
+            borderRadius="sm"
+            bg={isError ? "red.subtle" : `${palette}.subtle`}
+            color={isError ? "red.fg" : `${palette}.fg`}
           >
-            <Text
-              textStyle="xs"
-              color={isError ? "red.fg" : color}
-              lineHeight={1}
-              userSelect="none"
-            >
-              {icon}
-            </Text>
+            <Icon as={TypeIcon} boxSize={3} />
           </Flex>
 
           {/* Orphaned indicator */}

@@ -68,6 +68,10 @@ export const FlameView = memo(function FlameView({
     }
   }, []);
 
+  // Drawer can close mid-animation; without this, the rAF tick keeps firing
+  // setViewport on an unmounted component.
+  useEffect(() => () => cancelAnimation(), [cancelAnimation]);
+
   const clampViewport = useCallback(
     (v: Viewport): Viewport => {
       const fullDur = fullRange.endMs - fullRange.startMs;
@@ -483,9 +487,17 @@ export const FlameView = memo(function FlameView({
         }
         case "ArrowLeft":
         case "ArrowRight": {
-          e.preventDefault();
+          // Only intercept Arrow keys when the user has actually engaged
+          // with the flame — either holding shift to pan the viewport, or
+          // navigating between sibling spans after focusing one. Without
+          // a focused span and no modifier, the drawer-level handler is
+          // the right consumer (prev/next trace in the conversation), and
+          // the previous unconditional `preventDefault()` here used to fight
+          // it depending on what had document focus.
           const direction = e.key === "ArrowLeft" ? -1 : 1;
           if (e.shiftKey) {
+            e.preventDefault();
+            e.stopImmediatePropagation();
             setViewport((v) => {
               const d = v.endMs - v.startMs;
               const pan = d * 0.2 * direction;
@@ -502,7 +514,11 @@ export const FlameView = memo(function FlameView({
                 (n) => n.span.spanId === focusedSpanId,
               );
               const next = siblings[idx + direction];
-              if (next) setFocusedSpanId(next.span.spanId);
+              if (next) {
+                e.preventDefault();
+                e.stopImmediatePropagation();
+                setFocusedSpanId(next.span.spanId);
+              }
             }
           }
           break;

@@ -103,6 +103,10 @@ export function useViewportZoom(): ViewportZoomReturn {
     }
   }, []);
 
+  // Drawer can close mid-animation; without this, the rAF tick keeps firing
+  // setView on an unmounted component.
+  useEffect(() => () => cancelAnimation(), [cancelAnimation]);
+
   const computeFit = useCallback((): View | null => {
     const size = svgSizeRef.current;
     const vp = viewportSizeRef.current;

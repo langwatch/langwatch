@@ -168,6 +168,15 @@ export const WaterfallView = memo(function WaterfallView({
     });
   }, []);
 
+  useEffect(() => {
+    return () => {
+      if (scrollFrameRef.current) {
+        cancelAnimationFrame(scrollFrameRef.current);
+        scrollFrameRef.current = 0;
+      }
+    };
+  }, []);
+
   // The timeline panel itself doesn't scroll. Forward wheel/trackpad gestures
   // over it to the tree so users can scroll from either side.
   const handleTimelineWheel = useCallback((e: React.WheelEvent) => {

@@ -1,7 +1,9 @@
-import { Box, CodeBlock, Skeleton, VStack } from "@chakra-ui/react";
+import { Box, CodeBlock, VStack } from "@chakra-ui/react";
 import { motion } from "motion/react";
+import { useEffect } from "react";
 import { useColorMode } from "~/components/ui/color-mode";
 import { Drawer } from "~/components/ui/drawer";
+import { IsolatedErrorBoundary } from "~/components/ui/IsolatedErrorBoundary";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useDrawerStore } from "../../stores/drawerStore";
 import { parseTracePromptIds } from "../../utils/promptAttributes";
@@ -16,6 +18,7 @@ import { PromptsPanel } from "./PromptsPanel";
 import { SpanTabBar } from "./SpanTabBar";
 import { ScenarioRoleProvider } from "./scenarioRoles";
 import { TraceDrawerEmptyState } from "./TraceDrawerEmptyState";
+import { TraceDrawerSkeleton } from "./TraceDrawerSkeleton";
 import { TraceAccordions } from "./traceAccordions";
 import { useTraceDrawerScaffold } from "./useTraceDrawerScaffold";
 import { VizPlaceholder } from "./VizPlaceholder";
@@ -66,12 +69,25 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
   const selectedSpanId = useDrawerStore((s) => s.selectedSpanId);
   const isMaximized = useDrawerStore((s) => s.isMaximized);
   const shortcutsOpen = useDrawerStore((s) => s.shortcutsOpen);
+  const pinned = useDrawerStore((s) => s.pinned);
 
   const setVizTab = useDrawerStore((s) => s.setVizTab);
   const selectSpan = useDrawerStore((s) => s.selectSpan);
   const clearSpan = useDrawerStore((s) => s.clearSpan);
   const toggleMaximized = useDrawerStore((s) => s.toggleMaximized);
   const setShortcutsOpen = useDrawerStore((s) => s.setShortcutsOpen);
+
+  // Reset every drawer scroll container when the user crosses a layout
+  // boundary — switching the top-level mode (Trace ↔ Conversation) or the
+  // active span/summary tab. Without this, the browser carries the previous
+  // scrollTop into a totally different DOM (conversation has no viz chrome,
+  // summary has the input element), landing the operator halfway down or
+  // jumping mid-element. `overflowAnchor: "none"` only stops *automatic*
+  // anchoring; it doesn't actively reset to 0. We do that here.
+  useEffect(() => {
+    drawerBodyRef.current?.scrollTo({ top: 0 });
+    scrollContentRef.current?.scrollTo({ top: 0 });
+  }, [viewMode, activeTab, drawerBodyRef, scrollContentRef]);
 
   // Error state: trace not found, network failure, or no selection. The
   // dedicated empty-state component differentiates 404 vs load-failed and
@@ -105,13 +121,25 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
       open={true}
       placement="end"
       size={isMaximized ? "full" : "lg"}
+      // When unpinned, the drawer behaves as a standard modal — clicking
+      // outside or pressing Esc dismisses it. When pinned (default), it
+      // stays put so the operator can interact with the underlying page;
+      // dismissal is via the X button, Esc, or the explicit double-click
+      // gesture handled in the scaffold.
+      modal={!pinned}
+      closeOnInteractOutside={!pinned}
       onOpenChange={() => handleClose()}
     >
       <CodeBlock.AdapterProvider value={shikiAdapter}>
         <Drawer.Content
           ref={drawerContentRef}
           paddingX={0}
-          maxWidth={isMaximized ? undefined : "45%"}
+          // Maximized state used to expand to a full 100vw, leaving no gap on
+          // the left to click outside / peek at what's underneath. Capping at
+          // `calc(100vw - 80px)` keeps the page edge visible and clickable
+          // while still giving the drawer effectively all the horizontal
+          // room it needs for waterfall views.
+          maxWidth={isMaximized ? "calc(100vw - 10px)" : "45%"}
           transition="max-width 0.2s ease"
           // Anchor for the empty-state onboarding tour: a global
           // CSS rule keyed off `body[data-traces-tour-stage]`
@@ -120,7 +148,10 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
           // is pointing. No-op outside the onboarding journey.
           data-tour-target="drawer"
         >
-          <ResizeEdgeGrip onDoubleClick={toggleMaximized} />
+          <ResizeEdgeGrip
+            onDoubleClick={toggleMaximized}
+            isMaximized={isMaximized}
+          />
           <Drawer.Body
             ref={drawerBodyRef}
             paddingY={0}
@@ -135,26 +166,22 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
           >
             <VStack align="stretch" gap={0} height="full">
               {isLoading || !trace ? (
-                <VStack align="stretch" gap={2} padding={4}>
-                  <Skeleton height="40px" borderRadius="md" />
-                  <Skeleton height="24px" borderRadius="md" />
-                </VStack>
+                <TraceDrawerSkeleton onClose={handleClose} />
               ) : (
-                <Box onDoubleClick={toggleMaximized}>
-                  <DrawerHeader trace={trace} onClose={handleClose} />
-                </Box>
+                <>
+                  <Box onDoubleClick={toggleMaximized}>
+                    <IsolatedErrorBoundary
+                      scope="Couldn't render this trace's header"
+                      resetKeys={[trace.traceId]}
+                    >
+                      <DrawerHeader trace={trace} onClose={handleClose} />
+                    </IsolatedErrorBoundary>
+                  </Box>
+                  <Box borderBottomWidth="1px" borderColor="border" />
+                </>
               )}
 
-              <Box borderBottomWidth="1px" borderColor="border" />
-
-              {isLoading ? (
-                <VStack align="stretch" gap={2} padding={4}>
-                  <Skeleton height="120px" borderRadius="md" />
-                  <Skeleton height="32px" borderRadius="md" />
-                  <Skeleton height="80px" borderRadius="md" />
-                  <Skeleton height="80px" borderRadius="md" />
-                </VStack>
-              ) : trace ? (
+              {isLoading ? null : trace ? (
                 <ScenarioRoleProvider
                   isScenario={
                     !!(
@@ -186,10 +213,15 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
                     }}
                   >
                     {viewMode === "conversation" && trace.conversationId ? (
-                      <ConversationView
-                        conversationId={trace.conversationId}
-                        currentTraceId={trace.traceId}
-                      />
+                      <IsolatedErrorBoundary
+                        scope="Couldn't render conversation view"
+                        resetKeys={[trace.conversationId, trace.traceId]}
+                      >
+                        <ConversationView
+                          conversationId={trace.conversationId}
+                          currentTraceId={trace.traceId}
+                        />
+                      </IsolatedErrorBoundary>
                     ) : (
                       <VStack align="stretch" gap={0}>
                         {trace.conversationId && (
@@ -201,35 +233,50 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
                             borderColor="border.muted"
                             paddingY={5}
                           >
-                            <ConversationContext
-                              conversationId={trace.conversationId}
-                              traceId={trace.traceId}
-                            />
+                            <IsolatedErrorBoundary
+                              scope="Couldn't render conversation context"
+                              resetKeys={[trace.conversationId, trace.traceId]}
+                            >
+                              <ConversationContext
+                                conversationId={trace.conversationId}
+                                traceId={trace.traceId}
+                              />
+                            </IsolatedErrorBoundary>
                           </Box>
                         )}
 
                         <Box data-section-label="Visualisation">
-                          <VizPlaceholder
-                            vizTab={vizTab}
-                            onVizTabChange={setVizTab}
-                            trace={trace}
-                            spans={spanTree}
-                            isLoading={spanTreeQuery.isLoading}
-                            selectedSpanId={selectedSpanId}
-                            onSelectSpan={selectSpan}
-                            onClearSpan={clearSpan}
-                          />
+                          <IsolatedErrorBoundary
+                            scope="Couldn't render visualisation"
+                            resetKeys={[trace.traceId, vizTab]}
+                          >
+                            <VizPlaceholder
+                              vizTab={vizTab}
+                              onVizTabChange={setVizTab}
+                              trace={trace}
+                              spans={spanTree}
+                              isLoading={spanTreeQuery.isLoading}
+                              selectedSpanId={selectedSpanId}
+                              onSelectSpan={selectSpan}
+                              onClearSpan={clearSpan}
+                            />
+                          </IsolatedErrorBoundary>
                         </Box>
 
                         <Box borderBottomWidth="1px" borderColor="border" />
 
                         <Box position="sticky" top={0} zIndex={2} bg="bg.panel">
-                          <SpanTabBar
-                            spanTree={spanTree}
-                            promptCount={
-                              parseTracePromptIds(trace.attributes).length
-                            }
-                          />
+                          <IsolatedErrorBoundary
+                            scope="Couldn't render span tabs"
+                            resetKeys={[trace.traceId]}
+                          >
+                            <SpanTabBar
+                              spanTree={spanTree}
+                              promptCount={
+                                parseTracePromptIds(trace.attributes).length
+                              }
+                            />
+                          </IsolatedErrorBoundary>
                         </Box>
 
                         {/* `minHeight: 100vh` reserves room for the active
@@ -238,23 +285,32 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
                           scrollers but a sudden height drop would still
                           let the browser snap scrollTop. */}
                         <Box minHeight="100vh">
-                          {activeTab === "llm" ? (
-                            <LlmPanel trace={trace} spans={spanTree} />
-                          ) : activeTab === "prompts" ? (
-                            <PromptsPanel
-                              trace={trace}
-                              spans={spanTree}
-                              onSelectSpan={selectSpan}
-                            />
-                          ) : (
-                            <TraceAccordions
-                              trace={trace}
-                              spans={spanTree}
-                              selectedSpan={selectedSpan}
-                              activeTab={activeTab}
-                              onSelectSpan={selectSpan}
-                            />
-                          )}
+                          <IsolatedErrorBoundary
+                            scope={`Couldn't render the ${activeTab} tab`}
+                            resetKeys={[
+                              trace.traceId,
+                              activeTab,
+                              selectedSpanId,
+                            ]}
+                          >
+                            {activeTab === "llm" ? (
+                              <LlmPanel trace={trace} spans={spanTree} />
+                            ) : activeTab === "prompts" ? (
+                              <PromptsPanel
+                                trace={trace}
+                                spans={spanTree}
+                                onSelectSpan={selectSpan}
+                              />
+                            ) : (
+                              <TraceAccordions
+                                trace={trace}
+                                spans={spanTree}
+                                selectedSpan={selectedSpan}
+                                activeTab={activeTab}
+                                onSelectSpan={selectSpan}
+                              />
+                            )}
+                          </IsolatedErrorBoundary>
                         </Box>
                       </VStack>
                     )}
@@ -276,7 +332,19 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
   );
 }
 
-function ResizeEdgeGrip({ onDoubleClick }: { onDoubleClick: () => void }) {
+function ResizeEdgeGrip({
+  onDoubleClick,
+  isMaximized,
+}: {
+  onDoubleClick: () => void;
+  isMaximized: boolean;
+}) {
+  // When the drawer is maximized, the only direction it can resize toward is
+  // west (shrinking). When restored, the only direction is east (expanding).
+  // The OS cursor reflects that — `w-resize` for the maximized state and
+  // `e-resize` for the restored state. Double-click on the bar still toggles
+  // between the two.
+  const cursor = isMaximized ? "w-resize" : "e-resize";
   return (
     <Tooltip
       content="Double-click to expand · click again to restore"
@@ -289,7 +357,7 @@ function ResizeEdgeGrip({ onDoubleClick }: { onDoubleClick: () => void }) {
         bottom={0}
         left={0}
         width="6px"
-        cursor="ew-resize"
+        cursor={cursor}
         zIndex={2}
         onDoubleClick={onDoubleClick}
         _hover={{ "& > [data-edge-grip]": { opacity: 1 } }}
@@ -306,14 +374,33 @@ function ResizeEdgeGrip({ onDoubleClick }: { onDoubleClick: () => void }) {
           position="absolute"
           top="50%"
           left="2px"
-          transform="translateY(-50%)"
           width="2px"
           height="32px"
           borderRadius="full"
-          bg="border.emphasized"
-          opacity={0.35}
-          transition="opacity 120ms ease"
+          // When maximized the grip is the operator's only visible affordance
+          // for restoring the drawer — pure white at full opacity makes it
+          // pop against the page underneath, and a periodic east-bounce hints
+          // that you can drag/double-click here to restore. When restored,
+          // it falls back to the subtle muted state.
+          bg={isMaximized ? "white" : "border.emphasized"}
+          boxShadow={
+            isMaximized ? "0 0 8px rgba(255, 255, 255, 0.6)" : undefined
+          }
+          opacity={isMaximized ? 0.95 : 0.35}
+          transition="opacity 120ms ease, background 120ms ease"
           pointerEvents="none"
+          css={
+            isMaximized
+              ? {
+                  animation: "tracesV2EdgeGripBounce 1.6s ease-in-out infinite",
+                  "@keyframes tracesV2EdgeGripBounce": {
+                    "0%, 100%": { transform: "translate(0, -50%)" },
+                    "40%": { transform: "translate(6px, -50%)" },
+                    "60%": { transform: "translate(6px, -50%)" },
+                  },
+                }
+              : { transform: "translateY(-50%)" }
+          }
         />
       </Box>
     </Tooltip>

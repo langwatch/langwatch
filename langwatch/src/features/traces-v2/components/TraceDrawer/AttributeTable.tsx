@@ -5,6 +5,7 @@ import { Tooltip } from "~/components/ui/tooltip";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { usePinnedAttributes } from "../../hooks/usePinnedAttributes";
 import type { PinnedAttributeSource } from "../../stores/pinnedAttributesStore";
+import { AttributeValue } from "./AttributeValue";
 import { PinnedAwareJsonView } from "./JsonHighlight";
 import { SegmentedToggle } from "./SegmentedToggle";
 
@@ -226,18 +227,14 @@ function FlatRow({
       >
         {attrKey}
       </Text>
-      <Text
-        flex={1}
-        textStyle="xs"
-        fontFamily="mono"
-        color="fg"
-        truncate
-        minWidth={0}
-        paddingX={3}
-        paddingY={1.5}
-      >
-        {display}
-      </Text>
+      {/* Pretty-print column. Heuristic format detection picks chat / json
+          / text / leaf; non-leaf values render a `📋 format` pill that
+          opens a popover with the prettified payload + an override row.
+          Same component is wired into table-cell expanders so the same
+          payload reads identically wherever it surfaces. */}
+      <Box flex={1} minWidth={0}>
+        <AttributeValue attrKey={attrKey} value={value} />
+      </Box>
       <Button
         size="xs"
         variant="ghost"

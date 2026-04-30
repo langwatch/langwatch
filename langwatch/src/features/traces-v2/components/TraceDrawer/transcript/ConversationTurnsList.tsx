@@ -1,6 +1,7 @@
-import { Box } from "@chakra-ui/react";
+import { Box, chakra, Flex, Icon, Text } from "@chakra-ui/react";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import { LuChevronDown, LuChevronUp } from "react-icons/lu";
 import { ThreadedTurnView } from "./ThreadedTurnView";
 import { TurnView } from "./TurnView";
 import {
@@ -9,6 +10,13 @@ import {
   LONG_THREAD_THRESHOLD,
   VIRTUALIZE_AT,
 } from "./types";
+
+// When a thread runs longer than this we hide all but the tail behind a
+// "Show N earlier turns" expander. Each LLM call carries the prior context
+// forward, so without this you scroll past dozens of collapsed rows just to
+// reach the message that actually matters.
+const TAIL_VISIBLE_TURNS = 3;
+const COLLAPSE_EARLIER_AT = LONG_THREAD_THRESHOLD;
 
 interface ConversationTurnsListProps {
   turns: ConversationTurn[];
@@ -38,24 +46,149 @@ export function ConversationTurnsList({
   collapseTools = false,
   maxHeightPx,
 }: ConversationTurnsListProps) {
-  return turns.length >= VIRTUALIZE_AT ? (
-    <VirtualizedList
-      turns={turns}
-      layout={layout}
-      collapseTools={collapseTools}
-      maxHeightPx={maxHeightPx ?? 600}
+  const canCollapseEarlier =
+    layout === "thread" && turns.length > COLLAPSE_EARLIER_AT;
+  const [showEarlier, setShowEarlier] = useState(false);
+  const hiddenCount =
+    canCollapseEarlier && !showEarlier
+      ? Math.max(0, turns.length - TAIL_VISIBLE_TURNS)
+      : 0;
+  const visibleTurns =
+    hiddenCount > 0 ? turns.slice(hiddenCount) : turns;
+
+  // Once the user has revealed earlier turns we still want a way to collapse
+  // them again — otherwise the only escape is closing and reopening the
+  // drawer, which is jarring.
+  const header = canCollapseEarlier ? (
+    hiddenCount > 0 ? (
+      <EarlierTurnsExpander
+        hiddenCount={hiddenCount}
+        onClick={() => setShowEarlier(true)}
+      />
+    ) : (
+      <CollapseEarlierToggle onClick={() => setShowEarlier(false)} />
+    )
+  ) : null;
+
+  const list =
+    visibleTurns.length >= VIRTUALIZE_AT ? (
+      <VirtualizedList
+        turns={visibleTurns}
+        totalTurns={turns.length}
+        indexOffset={hiddenCount}
+        layout={layout}
+        collapseTools={collapseTools}
+        maxHeightPx={maxHeightPx ?? 600}
+      />
+    ) : (
+      <InlineList
+        turns={visibleTurns}
+        totalTurns={turns.length}
+        indexOffset={hiddenCount}
+        layout={layout}
+        collapseTools={collapseTools}
+      />
+    );
+
+  return (
+    <>
+      {header}
+      {list}
+    </>
+  );
+}
+
+// Matches the visual structure of `ThreadedTurnView`: a relative box with
+// `paddingLeft={6}` so the inner button aligns with the threaded turn's
+// summary text, and the chevron lives in the role-icon column rather than
+// hanging out on the far left.
+function EarlierTurnsHeader({
+  icon,
+  label,
+  onClick,
+}: {
+  icon: typeof LuChevronDown;
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <Box position="relative" paddingLeft={6} paddingY={0}>
+      <Flex
+        position="absolute"
+        left={0}
+        top="6px"
+        width="14px"
+        height="14px"
+        align="center"
+        justify="center"
+        flexShrink={0}
+      >
+        <Icon as={icon} boxSize="10px" color="fg.subtle" />
+      </Flex>
+      <chakra.button
+        type="button"
+        onClick={onClick}
+        display="flex"
+        alignItems="center"
+        paddingY={0.5}
+        paddingX={1.5}
+        borderRadius="sm"
+        cursor="pointer"
+        _hover={{ bg: "bg.muted" }}
+        textAlign="left"
+        width="full"
+      >
+        <Text
+          textStyle="2xs"
+          color="fg.muted"
+          fontWeight="600"
+          textTransform="uppercase"
+          letterSpacing="0.06em"
+          lineHeight={1.4}
+        >
+          {label}
+        </Text>
+      </chakra.button>
+    </Box>
+  );
+}
+
+function EarlierTurnsExpander({
+  hiddenCount,
+  onClick,
+}: {
+  hiddenCount: number;
+  onClick: () => void;
+}) {
+  return (
+    <EarlierTurnsHeader
+      icon={LuChevronDown}
+      label={`Show ${hiddenCount} earlier turn${hiddenCount === 1 ? "" : "s"}`}
+      onClick={onClick}
     />
-  ) : (
-    <InlineList turns={turns} layout={layout} collapseTools={collapseTools} />
+  );
+}
+
+function CollapseEarlierToggle({ onClick }: { onClick: () => void }) {
+  return (
+    <EarlierTurnsHeader
+      icon={LuChevronUp}
+      label="Hide earlier turns"
+      onClick={onClick}
+    />
   );
 }
 
 function InlineList({
   turns,
+  totalTurns,
+  indexOffset,
   layout,
   collapseTools,
 }: {
   turns: ConversationTurn[];
+  totalTurns: number;
+  indexOffset: number;
   layout: ChatLayout;
   collapseTools: boolean;
 }) {
@@ -71,17 +204,19 @@ function InlineList({
   const tailRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     tailRef.current?.scrollIntoView({ block: "end" });
-    // Only on mount + when the turn count changes (new trace opened).
-  }, [turns.length]);
+    // Re-pin only when the underlying trace changes (totalTurns) — not when
+    // the user reveals earlier turns from the same trace, which would yank
+    // them straight back to the bottom they were trying to escape.
+  }, [totalTurns]);
 
   return (
     <Box>
       {turns.map((turn, i) => (
         <TurnRow
-          key={i}
+          key={indexOffset + i}
           turn={turn}
-          index={i}
-          total={turns.length}
+          index={indexOffset + i}
+          total={totalTurns}
           layout={layout}
           collapseTools={collapseTools}
         />
@@ -93,11 +228,15 @@ function InlineList({
 
 function VirtualizedList({
   turns,
+  totalTurns,
+  indexOffset,
   layout,
   collapseTools,
   maxHeightPx,
 }: {
   turns: ConversationTurn[];
+  totalTurns: number;
+  indexOffset: number;
   layout: ChatLayout;
   collapseTools: boolean;
   maxHeightPx: number;
@@ -120,9 +259,9 @@ function VirtualizedList({
   useEffect(() => {
     if (turns.length === 0) return;
     virtualizer.scrollToIndex(turns.length - 1, { align: "end" });
-    // Re-pin only when the turn count changes — manual scroll-up to read
-    // history shouldn't be undone by a render.
-  }, [turns.length, virtualizer]);
+    // Re-pin only when the underlying trace changes (totalTurns) — not when
+    // the user reveals earlier turns from the same trace.
+  }, [totalTurns, virtualizer]);
 
   return (
     <Box
@@ -160,8 +299,8 @@ function VirtualizedList({
             >
               <TurnRow
                 turn={turn}
-                index={row.index}
-                total={turns.length}
+                index={indexOffset + row.index}
+                total={totalTurns}
                 layout={layout}
                 collapseTools={collapseTools}
               />

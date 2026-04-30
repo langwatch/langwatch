@@ -3,6 +3,7 @@ import { LuChevronDown, LuChevronRight, LuList } from "react-icons/lu";
 import { Tooltip } from "~/components/ui/tooltip";
 import { formatDuration, SPAN_TYPE_COLORS } from "../../../utils/formatters";
 import {
+  getSpanPalette,
   GROUP_ROW_HEIGHT,
   INDENT_PX,
   type SiblingGroup,
@@ -21,7 +22,8 @@ export function GroupRow({
   onSwitchToSpanList?: (nameFilter: string, typeFilter: string) => void;
 }) {
   const color = (SPAN_TYPE_COLORS[group.type] as string) ?? "gray.solid";
-  const icon = SPAN_TYPE_ICONS[group.type] ?? "○";
+  const TypeIcon = SPAN_TYPE_ICONS[group.type] ?? SPAN_TYPE_ICONS.span!;
+  const palette = getSpanPalette(group.type);
 
   return (
     <HStack
@@ -60,11 +62,12 @@ export function GroupRow({
         align="center"
         justify="center"
         flexShrink={0}
-        marginRight={1}
+        marginRight={1.5}
+        borderRadius="sm"
+        bg={`${palette}.subtle`}
+        color={`${palette}.fg`}
       >
-        <Text textStyle="xs" color={color} lineHeight={1}>
-          {icon}
-        </Text>
+        <Icon as={TypeIcon} boxSize={3} />
       </Flex>
 
       {/* Group info */}

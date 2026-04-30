@@ -56,13 +56,8 @@ export function TurnActionRow({ traceId, output }: TurnAnnotationProps) {
         mode="annotate"
         open={openPopover === "annotate"}
         onOpenChange={(open) => setOpenPopover(open ? "annotate" : null)}
-        trigger={
-          <ActionButton
-            icon={Edit3}
-            label="Annotate"
-            tooltip="Add a note or score"
-          />
-        }
+        triggerTooltip="Add a note or score"
+        trigger={<ActionButton icon={Edit3} label="Annotate" />}
       />
       <AnnotationPopover
         traceId={traceId}
@@ -70,13 +65,8 @@ export function TurnActionRow({ traceId, output }: TurnAnnotationProps) {
         mode="suggest"
         open={openPopover === "suggest"}
         onOpenChange={(open) => setOpenPopover(open ? "suggest" : null)}
-        trigger={
-          <ActionButton
-            icon={Lightbulb}
-            label="Suggest"
-            tooltip="Suggest a corrected output"
-          />
-        }
+        triggerTooltip="Suggest a corrected output"
+        trigger={<ActionButton icon={Lightbulb} label="Suggest" />}
       />
       <Tooltip
         content="Add this turn to a dataset"
@@ -106,24 +96,21 @@ const ActionButton = forwardRef<
   {
     icon: typeof Edit3;
     label: string;
-    tooltip: string;
   } & React.ComponentProps<typeof Button>
->(function ActionButton({ icon, label, tooltip, ...buttonProps }, ref) {
+>(function ActionButton({ icon, label, ...buttonProps }, ref) {
   return (
-    <Tooltip content={tooltip} positioning={{ placement: "top" }}>
-      <Button
-        ref={ref}
-        size="2xs"
-        variant="ghost"
-        color="fg.muted"
-        gap={1}
-        paddingX={2}
-        {...buttonProps}
-      >
-        <Icon as={icon} boxSize={3} />
-        <Text textStyle="2xs">{label}</Text>
-      </Button>
-    </Tooltip>
+    <Button
+      ref={ref}
+      size="2xs"
+      variant="ghost"
+      color="fg.muted"
+      gap={1}
+      paddingX={2}
+      {...buttonProps}
+    >
+      <Icon as={icon} boxSize={3} />
+      <Text textStyle="2xs">{label}</Text>
+    </Button>
   );
 });
 

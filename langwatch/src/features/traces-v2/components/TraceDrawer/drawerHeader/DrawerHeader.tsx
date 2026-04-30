@@ -12,6 +12,8 @@ import {
   LuArrowLeft,
   LuMaximize2,
   LuMinimize2,
+  LuPin,
+  LuPinOff,
   LuRefreshCw,
   LuX,
 } from "react-icons/lu";
@@ -171,6 +173,8 @@ export const DrawerHeader = memo(function DrawerHeader({
   onClose,
 }: DrawerHeaderProps) {
   const isMaximized = useDrawerStore((s) => s.isMaximized);
+  const pinned = useDrawerStore((s) => s.pinned);
+  const togglePinned = useDrawerStore((s) => s.togglePinned);
   const viewMode = useDrawerStore((s) => s.viewMode);
   const setViewMode = useDrawerStore((s) => s.setViewMode);
   const setActiveTab = useDrawerStore((s) => s.setActiveTab);
@@ -579,6 +583,29 @@ export const DrawerHeader = memo(function DrawerHeader({
           </Tooltip>
           <Tooltip
             content={
+              pinned
+                ? "Pinned — clicks outside don't close. Click to unpin."
+                : "Unpinned — click outside to close. Click to pin."
+            }
+            positioning={{ placement: "bottom" }}
+          >
+            <Button
+              size="xs"
+              variant="ghost"
+              onClick={togglePinned}
+              aria-label={
+                pinned
+                  ? "Unpin drawer (click outside closes)"
+                  : "Pin drawer (click outside ignored)"
+              }
+              aria-pressed={pinned}
+              color={pinned ? "blue.fg" : "fg.muted"}
+            >
+              <Icon as={pinned ? LuPin : LuPinOff} boxSize={3.5} />
+            </Button>
+          </Tooltip>
+          <Tooltip
+            content={
               <HStack gap={1}>
                 <Text>{isMaximized ? "Restore" : "Maximize"}</Text>
                 <Kbd>M</Kbd>
@@ -644,8 +671,18 @@ export const DrawerHeader = memo(function DrawerHeader({
           metrics, pinned context, source/tools chips — flow into one wrapped
           row separated by thin vertical dividers. The right end slot anchors
           the trace ID + relative timestamp. Collapsing what used to be three
-          separate rows keeps the header dense without losing categorisation. */}
-      <HStack gap={1.5} flexWrap="wrap" align="center">
+          separate rows keeps the header dense without losing categorisation.
+          `minHeight` reserves space for two pill rows so the strip's height
+          stays stable when the user navigates between traces with different
+          chip counts — without this lock, the body content visibly hops
+          every time you press ←/→ in a conversation. */}
+      <HStack
+        gap={1.5}
+        flexWrap="wrap"
+        align="center"
+        alignContent="flex-start"
+        minHeight="56px"
+      >
         {/* Section 1: Performance metrics */}
         <MetricPill label="Duration" value={formatDuration(trace.durationMs)} />
         {trace.spanCount > 0 && (
@@ -756,14 +793,20 @@ export const DrawerHeader = memo(function DrawerHeader({
       {/* Row 4: Dedicated pinned-context strip — auto-pins (identity / run /
           tag) inline with intra-category dividers, custom pins capped at 3
           inline with the rest in a "+N pinned" overflow popover. Lives on
-          its own row so the categorisation stays scannable; renders nothing
-          when there's no pinned context. */}
-      {(pinResult.inline.length > 0 || pinResult.overflow) && (
-        <HStack gap={1.5} flexWrap="wrap" align="center">
-          {pinResult.inline}
-          {pinResult.overflow}
-        </HStack>
-      )}
+          its own row so the categorisation stays scannable. The slot is
+          always reserved (even when empty) so navigating to a trace with
+          no pins doesn't collapse the header by 28px and shift the body
+          tabs underneath. */}
+      <HStack
+        gap={1.5}
+        flexWrap="wrap"
+        align="center"
+        alignContent="flex-start"
+        minHeight="28px"
+      >
+        {pinResult.inline}
+        {pinResult.overflow}
+      </HStack>
 
       {/* Row 5: Inline mode tabs — Trace / Conversation. Trace ID + relative
           timestamp tuck into the right corner of the same row, so they
