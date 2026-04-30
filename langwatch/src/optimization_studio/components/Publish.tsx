@@ -3,25 +3,21 @@ import {
   Box,
   Button,
   HStack,
-  type MenuItemProps,
   Separator,
   Skeleton,
   Spacer,
-  Spinner,
   Text,
   useDisclosure,
   VStack,
 } from "@chakra-ui/react";
 import type { Dataset, DatasetRecord, Project } from "@prisma/client";
 import type { Edge } from "@xyflow/react";
-import { useRouter } from "~/utils/compat/next-router";
 import { useCallback, useState } from "react";
 import {
   ArrowUp,
   ArrowUpCircle,
   ChevronDown,
   Code,
-  Lock,
   Play,
   Share2,
   XCircle,
@@ -37,8 +33,6 @@ import { toaster } from "../../components/ui/toaster";
 import { Tooltip } from "../../components/ui/tooltip";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
-import { trackEvent } from "../../utils/tracking";
-import { usePlanManagementUrl } from "../../hooks/usePlanManagementUrl";
 import { useModelProviderKeys } from "../hooks/useModelProviderKeys";
 import { useWorkflowStore } from "../hooks/useWorkflowStore";
 import type { Workflow } from "../types/dsl";
@@ -240,7 +234,6 @@ function PublishMenu({
     project,
     allowSaveIfAutoSaveIsCurrentButNotLatest: false,
   });
-  const router = useRouter();
   const trpc = api.useContext();
 
   const publishedWorkflow = api.optimization.getPublishedWorkflow.useQuery(
@@ -325,55 +318,9 @@ function PublishMenu({
     });
   };
 
-  const { organization } = useOrganizationTeamProject();
-  const { url: planManagementUrl } = usePlanManagementUrl();
-  const usage = api.limits.getUsage.useQuery(
-    { organizationId: organization?.id ?? "" },
-    {
-      enabled: !!organization,
-    },
-  );
-
-  const planAllowsToPublish = usage.data?.activePlan.canPublish;
   const publishDisabledLabel = !publishedWorkflow.data?.version
     ? "Publish a version to enable this option"
     : undefined;
-
-  const SubscriptionMenuItem = (
-    props: MenuItemProps & {
-      tooltip?: string;
-    },
-  ) => {
-    if (!planAllowsToPublish) {
-      return (
-        <Tooltip
-          content="Subscribe to unlock publishing, click to continue"
-          positioning={{ placement: "right" }}
-        >
-          <Menu.Item
-            {...props}
-            disabled={false}
-            color="fg.subtle"
-            onClick={() => {
-              trackEvent("subscription_hook_click", {
-                projectId: project?.id,
-                hook: "studio_click_subscribe_to_publish",
-              });
-              void router.push(planManagementUrl);
-            }}
-          >
-            {usage.data ? <Lock size={16} /> : <Spinner size="sm" />}
-            {props.children}
-          </Menu.Item>
-        </Tooltip>
-      );
-    }
-    return (
-      <Tooltip content={props.tooltip} positioning={{ placement: "right" }}>
-        <Menu.Item {...props} />
-      </Tooltip>
-    );
-  };
 
   const handleExportWorkflow = async () => {
     await exportWorkflow(workflow, datasetRecords.data ?? undefined);
@@ -390,16 +337,17 @@ function PublishMenu({
           <Separator />
         </>
       )}
-      <SubscriptionMenuItem
-        tooltip={canPublish}
-        onClick={onTogglePublish}
-        disabled={!!canPublish}
-        value="publish"
-      >
-        <ArrowUp size={16} />{" "}
-        <Text textTransform="capitalize">{`Publish ${workflow_type}`}</Text>
-      </SubscriptionMenuItem>
-      <SubscriptionMenuItem
+      <Tooltip content={canPublish} positioning={{ placement: "right" }}>
+        <Menu.Item
+          onClick={onTogglePublish}
+          disabled={!!canPublish}
+          value="publish"
+        >
+          <ArrowUp size={16} />{" "}
+          <Text textTransform="capitalize">{`Publish ${workflow_type}`}</Text>
+        </Menu.Item>
+      </Tooltip>
+      <Menu.Item
         hidden={
           workflow_type === "workflow" || !publishedWorkflow.data?.isEvaluator
         }
@@ -407,9 +355,9 @@ function PublishMenu({
         value="evaluator"
       >
         <XCircle size={16} /> Unpublish Evaluator
-      </SubscriptionMenuItem>
+      </Menu.Item>
 
-      <SubscriptionMenuItem
+      <Menu.Item
         hidden={
           workflow_type === "workflow" || !publishedWorkflow.data?.isComponent
         }
@@ -417,22 +365,26 @@ function PublishMenu({
         onClick={disableAsComponent}
       >
         <XCircle size={16} /> Unpublish Component
-      </SubscriptionMenuItem>
+      </Menu.Item>
 
-      <SubscriptionMenuItem
-        tooltip={publishDisabledLabel}
-        onClick={onToggleApi}
-        disabled={!!publishDisabledLabel}
-        value="api-reference"
+      <Tooltip
+        content={publishDisabledLabel}
+        positioning={{ placement: "right" }}
       >
-        <Code size={16} /> View API Reference
-      </SubscriptionMenuItem>
-      <SubscriptionMenuItem
+        <Menu.Item
+          onClick={onToggleApi}
+          disabled={!!publishDisabledLabel}
+          value="api-reference"
+        >
+          <Code size={16} /> View API Reference
+        </Menu.Item>
+      </Tooltip>
+      <Menu.Item
         onClick={() => void handleExportWorkflow()}
         value="export-workflow"
       >
         <Share2 size={16} /> Export Workflow
-      </SubscriptionMenuItem>
+      </Menu.Item>
     </>
   );
 }

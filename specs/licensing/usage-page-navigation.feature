@@ -52,20 +52,10 @@ Feature: Plan Management Navigation
     When I see the limit warning banner
     Then the upgrade link redirects to /settings/license
 
-  # Publish feature upgrade redirect
-  @e2e @unimplemented
-  Scenario: Publish upgrade redirects to Subscription in SaaS mode
-    Given the platform is deployed in SaaS mode
-    And the organization plan does not allow publishing
-    When I try to publish from the studio
-    Then the upgrade button redirects to /settings/subscription
-
-  @e2e @unimplemented
-  Scenario: Publish upgrade redirects to License in self-hosted mode
-    Given the platform is deployed in self-hosted mode
-    And the organization plan does not allow publishing
-    When I try to publish from the studio
-    Then the upgrade button redirects to /settings/license
+  # Publish feature upgrade redirect — REMOVED.
+  # The studio publish menu is no longer gated by plan.canPublish; resource
+  # count limits (max workflows/evaluators) are the only blockers.
+  # See specs/studio/publish-not-gated.feature
 
   # Settings menu visibility
   @integration @unimplemented
