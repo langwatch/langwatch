@@ -56,23 +56,8 @@ Feature: HTTP agent error surfacing and per-call diagnostics
     Then the formatted output replaces the values of "Authorization" and "x-api-key" with a redacted placeholder
 
   # ============================================================================
-  # AC #3 — Regression test exercises adapter at varying concurrency
-  # ============================================================================
-
-  @integration
-  Scenario: Regression test drives adapter against a stub at multiple concurrency levels
-    Given a configurable HTTP stub
-    When the adapter is driven against the stub at concurrency levels 1, 2, 5, and 10
-    Then every call completes with a recognisable success or surfaced-error outcome
-
-  @integration
-  Scenario: Regression test asserts surfaced-error contract under concurrency
-    Given the stub is configured to respond with 422 and an n8n-shaped JSON error body
-    When the adapter is driven against the stub at concurrency 5
-    Then every thrown error message contains the request URL, the response body, and the upstream request id
-
-  # ============================================================================
-  # AC #4 — Per-call diagnostic logging
+  # AC #3 — Per-call diagnostic logging (formerly AC #4 in the issue body
+  # before the concurrency-regression AC was dropped)
   # ============================================================================
 
   @integration
@@ -111,17 +96,14 @@ Feature: HTTP agent error surfacing and per-call diagnostics
   # --- AC Coverage Map ---
   # AC #1: "Root cause for parallel-mode 422s identified and documented" → OUT OF SCOPE in this PR.
   #        Issue body explicitly defers to #3590; depends on a real failure being captured AFTER
-  #        AC #2 + AC #4 ship in production. No scenarios mapped here by design.
+  #        AC #2 + AC #3 ship in production. No scenarios mapped here by design.
   # AC #2: "HTTP agent errors include response body, URL, upstream identifier" →
   #        Scenario "HTTP agent error includes response body, URL, and upstream request id"
   #        Scenario "HTTP agent error truncates large response bodies"
   #        Scenario "HTTP agent error reads non-JSON response bodies as text"
   #        Scenario "HTTP agent error surfaces alternate upstream identifier headers"
   #        Scenario "HTTP agent error redacts sensitive request headers"
-  # AC #3: "Repro captured as integration test, runnable at varying concurrency" →
-  #        Scenario "Regression test drives adapter against a stub at multiple concurrency levels"
-  #        Scenario "Regression test asserts surfaced-error contract under concurrency"
-  # AC #4: "Diagnostic logging emitted on every HTTP-agent call (not only failures)" →
+  # AC #3: "Diagnostic logging emitted on every HTTP-agent call (not only failures)" →
   #        Scenario "HTTP agent emits one diagnostic log line per successful call"
   #        Scenario "HTTP agent emits one diagnostic log line per failing call"
   #        Scenario "Diagnostic log preserves response body for the success path"
