@@ -53,4 +53,36 @@ describe("buildEnv", () => {
       expect(env).toContain("REDIS_URL=redis://localhost:6611/0");
     });
   });
+
+  describe("when nlpMode defaults (go)", () => {
+    const env = buildEnv({ ports: allocatePorts(5560) });
+
+    it("force-enables release_nlp_go_engine_enabled so /studio/* routes hit nlpgo", () => {
+      expect(env).toContain("FEATURE_FLAG_FORCE_ENABLE=release_nlp_go_engine_enabled");
+    });
+
+    it("records the mode as `go` for later diagnosis", () => {
+      expect(env).toContain("LANGWATCH_NPX_NLP=go");
+    });
+  });
+
+  describe("when nlpMode is python", () => {
+    const env = buildEnv({ ports: allocatePorts(5560), nlpMode: "python" });
+
+    it("omits FEATURE_FLAG_FORCE_ENABLE so PostHog default routes traffic to legacy langwatch_nlp", () => {
+      expect(env).not.toContain("FEATURE_FLAG_FORCE_ENABLE");
+    });
+
+    it("records the mode as `python` for later diagnosis", () => {
+      expect(env).toContain("LANGWATCH_NPX_NLP=python");
+    });
+  });
+
+  describe("when nlpMode is explicitly go", () => {
+    it("matches default (go) behavior", () => {
+      const explicit = buildEnv({ ports: allocatePorts(5560), nlpMode: "go" });
+      expect(explicit).toContain("FEATURE_FLAG_FORCE_ENABLE=release_nlp_go_engine_enabled");
+      expect(explicit).toContain("LANGWATCH_NPX_NLP=go");
+    });
+  });
 });
