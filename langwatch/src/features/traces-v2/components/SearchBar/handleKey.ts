@@ -7,6 +7,10 @@ export type EditorContext = {
   cursorPos: number;
   suggestion: SuggestionState;
   highlightedText: string | null;
+  /** True when the highlighted item is a namespaced prefix
+   * (`trace.attribute.`) — accept inserts the prefix without a trailing
+   * `:` and stays in field-mode so the user can complete the key. */
+  highlightedIsPrefix?: boolean;
 };
 
 export type KeyAction =
@@ -33,6 +37,19 @@ function acceptAction(
   const tokenEnd = ctx.cursorPos;
 
   if (ctx.suggestion.mode === "field") {
+    // Namespaced prefix — drop the user back where they were, just with
+    // `trace.attribute.` (or similar) inserted. The key still has to be
+    // typed; we don't auto-append `:` because the field name isn't
+    // complete yet.
+    if (ctx.highlightedIsPrefix) {
+      return {
+        kind: "accept",
+        tokenStart,
+        tokenEnd,
+        replacement: highlighted,
+        reopenInValueMode: false,
+      };
+    }
     return {
       kind: "accept",
       tokenStart,

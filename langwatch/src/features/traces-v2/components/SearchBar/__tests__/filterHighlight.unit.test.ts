@@ -130,8 +130,14 @@ describe("buildDecorationPlan — wildcard + boolean cases", () => {
 
       // Two tag widgets, one per tag.
       expect(plan.tokens).toEqual([
-        { start: 0, end: 11, field: "model", value: "gpt-*" },
-        { start: 16, end: 28, field: "status", value: "error" },
+        { start: 0, end: 11, field: "model", value: "gpt-*", kind: "ast" },
+        {
+          start: 16,
+          end: 28,
+          field: "status",
+          value: "error",
+          kind: "ast",
+        },
       ]);
     });
   });
@@ -143,7 +149,7 @@ describe("buildDecorationPlan — wildcard + boolean cases", () => {
         { from: 0, to: 11, className: "filter-token" },
       ]);
       expect(plan.tokens).toEqual([
-        { start: 0, end: 11, field: "model", value: "gpt-*" },
+        { start: 0, end: 11, field: "model", value: "gpt-*", kind: "ast" },
       ]);
     });
   });
@@ -164,22 +170,32 @@ describe("buildDecorationPlan — wildcard + boolean cases", () => {
   });
 
   describe("given an incomplete `<tag> AND` (no right operand)", () => {
-    it("falls back to the regex highlighter and only decorates the parseable left tag", () => {
+    it("falls back to the regex highlighter, decorates the AND keyword, and keeps the X widget", () => {
       const plan = buildDecorationPlan("model:gpt-* AND");
-      // Liqe parse fails for incomplete AND. The regex fallback only matches
-      // the field:value span and leaves the dangling AND unstyled.
+      // Liqe parse fails for incomplete AND. The regex fallback decorates
+      // the field:value span; `flagOperatorShapedTypos` paints the dangling
+      // AND so it doesn't suddenly un-bold mid-edit.
       const tokenSlots = plan.slots.filter((s) =>
         s.className.includes("filter-token"),
       );
       expect(tokenSlots).toEqual([
         { from: 0, to: 11, className: "filter-token" },
       ]);
-      // No AND keyword decoration — the parser couldn't confirm it as one.
       expect(
         plan.slots.some((s) => s.className.includes("filter-keyword-and")),
-      ).toBe(false);
-      // No widget tokens emitted by the regex fallback.
-      expect(plan.tokens).toEqual([]);
+      ).toBe(true);
+      // The fallback emits a widget too — without it, breaking the parse
+      // mid-edit (a trailing AND, an unmatched quote) would visually delete
+      // every chip's X button until the user tidied the syntax.
+      expect(plan.tokens).toEqual([
+        {
+          start: 0,
+          end: 11,
+          field: "model",
+          value: null,
+          kind: "fallback",
+        },
+      ]);
     });
   });
 
@@ -242,6 +258,7 @@ describe("buildDecorationPlan — wildcard + boolean cases", () => {
           end: 25,
           field: "errorMessage",
           value: "rate limit",
+          kind: "ast",
         },
       ]);
     });
@@ -351,7 +368,7 @@ describe("buildDecorationPlan — wildcard + boolean cases", () => {
     it("the half-built `status:` widget carries a null value (no `data-value` on the X)", () => {
       const plan = buildDecorationPlan("status:");
       expect(plan.tokens).toEqual([
-        { start: 0, end: 7, field: "status", value: null },
+        { start: 0, end: 7, field: "status", value: null, kind: "ast" },
       ]);
     });
   });
@@ -378,10 +395,10 @@ describe("buildDecorationPlan — wildcard + boolean cases", () => {
       const after = buildDecorationPlan("status:e");
 
       expect(before.tokens).toEqual([
-        { start: 0, end: 7, field: "status", value: null },
+        { start: 0, end: 7, field: "status", value: null, kind: "ast" },
       ]);
       expect(after.tokens).toEqual([
-        { start: 0, end: 8, field: "status", value: "e" },
+        { start: 0, end: 8, field: "status", value: "e", kind: "ast" },
       ]);
     });
   });
@@ -393,27 +410,30 @@ describe("buildDecorationPlan — wildcard + boolean cases", () => {
       const c = buildDecorationPlan("status:error AND model:gpt-4o");
 
       expect(a.tokens).toEqual([
-        { start: 0, end: 12, field: "status", value: "error" },
+        { start: 0, end: 12, field: "status", value: "error", kind: "ast" },
       ]);
 
       // `model:` with no value mid-clause means the parse fails (the AND
-      // dangles syntactically). The regex fallback still recognises
-      // `status:error` as a token, so its decoration survives — but no
-      // widgets are emitted from the fallback path.
+      // dangles syntactically). The regex fallback now recognises BOTH
+      // `status:error` and `model:` as fallback tokens so the X widgets
+      // don't disappear the moment the user breaks the parse mid-edit.
       const bTokens = b.slots.filter((s) =>
         s.className.includes("filter-token"),
       );
       expect(bTokens.length).toBeGreaterThanOrEqual(1);
-      // Either fallback (no widgets) or full parse — both keep the first
-      // status token decorated. We don't assert exact widget count here
-      // because the parser could legitimately go either way, but the
-      // FIRST status:error must survive structurally.
       expect(bTokens[0]?.from).toBe(0);
       expect(bTokens[0]?.to).toBe(12);
+      expect(b.tokens.length).toBeGreaterThanOrEqual(1);
 
       expect(c.tokens).toEqual([
-        { start: 0, end: 12, field: "status", value: "error" },
-        { start: 17, end: 29, field: "model", value: "gpt-4o" },
+        { start: 0, end: 12, field: "status", value: "error", kind: "ast" },
+        {
+          start: 17,
+          end: 29,
+          field: "model",
+          value: "gpt-4o",
+          kind: "ast",
+        },
       ]);
     });
   });
@@ -460,7 +480,7 @@ describe("buildDecorationPlan — wildcard + boolean cases", () => {
       // Only one widget — for the empty status: chip. The free-text arm
       // never gets a delete affordance.
       expect(plan.tokens).toEqual([
-        { start: 0, end: 7, field: "status", value: null },
+        { start: 0, end: 7, field: "status", value: null, kind: "ast" },
       ]);
     });
 
@@ -472,15 +492,21 @@ describe("buildDecorationPlan — wildcard + boolean cases", () => {
       const tokenSlot = plan.slots.find((s) =>
         s.className.includes("filter-token"),
       );
-      expect(tokenSlot?.className).toBe("filter-token");
-      // Widget will carry the literal-field name — a future "you can't
-      // query this field" hint could trigger off this.
+      // The unknown-field hint kicks in here — `NOT-status` isn't in
+      // SEARCH_FIELDS, so the chip renders with the dashed-yellow accent
+      // instead of the default blue.
+      expect(tokenSlot?.className).toBe(
+        "filter-token filter-token-unknown-field",
+      );
+      // Widget carries the literal-field name so a "you can't query this
+      // field" hint can be wired off the dataset later.
       expect(plan.tokens).toEqual([
         {
           start: 0,
           end: "NOT-status:error".length,
           field: "NOT-status",
           value: "error",
+          kind: "ast",
         },
       ]);
     });
@@ -491,7 +517,7 @@ describe("buildDecorationPlan — wildcard + boolean cases", () => {
       expect(buildDecorationPlan("(").slots).toEqual([]);
     });
 
-    it("`(status:error` (unmatched) falls back to regex but recognises the inner tag", () => {
+    it("`(status:error` (unmatched) falls back to regex AND emits a fallback widget", () => {
       const plan = buildDecorationPlan("(status:error");
       const tokenSlots = plan.slots.filter((s) =>
         s.className.includes("filter-token"),
@@ -500,8 +526,11 @@ describe("buildDecorationPlan — wildcard + boolean cases", () => {
       expect(tokenSlots).toEqual([
         { from: 1, to: 13, className: "filter-token" },
       ]);
-      // No widgets from the regex fallback.
-      expect(plan.tokens).toEqual([]);
+      // Fallback path now emits a widget so the X stays clickable while
+      // the user fixes the unmatched paren.
+      expect(plan.tokens).toEqual([
+        { start: 1, end: 13, field: "status", value: null, kind: "fallback" },
+      ]);
     });
 
     it("`(status:error)` parses cleanly: 2 paren slots + 1 token + 1 widget", () => {
@@ -510,7 +539,7 @@ describe("buildDecorationPlan — wildcard + boolean cases", () => {
       expect(parens).toHaveLength(2);
       // The walker emits the inner Tag as a token + widget.
       expect(plan.tokens).toEqual([
-        { start: 1, end: 13, field: "status", value: "error" },
+        { start: 1, end: 13, field: "status", value: "error", kind: "ast" },
       ]);
     });
   });
@@ -530,7 +559,7 @@ describe("buildDecorationPlan — wildcard + boolean cases", () => {
       // widget correctly. Absolute end = leadingWs + token.end.
       expect(plan.leadingWs).toBe(3);
       expect(plan.tokens).toEqual([
-        { start: 0, end: 12, field: "status", value: "error" },
+        { start: 0, end: 12, field: "status", value: "error", kind: "ast" },
       ]);
     });
   });
@@ -542,8 +571,14 @@ describe("buildDecorationPlan — wildcard + boolean cases", () => {
       // fuse the next clause — confirm the AND keyword is recognised.
       const plan = buildDecorationPlan("status:error\u00A0AND model:gpt-4o");
       expect(plan.tokens).toEqual([
-        { start: 0, end: 12, field: "status", value: "error" },
-        { start: 17, end: 29, field: "model", value: "gpt-4o" },
+        { start: 0, end: 12, field: "status", value: "error", kind: "ast" },
+        {
+          start: 17,
+          end: 29,
+          field: "model",
+          value: "gpt-4o",
+          kind: "ast",
+        },
       ]);
       // AND is recognised as a keyword, not absorbed into a value.
       expect(
@@ -556,11 +591,50 @@ describe("buildDecorationPlan — wildcard + boolean cases", () => {
     // While the user is in the middle of typing a wildcard value, the
     // chip should remain stable (no flicker between recognised/not).
     it.each([
-      ["model:g", { start: 0, end: 7, field: "model", value: "g" }],
-      ["model:gp", { start: 0, end: 8, field: "model", value: "gp" }],
-      ["model:gpt", { start: 0, end: 9, field: "model", value: "gpt" }],
-      ["model:gpt-", { start: 0, end: 10, field: "model", value: "gpt-" }],
-      ["model:gpt-*", { start: 0, end: 11, field: "model", value: "gpt-*" }],
+      [
+        "model:g",
+        { start: 0, end: 7, field: "model", value: "g", kind: "ast" as const },
+      ],
+      [
+        "model:gp",
+        {
+          start: 0,
+          end: 8,
+          field: "model",
+          value: "gp",
+          kind: "ast" as const,
+        },
+      ],
+      [
+        "model:gpt",
+        {
+          start: 0,
+          end: 9,
+          field: "model",
+          value: "gpt",
+          kind: "ast" as const,
+        },
+      ],
+      [
+        "model:gpt-",
+        {
+          start: 0,
+          end: 10,
+          field: "model",
+          value: "gpt-",
+          kind: "ast" as const,
+        },
+      ],
+      [
+        "model:gpt-*",
+        {
+          start: 0,
+          end: 11,
+          field: "model",
+          value: "gpt-*",
+          kind: "ast" as const,
+        },
+      ],
     ])("after %j the widget reflects the typed value verbatim", (input, expected) => {
       const plan = buildDecorationPlan(input);
       expect(plan.tokens).toEqual([expected]);
@@ -581,7 +655,13 @@ describe("buildDecorationPlan — wildcard + boolean cases", () => {
         { from: 0, to: 14, className: "filter-token" },
       ]);
       expect(plan.tokens).toEqual([
-        { start: 0, end: 14, field: "model", value: "gpt-*AND" },
+        {
+          start: 0,
+          end: 14,
+          field: "model",
+          value: "gpt-*AND",
+          kind: "ast",
+        },
       ]);
       // No AND keyword decoration — there is no boolean operator in the AST.
       expect(

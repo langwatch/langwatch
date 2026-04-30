@@ -1,70 +1,86 @@
-import {
-  Box,
-  Button,
-  Flex,
-  HStack,
-  Icon,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
 import { AlertTriangle, BookOpen, X } from "lucide-react";
 import type React from "react";
 import { Popover } from "~/components/ui/popover";
 import { useUIStore } from "../../stores/uiStore";
 
-/** Yellow triangle shown when the parsed AST contains a cross-facet OR. */
-export const CrossFacetWarning: React.FC = () => (
-  <Flex
-    align="center"
-    gap={1}
-    flexShrink={0}
-    title="Query uses cross-facet OR — sidebar may not fully reflect the query."
-  >
-    <Icon color="yellow.fg" boxSize="12px">
-      <AlertTriangle />
-    </Icon>
-  </Flex>
-);
+/**
+ * Severity of a query-state issue — drives the SearchBar's border tint and
+ * the matching badge. The previous design rendered a tiny yellow triangle
+ * for warnings and a red "Syntax" pill for errors, which were visually so
+ * different the user often missed the warning entirely. One indicator
+ * component, one colour palette per severity.
+ */
+export type SearchBarStatus =
+  | { kind: "ok" }
+  | { kind: "warning"; message: string }
+  | { kind: "error"; message: string };
 
-/** Trailing "Clear" button shown when the search bar has any content. */
-export const ClearButton: React.FC<{
-  onClear: (event: React.MouseEvent) => void;
-}> = ({ onClear }) => (
-  <Button
-    size="2xs"
-    variant="ghost"
-    flexShrink={0}
-    fontWeight="normal"
-    color="fg.subtle"
-    onMouseDown={onClear}
-  >
-    Clear
-    <X size={12} />
-  </Button>
-);
+const STATUS_PALETTE: Record<
+  "warning" | "error",
+  { fg: string; bg: string; border: string; label: string }
+> = {
+  warning: {
+    fg: "orange.fg",
+    bg: "orange.subtle",
+    border: "orange.muted",
+    label: "Warning",
+  },
+  error: {
+    fg: "red.fg",
+    bg: "red.subtle",
+    border: "red.muted",
+    label: "Syntax",
+  },
+};
+
+/** The bar's outer border colour for a given status. */
+export function statusBorderColor(status: SearchBarStatus): string {
+  if (status.kind === "error") return "red.fg";
+  if (status.kind === "warning") return "orange.fg";
+  return "border";
+}
+
+/** The bar's outer background colour for a given status. */
+export function statusBackgroundColor(status: SearchBarStatus): string {
+  if (status.kind === "error") return "red.subtle/30";
+  if (status.kind === "warning") return "orange.subtle/30";
+  return "bg.surface";
+}
 
 /**
- * "Syntax" pill shown when the query string fails to parse. Opens a popover
- * with the parse error and a link to the syntax help drawer.
+ * Single badge shown when the bar is in a warning or error state. Replaces
+ * the old `CrossFacetWarning` triangle and `ParseErrorIndicator` pill —
+ * they used to live next to each other with completely different shapes
+ * and weights, making it easy to miss that anything was wrong. Now both
+ * paths render the same badge shape, just tinted differently.
  */
-export const ParseErrorIndicator: React.FC<{ message: string }> = ({
-  message,
-}) => {
+export const StatusBadge: React.FC<{
+  status: SearchBarStatus;
+}> = ({ status }) => {
   const setSyntaxHelpOpen = useUIStore((s) => s.setSyntaxHelpOpen);
+  if (status.kind === "ok") return null;
+  const palette = STATUS_PALETTE[status.kind];
+
   return (
     <Popover.Root positioning={{ placement: "bottom-end" }}>
       <Popover.Trigger asChild>
         <Button
           size="2xs"
-          variant="ghost"
+          variant="surface"
           flexShrink={0}
-          colorPalette="red"
-          color="red.fg"
-          aria-label="View syntax error"
+          bg={palette.bg}
+          color={palette.fg}
+          borderWidth="1px"
+          borderColor={palette.border}
+          gap={1.5}
+          paddingX={2}
+          aria-label={`View ${palette.label.toLowerCase()}`}
+          _hover={{ bg: palette.bg, filter: "brightness(0.96)" }}
         >
           <AlertTriangle size={12} />
           <Text textStyle="xs" fontWeight="600">
-            Syntax
+            {palette.label}
           </Text>
         </Button>
       </Popover.Trigger>
@@ -75,8 +91,8 @@ export const ParseErrorIndicator: React.FC<{ message: string }> = ({
             <Box
               boxSize="20px"
               borderRadius="sm"
-              bg="red.subtle"
-              color="red.fg"
+              bg={palette.bg}
+              color={palette.fg}
               display="flex"
               alignItems="center"
               justifyContent="center"
@@ -92,30 +108,32 @@ export const ParseErrorIndicator: React.FC<{ message: string }> = ({
                 textTransform="uppercase"
                 letterSpacing="0.08em"
               >
-                Invalid query
+                {status.kind === "error" ? "Invalid query" : "Heads up"}
               </Text>
               <Text textStyle="sm" color="fg">
-                {message}
+                {status.message}
               </Text>
             </VStack>
           </HStack>
-          <Box
-            marginBottom={2}
-            paddingX={2}
-            paddingY={1.5}
-            borderRadius="sm"
-            bg="bg.subtle"
-            borderLeftWidth="2px"
-            borderColor="blue.muted"
-          >
-            <Text textStyle="xs" color="fg.muted">
-              Searching for a phrase? Wrap it in quotes —{" "}
-              <Text as="span" fontFamily="mono" color="fg">
-                &quot;refund policy&quot;
+          {status.kind === "error" && (
+            <Box
+              marginBottom={2}
+              paddingX={2}
+              paddingY={1.5}
+              borderRadius="sm"
+              bg="bg.subtle"
+              borderLeftWidth="2px"
+              borderColor="blue.muted"
+            >
+              <Text textStyle="xs" color="fg.muted">
+                Searching for a phrase? Wrap it in quotes —{" "}
+                <Text as="span" fontFamily="mono" color="fg">
+                  &quot;refund policy&quot;
+                </Text>
+                .
               </Text>
-              .
-            </Text>
-          </Box>
+            </Box>
+          )}
           <Button
             size="xs"
             variant="surface"
@@ -131,3 +149,23 @@ export const ParseErrorIndicator: React.FC<{ message: string }> = ({
     </Popover.Root>
   );
 };
+
+/** Trailing "Clear" button shown when the search bar has any content. */
+export const ClearButton: React.FC<{
+  onClear: (event: React.MouseEvent) => void;
+}> = ({ onClear }) => (
+  <Button
+    size="2xs"
+    variant="ghost"
+    flexShrink={0}
+    fontWeight="normal"
+    color="fg.subtle"
+    paddingX={2}
+    gap={1.5}
+    onMouseDown={onClear}
+  >
+    Clear
+    <X size={12} />
+  </Button>
+);
+

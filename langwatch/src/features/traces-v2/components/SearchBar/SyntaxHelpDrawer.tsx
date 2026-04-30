@@ -88,6 +88,28 @@ const EXAMPLE_GROUPS: ReadonlyArray<{
       { label: "Has eval", query: "has:eval" },
     ],
   },
+  {
+    // Namespaced dynamic prefixes — each one targets a different attribute
+    // map on the underlying schema. Documenting them inline here so users
+    // discover the new namespacing without having to read commit notes.
+    title: "Drill in",
+    icon: Sparkles,
+    accent: "pink",
+    examples: [
+      {
+        label: "Trace attribute",
+        query: 'trace.attribute.langwatch.user.id:"user-acme-1"',
+      },
+      {
+        label: "Span attribute",
+        query: "span.attribute.gen_ai.request.model:gpt-4o",
+      },
+      {
+        label: "Event attribute",
+        query: 'event.attribute.exception.type:"ValueError"',
+      },
+    ],
+  },
 ];
 
 const OPERATOR_ROWS: ReadonlyArray<{

@@ -41,8 +41,19 @@ export const editorStyles: SystemStyleObject = {
     borderTopLeftRadius: "8px",
     borderBottomLeftRadius: "8px",
     paddingLeft: "6px",
-    paddingRight: 0,
+    // Breathing room before the X widget — without this the value text
+    // crashed into the chip's right border, so the close button looked
+    // glued onto the value (`origin:agent×` instead of `origin:agent  ×`).
+    paddingRight: "6px",
     marginLeft: "1px",
+  },
+  // Field name was unrecognised (typo, removed key) — still parses as a
+  // tag but the rest of the platform won't filter on it. A warning tint
+  // makes that visible without rejecting the query outright.
+  "& .filter-token-unknown-field": {
+    background: "yellow.subtle",
+    borderColor: "yellow.muted",
+    borderStyle: "dashed",
   },
   "& .filter-token-exclude": {
     background: "red.subtle",
@@ -114,6 +125,21 @@ export const editorStyles: SystemStyleObject = {
   "& .filter-token-numeric + .filter-token-delete": {
     background: "green.subtle",
     borderColor: "green.muted",
+  },
+  "& .filter-token-unknown-field + .filter-token-delete": {
+    background: "yellow.subtle",
+    borderColor: "yellow.muted",
+    borderStyle: "dashed",
+  },
+  // Word-shaped tokens that look like operator typos (AMD instead of AND,
+  // ANY/BUT/NAND, etc.) — the parser silently treats them as implicit
+  // search text, so we surface them visually so the user spots the typo.
+  "& .filter-keyword-invalid": {
+    color: "red.fg",
+    fontWeight: "semibold",
+    textDecoration: "underline wavy",
+    textDecorationColor: "var(--chakra-colors-red-fg)",
+    textUnderlineOffset: "3px",
   },
   "& .filter-token-delete:hover": {
     background: "red.subtle",

@@ -6,6 +6,7 @@ import { Text as TiptapText } from "@tiptap/extension-text";
 import { type Editor, useEditor } from "@tiptap/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { removeNodeAtLocation } from "~/server/app-layer/traces/query-language/mutations";
+import { AutoUppercaseOperators } from "./autoUppercaseOperators";
 import {
   applyAcceptToEditor,
   buildDocument,
@@ -19,6 +20,7 @@ import {
   buildSuggestionUI,
   CLOSED_SUGGESTION,
   highlightedLabel,
+  highlightedRow,
   navigateSuggestion,
   type SuggestionUIState,
 } from "./suggestionUI";
@@ -27,11 +29,49 @@ import { useLatestRef } from "./useLatestRef";
 const TRIGGER_TERMINATOR_REGEX = /[ \t\n()]/;
 const TRIGGER_PRECEDERS = new Set([" ", "\t", "\n", "("]);
 
-function arraysShallowEqual(a: string[], b: string[]): boolean {
+/**
+ * Remove the chars at `[start, end)` from `text` and clean up any operator
+ * glue we left behind. Used by the X widget when the parser is currently
+ * failing — a normal `removeNodeAtLocation` would no-op there and the X
+ * would feel broken. Strips a trailing or leading `AND`/`OR` so we don't
+ * end up with `model:gpt AND ` orphaned at the end of the query.
+ */
+function sliceFallbackTokenRange(
+  text: string,
+  start: number,
+  end: number,
+): string {
+  if (start < 0 || end > text.length || start >= end) return text;
+  const before = text.slice(0, start).replace(/\s+(AND|OR)\s*$/i, "");
+  const after = text.slice(end).replace(/^\s*(AND|OR)\s+/i, "");
+  const joined = (before + " " + after).replace(/\s{2,}/g, " ").trim();
+  return joined;
+}
+
+function arraysShallowEqual<T>(a: readonly T[], b: readonly T[]): boolean {
   if (a === b) return true;
   if (a.length !== b.length) return false;
   for (let i = 0; i < a.length; i++) {
     if (a[i] !== b[i]) return false;
+  }
+  return true;
+}
+
+function suggestionRowsEqual(
+  a: { value: string; isPrefix?: boolean },
+  b: { value: string; isPrefix?: boolean },
+): boolean {
+  return a.value === b.value && !!a.isPrefix === !!b.isPrefix;
+}
+
+function suggestionRowArraysEqual(
+  a: ReadonlyArray<{ value: string; isPrefix?: boolean }>,
+  b: ReadonlyArray<{ value: string; isPrefix?: boolean }>,
+): boolean {
+  if (a === b) return true;
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    if (!suggestionRowsEqual(a[i]!, b[i]!)) return false;
   }
   return true;
 }
@@ -55,7 +95,7 @@ function suggestionUIEqual(
   if (a.selectedIndex !== b.selectedIndex) return false;
   if (a.itemCounts !== b.itemCounts) return false;
   if (!suggestionStateEqual(a.state, b.state)) return false;
-  return arraysShallowEqual(a.items, b.items);
+  return suggestionRowArraysEqual(a.items, b.items);
 }
 
 /**
@@ -245,9 +285,16 @@ export function useFilterEditor({
               base.selectedIndex,
               dynamic.items.length - 1,
             );
+            // Dynamic value-mode rows have no group (values aren't grouped)
+            // and aren't prefix entries — wrap the bare strings into the
+            // SuggestionRow shape that the dropdown renderer now expects.
             next = {
               state: base.state,
-              items: dynamic.items,
+              items: dynamic.items.map((value) => ({
+                value,
+                label: value,
+                group: null,
+              })),
               itemCounts: dynamic.counts,
               selectedIndex,
             };
@@ -269,6 +316,7 @@ export function useFilterEditor({
         placeholder: "Search filters, free text, or Ask AI…",
       }),
       FilterHighlight,
+      AutoUppercaseOperators,
     ],
     content: queryText ? buildDocument(queryText) : undefined,
     onUpdate: ({ editor: ed }) => {
@@ -338,14 +386,16 @@ export function useFilterEditor({
             : null;
         const liveState = triggerState ?? getSuggestionState(text, cursorPos);
         const dismissed = dismissedRef.current;
+        const highlighted = dismissed
+          ? null
+          : highlightedRow(suggestionRef.current);
         const action = handleKey(
           {
             text,
             cursorPos,
             suggestion: dismissed ? { open: false } : liveState,
-            highlightedText: dismissed
-              ? null
-              : highlightedLabel(suggestionRef.current),
+            highlightedText: highlighted?.value ?? null,
+            highlightedIsPrefix: highlighted?.isPrefix,
           },
           event.key,
         );
@@ -398,6 +448,10 @@ export function useFilterEditor({
     if (!editor || editor.isDestroyed) return;
     const dom = editor.view.dom;
     const handler = (event: MouseEvent) => {
+      // Editor may be destroyed between mount and this firing (StrictMode
+      // double-effect, fast unmount); calling getText/setContent on a
+      // destroyed view crashes ProseMirror.
+      if (editor.isDestroyed) return;
       const target = event.target as HTMLElement | null;
       const btn = target?.closest("[data-filter-delete]") as HTMLElement | null;
       if (!btn) return;
@@ -406,7 +460,17 @@ export function useFilterEditor({
       const start = Number(btn.dataset.locStart);
       const end = Number(btn.dataset.locEnd);
       if (!Number.isFinite(start) || !Number.isFinite(end)) return;
-      const next = removeNodeAtLocation(editor.getText(), start, end);
+      const kind = btn.dataset.kind === "fallback" ? "fallback" : "ast";
+      const current = editor.getText();
+      // AST-path widgets ride on liqe's trimmed-text locations and use
+      // `removeNodeAtLocation` to drop the matching node and any orphaned
+      // operator parents. Fallback-path widgets only exist while the parser
+      // is failing — there's no AST to walk, so we slice the matched range
+      // out of the raw text and tidy any AND/OR glue we leave behind.
+      const next =
+        kind === "ast"
+          ? removeNodeAtLocation(current, start, end)
+          : sliceFallbackTokenRange(current, start, end);
       // Update the editor directly — the sync effect skips while focused
       // (so it doesn't race with typing), so a delete from a still-focused
       // editor would otherwise leave the visible content stale until blur.
@@ -448,8 +512,17 @@ export function useFilterEditor({
       const current = suggestionRef.current.state;
       if (!current.open) return;
       const { text, cursorPos } = readEditorContext(editor);
+      // Look up whether the clicked label corresponds to a prefix row so
+      // the accept handler doesn't auto-append `:` to `trace.attribute.`.
+      const matched = suggestionRef.current.items.find((r) => r.value === label);
       const action = handleKey(
-        { text, cursorPos, suggestion: current, highlightedText: label },
+        {
+          text,
+          cursorPos,
+          suggestion: current,
+          highlightedText: label,
+          highlightedIsPrefix: matched?.isPrefix,
+        },
         "Enter",
       );
       if (action.kind === "accept") applyAcceptToEditor(editor, action);

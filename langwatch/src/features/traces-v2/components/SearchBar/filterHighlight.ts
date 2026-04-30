@@ -8,8 +8,32 @@ import type {
   TagToken,
   UnaryOperatorToken,
 } from "liqe";
-import { SCENARIO_FIELDS } from "~/server/app-layer/traces/query-language/metadata";
+import {
+  SCENARIO_FIELDS,
+  SEARCH_FIELDS,
+} from "~/server/app-layer/traces/query-language/metadata";
 import { parse as cachedParse } from "~/server/app-layer/traces/query-language/parse";
+
+/**
+ * The grammar's actual operator vocabulary — anything else uppercase-shaped
+ * in implicit-field position is a typo, not a deliberate free-text term.
+ * `TO` is the range delimiter inside `[N TO M]` and only valid there, but
+ * we accept it bare so users typing a partial range mid-edit don't get
+ * flagged on every keystroke.
+ */
+const GRAMMAR_OPERATOR_WORDS: ReadonlySet<string> = new Set([
+  "AND",
+  "OR",
+  "NOT",
+  "TO",
+]);
+/**
+ * Operator-shaped lexeme: 2–5 uppercase letters, surrounded by word
+ * boundaries. Tightened from a generic ALL-CAPS pattern so all-caps
+ * proper nouns in free text (`JSON`, `ASCII`, `OPENAI`, `GPT`) don't
+ * get false-flagged as operator typos. Real operators are short.
+ */
+const OPERATOR_SHAPED_WORD_REGEX = /\b([A-Z]{2,5})\b/g;
 
 // Tolerant fallback for queries that don't yet parse (mid-typing, unmatched
 // quotes, trailing operator). Decorates anything shaped like `field:value`
@@ -28,12 +52,21 @@ export interface DecorationSlot {
  * delete handler knows which liqe node to drop. Locations are absolute
  * positions in the query text (not the @-stripped form, since the editor
  * never holds `@` characters in the new flow).
+ *
+ * `kind` distinguishes the AST-derived path (where `start/end` are in
+ * liqe's *trimmed-string* coordinate space and feed `removeNodeAtLocation`)
+ * from the regex-fallback path (where the parser failed and `start/end`
+ * are absolute editor-text positions, used for a direct string-slice
+ * removal). Without the regex-fallback path the X widgets would vanish
+ * the moment the user typed something that broke the parse — which felt
+ * like the chips themselves were disappearing.
  */
 export interface TokenRef {
   start: number;
   end: number;
   field: string;
   value: string | null;
+  kind: "ast" | "fallback";
 }
 
 interface DecorationPlan {
@@ -56,6 +89,33 @@ const NUMERIC_FIELDS = new Set([
   "tokensPerSecond",
 ]);
 
+const DYNAMIC_FIELD_PREFIXES = [
+  // Canonical, namespaced forms — root prefix is unique so autocomplete
+  // can group cleanly without colliding keys.
+  "trace.attribute.",
+  "span.attribute.",
+  "event.attribute.",
+  // Legacy aliases preserved for back-compat with saved queries.
+  "attribute.",
+];
+
+function isKnownField(fieldName: string): boolean {
+  if (fieldName in SEARCH_FIELDS) return true;
+  if (SCENARIO_FIELDS.has(fieldName)) return true;
+  for (const prefix of DYNAMIC_FIELD_PREFIXES) {
+    if (fieldName.startsWith(prefix) && fieldName.length > prefix.length) {
+      return true;
+    }
+  }
+  // Legacy single-dot `event.<key>` — kept as alias for back-compat. The
+  // bare `event` field still routes to the static handler map (matches
+  // `Events.Name`), so accept dotted forms only.
+  if (fieldName.startsWith("event.") && fieldName.length > "event.".length) {
+    return true;
+  }
+  return false;
+}
+
 function tagClassName({
   fieldName,
   negated,
@@ -63,11 +123,71 @@ function tagClassName({
   fieldName: string;
   negated: boolean;
 }): string {
+  // Unknown field — the query parses, but no part of the platform knows
+  // how to filter on it. Yellow/dashed treatment makes the typo obvious
+  // before the user submits and gets zero rows.
+  if (!isKnownField(fieldName)) return "filter-token filter-token-unknown-field";
   if (negated) return "filter-token filter-token-exclude";
   if (SCENARIO_FIELDS.has(fieldName))
     return "filter-token filter-token-scenario";
   if (NUMERIC_FIELDS.has(fieldName)) return "filter-token filter-token-numeric";
   return "filter-token";
+}
+
+/**
+ * Flag operator-shaped uppercase words that aren't part of the grammar's
+ * actual operator vocabulary (`AND`, `OR`, `NOT`, `TO`). Driven entirely
+ * by `GRAMMAR_OPERATOR_WORDS` — no curated list of typos. Anything 2–5
+ * uppercase letters that *isn't* one of those four is highlighted as a
+ * suspect operator-typo (AMD, BUT, NAND, XOR, etc.).
+ *
+ * We walk the *covered* text only — slots already produced by `walkAst`
+ * mark `field:value` tokens and the canonical operator keywords. Skipping
+ * positions inside those slots avoids double-decorating the value side
+ * of `name:OK` (where `OK` is legitimate free text inside a quoted/literal
+ * value) or the inside of an `[N TO M]` range.
+ */
+function flagOperatorShapedTypos(
+  text: string,
+  baseOffset: number,
+  plan: DecorationPlan,
+): void {
+  OPERATOR_SHAPED_WORD_REGEX.lastIndex = 0;
+  let match: RegExpExecArray | null;
+  while ((match = OPERATOR_SHAPED_WORD_REGEX.exec(text)) !== null) {
+    const word = match[1] ?? "";
+    const from = baseOffset + match.index;
+    const to = from + word.length;
+    if (isPositionCoveredBySlot(plan.slots, from, to)) continue;
+    if (GRAMMAR_OPERATOR_WORDS.has(word)) {
+      // `TO` only carries the keyword highlight inside `[N TO M]`; outside
+      // that range it would visually fight with the value text. Skip it
+      // here — the AST walk handles it when the range parses.
+      if (word === "TO") continue;
+      plan.slots.push({
+        from,
+        to,
+        className: `filter-keyword filter-keyword-${word.toLowerCase()}`,
+      });
+      continue;
+    }
+    plan.slots.push({
+      from,
+      to,
+      className: "filter-keyword filter-keyword-invalid",
+    });
+  }
+}
+
+function isPositionCoveredBySlot(
+  slots: DecorationSlot[],
+  from: number,
+  to: number,
+): boolean {
+  for (const slot of slots) {
+    if (from >= slot.from && to <= slot.to) return true;
+  }
+  return false;
 }
 
 function walkAst(
@@ -96,6 +216,7 @@ function walkAst(
         end: tag.location.end,
         field: fieldName,
         value,
+        kind: "ast",
       });
       plan.slots.push({
         from: start,
@@ -148,22 +269,39 @@ function walkAst(
   }
 }
 
-function regexFallback(text: string, baseOffset: number): DecorationSlot[] {
-  const out: DecorationSlot[] = [];
+function regexFallback(
+  text: string,
+  baseOffset: number,
+): { slots: DecorationSlot[]; tokens: TokenRef[] } {
+  const slots: DecorationSlot[] = [];
+  const tokens: TokenRef[] = [];
   FILTER_TOKEN_REGEX.lastIndex = 0;
   let match: RegExpExecArray | null;
   while ((match = FILTER_TOKEN_REGEX.exec(text)) !== null) {
     const groups = match.groups ?? {};
-    out.push({
-      from: baseOffset + match.index,
-      to: baseOffset + match.index + match[0].length,
-      className: tagClassName({
-        fieldName: groups.field ?? "",
-        negated: !!groups.prefix,
-      }),
+    const fieldName = groups.field ?? "";
+    const negated = !!groups.prefix;
+    const from = baseOffset + match.index;
+    const to = from + match[0].length;
+    slots.push({
+      from,
+      to,
+      className: tagClassName({ fieldName, negated }),
+    });
+    // `start`/`end` are positions in the editor's *text content* (post
+    // NBSP-normalisation, no trimming). The X-widget click handler keys
+    // off `kind: "fallback"` to slice them out by string range — going
+    // through `removeNodeAtLocation` would no-op while the parser is
+    // failing, which is exactly when these tokens exist.
+    tokens.push({
+      start: match.index,
+      end: match.index + match[0].length,
+      field: fieldName,
+      value: null,
+      kind: "fallback",
     });
   }
-  return out;
+  return { slots, tokens };
 }
 
 export function buildDecorationPlan(
@@ -184,13 +322,17 @@ export function buildDecorationPlan(
     const ast = cachedParse(trimmed);
     const plan: DecorationPlan = { slots: [], tokens: [], leadingWs };
     walkAst(ast, false, baseOffset + leadingWs, plan);
+    flagOperatorShapedTypos(normalized, baseOffset, plan);
     return plan;
   } catch {
-    return {
-      slots: regexFallback(normalized, baseOffset),
-      tokens: [],
+    const fallback = regexFallback(normalized, baseOffset);
+    const plan: DecorationPlan = {
+      slots: fallback.slots,
+      tokens: fallback.tokens,
       leadingWs,
     };
+    flagOperatorShapedTypos(normalized, baseOffset, plan);
+    return plan;
   }
 }
 
@@ -216,6 +358,7 @@ function createDeleteWidget(token: TokenRef): HTMLElement {
   btn.dataset.locStart = String(token.start);
   btn.dataset.locEnd = String(token.end);
   btn.dataset.field = token.field;
+  btn.dataset.kind = token.kind;
   if (token.value !== null) btn.dataset.value = token.value;
 
   // Crisp SVG X — the "×" text glyph rendered chunky and uneven at this size.
@@ -257,11 +400,30 @@ function computeDecorations(
       );
     }
     for (const token of plan.tokens) {
-      const widgetPos = pos + plan.leadingWs + token.end;
+      // AST tokens carry liqe's trimmed-text coords, so we translate by
+      // `leadingWs` to get a normalised-text offset. Fallback tokens were
+      // already collected against the normalised text, so they need only
+      // the text-node base position. Two conventions because the AST path
+      // wants positions that round-trip through `removeNodeAtLocation`,
+      // whereas the fallback path slices directly out of the editor text.
+      const widgetPos =
+        token.kind === "ast"
+          ? pos + plan.leadingWs + token.end
+          : pos + token.end;
       decorations.push(
         Decoration.widget(widgetPos, () => createDeleteWidget(token), {
           side: 1,
           ignoreSelection: true,
+          // Without an explicit key, ProseMirror's DecorationSet diff
+          // compared widget specs by render-function reference equality.
+          // Each `computeDecorations` pass creates a fresh closure → every
+          // recompute looked like "all widgets are different" to PM, and
+          // its reconciliation could end up removing the old DOM without
+          // attaching the new one in some focus/blur transitions — the X
+          // appeared on first render and never returned. Keying by token
+          // identity lets PM pin DOM continuity to the *logical* widget,
+          // not the closure identity.
+          key: `del:${token.kind}:${token.field}:${token.start}:${token.end}:${token.value ?? ""}`,
         }),
       );
     }

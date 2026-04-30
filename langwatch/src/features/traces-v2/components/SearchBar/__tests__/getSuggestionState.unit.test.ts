@@ -237,6 +237,115 @@ describe("getSuggestionState", () => {
     });
   });
 
+  describe("given an existing dynamic-prefix attribute chip", () => {
+    describe("when the cursor sits inside the value of trace.attribute.langwatch.origin", () => {
+      it("opens in value mode for the full prefix-qualified field so the resolver can fetch values for that key", () => {
+        // This is the chip-edit bug from PRD review: `attribute.langwatch.origin:application`
+        // with the cursor mid-value used to return empty suggestions because
+        // the static FIELD_VALUES has no entry for the prefixed field.
+        const text = "trace.attribute.langwatch.origin:application";
+        expect(getSuggestionState(text, text.length)).toEqual({
+          open: true,
+          mode: "value",
+          field: "trace.attribute.langwatch.origin",
+          query: "application",
+          tokenStart: 0,
+        });
+      });
+    });
+
+    describe("when the cursor sits mid-value with only a wildcard typed", () => {
+      it("opens in value mode with the glob as the query so the resolver can return all values", () => {
+        const text = "trace.attribute.langwatch.origin:*";
+        expect(getSuggestionState(text, text.length)).toEqual({
+          open: true,
+          mode: "value",
+          field: "trace.attribute.langwatch.origin",
+          query: "*",
+          tokenStart: 0,
+        });
+      });
+    });
+
+    describe("when the cursor sits inside the key part of a dynamic-prefix chip", () => {
+      it("opens in field mode with the full typed prefix so key-discovery can re-rank", () => {
+        // Cursor right after `lang` of `trace.attribute.lang|watch.origin:foo`.
+        // No colon yet from cursor's POV → field mode with the partial key.
+        const text = "trace.attribute.langwatch.origin:application";
+        const cursorAfterLang = "trace.attribute.lang".length;
+        expect(getSuggestionState(text, cursorAfterLang)).toEqual({
+          open: true,
+          mode: "field",
+          query: "trace.attribute.lang",
+          tokenStart: 0,
+        });
+      });
+    });
+
+    describe("when the cursor sits inside the value of span.attribute.gen_ai.request.model", () => {
+      it("opens value mode against the full span-attribute-qualified field", () => {
+        const text = "span.attribute.gen_ai.request.model:gpt-4o";
+        expect(getSuggestionState(text, text.length)).toEqual({
+          open: true,
+          mode: "value",
+          field: "span.attribute.gen_ai.request.model",
+          query: "gpt-4o",
+          tokenStart: 0,
+        });
+      });
+    });
+
+    describe("when the cursor sits inside the value of event.attribute.exception.type", () => {
+      it("opens value mode against the full event-attribute-qualified field", () => {
+        const text = "event.attribute.exception.type:ValueError";
+        expect(getSuggestionState(text, text.length)).toEqual({
+          open: true,
+          mode: "value",
+          field: "event.attribute.exception.type",
+          query: "ValueError",
+          tokenStart: 0,
+        });
+      });
+    });
+
+    describe("when the chip is preceded by another clause", () => {
+      it("scopes tokenStart to the active token only — preceding clauses are untouched", () => {
+        // `status:error AND trace.attribute.langwatch.origin:appli|cation`
+        const prefix = "status:error AND ";
+        const chip = "trace.attribute.langwatch.origin:application";
+        const text = prefix + chip;
+        const cursorMidValue = prefix.length + chip.indexOf(":") + 1 + 5; // after "appli"
+        expect(getSuggestionState(text, cursorMidValue)).toEqual({
+          open: true,
+          mode: "value",
+          field: "trace.attribute.langwatch.origin",
+          query: "appli",
+          tokenStart: prefix.length,
+        });
+      });
+    });
+  });
+
+  describe("given a typo'd dynamic prefix", () => {
+    describe("when the user types a near-miss like 'atrace.attribute.x:foo'", () => {
+      it("still opens value mode against the typo'd field name", () => {
+        // The state machine doesn't know about valid prefixes — it only
+        // recognises the `field:value` shape. Routing the typo into a
+        // helpful "did you mean" is the resolver's job, not this layer's.
+        // What matters here is that we surface the typo'd field intact so
+        // downstream code can decide what to do with it.
+        const text = "atrace.attribute.x:foo";
+        expect(getSuggestionState(text, text.length)).toEqual({
+          open: true,
+          mode: "value",
+          field: "atrace.attribute.x",
+          query: "foo",
+          tokenStart: 0,
+        });
+      });
+    });
+  });
+
   describe("given the shorthand negation '-' prefix", () => {
     describe("when the cursor sits inside a negated value token with sigil", () => {
       it("opens in value mode and preserves the `-` prefix in the editor", () => {

@@ -1,13 +1,16 @@
 import { Badge, Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
 import { BookOpen } from "lucide-react";
 import type React from "react";
+import { useMemo } from "react";
 import {
+  type SearchFieldGroup,
   SEARCH_FIELDS,
   type SearchFieldMeta,
 } from "~/server/app-layer/traces/query-language/metadata";
 import { useUIStore } from "../../stores/uiStore";
 import type { SuggestionState } from "./getSuggestionState";
-import type { SuggestionUIState } from "./suggestionUI";
+import { SUGGESTION_GROUPS } from "./suggestionItems";
+import type { SuggestionRow, SuggestionUIState } from "./suggestionUI";
 
 interface SuggestionDropdownProps {
   ui: SuggestionUIState;
@@ -55,17 +58,8 @@ export const SuggestionDropdown: React.FC<SuggestionDropdownProps> = ({
         bg="bg.panel"
         position="relative"
       >
-        <VStack gap={0} align="stretch" maxHeight="240px" overflowY="auto">
-          {ui.items.map((label, index) => (
-            <SuggestionRow
-              key={label}
-              label={label}
-              state={state}
-              count={ui.itemCounts?.[label]}
-              isSelected={index === ui.selectedIndex}
-              onSelect={onSelect}
-            />
-          ))}
+        <VStack gap={0} align="stretch" maxHeight="320px" overflowY="auto">
+          <GroupedItems ui={ui} state={state} onSelect={onSelect} />
         </VStack>
         <DropdownFooter />
       </Box>
@@ -106,24 +100,138 @@ const DropdownFooter: React.FC = () => {
   );
 };
 
-interface SuggestionRowProps {
+/**
+ * Renders the items partitioned by `group`. Field-mode dropdowns show
+ * section headers (Trace / Span / Event / Eval / Metrics / Scenario);
+ * value-mode dropdowns have no group and render as a single ungrouped
+ * list. Selection index threads through the partitioned layout —
+ * keyboard navigation walks the *flat* list (`ui.items`) and we map
+ * each row's flat index back to a per-section slot when rendering.
+ */
+const GroupedItems: React.FC<{
+  ui: SuggestionUIState;
+  state: Extract<SuggestionState, { open: true }>;
+  onSelect: (label: string) => void;
+}> = ({ ui, state, onSelect }) => {
+  const grouped = useMemo(() => groupRows(ui.items), [ui.items]);
+
+  if (state.mode === "value") {
+    return (
+      <>
+        {ui.items.map((row, index) => (
+          <SuggestionRowView
+            key={row.value}
+            row={row}
+            state={state}
+            count={ui.itemCounts?.[row.value]}
+            isSelected={index === ui.selectedIndex}
+            onSelect={onSelect}
+          />
+        ))}
+      </>
+    );
+  }
+
+  return (
+    <>
+      {grouped.map((section) => (
+        <Box key={section.label}>
+          <Box
+            paddingX={3}
+            paddingY={1.5}
+            bg="bg.subtle"
+            borderTopWidth={section.first ? "0px" : "1px"}
+            borderColor="border.subtle"
+          >
+            <Text
+              textStyle="2xs"
+              fontWeight="700"
+              color="fg.subtle"
+              textTransform="uppercase"
+              letterSpacing="0.1em"
+            >
+              {section.label}
+            </Text>
+          </Box>
+          {section.rows.map(({ row, flatIndex }) => (
+            <SuggestionRowView
+              key={row.value}
+              row={row}
+              state={state}
+              count={ui.itemCounts?.[row.value]}
+              isSelected={flatIndex === ui.selectedIndex}
+              onSelect={onSelect}
+            />
+          ))}
+        </Box>
+      ))}
+    </>
+  );
+};
+
+interface GroupedSection {
   label: string;
+  first: boolean;
+  rows: Array<{ row: SuggestionRow; flatIndex: number }>;
+}
+
+function groupRows(items: SuggestionRow[]): GroupedSection[] {
+  const buckets = new Map<
+    string,
+    { label: string; rows: Array<{ row: SuggestionRow; flatIndex: number }> }
+  >();
+  for (let i = 0; i < items.length; i++) {
+    const row = items[i]!;
+    const groupId = row.group ?? "__other__";
+    const label = labelForGroup(row.group) ?? "Other";
+    let bucket = buckets.get(groupId);
+    if (!bucket) {
+      bucket = { label, rows: [] };
+      buckets.set(groupId, bucket);
+    }
+    bucket.rows.push({ row, flatIndex: i });
+  }
+  // Order sections by SUGGESTION_GROUPS, then trailing `Other`.
+  const ordered: GroupedSection[] = [];
+  for (const spec of SUGGESTION_GROUPS) {
+    const b = buckets.get(spec.id);
+    if (b) {
+      ordered.push({ label: b.label, first: ordered.length === 0, rows: b.rows });
+      buckets.delete(spec.id);
+    }
+  }
+  for (const [, b] of buckets) {
+    ordered.push({ label: b.label, first: ordered.length === 0, rows: b.rows });
+  }
+  return ordered;
+}
+
+function labelForGroup(group: SearchFieldGroup | null): string | null {
+  if (!group) return null;
+  return SUGGESTION_GROUPS.find((g) => g.id === group)?.label ?? null;
+}
+
+interface SuggestionRowProps {
+  row: SuggestionRow;
   state: Extract<SuggestionState, { open: true }>;
   count?: number;
   isSelected: boolean;
   onSelect: (label: string) => void;
 }
 
-const SuggestionRow: React.FC<SuggestionRowProps> = ({
-  label,
+const SuggestionRowView: React.FC<SuggestionRowProps> = ({
+  row,
   state,
   count,
   isSelected,
   onSelect,
 }) => {
-  const primary = state.mode === "field" ? label : state.field;
-  const secondary = state.mode === "field" ? "" : `:${label}`;
-  const fieldMeta = state.mode === "field" ? SEARCH_FIELDS[label] : undefined;
+  const primary = state.mode === "field" ? row.label : state.field;
+  const secondary = state.mode === "field" ? "" : `:${row.label}`;
+  const fieldMeta =
+    state.mode === "field" && !row.isPrefix
+      ? SEARCH_FIELDS[row.value]
+      : undefined;
 
   return (
     <Box
@@ -142,7 +250,7 @@ const SuggestionRow: React.FC<SuggestionRowProps> = ({
       _hover={{ bg: "blue.solid/8" }}
       onMouseDown={(event) => {
         event.preventDefault();
-        onSelect(label);
+        onSelect(row.value);
       }}
     >
       <HStack gap={2} minWidth={0} flex={1}>
@@ -157,6 +265,16 @@ const SuggestionRow: React.FC<SuggestionRowProps> = ({
           )}
         </Text>
         {fieldMeta && <FieldMetaSummary meta={fieldMeta} />}
+        {row.isPrefix && (
+          <Badge
+            size="xs"
+            variant="subtle"
+            colorPalette="purple"
+            flexShrink={0}
+          >
+            drill in
+          </Badge>
+        )}
       </HStack>
       {count !== undefined && (
         <Text
