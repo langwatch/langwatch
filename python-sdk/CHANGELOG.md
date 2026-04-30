@@ -1,5 +1,29 @@
 # Changelog
 
+## [3.2.1](https://github.com/langwatch/langwatch/compare/python-sdk@v0.22.0...python-sdk@v3.2.1) (2026-04-30)
+
+
+### Features
+
+* **npx-server:** npx @langwatch/server — single-command local LangWatch ([#3486](https://github.com/langwatch/langwatch/issues/3486)) ([0884d31](https://github.com/langwatch/langwatch/commit/0884d3145cd910fcd199e1e70f82f805c9d1c972))
+
+
+### Bug Fixes
+
+* **release:** scope Release-As to langwatch, restore other components ([#3618](https://github.com/langwatch/langwatch/issues/3618)) ([e259e79](https://github.com/langwatch/langwatch/commit/e259e796b50e4d060e5c7f42cad1927f1da8a83d))
+* **traces:** parse JSON-string langwatch.input when extracting primary I/O ([#3419](https://github.com/langwatch/langwatch/issues/3419)) ([1e87641](https://github.com/langwatch/langwatch/commit/1e87641060b872d9f924e1a583328f33590bd3ca))
+
+
+### Miscellaneous
+
+* **deps-dev:** bump faiss-cpu from 1.12.0 to 1.13.2 in /python-sdk ([#2096](https://github.com/langwatch/langwatch/issues/2096)) ([636ac8d](https://github.com/langwatch/langwatch/commit/636ac8dcff63fe89836d8d7bf0762885601f4e21))
+* **deps:** bump opentelemetry-api from 1.36.0 to 1.40.0 in /python-sdk ([#2090](https://github.com/langwatch/langwatch/issues/2090)) ([9d6bbc3](https://github.com/langwatch/langwatch/commit/9d6bbc37a933ac1842ba25632fffd4dae511d442))
+* **deps:** bump opentelemetry-instrumentation-crewai from 0.47.5 to 0.53.0 in /python-sdk ([#2094](https://github.com/langwatch/langwatch/issues/2094)) ([44dc407](https://github.com/langwatch/langwatch/commit/44dc40742f4ed78040b831a22db31368846676d6))
+* **deps:** bump opentelemetry-instrumentation-crewai in /python-sdk ([44dc407](https://github.com/langwatch/langwatch/commit/44dc40742f4ed78040b831a22db31368846676d6))
+* release as 3.2.1 ([ca9d7a9](https://github.com/langwatch/langwatch/commit/ca9d7a9231a7b3d9d8cf9a28a48fa494b1daeb4b))
+* release as 3.2.1 (override release-please from 3.3.0) ([#3615](https://github.com/langwatch/langwatch/issues/3615)) ([ca9d7a9](https://github.com/langwatch/langwatch/commit/ca9d7a9231a7b3d9d8cf9a28a48fa494b1daeb4b))
+* scope Release-As to langwatch, restore other components ([e259e79](https://github.com/langwatch/langwatch/commit/e259e796b50e4d060e5c7f42cad1927f1da8a83d))
+
 ## [0.22.0](https://github.com/langwatch/langwatch/compare/python-sdk@v0.21.0...python-sdk@v0.22.0) (2026-04-21)
 
 
