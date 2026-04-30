@@ -5,9 +5,10 @@ import { ExecuteEvaluationCommand } from "../../evaluation-processing/commands/e
 import type { ExecuteEvaluationCommandData } from "../../evaluation-processing/schemas/commands";
 import { KSUID_RESOURCES } from "../../../../../utils/constants";
 import { createLogger } from "../../../../../utils/logger/server";
-import type { ReactorContext, ReactorDefinition } from "../../../reactors/reactor.types";
+import type { ReactorDefinition } from "../../../reactors/reactor.types";
 import type { TraceSummaryData } from "../projections/traceSummary.foldProjection";
 import type { TraceProcessingEvent } from "../schemas/events";
+import { defineOriginGuardedTraceReactor } from "./_originGuardedReactor";
 import { DEFERRED_CHECK_DELAY_MS } from "./originGate.reactor";
 
 const logger = createLogger(
@@ -30,36 +31,21 @@ export interface EvaluationTriggerReactorDeps {
 export function createEvaluationTriggerReactor(
   deps: EvaluationTriggerReactorDeps,
 ): ReactorDefinition<TraceProcessingEvent, TraceSummaryData> {
-  return {
+  return defineOriginGuardedTraceReactor({
     name: "evaluationTrigger",
-    options: {
-      makeJobId: (payload) =>
-        `eval-trigger:${payload.event.tenantId}:${payload.event.aggregateId}`,
-      ttl: 30_000,
-      delay: 30_000,
-    },
-
-    async handle(
-      event: TraceProcessingEvent,
-      context: ReactorContext<TraceSummaryData>,
-    ): Promise<void> {
+    jobIdPrefix: "eval-trigger",
+    async handle(event, context) {
       const { tenantId, aggregateId: traceId, foldState } = context;
-
-      // Guard: skip old traces (resyncing)
-      if (event.occurredAt < Date.now() - 60 * 60 * 1000) return;
-
-      // Guard: skip traces blocked by guardrail with no output
-      if (foldState.blockedByGuardrail && !foldState.computedOutput) return;
-
-      const attrs = foldState.attributes ?? {};
-
-      // Guard: origin not yet resolved — originGate reactor handles deferred resolution
-      if (!attrs["langwatch.origin"]) return;
-
       // Origin is known — dispatch to monitors, precondition matchers filter by origin.
-      await dispatchEvaluations({ deps, tenantId, traceId, foldState, occurredAt: event.occurredAt });
+      await dispatchEvaluations({
+        deps,
+        tenantId,
+        traceId,
+        foldState,
+        occurredAt: event.occurredAt,
+      });
     },
-  };
+  });
 }
 
 // ---------------------------------------------------------------------------

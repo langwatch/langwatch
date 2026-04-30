@@ -45,6 +45,7 @@ import { RedisCachedFoldStore } from "./projections/redisCachedFoldStore";
 import { RepositoryFoldStore } from "./projections/repositoryFoldStore";
 import { SUITE_RUN_PROJECTION_VERSIONS } from "./pipelines/suite-run-processing/schemas/constants";
 import type { SuiteRunStateRepository } from "./pipelines/suite-run-processing/repositories/suiteRunState.repository";
+import type { TriggerActionDispatchDeps } from "./pipelines/shared/triggerActionDispatch";
 import { createTraceProcessingPipeline } from "./pipelines/trace-processing/pipeline";
 import { createSimulationMetricsSyncReactor } from "./pipelines/trace-processing/reactors/simulationMetricsSync.reactor";
 import { createExperimentMetricsSyncReactor } from "./pipelines/trace-processing/reactors/experimentMetricsSync.reactor";
@@ -200,6 +201,33 @@ export class PipelineRegistry {
     });
   }
 
+  /**
+   * Wires the trace-loading + dataset/queue dispatcher trio shared by the
+   * trace-pipeline `alertTrigger` reactor and the evaluation-pipeline
+   * `evaluationAlertTrigger` reactor. Both consume the same shape, so
+   * keep the wiring in one place.
+   */
+  private buildTraceReactorContext(): Pick<
+    TriggerActionDispatchDeps,
+    "traceById" | "addToAnnotationQueue" | "addToDataset"
+  > {
+    return {
+      traceById: async (projectId, traceId) => {
+        const traceService = TraceService.create(this.deps.prisma);
+        const protections = await getProtectionsForProject(this.deps.prisma, {
+          projectId,
+        });
+        return traceService.getById(projectId, traceId, protections);
+      },
+      addToAnnotationQueue: async (params) => {
+        await createOrUpdateQueueItems({ ...params, prisma: this.deps.prisma });
+      },
+      addToDataset: async (params) => {
+        await createManyDatasetRecords(params);
+      },
+    };
+  }
+
   registerAll() {
     // TODO: Customer.io reactors are implemented but not yet registered.
     // Counting strategy needs to be finalised (extend R5 daily sync pattern
@@ -253,17 +281,7 @@ export class PipelineRegistry {
       projects: this.deps.projects,
       traceSummaryStore,
       evaluationRuns: this.deps.evaluations.runs,
-      traceById: async (projectId, traceId) => {
-        const traceService = TraceService.create(this.deps.prisma);
-        const protections = await getProtectionsForProject(this.deps.prisma, { projectId });
-        return traceService.getById(projectId, traceId, protections);
-      },
-      addToAnnotationQueue: async (params) => {
-        await createOrUpdateQueueItems({ ...params, prisma: this.deps.prisma });
-      },
-      addToDataset: async (params) => {
-        await createManyDatasetRecords(params);
-      },
+      ...this.buildTraceReactorContext(),
     });
 
     return this.deps.eventSourcing.register(
@@ -301,17 +319,7 @@ export class PipelineRegistry {
     const alertTriggerReactor = createAlertTriggerReactor({
       triggers: this.deps.triggers,
       projects: this.deps.projects,
-      traceById: async (projectId, traceId) => {
-        const traceService = TraceService.create(this.deps.prisma);
-        const protections = await getProtectionsForProject(this.deps.prisma, { projectId });
-        return traceService.getById(projectId, traceId, protections);
-      },
-      addToAnnotationQueue: async (params) => {
-        await createOrUpdateQueueItems({ ...params, prisma: this.deps.prisma });
-      },
-      addToDataset: async (params) => {
-        await createManyDatasetRecords(params);
-      },
+      ...this.buildTraceReactorContext(),
     });
 
     const customEvaluationSyncReactor = createCustomEvaluationSyncReactor({

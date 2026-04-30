@@ -6,15 +6,13 @@ import {
 } from "~/server/filters/triggerFilter.matcher";
 import { createLogger } from "~/utils/logger/server";
 import { captureException } from "~/utils/posthogErrorCapture";
-import type {
-  ReactorContext,
-  ReactorDefinition,
-} from "../../../reactors/reactor.types";
-import type { TraceProcessingEvent } from "../schemas/events";
+import type { ReactorDefinition } from "../../../reactors/reactor.types";
 import {
   dispatchTriggerAction,
   type TriggerActionDispatchDeps,
 } from "../../shared/triggerActionDispatch";
+import type { TraceProcessingEvent } from "../schemas/events";
+import { defineOriginGuardedTraceReactor } from "./_originGuardedReactor";
 
 const logger = createLogger("langwatch:trace-processing:alert-trigger-reactor");
 
@@ -31,31 +29,11 @@ export type AlertTriggerReactorDeps = TriggerActionDispatchDeps;
 export function createAlertTriggerReactor(
   deps: AlertTriggerReactorDeps,
 ): ReactorDefinition<TraceProcessingEvent, TraceSummaryData> {
-  return {
+  return defineOriginGuardedTraceReactor({
     name: "alertTrigger",
-    options: {
-      makeJobId: (payload) =>
-        `alert-trigger:${payload.event.tenantId}:${payload.event.aggregateId}`,
-      ttl: 30_000,
-      delay: 30_000,
-    },
-
-    async handle(
-      event: TraceProcessingEvent,
-      context: ReactorContext<TraceSummaryData>,
-    ): Promise<void> {
+    jobIdPrefix: "alert-trigger",
+    async handle(_event, context) {
       const { tenantId, aggregateId: traceId, foldState } = context;
-
-      // Guard: skip old traces (resyncing)
-      if (event.occurredAt < Date.now() - 60 * 60 * 1000) return;
-
-      // Guard: skip traces blocked by guardrail with no output
-      if (foldState.blockedByGuardrail && !foldState.computedOutput) return;
-
-      const attrs = foldState.attributes ?? {};
-
-      // Guard: origin not yet resolved — originGate handles deferred resolution
-      if (!attrs["langwatch.origin"]) return;
 
       const triggers = await deps.triggers.getActiveTraceTriggersForProject(
         tenantId,
@@ -119,5 +97,5 @@ export function createAlertTriggerReactor(
         }
       }
     },
-  };
+  });
 }
