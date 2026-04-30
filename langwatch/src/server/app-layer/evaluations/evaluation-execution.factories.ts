@@ -61,7 +61,16 @@ export function createDefaultModelEnvResolver(): ModelEnvResolver {
   };
 }
 
-async function setupModelEnv(
+/**
+ * Builds the X_LITELLM_* env block for an evaluator that needs to call a
+ * specific model. Validates the provider is configured + enabled, projects
+ * litellm params, and overlays whitelisted generation params (temperature,
+ * max_tokens, etc.) from the evaluator settings.
+ *
+ * Throws `EvaluatorConfigError` for misconfigured providers — callers who
+ * need a per-worker error class should catch and rewrap.
+ */
+export async function setupModelEnv(
   model: string,
   embeddings: boolean,
   projectId: string,
