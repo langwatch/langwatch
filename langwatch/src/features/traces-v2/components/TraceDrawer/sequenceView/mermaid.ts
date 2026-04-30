@@ -1,12 +1,13 @@
 import type { SpanTreeNode } from "~/server/api/routers/tracesV2.schemas";
 import { abbreviateModel, formatDuration } from "../../../utils/formatters";
+import {
+  buildSpanTree,
+  sanitiseMermaidId,
+  type SpanWithChildren,
+} from "./_mermaidShared";
 import type { SequenceSpanType } from "./types";
 
 export const INVISIBLE_RETURN = "\u200B";
-
-interface SpanWithChildren extends SpanTreeNode {
-  children: SpanWithChildren[];
-}
 
 export type ParticipantKind = "agent" | "llm" | "tool" | "other";
 
@@ -26,30 +27,9 @@ export interface SequenceMermaidResult {
 
 const MAX_MESSAGES = 400;
 
-function buildTree(spans: SpanTreeNode[]): Record<string, SpanWithChildren> {
-  const lookup: Record<string, SpanWithChildren> = {};
-  for (const span of spans) {
-    lookup[span.spanId] = { ...span, children: [] };
-  }
-  for (const span of spans) {
-    const node = lookup[span.spanId];
-    if (!node) continue;
-    if (span.parentSpanId && lookup[span.parentSpanId]) {
-      lookup[span.parentSpanId]!.children.push(node);
-    }
-  }
-  return lookup;
-}
-
-function sanitiseId(raw: string): string {
-  const cleaned = raw.replace(/[^a-zA-Z0-9]/g, "_").replace(/^_+|_+$/g, "");
-  if (!cleaned) return "node";
-  return /^[0-9]/.test(cleaned) ? `n_${cleaned}` : cleaned;
-}
-
 function getParticipantId(span: SpanTreeNode): string | null {
   if (span.type === "agent" && span.name) {
-    return sanitiseId(
+    return sanitiseMermaidId(
       span.name
         .replace(".call", "")
         .replace(".run", "")
@@ -57,10 +37,10 @@ function getParticipantId(span: SpanTreeNode): string | null {
     );
   }
   if (span.type === "llm" && span.model) {
-    return sanitiseId(span.model);
+    return sanitiseMermaidId(span.model);
   }
   if (span.type === "tool") return null;
-  return span.name ? sanitiseId(span.name) : null;
+  return span.name ? sanitiseMermaidId(span.name) : null;
 }
 
 function getParticipantDisplay(span: SpanTreeNode): string | null {
@@ -225,7 +205,7 @@ export function generateMermaidSyntax(
   spans: SpanTreeNode[],
   includedTypes: readonly SequenceSpanType[],
 ): SequenceMermaidResult {
-  const tree = buildTree(spans);
+  const tree = buildSpanTree(spans);
   const typesToInclude = new Set<string>(includedTypes);
 
   const ctx: BuildContext = {

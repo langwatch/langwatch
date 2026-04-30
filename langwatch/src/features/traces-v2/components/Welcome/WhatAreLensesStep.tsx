@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import type React from "react";
 
+import { AiCallout } from "./_components";
 import type { WelcomeStepProps } from "./steps";
 
 interface Lens {
@@ -141,31 +142,17 @@ const LensCard: React.FC<Lens> = ({ icon, name, desc, accent }) => (
 );
 
 const AiLensCallout: React.FC = () => (
-  <HStack
-    gap={3}
-    align="flex-start"
-    borderRadius="md"
-    paddingX={4}
-    paddingY={3}
-    borderWidth="1px"
-    borderColor="purple.muted"
-    backgroundImage="linear-gradient(135deg, var(--chakra-colors-purple-subtle) 0%, var(--chakra-colors-pink-subtle) 100%)"
-  >
-    <Icon boxSize={4} color="purple.fg" marginTop={0.5}>
-      <Sparkles />
-    </Icon>
-    <VStack align="stretch" gap={1.5}>
-      <Text textStyle="xs" fontWeight="semibold" color="purple.fg">
-        Or describe the lens you want
-      </Text>
-      <Text textStyle="xs" color="fg.muted" lineHeight="1.5">
-        Hit the <InlineSparklesBadge /> in the search bar and ask in plain
-        English — &quot;<i>checkout failures from yesterday, grouped by user</i>
-        &quot;. The AI builds the filter, columns, sort, and grouping; click{" "}
-        <InlineSaveBadge /> to keep it.
-      </Text>
-    </VStack>
-  </HStack>
+  <AiCallout bodyGap={1.5}>
+    <Text textStyle="xs" fontWeight="semibold" color="purple.fg">
+      Or describe the lens you want
+    </Text>
+    <Text textStyle="xs" color="fg.muted" lineHeight="1.5">
+      Hit the <InlineSparklesBadge /> in the search bar and ask in plain
+      English — &quot;<i>checkout failures from yesterday, grouped by user</i>
+      &quot;. The AI builds the filter, columns, sort, and grouping; click{" "}
+      <InlineSaveBadge /> to keep it.
+    </Text>
+  </AiCallout>
 );
 
 const InlineSparklesBadge: React.FC = () => (

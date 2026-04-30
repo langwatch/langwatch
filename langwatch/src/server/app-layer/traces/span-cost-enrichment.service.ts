@@ -2,6 +2,7 @@ import type { PrismaClient } from "@prisma/client";
 import { matchModelCostWithFallbacks } from "~/server/background/workers/collector/cost";
 import type { MaybeStoredLLMModelCost } from "~/server/modelProviders/llmModelCost";
 import type { OtlpSpan } from "../../event-sourcing/pipelines/trace-processing/schemas/otlp";
+import { extractModelName } from "./utils/spanModel";
 
 /**
  * Attribute keys that may contain model names (checked in priority order).
@@ -72,7 +73,7 @@ export class OtlpSpanCostEnrichmentService {
    * @param tenantId - The project ID to look up custom costs for
    */
   async enrichSpan(span: OtlpSpan, tenantId: string): Promise<void> {
-    const modelName = this.extractModelName(span);
+    const modelName = extractModelName(span, MODEL_ATTRIBUTE_KEYS);
     if (!modelName) return;
 
     const customCosts = await this.deps.getCustomModelCosts(tenantId);
@@ -93,18 +94,4 @@ export class OtlpSpanCostEnrichmentService {
     );
   }
 
-  private extractModelName(span: OtlpSpan): string | null {
-    for (const key of MODEL_ATTRIBUTE_KEYS) {
-      for (const attr of span.attributes) {
-        if (
-          attr.key === key &&
-          typeof attr.value.stringValue === "string" &&
-          attr.value.stringValue.length > 0
-        ) {
-          return attr.value.stringValue;
-        }
-      }
-    }
-    return null;
-  }
 }

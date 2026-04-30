@@ -1,5 +1,6 @@
 import { Box, Flex, HStack, Icon, Text } from "@chakra-ui/react";
 import { useVirtualizer } from "@tanstack/react-virtual";
+import type React from "react";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   LuChevronsDownUp,
@@ -288,38 +289,16 @@ export const WaterfallView = memo(function WaterfallView({
                 </Flex>
               </Tooltip>
             )}
-            <Tooltip content="Expand all" positioning={{ placement: "top" }}>
-              <Flex
-                as="button"
-                align="center"
-                justify="center"
-                width="20px"
-                height="20px"
-                borderRadius="sm"
-                cursor="pointer"
-                color="fg.subtle"
-                _hover={{ color: "fg.muted", bg: "bg.muted" }}
-                onClick={handleExpandAll}
-              >
-                <Icon as={LuChevronsUpDown} boxSize={3} />
-              </Flex>
-            </Tooltip>
-            <Tooltip content="Collapse all" positioning={{ placement: "top" }}>
-              <Flex
-                as="button"
-                align="center"
-                justify="center"
-                width="20px"
-                height="20px"
-                borderRadius="sm"
-                cursor="pointer"
-                color="fg.subtle"
-                _hover={{ color: "fg.muted", bg: "bg.muted" }}
-                onClick={handleCollapseAll}
-              >
-                <Icon as={LuChevronsDownUp} boxSize={3} />
-              </Flex>
-            </Tooltip>
+            <ToolbarIconButton
+              tooltip="Expand all"
+              icon={LuChevronsUpDown}
+              onClick={handleExpandAll}
+            />
+            <ToolbarIconButton
+              tooltip="Collapse all"
+              icon={LuChevronsDownUp}
+              onClick={handleCollapseAll}
+            />
           </HStack>
         </Flex>
 
@@ -585,3 +564,32 @@ export const WaterfallView = memo(function WaterfallView({
     </Flex>
   );
 });
+
+function ToolbarIconButton({
+  tooltip,
+  icon,
+  onClick,
+}: {
+  tooltip: string;
+  icon: React.ComponentType;
+  onClick: () => void;
+}) {
+  return (
+    <Tooltip content={tooltip} positioning={{ placement: "top" }}>
+      <Flex
+        as="button"
+        align="center"
+        justify="center"
+        width="20px"
+        height="20px"
+        borderRadius="sm"
+        cursor="pointer"
+        color="fg.subtle"
+        _hover={{ color: "fg.muted", bg: "bg.muted" }}
+        onClick={onClick}
+      >
+        <Icon as={icon} boxSize={3} />
+      </Flex>
+    </Tooltip>
+  );
+}

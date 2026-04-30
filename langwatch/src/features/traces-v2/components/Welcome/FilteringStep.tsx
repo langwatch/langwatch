@@ -1,8 +1,9 @@
 import { Box, chakra, Flex, HStack, Icon, Text, VStack } from "@chakra-ui/react";
-import { ArrowRight, Sparkles, X } from "lucide-react";
+import { ArrowRight, X } from "lucide-react";
 import type React from "react";
 import { useCallback, useMemo, useState } from "react";
 
+import { AiCallout } from "./_components";
 import type { WelcomeStepProps } from "./steps";
 
 interface FacetSeed {
@@ -531,28 +532,14 @@ const ChipMono: React.FC<{ children: React.ReactNode }> = ({ children }) => (
 );
 
 const AiFilterCallout: React.FC = () => (
-  <HStack
-    gap={3}
-    align="flex-start"
-    borderRadius="md"
-    paddingX={4}
-    paddingY={3}
-    borderWidth="1px"
-    borderColor="purple.muted"
-    backgroundImage="linear-gradient(135deg, var(--chakra-colors-purple-subtle) 0%, var(--chakra-colors-pink-subtle) 100%)"
-  >
-    <Icon boxSize={4} color="purple.fg" marginTop={0.5}>
-      <Sparkles />
-    </Icon>
-    <VStack align="stretch" gap={1}>
-      <Text textStyle="xs" fontWeight="semibold" color="purple.fg">
-        Don&apos;t know the field name? Just ask.
-      </Text>
-      <Text textStyle="xs" color="fg.muted" lineHeight="1.5">
-        The sparkles in the search bar take plain English — &quot;
-        <i>slow checkout calls from EU users yesterday</i>&quot; — and turn it
-        into a filter expression you can tweak, then save as a lens.
-      </Text>
-    </VStack>
-  </HStack>
+  <AiCallout>
+    <Text textStyle="xs" fontWeight="semibold" color="purple.fg">
+      Don&apos;t know the field name? Just ask.
+    </Text>
+    <Text textStyle="xs" color="fg.muted" lineHeight="1.5">
+      The sparkles in the search bar take plain English — &quot;
+      <i>slow checkout calls from EU users yesterday</i>&quot; — and turn it
+      into a filter expression you can tweak, then save as a lens.
+    </Text>
+  </AiCallout>
 );

@@ -1,4 +1,5 @@
-import { Box, Flex, HStack, Skeleton, VStack } from "@chakra-ui/react";
+import { Box, HStack, Skeleton, VStack } from "@chakra-ui/react";
+import { SkeletonHeader } from "./SkeletonHeader";
 
 /**
  * Minimal placeholder for the sequence diagram while its chunk + Mermaid
@@ -9,20 +10,7 @@ import { Box, Flex, HStack, Skeleton, VStack } from "@chakra-ui/react";
 export function SequenceSkeleton() {
   return (
     <VStack align="stretch" gap={0} height="full" overflow="hidden">
-      <Flex
-        align="center"
-        gap={2}
-        paddingX={3}
-        paddingY={1.5}
-        borderBottomWidth="1px"
-        borderColor="border.subtle"
-        bg="bg.subtle/60"
-        flexShrink={0}
-      >
-        <Skeleton height="14px" width="80px" borderRadius="sm" />
-        <Box flex="1" />
-        <Skeleton height="14px" width="120px" borderRadius="sm" />
-      </Flex>
+      <SkeletonHeader />
 
       <Box flex="1" position="relative" paddingY={6} paddingX={6}>
         <HStack gap={8} justify="space-around">

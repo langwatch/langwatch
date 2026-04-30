@@ -1,27 +1,15 @@
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
-import { isPreviewTraceId } from "../onboarding/data/samplePreviewTraces";
 import { useDrawerStore } from "../stores/drawerStore";
+import { useTraceQueryArgs } from "./useTraceQueryArgs";
 
 export function useSpanDetail() {
-  const { project } = useOrganizationTeamProject();
-  const traceId = useDrawerStore((s) => s.traceId);
+  const { isReady, queryArgs } = useTraceQueryArgs();
   const spanId = useDrawerStore((s) => s.selectedSpanId);
-  const occurredAtMs = useDrawerStore((s) => s.occurredAtMs);
 
   return api.tracesV2.spanDetail.useQuery(
+    { ...queryArgs, spanId: spanId ?? "" },
     {
-      projectId: project?.id ?? "",
-      traceId: traceId ?? "",
-      spanId: spanId ?? "",
-      ...(occurredAtMs !== null ? { occurredAtMs } : {}),
-    },
-    {
-      enabled:
-        !!project?.id &&
-        !!traceId &&
-        !!spanId &&
-        !isPreviewTraceId(traceId),
+      enabled: isReady && !!spanId,
       staleTime: 300_000,
     },
   );

@@ -1,4 +1,5 @@
-import { Box, Flex, Skeleton, VStack } from "@chakra-ui/react";
+import { Box, Skeleton, VStack } from "@chakra-ui/react";
+import { SkeletonHeader } from "./SkeletonHeader";
 
 /**
  * Minimal placeholder for the topology view: a few rounded "node" cards
@@ -17,20 +18,7 @@ const NODES = [
 export function TopologySkeleton() {
   return (
     <VStack align="stretch" gap={0} height="full" overflow="hidden">
-      <Flex
-        align="center"
-        gap={2}
-        paddingX={3}
-        paddingY={1.5}
-        borderBottomWidth="1px"
-        borderColor="border.subtle"
-        bg="bg.subtle/60"
-        flexShrink={0}
-      >
-        <Skeleton height="14px" width="80px" borderRadius="sm" />
-        <Box flex="1" />
-        <Skeleton height="14px" width="120px" borderRadius="sm" />
-      </Flex>
+      <SkeletonHeader />
 
       <Box flex="1" position="relative">
         {NODES.map((n, i) => (

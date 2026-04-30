@@ -1,10 +1,11 @@
 import type { SpanTreeNode } from "~/server/api/routers/tracesV2.schemas";
 import { abbreviateModel, formatDuration } from "../../../utils/formatters";
+import {
+  buildSpanTree,
+  sanitiseMermaidId,
+  type SpanWithChildren,
+} from "./_mermaidShared";
 import type { SequenceSpanType } from "./types";
-
-interface SpanWithChildren extends SpanTreeNode {
-  children: SpanWithChildren[];
-}
 
 interface NodeInfo {
   id: string;
@@ -30,25 +31,6 @@ export interface TopologyMermaidResult {
   edgeCount: number;
 }
 
-function buildTree(spans: SpanTreeNode[]): Record<string, SpanWithChildren> {
-  const lookup: Record<string, SpanWithChildren> = {};
-  for (const span of spans) lookup[span.spanId] = { ...span, children: [] };
-  for (const span of spans) {
-    const node = lookup[span.spanId];
-    if (!node) continue;
-    if (span.parentSpanId && lookup[span.parentSpanId]) {
-      lookup[span.parentSpanId]!.children.push(node);
-    }
-  }
-  return lookup;
-}
-
-function sanitiseId(raw: string): string {
-  const cleaned = raw.replace(/[^a-zA-Z0-9]/g, "_").replace(/^_+|_+$/g, "");
-  if (!cleaned) return "node";
-  return /^[0-9]/.test(cleaned) ? `n_${cleaned}` : cleaned;
-}
-
 function escapeNodeLabel(text: string): string {
   // Mermaid graph node labels can contain HTML entities — strip anything that
   // would confuse the parser, then cap length so wide labels don't blow up
@@ -68,25 +50,25 @@ function getNode(span: SpanTreeNode): NodeInfo | null {
       .replace(".call", "")
       .replace(".run", "")
       .replace("invoke_agent ", "");
-    return { id: sanitiseId(`agent_${display}`), display, kind: "agent" };
+    return { id: sanitiseMermaidId(`agent_${display}`), display, kind: "agent" };
   }
   if (type === "llm" && span.model) {
     return {
-      id: sanitiseId(`llm_${span.model}`),
+      id: sanitiseMermaidId(`llm_${span.model}`),
       display: abbreviateModel(span.model),
       kind: "llm",
     };
   }
   if (type === "tool" && span.name) {
     return {
-      id: sanitiseId(`tool_${span.name}`),
+      id: sanitiseMermaidId(`tool_${span.name}`),
       display: span.name,
       kind: "tool",
     };
   }
   if (span.name) {
     return {
-      id: sanitiseId(`other_${span.name}`),
+      id: sanitiseMermaidId(`other_${span.name}`),
       display: span.name,
       kind: "other",
     };
@@ -133,7 +115,7 @@ export function generateTopologySyntax(
   includedTypes: readonly SequenceSpanType[],
   colorMode: "light" | "dark" = "light",
 ): TopologyMermaidResult {
-  const tree = buildTree(spans);
+  const tree = buildSpanTree(spans);
   const byId = new Map<string, SpanWithChildren>();
   for (const id in tree) {
     const node = tree[id];

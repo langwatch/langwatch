@@ -48,6 +48,25 @@ function occurredAtFromInput(input: {
     : {};
 }
 
+/**
+ * Shared filter-translation step for the list/facets/newCount procedures.
+ * Each one accepts the same `query` text + `projectId` + `timeRange` and
+ * needs the same null-coalesce → call → ?? undefined sequence.
+ */
+function buildFilterWhere(input: {
+  projectId: string;
+  timeRange: { from: number; to: number; live?: boolean };
+  query?: string | null;
+}) {
+  return (
+    translateFilterToClickHouse(
+      input.query ?? "",
+      input.projectId,
+      input.timeRange,
+    ) ?? undefined
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Mappers – internal types → scoped output models
 // ---------------------------------------------------------------------------
@@ -221,18 +240,13 @@ export const tracesV2Router = createTRPCRouter({
     .use(checkProjectPermission("traces:view"))
     .query(async ({ input }) => {
       const app = getApp();
-      const filterWhere = translateFilterToClickHouse(
-        input.query ?? "",
-        input.projectId,
-        input.timeRange,
-      );
       return app.traces.list.getList({
         tenantId: input.projectId,
         timeRange: input.timeRange,
         sort: input.sort,
         page: input.page,
         pageSize: input.pageSize,
-        filterWhere: filterWhere ?? undefined,
+        filterWhere: buildFilterWhere(input),
       });
     }),
 
@@ -247,15 +261,10 @@ export const tracesV2Router = createTRPCRouter({
     .use(checkProjectPermission("traces:view"))
     .query(async ({ input }) => {
       const app = getApp();
-      const filterWhere = translateFilterToClickHouse(
-        input.query ?? "",
-        input.projectId,
-        input.timeRange,
-      );
       return app.traces.list.getFacets({
         tenantId: input.projectId,
         timeRange: input.timeRange,
-        filterWhere: filterWhere ?? undefined,
+        filterWhere: buildFilterWhere(input),
       });
     }),
 
@@ -271,16 +280,11 @@ export const tracesV2Router = createTRPCRouter({
     .use(checkProjectPermission("traces:view"))
     .query(async ({ input }) => {
       const app = getApp();
-      const filterWhere = translateFilterToClickHouse(
-        input.query ?? "",
-        input.projectId,
-        input.timeRange,
-      );
       const count = await app.traces.list.getNewCount({
         tenantId: input.projectId,
         timeRange: input.timeRange,
         since: input.since,
-        filterWhere: filterWhere ?? undefined,
+        filterWhere: buildFilterWhere(input),
       });
       return { count };
     }),
