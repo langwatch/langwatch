@@ -174,6 +174,7 @@ describe("SerializedHttpAgentAdapter", () => {
       status: 200,
       headers: new Headers({ "content-type": "application/json" }),
       json: vi.fn().mockResolvedValue({ data: "value" }),
+      text: vi.fn().mockResolvedValue('{"data":"value"}'),
     } as unknown as Awaited<ReturnType<typeof ssrfSafeFetch>>);
 
     const adapter = new SerializedHttpAgentAdapter(config);
@@ -187,6 +188,8 @@ describe("SerializedHttpAgentAdapter", () => {
       ok: false,
       status: 500,
       statusText: "Internal Server Error",
+      headers: new Headers(),
+      text: vi.fn().mockResolvedValue(""),
     } as unknown as Awaited<ReturnType<typeof ssrfSafeFetch>>);
 
     const adapter = new SerializedHttpAgentAdapter(defaultConfig);
