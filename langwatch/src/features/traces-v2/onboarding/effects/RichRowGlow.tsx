@@ -26,26 +26,33 @@ import { RICH_ARRIVAL_TRACE_ID } from "../data/samplePreviewTraces";
  * Uses `html.dark` for the dark-mode override (Chakra v3's
  * class-based color mode), matching `DrawerGlow`.
  */
+const ACTIVE_STAGES = [
+  "auroraArrival",
+  "postArrival",
+  "drawerOverview",
+] as const;
+
 export const RichRowGlow: React.FC = () => {
-  const tbodySel = `tbody[data-trace-id="${RICH_ARRIVAL_TRACE_ID}"]`;
-  // Comma-list of body-stage selectors that should keep the row lit.
-  // `auroraArrival` covers the arrival moment, `postArrival` is the
-  // click-target beat, `drawerOverview` keeps the row tagged while
-  // the user reads the drawer (so closing the drawer lands them on
-  // the same visually marked row instead of a generic table).
-  const stageScope = [
-    `body[data-traces-tour-stage="auroraArrival"]`,
-    `body[data-traces-tour-stage="postArrival"]`,
-    `body[data-traces-tour-stage="drawerOverview"]`,
-  ].join(", ");
-  // Helper for hover scopes — each stage selector needs its own
-  // `:hover` form because comma lists don't compose well across
-  // descendant selectors.
-  const stageScopeHover = [
-    `body[data-traces-tour-stage="auroraArrival"] ${tbodySel}:hover`,
-    `body[data-traces-tour-stage="postArrival"] ${tbodySel}:hover`,
-    `body[data-traces-tour-stage="drawerOverview"] ${tbodySel}:hover`,
-  ].join(", ");
+  const tbody = `tbody[data-trace-id="${RICH_ARRIVAL_TRACE_ID}"]`;
+
+  // Build a comma-separated selector list. Each rule needs to match
+  // the row under any of the three active stages, and CSS doesn't
+  // let us factor that out — so we generate the cross-product here
+  // once and pass it to every rule that needs it.
+  const each = (suffix: string, opts: { hover?: boolean; dark?: boolean } = {}) =>
+    ACTIVE_STAGES.map((stage) => {
+      const dark = opts.dark ? "html.dark " : "";
+      const hover = opts.hover ? ":hover" : "";
+      return `${dark}body[data-traces-tour-stage="${stage}"] ${tbody}${hover}${suffix}`;
+    }).join(", ");
+
+  // Outer ring on the main row only. Top + bottom strokes on every
+  // td; first/last td add the matching side stroke. The result reads
+  // as one outlined block rather than four side-by-side boxes.
+  const ROW = " > tr:first-child > td";
+  const ROW_FIRST = " > tr:first-child > td:first-child";
+  const ROW_LAST = " > tr:first-child > td:last-child";
+
   return (
     <style>{`
       @keyframes tracesV2RichRowGlow {
@@ -72,7 +79,7 @@ export const RichRowGlow: React.FC = () => {
             drop-shadow(0 0 30px rgba(165, 180, 252, 0.34));
         }
       }
-      ${stageScope.split(", ").map((s) => `${s} ${tbodySel}`).join(", ")} {
+      ${each("")} {
         --rich-ring: rgba(59, 130, 246, 0.55);
         --rich-ring-hover: rgba(59, 130, 246, 0.78);
         --rich-bg: rgba(59, 130, 246, 0.08);
@@ -83,50 +90,45 @@ export const RichRowGlow: React.FC = () => {
         animation: tracesV2RichRowGlow 2.2s ease-in-out infinite;
         transition: filter 220ms ease;
       }
-      html.dark ${stageScope.split(", ").map((s) => `${s} ${tbodySel}`).join(", html.dark ")} {
+      ${each("", { dark: true })} {
         --rich-ring: rgba(125, 211, 252, 0.4);
         --rich-ring-hover: rgba(125, 211, 252, 0.62);
         --rich-bg: rgba(125, 211, 252, 0.1);
         --rich-bg-hover: rgba(125, 211, 252, 0.2);
         animation: tracesV2RichRowGlowDark 2.2s ease-in-out infinite;
       }
-      /* Outer-perimeter ring on the main row only — every td gets
-         top + bottom strokes, first/last td add the left/right
-         strokes, so the row reads as one outlined block instead of
-         a strip per cell. The `> tr:first-child` scope skips any
-         IOPreview / Error addon `<Tr>` inside the same `<tbody>`. */
-      ${stageScope.split(", ").map((s) => `${s} ${tbodySel} > tr:first-child > td`).join(", ")} {
+      ${each(ROW)} {
         background-color: var(--rich-bg);
         box-shadow:
           inset 0 1px 0 0 var(--rich-ring),
           inset 0 -1px 0 0 var(--rich-ring);
         transition: background-color 200ms ease, box-shadow 200ms ease;
       }
-      ${stageScope.split(", ").map((s) => `${s} ${tbodySel} > tr:first-child > td:first-child`).join(", ")} {
+      ${each(ROW_FIRST)} {
         box-shadow:
           inset 0 1px 0 0 var(--rich-ring),
           inset 0 -1px 0 0 var(--rich-ring),
           inset 1px 0 0 0 var(--rich-ring);
       }
-      ${stageScope.split(", ").map((s) => `${s} ${tbodySel} > tr:first-child > td:last-child`).join(", ")} {
+      ${each(ROW_LAST)} {
         box-shadow:
           inset 0 1px 0 0 var(--rich-ring),
           inset 0 -1px 0 0 var(--rich-ring),
           inset -1px 0 0 0 var(--rich-ring);
       }
-      ${stageScopeHover.split(", ").map((s) => `${s} > tr:first-child > td`).join(", ")} {
+      ${each(ROW, { hover: true })} {
         background-color: var(--rich-bg-hover);
         box-shadow:
           inset 0 1px 0 0 var(--rich-ring-hover),
           inset 0 -1px 0 0 var(--rich-ring-hover);
       }
-      ${stageScopeHover.split(", ").map((s) => `${s} > tr:first-child > td:first-child`).join(", ")} {
+      ${each(ROW_FIRST, { hover: true })} {
         box-shadow:
           inset 0 1px 0 0 var(--rich-ring-hover),
           inset 0 -1px 0 0 var(--rich-ring-hover),
           inset 1px 0 0 0 var(--rich-ring-hover);
       }
-      ${stageScopeHover.split(", ").map((s) => `${s} > tr:first-child > td:last-child`).join(", ")} {
+      ${each(ROW_LAST, { hover: true })} {
         box-shadow:
           inset 0 1px 0 0 var(--rich-ring-hover),
           inset 0 -1px 0 0 var(--rich-ring-hover),
