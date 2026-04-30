@@ -28,7 +28,7 @@ export const LensTabs: React.FC = () => {
   const activeLensId = useViewStore((s) => s.activeLensId);
   const allLenses = useViewStore((s) => s.allLenses);
   const selectLens = useViewStore((s) => s.selectLens);
-  const saveAsNewLens = useViewStore((s) => s.saveAsNewLens);
+  const createLens = useViewStore((s) => s.createLens);
   const revertLens = useViewStore((s) => s.revertLens);
   const isDraft = useViewStore((s) => s.isDraft);
   const errorCount = useErrorCount();
@@ -74,7 +74,7 @@ export const LensTabs: React.FC = () => {
     if (!name) return;
     const trimmed = name.trim();
     if (!trimmed) return;
-    saveAsNewLens(trimmed);
+    createLens(trimmed);
     setPendingLensId(null);
   };
 

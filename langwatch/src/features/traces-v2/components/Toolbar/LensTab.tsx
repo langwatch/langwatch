@@ -198,7 +198,7 @@ const RenameInput: React.FC<{
 };
 
 /**
- * Prompt the user for a new lens name and call `saveAsNewLens` with the
+ * Prompt the user for a new lens name and call `createLens` with the
  * trimmed result. Uses `window.prompt` for now — it sidesteps the awkward
  * "popover-from-context-menu" interaction and matches the bar of effort the
  * existing rename flow sets. Replace with a proper inline input later if
@@ -206,14 +206,14 @@ const RenameInput: React.FC<{
  */
 function promptSaveAsNewLens(
   defaultName: string,
-  saveAsNewLens: (name: string) => string,
+  createLens: (name: string) => string,
 ): void {
   if (typeof window === "undefined") return;
   const name = window.prompt("Save as new lens — name:", defaultName);
   if (!name) return;
   const trimmed = name.trim();
   if (!trimmed) return;
-  saveAsNewLens(trimmed);
+  createLens(trimmed);
 }
 
 const BuiltInLensMenuItems: React.FC<{
@@ -225,14 +225,14 @@ const BuiltInLensMenuItems: React.FC<{
     (s) => s.allLenses.find((l) => l.id === lensId)?.name ?? "",
   );
   const revertLens = useViewStore((s) => s.revertLens);
-  const saveAsNewLens = useViewStore((s) => s.saveAsNewLens);
+  const createLens = useViewStore((s) => s.createLens);
   const deleteLens = useViewStore((s) => s.deleteLens);
 
   return (
     <>
       <MenuItem
         value="save-as-new"
-        onClick={() => promptSaveAsNewLens(`${lensName} (copy)`, saveAsNewLens)}
+        onClick={() => promptSaveAsNewLens(`${lensName} (copy)`, createLens)}
         fontWeight={isDraft ? "semibold" : undefined}
       >
         <LuFilePlus />
@@ -269,7 +269,7 @@ const UserLensMenuItems: React.FC<{
     (s) => s.allLenses.find((l) => l.id === lensId)?.name ?? "",
   );
   const revertLens = useViewStore((s) => s.revertLens);
-  const saveAsNewLens = useViewStore((s) => s.saveAsNewLens);
+  const createLens = useViewStore((s) => s.createLens);
   const duplicateLens = useViewStore((s) => s.duplicateLens);
   const deleteLens = useViewStore((s) => s.deleteLens);
 
@@ -280,7 +280,7 @@ const UserLensMenuItems: React.FC<{
           "persist my changes" with "rewrite the shared lens definition". */}
       <MenuItem
         value="save-as-new"
-        onClick={() => promptSaveAsNewLens(`${lensName} (copy)`, saveAsNewLens)}
+        onClick={() => promptSaveAsNewLens(`${lensName} (copy)`, createLens)}
         fontWeight={isDraft ? "semibold" : undefined}
       >
         <LuFilePlus />

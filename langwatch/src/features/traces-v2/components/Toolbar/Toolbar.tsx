@@ -1,5 +1,5 @@
 import { Button, Flex, Icon, IconButton } from "@chakra-ui/react";
-import { Compass, Download, Search } from "lucide-react";
+import { Compass, Download, Search, Tent } from "lucide-react";
 import type React from "react";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useTourEntryPoints } from "../../onboarding";
@@ -25,8 +25,11 @@ export const Toolbar: React.FC<ToolbarProps> = ({ onExportAll }) => {
   // when the tour outro absorbed its content (release notes,
   // multiplayer hint, shortcuts, beta note). Replaying the tour
   // takes the user past the OutroPanel, which is now the only
-  // surface for that information.
-  const { onLaunchTour } = useTourEntryPoints();
+  // surface for that information. While the journey is rendering
+  // the same button doubles as the exit ("On safari" → click to
+  // end), so users have one consistent place to leave the demo
+  // instead of hunting for an exit in the empty-state body.
+  const { onLaunchTour, onEndTour, tourActive } = useTourEntryPoints();
 
   return (
     <Flex
@@ -41,19 +44,21 @@ export const Toolbar: React.FC<ToolbarProps> = ({ onExportAll }) => {
       <LensTabs />
       <Flex marginLeft="auto" gap={1.5} align="center" flexShrink={0}>
         <Tooltip
-          content="Take the trace explorer tour"
+          content={tourActive ? "Click to end the tour" : "Take the trace explorer tour"}
           positioning={{ placement: "bottom" }}
         >
           <Button
             size="xs"
-            variant="ghost"
-            onClick={onLaunchTour}
-            aria-label="Take the tour"
+            variant={tourActive ? "subtle" : "ghost"}
+            colorPalette={tourActive ? "orange" : undefined}
+            onClick={tourActive ? onEndTour : onLaunchTour}
+            aria-label={tourActive ? "End the tour" : "Take the tour"}
+            aria-pressed={tourActive}
           >
             <Icon boxSize={3.5} color="orange.fg">
-              <Compass />
+              {tourActive ? <Tent /> : <Compass />}
             </Icon>
-            Tour
+            {tourActive ? "On safari" : "Tour"}
           </Button>
         </Tooltip>
         <LiveIndicator />
