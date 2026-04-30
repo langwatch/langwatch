@@ -274,7 +274,7 @@ export class DatasetService {
         { tx },
       );
 
-      if (datasetRecords && datasetRecords.length > 0) {
+      if (datasetRecords) {
         await createManyDatasetRecords({
           datasetId: dataset.id,
           projectId,
