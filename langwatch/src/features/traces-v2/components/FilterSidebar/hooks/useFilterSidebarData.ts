@@ -1,5 +1,5 @@
 import { useCallback, useMemo } from "react";
-import { buildFacetStateLookup } from "~/server/app-layer/traces/query-language/queryParser";
+import { buildFacetStateLookup } from "~/server/app-layer/traces/query-language/queries";
 import { useTraceFacets } from "../../../hooks/useTraceFacets";
 import {
   applyLensOrder,

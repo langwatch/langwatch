@@ -1,9 +1,9 @@
 import type React from "react";
+import type { LiqeQuery } from "liqe";
 import {
   getFacetValueState,
   getRangeValue,
-  type LiqeQuery,
-} from "~/server/app-layer/traces/query-language/queryParser";
+} from "~/server/app-layer/traces/query-language/queries";
 import { AttributesSection } from "./AttributesSection";
 import { ATTRIBUTES_SECTION_KEY, NONE_TOGGLE_VALUE } from "./constants";
 import { FacetSection } from "./FacetSection";

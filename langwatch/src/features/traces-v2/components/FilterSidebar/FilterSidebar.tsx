@@ -27,10 +27,12 @@ import { useCallback, useMemo } from "react";
 import { Kbd } from "~/components/ops/shared/Kbd";
 import {
   FIELD_NAMES,
+  SEARCH_FIELDS,
+} from "~/server/app-layer/traces/query-language/metadata";
+import {
   getFacetValues,
   getRangeValue,
-  SEARCH_FIELDS,
-} from "~/server/app-layer/traces/query-language/queryParser";
+} from "~/server/app-layer/traces/query-language/queries";
 import { useUIStore } from "../../stores/uiStore";
 import { CollapsedSidebar } from "./CollapsedSidebar";
 import { getFacetGroupId } from "./constants";

@@ -1,17 +1,21 @@
 import type { LiqeQuery } from "liqe";
 import { create } from "zustand";
 import {
-  getFacetValueState,
   isEmptyAST,
   ParseError,
   parse,
+  serialize,
+} from "~/server/app-layer/traces/query-language/parse";
+import {
+  getFacetValueState,
+  validateAst,
+} from "~/server/app-layer/traces/query-language/queries";
+import {
   removeFacetValueFromQuery,
   removeFieldFromQuery,
-  serialize,
   setRangeInQuery,
   toggleFacetInQuery,
-  validateAst,
-} from "~/server/app-layer/traces/query-language/queryParser";
+} from "~/server/app-layer/traces/query-language/mutations";
 
 export interface TimeRange {
   from: number;

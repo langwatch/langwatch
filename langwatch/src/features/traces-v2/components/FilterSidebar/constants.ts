@@ -28,7 +28,7 @@ import {
   User,
   Workflow,
 } from "lucide-react";
-import { FIELD_VALUES } from "~/server/app-layer/traces/query-language/queryParser";
+import { FIELD_VALUES } from "~/server/app-layer/traces/query-language/metadata";
 import { STATUS_COLORS } from "../../utils/formatters";
 
 export const ATTRIBUTES_SECTION_KEY = "__attributes__";
