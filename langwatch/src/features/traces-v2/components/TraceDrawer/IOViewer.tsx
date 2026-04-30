@@ -1,5 +1,5 @@
 import { Box, Button, HStack, Icon, Text } from "@chakra-ui/react";
-import { forwardRef, memo, useEffect, useMemo, useRef, useState } from "react";
+import { forwardRef, memo, useMemo, useState } from "react";
 import {
   LuCheck,
   LuChevronDown,
@@ -12,20 +12,16 @@ import {
   LuMessageSquare,
   LuPencil,
 } from "react-icons/lu";
-import { Tooltip } from "~/components/ui/tooltip";
-import { useColorMode } from "~/components/ui/color-mode";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { AnnotationPopover } from "./conversationView/AnnotationPopover";
+import { IOViewerBody, IOViewerEngageScrim } from "./IOViewerBody";
 import { safePrettyJson } from "./JsonHighlight";
-import { RenderedMarkdown, ShikiCodeBlock } from "./markdownView";
 import { SegmentedToggle } from "./SegmentedToggle";
 import {
-  AssistantTurnCard,
   asMarkdownBody,
   type ChatLayout,
   type ChatMessage,
   type ConversationTurn,
-  ConversationTurnsList,
   coerceToChatMessages,
   extractInlineBlocks,
   groupMessagesIntoTurns,
@@ -33,14 +29,13 @@ import {
   tryParseJSON,
   VIRTUALIZE_AT,
 } from "./transcript";
+import { useIOViewerState, type ViewFormat } from "./useIOViewerState";
 
 const COPY_FEEDBACK_MS = 1500;
 const TRUNCATE_AT = 100_000;
 // Require a meaningful tail before offering an expander — otherwise we
 // render "Show remaining 0K chars" on borderline content right at the cap.
 const TRUNCATE_TAIL_MIN = 1_000;
-const COMPACT_MAX_HEIGHT_PX = 300;
-const EXPANDED_MAX_HEIGHT_PX = 500;
 
 interface IOViewerProps {
   label: string;
@@ -123,8 +118,6 @@ function SuggestCorrectionButton({
     />
   );
 }
-
-type ViewFormat = "pretty" | "text" | "json" | "markdown";
 
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
@@ -217,41 +210,21 @@ export const IOViewer = memo(function IOViewer({
     [chatMessagesToRender],
   );
 
-  const [format, setFormat] = useState<ViewFormat>("pretty");
-  // For output mode, default to bubbles — there's only ever one assistant
-  // message, so a "Turn N" thread row is meaningless. For input mode (the
-  // full chat history), keep thread as the default.
-  const [chatLayout, setChatLayout] = useState<ChatLayout>(
-    mode === "output" ? "bubbles" : "thread",
-  );
-  // Markdown sub-mode: rendered (with formatting + Shiki for code fences)
-  // or source (raw markdown text, syntax-highlighted as markdown).
-  const [markdownSubmode, setMarkdownSubmode] = useState<"rendered" | "source">(
-    "rendered",
-  );
-  const [expanded, setExpanded] = useState(false);
-  const [collapsed, setCollapsed] = useState(false);
-  const { colorMode } = useColorMode();
-
-  // Two-mode interaction: idle = panel is a static preview that lets wheel
-  // events pass through to the page. Engaged (after a click) = fully
-  // interactive with internal scroll. Clicking anywhere outside the panel
-  // disengages it. Combined with `overscroll-behavior: auto` below, the
-  // panel never traps scroll either at boundaries or globally.
-  const [engaged, setEngaged] = useState(false);
-  const engagedRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!engaged) return;
-    const onPointerDown = (e: MouseEvent) => {
-      const target = e.target as Node | null;
-      if (!target || !engagedRef.current) return;
-      if (engagedRef.current.contains(target)) return;
-      setEngaged(false);
-    };
-    document.addEventListener("mousedown", onPointerDown);
-    return () => document.removeEventListener("mousedown", onPointerDown);
-  }, [engaged]);
+  const {
+    format,
+    setFormat,
+    chatLayout,
+    setChatLayout,
+    markdownSubmode,
+    setMarkdownSubmode,
+    expanded,
+    setExpanded,
+    collapsed,
+    setCollapsed,
+    engaged,
+    setEngaged,
+    engagedRef,
+  } = useIOViewerState({ mode });
 
   const collapsedSummary =
     isChat && allChatMessages
@@ -400,9 +373,7 @@ export const IOViewer = memo(function IOViewer({
             })}
           />
         )}
-        {!collapsed && traceId && (
-          <AnnotateButton traceId={traceId} />
-        )}
+        {!collapsed && traceId && <AnnotateButton traceId={traceId} />}
         {!collapsed && traceId && mode === "output" && (
           <SuggestCorrectionButton traceId={traceId} output={content} />
         )}
@@ -412,132 +383,59 @@ export const IOViewer = memo(function IOViewer({
       {!collapsed && (
         <>
           <Box ref={engagedRef} position="relative">
-          <Box
-            bg={flushChatCard ? "transparent" : "bg.subtle"}
-            borderRadius={flushChatCard ? "0" : "md"}
-            borderWidth={flushChatCard ? "0" : "1px"}
-            borderColor="border"
-            padding={
-              flushChatCard
-                ? 0
-                : format === "markdown" || isVirtualizingChat
-                  ? 0
-                  : 3
-            }
-            opacity={!isVirtualizingChat && !engaged ? 0.6 : 1}
-            transition="opacity 120ms ease-out"
-            maxHeight={
-              isVirtualizingChat
-                ? undefined
-                : engaged
-                  ? "min(90vh, 900px)"
-                  : "min(80vh, 600px)"
-            }
-            // Idle: overflow hidden so wheel falls through to the page.
-            // Engaged: overflow auto + `overscroll-behavior: auto` so the
-            // panel scrolls internally but chains back to the page at
-            // boundaries (no trap).
-            overflow={
-              isVirtualizingChat ? "hidden" : engaged ? "auto" : "hidden"
-            }
-            overscrollBehavior="auto"
-          >
-            {format === "json" && canJson ? (
-              <ShikiCodeBlock
-                code={prettyJsonContent}
-                language="json"
-                colorMode={colorMode}
-                flush
-              />
-            ) : format === "markdown" ? (
-              markdownSubmode === "rendered" ? (
-                // Rendered markdown — proper formatting + Shiki for any fenced
-                // code blocks inside. Lives behind the toggle because for very
-                // long content the rendered path is heavier than source.
-                <RenderedMarkdown
-                  markdown={markdownBody}
-                  paddingX={3}
-                  paddingY={2}
-                />
-              ) : (
-                // Source — raw markdown with markdown syntax highlighting.
-                // Plain text, copyable, lightning fast even on huge content.
-                <ShikiCodeBlock
-                  code={markdownBody}
-                  language="markdown"
-                  colorMode={colorMode}
-                  flush
-                />
-              )
-            ) : format === "pretty" && isChat ? (
-              <ConversationTurnsList
-                turns={conversationTurns}
-                layout={chatLayout}
-                collapseTools={mode === "output"}
-                maxHeightPx={
-                  isLong && !expanded
-                    ? COMPACT_MAX_HEIGHT_PX
-                    : EXPANDED_MAX_HEIGHT_PX
-                }
-              />
-            ) : format === "pretty" && hasInlineRichContent ? (
-              // Plain-string content with inline typed blocks (e.g. a flattened
-              // agent transcript). Render under a single assistant turn card so
-              // thinking/tool_use/tool_result get the same visual hierarchy as
-              // structured chat — left accent bar, role chip, blocks stacked.
-              <AssistantTurnCard
-                blocks={inlineBlocks}
-                toolCalls={[]}
-                collapseTools={mode === "output"}
-              />
-            ) : format === "pretty" && canJson ? (
-              <ShikiCodeBlock
-                code={prettyJsonContent}
-                language="json"
-                colorMode={colorMode}
-                flush
-              />
-            ) : (
-              <Text
-                textStyle="xs"
-                color="fg"
-                fontFamily="mono"
-                whiteSpace="pre-wrap"
-                wordBreak="break-word"
-                lineHeight="tall"
-              >
-                {displayContent}
-              </Text>
-            )}
-          </Box>
-          {!isVirtualizingChat && !engaged && (
             <Box
-              position="absolute"
-              inset={0}
-              cursor="zoom-in"
-              onClick={() => setEngaged(true)}
-              display="flex"
-              alignItems="flex-end"
-              justifyContent="center"
-              paddingBottom={2}
-              background="linear-gradient(to bottom, transparent 60%, var(--chakra-colors-bg-subtle) 100%)"
+              bg={flushChatCard ? "transparent" : "bg.subtle"}
               borderRadius={flushChatCard ? "0" : "md"}
+              borderWidth={flushChatCard ? "0" : "1px"}
+              borderColor="border"
+              padding={
+                flushChatCard
+                  ? 0
+                  : format === "markdown" || isVirtualizingChat
+                    ? 0
+                    : 3
+              }
+              opacity={!isVirtualizingChat && !engaged ? 0.6 : 1}
+              transition="opacity 120ms ease-out"
+              maxHeight={
+                isVirtualizingChat
+                  ? undefined
+                  : engaged
+                    ? "min(90vh, 900px)"
+                    : "min(80vh, 600px)"
+              }
+              // Idle: overflow hidden so wheel falls through to the page.
+              // Engaged: overflow auto + `overscroll-behavior: auto` so the
+              // panel scrolls internally but chains back to the page at
+              // boundaries (no trap).
+              overflow={
+                isVirtualizingChat ? "hidden" : engaged ? "auto" : "hidden"
+              }
+              overscrollBehavior="auto"
             >
-              <Text
-                textStyle="2xs"
-                color="fg.muted"
-                fontWeight="medium"
-                bg="bg.surface"
-                paddingX={2}
-                paddingY={0.5}
-                borderRadius="full"
-                borderWidth="1px"
-                borderColor="border"
-              >
-                Click to interact
-              </Text>
+              <IOViewerBody
+                format={format}
+                isChat={isChat}
+                canJson={canJson}
+                prettyJsonContent={prettyJsonContent}
+                markdownBody={markdownBody}
+                markdownSubmode={markdownSubmode}
+                conversationTurns={conversationTurns}
+                chatLayout={chatLayout}
+                inlineBlocks={inlineBlocks}
+                hasInlineRichContent={hasInlineRichContent}
+                displayContent={displayContent}
+                isLong={isLong}
+                expanded={expanded}
+                mode={mode}
+              />
             </Box>
-          )}
+            {!isVirtualizingChat && !engaged && (
+              <IOViewerEngageScrim
+                flushChatCard={flushChatCard}
+                onEngage={() => setEngaged(true)}
+              />
+            )}
           </Box>
 
           {isLong && (
@@ -560,4 +458,3 @@ export const IOViewer = memo(function IOViewer({
     </Box>
   );
 });
-
