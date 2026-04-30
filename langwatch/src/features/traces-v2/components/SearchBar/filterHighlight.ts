@@ -8,10 +8,8 @@ import type {
   TagToken,
   UnaryOperatorToken,
 } from "liqe";
-import {
-  parse as cachedParse,
-  SCENARIO_FIELDS,
-} from "~/server/app-layer/traces/query-language/queryParser";
+import { SCENARIO_FIELDS } from "~/server/app-layer/traces/query-language/metadata";
+import { parse as cachedParse } from "~/server/app-layer/traces/query-language/parse";
 
 // Tolerant fallback for queries that don't yet parse (mid-typing, unmatched
 // quotes, trailing operator). Decorates anything shaped like `field:value`
@@ -34,7 +32,7 @@ export interface DecorationSlot {
 export interface TokenRef {
   start: number;
   end: number;
-  field: string | null;
+  field: string;
   value: string | null;
 }
 
@@ -91,16 +89,15 @@ function walkAst(
           ? String(tag.expression.value)
           : null;
 
+      if (isImplicit) return; // free text — no chip, no X widget.
       // Token coords are in @-stripped trimmed-string space — same as what
       // `removeNodeAtLocation` will see when it re-parses the query.
       plan.tokens.push({
         start: tag.location.start,
         end: tag.location.end,
-        field: isImplicit ? null : fieldName,
+        field: fieldName,
         value,
       });
-
-      if (isImplicit) return; // free text — no inline accent
       plan.slots.push({
         from: start,
         to: end,
@@ -219,7 +216,7 @@ function createDeleteWidget(token: TokenRef): HTMLElement {
   btn.setAttribute("tabindex", "-1");
   btn.dataset.locStart = String(token.start);
   btn.dataset.locEnd = String(token.end);
-  if (token.field) btn.dataset.field = token.field;
+  btn.dataset.field = token.field;
   if (token.value !== null) btn.dataset.value = token.value;
 
   // Crisp SVG X — the "×" text glyph rendered chunky and uneven at this size.

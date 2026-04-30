@@ -1,7 +1,7 @@
 import {
   FIELD_NAMES,
   FIELD_VALUES,
-} from "~/server/app-layer/traces/query-language/queryParser";
+} from "~/server/app-layer/traces/query-language/metadata";
 import type { SuggestionState } from "./getSuggestionState";
 
 const MAX_ITEMS = 10;

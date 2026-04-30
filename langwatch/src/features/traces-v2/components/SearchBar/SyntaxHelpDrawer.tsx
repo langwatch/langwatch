@@ -27,7 +27,7 @@ import {
   FIELD_VALUES,
   SEARCH_FIELDS,
   type SearchFieldMeta,
-} from "~/server/app-layer/traces/query-language/queryParser";
+} from "~/server/app-layer/traces/query-language/metadata";
 import { useFilterStore } from "../../stores/filterStore";
 import { useUIStore } from "../../stores/uiStore";
 import { QueryPreview } from "./QueryPreview";

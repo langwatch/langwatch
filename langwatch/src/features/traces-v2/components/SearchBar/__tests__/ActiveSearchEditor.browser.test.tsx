@@ -950,6 +950,54 @@ describe("SearchBar in real Chromium", () => {
     });
   });
 
+  describe("the rendered token chip is visually contiguous with its X widget", () => {
+    it("after value-accept, the token's right edge touches the delete button's left edge — no visible gap from the trailing NBSP", async () => {
+      renderEditor();
+      const editor = getEditor();
+
+      await userEvent.click(editor);
+      // Accept via dropdown so the NBSP-insertion code path runs.
+      await userEvent.keyboard("status:error[Enter]");
+
+      const token = editor.querySelector(".filter-token") as HTMLElement;
+      const del = editor.querySelector(".filter-token-delete") as HTMLElement;
+      expect(token).toBeTruthy();
+      expect(del).toBeTruthy();
+
+      const tokenRect = token.getBoundingClientRect();
+      const delRect = del.getBoundingClientRect();
+      // The CSS uses marginLeft: -1px on the delete button to overlap
+      // borders, so the delete's left edge should sit at or just-left-of
+      // the token's right edge. Anything > 1px is a visible gap.
+      const gap = delRect.left - tokenRect.right;
+      expect(gap).toBeLessThanOrEqual(1);
+    });
+
+    it("after typing `status:error AND model:gpt-4o`, every token-X pair is flush", async () => {
+      renderEditor();
+      const editor = getEditor();
+
+      await userEvent.click(editor);
+      await userEvent.keyboard("status:error AND model:gpt-4o");
+
+      const tokens = Array.from(
+        editor.querySelectorAll(".filter-token"),
+      ) as HTMLElement[];
+      const deletes = Array.from(
+        editor.querySelectorAll(".filter-token-delete"),
+      ) as HTMLElement[];
+      expect(tokens.length).toBe(2);
+      expect(deletes.length).toBe(2);
+
+      for (let i = 0; i < tokens.length; i++) {
+        const tokenRect = tokens[i]!.getBoundingClientRect();
+        const delRect = deletes[i]!.getBoundingClientRect();
+        const gap = delRect.left - tokenRect.right;
+        expect(gap, `token[${i}] gap`).toBeLessThanOrEqual(1);
+      }
+    });
+  });
+
   describe("Range value", () => {
     // Note: `cost:[1 TO 10]` can't be tested via userEvent.keyboard because
     // `[...]` is reserved syntax for special-key actions in user-event. The
@@ -965,6 +1013,197 @@ describe("SearchBar in real Chromium", () => {
       const tokens = editor.querySelectorAll(".filter-token");
       expect(tokens.length).toBe(1);
       expect(tokens[0]?.textContent).toBe("cost:>5");
+    });
+  });
+
+  describe("operator matrix — comparison forms render as numeric (green) chips", () => {
+    it.each([
+      ["greater-than",  "cost:>5"],
+      ["greater-equal", "cost:>=5"],
+      ["less-than",     "duration:<5000"],
+      ["less-equal",    "duration:<=5000"],
+    ])("`%s` renders one numeric chip for `%s`", async (_label, query) => {
+      renderEditor();
+      const editor = getEditor();
+      await userEvent.click(editor);
+      await userEvent.keyboard(query);
+      const numeric = editor.querySelector(".filter-token-numeric");
+      expect(numeric).toBeTruthy();
+      expect(numeric?.textContent).toBe(query);
+    });
+  });
+
+  describe("operator matrix — quoted values with spaces", () => {
+    it("`errorMessage:\"rate limit\"` is one chip and the X carries the unquoted value", async () => {
+      renderEditor();
+      const editor = getEditor();
+      await userEvent.click(editor);
+      // userEvent supports `"` directly — Shift+' on US layout.
+      await userEvent.keyboard('errorMessage:"rate limit"');
+      const tokens = editor.querySelectorAll(".filter-token");
+      expect(tokens.length).toBe(1);
+      expect(tokens[0]?.textContent).toBe('errorMessage:"rate limit"');
+      const widget = editor.querySelector(
+        "[data-filter-delete]",
+      ) as HTMLElement | null;
+      expect(widget?.dataset.value).toBe("rate limit");
+    });
+  });
+
+  describe("operator matrix — wildcards in different positions", () => {
+    it.each([
+      ["trailing", "model:gpt-*"],
+      ["leading",  "model:*-mini"],
+      ["middle",   "model:gpt*mini"],
+    ])("renders `%s` (`%s`) as a single chip", async (_label, query) => {
+      renderEditor();
+      const editor = getEditor();
+      await userEvent.click(editor);
+      await userEvent.keyboard(query);
+      const tokens = editor.querySelectorAll(".filter-token");
+      expect(tokens.length).toBe(1);
+      expect(tokens[0]?.textContent).toBe(query);
+    });
+  });
+
+  describe("operator matrix — scenario fields get the purple accent", () => {
+    it.each([
+      "scenarioVerdict:success",
+      "scenarioStatus:failed",
+    ])("`%s` is rendered with filter-token-scenario", async (query) => {
+      renderEditor();
+      const editor = getEditor();
+      await userEvent.click(editor);
+      await userEvent.keyboard(query);
+      const scenario = editor.querySelector(".filter-token-scenario");
+      expect(scenario).toBeTruthy();
+      expect(scenario?.textContent).toBe(query);
+    });
+  });
+
+  describe("free-text fragments NEVER get a delete widget", () => {
+    // Critical UX regression — previously the X button rendered for any
+    // parseable Tag, including ImplicitField (free text). Now it only
+    // renders on recognised `field:value` shapes.
+    it.each([
+      ["a single letter", "A"],
+      ["two letters",     "AN"],
+      ["the word AND",    "AND"],
+      ["a free-text word","refund"],
+      ["quoted free text",'"refund policy"'],
+    ])("`%s` (%s) emits zero delete widgets", async (_label, input) => {
+      renderEditor();
+      const editor = getEditor();
+      await userEvent.click(editor);
+      await userEvent.keyboard(input);
+      const widgets = editor.querySelectorAll("[data-filter-delete]");
+      expect(widgets.length).toBe(0);
+    });
+  });
+
+  describe("partial typing — chip arrives at the colon and survives backspaces", () => {
+    it("after `status:`, exactly one chip is visible (with no value yet)", async () => {
+      renderEditor();
+      const editor = getEditor();
+      await userEvent.click(editor);
+      await userEvent.keyboard("status:");
+      const tokens = editor.querySelectorAll(".filter-token");
+      expect(tokens.length).toBe(1);
+      // The chip exists even without a value — the user sees a half-built
+      // affordance prompting them to type something.
+      const widget = editor.querySelector(
+        "[data-filter-delete]",
+      ) as HTMLElement | null;
+      expect(widget).toBeTruthy();
+      // No data-value attribute — the value is null until the user types.
+      expect(widget?.dataset.value).toBeUndefined();
+    });
+
+    it("after typing `status:error` then 5 backspaces back to `status:`, the chip survives every step", async () => {
+      renderEditor();
+      const editor = getEditor();
+      await userEvent.click(editor);
+      await userEvent.keyboard("status:error");
+      expect(editor.querySelectorAll(".filter-token").length).toBe(1);
+      // Walk backspace one keystroke at a time — chip should remain
+      // throughout (never flicker out, never multiply).
+      for (let i = 0; i < 5; i++) {
+        await userEvent.keyboard("[Backspace]");
+        expect(
+          editor.querySelectorAll(".filter-token").length,
+          `after backspace ${i + 1}`,
+        ).toBe(1);
+      }
+      // We're now at `status:` — chip still here.
+      expect(plainText(editor)).toBe("status:");
+    });
+
+    it("one more backspace (drops the colon) makes the chip disappear", async () => {
+      renderEditor();
+      const editor = getEditor();
+      await userEvent.click(editor);
+      await userEvent.keyboard("status:[Backspace]");
+      // `status` (no colon) — no field:value shape, so no chip.
+      expect(plainText(editor)).toBe("status");
+      expect(editor.querySelectorAll(".filter-token").length).toBe(0);
+    });
+  });
+
+  describe("regression: silent miscarriages get visible feedback", () => {
+    it("`status: error` (space after colon) renders a half-built `status:` chip and `error` as plain text", async () => {
+      renderEditor();
+      const editor = getEditor();
+      await userEvent.click(editor);
+      await userEvent.keyboard("status: error");
+      // The chip covers `status:` — a visible signal that the clause split
+      // and the value never landed inside the tag. `error` after the space
+      // is free-text (no chip).
+      const tokens = editor.querySelectorAll(".filter-token");
+      expect(tokens.length).toBe(1);
+      expect(tokens[0]?.textContent).toBe("status:");
+    });
+
+    it("`NOT-status:error` (no space after NOT) renders one chip in default blue (not red exclude)", async () => {
+      renderEditor();
+      const editor = getEditor();
+      await userEvent.click(editor);
+      await userEvent.keyboard("NOT-status:error");
+      const tokens = editor.querySelectorAll(".filter-token");
+      expect(tokens.length).toBe(1);
+      // No exclude class — the parser treated `NOT-status` as a literal
+      // field name, not as negation. The chip is plain blue.
+      expect(
+        editor.querySelector(".filter-token-exclude"),
+        "should NOT have exclude colouring",
+      ).toBeNull();
+    });
+  });
+
+  describe("regression: chip colour matches field type", () => {
+    it("`scenarioVerdict:success` is purple (scenario), `cost:>5` is green (numeric), `status:error` is blue (categorical)", async () => {
+      renderEditor();
+      const editor = getEditor();
+      await userEvent.click(editor);
+      await userEvent.keyboard(
+        "scenarioVerdict:success AND cost:>5 AND status:error",
+      );
+
+      const scenario = editor.querySelector(".filter-token-scenario");
+      const numeric = editor.querySelector(".filter-token-numeric");
+      // The plain `.filter-token` class is on every chip — to find the
+      // categorical-only one we exclude the modifier classes.
+      const categorical = Array.from(
+        editor.querySelectorAll(".filter-token"),
+      ).find(
+        (el) =>
+          !el.classList.contains("filter-token-scenario") &&
+          !el.classList.contains("filter-token-numeric") &&
+          !el.classList.contains("filter-token-exclude"),
+      );
+
+      expect(scenario?.textContent).toBe("scenarioVerdict:success");
+      expect(numeric?.textContent).toBe("cost:>5");
+      expect(categorical?.textContent).toBe("status:error");
     });
   });
 });

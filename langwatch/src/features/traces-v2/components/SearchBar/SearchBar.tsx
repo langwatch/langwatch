@@ -4,10 +4,8 @@ import { AnimatePresence } from "motion/react";
 import type React from "react";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { Kbd } from "~/components/ops/shared/Kbd";
-import {
-  hasCrossFacetOR,
-  SEARCH_FIELDS,
-} from "~/server/app-layer/traces/query-language/queryParser";
+import { SEARCH_FIELDS } from "~/server/app-layer/traces/query-language/metadata";
+import { hasCrossFacetOR } from "~/server/app-layer/traces/query-language/queries";
 import { useTraceFacets } from "../../hooks/useTraceFacets";
 import { useFilterStore } from "../../stores/filterStore";
 import { AskAiButton } from "../ai/AskAiButton";

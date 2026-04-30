@@ -4,7 +4,7 @@ import type React from "react";
 import {
   SEARCH_FIELDS,
   type SearchFieldMeta,
-} from "~/server/app-layer/traces/query-language/queryParser";
+} from "~/server/app-layer/traces/query-language/metadata";
 import { useUIStore } from "../../stores/uiStore";
 import type { SuggestionState } from "./getSuggestionState";
 import type { SuggestionUIState } from "./suggestionUI";

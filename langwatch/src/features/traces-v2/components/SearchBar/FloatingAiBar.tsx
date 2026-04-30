@@ -92,25 +92,24 @@ export const FloatingAiBar: React.FC<FloatingAiBarProps> = ({
           zIndex: 31,
           pointerEvents: "none",
         }}
-        initial={{ opacity: 0, y: -4 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: -4 }}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
         transition={{ duration: 0.32, ease: [0.16, 1, 0.3, 1], delay: 0.08 }}
       >
         <Box paddingX={3} display="flex" justifyContent="flex-start">
           <AnimatePresence mode="wait">
             <motion.div
               key={tip}
-              initial={{ opacity: 0, y: 2 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -2 }}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
               transition={{ duration: 0.28 }}
             >
               <HStack
                 gap={1.5}
                 align="center"
-                bg="bg.panel/90"
-                backdropFilter="blur(8px)"
+                bg="bg.panel"
                 borderWidth="1px"
                 borderColor="border.subtle"
                 borderRadius="md"

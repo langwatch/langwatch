@@ -19,18 +19,30 @@ export const editorStyles: SystemStyleObject = {
     height: 0,
     pointerEvents: "none",
   },
+  // Left half of the chip — the X widget styled by `.filter-token-delete`
+  // is the right half. Together they read as one piece: the token drops its
+  // right border + right radius, the button picks them up with a matching
+  // separator on its left edge. `whiteSpace: nowrap` on the chunk + a
+  // sub-pixel negative margin on the button (below) keep the two halves
+  // visually glued so the X can't detach when the editor scrolls or the
+  // browser sub-pixel-rounds adjacent inline elements.
   "& .filter-token": {
     display: "inline-flex",
     alignItems: "center",
     height: "23px",
     lineHeight: "22px",
     verticalAlign: "middle",
+    whiteSpace: "nowrap",
     background: "blue.subtle",
-    border: "1px solid",
+    borderTop: "1px solid",
+    borderBottom: "1px solid",
+    borderLeft: "1px solid",
     borderColor: "blue.solid",
-    borderRadius: "8px",
-    padding: "0 22px 0 4px",
-    margin: "0 1px",
+    borderTopLeftRadius: "8px",
+    borderBottomLeftRadius: "8px",
+    paddingLeft: "6px",
+    paddingRight: 0,
+    marginLeft: "1px",
   },
   "& .filter-token-exclude": {
     background: "red.subtle",
@@ -59,41 +71,58 @@ export const editorStyles: SystemStyleObject = {
     color: "fg.subtle",
     fontWeight: "semibold",
   },
-  // The X tucks into the right-edge well reserved by `.filter-token`'s
-  // 22px right padding. Circular hit target, no border (the previous
-  // half-border made the chip's right corner look frayed), opacity-faded
-  // until the chip is hovered, red wash on its own hover.
+  // Right half of the chip — flush against the token, full chip height,
+  // rounded only on the right side. Variant tints are mirrored from the
+  // adjacent token via sibling selectors so the two halves match.
+  // `marginLeft: -1px` overlaps the button's left border with the token's
+  // right edge, so any sub-pixel gap from inline-flow rounding closes
+  // visually — the X always reads as the right side of the same chip.
   "& .filter-token-delete": {
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
-    width: "14px",
-    height: "14px",
-    marginLeft: "-18px",
-    marginRight: "4px",
-    padding: 0,
-    border: "none",
-    borderRadius: "999px",
-    background: "transparent",
+    width: "18px",
+    height: "23px",
+    paddingLeft: "2px",
+    paddingRight: 0,
+    background: "blue.subtle",
+    borderTop: "1px solid",
+    borderBottom: "1px solid",
+    borderRight: "1px solid",
+    borderLeft: "1px solid",
+    borderColor: "blue.solid",
+    borderTopRightRadius: "8px",
+    borderBottomRightRadius: "8px",
     color: "fg.muted",
     cursor: "pointer",
-    opacity: 0,
-    transition:
-      "opacity 100ms ease-out, background-color 100ms ease-out, color 100ms ease-out",
+    marginLeft: "-1px",
+    marginRight: "1px",
+    whiteSpace: "nowrap",
+    transition: "background-color 100ms ease-out, color 100ms ease-out",
     verticalAlign: "middle",
     userSelect: "none",
     pointerEvents: "auto",
   },
-  "& .filter-token:hover + .filter-token-delete, & .filter-token-delete:hover":
-    {
-      opacity: 1,
-    },
+  "& .filter-token-exclude + .filter-token-delete": {
+    background: "red.subtle",
+    borderColor: "red.muted",
+  },
+  "& .filter-token-scenario + .filter-token-delete": {
+    background: "purple.subtle",
+    borderColor: "purple.muted",
+  },
+  "& .filter-token-numeric + .filter-token-delete": {
+    background: "green.subtle",
+    borderColor: "green.muted",
+  },
   "& .filter-token-delete:hover": {
     background: "red.subtle",
+    borderColor: "red.muted",
     color: "red.fg",
   },
   "& .filter-token-delete:active": {
     background: "red.muted",
+    borderColor: "red.muted",
     color: "red.fg",
   },
 };
