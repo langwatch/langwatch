@@ -8,6 +8,8 @@ import type { CellDef } from "../../types";
 
 const MAX_EVALS = 9;
 
+type Density = "compact" | "comfortable";
+
 // Server returns evaluations ordered by UpdatedAt DESC, so the first
 // occurrence per evaluator is the latest run — keep that one and drop
 // older re-runs.
@@ -23,49 +25,34 @@ function dedupeLatest(evals: TraceEvalResult[]): TraceEvalResult[] {
   return result;
 }
 
+function renderEvaluations(row: TraceListItem, density: Density) {
+  const evals = dedupeLatest(row.evaluations);
+  const textStyle = density === "compact" ? "xs" : "sm";
+  if (evals.length === 0) {
+    return (
+      <Text textStyle={textStyle} color="fg.subtle">
+        —
+      </Text>
+    );
+  }
+  const visible = evals.slice(0, MAX_EVALS);
+  const overflow = evals.length - visible.length;
+  const gap = density === "compact" ? 1 : 1.5;
+  return (
+    <HStack gap={gap} flexWrap="wrap">
+      {visible.map((ev, i) => (
+        <EvalChip key={`${ev.evaluatorId}-${i}`} eval_={ev} />
+      ))}
+      {overflow > 0 && <MoreEvalsPill count={overflow} />}
+    </HStack>
+  );
+}
+
 export const EvaluationsCell = {
   id: "evaluations",
   label: "Evals",
-  render: ({ row }) => {
-    const evals = dedupeLatest(row.evaluations);
-    if (evals.length === 0) {
-      return (
-        <Text textStyle="xs" color="fg.subtle">
-          —
-        </Text>
-      );
-    }
-    const visible = evals.slice(0, MAX_EVALS);
-    const overflow = evals.length - visible.length;
-    return (
-      <HStack gap={1} flexWrap="wrap">
-        {visible.map((ev, i) => (
-          <EvalChip key={`${ev.evaluatorId}-${i}`} eval_={ev} />
-        ))}
-        {overflow > 0 && <MoreEvalsPill count={overflow} />}
-      </HStack>
-    );
-  },
-  renderComfortable: ({ row }) => {
-    const evals = dedupeLatest(row.evaluations);
-    if (evals.length === 0) {
-      return (
-        <Text textStyle="sm" color="fg.subtle">
-          —
-        </Text>
-      );
-    }
-    const visible = evals.slice(0, MAX_EVALS);
-    const overflow = evals.length - visible.length;
-    return (
-      <HStack gap={1.5} flexWrap="wrap">
-        {visible.map((ev, i) => (
-          <EvalChip key={`${ev.evaluatorId}-${i}`} eval_={ev} />
-        ))}
-        {overflow > 0 && <MoreEvalsPill count={overflow} />}
-      </HStack>
-    );
-  },
+  render: ({ row }) => renderEvaluations(row, "compact"),
+  renderComfortable: ({ row }) => renderEvaluations(row, "comfortable"),
 } as const satisfies CellDef<TraceListItem>;
 
 function MoreEvalsPill({ count }: { count: number }) {

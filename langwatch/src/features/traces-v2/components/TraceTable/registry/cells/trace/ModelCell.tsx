@@ -5,6 +5,8 @@ import { abbreviateModel } from "../../../../../utils/formatters";
 import { MonoCell } from "../../../MonoCell";
 import type { CellDef } from "../../types";
 
+type Density = "compact" | "comfortable";
+
 function ExtraModelsBadge({
   models,
   size,
@@ -32,19 +34,17 @@ function ExtraModelsBadge({
   );
 }
 
-export const ModelCell = {
-  id: "model",
-  label: "Model",
-  render: ({ row }) => {
-    if (row.models.length === 0) {
-      return (
-        <Text textStyle="sm" color="fg.subtle">
-          —
-        </Text>
-      );
-    }
-    const primary = abbreviateModel(row.models[0]!);
-    const rest = row.models.slice(1);
+function renderModel(row: TraceListItem, density: Density) {
+  if (row.models.length === 0) {
+    return (
+      <Text textStyle="sm" color="fg.subtle">
+        —
+      </Text>
+    );
+  }
+  const primary = abbreviateModel(row.models[0]!);
+  const rest = row.models.slice(1);
+  if (density === "compact") {
     return (
       <HStack gap={1}>
         <MonoCell truncate whiteSpace={undefined}>
@@ -53,24 +53,20 @@ export const ModelCell = {
         {rest.length > 0 && <ExtraModelsBadge models={rest} size="xs" />}
       </HStack>
     );
-  },
-  renderComfortable: ({ row }) => {
-    if (row.models.length === 0) {
-      return (
-        <Text textStyle="sm" color="fg.subtle">
-          —
-        </Text>
-      );
-    }
-    const primary = abbreviateModel(row.models[0]!);
-    const rest = row.models.slice(1);
-    return (
-      <HStack gap={2}>
-        <Text textStyle="sm" color="fg.muted" fontFamily="mono" truncate>
-          {primary}
-        </Text>
-        {rest.length > 0 && <ExtraModelsBadge models={rest} size="sm" />}
-      </HStack>
-    );
-  },
+  }
+  return (
+    <HStack gap={2}>
+      <Text textStyle="sm" color="fg.muted" fontFamily="mono" truncate>
+        {primary}
+      </Text>
+      {rest.length > 0 && <ExtraModelsBadge models={rest} size="sm" />}
+    </HStack>
+  );
+}
+
+export const ModelCell = {
+  id: "model",
+  label: "Model",
+  render: ({ row }) => renderModel(row, "compact"),
+  renderComfortable: ({ row }) => renderModel(row, "comfortable"),
 } as const satisfies CellDef<TraceListItem>;
