@@ -4,7 +4,7 @@ import type { ChatMessage, ContentBlock } from "./types";
  * Heuristic: does this string look like an XML/tag-shaped payload (e.g. an
  * Anthropic-style prompt template with `<scenario>…</scenario>` blocks)?
  */
-export function looksLikeXml(s: string): boolean {
+function looksLikeXml(s: string): boolean {
   const t = s.trim();
   if (t.length === 0 || t[0] !== "<") return false;
   return /<([a-zA-Z][\w-]*)(\s[^>]*)?>[\s\S]*?<\/\1\s*>/.test(t);
@@ -15,7 +15,7 @@ export function looksLikeXml(s: string): boolean {
  * when the entire content parses — a JSON snippet embedded in prose stays
  * as-is so the prose still renders normally.
  */
-export function looksLikeJson(s: string): boolean {
+function looksLikeJson(s: string): boolean {
   const t = s.trim();
   if (t.length === 0) return false;
   if (t[0] !== "{" && t[0] !== "[") return false;
@@ -90,7 +90,7 @@ function isOneChatMessage(item: unknown): item is ChatMessage {
   return validContent || hasToolCalls;
 }
 
-export function isChatMessagesArray(data: unknown): data is ChatMessage[] {
+function isChatMessagesArray(data: unknown): data is ChatMessage[] {
   if (!Array.isArray(data)) return false;
   if (data.length === 0) return false;
   return data.every(isOneChatMessage);
@@ -146,7 +146,7 @@ export function coerceToChatMessages(data: unknown): ChatMessage[] | null {
  * Find the position of the matching closing `}` for the JSON object that
  * starts at `start`. String-literal aware so escaped quotes don't fool it.
  */
-export function findJsonObjectEnd(text: string, start: number): number {
+function findJsonObjectEnd(text: string, start: number): number {
   let depth = 0;
   let inString = false;
   let escape = false;
@@ -367,7 +367,7 @@ export function parseContentBlocks(
   return out;
 }
 
-export function joinTextBlocks(blocks: ContentBlock[]): string {
+function joinTextBlocks(blocks: ContentBlock[]): string {
   return blocks
     .filter(
       (b): b is Extract<ContentBlock, { kind: "text" }> => b.kind === "text",

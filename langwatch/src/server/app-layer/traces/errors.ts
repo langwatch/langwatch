@@ -1,3 +1,4 @@
+// TODO: wire or delete — never thrown
 import { DomainError, NotFoundError } from "~/server/app-layer/domain-error";
 
 export class TraceNotFoundError extends NotFoundError {

@@ -27,22 +27,7 @@ export const groupRegistry: Registry<TraceGroup> = {
   addons: groupAddons,
 };
 
-export {
-  buildGroups,
-  type GroupBy,
-  type TraceGroup,
-} from "./cells/group/types";
-export {
-  type ExpandedColumn,
-  expandTraceColumns,
-  traceComfortableExpanders,
-} from "./expanders";
+export { buildGroups, type TraceGroup } from "./cells/group/types";
+export { expandTraceColumns } from "./expanders";
 export { RegistryRow } from "./RegistryRow";
-export type {
-  AddonDef,
-  CellDef,
-  CellRenderContext,
-  Registry,
-  RowActions,
-  RowKind,
-} from "./types";
+export type { Registry, RowKind } from "./types";

@@ -5,7 +5,7 @@ import {
   getSingletonHighlighter,
 } from "shiki";
 
-export const SHIKI_LANGS = [
+const SHIKI_LANGS = [
   "markdown",
   "json",
   "bash",
@@ -16,16 +16,16 @@ export const SHIKI_LANGS = [
   "yaml",
 ] as const;
 
-export const SHIKI_THEMES = ["github-dark", "github-light"] as const;
+const SHIKI_THEMES = ["github-dark", "github-light"] as const;
 
-export type SharedHighlighter = HighlighterGeneric<
+type SharedHighlighter = HighlighterGeneric<
   (typeof SHIKI_LANGS)[number],
   (typeof SHIKI_THEMES)[number]
 >;
 
-export type SharedShikiTheme = (typeof SHIKI_THEMES)[number];
+type SharedShikiTheme = (typeof SHIKI_THEMES)[number];
 
-export function shikiThemeForColorMode(colorMode: string): SharedShikiTheme {
+function shikiThemeForColorMode(colorMode: string): SharedShikiTheme {
   return colorMode === "dark" ? "github-dark" : "github-light";
 }
 
@@ -45,7 +45,7 @@ export function shikiThemeForColorMode(colorMode: string): SharedShikiTheme {
  * standalone `codeToTokens` / `codeToHtml` exports go through it too,
  * so our adapter and any direct callers share one instance.
  */
-export function getSharedHighlighter(): Promise<SharedHighlighter> {
+function getSharedHighlighter(): Promise<SharedHighlighter> {
   return getSingletonHighlighter({
     langs: [...SHIKI_LANGS],
     themes: [...SHIKI_THEMES],

@@ -56,7 +56,7 @@ export interface TraceListPage {
   evaluations: Record<string, EvalSummary[]>;
 }
 
-export interface FacetCounts {
+interface FacetCounts {
   origin: Record<string, number>;
   status: Record<string, number>;
   service: Record<string, number>;
@@ -68,7 +68,7 @@ export interface FacetCounts {
   };
 }
 
-export interface ListParams {
+interface ListParams {
   tenantId: string;
   timeRange: { from: number; to: number };
   sort: { columnId: string; direction: "asc" | "desc" };
@@ -77,32 +77,32 @@ export interface ListParams {
   filterWhere?: { sql: string; params: Record<string, unknown> };
 }
 
-export interface FacetParams {
+interface FacetParams {
   tenantId: string;
   timeRange: { from: number; to: number };
   filterWhere?: { sql: string; params: Record<string, unknown> };
 }
 
-export interface NewCountParams {
+interface NewCountParams {
   tenantId: string;
   timeRange: { from: number; to: number };
   since: number;
   filterWhere?: { sql: string; params: Record<string, unknown> };
 }
 
-export interface SuggestParams {
+interface SuggestParams {
   tenantId: string;
   field: string;
   prefix: string;
   limit?: number;
 }
 
-export interface DiscoverParams {
+interface DiscoverParams {
   tenantId: string;
   timeRange: { from: number; to: number };
 }
 
-export interface FacetValuesParams {
+interface FacetValuesParams {
   tenantId: string;
   timeRange: { from: number; to: number };
   facetKey: string;
@@ -185,7 +185,7 @@ function discoverCacheKey(params: DiscoverParams): string {
   ].join("|");
 }
 
-export interface CategoricalFacetDescriptor {
+interface CategoricalFacetDescriptor {
   key: string;
   kind: "categorical";
   label: string;
@@ -194,7 +194,7 @@ export interface CategoricalFacetDescriptor {
   totalDistinct: number;
 }
 
-export interface RangeFacetDescriptor {
+interface RangeFacetDescriptor {
   key: string;
   kind: "range";
   label: string;
@@ -203,7 +203,7 @@ export interface RangeFacetDescriptor {
   max: number;
 }
 
-export interface DynamicKeysFacetDescriptor {
+interface DynamicKeysFacetDescriptor {
   key: string;
   kind: "dynamic_keys";
   label: string;
@@ -212,12 +212,12 @@ export interface DynamicKeysFacetDescriptor {
   totalDistinct: number;
 }
 
-export type FacetDescriptor =
+type FacetDescriptor =
   | CategoricalFacetDescriptor
   | RangeFacetDescriptor
   | DynamicKeysFacetDescriptor;
 
-export interface FacetValuesResult {
+interface FacetValuesResult {
   values: { value: string; label?: string; count: number }[];
   totalDistinct: number;
 }

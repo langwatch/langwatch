@@ -9,7 +9,7 @@ import { z } from "zod";
  * older callers / replayed cached responses may pre-date newer fields — falling
  * back keeps consumers safe instead of throwing on a fresh deploy.
  */
-export const traceListItemSchema = z.object({
+const traceListItemSchema = z.object({
   traceId: z.string(),
   timestamp: z.number(),
   name: z.string(),
@@ -49,7 +49,7 @@ export type TraceListItemDto = z.infer<typeof traceListItemSchema>;
  * Trace header: everything the drawer header + summary tab needs.
  * Returned by `tracesV2.header`.
  */
-export const traceHeaderSchema = z.object({
+const traceHeaderSchema = z.object({
   traceId: z.string(),
   timestamp: z.number(),
   name: z.string(),
@@ -107,7 +107,7 @@ export type TraceHeader = z.infer<typeof traceHeaderSchema>;
  * Span tree node: lightweight per-span data for waterfall / flame / span-list.
  * Returned by `tracesV2.spanTree`.
  */
-export const spanTreeNodeSchema = z.object({
+const spanTreeNodeSchema = z.object({
   spanId: z.string(),
   parentSpanId: z.string().nullable(),
   name: z.string(),

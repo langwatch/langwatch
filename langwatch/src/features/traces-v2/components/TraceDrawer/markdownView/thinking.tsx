@@ -3,7 +3,7 @@ import { keyframes } from "@emotion/react";
 import React from "react";
 import { Tooltip } from "~/components/ui/tooltip";
 
-export const thinkingShimmer = keyframes`
+const thinkingShimmer = keyframes`
   0% { background-position: 200% center; }
   100% { background-position: -200% center; }
 `;
@@ -57,7 +57,7 @@ export function ThinkingText({ children }: { children: React.ReactNode }) {
   );
 }
 
-export const THINKING_MARKER_RE = /^🧠\s*/;
+const THINKING_MARKER_RE = /^🧠\s*/;
 
 /**
  * If the first text node of a markdown `<em>` body starts with the 🧠

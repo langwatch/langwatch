@@ -16,7 +16,7 @@ interface ExecutorOpts {
   resourceAttributes?: Record<string, string>;
 }
 
-export interface FoundryExecutor {
+interface FoundryExecutor {
   executeTrace(traceConfig: TraceConfig): Promise<string>;
   executeTraces(traces: TraceConfig[]): Promise<string[]>;
   /** forceFlush without shutdown — leaves the provider warm. */
@@ -88,7 +88,7 @@ export function getFoundryExecutor(opts: ExecutorOpts): FoundryExecutor {
  * clean slate between cases; production code rarely needs it (the
  * page-hide hook handles real teardown).
  */
-export async function closeAllFoundryExecutors(): Promise<void> {
+async function closeAllFoundryExecutors(): Promise<void> {
   const all = [...executorCache.values()];
   executorCache.clear();
   await Promise.all(all.map((e) => e.close()));
@@ -99,7 +99,7 @@ export async function closeAllFoundryExecutors(): Promise<void> {
  * unless you need an isolated lifecycle (e.g. a test that owns the
  * provider it tears down).
  */
-export function createFoundryExecutor(opts: ExecutorOpts): FoundryExecutor {
+function createFoundryExecutor(opts: ExecutorOpts): FoundryExecutor {
   const provider = createFoundryProvider({
     apiKey: opts.apiKey,
     endpoint: opts.endpoint,

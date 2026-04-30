@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const presenceLensSchema = z.enum([
+const presenceLensSchema = z.enum([
   "traces",
   "evaluations",
   "datasets",
@@ -12,21 +12,21 @@ export const presenceLensSchema = z.enum([
   "settings",
   "other",
 ]);
-export type PresenceLens = z.infer<typeof presenceLensSchema>;
+type PresenceLens = z.infer<typeof presenceLensSchema>;
 
-export const presenceDrawerViewModeSchema = z.enum([
+const presenceDrawerViewModeSchema = z.enum([
   "trace",
   "conversation",
   "scenario",
 ]);
-export const presenceVizTabSchema = z.enum([
+const presenceVizTabSchema = z.enum([
   "waterfall",
   "flame",
   "spanlist",
   "topology",
   "sequence",
 ]);
-export const presenceDrawerTabSchema = z.enum([
+const presenceDrawerTabSchema = z.enum([
   "summary",
   "llm",
   "span",
