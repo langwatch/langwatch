@@ -9,6 +9,14 @@ export type EnvScaffoldInput = {
   ports: PortAllocation;
   baseHost?: string;
   overrides?: EnvOverrides;
+  /**
+   * NLP backend mode plumbed from RuntimeContext.nlpMode. `go` (default)
+   * keeps FEATURE_FLAG_FORCE_ENABLE=release_nlp_go_engine_enabled so
+   * /studio/* routes hit nlpgo; `python` drops that line so the langwatch
+   * app falls through to the legacy uvicorn-served langwatch_nlp upstream.
+   * smith owns the buildEnv branch — see CLI ↔ env seam in PR description.
+   */
+  nlpMode?: "python" | "go";
 };
 
 // Keys whose generated value MUST be stable across .env regenerations —

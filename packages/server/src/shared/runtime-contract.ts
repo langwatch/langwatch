@@ -15,6 +15,15 @@ export type RuntimeContext = {
   version: string;
   /** Opt-in: start bullboard alongside the rest. CLI flag `--bullboard`. */
   bullboard: boolean;
+  /**
+   * NLP runtime backend. `go` (default) runs the Go nlpgo service from
+   * the aigateway monobinary; `python` runs the legacy uvicorn-served
+   * langwatch_nlp project under uv. CLI flag `--nlp <python|go>`. The
+   * scaffolded .env's FEATURE_FLAG_FORCE_ENABLE block is gated on this
+   * so the langwatch app routes /studio/* traffic to the matching
+   * upstream — see shared/env.ts buildEnv.
+   */
+  nlpMode: "python" | "go";
   /** Pass-through env from the user shell (OPENAI_API_KEY, …) — propagated to children, never persisted. */
   userEnv: Record<string, string>;
 };

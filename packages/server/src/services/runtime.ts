@@ -15,6 +15,7 @@ import { readEnvFile } from "./env-file.ts";
 import { EventBus } from "./event-bus.ts";
 import { startLangevals } from "./langevals.ts";
 import { startLangwatch } from "./langwatch.ts";
+import { startLangwatchNlp } from "./langwatch-nlp.ts";
 import { startLangwatchWorkers } from "./langwatch-workers.ts";
 import { startNlpgo } from "./nlpgo.ts";
 import { runMigrations } from "./migrate.ts";
@@ -91,14 +92,16 @@ const runtimeImpl: RuntimeApi = {
     const childEnv = { ...envFromFile, ...ctx.userEnv };
 
     try {
-      // Start aigateway BEFORE nlpgo because both share the same monobinary
-      // (cmd/service dispatcher); with the predep-resolved binary already
-      // exec'd as `aigateway`, nlpgo just spawns the same file with `nlpgo`
-      // arg. They listen on different ports — no collision. Done in one
-      // Promise.all so total wallclock is still bounded by the slowest
-      // service.
+      // NLP backend selection: ctx.nlpMode picks startNlpgo (default,
+      // bundled monobinary) or startLangwatchNlp (legacy uvicorn under
+      // uv). Both bind to ctx.ports.nlp; the langwatch app's
+      // /studio/* routing is steered by FEATURE_FLAG_FORCE_ENABLE=
+      // release_nlp_go_engine_enabled in the .env (set by buildEnv only
+      // when nlpMode==='go'). aigateway uses the same monobinary either
+      // way — only the nlpgo subcommand is mode-gated.
+      const startNlp = ctx.nlpMode === "python" ? startLangwatchNlp : startNlpgo;
       const [nlp, langevals, gw, lw] = await Promise.all([
-        startNlpgo(ctx, bus, childEnv),
+        startNlp(ctx, bus, childEnv),
         startLangevals(ctx, bus, childEnv),
         startAigateway(ctx, bus, envFromFile),
         startLangwatch(ctx, bus, childEnv),
