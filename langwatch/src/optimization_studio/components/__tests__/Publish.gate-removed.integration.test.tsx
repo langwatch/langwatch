@@ -251,6 +251,11 @@ describe("given the studio Publish menu is rendered", () => {
       renderPublish();
       const publishItem = screen.getByText(/Publish workflow/i);
       expect(publishItem).toBeDefined();
+      // react-feather renders <Lock /> as <svg class="feather feather-lock">,
+      // which the paywall used to inject next to the menu item children.
+      // Asserting it's absent guards against regressing the icon on its own.
+      const lockIcons = document.querySelectorAll(".feather-lock");
+      expect(lockIcons).toHaveLength(0);
     });
 
     /** @scenario Publish.tsx does not query plan.canPublish to gate the menu */
