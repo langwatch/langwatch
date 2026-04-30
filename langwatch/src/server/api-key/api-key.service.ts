@@ -3,6 +3,7 @@ import { RoleBindingScopeType, TeamUserRole } from "@prisma/client";
 import { ApiKeyRepository, type ApiKeyWithBindings } from "./api-key.repository";
 import {
   generateApiKeyToken,
+  hashSecret,
   splitApiKeyToken,
   verifySecret,
 } from "./api-key-token.utils";
@@ -426,8 +427,20 @@ export class ApiKeyService {
     // Expired tokens are rejected
     if (apiKey.expiresAt && apiKey.expiresAt < new Date()) return null;
 
-    // Verify the secret portion
-    if (!verifySecret(parts.secret, apiKey.hashedSecret)) return null;
+    // Verify the secret portion — supports both current HMAC and legacy SHA-256
+    const result = verifySecret(parts.secret, apiKey.hashedSecret);
+    if (result === "no_match") return null;
+
+    // Auto-upgrade legacy SHA-256 hashes to HMAC-SHA256 (fire-and-forget)
+    if (result === "match_legacy") {
+      const upgraded = hashSecret(parts.secret);
+      this.repo.upgradeHash({ id: apiKey.id, hashedSecret: upgraded }).catch((err: unknown) => {
+        logger.warn(
+          { err, apiKeyId: apiKey.id },
+          "failed to upgrade legacy hash to HMAC (fire-and-forget)",
+        );
+      });
+    }
 
     return apiKey;
   }

@@ -48,7 +48,7 @@ function getApiKeyPepper(): string {
  *
  * Format: sk-lw-{lookupId}_{secret}
  *   - lookupId: indexed in plaintext for O(1) DB lookup
- *   - secret: stored as SHA-256 hash only
+ *   - secret: stored as HMAC-SHA256 hash
  *
  * Returns the full plaintext token (shown once to user),
  * plus the lookupId and hashedSecret for DB storage.
@@ -99,19 +99,10 @@ export function splitApiKeyToken(
 }
 
 /**
- * HMAC-SHA256 of an API key secret, keyed by the server pepper. Deterministic
- * and fast — suitable for per-request verification on the hot path.
- *
- * CodeQL flags this as "insufficient computational effort" because it sees
- * a secret being hashed without bcrypt/argon2. This is intentional:
- *   - API key secrets are 48 chars from a 62-char alphabet (~286 bits of
- *     entropy) — brute-force is infeasible regardless of hash speed.
- *   - This runs on every authenticated request. A slow KDF (bcrypt at
- *     100ms) would cap throughput at ~10 req/s and become a DoS surface.
- *   - The HMAC pepper means a DB-only leak is useless without the pepper.
- * This is NOT a user-chosen password — it is a machine-generated secret.
+ * HMAC-SHA256 of an API key secret, keyed by the server pepper.
+ * Used for all newly created keys.
  */
-// eslint-disable-next-line @codeql/js/insufficient-password-hash -- see rationale above
+// eslint-disable-next-line @codeql/js/insufficient-password-hash -- machine-generated 286-bit secret, not a user password
 export function hashSecret(secret: string): string {
   return crypto
     .createHmac("sha256", getApiKeyPepper())
@@ -120,17 +111,45 @@ export function hashSecret(secret: string): string {
 }
 
 /**
- * Verifies a secret against a stored hash.
- * Returns false (instead of throwing) when the hash lengths differ,
- * which can happen if hashedSecret is corrupt or a different algorithm.
+ * Plain SHA-256 hash — the algorithm used by PATs created before the
+ * HMAC-pepper upgrade. Kept only for backward-compat verification.
+ * New keys are never hashed with this function.
  */
-export function verifySecret(secret: string, hashedSecret: string): boolean {
-  const computed = Buffer.from(hashSecret(secret), "hex");
+function hashSecretLegacy(secret: string): string {
+  return crypto.createHash("sha256").update(secret).digest("hex");
+}
+
+/**
+ * Verifies a secret against a stored hash.
+ *
+ * Tries HMAC-SHA256 (current) first. If that fails, falls back to
+ * plain SHA-256 (legacy) for keys created before the pepper upgrade.
+ *
+ * Returns:
+ *  - "match"          — verified with current HMAC algorithm
+ *  - "match_legacy"   — verified with legacy SHA-256 (caller should re-hash)
+ *  - "no_match"       — neither algorithm matched
+ */
+export function verifySecret(
+  secret: string,
+  hashedSecret: string,
+): "match" | "match_legacy" | "no_match" {
+  // Try current HMAC-SHA256 first
+  const hmacHash = Buffer.from(hashSecret(secret), "hex");
   const stored = Buffer.from(hashedSecret, "hex");
 
-  if (computed.length !== stored.length) return false;
+  if (hmacHash.length === stored.length && crypto.timingSafeEqual(hmacHash, stored)) {
+    return "match";
+  }
 
-  return crypto.timingSafeEqual(computed, stored);
+  // Fall back to legacy plain SHA-256
+  const legacyHash = Buffer.from(hashSecretLegacy(secret), "hex");
+
+  if (legacyHash.length === stored.length && crypto.timingSafeEqual(legacyHash, stored)) {
+    return "match_legacy";
+  }
+
+  return "no_match";
 }
 
 /**

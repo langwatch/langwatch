@@ -153,6 +153,13 @@ export class ApiKeyRepository {
     });
   }
 
+  async upgradeHash({ id, hashedSecret }: { id: string; hashedSecret: string }): Promise<void> {
+    await this.prisma.apiKey.update({
+      where: { id },
+      data: { hashedSecret },
+    });
+  }
+
   async revoke({ id }: { id: string }): Promise<ApiKey> {
     return this.prisma.apiKey.update({
       where: { id },
