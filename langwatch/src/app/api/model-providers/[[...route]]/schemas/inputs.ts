@@ -17,3 +17,11 @@ export const updateModelProviderInputSchema = z.object({
     .optional(),
   defaultModel: z.string().optional(),
 });
+
+/**
+ * Input schema for POST /:provider/validate.
+ * Accepts custom keys (API key + optional base URL) to validate.
+ */
+export const validateModelProviderInputSchema = z.object({
+  customKeys: z.record(z.string()),
+});

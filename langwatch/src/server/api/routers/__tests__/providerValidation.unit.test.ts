@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MASKED_KEY_PLACEHOLDER } from "../../../../utils/constants";
-import { validateProviderApiKey } from "../providerValidation";
+import { validateProviderApiKey } from "../../../modelProviders/providerValidation";
 
 // Mock fetch globally
 const mockFetch = vi.fn();

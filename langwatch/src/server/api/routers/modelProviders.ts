@@ -10,7 +10,7 @@ import { createTRPCRouter, protectedProcedure } from "../trpc";
 import {
   validateKeyWithCustomUrl,
   validateProviderApiKey,
-} from "./providerValidation";
+} from "../../modelProviders/providerValidation";
 import {
   getProjectModelProviders,
   getProjectModelProvidersForFrontend,
