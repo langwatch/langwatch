@@ -82,7 +82,13 @@ func TestSelectEvaluationEntries_SpecificModeRequiresIndex(t *testing.T) {
 	assert.Equal(t, "b", got[0]["q"])
 }
 
-func TestSelectEvaluationEntries_RejectsRemoteDatasets(t *testing.T) {
+// Defensive guard: if Studio's loadDatasets() somehow fails to inline a
+// saved dataset before forwarding, the Go engine should NOT silently
+// run an empty eval. Surface a structured error pointing the operator
+// at the right TS-side helper to fix. Behavior change vs the
+// pre-fix "remote datasets not yet supported" message: now actionable
+// — tells you WHICH file to fix, not just "not supported".
+func TestSelectEvaluationEntries_NonInlineDatasetReturnsActionableError(t *testing.T) {
 	wf := &dsl.Workflow{
 		Nodes: []dsl.Node{
 			{ID: "entry", Type: dsl.ComponentEntry, Data: dsl.Component{
@@ -92,7 +98,103 @@ func TestSelectEvaluationEntries_RejectsRemoteDatasets(t *testing.T) {
 	}
 	_, err := selectEvaluationEntries(wf, "full", nil)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "remote datasets")
+	assert.Contains(t, err.Error(), "loadDatasets",
+		"error must point operator at the TS-side helper that owns inlining")
+	assert.Contains(t, err.Error(), "no inline dataset",
+		"error must surface the underlying state (no inline) for log search")
+}
+
+// TestSelectEvaluationEntries_TrainTestSplitShuffleByPositiveSeed —
+// Python parity (S2.2). sklearn.train_test_split with `shuffle=(seed
+// >= 0), random_state=seed` reorders rows before slicing. With a
+// positive seed the same dataset+seed must produce the same train
+// rows (deterministic), and they should NOT all match the in-order
+// slice (proving shuffle actually happened).
+func TestSelectEvaluationEntries_TrainTestSplitShuffleByPositiveSeed(t *testing.T) {
+	makeWf := func(seed int) *dsl.Workflow {
+		s := seed
+		return &dsl.Workflow{
+			Nodes: []dsl.Node{
+				{ID: "entry", Type: dsl.ComponentEntry, Data: dsl.Component{
+					TrainSize: ptrFloat(0.5),
+					TestSize:  ptrFloat(0.5),
+					Seed:      &s,
+					Dataset: &dsl.NodeDataset{Inline: &dsl.DatasetInline{
+						Records: map[string][]any{"q": {"a", "b", "c", "d", "e", "f", "g", "h"}},
+					}},
+				}},
+			},
+		}
+	}
+	train, err := selectEvaluationEntries(makeWf(7), "train", nil)
+	require.NoError(t, err)
+	trainAgain, err := selectEvaluationEntries(makeWf(7), "train", nil)
+	require.NoError(t, err)
+	assert.Equal(t, train, trainAgain, "same seed → same shuffle (deterministic)")
+
+	// Was the shuffle effective? At least ONE row in the train slice
+	// must differ from the in-order half {a,b,c,d}.
+	inOrder := []string{"a", "b", "c", "d"}
+	allMatch := true
+	for i, row := range train {
+		if row["q"] != inOrder[i] {
+			allMatch = false
+			break
+		}
+	}
+	assert.False(t, allMatch, "with seed >= 0 the shuffled train slice should not equal the in-order slice; got %v", train)
+
+	// Different seed yields a different ordering (statistical, not
+	// guaranteed for tiny seed-pairs, but sklearn parity for these
+	// values).
+	trainOther, err := selectEvaluationEntries(makeWf(13), "train", nil)
+	require.NoError(t, err)
+	assert.NotEqual(t, train, trainOther, "different seed → different shuffle")
+}
+
+// Negative-seed (or unset) falls back to in-order slicing — keeps
+// re-runs of the same dataset deterministic when the user explicitly
+// disables shuffle. Mirrors Python's `shuffle=(seed >= 0)`.
+func TestSelectEvaluationEntries_TrainTestSplitNegativeSeedKeepsOrder(t *testing.T) {
+	negSeed := -1
+	wf := &dsl.Workflow{
+		Nodes: []dsl.Node{
+			{ID: "entry", Type: dsl.ComponentEntry, Data: dsl.Component{
+				TrainSize: ptrFloat(0.5),
+				TestSize:  ptrFloat(0.5),
+				Seed:      &negSeed,
+				Dataset: &dsl.NodeDataset{Inline: &dsl.DatasetInline{
+					Records: map[string][]any{"q": {"a", "b", "c", "d"}},
+				}},
+			}},
+		},
+	}
+	train, err := selectEvaluationEntries(wf, "train", nil)
+	require.NoError(t, err)
+	require.Len(t, train, 2)
+	assert.Equal(t, "a", train[0]["q"], "no shuffle when seed<0 — first row preserved")
+	assert.Equal(t, "b", train[1]["q"])
+}
+
+// testSize must be honored — pre-fix it was discarded (`_ = testSize`)
+// and the test slice was always the complement. Now an explicit
+// testSize<complement size truncates the test slice to that count.
+func TestSelectEvaluationEntries_TestSizeRespected(t *testing.T) {
+	wf := &dsl.Workflow{
+		Nodes: []dsl.Node{
+			{ID: "entry", Type: dsl.ComponentEntry, Data: dsl.Component{
+				TrainSize: ptrFloat(0.5),  // 5 rows
+				TestSize:  ptrFloat(0.2),  // 2 rows (not 5)
+				Dataset: &dsl.NodeDataset{Inline: &dsl.DatasetInline{
+					Records: map[string][]any{"q": {"a", "b", "c", "d", "e", "f", "g", "h", "i", "j"}},
+				}},
+			}},
+		},
+	}
+	test, err := selectEvaluationEntries(wf, "test", nil)
+	require.NoError(t, err)
+	assert.Len(t, test, 2,
+		"explicit testSize=0.2 of 10 rows = 2 (not the 5-row complement of trainSize)")
 }
 
 func TestSelectEvaluationEntries_TrainTestSplitByPercentage(t *testing.T) {

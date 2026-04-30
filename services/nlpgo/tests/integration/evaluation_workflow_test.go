@@ -234,12 +234,16 @@ func TestEvaluationWorkflow_PostsBatchResultsToLangWatch(t *testing.T) {
 	}
 }
 
-// TestEvaluationWorkflow_RejectsRemoteDataset pins the explicit error
-// when the workflow's entry node references an API-hosted dataset
-// (not the inline one). Until we port langwatch.dataset.get_dataset
-// to Go, the SSE handler must surface a clear error rather than
-// running an empty evaluation that silently posts no results.
-func TestEvaluationWorkflow_RejectsRemoteDataset(t *testing.T) {
+// TestEvaluationWorkflow_NonInlineDatasetReturnsActionableError —
+// defensive guard for when Studio's loadDatasets() somehow fails to
+// inline a saved dataset before forwarding to nlpgo. Originally the
+// engine surfaced 'remote datasets not yet supported on Go path'; that
+// message broke 3.2.0 prod for a customer because it was confusing
+// (the user saw it on what they thought was a fully-supported feature).
+// Now the error points operators at the TS-side helper that owns the
+// inlining so the right code gets fixed instead of users blaming the
+// engine.
+func TestEvaluationWorkflow_NonInlineDatasetReturnsActionableError(t *testing.T) {
 	url, _, _ := setupEvaluationStack(t)
 
 	envelope := `{
@@ -279,10 +283,12 @@ func TestEvaluationWorkflow_RejectsRemoteDataset(t *testing.T) {
 		if es["status"] == "error" {
 			sawError = true
 			msg, _ := es["error"].(string)
-			assert.Contains(t, msg, "remote datasets",
-				"error must mention remote datasets so the user knows what's not yet supported")
+			assert.Contains(t, msg, "loadDatasets",
+				"error must point operators at the TS-side helper that owns inlining (loadDatasets.ts) so the right code gets fixed")
+			assert.Contains(t, msg, "no inline dataset",
+				"error must surface the underlying engine-level state for log search")
 			break
 		}
 	}
-	assert.True(t, sawError, "remote-dataset evaluation must emit a structured evaluation_state_change error event")
+	assert.True(t, sawError, "non-inline dataset evaluation must emit a structured evaluation_state_change error event")
 }
