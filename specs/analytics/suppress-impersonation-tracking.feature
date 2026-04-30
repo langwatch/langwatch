@@ -1,3 +1,4 @@
+@unimplemented
 Feature: Suppress analytics tracking during admin impersonation and label admin users
   As a LangWatch product team member
   I want analytics tracking suppressed when an admin impersonates a user
