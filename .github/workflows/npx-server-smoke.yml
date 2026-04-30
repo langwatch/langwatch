@@ -246,17 +246,20 @@ jobs:
           fi
 
       - name: Probe a workflow execution end-to-end
-        # Read the secret directly in the if-check. Step-level `env:` is
-        # populated AFTER the if-check is evaluated, so `env.OPENAI_API_KEY_CI`
-        # in the condition was always empty → the step was always skipped.
-        if: ${{ secrets.OPENAI_API_KEY_CI != '' }}
+        # `secrets.*` is not available in step-level `if:` expressions
+        # (only `env`, `inputs`, `github`, `runner`, etc. are valid there).
+        # We pass the secret through job-level env via `OPENAI_API_KEY_CI`,
+        # then short-circuit inside the script when it's empty. Net effect
+        # matches the original "skip if no key" intent without invalid YAML.
         env:
           OPENAI_API_KEY_CI: ${{ secrets.OPENAI_API_KEY_CI }}
         run: |
-          # Posts a minimal workflow execution that hits langwatch_nlp.
-          # If OPENAI_API_KEY_CI isn't set, this step is skipped and the
-          # smoke flow stays gateable on infrastructure alone.
           set -e
+          if [[ -z "$OPENAI_API_KEY_CI" ]]; then
+            echo "OPENAI_API_KEY_CI not set — skipping workflow execution probe."
+            exit 0
+          fi
+          # Posts a minimal workflow execution that hits langwatch_nlp.
           base=${RESOLVED_BASE}
           # TODO: replace with a real workflow execution once the smoke fixture lands.
           curl -fsS -X POST "http://127.0.0.1:$((base + 1))/health"
