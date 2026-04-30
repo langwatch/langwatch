@@ -148,7 +148,7 @@ export const ONBOARDING_JOURNEY: StageDef[] = [
     // than "we're holding you hostage waiting to read." A longer
     // linger gives the user time to register both lines before
     // density kicks in.
-    subhead: "Same data, fresh layout. Quick setup, then you're in.",
+    subhead: "Same data, fresh layout. We'll have you in in a minute.",
     typewriter: true,
     holdMs: 1700,
     next: "densityIntro",
@@ -156,7 +156,7 @@ export const ONBOARDING_JOURNEY: StageDef[] = [
   },
   {
     id: "densityIntro",
-    heading: "Firstly, let's match your vibe.",
+    heading: "Let's match your vibe.",
     subhead: "Pick a density. Swap any time from the toolbar, or press D.",
     cta: "Continue",
     next: "serviceSegue",
@@ -171,9 +171,9 @@ export const ONBOARDING_JOURNEY: StageDef[] = [
     // `chapters.ts` and the §14 design discussion for the arc
     // rationale.
     id: "serviceSegue",
-    heading: "Lenses + facets.",
+    heading: "Two ways to cut through.",
     subhead:
-      "Lens tabs above shape the whole table. Facets in the sidebar slice it.",
+      "Lens tabs above reshape the whole table. Facets in the sidebar narrow what you see.",
     typewriter: true,
     cta: "Show me",
     next: "facetsReveal",
@@ -182,9 +182,9 @@ export const ONBOARDING_JOURNEY: StageDef[] = [
   },
   {
     id: "facetsReveal",
-    heading: "Click any facet to slice.",
+    heading: "Pick a facet, narrow the view.",
     subhead:
-      "Same chips you'll see inside a trace, lifted to the sidebar so they apply to the whole table. Filter bar up top takes a query if you'd rather type.",
+      "Same tags you'll find inside a trace — applied to the whole table. Or type a query in the bar up top.",
     typewriter: true,
     cta: "Got it",
     next: "arrivalPrep",

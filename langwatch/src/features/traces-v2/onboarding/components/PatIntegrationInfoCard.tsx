@@ -10,7 +10,7 @@ import {
 import { RoleBindingScopeType, TeamUserRole } from "@prisma/client";
 import { Key, Sparkles } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Kbd } from "~/components/ops/shared/Kbd";
 import { toaster } from "~/components/ui/toaster";
 import { CodePreview } from "~/features/onboarding/components/sections/observability/CodePreview";
@@ -156,6 +156,12 @@ export function PatIntegrationInfoCard({
   // token is already minted (button disappears) or while another mutation
   // is in flight, and suppressed for typing targets so it doesn't fire
   // when the user is in an input elsewhere on the page.
+  //
+  // Route through a ref so the handler always invokes the latest closure
+  // (organizationId/projectId/onTokenGenerated change → ref updates) without
+  // re-binding the listener on every render.
+  const handleGenerateRef = useRef(handleGenerate);
+  handleGenerateRef.current = handleGenerate;
   useEffect(() => {
     if (token || createMutation.isLoading) return;
     const handler = (e: KeyboardEvent) => {
@@ -170,14 +176,11 @@ export function PatIntegrationInfoCard({
       }
       if (e.key.toLowerCase() === "g") {
         e.preventDefault();
-        handleGenerate();
+        handleGenerateRef.current();
       }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-    // handleGenerate closes over fresh deps each render; rebinding on
-    // token / loading transitions is enough.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, createMutation.isLoading]);
 
   // Pre-generation preview uses a non-secret obvious placeholder so the

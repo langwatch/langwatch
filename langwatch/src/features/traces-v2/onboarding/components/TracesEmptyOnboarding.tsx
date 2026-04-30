@@ -1,5 +1,5 @@
 import { Button, HStack, Icon, Text, VStack } from "@chakra-ui/react";
-import { BookOpen, Wrench } from "lucide-react";
+import { ArrowLeft, BookOpen, RotateCcw, Wrench } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import type React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -74,7 +74,16 @@ export function TracesEmptyOnboarding(): React.ReactElement {
   const stage = useOnboardingStore((s) => s.stage);
   const setStage = useOnboardingStore((s) => s.setStage);
   const resetStage = useOnboardingStore((s) => s.reset);
+  const goBack = useOnboardingStore((s) => s.goBack);
+  const replayStage = useOnboardingStore((s) => s.replayStage);
+  const replayToken = useOnboardingStore((s) => s.replayToken);
+  const history = useOnboardingStore((s) => s.history);
   const stageDef = findStageDef(stage);
+  // Back is only meaningful once we've left the silent settle beat —
+  // the welcome typewriter is technically the journey's first
+  // user-facing stage, so anything before it shouldn't trap the user
+  // in a back-button loop.
+  const canGoBack = history.length > 0 && stage !== "settle";
 
   // Clear the density-picked flag whenever we leave the
   // density-spotlight stage, so a re-entry (back-button) gets a
@@ -272,6 +281,11 @@ export function TracesEmptyOnboarding(): React.ReactElement {
   }
 
   const showIntegrateCta = stageDef.showIntegrateCta !== false;
+  // Returning users who completed the journey already see the welcome
+  // beat as a quiet hub of jump-to-this-bit cards — strip the
+  // surrounding chrome (agent-handoff CTA, Replay, Integration
+  // overview link) so the hub reads as the single thing on screen.
+  const isReturningWelcome = stage === "welcome" && hasCompletedJourney();
 
   return (
     <>
@@ -287,13 +301,16 @@ export function TracesEmptyOnboarding(): React.ReactElement {
         align="center"
         gap={4}
         width="full"
-        // The hero shrinks dramatically during the drawer-tour
-        // stages — the drawer covers the right half of the viewport,
-        // so anything wider than ~400px would slide under it. 380px
-        // is the sweet spot: keeps the tour-gate CTAs ("Show me
-        // around" + "I'll explore myself") on one line without
-        // creeping toward the drawer.
-        maxWidth={stageDef.heroLayout === "left" ? "380px" : "640px"}
+        // Left-anchored hero (drawer-overview chapter) was 380px and
+        // the subhead — "Conversation, spans, evals — it's all in
+        // here. Take your time, then we'll wrap up." — wrapped into
+        // a squashed three-line block. 460px gives the subhead room
+        // to breathe on two lines while still leaving the
+        // drawer-anchored padding logic in `EmptyStateOverlay` enough
+        // slack on narrower viewports (the Flex container's
+        // paddingRight = viewport - drawerLeft caps the visible
+        // canvas, so this maxWidth only kicks in when there's space).
+        maxWidth={stageDef.heroLayout === "left" ? "460px" : "640px"}
         paddingX={{ base: 4, md: 8 }}
       >
         {/* Hero motion key is the heading text (or a hidden-stage
@@ -321,7 +338,14 @@ export function TracesEmptyOnboarding(): React.ReactElement {
             </motion.div>
           ) : stageDef.heading ? (
             <motion.div
-              key={stageDef.heading}
+              // Including `replayToken` in the key is what makes the
+              // Replay button work: bumping the token forces this
+              // node to remount, which in turn restarts the
+              // typewriter (or the static hero's enter animation)
+              // even when the heading text and stage haven't
+              // changed. Stage transitions still get clean exits
+              // because the heading text changes alongside.
+              key={`${stageDef.heading}__${replayToken}`}
               initial={{ opacity: 0, y: 4 }}
               // `dimHero` (currently `auroraArrival`) drops the hero
               // text to ~45% so the user's eye is pulled UP to the
@@ -351,22 +375,25 @@ export function TracesEmptyOnboarding(): React.ReactElement {
           ) : null}
         </AnimatePresence>
 
-        {/* Chapter progress beads — small dots under the hero that
-            show "you are here" across the six-chapter arc. Hidden on
-            `settle` (no copy yet, the user hasn't been told there's
-            a journey at all) so they don't appear before any
-            narrative beat lands. The strip is intentionally quiet
-            and non-clickable — it's an indicator, not navigation;
-            jumping is offered separately via `ReturningUserHub`. */}
-        {stage !== "settle" && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.5, delay: 0.2 }}
-          >
-            <BeadStrip stage={stage} />
-          </motion.div>
-        )}
+        {/* Auto-click countdown — visible during postArrival so the
+            user can see when we'll open the drawer for them if they
+            don't engage. Hidden behind IntegrateDrawer (the timer
+            also pauses there in the effect above). Pure presentation
+            keyed off the same constant the timer uses, so they can't
+            drift. */}
+        <AnimatePresence>
+          {stage === "postArrival" && !drawerOpen && (
+            <motion.div
+              key="post-arrival-countdown"
+              initial={{ opacity: 0, y: 4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.4, delay: 0.6 }}
+            >
+              <PostArrivalCountdown totalMs={POST_ARRIVAL_AUTO_OPEN_MS} />
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Outro panel — terminal chapter. Replaces the old "That's
             the tour." typewriter hero with a compact panel of three
@@ -425,7 +452,8 @@ export function TracesEmptyOnboarding(): React.ReactElement {
             IntegrateDrawer (the drawer's default segment), which is
             the lightest-touch handoff path. */}
         <AnimatePresence>
-          {(stage === "welcome" || stage === "trace_explorer") && (
+          {(stage === "welcome" || stage === "trace_explorer") &&
+            !isReturningWelcome && (
             <motion.div
               key="agent-handoff"
               initial={{ opacity: 0, y: 4 }}
@@ -487,6 +515,47 @@ export function TracesEmptyOnboarding(): React.ReactElement {
           )}
         </AnimatePresence>
 
+        {/* Primary "advance" CTA — promoted out of the secondary
+            footer row so it actually reads as the next thing to do.
+            Was previously a small ghost button inline with docs/skip,
+            which got lost ("Got it" / "Show me" looked like a quiet
+            label rather than the primary action). Renders as a
+            solid orange button keyed to the stage so each beat
+            animates in fresh. Skipped on the density spotlight (the
+            cards do double-duty as the advance affordance) and the
+            outro chapter (the OutroPanel owns its own CTAs). */}
+        <AnimatePresence>
+          {stageDef.cta &&
+            stageDef.next &&
+            !stageDef.showDensitySpotlight &&
+            stage !== "outro" && (
+              <motion.div
+                key={`stage-cta-${stage}`}
+                initial={{ opacity: 0, y: 4 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -4 }}
+                transition={{
+                  duration: 0.35,
+                  delay: 0.22,
+                  ease: [0.16, 1, 0.3, 1],
+                }}
+              >
+                <Button
+                  size="md"
+                  variant="solid"
+                  colorPalette="orange"
+                  onClick={handleAdvanceManual}
+                  paddingX={5}
+                >
+                  <Text>{stageDef.cta}</Text>
+                  <Text aria-hidden as="span">
+                    →
+                  </Text>
+                </Button>
+              </motion.div>
+            )}
+        </AnimatePresence>
+
         {/* Single footer row — manual advance CTA (when the stage
             defines one), docs link and skip, all inline. Saves the
             vertical space we'd otherwise lose to a dedicated CTA
@@ -507,46 +576,78 @@ export function TracesEmptyOnboarding(): React.ReactElement {
             flexWrap="wrap"
             justify="center"
           >
-            {/* Footer-level CTA only renders for stages that *don't*
-                have the density spotlight — the spotlight cards do
-                double-duty as the advance affordance there (click
-                once to pick, click again to continue), so a
-                separate Continue button here would just be noise. */}
-            {stageDef.cta &&
-              stageDef.next &&
-              !stageDef.showDensitySpotlight && (
-                <>
-                  <Button
-                    size="xs"
-                    variant="ghost"
-                    colorPalette="gray"
-                    onClick={handleAdvanceManual}
-                  >
-                    <Text>{stageDef.cta}</Text>
-                    <Text aria-hidden as="span" color="fg.muted">
-                      →
+            {/* Back + Replay sit before Continue / docs / skip — they
+                give the user a way out of "I missed that beat" without
+                forcing them to restart the whole tour. Hidden on the
+                density spotlight (its cards already double as advance
+                affordances) and the outro (the OutroPanel owns its own
+                CTAs there). The bullet separators are only rendered
+                when an item is shown so we don't get adjacent dots. */}
+            {!stageDef.showDensitySpotlight &&
+              stage !== "outro" &&
+              !isReturningWelcome && (
+              <>
+                {canGoBack && (
+                  <>
+                    <Button
+                      size="xs"
+                      variant="ghost"
+                      colorPalette="gray"
+                      onClick={goBack}
+                      aria-label="Previous beat"
+                    >
+                      <Icon boxSize={3.5}>
+                        <ArrowLeft />
+                      </Icon>
+                      <Text>Back</Text>
+                    </Button>
+                    <Text aria-hidden color="fg.subtle">
+                      •
                     </Text>
-                  </Button>
-                  <Text aria-hidden color="fg.subtle">
-                    •
-                  </Text>
-                </>
-              )}
-            <Link
-              href="https://docs.langwatch.ai/integration/overview"
-              isExternal
-              _hover={{ color: "fg" }}
-            >
-              <HStack gap={1.5}>
-                <Icon boxSize={3.5}>
-                  <BookOpen />
-                </Icon>
-                <Text>Integration overview</Text>
-              </HStack>
-            </Link>
-            <Text aria-hidden color="fg.subtle">
-              •
-            </Text>
+                  </>
+                )}
+                <Button
+                  size="xs"
+                  variant="ghost"
+                  colorPalette="gray"
+                  onClick={replayStage}
+                  aria-label="Replay this beat"
+                >
+                  <Icon boxSize={3.5}>
+                    <RotateCcw />
+                  </Icon>
+                  <Text>Replay</Text>
+                </Button>
+                <Text aria-hidden color="fg.subtle">
+                  •
+                </Text>
+              </>
+            )}
+            {/* Stage-level "advance" CTA used to live here as a quiet
+                ghost button. It's been promoted into a solid primary
+                button above the footer so the next action is
+                actually obvious — the footer is now reserved for
+                secondary affordances (Back / Replay / Docs / Skip)
+                only. */}
+            {!isReturningWelcome && (
+              <>
+                <Link
+                  href="https://docs.langwatch.ai/integration/overview"
+                  isExternal
+                  _hover={{ color: "fg" }}
+                >
+                  <HStack gap={1.5}>
+                    <Icon boxSize={3.5}>
+                      <BookOpen />
+                    </Icon>
+                    <Text>Integration overview</Text>
+                  </HStack>
+                </Link>
+                <Text aria-hidden color="fg.subtle">
+                  •
+                </Text>
+              </>
+            )}
             <Button
               variant="plain"
               size="xs"
@@ -565,9 +666,63 @@ export function TracesEmptyOnboarding(): React.ReactElement {
                 outro footer feel cluttered. */}
           </HStack>
         </motion.div>
+
+        {/* Chapter progress strip — sits at the bottom of the hero
+            stack, beneath the docs / skip secondary controls, so it
+            reads as a quiet "where am I in this" indicator rather
+            than competing with the primary CTA. Hidden on `settle`
+            (no narrative beat has landed yet) so it doesn't appear
+            before the journey is acknowledged. The strip itself is
+            non-clickable — chapter jumping is offered separately
+            via `ReturningUserHub` for users who've already done the
+            tour once. */}
+        {stage !== "settle" && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.5, delay: 0.25 }}
+          >
+            <BeadStrip stage={stage} />
+          </motion.div>
+        )}
       </VStack>
 
       <IntegrateDrawer open={drawerOpen} onOpenChange={setDrawerOpen} />
     </>
   );
 }
+
+/**
+ * Visible countdown for the postArrival auto-click. Renders a small
+ * "We'll open it for you in {n}s" line so the user understands the
+ * journey will advance even if they don't click — it stops feeling
+ * like the tour stalled. Mounts only during `postArrival` (the
+ * caller gates this); when it unmounts the timer goes with it.
+ *
+ * The component owns its own `setInterval` and re-mounts whenever
+ * postArrival re-enters (Back button → re-forward, replayStage,
+ * etc.), so the countdown always starts fresh from `totalMs` even
+ * though the orchestrator's auto-open `setTimeout` resets the same
+ * way. They don't share a clock — they share a constant — but both
+ * stop the moment the stage changes, so visible progress and actual
+ * fire never drift more than a tick.
+ */
+const PostArrivalCountdown: React.FC<{ totalMs: number }> = ({ totalMs }) => {
+  const [remainingMs, setRemainingMs] = useState(totalMs);
+  useEffect(() => {
+    const start = Date.now();
+    const id = window.setInterval(() => {
+      const elapsed = Date.now() - start;
+      const next = Math.max(0, totalMs - elapsed);
+      setRemainingMs(next);
+      if (next <= 0) window.clearInterval(id);
+    }, 250);
+    return () => window.clearInterval(id);
+  }, [totalMs]);
+  const seconds = Math.ceil(remainingMs / 1000);
+  return (
+    <Text textStyle="xs" color="fg.muted" textAlign="center">
+      Or we&apos;ll open it for you in {seconds}s.
+    </Text>
+  );
+};

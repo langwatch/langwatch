@@ -1,17 +1,10 @@
-import { Button, Heading, Icon, Text, VStack } from "@chakra-ui/react";
-import {
-  ArrowRight,
-  Compass,
-  Filter,
-  PanelRightOpen,
-  Sparkles,
-} from "lucide-react";
+import { Button, HStack, Heading, Icon, Text, VStack } from "@chakra-ui/react";
+import { Filter, PanelRightOpen, Sparkles } from "lucide-react";
 import type React from "react";
 import type { StageId } from "../chapters/onboardingJourneyConfig";
 
 interface HubOption {
   label: string;
-  description: string;
   icon: typeof Sparkles;
   /**
    * Stage to jump into when this option is picked. Aim at the *narrative
@@ -27,19 +20,16 @@ interface HubOption {
 const RETURNING_USER_HUB_OPTIONS: HubOption[] = [
   {
     label: "How traces arrive",
-    description: "The aurora ribbon and the live-update feel.",
     icon: Sparkles,
     target: "arrivalPrep",
   },
   {
     label: "The trace drawer",
-    description: "Conversation, spans, evals — see one in detail.",
     icon: PanelRightOpen,
     target: "postArrival",
   },
   {
     label: "Filters and facets",
-    description: "Slice the table by service, model, status, more.",
     icon: Filter,
     target: "facetsReveal",
   },
@@ -54,15 +44,14 @@ interface ReturningUserHubProps {
  * least once. Instead of making them sit through the linear narrative
  * again, we offer a small hub of "help me with that bit" jumps.
  *
- * `Run me through the whole thing` falls back to `trace_explorer` (the
- * first substantive beat) so we don't repeat the bare welcome line they
- * just saw.
+ * Three cards in a single row, icon + label only — descriptions and
+ * arrow chrome were noise once the user already knows the product.
  */
 export function ReturningUserHub({
   onJump,
 }: ReturningUserHubProps): React.ReactElement {
   return (
-    <VStack align="center" gap={4} maxWidth="58ch" textAlign="center">
+    <VStack align="center" gap={5} maxWidth="58ch" textAlign="center">
       <Heading
         fontSize={{ base: "3xl", md: "4xl" }}
         letterSpacing="-0.035em"
@@ -75,50 +64,31 @@ export function ReturningUserHub({
       <Text color="fg.muted" textStyle="md" lineHeight="1.65" maxWidth="48ch">
         Want a hand with a specific bit? Pick one — or click around the table.
       </Text>
-      <VStack gap={2} width="full" maxWidth="380px" align="stretch">
+      <HStack gap={2} width="full" align="stretch" justify="center">
         {RETURNING_USER_HUB_OPTIONS.map((opt) => (
           <Button
             key={opt.target}
             onClick={() => onJump(opt.target)}
             variant="outline"
             colorPalette="gray"
-            justifyContent="flex-start"
-            width="full"
+            flex={1}
+            maxWidth="180px"
             height="auto"
-            paddingY={2.5}
+            paddingY={3}
             paddingX={3}
+            flexDirection="column"
+            gap={2}
             _hover={{ borderColor: "border.emphasized", bg: "bg.panel" }}
           >
             <Icon boxSize={4} color="orange.fg">
               <opt.icon />
             </Icon>
-            <VStack align="start" gap={0} flex={1}>
-              <Text textStyle="sm" fontWeight={500} color="fg">
-                {opt.label}
-              </Text>
-              <Text textStyle="xs" color="fg.muted" fontWeight={400}>
-                {opt.description}
-              </Text>
-            </VStack>
-            <Icon boxSize={3.5} color="fg.subtle">
-              <ArrowRight />
-            </Icon>
+            <Text textStyle="sm" fontWeight={500} color="fg">
+              {opt.label}
+            </Text>
           </Button>
         ))}
-      </VStack>
-      <Button
-        size="xs"
-        variant="ghost"
-        colorPalette="gray"
-        color="fg.muted"
-        onClick={() => onJump("trace_explorer")}
-        _hover={{ color: "fg" }}
-      >
-        <Icon boxSize={3.5}>
-          <Compass />
-        </Icon>
-        Run me through the whole thing
-      </Button>
+      </HStack>
     </VStack>
   );
 }

@@ -1,6 +1,10 @@
 import { useCallback } from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { api } from "~/utils/api";
 import { useProjectHasTraces } from "../../hooks/useProjectHasTraces";
+import { INITIAL_TIME_RANGE, useFilterStore } from "../../stores/filterStore";
+import { useViewStore } from "../../stores/viewStore";
+import { useOnboardingActive } from "./useOnboardingActive";
 import { useOnboardingStore } from "../store/onboardingStore";
 
 export interface OnboardingEntryState {
@@ -9,9 +13,23 @@ export interface OnboardingEntryState {
    * For new-user (firstMessage=false) projects this just clears any
    * dismissal. For existing-customer projects it sets `tourActive`
    * so the journey runs over the real data table. Always safe to
-   * call — exits cleanly via "Done exploring" or "Skip for now".
+   * call — exits cleanly via `onEndTour`.
    */
   onLaunchTour: () => void;
+  /**
+   * End the active tour — flips the per-project dismissal flag on
+   * and clears the `tourActive` override so the empty-state pane
+   * unmounts immediately and the user lands in the clean (real)
+   * table. Invalidates the trace list cache so the first real fetch
+   * after the tour isn't satisfied by any pre-flight cached entries.
+   */
+  onEndTour: () => void;
+  /**
+   * Whether the empty-state journey is currently rendering. The
+   * toolbar uses this to swap the Tour button into its "On safari"
+   * exit state.
+   */
+  tourActive: boolean;
   /**
    * Whether the toolbar should be showing the "SDK connection
    * pending" affordance. True only when the project has *never*
@@ -45,6 +63,8 @@ export function useTourEntryPoints(): OnboardingEntryState {
     (s) => s.setSetupDismissedForProject,
   );
   const setTourActive = useOnboardingStore((s) => s.setTourActive);
+  const tourActive = useOnboardingActive();
+  const utils = api.useUtils();
 
   const projectId = project?.id;
   const setupDismissed = projectId
@@ -59,6 +79,24 @@ export function useTourEntryPoints(): OnboardingEntryState {
     // their populated table.
     setSetupDismissedForProject(projectId, false);
     setTourActive(true);
+    // Purge every filter/lens/time-range tweak the user might have
+    // had active so the sample-preview fixtures render unblocked
+    // for the whole journey. Filters are NOT restored at tour end
+    // — the tour is a clean slate and any prior state would re-
+    // hide rows the moment the user lands back on the real table.
+    // `useSamplePreview` substring-matches on `debouncedQueryText`,
+    // and the time-range filters real fetches once preview ends —
+    // both need to be at defaults.
+    useViewStore.getState().selectLens("all-traces");
+    const filter = useFilterStore.getState();
+    filter.clearAll();
+    filter.setTimeRange(INITIAL_TIME_RANGE);
+    // `clearAll` only updates `queryText` — `debouncedQueryText` (the
+    // value `useSamplePreview` actually filters against) doesn't
+    // catch up until `useDebouncedFilterCommit` fires its 300ms
+    // timer. Force-commit so the debounced value is empty by the
+    // time the journey paints.
+    filter.commitDebounced();
   }, [projectId, setSetupDismissedForProject, setTourActive]);
 
   const onResume = useCallback(() => {
@@ -66,8 +104,22 @@ export function useTourEntryPoints(): OnboardingEntryState {
     setSetupDismissedForProject(projectId, false);
   }, [projectId, setSetupDismissedForProject]);
 
+  const onEndTour = useCallback(() => {
+    if (!projectId) return;
+    // Mirror what the old "Done exploring" banner button did: dismiss
+    // for this project, drop the `tourActive` override so existing-
+    // customer re-entries also fall back to the real table, and
+    // invalidate the list cache so the first real fetch isn't served
+    // from a pre-flight cached entry.
+    setSetupDismissedForProject(projectId, true);
+    setTourActive(false);
+    void utils.tracesV2.list.invalidate({ projectId });
+  }, [projectId, setSetupDismissedForProject, setTourActive, utils]);
+
   return {
     onLaunchTour,
+    onEndTour,
+    tourActive,
     sdkPendingVisible: hasAnyTraces === false && setupDismissed,
     onResume,
   };

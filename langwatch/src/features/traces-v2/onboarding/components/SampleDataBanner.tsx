@@ -1,54 +1,26 @@
-import { Button, Flex, Icon, Text } from "@chakra-ui/react";
+import { Flex, Icon, Text } from "@chakra-ui/react";
 import { Sparkles } from "lucide-react";
 import type React from "react";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { api } from "~/utils/api";
-import { useOnboardingStore } from "../store/onboardingStore";
 
 /**
  * Persistent banner across the top of the table while the trace list
  * is rendering `SAMPLE_PREVIEW_TRACES` (i.e. `usePreviewTracesActive`
- * is true). Two jobs:
+ * is true).
  *
- *   1. Honesty — the moment the user tries a facet, search, or filter
- *      the substring matcher in `filterPreviewTraces` will frequently
- *      return zero rows (e.g. a service facet for "production-api"
- *      doesn't substring-match the fixture services). Without the
- *      banner that reads as a broken product. With it, the user knows
- *      "ah, sample data, my real facets will fire when traces land."
+ * Honesty affordance — the moment the user tries a facet, search, or
+ * filter the substring matcher in `filterPreviewTraces` will
+ * frequently return zero rows (e.g. a service facet for
+ * "production-api" doesn't substring-match the fixture services).
+ * Without the banner that reads as a broken product. With it, the
+ * user knows "ah, sample data, this is just a tour."
  *
- *   2. Exit — gives the user an explicit "drop me into the real
- *      (empty) table" affordance. Click flips the per-project
- *      `setupDismissedByProject` flag, which gates `previewActive`
- *      off; the underlying tRPC list query enables and fetches
- *      against the real backend; the user lands in the clean
- *      post-tour state. We invalidate the list cache on the way out
- *      so the first real fetch isn't accidentally satisfied by any
- *      pre-flight cached entries from a prior visit.
+ * Exit lives on the toolbar's "On safari" button, not here — one
+ * exit affordance, not two.
  *
  * Visible only when preview is active — once dismissed, this whole
  * pane unmounts and the banner with it.
  */
 export const SampleDataBanner: React.FC = () => {
-  const { project } = useOrganizationTeamProject();
-  const setSetupDismissedForProject = useOnboardingStore(
-    (s) => s.setSetupDismissedForProject,
-  );
-  const utils = api.useUtils();
-  const setTourActive = useOnboardingStore((s) => s.setTourActive);
-
-  const handleDone = () => {
-    if (!project) return;
-    setSetupDismissedForProject(project.id, true);
-    // Also clear the tour-active override (set by the toolbar's Tour
-    // button for existing customers re-entering the demo). Without
-    // this, the empty state would re-mount on next render because
-    // `tourActive=true` keeps `showEmptyState` true regardless of
-    // dismissal.
-    setTourActive(false);
-    void utils.tracesV2.list.invalidate({ projectId: project.id });
-  };
-
   return (
     <Flex
       align="center"
@@ -65,19 +37,9 @@ export const SampleDataBanner: React.FC = () => {
         <Sparkles />
       </Icon>
       <Text textStyle="xs" fontWeight={500}>
-        Sample data — facets, filters, the drawer all work. Nothing here is real
-        until you connect your SDK.
+        Sample data — facets, filters, and the drawer all work, but nothing
+        here is real.
       </Text>
-      <Button
-        size="xs"
-        variant="ghost"
-        colorPalette="orange"
-        marginLeft="auto"
-        onClick={handleDone}
-        disabled={!project}
-      >
-        Done exploring →
-      </Button>
     </Flex>
   );
 };

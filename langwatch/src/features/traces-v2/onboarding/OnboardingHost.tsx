@@ -1,5 +1,6 @@
 import type React from "react";
 import { BodyStageAttribute } from "./effects/BodyStageAttribute";
+import { CloseDrawerOnTour } from "./effects/CloseDrawerOnTour";
 import { DrawerGlow } from "./effects/DrawerGlow";
 import { RichRowGlow } from "./effects/RichRowGlow";
 import { useOnboardingActive } from "./hooks/useOnboardingActive";
@@ -31,6 +32,7 @@ export function OnboardingHost({
   return (
     <>
       <BodyStageAttribute />
+      <CloseDrawerOnTour />
       <DrawerGlow />
       <RichRowGlow />
       {children}

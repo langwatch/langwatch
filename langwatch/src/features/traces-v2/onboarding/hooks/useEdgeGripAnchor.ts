@@ -41,6 +41,11 @@ export function useEdgeGripAnchor(active: boolean): number | null {
         });
         ro.observe(target);
         observedTarget = target;
+        // Once we've latched onto the drawer, the ResizeObserver covers
+        // size changes — there's no reason to keep watching every DOM
+        // mutation in the app for further appearances.
+        mo?.disconnect();
+        mo = null;
       }
     };
 
@@ -48,11 +53,13 @@ export function useEdgeGripAnchor(active: boolean): number | null {
 
     // The drawer mounts asynchronously after the empty state's
     // stage advances, so we watch the DOM until the edge-grip
-    // element appears.
-    mo = new MutationObserver(() => {
-      frame = window.requestAnimationFrame(measure);
-    });
-    mo.observe(document.body, { childList: true, subtree: true });
+    // element appears, then disengage above.
+    if (!observedTarget) {
+      mo = new MutationObserver(() => {
+        frame = window.requestAnimationFrame(measure);
+      });
+      mo.observe(document.body, { childList: true, subtree: true });
+    }
 
     const onResize = () => {
       frame = window.requestAnimationFrame(measure);
