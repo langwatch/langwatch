@@ -97,7 +97,7 @@
     "dependencies": {
         "@opentelemetry/api-logs": "0.205.0",
         "@opentelemetry/core": "^2.0.1",
-        "@opentelemetry/exporter-logs-otlp-http": "0.205.0",
+        "@opentelemetry/exporter-logs-otlp-http": "0.216.0",
         "@opentelemetry/exporter-trace-otlp-http": "0.205.0",
         "@opentelemetry/instrumentation": "0.212.0",
         "@opentelemetry/resources": "^2.0.1",
@@ -170,7 +170,7 @@
             "@opentelemetry/context-async-hooks": "^2.1.0",
             "@opentelemetry/api-logs": "0.205.0",
             "@opentelemetry/sdk-logs": "0.205.0",
-            "@opentelemetry/exporter-logs-otlp-http": "0.205.0",
+            "@opentelemetry/exporter-logs-otlp-http": "0.216.0",
             "@opentelemetry/exporter-trace-otlp-http": "0.205.0",
             "zod": "^4.0.14",
             "langchain@<0.3.37": "0.3.37",
