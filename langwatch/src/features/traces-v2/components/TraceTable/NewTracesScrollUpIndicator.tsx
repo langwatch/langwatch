@@ -75,7 +75,6 @@ export const NewTracesScrollUpIndicator: React.FC<
             "radial-gradient(circle at 30% 25%, rgba(147,197,253,0.95), rgba(37,99,235,0.78) 70%)",
           boxShadow:
             "0 6px 28px rgba(59,130,246,0.45), inset 0 0 0 1px rgba(255,255,255,0.18), inset 0 -8px 18px rgba(30,64,175,0.35)",
-          backdropFilter: "blur(6px)",
           animation:
             "tracesV2OrbMorph 5.5s ease-in-out infinite, tracesV2OrbBob 2.6s ease-in-out infinite",
           ...ORB_KEYFRAMES,

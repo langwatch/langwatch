@@ -111,6 +111,14 @@ function RegistryRowComponent<TRow>({
             // drawer-open / expand handler does not also fire.
             padding={isSelectCell ? 0 : `${tokens.rowPaddingY} 8px`}
             cursor={isSelectCell ? "pointer" : undefined}
+            // Clip whatever the cell renders at the column boundary —
+            // long unbreakable strings (trace IDs, model slugs, error
+            // messages) will otherwise visually bleed across the right
+            // border and overlap the next cell's content. Cell
+            // children that need ellipsis behaviour set `truncate` /
+            // `whiteSpace=nowrap` themselves; the Td-level clip is the
+            // belt-and-suspenders that catches anything that doesn't.
+            overflow="hidden"
             {...cellPropsFor(cell, style.borderColor, i)}
           >
             {pickCell(registry, cell.column.id, densityMode, {

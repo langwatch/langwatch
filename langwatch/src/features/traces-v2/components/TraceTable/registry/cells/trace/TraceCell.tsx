@@ -82,6 +82,9 @@ const TraceContent: React.FC<{
           textStyle={nameStyle}
           color="fg"
           userSelect="all"
+          truncate
+          flexShrink={1}
+          minWidth={0}
         >
           {trace.traceId}
         </Text>

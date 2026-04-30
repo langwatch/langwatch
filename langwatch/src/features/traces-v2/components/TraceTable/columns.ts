@@ -15,23 +15,30 @@ export const traceAtomicColumnDefs: Record<
   string,
   ColumnDef<TraceListItem, any>
 > = {
+  // The backend `SORT_COLUMN_MAP` (server/app-layer/traces/trace-list.service.ts)
+  // covers only the numeric/time columns. UI sorting is disabled here for
+  // columns the backend silently falls back to `OccurredAt` on — clicking
+  // those headers used to look like a no-op.
   "span-name": traceCol.accessor((row) => row.rootSpanName ?? row.name, {
     id: "span-name",
     header: "Name",
     size: 200,
     minSize: 140,
+    enableSorting: false,
   }),
   "span-type": traceCol.accessor((row) => row.rootSpanType ?? "", {
     id: "span-type",
     header: "Type",
     size: 80,
     minSize: 70,
+    enableSorting: false,
   }),
   "trace-id": traceCol.accessor("traceId", {
     id: "trace-id",
     header: "Trace ID",
     size: 240,
     minSize: 180,
+    enableSorting: false,
   }),
   input: traceCol.accessor("input", {
     id: "input",
@@ -69,9 +76,20 @@ const traceColumnDefs = {
   trace: traceCol.accessor("name", {
     id: "trace",
     header: "Trace",
-    size: 9999,
-    minSize: 200,
-    meta: { ...flex, skeletonLines: 2 },
+    // Was flex (`size: 9999, meta.flex`) so the column absorbed every
+    // pixel of leftover space — fine on a typical lens with eight to
+    // ten columns visible, but with a slimmer column set (or a
+    // collapsed sidebar) the trace cell ballooned out to 800px+ of
+    // mostly empty whitespace beside the name + ID. Pinning the
+    // default to `560px` (and capping the resize range to 320–820)
+    // keeps the cell legible when it has room AND prevents
+    // pathological growth when the user trims columns. Resizing
+    // still works because non-flex columns honour `getSize()` width
+    // directly.
+    size: 560,
+    minSize: 320,
+    maxSize: 820,
+    meta: { skeletonLines: 2 },
     enableSorting: false,
   }),
   service: traceCol.accessor("serviceName", {

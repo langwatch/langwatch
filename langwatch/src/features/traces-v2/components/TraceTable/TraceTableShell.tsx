@@ -1,7 +1,13 @@
-import { Button, HStack, Icon, type SystemStyleObject } from "@chakra-ui/react";
+import {
+  Button,
+  HStack,
+  Icon,
+  type SystemStyleObject,
+} from "@chakra-ui/react";
 import { flexRender, type Header, type Table } from "@tanstack/react-table";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import type React from "react";
+import { ColumnResizeGrip } from "./ColumnResizeGrip";
 import { Table as TableEl, Th, Thead, Tr } from "./TablePrimitives";
 
 type Color = NonNullable<SystemStyleObject["color"]>;
@@ -70,18 +76,31 @@ function HeaderCell<T>({
 }: HeaderCellProps<T>): React.ReactElement {
   const meta = header.column.columnDef.meta as ColumnMeta | undefined;
   const size = header.column.getSize();
+  const declaredSize = header.column.columnDef.size;
+  // Flex columns declare a sentinel `size` (9999) to absorb leftover
+  // space — those normally render with `width: undefined` so the
+  // browser flexes them to fill the table. Once the user manually
+  // resizes one (TanStack writes the resolved px width into
+  // columnSizing → `getSize()` no longer matches the sentinel) we
+  // switch to a fixed `${size}px` so the resize actually sticks.
+  // Without this, dragging the trace column's grip updated state but
+  // visually nothing happened because `width` stayed undefined.
+  const isFlex = meta?.flex;
+  const wasResized = isFlex && declaredSize !== undefined && size !== declaredSize;
+  const useFixedWidth = !isFlex || wasResized;
   const align = meta?.align ?? "left";
   const canSort = header.column.getCanSort();
   const sortDirection = header.column.getIsSorted();
+  const isActiveSort = sortDirection !== false;
 
   return (
     <Th
-      width={meta?.flex ? undefined : `${size}px`}
+      width={useFixedWidth ? `${size}px` : undefined}
       minWidth={`${header.column.columnDef.minSize}px`}
       textAlign={align}
       textStyle="2xs"
-      fontWeight="500"
-      color="fg.subtle/70"
+      fontWeight={isActiveSort ? "600" : "500"}
+      color={isActiveSort ? "fg" : "fg.subtle/70"}
       textTransform="uppercase"
       letterSpacing="0.06em"
       whiteSpace="nowrap"
@@ -89,11 +108,22 @@ function HeaderCell<T>({
       position={isStickyFirst ? "sticky" : "relative"}
       left={isStickyFirst ? 0 : undefined}
       zIndex={isStickyFirst ? 3 : undefined}
-      bg={isStickyFirst ? "bg.surface" : undefined}
+      bg={
+        isActiveSort
+          ? "blue.subtle"
+          : isStickyFirst
+            ? "bg.surface"
+            : undefined
+      }
       borderRightWidth="1px"
       borderRightColor="border.subtle"
-      paddingX={canSort ? 0 : 2}
-      paddingY={canSort ? 0 : 1}
+      // Unified padding for every header — sortable + non-sortable share the
+      // same Th paddings so the column titles line up across the row. The
+      // sortable button below is `width: full` and only adds its own
+      // background on hover, so it slots inside this padding rather than
+      // replacing it.
+      paddingX={2}
+      paddingY={1}
     >
       {canSort ? (
         <SortableHeaderButton
@@ -106,6 +136,7 @@ function HeaderCell<T>({
       ) : (
         flexRender(header.column.columnDef.header, header.getContext())
       )}
+      <ColumnResizeGrip header={header} />
     </Th>
   );
 }
@@ -123,6 +154,7 @@ function SortableHeaderButton({
   onToggle,
   children,
 }: SortableHeaderButtonProps): React.ReactElement {
+  const isActive = sortDirection !== false;
   return (
     <Button
       type="button"
@@ -130,8 +162,10 @@ function SortableHeaderButton({
       width="full"
       height="auto"
       minHeight="unset"
-      paddingX={2}
-      paddingY={1}
+      // No additional padding — the parent `Th` owns the padding so sortable
+      // and non-sortable headers line up to the same grid.
+      paddingX={0}
+      paddingY={0}
       justifyContent={align === "right" ? "flex-end" : "flex-start"}
       color="inherit"
       userSelect="none"
@@ -144,16 +178,29 @@ function SortableHeaderButton({
       _hover={{ color: "fg", bg: "transparent" }}
       _active={{ bg: "transparent" }}
       _focusVisible={{ bg: "transparent" }}
+      role="group"
     >
-      <HStack gap={0.5}>
+      <HStack gap={1}>
         {children}
-        <Icon
-          boxSize="12px"
-          color="blue.fg"
-          visibility={sortDirection ? "visible" : "hidden"}
-        >
-          {sortDirection === "desc" ? <ChevronDown /> : <ChevronUp />}
-        </Icon>
+        {isActive ? (
+          <Icon boxSize="12px" color="blue.fg">
+            {sortDirection === "desc" ? <ChevronDown /> : <ChevronUp />}
+          </Icon>
+        ) : (
+          // Inactive sortable columns get a faint chevron that fades in on
+          // hover so the user knows the column *is* clickable. Hidden by
+          // default (`opacity: 0`) so it doesn't crowd numeric headers — the
+          // group hover state lifts it to 0.5 for the affordance hint.
+          <Icon
+            boxSize="12px"
+            color="fg.muted"
+            opacity={0}
+            _groupHover={{ opacity: 0.5 }}
+            transition="opacity 0.1s ease"
+          >
+            <ChevronDown />
+          </Icon>
+        )}
       </HStack>
     </Button>
   );
@@ -164,7 +211,7 @@ export function cellPropsFor(
     column: {
       id: string;
       getSize: () => number;
-      columnDef: { minSize?: number; meta?: unknown };
+      columnDef: { size?: number; minSize?: number; meta?: unknown };
     };
   },
   leftBorderColor?: Color,
@@ -180,9 +227,19 @@ export function cellPropsFor(
 } {
   const meta = cell.column.columnDef.meta as ColumnMeta | undefined;
   const size = cell.column.getSize();
+  const declaredSize = cell.column.columnDef.size;
+  // Flex cells follow the same rule as the header: undefined width
+  // when the column is still in its "absorb leftover space" state,
+  // fixed px width once the user has explicitly resized it. Keeping
+  // header + body in lockstep on this is what makes the resize grip
+  // affect the visible cell width.
+  const isFlex = meta?.flex;
+  const wasResized =
+    isFlex && declaredSize !== undefined && size !== declaredSize;
+  const useFixedWidth = !isFlex || wasResized;
   return {
     textAlign: meta?.align ?? "left",
-    width: meta?.flex ? undefined : `${size}px`,
+    width: useFixedWidth ? `${size}px` : undefined,
     minWidth: `${cell.column.columnDef.minSize ?? 0}px`,
     borderRightWidth: "1px",
     borderRightColor: "border.subtle",

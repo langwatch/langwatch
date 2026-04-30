@@ -1,5 +1,6 @@
 import { Box } from "@chakra-ui/react";
 import {
+  type ColumnSizingState,
   getCoreRowModel,
   getSortedRowModel,
   type SortingState,
@@ -8,6 +9,10 @@ import {
 } from "@tanstack/react-table";
 import type React from "react";
 import { useCallback, useMemo } from "react";
+import {
+  getColumnSizingKey,
+  useColumnSizingStore,
+} from "../../stores/columnSizingStore";
 import { type LensConfig, useViewStore } from "../../stores/viewStore";
 import type { TraceListItem } from "../../types/trace";
 import { RegistryRow } from "./registry";
@@ -44,6 +49,24 @@ export const TraceLensBody: React.FC<TraceLensBodyProps> = ({
   const sortFromStore = useViewStore((s) => s.sort);
   const setSortInStore = useViewStore((s) => s.setSort);
 
+  const sizingKey = getColumnSizingKey(lens.id, "trace");
+  const persistedSizing = useColumnSizingStore(
+    (s) => s.byKey[sizingKey] ?? null,
+  );
+  const setSizing = useColumnSizingStore((s) => s.setSizing);
+  const columnSizing = useMemo<ColumnSizingState>(
+    () => persistedSizing ?? {},
+    [persistedSizing],
+  );
+  const handleColumnSizingChange = useCallback(
+    (updater: Updater<ColumnSizingState>) => {
+      const next =
+        typeof updater === "function" ? updater(columnSizing) : updater;
+      setSizing(sizingKey, next);
+    },
+    [columnSizing, sizingKey, setSizing],
+  );
+
   const sorting = useMemo<SortingState>(
     () => [
       {
@@ -70,8 +93,10 @@ export const TraceLensBody: React.FC<TraceLensBodyProps> = ({
   const table = useReactTable({
     data: traces,
     columns,
-    state: { sorting },
+    state: { sorting, columnSizing },
     onSortingChange: handleSortingChange,
+    onColumnSizingChange: handleColumnSizingChange,
+    columnResizeMode: "onChange",
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     manualSorting: true,
