@@ -19,6 +19,7 @@ describe("applySpanToSummary() trace name extraction", () => {
   });
 
   describe("when root span has a name", () => {
+    /** @scenario Trace projection populates TraceName from root span */
     it("populates traceName from root span", () => {
       const span = createTestSpan({
         parentSpanId: null,
@@ -32,6 +33,7 @@ describe("applySpanToSummary() trace name extraction", () => {
   });
 
   describe("when root span has an empty name", () => {
+    /** @scenario Trace projection defaults TraceName when root span has no name */
     it("defaults traceName to empty string", () => {
       const span = createTestSpan({
         parentSpanId: null,
@@ -45,6 +47,7 @@ describe("applySpanToSummary() trace name extraction", () => {
   });
 
   describe("when child span arrives after root span", () => {
+    /** @scenario TraceName is preserved when child spans arrive after root */
     it("preserves traceName from root span", () => {
       const rootSpan = createTestSpan({
         id: "root-1",
@@ -96,6 +99,7 @@ describe("applySpanToSummary() trace name extraction", () => {
   });
 
   describe("when multiple root spans exist", () => {
+    /** @scenario Multiple root spans use earliest start time */
     it("uses the root span with earliest start time", () => {
       const laterRoot = createTestSpan({
         id: "root-2",

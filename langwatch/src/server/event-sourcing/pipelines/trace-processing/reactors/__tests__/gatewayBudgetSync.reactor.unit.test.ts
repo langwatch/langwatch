@@ -48,6 +48,7 @@ function createFoldState(
     blockedByGuardrail: false,
     topicId: null,
     subTopicId: null,
+    traceName: "",
     annotationIds: [],
     lastEventOccurredAt: 0,
     occurredAt: 1700_000_000_000,

@@ -69,6 +69,7 @@ function buildFoldState(attrs: Record<string, string>): TraceSummaryData {
     blockedByGuardrail: false,
     topicId: null,
     subTopicId: null,
+    traceName: "",
     annotationIds: [],
     attributes: attrs,
     occurredAt: now,

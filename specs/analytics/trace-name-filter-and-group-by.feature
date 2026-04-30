@@ -57,7 +57,7 @@ Feature: Trace Name Filter and Group-By
   # Filter: trace name appears as a filter dimension
   # ---------------------------------------------------------------------------
 
-  @integration
+  @integration @unimplemented
   Scenario: Trace name is available as a filter dimension
     Given the project has traces with names "OrderAgent", "SearchAgent", and "SupportAgent"
     When a user requests available filter options for the trace name field
@@ -67,7 +67,7 @@ Feature: Trace Name Filter and Group-By
   # Filter: single trace name
   # ---------------------------------------------------------------------------
 
-  @integration
+  @integration @unimplemented
   Scenario: Filtering a graph by a single trace name
     Given the project has traces named "OrderAgent" and "SearchAgent"
     When the user filters the analytics graph to trace name "OrderAgent"
@@ -77,7 +77,7 @@ Feature: Trace Name Filter and Group-By
   # Filter: multiple trace names
   # ---------------------------------------------------------------------------
 
-  @integration
+  @integration @unimplemented
   Scenario: Filtering a graph by multiple trace names
     Given the project has traces named "OrderAgent", "SearchAgent", and "SupportAgent"
     When the user filters the analytics graph to trace names "OrderAgent" and "SearchAgent"
@@ -88,13 +88,13 @@ Feature: Trace Name Filter and Group-By
   # Group-by: trace name
   # ---------------------------------------------------------------------------
 
-  @integration
+  @integration @unimplemented
   Scenario: Grouping a graph by trace name
     Given the project has traces named "OrderAgent" and "SearchAgent"
     When the user groups the analytics graph by trace name
     Then the graph displays separate series for "OrderAgent" and "SearchAgent"
 
-  @integration
+  @integration @unimplemented
   Scenario: Group-by shows empty trace names as unknown
     Given the project has traces named "OrderAgent" and traces with empty TraceName
     When the user groups the analytics graph by trace name
@@ -104,7 +104,7 @@ Feature: Trace Name Filter and Group-By
   # Composition: date range and previous-period comparison
   # ---------------------------------------------------------------------------
 
-  @integration
+  @integration @unimplemented
   Scenario: Trace name filter composes with date range and previous-period comparison
     Given the project has "OrderAgent" traces spanning the last 30 days
     When the user filters to trace name "OrderAgent" with a 7-day date range and previous-period comparison enabled
@@ -115,7 +115,7 @@ Feature: Trace Name Filter and Group-By
   # Composition: existing label and metadata filters
   # ---------------------------------------------------------------------------
 
-  @integration
+  @integration @unimplemented
   Scenario: Trace name filter composes with label and metadata filters
     Given the project has traces with name "OrderAgent" and various labels and user IDs
     When the user filters to trace name "OrderAgent" combined with a label filter and a user ID filter
@@ -125,7 +125,7 @@ Feature: Trace Name Filter and Group-By
   # Filter translator: WHERE clause generation
   # ---------------------------------------------------------------------------
 
-  @unit
+  @unit @unimplemented
   Scenario: Filter translator generates correct WHERE clause for trace name
     Given a trace name filter with values "OrderAgent" and "SearchAgent"
     When the filter is translated to a ClickHouse WHERE clause
@@ -136,7 +136,7 @@ Feature: Trace Name Filter and Group-By
   # Group-by expression: column resolution
   # ---------------------------------------------------------------------------
 
-  @unit
+  @unit @unimplemented
   Scenario: Group-by expression resolves TraceName as a direct column
     Given a group-by request for the trace name field
     When the group-by expression is resolved
