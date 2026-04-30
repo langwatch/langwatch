@@ -1,6 +1,7 @@
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
 import type { TraceSummaryData } from "../types";
+import type { TraceSummaryFieldsBase } from "./_summary-fields.types";
 import type {
   BatchedFacetResult,
   CategoricalFacetResult,
@@ -13,9 +14,7 @@ import type {
 
 const TABLE_NAME = "trace_summaries" as const;
 
-interface ClickHouseSummaryRow {
-  TraceId: string;
-  TenantId: string;
+interface ClickHouseSummaryRow extends TraceSummaryFieldsBase {
   // The list mapper only reads these five keys out of `Attributes`.
   // Projecting them individually lets ClickHouse skip reading the full
   // Map column off disk for every row — the dominant cost on traces
@@ -25,45 +24,6 @@ interface ClickHouseSummaryRow {
   AttrConversationId: string;
   AttrUserId: string;
   AttrOrigin: string;
-  OccurredAt: number;
-  CreatedAt: number;
-  UpdatedAt: number;
-  ComputedIOSchemaVersion: string;
-  ComputedInput: string | null;
-  ComputedOutput: string | null;
-  TimeToFirstTokenMs: number | null;
-  TimeToLastTokenMs: number | null;
-  TotalDurationMs: number;
-  TokensPerSecond: number | null;
-  SpanCount: number;
-  ContainsErrorStatus: number;
-  ContainsOKStatus: number;
-  ErrorMessage: string | null;
-  Models: string[];
-  TotalCost: number | null;
-  TokensEstimated: boolean;
-  TotalPromptTokenCount: number | null;
-  TotalCompletionTokenCount: number | null;
-  OutputFromRootSpan: number;
-  OutputSpanEndTimeMs: number;
-  BlockedByGuardrail: number;
-  RootSpanName: string | null;
-  RootSpanType: string | null;
-  ContainsAi: number;
-  ContainsPrompt: number;
-  SelectedPromptId: string | null;
-  SelectedPromptSpanId: string | null;
-  LastUsedPromptId: string | null;
-  LastUsedPromptVersionNumber: number | null;
-  LastUsedPromptVersionId: string | null;
-  LastUsedPromptSpanId: string | null;
-  TopicId: string | null;
-  SubTopicId: string | null;
-  AnnotationIds: string[];
-  ScenarioRoleCosts: Record<string, number>;
-  ScenarioRoleLatencies: Record<string, number>;
-  ScenarioRoleSpans: Record<string, string>;
-  SpanCosts: Record<string, number>;
   lastEventOccurredAt: number;
   TotalCount: number;
 }
@@ -528,19 +488,8 @@ export class TraceListClickHouseRepository implements TraceListRepository {
       format: "JSONEachRow",
     });
 
-    const rows = await result.json<{
-      facet_value: string;
-      cnt: number;
-      total_distinct: number;
-    }>();
-
-    return {
-      values: rows.map((r) => ({
-        value: r.facet_value,
-        count: Number(r.cnt),
-      })),
-      totalDistinct: rows.length > 0 ? Number(rows[0]!.total_distinct) : 0,
-    };
+    const rows = await result.json<FacetRow>();
+    return mapFacetRows(rows);
   }
 
   async findCategoricalFacetRaw(params: {
@@ -559,21 +508,8 @@ export class TraceListClickHouseRepository implements TraceListRepository {
       format: "JSONEachRow",
     });
 
-    const rows = await result.json<{
-      facet_value: string;
-      facet_label?: string;
-      cnt: number;
-      total_distinct: number;
-    }>();
-
-    return {
-      values: rows.map((r) => ({
-        value: r.facet_value,
-        ...(r.facet_label ? { label: r.facet_label } : {}),
-        count: Number(r.cnt),
-      })),
-      totalDistinct: rows.length > 0 ? Number(rows[0]!.total_distinct) : 0,
-    };
+    const rows = await result.json<FacetRow>();
+    return mapFacetRows(rows);
   }
 
   async findRangeStatsForTable(params: {
@@ -841,19 +777,8 @@ export class TraceListClickHouseRepository implements TraceListRepository {
       format: "JSONEachRow",
     });
 
-    const rows = await result.json<{
-      facet_value: string;
-      cnt: number;
-      total_distinct: number;
-    }>();
-
-    return {
-      values: rows.map((r) => ({
-        value: r.facet_value,
-        count: Number(r.cnt),
-      })),
-      totalDistinct: rows.length > 0 ? Number(rows[0]!.total_distinct) : 0,
-    };
+    const rows = await result.json<FacetRow>();
+    return mapFacetRows(rows);
   }
 
   private toTraceSummaryData(row: ClickHouseSummaryRow): TraceSummaryData {
@@ -904,6 +829,24 @@ export class TraceListClickHouseRepository implements TraceListRepository {
       lastEventOccurredAt: Number(row.lastEventOccurredAt ?? 0),
     };
   }
+}
+
+type FacetRow = {
+  facet_value: string;
+  facet_label?: string;
+  cnt: number;
+  total_distinct: number;
+};
+
+function mapFacetRows(rows: FacetRow[]): CategoricalFacetResult {
+  return {
+    values: rows.map((r) => ({
+      value: r.facet_value,
+      ...(r.facet_label ? { label: r.facet_label } : {}),
+      count: Number(r.cnt),
+    })),
+    totalDistinct: rows.length > 0 ? Number(rows[0]!.total_distinct) : 0,
+  };
 }
 
 // Empty strings come back from ClickHouse for missing Map keys; the

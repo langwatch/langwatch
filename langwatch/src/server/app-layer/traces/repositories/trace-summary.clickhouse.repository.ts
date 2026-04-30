@@ -4,7 +4,9 @@ import { TRACE_SUMMARY_PROJECTION_VERSION_LATEST } from "~/server/event-sourcing
 import { IdUtils } from "~/server/event-sourcing/pipelines/trace-processing/utils/id.utils";
 import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
 import { createLogger } from "~/utils/logger/server";
+import { validateBatchTenants } from "../../_shared/clickhouse-batch";
 import type { TraceSummaryData } from "../types";
+import type { TraceSummaryFieldsBase } from "./_summary-fields.types";
 import type { TraceSummaryRepository } from "./trace-summary.repository";
 
 const TABLE_NAME = "trace_summaries" as const;
@@ -23,53 +25,11 @@ type ClickHouseSummaryWriteRecord = Omit<
   "Events.Timestamp": Date[];
 };
 
-interface ClickHouseSummaryRecord {
+interface ClickHouseSummaryRecord extends TraceSummaryFieldsBase {
   ProjectionId: string;
-  TenantId: string;
-  TraceId: string;
   Version: string;
   Attributes: Record<string, string>;
-  OccurredAt: number;
-  CreatedAt: number;
-  UpdatedAt: number;
-  ComputedIOSchemaVersion: string;
-  ComputedInput: string | null;
-  ComputedOutput: string | null;
-  TimeToFirstTokenMs: number | null;
-  TimeToLastTokenMs: number | null;
-  TotalDurationMs: number;
-  TokensPerSecond: number | null;
-  SpanCount: number;
-  ContainsErrorStatus: number;
-  ContainsOKStatus: number;
-  ErrorMessage: string | null;
-  Models: string[];
-  TotalCost: number | null;
-  TokensEstimated: boolean;
-  TotalPromptTokenCount: number | null;
-  TotalCompletionTokenCount: number | null;
-  OutputFromRootSpan: number;
-  OutputSpanEndTimeMs: number;
-  BlockedByGuardrail: number;
-  RootSpanName: string | null;
-  RootSpanType: string | null;
-  ContainsAi: number;
-  ContainsPrompt: number;
-  SelectedPromptId: string | null;
-  SelectedPromptSpanId: string | null;
-  LastUsedPromptId: string | null;
-  LastUsedPromptVersionNumber: number | null;
-  LastUsedPromptVersionId: string | null;
-  LastUsedPromptSpanId: string | null;
-  TopicId: string | null;
-  SubTopicId: string | null;
-  AnnotationIds: string[];
   HasAnnotation: number | null;
-  ScenarioRoleCosts: Record<string, number>;
-  ScenarioRoleLatencies: Record<string, number>;
-  TraceName: string;
-  ScenarioRoleSpans: Record<string, string>;
-  SpanCosts: Record<string, number>;
   "Events.SpanId": string[];
   "Events.Timestamp": string[];
   "Events.Name": string[];
@@ -125,19 +85,10 @@ export class TraceSummaryClickHouseRepository
   ): Promise<void> {
     if (entries.length === 0) return;
 
-    const tenantId = entries[0]!.tenantId;
-    EventUtils.validateTenantId(
-      { tenantId },
+    const tenantId = validateBatchTenants(
+      entries,
       "TraceSummaryClickHouseRepository.upsertBatch",
     );
-
-    const mixedTenant = entries.find((e) => e.tenantId !== tenantId);
-    if (mixedTenant) {
-      throw new Error(
-        `Mixed tenants in upsertBatch: expected ${tenantId}, got ${mixedTenant.tenantId}. ` +
-          `Each batch must contain a single tenant to ensure correct DB routing.`,
-      );
-    }
 
     try {
       const client = await this.resolveClient(tenantId);

@@ -4,6 +4,7 @@ import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
 import { EVALUATION_PROJECTION_VERSIONS } from "~/server/event-sourcing/pipelines/evaluation-processing/schemas/constants";
 import { IdUtils } from "~/server/event-sourcing/pipelines/evaluation-processing/utils/id.utils";
 import { createLogger } from "~/utils/logger/server";
+import { validateBatchTenants } from "../../_shared/clickhouse-batch";
 import type { EvalSummary, EvaluationRunData } from "../types";
 import type { EvaluationRunRepository } from "./evaluation-run.repository";
 
@@ -98,19 +99,10 @@ export class EvaluationRunClickHouseRepository
   ): Promise<void> {
     if (entries.length === 0) return;
 
-    const tenantId = entries[0]!.tenantId;
-    EventUtils.validateTenantId(
-      { tenantId },
+    const tenantId = validateBatchTenants(
+      entries,
       "EvaluationRunClickHouseRepository.upsertBatch",
     );
-
-    const mixedTenant = entries.find((e) => e.tenantId !== tenantId);
-    if (mixedTenant) {
-      throw new Error(
-        `Mixed tenants in upsertBatch: expected ${tenantId}, got ${mixedTenant.tenantId}. ` +
-        `Each batch must contain a single tenant to ensure correct DB routing.`,
-      );
-    }
 
     try {
       const client = await this.resolveClient(tenantId);
