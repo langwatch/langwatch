@@ -29,6 +29,19 @@ export class InMemoryPresenceRepository implements PresenceRepository {
     return this.entries.delete(this.key(projectId, sessionId));
   }
 
+  async findById(
+    projectId: string,
+    sessionId: string,
+  ): Promise<PresenceSession | undefined> {
+    const entry = this.entries.get(this.key(projectId, sessionId));
+    if (!entry) return undefined;
+    if (entry.expiresAt <= this.now()) {
+      this.entries.delete(this.key(projectId, sessionId));
+      return undefined;
+    }
+    return entry.session;
+  }
+
   async findByProjectId(projectId: string): Promise<PresenceSession[]> {
     const prefix = `${projectId}::`;
     const sessions: PresenceSession[] = [];

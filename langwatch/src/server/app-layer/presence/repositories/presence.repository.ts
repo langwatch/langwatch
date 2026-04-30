@@ -9,4 +9,14 @@ export interface PresenceRepository {
 
   /** All currently-active sessions for a project. */
   findByProjectId(projectId: string): Promise<PresenceSession[]>;
+
+  /**
+   * Single-session lookup. Implementations should make this O(1) (single
+   * GET on Redis) since it's called on every heartbeat to detect location
+   * changes; falling back to findByProjectId on the hot path is N².
+   */
+  findById(
+    projectId: string,
+    sessionId: string,
+  ): Promise<PresenceSession | undefined>;
 }

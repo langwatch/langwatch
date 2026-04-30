@@ -200,6 +200,7 @@ model Organization {
     sentPlanLimitAlert     DateTime?
     ssoDomain              String?              @unique
     ssoProvider            String?
+    presenceEnabled        Boolean              @default(true)
 
     promoCode     String?
     stripeCustomerId String?      @unique
@@ -308,6 +309,7 @@ model Project {
     capturedInputVisibility  ProjectSensitiveDataVisibilityLevel @default(VISIBLE_TO_ALL)
     capturedOutputVisibility ProjectSensitiveDataVisibilityLevel @default(VISIBLE_TO_ALL)
     traceSharingEnabled      Boolean                             @default(true)
+    presenceEnabled          Boolean                             @default(true)
     triggers                 Trigger[]
     experiments              Experiment[]
     annotations              Annotation[]

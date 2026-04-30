@@ -1,5 +1,6 @@
 import { createLogger } from "~/utils/logger/server";
 import type { BroadcastService } from "../broadcast/broadcast.service";
+import type { PresenceConfig } from "../projects/repositories/project.repository";
 import type { PresenceRepository } from "./repositories/presence.repository";
 import type {
   PresenceCursorEvent,
@@ -11,6 +12,15 @@ import type {
 } from "./types";
 
 export const PRESENCE_TTL_SECONDS = 30;
+
+/**
+ * Subset of {@link ProjectService} that PresenceService depends on. Stated
+ * structurally to avoid a service-to-service import cycle and to keep the
+ * presence service trivial to fake in tests.
+ */
+export interface PresenceProjectLookup {
+  getPresenceConfig(projectId: string): Promise<PresenceConfig | null>;
+}
 
 export interface PresenceUpdateInput {
   projectId: string;
@@ -37,8 +47,21 @@ export class PresenceService {
   constructor(
     private readonly repository: PresenceRepository,
     private readonly broadcast: BroadcastService,
+    private readonly projects: PresenceProjectLookup,
     private readonly ttlSeconds: number = PRESENCE_TTL_SECONDS,
   ) {}
+
+  /**
+   * Whether multiplayer presence is allowed for the given project. Org-level
+   * disable is the global kill-switch; project-level disable scopes the kill
+   * to a single project. Missing rows count as disabled — there's nothing to
+   * broadcast for a project we can't load.
+   */
+  async isEnabledForProject(projectId: string): Promise<boolean> {
+    const config = await this.projects.getPresenceConfig(projectId);
+    if (!config) return false;
+    return config.orgEnabled && config.projectEnabled;
+  }
 
   /**
    * Record a heartbeat / location update for a session. Emits a join delta
@@ -102,6 +125,7 @@ export class PresenceService {
     payload: PresenceCursorPayload;
   }): Promise<void> {
     const event: PresenceCursorEvent = {
+      projectId: input.projectId,
       sessionId: input.sessionId,
       user: input.user,
       anchor: input.payload.anchor,
@@ -128,8 +152,7 @@ export class PresenceService {
     projectId: string,
     sessionId: string,
   ): Promise<PresenceSession | undefined> {
-    const sessions = await this.repository.findByProjectId(projectId);
-    return sessions.find((s) => s.sessionId === sessionId);
+    return this.repository.findById(projectId, sessionId);
   }
 
   private async publish(

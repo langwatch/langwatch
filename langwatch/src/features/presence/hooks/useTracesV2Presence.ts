@@ -7,6 +7,7 @@ import {
   useSectionTrackerStore,
 } from "../stores/sectionTrackerStore";
 import { usePresence } from "./usePresence";
+import { usePresenceFeatureEnabled } from "./usePresenceFeatureEnabled";
 
 /**
  * Drives the multiplayer presence channel from traces-v2 page state.
@@ -19,6 +20,7 @@ import { usePresence } from "./usePresence";
 export function useTracesV2Presence(): void {
   const { project } = useOrganizationTeamProject();
   const projectId = project?.id ?? null;
+  const { enabled: featureEnabled } = usePresenceFeatureEnabled();
 
   const isOpen = useDrawerStore((s) => s.isOpen);
   const traceId = useDrawerStore((s) => s.traceId);
@@ -48,6 +50,6 @@ export function useTracesV2Presence(): void {
   usePresence({
     projectId,
     location,
-    enabled: Boolean(projectId),
+    enabled: Boolean(projectId) && featureEnabled,
   });
 }

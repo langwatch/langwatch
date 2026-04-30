@@ -26,6 +26,19 @@ export class RedisPresenceRepository implements PresenceRepository {
     return removed > 0;
   }
 
+  async findById(
+    projectId: string,
+    sessionId: string,
+  ): Promise<PresenceSession | undefined> {
+    const raw = await this.redis.get(sessionKey(projectId, sessionId));
+    if (!raw) return undefined;
+    try {
+      return JSON.parse(raw) as PresenceSession;
+    } catch {
+      return undefined;
+    }
+  }
+
   async findByProjectId(projectId: string): Promise<PresenceSession[]> {
     const keys = await this.scanProjectKeys(projectId);
     if (keys.length === 0) return [];

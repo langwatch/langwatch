@@ -34,6 +34,9 @@ export const presenceRouter = createTRPCRouter({
     )
     .use(checkProjectPermission("traces:view"))
     .mutation(async ({ input, ctx }) => {
+      if (!(await getApp().presence.isEnabledForProject(input.projectId))) {
+        return { ok: true as const };
+      }
       const user = ctx.session.user;
       await getApp().presence.update({
         projectId: input.projectId,
@@ -52,7 +55,10 @@ export const presenceRouter = createTRPCRouter({
   leave: protectedProcedure
     .input(sessionInput)
     .use(checkProjectPermission("traces:view"))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
+      if (!(await getApp().presence.isEnabledForProject(input.projectId))) {
+        return { ok: true as const };
+      }
       await getApp().presence.leave({
         projectId: input.projectId,
         sessionId: input.sessionId,
@@ -71,6 +77,14 @@ export const presenceRouter = createTRPCRouter({
     .subscription(async function* (opts) {
       const { projectId } = opts.input;
       const app = getApp();
+
+      // Yield an empty snapshot and exit immediately when presence is off —
+      // the client unsubscribes on its own once it sees no further frames.
+      if (!(await app.presence.isEnabledForProject(projectId))) {
+        yield { kind: "snapshot", sessions: [] } satisfies PresenceEvent;
+        return;
+      }
+
       const emitter = app.broadcast.getTenantEmitter(projectId);
 
       logger.debug({ projectId }, "Presence subscription started");
@@ -131,6 +145,9 @@ export const presenceRouter = createTRPCRouter({
     )
     .use(checkProjectPermission("traces:view"))
     .mutation(async ({ input, ctx }) => {
+      if (!(await getApp().presence.isEnabledForProject(input.projectId))) {
+        return { ok: true as const };
+      }
       const user = ctx.session.user;
       await getApp().presence.broadcastCursor({
         projectId: input.projectId,
@@ -161,6 +178,11 @@ export const presenceRouter = createTRPCRouter({
     .use(checkProjectPermission("traces:view"))
     .subscription(async function* (opts) {
       const { projectId, anchor, sessionId } = opts.input;
+
+      if (!(await getApp().presence.isEnabledForProject(projectId))) {
+        return;
+      }
+
       const emitter = getApp().broadcast.getTenantEmitter(projectId);
 
       try {
@@ -175,6 +197,10 @@ export const presenceRouter = createTRPCRouter({
           } catch {
             continue;
           }
+          // Defense-in-depth: per-tenant emitter already isolates this, but
+          // a malformed payload or future shared-emitter regression must not
+          // leak cursors across projects.
+          if (parsed.projectId !== projectId) continue;
           if (parsed.anchor !== anchor) continue;
           // Don't echo a client's own cursor back to it.
           if (parsed.sessionId === sessionId) continue;

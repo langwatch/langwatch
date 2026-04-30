@@ -186,6 +186,7 @@ export interface UpdateOrganizationInput {
   elasticsearchNodeUrl?: string | null;
   elasticsearchApiKey?: string | null;
   s3Bucket?: string | null;
+  presenceEnabled?: boolean;
 }
 
 /**

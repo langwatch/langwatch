@@ -52,17 +52,31 @@ export function setupTRPCWebSocket(server: HttpServer): TRPCWebSocketHandle {
   const wss = new WebSocketServer({ noServer: true });
   const allowedOrigins = buildOriginAllowlist();
 
+  if (!allowedOrigins) {
+    // Fail-closed: cookie-based auth across origins is a CSRF vector. If we
+    // can't resolve an allowlist (NEXTAUTH_URL missing or malformed) we
+    // refuse all upgrades rather than silently accept everything.
+    logger.error(
+      "WS origin allowlist could not be built (NEXTAUTH_URL missing or invalid); all WS upgrades will be rejected",
+    );
+  }
+
   server.on("upgrade", (req, socket, head) => {
     const url = new URL(req.url ?? "/", "http://localhost");
     if (url.pathname !== PATH) return;
 
     // Origin allowlist — cookie-based auth means we must enforce same-origin
     // on the upgrade. Otherwise a logged-in user on evil.com could open a
-    // WS back to our origin and call procedures with their session.
+    // WS back to our origin and call procedures with their session. We
+    // fail-closed: missing allowlist OR missing/unknown Origin → 403.
     const origin = req.headers.origin;
-    if (allowedOrigins && origin && !allowedOrigins.has(origin)) {
+    if (!allowedOrigins || !origin || !allowedOrigins.has(origin)) {
       logger.warn(
-        { origin, path: url.pathname },
+        {
+          origin: origin ?? null,
+          hasAllowlist: !!allowedOrigins,
+          path: url.pathname,
+        },
         "rejecting WS upgrade: origin not allowed",
       );
       socket.write("HTTP/1.1 403 Forbidden\r\n\r\n");

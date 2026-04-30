@@ -2,6 +2,7 @@ import type { Project } from "@prisma/client";
 import { createLogger } from "~/utils/logger/server";
 import { captureException } from "~/utils/posthogErrorCapture";
 import type {
+  PresenceConfig,
   ProjectRepository,
   ProjectWithTeam,
   SearchProjectsResult,
@@ -54,6 +55,10 @@ export class ProjectService {
   ): Promise<boolean> {
     const project = await this.repo.getById(projectId);
     return project ? Boolean(project[flag]) : false;
+  }
+
+  async getPresenceConfig(projectId: string): Promise<PresenceConfig | null> {
+    return this.repo.getPresenceConfig(projectId);
   }
 
   /**

@@ -109,6 +109,13 @@ export const presenceCursorPayloadSchema = z.object({
 export type PresenceCursorPayload = z.infer<typeof presenceCursorPayloadSchema>;
 
 export interface PresenceCursorEvent extends PresenceCursorPayload {
+  /**
+   * Tenancy boundary — the cursor subscriber must drop any event whose
+   * projectId does not match its own subscription. The per-tenant emitter
+   * already isolates this in practice, but having the field on the wire
+   * lets defense-in-depth checks parallel the snapshot/join/update path.
+   */
+  projectId: string;
   sessionId: string;
   user: PresenceUser;
   /** Server timestamp; subscribers use this to drop stale ticks. */

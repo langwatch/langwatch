@@ -3,6 +3,7 @@ import { memo, useRef } from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useCursorBroadcast } from "../hooks/useCursorBroadcast";
 import { usePeerCursors, type PeerCursor } from "../hooks/usePeerCursors";
+import { usePresenceFeatureEnabled } from "../hooks/usePresenceFeatureEnabled";
 import {
   presenceUserColor,
   presenceUserDisplayName,
@@ -33,6 +34,8 @@ export function PeerCursorOverlay({
 }: PeerCursorOverlayProps & { children: React.ReactNode }) {
   const { project } = useOrganizationTeamProject();
   const projectId = project?.id ?? null;
+  const { enabled: featureEnabled } = usePresenceFeatureEnabled();
+  const effectivelyEnabled = enabled && featureEnabled;
   const internalRef = useRef<HTMLDivElement | null>(null);
   const ref = (containerRef ?? internalRef) as React.RefObject<HTMLDivElement | null>;
 
@@ -40,19 +43,19 @@ export function PeerCursorOverlay({
     projectId,
     anchor,
     containerRef: ref,
-    enabled,
+    enabled: effectivelyEnabled,
   });
 
   const cursors = usePeerCursors({
     projectId,
     anchor,
-    enabled,
+    enabled: effectivelyEnabled,
   });
 
   return (
     <Box ref={internalRef} position="relative" width="100%" height="100%">
       {children}
-      {enabled && anchor && projectId
+      {effectivelyEnabled && anchor && projectId
         ? cursors.map((cursor) => (
             <PeerCursor key={cursor.sessionId} cursor={cursor} />
           ))

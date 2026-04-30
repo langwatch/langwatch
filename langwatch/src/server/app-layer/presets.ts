@@ -153,9 +153,14 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
   });
 
   const broadcast = new BroadcastService(redis);
+  const projects = traced(
+    new ProjectService(new PrismaProjectRepository(prisma)),
+    "ProjectService",
+  );
   const presence = new PresenceService(
     redis ? new RedisPresenceRepository(redis) : new InMemoryPresenceRepository(),
     broadcast,
+    projects,
   );
   const spanDedup = createSpanDedupeService(redis);
 
@@ -213,11 +218,6 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     ),
     "OrganizationService",
   );
-  const projects = traced(
-    new ProjectService(new PrismaProjectRepository(prisma)),
-    "ProjectService",
-  );
-
   const traceService = TraceService.create(prisma);
 
   const evaluationExecution = traced(
@@ -561,6 +561,7 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
     presence: new PresenceService(
       new InMemoryPresenceRepository(),
       testBroadcast,
+      nullProjects,
     ),
     traces: (() => {
       const nullEvalRuns = new EvaluationRunService(new NullEvaluationRunRepository());
