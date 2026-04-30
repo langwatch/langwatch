@@ -8,6 +8,7 @@
 import type { AgentInput } from "@langwatch/scenario";
 import { AgentAdapter, AgentRole } from "@langwatch/scenario";
 import { JSONPath } from "jsonpath-plus";
+import { createLogger } from "~/utils/logger";
 import { ssrfSafeFetch } from "~/utils/ssrfProtection";
 import { applyAuthentication } from "../../adapters/auth.strategies";
 import {
@@ -18,6 +19,12 @@ import {
 import { injectTraceContextHeaders } from "../trace-context-headers";
 import type { HttpAgentData } from "../types";
 
+/** Header names (lowercase) whose values must be redacted in logs and errors. */
+const SENSITIVE_HEADERS = new Set(["authorization", "x-api-key"]);
+
+/** Maximum body length to include in errors and logs before truncating. */
+const MAX_BODY_LENGTH = 2048;
+
 /**
  * Serialized HTTP agent adapter that uses pre-fetched configuration.
  * No database access required.
@@ -26,12 +33,14 @@ export class SerializedHttpAgentAdapter extends AgentAdapter {
   role = AgentRole.AGENT;
 
   private readonly config: HttpAgentData;
+  private readonly logger: ReturnType<typeof createLogger>;
   private capturedTraceId: string | undefined;
 
   constructor(config: HttpAgentData) {
     super();
     this.name = "SerializedHttpAgentAdapter";
     this.config = config;
+    this.logger = createLogger("langwatch:scenarios:http-agent");
   }
 
   /** Returns the trace ID captured during the most recent HTTP request. */
@@ -81,21 +90,68 @@ export class SerializedHttpAgentAdapter extends AgentAdapter {
     body: string,
   ): Promise<unknown> {
     const method = this.config.method.toUpperCase();
+    const startedAt = Date.now();
+
     const response = await ssrfSafeFetch(url, {
       method,
       headers,
       body: method !== "GET" ? body : undefined,
     });
 
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    const durationMs = Date.now() - startedAt;
+
+    // Read body once — used for both logging and error/response handling.
+    const rawBody = await response.text();
+
+    let parsedBody: unknown;
+    try {
+      parsedBody = JSON.parse(rawBody);
+    } catch {
+      parsedBody = rawBody;
     }
 
-    const contentType = response.headers.get("content-type");
-    if (contentType?.includes("application/json")) {
-      return await response.json();
+    // Extract upstream request id from response headers (priority order).
+    const upstreamRequestId =
+      response.headers.get("x-request-id") ??
+      response.headers.get("x-amzn-requestid") ??
+      response.headers.get("x-n8n-execution-id") ??
+      undefined;
+
+    // Truncate body sample for logging and error messages.
+    const truncatedBody =
+      rawBody.length > MAX_BODY_LENGTH
+        ? `${rawBody.slice(0, MAX_BODY_LENGTH)}... [truncated]`
+        : rawBody;
+
+    // Build redacted copy of request headers for safe logging.
+    const redactedHeaders: Record<string, string> = {};
+    for (const [key, value] of Object.entries(headers)) {
+      redactedHeaders[key] = SENSITIVE_HEADERS.has(key.toLowerCase())
+        ? "[REDACTED]"
+        : value;
     }
-    return await response.text();
+
+    // Emit exactly one structured diagnostic log per call.
+    this.logger.info(
+      {
+        url,
+        method,
+        status: response.status,
+        duration_ms: durationMs,
+        request_id: upstreamRequestId,
+        headers: redactedHeaders,
+        body: truncatedBody,
+      },
+      "http_agent_call",
+    );
+
+    if (!response.ok) {
+      throw new Error(
+        `HTTP ${response.status}: ${response.statusText} from ${url} (request-id: ${upstreamRequestId ?? "none"}): ${truncatedBody}`,
+      );
+    }
+
+    return parsedBody;
   }
 
   private extractResponseContent(data: unknown): string {
