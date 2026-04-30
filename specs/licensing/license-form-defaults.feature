@@ -19,12 +19,12 @@ Feature: License form defaults and unlimited plan limits
     When resolving PRO plan defaults
     Then the usage unit is "events"
 
-  @integration
+  @integration @unimplemented
   Scenario: Form loads with "events" as default usage unit
     When the form loads with the default Enterprise plan
     Then the usage unit dropdown shows "Events"
 
-  @integration
+  @integration @unimplemented
   Scenario: Switching plan type preserves "events" as default usage unit
     When I switch the plan type to "PRO"
     Then the usage unit dropdown shows "Events"
@@ -33,24 +33,24 @@ Feature: License form defaults and unlimited plan limits
 
   # --- Empty Fields = Unlimited ---
 
-  @integration
+  @integration @unimplemented
   Scenario: Cleared number field displays Unlimited placeholder
     When I clear the "Max Members" field
     Then the field shows an empty input with an "Unlimited" placeholder
 
-  @integration
+  @integration @unimplemented
   Scenario: Cleared number field submits as unlimited
     When I clear the "Max Members" field
     And the form is submitted
     Then the value for maxMembers is sent as unlimited
 
-  @integration
+  @integration @unimplemented
   Scenario: All plan limit fields support empty-as-unlimited
     When I clear each plan limit field
     Then each cleared field shows the "Unlimited" placeholder
     And submitting the form sends each cleared value as unlimited
 
-  @integration
+  @integration @unimplemented
   Scenario: Entering a number after clearing replaces unlimited
     Given I have cleared the "Max Members" field
     When I type "50" into the "Max Members" field
@@ -65,7 +65,7 @@ Feature: License form defaults and unlimited plan limits
     Then the signed license data contains maxMembers as unlimited
     And the license passes validation
 
-  @integration
+  @integration @unimplemented
   Scenario: Plan template selection resets fields to template defaults
     Given I have cleared the "Max Members" field
     When I switch the plan type to "ENTERPRISE"

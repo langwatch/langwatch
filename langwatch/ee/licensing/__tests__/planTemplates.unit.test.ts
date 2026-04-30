@@ -47,6 +47,7 @@ describe("PRO_TEMPLATE", () => {
     expect(PRO_TEMPLATE.canPublish).toBe(true);
   });
 
+  /** @scenario PRO plan template defaults to "events" usage unit */
   it("has usageUnit of events", () => {
     expect(PRO_TEMPLATE.usageUnit).toBe("events");
   });
@@ -97,6 +98,7 @@ describe("ENTERPRISE_TEMPLATE", () => {
     expect(ENTERPRISE_TEMPLATE.canPublish).toBe(true);
   });
 
+  /** @scenario Enterprise plan template defaults to "events" usage unit */
   it("has usageUnit of events", () => {
     expect(ENTERPRISE_TEMPLATE.usageUnit).toBe("events");
   });
