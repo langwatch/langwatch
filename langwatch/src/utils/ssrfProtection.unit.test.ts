@@ -5,7 +5,7 @@ import {
   createSSRFValidator,
   createSSRFSafeFetchConfig,
   fetchWithResolvedIp,
-  type SSRFDevelopmentBypassResult,
+  type SSRFUnresolvedResult,
   type SSRFResolvedResult,
 } from "./ssrfProtection";
 
@@ -40,11 +40,10 @@ describe("createSSRFValidator()", () => {
     vi.resetAllMocks();
   });
 
-  describe("when isSaaS is false", () => {
+  describe("when blockLocal is false", () => {
     const validate = createSSRFValidator({
-      isDevelopment: false,
-      allowedDevHosts: [],
-      isSaaS: false,
+      blockLocal: false,
+      allowedHosts: [],
     });
 
     it("allows a private hostname", async () => {
@@ -81,11 +80,10 @@ describe("createSSRFValidator()", () => {
     });
   });
 
-  describe("when isSaaS is true", () => {
+  describe("when blockLocal is true", () => {
     const validate = createSSRFValidator({
-      isDevelopment: false,
-      allowedDevHosts: [],
-      isSaaS: true,
+      blockLocal: true,
+      allowedHosts: [],
     });
 
     it("blocks a private hostname", async () => {
@@ -136,6 +134,62 @@ describe("createSSRFValidator()", () => {
       ).rejects.toThrow(/Unsupported protocol: javascript:/);
     });
   });
+
+  describe("when allowedHosts contains the target hostname", () => {
+    it("allows a private IP literal even when blockLocal is true", async () => {
+      const validate = createSSRFValidator({
+        blockLocal: true,
+        allowedHosts: ["10.0.5.3"],
+      });
+
+      const result = await validate("http://10.0.5.3:8080/api");
+      expect(result.type).toBe("allowlisted");
+      expect(result.hostname).toBe("10.0.5.3");
+    });
+
+    it("allows localhost when explicitly listed", async () => {
+      const validate = createSSRFValidator({
+        blockLocal: true,
+        allowedHosts: ["localhost"],
+      });
+
+      const result = await validate("http://localhost:5560/foo");
+      expect(result.type).toBe("allowlisted");
+    });
+
+    it("never bypasses cloud metadata even when listed", async () => {
+      const validate = createSSRFValidator({
+        blockLocal: true,
+        allowedHosts: ["169.254.169.254"],
+      });
+
+      await expect(
+        validate("http://169.254.169.254/latest/meta-data/")
+      ).rejects.toThrow("cloud metadata endpoints");
+    });
+
+    it("is matched case-insensitively on hostname", async () => {
+      const validate = createSSRFValidator({
+        blockLocal: true,
+        allowedHosts: ["Internal.Example.Com"],
+      });
+      stubDnsResolve(["10.0.5.3"]);
+
+      const result = await validate("http://internal.example.com/api");
+      expect(result.type).toBe("allowlisted");
+    });
+
+    it("does not allow hostnames not in the list", async () => {
+      const validate = createSSRFValidator({
+        blockLocal: true,
+        allowedHosts: ["10.0.5.3"],
+      });
+
+      await expect(validate("http://10.0.5.4/")).rejects.toThrow(
+        "private or localhost IP addresses",
+      );
+    });
+  });
 });
 
 describe("createSSRFSafeFetchConfig()", () => {
@@ -159,9 +213,9 @@ describe("fetchWithResolvedIp()", () => {
     vi.resetAllMocks();
   });
 
-  describe("when resolvedIp is null (development-bypass)", () => {
-    const devBypassResult: SSRFDevelopmentBypassResult = {
-      type: "development-bypass",
+  describe("when result is unresolved (DNS failed but blockLocal is off)", () => {
+    const unresolvedResult: SSRFUnresolvedResult = {
+      type: "unresolved",
       reason: "dns-failed",
       originalUrl: "http://my-service:3000/api",
       hostname: "my-service",
@@ -174,7 +228,7 @@ describe("fetchWithResolvedIp()", () => {
       const fakeResponse = { status: 200, headers: new Headers() };
       mockedFetch.mockResolvedValue(fakeResponse as never);
 
-      await fetchWithResolvedIp(devBypassResult, undefined, {
+      await fetchWithResolvedIp(unresolvedResult, undefined, {
         rejectUnauthorized: false,
       });
 
@@ -189,7 +243,7 @@ describe("fetchWithResolvedIp()", () => {
       mockedFetch.mockResolvedValue(fakeResponse as never);
 
       // Passing rejectUnauthorized: false (on-prem mode)
-      await fetchWithResolvedIp(devBypassResult, undefined, {
+      await fetchWithResolvedIp(unresolvedResult, undefined, {
         rejectUnauthorized: false,
       });
 

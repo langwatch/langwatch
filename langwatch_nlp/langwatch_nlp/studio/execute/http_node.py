@@ -157,15 +157,33 @@ def _is_metadata_endpoint(hostname: str) -> bool:
     return hostname.lower() in metadata_hosts
 
 
+def _block_local_http_calls_enabled() -> bool:
+    """Check whether private-IP / localhost blocking is enabled via env var.
+
+    Mirrors the TypeScript side (langwatch/src/utils/ssrfProtection.ts):
+    accepts "1" or any case-insensitive variant of "true". Anything else
+    (including unset) means blocking is OFF.
+    """
+    import os
+
+    value = os.environ.get("BLOCK_LOCAL_HTTP_CALLS", "")
+    return value == "1" or value.lower() == "true"
+
+
 def _is_blocked_url(url: str) -> bool:
     """Check if URL targets localhost or internal networks.
 
-    SSRF Protection:
-    - ALWAYS blocks cloud metadata endpoints (169.254.169.254, etc.)
-    - In production: blocks private IPs, localhost, internal networks
-    - In development: allows hosts listed in ALLOWED_PROXY_HOSTS env var
+    SSRF Protection (parity with langwatch/src/utils/ssrfProtection.ts):
+    - ALWAYS blocks cloud metadata endpoints (169.254.169.254, etc.) regardless
+      of BLOCK_LOCAL_HTTP_CALLS or ALLOWED_PROXY_HOSTS.
+    - When BLOCK_LOCAL_HTTP_CALLS is "true"/"1": blocks private IPs, localhost,
+      and hostnames that DNS-resolve to private IPs, unless the hostname is
+      listed in ALLOWED_PROXY_HOSTS (literal, case-insensitive match).
+    - When BLOCK_LOCAL_HTTP_CALLS is unset/false: only cloud metadata is
+      blocked; everything else is allowed.
 
-    DNS rebinding protection: resolves hostname and checks the IP.
+    Allowlist semantics: literal hostname match, case-insensitive, port is
+    ignored. Identical to the TS validator's allowedHosts behavior.
     """
     import os
     import socket
@@ -178,7 +196,11 @@ def _is_blocked_url(url: str) -> bool:
     if _is_metadata_endpoint(hostname):
         return True
 
-    # Check if host is in allowed list (for development)
+    # Toggle off → allow anything that isn't a metadata endpoint
+    if not _block_local_http_calls_enabled():
+        return False
+
+    # Check if host is in allowed list
     allowed_hosts_str = os.environ.get("ALLOWED_PROXY_HOSTS", "")
     allowed_hosts = [h.strip().lower() for h in allowed_hosts_str.split(",") if h.strip()]
 

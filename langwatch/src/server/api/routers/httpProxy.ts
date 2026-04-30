@@ -38,9 +38,9 @@ type HttpProxyResult = {
  * - Workflow/simulation HTTP component execution
  *
  * Security:
- * - In production, blocks requests to localhost, private IPs, and cloud metadata endpoints
- * - In development, allows requests to hosts in ALLOWED_PROXY_HOSTS env var
- * - Always blocks cloud metadata endpoints (169.254.169.254, etc.) in all environments
+ * - When BLOCK_LOCAL_HTTP_CALLS is on, blocks requests to localhost, private IPs, and cloud metadata endpoints
+ * - When BLOCK_LOCAL_HTTP_CALLS is on, allows requests to hosts in ALLOWED_PROXY_HOSTS env var
+ * - Always blocks cloud metadata endpoints (169.254.169.254, etc.) regardless of toggle
  */
 export const httpProxyRouter = createTRPCRouter({
   /**
