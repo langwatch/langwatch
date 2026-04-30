@@ -17,14 +17,21 @@ export type MessageSource =
       extractor: (ev: NormalizedEvent) => unknown;
     };
 
-export const extractInputMessages = (
+type ExtractMessagesConfig = {
+  attrKey: string;
+  defaultRole: "user" | "assistant";
+  extractSystemInstructions: boolean;
+};
+
+const extractMessages = (
   ctx: ExtractorContext,
   sources: MessageSource[],
   ruleId: string,
+  config: ExtractMessagesConfig,
 ): boolean => {
   if (
-    ctx.bag.attrs.has(ATTR_KEYS.GEN_AI_INPUT_MESSAGES) ||
-    ctx.out[ATTR_KEYS.GEN_AI_INPUT_MESSAGES] !== undefined
+    ctx.bag.attrs.has(config.attrKey) ||
+    ctx.out[config.attrKey] !== undefined
   ) {
     return false;
   }
@@ -35,8 +42,10 @@ export const extractInputMessages = (
         const raw = ctx.bag.attrs.take(key);
         if (raw !== undefined) {
           const decoded = decodeMessagesPayload(raw);
-          const msgs = normalizeToMessages(decoded, "user");
-          if (msgs) {
+          const msgs = normalizeToMessages(decoded, config.defaultRole);
+          if (!msgs) continue;
+
+          if (config.extractSystemInstructions) {
             const systemInstruction =
               extractSystemInstructionFromMessages(msgs);
             // Strip system messages — they go to gen_ai.system_instructions
@@ -44,7 +53,7 @@ export const extractInputMessages = (
               ? stripSystemMessages(msgs)
               : msgs;
             if (chatMsgs.length > 0) {
-              ctx.setAttr(ATTR_KEYS.GEN_AI_INPUT_MESSAGES, chatMsgs);
+              ctx.setAttr(config.attrKey, chatMsgs);
             }
             if (systemInstruction !== null) {
               ctx.setAttrIfAbsent(
@@ -55,51 +64,9 @@ export const extractInputMessages = (
             ctx.recordRule(ruleId);
             return true;
           }
-        }
-      }
-    } else if (source.type === "event") {
-      const events = ctx.bag.events.takeAll(source.name);
-      if (events.length > 0) {
-        const messages: unknown[] = [];
-        for (const ev of events) {
-          const extracted = source.extractor(ev);
-          if (extracted !== undefined) {
-            messages.push(extracted);
-          }
-        }
-        if (messages.length > 0) {
-          ctx.setAttr(ATTR_KEYS.GEN_AI_INPUT_MESSAGES, messages);
-          ctx.recordRule(ruleId);
-          return true;
-        }
-      }
-    }
-  }
 
-  return false;
-};
-
-export const extractOutputMessages = (
-  ctx: ExtractorContext,
-  sources: MessageSource[],
-  ruleId: string,
-): boolean => {
-  if (
-    ctx.bag.attrs.has(ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES) ||
-    ctx.out[ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES] !== undefined
-  ) {
-    return false;
-  }
-
-  for (const source of sources) {
-    if (source.type === "attr") {
-      for (const key of source.keys) {
-        const raw = ctx.bag.attrs.take(key);
-        if (raw !== undefined) {
-          const decoded = decodeMessagesPayload(raw);
-          const msgs = normalizeToMessages(decoded, "assistant");
-          if (msgs && msgs.length > 0) {
-            ctx.setAttr(ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES, msgs);
+          if (msgs.length > 0) {
+            ctx.setAttr(config.attrKey, msgs);
             ctx.recordRule(ruleId);
             return true;
           }
@@ -116,7 +83,7 @@ export const extractOutputMessages = (
           }
         }
         if (messages.length > 0) {
-          ctx.setAttr(ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES, messages);
+          ctx.setAttr(config.attrKey, messages);
           ctx.recordRule(ruleId);
           return true;
         }
@@ -126,6 +93,28 @@ export const extractOutputMessages = (
 
   return false;
 };
+
+export const extractInputMessages = (
+  ctx: ExtractorContext,
+  sources: MessageSource[],
+  ruleId: string,
+): boolean =>
+  extractMessages(ctx, sources, ruleId, {
+    attrKey: ATTR_KEYS.GEN_AI_INPUT_MESSAGES,
+    defaultRole: "user",
+    extractSystemInstructions: true,
+  });
+
+export const extractOutputMessages = (
+  ctx: ExtractorContext,
+  sources: MessageSource[],
+  ruleId: string,
+): boolean =>
+  extractMessages(ctx, sources, ruleId, {
+    attrKey: ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES,
+    defaultRole: "assistant",
+    extractSystemInstructions: false,
+  });
 
 export const extractModelToBoth = (
   ctx: ExtractorContext,
@@ -153,6 +142,29 @@ export const extractModelToBoth = (
   }
 
   return false;
+};
+
+/**
+ * Coerces string-typed numeric attributes (e.g. "1.5") into actual numbers.
+ * Walks each key in the attribute bag, replaces stringy numbers in place,
+ * and records a `<extractorId>:coerce(<key>)` rule for traceability.
+ */
+export const coerceStringNumberAttrs = (
+  ctx: ExtractorContext,
+  extractorId: string,
+  keys: readonly string[],
+): void => {
+  for (const key of keys) {
+    const raw = ctx.bag.attrs.get(key);
+    if (typeof raw === "string") {
+      const n = asNumber(raw);
+      if (n !== null) {
+        ctx.bag.attrs.take(key);
+        ctx.setAttr(key, n);
+        ctx.recordRule(`${extractorId}:coerce(${key})`);
+      }
+    }
+  }
 };
 
 export type UsageTokenSources =

@@ -35,6 +35,7 @@
 
 import { ATTR_KEYS } from "./_constants";
 import {
+  coerceStringNumberAttrs,
   extractInputMessages,
   extractModelToBoth,
   extractOutputMessages,
@@ -254,49 +255,25 @@ export class GenAIExtractor implements CanonicalAttributesExtractor {
     // Coerce string→number for reasoning tokens and cache tokens
     // (Mastra sends these as strings, e.g. "720")
     // ─────────────────────────────────────────────────────────────────────────
-    const extendedTokenKeys = [
+    coerceStringNumberAttrs(ctx, this.id, [
       ATTR_KEYS.GEN_AI_USAGE_REASONING_TOKENS,
       ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS,
       ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS,
-    ] as const;
-
-    for (const key of extendedTokenKeys) {
-      const raw = attrs.get(key);
-      if (typeof raw === "string") {
-        const n = asNumber(raw);
-        if (n !== null) {
-          attrs.take(key);
-          ctx.setAttr(key, n);
-          ctx.recordRule(`${this.id}:coerce(${key})`);
-        }
-      }
-    }
+    ]);
 
     // ─────────────────────────────────────────────────────────────────────────
     // Request Parameter Coercion
     // Coerce string→number for request parameters that arrive as strings
     // (e.g. Mastra sends temperature as "1" instead of 1)
     // ─────────────────────────────────────────────────────────────────────────
-    const requestParamKeys = [
+    coerceStringNumberAttrs(ctx, this.id, [
       ATTR_KEYS.GEN_AI_REQUEST_TEMPERATURE,
       ATTR_KEYS.GEN_AI_REQUEST_MAX_TOKENS,
       ATTR_KEYS.GEN_AI_REQUEST_TOP_P,
       ATTR_KEYS.GEN_AI_REQUEST_FREQUENCY_PENALTY,
       ATTR_KEYS.GEN_AI_REQUEST_PRESENCE_PENALTY,
       ATTR_KEYS.GEN_AI_REQUEST_SEED,
-    ] as const;
-
-    for (const key of requestParamKeys) {
-      const raw = attrs.get(key);
-      if (typeof raw === "string") {
-        const n = asNumber(raw);
-        if (n !== null) {
-          attrs.take(key);
-          ctx.setAttr(key, n);
-          ctx.recordRule(`${this.id}:coerce(${key})`);
-        }
-      }
-    }
+    ]);
 
     // ─────────────────────────────────────────────────────────────────────────
     // Request Parameters (from legacy llm.invocation_parameters)
