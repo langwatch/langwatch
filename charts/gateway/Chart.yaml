@@ -4,8 +4,8 @@ description: >-
   LangWatch AI Gateway (Go service). Virtual keys, budgets, guardrails,
   multi-provider routing via Bifrost.
 type: application
-version: 3.2.0
-appVersion: 3.2.0
+version: 3.2.1
+appVersion: 3.2.1
 keywords:
   - langwatch
   - ai-gateway

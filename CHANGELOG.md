@@ -1,5 +1,36 @@
 # Changelog
 
+## [3.2.1](https://github.com/langwatch/langwatch/compare/langwatch@v3.2.0...langwatch@v3.2.1) (2026-04-30)
+
+
+### Features
+
+* **npx-server:** --nlp=python|go escape hatch for legacy langwatch_nlp ([#3613](https://github.com/langwatch/langwatch/issues/3613)) ([2eb38a4](https://github.com/langwatch/langwatch/commit/2eb38a445f1ff3cda65082f7f2c3e79f758463c0))
+
+
+### Bug Fixes
+
+* **deps:** bump liquidjs to 10.25.7 in langwatch app ([#3610](https://github.com/langwatch/langwatch/issues/3610)) ([18f3805](https://github.com/langwatch/langwatch/commit/18f38051ccbbf668d0e3bfd85b3442125815a017))
+* **deps:** bump liquidjs to 10.25.7 in langwatch app to clear CVEs ([18f3805](https://github.com/langwatch/langwatch/commit/18f38051ccbbf668d0e3bfd85b3442125815a017))
+* **deps:** bump protobufjs to clear CVE-2026-41242 across JS workspaces ([#3612](https://github.com/langwatch/langwatch/issues/3612)) ([f2f2c37](https://github.com/langwatch/langwatch/commit/f2f2c37a4dc2011e7463752e952172b6225c2b6d))
+* **nlpgo:** inline saved datasets + parallelize eval + sklearn-parity train/test split (3.2.0 prod fix) ([#3607](https://github.com/langwatch/langwatch/issues/3607)) ([90a6711](https://github.com/langwatch/langwatch/commit/90a6711e2dbb61519f32652694ed0bb30640cc56))
+* **release:** chart-release + npx-server tag stripping for langwatch@3.2.0 ([#3604](https://github.com/langwatch/langwatch/issues/3604)) ([c1e998b](https://github.com/langwatch/langwatch/commit/c1e998be94dc9d3b602c8a19ffb818b4221c360b))
+* **release:** chart-release pipeline + npx-server tag stripping for langwatch@3.2.0 ([c1e998b](https://github.com/langwatch/langwatch/commit/c1e998be94dc9d3b602c8a19ffb818b4221c360b))
+* **release:** path-routed Release-As 3.2.1 to retarget [#3605](https://github.com/langwatch/langwatch/issues/3605) (langwatch root) ([#3619](https://github.com/langwatch/langwatch/issues/3619)) ([c4d44af](https://github.com/langwatch/langwatch/commit/c4d44af1679d2313d67fdde2f4962d766c5f86da))
+* send slack and cio notifications on invite acceptance ([#3587](https://github.com/langwatch/langwatch/issues/3587)) ([359b49e](https://github.com/langwatch/langwatch/commit/359b49e84529c19b80298899a043c180d946a034))
+* **studio:** remove publish-button paywall on optimization studio ([#3611](https://github.com/langwatch/langwatch/issues/3611)) ([020c148](https://github.com/langwatch/langwatch/commit/020c1489d0705e00da55eccef308d2b228b02f73))
+
+
+### Miscellaneous
+
+* **features:** apply Phase 1 cull ([#3458](https://github.com/langwatch/langwatch/issues/3458)) ([#3468](https://github.com/langwatch/langwatch/issues/3468)) ([9eb0f33](https://github.com/langwatch/langwatch/commit/9eb0f33702ffb11461c18b1a54c60e72f7637a5f))
+* **traces:** apply Phase 1 cull ([#3458](https://github.com/langwatch/langwatch/issues/3458)) ([#3473](https://github.com/langwatch/langwatch/issues/3473)) ([237eed9](https://github.com/langwatch/langwatch/commit/237eed9fad79103fb22e595eaad6373738906d4a))
+
+
+### Documentation
+
+* **env:** document LANGWATCH_NPX_NLP marker from npx-server --nlp flag ([c4d44af](https://github.com/langwatch/langwatch/commit/c4d44af1679d2313d67fdde2f4962d766c5f86da))
+
 ## [3.2.0](https://github.com/langwatch/langwatch/compare/langwatch@v3.1.0...langwatch@v3.2.0) (2026-04-29)
 
 
