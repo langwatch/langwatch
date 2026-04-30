@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
 import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
+import { generate as generateSelfsigned } from "selfsigned";
 
 // Load `.env` into the Vite config's process environment. Vite normally
 // only exposes `VITE_*` vars to client code — but this config itself
@@ -52,11 +53,7 @@ function loadDevHttpsCredentials():
     return { cert: readFileSync(certPath), key: readFileSync(keyPath) };
   }
 
-  // Lazy require so consumers without the dep installed still get a
-  // useful error message rather than a Vite crash on config load.
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const { generate } = require("selfsigned") as typeof import("selfsigned");
-  const pems = generate(
+  const pems = generateSelfsigned(
     [{ name: "commonName", value: "localhost" }],
     {
       days: 825,
