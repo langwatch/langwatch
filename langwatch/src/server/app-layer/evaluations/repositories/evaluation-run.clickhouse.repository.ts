@@ -198,11 +198,13 @@ export class EvaluationRunClickHouseRepository
           FROM ${TABLE_NAME} AS t
           WHERE t.TenantId = {tenantId:String}
             AND t.EvaluationId = {evaluationId:String}
+            AND t.ScheduledAt >= now() - INTERVAL 7 DAY
             AND (t.TenantId, t.EvaluationId, t.UpdatedAt) IN (
               SELECT TenantId, EvaluationId, max(UpdatedAt)
               FROM ${TABLE_NAME}
               WHERE TenantId = {tenantId:String}
                 AND EvaluationId = {evaluationId:String}
+                AND ScheduledAt >= now() - INTERVAL 7 DAY
               GROUP BY TenantId, EvaluationId
             )
           LIMIT 1
@@ -271,6 +273,14 @@ export class EvaluationRunClickHouseRepository
           WHERE TenantId = {tenantId:String}
             AND ScheduledAt >= now() - INTERVAL 7 DAY
             AND TraceId = {traceId:String}
+            AND (TenantId, EvaluationId, UpdatedAt) IN (
+              SELECT TenantId, EvaluationId, max(UpdatedAt)
+              FROM ${TABLE_NAME}
+              WHERE TenantId = {tenantId:String}
+                AND ScheduledAt >= now() - INTERVAL 7 DAY
+                AND TraceId = {traceId:String}
+              GROUP BY TenantId, EvaluationId
+            )
           ORDER BY UpdatedAt DESC
         `,
         query_params: { tenantId, traceId },
@@ -278,17 +288,10 @@ export class EvaluationRunClickHouseRepository
       });
 
       const rows = await result.json<ClickHouseEvaluationRunRecord>();
-
-      // Deduplicate by EvaluationId (take latest UpdatedAt per evaluation)
-      const seen = new Set<string>();
-      const deduped: EvaluationRunData[] = [];
-      for (const row of rows) {
-        if (seen.has(row.EvaluationId)) continue;
-        seen.add(row.EvaluationId);
-        deduped.push(this.fromClickHouseRecord(row));
-      }
-
-      return deduped;
+      // Dedup is enforced by the IN-tuple subquery on (EvaluationId, max(UpdatedAt))
+      // — heavy columns (Inputs/Details/ErrorDetails) are only materialized for
+      // the surviving rows, not for every duplicate.
+      return rows.map((row) => this.fromClickHouseRecord(row));
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
@@ -331,6 +334,14 @@ export class EvaluationRunClickHouseRepository
           WHERE TenantId = {tenantId:String}
             AND ScheduledAt >= fromUnixTimestamp64Milli({since:Int64})
             AND TraceId IN ({traceIds:Array(String)})
+            AND (TenantId, EvaluationId, UpdatedAt) IN (
+              SELECT TenantId, EvaluationId, max(UpdatedAt)
+              FROM ${TABLE_NAME}
+              WHERE TenantId = {tenantId:String}
+                AND ScheduledAt >= fromUnixTimestamp64Milli({since:Int64})
+                AND TraceId IN ({traceIds:Array(String)})
+              GROUP BY TenantId, EvaluationId
+            )
           ORDER BY UpdatedAt DESC
         `,
         query_params: { tenantId, traceIds, since },
@@ -353,12 +364,9 @@ export class EvaluationRunClickHouseRepository
       const rows = await result.json<SlimRow>();
 
       const byTrace: Record<string, EvalSummary[]> = {};
-      const seen = new Set<string>();
 
+      // Dedup is now enforced by the IN-tuple subquery — no JS-side `seen` set.
       for (const row of rows) {
-        if (seen.has(row.EvaluationId)) continue;
-        seen.add(row.EvaluationId);
-
         const traceId = row.TraceId;
         if (!traceId) continue;
 
