@@ -14,7 +14,7 @@ Feature: Code block — execute user Python with isolated subprocess and structu
 
   Rule: Inputs are passed by name and outputs are read by name
 
-    @unit
+    @unit @unimplemented
     Scenario: a code block with two inputs and one output runs and returns the output
       Given a code node declaring inputs ["a", "b"] of type int and output "sum" of type int
       And the code body:
@@ -26,7 +26,7 @@ Feature: Code block — execute user Python with isolated subprocess and structu
       Then the node's output equals {"sum": 5}
       And the node's status is "success"
 
-    @unit
+    @unit @unimplemented
     Scenario: a missing declared output is reported as an error
       Given a code node declaring outputs ["sum", "diff"]
       And the code body returns only {"sum": 5}
@@ -34,7 +34,7 @@ Feature: Code block — execute user Python with isolated subprocess and structu
       Then the node's status is "error"
       And the error message contains "missing_output: diff"
 
-    @unit
+    @unit @unimplemented
     Scenario: an extra undeclared output is dropped silently
       Given a code node declaring output "sum"
       And the code body returns {"sum": 5, "scratch": [1,2,3]}
@@ -43,13 +43,13 @@ Feature: Code block — execute user Python with isolated subprocess and structu
 
   Rule: stdout and stderr are captured for observability
 
-    @integration
+    @integration @unimplemented
     Scenario: stdout from user code is attached to the node's execution event
       Given a code node whose body prints "hello-stdout" then returns {"ok": true}
       When I POST /go/studio/execute and read the SSE stream
       Then the node's "execution_state_change" event includes stdout containing "hello-stdout"
 
-    @integration
+    @integration @unimplemented
     Scenario: stderr from user code is attached to the node's execution event
       Given a code node whose body writes "hello-stderr" to stderr then returns {"ok": true}
       When I POST /go/studio/execute and read the SSE stream
@@ -57,7 +57,7 @@ Feature: Code block — execute user Python with isolated subprocess and structu
 
   Rule: Exceptions are surfaced as structured errors with the traceback
 
-    @integration
+    @integration @unimplemented
     Scenario: ZeroDivisionError aborts the node and the workflow with the traceback intact
       Given a code node whose body computes 1/0
       When I POST /go/studio/execute_sync
@@ -66,7 +66,7 @@ Feature: Code block — execute user Python with isolated subprocess and structu
       And the error.message contains "ZeroDivisionError: division by zero"
       And the error.traceback contains the user code line that triggered the error
 
-    @integration
+    @integration @unimplemented
     Scenario: a SyntaxError in user code is surfaced before any input is sent
       Given a code node whose body is "def execute(:" (invalid syntax)
       When I POST /go/studio/execute_sync
@@ -75,7 +75,7 @@ Feature: Code block — execute user Python with isolated subprocess and structu
 
   Rule: Wall-clock timeout terminates the subprocess
 
-    @integration
+    @integration @unimplemented
     Scenario: a code block exceeding NLP_CODE_BLOCK_TIMEOUT_SECONDS is killed and reports a timeout
       Given NLP_CODE_BLOCK_TIMEOUT_SECONDS is set to 2
       And a code node whose body sleeps 10 seconds
@@ -86,7 +86,7 @@ Feature: Code block — execute user Python with isolated subprocess and structu
 
   Rule: Process isolation prevents cross-invocation leaks
 
-    @integration
+    @integration @unimplemented
     Scenario: state set in one invocation does not leak to the next
       Given a code node that increments a global counter "x" and returns it
       When I invoke the workflow 5 times in succession
@@ -94,13 +94,13 @@ Feature: Code block — execute user Python with isolated subprocess and structu
 
   Rule: Container packages a stable Python toolchain for user code
 
-    @integration
+    @integration @unimplemented
     Scenario: the bundled Python interpreter exposes the standard library
       Given a code node whose body imports json, math, datetime, re, hashlib, base64, urllib
       When I POST /go/studio/execute_sync
       Then the node returns successfully
 
-    @integration
+    @integration @unimplemented
     Scenario: the bundled Python interpreter does not have network access by default
       Given a code node whose body opens a TCP connection to "8.8.8.8:53"
       When I POST /go/studio/execute_sync
@@ -109,7 +109,7 @@ Feature: Code block — execute user Python with isolated subprocess and structu
 
   Rule: Parity with Python code-node executor
 
-    @integration @parity
+    @integration @parity @unimplemented
     Scenario: identical user code + inputs produce identical outputs on Go and Python
       Given a fixture code workflow at tests/fixtures/workflows/code_only.json
       And the same input

@@ -10,7 +10,7 @@ Feature: Tracing parity with Python langwatch_nlp — Studio shows the same dept
 
   Rule: Each component dispatch produces a span named "execute_component" matching Python
 
-    @integration @tracing-parity @M1
+    @integration @tracing-parity @M1 @unimplemented
     Scenario: code-block execute_component span has the same name and span.type as Python
       Given a workflow with one code node returning {"output": "hi"}
       When the engine dispatches the node
@@ -20,7 +20,7 @@ Feature: Tracing parity with Python langwatch_nlp — Studio shows the same dept
       And the span has attribute "langwatch.node_type" = "code"
       And the span has attribute "langwatch.origin" inherited from the request
 
-    @integration @tracing-parity @M1
+    @integration @tracing-parity @M1 @unimplemented
     Scenario: signature-block execute_component span has the same shape
       Given a workflow with one signature node calling gpt-5-mini
       When the engine dispatches the node
@@ -28,7 +28,7 @@ Feature: Tracing parity with Python langwatch_nlp — Studio shows the same dept
       And the span has attribute "langwatch.span.type" = "component"
       And the span has attribute "langwatch.node_type" = "signature"
 
-    @integration @tracing-parity @M1
+    @integration @tracing-parity @M1 @unimplemented
     Scenario: http-block execute_component span has the same shape
       Given a workflow with one http node calling https://example.com
       When the engine dispatches the node
@@ -36,7 +36,7 @@ Feature: Tracing parity with Python langwatch_nlp — Studio shows the same dept
       And the span has attribute "langwatch.span.type" = "component"
       And the span has attribute "langwatch.node_type" = "http"
 
-    @integration @tracing-parity @M1
+    @integration @tracing-parity @M1 @unimplemented
     Scenario: evaluator and agent_workflow nodes emit execute_component spans too
       Given a workflow with an evaluator node and an agent_workflow node
       When the engine dispatches both
@@ -45,7 +45,7 @@ Feature: Tracing parity with Python langwatch_nlp — Studio shows the same dept
 
   Rule: INPUT and OUTPUT are captured as JSON strings on every span (output_source = "explicit")
 
-    @integration @tracing-parity @M2
+    @integration @tracing-parity @M2 @unimplemented
     Scenario: code block dispatch stamps langwatch.input and langwatch.output as JSON
       Given a code node that takes {"a": 2, "b": 3} and returns {"sum": 5}
       When the engine dispatches the node
@@ -53,13 +53,13 @@ Feature: Tracing parity with Python langwatch_nlp — Studio shows the same dept
       And the same span has attribute "langwatch.output" set to the JSON string '{"sum":5}'
       And Studio renders these via the Trace Details drawer with output_source = "explicit" (not "inferred")
 
-    @integration @tracing-parity @M2
+    @integration @tracing-parity @M2 @unimplemented
     Scenario: signature block dispatch stamps langwatch.input and langwatch.output as JSON
       Given a signature node that takes {"question": "..."} and returns {"answer": "..."}
       When the engine dispatches the node
       Then the execute_component span has langwatch.input and langwatch.output set as JSON-encoded maps
 
-    @integration @tracing-parity @M2
+    @integration @tracing-parity @M2 @unimplemented
     Scenario: huge agent outputs are preserved without truncation
       Given a code node returning a 200KB output blob
       When the engine dispatches the node
@@ -68,7 +68,7 @@ Feature: Tracing parity with Python langwatch_nlp — Studio shows the same dept
       # Python SDK default was 5000 chars/string; deliberate decision to
       # not match that on the Go path. Operators want full agent output.
 
-    @integration @tracing-parity @M2
+    @integration @tracing-parity @M2 @unimplemented
     Scenario: error path still stamps langwatch.input but no langwatch.output
       Given a code node that raises a runtime exception
       When the engine dispatches the node
@@ -78,27 +78,27 @@ Feature: Tracing parity with Python langwatch_nlp — Studio shows the same dept
 
   Rule: Per-implementation child span names match the Python entrypoint
 
-    @integration @tracing-parity @M3
+    @integration @tracing-parity @M3 @unimplemented
     Scenario: code block with class.__call__ entrypoint creates a child span "Code.__call__"
       Given a code node defining "class Code: def __call__(self, input): ..."
       When the engine dispatches the node
       Then the execute_component span has a child span named "Code.__call__"
       And the child span carries the same trace_id and is a direct descendant
 
-    @integration @tracing-parity @M3
+    @integration @tracing-parity @M3 @unimplemented
     Scenario: code block with class.forward entrypoint creates a child span "Code.forward"
       Given a code node defining "class Code: def forward(self, input): ..."
       When the engine dispatches the node
       Then the execute_component span has a child span named "Code.forward"
 
-    @integration @tracing-parity @M3
+    @integration @tracing-parity @M3 @unimplemented
     Scenario: code block with dspy.Module subclass creates a child span via dspy auto-instrumentation
       Given a code node defining "class Code(dspy.Module): def forward(self, input): ..."
       When the engine dispatches the node
       Then the execute_component span has a child span named "Code.forward"
       And dspy.Module reference is stamped as an attribute (matches Python's "dspy.Module" output attr)
 
-    @integration @tracing-parity @M3
+    @integration @tracing-parity @M3 @unimplemented
     Scenario: signature node creates a child span "Signature.predict" and a grandchild "gateway.chat.completions"
       Given a signature node calls openai/gpt-5-mini via the gateway
       When the dispatch completes
@@ -106,14 +106,14 @@ Feature: Tracing parity with Python langwatch_nlp — Studio shows the same dept
       And the Signature.predict span has a grandchild from the AI Gateway named "gateway.chat.completions"
       And the gateway span carries gen_ai.system, gen_ai.request.model, gen_ai.usage.input_tokens, gen_ai.usage.output_tokens
 
-    @integration @tracing-parity @M3
+    @integration @tracing-parity @M3 @unimplemented
     Scenario: http block creates a child span "HTTP.fetch" with method + URL + status
       Given an http node that POSTs to https://api.example.com
       When the dispatch completes
       Then the execute_component span has a child "HTTP.fetch"
       And the child span carries http.request.method, url.full, http.response.status_code
 
-    @integration @tracing-parity @M3
+    @integration @tracing-parity @M3 @unimplemented
     Scenario: evaluator node creates a child span "Evaluator.run" with evaluator name
       Given an evaluator node running "ragas/answer_relevancy"
       When the dispatch completes
@@ -121,7 +121,7 @@ Feature: Tracing parity with Python langwatch_nlp — Studio shows the same dept
       And the child span carries langwatch.evaluator.name = "ragas/answer_relevancy"
       And langwatch.evaluator.score is set to the numeric result
 
-    @integration @tracing-parity @M3
+    @integration @tracing-parity @M3 @unimplemented
     Scenario: agent_workflow node nests sub-workflow spans under its execute_component
       Given an agent_workflow node referencing another workflow
       When the dispatch completes
@@ -130,7 +130,7 @@ Feature: Tracing parity with Python langwatch_nlp — Studio shows the same dept
 
   Rule: Whole-flow execute carries an outer "execute_flow" span wrapping every execute_component
 
-    @integration @tracing-parity @M4
+    @integration @tracing-parity @M4 @unimplemented
     Scenario: a multi-node flow run nests every component under one execute_flow span
       Given a flow with nodes [entry → code → signature → end]
       When /go/studio/execute_sync runs the whole flow
@@ -139,7 +139,7 @@ Feature: Tracing parity with Python langwatch_nlp — Studio shows the same dept
       And langwatch.input on execute_flow equals the request inputs
       And langwatch.output on execute_flow equals the final node's outputs
 
-    @integration @tracing-parity @M4
+    @integration @tracing-parity @M4 @unimplemented
     Scenario: streaming /go/studio/execute (SSE) emits the same span shape as /execute_sync
       Given the same flow as above
       When /go/studio/execute streams events
@@ -148,7 +148,7 @@ Feature: Tracing parity with Python langwatch_nlp — Studio shows the same dept
 
   Rule: An evaluation-run wraps its many flow executions under a batch span
 
-    @integration @tracing-parity @M5
+    @integration @tracing-parity @M5 @unimplemented
     Scenario: an evaluation experiment running 100 dataset rows produces one batch span with 100 child execute_flow spans
       Given an evaluation v3 experiment with 100 dataset rows
       When the experiment runs to completion
@@ -159,7 +159,7 @@ Feature: Tracing parity with Python langwatch_nlp — Studio shows the same dept
 
   Rule: Origin attribution survives the new span shape
 
-    @integration @tracing-parity @M1
+    @integration @tracing-parity @M1 @unimplemented
     Scenario: every span in the tree inherits langwatch.origin from the inbound request
       Given a workflow run with X-LangWatch-Origin: workflow
       When the run completes
@@ -172,7 +172,7 @@ Feature: Tracing parity with Python langwatch_nlp — Studio shows the same dept
 
   Rule: Test matrix — every row below has a Go integration test asserting the span shape
 
-    @integration @tracing-parity @matrix
+    @integration @tracing-parity @matrix @unimplemented
     Scenario Outline: dispatch of <node_kind> with <entrypoint_shape> produces the expected span tree
       Given a node of kind "<node_kind>" with entrypoint shape "<entrypoint_shape>"
       When the engine dispatches it

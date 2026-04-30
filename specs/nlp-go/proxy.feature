@@ -18,7 +18,7 @@ Feature: Proxy passthrough — playground LLM calls via /go/proxy/v1/*
   # Path shape and method coverage
   # ============================================================================
 
-  @integration @v1
+  @integration @v1 @unimplemented
   Scenario Outline: every OpenAI-style /v1/* method is reachable under /go/proxy/v1/*
     When the TS app forwards a "<method>" request to "/go/proxy/v1<subpath>"
     Then nlpgo dispatches a corresponding gateway call to "<gateway_path>"
@@ -37,7 +37,7 @@ Feature: Proxy passthrough — playground LLM calls via /go/proxy/v1/*
   # x-litellm-* header → inline credentials translation
   # ============================================================================
 
-  @integration @v1
+  @integration @v1 @unimplemented
   Scenario: x-litellm-api_key is mapped into inline credentials before the gateway call
     Given the TS app sends "x-litellm-api_key: sk-test-..." with the playground request
     When nlpgo forwards the request to the gateway
@@ -45,7 +45,7 @@ Feature: Proxy passthrough — playground LLM calls via /go/proxy/v1/*
     And nlpgo adds a "X-LangWatch-Inline-Credentials" header carrying the api_key in JSON
     And the gateway-bound HMAC signature includes the inline-credentials header bytes
 
-  @integration @v1
+  @integration @v1 @unimplemented
   Scenario Outline: x-litellm-<provider_field> headers map into the right inline-credentials slot
     Given the TS app sends "<header_in>" with the playground request
     When nlpgo forwards the request
@@ -68,7 +68,7 @@ Feature: Proxy passthrough — playground LLM calls via /go/proxy/v1/*
   # Streaming pass-through
   # ============================================================================
 
-  @integration @v1
+  @integration @v1 @unimplemented
   Scenario: SSE streaming from /go/proxy/v1/chat/completions forwards deltas without buffering
     Given the playground request has body { "stream": true, ... }
     When nlpgo forwards the request to the gateway
@@ -81,7 +81,7 @@ Feature: Proxy passthrough — playground LLM calls via /go/proxy/v1/*
   # Bytes-equivalent passthrough — the playground UI relies on exact OpenAI shape
   # ============================================================================
 
-  @integration @v1
+  @integration @v1 @unimplemented
   Scenario: response body is byte-equivalent to the gateway's response (no rewrite)
     Given a non-streaming chat_completions request via /go/proxy/v1/chat/completions
     When the gateway returns a JSON body
@@ -89,7 +89,7 @@ Feature: Proxy passthrough — playground LLM calls via /go/proxy/v1/*
     And the "id", "created", "model", "choices", "usage" fields are present and unmodified
     And nlpgo does NOT inject extra fields into the body
 
-  @integration @v1
+  @integration @v1 @unimplemented
   Scenario: tool_call arguments arrive at the playground as a raw JSON string
     Given a non-streaming chat_completions response with a tool_call
     When nlpgo proxies the response back
@@ -100,13 +100,13 @@ Feature: Proxy passthrough — playground LLM calls via /go/proxy/v1/*
   # Auth + bypass behavior
   # ============================================================================
 
-  @integration @v1
+  @integration @v1 @unimplemented
   Scenario: /go/proxy/v1/* without provider headers returns a typed 400 before any dispatch
     When a request to "/go/proxy/v1/chat/completions" arrives with no x-litellm-* credential headers and no provider prefix in body.model
     Then the response status is 400
     And no gateway call is made
 
-  @integration @v1
+  @integration @v1 @unimplemented
   Scenario: /go/proxy/v1/* requests under NLPGO_BYPASS=1 never reach the Go binary
     Given the container is started with NLPGO_BYPASS=1
     When a request to "/go/proxy/v1/chat/completions" arrives
@@ -117,7 +117,7 @@ Feature: Proxy passthrough — playground LLM calls via /go/proxy/v1/*
   # Errors
   # ============================================================================
 
-  @integration @v1
+  @integration @v1 @unimplemented
   Scenario: gateway 4xx errors are forwarded with envelope intact
     Given the gateway returns a 400 with envelope { "type": "model_invalid", "message": "..." }
     When nlpgo proxies the error back
@@ -125,7 +125,7 @@ Feature: Proxy passthrough — playground LLM calls via /go/proxy/v1/*
     And the body is the same envelope verbatim
     And nlpgo emits an access-log line tagged status=400
 
-  @integration @v1
+  @integration @v1 @unimplemented
   Scenario: gateway timeout surfaces as 504 with a clear envelope, no half-written stream
     Given the gateway never responds within the proxy timeout
     When the client request times out

@@ -17,7 +17,7 @@ Feature: Telemetry — every span carries the correct origin
   # Wire format — single header that propagates across processes
   # ============================================================================
 
-  @integration @v1
+  @integration @v1 @unimplemented
   Scenario Outline: TS app sets X-LangWatch-Origin per call site, value is one of the canonical origins
     When the TS app calls nlpgo from "<call_site>"
     Then the request carries header "X-LangWatch-Origin: <origin>"
@@ -32,14 +32,14 @@ Feature: Telemetry — every span carries the correct origin
       | langwatch/src/server/topicClustering/topicClustering.ts      | topic_clustering  |
       | langwatch/src/server/evaluations/runEvaluation.ts            | evaluation        |
 
-  @integration @v1
+  @integration @v1 @unimplemented
   Scenario: missing X-LangWatch-Origin header defaults to "unknown" and emits a warning log
     When a /go/* request arrives with no X-LangWatch-Origin header
     Then nlpgo accepts the request (no 400)
     And the request span carries attribute "langwatch.origin" = "unknown"
     And nlpgo emits a warning log line "missing_origin_header" with method + path
 
-  @integration @v1
+  @integration @v1 @unimplemented
   Scenario: unknown origin value is preserved verbatim — operator can investigate later
     When a /go/* request arrives with X-LangWatch-Origin = "experimental_pipeline"
     Then nlpgo does NOT reject the request
@@ -49,7 +49,7 @@ Feature: Telemetry — every span carries the correct origin
   # Origin propagation through the engine — every span inherits
   # ============================================================================
 
-  @integration @v1
+  @integration @v1 @unimplemented
   Scenario: every per-node span emitted by the engine inherits langwatch.origin from the request
     Given a workflow with three nodes: dataset → signature → end
     And the request carries X-LangWatch-Origin = "workflow"
@@ -58,14 +58,14 @@ Feature: Telemetry — every span carries the correct origin
     And every per-node span has the same attribute "langwatch.origin" = "workflow"
     And the gateway span (from the signature node's gateway call) also carries "langwatch.origin" = "workflow"
 
-  @integration @v1
+  @integration @v1 @unimplemented
   Scenario: child gateway calls inherit the origin without nlpgo having to set it manually per call site
     Given the engine runs an LLM block with origin "evaluation" in context
     When the gateway client builds the outbound request
     Then the outbound request includes "X-LangWatch-Origin: evaluation"
     And the gateway-side span attaches attribute "langwatch.origin" = "evaluation"
 
-  @integration @v1
+  @integration @v1 @unimplemented
   Scenario: code-block subprocess receives the origin via env var
     Given the engine runs a code block with origin "scenario" in context
     When nlpgo spawns python3 runner.py
@@ -76,14 +76,14 @@ Feature: Telemetry — every span carries the correct origin
   # Span hierarchy — nlpgo span must be a child of the TS-app span when present
   # ============================================================================
 
-  @integration @v1
+  @integration @v1 @unimplemented
   Scenario: incoming W3C traceparent makes nlpgo's root span a child of the TS-app span
     When the TS app sends "traceparent: 00-<trace_id>-<parent_span>-01"
     Then nlpgo's root span has trace_id = <trace_id>
     And nlpgo's root span parent_span_id = <parent_span>
     And the response includes the same traceparent (carrying nlpgo's span id) for downstream propagation
 
-  @integration @v1
+  @integration @v1 @unimplemented
   Scenario: nlpgo and gateway emit spans with langwatch.project_id matching the request
     Given a request for project "acme-api"
     When the workflow runs through nlpgo and gateway
@@ -94,7 +94,7 @@ Feature: Telemetry — every span carries the correct origin
   # Per-block span granularity
   # ============================================================================
 
-  @integration @v1
+  @integration @v1 @unimplemented
   Scenario Outline: each block kind emits a span with a stable name + attributes
     Given a workflow that runs a "<kind>" block
     When the block executes
@@ -115,7 +115,7 @@ Feature: Telemetry — every span carries the correct origin
   # Attributes on the LLM gateway-call span
   # ============================================================================
 
-  @integration @v1
+  @integration @v1 @unimplemented
   Scenario: gateway-call span carries provider + model + latency + token attributes
     Given a signature node calls openai/gpt-5-mini through the gateway
     When the response returns
@@ -129,7 +129,7 @@ Feature: Telemetry — every span carries the correct origin
   # Cost attribution — origin tag flows to billing-relevant traces
   # ============================================================================
 
-  @integration @v1
+  @integration @v1 @unimplemented
   Scenario: cost attribution lands on the trace pile keyed by origin + project
     Given a workflow runs for project "acme-api" with origin "workflow"
     When the run completes
@@ -141,7 +141,7 @@ Feature: Telemetry — every span carries the correct origin
   # Gateway proxy passthrough — origin still flows
   # ============================================================================
 
-  @integration @v1
+  @integration @v1 @unimplemented
   Scenario: /go/proxy/v1/chat/completions forwards X-LangWatch-Origin to the gateway
     Given the TS app (playground call site) sends "X-LangWatch-Origin: playground"
     When nlpgo proxies the request to the gateway
@@ -152,7 +152,7 @@ Feature: Telemetry — every span carries the correct origin
   # Topic clustering — Python-side path also tags origin
   # ============================================================================
 
-  @integration @v1
+  @integration @v1 @unimplemented
   Scenario: topic-clustering worker on Python path tags spans with origin = topic_clustering
     Given the topic-clustering worker calls /topics/batch_clustering on uvicorn
     When the worker job runs
@@ -163,13 +163,13 @@ Feature: Telemetry — every span carries the correct origin
   # Negative cases
   # ============================================================================
 
-  @integration @v1
+  @integration @v1 @unimplemented
   Scenario: nlpgo never logs the inline credentials JSON (security)
     When a /go/studio/execute_sync request runs
     Then no log line at any level contains the X-LangWatch-Inline-Credentials header value
     And no log line contains any api_key, aws_secret_access_key, or vertex_credentials value
 
-  @integration @v1
+  @integration @v1 @unimplemented
   Scenario: nlpgo never propagates customer-supplied trace headers blindly past the gateway
     Given a request includes a customer Traceparent header
     When nlpgo forwards to the gateway

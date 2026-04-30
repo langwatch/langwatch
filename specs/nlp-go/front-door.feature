@@ -17,7 +17,7 @@ Feature: Front-door reverse proxy — nlpgo routes /go/* itself, everything else
   # In-process route table
   # ============================================================================
 
-  @integration @v1
+  @integration @v1 @unimplemented
   Scenario Outline: /go/* and health routes are handled by nlpgo's in-process router
     When a request hits "<path>"
     Then nlpgo's in-process handler runs
@@ -33,7 +33,7 @@ Feature: Front-door reverse proxy — nlpgo routes /go/* itself, everything else
       | /healthz                        |
       | /readyz                         |
 
-  @integration @v1
+  @integration @v1 @unimplemented
   Scenario: GET /readyz returns 503 until uvicorn child first reports healthy
     Given the container has just started
     When the uvicorn child has not yet returned 200 from its own /healthz
@@ -45,7 +45,7 @@ Feature: Front-door reverse proxy — nlpgo routes /go/* itself, everything else
   # Reverse-proxy behavior for legacy paths
   # ============================================================================
 
-  @integration @v1
+  @integration @v1 @unimplemented
   Scenario Outline: every path not in the in-process route table is reverse-proxied to uvicorn
     When a request hits "<path>" with method "<method>" and body "<body>"
     Then nlpgo forwards to "http://127.0.0.1:5561<path>" with the same method, headers, and body
@@ -59,13 +59,13 @@ Feature: Front-door reverse proxy — nlpgo routes /go/* itself, everything else
       | POST   | /topics/batch_clustering          | {traces}     |
       | POST   | /topics/incremental_clustering    | {traces}     |
 
-  @integration @v1
+  @integration @v1 @unimplemented
   Scenario: query-string and trailing-slash paths are forwarded byte-equivalent
     When a GET request hits "/proxy/v1/models?provider=openai" (with query string)
     Then nlpgo reverse-proxies to "http://127.0.0.1:5561/proxy/v1/models?provider=openai"
     And the path-and-query land at uvicorn unchanged
 
-  @integration @v1
+  @integration @v1 @unimplemented
   Scenario: streaming response bodies pass through with flush per chunk
     Given a uvicorn endpoint that emits one SSE "data:" line every 200ms for 5 seconds
     When the client GETs that endpoint via :5562 (proxy hop)
@@ -73,14 +73,14 @@ Feature: Front-door reverse proxy — nlpgo routes /go/* itself, everything else
     And nlpgo never accumulates the full body before flushing
     And the connection stays open until uvicorn closes it
 
-  @integration @v1
+  @integration @v1 @unimplemented
   Scenario: large request bodies are streamed (not buffered) into uvicorn
     Given a POST /studio/execute_sync with a 10 MB body
     When the request flows through nlpgo's proxy
     Then nlpgo does not buffer the full body before forwarding
     And the proxy uses chunked transfer encoding when the client did
 
-  @integration @v1
+  @integration @v1 @unimplemented
   Scenario: client cancellation propagates to uvicorn
     Given the client closes the connection while uvicorn is mid-response
     When nlpgo observes the client close
@@ -98,7 +98,7 @@ Feature: Front-door reverse proxy — nlpgo routes /go/* itself, everything else
   # The infra layer (Lambda Function URL, restrictive Security Groups, URL
   # secrecy) is the auth boundary.
 
-  @integration @v1
+  @integration @v1 @unimplemented
   Scenario: legacy paths are reverse-proxied to uvicorn unchanged
     When a request hits "/studio/execute_sync"
     Then the request is reverse-proxied to uvicorn unchanged
@@ -108,20 +108,20 @@ Feature: Front-door reverse proxy — nlpgo routes /go/* itself, everything else
   # Header hygiene
   # ============================================================================
 
-  @integration @v1
+  @integration @v1 @unimplemented
   Scenario: hop-by-hop headers are stripped on both directions per RFC 7230
     When a request includes "Connection: keep-alive" or "Transfer-Encoding: chunked" headers
     Then those hop-by-hop headers do not appear in the request that reaches uvicorn
     And those hop-by-hop headers do not appear in the response that reaches the client
 
-  @integration @v1
+  @integration @v1 @unimplemented
   Scenario: X-Forwarded-For is appended (not replaced) when forwarding to uvicorn
     Given the incoming request has "X-Forwarded-For: 1.2.3.4"
     And the connecting peer's IP is 5.6.7.8
     When nlpgo reverse-proxies to uvicorn
     Then uvicorn sees "X-Forwarded-For: 1.2.3.4, 5.6.7.8"
 
-  @integration @v1
+  @integration @v1 @unimplemented
   Scenario: request id is preserved (or generated) and surfaces in both nlpgo and uvicorn logs
     Given a request with no "X-Request-Id" header
     When the request flows through nlpgo
@@ -133,7 +133,7 @@ Feature: Front-door reverse proxy — nlpgo routes /go/* itself, everything else
   # Failure modes
   # ============================================================================
 
-  @integration @v1
+  @integration @v1 @unimplemented
   Scenario: uvicorn child is unreachable — nlpgo returns 502 with a clear envelope
     Given the uvicorn child has been stopped (TCP refused on :5561)
     When a legacy-path request arrives
@@ -141,7 +141,7 @@ Feature: Front-door reverse proxy — nlpgo routes /go/* itself, everything else
     And the response includes a "X-LangWatch-Upstream: uvicorn" header
     And nlpgo emits a structured log line at level "error"
 
-  @integration @v1
+  @integration @v1 @unimplemented
   Scenario: uvicorn returns a 5xx — nlpgo forwards it without rewriting
     Given the uvicorn child returns 503 for a /studio/execute_sync request
     Then nlpgo returns 503 to the client with the same body
@@ -151,7 +151,7 @@ Feature: Front-door reverse proxy — nlpgo routes /go/* itself, everything else
   # The "anything else" trap
   # ============================================================================
 
-  @integration @v1
+  @integration @v1 @unimplemented
   Scenario: an arbitrary unknown path is reverse-proxied (no nlpgo hardcoding of legacy routes)
     When a request hits "/some/new/python-only/route" that doesn't exist in nlpgo's table
     Then nlpgo reverse-proxies it to "http://127.0.0.1:5561/some/new/python-only/route"
