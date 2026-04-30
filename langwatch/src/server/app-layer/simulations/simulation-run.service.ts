@@ -100,8 +100,11 @@ export class SimulationRunService {
     return this.repository.getRunDataForAllSuites(params);
   }
 
-  async getAllRunIdsForProject(params: { projectId: string }): Promise<string[]> {
-    return this.repository.getAllRunIdsForProject(params);
+  async getRunIdsForSet(params: {
+    projectId: string;
+    scenarioSetId: string;
+  }): Promise<{ runIds: string[]; reachedCap: boolean }> {
+    return this.repository.getRunIdsForSet(params);
   }
 
   /**
