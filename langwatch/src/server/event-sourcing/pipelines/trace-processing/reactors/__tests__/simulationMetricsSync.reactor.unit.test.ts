@@ -21,6 +21,7 @@ function createDeps(): SimulationMetricsSyncReactorDeps & {
 function createTraceSummaryState(overrides: Partial<TraceSummaryData> = {}): TraceSummaryData {
   return {
     traceId: "trace-1",
+    traceName: "",
     spanCount: 2,
     totalDurationMs: 500,
     computedIOSchemaVersion: "2025-12-18",

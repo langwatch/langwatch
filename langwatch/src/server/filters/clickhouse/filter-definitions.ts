@@ -317,6 +317,28 @@ export const clickHouseFilters: Record<
     extractResults: extractStandardResults,
   },
 
+  "traces.name": {
+    tableName: "trace_summaries",
+    buildQuery: (params) => {
+      const { sql: scopeSql } = buildScopeConditions(params);
+      return `
+        SELECT
+          ts.TraceName as field,
+          ts.TraceName as label,
+          count() as count
+        FROM trace_summaries ts
+        WHERE ${buildTraceSummariesConditions(params)}
+          AND ts.TraceName != ''
+          ${buildQueryFilter("ts.TraceName", params)}
+          ${scopeSql}
+        GROUP BY ts.TraceName
+        ORDER BY ts.TraceName ASC
+        LIMIT 10000
+      `;
+    },
+    extractResults: extractStandardResults,
+  },
+
   // Span filters
   "spans.type": {
     tableName: "stored_spans",

@@ -109,6 +109,26 @@ export function applySpanToSummary({
     span,
   });
 
+  // Trace name: use the root span's name. Precedence:
+  // 1. Named roots win over empty-named roots (empty = "not set")
+  // 2. Among multiple named roots, earliest startTimeUnixMs wins
+  // After checkpoint reload, rootSpanStartTimeMs is undefined so first root wins.
+  const isRootSpan = span.parentSpanId === null;
+  const spanStartMs = span.startTimeUnixMs;
+  let traceName = state.traceName;
+  let rootSpanStartTimeMs = state.rootSpanStartTimeMs;
+  if (isRootSpan) {
+    const hasNoName = traceName === "";
+    const isEarlierNamedRoot =
+      span.name !== "" &&
+      rootSpanStartTimeMs !== undefined &&
+      spanStartMs < rootSpanStartTimeMs;
+    if (hasNoName || isEarlierNamedRoot) {
+      traceName = span.name;
+      rootSpanStartTimeMs = spanStartMs;
+    }
+  }
+
   return {
     ...state,
     traceId: state.traceId || span.traceId,
@@ -117,6 +137,8 @@ export function applySpanToSummary({
     occurredAt: timing.occurredAt,
     totalDurationMs: timing.totalDurationMs,
     models,
+    traceName,
+    rootSpanStartTimeMs,
     ...tokens,
     ...status,
     computedInput: io.computedInput,
@@ -189,6 +211,8 @@ export class TraceSummaryFoldProjection
       topicId: null,
       subTopicId: null,
       annotationIds: [],
+      traceName: "",
+      rootSpanStartTimeMs: undefined,
       attributes: {},
       scenarioRoleCosts: {},
       scenarioRoleLatencies: {},

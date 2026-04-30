@@ -81,6 +81,9 @@ export const traceSummaryDataSchema = z.object({
   scenarioRoleSpans: z.record(z.string(), z.string()).optional(),
   /** Per-span costs for retroactive role assignment when parent arrives after children. Internal bookkeeping. */
   spanCosts: z.record(z.string(), z.number()).optional(),
+  traceName: z.string(),
+  /** Start time of the root span that set traceName, used for deterministic tie-breaking when multiple root spans exist. Internal bookkeeping. */
+  rootSpanStartTimeMs: z.number().optional(),
   occurredAt: z.number(),
   createdAt: z.number(),
   updatedAt: z.number(),

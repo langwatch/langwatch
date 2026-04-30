@@ -86,6 +86,7 @@ const filterHandlers: Record<FilterField, FilterHandler | null> = {
   // Trace Filters
   "traces.origin": (values) => translateOriginFilter(values),
   "traces.error": (values) => translateErrorFilter(values),
+  "traces.name": (values) => translateTraceNameFilter(values),
 
   // Span Filters
   "spans.type": (values) => translateSpanTypeFilter(values),
@@ -336,6 +337,20 @@ function translateErrorFilter(values: string[]): FilterTranslation {
 
   // Both or neither - no filtering
   return { whereClause: "1=1", requiredJoins: [], params: {} };
+}
+
+/**
+ * Translate trace name filter.
+ * Uses the dedicated TraceName column on trace_summaries.
+ */
+function translateTraceNameFilter(values: string[]): FilterTranslation {
+  const ts = tableAliases.trace_summaries;
+  const paramName = genParamName("traceNames");
+  return {
+    whereClause: `${ts}.TraceName IN ({${paramName}:Array(String)})`,
+    requiredJoins: [],
+    params: { [paramName]: values },
+  };
 }
 
 /**

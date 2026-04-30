@@ -52,6 +52,7 @@ interface ClickHouseSummaryRecord {
   HasAnnotation: number | null;
   ScenarioRoleCosts: Record<string, number>;
   ScenarioRoleLatencies: Record<string, number>;
+  TraceName: string;
   ScenarioRoleSpans: Record<string, string>;
   SpanCosts: Record<string, number>;
   LastEventOccurredAt: number;
@@ -199,6 +200,7 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
             HasAnnotation,
             ScenarioRoleCosts,
             ScenarioRoleLatencies,
+            TraceName,
             ScenarioRoleSpans,
             SpanCosts
           FROM ${TABLE_NAME}
@@ -254,6 +256,7 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
       topicId: record.TopicId,
       subTopicId: record.SubTopicId,
       annotationIds: record.AnnotationIds ?? [],
+      traceName: record.TraceName ?? "",
       attributes: record.Attributes ?? {},
       scenarioRoleCosts: record.ScenarioRoleCosts ?? {},
       scenarioRoleLatencies: record.ScenarioRoleLatencies ?? {},
@@ -305,6 +308,7 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
       SubTopicId: data.subTopicId,
       AnnotationIds: data.annotationIds,
       HasAnnotation: data.annotationIds.length > 0 ? 1 : 0,
+      TraceName: data.traceName,
       ScenarioRoleCosts: data.scenarioRoleCosts ?? {},
       ScenarioRoleLatencies: data.scenarioRoleLatencies ?? {},
       ScenarioRoleSpans: data.scenarioRoleSpans ?? {},

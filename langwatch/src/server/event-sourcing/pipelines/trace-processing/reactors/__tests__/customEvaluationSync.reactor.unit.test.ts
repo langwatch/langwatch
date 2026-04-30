@@ -43,6 +43,7 @@ function createFoldState(
 ): TraceSummaryData {
   return {
     traceId: "trace-1",
+    traceName: "",
     spanCount: 1,
     totalDurationMs: 100,
     computedIOSchemaVersion: "2025-12-18",

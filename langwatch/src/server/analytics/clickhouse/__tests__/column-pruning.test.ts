@@ -392,6 +392,7 @@ describe("column-pruning", () => {
         "TokensPerSecond",
         "ContainsErrorStatus",
         "ErrorMessage",
+        "TraceName",
         "TopicId",
         "SubTopicId",
         "AnnotationIds",
