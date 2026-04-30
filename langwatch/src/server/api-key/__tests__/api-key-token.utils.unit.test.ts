@@ -70,15 +70,31 @@ describe("splitApiKeyToken", () => {
 });
 
 describe("verifySecret", () => {
-  it("returns true for matching secret", () => {
-    const secret = "testSecretValue123";
-    const hashed = hashSecret(secret);
-    expect(verifySecret(secret, hashed)).toBe(true);
+  describe("when verifying with current HMAC hash", () => {
+    it("returns match", () => {
+      const secret = "testSecretValue123";
+      const hashed = hashSecret(secret);
+      expect(verifySecret(secret, hashed)).toBe("match");
+    });
   });
 
-  it("returns false for non-matching secret", () => {
-    const hashed = hashSecret("correct");
-    expect(verifySecret("wrong", hashed)).toBe(false);
+  describe("when verifying with legacy plain SHA-256 hash", () => {
+    it("returns match_legacy", () => {
+      const secret = "legacySecretValue123";
+      // Simulate a hash created with the old plain SHA-256 algorithm
+      const legacyHash = require("node:crypto")
+        .createHash("sha256")
+        .update(secret)
+        .digest("hex");
+      expect(verifySecret(secret, legacyHash)).toBe("match_legacy");
+    });
+  });
+
+  describe("when secret does not match", () => {
+    it("returns no_match", () => {
+      const hashed = hashSecret("correct");
+      expect(verifySecret("wrong", hashed)).toBe("no_match");
+    });
   });
 });
 

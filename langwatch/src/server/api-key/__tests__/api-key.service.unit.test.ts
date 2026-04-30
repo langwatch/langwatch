@@ -10,6 +10,7 @@ vi.mock("../api-key-token.utils", () => ({
   }),
   splitApiKeyToken: vi.fn(),
   verifySecret: vi.fn(),
+  hashSecret: vi.fn().mockReturnValue("upgraded-hash"),
 }));
 
 // Mock the role binding permission check
