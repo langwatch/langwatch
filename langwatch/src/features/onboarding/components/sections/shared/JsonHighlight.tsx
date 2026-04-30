@@ -32,7 +32,7 @@ export function JsonHighlight({
             py={4}
             pr={12}
             fontFamily="'Geist Mono', 'IBM Plex Mono', 'Source Code Pro', Menlo, monospace"
-            fontSize="12.5px"
+            textStyle="sm"
             lineHeight="1.8"
             letterSpacing="0.01em"
             color="fg"

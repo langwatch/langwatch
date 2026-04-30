@@ -1120,7 +1120,7 @@ export const FlameView = memo(function FlameView({
                       >
                         <Text
                           textStyle="xs"
-                          color={isEmphasized ? "white" : "whiteAlpha.900"}
+                          color={isEmphasized ? "white" : "white/90"}
                           truncate
                           lineHeight={1}
                           userSelect="none"

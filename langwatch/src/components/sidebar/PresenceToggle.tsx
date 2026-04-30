@@ -62,7 +62,7 @@ export const PresenceToggle = ({ showLabel = true }: PresenceToggleProps) => {
       {showLabel && (
         <>
           <Text
-            fontSize="14px"
+            textStyle="sm"
             fontWeight="normal"
             color="nav.fg"
             whiteSpace="nowrap"

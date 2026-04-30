@@ -80,6 +80,7 @@ const resources: ResourceCard[] = [
     icon: <LuBookOpen size={18} />,
     // Documentation: cool, calm, almost-still. Grain shader in `blob`
     // mode — soft cloud forms with a subtle film grain over the top.
+    // chart palette — distinct hues required
     shader: {
       kind: "grain",
       colors: ["#0c1c3d", "#1e3a8a", "#3b82f6", "#67e8f9", "#a5f3fc"],

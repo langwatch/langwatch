@@ -108,8 +108,8 @@ export function NewTracesPromo({
         justifyContent="center"
         boxSize={isCompact ? "28px" : "34px"}
         borderRadius="full"
-        bg="whiteAlpha.200"
-        boxShadow="inset 0 0 0 1px var(--chakra-colors-whiteAlpha-300)"
+        bg="white/20"
+        boxShadow="inset 0 0 0 1px rgba(255, 255, 255, 0.3)"
       >
         <Icon as={LuSparkles} boxSize={isCompact ? 3.5 : 4} color="white" />
       </Box>
@@ -128,7 +128,7 @@ export function NewTracesPromo({
             paddingX={1.5}
             paddingY="2px"
             borderRadius="full"
-            bg="whiteAlpha.300"
+            bg="white/30"
             flexShrink={0}
           >
             <Text
@@ -146,7 +146,7 @@ export function NewTracesPromo({
         {!isCompact && (
           <Text
             textStyle="xs"
-            color="whiteAlpha.900"
+            color="white/90"
             lineHeight={1.45}
             css={{
               display: "-webkit-box",
@@ -168,8 +168,8 @@ export function NewTracesPromo({
           fontWeight="600"
           paddingX={isCompact ? 3 : 4}
           boxShadow="0 1px 2px rgba(0, 0, 0, 0.12)"
-          _hover={{ bg: "whiteAlpha.900", transform: "translateY(-1px)" }}
-          _active={{ bg: "whiteAlpha.800", transform: "translateY(0)" }}
+          _hover={{ bg: "white/90", transform: "translateY(-1px)" }}
+          _active={{ bg: "white/80", transform: "translateY(0)" }}
           transition="background-color 0.12s ease, transform 0.12s ease"
         >
           Try the new one
@@ -183,9 +183,9 @@ export function NewTracesPromo({
         <IconButton
           size={isCompact ? "xs" : "sm"}
           variant="ghost"
-          color="whiteAlpha.800"
-          _hover={{ bg: "whiteAlpha.200", color: "white" }}
-          _active={{ bg: "whiteAlpha.300" }}
+          color="white/80"
+          _hover={{ bg: "white/20", color: "white" }}
+          _active={{ bg: "white/30" }}
           onClick={handleDismiss}
           aria-label="Dismiss"
         >

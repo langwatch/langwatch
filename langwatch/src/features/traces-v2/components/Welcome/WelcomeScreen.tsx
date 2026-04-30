@@ -72,7 +72,7 @@ export const WelcomeScreen: React.FC = () => {
             height: "auto",
           },
           backdropFilter: "blur(10px)",
-          background: "blackAlpha.500",
+          background: "black/50",
         }}
         positionerProps={{
           // Inline style so we beat the Chakra dialog recipe's class CSS.

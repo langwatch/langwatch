@@ -246,7 +246,7 @@ export function Minimap({
             width={`${Math.max(0, vpLeft)}%`}
             top={0}
             bottom={0}
-            bg="blackAlpha.500"
+            bg="black/50"
             pointerEvents="none"
           />
           <Box
@@ -255,7 +255,7 @@ export function Minimap({
             right={0}
             top={0}
             bottom={0}
-            bg="blackAlpha.500"
+            bg="black/50"
             pointerEvents="none"
           />
 

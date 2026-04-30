@@ -123,7 +123,7 @@ export function GenerateConversationDialog() {
                       colorPalette={turnCount === v ? "orange" : undefined}
                       onClick={() => setTurnCount(v)}
                       flex={1}
-                      fontSize="10px"
+                      textStyle="2xs"
                     >
                       {v}
                     </Button>

@@ -116,7 +116,7 @@ export function GenerateTraceDialog() {
                       colorPalette={targetSpanCount === v ? "orange" : undefined}
                       onClick={() => setTargetSpanCount(v)}
                       flex={1}
-                      fontSize="10px"
+                      textStyle="2xs"
                     >
                       {v >= 1000
                         ? `${(v / 1000).toFixed(v % 1000 === 0 ? 0 : 1)}k`
@@ -145,7 +145,7 @@ export function GenerateTraceDialog() {
                     </Button>
                   ))}
                 </Flex>
-                <Text fontSize="10px" color="fg.subtle" mt={1}>
+                <Text textStyle="2xs" color="fg.subtle" mt={1}>
                   Max {DEPTH_PRESETS[depthPreset]!.value} levels deep
                 </Text>
               </Box>
@@ -171,10 +171,10 @@ export function GenerateTraceDialog() {
                   }
                 />
                 <Flex justify="space-between" mt={0.5}>
-                  <Text fontSize="10px" color="fg.subtle">
+                  <Text textStyle="2xs" color="fg.subtle">
                     Mixed infra
                   </Text>
-                  <Text fontSize="10px" color="fg.subtle">
+                  <Text textStyle="2xs" color="fg.subtle">
                     All GenAI
                   </Text>
                 </Flex>
@@ -187,7 +187,7 @@ export function GenerateTraceDialog() {
                     <Text fontSize="xs" color="fg.muted">
                       OTel span events
                     </Text>
-                    <Text fontSize="10px" color="fg.subtle">
+                    <Text textStyle="2xs" color="fg.subtle">
                       Attach gen_ai.* messages, choices, exceptions
                     </Text>
                   </Box>
@@ -207,7 +207,7 @@ export function GenerateTraceDialog() {
                     <Text fontSize="xs" color="fg.muted">
                       Use real prompts
                     </Text>
-                    <Text fontSize="10px" color="fg.subtle">
+                    <Text textStyle="2xs" color="fg.subtle">
                       {!selectedProjectId
                         ? "Select a project first"
                         : useRealPrompts

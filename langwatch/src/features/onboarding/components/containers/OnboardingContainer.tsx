@@ -102,7 +102,7 @@ export const OnboardingContainer: React.FC<OnboardingContainerProps> = ({
               size="sm"
               borderRadius="full"
               aria-label="Go back"
-              _hover={{ bg: "blackAlpha.50" }}
+              _hover={{ bg: "bg.muted" }}
               onClick={onBack}
             >
               <ArrowLeft size={18} />
@@ -127,7 +127,7 @@ export const OnboardingContainer: React.FC<OnboardingContainerProps> = ({
             borderRadius="full"
             aria-label="Sign out"
             color="fg.subtle"
-            _hover={{ bg: "blackAlpha.50", color: "fg" }}
+            _hover={{ bg: "bg.muted", color: "fg" }}
             onClick={() => {
               emit("clicked", "sign_out");
               void signOut();

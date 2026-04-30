@@ -79,7 +79,7 @@ function HeaderCell<T>({
       width={meta?.flex ? undefined : `${size}px`}
       minWidth={`${header.column.columnDef.minSize}px`}
       textAlign={align}
-      fontSize="10px"
+      textStyle="2xs"
       fontWeight="500"
       color="fg.subtle/70"
       textTransform="uppercase"
