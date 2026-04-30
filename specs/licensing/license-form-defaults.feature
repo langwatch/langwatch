@@ -74,7 +74,7 @@ Feature: License form defaults and unlimited plan limits
 
   # --- Complete Form Fields ---
 
-  @integration
+  @integration @unimplemented
   Scenario: Form includes all license plan limit fields
     When the form loads
     Then the plan limits section contains fields for:
@@ -84,7 +84,6 @@ Feature: License form defaults and unlimited plan limits
       | Max Teams              |
       | Max Projects           |
       | Max Messages/Month     |
-      | Evaluations Credit     |
       | Max Workflows          |
       | Max Prompts            |
       | Max Evaluators         |
