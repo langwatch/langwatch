@@ -125,8 +125,8 @@ def main():
 
             print(f"   Model: {prompt.model}")  # from the prompt data itself
             assert (
-                prompt.model == "openai/gpt-5-mini"
-            ), "Prompt model should be openai/gpt-4o-mini"
+                prompt.model == "openai/gpt-5"
+            ), "Prompt model should match the langwatch CLI's default (openai/gpt-5 — see typescript-sdk/src/cli/commands/create.ts)"
 
             # 5. Test compile the prompt
             print("\n5️⃣ Test compile the prompt")
