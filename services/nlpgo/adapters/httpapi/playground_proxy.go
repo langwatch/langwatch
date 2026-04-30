@@ -35,6 +35,14 @@ type playgroundProxyRequest struct {
 	// /v1beta/models/gemini-2.0-flash:generateContent). Only consulted
 	// when Type == RequestTypePassthrough.
 	HTTPPath string
+	// HTTPMethod / HTTPRawQuery / HTTPHeaders are populated only when
+	// Type == RequestTypePassthrough so the dispatcher's Passthrough
+	// branch can reconstruct the upstream call. Auth headers (the
+	// langwatch-internal x-litellm-* set we already parsed into
+	// Credential) are stripped by the handler before forwarding here.
+	HTTPMethod   string
+	HTTPRawQuery string
+	HTTPHeaders  map[string]string
 }
 
 // playgroundProxyResponse mirrors *domain.Response but kept thin to
@@ -132,22 +140,6 @@ func playgroundProxyDispatch(proxy PlaygroundProxy) http.HandlerFunc {
 
 		reqType, httpPath := classifyPath(r.URL.Path)
 
-		// /v1beta/* etc. → RequestTypePassthrough. Wiring it through the
-		// dispatcher requires constructing dispatcher.PassthroughRequest
-		// (HTTP path + method + headers), which the current shimAdapter
-		// doesn't surface. Until that's plumbed, return a typed
-		// not-implemented error rather than silently calling Dispatch
-		// with type=passthrough and letting the provider fail with an
-		// opaque "missing path" downstream.
-		if reqType == domain.RequestTypePassthrough {
-			herr.WriteHTTP(w, herr.New(ctx, nlpgodomain.ErrInternal, herr.M{
-				"reason": "passthrough_not_implemented",
-				"path":   r.URL.Path,
-				"hint":   "/v1beta/* and other raw-forward paths are tracked as a separate follow-up; for now use /v1/chat/completions, /v1/messages, /v1/embeddings, or /v1/responses",
-			}))
-			return
-		}
-
 		req := playgroundProxyRequest{
 			Type:       reqType,
 			Model:      bareModel,
@@ -156,12 +148,58 @@ func playgroundProxyDispatch(proxy PlaygroundProxy) http.HandlerFunc {
 			HTTPPath:   httpPath,
 		}
 
+		// /v1beta/* (Gemini-native generateContent / streamGenerateContent
+		// and friends, called by gemini-cli + the Google GenAI SDK) flows
+		// through the dispatcher's passthrough mode rather than the typed
+		// RequestType branches. Capture the inbound HTTP shape (method,
+		// query, forwarded headers) so the dispatcher can reconstruct the
+		// upstream call. Auth headers (x-litellm-* — already parsed into
+		// Credential above; Authorization/X-Auth-Token — never expected
+		// from a /v1beta caller in our deployment shape) are stripped so
+		// they aren't double-applied or leaked to the upstream provider.
+		if reqType == domain.RequestTypePassthrough {
+			req.HTTPMethod = r.Method
+			req.HTTPRawQuery = r.URL.RawQuery
+			req.HTTPHeaders = filterPassthroughHeaders(r.Header)
+			// Gemini-native streaming endpoints encode the stream/sync
+			// distinction in the URL action suffix (e.g.
+			// `:streamGenerateContent` vs `:generateContent`), NOT in the
+			// OpenAI-style `"stream": true` body flag. peekBodyMetadata
+			// only saw the latter, so streamGenerateContent calls
+			// (gemini-cli + Google GenAI SDK) used to fall through to
+			// handleSync and discard the SSE deltas. Promote isStream
+			// when the path resolves to a stream-typed action.
+			if isPassthroughStreamPath(req.HTTPPath) {
+				isStream = true
+			}
+		}
+
 		if isStream {
 			handleStream(ctx, w, proxy, req)
 			return
 		}
 		handleSync(ctx, w, proxy, req)
 	}
+}
+
+// isPassthroughStreamPath reports whether a /v1beta-family relative
+// path is a streaming endpoint. The Google GenAI surface signals
+// streaming via the action suffix on `:` rather than via a body flag —
+// `:streamGenerateContent`, `:streamRawPredict` etc. all stream;
+// `:generateContent`, `:countTokens` etc. don't. We match a small
+// allowlist of known stream actions today; anything else defaults to
+// non-streaming so a typo on the inbound URL surfaces as a regular
+// sync 4xx instead of an opened SSE stream that never closes.
+func isPassthroughStreamPath(path string) bool {
+	idx := strings.LastIndexByte(path, ':')
+	if idx < 0 {
+		return false
+	}
+	switch path[idx+1:] {
+	case "streamGenerateContent", "streamRawPredict":
+		return true
+	}
+	return false
 }
 
 // rewriteBodyModel sets body.model = newModel while preserving every
@@ -230,9 +268,23 @@ func peekBodyMetadata(body []byte) (model string, stream bool, err error) {
 // The known set covers OpenAI's /chat/completions, /embeddings,
 // /responses, Anthropic's /messages, and a passthrough catch-all for
 // Gemini's /v1beta/models/...:generateContent style paths.
+//
+// The returned suffix is the provider-relative path the dispatcher's
+// passthrough adapter forwards (e.g. "/models/gemini-2.5-flash:generateContent"
+// for Gemini, with the api-version segment stripped). For typed
+// RequestType branches the suffix is informational only — the
+// dispatcher recomputes the upstream URL from provider config.
 func classifyPath(urlPath string) (domain.RequestType, string) {
 	suffix := strings.TrimPrefix(urlPath, "/go/proxy")
-	suffix = strings.TrimPrefix(suffix, "/v1")
+	// Strip the api-version segment ("/v1" or "/v1beta") explicitly —
+	// trimming "/v1" alone would also eat the "v1" in "/v1beta/...",
+	// leaving a malformed "beta/models/..." path that breaks Gemini's
+	// generateContent provider adapter.
+	if strings.HasPrefix(suffix, "/v1beta") {
+		suffix = strings.TrimPrefix(suffix, "/v1beta")
+	} else if strings.HasPrefix(suffix, "/v1") {
+		suffix = strings.TrimPrefix(suffix, "/v1")
+	}
 	switch {
 	case strings.HasSuffix(suffix, "/chat/completions"):
 		return domain.RequestTypeChat, suffix
@@ -350,6 +402,8 @@ var _ = errors.New
 type DispatcherShim interface {
 	Dispatch(ctx context.Context, req DispatchRequest) (*DispatchResponse, error)
 	DispatchStream(ctx context.Context, req DispatchRequest) (DispatchStream, error)
+	Passthrough(ctx context.Context, req PassthroughDispatchRequest) (*DispatchResponse, error)
+	PassthroughStream(ctx context.Context, req PassthroughDispatchRequest) (DispatchStream, error)
 }
 
 // DispatchRequest mirrors dispatcher.Request via re-export-by-shape so
@@ -361,6 +415,19 @@ type DispatchRequest struct {
 	Model      string
 	Body       []byte
 	Credential domain.Credential
+}
+
+// PassthroughDispatchRequest carries the typed Request fields plus the
+// HTTP-shape fields a raw-forward path needs. Mirrors
+// dispatcher.PassthroughRequest. The shim adapter in cmd/ does the
+// field-by-field copy so this package keeps zero dispatcher imports.
+type PassthroughDispatchRequest struct {
+	DispatchRequest
+	HTTPMethod   string
+	HTTPPath     string
+	HTTPRawQuery string
+	HTTPHeaders  map[string]string
+	Stream       bool
 }
 
 // DispatchResponse mirrors *domain.Response.
@@ -379,8 +446,10 @@ type DispatchStream interface {
 }
 
 // shimAdapter adapts a DispatcherShim to PlaygroundProxy. It bridges
-// the playgroundProxyRequest (with HTTPPath) → DispatchRequest (without
-// — passthrough mode is a future extension that wires HTTPPath in).
+// the playgroundProxyRequest (with HTTPPath) → DispatchRequest for
+// typed RequestType branches, and → PassthroughDispatchRequest for
+// RequestTypePassthrough so /v1beta/* (Gemini-native) calls reach the
+// dispatcher's raw-forward path.
 type shimAdapter struct {
 	shim DispatcherShim
 }
@@ -393,6 +462,29 @@ func NewPlaygroundProxyFromShim(shim DispatcherShim) PlaygroundProxy {
 }
 
 func (a *shimAdapter) Dispatch(ctx context.Context, req playgroundProxyRequest) (*playgroundProxyResponse, error) {
+	if req.Type == domain.RequestTypePassthrough {
+		resp, err := a.shim.Passthrough(ctx, PassthroughDispatchRequest{
+			DispatchRequest: DispatchRequest{
+				Type:       req.Type,
+				Model:      req.Model,
+				Body:       req.Body,
+				Credential: req.Credential,
+			},
+			HTTPMethod:   req.HTTPMethod,
+			HTTPPath:     req.HTTPPath,
+			HTTPRawQuery: req.HTTPRawQuery,
+			HTTPHeaders:  req.HTTPHeaders,
+			Stream:       false,
+		})
+		if err != nil {
+			return nil, err
+		}
+		return &playgroundProxyResponse{
+			StatusCode: resp.StatusCode,
+			Body:       resp.Body,
+			Headers:    resp.Headers,
+		}, nil
+	}
 	resp, err := a.shim.Dispatch(ctx, DispatchRequest{
 		Type:       req.Type,
 		Model:      req.Model,
@@ -410,6 +502,25 @@ func (a *shimAdapter) Dispatch(ctx context.Context, req playgroundProxyRequest) 
 }
 
 func (a *shimAdapter) DispatchStream(ctx context.Context, req playgroundProxyRequest) (playgroundProxyStream, error) {
+	if req.Type == domain.RequestTypePassthrough {
+		iter, err := a.shim.PassthroughStream(ctx, PassthroughDispatchRequest{
+			DispatchRequest: DispatchRequest{
+				Type:       req.Type,
+				Model:      req.Model,
+				Body:       req.Body,
+				Credential: req.Credential,
+			},
+			HTTPMethod:   req.HTTPMethod,
+			HTTPPath:     req.HTTPPath,
+			HTTPRawQuery: req.HTTPRawQuery,
+			HTTPHeaders:  req.HTTPHeaders,
+			Stream:       true,
+		})
+		if err != nil {
+			return nil, err
+		}
+		return iter, nil
+	}
 	iter, err := a.shim.DispatchStream(ctx, DispatchRequest{
 		Type:       req.Type,
 		Model:      req.Model,
@@ -420,4 +531,58 @@ func (a *shimAdapter) DispatchStream(ctx context.Context, req playgroundProxyReq
 		return nil, err
 	}
 	return iter, nil
+}
+
+// filterPassthroughHeaders returns a copy of the inbound HTTP headers
+// suitable for forwarding to the upstream provider on a passthrough
+// call. Strips:
+//   - x-litellm-* — already parsed into domain.Credential by the handler;
+//     forwarding them would leak provider keys to the upstream and could
+//     cause double-application by Bifrost.
+//   - Authorization / X-Auth-Token — never expected from a /v1beta caller
+//     in our deployment shape; if present, it's almost certainly meant
+//     for the LangWatch app surface, not the upstream.
+//   - Hop-by-hop headers per RFC 7230 §6.1.
+//   - Host (the upstream provider sets its own).
+//   - Content-Length (the dispatcher recomputes this for the outbound
+//     request so the byte count matches whatever the parser emits).
+func filterPassthroughHeaders(in http.Header) map[string]string {
+	// Build the dynamic skip set first: RFC 7230 §6.1 lets the
+	// `Connection` header name additional hop-by-hop tokens (e.g.
+	// `Connection: Foo` makes `Foo: bar` hop-by-hop too). Forwarding
+	// those would leak short-circuit framing details to the upstream
+	// provider, so add them to the per-call denylist alongside the
+	// canonical hop-by-hop set.
+	dyn := map[string]struct{}{}
+	for _, raw := range in.Values("Connection") {
+		for _, tok := range strings.Split(raw, ",") {
+			tok = strings.TrimSpace(strings.ToLower(tok))
+			if tok != "" {
+				dyn[tok] = struct{}{}
+			}
+		}
+	}
+	out := make(map[string]string, len(in))
+	for k, vs := range in {
+		lk := strings.ToLower(k)
+		if strings.HasPrefix(lk, "x-litellm-") {
+			continue
+		}
+		if _, ok := dyn[lk]; ok {
+			continue
+		}
+		switch lk {
+		case "authorization", "x-auth-token",
+			"connection", "keep-alive", "proxy-authenticate", "proxy-authorization",
+			"te", "trailer", "transfer-encoding", "upgrade",
+			"host", "content-length":
+			continue
+		}
+		// Multi-value headers are joined with comma per RFC 7230 §3.2.2 —
+		// matches what http.Client does on the way out anyway.
+		if len(vs) > 0 {
+			out[k] = strings.Join(vs, ", ")
+		}
+	}
+	return out
 }

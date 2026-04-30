@@ -162,6 +162,13 @@ func decodeStudioClientEvent(r *http.Request, body []byte) (*app.WorkflowRequest
 		WorkflowVersionID string `json:"workflow_version_id,omitempty"`
 		EvaluateOn        string `json:"evaluate_on,omitempty"`
 		DatasetEntry      *int   `json:"dataset_entry,omitempty"`
+		// DoNotTrace is set by sub-workflow callers (Python's
+		// CustomNode.forward / Go's agentblock.WorkflowRunner inject it
+		// on /api/workflows/<id>/run bodies) to suppress trace emission
+		// on the inner run, preventing double-counted spans when a
+		// parent workflow already owns the trace. Mirrors
+		// langwatch_nlp/studio/types/events.py:57 + execute_flow.py:53.
+		DoNotTrace bool `json:"do_not_trace,omitempty"`
 	}
 	if err := json.Unmarshal(innerBytes, &inner); err != nil {
 		e := herr.New(r.Context(), domain.ErrBadRequest, herr.M{
@@ -184,6 +191,15 @@ func decodeStudioClientEvent(r *http.Request, body []byte) (*app.WorkflowRequest
 	if threadID == "" {
 		threadID = r.Header.Get("X-LangWatch-Thread-Id")
 	}
+	// Combine envelope-level do_not_trace with the workflow's
+	// enable_tracing setting (default true). Either being false
+	// suppresses the studio span. Mirrors execute_flow.py:53 logic
+	// `not workflow.enable_tracing or event.do_not_trace`.
+	doNotTrace := inner.DoNotTrace
+	if !peekWorkflowEnableTracing(inner.Workflow) {
+		doNotTrace = true
+	}
+
 	return &app.WorkflowRequest{
 		WorkflowJSON:      inner.Workflow,
 		Inputs:            normalizeInputs(inner.Inputs),
@@ -198,7 +214,31 @@ func decodeStudioClientEvent(r *http.Request, body []byte) (*app.WorkflowRequest
 		WorkflowVersionID: inner.WorkflowVersionID,
 		EvaluateOn:        inner.EvaluateOn,
 		DatasetEntry:      inner.DatasetEntry,
+		DoNotTrace:        doNotTrace,
 	}, nil
+}
+
+// peekWorkflowEnableTracing extracts `enable_tracing` from the raw
+// workflow JSON without parsing the full Workflow struct. Default is
+// true (parity with Python's pydantic Workflow.enable_tracing default
+// at langwatch_nlp/studio/types/dsl.py and the Studio TS DSL where
+// the field is optional + defaults to true downstream). Returns true
+// on parse error so a malformed workflow doesn't unintentionally
+// suppress all observability before the engine even runs.
+func peekWorkflowEnableTracing(raw json.RawMessage) bool {
+	if len(raw) == 0 {
+		return true
+	}
+	var peek struct {
+		EnableTracing *bool `json:"enable_tracing"`
+	}
+	if err := json.Unmarshal(raw, &peek); err != nil {
+		return true
+	}
+	if peek.EnableTracing == nil {
+		return true
+	}
+	return *peek.EnableTracing
 }
 
 // peekWorkflowAPIKey extracts the `api_key` field from raw workflow

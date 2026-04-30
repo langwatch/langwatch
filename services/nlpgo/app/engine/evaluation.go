@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	mathrand "math/rand"
 	"net/http"
 	"sync"
 	"time"
@@ -13,6 +14,14 @@ import (
 	"github.com/langwatch/langwatch/services/nlpgo/app/engine/blocks/dataset"
 	"github.com/langwatch/langwatch/services/nlpgo/app/engine/dsl"
 )
+
+// newDeterministicRand returns a math/rand source seeded with the
+// given int64. Used by splitTrainTest to reproduce sklearn's
+// random_state behavior — we don't need cryptographic randomness here
+// since the goal is "same seed → same shuffle for re-runnable evals".
+func newDeterministicRand(seed int64) *mathrand.Rand {
+	return mathrand.New(mathrand.NewSource(seed))
+}
 
 // evalLogResultsClient posts an evaluation batch to the LangWatch
 // control-plane (/api/evaluations/batch/log_results). Behind an
@@ -100,6 +109,17 @@ func newEvaluationReporter(req ExecuteRequest, total int, baseURL string, logRes
 		baseURL:           baseURL,
 		logger:            logger,
 	}
+}
+
+// progressCount returns the current number of recorded entries under
+// the same mutex `recordEntry` writes with. Callers in different
+// goroutines (the worker pool emits per-row progress events) MUST go
+// through this helper rather than reading `r.progress` directly to
+// avoid a data race.
+func (r *evaluationReporter) progressCount() int {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.progress
 }
 
 // recordEntry appends one dataset entry's predicted outputs + per-node
@@ -297,50 +317,104 @@ func (e *Engine) executeEvaluationStream(ctx context.Context, req ExecuteRequest
 		e.logger.Warn("evaluation: initial empty batch post failed", "err", err)
 	}
 
+	// Run rows through a worker pool — Python's DSPy Evaluate uses
+	// num_threads=10 (langwatch_nlp/studio/execute/execute_evaluation.py:144).
+	// Sequential iteration was ~10x slower than Python on the same
+	// dataset; a 3.2.0 customer's 26-row eval (3.2.0 prod) felt sluggish
+	// before this. Cap at the same default and bound at the row count.
+	const defaultEvalConcurrency = 10
+	concurrency := defaultEvalConcurrency
+	if total < concurrency {
+		concurrency = total
+	}
+	if concurrency < 1 {
+		concurrency = 1
+	}
+	type job struct {
+		index int
+		entry map[string]any
+	}
+	jobs := make(chan job, concurrency)
+	var wg sync.WaitGroup
+	wg.Add(concurrency)
+	for w := 0; w < concurrency; w++ {
+		go func() {
+			defer wg.Done()
+			for j := range jobs {
+				if ctx.Err() != nil {
+					continue // drain remaining jobs to let producer finish
+				}
+				entryStart := time.Now()
+				entryReq := ExecuteRequest{
+					Workflow:  req.Workflow,
+					Inputs:    j.entry,
+					Origin:    req.Origin,
+					ProjectID: req.ProjectID,
+					ThreadID:  req.ThreadID,
+					// Each entry gets its own trace id so the LangWatch
+					// trace view shows one trace per evaluated row, not
+					// all rows merged into the parent eval trace.
+					TraceID: "",
+					Type:    "execute_flow",
+				}
+				entryRes, err := e.Execute(ctx, entryReq)
+				duration := time.Since(entryStart).Milliseconds()
+				var entryTraceID string
+				if entryRes != nil {
+					entryTraceID = entryRes.TraceID
+				}
+				if err != nil && entryRes == nil {
+					// Surface the error as a dataset row but don't
+					// abort the whole evaluation — Python's DSPy
+					// Evaluate continues past per-row failures
+					// (provide_traceback=True), and the UI renders
+					// failed rows in red rather than stopping at the
+					// first one.
+					entryRes = &ExecuteResult{
+						Status: "error",
+						Error:  &NodeError{Type: "engine_error", Message: err.Error()},
+					}
+				}
+				reporter.recordEntry(j.index, j.entry, entryRes, entryTraceID, duration)
+				// Read progress through the synchronized helper —
+				// reporter.progress lives behind the same mutex
+				// recordEntry uses; reading the field directly across
+				// goroutines is a data race (CodeRabbit critical on
+				// PR #3607).
+				emit(ctx, out, evaluationProgressEvent(req, traceID, reporter.progressCount(), total, started))
+			}
+		}()
+	}
+	canceled := false
 	for i, entry := range entries {
-		if err := ctx.Err(); err != nil {
-			emit(ctx, out, workflowErrorEvent(req, traceID, err.Error(), true))
+		if ctx.Err() != nil {
+			emit(ctx, out, workflowErrorEvent(req, traceID, ctx.Err().Error(), true))
+			canceled = true
 			break
 		}
-		entryStart := time.Now()
-		entryReq := ExecuteRequest{
-			Workflow:  req.Workflow,
-			Inputs:    entry,
-			Origin:    req.Origin,
-			ProjectID: req.ProjectID,
-			ThreadID:  req.ThreadID,
-			// Each entry gets its own trace id so the LangWatch trace
-			// view shows one trace per evaluated row, not all rows
-			// merged into the parent eval trace.
-			TraceID: "",
-			Type:    "execute_flow",
-		}
-		entryRes, err := e.Execute(ctx, entryReq)
-		duration := time.Since(entryStart).Milliseconds()
-		var entryTraceID string
-		if entryRes != nil {
-			entryTraceID = entryRes.TraceID
-		}
-		if err != nil && entryRes == nil {
-			// Surface the error as a dataset row but don't abort the
-			// whole evaluation — Python's DSPy Evaluate continues past
-			// per-row failures (provide_traceback=True), and the UI
-			// renders failed rows in red rather than stopping at the
-			// first one.
-			entryRes = &ExecuteResult{
-				Status: "error",
-				Error:  &NodeError{Type: "engine_error", Message: err.Error()},
-			}
-		}
-		reporter.recordEntry(i, entry, entryRes, entryTraceID, duration)
-		emit(ctx, out, evaluationProgressEvent(req, traceID, reporter.progress, total, started))
+		jobs <- job{index: i, entry: entry}
 	}
+	close(jobs)
+	wg.Wait()
 
 	// Final flush carries finished_at — the same call mirrors Python's
 	// EvaluationReporting.wait_for_completion (which calls send_batch
-	// with finished=True before joining the worker threads).
-	if err := reporter.flush(ctx, true); err != nil {
+	// with finished=True before joining the worker threads). Use
+	// context.Background() so a canceled ctx doesn't abort the final
+	// POST; the partial-results flush is still valuable.
+	finalFlushCtx := ctx
+	if canceled {
+		finalFlushCtx = context.Background()
+	}
+	if err := reporter.flush(finalFlushCtx, true); err != nil {
 		e.logger.Warn("evaluation: final batch post failed — experiment row may stay incomplete", "err", err)
+	}
+	if canceled {
+		// Don't emit a success state after the cancellation error
+		// (CodeRabbit major on PR #3607: producing two terminal
+		// states for one run confuses Studio's reducer).
+		emit(ctx, out, doneEvent(traceID, newRunState(req.Workflow), started))
+		return
 	}
 	emit(ctx, out, workflowSuccessEvent(req, traceID, newRunState(req.Workflow), started, true))
 	emit(ctx, out, doneEvent(traceID, newRunState(req.Workflow), started))
@@ -370,7 +444,15 @@ func selectEvaluationEntries(wf *dsl.Workflow, evaluateOn string, datasetEntry *
 		return nil, fmt.Errorf("evaluation: workflow has no entry node")
 	}
 	if entryNode.Data.Dataset == nil || entryNode.Data.Dataset.Inline == nil {
-		return nil, fmt.Errorf("evaluation: entry node has no inline dataset (remote datasets not yet supported on Go path)")
+		// Studio's loadDatasets() (langwatch/src/optimization_studio/
+		// server/loadDatasets.ts) is supposed to fetch + inline saved
+		// datasets server-side before posting the event to nlpgo. If
+		// we end up here it means the inlining was skipped (an older
+		// server version, or the bypass-when-all branch that broke
+		// 3.2.0 prod for a 3.2.0 customer). Surface the *actionable*
+		// path — pointing at the TS helper — rather than blaming the
+		// user for "remote datasets not supported".
+		return nil, fmt.Errorf("evaluation: entry node has no inline dataset — Studio's loadDatasets() must inline saved datasets before forwarding to the Go engine; check langwatch/src/optimization_studio/server/loadDatasets.ts")
 	}
 	rows, err := dataset.Materialize(entryNode.Data.Dataset.Inline)
 	if err != nil {
@@ -387,11 +469,13 @@ func selectEvaluationEntries(wf *dsl.Workflow, evaluateOn string, datasetEntry *
 	case "full":
 		return rows, nil
 	case "test", "train":
-		// train/test split — slice by entry node's train_size. Python
-		// uses sklearn shuffle; we slice in order. This loses the
-		// shuffle guarantee but keeps results stable for test
-		// re-runs, which is what Studio cares about for now.
-		train, test := splitTrainTest(rows, entryNode.Data.TrainSize, entryNode.Data.TestSize)
+		// train/test split — Python uses sklearn.train_test_split with
+		// shuffle gated on `seed >= 0` (langwatch_nlp/studio/execute/
+		// execute_evaluation.py:108-111). We mirror that: when the
+		// entry node's seed is unset or <0, slice in order; otherwise
+		// shuffle with that seed before slicing so train/test rows
+		// match Python's selection for the same dataset+seed.
+		train, test := splitTrainTest(rows, entryNode.Data.TrainSize, entryNode.Data.TestSize, entryNode.Data.Seed)
 		if mode == "train" {
 			return train, nil
 		}
@@ -410,16 +494,39 @@ func selectEvaluationEntries(wf *dsl.Workflow, evaluateOn string, datasetEntry *
 	}
 }
 
-// splitTrainTest divides rows into train/test slices using the entry
-// node's configured sizes. When both sizes are < 1 they are treated as
-// percentages of the row count; otherwise as absolute row counts. Empty
-// inputs / nil sizes default to a 50/50 split — matching the Python
-// behavior for unconfigured datasets.
-func splitTrainTest(rows []map[string]any, trainSize, testSize *float64) (train, test []map[string]any) {
+// splitTrainTest divides rows into train/test slices, mirroring
+// Python's sklearn.train_test_split call shape from
+// langwatch_nlp/studio/execute/execute_evaluation.py:
+//   - When trainSize/testSize are < 1 they are treated as fractions of
+//     the row count; otherwise absolute row counts.
+//   - When seed >= 0, rows are shuffled (deterministically) BEFORE
+//     slicing — matching Python's `shuffle=(seed >= 0), random_state=
+//     seed` argument. When seed is nil or <0, rows stay in dataset
+//     order so deterministic test re-runs aren't disrupted.
+//   - testSize is now honored: if the user configures a smaller test
+//     fraction than `1 - trainSize`, the test slice is truncated to
+//     that count rather than getting the full complement.
+//   - Empty inputs / nil sizes default to a 50/50 split.
+func splitTrainTest(rows []map[string]any, trainSize, testSize *float64, seed *int) (train, test []map[string]any) {
 	if len(rows) == 0 {
 		return nil, nil
 	}
 	n := len(rows)
+	// Optional shuffle (Python parity). The shuffle copies rows so
+	// the caller's slice is preserved — important because the engine
+	// also reads dataset.records elsewhere for the materialized run.
+	working := rows
+	if seed != nil && *seed >= 0 {
+		rng := newDeterministicRand(int64(*seed))
+		shuffled := make([]map[string]any, n)
+		copy(shuffled, working)
+		// Fisher–Yates with a deterministic RNG.
+		for i := n - 1; i > 0; i-- {
+			j := rng.Intn(i + 1)
+			shuffled[i], shuffled[j] = shuffled[j], shuffled[i]
+		}
+		working = shuffled
+	}
 	tr := 0.5
 	if trainSize != nil {
 		tr = *trainSize
@@ -438,10 +545,31 @@ func splitTrainTest(rows []map[string]any, trainSize, testSize *float64) (train,
 	if trainN < 0 {
 		trainN = 0
 	}
-	_ = testSize // honored implicitly via 1 - train; explicit testSize would let
-	// the user evaluate on a subset rather than the complement, but the
-	// dogfood path doesn't exercise that.
-	return rows[:trainN], rows[trainN:]
+	train = working[:trainN]
+	rest := working[trainN:]
+	// Honor explicit testSize when set: when testSize < remaining
+	// length, truncate so the user's request is respected. The Python
+	// path passes both sizes to sklearn which can produce a subset on
+	// either side; mirror that here.
+	if testSize != nil {
+		ts := *testSize
+		var testN int
+		if ts <= 0 {
+			testN = 0
+		} else if ts <= 1 {
+			testN = int(float64(n) * ts)
+		} else {
+			testN = int(ts)
+		}
+		if testN < 0 {
+			testN = 0
+		}
+		if testN > len(rest) {
+			testN = len(rest)
+		}
+		return train, rest[:testN]
+	}
+	return train, rest
 }
 
 // evaluationProgressEvent emits an evaluation_state_change carrying the

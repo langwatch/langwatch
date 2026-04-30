@@ -164,20 +164,29 @@ func TestPlan_RejectsRetiredKindRetriever(t *testing.T) {
 	assert.Contains(t, ret.Message, "retired")
 }
 
-func TestPlan_RejectsRetiredKindCustom(t *testing.T) {
+func TestPlan_AcceptsCustomKind(t *testing.T) {
+	// `custom` was previously listed retired; Studio actively persists
+	// `type: "custom"` for saved sub-workflow drops (NodeSelectionPanel.tsx
+	// line 168). The engine now dispatches these through runCustom →
+	// agentblock.WorkflowRunner, mirroring Python's CustomNode.forward.
+	// Planner must accept them so a workflow that contains a saved
+	// sub-workflow node can still build a plan; rchaves dogfood
+	// 2026-04-30 hit a saved-workflow eval that retired-rejected here
+	// instead of dispatching.
 	w := &dsl.Workflow{
 		Nodes: []dsl.Node{
 			{ID: "Entry", Type: dsl.ComponentEntry},
 			{ID: "Custom", Type: dsl.ComponentCustom},
+			{ID: "End", Type: dsl.ComponentEnd},
 		},
-		Edges: []dsl.Edge{{ID: "e1", Source: "Entry", Target: "Custom"}},
+		Edges: []dsl.Edge{
+			{ID: "e1", Source: "Entry", Target: "Custom"},
+			{ID: "e2", Source: "Custom", Target: "End"},
+		},
 	}
-	_, err := planner.New(w)
-	require.Error(t, err)
-	var ret *planner.RetiredNodeKindError
-	require.True(t, errors.As(err, &ret), "want RetiredNodeKindError, got %T: %v", err, err)
-	assert.Equal(t, "Custom", ret.NodeID)
-	assert.Contains(t, ret.Message, "not supported")
+	plan, err := planner.New(w)
+	require.NoError(t, err)
+	assert.NotNil(t, plan)
 }
 
 func TestPlan_AcceptsAgentAndEvaluatorKinds(t *testing.T) {

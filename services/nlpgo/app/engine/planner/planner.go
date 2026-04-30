@@ -23,6 +23,7 @@ var supportedKinds = map[dsl.ComponentType]struct{}{
 	dsl.ComponentPromptingTechnique: {},
 	dsl.ComponentEvaluator:          {},
 	dsl.ComponentAgent:              {},
+	dsl.ComponentCustom:             {},
 }
 
 // Plan is the result of validating + topologically sorting a workflow.
@@ -81,7 +82,13 @@ func (e *UnsupportedNodeKindError) Error() string {
 // kind that never had a real executor.
 var retiredKinds = map[dsl.ComponentType]string{
 	dsl.ComponentRetriever: "retriever was retired; remove the node from the workflow",
-	dsl.ComponentCustom:    "custom node kind is not supported; replace with code/http/agent/signature/evaluator",
+	// `custom` kind was previously listed retired, but Studio's
+	// NodeSelectionPanel.tsx actively writes `type: "custom"` when a
+	// user drags a saved sub-workflow onto the canvas (with typed
+	// data.workflow_id / data.version_id). The engine now handles it
+	// via runCustom (engine.go) using the same agentblock.WorkflowRunner
+	// as `agent_type=workflow`, so it executes on the Go path with parity
+	// to Python's CustomNode.forward.
 }
 
 // RetiredNodeKindError signals the workflow contains a node kind that

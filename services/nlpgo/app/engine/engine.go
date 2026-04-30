@@ -272,6 +272,8 @@ func (e *Engine) dispatch(ctx context.Context, req ExecuteRequest, node *dsl.Nod
 		return e.runEvaluator(ctx, req, node, inputs, ns)
 	case dsl.ComponentAgent:
 		return e.runAgent(ctx, req, node, inputs, ns)
+	case dsl.ComponentCustom:
+		return e.runCustom(ctx, req, node, inputs, ns)
 	default:
 		return nil, &NodeError{Type: "unsupported_node_kind", Message: "node kind not supported on Go engine: " + string(node.Type)}
 	}
@@ -735,6 +737,87 @@ func (e *Engine) runAgentWorkflow(ctx context.Context, req ExecuteRequest, node 
 	return map[string]any{"value": res.Result}, nil
 }
 
+// runCustom dispatches a node persisted as `type: "custom"` — Studio's
+// shape for a saved sub-workflow reference (NodeSelectionPanel.tsx
+// drops a Custom Component drag with `type: "custom"` + `data.isCustom`
+// + typed `data.workflow_id` / `data.version_id`). Functionally
+// equivalent to `agent_type=workflow`, but the slug/version live on
+// the typed Component fields rather than under `data.parameters[]`,
+// so we read directly from `node.Data.WorkflowID` / `VersionID`.
+//
+// Mirrors langwatch_nlp's `CustomNode.forward` (custom_node.py:34) —
+// same wire (`POST /api/workflows/<id>[/<version>]/run` with
+// `do_not_trace=true`), same auth (X-Auth-Token from workflow.api_key).
+// rchaves dogfood 2026-04-30 hit this on a saved workflow that had a
+// `type: custom` evaluator node — pre-fix the planner blanket-rejected
+// it as a retired kind even though the executor was right there in
+// `agentblock.WorkflowRunner` waiting to be reused.
+func (e *Engine) runCustom(ctx context.Context, req ExecuteRequest, node *dsl.Node, inputs map[string]any, ns *NodeState) (map[string]any, *NodeError) {
+	if e.agentWorkflow == nil {
+		return nil, &NodeError{Type: "custom_workflow_executor_unavailable", Message: "custom node runner not configured (agentblock.WorkflowRunner missing)"}
+	}
+	if e.langwatchBaseURL == "" {
+		return nil, &NodeError{Type: "custom_unconfigured", Message: "LangWatchBaseURL is required to call custom nodes"}
+	}
+	if req.Workflow == nil || req.Workflow.APIKey == "" {
+		return nil, &NodeError{Type: "custom_unauthorized", Message: "workflow.api_key is required for custom node dispatch"}
+	}
+
+	workflowID := ""
+	if node.Data.WorkflowID != nil {
+		workflowID = *node.Data.WorkflowID
+	}
+	// Defensive fallback: very old persisted workflows may have stuffed
+	// the id into parameters[]. Honor that path so customers don't have
+	// to re-save every workflow to migrate to the typed shape.
+	if workflowID == "" {
+		workflowID = paramString(node.Data.Parameters, "workflow_id")
+	}
+	if workflowID == "" {
+		return nil, &NodeError{Type: "custom_missing_workflow_id", Message: "custom node requires data.workflow_id (the saved sub-workflow id)"}
+	}
+
+	versionID := ""
+	if node.Data.VersionID != nil {
+		versionID = *node.Data.VersionID
+	}
+	if versionID == "" {
+		versionID = paramString(node.Data.Parameters, "version_id")
+	}
+
+	res, err := e.agentWorkflow.Execute(ctx, agentblock.WorkflowRunRequest{
+		BaseURL:    e.langwatchBaseURL,
+		APIKey:     req.Workflow.APIKey,
+		WorkflowID: workflowID,
+		VersionID:  versionID,
+		Inputs:     inputs,
+		TraceID:    req.TraceID,
+		Origin:     req.Origin,
+		ThreadID:   req.ThreadID,
+	})
+	if err != nil {
+		return nil, &NodeError{Type: "custom_workflow_error", Message: err.Error()}
+	}
+
+	_ = ns
+	declared := outputNames(node.Data.Outputs)
+	if len(declared) == 1 {
+		return map[string]any{declared[0]: res.Result}, nil
+	}
+	if m, ok := res.Result.(map[string]any); ok && len(declared) > 1 {
+		filtered := make(map[string]any, len(declared))
+		for _, name := range declared {
+			if v, ok := m[name]; ok {
+				filtered[name] = v
+			}
+		}
+		if len(filtered) > 0 {
+			return filtered, nil
+		}
+	}
+	return map[string]any{"value": res.Result}, nil
+}
+
 // applyManualInputs primes runState with the inbound execute_component
 // payload's `node_id` + `inputs` so resolveInputs can short-circuit for
 // the target node. Both Execute and ExecuteStream MUST call this — the
@@ -1094,14 +1177,14 @@ func buildMessages(node *dsl.Node, inputs map[string]any) []app.ChatMessage {
 		return msgs
 	}
 	if instr := paramString(node.Data.Parameters, "instructions"); instr != "" {
-		// Render Liquid-subset placeholders against the upstream
-		// inputs so {{ var }} / {{ x.y }} / {{ x[0] }} in the system
-		// prompt resolve like they do on the Python path. Unresolved
-		// keys come back as warnings — non-fatal here, the engine
-		// still emits the partially-rendered string. Full Liquid
-		// (loops, ifs, filters) intentionally not supported yet:
-		// see specs/nlp-go/llm-block.feature.
-		rendered, _ := template.Render(instr, inputs)
+		// Render Liquid placeholders + control flow + filters against
+		// the upstream inputs. Mirrors langwatch_nlp's
+		// dspy/template_adapter.py — DSPy templates with loops over
+		// chat history (`{% for m in messages %}{{ m.content }}{% endfor %}`)
+		// or branches on input shape now render correctly on the Go
+		// path. Pure `{{ var }}` templates fall back to the simple
+		// JSON-escaping interpolator so HTTP-block parity stays.
+		rendered, _ := template.RenderFull(instr, inputs)
 		return []app.ChatMessage{
 			{Role: "system", Content: rendered},
 			{Role: "user", Content: composeUserPrompt(inputs)},

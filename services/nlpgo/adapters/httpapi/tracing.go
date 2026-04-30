@@ -35,6 +35,17 @@ func startStudioSpan(ctx context.Context, name string, req *app.WorkflowRequest,
 	if workflowAPIKey != "" {
 		ctx = context.WithValue(ctx, otelsetup.APIKeyContextKey{}, workflowAPIKey)
 	}
+	// req.DoNotTrace is the OR of envelope-level event.do_not_trace
+	// (set by sub-workflow callers via Python CustomNode.forward /
+	// Go agentblock.WorkflowRunner to prevent double-counted spans
+	// against the parent trace) and workflow.enable_tracing=false
+	// (customer opt-out). Mirrors execute_flow.py:53. When set we
+	// return a no-op span so neither this top-level span nor any
+	// engine descendants emit — same as Python's
+	// optional_langwatch_trace(do_not_trace=True).
+	if req.DoNotTrace {
+		return ctx, trace.SpanFromContext(ctx)
+	}
 	if tid, ok := parseTraceID(req.TraceID); ok {
 		// Remote=true tells the sampler to honor the inbound decision
 		// (we always-sample inbound Studio runs since the langwatch app

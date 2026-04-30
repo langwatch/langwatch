@@ -1,24 +1,29 @@
-// Package template renders a small Liquid-subset template against a
-// map of inputs. Used by the HTTP block (body templates) and the
-// signature/LLM block (instructions + user prompts) so all three
-// places interpolate variables consistently.
+// Package template renders templates against a map of inputs. Two
+// public entry points:
 //
-// This is intentionally a subset of full Liquid — no loops, no
-// conditionals, no filters. Just `{{ var }}`, `{{ x.y.z }}` dotted
-// paths, and `{{ x[0] }}` numeric indexing. Mirrors the Python
-// `interpolate_template` shape (langwatch_nlp/.../http_node.py) and
-// is a strict subset of what `liquid.render` accepts in
-// `langwatch_nlp/.../template_adapter.py`. Anything more elaborate
-// from a customer template renders as the literal expression with a
-// warning, so callers can detect un-supported syntax and fall back if
-// needed.
+//   - Render: a Liquid-subset interpolator used by the HTTP block. Just
+//     `{{ var }}`, `{{ x.y.z }}` dotted paths, `{{ x[0] }}` indexing.
+//     Output is JSON-escaped for embedding inside JSON literals (the
+//     httpblock body context). HTML chars survive verbatim. Behavior
+//     pinned by template_test.go since v0 of nlpgo and unchanged.
+//
+//   - RenderFull: full Liquid via github.com/osteele/liquid for the
+//     LLM Call instructions path. Supports `{% for %}` / `{% if %}` /
+//     filters / dotted paths / native list iteration. Mirrors Python's
+//     `liquid.render(template, **rendered_inputs)` in
+//     langwatch_nlp/.../template_adapter.py — DSPy templates with
+//     control-flow tags now render correctly on the Go path
+//     (previously the literal `{% for %}` survived in the output).
 package template
 
 import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"strings"
+
+	"github.com/osteele/liquid"
 )
 
 // Render replaces {{ variable.path }} placeholders in template using
@@ -169,4 +174,78 @@ func nthOf(v any, i int) any {
 		return nil
 	}
 	return arr[i]
+}
+
+// liquidEngine is the singleton osteele/liquid engine used by RenderFull.
+// Created lazily so package init stays lightweight.
+var liquidEngine = liquid.NewEngine()
+
+// liquidControlFlowOrFilterRE matches templates that use Liquid features
+// beyond simple `{{ var }}` interpolation — `{% tag %}` blocks or
+// `{{ var | filter }}` pipe filters. RenderFull uses this to short-
+// circuit to the simple Render path when there is no Liquid-extended
+// syntax in the template, preserving the existing JSON-escape semantics
+// for templates that don't need full Liquid (the HTTP-block path
+// covered by template_test.go).
+var liquidControlFlowOrFilterRE = regexp.MustCompile(`(?s)({%.*?%})|({{[^{}]*\|[^{}]*}})`)
+
+// RenderFull renders a template with full Liquid semantics
+// (loops, conditionals, filters) when the template uses any
+// Liquid-extended syntax; falls back to the simple Render path when
+// it doesn't. Mirrors langwatch_nlp's `liquid.render` call in
+// dspy/template_adapter.py — needed for DSPy templates that iterate
+// over chat history (`{% for m in messages %}{{ m.content }}{% endfor %}`)
+// or branch on input shape.
+//
+// Returns the rendered string and a list of warnings. Warnings include
+// missing-variable references (so callers can log them) and any Liquid
+// parse/render errors (returned as-is so operators see the bad syntax
+// instead of silently emitting an empty string).
+func RenderFull(tmpl string, inputs map[string]any) (string, []string) {
+	if !liquidControlFlowOrFilterRE.MatchString(tmpl) {
+		// No control flow / filters — fall back to the simple
+		// interpolator so HTTP-block-style JSON-escape behavior stays
+		// intact for `{{ var }}`-only templates.
+		return Render(tmpl, inputs)
+	}
+	bindings := make(map[string]any, len(inputs))
+	for k, v := range inputs {
+		bindings[k] = coerceForLiquid(v)
+	}
+	out, err := liquidEngine.ParseAndRenderString(tmpl, bindings)
+	if err != nil {
+		// Surface the error as a warning rather than failing the run —
+		// callers (engine.runSignature) already treat the rendered
+		// string as best-effort and emit warnings to the log. A bad
+		// template shouldn't hard-fail the whole workflow.
+		return "", []string{fmt.Sprintf("liquid render error: %v", err)}
+	}
+	return out, nil
+}
+
+// coerceForLiquid prepares a template input for full-Liquid rendering.
+// Mirrors langwatch_nlp's `_coerce_for_liquid` — strings that parse as
+// JSON arrays/objects are parsed back into native Go containers so
+// `{% for m in messages %}` works on values that arrived through the
+// TS↔NLP wire as JSON-stringified.
+func coerceForLiquid(value any) any {
+	s, ok := value.(string)
+	if !ok {
+		return value
+	}
+	stripped := strings.TrimLeft(s, " \t\r\n")
+	if stripped == "" {
+		return value
+	}
+	switch stripped[0] {
+	case '[', '{':
+		var parsed any
+		if err := json.Unmarshal([]byte(s), &parsed); err == nil {
+			switch parsed.(type) {
+			case []any, map[string]any:
+				return parsed
+			}
+		}
+	}
+	return value
 }

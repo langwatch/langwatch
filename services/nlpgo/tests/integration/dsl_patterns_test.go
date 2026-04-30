@@ -1028,19 +1028,26 @@ func TestPattern006_TwoSignaturesIntoCodeAggregator(t *testing.T) {
 	}
 }
 
-// TestPattern010_CustomNodeFailsWithActionableError pins the contract
-// for retired/unsupported node kinds: the engine fails the run with a
-// clean error rather than silently producing nothing. This is what
-// makes a Studio workflow with a `custom` node *diagnosable* from the
-// UI on the FF-on path — operators see a specific instruction telling
-// them which kinds are allowed instead of a generic 500. Observed
-// customer data shows 4 `custom` instances still in the wild; this
-// test ensures the failure is loud + actionable.
+// TestPattern010_CustomNodeMissingWorkflowIDFailsActionably pins what
+// happens when a `type: "custom"` node lands at the engine WITHOUT the
+// typed `data.workflow_id` field set — the engine should surface a
+// typed actionable error naming the missing field, not a generic
+// retired-kind rejection (which is what the planner did pre-fix).
 //
-// Same contract applies to retired `retriever`. The planner-level
-// rejection lives in planner_test.go; this test pins the end-to-end
-// HTTP surface (Studio JSON in → typed error out via /go/studio/execute_sync).
-func TestPattern010_CustomNodeFailsWithActionableError(t *testing.T) {
+// Background: rchaves dogfood 2026-04-30 caught a saved-workflow
+// evaluator persisted with `type: custom`. Pre-fix, the planner
+// blanket-rejected the kind as retired even though the executor
+// (agentblock.WorkflowRunner) was already there. Post-fix, the planner
+// accepts the kind and runCustom dispatches via the runner, but the
+// runner needs `data.workflow_id` to know which sub-workflow to call.
+// Empty/missing → typed `custom_missing_workflow_id` error. This test
+// pins that boundary so a malformed Studio export (e.g. a Custom
+// component dropped without picking the target) gets a diagnosable
+// surface instead of a 500.
+//
+// Successful dispatch (typed workflow_id present) is covered by
+// TestPattern016_CustomNodeKindRoutesToWorkflowRunner.
+func TestPattern010_CustomNodeMissingWorkflowIDFailsActionably(t *testing.T) {
 	url, _ := setupPatternStack(t, &fakeLLMClient{}, func(http.ResponseWriter, *http.Request) {})
 
 	body := `{
@@ -1071,15 +1078,15 @@ func TestPattern010_CustomNodeFailsWithActionableError(t *testing.T) {
 	  }
 	}`
 	res := postSync(t, &stack{url: url}, body)
-	require.Equal(t, "error", res.Status, "custom node must surface as a clean engine error, not silent success")
+	require.Equal(t, "error", res.Status, "custom node with missing workflow_id must surface as a clean engine error, not silent success")
 	require.NotNil(t, res.Error)
-	// Error message must be actionable — name the kind AND tell the
-	// operator what to replace it with (planner.unsupportedKindMessages
-	// supplies the hint).
-	assert.Contains(t, res.Error.Message, "custom",
-		"error message should name the offending node kind so operators know what to fix")
-	assert.Contains(t, res.Error.Message, "replace",
-		"error message should include the actionable hint about replacing the node")
+	// Error must name the missing field and the offending node kind so
+	// an operator looking at the Studio Trace Details drawer can spot
+	// the gap without diving into source.
+	assert.Equal(t, "custom_missing_workflow_id", res.Error.Type,
+		"error type must be the typed sentinel so the TS app can render a specific banner")
+	assert.Contains(t, res.Error.Message, "workflow_id",
+		"error message should name the missing typed field so operators know what to fix")
 }
 
 // TestPattern008_LLMBooleanEvaluator — signature → evaluator with the
@@ -1986,4 +1993,121 @@ func TestPattern014_SignatureFallsBackToWorkflowDefaultLLM(t *testing.T) {
 	// (3) The signature output reached the end node verbatim.
 	require.NotNil(t, res.Result)
 	assert.Equal(t, "fallback ok", res.Result["answer"])
+}
+
+// TestPattern016_CustomNodeKindRoutesToWorkflowRunner pins that a
+// workflow persisted with `type: "custom"` (the canonical Studio shape
+// for a saved sub-workflow drag-drop — NodeSelectionPanel.tsx:168
+// writes `type="custom"` while data carries typed workflow_id /
+// version_id) reaches the same /api/workflows/<id>/run endpoint as a
+// `type: "agent"` + `agent_type: "workflow"` node.
+//
+// rchaves dogfood 2026-04-30: a saved workflow that had a `type: custom`
+// evaluator node was retired-rejected by the planner before reaching
+// the dispatcher, even though the executor (agentblock.WorkflowRunner)
+// was already there for the `agent_type: workflow` path. The fix in
+// engine.go::runCustom routes custom kind through the same runner,
+// reading workflow_id / version_id from the typed Component fields
+// (data.workflow_id, data.version_id) rather than data.parameters[].
+//
+// What this proves end-to-end:
+//   1. Planner accepts `type: custom` and builds a layer for it.
+//   2. Engine dispatches it through agentblock.WorkflowRunner.
+//   3. The HTTP request carries the same shape Python's CustomNode.
+//      forward emits: POST /api/workflows/<id>[/<version>]/run with
+//      X-Auth-Token + body containing inputs + do_not_trace=true.
+//   4. The wrapper response unwraps and binds to declared outputs.
+func TestPattern016_CustomNodeKindRoutesToWorkflowRunner(t *testing.T) {
+	url, lwRequests := setupPatternStack(t, nil, func(w http.ResponseWriter, r *http.Request) {
+		if !stringContains(r.URL.Path, "/api/workflows/") || !stringContains(r.URL.Path, "/run") {
+			http.Error(w, "unexpected path", http.StatusBadRequest)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"result": map[string]any{
+				"score":  0.9,
+				"passed": true,
+			},
+		})
+	})
+
+	// Note: data.workflow_id + data.version_id sit at the typed
+	// Component-level keys (mirrors Studio NodeSelectionPanel's drag),
+	// NOT inside parameters[]. That's the load-bearing shape contract
+	// runCustom reads from.
+	body := `{
+	  "type":"execute_flow",
+	  "payload": {
+	    "trace_id":"pattern-016",
+	    "origin":"workflow",
+	    "workflow": {
+	      "workflow_id":"wf","api_key":"sk-pattern-016","spec_version":"1.3",
+	      "name":"Pattern016","icon":"x","description":"x","version":"x",
+	      "template_adapter":"default",
+	      "nodes":[
+	        {"id":"entry","type":"entry","data":{
+	          "outputs":[{"identifier":"input","type":"str"},{"identifier":"expected","type":"str"}],
+	          "dataset":{"inline":{"records":{"input":["hello"],"expected":["hello"]},"count":1}},
+	          "entry_selection":0,"train_size":1.0,"test_size":0.0,"seed":1
+	        }},
+	        {"id":"check","type":"custom","data":{
+	          "name":"CustomEvaluator","isCustom":true,
+	          "workflow_id":"wf_saved_evaluator_99",
+	          "version_id":"v1",
+	          "inputs":[{"identifier":"input","type":"str"},{"identifier":"expected","type":"str"}],
+	          "outputs":[{"identifier":"check","type":"dict"}]
+	        }},
+	        {"id":"end","type":"end","data":{"inputs":[
+	          {"identifier":"check","type":"dict"}
+	        ]}}
+	      ],
+	      "edges":[
+	        {"id":"e1","source":"entry","sourceHandle":"outputs.input","target":"check","targetHandle":"inputs.input","type":"default"},
+	        {"id":"e2","source":"entry","sourceHandle":"outputs.expected","target":"check","targetHandle":"inputs.expected","type":"default"},
+	        {"id":"e3","source":"check","sourceHandle":"outputs.check","target":"end","targetHandle":"inputs.check","type":"default"}
+	      ],
+	      "state":{}
+	    },
+	    "inputs":[{}]
+	  }
+	}`
+
+	res := postSync(t, &stack{url: url}, body)
+	require.Equal(t, "success", res.Status, "engine error: %+v", res.Error)
+
+	// (1) Exactly one upstream call — the saved sub-workflow's run.
+	require.Len(t, *lwRequests, 1, "expected exactly one /api/workflows/<id>/run call")
+	rec := (*lwRequests)[0]
+
+	// (2) URL targets the typed-field workflow_id (NOT parameters);
+	// version_id from typed field appears in the path.
+	assert.Equal(t, "/api/workflows/wf_saved_evaluator_99/v1/run", rec["path"])
+	assert.Equal(t, "POST", rec["method"])
+	assert.Equal(t, "sk-pattern-016", rec["x_auth_token"])
+
+	// (3) Body carries the upstream entry outputs verbatim AND the
+	// runner injects do_not_trace=true (parity with Python
+	// CustomNode.forward).
+	subBody, ok := rec["body"].(map[string]any)
+	require.True(t, ok, "sub-workflow request body must be a JSON object")
+	assert.Equal(t, "hello", subBody["input"])
+	assert.Equal(t, "hello", subBody["expected"])
+	assert.Equal(t, true, subBody["do_not_trace"],
+		"runCustom must inject do_not_trace=true (parity with CustomNode.forward)")
+
+	// (4) Wrapper response unwrapped into the single declared output.
+	require.NotNil(t, res.Result)
+	check, ok := res.Result["check"].(map[string]any)
+	require.True(t, ok, "check output must be a map (unwrapped result envelope)")
+	assert.Equal(t, true, check["passed"])
+	assert.Equal(t, 0.9, check["score"])
+
+	// (5) All three nodes succeeded.
+	require.NotNil(t, res.Nodes)
+	for _, id := range []string{"entry", "check", "end"} {
+		node, ok := res.Nodes[id].(map[string]any)
+		require.True(t, ok, "missing node %q in result.nodes", id)
+		assert.Equal(t, "success", node["status"], "node %q expected success", id)
+	}
 }

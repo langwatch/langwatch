@@ -18,6 +18,12 @@ import (
 
 // fakeProxy is a minimal PlaygroundProxy stub for handler tests. It
 // records the inbound request and replies with whatever the test set.
+// Both typed (Dispatch/DispatchStream) and passthrough (Dispatch is
+// the only entry point on PlaygroundProxy — passthrough flows through
+// the same Dispatch call with Type=RequestTypePassthrough plus the
+// HTTPMethod/Headers/RawQuery fields populated, since the
+// shimAdapter routes to dispatcher.Passthrough internally) requests
+// land here.
 type fakeProxy struct {
 	syncResp   *playgroundProxyResponse
 	syncErr    error
@@ -338,38 +344,150 @@ func TestPlaygroundProxy_DispatcherErrorReturns502(t *testing.T) {
 	}
 }
 
-func TestPlaygroundProxy_PassthroughPathReturns500_NotImplemented(t *testing.T) {
-	// /v1beta/* paths classify as RequestTypePassthrough but the current
-	// shimAdapter doesn't pipe HTTPPath through to dispatcher.Passthrough;
-	// rather than silently calling Dispatch with type=passthrough and
-	// failing opaquely downstream, the handler returns a typed
-	// not-implemented error. Documents the gap until passthrough is wired
-	// for real (separate follow-up).
-	fake := &fakeProxy{}
+// TestPlaygroundProxy_PassthroughStreamPathDetectsActionSuffix pins
+// CodeRabbit feedback on PR #3607: Gemini-native streaming endpoints
+// (`:streamGenerateContent`, `:streamRawPredict`) signal streaming via
+// the URL action suffix — they don't set OpenAI's `"stream": true`
+// body flag. Pre-fix the handler peeked only at body.stream and
+// streamGenerateContent calls fell through to handleSync, discarding
+// SSE deltas. Post-fix isPassthroughStreamPath promotes streaming
+// when the path's `:`-action matches a known stream action.
+func TestPlaygroundProxy_PassthroughStreamPathDetectsActionSuffix(t *testing.T) {
+	cases := []struct {
+		name string
+		path string
+		want bool
+	}{
+		{"sync_generateContent", "/models/gemini-2.5-flash:generateContent", false},
+		{"stream_generateContent", "/models/gemini-2.5-flash:streamGenerateContent", true},
+		{"stream_rawPredict", "/publishers/google/models/gemini-2.5-flash:streamRawPredict", true},
+		{"sync_countTokens", "/models/gemini-2.5-flash:countTokens", false},
+		{"no_action_suffix", "/models/gemini-2.5-flash", false},
+		{"unknown_action", "/models/gemini-2.5-flash:fakeAction", false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := isPassthroughStreamPath(tc.path)
+			if got != tc.want {
+				t.Errorf("isPassthroughStreamPath(%q) = %v, want %v", tc.path, got, tc.want)
+			}
+		})
+	}
+}
+
+// TestFilterPassthroughHeaders_StripsConnectionNominatedHeaders pins
+// CodeRabbit feedback on PR #3607: RFC 7230 §6.1 says headers nominated
+// by `Connection: Foo, Bar` are also hop-by-hop. The static denylist
+// already drops Connection itself, but pre-fix it forwarded any
+// header named in the Connection token list (e.g. `Connection: Foo` +
+// `Foo: bar` would leak `Foo: bar` upstream). Post-fix we parse the
+// Connection tokens and add them to the skip set.
+func TestFilterPassthroughHeaders_StripsConnectionNominatedHeaders(t *testing.T) {
+	in := http.Header{}
+	in.Set("Connection", "X-Hop-By-Hop, Trailer-Test")
+	in.Set("X-Hop-By-Hop", "should-be-stripped")
+	in.Set("Trailer-Test", "should-be-stripped-too")
+	in.Set("Accept", "application/json") // canonical pass-through
+	in.Set("Authorization", "Bearer x")  // explicit deny
+	in.Set("X-LangWatch-Trace-Id", "tid") // pass-through
+	in.Set("x-litellm-model", "leak")     // explicit deny
+
+	out := filterPassthroughHeaders(in)
+
+	for _, k := range []string{"X-Hop-By-Hop", "Trailer-Test", "Connection", "Authorization", "X-Litellm-Model"} {
+		if _, present := out[k]; present {
+			t.Errorf("header %q must NOT be forwarded: %v", k, out)
+		}
+	}
+	if out["Accept"] != "application/json" {
+		t.Errorf("Accept lost: %v", out)
+	}
+	if out["X-Langwatch-Trace-Id"] != "tid" && out["X-LangWatch-Trace-Id"] != "tid" {
+		t.Errorf("X-LangWatch-Trace-Id should pass through: %v", out)
+	}
+}
+
+func TestPlaygroundProxy_PassthroughForwardsHTTPShapeToDispatcher(t *testing.T) {
+	// /v1beta/* paths (Gemini-native generateContent + streamGenerateContent,
+	// called by gemini-cli + Google GenAI SDK) classify as
+	// RequestTypePassthrough and now reach the dispatcher's typed
+	// Passthrough API. Pre-fix the handler short-circuited with a 501
+	// passthrough_not_implemented; post-fix it captures the inbound HTTP
+	// method/query/forwarded-headers and hands them to the proxy so the
+	// dispatcher can reconstruct the upstream call. Auth headers
+	// (x-litellm-*, Authorization) are stripped by the handler since the
+	// gateway already parsed them into the typed Credential.
+	fake := &fakeProxy{
+		syncResp: &playgroundProxyResponse{
+			StatusCode: 200,
+			Headers:    http.Header{"Content-Type": []string{"application/json"}},
+			Body:       []byte(`{"candidates":[{"content":{"parts":[{"text":"ok"}]}}]}`),
+		},
+	}
 	srv := newProxyTestServer(t, fake)
 
 	body := `{"model":"vertex_ai/gemini-2.5-flash","contents":[]}`
-	req, _ := http.NewRequest(http.MethodPost, srv.URL+"/go/proxy/v1beta/models/gemini-2.5-flash:generateContent", strings.NewReader(body))
+	req, _ := http.NewRequest(http.MethodPost, srv.URL+"/go/proxy/v1beta/models/gemini-2.5-flash:generateContent?alt=json", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
 	req.Header.Set("x-litellm-model", "vertex_ai/gemini-2.5-flash")
 	req.Header.Set("x-litellm-vertex_credentials", `{"type":"service_account"}`)
 	req.Header.Set("x-litellm-vertex_project", "p")
 	req.Header.Set("x-litellm-vertex_location", "us-central1")
+	// Authorization header should be stripped — never expected from a
+	// /v1beta caller in our deployment shape; if forwarded it would
+	// leak the inbound auth to the upstream provider.
+	req.Header.Set("Authorization", "Bearer should-be-stripped")
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatalf("Do: %v", err)
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusInternalServerError {
-		t.Errorf("status = %d, want 500 (passthrough_not_implemented)", resp.StatusCode)
+	if resp.StatusCode != 200 {
+		respBody, _ := io.ReadAll(resp.Body)
+		t.Fatalf("status = %d, body = %s", resp.StatusCode, respBody)
 	}
-	respBody, _ := io.ReadAll(resp.Body)
-	if !bytes.Contains(respBody, []byte("passthrough_not_implemented")) {
-		t.Errorf("body should mention passthrough_not_implemented, got: %s", respBody)
+
+	// (1) Dispatcher was called exactly once.
+	if fake.called != 1 {
+		t.Errorf("dispatcher called %d times, want 1", fake.called)
 	}
-	if fake.called != 0 {
-		t.Errorf("dispatcher must not be called for passthrough yet (got %d calls)", fake.called)
+	// (2) Type classified as passthrough.
+	if fake.gotRequest.Type != domain.RequestTypePassthrough {
+		t.Errorf("Type = %q, want passthrough", fake.gotRequest.Type)
+	}
+	// (3) HTTP shape captured for dispatcher.PassthroughRequest.
+	if fake.gotRequest.HTTPMethod != http.MethodPost {
+		t.Errorf("HTTPMethod = %q, want POST", fake.gotRequest.HTTPMethod)
+	}
+	if fake.gotRequest.HTTPPath != "/models/gemini-2.5-flash:generateContent" {
+		t.Errorf("HTTPPath = %q, want /models/gemini-2.5-flash:generateContent", fake.gotRequest.HTTPPath)
+	}
+	if fake.gotRequest.HTTPRawQuery != "alt=json" {
+		t.Errorf("HTTPRawQuery = %q, want alt=json", fake.gotRequest.HTTPRawQuery)
+	}
+	// (4) Forwarded headers include caller's Content-Type / Accept but
+	// strip x-litellm-* (already in Credential) and Authorization.
+	hdrs := fake.gotRequest.HTTPHeaders
+	if hdrs == nil {
+		t.Fatal("HTTPHeaders nil — passthrough must forward inbound headers")
+	}
+	if hdrs["Accept"] != "application/json" {
+		t.Errorf("Accept header lost: %v", hdrs)
+	}
+	for k := range hdrs {
+		lk := strings.ToLower(k)
+		if strings.HasPrefix(lk, "x-litellm-") {
+			t.Errorf("x-litellm-* header must NOT be forwarded (already in Credential): %q", k)
+		}
+		if lk == "authorization" {
+			t.Errorf("Authorization header must NOT be forwarded to upstream: %q", k)
+		}
+	}
+	// (5) Credential parsed from x-litellm-* headers reached the dispatcher.
+	if fake.gotRequest.Credential.ProviderID != domain.ProviderVertex {
+		t.Errorf("ProviderID = %q, want vertex_ai", fake.gotRequest.Credential.ProviderID)
 	}
 }
 

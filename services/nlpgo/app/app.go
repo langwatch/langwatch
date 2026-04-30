@@ -78,6 +78,17 @@ type WorkflowRequest struct {
 	// behavior — the historical default for flat (non-discriminated)
 	// payloads from tests + curl.
 	Type string
+	// DoNotTrace suppresses the engine's outer "nlpgo.studio.execute_*"
+	// span, matching Python's optional_langwatch_trace(do_not_trace=...)
+	// behavior at langwatch_nlp/studio/execute/execute_flow.py:53.
+	// Two source paths: (1) envelope-level event.do_not_trace=true sent
+	// by sub-workflow callers (Python CustomNode.forward / Go
+	// agentblock.WorkflowRunner) so the inner trace doesn't double-count
+	// against the parent's span, (2) workflow.enable_tracing=false (set
+	// by customers who explicitly opt out of tracing for a particular
+	// workflow). The handler ORs the two before stamping this field so
+	// the engine consults a single boolean.
+	DoNotTrace bool
 	// RunID identifies the evaluation run on `execute_evaluation` events.
 	// Stamped into evaluation_state_change payloads so Studio's reducer
 	// can match streamed updates to the run it dispatched (the reducer
