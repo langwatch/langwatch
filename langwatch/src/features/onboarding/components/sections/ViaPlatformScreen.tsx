@@ -109,7 +109,7 @@ function CapabilityCard({
         <Text
           fontSize="sm"
           fontWeight="semibold"
-          color="fg.DEFAULT"
+          color="fg"
           letterSpacing="-0.01em"
         >
           {title}

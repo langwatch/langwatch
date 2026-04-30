@@ -136,7 +136,7 @@ export const ProductSelectionScreen: React.FC<ProductSelectionScreenProps> = ({
               <Text
                 fontSize="md"
                 fontWeight="semibold"
-                color="fg.DEFAULT"
+                color="fg"
                 letterSpacing="-0.01em"
               >
                 {opt.title}

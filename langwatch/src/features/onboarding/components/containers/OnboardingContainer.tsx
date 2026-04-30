@@ -53,7 +53,7 @@ export const OnboardingContainer: React.FC<OnboardingContainerProps> = ({
           key={title}
           textStyle="xl"
           fontWeight="600"
-          color="fg.DEFAULT"
+          color="fg"
           letterSpacing="-0.01em"
           lineHeight="1.3"
           initial={{ opacity: 0, y: 6, filter: "blur(4px)" }}
@@ -127,7 +127,7 @@ export const OnboardingContainer: React.FC<OnboardingContainerProps> = ({
             borderRadius="full"
             aria-label="Sign out"
             color="fg.subtle"
-            _hover={{ bg: "blackAlpha.50", color: "fg.DEFAULT" }}
+            _hover={{ bg: "blackAlpha.50", color: "fg" }}
             onClick={() => {
               emit("clicked", "sign_out");
               void signOut();
@@ -169,7 +169,7 @@ export const OnboardingContainer: React.FC<OnboardingContainerProps> = ({
             transition="all 0.25s ease"
             _hover={{
               bg: "bg.panel",
-              color: "fg.DEFAULT",
+              color: "fg",
               boxShadow: "md",
               transform: "translateY(-2px)",
               borderColor: "border.emphasized",
