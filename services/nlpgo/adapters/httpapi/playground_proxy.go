@@ -161,6 +161,17 @@ func playgroundProxyDispatch(proxy PlaygroundProxy) http.HandlerFunc {
 			req.HTTPMethod = r.Method
 			req.HTTPRawQuery = r.URL.RawQuery
 			req.HTTPHeaders = filterPassthroughHeaders(r.Header)
+			// Gemini-native streaming endpoints encode the stream/sync
+			// distinction in the URL action suffix (e.g.
+			// `:streamGenerateContent` vs `:generateContent`), NOT in the
+			// OpenAI-style `"stream": true` body flag. peekBodyMetadata
+			// only saw the latter, so streamGenerateContent calls
+			// (gemini-cli + Google GenAI SDK) used to fall through to
+			// handleSync and discard the SSE deltas. Promote isStream
+			// when the path resolves to a stream-typed action.
+			if isPassthroughStreamPath(req.HTTPPath) {
+				isStream = true
+			}
 		}
 
 		if isStream {
@@ -169,6 +180,26 @@ func playgroundProxyDispatch(proxy PlaygroundProxy) http.HandlerFunc {
 		}
 		handleSync(ctx, w, proxy, req)
 	}
+}
+
+// isPassthroughStreamPath reports whether a /v1beta-family relative
+// path is a streaming endpoint. The Google GenAI surface signals
+// streaming via the action suffix on `:` rather than via a body flag —
+// `:streamGenerateContent`, `:streamRawPredict` etc. all stream;
+// `:generateContent`, `:countTokens` etc. don't. We match a small
+// allowlist of known stream actions today; anything else defaults to
+// non-streaming so a typo on the inbound URL surfaces as a regular
+// sync 4xx instead of an opened SSE stream that never closes.
+func isPassthroughStreamPath(path string) bool {
+	idx := strings.LastIndexByte(path, ':')
+	if idx < 0 {
+		return false
+	}
+	switch path[idx+1:] {
+	case "streamGenerateContent", "streamRawPredict":
+		return true
+	}
+	return false
 }
 
 // rewriteBodyModel sets body.model = newModel while preserving every
@@ -516,10 +547,28 @@ func (a *shimAdapter) DispatchStream(ctx context.Context, req playgroundProxyReq
 //   - Content-Length (the dispatcher recomputes this for the outbound
 //     request so the byte count matches whatever the parser emits).
 func filterPassthroughHeaders(in http.Header) map[string]string {
+	// Build the dynamic skip set first: RFC 7230 §6.1 lets the
+	// `Connection` header name additional hop-by-hop tokens (e.g.
+	// `Connection: Foo` makes `Foo: bar` hop-by-hop too). Forwarding
+	// those would leak short-circuit framing details to the upstream
+	// provider, so add them to the per-call denylist alongside the
+	// canonical hop-by-hop set.
+	dyn := map[string]struct{}{}
+	for _, raw := range in.Values("Connection") {
+		for _, tok := range strings.Split(raw, ",") {
+			tok = strings.TrimSpace(strings.ToLower(tok))
+			if tok != "" {
+				dyn[tok] = struct{}{}
+			}
+		}
+	}
 	out := make(map[string]string, len(in))
 	for k, vs := range in {
 		lk := strings.ToLower(k)
 		if strings.HasPrefix(lk, "x-litellm-") {
+			continue
+		}
+		if _, ok := dyn[lk]; ok {
 			continue
 		}
 		switch lk {

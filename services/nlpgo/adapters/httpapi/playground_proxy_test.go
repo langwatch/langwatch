@@ -344,6 +344,69 @@ func TestPlaygroundProxy_DispatcherErrorReturns502(t *testing.T) {
 	}
 }
 
+// TestPlaygroundProxy_PassthroughStreamPathDetectsActionSuffix pins
+// CodeRabbit feedback on PR #3607: Gemini-native streaming endpoints
+// (`:streamGenerateContent`, `:streamRawPredict`) signal streaming via
+// the URL action suffix — they don't set OpenAI's `"stream": true`
+// body flag. Pre-fix the handler peeked only at body.stream and
+// streamGenerateContent calls fell through to handleSync, discarding
+// SSE deltas. Post-fix isPassthroughStreamPath promotes streaming
+// when the path's `:`-action matches a known stream action.
+func TestPlaygroundProxy_PassthroughStreamPathDetectsActionSuffix(t *testing.T) {
+	cases := []struct {
+		name string
+		path string
+		want bool
+	}{
+		{"sync_generateContent", "/models/gemini-2.5-flash:generateContent", false},
+		{"stream_generateContent", "/models/gemini-2.5-flash:streamGenerateContent", true},
+		{"stream_rawPredict", "/publishers/google/models/gemini-2.5-flash:streamRawPredict", true},
+		{"sync_countTokens", "/models/gemini-2.5-flash:countTokens", false},
+		{"no_action_suffix", "/models/gemini-2.5-flash", false},
+		{"unknown_action", "/models/gemini-2.5-flash:fakeAction", false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := isPassthroughStreamPath(tc.path)
+			if got != tc.want {
+				t.Errorf("isPassthroughStreamPath(%q) = %v, want %v", tc.path, got, tc.want)
+			}
+		})
+	}
+}
+
+// TestFilterPassthroughHeaders_StripsConnectionNominatedHeaders pins
+// CodeRabbit feedback on PR #3607: RFC 7230 §6.1 says headers nominated
+// by `Connection: Foo, Bar` are also hop-by-hop. The static denylist
+// already drops Connection itself, but pre-fix it forwarded any
+// header named in the Connection token list (e.g. `Connection: Foo` +
+// `Foo: bar` would leak `Foo: bar` upstream). Post-fix we parse the
+// Connection tokens and add them to the skip set.
+func TestFilterPassthroughHeaders_StripsConnectionNominatedHeaders(t *testing.T) {
+	in := http.Header{}
+	in.Set("Connection", "X-Hop-By-Hop, Trailer-Test")
+	in.Set("X-Hop-By-Hop", "should-be-stripped")
+	in.Set("Trailer-Test", "should-be-stripped-too")
+	in.Set("Accept", "application/json") // canonical pass-through
+	in.Set("Authorization", "Bearer x")  // explicit deny
+	in.Set("X-LangWatch-Trace-Id", "tid") // pass-through
+	in.Set("x-litellm-model", "leak")     // explicit deny
+
+	out := filterPassthroughHeaders(in)
+
+	for _, k := range []string{"X-Hop-By-Hop", "Trailer-Test", "Connection", "Authorization", "X-Litellm-Model"} {
+		if _, present := out[k]; present {
+			t.Errorf("header %q must NOT be forwarded: %v", k, out)
+		}
+	}
+	if out["Accept"] != "application/json" {
+		t.Errorf("Accept lost: %v", out)
+	}
+	if out["X-Langwatch-Trace-Id"] != "tid" && out["X-LangWatch-Trace-Id"] != "tid" {
+		t.Errorf("X-LangWatch-Trace-Id should pass through: %v", out)
+	}
+}
+
 func TestPlaygroundProxy_PassthroughForwardsHTTPShapeToDispatcher(t *testing.T) {
 	// /v1beta/* paths (Gemini-native generateContent + streamGenerateContent,
 	// called by gemini-cli + Google GenAI SDK) classify as
