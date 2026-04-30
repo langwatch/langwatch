@@ -15,13 +15,11 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { mockCanPublish, mockRouterPush, mockTrackEvent, mockTogglePublish } =
-  vi.hoisted(() => ({
-    mockCanPublish: { current: false as boolean },
-    mockRouterPush: vi.fn(),
-    mockTrackEvent: vi.fn(),
-    mockTogglePublish: vi.fn(),
-  }));
+const { mockCanPublish, mockRouterPush, mockTrackEvent } = vi.hoisted(() => ({
+  mockCanPublish: { current: false as boolean },
+  mockRouterPush: vi.fn(),
+  mockTrackEvent: vi.fn(),
+}));
 
 vi.mock("~/utils/compat/next-router", () => ({
   useRouter: () => ({
@@ -221,7 +219,7 @@ function renderPublish() {
   );
 }
 
-describe("studio Publish menu", () => {
+describe("given the studio Publish menu is rendered", () => {
   afterEach(() => {
     cleanup();
     vi.clearAllMocks();
