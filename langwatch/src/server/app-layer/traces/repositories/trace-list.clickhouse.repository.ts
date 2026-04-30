@@ -16,7 +16,15 @@ const TABLE_NAME = "trace_summaries" as const;
 interface ClickHouseSummaryRow {
   TraceId: string;
   TenantId: string;
-  Attributes: Record<string, string>;
+  // The list mapper only reads these five keys out of `Attributes`.
+  // Projecting them individually lets ClickHouse skip reading the full
+  // Map column off disk for every row — the dominant cost on traces
+  // with large attribute bags.
+  AttrSpanName: string;
+  AttrServiceName: string;
+  AttrConversationId: string;
+  AttrUserId: string;
+  AttrOrigin: string;
   OccurredAt: number;
   CreatedAt: number;
   UpdatedAt: number;
@@ -143,13 +151,21 @@ export class TraceListClickHouseRepository implements TraceListRepository {
 
     // Subquery so WHERE/ORDER BY operate on raw DateTime columns —
     // aliasing DateTime to millis in the same scope shadows the column
-    // and breaks the WHERE comparison.
+    // and breaks the WHERE comparison. The inner SELECT also lists
+    // explicit columns (no `SELECT *`) so ClickHouse doesn't read the
+    // whole `Attributes` Map off storage just to drop it on the floor.
+    // Only five attribute keys flow through to the list mapper — see
+    // `mapToTraceListItem`.
     const result = await client.query({
       query: `
         SELECT
           TraceId,
           TenantId,
-          Attributes,
+          AttrSpanName,
+          AttrServiceName,
+          AttrConversationId,
+          AttrUserId,
+          AttrOrigin,
           toUnixTimestamp64Milli(OccurredAt) AS OccurredAt,
           toUnixTimestamp64Milli(CreatedAt) AS CreatedAt,
           toUnixTimestamp64Milli(UpdatedAt) AS UpdatedAt,
@@ -192,7 +208,55 @@ export class TraceListClickHouseRepository implements TraceListRepository {
           toUnixTimestamp64Milli(lastEventOccurredAt) AS lastEventOccurredAt,
           TotalCount
         FROM (
-          SELECT *, count() OVER () AS TotalCount
+          SELECT
+            TraceId,
+            TenantId,
+            Attributes['langwatch.span.name'] AS AttrSpanName,
+            Attributes['service.name'] AS AttrServiceName,
+            Attributes['gen_ai.conversation.id'] AS AttrConversationId,
+            Attributes['langwatch.user_id'] AS AttrUserId,
+            Attributes['langwatch.origin'] AS AttrOrigin,
+            OccurredAt,
+            CreatedAt,
+            UpdatedAt,
+            ComputedIOSchemaVersion,
+            ComputedInput,
+            ComputedOutput,
+            TimeToFirstTokenMs,
+            TimeToLastTokenMs,
+            TotalDurationMs,
+            TokensPerSecond,
+            SpanCount,
+            ContainsErrorStatus,
+            ContainsOKStatus,
+            ErrorMessage,
+            Models,
+            TotalCost,
+            TokensEstimated,
+            TotalPromptTokenCount,
+            TotalCompletionTokenCount,
+            OutputFromRootSpan,
+            OutputSpanEndTimeMs,
+            BlockedByGuardrail,
+            RootSpanName,
+            RootSpanType,
+            ContainsAi,
+            ContainsPrompt,
+            SelectedPromptId,
+            SelectedPromptSpanId,
+            LastUsedPromptId,
+            LastUsedPromptVersionNumber,
+            LastUsedPromptVersionId,
+            LastUsedPromptSpanId,
+            TopicId,
+            SubTopicId,
+            AnnotationIds,
+            ScenarioRoleCosts,
+            ScenarioRoleLatencies,
+            ScenarioRoleSpans,
+            SpanCosts,
+            lastEventOccurredAt,
+            count() OVER () AS TotalCount
           FROM ${TABLE_NAME}
           WHERE ${whereClause}
             AND (TenantId, TraceId, UpdatedAt) IN (
@@ -829,7 +893,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
       topicId: row.TopicId,
       subTopicId: row.SubTopicId,
       annotationIds: row.AnnotationIds ?? [],
-      attributes: row.Attributes ?? {},
+      attributes: buildListAttributes(row),
       scenarioRoleCosts: row.ScenarioRoleCosts ?? {},
       scenarioRoleLatencies: row.ScenarioRoleLatencies ?? {},
       scenarioRoleSpans: row.ScenarioRoleSpans ?? {},
@@ -840,4 +904,29 @@ export class TraceListClickHouseRepository implements TraceListRepository {
       lastEventOccurredAt: Number(row.lastEventOccurredAt ?? 0),
     };
   }
+}
+
+// Empty strings come back from ClickHouse for missing Map keys; the
+// list mapper expects keys absent (so its `?? null` / `?? ""` fallbacks
+// fire) rather than present-but-empty.
+//
+// The five keys below match the explicit Attributes[...] projections in
+// `findAll`'s SELECT. To surface another attribute in the list, add it
+// in both places. If user-pinned attribute columns ever ship, prefer
+// extending the query input with an `extraAttributeKeys: string[]` list
+// (parameterised + aliased per key) over re-introducing the full
+// Attributes Map projection — that read is what this change exists to
+// avoid.
+function buildListAttributes(
+  row: ClickHouseSummaryRow,
+): Record<string, string> {
+  const attributes: Record<string, string> = {};
+  if (row.AttrSpanName) attributes["langwatch.span.name"] = row.AttrSpanName;
+  if (row.AttrServiceName) attributes["service.name"] = row.AttrServiceName;
+  if (row.AttrConversationId) {
+    attributes["gen_ai.conversation.id"] = row.AttrConversationId;
+  }
+  if (row.AttrUserId) attributes["langwatch.user_id"] = row.AttrUserId;
+  if (row.AttrOrigin) attributes["langwatch.origin"] = row.AttrOrigin;
+  return attributes;
 }

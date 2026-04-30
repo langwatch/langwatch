@@ -19,7 +19,6 @@ import { formatCount } from "./utils";
 export const AttributeKeyRow = memo(function AttributeKeyRow({
   attrKey,
   count,
-  prefetch,
   getValueState,
   noneActive,
   onToggleValue,
@@ -27,14 +26,13 @@ export const AttributeKeyRow = memo(function AttributeKeyRow({
 }: {
   attrKey: string;
   count: number;
-  prefetch: boolean;
   getValueState: (attrKey: string, value: string) => FacetValueState;
   noneActive: boolean;
   onToggleValue: (attrKey: string, value: string) => void;
   onToggleNone: () => void;
 }) {
   const [open, setOpen] = useState(false);
-  const { values, isLoading } = useAttributeValues(attrKey, open || prefetch);
+  const { values, isLoading } = useAttributeValues(attrKey, open);
 
   const activeCount = useMemo(() => {
     const valueActive = values.filter(

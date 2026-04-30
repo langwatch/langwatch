@@ -21,7 +21,10 @@ export function useTraceFacets() {
     },
     {
       enabled: !!projectId,
-      staleTime: 30_000,
+      // Discover returns the *schema* of available facet keys (which
+      // attributes exist, with counts) — it shifts on the order of
+      // minutes, not seconds. SSE invalidates this on real changes.
+      staleTime: 10 * 60_000,
       // Keep prior facets visible across time-range / filter refetches so
       // the sidebar doesn't flicker. Project switches are gated below by
       // remembering which project the cached response belongs to.

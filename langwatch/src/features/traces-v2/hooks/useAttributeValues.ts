@@ -26,7 +26,10 @@ export function useAttributeValues(attrKey: string, enabled: boolean) {
     },
     {
       enabled: enabled && !!project?.id && !!attrKey,
-      staleTime: 30_000,
+      // Distinct attribute values turn over slowly; SSE invalidates on
+      // real changes, so a long staleTime keeps expanded sections from
+      // refetching every time the rolling time range ticks.
+      staleTime: 5 * 60_000,
       keepPreviousData: true,
     },
   );

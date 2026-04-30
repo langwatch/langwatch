@@ -2,10 +2,7 @@ import { Input, Text, VStack } from "@chakra-ui/react";
 import type React from "react";
 import { useMemo, useState } from "react";
 import { AttributeKeyRow } from "./AttributeKeyRow";
-import {
-  PREFETCH_TOP_ATTRIBUTE_KEYS,
-  SEARCHABLE_VALUE_THRESHOLD,
-} from "./constants";
+import { SEARCHABLE_VALUE_THRESHOLD } from "./constants";
 import { SidebarSection } from "./SidebarSection";
 import type { AttributeKey, FacetValueState } from "./types";
 
@@ -60,12 +57,11 @@ export const AttributesSection: React.FC<AttributesSectionProps> = ({
             textStyle="xs"
           />
         )}
-        {filtered.map((key, idx) => (
+        {filtered.map((key) => (
           <AttributeKeyRow
             key={key.value}
             attrKey={key.value}
             count={key.count}
-            prefetch={idx < PREFETCH_TOP_ATTRIBUTE_KEYS && !searchQuery}
             getValueState={getValueState}
             noneActive={getNoneActive(key.value)}
             onToggleValue={onToggleValue}

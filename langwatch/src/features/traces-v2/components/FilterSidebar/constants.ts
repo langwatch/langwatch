@@ -245,5 +245,3 @@ export const MAX_EXPANDED_FACETS = 30;
 export const AUTO_EXPAND_THRESHOLD = 5;
 /** When a value-list reaches this size, show an inline filter input. */
 export const SEARCHABLE_VALUE_THRESHOLD = 5;
-/** Top-K most common attribute keys whose values get prefetched on mount. */
-export const PREFETCH_TOP_ATTRIBUTE_KEYS = 8;
