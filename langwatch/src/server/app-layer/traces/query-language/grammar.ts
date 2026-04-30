@@ -1,4 +1,4 @@
-import { FIELD_VALUES, SEARCH_FIELDS } from "./queryParser";
+import { FIELD_VALUES, SEARCH_FIELDS } from "./metadata";
 
 /**
  * Single source of truth for the trace query language. The same markdown is

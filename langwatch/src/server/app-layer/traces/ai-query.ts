@@ -6,11 +6,10 @@ import { createLogger } from "~/utils/logger";
 import { QUERY_SYNTAX_DOC } from "./query-language/grammar";
 import {
   FIELD_VALUES,
-  isEmptyAST,
-  parse,
   SEARCH_FIELDS,
-  validateAst,
-} from "./query-language/queryParser";
+} from "./query-language/metadata";
+import { isEmptyAST, parse } from "./query-language/parse";
+import { validateAst } from "./query-language/queries";
 
 const logger = createLogger("langwatch:ai-query");
 
