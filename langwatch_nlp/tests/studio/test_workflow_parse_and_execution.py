@@ -41,6 +41,11 @@ llm_field = Field(
         model="gpt-5-mini",
         temperature=0.0,
         max_tokens=100,
+        # reasoning="minimal" caps gpt-5-mini's reasoning tokens in CI. Without it,
+        # `get_corrected_llm_params` bumps max_tokens to 16000 (DSPy minimum for
+        # reasoning models) and default-medium reasoning bills multi-thousand
+        # output tokens per call at $2/1M, dominating the OpenAI bill.
+        reasoning="minimal",
     ),
     desc=None,
 )
@@ -983,7 +988,7 @@ def test_parse_workflow_with_default_llm():
 
     workflow = copy.deepcopy(simple_workflow)
     workflow.default_llm = LLMConfig(
-        model="gpt-5-mini", temperature=0.0, max_tokens=100
+        model="gpt-5-mini", temperature=0.0, max_tokens=100, reasoning="minimal"
     )
 
     generate_query_node = next(
@@ -1303,7 +1308,12 @@ def test_proposes_instructions_with_grounded_proposer():
         from dspy.propose.grounded_proposer import GroundedProposer
 
         proposer = GroundedProposer(
-            prompt_model=dspy.LM(model="openai/gpt-5-mini"),
+            prompt_model=dspy.LM(
+                model="openai/gpt-5-mini",
+                max_tokens=16000,
+                temperature=1.0,
+                reasoning_effort="minimal",
+            ),
             program=instance,
             trainset=[],
         )
