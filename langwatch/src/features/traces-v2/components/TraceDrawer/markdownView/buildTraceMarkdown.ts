@@ -323,6 +323,100 @@ function thinkingLine(content: string): string {
  * - `image` → `[image]`
  * - anything else → compact JSON
  */
+type Block = Record<string, unknown>;
+type BlockRenderer = (block: Block, lines: string[]) => void;
+
+function renderTextBlock(block: Block, lines: string[]): void {
+  if (typeof block.text !== "string") {
+    lines.push(truncate(JSON.stringify(block), 240));
+    return;
+  }
+  // Some providers stream `<thinking>…</thinking>` inside plain text
+  // blocks instead of using a dedicated block type — tease them apart
+  // here so they get the same shimmer treatment.
+  for (const seg of splitThinkingFromText(block.text)) {
+    lines.push(
+      seg.kind === "thinking" ? thinkingLine(seg.content) : seg.content,
+    );
+  }
+}
+
+// Anthropic emits `type: "thinking"` with a `thinking` field; OpenAI
+// (Responses / o1 family) emits `type: "reasoning"` with `text` /
+// `summary` fields; some intermediates use `redacted_thinking`. Cover
+// all three so the shimmer fires uniformly.
+function renderThinkingBlock(block: Block, lines: string[]): void {
+  const raw =
+    (typeof block.thinking === "string" ? block.thinking : null) ??
+    (typeof block.reasoning === "string" ? block.reasoning : null) ??
+    (typeof block.text === "string" ? block.text : null) ??
+    (typeof block.summary === "string" ? block.summary : null) ??
+    (block.type === "redacted_thinking" ? "[redacted thinking]" : null);
+  if (raw) lines.push(thinkingLine(raw));
+}
+
+function renderToolCallBlock(block: Block, lines: string[]): void {
+  const name = typeof block.name === "string" ? block.name : "tool";
+  const id =
+    typeof block.id === "string" ? ` (${block.id.slice(0, 8)})` : "";
+  lines.push(`tool_call: ${name}${id}`);
+  const input = (block.input ?? block.arguments ?? block.args) as unknown;
+  if (input && typeof input === "object" && !Array.isArray(input)) {
+    const flat = flattenAttributes(input as Record<string, unknown>);
+    for (const ln of flat) lines.push(`  ${ln}`);
+  } else if (input != null) {
+    lines.push(`  args: ${truncate(String(input))}`);
+  }
+}
+
+function renderToolResultBlock(block: Block, lines: string[]): void {
+  const id =
+    typeof block.tool_use_id === "string"
+      ? ` (${block.tool_use_id.slice(0, 8)})`
+      : "";
+  lines.push(`tool_result${id}:`);
+  const result = block.content;
+  if (typeof result === "string") {
+    for (const ln of result.split("\n")) {
+      lines.push(`  ${truncate(ln, 400)}`);
+    }
+  } else if (Array.isArray(result)) {
+    for (const r of result) {
+      if (typeof r === "string") {
+        lines.push(`  - ${truncate(r, 400)}`);
+      } else if (r && typeof r === "object") {
+        const rblock = r as Block;
+        if (rblock.type === "text" && typeof rblock.text === "string") {
+          for (const ln of rblock.text.split("\n")) {
+            lines.push(`  ${truncate(ln, 400)}`);
+          }
+        } else {
+          lines.push(`  - ${truncate(JSON.stringify(rblock), 400)}`);
+        }
+      }
+    }
+  } else if (result && typeof result === "object") {
+    const flat = flattenAttributes(result as Record<string, unknown>);
+    for (const ln of flat) lines.push(`  ${ln}`);
+  }
+}
+
+function renderImageBlock(_block: Block, lines: string[]): void {
+  lines.push("[image]");
+}
+
+const BLOCK_RENDERERS: Record<string, BlockRenderer> = {
+  text: renderTextBlock,
+  thinking: renderThinkingBlock,
+  reasoning: renderThinkingBlock,
+  redacted_thinking: renderThinkingBlock,
+  tool_use: renderToolCallBlock,
+  tool_call: renderToolCallBlock,
+  tool_result: renderToolResultBlock,
+  image: renderImageBlock,
+  image_url: renderImageBlock,
+};
+
 function renderMessageBlocks(content: unknown): string[] {
   if (content == null) return [];
   if (typeof content === "string") {
@@ -346,94 +440,15 @@ function renderMessageBlocks(content: unknown): string[] {
       continue;
     }
     if (!b || typeof b !== "object") continue;
-    const block = b as Record<string, unknown>;
-
-    if (block.type === "text" && typeof block.text === "string") {
-      // Some providers stream `<thinking>…</thinking>` inside plain text
-      // blocks instead of using a dedicated block type — tease them apart
-      // here so they get the same shimmer treatment.
-      for (const seg of splitThinkingFromText(block.text)) {
-        lines.push(
-          seg.kind === "thinking" ? thinkingLine(seg.content) : seg.content,
-        );
-      }
-      continue;
+    const block = b as Block;
+    const renderer =
+      typeof block.type === "string" ? BLOCK_RENDERERS[block.type] : undefined;
+    if (renderer) {
+      renderer(block, lines);
+    } else {
+      // Fallback: terse JSON for unknown block shapes.
+      lines.push(truncate(JSON.stringify(block), 240));
     }
-
-    // Anthropic emits `type: "thinking"` with a `thinking` field; OpenAI
-    // (Responses / o1 family) emits `type: "reasoning"` with `text` /
-    // `summary` fields; some intermediates use `redacted_thinking`. Cover
-    // all three so the shimmer fires uniformly.
-    if (
-      block.type === "thinking" ||
-      block.type === "reasoning" ||
-      block.type === "redacted_thinking"
-    ) {
-      const raw =
-        (typeof block.thinking === "string" ? block.thinking : null) ??
-        (typeof block.reasoning === "string" ? block.reasoning : null) ??
-        (typeof block.text === "string" ? block.text : null) ??
-        (typeof block.summary === "string" ? block.summary : null) ??
-        (block.type === "redacted_thinking" ? "[redacted thinking]" : null);
-      if (raw) lines.push(thinkingLine(raw));
-      continue;
-    }
-
-    if (block.type === "tool_use" || block.type === "tool_call") {
-      const name = typeof block.name === "string" ? block.name : "tool";
-      const id =
-        typeof block.id === "string" ? ` (${block.id.slice(0, 8)})` : "";
-      lines.push(`tool_call: ${name}${id}`);
-      const input = (block.input ?? block.arguments ?? block.args) as unknown;
-      if (input && typeof input === "object" && !Array.isArray(input)) {
-        const flat = flattenAttributes(input as Record<string, unknown>);
-        for (const ln of flat) lines.push(`  ${ln}`);
-      } else if (input != null) {
-        lines.push(`  args: ${truncate(String(input))}`);
-      }
-      continue;
-    }
-
-    if (block.type === "tool_result") {
-      const id =
-        typeof block.tool_use_id === "string"
-          ? ` (${block.tool_use_id.slice(0, 8)})`
-          : "";
-      lines.push(`tool_result${id}:`);
-      const result = block.content;
-      if (typeof result === "string") {
-        for (const ln of result.split("\n")) {
-          lines.push(`  ${truncate(ln, 400)}`);
-        }
-      } else if (Array.isArray(result)) {
-        for (const r of result) {
-          if (typeof r === "string") {
-            lines.push(`  - ${truncate(r, 400)}`);
-          } else if (r && typeof r === "object") {
-            const rblock = r as Record<string, unknown>;
-            if (rblock.type === "text" && typeof rblock.text === "string") {
-              for (const ln of rblock.text.split("\n")) {
-                lines.push(`  ${truncate(ln, 400)}`);
-              }
-            } else {
-              lines.push(`  - ${truncate(JSON.stringify(rblock), 400)}`);
-            }
-          }
-        }
-      } else if (result && typeof result === "object") {
-        const flat = flattenAttributes(result as Record<string, unknown>);
-        for (const ln of flat) lines.push(`  ${ln}`);
-      }
-      continue;
-    }
-
-    if (block.type === "image" || block.type === "image_url") {
-      lines.push("[image]");
-      continue;
-    }
-
-    // Fallback: terse JSON for unknown block shapes.
-    lines.push(truncate(JSON.stringify(block), 240));
   }
   return lines;
 }
