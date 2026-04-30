@@ -11,7 +11,7 @@ import {
   useDisclosure,
 } from "@chakra-ui/react";
 import { Tooltip } from "../../../components/ui/tooltip";
-import { Key, Pencil, Plus, RefreshCw, Trash2 } from "lucide-react";
+import { Key, Pencil, Plus, Trash2 } from "lucide-react";
 import { PageLayout } from "../../../components/ui/layouts/PageLayout";
 import { useState } from "react";
 import { toaster } from "../../../components/ui/toaster";
