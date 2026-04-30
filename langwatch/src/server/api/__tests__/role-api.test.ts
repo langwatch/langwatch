@@ -1,4 +1,4 @@
-import { TeamUserRole } from "@prisma/client";
+import { RoleBindingScopeType, TeamUserRole } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { RoleService } from "../../role";
 import {
@@ -328,6 +328,13 @@ describe("RoleService Tests", () => {
       );
 
       expect(result).toEqual({ success: true });
+      expect(mockPrisma.roleBinding.findFirst).toHaveBeenCalledWith({
+        where: {
+          userId: "user-123",
+          scopeType: RoleBindingScopeType.TEAM,
+          scopeId: "team-123",
+        },
+      });
       expect(mockPrisma.roleBinding.deleteMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({ userId: "user-123", scopeType: "TEAM", scopeId: "team-123" }),
@@ -398,9 +405,13 @@ describe("RoleService Tests", () => {
       await expect(
         roleService.assignRoleToUser("user-123", "team-123", "role-123"),
       ).rejects.toThrow(UserNotTeamMemberError);
-      await expect(
-        roleService.assignRoleToUser("user-123", "team-123", "role-123"),
-      ).rejects.toThrow("User is not a member of the specified team");
+      expect(mockPrisma.roleBinding.findFirst).toHaveBeenCalledWith({
+        where: {
+          userId: "user-123",
+          scopeType: RoleBindingScopeType.TEAM,
+          scopeId: "team-123",
+        },
+      });
     });
   });
 
