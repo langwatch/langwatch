@@ -126,11 +126,12 @@ describe("<ScenarioCreateModal/>", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockToasterCreate.mockClear();
-    // Reset to having providers by default
+    // Reset to having providers + a valid default model by default so the
+    // AI form renders. Tests targeting the no-default / no-providers gate
+    // override this in their own beforeEach.
     mockHasEnabledProviders = true;
     mockProviders = { openai: { enabled: true } };
-    // Reset project to default (no Azure)
-    mockProject = { id: "project-123", slug: "my-project" };
+    mockProject = { id: "project-123", slug: "my-project", defaultModel: "openai/gpt-4o-mini" };
 
     // Mock fetch for AI generation
     global.fetch = vi.fn().mockResolvedValue({
@@ -362,14 +363,17 @@ describe("<ScenarioCreateModal/>", () => {
       mockProviders = {};
     });
 
-    it("shows warning message instead of form", () => {
+    it("shows the model-provider-required modal instead of the AI form", () => {
       render(
         <ScenarioCreateModal open={true} onClose={vi.fn()} />,
         { wrapper: Wrapper }
       );
 
       const dialog = getDialogContent();
-      expect(within(dialog).getByText("No model provider configured")).toBeInTheDocument();
+      expect(within(dialog).getByText("Model provider not ready")).toBeInTheDocument();
+      expect(
+        within(dialog).getByTestId("model-provider-required-modal-configure-button")
+      ).toHaveAccessibleName("Configure model provider");
     });
 
     it("hides textarea", () => {
@@ -449,20 +453,17 @@ describe("when default model is Azure deployment not in registry", () => {
       });
     });
 
-    it("shows provider disabled error when generating because azure provider is not configured", async () => {
+    it("shows the model-provider-required modal up-front (no Generate flow)", () => {
       render(
         <ScenarioCreateModal open={true} onClose={vi.fn()} />,
         { wrapper: Wrapper }
       );
 
       const dialog = getDialogContent();
-      const textarea = within(dialog).getByRole("textbox");
-      fireEvent.change(textarea, { target: { value: "Test azure scenario" } });
-      fireEvent.click(within(dialog).getByRole("button", { name: /generate with ai/i }));
-
-      await waitFor(() => {
-        expect(within(dialog).getByText(/provider.*disabled|disabled.*provider/i)).toBeInTheDocument();
-      });
+      expect(within(dialog).getByText("Model provider not ready")).toBeInTheDocument();
+      expect(
+        within(dialog).getByTestId("model-provider-required-modal-configure-button")
+      ).toBeInTheDocument();
     });
   });
 });
@@ -475,14 +476,14 @@ describe("when default model is Azure and provider is NOT configured at all", ()
     mockProviders = {};
   });
 
-  it("shows No model provider configured warning", () => {
+  it("shows the model-provider-required modal", () => {
     render(
       <ScenarioCreateModal open={true} onClose={vi.fn()} />,
       { wrapper: Wrapper }
     );
 
     const dialog = getDialogContent();
-    expect(within(dialog).getByText("No model provider configured")).toBeInTheDocument();
+    expect(within(dialog).getByText("Model provider not ready")).toBeInTheDocument();
   });
 });
 
@@ -541,9 +542,11 @@ describe("given azure is the only enabled provider and project.defaultModel is a
 });
 
 describe("given azure is the only enabled provider and project.defaultModel is null", () => {
-  describe("when user clicks Generate with AI", () => {
+  // null defaultModel → getDefaultModelState returns { ok: false, reason: "no-default" }
+  // The modal must show the same "Configure model provider" UI it shows for no-providers,
+  // so the user can self-recover instead of hitting a dead-end error.
+  describe("when the modal opens", () => {
     beforeEach(() => {
-      // null defaultModel → getDefaultModelState returns { ok: false, reason: "no-default" }
       mockProject = { id: "p1", slug: "proj", defaultModel: undefined };
       mockHasEnabledProviders = true;
       mockProviders = { azure: { enabled: true }, openai: { enabled: false } };
@@ -554,65 +557,48 @@ describe("given azure is the only enabled provider and project.defaultModel is n
       });
     });
 
+    it("shows the Configure model provider footer button", () => {
+      render(
+        <ScenarioCreateModal open={true} onClose={vi.fn()} />,
+        { wrapper: Wrapper }
+      );
+
+      const dialog = getDialogContent();
+      expect(
+        within(dialog).getByTestId("model-provider-required-modal-configure-button")
+      ).toHaveAccessibleName("Configure model provider");
+    });
+
+    it("does not render the description textarea or Generate button", () => {
+      render(
+        <ScenarioCreateModal open={true} onClose={vi.fn()} />,
+        { wrapper: Wrapper }
+      );
+
+      const dialog = getDialogContent();
+      expect(within(dialog).queryByRole("textbox")).not.toBeInTheDocument();
+      expect(within(dialog).queryByRole("button", { name: /generate with ai/i })).not.toBeInTheDocument();
+    });
+
     it("does not call generateScenarioWithAI", async () => {
       render(
         <ScenarioCreateModal open={true} onClose={vi.fn()} />,
         { wrapper: Wrapper }
       );
 
-      const dialog = getDialogContent();
-      const textarea = within(dialog).getByRole("textbox");
-      fireEvent.change(textarea, { target: { value: "Test missing default" } });
-      fireEvent.click(within(dialog).getByRole("button", { name: /generate with ai/i }));
-
-      // Wait briefly to allow any async state to settle
+      // Nothing the user can do in the modal triggers a generation.
       await waitFor(() => {
-        // fetch must NOT have been called — no valid default model
         expect(global.fetch).not.toHaveBeenCalled();
-      });
-    });
-
-    it("renders an error state with a message not containing API keys not configured", async () => {
-      render(
-        <ScenarioCreateModal open={true} onClose={vi.fn()} />,
-        { wrapper: Wrapper }
-      );
-
-      const dialog = getDialogContent();
-      const textarea = within(dialog).getByRole("textbox");
-      fireEvent.change(textarea, { target: { value: "Test missing default" } });
-      fireEvent.click(within(dialog).getByRole("button", { name: /generate with ai/i }));
-
-      // Wait for the error state to appear (any error), then assert on the message
-      await waitFor(() => {
-        expect(within(dialog).getByText(/something went wrong/i)).toBeInTheDocument();
-      });
-      // The error message must NOT be the misleading "API keys not configured" text
-      expect(within(dialog).queryByText(/api keys not configured/i)).not.toBeInTheDocument();
-    });
-
-    it("renders an error mentioning default model", async () => {
-      render(
-        <ScenarioCreateModal open={true} onClose={vi.fn()} />,
-        { wrapper: Wrapper }
-      );
-
-      const dialog = getDialogContent();
-      const textarea = within(dialog).getByRole("textbox");
-      fireEvent.change(textarea, { target: { value: "Test missing default" } });
-      fireEvent.click(within(dialog).getByRole("button", { name: /generate with ai/i }));
-
-      await waitFor(() => {
-        expect(within(dialog).getByText(/default model/i)).toBeInTheDocument();
       });
     });
   });
 });
 
 describe("given azure is the only enabled provider and project.defaultModel is openai/gpt-5.2 (stale)", () => {
-  describe("when user clicks Generate with AI", () => {
+  // Stale default → getDefaultModelState returns { ok: false, reason: "stale-default" }
+  // Same contract as no-default: surface the recovery affordance, suppress generation.
+  describe("when the modal opens", () => {
     beforeEach(() => {
-      // Stale default: openai provider is disabled → getDefaultModelState returns { ok: false, reason: "stale-default" }
       mockProject = { id: "p1", slug: "proj", defaultModel: "openai/gpt-5.2" };
       mockHasEnabledProviders = true;
       mockProviders = { azure: { enabled: true }, openai: { enabled: false } };
@@ -623,54 +609,37 @@ describe("given azure is the only enabled provider and project.defaultModel is o
       });
     });
 
+    it("shows the Configure model provider footer button", () => {
+      render(
+        <ScenarioCreateModal open={true} onClose={vi.fn()} />,
+        { wrapper: Wrapper }
+      );
+
+      const dialog = getDialogContent();
+      expect(
+        within(dialog).getByTestId("model-provider-required-modal-configure-button")
+      ).toHaveAccessibleName("Configure model provider");
+    });
+
+    it("does not render the description textarea or Generate button", () => {
+      render(
+        <ScenarioCreateModal open={true} onClose={vi.fn()} />,
+        { wrapper: Wrapper }
+      );
+
+      const dialog = getDialogContent();
+      expect(within(dialog).queryByRole("textbox")).not.toBeInTheDocument();
+      expect(within(dialog).queryByRole("button", { name: /generate with ai/i })).not.toBeInTheDocument();
+    });
+
     it("does not call generateScenarioWithAI", async () => {
       render(
         <ScenarioCreateModal open={true} onClose={vi.fn()} />,
         { wrapper: Wrapper }
       );
 
-      const dialog = getDialogContent();
-      const textarea = within(dialog).getByRole("textbox");
-      fireEvent.change(textarea, { target: { value: "Test stale default" } });
-      fireEvent.click(within(dialog).getByRole("button", { name: /generate with ai/i }));
-
       await waitFor(() => {
         expect(global.fetch).not.toHaveBeenCalled();
-      });
-    });
-
-    it("renders an error state with a message not containing API keys not configured", async () => {
-      render(
-        <ScenarioCreateModal open={true} onClose={vi.fn()} />,
-        { wrapper: Wrapper }
-      );
-
-      const dialog = getDialogContent();
-      const textarea = within(dialog).getByRole("textbox");
-      fireEvent.change(textarea, { target: { value: "Test stale default" } });
-      fireEvent.click(within(dialog).getByRole("button", { name: /generate with ai/i }));
-
-      // Wait for the error state to appear (any error), then assert on the message
-      await waitFor(() => {
-        expect(within(dialog).getByText(/something went wrong/i)).toBeInTheDocument();
-      });
-      // The error message must NOT be the misleading "API keys not configured" text
-      expect(within(dialog).queryByText(/api keys not configured/i)).not.toBeInTheDocument();
-    });
-
-    it("renders an error mentioning the provider is disabled", async () => {
-      render(
-        <ScenarioCreateModal open={true} onClose={vi.fn()} />,
-        { wrapper: Wrapper }
-      );
-
-      const dialog = getDialogContent();
-      const textarea = within(dialog).getByRole("textbox");
-      fireEvent.change(textarea, { target: { value: "Test stale default" } });
-      fireEvent.click(within(dialog).getByRole("button", { name: /generate with ai/i }));
-
-      await waitFor(() => {
-        expect(within(dialog).getByText(/provider.*disabled|disabled.*provider/i)).toBeInTheDocument();
       });
     });
   });

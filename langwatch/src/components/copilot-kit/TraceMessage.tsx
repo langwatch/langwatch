@@ -17,8 +17,9 @@ const TRACE_QUERY_CONFIG = {
   retry: 10,
   retryDelay: (attemptIndex: number) =>
     Math.min(2000 * 2 ** attemptIndex, 60000),
-  staleTime: Infinity, // Never consider successful data stale
-  cacheTime: Infinity, // Cache successful results indefinitely
+  // Traces are immutable once written, so caching forever is correct.
+  staleTime: Infinity,
+  cacheTime: Infinity,
 } as const;
 
 interface TraceMessageProps extends StackProps {

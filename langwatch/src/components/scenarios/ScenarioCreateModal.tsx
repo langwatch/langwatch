@@ -1,5 +1,6 @@
 import { useCallback } from "react";
 import { AICreateModal, type ExampleTemplate } from "../shared/AICreateModal";
+import { ModelProviderRequiredModal } from "./ModelProviderRequiredModal";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useModelProvidersSettings } from "~/hooks/useModelProvidersSettings";
@@ -91,23 +92,6 @@ export function ScenarioCreateModal({ open, onClose }: ScenarioCreateModalProps)
         throw new Error("No project selected");
       }
 
-      if (!defaultModelState.ok) {
-        if (defaultModelState.reason === "no-default") {
-          throw new Error(
-            "No default model set. Configure one in Settings → Model Providers."
-          );
-        }
-        if (defaultModelState.reason === "stale-default") {
-          throw new Error(
-            "Your default model's provider is disabled. Configure a new default in Settings → Model Providers."
-          );
-        }
-        // no-providers: AICreateModal hides the Generate button, so this is unreachable in practice
-        const _exhaustiveCheck: "no-providers" = defaultModelState.reason;
-        void _exhaustiveCheck;
-        return;
-      }
-
       try {
         const generatedData = await generateScenarioWithAI(description, project.id);
         openEditorWithData(generatedData);
@@ -116,7 +100,7 @@ export function ScenarioCreateModal({ open, onClose }: ScenarioCreateModalProps)
         throw error;
       }
     },
-    [project?.id, defaultModelState, openEditorWithData]
+    [project?.id, openEditorWithData]
   );
 
   const handleSkip = useCallback(() => {
@@ -127,7 +111,15 @@ export function ScenarioCreateModal({ open, onClose }: ScenarioCreateModalProps)
     });
   }, [openEditorWithData]);
 
-  const hasModelProviders = defaultModelState.ok || defaultModelState.reason !== "no-providers";
+  if (!defaultModelState.ok) {
+    return (
+      <ModelProviderRequiredModal
+        open={open}
+        onClose={onClose}
+        onProceedAnyway={() => checkAndProceed(handleSkip)}
+      />
+    );
+  }
 
   return (
     <AICreateModal
@@ -139,7 +131,6 @@ export function ScenarioCreateModal({ open, onClose }: ScenarioCreateModalProps)
       onGenerate={(desc) => checkAndProceed(() => handleGenerate(desc))}
       onSkip={() => checkAndProceed(handleSkip)}
       generatingText={GENERATING_TEXT}
-      hasModelProviders={hasModelProviders}
     />
   );
 }
