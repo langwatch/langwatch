@@ -25,6 +25,19 @@ on:
     paths:
       - "charts/gateway/Chart.yaml"
       - "charts/langwatch/Chart.yaml"
+  # Self-heal on push to main. The PR-time lock-sync (above) is the
+  # primary path, but it can race-lose: if release-please bumps Chart.yaml
+  # and the rp PR is merged before the runner queue picks the workflow up,
+  # the lock-sync runs against a deleted branch and never recovers. This
+  # second trigger catches that case by regenerating Chart.lock directly
+  # on main when the on-disk gateway/Chart.yaml drifts past Chart.lock.
+  # paths-ignore on Chart.lock prevents this job's own commit from
+  # re-triggering the workflow.
+  push:
+    branches: [main]
+    paths:
+      - "charts/gateway/Chart.yaml"
+      - "charts/langwatch/Chart.yaml"
 
 permissions:
   contents: write
@@ -38,6 +51,7 @@ jobs:
     # acquire write access. Release-please-action only opens PRs from inside
     # the upstream repo, so this is the right tightening.
     if: |
+      github.event_name == 'pull_request_target' &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       startsWith(github.head_ref, 'release-please--branches--main--components--langwatch')
     steps:
@@ -78,4 +92,49 @@ jobs:
           fi
           git add charts/langwatch/Chart.lock
           git commit -m "chore(charts): regenerate Chart.lock for release"
+          git push
+
+  # Defense-in-depth: regenerate Chart.lock directly on main when an rp PR
+  # was merged before the PR-time lock-sync could run. Triggered by the
+  # `push: branches: [main]` filter above. GITHUB_TOKEN suffices here —
+  # we don't need to re-trigger downstream workflows because the chart
+  # CI already runs on the same push event that originally created the
+  # drift, and our follow-up push of Chart.lock will trigger another
+  # chart CI run via its own push trigger.
+  sync-main:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install Helm
+        uses: azure/setup-helm@v5
+        with:
+          version: v3.12.0
+
+      - name: Add Helm repositories
+        run: |
+          helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+          helm repo update
+
+      - name: Regenerate Chart.lock
+        run: helm dependency update charts/langwatch
+
+      - name: Discard downloaded sub-chart archives
+        run: rm -rf charts/langwatch/charts
+
+      - name: Commit + push if Chart.lock drifted
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet -- charts/langwatch/Chart.lock; then
+            echo "→ Chart.lock already in sync with on-disk Chart.yaml, nothing to push"
+            exit 0
+          fi
+          git add charts/langwatch/Chart.lock
+          git commit -m "chore(charts): self-heal Chart.lock post-merge"
           git push
