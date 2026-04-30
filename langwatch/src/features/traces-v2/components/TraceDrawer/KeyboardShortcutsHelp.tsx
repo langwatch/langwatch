@@ -20,6 +20,7 @@ import {
 } from "react-icons/lu";
 import { Kbd } from "~/components/ops/shared/Kbd";
 import { Dialog } from "~/components/ui/dialog";
+import { TRACE_DRAWER_HELP_GROUPS } from "~/features/traces-v2/hooks/traceDrawerShortcutTable";
 
 type GroupAccent = "blue" | "purple" | "teal" | "amber" | "pink" | "gray";
 
@@ -53,56 +54,7 @@ const TITLE_DEFAULTS: Record<string, { icon: IconType; accent: GroupAccent }> =
     "Reorder sections": { icon: LuArrowUpDown, accent: "gray" },
   };
 
-const DRAWER_GROUPS: ShortcutGroup[] = [
-  {
-    title: "View",
-    items: [
-      { keys: ["T"], label: "Trace view" },
-      { keys: ["L"], label: "LLM tab" },
-      {
-        keys: ["P"],
-        label: "Prompts tab",
-        detail: "When the trace used a managed prompt",
-      },
-      { keys: ["C"], label: "Conversation view" },
-      { keys: ["M"], label: "Maximize / restore" },
-      { keys: ["Esc"], label: "Close drawer / span" },
-    ],
-  },
-  {
-    title: "Visualisation",
-    items: [
-      { keys: ["1"], label: "Waterfall" },
-      { keys: ["2"], label: "Flame graph" },
-      { keys: ["3"], label: "Span list" },
-      { keys: ["4"], label: "Topology" },
-      { keys: ["5"], label: "Sequence diagram" },
-    ],
-  },
-  {
-    title: "Navigation",
-    items: [
-      { keys: ["→"], label: "Next trace in conversation" },
-      { keys: ["←"], label: "Previous trace in conversation" },
-      { keys: ["]"], label: "Next span" },
-      { keys: ["["], label: "Previous span" },
-      { keys: ["O"], label: "Back to trace summary" },
-      { keys: ["B"], label: "Back to previous trace" },
-    ],
-  },
-  {
-    title: "Actions",
-    items: [
-      { keys: ["R"], label: "Refresh trace" },
-      { keys: ["Y"], label: "Copy trace ID" },
-      { keys: ["\\"], label: "View raw JSON" },
-    ],
-  },
-  {
-    title: "Help",
-    items: [{ keys: ["?"], label: "Show this help" }],
-  },
-];
+const DRAWER_GROUPS: ShortcutGroup[] = TRACE_DRAWER_HELP_GROUPS;
 
 function resolveGroupVisuals(group: ShortcutGroup) {
   const fallback = TITLE_DEFAULTS[group.title];
