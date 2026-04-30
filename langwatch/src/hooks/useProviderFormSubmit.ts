@@ -163,7 +163,11 @@ export function useProviderFormSubmit({
       let customKeysToSend: Record<string, unknown> | undefined;
       const userEnteredNewKey = hasUserEnteredNewApiKey(customKeys);
       if (!isUsingEnvVars) {
-        customKeysToSend = { ...customKeys };
+        // Strip any masked placeholder values — they appear when the provider
+        // was configured via env vars in a prior session and the user opened
+        // the drawer without editing. Submitting the placeholder string would
+        // fail backend validation; omitting it preserves the existing key.
+        customKeysToSend = filterMaskedApiKeys(customKeys);
       } else if (userEnteredNewKey || hasNonApiKeyChanges) {
         customKeysToSend = userEnteredNewKey
           ? { ...customKeys }
