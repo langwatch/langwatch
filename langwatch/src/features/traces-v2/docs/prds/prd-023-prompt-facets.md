@@ -81,7 +81,7 @@ columns carries the work and the SpanId comes along for free.
 ## Implementation outline
 
 1. **Spec + PRD** — this doc + `prompt-facets.feature`.
-2. **Migration** — `00020_add_trace_summary_prompt_columns.sql`. Seven
+2. **Migration** — `00021_add_trace_summary_prompt_columns.sql`. Seven
    `ADD COLUMN IF NOT EXISTS` statements (six prompt + `ContainsPrompt`)
    plus four `ADD INDEX` statements, each in its own
    `+goose StatementBegin`/`StatementEnd` block (multi-statement queries
