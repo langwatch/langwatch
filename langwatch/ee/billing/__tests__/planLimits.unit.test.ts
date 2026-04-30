@@ -16,7 +16,6 @@ const NUMERIC_LIMIT_FIELDS = [
   "maxTeams",
   "maxProjects",
   "maxMessagesPerMonth",
-  "evaluationsCredit",
   "maxWorkflows",
   "maxPrompts",
   "maxEvaluators",
@@ -49,8 +48,9 @@ describe("PLAN_LIMITS", () => {
     const planEntries = Object.entries(PLAN_LIMITS) as [string, PlanInfo][];
 
     describe("when checking SaaS plans for numeric limit completeness", () => {
+      /** @scenario SaaS-sourced plan populates all limit fields */
       it.each(planEntries)(
-        "populates all 17 numeric limit fields for %s",
+        "populates all 16 numeric limit fields for %s",
         (_planType, plan) => {
           for (const field of NUMERIC_LIMIT_FIELDS) {
             const value = plan[field];
@@ -79,14 +79,13 @@ describe("PLAN_LIMITS", () => {
           maxMembers: 10,
           maxProjects: 99,
           maxMessagesPerMonth: 100_000,
-          evaluationsCredit: 100,
           maxWorkflows: 50,
           canPublish: true,
-          // All optional fields omitted — tests default fill
         },
       };
 
-      it("populates all 17 numeric limit fields via defaults", () => {
+      /** @scenario License-sourced plan populates all limit fields */
+      it("populates all 16 numeric limit fields via defaults", () => {
         const plan = mapToPlanInfo(minimalLicense);
 
         for (const field of NUMERIC_LIMIT_FIELDS) {

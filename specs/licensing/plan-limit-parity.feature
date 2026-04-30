@@ -70,14 +70,14 @@ Feature: Plan limit parity between SaaS subscription and self-hosted license
   Scenario: License-sourced plan populates all limit fields
     Given a license with all optional fields omitted
     When the license is mapped to PlanInfo
-    Then all 17 numeric limit fields have defined values
+    Then all 16 numeric limit fields have defined values
     And usageUnit defaults to "traces"
 
   @unit
   Scenario: SaaS-sourced plan populates all limit fields
     Given an active subscription on any paid plan
     When the SaaS provider resolves the plan
-    Then all 17 numeric limit fields have defined values
+    Then all 16 numeric limit fields have defined values
 
   # --- overrideAddingLimitations consistency ---
 

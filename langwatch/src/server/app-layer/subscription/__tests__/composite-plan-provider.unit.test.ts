@@ -76,6 +76,8 @@ describe("createCompositePlanProvider", () => {
   });
 
   describe("when no valid license exists", () => {
+    /** @scenario Subscription-only organization uses SaaS limits */
+    /** @scenario Expired license falls through to SaaS subscription */
     it("selects SaaS plan", async () => {
       const provider = createCompositePlanProvider({
         licensePlanProvider: mockLicense,
@@ -113,6 +115,8 @@ describe("createCompositePlanProvider", () => {
       );
     });
 
+    /** @scenario License-only organization uses license limits */
+    /** @scenario Organization with both license and subscription uses license */
     it("selects license plan over SaaS plan", async () => {
       const provider = createCompositePlanProvider({
         licensePlanProvider: mockLicense,
@@ -153,6 +157,7 @@ describe("createCompositePlanProvider", () => {
       expect(plan.overrideAddingLimitations).toBe(false);
     });
 
+    /** @scenario Override is false for non-impersonated user on SaaS plan */
     it("is false for regular user without impersonator on SaaS plan", async () => {
       const provider = createCompositePlanProvider({
         licensePlanProvider: mockLicense,
@@ -168,6 +173,7 @@ describe("createCompositePlanProvider", () => {
       expect(plan.overrideAddingLimitations).toBe(false);
     });
 
+    /** @scenario Override is true for admin-impersonated user on SaaS plan */
     it("is true when impersonated by admin on SaaS plan", async () => {
       const provider = createCompositePlanProvider({
         licensePlanProvider: mockLicense,
@@ -205,6 +211,7 @@ describe("createCompositePlanProvider", () => {
       expect(plan.overrideAddingLimitations).toBe(false);
     });
 
+    /** @scenario Override is true for admin-impersonated user on license plan */
     it("recomputes override even when license plan is selected", async () => {
       vi.mocked(mockLicense.getActivePlan).mockResolvedValue(
         ENTERPRISE_LICENSE_PLAN,
@@ -229,6 +236,7 @@ describe("createCompositePlanProvider", () => {
       expect(plan.overrideAddingLimitations).toBe(true);
     });
 
+    /** @scenario Override is false for non-impersonated user on license plan */
     it("does not leak SaaS override value into license plan", async () => {
       // SaaS provider returns plan with override=true
       vi.mocked(mockSaas.getActivePlan).mockResolvedValue({
@@ -261,6 +269,8 @@ describe("createCompositePlanProvider", () => {
   // verify that the composite provider correctly falls through when the
   // license provider returns FREE_PLAN (the result of expiry or absence).
   describe("when license provider returns FREE (expired or absent)", () => {
+    /** @scenario Expired license without subscription falls to FREE */
+    /** @scenario No license and no subscription falls to FREE */
     it("falls to FREE when SaaS also returns FREE", async () => {
       vi.mocked(mockSaas.getActivePlan).mockResolvedValue({
         ...FREE_PLAN,
@@ -284,6 +294,7 @@ describe("createCompositePlanProvider", () => {
   });
 
   describe("when license is less generous than subscription", () => {
+    /** @scenario License wins even when subscription has more generous limits */
     it("still selects license (license-first precedence)", async () => {
       const modestLicensePlan: PlanInfo = {
         ...ENTERPRISE_LICENSE_PLAN,
