@@ -90,7 +90,7 @@ jobs:
       - name: Run tests
         working-directory: langevals
         env:
-          OPENAI_API_KEY: ${{ secrets.PYTHON_SDK_OPENAI_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.LANGEVALS_OPENAI_API_KEY }}
           AZURE_API_KEY: ${{ secrets.PYTHON_SDK_AZURE_OPENAI_API_KEY }}
           AZURE_API_BASE: ${{ secrets.PYTHON_SDK_AZURE_OPENAI_ENDPOINT }}
           AZURE_CONTENT_SAFETY_ENDPOINT: ${{ secrets.LANGEVALS_AZURE_CONTENT_SAFETY_ENDPOINT }}

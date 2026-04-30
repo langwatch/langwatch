@@ -48,7 +48,7 @@ Answer:
 retriever = InMemoryBM25Retriever(document_store=document_store)
 prompt_builder = PromptBuilder(template=prompt_template)
 llm = OpenAIGenerator(
-    api_key=Secret.from_token(os.environ["OPENAI_API_KEY"]), model="gpt-5"
+    api_key=Secret.from_token(os.environ["OPENAI_API_KEY"]), model="gpt-5-mini"
 )
 
 rag_pipeline = Pipeline()
