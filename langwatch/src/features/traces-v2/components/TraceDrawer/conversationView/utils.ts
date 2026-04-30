@@ -1,3 +1,4 @@
+import { contentToString } from "../../TraceTable/chatContent";
 import {
   abbreviateModel,
   formatDuration,
@@ -159,28 +160,6 @@ export function parseLastUserText(raw: string | null | undefined): string {
   return raw;
 }
 
-export function contentToString(content: unknown): string {
-  if (content == null) return "";
-  if (typeof content === "string") return content;
-  if (Array.isArray(content)) {
-    return content
-      .map((part) => {
-        if (typeof part === "string") return part;
-        if (
-          part &&
-          typeof part === "object" &&
-          typeof (part as { text?: unknown }).text === "string"
-        ) {
-          return (part as { text: string }).text;
-        }
-        return "";
-      })
-      .filter(Boolean)
-      .join(" ");
-  }
-  return JSON.stringify(content);
-}
-
 export function formatGap(secs: number): string {
   if (secs < 60) return `${secs.toFixed(1)}s gap`;
   if (secs < 3600) {
@@ -191,4 +170,6 @@ export function formatGap(secs: number): string {
   const h = Math.floor(secs / 3600);
   const m = Math.floor((secs % 3600) / 60);
   return `${h}h ${m}m gap`;
+}
+ return `${h}h ${m}m gap`;
 }

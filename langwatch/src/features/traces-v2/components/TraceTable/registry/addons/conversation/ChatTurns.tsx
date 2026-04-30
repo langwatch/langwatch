@@ -1,15 +1,6 @@
 import { Box, Flex, HStack, Icon, Text, VStack } from "@chakra-ui/react";
-import {
-  AlertTriangle,
-  Bot,
-  ChevronDown,
-  ChevronRight,
-  Clock,
-  Settings2,
-  User,
-} from "lucide-react";
+import { AlertTriangle, Bot, Clock, User } from "lucide-react";
 import type React from "react";
-import { useState } from "react";
 import { useDrawer, useDrawerParams } from "~/hooks/useDrawer";
 import { useOpenTraceDrawer } from "../../../../../hooks/useOpenTraceDrawer";
 import type { TraceListItem } from "../../../../../types/trace";
@@ -17,6 +8,7 @@ import {
   abbreviateModel,
   formatDuration,
 } from "../../../../../utils/formatters";
+import { SystemPromptBanner } from "../../../../TraceDrawer/conversationView/SystemPromptBanner";
 import { TraceIdPeek } from "../../../../TraceIdPeek";
 import { findMessageContent, parseSystemPrompt } from "../../../chatContent";
 import type { ConversationGroup } from "../../../conversationGroups";
@@ -30,8 +22,6 @@ import {
   TURN_GAP_VISIBLE_SECONDS,
   turnGapSeconds,
 } from "./turnGap";
-
-const SYSTEM_PROMPT_LONG_THRESHOLD = 280;
 
 interface ChatTurnsProps {
   group: ConversationGroup;
@@ -79,66 +69,6 @@ export const ChatTurns: React.FC<ChatTurnsProps> = ({
         </VStack>
       </Td>
     </Tr>
-  );
-};
-
-const SystemPromptBanner: React.FC<{ text: string }> = ({ text }) => {
-  const [expanded, setExpanded] = useState(false);
-  const isLong = text.length > SYSTEM_PROMPT_LONG_THRESHOLD;
-  return (
-    <Box
-      borderRadius="lg"
-      borderWidth="1px"
-      borderColor="border.muted"
-      bg="bg.subtle"
-      overflow="hidden"
-    >
-      <HStack
-        gap={2}
-        paddingX={3}
-        paddingY={2}
-        cursor={isLong ? "pointer" : "default"}
-        onClick={isLong ? () => setExpanded((v) => !v) : undefined}
-        _hover={isLong ? { bg: "bg.muted" } : undefined}
-      >
-        <Icon as={Settings2} boxSize="13px" color="fg.muted" />
-        <Text
-          textStyle="2xs"
-          fontWeight="600"
-          color="fg.muted"
-          textTransform="uppercase"
-          letterSpacing="0.06em"
-        >
-          System
-        </Text>
-        <Box flex={1} />
-        {isLong && (
-          <Icon
-            as={expanded ? ChevronDown : ChevronRight}
-            boxSize="13px"
-            color="fg.subtle"
-          />
-        )}
-      </HStack>
-      <Box
-        paddingX={3}
-        paddingBottom={2.5}
-        paddingTop={0.5}
-        borderTopWidth="1px"
-        borderTopColor="border.muted"
-      >
-        <Text
-          textStyle="xs"
-          fontFamily="mono"
-          color="fg.muted"
-          whiteSpace="pre-wrap"
-          lineHeight="1.6"
-          lineClamp={isLong && !expanded ? 3 : undefined}
-        >
-          {text}
-        </Text>
-      </Box>
-    </Box>
   );
 };
 

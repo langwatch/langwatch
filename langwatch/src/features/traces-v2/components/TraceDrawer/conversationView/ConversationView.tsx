@@ -9,13 +9,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import {
-  Check,
-  ChevronDown,
-  ChevronRight,
-  Copy,
-  Settings2,
-} from "lucide-react";
+import { Check, Copy } from "lucide-react";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api, type RouterOutputs } from "~/utils/api";
@@ -27,6 +21,7 @@ import { SegmentedToggle } from "../SegmentedToggle";
 import { extractReadableText, extractReasoningText } from "../transcript";
 import { AnnotationsView } from "./AnnotationsView";
 import { ChatTurnRow } from "./ChatTurnRow";
+import { SystemPromptBanner } from "./SystemPromptBanner";
 import { EMPTY_TURNS, type Mode, type ParsedTurn } from "./types";
 import {
   buildConversationMarkdownChunks,
@@ -484,66 +479,6 @@ const VirtualizedBubblesView: React.FC<{
             </Box>
           );
         })}
-      </Box>
-    </Box>
-  );
-};
-
-const SystemPromptBanner: React.FC<{ text: string }> = ({ text }) => {
-  const [expanded, setExpanded] = useState(false);
-  const isLong = text.length > 280;
-  return (
-    <Box
-      borderRadius="lg"
-      borderWidth="1px"
-      borderColor="border.muted"
-      bg="bg.subtle"
-      overflow="hidden"
-    >
-      <HStack
-        gap={2}
-        paddingX={3}
-        paddingY={2}
-        cursor={isLong ? "pointer" : "default"}
-        onClick={isLong ? () => setExpanded((v) => !v) : undefined}
-        _hover={isLong ? { bg: "bg.muted" } : undefined}
-      >
-        <Icon as={Settings2} boxSize="13px" color="fg.muted" />
-        <Text
-          textStyle="2xs"
-          fontWeight="600"
-          color="fg.muted"
-          textTransform="uppercase"
-          letterSpacing="0.06em"
-        >
-          System
-        </Text>
-        <Box flex={1} />
-        {isLong && (
-          <Icon
-            as={expanded ? ChevronDown : ChevronRight}
-            boxSize="13px"
-            color="fg.subtle"
-          />
-        )}
-      </HStack>
-      <Box
-        paddingX={3}
-        paddingBottom={2.5}
-        paddingTop={0.5}
-        borderTopWidth="1px"
-        borderTopColor="border.muted"
-      >
-        <Text
-          textStyle="xs"
-          fontFamily="mono"
-          color="fg.muted"
-          whiteSpace="pre-wrap"
-          lineHeight="1.6"
-          lineClamp={isLong && !expanded ? 3 : undefined}
-        >
-          {text}
-        </Text>
       </Box>
     </Box>
   );
