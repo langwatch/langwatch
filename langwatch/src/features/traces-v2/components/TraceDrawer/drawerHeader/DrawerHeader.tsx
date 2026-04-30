@@ -28,8 +28,8 @@ import { useDejaViewLink } from "~/hooks/useDejaViewLink";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { TraceHeader } from "~/server/api/routers/tracesV2.schemas";
-import { usePinnedAttributes } from "../../../hooks/usePinnedAttributes";
 import { useConversationContext } from "../../../hooks/useConversationContext";
+import { usePinnedAttributes } from "../../../hooks/usePinnedAttributes";
 import { useTraceDrawerNavigation } from "../../../hooks/useTraceDrawerNavigation";
 import { useTraceHeader } from "../../../hooks/useTraceHeader";
 import { useTraceRefresh } from "../../../hooks/useTraceRefresh";
@@ -46,10 +46,10 @@ import {
   SPAN_TYPE_COLORS,
   STATUS_COLORS,
 } from "../../../utils/formatters";
-import { ModeSwitch } from "../ModeSwitch";
-import { RawJsonDialog } from "../RawJsonDialog";
 import { Chip } from "../Chip";
 import { splitChipsForOverflow } from "../ChipBar";
+import { ModeSwitch } from "../ModeSwitch";
+import { RawJsonDialog } from "../RawJsonDialog";
 import { useTraceHeaderChipDefs } from "../TraceHeaderChips";
 import { MetricPill } from "./MetricPill";
 import {

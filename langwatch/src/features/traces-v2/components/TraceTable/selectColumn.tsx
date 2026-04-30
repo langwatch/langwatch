@@ -1,8 +1,8 @@
 import { type ColumnDef, createColumnHelper } from "@tanstack/react-table";
 import type { TraceListItem } from "../../types/trace";
 import type { ConversationGroup } from "./conversationGroups";
-import { SELECT_COLUMN_ID } from "./registry/cells/SelectCells";
 import type { TraceGroup } from "./registry/cells/group/types";
+import { SELECT_COLUMN_ID } from "./registry/cells/SelectCells";
 import { SelectHeaderCheckbox } from "./SelectHeaderCheckbox";
 
 const SELECT_COLUMN_SIZE = 36;
@@ -45,8 +45,8 @@ export const conversationSelectColumnDef: ColumnDef<ConversationGroup, any> =
     ),
   });
 
-export const groupSelectColumnDef: ColumnDef<TraceGroup, any> = groupCol.display(
-  {
+export const groupSelectColumnDef: ColumnDef<TraceGroup, any> =
+  groupCol.display({
     id: SELECT_COLUMN_ID,
     size: SELECT_COLUMN_SIZE,
     minSize: SELECT_COLUMN_SIZE,
@@ -61,5 +61,4 @@ export const groupSelectColumnDef: ColumnDef<TraceGroup, any> = groupCol.display
           )}
       />
     ),
-  },
-);
+  });

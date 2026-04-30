@@ -227,7 +227,9 @@ export function TreeRow({
               >
                 {span.name}
               </Text>
-              {signals.length > 0 && <LangwatchSignalBadges signals={signals} />}
+              {signals.length > 0 && (
+                <LangwatchSignalBadges signals={signals} />
+              )}
             </HStack>
             {isLlm && (
               <Text

@@ -9,9 +9,9 @@
  * See ./README.md for the migration story and lazy-mount discipline.
  */
 
-export { OnboardingHost } from "./OnboardingHost";
 export { useOnboardingActive } from "./hooks/useOnboardingActive";
-export { useSamplePreview } from "./hooks/useSamplePreview";
 export type { SamplePreviewResult } from "./hooks/useSamplePreview";
-export { useTourEntryPoints } from "./hooks/useTourEntryPoints";
+export { useSamplePreview } from "./hooks/useSamplePreview";
 export type { OnboardingEntryState } from "./hooks/useTourEntryPoints";
+export { useTourEntryPoints } from "./hooks/useTourEntryPoints";
+export { OnboardingHost } from "./OnboardingHost";

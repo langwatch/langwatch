@@ -1,7 +1,8 @@
 import type React from "react";
-import { useOnboardingActive } from "./hooks/useOnboardingActive";
 import { BodyStageAttribute } from "./effects/BodyStageAttribute";
 import { DrawerGlow } from "./effects/DrawerGlow";
+import { RichRowGlow } from "./effects/RichRowGlow";
+import { useOnboardingActive } from "./hooks/useOnboardingActive";
 
 interface OnboardingHostProps {
   children: React.ReactNode;
@@ -31,6 +32,7 @@ export function OnboardingHost({
     <>
       <BodyStageAttribute />
       <DrawerGlow />
+      <RichRowGlow />
       {children}
     </>
   );

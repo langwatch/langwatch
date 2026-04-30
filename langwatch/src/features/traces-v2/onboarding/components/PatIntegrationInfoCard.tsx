@@ -238,7 +238,6 @@ export function PatIntegrationInfoCard({
             >
               <Key size={14} />
               Generate access token
-
               <Kbd>G</Kbd>
             </Button>
           </Flex>

@@ -1,4 +1,12 @@
-import { Box, chakra, Flex, HStack, Icon, Text, VStack } from "@chakra-ui/react";
+import {
+  Box,
+  chakra,
+  Flex,
+  HStack,
+  Icon,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
 import { ArrowRight, X } from "lucide-react";
 import type React from "react";
 import { useCallback, useMemo, useState } from "react";
@@ -36,14 +44,10 @@ const EXTRA_CHIP_SEEDS: readonly ExtraChipSeed[] = [
 
 export const FilteringStep: React.FC<WelcomeStepProps> = () => {
   const initialSelected = useMemo(
-    () =>
-      new Set(FACET_SEEDS.filter((f) => f.selected).map((f) => f.label)),
+    () => new Set(FACET_SEEDS.filter((f) => f.selected).map((f) => f.label)),
     [],
   );
-  const initialExtras = useMemo(
-    () => EXTRA_CHIP_SEEDS.map((c) => c.id),
-    [],
-  );
+  const initialExtras = useMemo(() => EXTRA_CHIP_SEEDS.map((c) => c.id), []);
 
   const [selectedFacets, setSelectedFacets] =
     useState<Set<string>>(initialSelected);
@@ -402,11 +406,7 @@ const ChipsPanel: React.FC<{
             {chips.map((chip, i) => {
               const prev = chips[i - 1];
               const sameFieldAsPrev = prev && prev.field === chip.field;
-              const connector = !prev
-                ? null
-                : sameFieldAsPrev
-                  ? "OR"
-                  : "AND";
+              const connector = !prev ? null : sameFieldAsPrev ? "OR" : "AND";
               return (
                 <HStack key={chip.key} gap={0} alignItems="center">
                   {connector ? <KeywordToken kind={connector} /> : null}

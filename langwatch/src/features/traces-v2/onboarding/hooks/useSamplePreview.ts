@@ -1,12 +1,12 @@
 import { useFilterStore } from "../../stores/filterStore";
 import type { TraceListItem } from "../../types/trace";
-import { usePreviewTracesActive } from "./usePreviewTracesActive";
 import { shouldShowArrivals } from "../chapters/onboardingJourneyConfig";
 import {
   ARRIVAL_PREVIEW_TRACES,
   SAMPLE_PREVIEW_TRACES,
 } from "../data/samplePreviewTraces";
 import { useOnboardingStore } from "../store/onboardingStore";
+import { usePreviewTracesActive } from "./usePreviewTracesActive";
 
 export interface SamplePreviewResult {
   data: TraceListItem[];

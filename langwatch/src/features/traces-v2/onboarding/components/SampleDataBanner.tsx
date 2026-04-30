@@ -43,10 +43,7 @@ export const SampleDataBanner: React.FC = () => {
   );
   const utils = api.useUtils();
   const setTourActive = useOnboardingStore((s) => s.setTourActive);
-  const [, setWelcomeSeen] = useLocalStorage<boolean>(
-    WELCOME_SEEN_KEY,
-    false,
-  );
+  const [, setWelcomeSeen] = useLocalStorage<boolean>(WELCOME_SEEN_KEY, false);
 
   const handleDone = () => {
     if (!project) return;
@@ -77,8 +74,8 @@ export const SampleDataBanner: React.FC = () => {
         <Sparkles />
       </Icon>
       <Text textStyle="xs" fontWeight={500}>
-        Sample data — facets, filters, the drawer all work. Nothing here
-        is real until you connect your SDK.
+        Sample data — facets, filters, the drawer all work. Nothing here is real
+        until you connect your SDK.
       </Text>
       <Button
         size="xs"

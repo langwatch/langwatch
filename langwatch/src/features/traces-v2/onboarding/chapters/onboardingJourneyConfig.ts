@@ -208,7 +208,8 @@ export const ONBOARDING_JOURNEY: StageDef[] = [
     // content of the trace. The juicy bit is what's *inside* the
     // drawer; this just opens the door.
     heading: "There's a juicy one.",
-    subhead: "Click the highlighted row to see how the agent worked through it.",
+    subhead:
+      "Click the highlighted row to see how the agent worked through it.",
     typewriter: true,
     showArrivals: true,
     highlightRichRow: true,

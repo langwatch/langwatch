@@ -1,5 +1,5 @@
-import { GroupSelectCell } from "../SelectCells";
 import type { CellDef } from "../../types";
+import { GroupSelectCell } from "../SelectCells";
 import { GroupLabelCell } from "./GroupLabelCell";
 import {
   AvgDurationCell,

@@ -1,11 +1,4 @@
-import {
-  Badge,
-  Box,
-  Circle,
-  HStack,
-  Icon,
-  Text,
-} from "@chakra-ui/react";
+import { Badge, Box, Circle, HStack, Icon, Text } from "@chakra-ui/react";
 import { AlertTriangle, Bot, Clock, GitBranch, User, Zap } from "lucide-react";
 import type React from "react";
 import { useDrawer, useDrawerParams } from "~/hooks/useDrawer";
@@ -277,7 +270,7 @@ const InlineMessage: React.FC<{
     <Icon boxSize="12px" color={iconColor} flexShrink={0}>
       {icon}
     </Icon>
-    <Text  color={textColor} truncate textStyle={textStyleOverride}>
+    <Text color={textColor} truncate textStyle={textStyleOverride}>
       {truncateText({ text, limit })}
     </Text>
   </HStack>

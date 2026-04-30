@@ -1,9 +1,9 @@
 import {
   Badge,
   Box,
-  chakra,
   Clipboard,
   Code,
+  chakra,
   Heading,
   HStack,
   IconButton,
@@ -166,7 +166,9 @@ interface SyntaxHelpBodyProps {
   onClose: () => void;
 }
 
-const SyntaxHelpBody: React.FC<SyntaxHelpBodyProps> = ({ onClose: _onClose }) => {
+const SyntaxHelpBody: React.FC<SyntaxHelpBodyProps> = ({
+  onClose: _onClose,
+}) => {
   const applyQueryText = useFilterStore((s) => s.applyQueryText);
   // Append onto whatever is already in the bar so the user can stack
   // suggestions while learning. Empty bar → first suggestion lands as-is.

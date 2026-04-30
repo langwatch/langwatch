@@ -56,8 +56,7 @@ export const TraceLensBody: React.FC<TraceLensBodyProps> = ({
 
   const handleSortingChange = useCallback(
     (updater: Updater<SortingState>) => {
-      const next =
-        typeof updater === "function" ? updater(sorting) : updater;
+      const next = typeof updater === "function" ? updater(sorting) : updater;
       const first = next[0];
       if (!first) return;
       setSortInStore({

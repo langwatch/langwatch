@@ -1,4 +1,5 @@
 import { Button, HStack, Icon, Text } from "@chakra-ui/react";
+import { MoreVertical } from "lucide-react";
 import { useCallback } from "react";
 import {
   LuBraces,
@@ -10,7 +11,6 @@ import {
   LuScanSearch,
   LuShare2,
 } from "react-icons/lu";
-import { MoreVertical } from "lucide-react";
 import { Menu } from "~/components/ui/menu";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useConversationTurns } from "../../../hooks/useConversationTurns";
@@ -45,8 +45,7 @@ export function TraceOverflowMenu({
   const conversationTurns = useConversationTurns(conversationId);
   const conversationTraceIds =
     conversationTurns.data?.items.map((t) => t.traceId) ?? [];
-  const hasConversation =
-    !!conversationId && conversationTraceIds.length > 1;
+  const hasConversation = !!conversationId && conversationTraceIds.length > 1;
 
   const handleAddTrace = useCallback(() => {
     openDrawer("addDatasetRecord", { traceId });
@@ -101,7 +100,9 @@ export function TraceOverflowMenu({
               <Icon as={LuMessagesSquare} boxSize={3.5} />
               <Text>Add conversation to dataset</Text>
             </HStack>
-            <Menu.ItemCommand>{conversationTraceIds.length} turns</Menu.ItemCommand>
+            <Menu.ItemCommand>
+              {conversationTraceIds.length} turns
+            </Menu.ItemCommand>
           </Menu.Item>
         )}
 

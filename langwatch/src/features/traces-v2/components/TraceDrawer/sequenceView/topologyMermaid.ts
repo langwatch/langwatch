@@ -2,8 +2,8 @@ import type { SpanTreeNode } from "~/server/api/routers/tracesV2.schemas";
 import { abbreviateModel, formatDuration } from "../../../utils/formatters";
 import {
   buildSpanTree,
-  sanitiseMermaidId,
   type SpanWithChildren,
+  sanitiseMermaidId,
 } from "./_mermaidShared";
 import type { SequenceSpanType } from "./types";
 
@@ -35,10 +35,7 @@ function escapeNodeLabel(text: string): string {
   // Mermaid graph node labels can contain HTML entities — strip anything that
   // would confuse the parser, then cap length so wide labels don't blow up
   // the layout.
-  const sanitised = text
-    .replace(/[<>"]/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
+  const sanitised = text.replace(/[<>"]/g, "").replace(/\s+/g, " ").trim();
   if (sanitised.length <= 36) return sanitised;
   return `${sanitised.slice(0, 33)}…`;
 }
@@ -50,7 +47,11 @@ function getNode(span: SpanTreeNode): NodeInfo | null {
       .replace(".call", "")
       .replace(".run", "")
       .replace("invoke_agent ", "");
-    return { id: sanitiseMermaidId(`agent_${display}`), display, kind: "agent" };
+    return {
+      id: sanitiseMermaidId(`agent_${display}`),
+      display,
+      kind: "agent",
+    };
   }
   if (type === "llm" && span.model) {
     return {

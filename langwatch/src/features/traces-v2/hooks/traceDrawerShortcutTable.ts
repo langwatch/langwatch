@@ -23,7 +23,9 @@ export interface ShortcutContext {
   nextTimestamp: number | undefined;
   prevTraceId: string | null;
   prevTimestamp: number | undefined;
-  navigateToTrace: ReturnType<typeof useTraceDrawerNavigation>["navigateToTrace"];
+  navigateToTrace: ReturnType<
+    typeof useTraceDrawerNavigation
+  >["navigateToTrace"];
   goBack: () => void;
   canGoBack: boolean;
   refreshActiveTrace: () => Promise<void> | void;
@@ -276,10 +278,7 @@ export const TRACE_DRAWER_HELP_GROUPS: HelpGroup[] = HELP_GROUP_ORDER.map(
     g.title === "Actions"
       ? {
           ...g,
-          items: [
-            ...g.items,
-            { keys: ["\\"], label: "View raw JSON" },
-          ],
+          items: [...g.items, { keys: ["\\"], label: "View raw JSON" }],
         }
       : g,
   )

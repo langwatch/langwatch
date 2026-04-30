@@ -147,8 +147,8 @@ const AiLensCallout: React.FC = () => (
       Or describe the lens you want
     </Text>
     <Text textStyle="xs" color="fg.muted" lineHeight="1.5">
-      Hit the <InlineSparklesBadge /> in the search bar and ask in plain
-      English — &quot;<i>checkout failures from yesterday, grouped by user</i>
+      Hit the <InlineSparklesBadge /> in the search bar and ask in plain English
+      — &quot;<i>checkout failures from yesterday, grouped by user</i>
       &quot;. The AI builds the filter, columns, sort, and grouping; click{" "}
       <InlineSaveBadge /> to keep it.
     </Text>

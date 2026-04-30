@@ -17,8 +17,7 @@ import { toaster } from "~/components/ui/toaster";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api, type RouterOutputs } from "~/utils/api";
 
-type AnnotationScoreList =
-  RouterOutputs["annotationScore"]["getAllActive"];
+type AnnotationScoreList = RouterOutputs["annotationScore"]["getAllActive"];
 
 type Mode = "annotate" | "suggest";
 
@@ -116,9 +115,7 @@ interface AnnotationFormState {
   mode: Mode;
 }
 
-function useAnnotationForm(
-  props: AnnotationPopoverProps,
-): AnnotationFormState {
+function useAnnotationForm(props: AnnotationPopoverProps): AnnotationFormState {
   const { project } = useOrganizationTeamProject();
   const trpc = api.useContext();
 
@@ -128,8 +125,7 @@ function useAnnotationForm(
   );
 
   const existing = useMemo(
-    () =>
-      annotationsForTrace.data?.find((a) => a.id === props.annotationId),
+    () => annotationsForTrace.data?.find((a) => a.id === props.annotationId),
     [annotationsForTrace.data, props.annotationId],
   );
 
@@ -152,14 +148,10 @@ function useAnnotationForm(
     if (isEdit && existing) {
       setComment(existing.comment ?? "");
       setExpectedOutput(existing.expectedOutput ?? "");
-      setScoreOptions(
-        (existing.scoreOptions as unknown as ScoreOptions) ?? {},
-      );
+      setScoreOptions((existing.scoreOptions as unknown as ScoreOptions) ?? {});
     } else {
       setComment("");
-      setExpectedOutput(
-        props.mode === "suggest" ? (props.output ?? "") : "",
-      );
+      setExpectedOutput(props.mode === "suggest" ? (props.output ?? "") : "");
       setScoreOptions({});
     }
   }, [props.open, isEdit, existing, props.mode, props.output]);
@@ -355,10 +347,7 @@ function SuggestBody({
           <DiffCounts original={originalOutput} edited={state.expectedOutput} />
         </HStack>
       </SectionLabel>
-      <DiffPanel
-        original={originalOutput}
-        edited={state.expectedOutput}
-      />
+      <DiffPanel original={originalOutput} edited={state.expectedOutput} />
 
       <CommentField value={state.comment} onChange={state.setComment} />
 
@@ -673,13 +662,7 @@ function DiffCounts({
  * panel size is locked so the popover doesn't resize as the user types.
  * `useDeferredValue` keeps typing snappy by recomputing the diff at idle.
  */
-function DiffPanel({
-  original,
-  edited,
-}: {
-  original: string;
-  edited: string;
-}) {
+function DiffPanel({ original, edited }: { original: string; edited: string }) {
   const deferredEdited = useDeferredValue(edited);
   const parts = useMemo(
     () => diffWordsWithSpace(original, deferredEdited),

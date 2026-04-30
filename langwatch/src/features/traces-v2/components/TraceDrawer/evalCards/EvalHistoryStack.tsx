@@ -47,7 +47,14 @@ export function EvalHistoryStack({
       {expanded && (
         <VStack align="stretch" gap={1} paddingTop={1.5}>
           {entries.map((e, i) => (
-            <EvalHistoryRow key={i} entry={e} onSelectSpan={onSelectSpan} />
+            <EvalHistoryRow
+              key={
+                e.evaluationId ??
+                `${e.evaluatorId ?? e.name}:${e.timestamp ?? i}`
+              }
+              entry={e}
+              onSelectSpan={onSelectSpan}
+            />
           ))}
         </VStack>
       )}

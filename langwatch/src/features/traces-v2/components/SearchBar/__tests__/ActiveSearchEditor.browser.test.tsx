@@ -1018,10 +1018,10 @@ describe("SearchBar in real Chromium", () => {
 
   describe("operator matrix — comparison forms render as numeric (green) chips", () => {
     it.each([
-      ["greater-than",  "cost:>5"],
+      ["greater-than", "cost:>5"],
       ["greater-equal", "cost:>=5"],
-      ["less-than",     "duration:<5000"],
-      ["less-equal",    "duration:<=5000"],
+      ["less-than", "duration:<5000"],
+      ["less-equal", "duration:<=5000"],
     ])("`%s` renders one numeric chip for `%s`", async (_label, query) => {
       renderEditor();
       const editor = getEditor();
@@ -1034,7 +1034,7 @@ describe("SearchBar in real Chromium", () => {
   });
 
   describe("operator matrix — quoted values with spaces", () => {
-    it("`errorMessage:\"rate limit\"` is one chip and the X carries the unquoted value", async () => {
+    it('`errorMessage:"rate limit"` is one chip and the X carries the unquoted value', async () => {
       renderEditor();
       const editor = getEditor();
       await userEvent.click(editor);
@@ -1053,8 +1053,8 @@ describe("SearchBar in real Chromium", () => {
   describe("operator matrix — wildcards in different positions", () => {
     it.each([
       ["trailing", "model:gpt-*"],
-      ["leading",  "model:*-mini"],
-      ["middle",   "model:gpt*mini"],
+      ["leading", "model:*-mini"],
+      ["middle", "model:gpt*mini"],
     ])("renders `%s` (`%s`) as a single chip", async (_label, query) => {
       renderEditor();
       const editor = getEditor();
@@ -1087,10 +1087,10 @@ describe("SearchBar in real Chromium", () => {
     // renders on recognised `field:value` shapes.
     it.each([
       ["a single letter", "A"],
-      ["two letters",     "AN"],
-      ["the word AND",    "AND"],
-      ["a free-text word","refund"],
-      ["quoted free text",'"refund policy"'],
+      ["two letters", "AN"],
+      ["the word AND", "AND"],
+      ["a free-text word", "refund"],
+      ["quoted free text", '"refund policy"'],
     ])("`%s` (%s) emits zero delete widgets", async (_label, input) => {
       renderEditor();
       const editor = getEditor();

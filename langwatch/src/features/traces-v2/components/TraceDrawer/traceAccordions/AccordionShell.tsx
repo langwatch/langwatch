@@ -1,5 +1,5 @@
 import { Accordion, Badge, Box, HStack, Text } from "@chakra-ui/react";
-import { useRef, type ReactNode } from "react";
+import { type ReactNode, useRef } from "react";
 import { PresenceSection } from "~/features/presence/components/PresenceSection";
 import { SectionPresenceDot } from "~/features/presence/components/SectionPresenceDot";
 import { useSectionPresenceStore } from "./sectionPresence";

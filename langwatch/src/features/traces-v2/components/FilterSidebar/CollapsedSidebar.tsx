@@ -1,7 +1,7 @@
 import { HStack, IconButton, Separator, VStack } from "@chakra-ui/react";
+import type { LiqeQuery } from "liqe";
 import { PanelLeftOpen } from "lucide-react";
 import type React from "react";
-import type { LiqeQuery } from "liqe";
 import {
   getFacetValues,
   getRangeValue,

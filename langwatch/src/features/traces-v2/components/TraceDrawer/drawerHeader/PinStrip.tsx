@@ -1,5 +1,5 @@
 import { Box, VStack } from "@chakra-ui/react";
-import { type ReactElement } from "react";
+import type { ReactElement } from "react";
 import { LuPin } from "react-icons/lu";
 import type { PinnedAttribute } from "../../../stores/pinnedAttributesStore";
 import { Chip } from "../Chip";
@@ -114,7 +114,13 @@ export function renderPinPills(
         tone="blue"
         ariaLabel={`${overflowCustom.length} more pinned attributes`}
         popover={
-          <VStack align="stretch" gap={1.5} padding={3} maxHeight="320px" overflowY="auto">
+          <VStack
+            align="stretch"
+            gap={1.5}
+            padding={3}
+            maxHeight="320px"
+            overflowY="auto"
+          >
             {overflowCustom.map((p) => (
               <Box key={`${p.pin.source}:${p.pin.key}`}>
                 {renderPinPill(p, onUnpin)}

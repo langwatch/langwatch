@@ -1,5 +1,5 @@
-import type React from "react";
 import type { LiqeQuery } from "liqe";
+import type React from "react";
 import {
   getFacetValueState,
   getRangeValue,
@@ -77,9 +77,7 @@ export const SectionRenderer: React.FC<SectionRendererProps> = ({
         currentFrom={current?.from}
         currentTo={current?.to}
         formatValue={getRangeFormatter(section.key)}
-        onChange={(from, to) =>
-          setRange(section.key, String(from), String(to))
-        }
+        onChange={(from, to) => setRange(section.key, String(from), String(to))}
         onClear={() => removeRange(section.key)}
         onShiftToggle={onShiftToggle}
       />

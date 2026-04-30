@@ -59,12 +59,7 @@ export const GroupingSelector: React.FC = () => {
           onValueChange={(e) => setGrouping(e.value as GroupingMode)}
         >
           {Object.entries(GROUPING_OPTIONS).map(([value, label]) => (
-            <MenuRadioItem
-              key={value}
-              value={value}
-              fontSize="xs"
-              paddingY={1}
-            >
+            <MenuRadioItem key={value} value={value} fontSize="xs" paddingY={1}>
               {label}
             </MenuRadioItem>
           ))}

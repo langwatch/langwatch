@@ -36,10 +36,7 @@ function arraysShallowEqual(a: string[], b: string[]): boolean {
   return true;
 }
 
-function suggestionStateEqual(
-  a: SuggestionState,
-  b: SuggestionState,
-): boolean {
+function suggestionStateEqual(a: SuggestionState, b: SuggestionState): boolean {
   if (a === b) return true;
   if (!a.open || !b.open) return a.open === b.open;
   if (a.mode !== b.mode) return false;

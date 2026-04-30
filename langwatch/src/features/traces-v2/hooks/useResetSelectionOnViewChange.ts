@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
-import { useSelectionStore } from "../stores/selectionStore";
 import { useFilterStore } from "../stores/filterStore";
+import { useSelectionStore } from "../stores/selectionStore";
 import { useViewStore } from "../stores/viewStore";
 
 /**

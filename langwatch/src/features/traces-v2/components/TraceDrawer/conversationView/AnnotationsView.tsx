@@ -15,8 +15,9 @@ import { api, type RouterOutputs } from "~/utils/api";
 
 type AnnotationByTraceIds =
   RouterOutputs["annotation"]["getByTraceIds"][number];
-import type { ParsedTurn } from "./types";
+
 import { AnnotationPopover } from "./AnnotationPopover";
+import type { ParsedTurn } from "./types";
 
 interface AnnotationsViewProps {
   parsedTurns: ParsedTurn[];
@@ -45,7 +46,9 @@ export function AnnotationsView({
     { projectId: project?.id ?? "", traceIds },
     {
       enabled:
-        !!project?.id && traceIds.length > 0 && hasPermission("annotations:view"),
+        !!project?.id &&
+        traceIds.length > 0 &&
+        hasPermission("annotations:view"),
       staleTime: 5 * 60_000,
       refetchOnWindowFocus: false,
     },
@@ -234,14 +237,25 @@ function AnnotationRow({
 
 function EmptyState() {
   return (
-    <Flex align="center" justify="center" padding={8} direction="column" gap={2}>
+    <Flex
+      align="center"
+      justify="center"
+      padding={8}
+      direction="column"
+      gap={2}
+    >
       <Icon as={Edit3} boxSize={5} color="fg.subtle" />
       <Text textStyle="sm" color="fg.muted" fontWeight="600">
         No annotations yet
       </Text>
-      <Text textStyle="xs" color="fg.subtle" textAlign="center" maxWidth="320px">
-        Switch back to the bubbles view and use Annotate or Suggest on any
-        turn — they&apos;ll show up here.
+      <Text
+        textStyle="xs"
+        color="fg.subtle"
+        textAlign="center"
+        maxWidth="320px"
+      >
+        Switch back to the bubbles view and use Annotate or Suggest on any turn
+        — they&apos;ll show up here.
       </Text>
     </Flex>
   );

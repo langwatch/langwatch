@@ -1,6 +1,12 @@
 import type { LiqeQuery } from "liqe";
 import { create } from "zustand";
 import {
+  removeFacetValueFromQuery,
+  removeFieldFromQuery,
+  setRangeInQuery,
+  toggleFacetInQuery,
+} from "~/server/app-layer/traces/query-language/mutations";
+import {
   isEmptyAST,
   ParseError,
   parse,
@@ -10,12 +16,6 @@ import {
   getFacetValueState,
   validateAst,
 } from "~/server/app-layer/traces/query-language/queries";
-import {
-  removeFacetValueFromQuery,
-  removeFieldFromQuery,
-  setRangeInQuery,
-  toggleFacetInQuery,
-} from "~/server/app-layer/traces/query-language/mutations";
 
 export interface TimeRange {
   from: number;
@@ -157,10 +157,7 @@ export const useFilterStore = create<FilterState>((set, get) => ({
       // Canonical text matches and we're already error-free → the AST is
       // structurally the same. Keep the previous reference so `s.ast`
       // subscribers don't churn on a round-trip-equivalent edit.
-      if (
-        result.queryText === state.queryText &&
-        state.parseError === null
-      ) {
+      if (result.queryText === state.queryText && state.parseError === null) {
         return state;
       }
       return { ...result, page: 1 };

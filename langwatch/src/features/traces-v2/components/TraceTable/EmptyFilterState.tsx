@@ -10,9 +10,9 @@ import {
 import type React from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useProjectHasTraces } from "../../hooks/useProjectHasTraces";
+import { useOnboardingStore } from "../../onboarding/store/onboardingStore";
 import type { TimeRange } from "../../stores/filterStore";
 import { useFilterStore } from "../../stores/filterStore";
-import { useOnboardingStore } from "../../onboarding/store/onboardingStore";
 import { useViewStore } from "../../stores/viewStore";
 
 const LangWatchMark: React.FC = () => (

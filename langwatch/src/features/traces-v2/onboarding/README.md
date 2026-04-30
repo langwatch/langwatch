@@ -113,14 +113,32 @@ Done:
 - [x] Step 3 — consolidate stores (onboardingStageStore + onboarding fields
   from uiStore → `store/onboardingStore.ts`; journey config moved to
   `chapters/onboardingJourneyConfig.ts`)
+- [x] Step 4 — hero sub-components extracted (`TypewriterHero`,
+  `StaticHero`, `DensitySpotlight`, `ReturningUserHub`)
+- [x] Step 5 — public-API hooks (`useOnboardingActive`,
+  `useSamplePreview`, `useTourEntryPoints`)
+- [x] Step 6 — `useTraceListQuery` consumes `useSamplePreview`
+- [x] Step 7 — `Toolbar` consumes `useTourEntryPoints` for the Tour
+  button. The What's-new button is left in place for now and retires
+  in Step 9 once the OutroPanel absorbs its content. SDK-pending
+  button intentionally not re-added — the no-traces empty state's
+  rewatch link covers that path.
+- [x] Step 8 — `OnboardingHost` mounts `BodyStageAttribute`,
+  `DrawerGlow`, and `RichRowGlow`. `OnboardingAurora` is a self-
+  gating component invoked from `EmptyResultsPane`. Aurora is *not*
+  hoisted into the host because the ribbon is positioned within the
+  table-area subtree; mounting it from the host would require either
+  a render slot or a portal anchor. Calling it from
+  `EmptyResultsPane` keeps the structural placement intact while
+  ownership stays inside the onboarding module.
 
 In progress:
-- [ ] Step 4 — extract hero sub-components
-- [ ] Step 5 — build public-API hooks
-- [ ] Step 6 — refactor `useTraceListQuery` to use `useSamplePreview`
-- [ ] Step 7 — refactor `Toolbar` to use `useTourEntryPoints`
-- [ ] Step 8 — build `OnboardingHost` and shrink `TracesPage`
-- [ ] Step 9 — delete obsolete files (`welcomeStore`, `useAutoOpenWelcome`,
-  `EmptyState/`)
-- [ ] Step 10 — start adding the new chapter content (lens reveal, slice
-  merge, outro panel, bead strip)
+- [ ] Step 9 — delete obsolete files (`welcomeStore`,
+  `useAutoOpenWelcome`, `WelcomeScreen`, the `welcomeBoom` plumbing
+  in `RefreshProgressBar`). Blocked on Step 10 — the OutroPanel must
+  absorb the What's-new content first; deleting earlier loses
+  release-note copy.
+- [ ] Step 10 — new chapter content (drawer-as-finale arc per §14:
+  welcome → density → slice → arrivals → drawer → outroPanel,
+  lenses + facets merged into one `slice` chapter, `BeadStrip` for
+  progress, `OutroPanel` absorbing What's-new).

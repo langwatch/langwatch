@@ -1,6 +1,6 @@
 import type { ConversationGroup } from "../../../conversationGroups";
-import { ConversationSelectCell } from "../SelectCells";
 import type { CellDef } from "../../types";
+import { ConversationSelectCell } from "../SelectCells";
 import { ConversationCell } from "./ConversationCell";
 import { LastTurnCell } from "./LastTurnCell";
 import {

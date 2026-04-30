@@ -15,8 +15,7 @@ export function useTraceSpanTree(traceId: string) {
   return api.tracesV2.spanTree.useQuery(
     { projectId: project?.id ?? "", traceId },
     {
-      enabled:
-        !!project?.id && !!traceId && !isPreviewTraceId(traceId),
+      enabled: !!project?.id && !!traceId && !isPreviewTraceId(traceId),
       staleTime: 300_000,
     },
   );

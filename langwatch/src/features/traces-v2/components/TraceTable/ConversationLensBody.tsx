@@ -33,7 +33,10 @@ export const ConversationLensBody: React.FC<ConversationLensBodyProps> = ({
 }) => {
   const groups = useMemo(() => groupTracesByConversation(traces), [traces]);
   const columns = useMemo(
-    () => [conversationSelectColumnDef, ...buildConversationColumns(lens.columns)],
+    () => [
+      conversationSelectColumnDef,
+      ...buildConversationColumns(lens.columns),
+    ],
     [lens.columns],
   );
   const [sorting, setSorting] = useState<SortingState>([

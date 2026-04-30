@@ -2,11 +2,7 @@ import { Box, Flex, HStack, Icon, Text } from "@chakra-ui/react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import type React from "react";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  LuChevronsDownUp,
-  LuChevronsUpDown,
-  LuSparkles,
-} from "react-icons/lu";
+import { LuChevronsDownUp, LuChevronsUpDown, LuSparkles } from "react-icons/lu";
 import { Tooltip } from "~/components/ui/tooltip";
 import type { SpanTreeNode } from "~/server/api/routers/tracesV2.schemas";
 import { useSpanLangwatchSignals } from "../../../hooks/useSpanLangwatchSignals";
@@ -62,7 +58,9 @@ export const WaterfallView = memo(function WaterfallView({
       let cursor: SpanTreeNode | undefined = span;
       while (cursor && !kept.has(cursor.spanId)) {
         kept.add(cursor.spanId);
-        cursor = cursor.parentSpanId ? byId.get(cursor.parentSpanId) : undefined;
+        cursor = cursor.parentSpanId
+          ? byId.get(cursor.parentSpanId)
+          : undefined;
       }
     }
     return spans.filter((s) => kept.has(s.spanId));

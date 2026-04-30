@@ -130,11 +130,7 @@ export function ModeSwitch({
     traceId ? <ModePresenceDot traceId={traceId} mode={mode} /> : null;
 
   return (
-    <HStack
-      paddingX={4}
-      gap={4}
-      align="center"
-    >
+    <HStack paddingX={4} gap={4} align="center">
       <ModeTab
         label="Trace"
         shortcut="T"

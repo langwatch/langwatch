@@ -4,11 +4,11 @@ import {
   type DrawerTab,
   type DrawerUrlState,
   type DrawerViewMode,
-  type VizTab,
   isDrawerTab,
   isViewMode,
   isVizTab,
   useDrawerStore,
+  type VizTab,
 } from "../stores/drawerStore";
 
 const DEFAULTS = {
@@ -25,10 +25,7 @@ function parseViz(raw: string | undefined): VizTab {
   return raw && isVizTab(raw) ? raw : DEFAULTS.viz;
 }
 
-function parseTab(
-  raw: string | undefined,
-  hasSpan: boolean,
-): DrawerTab {
+function parseTab(raw: string | undefined, hasSpan: boolean): DrawerTab {
   if (raw && isDrawerTab(raw)) return raw;
   return hasSpan ? "span" : DEFAULTS.tab;
 }

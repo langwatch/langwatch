@@ -48,9 +48,7 @@ export function useTraceDrawerNavigation() {
       if (toViewMode) setViewMode(toViewMode);
       // Push into the store immediately so drawer hooks render with the
       // right traceId/occurredAtMs before the URL change settles.
-      useDrawerStore
-        .getState()
-        .openTrace(toTraceId, toTimestamp ?? null);
+      useDrawerStore.getState().openTrace(toTraceId, toTimestamp ?? null);
       openDrawer("traceV2Details", {
         traceId: toTraceId,
         ...(toTimestamp !== undefined ? { t: String(toTimestamp) } : {}),

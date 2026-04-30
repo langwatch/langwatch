@@ -1,7 +1,7 @@
 import type { TraceListItem } from "../../../../../types/trace";
 import type { TraceColumnId } from "../../../columns";
-import { TraceSelectCell, SELECT_COLUMN_ID } from "../SelectCells";
 import type { CellDef } from "../../types";
+import { type SELECT_COLUMN_ID, TraceSelectCell } from "../SelectCells";
 import { CostCell } from "./CostCell";
 import { DurationCell } from "./DurationCell";
 import { ErrorTextCell } from "./ErrorTextCell";

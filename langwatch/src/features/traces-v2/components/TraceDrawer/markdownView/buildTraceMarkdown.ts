@@ -357,8 +357,7 @@ function renderThinkingBlock(block: Block, lines: string[]): void {
 
 function renderToolCallBlock(block: Block, lines: string[]): void {
   const name = typeof block.name === "string" ? block.name : "tool";
-  const id =
-    typeof block.id === "string" ? ` (${block.id.slice(0, 8)})` : "";
+  const id = typeof block.id === "string" ? ` (${block.id.slice(0, 8)})` : "";
   lines.push(`tool_call: ${name}${id}`);
   const input = (block.input ?? block.arguments ?? block.args) as unknown;
   if (input && typeof input === "object" && !Array.isArray(input)) {

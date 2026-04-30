@@ -1,4 +1,5 @@
 import { HStack, Icon } from "@chakra-ui/react";
+import type { IconType } from "react-icons";
 import {
   LuBookOpen,
   LuBot,
@@ -9,7 +10,6 @@ import {
   LuTheater,
   LuUser,
 } from "react-icons/lu";
-import type { IconType } from "react-icons";
 import { Tooltip } from "~/components/ui/tooltip";
 import type { LangwatchSignalBucket } from "~/server/api/routers/tracesV2.schemas";
 

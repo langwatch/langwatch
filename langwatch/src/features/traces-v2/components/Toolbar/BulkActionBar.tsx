@@ -30,7 +30,8 @@ export const BulkActionBar: React.FC<BulkActionBarProps> = ({
 
   const explicitCount = traceIds.size;
   const allMatchingCount = Math.min(totalHits, SELECT_ALL_MATCHING_CAP);
-  const displayCount = mode === "all-matching" ? allMatchingCount : explicitCount;
+  const displayCount =
+    mode === "all-matching" ? allMatchingCount : explicitCount;
 
   if (mode === "explicit" && explicitCount === 0) return null;
 
@@ -109,7 +110,12 @@ export const BulkActionBar: React.FC<BulkActionBarProps> = ({
           </Button>
         </Tooltip>
 
-        <Button size="xs" variant="ghost" onClick={clear} aria-label="Clear selection">
+        <Button
+          size="xs"
+          variant="ghost"
+          onClick={clear}
+          aria-label="Clear selection"
+        >
           <X size={14} />
         </Button>
       </HStack>

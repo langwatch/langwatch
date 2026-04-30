@@ -32,7 +32,8 @@ export function useTraceQueryArgs() {
     ...(occurredAtMs !== null ? { occurredAtMs } : {}),
   };
 
-  const isReady = !!project?.id && !!traceId && !isPreviewTraceId(traceId ?? "");
+  const isReady =
+    !!project?.id && !!traceId && !isPreviewTraceId(traceId ?? "");
 
   return { project, traceId, occurredAtMs, isLive, isReady, queryArgs };
 }

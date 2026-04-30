@@ -1,19 +1,8 @@
-import {
-  Box,
-  Grid,
-  HStack,
-  Tabs,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Grid, HStack, Tabs, Text, VStack } from "@chakra-ui/react";
 import type React from "react";
 import { useEffect, useMemo, useState } from "react";
 import { Kbd } from "~/components/ops/shared/Kbd";
 import { Drawer } from "~/components/ui/drawer";
-import {
-  type ActiveProjectContextValue,
-  ActiveProjectProvider,
-} from "~/features/onboarding/contexts/ActiveProjectContext";
 import { DocsLinks } from "~/features/onboarding/components/sections/observability/DocsLinks";
 import { FrameworkGrid } from "~/features/onboarding/components/sections/observability/FrameworkGrid";
 import { FrameworkIntegrationCode } from "~/features/onboarding/components/sections/observability/FrameworkIntegrationCode";
@@ -24,6 +13,10 @@ import {
   SkillList,
 } from "~/features/onboarding/components/sections/ViaClaudeCodeScreen";
 import { ViaMcpClientScreen } from "~/features/onboarding/components/sections/ViaClaudeDesktopScreen";
+import {
+  type ActiveProjectContextValue,
+  ActiveProjectProvider,
+} from "~/features/onboarding/contexts/ActiveProjectContext";
 import { getRegistryEntry } from "~/features/onboarding/regions/observability/codegen/registry";
 import type {
   FrameworkKey,
@@ -57,8 +50,7 @@ const SEGMENTS: SegmentDef[] = [
     value: "mcp",
     label: "MCP",
     shortcut: "M",
-    description:
-      "Connect LangWatch as an MCP server in any compatible client.",
+    description: "Connect LangWatch as an MCP server in any compatible client.",
   },
   {
     value: "prompt",

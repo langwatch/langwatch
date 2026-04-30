@@ -2,8 +2,8 @@ import type { SpanTreeNode } from "~/server/api/routers/tracesV2.schemas";
 import { abbreviateModel, formatDuration } from "../../../utils/formatters";
 import {
   buildSpanTree,
-  sanitiseMermaidId,
   type SpanWithChildren,
+  sanitiseMermaidId,
 } from "./_mermaidShared";
 import type { SequenceSpanType } from "./types";
 

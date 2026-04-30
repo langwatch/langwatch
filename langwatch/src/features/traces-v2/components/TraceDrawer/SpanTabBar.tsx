@@ -8,7 +8,13 @@ import {
   Text,
 } from "@chakra-ui/react";
 import { memo, useMemo } from "react";
-import { LuChevronDown, LuFileText, LuPin, LuPinOff, LuX } from "react-icons/lu";
+import {
+  LuChevronDown,
+  LuFileText,
+  LuPin,
+  LuPinOff,
+  LuX,
+} from "react-icons/lu";
 import { useShallow } from "zustand/react/shallow";
 import { Kbd } from "~/components/ops/shared/Kbd";
 import { Menu } from "~/components/ui/menu";
@@ -281,7 +287,8 @@ function DrawerTabButton({
   traceId,
   tab,
 }: DrawerTabButtonProps) {
-  const activeBorder = activeColorPalette === "purple" ? "purple.solid" : "blue.solid";
+  const activeBorder =
+    activeColorPalette === "purple" ? "purple.solid" : "blue.solid";
   const activeColor = activeColorPalette === "purple" ? "purple.fg" : "fg";
   return (
     <Tooltip

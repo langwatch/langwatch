@@ -49,7 +49,6 @@ export function ThreadedTurnView({
     scenarioVisuals?.label ??
     ROLE_LABELS[sourceRole] ??
     sourceRole.toUpperCase();
-  const colorBase = color.split(".")[0]!;
 
   return (
     <Box position="relative" paddingLeft={6} paddingY={0}>

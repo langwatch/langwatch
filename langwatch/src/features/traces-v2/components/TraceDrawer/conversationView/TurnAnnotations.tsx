@@ -1,4 +1,12 @@
-import { Avatar, Box, Button, HStack, Icon, Text, VStack } from "@chakra-ui/react";
+import {
+  Avatar,
+  Box,
+  Button,
+  HStack,
+  Icon,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
 import { Database, Edit3, Lightbulb, MessageSquare } from "lucide-react";
 import { forwardRef, useState } from "react";
 import { Popover } from "~/components/ui/popover";
@@ -119,7 +127,6 @@ const ActionButton = forwardRef<
   );
 });
 
-
 interface TurnAnnotationBadgesProps {
   traceId: string;
   output?: string | null;
@@ -231,10 +238,12 @@ export function TurnAnnotationBadges({
                   _hover={canEdit ? { bg: "bg.muted" } : undefined}
                 >
                   <HStack gap={2} align="start">
-                    <Avatar.Root size="xs" background="gray.solid" color="white">
-                      <Avatar.Fallback
-                        name={a.user?.name ?? a.email ?? "?"}
-                      />
+                    <Avatar.Root
+                      size="xs"
+                      background="gray.solid"
+                      color="white"
+                    >
+                      <Avatar.Fallback name={a.user?.name ?? a.email ?? "?"} />
                     </Avatar.Root>
                     <VStack align="start" gap={0} flex={1} minWidth={0}>
                       <HStack gap={1.5} width="full">

@@ -58,8 +58,7 @@ export function useConversationContext(
   // the cache; we just have to be careful not to short-circuit
   // *before* reading `query.data` below.
   const isPreview = !!traceId && isPreviewTraceId(traceId);
-  const fetchEnabled =
-    !!project?.id && !!conversationId && !isPreview;
+  const fetchEnabled = !!project?.id && !!conversationId && !isPreview;
 
   const query = api.tracesV2.conversationContext.useQuery(
     {

@@ -45,7 +45,9 @@ export const useSelectionStore = create<SelectionState>((set, get) => ({
   setMany: (traceIds, checked) =>
     set((state) => {
       const next =
-        state.mode === "all-matching" ? new Set<string>() : new Set(state.traceIds);
+        state.mode === "all-matching"
+          ? new Set<string>()
+          : new Set(state.traceIds);
       for (const id of traceIds) {
         if (checked) next.add(id);
         else next.delete(id);

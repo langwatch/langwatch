@@ -8,7 +8,7 @@ import { Link } from "~/components/ui/link";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useOpenTraceDrawer } from "../../hooks/useOpenTraceDrawer";
-import { type Density } from "../../stores/densityStore";
+import type { Density } from "../../stores/densityStore";
 import { useUIStore } from "../../stores/uiStore";
 import { findStageDef } from "../chapters/onboardingJourneyConfig";
 import {
@@ -119,12 +119,7 @@ export function TracesEmptyOnboarding(): React.ReactElement {
     // launched the tour from the toolbar end up back at their real
     // table, not the demo on next render.
     setTourActive(false);
-  }, [
-    project,
-    setSetupDisengaged,
-    setSetupDismissedForProject,
-    setTourActive,
-  ]);
+  }, [project, setSetupDisengaged, setSetupDismissedForProject, setTourActive]);
 
   const handleAdvanceManual = useCallback(() => {
     // If the user is confirming the density spotlight, persist the
@@ -523,24 +518,26 @@ export function TracesEmptyOnboarding(): React.ReactElement {
                 double-duty as the advance affordance there (click
                 once to pick, click again to continue), so a
                 separate Continue button here would just be noise. */}
-            {stageDef.cta && stageDef.next && !stageDef.showDensitySpotlight && (
-              <>
-                <Button
-                  size="xs"
-                  variant="ghost"
-                  colorPalette="gray"
-                  onClick={handleAdvanceManual}
-                >
-                  <Text>{stageDef.cta}</Text>
-                  <Text aria-hidden as="span" color="fg.muted">
-                    →
+            {stageDef.cta &&
+              stageDef.next &&
+              !stageDef.showDensitySpotlight && (
+                <>
+                  <Button
+                    size="xs"
+                    variant="ghost"
+                    colorPalette="gray"
+                    onClick={handleAdvanceManual}
+                  >
+                    <Text>{stageDef.cta}</Text>
+                    <Text aria-hidden as="span" color="fg.muted">
+                      →
+                    </Text>
+                  </Button>
+                  <Text aria-hidden color="fg.subtle">
+                    •
                   </Text>
-                </Button>
-                <Text aria-hidden color="fg.subtle">
-                  •
-                </Text>
-              </>
-            )}
+                </>
+              )}
             <Link
               href="https://docs.langwatch.ai/integration/overview"
               isExternal

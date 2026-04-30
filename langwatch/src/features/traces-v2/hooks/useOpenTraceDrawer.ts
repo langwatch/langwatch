@@ -4,9 +4,9 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { TraceHeader } from "~/server/api/routers/tracesV2.schemas";
 import { api } from "~/utils/api";
 import {
-  RICH_ARRIVAL_TRACE_ID,
   buildRichArrivalTraceDetail,
   isPreviewTraceId,
+  RICH_ARRIVAL_TRACE_ID,
 } from "../onboarding/data/samplePreviewTraces";
 import { useDrawerStore } from "../stores/drawerStore";
 import type { TraceListItem } from "../types/trace";

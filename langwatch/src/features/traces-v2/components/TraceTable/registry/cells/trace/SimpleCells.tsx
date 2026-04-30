@@ -76,7 +76,9 @@ export const TokensInCell = {
   id: "tokensIn",
   label: "Tokens In",
   render: ({ row }) => (
-    <MonoCell>{row.inputTokens != null ? formatTokens(row.inputTokens) : dash}</MonoCell>
+    <MonoCell>
+      {row.inputTokens != null ? formatTokens(row.inputTokens) : dash}
+    </MonoCell>
   ),
   renderComfortable: ({ row }) => (
     <Text textStyle="sm" color="fg.muted" textAlign="right" fontFamily="mono">
@@ -89,7 +91,9 @@ export const TokensOutCell = {
   id: "tokensOut",
   label: "Tokens Out",
   render: ({ row }) => (
-    <MonoCell>{row.outputTokens != null ? formatTokens(row.outputTokens) : dash}</MonoCell>
+    <MonoCell>
+      {row.outputTokens != null ? formatTokens(row.outputTokens) : dash}
+    </MonoCell>
   ),
   renderComfortable: ({ row }) => (
     <Text textStyle="sm" color="fg.muted" textAlign="right" fontFamily="mono">

@@ -15,9 +15,6 @@ import {
   useRef,
   useState,
 } from "react";
-import { FlameView } from "./flameView";
-import { SpanListView } from "./spanListView";
-import { WaterfallView } from "./waterfallView";
 import {
   LuChartGantt,
   LuChevronDown,
@@ -44,8 +41,11 @@ import type {
 } from "~/server/api/routers/tracesV2.schemas";
 import type { VizTab } from "../../stores/drawerStore";
 import { SPAN_TYPE_COLORS } from "../../utils/formatters";
+import { FlameView } from "./flameView";
 import { NewSpanFlash } from "./NewSpanFlash";
 import { SequenceSkeleton, TopologySkeleton } from "./sequenceView";
+import { SpanListView } from "./spanListView";
+import { WaterfallView } from "./waterfallView";
 
 // SequenceView pulls in `mermaid` (~1MB+ — d3, dagre, several parsers).
 // That's the only viz heavy enough to keep code-split — the others are
@@ -622,13 +622,7 @@ const FLAME_STRIPS = [
 
 function FlameSkeleton() {
   return (
-    <VStack
-      align="stretch"
-      gap="2px"
-      paddingX={3}
-      paddingY={3}
-      height="full"
-    >
+    <VStack align="stretch" gap="2px" paddingX={3} paddingY={3} height="full">
       {FLAME_STRIPS.map((strip, depth) => (
         <Box key={depth} position="relative" height="22px">
           {strip.map((seg, i) => (

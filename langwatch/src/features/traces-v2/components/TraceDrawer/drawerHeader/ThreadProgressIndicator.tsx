@@ -60,9 +60,7 @@ export function ThreadProgressIndicator({
       paddingX={conversationId ? 1.5 : 0}
       paddingY={conversationId ? 0.5 : 0}
       borderRadius={conversationId ? "sm" : undefined}
-      _hover={
-        conversationId ? { bg: "bg.muted" } : undefined
-      }
+      _hover={conversationId ? { bg: "bg.muted" } : undefined}
       transition="background 0.12s ease"
     >
       {isLoading ? (
@@ -166,8 +164,7 @@ export function ThreadProgressIndicator({
             </VStack>
 
             <Text textStyle="2xs" color="fg.subtle">
-              Turn {safePosition} of {total}. Use{" "}
-              <Kbd>←</Kbd>
+              Turn {safePosition} of {total}. Use <Kbd>←</Kbd>
               {" / "}
               <Kbd>→</Kbd>
               {" to navigate."}

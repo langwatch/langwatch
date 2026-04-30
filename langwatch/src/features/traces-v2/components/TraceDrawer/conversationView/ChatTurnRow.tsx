@@ -159,7 +159,6 @@ export const ChatTurnRow = memo<ChatTurnRowProps>(function ChatTurnRow({
           annotation={annotationSummary}
         />
       ) : null}
-
     </VStack>
   );
 });

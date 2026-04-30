@@ -1,9 +1,9 @@
-import { contentToString } from "../../TraceTable/chatContent";
 import {
   abbreviateModel,
   formatDuration,
   formatRelativeTime,
 } from "../../../utils/formatters";
+import { contentToString } from "../../TraceTable/chatContent";
 import type { ParsedTurn } from "./types";
 
 export interface ConversationMarkdownChunk {
@@ -170,6 +170,4 @@ export function formatGap(secs: number): string {
   const h = Math.floor(secs / 3600);
   const m = Math.floor((secs % 3600) / 60);
   return `${h}h ${m}m gap`;
-}
- return `${h}h ${m}m gap`;
 }

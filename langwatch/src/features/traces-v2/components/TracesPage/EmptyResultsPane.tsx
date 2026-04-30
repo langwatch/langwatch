@@ -1,14 +1,11 @@
 import { Box, Flex } from "@chakra-ui/react";
-import { AnimatePresence, motion } from "motion/react";
 import React from "react";
-import { shouldShowAurora } from "../../onboarding/chapters/onboardingJourneyConfig";
 import { EmptyStateOverlay } from "../../onboarding/components/EmptyStateOverlay";
 import { SampleDataBanner } from "../../onboarding/components/SampleDataBanner";
-import { RICH_ARRIVAL_TRACE_ID } from "../../onboarding/data/samplePreviewTraces";
+import { OnboardingAurora } from "../../onboarding/effects/OnboardingAurora";
 import { useOnboardingStore } from "../../onboarding/store/onboardingStore";
 import { Toolbar } from "../Toolbar/Toolbar";
 import { TraceTable } from "../TraceTable/TraceTable";
-import { AuroraSvg } from "./AuroraSvg";
 
 const DIMMED_PROPS = {
   opacity: 0.45,
@@ -29,7 +26,6 @@ export const EmptyResultsPane: React.FC = React.memo(() => {
   // — sample data is already on screen, no waiting for ingestion.
   const setupDisengaged = useOnboardingStore((s) => s.setupDisengaged);
   const onboardingStage = useOnboardingStore((s) => s.stage);
-  const showAuroraStrip = shouldShowAurora(onboardingStage);
   const isPostArrival = onboardingStage === "postArrival";
 
   return (
@@ -45,9 +41,7 @@ export const EmptyResultsPane: React.FC = React.memo(() => {
     >
       <Box
         width="full"
-        {...(setupDisengaged
-          ? {}
-          : (DIMMED_PROPS as Record<string, unknown>))}
+        {...(setupDisengaged ? {} : (DIMMED_PROPS as Record<string, unknown>))}
       >
         <Toolbar />
       </Box>
@@ -78,137 +72,25 @@ export const EmptyResultsPane: React.FC = React.memo(() => {
               // to tourGate via the same path); the highlighted rich
               // row is just the visually obvious target, not the only
               // one. setupDisengaged is the post-onboarding state
-              // where preview data is still rendering.
+              // where preview data is still rendering. The row glow
+              // itself is a global stylesheet rule injected by
+              // `OnboardingHost`'s `<RichRowGlow>` effect — see
+              // `onboarding/effects/RichRowGlow.tsx`.
               {}
             : ({
                 pointerEvents: "none",
                 "aria-disabled": true,
                 inert: "",
               } as Record<string, unknown>))}
-          // During `postArrival` the rich arrival row gets the same
-          // visual language as the drawer-tour glow: a soft blue
-          // halo that pulses around the *whole row*, not per-cell.
-          // Implemented with `filter: drop-shadow(...)` on the
-          // tbody — drop-shadow paints from the rendered cell area
-          // outward, so it traces the row's outer edge as one
-          // continuous shape even though `border-collapse: collapse`
-          // means tbody/tr can't carry box-shadow themselves.
-          // Per-cell inset box-shadow + a faint background-tint
-          // give the inner ring; the row itself is `z-index: 10` so
-          // the halo doesn't get clipped by neighbouring rows.
-          css={
-            isPostArrival
-              ? {
-                  // Light theme: heavier alpha needed for blue to
-                  // read against a white surface without disappearing.
-                  "@keyframes tracesV2RichRowGlow": {
-                    "0%, 100%": {
-                      filter:
-                        "drop-shadow(0 0 6px rgba(59, 130, 246, 0.45)) drop-shadow(0 0 16px rgba(99, 102, 241, 0.24))",
-                    },
-                    "50%": {
-                      filter:
-                        "drop-shadow(0 0 12px rgba(59, 130, 246, 0.7)) drop-shadow(0 0 26px rgba(99, 102, 241, 0.36))",
-                    },
-                  },
-                  // Dark theme: sky-blue palette (blue.300-ish) so the
-                  // glow stays visible without going neon. Lower
-                  // base alpha, similar peak — same shape, tuned
-                  // for the darker canvas.
-                  "@keyframes tracesV2RichRowGlowDark": {
-                    "0%, 100%": {
-                      filter:
-                        "drop-shadow(0 0 8px rgba(125, 211, 252, 0.32)) drop-shadow(0 0 20px rgba(165, 180, 252, 0.2))",
-                    },
-                    "50%": {
-                      filter:
-                        "drop-shadow(0 0 14px rgba(125, 211, 252, 0.55)) drop-shadow(0 0 30px rgba(165, 180, 252, 0.34))",
-                    },
-                  },
-                  [`& tbody[data-trace-id="${RICH_ARRIVAL_TRACE_ID}"]`]: {
-                    position: "relative",
-                    zIndex: 10,
-                    cursor: "pointer",
-                    animation:
-                      "tracesV2RichRowGlow 2.2s ease-in-out infinite",
-                    transition: "filter 220ms ease",
-                    _dark: {
-                      animation:
-                        "tracesV2RichRowGlowDark 2.2s ease-in-out infinite",
-                    },
-                  },
-                  // Inner blue ring — inset shadow on every cell,
-                  // gives the row a clear outline that joins up
-                  // along shared edges (collapsed borders share
-                  // pixels so adjacent insets line up). Background
-                  // tint is the same uniform alpha across the row.
-                  [`& tbody[data-trace-id="${RICH_ARRIVAL_TRACE_ID}"] td`]:
-                    {
-                      backgroundColor: "rgba(59, 130, 246, 0.08)",
-                      boxShadow: "inset 0 0 0 1px rgba(59, 130, 246, 0.45)",
-                      transition:
-                        "background-color 200ms ease, box-shadow 200ms ease",
-                      _dark: {
-                        backgroundColor: "rgba(125, 211, 252, 0.1)",
-                        boxShadow:
-                          "inset 0 0 0 1px rgba(125, 211, 252, 0.32)",
-                      },
-                    },
-                  [`& tbody[data-trace-id="${RICH_ARRIVAL_TRACE_ID}"]:hover td`]:
-                    {
-                      backgroundColor: "rgba(59, 130, 246, 0.18)",
-                      boxShadow: "inset 0 0 0 1px rgba(59, 130, 246, 0.7)",
-                      _dark: {
-                        backgroundColor: "rgba(125, 211, 252, 0.2)",
-                        boxShadow:
-                          "inset 0 0 0 1px rgba(125, 211, 252, 0.55)",
-                      },
-                    },
-                }
-              : undefined
-          }
         >
           <TraceTable />
         </Box>
-        {/* Aurora strip — exact same pattern as `RefreshProgressBar`
-            so the visual word (a refresh / arrival / new-span swell)
-            stays consistent everywhere on the platform. The only
-            tweak is an extra horizontal mask so the ribbon fades
-            into the page edges. Normally `FilterSidebar` covers the
-            leftmost slice and gives a natural visual gutter; during
-            onboarding the sidebar is hidden, so without the
-            horizontal fade the aurora would butt right up against
-            the viewport edge and read as a banner. */}
-        <AnimatePresence>
-          {showAuroraStrip && (
-            <motion.div
-              key="onboarding-aurora"
-              aria-hidden="true"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.6, ease: "easeOut" }}
-              style={{
-                position: "absolute",
-                top: "-90px",
-                left: 0,
-                right: 0,
-                height: 200,
-                pointerEvents: "none",
-                zIndex: 2,
-                overflow: "hidden",
-                maskImage:
-                  "linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,1) 35%, rgba(0,0,0,0.7) 65%, transparent 100%), linear-gradient(to right, transparent 0%, rgba(0,0,0,1) 14%, rgba(0,0,0,1) 86%, transparent 100%)",
-                WebkitMaskImage:
-                  "linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,1) 35%, rgba(0,0,0,0.7) 65%, transparent 100%), linear-gradient(to right, transparent 0%, rgba(0,0,0,1) 14%, rgba(0,0,0,1) 86%, transparent 100%)",
-                maskComposite: "intersect",
-                WebkitMaskComposite: "source-in",
-              }}
-            >
-              <AuroraSvg idSuffix="onboardingArrival" />
-            </motion.div>
-          )}
-        </AnimatePresence>
+        {/* Aurora ribbon — self-gates on stage, lazy-mounts only
+            during aurora stages. Owned by the onboarding module so
+            this pane doesn't have to know about `shouldShowAurora`
+            or the mask geometry; see
+            `onboarding/effects/OnboardingAurora.tsx`. */}
+        <OnboardingAurora />
         <Box position="absolute" inset={0} overflow="auto" zIndex={1}>
           <EmptyStateOverlay />
         </Box>

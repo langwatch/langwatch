@@ -4,18 +4,20 @@ import type {
   TraceHeader,
 } from "~/server/api/routers/tracesV2.schemas";
 import { useDrawerStore } from "../stores/drawerStore";
-import type { ConversationContextResult } from "./useConversationContext";
-import type { useTraceDrawerNavigation } from "./useTraceDrawerNavigation";
 import {
   type ShortcutContext,
   TRACE_DRAWER_SHORTCUTS,
 } from "./traceDrawerShortcutTable";
+import type { ConversationContextResult } from "./useConversationContext";
+import type { useTraceDrawerNavigation } from "./useTraceDrawerNavigation";
 
 interface ShortcutsParams {
   trace: TraceHeader | null;
   spanTree: SpanTreeNode[];
   conversationContext: ConversationContextResult;
-  navigateToTrace: ReturnType<typeof useTraceDrawerNavigation>["navigateToTrace"];
+  navigateToTrace: ReturnType<
+    typeof useTraceDrawerNavigation
+  >["navigateToTrace"];
   goBack: () => void;
   canGoBack: boolean;
   refreshActiveTrace: () => Promise<void> | void;
@@ -26,9 +28,7 @@ function isTypingTarget(target: EventTarget | null): boolean {
   const el = target as HTMLElement | null;
   if (!el) return false;
   return (
-    el.tagName === "INPUT" ||
-    el.tagName === "TEXTAREA" ||
-    el.isContentEditable
+    el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable
   );
 }
 

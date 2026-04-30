@@ -66,8 +66,7 @@ function tagClassName({
   if (negated) return "filter-token filter-token-exclude";
   if (SCENARIO_FIELDS.has(fieldName))
     return "filter-token filter-token-scenario";
-  if (NUMERIC_FIELDS.has(fieldName))
-    return "filter-token filter-token-numeric";
+  if (NUMERIC_FIELDS.has(fieldName)) return "filter-token filter-token-numeric";
   return "filter-token";
 }
 

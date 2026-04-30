@@ -1,9 +1,6 @@
 import { createShikiAdapter } from "@chakra-ui/react";
 import { useMemo } from "react";
-import {
-  type HighlighterGeneric,
-  getSingletonHighlighter,
-} from "shiki";
+import { getSingletonHighlighter, type HighlighterGeneric } from "shiki";
 
 const SHIKI_LANGS = [
   "markdown",

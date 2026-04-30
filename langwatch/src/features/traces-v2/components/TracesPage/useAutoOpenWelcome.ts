@@ -14,7 +14,9 @@ const WELCOME_SEEN_KEY = "langwatch:traces-v2:welcome-seen";
  */
 export const useAutoOpenWelcome = ({
   enabled = true,
-}: { enabled?: boolean } = {}): void => {
+}: {
+  enabled?: boolean;
+} = {}): void => {
   const isOpen = useWelcomeStore((s) => s.isOpen);
   const open = useWelcomeStore((s) => s.open);
   const [seen] = useLocalStorage<boolean>(WELCOME_SEEN_KEY, false);

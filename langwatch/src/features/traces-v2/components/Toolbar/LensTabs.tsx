@@ -105,12 +105,7 @@ export const LensTabs: React.FC = () => {
           flex="1"
           minWidth={0}
         >
-          <Box
-            ref={scrollerRef}
-            overflowX="hidden"
-            flex="1"
-            minWidth={0}
-          >
+          <Box ref={scrollerRef} overflowX="hidden" flex="1" minWidth={0}>
             <HStack
               gap={0}
               flexWrap="nowrap"
@@ -203,9 +198,7 @@ function useHiddenLensTabs(
     const root = scrollerRef.current;
     if (!root) return;
 
-    const tabs = Array.from(
-      root.querySelectorAll<HTMLElement>("[data-value]"),
-    );
+    const tabs = Array.from(root.querySelectorAll<HTMLElement>("[data-value]"));
     if (tabs.length === 0) return;
 
     const containerRect = root.getBoundingClientRect();

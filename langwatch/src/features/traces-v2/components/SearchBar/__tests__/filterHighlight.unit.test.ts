@@ -251,9 +251,9 @@ describe("buildDecorationPlan — wildcard + boolean cases", () => {
       // ImplicitField — no chip, no X widget. The walkAst early-return
       // for isImplicit is what makes this true.
       expect(plan.tokens).toEqual([]);
-      expect(
-        plan.slots.some((s) => s.className.includes("filter-token")),
-      ).toBe(false);
+      expect(plan.slots.some((s) => s.className.includes("filter-token"))).toBe(
+        false,
+      );
     });
   });
 
@@ -335,23 +335,18 @@ describe("buildDecorationPlan — wildcard + boolean cases", () => {
       ["status:err", 1, 1],
       ["status:erro", 1, 1],
       ["status:error", 1, 1],
-    ])(
-      "after typing %j: %d filter-token slot(s), %d delete widget(s)",
-      (input, expectedTokens, expectedWidgets) => {
-        const plan = buildDecorationPlan(input);
-        const tokenSlots = plan.slots.filter((s) =>
-          s.className.includes("filter-token"),
-        );
-        expect(
-          tokenSlots.length,
-          `tokens for ${JSON.stringify(input)}`,
-        ).toBe(expectedTokens);
-        expect(
-          plan.tokens.length,
-          `widgets for ${JSON.stringify(input)}`,
-        ).toBe(expectedWidgets);
-      },
-    );
+    ])("after typing %j: %d filter-token slot(s), %d delete widget(s)", (input, expectedTokens, expectedWidgets) => {
+      const plan = buildDecorationPlan(input);
+      const tokenSlots = plan.slots.filter((s) =>
+        s.className.includes("filter-token"),
+      );
+      expect(tokenSlots.length, `tokens for ${JSON.stringify(input)}`).toBe(
+        expectedTokens,
+      );
+      expect(plan.tokens.length, `widgets for ${JSON.stringify(input)}`).toBe(
+        expectedWidgets,
+      );
+    });
 
     it("the half-built `status:` widget carries a null value (no `data-value` on the X)", () => {
       const plan = buildDecorationPlan("status:");
@@ -428,8 +423,17 @@ describe("buildDecorationPlan — wildcard + boolean cases", () => {
       // Each step is what the highlighter sees on the next render. The
       // half-built Tag (EmptyExpression) still gets a chip — same shape
       // as the colon-just-pressed state above.
-      const steps = ["status:error", "status:erro", "status:err", "status:er", "status:e", "status:"];
-      const tokenCounts = steps.map((s) => buildDecorationPlan(s).tokens.length);
+      const steps = [
+        "status:error",
+        "status:erro",
+        "status:err",
+        "status:er",
+        "status:e",
+        "status:",
+      ];
+      const tokenCounts = steps.map(
+        (s) => buildDecorationPlan(s).tokens.length,
+      );
       expect(tokenCounts).toEqual([1, 1, 1, 1, 1, 1]);
     });
 

@@ -19,8 +19,8 @@ import {
   ParseErrorIndicator,
 } from "./SearchBarIndicators";
 import { SyntaxHelpDrawerHost } from "./SyntaxHelpDrawer";
-import { useFloatRect } from "./useFloatRect";
 import type { ValueResolver } from "./useFilterEditor";
+import { useFloatRect } from "./useFloatRect";
 
 const MAX_DYNAMIC_ITEMS = 10;
 
@@ -54,9 +54,7 @@ export const SearchBar: React.FC = () => {
   const parseError = useFilterStore((s) => s.parseError);
   const applyQueryText = useFilterStore((s) => s.applyQueryText);
   const clearAll = useFilterStore((s) => s.clearAll);
-  const showCrossFacetWarning = useFilterStore((s) =>
-    hasCrossFacetOR(s.ast),
-  );
+  const showCrossFacetWarning = useFilterStore((s) => hasCrossFacetOR(s.ast));
 
   // Defer TipTap mount until the user actually focuses the search bar — the
   // ProseMirror init reflow used to dominate LCP.

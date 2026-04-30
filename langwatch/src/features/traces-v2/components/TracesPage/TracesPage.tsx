@@ -1,25 +1,25 @@
 import { Box, Flex, HStack, VStack } from "@chakra-ui/react";
 import React, { useMemo } from "react";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { useTracesV2Presence } from "~/features/presence/hooks/useTracesV2Presence";
 import { ExportConfigDialog } from "~/components/messages/ExportConfigDialog";
 import { ExportProgress } from "~/components/messages/ExportProgress";
-import { useProjectHasTraces } from "../../hooks/useProjectHasTraces";
+import { useTracesV2Presence } from "~/features/presence/hooks/useTracesV2Presence";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useLensFilterDirtySync } from "../../hooks/useLensFilterDirtySync";
+import { useProjectHasTraces } from "../../hooks/useProjectHasTraces";
 import { useResetSelectionOnViewChange } from "../../hooks/useResetSelectionOnViewChange";
 import { useRollingTimeRange } from "../../hooks/useRollingTimeRange";
 import { useTraceFreshness } from "../../hooks/useTraceFreshness";
 import { useTraceListExport } from "../../hooks/useTraceListExport";
 import { useTraceListQuery } from "../../hooks/useTraceListQuery";
 import { useURLSync } from "../../hooks/useURLSync";
+import { OnboardingHost } from "../../onboarding";
+import { useOnboardingStore } from "../../onboarding/store/onboardingStore";
 import {
   SELECT_ALL_MATCHING_CAP,
   useSelectionStore,
 } from "../../stores/selectionStore";
-import { useOnboardingStore } from "../../onboarding/store/onboardingStore";
 import { useUIStore } from "../../stores/uiStore";
 import { DensityProvider } from "../DensityProvider";
-import { OnboardingHost } from "../../onboarding";
 import { FilterSidebar } from "../FilterSidebar/FilterSidebar";
 import { FindBar } from "../FindBar";
 import { SearchBar } from "../SearchBar/SearchBar";
@@ -30,7 +30,6 @@ import { EmptyResultsPane } from "./EmptyResultsPane";
 import { PageKeyboardShortcuts } from "./PageKeyboardShortcuts";
 import { useAutoOpenWelcome } from "./useAutoOpenWelcome";
 import { useDebouncedFilterCommit } from "./useDebouncedFilterCommit";
-import { useTracesPageTitle } from "./usePageTitle";
 import {
   useClearSelectionShortcut,
   useDensityToggleShortcut,
@@ -38,6 +37,7 @@ import {
   useShortcutsHelpShortcut,
   useSidebarShortcut,
 } from "./useKeyboardShortcuts";
+import { useTracesPageTitle } from "./usePageTitle";
 
 const SIDEBAR_WIDTH_EXPANDED = "220px";
 const SIDEBAR_WIDTH_COLLAPSED = "40px";
@@ -75,7 +75,9 @@ export const TracesPage: React.FC = () => {
   );
   const setupDisengaged = useOnboardingStore((s) => s.setupDisengaged);
   const tourActive = useOnboardingStore((s) => s.tourActive);
-  const setupDismissed = project ? !!setupDismissedByProject[project.id] : false;
+  const setupDismissed = project
+    ? !!setupDismissedByProject[project.id]
+    : false;
   // Read the onboarding stage at the top level so we can decide
   // whether to surface the FilterSidebar even while the empty
   // state is technically "active" — the `facetsReveal` and `outro`
@@ -117,56 +119,60 @@ export const TracesPage: React.FC = () => {
           active. When inactive it returns its children verbatim so
           users not in the journey ship zero onboarding DOM nodes. */}
       <OnboardingHost>
-      <VStack
-        width="full"
-        height="full"
-        gap={0}
-        overflow="hidden"
-        bg="bg.surface"
-        role="application"
-        aria-label="Trace explorer"
-        position="relative"
-      >
-        <Box
-          role="search"
-          aria-label="Trace search"
+        <VStack
           width="full"
-          {...(dimChrome ? (DIMMED_PROPS as Record<string, unknown>) : {})}
+          height="full"
+          gap={0}
+          overflow="hidden"
+          bg="bg.surface"
+          role="application"
+          aria-label="Trace explorer"
+          position="relative"
         >
-          <SearchBar />
-        </Box>
+          <Box
+            role="search"
+            aria-label="Trace search"
+            width="full"
+            {...(dimChrome ? (DIMMED_PROPS as Record<string, unknown>) : {})}
+          >
+            <SearchBar />
+          </Box>
 
-        <HStack flex={1} align="stretch" width="full" gap={0} overflow="hidden">
-          {/* Hide the sidebar during the empty-state journey except
+          <HStack
+            flex={1}
+            align="stretch"
+            width="full"
+            gap={0}
+            overflow="hidden"
+          >
+            {/* Hide the sidebar during the empty-state journey except
               for the facets / outro beats — those stages are
               *about* the sidebar, so we surface it then. During
               `facetsReveal` we wrap the aside in a soft blue
               animated glow so the user's eye lands on it as the
               copy points at it. */}
-          {(!showEmptyState || sidebarVisibleDuringEmpty) && (
-            // `height="full"` + `overflow="hidden"` on this wrapper is
-            // load-bearing: without it the inner aside expands to its
-            // intrinsic content height (1700px+ once every facet group
-            // is rendered) and the HStack just hides the overflow at
-            // the bottom — meaning ~half the facets are invisible AND
-            // unscrollable on shorter viewports. Constraining the
-            // wrapper here lets the inner VStack's `overflowY="auto"`
-            // actually kick in.
-            <Box
-              flexShrink={0}
-              data-tour-target="sidebar"
-              height="full"
-              overflow="hidden"
-            >
-              <FilterAside
-                dimmed={dimChrome && !sidebarVisibleDuringEmpty}
-              />
-            </Box>
-          )}
-          {showEmptyState ? <EmptyResultsPane /> : <ResultsPane />}
-        </HStack>
-        <PageKeyboardShortcuts />
-      </VStack>
+            {(!showEmptyState || sidebarVisibleDuringEmpty) && (
+              // `height="full"` + `overflow="hidden"` on this wrapper is
+              // load-bearing: without it the inner aside expands to its
+              // intrinsic content height (1700px+ once every facet group
+              // is rendered) and the HStack just hides the overflow at
+              // the bottom — meaning ~half the facets are invisible AND
+              // unscrollable on shorter viewports. Constraining the
+              // wrapper here lets the inner VStack's `overflowY="auto"`
+              // actually kick in.
+              <Box
+                flexShrink={0}
+                data-tour-target="sidebar"
+                height="full"
+                overflow="hidden"
+              >
+                <FilterAside dimmed={dimChrome && !sidebarVisibleDuringEmpty} />
+              </Box>
+            )}
+            {showEmptyState ? <EmptyResultsPane /> : <ResultsPane />}
+          </HStack>
+          <PageKeyboardShortcuts />
+        </VStack>
       </OnboardingHost>
     </DensityProvider>
   );

@@ -1,6 +1,7 @@
 import { Box, chakra } from "@chakra-ui/react";
 
 const ChakraButton = chakra("button");
+
 import type React from "react";
 import { Checkbox } from "~/components/ui/checkbox";
 import { useSelectionStore } from "../../stores/selectionStore";

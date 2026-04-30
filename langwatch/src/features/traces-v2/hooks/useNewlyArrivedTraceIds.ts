@@ -12,9 +12,7 @@ const SEEN_IDS_CAP = 5_000;
  * `NEW_ID_TTL_MS`. The seen-ids set is bounded so a long-running tab doesn't
  * grow it without limit.
  */
-export function useNewlyArrivedTraceIds(
-  traces: TraceListItem[],
-): Set<string> {
+export function useNewlyArrivedTraceIds(traces: TraceListItem[]): Set<string> {
   const mountedAtRef = useRef(Date.now());
   // Insertion-ordered Map used as a bounded FIFO set.
   const seenIdsRef = useRef<Map<string, true>>(new Map());

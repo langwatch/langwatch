@@ -73,8 +73,7 @@ export function ReturningUserHub({
         Welcome back.
       </Heading>
       <Text color="fg.muted" textStyle="md" lineHeight="1.65" maxWidth="48ch">
-        Want a hand with a specific bit? Pick one — or click around the
-        table.
+        Want a hand with a specific bit? Pick one — or click around the table.
       </Text>
       <VStack gap={2} width="full" maxWidth="380px" align="stretch">
         {RETURNING_USER_HUB_OPTIONS.map((opt) => (
