@@ -10,7 +10,7 @@ import {
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useExecutionStore } from "./executionStore";
 import { useFoundryProjectStore } from "./foundryProjectStore";
-import { executeTrace } from "./traceExecutor";
+import { getFoundryExecutor } from "./traceExecutor";
 import { generateConversation } from "./generateConversation";
 
 const TURN_PRESETS = [10, 25, 50, 100] as const;
@@ -32,6 +32,12 @@ export function GenerateConversationDialog() {
     setIsOpen(false);
     try {
       const traces = generateConversation({ turnCount });
+      const executor = getFoundryExecutor({
+        apiKey,
+        endpoint: window.location.origin,
+        projectId: project?.id,
+        resourceAttributes: traces[0]?.resourceAttributes,
+      });
       for (let i = 0; i < traces.length; i++) {
         const logId = `conv-${Date.now()}-${i}`;
         addLogEntry({
@@ -41,12 +47,7 @@ export function GenerateConversationDialog() {
           status: "pending",
         });
         try {
-          const traceId = await executeTrace({
-            trace: traces[i]!,
-            apiKey,
-            endpoint: window.location.origin,
-            projectId: project?.id,
-          });
+          const traceId = await executor.executeTrace(traces[i]!);
           updateLogEntry(logId, { status: "success", traceId });
         } catch (err) {
           updateLogEntry(logId, {

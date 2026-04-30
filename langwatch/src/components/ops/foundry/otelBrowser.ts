@@ -54,7 +54,7 @@ export function createFoundryProvider({
     // for a long time without issues. The empty-state sample loader
     // mirrors Foundry's per-trace send pattern, so the same value
     // works for both.
-    concurrencyLimit: 64,
+    concurrencyLimit: 10,
     // Per-fetch AbortSignal timeout (separate from the
     // BatchSpanProcessor's flush timeout). Local dev servers can be
     // slow on the first request after a cold start, so be generous.
@@ -70,9 +70,7 @@ export function createFoundryProvider({
     // trace at most, so 256 is plenty without ever splitting.
     spanProcessors: [
       new BatchSpanProcessor(exporter, {
-        maxExportBatchSize: 256,
         maxQueueSize: 8192,
-        scheduledDelayMillis: 50,
         exportTimeoutMillis: 30_000,
       }),
     ],
@@ -80,4 +78,3 @@ export function createFoundryProvider({
 
   return provider;
 }
-

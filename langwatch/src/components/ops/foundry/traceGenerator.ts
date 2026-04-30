@@ -100,70 +100,6 @@ function randInt(min: number, max: number): number {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
-function makeLlmEvents({
-  systemPrompt,
-  userMsg,
-  assistantMsg,
-  model,
-  durationMs,
-  toolCalls,
-}: {
-  systemPrompt: string;
-  userMsg: string;
-  assistantMsg: string;
-  model: string;
-  durationMs: number;
-  toolCalls?: Array<{ name: string; args: Record<string, unknown> }>;
-}): NonNullable<SpanConfig["events"]> {
-  const events: NonNullable<SpanConfig["events"]> = [
-    {
-      name: "gen_ai.system.message",
-      offsetMs: 0,
-      attributes: {
-        "gen_ai.system": "openai",
-        role: "system",
-        content: systemPrompt,
-      },
-    },
-    {
-      name: "gen_ai.user.message",
-      offsetMs: randInt(1, 5),
-      attributes: {
-        "gen_ai.system": "openai",
-        role: "user",
-        content: userMsg,
-      },
-    },
-  ];
-
-  for (const tc of toolCalls ?? []) {
-    events.push({
-      name: "gen_ai.tool.message",
-      offsetMs: randInt(10, Math.max(11, Math.floor(durationMs * 0.4))),
-      attributes: {
-        "gen_ai.system": "openai",
-        role: "tool",
-        id: shortId(),
-        content: JSON.stringify(tc.args),
-      },
-    });
-  }
-
-  events.push({
-    name: "gen_ai.choice",
-    offsetMs: Math.max(events[events.length - 1]!.offsetMs! + 1, durationMs - randInt(5, 50)),
-    attributes: {
-      "gen_ai.system": "openai",
-      "gen_ai.response.model": model,
-      finish_reason: pick(["stop", "length", "tool_calls"]),
-      index: 0,
-      message: JSON.stringify({ role: "assistant", content: assistantMsg }),
-    },
-  });
-
-  return events;
-}
-
 function makeExceptionEvent(
   durationMs: number,
   message: string,
@@ -279,18 +215,11 @@ function makeLlmSpan(prompts?: PromptRef[], includeEvents?: boolean): SpanConfig
     output: { type: "text", value: assistantMsg },
   };
 
-  if (includeEvents) {
-    const events = makeLlmEvents({
-      systemPrompt,
-      userMsg,
-      assistantMsg,
-      model,
-      durationMs,
-    });
-    if (status === "error") {
-      events.push(makeExceptionEvent(durationMs, "Provider returned 500"));
-    }
-    span.events = events;
+  // gen_ai.* message + choice events are auto-emitted by the executor
+  // from `llm.messages`, so we only attach an exception event here when
+  // we want one — no need to duplicate the chat envelope as DSL events.
+  if (includeEvents && status === "error") {
+    span.events = [makeExceptionEvent(durationMs, "Provider returned 500")];
   }
 
   if (promptRef) {
