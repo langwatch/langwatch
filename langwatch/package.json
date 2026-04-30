@@ -321,7 +321,8 @@
       "ra-ui-materialui": "5.13.1",
       "ra-language-english": "5.13.1",
       "ai": "^6.0.161",
-      "liquidjs": ">=10.25.7"
+      "liquidjs": ">=10.25.7",
+      "protobufjs": ">=7.5.5 <8.0.0 || >=8.0.1"
     }
   },
   "ct3aMetadata": {
