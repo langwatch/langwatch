@@ -649,6 +649,7 @@ describe("Feature: Dataset File Upload REST API", () => {
   // (b) roll back the dataset row when record insertion fails.
   describe("when uploaded payload contains a U+0000 null byte", () => {
     describe("via JSONL create+upload", () => {
+      /** @scenario Create + upload accepts a JSONL file containing a null byte in a string field */
       it("strips the null byte and persists all records", async () => {
         const NUL = String.fromCharCode(0);
         const jsonl =
@@ -693,6 +694,7 @@ describe("Feature: Dataset File Upload REST API", () => {
         });
       });
 
+      /** @scenario Upload to existing dataset accepts a CSV containing null bytes */
       it("strips the null byte and persists the new record", async () => {
         const NUL = String.fromCharCode(0);
         // CSV with a quoted value containing a null byte.
@@ -717,7 +719,92 @@ describe("Feature: Dataset File Upload REST API", () => {
     });
   });
 
+  describe("when REST batch-create records carry a U+0000 null byte", () => {
+    beforeEach(async () => {
+      await createDataset({
+        name: "Batched",
+        slug: "batched",
+        columnTypes: [{ name: "input", type: "string" }],
+      });
+    });
+
+    /** @scenario Batch create records via REST sanitises null bytes */
+    it("strips the null byte and persists the new record", async () => {
+      const NUL = String.fromCharCode(0);
+      const res = await app.request("/api/dataset/batched/records", {
+        method: "POST",
+        headers: {
+          "X-Auth-Token": testApiKey,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          entries: [{ input: `hello${NUL}world` }],
+        }),
+      });
+
+      expect(res.status).toBe(201);
+
+      const dataset = await prisma.dataset.findFirst({
+        where: { slug: "batched", projectId: testProjectId },
+      });
+      const records = await prisma.datasetRecord.findMany({
+        where: { datasetId: dataset!.id, projectId: testProjectId },
+      });
+      expect(records).toHaveLength(1);
+      const entry = records[0]!.entry as Record<string, string>;
+      expect(entry.input).toBe("helloworld");
+    });
+  });
+
+  describe("when REST single-record update carries a U+0000 null byte", () => {
+    let datasetId: string;
+    let recordId: string;
+    beforeEach(async () => {
+      const dataset = await createDataset({
+        name: "Editable",
+        slug: "editable",
+        columnTypes: [{ name: "input", type: "string" }],
+      });
+      datasetId = dataset.id;
+      recordId = `rec-${nanoid()}`;
+      await prisma.datasetRecord.create({
+        data: {
+          id: recordId,
+          datasetId,
+          projectId: testProjectId,
+          entry: { input: "old" } as any,
+        },
+      });
+    });
+
+    /** @scenario Update record via REST sanitises null bytes */
+    it("strips the null byte from the updated entry", async () => {
+      const NUL = String.fromCharCode(0);
+      const res = await app.request(
+        `/api/dataset/editable/records/${recordId}`,
+        {
+          method: "PATCH",
+          headers: {
+            "X-Auth-Token": testApiKey,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ entry: { input: `new${NUL}value` } }),
+        },
+      );
+
+      expect(res.status).toBe(200);
+
+      const updated = await prisma.datasetRecord.findFirst({
+        where: { id: recordId, datasetId, projectId: testProjectId },
+      });
+      const entry = updated!.entry as Record<string, string>;
+      expect(entry.input).toBe("newvalue");
+    });
+  });
+
   describe("when record insertion fails after the dataset row is created", () => {
+    /** @scenario Create + upload rolls back the dataset row when record insertion fails */
+    /** @scenario Retrying after a failed create + upload reuses the same name */
     it("rolls back the dataset row so retries with the same name succeed", async () => {
       // We supply a record id guaranteed to collide with a pre-existing
       // record, so datasetRecord.createMany inside the transaction throws
