@@ -1,13 +1,9 @@
-import type { TriggerService } from "~/server/app-layer/triggers/trigger.service";
-import type { ProjectService } from "~/server/app-layer/projects/project.service";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import {
   buildPreconditionTraceDataFromFoldState,
   classifyTriggerFilters,
   matchesTriggerFilters,
 } from "~/server/filters/triggerFilter.matcher";
-import type { DatasetRecordEntry } from "~/server/datasets/types";
-import type { Trace } from "~/server/tracer/types";
 import { createLogger } from "~/utils/logger/server";
 import { captureException } from "~/utils/posthogErrorCapture";
 import type {
@@ -22,22 +18,7 @@ import {
 
 const logger = createLogger("langwatch:trace-processing:alert-trigger-reactor");
 
-export interface AlertTriggerReactorDeps extends TriggerActionDispatchDeps {
-  triggers: TriggerService;
-  projects: ProjectService;
-  traceById: (projectId: string, traceId: string) => Promise<Trace | undefined>;
-  addToAnnotationQueue: (params: {
-    traceIds: string[];
-    projectId: string;
-    annotators: string[];
-    userId: string;
-  }) => Promise<void>;
-  addToDataset: (params: {
-    datasetId: string;
-    projectId: string;
-    datasetRecords: DatasetRecordEntry[];
-  }) => Promise<void>;
-}
+export type AlertTriggerReactorDeps = TriggerActionDispatchDeps;
 
 /**
  * Evaluates user-defined trace-based triggers reactively when traces arrive.

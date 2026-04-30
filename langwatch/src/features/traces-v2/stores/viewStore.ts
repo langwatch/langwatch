@@ -515,6 +515,7 @@ export const useViewStore = create<ViewState>((set, get) => ({
 
   isDraft: (lensId) => get().draftState.has(lensId),
 
+  // TODO: createLens vs saveAsNewLens — these are currently identical, intent unclear
   createLens: (name) => {
     const id = generateId();
     const state = get();
@@ -534,6 +535,7 @@ export const useViewStore = create<ViewState>((set, get) => ({
     return id;
   },
 
+  // TODO: createLens vs saveAsNewLens — these are currently identical, intent unclear
   saveAsNewLens: (name) => {
     const id = generateId();
     const state = get();
