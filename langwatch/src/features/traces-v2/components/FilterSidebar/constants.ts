@@ -23,15 +23,25 @@ import {
   Shield,
   Sparkles,
   Tag,
+  Target,
   Timer,
   TimerReset,
   User,
+  UserSquare,
+  Users,
   Workflow,
 } from "lucide-react";
 import { FIELD_VALUES } from "~/server/app-layer/traces/query-language/metadata";
 import { STATUS_COLORS } from "../../utils/formatters";
 
+/** Section key for the trace-level Attributes block (reads `Attributes` map on `trace_summaries`). */
 export const ATTRIBUTES_SECTION_KEY = "__attributes__";
+
+/** Section key for the span-level Attributes block (reads `SpanAttributes` map on `stored_spans`). */
+export const SPAN_ATTRIBUTES_SECTION_KEY = "__span_attributes__";
+
+/** Section key for the per-event Attributes block (reads `Events.Attributes` on `stored_spans`). */
+export const EVENT_ATTRIBUTES_SECTION_KEY = "__event_attributes__";
 
 /** Acronyms whose canonical casing differs from the raw value. */
 export const FACET_LABELS: Record<string, string> = {
@@ -45,6 +55,7 @@ export const NORMAL_CASE_FIELDS = new Set([
   "status",
   "origin",
   "spanType",
+  "spanStatus",
   "rootSpanType",
   "guardrail",
   "annotation",
@@ -80,6 +91,7 @@ export const FACET_DEFAULTS: Record<string, string[]> = {
   status: FIELD_VALUES.status ?? [],
   spanType: SPAN_TYPE_DEFAULTS,
   rootSpanType: SPAN_TYPE_DEFAULTS,
+  spanStatus: ["ok", "error", "unset"],
   guardrail: ["blocked", "allowed"],
   annotation: ["annotated", "unannotated"],
   containsAi: ["yes", "no"],
@@ -107,6 +119,8 @@ export const FACET_ICONS: Record<string, LucideIcon> = {
   service: Server,
   user: User,
   conversation: MessageSquare,
+  customer: UserSquare,
+  scenarioRun: Target,
   topic: Tag,
   subtopic: Tag,
   label: Tag,
@@ -127,29 +141,46 @@ export const FACET_ICONS: Record<string, LucideIcon> = {
   selectedPrompt: BookMarked,
   lastUsedPrompt: History,
   promptVersion: Hash,
+  spanName: FileText,
+  spanStatus: Activity,
   [ATTRIBUTES_SECTION_KEY]: Database,
+  [SPAN_ATTRIBUTES_SECTION_KEY]: Database,
+  [EVENT_ATTRIBUTES_SECTION_KEY]: Database,
 };
 
 export const GROUP_ICONS: Record<string, LucideIcon> = {
   trace: ListTree,
+  subjects: Users,
   span: Boxes,
   evaluation: CheckSquare,
   metadata: Database,
 };
 
 export interface FacetGroupDef {
-  id: "trace" | "prompts" | "metrics" | "evaluators" | "events" | "attributes";
+  id: "trace" | "subjects" | "span" | "evaluators" | "metrics" | "prompts";
   label: string;
   keys: string[];
 }
 
 /**
- * Visual grouping for the filter sidebar. Group order is fixed; within a group
- * sections follow the listed order (and may be reordered by the user via DnD —
- * but only inside the same group).
+ * Visual grouping for the filter sidebar. Mirrors the canonical
+ * `SearchFieldGroup` taxonomy in `query-language/metadata.ts`
+ * (trace / span / eval / metrics) so the sidebar groups, search-bar
+ * dropdown sections, and field metadata all agree. Group order is fixed;
+ * within a group sections follow the listed order (and may be reordered by
+ * the user via DnD — but only inside the same group).
+ *
+ * There's no standalone "events" group: span events are hoisted onto the
+ * trace at ingest, so the `event` facet (event name) is a trace-level
+ * filter and lives in the Trace group with the other trace facets.
  */
 export const FACET_GROUPS: FacetGroupDef[] = [
   {
+    // Trace-level facets: properties of the whole trace, plus the root span's
+    // identity, plus span events (hoisted to the trace at ingest), plus
+    // model/service rolled up across all spans. The Attributes section
+    // reads `trace_summaries.Attributes` (trace.attribute.* keys), so it
+    // belongs here too.
     id: "trace",
     label: "Trace",
     keys: [
@@ -158,24 +189,44 @@ export const FACET_GROUPS: FacetGroupDef[] = [
       "errorMessage",
       "guardrail",
       "containsAi",
-      "annotation",
       "rootSpanType",
       "rootSpanName",
-      "spanType",
       "model",
       "service",
-      "user",
-      "conversation",
       "topic",
       "subtopic",
       "label",
-      "tokensEstimated",
+      "event",
+      ATTRIBUTES_SECTION_KEY,
+      EVENT_ATTRIBUTES_SECTION_KEY,
     ],
   },
   {
-    id: "prompts",
-    label: "Prompts",
-    keys: ["selectedPrompt", "lastUsedPrompt", "promptVersion"],
+    // Who/what is this trace about? End user, conversation thread, paying
+    // customer, and (when produced by a simulator) the scenario run that
+    // emitted it. Splitting these out of the Trace block makes the sidebar
+    // legible at a glance — "Subjects" is the axis you scope to a person
+    // or session, not the axis of trace-shape properties.
+    id: "subjects",
+    label: "Subjects",
+    keys: ["user", "conversation", "customer", "scenarioRun"],
+  },
+  {
+    // Span-level facets: "this trace contains *any* span where …".
+    id: "span",
+    label: "Span",
+    keys: ["spanName", "spanType", "spanStatus", SPAN_ATTRIBUTES_SECTION_KEY],
+  },
+  {
+    id: "evaluators",
+    label: "Evaluators",
+    keys: [
+      "annotation",
+      "evaluator",
+      "evaluatorStatus",
+      "evaluatorVerdict",
+      "evaluatorScore",
+    ],
   },
   {
     id: "metrics",
@@ -189,28 +240,14 @@ export const FACET_GROUPS: FacetGroupDef[] = [
       "ttft",
       "ttlt",
       "tokensPerSecond",
+      "tokensEstimated",
       "spans",
     ],
   },
   {
-    id: "evaluators",
-    label: "Evaluators",
-    keys: [
-      "evaluator",
-      "evaluatorStatus",
-      "evaluatorVerdict",
-      "evaluatorScore",
-    ],
-  },
-  {
-    id: "events",
-    label: "Events",
-    keys: ["event"],
-  },
-  {
-    id: "attributes",
-    label: "Attributes",
-    keys: [ATTRIBUTES_SECTION_KEY],
+    id: "prompts",
+    label: "Prompts",
+    keys: ["selectedPrompt", "lastUsedPrompt", "promptVersion"],
   },
 ];
 
@@ -233,6 +270,7 @@ export function getFacetGroupId(key: string): FacetGroupDef["id"] | undefined {
 export const NONE_TOGGLE_VALUE: Record<string, string> = {
   user: "user",
   conversation: "conversation",
+  customer: "customer",
   topic: "topic",
   subtopic: "subtopic",
   label: "label",

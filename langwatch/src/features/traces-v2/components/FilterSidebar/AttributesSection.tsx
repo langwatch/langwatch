@@ -7,11 +7,17 @@ import { SidebarSection } from "./SidebarSection";
 import type { AttributeKey, FacetValueState } from "./types";
 
 interface AttributesSectionProps {
+  /**
+   * Section title — varies by attribute flavour ("Trace attributes",
+   * "Span attributes"). Owned by the section data so the same component
+   * renders both flavours unchanged.
+   */
+  title: string;
   keys: AttributeKey[];
   icon?: React.ElementType;
-  /** Active filter state per `attribute.<key>:<value>` */
+  /** Active filter state per `<prefix>.<key>:<value>` */
   getValueState: (attrKey: string, value: string) => FacetValueState;
-  /** Active state for `none:attribute.<key>` */
+  /** Active state for `none:<prefix>.<key>` */
   getNoneActive: (attrKey: string) => boolean;
   onToggleValue: (attrKey: string, value: string) => void;
   onToggleNone: (attrKey: string) => void;
@@ -20,6 +26,7 @@ interface AttributesSectionProps {
 }
 
 export const AttributesSection: React.FC<AttributesSectionProps> = ({
+  title,
   keys,
   icon,
   getValueState,
@@ -40,7 +47,7 @@ export const AttributesSection: React.FC<AttributesSectionProps> = ({
 
   return (
     <SidebarSection
-      title="Attributes"
+      title={title}
       icon={icon}
       valueCount={keys.length}
       dragHandleProps={dragHandleProps}

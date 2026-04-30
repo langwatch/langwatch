@@ -9,15 +9,18 @@ import { useFilterStore } from "../../../stores/filterStore";
 import { hashColor } from "../../../utils/formatters";
 import {
   ATTRIBUTES_SECTION_KEY,
+  EVENT_ATTRIBUTES_SECTION_KEY,
   FACET_COLORS,
   FACET_DEFAULTS,
   FACET_GROUPS,
   type FacetGroupDef,
   getFacetGroupId,
+  SPAN_ATTRIBUTES_SECTION_KEY,
   VIBRANT_FIELDS,
 } from "../constants";
 import type {
   AttributeKey,
+  AttributesSectionData,
   CategoricalSection,
   FacetItem,
   FacetValueState,
@@ -53,10 +56,45 @@ export function useFilterSidebarData() {
     [facetStateLookup],
   );
 
-  const { categoricals, ranges, attributeKeys } = useMemo(
-    () => partitionDescriptors(descriptors),
-    [descriptors],
-  );
+  const {
+    categoricals,
+    ranges,
+    traceAttributeKeys,
+    spanAttributeKeys,
+    eventAttributeKeys,
+  } = useMemo(() => partitionDescriptors(descriptors), [descriptors]);
+
+  const attributeSections = useMemo<AttributesSectionData[]>(() => {
+    const sections: AttributesSectionData[] = [];
+    if (traceAttributeKeys.length > 0) {
+      sections.push({
+        key: ATTRIBUTES_SECTION_KEY,
+        label: "Trace attributes",
+        kind: "attributes",
+        filterPrefix: "attribute",
+        keys: traceAttributeKeys,
+      });
+    }
+    if (eventAttributeKeys.length > 0) {
+      sections.push({
+        key: EVENT_ATTRIBUTES_SECTION_KEY,
+        label: "Event attributes",
+        kind: "attributes",
+        filterPrefix: "event.attribute",
+        keys: eventAttributeKeys,
+      });
+    }
+    if (spanAttributeKeys.length > 0) {
+      sections.push({
+        key: SPAN_ATTRIBUTES_SECTION_KEY,
+        label: "Span attributes",
+        kind: "attributes",
+        filterPrefix: "span.attribute",
+        keys: spanAttributeKeys,
+      });
+    }
+    return sections;
+  }, [traceAttributeKeys, spanAttributeKeys, eventAttributeKeys]);
 
   const facetItems = useMemo(() => {
     const map = new Map<string, FacetItem[]>();
@@ -78,26 +116,18 @@ export function useFilterSidebarData() {
     const map = new Map<string, Section>();
     for (const c of categoricals) map.set(c.key, c);
     for (const r of ranges) map.set(r.key, r);
-    if (attributeKeys.length > 0) {
-      map.set(ATTRIBUTES_SECTION_KEY, {
-        key: ATTRIBUTES_SECTION_KEY,
-        label: "Attributes",
-        kind: "attributes",
-      });
-    }
+    for (const a of attributeSections) map.set(a.key, a);
     return map;
-  }, [categoricals, ranges, attributeKeys]);
+  }, [categoricals, ranges, attributeSections]);
 
   const orderedKeys = useMemo(() => {
     const naturalOrder = sortBySectionOrder([
       ...categoricals.map((c) => ({ key: c.key, label: c.label })),
       ...ranges.map((r) => ({ key: r.key, label: r.label })),
-      ...(attributeKeys.length > 0
-        ? [{ key: ATTRIBUTES_SECTION_KEY, label: "Attributes" }]
-        : []),
+      ...attributeSections.map((a) => ({ key: a.key, label: a.label })),
     ]).map((s) => s.key);
     return applyLensOrder(naturalOrder, lensSectionOrder);
-  }, [categoricals, ranges, attributeKeys, lensSectionOrder]);
+  }, [categoricals, ranges, attributeSections, lensSectionOrder]);
 
   const orderedGroups = useMemo(
     () => partitionIntoGroups(orderedKeys, lensGroupOrder),
@@ -108,7 +138,10 @@ export function useFilterSidebarData() {
     ast,
     categoricals,
     ranges,
-    attributeKeys,
+    traceAttributeKeys,
+    spanAttributeKeys,
+    eventAttributeKeys,
+    attributeSections,
     facetItems,
     getValueStates,
     facetsLoading,
@@ -137,8 +170,10 @@ export interface FacetGroupSlice {
  * Within a group, keys keep the order they appeared in the input (preserving
  * any DnD reordering). Unknown keys go to a synthetic trailing "other" group
  * so we never silently drop a section if the registry adds one we forgot to map.
+ *
+ * Exported for unit testing — the real call site is `useFilterSidebarData`.
  */
-function partitionIntoGroups(
+export function partitionIntoGroups(
   keys: string[],
   lensGroupOrder: readonly string[],
 ): FacetGroupSlice[] {
@@ -183,7 +218,9 @@ function partitionDescriptors(
 ) {
   const cats: CategoricalSection[] = [];
   const rngs: RangeSectionData[] = [];
-  let attrKeys: AttributeKey[] = [];
+  let traceAttrs: AttributeKey[] = [];
+  let spanAttrs: AttributeKey[] = [];
+  let eventAttrs: AttributeKey[] = [];
 
   for (const d of descriptors) {
     if (
@@ -206,15 +243,27 @@ function partitionDescriptors(
         min: d.min,
         max: d.max,
       });
-    } else if (d.kind === "dynamic_keys" && d.key === "metadataKeys") {
-      attrKeys = d.topKeys;
+    } else if (d.kind === "dynamic_keys") {
+      // Three parallel attribute discovery streams. Each one corresponds
+      // to a distinct `Map` (or `Array(Map)`) column in ClickHouse:
+      //   `metadataKeys`        → `trace_summaries.Attributes`
+      //   `spanAttributeKeys`   → `stored_spans.SpanAttributes`
+      //   `eventAttributeKeys`  → `stored_spans.Events.Attributes`
+      // Split here so the sidebar can render distinct sections under
+      // their respective groups (event keys live with the trace block
+      // because span events are hoisted onto the trace at ingest).
+      if (d.key === "metadataKeys") traceAttrs = d.topKeys;
+      else if (d.key === "spanAttributeKeys") spanAttrs = d.topKeys;
+      else if (d.key === "eventAttributeKeys") eventAttrs = d.topKeys;
     }
   }
 
   return {
     categoricals: sortBySectionOrder(cats),
     ranges: sortBySectionOrder(rngs),
-    attributeKeys: attrKeys,
+    traceAttributeKeys: traceAttrs,
+    spanAttributeKeys: spanAttrs,
+    eventAttributeKeys: eventAttrs,
   };
 }
 

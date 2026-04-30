@@ -56,11 +56,28 @@ export const FacetGroupHeader: React.FC<FacetGroupHeaderProps> = ({
       opacity={isDragging ? 0.6 : 1}
       zIndex={isDragging ? 1 : undefined}
       data-group-row
+      // Subtle separator between groups so the categorisation
+      // (identity / metrics / tags / …) is scannable without
+      // having to read every section heading. The first group
+      // gets neither the divider nor the wider top padding — its
+      // header should sit close to the search bar above so the
+      // first facet row stays in the user's eye line.
+      css={{
+        "&:not(:first-of-type)": {
+          borderTopWidth: "1px",
+          borderTopColor: "var(--chakra-colors-border-subtle)",
+          marginTop: "var(--chakra-spacing-1)",
+        },
+        "&:not(:first-of-type) > [data-facet-group-heading]": {
+          paddingTop: "var(--chakra-spacing-3)",
+        },
+      }}
     >
       <HStack
+        data-facet-group-heading
         gap={1}
         paddingX={3}
-        paddingTop={3}
+        paddingTop={1}
         paddingBottom={1}
         align="center"
       >

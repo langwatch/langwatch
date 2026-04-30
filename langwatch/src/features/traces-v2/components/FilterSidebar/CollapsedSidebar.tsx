@@ -34,6 +34,11 @@ export const CollapsedSidebar: React.FC<CollapsedSidebarProps> = ({
     })
     .filter((entry): entry is NonNullable<typeof entry> => entry !== null);
 
+  // Group categoricals by their SectionGroup so the collapsed rail mirrors
+  // the expanded sidebar's group separators. Same categorisation users see
+  // when expanded — just rendered as icon clusters with thin separators.
+  const groupedCategoricals = groupBySection(categoricals);
+
   return (
     <VStack height="full" gap={0} align="stretch" overflow="hidden" as="aside">
       <VStack
@@ -44,13 +49,25 @@ export const CollapsedSidebar: React.FC<CollapsedSidebarProps> = ({
         overflowY="auto"
         overflowX="hidden"
       >
-        {categoricals.map((cat) => (
-          <CategoricalCollapsedIcon
-            key={cat.key}
-            ast={ast}
-            section={cat}
-            onClick={onExpand}
-          />
+        {groupedCategoricals.map((cluster, idx) => (
+          <VStack key={cluster.key} gap={1} align="center" width="full">
+            {idx > 0 && (
+              <Separator
+                marginX={2}
+                marginY={0.5}
+                width="auto"
+                alignSelf="stretch"
+              />
+            )}
+            {cluster.items.map((cat) => (
+              <CategoricalCollapsedIcon
+                key={cat.key}
+                ast={ast}
+                section={cat}
+                onClick={onExpand}
+              />
+            ))}
+          </VStack>
         ))}
 
         {activeRanges.length > 0 && (
@@ -84,6 +101,30 @@ export const CollapsedSidebar: React.FC<CollapsedSidebarProps> = ({
   );
 };
 
+/**
+ * Group categoricals by their SectionGroup, preserving original order so
+ * the user-customised group ordering from the expanded sidebar carries
+ * through to the collapsed rail. Sections without a group fall into a
+ * trailing "ungrouped" cluster.
+ */
+function groupBySection(
+  sections: CategoricalSection[],
+): Array<{ key: string; items: CategoricalSection[] }> {
+  const order: string[] = [];
+  const buckets = new Map<string, CategoricalSection[]>();
+  for (const cat of sections) {
+    const key = cat.group ?? "__ungrouped__";
+    let bucket = buckets.get(key);
+    if (!bucket) {
+      bucket = [];
+      buckets.set(key, bucket);
+      order.push(key);
+    }
+    bucket.push(cat);
+  }
+  return order.map((key) => ({ key, items: buckets.get(key) ?? [] }));
+}
+
 const CategoricalCollapsedIcon: React.FC<{
   ast: LiqeQuery;
   section: CategoricalSection;
@@ -103,6 +144,7 @@ const CategoricalCollapsedIcon: React.FC<{
       isActive={activeCount > 0}
       badgeCount={activeCount}
       tooltipLines={tooltipLines}
+      previewValues={section.topValues}
       onClick={onClick}
     />
   );

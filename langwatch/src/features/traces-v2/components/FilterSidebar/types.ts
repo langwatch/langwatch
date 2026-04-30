@@ -53,6 +53,17 @@ export interface RangeSectionData extends SectionBase {
 
 export interface AttributesSectionData extends SectionBase {
   kind: "attributes";
+  /**
+   * Filter-language prefix used to dispatch toggles for this section.
+   * `attribute` → `attribute.<key>:<value>` (legacy / trace.attribute alias).
+   * `span.attribute` → `span.attribute.<key>:<value>` (any-span match).
+   * `event.attribute` → `event.attribute.<key>:<value>` (any span event match).
+   * Keeping it on the section, not the consumer, lets one render path
+   * serve trace, span, and event attribute lists.
+   */
+  filterPrefix: "attribute" | "span.attribute" | "event.attribute";
+  /** The discovered attribute keys for this section (with counts). */
+  keys: AttributeKey[];
 }
 
 export type Section =

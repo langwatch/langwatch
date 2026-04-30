@@ -5,11 +5,10 @@ import {
   getRangeValue,
 } from "~/server/app-layer/traces/query-language/queries";
 import { AttributesSection } from "./AttributesSection";
-import { ATTRIBUTES_SECTION_KEY, NONE_TOGGLE_VALUE } from "./constants";
+import { NONE_TOGGLE_VALUE } from "./constants";
 import { FacetSection } from "./FacetSection";
 import { RangeSection } from "./RangeSection";
 import type {
-  AttributeKey,
   FacetItem,
   FacetValueState,
   Section,
@@ -19,7 +18,6 @@ import { getFacetIcon, getRangeFormatter } from "./utils";
 interface SectionRendererProps {
   section: Section;
   ast: LiqeQuery;
-  attributeKeys: AttributeKey[];
   facetItemsByKey: Map<string, FacetItem[]>;
   valueStateGetters: Map<string, (value: string) => FacetValueState>;
   toggleFacet: (field: string, value: string) => void;
@@ -31,7 +29,6 @@ interface SectionRendererProps {
 export const SectionRenderer: React.FC<SectionRendererProps> = ({
   section,
   ast,
-  attributeKeys,
   facetItemsByKey,
   valueStateGetters,
   toggleFacet,
@@ -84,23 +81,25 @@ export const SectionRenderer: React.FC<SectionRendererProps> = ({
     );
   }
 
+  // Attributes section: same component for trace, span, and event — the
+  // section data carries its own filter prefix (`attribute.` vs
+  // `span.attribute.` vs `event.attribute.`) and key list, so the renderer
+  // doesn't need to know which flavour it's drawing.
+  const { filterPrefix, keys, label } = section;
+  const fieldFor = (attrKey: string) => `${filterPrefix}.${attrKey}`;
   return (
     <AttributesSection
-      icon={getFacetIcon({
-        key: ATTRIBUTES_SECTION_KEY,
-        group: "metadata",
-      })}
-      keys={attributeKeys}
+      title={label}
+      icon={icon}
+      keys={keys}
       getValueState={(attrKey, value) =>
-        getFacetValueState(ast, `attribute.${attrKey}`, value)
+        getFacetValueState(ast, fieldFor(attrKey), value)
       }
       getNoneActive={(attrKey) =>
-        getFacetValueState(ast, "none", `attribute.${attrKey}`) === "include"
+        getFacetValueState(ast, "none", fieldFor(attrKey)) === "include"
       }
-      onToggleValue={(attrKey, value) =>
-        toggleFacet(`attribute.${attrKey}`, value)
-      }
-      onToggleNone={(attrKey) => toggleFacet("none", `attribute.${attrKey}`)}
+      onToggleValue={(attrKey, value) => toggleFacet(fieldFor(attrKey), value)}
+      onToggleNone={(attrKey) => toggleFacet("none", fieldFor(attrKey))}
       onShiftToggle={onShiftToggle}
     />
   );

@@ -25,6 +25,7 @@ import { PanelLeftClose } from "lucide-react";
 import type React from "react";
 import { useCallback, useMemo } from "react";
 import { Kbd } from "~/components/ops/shared/Kbd";
+import { IsolatedErrorBoundary } from "~/components/ui/IsolatedErrorBoundary";
 import {
   FIELD_NAMES,
   SEARCH_FIELDS,
@@ -35,6 +36,7 @@ import {
 } from "~/server/app-layer/traces/query-language/queries";
 import { useUIStore } from "../../stores/uiStore";
 import { CollapsedSidebar } from "./CollapsedSidebar";
+import { CollapsedSidebarSkeleton } from "./CollapsedSidebarSkeleton";
 import { getFacetGroupId } from "./constants";
 import { FacetGroupHeader } from "./FacetGroupHeader";
 import { FilterSidebarSkeleton } from "./FilterSidebarSkeleton";
@@ -58,7 +60,6 @@ export const FilterSidebar: React.FC = () => {
     ast,
     categoricals,
     ranges,
-    attributeKeys,
     facetItems,
     getValueStates,
     facetsLoading,
@@ -141,24 +142,30 @@ export const FilterSidebar: React.FC = () => {
       const section = sectionByKey.get(key);
       if (!section) return null;
       return (
-        <SectionRenderer
+        // Per-section boundary — a single facet that throws (e.g. malformed
+        // descriptor, attribute renderer crash) should show an inline panel
+        // for that one row instead of taking out the entire sidebar.
+        <IsolatedErrorBoundary
           key={key}
-          section={section}
-          ast={ast}
-          attributeKeys={attributeKeys}
-          facetItemsByKey={facetItems}
-          valueStateGetters={getValueStates}
-          toggleFacet={toggleFacet}
-          setRange={setRange}
-          removeRange={removeRange}
-          onShiftToggle={handleShiftToggle}
-        />
+          scope={`Couldn't render the ${key} filter`}
+          resetKeys={[key]}
+        >
+          <SectionRenderer
+            section={section}
+            ast={ast}
+            facetItemsByKey={facetItems}
+            valueStateGetters={getValueStates}
+            toggleFacet={toggleFacet}
+            setRange={setRange}
+            removeRange={removeRange}
+            onShiftToggle={handleShiftToggle}
+          />
+        </IsolatedErrorBoundary>
       );
     },
     [
       sectionByKey,
       ast,
-      attributeKeys,
       facetItems,
       getValueStates,
       toggleFacet,
@@ -168,7 +175,16 @@ export const FilterSidebar: React.FC = () => {
     ],
   );
 
+  const showSkeleton = facetsLoading && descriptors.length === 0;
+
   if (collapsed) {
+    // Mirror the expanded-sidebar skeleton policy on the collapsed
+    // rail: until the first facet payload lands the rail used to
+    // render as an empty 40px column, which read as a layout glitch
+    // rather than "filters are loading." Showing circular icon
+    // placeholders matches the live rail's silhouette so the swap
+    // when data arrives feels like a fade-in, not a pop-in.
+    if (showSkeleton) return <CollapsedSidebarSkeleton />;
     return (
       <CollapsedSidebar
         ast={ast}
@@ -178,8 +194,6 @@ export const FilterSidebar: React.FC = () => {
       />
     );
   }
-
-  const showSkeleton = facetsLoading && descriptors.length === 0;
 
   return (
     <VStack height="full" gap={0} align="stretch" overflow="hidden" as="aside">
@@ -204,14 +218,19 @@ export const FilterSidebar: React.FC = () => {
               strategy={verticalListSortingStrategy}
             >
               {orderedGroups.map((group) => (
-                <FacetGroupHeader
+                <IsolatedErrorBoundary
                   key={group.id}
-                  id={groupSortableId(group.id)}
-                  label={group.label}
-                  isModified={modifiedGroupIds.has(group.id)}
+                  scope={`Couldn't render the ${group.label} filter group`}
+                  resetKeys={[group.id]}
                 >
-                  {group.keys.map(renderSection)}
-                </FacetGroupHeader>
+                  <FacetGroupHeader
+                    id={groupSortableId(group.id)}
+                    label={group.label}
+                    isModified={modifiedGroupIds.has(group.id)}
+                  >
+                    {group.keys.map(renderSection)}
+                  </FacetGroupHeader>
+                </IsolatedErrorBoundary>
               ))}
             </SortableContext>
           </DndContext>
