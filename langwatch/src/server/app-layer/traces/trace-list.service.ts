@@ -286,7 +286,7 @@ export class TraceListService {
     };
   }
 
-  async list(params: ListParams): Promise<TraceListPage> {
+  async getList(params: ListParams): Promise<TraceListPage> {
     const sortColumn = SORT_COLUMN_MAP[params.sort.columnId] ?? "OccurredAt";
 
     const result = await this.repository.findAll({
@@ -314,7 +314,7 @@ export class TraceListService {
     };
   }
 
-  async facets(params: FacetParams): Promise<FacetCounts> {
+  async getFacets(params: FacetParams): Promise<FacetCounts> {
     const facetPromises = Object.entries(FACET_EXPRESSIONS).map(
       async ([name, expression]) => {
         const result = await this.repository.findFacetCounts({
@@ -382,7 +382,7 @@ export class TraceListService {
     };
   }
 
-  async newCount(params: NewCountParams): Promise<number> {
+  async getNewCount(params: NewCountParams): Promise<number> {
     return this.repository.findCount({
       tenantId: params.tenantId,
       timeRange: params.timeRange,
@@ -391,7 +391,7 @@ export class TraceListService {
     });
   }
 
-  async suggest(params: SuggestParams): Promise<string[]> {
+  async getSuggestions(params: SuggestParams): Promise<string[]> {
     const column = SUGGEST_COLUMN_MAP[params.field];
     if (!column) return [];
 
@@ -406,7 +406,7 @@ export class TraceListService {
   /** Per-pod dedup of in-flight background refreshes. */
   private readonly discoverRefreshing = new Set<string>();
 
-  async discover(params: DiscoverParams): Promise<FacetDescriptor[]> {
+  async getDiscover(params: DiscoverParams): Promise<FacetDescriptor[]> {
     const cacheKey = discoverCacheKey(params);
     const cached = await DISCOVER_CACHE.get(cacheKey);
 
@@ -628,7 +628,7 @@ export class TraceListService {
   /** Per-pod dedup of in-flight background refreshes. */
   private readonly facetValuesRefreshing = new Set<string>();
 
-  async facetValues(params: FacetValuesParams): Promise<FacetValuesResult> {
+  async getFacetValues(params: FacetValuesParams): Promise<FacetValuesResult> {
     const cacheKey = facetValuesCacheKey(params);
     const cached = await FACET_VALUES_CACHE.get(cacheKey);
 

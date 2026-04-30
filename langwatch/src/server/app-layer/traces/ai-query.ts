@@ -302,7 +302,7 @@ async function fetchDynamicCategoricalValues(
 
   const results = await Promise.allSettled(
     facetFields.map((facetKey) =>
-      app.traces.list.facetValues({
+      app.traces.list.getFacetValues({
         tenantId: input.projectId,
         timeRange: input.timeRange,
         facetKey,

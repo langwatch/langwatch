@@ -226,7 +226,7 @@ export const tracesV2Router = createTRPCRouter({
         input.projectId,
         input.timeRange,
       );
-      return app.traces.list.list({
+      return app.traces.list.getList({
         tenantId: input.projectId,
         timeRange: input.timeRange,
         sort: input.sort,
@@ -252,7 +252,7 @@ export const tracesV2Router = createTRPCRouter({
         input.projectId,
         input.timeRange,
       );
-      return app.traces.list.facets({
+      return app.traces.list.getFacets({
         tenantId: input.projectId,
         timeRange: input.timeRange,
         filterWhere: filterWhere ?? undefined,
@@ -276,7 +276,7 @@ export const tracesV2Router = createTRPCRouter({
         input.projectId,
         input.timeRange,
       );
-      const count = await app.traces.list.newCount({
+      const count = await app.traces.list.getNewCount({
         tenantId: input.projectId,
         timeRange: input.timeRange,
         since: input.since,
@@ -297,7 +297,7 @@ export const tracesV2Router = createTRPCRouter({
     .use(checkProjectPermission("traces:view"))
     .query(async ({ input }) => {
       const app = getApp();
-      const values = await app.traces.list.suggest({
+      const values = await app.traces.list.getSuggestions({
         tenantId: input.projectId,
         field: input.field,
         prefix: input.prefix,
@@ -329,7 +329,7 @@ export const tracesV2Router = createTRPCRouter({
         sql: "Attributes['gen_ai.conversation.id'] = {threadConversationId:String}",
         params: { threadConversationId: input.conversationId },
       };
-      const page = await app.traces.list.list({
+      const page = await app.traces.list.getList({
         tenantId: input.projectId,
         timeRange,
         sort: { columnId: "time", direction: "asc" },
@@ -365,7 +365,7 @@ export const tracesV2Router = createTRPCRouter({
     .use(checkProjectPermission("traces:view"))
     .query(async ({ input }) => {
       const app = getApp();
-      return app.traces.list.discover({
+      return app.traces.list.getDiscover({
         tenantId: input.projectId,
         timeRange: input.timeRange,
       });
@@ -385,7 +385,7 @@ export const tracesV2Router = createTRPCRouter({
     .use(checkProjectPermission("traces:view"))
     .query(async ({ input }) => {
       const app = getApp();
-      return app.traces.list.facetValues({
+      return app.traces.list.getFacetValues({
         tenantId: input.projectId,
         timeRange: input.timeRange,
         facetKey: input.facetKey,
