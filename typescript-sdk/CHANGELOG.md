@@ -1,5 +1,19 @@
 # Changelog
 
+## [3.2.1](https://github.com/langwatch/langwatch/compare/typescript-sdk@v0.27.0...typescript-sdk@v3.2.1) (2026-04-30)
+
+
+### Bug Fixes
+
+* **release:** scope Release-As to langwatch, restore other components ([#3618](https://github.com/langwatch/langwatch/issues/3618)) ([e259e79](https://github.com/langwatch/langwatch/commit/e259e796b50e4d060e5c7f42cad1927f1da8a83d))
+
+
+### Miscellaneous
+
+* release as 3.2.1 ([ca9d7a9](https://github.com/langwatch/langwatch/commit/ca9d7a9231a7b3d9d8cf9a28a48fa494b1daeb4b))
+* release as 3.2.1 (override release-please from 3.3.0) ([#3615](https://github.com/langwatch/langwatch/issues/3615)) ([ca9d7a9](https://github.com/langwatch/langwatch/commit/ca9d7a9231a7b3d9d8cf9a28a48fa494b1daeb4b))
+* scope Release-As to langwatch, restore other components ([e259e79](https://github.com/langwatch/langwatch/commit/e259e796b50e4d060e5c7f42cad1927f1da8a83d))
+
 ## [0.27.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v0.26.0...typescript-sdk@v0.27.0) (2026-04-30)
 
 
