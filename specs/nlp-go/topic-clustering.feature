@@ -20,7 +20,7 @@ Feature: Topic clustering migrates to langevals when the Go-engine flag is on
   # Path selection driven by release_nlp_go_engine_enabled
   # ============================================================================
 
-  @integration @v1
+  @integration @v1 @unimplemented
   Scenario: with the flag OFF, batch clustering hits the legacy langwatch_nlp host
     Given the flag "release_nlp_go_engine_enabled" is OFF for project "acme-api"
     When the topic-clustering worker calls fetchTopicsBatchClustering for "acme-api"
@@ -28,7 +28,7 @@ Feature: Topic clustering migrates to langevals when the Go-engine flag is on
     And the request body shape is unchanged from today (BatchClusteringParams)
     And the response shape is TopicClusteringResponse
 
-  @integration @v1
+  @integration @v1 @unimplemented
   Scenario: with the flag ON, batch clustering hits langevals
     Given the flag is ON for project "acme-api"
     When the topic-clustering worker calls fetchTopicsBatchClustering for "acme-api"
@@ -36,13 +36,13 @@ Feature: Topic clustering migrates to langevals when the Go-engine flag is on
     And the request body shape is unchanged from today (BatchClusteringParams)
     And the response shape is TopicClusteringResponse
 
-  @integration @v1
+  @integration @v1 @unimplemented
   Scenario: with the flag ON, incremental clustering hits langevals
     Given the flag is ON for project "acme-api"
     When the topic-clustering worker calls fetchTopicsIncrementalClustering for "acme-api"
     Then the request POSTs to "${LANGEVALS_ENDPOINT}/topics/incremental_clustering"
 
-  @integration @v1
+  @integration @v1 @unimplemented
   Scenario: with the flag OFF, incremental clustering stays on langwatch_nlp
     Given the flag is OFF for project "acme-api"
     When the topic-clustering worker calls fetchTopicsIncrementalClustering for "acme-api"
@@ -52,7 +52,7 @@ Feature: Topic clustering migrates to langevals when the Go-engine flag is on
   # Result parity — the algorithm hasn't changed; both hosts produce the same answer
   # ============================================================================
 
-  @integration @v1
+  @integration @v1 @unimplemented
   Scenario: a deterministic input produces the same topics on both hosts
     Given a fixed seed and a fixed set of 200 traces with stable embeddings
     When the same BatchClusteringParams are POSTed to both
@@ -69,7 +69,7 @@ Feature: Topic clustering migrates to langevals when the Go-engine flag is on
   # Configuration — what env vars matter and how the TS app picks the host
   # ============================================================================
 
-  @integration @v1
+  @integration @v1 @unimplemented
   Scenario: missing LANGEVALS_ENDPOINT skips clustering with a warning, does not error
     Given the flag is ON for project "acme-api"
     And the env var LANGEVALS_ENDPOINT is unset
@@ -78,7 +78,7 @@ Feature: Topic clustering migrates to langevals when the Go-engine flag is on
     And a warning is logged with projectId and the reason "service URL not set"
     And no exception is thrown to the worker queue
 
-  @integration @v1
+  @integration @v1 @unimplemented
   Scenario: missing TOPIC_CLUSTERING_SERVICE on the legacy path skips clustering with a warning
     Given the flag is OFF for project "acme-api"
     And the env var TOPIC_CLUSTERING_SERVICE is unset
@@ -90,7 +90,7 @@ Feature: Topic clustering migrates to langevals when the Go-engine flag is on
   # Observability — operators can see which host served the job
   # ============================================================================
 
-  @integration @v1
+  @integration @v1 @unimplemented
   Scenario: every clustering call logs which engine served it
     When fetchTopicsBatchClustering completes for any project
     Then the access log line carries an "engine" field with value "langevals" or "langwatch_nlp"
@@ -100,7 +100,7 @@ Feature: Topic clustering migrates to langevals when the Go-engine flag is on
   # Provider credentials — the litellm_params payload travels with the request
   # ============================================================================
 
-  @integration @v1
+  @integration @v1 @unimplemented
   Scenario: the same litellm_params payload format is accepted by both hosts
     Given a BatchClusteringParams with litellm_params for the project's chat model
     And embeddings_litellm_params for the project's embedding model
@@ -113,14 +113,14 @@ Feature: Topic clustering migrates to langevals when the Go-engine flag is on
   # Deployment — langevals lambda runs the same Python code, sized appropriately
   # ============================================================================
 
-  @integration @v1
+  @integration @v1 @unimplemented
   Scenario: the langevals topic_clustering lambda has memory tier 3072MB
     When the operator inspects the deployed lambda
     Then aws_lambda_function for evaluator_package "topic_clustering" has memory_size 3072
     # sklearn + scipy + numpy + per-cluster LiteLLM calls measured ~2.7GB peak
     # during a 5k-trace batch run; the existing default of 256MB would OOM.
 
-  @integration @v1
+  @integration @v1 @unimplemented
   Scenario: the langevals package register_routes hook only mounts when installed
     Given a langevals lambda built without the topic_clustering extra
     When the FastAPI app starts up
@@ -133,7 +133,7 @@ Feature: Topic clustering migrates to langevals when the Go-engine flag is on
   # Migration safety — flagging a project off mid-run does not cancel work
   # ============================================================================
 
-  @integration @v1
+  @integration @v1 @unimplemented
   Scenario: flipping the flag during a queued clustering job does not break it
     Given the flag was ON when the worker dequeued a job for "acme-api"
     And the worker has already POSTed to ${LANGEVALS_ENDPOINT}/topics/batch_clustering

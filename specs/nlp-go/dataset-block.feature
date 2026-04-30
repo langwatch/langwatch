@@ -11,7 +11,7 @@ Feature: Dataset block — entry node reads inline dataset records and emits one
 
   Rule: Inline dataset deserializes column-oriented records
 
-    @unit
+    @unit @unimplemented
     Scenario: a dataset with three columns of three rows produces three records
       Given an entry node with dataset:
         """
@@ -27,7 +27,7 @@ Feature: Dataset block — entry node reads inline dataset records and emits one
       Then the engine has 3 records
       And the first record equals {"input": "a", "expected_output": "x", "id": 1}
 
-    @unit
+    @unit @unimplemented
     Scenario: a dataset whose columns have unequal lengths is rejected
       Given an entry node with dataset whose "input" has 3 rows and "expected_output" has 2 rows
       When the engine materializes the dataset
@@ -35,14 +35,14 @@ Feature: Dataset block — entry node reads inline dataset records and emits one
 
   Rule: entry_selection emits exactly one record by index
 
-    @integration
+    @integration @unimplemented
     Scenario: entry_selection=1 emits the second row only
       Given a workflow whose entry node has 4 records and entry_selection=1
       When I POST /go/studio/execute_sync
       Then the result references exactly one execution
       And the entry node's output equals the second record
 
-    @integration
+    @integration @unimplemented
     Scenario: entry_selection out of bounds returns a 400
       Given a workflow whose entry node has 3 records and entry_selection=10
       When I POST /go/studio/execute_sync
@@ -51,7 +51,7 @@ Feature: Dataset block — entry node reads inline dataset records and emits one
 
   Rule: train/test split is deterministic for a given seed
 
-    @unit
+    @unit @unimplemented
     Scenario Outline: same seed always produces the same split ordering
       Given a dataset with 100 rows, train_size=<train>, test_size=<test>, seed=<seed>
       When the engine computes the split twice
@@ -64,7 +64,7 @@ Feature: Dataset block — entry node reads inline dataset records and emits one
         | 70    | 30   | 7    |
         | 50    | 50   | 12345|
 
-    @unit
+    @unit @unimplemented
     Scenario: train_size + test_size > total rows is rejected
       Given a dataset with 10 rows, train_size=8, test_size=5
       When the engine computes the split
@@ -72,7 +72,7 @@ Feature: Dataset block — entry node reads inline dataset records and emits one
 
   Rule: Iterated execution emits one stream per record
 
-    @integration
+    @integration @unimplemented
     Scenario: a workflow with no entry_selection runs once per training record
       Given a workflow with 5 training records and no entry_selection
       When I POST /go/studio/execute and read the SSE stream
@@ -82,7 +82,7 @@ Feature: Dataset block — entry node reads inline dataset records and emits one
 
   Rule: Output field types match the dataset declaration
 
-    @unit
+    @unit @unimplemented
     Scenario Outline: typed columns are emitted with the declared type
       Given a dataset with column "v" declared as <field_type> and value <raw>
       When the entry node emits the record
@@ -97,7 +97,7 @@ Feature: Dataset block — entry node reads inline dataset records and emits one
 
   Rule: Parity with Python entry node
 
-    @integration @parity
+    @integration @parity @unimplemented
     Scenario: same dataset + seed produce identical record ordering on Go and Python
       Given a fixture dataset with 50 rows and seed=42
       When I run the dataset materializer in Go and in Python

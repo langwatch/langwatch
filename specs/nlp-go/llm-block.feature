@@ -20,7 +20,7 @@ Feature: LLM block — Studio signature node executes via the Go AI Gateway
   # OpenAI — the simplest path; baseline shape for all subsequent providers
   # ============================================================================
 
-  @integration @v1
+  @integration @v1 @unimplemented
   Scenario: signature node with OpenAI litellm_params runs end-to-end via the gateway
     Given a workflow whose signature node has model "openai/gpt-5-mini" and litellm_params:
       | api_key | sk-test-... |
@@ -36,7 +36,7 @@ Feature: LLM block — Studio signature node executes via the Go AI Gateway
     And the workflow result contains the assistant message in chat_messages shape
     And the gateway emits a span with attribute "langwatch.project_id" = "acme-api"
 
-  @integration @v1
+  @integration @v1 @unimplemented
   Scenario: signature node propagates the LangWatch trace id through to the gateway span
     Given a workflow whose signature node has model "openai/gpt-5-mini" and a litellm_params api_key
     And the TS app sends header "X-LangWatch-Trace-Id" = "trc_abc123"
@@ -49,19 +49,19 @@ Feature: LLM block — Studio signature node executes via the Go AI Gateway
   # Anthropic — model id normalization (dot→dash) and temperature clamp
   # ============================================================================
 
-  @integration @v1
+  @integration @v1 @unimplemented
   Scenario: anthropic model id with dotted version segment is normalized to dashes
     Given a workflow whose signature node has model "anthropic/claude-opus-4.5"
     When nlpgo translates the request before calling the gateway
     Then the model id sent to the gateway is "anthropic/claude-opus-4-5"
 
-  @integration @v1
+  @integration @v1 @unimplemented
   Scenario: anthropic alias expansion matches the TS modelIdBoundary mapping exactly
     Given a workflow whose signature node has model "anthropic/claude-sonnet-4"
     When nlpgo translates the request
     Then the model id sent to the gateway is "anthropic/claude-sonnet-4-20250514"
 
-  @integration @v1
+  @integration @v1 @unimplemented
   Scenario: anthropic temperature greater than 1.0 is clamped to 1.0 before the gateway sees it
     Given a workflow whose signature node has model "anthropic/claude-sonnet-4-20250514" and temperature 1.5
     When nlpgo executes the node
@@ -72,7 +72,7 @@ Feature: LLM block — Studio signature node executes via the Go AI Gateway
   # Reasoning models — temperature pinned to 1.0, max_tokens floor at 16000
   # ============================================================================
 
-  @integration @v1
+  @integration @v1 @unimplemented
   Scenario Outline: reasoning model overrides force temperature 1.0 and max_tokens floor
     Given a workflow whose signature node has model "<model>" with temperature 0.2 and max_tokens 1000
     When nlpgo translates the request
@@ -86,7 +86,7 @@ Feature: LLM block — Studio signature node executes via the Go AI Gateway
       | openai/o4-preview  |
       | openai/gpt-5-mini  |
 
-  @integration @v1
+  @integration @v1 @unimplemented
   Scenario: reasoning fields are normalized to a single canonical key before the gateway call
     Given a workflow whose signature node has any of: "reasoning", "reasoning_effort", "thinkingLevel", "effort" set to "medium"
     When nlpgo translates the request
@@ -97,7 +97,7 @@ Feature: LLM block — Studio signature node executes via the Go AI Gateway
   # Azure OpenAI — deployment name, api_version, extra_headers, optional Azure gateway proxy
   # ============================================================================
 
-  @integration @v1
+  @integration @v1 @unimplemented
   Scenario: Azure deployment routes via api_base + api_version with deployment name from model id
     Given a workflow whose signature node has model "azure/my-gpt5-prod" and litellm_params:
       | api_key       | <key>                           |
@@ -108,19 +108,19 @@ Feature: LLM block — Studio signature node executes via the Go AI Gateway
     And the gateway dispatches to Azure with deployment "my-gpt5-prod"
     And the response is 200
 
-  @integration @v1
+  @integration @v1 @unimplemented
   Scenario: Azure missing api_version falls back to default 2024-05-01-preview
     Given a workflow whose signature node has model "azure/my-deployment" and litellm_params with no api_version
     When nlpgo executes the node
     Then nlpgo injects api_version "2024-05-01-preview" into the Credential before dispatch
 
-  @integration @v1
+  @integration @v1 @unimplemented
   Scenario: Azure extra_headers JSON string is forwarded as a parsed object
     Given a workflow whose signature node has Azure litellm_params with extra_headers = '{"X-Internal-Tag":"acme"}'
     When nlpgo executes the node
     Then the gateway-bound request body includes header "X-Internal-Tag" with value "acme"
 
-  @integration @v1
+  @integration @v1 @unimplemented
   Scenario: Azure with use_azure_gateway = "true" routes via the Azure API Gateway base url
     Given a workflow whose signature node has Azure litellm_params with use_azure_gateway = "true"
     And the gateway is configured with an AZURE_API_GATEWAY_BASE_URL
@@ -132,7 +132,7 @@ Feature: LLM block — Studio signature node executes via the Go AI Gateway
   # AWS Bedrock — STS chain (managed) + plain access keys (BYO)
   # ============================================================================
 
-  @integration @v1
+  @integration @v1 @unimplemented
   Scenario: Bedrock with raw IAM credentials calls the gateway with bedrock.* fields
     Given a workflow with signature node model "bedrock/anthropic.claude-3-sonnet-20240229-v1:0" and litellm_params:
       | aws_access_key_id     | AKIA...           |
@@ -143,7 +143,7 @@ Feature: LLM block — Studio signature node executes via the Go AI Gateway
     And the gateway dispatches to Bedrock in us-east-1
     And the response is 200
 
-  @integration @v1
+  @integration @v1 @unimplemented
   Scenario: Bedrock with STS session token propagates aws_session_token and runtime endpoint
     Given a workflow with Bedrock litellm_params containing aws_session_token and aws_bedrock_runtime_endpoint (managed STS chain)
     When nlpgo executes the node
@@ -154,7 +154,7 @@ Feature: LLM block — Studio signature node executes via the Go AI Gateway
   # Vertex AI — inline JSON service-account key, project + location
   # ============================================================================
 
-  @integration @v1
+  @integration @v1 @unimplemented
   Scenario: Vertex with inline service-account JSON dispatches via vertex_ai/<model>
     Given a workflow whose signature node has model "vertex_ai/gemini-2.0-flash" and litellm_params:
       | vertex_credentials | {"type":"service_account",...}  |
@@ -170,7 +170,7 @@ Feature: LLM block — Studio signature node executes via the Go AI Gateway
   # Gemini AI Studio (separate from Vertex)
   # ============================================================================
 
-  @integration @v1
+  @integration @v1 @unimplemented
   Scenario: Gemini AI Studio uses a plain api_key
     Given a workflow with signature node model "gemini/gemini-2.0-flash" and litellm_params api_key
     When nlpgo executes the node
@@ -181,7 +181,7 @@ Feature: LLM block — Studio signature node executes via the Go AI Gateway
   # Custom OpenAI-compatible providers (Mistral, Together, Groq, etc.)
   # ============================================================================
 
-  @integration @v1
+  @integration @v1 @unimplemented
   Scenario: custom provider with custom_base_url forwards as openai-compatible at the gateway boundary
     Given a workflow with signature node model "custom/my-model" and litellm_params:
       | api_key  | <key>                           |
@@ -196,14 +196,14 @@ Feature: LLM block — Studio signature node executes via the Go AI Gateway
   # Tool calls + structured outputs preserved across the engine
   # ============================================================================
 
-  @integration @v1
+  @integration @v1 @unimplemented
   Scenario: tool_call arguments round-trip as canonical JSON without byte drift
     Given a workflow whose signature node has tools defined and the LLM responds with a tool_call
     When nlpgo serializes the assistant message back into the workflow chat_messages
     Then the tool_call arguments string is canonical-JSON encoded (sorted keys, no extra whitespace)
     And downstream nodes receive the exact same string
 
-  @integration @v1
+  @integration @v1 @unimplemented
   Scenario: structured-output workflow returns a parseable JSON matching the response_format
     Given a workflow whose signature node sets response_format = {"type":"json_schema", "json_schema": {...}}
     When the LLM responds
@@ -214,7 +214,7 @@ Feature: LLM block — Studio signature node executes via the Go AI Gateway
   # Multi-turn chat history preserved across signature nodes
   # ============================================================================
 
-  @integration @v1
+  @integration @v1 @unimplemented
   Scenario: chat_messages history is preserved across two consecutive signature nodes
     Given a workflow with two signature nodes in series, both consuming and producing chat_messages
     And the input is a 4-message history including a tool_call/tool_result pair
@@ -226,7 +226,7 @@ Feature: LLM block — Studio signature node executes via the Go AI Gateway
   # Streaming — SSE pass-through
   # ============================================================================
 
-  @integration @v1
+  @integration @v1 @unimplemented
   Scenario: streaming /go/studio/execute forwards SSE deltas from the gateway in real time
     Given a workflow with one signature node configured for streaming
     When the TS app GETs "/go/studio/execute" expecting text/event-stream
@@ -239,7 +239,7 @@ Feature: LLM block — Studio signature node executes via the Go AI Gateway
   # Errors & cancellation
   # ============================================================================
 
-  @integration @v1
+  @integration @v1 @unimplemented
   Scenario: gateway returning 401 surfaces a clean error event in the studio stream
     Given a workflow signature node whose litellm_params api_key is intentionally wrong
     When the workflow runs through nlpgo
@@ -247,7 +247,7 @@ Feature: LLM block — Studio signature node executes via the Go AI Gateway
     And nlpgo emits an "error" event with message containing "authentication failed" and the gateway request id
     And nlpgo does NOT include the api_key value in any log line
 
-  @integration @v1
+  @integration @v1 @unimplemented
   Scenario: client closing the SSE connection cancels the in-flight gateway request
     Given a workflow streaming a long signature node
     When the client closes the connection mid-stream
@@ -255,7 +255,7 @@ Feature: LLM block — Studio signature node executes via the Go AI Gateway
     And the gateway sees an upstream client_disconnect within 1 second
     And no further node executions are scheduled
 
-  @integration @v1
+  @integration @v1 @unimplemented
   Scenario: workflow with an unsupported node kind (agent/evaluator/retriever/custom) returns 501
     Given a workflow that contains a node of kind "evaluator"
     When the TS app POSTs to "/go/studio/execute_sync"
@@ -266,7 +266,7 @@ Feature: LLM block — Studio signature node executes via the Go AI Gateway
   # Cost attribution
   # ============================================================================
 
-  @integration @v1
+  @integration @v1 @unimplemented
   Scenario: gateway cost attribution lands on the correct project for studio runs
     Given a workflow run for project "acme-api" on the Go path
     When the run completes
@@ -284,7 +284,7 @@ Feature: LLM block — Studio signature node executes via the Go AI Gateway
   # application-layer auth, security comes from Lambda Function URL + URL
   # secrecy + restrictive Security Groups.
 
-  @integration @v1
+  @integration @v1 @unimplemented
   Scenario: /go/studio/execute_sync with a malformed body returns a typed 400
     When a request hits "/go/studio/execute_sync" with a body that is not valid JSON
     Then the response status is 400

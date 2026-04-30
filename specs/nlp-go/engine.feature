@@ -12,21 +12,21 @@ Feature: Workflow execution engine — DSL parsing, DAG resolution, lifecycle
 
   Rule: Workflow JSON deserializes losslessly
 
-    @unit
+    @unit @unimplemented
     Scenario: every node kind in the v1 scope round-trips
       Given a workflow JSON containing nodes of kinds "entry", "signature", "code", "http", "end", "prompting_technique"
       When the engine deserializes the workflow
       Then no fields are dropped
       And re-serializing the parsed workflow produces JSON canonically equal to the input
 
-    @unit
+    @unit @unimplemented
     Scenario: unsupported node kinds produce a structured error before execution
       Given a workflow JSON containing a node of kind "agent"
       When the engine attempts to plan execution
       Then the engine returns a 501 with body {"error": {"type": "unsupported_node_kind", "node_kind": "agent"}}
       And no nodes are executed
 
-    @unit
+    @unit @unimplemented
     Scenario Outline: field types parse with the expected Go representation
       Given a node parameter of declared type <field_type> with value <example>
       When the engine reads the parameter
@@ -46,13 +46,13 @@ Feature: Workflow execution engine — DSL parsing, DAG resolution, lifecycle
 
   Rule: DAG resolution rejects cycles and missing edges
 
-    @unit
+    @unit @unimplemented
     Scenario: a cycle in the workflow is rejected before any node runs
       Given a workflow with edges A->B, B->C, C->A
       When the engine plans execution
       Then the engine returns a 400 with body {"error": {"type": "invalid_workflow", "reason": "cycle_detected"}}
 
-    @unit
+    @unit @unimplemented
     Scenario: an edge whose source_node does not exist is rejected
       Given a workflow with an edge from "ghost_node" to "entry"
       When the engine plans execution
@@ -60,7 +60,7 @@ Feature: Workflow execution engine — DSL parsing, DAG resolution, lifecycle
 
   Rule: Topological execution preserves dependencies and parallelizes within a layer
 
-    @integration
+    @integration @unimplemented
     Scenario: nodes within the same layer execute concurrently
       Given a workflow where the entry fans out to three independent HTTP nodes that each sleep 200ms
       When I POST /go/studio/execute_sync with a valid input
@@ -68,7 +68,7 @@ Feature: Workflow execution engine — DSL parsing, DAG resolution, lifecycle
       And the total wall-clock time is less than 500ms
       And each HTTP node's "duration_ms" is between 180 and 400
 
-    @integration
+    @integration @unimplemented
     Scenario: a downstream node receives outputs from all its upstreams
       Given a workflow where the entry feeds two code nodes that each emit {"value": <number>}
       And both code nodes feed a final code node that sums the two "value" fields
@@ -78,7 +78,7 @@ Feature: Workflow execution engine — DSL parsing, DAG resolution, lifecycle
 
   Rule: Streaming endpoint emits the documented event shapes
 
-    @integration
+    @integration @unimplemented
     Scenario: /go/studio/execute streams execution_state_change per node, then done
       Given a workflow with one entry, one code node, and one end node
       When I POST /go/studio/execute and read the SSE stream
@@ -86,14 +86,14 @@ Feature: Workflow execution engine — DSL parsing, DAG resolution, lifecycle
       And I receive a final "done" event with status "success"
       And the connection closes after "done"
 
-    @integration
+    @integration @unimplemented
     Scenario: heartbeat keeps the connection alive during long-running nodes
       Given NLP_STREAM_HEARTBEAT_SECONDS is set to 1
       And a workflow whose only code node sleeps 5 seconds
       When I POST /go/studio/execute and read the SSE stream
       Then I receive at least 4 "is_alive_response" events before the "done" event
 
-    @integration
+    @integration @unimplemented
     Scenario: idle stream times out and closes
       Given NLP_STREAM_IDLE_TIMEOUT_SECONDS is set to 2
       And a workflow whose code node sleeps 10 seconds and emits no progress
@@ -103,7 +103,7 @@ Feature: Workflow execution engine — DSL parsing, DAG resolution, lifecycle
 
   Rule: Client cancellation propagates to in-flight nodes
 
-    @integration
+    @integration @unimplemented
     Scenario: closing the connection cancels HTTP-block requests
       Given a workflow whose only HTTP node calls a slow upstream that takes 30 seconds
       When I POST /go/studio/execute, read 2 events, then close the connection
@@ -112,7 +112,7 @@ Feature: Workflow execution engine — DSL parsing, DAG resolution, lifecycle
 
   Rule: Errors from one node fail the workflow with structured details
 
-    @integration
+    @integration @unimplemented
     Scenario: a code-block exception aborts the workflow with the traceback in the event payload
       Given a workflow whose code node raises ZeroDivisionError
       When I POST /go/studio/execute_sync
@@ -122,7 +122,7 @@ Feature: Workflow execution engine — DSL parsing, DAG resolution, lifecycle
       And the result.error.message contains "ZeroDivisionError"
       And no downstream nodes were executed
 
-    @integration
+    @integration @unimplemented
     Scenario: a node-level error emitted on the SSE stream does not break the heartbeat
       Given a workflow whose first node fails with a runtime error
       When I POST /go/studio/execute and read the SSE stream
@@ -131,7 +131,7 @@ Feature: Workflow execution engine — DSL parsing, DAG resolution, lifecycle
 
   Rule: chat_messages history is preserved across node boundaries
 
-    @integration
+    @integration @unimplemented
     Scenario: a multi-turn chat history threads through two LLM nodes intact
       Given a workflow with: entry -> signature_node_a (LLM) -> signature_node_b (LLM)
       And the entry produces chat_messages with 3 prior turns (user, assistant, user)
@@ -142,7 +142,7 @@ Feature: Workflow execution engine — DSL parsing, DAG resolution, lifecycle
 
   Rule: Per-node cost and duration are surfaced in the result
 
-    @integration
+    @integration @unimplemented
     Scenario: result includes per-node cost and duration_ms when LLM nodes ran
       Given a workflow with one signature node calling a real model via the gateway
       When I POST /go/studio/execute_sync
@@ -152,7 +152,7 @@ Feature: Workflow execution engine — DSL parsing, DAG resolution, lifecycle
 
   Rule: Workflow execution is byte-equivalent to the Python implementation
 
-    @integration @parity
+    @integration @parity @unimplemented
     Scenario Outline: a fixture workflow produces the same output on Go and Python
       Given the fixture workflow at <fixture_path>
       And the same input <input_path>
