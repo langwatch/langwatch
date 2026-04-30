@@ -223,6 +223,7 @@ async def test_example(example_file: str):
                         # "This is a chat model and not supported in the v1/completions endpoint",
                         "Rate limit",
                         "RateLimitError",
+                        "insufficient_quota",
                         "API Error",
                         "Connection error",
                         "Timeout",
