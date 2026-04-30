@@ -29,27 +29,27 @@ export interface DensityTokens {
 }
 
 const COMPACT: Readonly<DensityTokens> = {
-  rowPaddingY: "4px",
+  rowPaddingY: "3px",
   rowFontSize: "12px",
   ioFontSize: "11px",
   ioPaddingTop: "2px",
-  ioPaddingBottom: "5px",
-  groupRowPaddingY: "7px",
-  errorRowPaddingY: "5px",
+  ioPaddingBottom: "4px",
+  groupRowPaddingY: "5px",
+  errorRowPaddingY: "4px",
   errorRowFontSize: "12px",
-  errorDetailPaddingBottom: "5px",
+  errorDetailPaddingBottom: "4px",
 };
 
 const COMFORTABLE: Readonly<DensityTokens> = {
-  rowPaddingY: "12px",
+  rowPaddingY: "8px",
   rowFontSize: "14px",
   ioFontSize: "13px",
   ioPaddingTop: "2px",
-  ioPaddingBottom: "10px",
-  groupRowPaddingY: "12px",
-  errorRowPaddingY: "12px",
+  ioPaddingBottom: "8px",
+  groupRowPaddingY: "9px",
+  errorRowPaddingY: "9px",
   errorRowFontSize: "14px",
-  errorDetailPaddingBottom: "10px",
+  errorDetailPaddingBottom: "8px",
 };
 
 export function useDensityTokens(): DensityTokens {

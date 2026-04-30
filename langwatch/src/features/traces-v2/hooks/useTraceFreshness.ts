@@ -42,32 +42,45 @@ export function useTraceFreshness() {
       // Reset adaptive polling to fast interval
       requestFastPoll();
 
-      // Targeted drawer invalidation
+      // Targeted drawer invalidation. Project-scoped explicitly so the
+      // partial-input filter matches the project queries are keyed under,
+      // not just every header/spanTree/evals query in the cache.
       const { traceId: openTraceId } = useDrawerStore.getState();
-      if (openTraceId && traceIds.includes(openTraceId)) {
-        void trpcUtils.tracesV2.header.invalidate({ traceId: openTraceId });
-        void trpcUtils.tracesV2.spanTree.invalidate({
+      const projectId = project?.id;
+      if (openTraceId && projectId && traceIds.includes(openTraceId)) {
+        void trpcUtils.tracesV2.header.invalidate({
+          projectId,
           traceId: openTraceId,
         });
-        void trpcUtils.tracesV2.evals.invalidate({ traceId: openTraceId });
+        void trpcUtils.tracesV2.spanTree.invalidate({
+          projectId,
+          traceId: openTraceId,
+        });
+        void trpcUtils.tracesV2.evals.invalidate({
+          projectId,
+          traceId: openTraceId,
+        });
       }
     },
-    [trpcUtils, requestFastPoll, pulse],
+    [trpcUtils, requestFastPoll, pulse, project?.id],
   );
 
   const onSpanStored = useCallback(
     (traceIds: string[]) => {
       const { traceId: openTraceId } = useDrawerStore.getState();
-      if (!openTraceId || !traceIds.includes(openTraceId)) return;
+      const projectId = project?.id;
+      if (!openTraceId || !projectId || !traceIds.includes(openTraceId)) return;
 
       void trpcUtils.tracesV2.spanTree.invalidate({
+        projectId,
         traceId: openTraceId,
       });
       void trpcUtils.tracesV2.spanDetail.invalidate({
+        projectId,
         traceId: openTraceId,
       });
     },
-    [trpcUtils],
+    [trpcUtils, project?.id],
   );
 
   const { connectionState, lastEventAt } = useTraceUpdateListener({

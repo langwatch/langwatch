@@ -21,11 +21,16 @@ export function useResetSelectionOnViewChange(): void {
   const clear = useSelectionStore((s) => s.clear);
   const firstRunRef = useRef(true);
 
+  // While a relative-time label is active, from/to tick every minute
+  // (rolling window). We only want to clear selection on real semantic
+  // changes — collapse the time identity to the label when one is set.
+  const timeKey = timeLabel ?? `${timeFrom}|${timeTo}`;
+
   useEffect(() => {
     if (firstRunRef.current) {
       firstRunRef.current = false;
       return;
     }
     clear();
-  }, [queryText, timeFrom, timeTo, timeLabel, activeLensId, clear]);
+  }, [queryText, timeKey, activeLensId, clear]);
 }

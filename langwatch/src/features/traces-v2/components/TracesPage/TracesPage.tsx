@@ -48,7 +48,9 @@ const DIMMED_PROPS = {
   // `inert` keeps focus, hover, and pointer interactions out of the chrome
   // while the empty-state body is what the user should be touching.
   // React types lag the DOM property, so we widen via a record cast at the
-  // call sites that compose this object.
+  // call sites that compose this object. `inert` belt-and-suspenders the
+  // pointer-events block: even if a portal-rendered popover bypassed the
+  // wrapper's pointer-events, the trigger's click never fires under inert.
   inert: "",
 };
 

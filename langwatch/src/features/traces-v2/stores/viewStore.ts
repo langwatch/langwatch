@@ -77,6 +77,20 @@ interface DraftLensState {
   filter?: string;
 }
 
+/**
+ * Fields the rich create dialog can supply when materialising a brand-new lens
+ * instead of snapshotting the active table state. Anything omitted falls back
+ * to the live `viewStore` values (so the existing fast-path popover can keep
+ * calling `createLens(name)` without changes).
+ */
+export interface LensDraftInput {
+  columns: string[];
+  addons: string[];
+  grouping: GroupingMode;
+  sort: SortConfig;
+  filterText: string;
+}
+
 interface ViewState {
   activeLensId: string;
   allLenses: LensConfig[];
@@ -94,8 +108,7 @@ interface ViewState {
   setFilterDraft: (text: string) => void;
 
   isDraft: (lensId: string) => boolean;
-  createLens: (name: string) => string;
-  saveAsNewLens: (name: string) => string;
+  createLens: (name: string, overrides?: Partial<LensDraftInput>) => string;
   revertLens: (lensId: string) => void;
   renameLens: (lensId: string, name: string) => void;
   duplicateLens: (lensId: string) => string;
@@ -518,43 +531,45 @@ export const useViewStore = create<ViewState>((set, get) => ({
 
   isDraft: (lensId) => get().draftState.has(lensId),
 
-  // TODO: createLens vs saveAsNewLens — these are currently identical, intent unclear
-  createLens: (name) => {
+  // Snapshot the current view (columns, grouping, sort, filter text) into a
+  // new persisted lens. Both "Create lens" (from scratch) and "Save as new
+  // lens" (fork from current) flows go through here — the only difference
+  // is the supplied name. The rich Configure dialog passes `overrides` so
+  // every field is explicit; the popover fast-path omits them and we
+  // snapshot live `viewStore` state.
+  createLens: (name, overrides) => {
     const id = generateId();
     const state = get();
     const newLens: LensConfig = {
       id,
       name,
       isBuiltIn: false,
-      columns: [...state.columnOrder],
-      addons: [],
-      grouping: state.grouping,
-      sort: { ...state.sort },
-      filterText: getCurrentFilterText(),
+      columns: overrides?.columns
+        ? [...overrides.columns]
+        : [...state.columnOrder],
+      addons: overrides?.addons ? [...overrides.addons] : [],
+      grouping: overrides?.grouping ?? state.grouping,
+      sort: overrides?.sort ? { ...overrides.sort } : { ...state.sort },
+      filterText: overrides?.filterText ?? getCurrentFilterText(),
     };
     const allLenses = [...state.allLenses, newLens];
     persistCustomLenses(allLenses);
-    set({ allLenses, activeLensId: id });
-    return id;
-  },
-
-  // TODO: createLens vs saveAsNewLens — these are currently identical, intent unclear
-  saveAsNewLens: (name) => {
-    const id = generateId();
-    const state = get();
-    const newLens: LensConfig = {
-      id,
-      name,
-      isBuiltIn: false,
-      columns: [...state.columnOrder],
-      addons: [],
-      grouping: state.grouping,
-      sort: { ...state.sort },
-      filterText: getCurrentFilterText(),
-    };
-    const allLenses = [...state.allLenses, newLens];
-    persistCustomLenses(allLenses);
-    set({ allLenses, activeLensId: id });
+    // Adopt the new lens as the active one. When overrides are present we
+    // also push the saved values into live state so the table immediately
+    // reflects the configured shape (otherwise the user sees the old grouping
+    // / columns until they switch tabs).
+    if (overrides) {
+      applyFilterTextFromLens(newLens.filterText);
+      set({
+        allLenses,
+        activeLensId: id,
+        sort: { ...newLens.sort },
+        grouping: newLens.grouping,
+        columnOrder: [...newLens.columns],
+      });
+    } else {
+      set({ allLenses, activeLensId: id });
+    }
     return id;
   },
 

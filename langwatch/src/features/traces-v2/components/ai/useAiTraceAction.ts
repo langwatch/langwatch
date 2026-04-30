@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { useFilterStore } from "../../stores/filterStore";
@@ -54,8 +54,20 @@ export function useAiTraceAction({
   const createLens = useViewStore((s) => s.createLens);
   const [error, setError] = useState<string | null>(null);
 
+  // If the hosting composer unmounts (user closed it, navigated away,
+  // reopened it for a new prompt), drop the in-flight mutation's response
+  // so a stale reply never mutates global filter/lens state.
+  const cancelledRef = useRef(false);
+  useEffect(() => {
+    cancelledRef.current = false;
+    return () => {
+      cancelledRef.current = true;
+    };
+  }, []);
+
   const aiAction = api.tracesV2.aiAction.useMutation({
     onSuccess: (result) => {
+      if (cancelledRef.current) return;
       if (!result.ok) {
         setError(`Couldn't understand that. ${result.error}`);
         return;
@@ -73,6 +85,7 @@ export function useAiTraceAction({
       onDone?.();
     },
     onError: (e) => {
+      if (cancelledRef.current) return;
       setError(e.message);
     },
   });

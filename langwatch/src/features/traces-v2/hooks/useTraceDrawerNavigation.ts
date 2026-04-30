@@ -22,12 +22,19 @@ export function useTraceDrawerNavigation() {
     ({
       fromTraceId,
       fromViewMode,
+      fromTimestamp,
       toTraceId,
       toTimestamp,
       toViewMode,
     }: {
       fromTraceId: string;
       fromViewMode: DrawerViewMode;
+      /**
+       * The trace we're navigating *away from* — its occurredAt is captured
+       * onto the back stack so a future `goBack` can forward the partition-
+       * pruning hint to drawer queries (header / spanTree / evals).
+       */
+      fromTimestamp?: number;
       toTraceId: string;
       /**
        * Trace's actual occurredAt (ms). Forwarded to the URL as `drawer.t`
@@ -44,7 +51,11 @@ export function useTraceDrawerNavigation() {
       ) {
         return;
       }
-      pushTraceHistory({ traceId: fromTraceId, viewMode: fromViewMode });
+      pushTraceHistory({
+        traceId: fromTraceId,
+        viewMode: fromViewMode,
+        occurredAtMs: fromTimestamp,
+      });
       if (toViewMode) setViewMode(toViewMode);
       // Push into the store immediately so drawer hooks render with the
       // right traceId/occurredAtMs before the URL change settles.
@@ -61,8 +72,15 @@ export function useTraceDrawerNavigation() {
     const previous = popTraceHistory();
     if (!previous) return;
     setViewMode(previous.viewMode);
-    useDrawerStore.getState().openTrace(previous.traceId);
-    openDrawer("traceV2Details", { traceId: previous.traceId });
+    useDrawerStore
+      .getState()
+      .openTrace(previous.traceId, previous.occurredAtMs ?? null);
+    openDrawer("traceV2Details", {
+      traceId: previous.traceId,
+      ...(previous.occurredAtMs !== undefined
+        ? { t: String(previous.occurredAtMs) }
+        : {}),
+    });
   }, [openDrawer, popTraceHistory, setViewMode]);
 
   const goBackTo = useCallback(
@@ -70,8 +88,15 @@ export function useTraceDrawerNavigation() {
       const target = popTraceHistoryTo(index);
       if (!target) return;
       setViewMode(target.viewMode);
-      useDrawerStore.getState().openTrace(target.traceId);
-      openDrawer("traceV2Details", { traceId: target.traceId });
+      useDrawerStore
+        .getState()
+        .openTrace(target.traceId, target.occurredAtMs ?? null);
+      openDrawer("traceV2Details", {
+        traceId: target.traceId,
+        ...(target.occurredAtMs !== undefined
+          ? { t: String(target.occurredAtMs) }
+          : {}),
+      });
     },
     [openDrawer, popTraceHistoryTo, setViewMode],
   );

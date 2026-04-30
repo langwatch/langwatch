@@ -29,6 +29,10 @@ export function useTraceFacets() {
       // the sidebar doesn't flicker. Project switches are gated below by
       // remembering which project the cached response belongs to.
       keepPreviousData: true,
+      // Discover must not batch with `list`: the list query is the slow one
+      // on heavy projects (10–30s) and batching makes the sidebar wait the
+      // full duration even though discover itself returns in ~2s.
+      trpc: { context: { skipBatch: true } },
     },
   );
 

@@ -14,6 +14,13 @@ type AccordionSection = "events" | "evals" | "conversation";
 interface TraceHistoryEntry {
   traceId: string;
   viewMode: DrawerViewMode;
+  /**
+   * The trace's `occurredAt` timestamp (ms since epoch) at the time it was
+   * pushed onto the back stack. Carrying this lets back-navigation forward
+   * the partition-pruning hint to the drawer queries — without it, going
+   * back loses the hint and re-opens the drawer on a cold partition scan.
+   */
+  occurredAtMs?: number;
 }
 
 /**
@@ -31,6 +38,14 @@ interface DrawerState extends DrawerUrlState {
   isOpen: boolean;
   isMaximized: boolean;
   shortcutsOpen: boolean;
+  /**
+   * When true, clicking outside the drawer panel does NOT dismiss it —
+   * the user closes via the explicit X button, Esc, or double-click.
+   * When false, the drawer behaves like a standard modal: click-outside
+   * (or Esc) closes it. Persisted to localStorage so the operator's
+   * preference survives reloads.
+   */
+  pinned: boolean;
   traceId: string | null;
   /**
    * Trace's approximate occurredAt (ms epoch). Threaded into per-trace
@@ -55,6 +70,8 @@ interface DrawerState extends DrawerUrlState {
   setMaximized: (value: boolean) => void;
   toggleMaximized: () => void;
   setShortcutsOpen: (value: boolean) => void;
+  setPinned: (value: boolean) => void;
+  togglePinned: () => void;
   pinSpan: (spanId: string) => void;
   unpinSpan: (spanId: string) => void;
   clearPinnedSpans: () => void;
@@ -155,10 +172,34 @@ function readInitialFromURL(): InitialFromURL {
 
 const initial = readInitialFromURL();
 
+const PINNED_STORAGE_KEY = "langwatch:traces-v2:drawer-pinned:v1";
+
+function readPinnedFromStorage(): boolean {
+  if (typeof window === "undefined") return true;
+  try {
+    const raw = window.localStorage.getItem(PINNED_STORAGE_KEY);
+    if (raw === null) return true;
+    return raw === "true";
+  } catch {
+    return true;
+  }
+}
+
+function persistPinned(value: boolean) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(PINNED_STORAGE_KEY, String(value));
+  } catch {
+    // Best-effort persistence — quota errors / disabled storage just lose
+    // the preference for this session.
+  }
+}
+
 export const useDrawerStore = create<DrawerState>((set, get) => ({
   isOpen: initial.isOpen,
   isMaximized: false,
   shortcutsOpen: false,
+  pinned: readPinnedFromStorage(),
   traceId: initial.traceId,
   occurredAtMs: initial.occurredAtMs,
   selectedSpanId: initial.selectedSpanId,
@@ -204,6 +245,17 @@ export const useDrawerStore = create<DrawerState>((set, get) => ({
   setMaximized: (value) => set({ isMaximized: value }),
   toggleMaximized: () => set((s) => ({ isMaximized: !s.isMaximized })),
   setShortcutsOpen: (value) => set({ shortcutsOpen: value }),
+
+  setPinned: (value) => {
+    persistPinned(value);
+    set({ pinned: value });
+  },
+  togglePinned: () =>
+    set((s) => {
+      const next = !s.pinned;
+      persistPinned(next);
+      return { pinned: next };
+    }),
 
   pinSpan: (spanId) =>
     set((s) =>

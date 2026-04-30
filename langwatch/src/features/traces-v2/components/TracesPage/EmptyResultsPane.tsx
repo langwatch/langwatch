@@ -7,17 +7,6 @@ import { useOnboardingStore } from "../../onboarding/store/onboardingStore";
 import { Toolbar } from "../Toolbar/Toolbar";
 import { TraceTable } from "../TraceTable/TraceTable";
 
-const DIMMED_PROPS = {
-  opacity: 0.45,
-  pointerEvents: "none" as const,
-  "aria-disabled": true,
-  // `inert` keeps focus, hover, and pointer interactions out of the chrome
-  // while the empty-state body is what the user should be touching.
-  // React types lag the DOM property, so we widen via a record cast at the
-  // call sites that compose this object.
-  inert: "",
-};
-
 export const EmptyResultsPane: React.FC = React.memo(() => {
   // The trace list query short-circuits to `SAMPLE_PREVIEW_TRACES`
   // (purely client-side) whenever this pane is rendered, so the table
@@ -39,17 +28,16 @@ export const EmptyResultsPane: React.FC = React.memo(() => {
       height="full"
       overflow="hidden"
     >
-      <Box
-        width="full"
-        {...(setupDisengaged ? {} : (DIMMED_PROPS as Record<string, unknown>))}
-      >
-        <Toolbar />
-      </Box>
+      {/* Toolbar stays fully interactive during the tour — it now
+          carries the "On safari" exit affordance, which is the only
+          way out of the journey. Dimming/inert-ing it would make
+          the tour feel like a trap. */}
+      <Toolbar />
       {/* Sample-data banner — sits between toolbar and table so users
           can read it before they touch a facet. Always-on while preview
-          is active; the only way out is its "Done exploring" button,
-          which flips the dismissal flag and drops the user into the
-          real (empty) table. */}
+          is active; exit is the toolbar's "On safari" button, which
+          flips the dismissal flag and drops the user into the real
+          (empty) table. */}
       <SampleDataBanner />
       <Box flex={1} minHeight={0} position="relative" overflow="hidden">
         <Box
@@ -91,7 +79,22 @@ export const EmptyResultsPane: React.FC = React.memo(() => {
             or the mask geometry; see
             `onboarding/effects/OnboardingAurora.tsx`. */}
         <OnboardingAurora />
-        <Box position="absolute" inset={0} overflow="auto" zIndex={1}>
+        {/* Outer wrapper is pointer-events:none so clicks fall
+            through to the table behind it (notably the highlighted
+            row during `postArrival`, which is otherwise eclipsed by
+            this scroll-container's hit area). The hero composition
+            inside `EmptyStateOverlay` sets pointer-events:auto on
+            its inner Box, so headings, CTAs, and density cards stay
+            clickable. We also drop `overflow:auto` here for the same
+            reason — overflow:auto creates a hit-testable scroll
+            container. The hero composition Flex inside has its own
+            overflow:auto for the rare tall-hero case. */}
+        <Box
+          position="absolute"
+          inset={0}
+          zIndex={1}
+          pointerEvents="none"
+        >
           <EmptyStateOverlay />
         </Box>
       </Box>
