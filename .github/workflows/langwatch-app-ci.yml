@@ -151,6 +151,8 @@ jobs:
       CLICKHOUSE_URL: "http://default:ci_password@localhost:8123/test_langwatch"
       CI_REDIS_URL: "redis://localhost:6379"
       CI_CLICKHOUSE_URL: "http://default:ci_password@localhost:8123/test_langwatch"
+      LANGWATCH_NLP_SERVICE: "http://localhost:5561"
+      LANGWATCH_ENDPOINT: "http://localhost:3000"
       BUILD_TIME: "true"
       CI: "true"
 

@@ -108,7 +108,7 @@ export class SimulationRunnerService {
 
       // For HTTP targets, use remote span judge to collect spans from the
       // user's agent. For other targets, use standard in-process judge.
-      const langwatchEndpoint = this.getLangWatchEndpoint();
+      const langwatchEndpoint = env.LANGWATCH_ENDPOINT ?? "";
       let remoteSpanJudge: RemoteSpanJudgeAgent | undefined;
       const judgeAgentInstance =
         target.type === "http"
@@ -172,14 +172,6 @@ export class SimulationRunnerService {
         "Scenario execution failed",
       );
     }
-  }
-
-  private getLangWatchEndpoint(): string {
-    const endpoint = process.env.LANGWATCH_ENDPOINT;
-    if (!endpoint) {
-      throw new Error("LANGWATCH_ENDPOINT env var is required but not set");
-    }
-    return endpoint;
   }
 
   private resolveAdapter(
