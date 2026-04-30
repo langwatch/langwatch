@@ -3,15 +3,15 @@
  *
  * Prevents Server-Side Request Forgery by validating URLs before fetching.
  *
- * ## What's Blocked (Always)
+ * ## What's Blocked (Always, regardless of toggle or allowlist)
  * - Cloud metadata endpoints (see ssrfConstants.ts for full list)
  * - Cloud provider internal domains (configured for AWS, see ssrfConstants.ts to extend)
  *
- * ## What's Blocked (Production Only)
+ * ## What's Blocked (only when BLOCK_LOCAL_HTTP_CALLS is true)
  * - IPv4 private: 127.0.0.0/8, 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 169.254.0.0/16
  * - IPv6 private: ::1, ::, fc00::/7 (ULA), fe80::/10 (link-local)
  * - IPv4-mapped IPv6: ::ffff:x.x.x.x (extracted and checked as IPv4)
- * - Hostnames resolving to private IPs
+ * - Hostnames resolving to any of the above
  *
  * ## DNS Rebinding Protection
  * Eliminates TOCTOU attacks by:
@@ -26,14 +26,19 @@
  * - Re-validates redirect URLs through SSRF checks
  * - Limits redirect chain to 10 hops to prevent infinite loops
  *
- * ## Development Mode
- * - Without ALLOWED_PROXY_HOSTS: All localhost/private IPs allowed
- * - With ALLOWED_PROXY_HOSTS: Only listed hosts bypass checks
- * - DNS failures: Allowed (for debugging)
+ * ## Behavior matrix
  *
- * ## Production Mode
- * - DNS failures: Fail closed (throw error)
- * - All private/localhost blocked
+ * | BLOCK_LOCAL_HTTP_CALLS | ALLOWED_PROXY_HOSTS    | Cloud metadata | Private IP / localhost                      |
+ * |------------------------|------------------------|----------------|---------------------------------------------|
+ * | unset / "false"        | (any)                  | blocked        | allowed                                     |
+ * | "true"                 | empty                  | blocked        | blocked                                     |
+ * | "true"                 | "10.0.5.3,foo.local"   | blocked        | allowed only for the listed hostnames       |
+ *
+ * ## Allowlist semantics
+ * `ALLOWED_PROXY_HOSTS` is a comma-separated list of hostnames matched
+ * literally (case-insensitive) against the URL hostname. Match bypasses
+ * private-IP/localhost blocking but NEVER bypasses cloud metadata blocking.
+ * Identical semantics in the Python NLP service (`http_node.py`).
  *
  * ## Usage
  * ```ts
@@ -45,15 +50,16 @@
  * const response = await fetchWithResolvedIp(validated, { method: "POST" });
  * ```
  *
- * ## On-Prem Mode (IS_SAAS=false)
- * - Private IP/hostname checks are skipped (allows reaching internal services)
- * - TLS certificate validation is disabled (allows self-signed certs)
- * - Cloud metadata endpoints and cloud provider domains are ALWAYS blocked
+ * ## TLS (separate concern, still gated on IS_SAAS)
+ * `IS_SAAS=false` (on-prem) disables TLS certificate verification so on-prem
+ * operators can call services with self-signed certs. This is intentionally
+ * NOT controlled by BLOCK_LOCAL_HTTP_CALLS — the two flags address different
+ * threat models.
  *
  * ## Environment Variables
- * - IS_SAAS: "true"/"1" to enable SaaS mode, "false"/"0" or unset for on-prem mode
- * - ALLOWED_PROXY_HOSTS: Comma-separated allowlist for dev (e.g., "localhost,127.0.0.1")
- * - NODE_ENV: "development" or "production"
+ * - BLOCK_LOCAL_HTTP_CALLS: "true"/"1" to block private/localhost; otherwise allowed
+ * - ALLOWED_PROXY_HOSTS: Comma-separated literal hostname allowlist (e.g. "localhost,10.0.5.3")
+ * - IS_SAAS: separately controls TLS rejectUnauthorized — see TLS section above
  *
  * @module ssrfProtection
  */
@@ -71,9 +77,6 @@ import { BLOCKED_CLOUD_DOMAINS, BLOCKED_METADATA_HOSTS } from "./ssrfConstants";
 
 const logger = createLogger("langwatch:ssrfProtection");
 
-/** Single source of truth for SaaS mode. Uses env module (false when IS_SAAS is unset). */
-const isSaaS = !!env.IS_SAAS;
-
 // ============================================================================
 // Types
 // ============================================================================
@@ -83,10 +86,10 @@ const isSaaS = !!env.IS_SAAS;
  * Inject this to avoid direct process.env dependency.
  */
 export interface SSRFConfig {
-  isDevelopment: boolean;
-  allowedDevHosts: string[];
-  /** When false (on-prem), private IP/hostname checks are skipped. Cloud metadata is always blocked. Defaults to true. */
-  isSaaS: boolean;
+  /** When true, block private IPs / localhost / DNS-resolved private hosts. Cloud metadata is always blocked regardless. */
+  blockLocal: boolean;
+  /** Literal hostname allowlist (case-insensitive) that bypasses private-IP blocking. Cloud metadata is never bypassed. */
+  allowedHosts: string[];
 }
 
 /**
@@ -96,7 +99,7 @@ export interface SSRFConfig {
 export type SSRFValidationResult =
   | SSRFResolvedResult
   | SSRFAllowlistedResult
-  | SSRFDevelopmentBypassResult;
+  | SSRFUnresolvedResult;
 
 interface SSRFResultBase {
   originalUrl: string;
@@ -116,8 +119,8 @@ export interface SSRFAllowlistedResult extends SSRFResultBase {
   resolvedIp?: string;
 }
 
-export interface SSRFDevelopmentBypassResult extends SSRFResultBase {
-  type: "development-bypass";
+export interface SSRFUnresolvedResult extends SSRFResultBase {
+  type: "unresolved";
   reason: "dns-failed" | "no-records";
 }
 
@@ -180,7 +183,7 @@ function isBareLocalhostOrLocal(hostname: string): boolean {
 /**
  * Checks if hostname matches a blocked cloud provider domain pattern.
  * Bare "localhost" and "local" are NOT blocked here - they are handled
- * by the private IP checks which respect development mode settings.
+ * by the private IP checks which respect BLOCK_LOCAL_HTTP_CALLS.
  */
 export function isBlockedCloudDomain(hostname: string): boolean {
   const lowerHostname = hostname.toLowerCase();
@@ -274,12 +277,12 @@ function validateNotBlockedCloudDomain(ctx: ValidationContext): void {
 
 function validateNotPrivateIpLiteral(
   ctx: ValidationContext,
-  skipPrivateChecks: boolean,
+  blockLocal: boolean,
 ): void {
   const ipVersion = isIP(ctx.hostname);
   if (
     ipVersion !== 0 &&
-    !skipPrivateChecks &&
+    blockLocal &&
     isPrivateOrLocalhostIP(ctx.hostname)
   ) {
     logger.warn(
@@ -300,9 +303,9 @@ function validateNotPrivateIpLiteral(
 function validateResolvedAddresses(
   ctx: ValidationContext,
   addresses: string[],
-  skipPrivateChecks: boolean,
+  blockLocal: boolean,
 ): void {
-  if (skipPrivateChecks) return;
+  if (!blockLocal) return;
 
   const privateAddresses = addresses.filter(isPrivateOrLocalhostIP);
   if (privateAddresses.length > 0) {
@@ -364,11 +367,11 @@ function buildAllowlistedResult(
   return { ...buildResultBase(ctx), type: "allowlisted", resolvedIp };
 }
 
-function buildDevelopmentBypassResult(
+function buildUnresolvedResult(
   ctx: ValidationContext,
   reason: "dns-failed" | "no-records",
-): SSRFDevelopmentBypassResult {
-  return { ...buildResultBase(ctx), type: "development-bypass", reason };
+): SSRFUnresolvedResult {
+  return { ...buildResultBase(ctx), type: "unresolved", reason };
 }
 
 // ============================================================================
@@ -417,15 +420,17 @@ export function createSSRFValidator(config: SSRFConfig) {
     validateNotMetadataEndpoint(ctx);
     validateNotBlockedCloudDomain(ctx);
 
-    // Check development allowlist
-    if (config.isDevelopment && config.allowedDevHosts.length > 0) {
-      const normalizedAllowed = config.allowedDevHosts.map((h) =>
+    // Allowlist (literal hostname match, case-insensitive) — bypasses
+    // private-IP / localhost blocking. Cloud metadata was already rejected
+    // above, so it can never be allowlisted.
+    if (config.allowedHosts.length > 0) {
+      const normalizedAllowed = config.allowedHosts.map((h) =>
         h.trim().toLowerCase(),
       );
       if (normalizedAllowed.includes(hostname)) {
         logger.info(
           { url, hostname, allowedHosts: normalizedAllowed },
-          "Development mode: allowing request to allowlisted host",
+          "Allowing request to allowlisted host",
         );
         const ipVersion = isIP(hostname);
         return buildAllowlistedResult(
@@ -435,14 +440,10 @@ export function createSSRFValidator(config: SSRFConfig) {
       }
     }
 
-    const skipPrivateChecks =
-      !config.isSaaS ||
-      (config.isDevelopment && config.allowedDevHosts.length === 0);
-
     // Handle IP literals
     const ipVersion = isIP(hostname);
     if (ipVersion !== 0) {
-      validateNotPrivateIpLiteral(ctx, skipPrivateChecks);
+      validateNotPrivateIpLiteral(ctx, config.blockLocal);
       return buildResolvedResult(ctx, hostname);
     }
 
@@ -451,7 +452,7 @@ export function createSSRFValidator(config: SSRFConfig) {
     try {
       allAddresses = await resolveHostname(hostname);
     } catch (dnsError) {
-      if (config.isDevelopment) {
+      if (!config.blockLocal) {
         logger.debug(
           {
             url,
@@ -459,9 +460,9 @@ export function createSSRFValidator(config: SSRFConfig) {
             error:
               dnsError instanceof Error ? dnsError.message : String(dnsError),
           },
-          "DNS resolution failed during SSRF check in development",
+          "DNS resolution failed; not blocking because BLOCK_LOCAL_HTTP_CALLS is off",
         );
-        return buildDevelopmentBypassResult(ctx, "dns-failed");
+        return buildUnresolvedResult(ctx, "dns-failed");
       }
       logger.error(
         {
@@ -478,12 +479,12 @@ export function createSSRFValidator(config: SSRFConfig) {
     }
 
     if (allAddresses.length === 0) {
-      if (config.isDevelopment) {
+      if (!config.blockLocal) {
         logger.debug(
           { url, hostname },
-          "No DNS records found in development, allowing request",
+          "No DNS records found; not blocking because BLOCK_LOCAL_HTTP_CALLS is off",
         );
-        return buildDevelopmentBypassResult(ctx, "no-records");
+        return buildUnresolvedResult(ctx, "no-records");
       }
       logger.error(
         { url, hostname },
@@ -494,7 +495,7 @@ export function createSSRFValidator(config: SSRFConfig) {
       );
     }
 
-    validateResolvedAddresses(ctx, allAddresses, skipPrivateChecks);
+    validateResolvedAddresses(ctx, allAddresses, config.blockLocal);
 
     const resolvedIp = allAddresses[0]!;
     logger.debug(
@@ -511,9 +512,8 @@ export function createSSRFValidator(config: SSRFConfig) {
  * For most use cases, use this or ssrfSafeFetch directly.
  */
 export const validateUrlForSSRF = createSSRFValidator({
-  isDevelopment: process.env.NODE_ENV === "development",
-  allowedDevHosts: process.env.ALLOWED_PROXY_HOSTS?.split(",") || [],
-  isSaaS,
+  blockLocal: !!env.BLOCK_LOCAL_HTTP_CALLS,
+  allowedHosts: env.ALLOWED_PROXY_HOSTS?.split(",") ?? [],
 });
 
 // ============================================================================
@@ -526,12 +526,19 @@ export interface SSRFSafeFetchOptions extends RequestInit {
   _redirectCount?: number;
 }
 
-/** Returns TLS/fetch configuration based on SaaS mode. */
+/**
+ * Returns TLS/fetch configuration based on SaaS mode.
+ *
+ * Note: TLS verification is intentionally tied to IS_SAAS, NOT to
+ * BLOCK_LOCAL_HTTP_CALLS — the two flags address different concerns. On-prem
+ * operators frequently need to call services with self-signed certs, which
+ * has nothing to do with whether private-IP blocking is on.
+ */
 export function createSSRFSafeFetchConfig({ isSaaS }: { isSaaS: boolean }): { rejectUnauthorized: boolean } {
   return { rejectUnauthorized: isSaaS };
 }
 
-const defaultFetchConfig = createSSRFSafeFetchConfig({ isSaaS });
+const defaultFetchConfig = createSSRFSafeFetchConfig({ isSaaS: !!env.IS_SAAS });
 
 function createIpPinningAgent(resolvedIp: string, tlsConfig: { rejectUnauthorized: boolean } = defaultFetchConfig): Agent {
   return new Agent({
@@ -552,7 +559,7 @@ function getResolvedIpForPinning(result: SSRFValidationResult): string | null {
       return result.resolvedIp;
     case "allowlisted":
       return result.resolvedIp ?? null;
-    case "development-bypass":
+    case "unresolved":
       return null;
   }
 }

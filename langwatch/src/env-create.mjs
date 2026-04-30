@@ -85,6 +85,14 @@ export function createEnvConfig() {
       EMAIL_DEFAULT_FROM: z.string().optional(),
       S3_KEY_SALT: z.string().optional(),
       IS_SAAS: z.boolean().optional(),
+      // Controls SSRF blocking for outbound HTTP calls (TS proxy + scenario
+      // runner; mirrored on the Python NLP side via the same env name). When
+      // true: private IPs, localhost, and hostnames resolving to private IPs
+      // are blocked unless listed in ALLOWED_PROXY_HOSTS. When unset/false:
+      // local destinations are allowed (cloud metadata is still always
+      // blocked). Default: false.
+      BLOCK_LOCAL_HTTP_CALLS: z.boolean().optional(),
+      ALLOWED_PROXY_HOSTS: z.string().optional(),
       SHOW_OPS_IN_MAIN_SIDEBAR: z.string().optional(),
       USE_S3_STORAGE: z.boolean().optional(),
       S3_ENDPOINT: z.string().optional(),
@@ -223,6 +231,10 @@ export function createEnvConfig() {
       IS_SAAS:
         process.env.IS_SAAS === "1" ||
         process.env.IS_SAAS?.toLowerCase() === "true",
+      BLOCK_LOCAL_HTTP_CALLS:
+        process.env.BLOCK_LOCAL_HTTP_CALLS === "1" ||
+        process.env.BLOCK_LOCAL_HTTP_CALLS?.toLowerCase() === "true",
+      ALLOWED_PROXY_HOSTS: process.env.ALLOWED_PROXY_HOSTS,
       SHOW_OPS_IN_MAIN_SIDEBAR: process.env.SHOW_OPS_IN_MAIN_SIDEBAR,
       USE_S3_STORAGE:
         process.env.USE_S3_STORAGE === "1" ||
