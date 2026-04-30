@@ -9,6 +9,7 @@ import {
   type PlanProvider,
 } from "~/server/app-layer/subscription/plan-provider";
 import { prisma } from "~/server/db";
+import { DatasetService } from "~/server/datasets/dataset.service";
 import type { DatasetColumns } from "~/server/datasets/types";
 import { FREE_PLAN } from "../../../../../ee/licensing/constants";
 import { app } from "../[[...route]]/app";
@@ -637,6 +638,143 @@ describe("Feature: Dataset File Upload REST API", () => {
         });
         expect(res.status).toBe(401);
       });
+    });
+  });
+
+  // ── Postgres null-byte safety + atomicity ──────────────────────
+  // Customer report: JSONL upload produced a Postgres 22P05 error
+  // ("\u0000 cannot be converted to text"), the dataset row was created
+  // anyway, and retrying with the same name failed with "already exists".
+  // We must (a) sanitise null bytes from user-supplied strings and
+  // (b) roll back the dataset row when record insertion fails.
+  describe("when uploaded payload contains a U+0000 null byte", () => {
+    describe("via JSONL create+upload", () => {
+      it("strips the null byte and persists all records", async () => {
+        const NUL = String.fromCharCode(0);
+        const jsonl =
+          `{"input": "before${NUL}after"}\n` +
+          `{"input": "clean"}\n`;
+        const form = buildFormData({
+          file: { content: jsonl, filename: "data.jsonl" },
+          name: "Nulls JSONL",
+        });
+        const res = await createAndUpload(form);
+
+        expect(res.status).toBe(201);
+
+        const dataset = await prisma.dataset.findFirst({
+          where: { slug: "nulls-jsonl", projectId: testProjectId },
+        });
+        expect(dataset).not.toBeNull();
+
+        const records = await prisma.datasetRecord.findMany({
+          where: { datasetId: dataset!.id, projectId: testProjectId },
+          orderBy: { id: "asc" },
+        });
+        expect(records).toHaveLength(2);
+
+        const entries = records.map((r) => r.entry as Record<string, string>);
+        const inputs = entries.map((e) => e.input).sort();
+        expect(inputs).toContain("beforeafter");
+        expect(inputs).toContain("clean");
+        // Sanity: stored values must not contain a null byte.
+        for (const entry of entries) {
+          expect(entry.input).not.toContain(NUL);
+        }
+      });
+    });
+
+    describe("via CSV upload to existing dataset", () => {
+      beforeEach(async () => {
+        await createDataset({
+          name: "Feedback",
+          slug: "feedback",
+          columnTypes: [{ name: "input", type: "string" }],
+        });
+      });
+
+      it("strips the null byte and persists the new record", async () => {
+        const NUL = String.fromCharCode(0);
+        // CSV with a quoted value containing a null byte.
+        const csv = `input\n"hello${NUL}world"\n`;
+        const form = buildFormData({
+          file: { content: csv, filename: "rows.csv" },
+        });
+        const res = await uploadToExisting("feedback", form);
+
+        expect(res.status).toBe(200);
+
+        const dataset = await prisma.dataset.findFirst({
+          where: { slug: "feedback", projectId: testProjectId },
+        });
+        const records = await prisma.datasetRecord.findMany({
+          where: { datasetId: dataset!.id, projectId: testProjectId },
+        });
+        expect(records).toHaveLength(1);
+        const entry = records[0]!.entry as Record<string, string>;
+        expect(entry.input).toBe("helloworld");
+      });
+    });
+  });
+
+  describe("when record insertion fails after the dataset row is created", () => {
+    it("rolls back the dataset row so retries with the same name succeed", async () => {
+      // We supply a record id guaranteed to collide with a pre-existing
+      // record, so datasetRecord.createMany inside the transaction throws
+      // a Postgres unique-constraint error after the dataset row has
+      // already been INSERTed within the same transaction. The fix wraps
+      // both writes in $transaction so the dataset row rolls back.
+
+      // Pre-create a sibling dataset + a record whose id we will collide on.
+      const sibling = await prisma.dataset.create({
+        data: {
+          id: `dataset_${nanoid()}`,
+          name: "Sibling",
+          slug: `sibling-${nanoid()}`,
+          projectId: testProjectId,
+          columnTypes: [{ name: "input", type: "string" }],
+        },
+      });
+      const collidingId = `record-collide-${nanoid()}`;
+      await prisma.datasetRecord.create({
+        data: {
+          id: collidingId,
+          datasetId: sibling.id,
+          projectId: testProjectId,
+          entry: { input: "existing" } as any,
+        },
+      });
+
+      const service = DatasetService.create(prisma);
+
+      await expect(
+        service.upsertDataset({
+          projectId: testProjectId,
+          name: "Atomic Test",
+          columnTypes: [{ name: "input", type: "string" }],
+          datasetRecords: [
+            { id: collidingId, input: "would crash on insert" },
+          ],
+        }),
+      ).rejects.toThrow();
+
+      // The dataset row for "Atomic Test" must NOT exist — the failure
+      // inside the transaction should have rolled it back.
+      const orphan = await prisma.dataset.findFirst({
+        where: { slug: "atomic-test", projectId: testProjectId },
+      });
+      expect(orphan).toBeNull();
+
+      // And the next attempt with the same name (after the user fixes
+      // their data) must succeed — proving the customer's "already exists"
+      // wedge is gone.
+      const followUp = await service.upsertDataset({
+        projectId: testProjectId,
+        name: "Atomic Test",
+        columnTypes: [{ name: "input", type: "string" }],
+        datasetRecords: [{ input: "now valid" }],
+      });
+      expect(followUp.slug).toBe("atomic-test");
     });
   });
 });
