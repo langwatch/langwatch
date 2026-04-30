@@ -17,6 +17,8 @@ import type { SimulationRepository } from "./simulation.repository";
 
 const TABLE_NAME = "simulation_runs" as const;
 
+export const RUN_ID_CAP = 10000;
+
 /**
  * Returns an IN-tuple dedup predicate for simulation_runs.
  *
@@ -855,19 +857,23 @@ export class SimulationClickHouseRepository implements SimulationRepository {
     }));
   }
 
-  async getAllRunIdsForProject({
+  async getRunIdsForSet({
     projectId,
+    scenarioSetId,
   }: {
     projectId: string;
-  }): Promise<string[]> {
+    scenarioSetId: string;
+  }): Promise<{ runIds: string[]; reachedCap: boolean }> {
     const client = await this.getClient(projectId);
+    const scenarioSetIds = expandSetIdFilter(scenarioSetId);
     const result = await client.query({
-      query: `SELECT DISTINCT ScenarioRunId FROM ${TABLE_NAME} WHERE TenantId = {tenantId:String} AND ArchivedAt IS NULL LIMIT 10000`,
-      query_params: { tenantId: projectId },
+      query: `SELECT DISTINCT ScenarioRunId FROM ${TABLE_NAME} WHERE TenantId = {tenantId:String} AND ArchivedAt IS NULL AND ScenarioSetId IN ({scenarioSetIds:Array(String)}) LIMIT ${RUN_ID_CAP}`,
+      query_params: { tenantId: projectId, scenarioSetIds },
       format: "JSONEachRow",
     });
     const rows = await result.json<{ ScenarioRunId: string }>();
-    return rows.map((r) => r.ScenarioRunId);
+    const runIds = rows.map((r) => r.ScenarioRunId);
+    return { runIds, reachedCap: runIds.length === RUN_ID_CAP };
   }
 
   async getDistinctExternalSetIds({

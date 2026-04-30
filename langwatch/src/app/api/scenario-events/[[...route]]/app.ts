@@ -2,6 +2,7 @@ import type { Project } from "@prisma/client";
 import { Hono } from "hono";
 import { describeRoute } from "hono-openapi";
 import { resolver, validator as zValidator } from "hono-openapi/zod";
+import { z } from "zod";
 import { getApp } from "~/server/app-layer/app";
 import { ScenarioEventType } from "~/server/scenarios/scenario-event.enums";
 import type { ScenarioEvent } from "~/server/scenarios/scenario-event.types";
@@ -121,27 +122,36 @@ app.post(
   },
 );
 
-// DELETE /api/scenario-events - Delete all events for a project
+// DELETE /api/scenario-events - Archive all simulation runs for a scenario set
 export const route = app.delete(
   "/",
   describeRoute({
-    description: "Delete all events",
+    description:
+      "Archive all simulation runs for a scenario set. Pass `scenarioSetId=default` to archive runs in the implicit default set; future SDK runs without an explicit setId will repopulate it.",
     responses: {
       ...baseResponses,
       200: {
-        description: "Events deleted successfully",
+        description: "Runs archived successfully",
         content: {
-          "application/json": { schema: resolver(responseSchemas.success) },
+          "application/json": { schema: resolver(responseSchemas.archive) },
+        },
+      },
+      400: {
+        description: "Missing or invalid scenarioSetId",
+        content: {
+          "application/json": { schema: resolver(responseSchemas.error) },
         },
       },
     },
   }),
+  zValidator("query", z.object({ scenarioSetId: z.string().min(1, "scenarioSetId query parameter is required") })),
   async (c) => {
     const { project } = c.var;
+    const { scenarioSetId } = c.req.valid("query");
 
-    await archiveAllSimulationRuns(project.id);
+    const result = await archiveScenarioSetRuns(project.id, scenarioSetId);
 
-    return c.json({ success: true }, 200);
+    return c.json(result, 200);
   },
 );
 
@@ -220,22 +230,47 @@ function isStreamingEvent(type: string): boolean {
   );
 }
 
-async function archiveAllSimulationRuns(projectId: string): Promise<void> {
-  const app = getApp();
-  const runIds = await app.simulations.runs.getAllRunIdsForProject({ projectId });
+export async function archiveScenarioSetRuns(
+  projectId: string,
+  scenarioSetId: string,
+): Promise<{ archived: number; failed: number; scenarioSetId: string; hasMore: boolean }> {
+  const { runIds, reachedCap } = await getApp().simulations.runs.getRunIdsForSet({ projectId, scenarioSetId });
 
   const now = Date.now();
-  await Promise.all(
-    runIds.map((scenarioRunId) =>
-      getApp().simulations.deleteRun({
-        tenantId: projectId,
-        scenarioRunId,
-        occurredAt: now,
-      }),
-    ),
-  );
+  let archived = 0;
+  let failed = 0;
 
-  logger.info({ projectId, count: runIds.length }, "Dispatched archive commands for all simulation runs");
+  await pMapLimited(runIds, async (id) => {
+    try {
+      await getApp().simulations.deleteRun({
+        tenantId: projectId,
+        scenarioRunId: id,
+        occurredAt: now,
+      });
+      archived++;
+    } catch (err) {
+      failed++;
+      logger.warn({ projectId, scenarioRunId: id, err }, "Failed to dispatch deleteRun");
+    }
+  }, 8);
+
+  return { archived, failed, scenarioSetId, hasMore: reachedCap };
+}
+
+async function pMapLimited<T>(
+  items: T[],
+  fn: (item: T) => Promise<void>,
+  concurrency: number,
+): Promise<void> {
+  const executing = new Set<Promise<void>>();
+  for (const item of items) {
+    const p = fn(item).then(() => {
+      executing.delete(p);
+    });
+    executing.add(p);
+    if (executing.size >= concurrency) await Promise.race(executing);
+  }
+  await Promise.all(executing);
 }
 
 async function broadcastStreamingEvent(
