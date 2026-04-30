@@ -3,7 +3,7 @@
 You are an audit soldier. Goal: classify every `@unimplemented` scenario in `specs/features/`.
 
 ## Read this first
-- Plan doc: /home/boxd/workspace/orchard-codex/plans/unimpl-reduction-2026-04-25.md
+- Plan doc: orchard-codex/plans/unimpl-reduction-2026-04-25.md (in the orchard-codex repo)
 - Existing tracking issue: https://github.com/langwatch/langwatch/issues/3458
 
 ## Your contract
@@ -25,12 +25,12 @@ Classes: KEEP / UPDATE / DELETE / DUPLICATE.
 
 ## Convergence test (ralph-loop)
 
-Manifest is COMPLETE when the row count >= `@unimplemented` count:
+Manifest is COMPLETE when the row count equals the `@unimplemented` count exactly:
 
 ```bash
 mc=$(awk '/^\| specs\//' specs/features/AUDIT_MANIFEST.md | wc -l)
 uc=$(grep -rh '@unimplemented' specs/features/ | wc -l)
-[ "$mc" -ge "$uc" ] && echo "AUDIT COMPLETE"
+[ "$mc" -eq "$uc" ] && echo "AUDIT COMPLETE"
 ```
 
 ## Process
