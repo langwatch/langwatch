@@ -9,6 +9,14 @@ export type EnvScaffoldInput = {
   ports: PortAllocation;
   baseHost?: string;
   overrides?: EnvOverrides;
+  /**
+   * NLP backend mode plumbed from RuntimeContext.nlpMode. `go` (default)
+   * keeps FEATURE_FLAG_FORCE_ENABLE=release_nlp_go_engine_enabled so
+   * /studio/* routes hit nlpgo; `python` drops that line so the langwatch
+   * app falls through to the legacy uvicorn-served langwatch_nlp upstream.
+   * smith owns the buildEnv branch — see CLI ↔ env seam in PR description.
+   */
+  nlpMode?: "python" | "go";
 };
 
 // Keys whose generated value MUST be stable across .env regenerations —
@@ -42,7 +50,7 @@ const b64 = (bytes: number) => randomBytes(bytes).toString("base64");
  * allocated port table so a `--port-base 5570` shift cascades to every
  * service consistently.
  */
-export function buildEnv({ ports, baseHost, overrides = {} }: EnvScaffoldInput): string {
+export function buildEnv({ ports, baseHost, nlpMode = "go", overrides = {} }: EnvScaffoldInput): string {
   const host = baseHost ?? `http://localhost:${ports.langwatch}`;
   const lines: string[] = [];
   const set = (key: string, value: string) => {
@@ -96,17 +104,23 @@ export function buildEnv({ ports, baseHost, overrides = {} }: EnvScaffoldInput):
   set("ENVIRONMENT", "local");
 
   sectionBreak("FEATURE FLAGS");
-  // Force-enable the Go NLP engine for every project. npx-server runs
-  // nlpgo in Go-only mode (NLPGO_CHILD_BYPASS=true, no Python uvicorn),
-  // so any code path that would fall back to legacy Python has to be
-  // routed to /go/* instead — that's what `release_nlp_go_engine_enabled`
-  // gates inside the langwatch app. Without this, nlpgoFetch checks
-  // PostHog (default: off) and sends to /studio/execute_sync (Python) →
-  // nlpgo's proxypass returns a self-explaining 502 because there's no
-  // upstream. With this on, traffic goes to /go/studio/execute_sync.
-  // FEATURE_FLAG_FORCE_ENABLE is a comma-separated list; see
-  // langwatch/src/server/featureFlag/featureFlag.service.ts.
-  set("FEATURE_FLAG_FORCE_ENABLE", "release_nlp_go_engine_enabled");
+  set("LANGWATCH_NPX_NLP", nlpMode);
+  if (nlpMode === "go") {
+    // Force-enable the Go NLP engine for every project. npx-server runs
+    // nlpgo in Go-only mode (NLPGO_CHILD_BYPASS=true, no Python uvicorn),
+    // so any code path that would fall back to legacy Python has to be
+    // routed to /go/* instead — that's what `release_nlp_go_engine_enabled`
+    // gates inside the langwatch app. Without this, nlpgoFetch checks
+    // PostHog (default: off) and sends to /studio/execute_sync (Python) →
+    // nlpgo's proxypass returns a self-explaining 502 because there's no
+    // upstream. With this on, traffic goes to /go/studio/execute_sync.
+    // FEATURE_FLAG_FORCE_ENABLE is a comma-separated list; see
+    // langwatch/src/server/featureFlag/featureFlag.service.ts.
+    set("FEATURE_FLAG_FORCE_ENABLE", "release_nlp_go_engine_enabled");
+  }
+  // In python mode the FF stays at its PostHog default (off) so traffic
+  // routes through /studio/* to the legacy uvicorn-served langwatch_nlp
+  // upstream — i.e. the pre-#3539 behavior, restored as an opt-in.
 
   sectionBreak("MODELS — fill in any provider you want to evaluate against");
   set("OPENAI_API_KEY", "");

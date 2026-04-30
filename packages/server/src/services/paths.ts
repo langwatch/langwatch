@@ -6,6 +6,7 @@ export type ServiceName =
   | "redis"
   | "clickhouse"
   | "nlpgo"
+  | "langwatch_nlp"
   | "langevals"
   | "aigateway"
   | "langwatch"
@@ -15,7 +16,7 @@ export type ServiceName =
 export type ServicePaths = {
   log(name: ServiceName): string;
   pid(name: ServiceName): string;
-  venv(name: "langevals"): string;
+  venv(name: "langevals" | "langwatch_nlp"): string;
   redisConf: string;
   clickhouseConfigDir: string;
 };

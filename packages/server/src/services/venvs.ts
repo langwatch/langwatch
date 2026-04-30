@@ -8,7 +8,7 @@ import { servicePaths } from "./paths.ts";
 import { execAndPipe } from "./_pipe-to-bus.ts";
 
 type VenvSpec = {
-  name: "langevals";
+  name: "langevals" | "langwatch_nlp";
   projectDir: string;
   lockFile: string;
   extras?: string[];
@@ -24,7 +24,7 @@ export async function syncVenvs(ctx: RuntimeContext, bus: EventBus): Promise<voi
   if (!uvBin) throw new Error("uv predep not resolved — run install first");
 
   const sp = servicePaths(ctx.paths);
-  const specs = resolveVenvSpecs();
+  const specs = resolveVenvSpecs(ctx);
 
   await Promise.all(
     specs.map(async (spec) => {
@@ -60,14 +60,15 @@ export async function syncVenvs(ctx: RuntimeContext, bus: EventBus): Promise<voi
   );
 }
 
-function resolveVenvSpecs(): VenvSpec[] {
+function resolveVenvSpecs(ctx: RuntimeContext): VenvSpec[] {
   const root = appRoot();
-  // langwatch_nlp's uv venv is no longer built — npx-server runs nlpgo
-  // (Go) in Go-only mode (NLPGO_CHILD_BYPASS=true), so the legacy uvicorn
-  // never starts. The langwatch_nlp Python project still exists in the
-  // npm tarball for the source-of-truth runner.py codeblock harness, but
-  // its dependencies are not needed at npx runtime.
-  return [
+  // langwatch_nlp's uv venv is only built when ctx.nlpMode === "python"
+  // (the legacy escape hatch). The default `go` mode runs nlpgo from the
+  // aigateway monobinary and the langwatch_nlp Python project still ships
+  // in the npm tarball for the source-of-truth runner.py codeblock
+  // harness, but its uvicorn dependencies are skipped to save 100MB+
+  // and ~30s of cold-install time.
+  const specs: VenvSpec[] = [
     {
       name: "langevals",
       projectDir: join(root, "langevals"),
@@ -89,6 +90,16 @@ function resolveVenvSpecs(): VenvSpec[] {
       extras: ["all"],
     },
   ];
+
+  if (ctx.nlpMode === "python") {
+    specs.push({
+      name: "langwatch_nlp",
+      projectDir: join(root, "langwatch_nlp"),
+      lockFile: join(root, "langwatch_nlp", "uv.lock"),
+    });
+  }
+
+  return specs;
 }
 
 function hashFileSafely(file: string): string {
