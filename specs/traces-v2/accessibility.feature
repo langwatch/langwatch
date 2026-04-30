@@ -6,7 +6,9 @@
 # FOCUS ZONE MODEL
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Focus zone model
+Feature: Accessibility and responsive behavior
+
+Rule: Focus zone model
   Keyboard shortcuts are scoped to focus zones so the same key means different things in different parts of the UI.
 
   Scenario: Only the focused zone responds to shortcuts
@@ -51,7 +53,7 @@ Feature: Focus zone model
 # ESCAPE CASCADE
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Escape cascade
+Rule: Escape cascade
   Escape always exits the current context one level at a time in a strictly ordered cascade.
 
   Scenario: Escape zooms out the flame graph when zoomed
@@ -101,7 +103,7 @@ Feature: Escape cascade
 # ZONE: PAGE (GLOBAL)
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Page-level keyboard shortcuts
+Rule: Page-level keyboard shortcuts
   Global shortcuts that work from any focus zone on the page.
 
   Scenario: Slash focuses the search bar from anywhere
@@ -119,7 +121,7 @@ Feature: Page-level keyboard shortcuts
 # ZONE: SEARCH BAR
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Search bar keyboard shortcuts
+Rule: Search bar keyboard shortcuts
   Keyboard shortcuts available when the search bar has focus.
 
   Background:
@@ -150,7 +152,7 @@ Feature: Search bar keyboard shortcuts
 # ZONE: FILTER SIDEBAR
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Filter sidebar keyboard shortcuts
+Rule: Filter sidebar keyboard shortcuts
   Keyboard shortcuts available when the filter sidebar has focus.
 
   Background:
@@ -175,7 +177,7 @@ Feature: Filter sidebar keyboard shortcuts
 # ZONE: TABLE
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Table keyboard shortcuts
+Rule: Table keyboard shortcuts
   Keyboard shortcuts available when the trace table has focus.
 
   Background:
@@ -203,7 +205,7 @@ Feature: Table keyboard shortcuts
 # ZONE: DRAWER (CHROME)
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Drawer chrome keyboard shortcuts
+Rule: Drawer chrome keyboard shortcuts
   Shortcuts that work anywhere in the drawer regardless of which sub-zone has focus.
 
   Background:
@@ -232,7 +234,7 @@ Feature: Drawer chrome keyboard shortcuts
 # ZONE: VIZ — SPAN TREE (WATERFALL)
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Span tree keyboard shortcuts
+Rule: Span tree keyboard shortcuts
   Keyboard shortcuts available when the span tree in the waterfall view has focus.
 
   Background:
@@ -281,7 +283,7 @@ Feature: Span tree keyboard shortcuts
 # ZONE: VIZ — FLAME GRAPH
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Flame graph keyboard shortcuts
+Rule: Flame graph keyboard shortcuts
   Keyboard shortcuts available when the flame graph has focus.
 
   Background:
@@ -337,7 +339,7 @@ Feature: Flame graph keyboard shortcuts
 # ZONE: VIZ — SPAN LIST
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Span list keyboard shortcuts
+Rule: Span list keyboard shortcuts
   Keyboard shortcuts available when the span list table has focus.
 
   Background:
@@ -362,7 +364,7 @@ Feature: Span list keyboard shortcuts
 # ZONE: TAB BAR
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Tab bar keyboard shortcuts
+Rule: Tab bar keyboard shortcuts
   Keyboard shortcuts available when the tab bar has focus.
 
   Background:
@@ -381,7 +383,7 @@ Feature: Tab bar keyboard shortcuts
 # ZONE: ACCORDIONS
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Accordion keyboard shortcuts
+Rule: Accordion keyboard shortcuts
   Keyboard shortcuts available when the accordion section has focus.
 
   Background:
@@ -406,7 +408,7 @@ Feature: Accordion keyboard shortcuts
 # FOCUS MANAGEMENT
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Focus management
+Rule: Focus management
   Focus moves predictably when UI elements open, close, or change.
 
   Scenario: Opening the drawer moves focus to the drawer header
@@ -462,7 +464,7 @@ Feature: Focus management
 # ARIA LANDMARKS
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: ARIA landmarks
+Rule: ARIA landmarks
   Regions of the page are marked with appropriate ARIA roles and labels.
 
   Scenario: Filter sidebar has the correct ARIA role and label
@@ -489,7 +491,7 @@ Feature: ARIA landmarks
 # ARIA LABELS
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: ARIA labels on interactive elements
+Rule: ARIA labels on interactive elements
   Individual elements carry descriptive ARIA attributes for assistive technology.
 
   Scenario: Status dot has an aria-label describing the status
@@ -529,7 +531,7 @@ Feature: ARIA labels on interactive elements
 # ARIA LIVE REGIONS
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: ARIA live regions
+Rule: ARIA live regions
   Dynamic content changes are announced to assistive technology.
 
   Scenario: Filter change announces the updated trace count
@@ -549,7 +551,7 @@ Feature: ARIA live regions
 # KEYBOARD SHORTCUT HINTS
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Keyboard shortcut hint badges
+Rule: Keyboard shortcut hint badges
   Every interactive element with a keyboard shortcut displays a visible hint badge.
 
   Scenario: Search bar displays the slash shortcut hint
@@ -596,7 +598,7 @@ Feature: Keyboard shortcut hint badges
 # COLOR CONTRAST
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Color contrast and non-color differentiation
+Rule: Color contrast and non-color differentiation
   The UI meets WCAG 2.1 AA contrast requirements and does not rely on color alone.
 
   Scenario: Body text meets WCAG AA contrast ratio
@@ -626,7 +628,7 @@ Feature: Color contrast and non-color differentiation
 # TOUCH TARGETS
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Touch targets
+Rule: Touch targets
   Interactive elements meet minimum touch target sizes for tablet users.
 
   Scenario: Interactive elements meet the 44px minimum on tablet viewports
@@ -650,7 +652,7 @@ Feature: Touch targets
 # RESPONSIVE BREAKPOINTS
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Responsive breakpoints using container queries
+Rule: Responsive breakpoints using container queries
   The layout adapts based on content area width using Chakra container queries.
 
   Background:
@@ -701,7 +703,7 @@ Feature: Responsive breakpoints using container queries
 # COLUMN PRIORITY
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Table column priority when width decreases
+Rule: Table column priority when width decreases
   Columns hide progressively as the table narrows.
 
   Background:
@@ -724,7 +726,7 @@ Feature: Table column priority when width decreases
 # DRAWER AT NARROW VIEWPORTS
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Drawer behavior at narrow viewports
+Rule: Drawer behavior at narrow viewports
   The drawer adapts its layout when the container is narrow.
 
   Scenario: Drawer becomes full-screen below 1024px

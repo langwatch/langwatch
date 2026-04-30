@@ -6,7 +6,9 @@
 # DRAWER HEADER — TRACE-LEVEL
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Trace-level drawer header
+Feature: Metrics display
+
+Rule: Trace-level drawer header
   The drawer header shows identity and key metrics for the current trace.
 
   Background:
@@ -71,7 +73,7 @@ Feature: Trace-level drawer header
 # DRAWER HEADER — PROMOTED ATTRIBUTES
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Promoted attributes in drawer header
+Rule: Promoted attributes in drawer header
   Users can pin trace or span attributes to always appear in the header.
 
   Background:
@@ -103,7 +105,7 @@ Feature: Promoted attributes in drawer header
 # SPAN TAB METRICS
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Span tab metrics
+Rule: Span tab metrics
   When a span is selected, its metrics appear in a tab rather than replacing the header.
 
   Background:
@@ -159,7 +161,7 @@ Feature: Span tab metrics
 # METRIC FORMATTING — DURATION
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Duration formatting
+Rule: Duration formatting
   Duration values are formatted with appropriate units based on magnitude.
 
   Scenario: Sub-millisecond duration
@@ -207,7 +209,7 @@ Feature: Duration formatting
 # METRIC FORMATTING — COST
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Cost formatting
+Rule: Cost formatting
   Cost values are formatted with appropriate decimal places based on magnitude.
 
   Scenario: Sub-cent cost shows three decimal places
@@ -240,7 +242,7 @@ Feature: Cost formatting
 # METRIC FORMATTING — COST HOVER BREAKDOWN
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Cost hover breakdown
+Rule: Cost hover breakdown
   Hovering the cost pill shows a detailed breakdown tooltip.
 
   Background:
@@ -269,7 +271,7 @@ Feature: Cost hover breakdown
 # METRIC FORMATTING — TOKENS
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Token formatting
+Rule: Token formatting
   Token counts are formatted with K/M suffixes and displayed in split or combined form.
 
   Scenario: Token count below 1000 shows exact number
@@ -297,7 +299,7 @@ Feature: Token formatting
 # METRIC FORMATTING — TOKEN HOVER BREAKDOWN
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Token hover breakdown
+Rule: Token hover breakdown
   Hovering the token pill shows a detailed breakdown tooltip.
 
   Background:
@@ -322,7 +324,7 @@ Feature: Token hover breakdown
 # METRIC FORMATTING — MODEL
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Model display
+Rule: Model display
   Model names are shown in full or abbreviated form depending on context.
 
   Scenario: Header shows provider and model name
@@ -346,7 +348,7 @@ Feature: Model display
 # METRIC FORMATTING — STATUS
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Status display
+Rule: Status display
   Status is shown as a colored dot with optional text.
 
   Scenario: OK status shows green dot
@@ -367,7 +369,7 @@ Feature: Status display
 # METRIC FORMATTING — TIME TO FIRST TOKEN
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Time to first token display
+Rule: Time to first token display
   TTFT is shown for LLM spans and at trace level when available.
 
   Scenario: Trace-level TTFT from trace summaries
@@ -390,7 +392,7 @@ Feature: Time to first token display
 # TABLE CELL FORMATTING
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Trace table metric cells
+Rule: Trace table metric cells
   Metrics in the trace table use compact formatting and monospace alignment.
 
   Background:
@@ -425,7 +427,7 @@ Feature: Trace table metric cells
 # TOOLTIP BEHAVIOR
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Metric tooltip behavior
+Rule: Metric tooltip behavior
   All metric tooltips follow consistent positioning and styling rules.
 
   Background:
@@ -465,7 +467,7 @@ Feature: Metric tooltip behavior
 # COMPARISON INDICATORS (FUTURE)
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Comparison indicators
+Rule: Comparison indicators
   Space is reserved for comparative indicators next to metrics in a future phase.
 
   Scenario: Phase 1 shows raw metric values without comparison

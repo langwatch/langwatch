@@ -6,7 +6,9 @@
 # VIEW-LEVEL PRESENCE (PRESET TABS)
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: View-level presence in preset tab bar
+Feature: Multiplayer presence
+
+Rule: View-level presence in preset tab bar
   Shows teammate avatars for people on the same lens/preset, right-aligned in the tab bar.
 
   Background:
@@ -58,7 +60,7 @@ Feature: View-level presence in preset tab bar
 # TRACE-LEVEL PRESENCE (TABLE ROWS)
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Trace-level presence dots on table rows
+Rule: Trace-level presence dots on table rows
   A colored dot appears on trace rows where someone has that trace open, with fan-out on hover.
 
   Background:
@@ -131,7 +133,7 @@ Feature: Trace-level presence dots on table rows
 # DRAWER-LEVEL PRESENCE
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Drawer-level presence showing co-viewers
+Rule: Drawer-level presence showing co-viewers
   When others have the same trace open, their avatars and "Also viewing" appear in the drawer header.
 
   Background:
@@ -177,7 +179,7 @@ Feature: Drawer-level presence showing co-viewers
 # SPAN-LEVEL PRESENCE (INSIDE DRAWER)
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Span-level presence dots inside the drawer
+Rule: Span-level presence dots inside the drawer
   Colored dots appear next to spans where someone is focused, with hover-to-reveal behavior.
 
   Background:
@@ -223,7 +225,7 @@ Feature: Span-level presence dots inside the drawer
 # INTERACTION STATES
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Presence interaction states
+Rule: Presence interaction states
   Presence indicators respond correctly to all edge cases and state transitions.
 
   Background:
@@ -251,7 +253,7 @@ Feature: Presence interaction states
 # MOCK DATA AND TEAM MEMBER COLORS
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Mock data and team member color assignments
+Rule: Mock data and team member color assignments
   Team member colors are distinct from span type colors and feel personal.
 
   Background:

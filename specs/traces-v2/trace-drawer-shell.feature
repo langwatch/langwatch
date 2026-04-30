@@ -8,7 +8,9 @@
 # DRAWER LAYOUT
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Drawer layout
+Feature: Trace drawer shell
+
+Rule: Drawer layout
   The drawer opens from the right side as an overlay when a trace or session
   is clicked in the table.
 
@@ -43,7 +45,7 @@ Feature: Drawer layout
 # DRAWER MAXIMISE AND RESTORE
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Drawer maximise and restore
+Rule: Drawer maximise and restore
   The drawer can expand to full content width, hiding the filters and table.
 
   Background:
@@ -71,7 +73,7 @@ Feature: Drawer maximise and restore
 # UNIFIED DRAWER MODEL
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Unified drawer model
+Rule: Unified drawer model
   One drawer shell adapts its content to Trace mode or Conversation mode.
 
   Background:
@@ -110,7 +112,7 @@ Feature: Unified drawer model
 # SPAN SELECTION TAB MODEL
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Span selection tab model
+Rule: Span selection tab model
   Span selection uses a tab bar between the visualization and the accordions.
 
   Background:
@@ -181,7 +183,7 @@ Feature: Span selection tab model
 # HEADER CHIP STRIP
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Header chip strip
+Rule: Header chip strip
   Trace metadata renders as a strip of pill-shaped chips above the mode
   switch. The strip is composed from an array — each chip is one entry —
   so adding a new dimension (prompt, scenario, sdk, …) is one entry, not
@@ -219,7 +221,7 @@ Feature: Header chip strip
 # MODE SWITCH
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Mode switch
+Rule: Mode switch
   An inline tab strip below the chip row toggles between Trace and
   Conversation modes when the trace belongs to a conversation.
 
@@ -262,7 +264,7 @@ Feature: Mode switch
 # CONTEXT PEEK
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Context peek
+Rule: Context peek
   In Trace mode, when the trace belongs to a conversation, a compact context
   peek shows adjacent turns above the visualization.
 
@@ -297,7 +299,7 @@ Feature: Context peek
 # CONVERSATION MODE — LAYOUT AND TURNS
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Conversation mode layout
+Rule: Conversation mode layout
   The conversation view shows the user-facing thread with system machinery
   visible but subordinate.
 
@@ -347,7 +349,7 @@ Feature: Conversation mode layout
 # CONVERSATION MODE — TOOL CALLS WITHIN TURNS
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Tool calls within conversation turns
+Rule: Tool calls within conversation turns
   Tool calls, guardrails, and RAG spans are shown as collapsed system activity
   within each turn.
 
@@ -385,7 +387,7 @@ Feature: Tool calls within conversation turns
 # CONVERSATION MODE — HEADER
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Conversation header
+Rule: Conversation header
   The conversation header shows aggregate information about the entire
   conversation.
 
@@ -413,7 +415,7 @@ Feature: Conversation header
 # CONVERSATION MODE — NAVIGATION
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Conversation navigation
+Rule: Conversation navigation
   Navigation within the conversation view uses scrolling, keyboard controls,
   and a jump-to-turn selector.
 
@@ -452,7 +454,7 @@ Feature: Conversation navigation
 # CONVERSATION MODE — LONG CONVERSATIONS
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Long conversation handling
+Rule: Long conversation handling
   Conversations with 20 or more turns receive additional navigation aids
   and performance optimizations.
 
@@ -490,7 +492,7 @@ Feature: Long conversation handling
 # CONVERSATION MODE — DETAIL ACCORDIONS
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Conversation detail accordions
+Rule: Conversation detail accordions
   Below the conversation area, accordion sections show conversation-level
   aggregated data.
 
@@ -530,7 +532,7 @@ Feature: Conversation detail accordions
 # CONVERSATION MODE — DATA GATING
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Conversation data gating
+Rule: Conversation data gating
   Edge cases in conversation data are handled gracefully.
 
   Background:
@@ -569,7 +571,7 @@ Feature: Conversation data gating
 # ENTRY POINTS AND NAVIGATION
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Entry points and navigation
+Rule: Entry points and navigation
   The entry point determines the initial drawer mode.
 
   Background:
@@ -611,7 +613,7 @@ Feature: Entry points and navigation
 # CONTEXTUAL ALERTS
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Contextual alerts
+Rule: Contextual alerts
   Rule-based alerts shown below the header in Trace mode only.
 
   Background:
@@ -649,7 +651,7 @@ Feature: Contextual alerts
 # LOADING STATES
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Loading states
+Rule: Loading states
   Data streams progressively over HTTP/2 and sections render as data arrives.
 
   Background:
@@ -699,7 +701,7 @@ Feature: Loading states
 # ANIMATION AND TRANSITIONS
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Animation and transitions
+Rule: Animation and transitions
   All drawer animations are CSS-only and follow consistent patterns.
 
   Background:
@@ -728,7 +730,7 @@ Feature: Animation and transitions
 # KEYBOARD SHORTCUTS
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Keyboard shortcuts
+Rule: Keyboard shortcuts
   Keyboard shortcuts for navigating the drawer follow the Focus Zone Model.
 
   Background:
@@ -788,7 +790,7 @@ Feature: Keyboard shortcuts
 # DEEP LINKING
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Deep linking
+Rule: Deep linking
   Drawer state is reflected in the URL so pages can be loaded with the drawer
   pre-configured.
 
@@ -829,7 +831,7 @@ Feature: Deep linking
 # RESPONSIVE BEHAVIOR
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Responsive behavior
+Rule: Responsive behavior
   The drawer layout adapts based on container width using Chakra v3 container
   queries, not viewport media queries.
 

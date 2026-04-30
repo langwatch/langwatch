@@ -6,7 +6,9 @@
 # EVALS ACCORDION
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Evals accordion on trace summary tab
+Feature: Evaluations display
+
+Rule: Evals accordion on trace summary tab
   The Evals accordion displays all evaluation results hoisted from all spans
   in the trace, shown only on the Trace Summary tab.
 
@@ -41,7 +43,7 @@ Feature: Evals accordion on trace summary tab
 # EVAL CARD LAYOUT
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Eval card layout
+Rule: Eval card layout
   Each eval type gets one compact card showing the most recent run.
 
   Background:
@@ -86,7 +88,7 @@ Feature: Eval card layout
 # RUN HISTORY
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Eval run history
+Rule: Eval run history
   When the same eval type runs multiple times on a trace, the card shows
   the most recent run with inline run history.
 
@@ -154,7 +156,7 @@ Feature: Eval run history
 # EVAL CARD INTERACTIONS
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Eval card interactions
+Rule: Eval card interactions
   Eval cards provide clickable links and visual feedback for navigation.
 
   Background:
@@ -185,7 +187,7 @@ Feature: Eval card interactions
 # COLOR CODING
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Eval score color coding
+Rule: Eval score color coding
   Eval cards use consistent color coding for scores.
 
   Background:
@@ -226,7 +228,7 @@ Feature: Eval score color coding
 # SCORE TYPES
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Eval score type display
+Rule: Eval score type display
   Evaluations adapt their display based on score format.
 
   Background:
@@ -263,7 +265,7 @@ Feature: Eval score type display
 # NO EVALS STATE
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: No evaluations state
+Rule: No evaluations state
   When a trace has no evaluation results, the accordion shows a helpful
   empty state with a link to set up evaluations.
 
@@ -293,7 +295,7 @@ Feature: No evaluations state
 # ANNOTATIONS
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Annotations display
+Rule: Annotations display
   Annotations are human-provided corrections or notes on a trace,
   shown below eval cards.
 
@@ -335,7 +337,7 @@ Feature: Annotations display
 # FEEDBACK AS EVENTS
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Feedback is displayed as events
+Rule: Feedback is displayed as events
   Feedback (thumbs up/down, satisfaction scores) is not a special UI section.
   It appears in the Events accordion alongside other event types.
 
@@ -366,7 +368,7 @@ Feature: Feedback is displayed as events
 # TABLE INTEGRATION: INDIVIDUAL EVAL COLUMNS
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Individual eval columns in trace table
+Rule: Individual eval columns in trace table
   Users can add individual columns per eval type to the trace table.
 
   Background:
@@ -407,7 +409,7 @@ Feature: Individual eval columns in trace table
 # TABLE INTEGRATION: EVALS SUMMARY COLUMN
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Evals summary column in trace table
+Rule: Evals summary column in trace table
   A single column shows compact inline badges for all evals on a trace.
 
   Background:
@@ -439,7 +441,7 @@ Feature: Evals summary column in trace table
 # TABLE INTEGRATION: EVENTS SUMMARY COLUMN
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Events summary column in trace table
+Rule: Events summary column in trace table
   A single column shows event count and exception indicator.
 
   Background:
@@ -468,7 +470,7 @@ Feature: Events summary column in trace table
 # DATA GATING
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Data gating for evaluations
+Rule: Data gating for evaluations
   The UI adapts gracefully based on available evaluation data.
 
   Background:

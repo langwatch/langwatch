@@ -6,7 +6,9 @@
 # ACCORDION LAYOUT
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Trace summary accordion layout
+Feature: Trace view (trace summary tab)
+
+Rule: Trace summary accordion layout
   The trace detail section uses collapsible accordions that can be open simultaneously.
 
   Background:
@@ -62,7 +64,7 @@ Feature: Trace summary accordion layout
 # AUTO-OPEN RULES
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Trace summary auto-open rules
+Rule: Trace summary auto-open rules
   Accordions auto-open based on trace context to surface the most relevant data.
 
   Background:
@@ -117,7 +119,7 @@ Feature: Trace summary auto-open rules
 # I/O SECTION
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Trace I/O accordion
+Rule: Trace I/O accordion
   Shows computed input and output for the entire trace with format toggling.
 
   Background:
@@ -160,7 +162,7 @@ Feature: Trace I/O accordion
 # I/O PRETTY MODE RENDERING
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: I/O pretty mode rendering
+Rule: I/O pretty mode rendering
   Pretty mode detects data shape and renders the most readable format.
 
   Background:
@@ -207,7 +209,7 @@ Feature: I/O pretty mode rendering
 # I/O CONTENT DISPLAY RULES
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: I/O content display rules
+Rule: I/O content display rules
   Content display handles long text, truncation, and expand/collapse behavior.
 
   Background:
@@ -240,7 +242,7 @@ Feature: I/O content display rules
 # I/O MULTIMODAL CONTENT
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: I/O multimodal content rendering
+Rule: I/O multimodal content rendering
   Multimodal content items render inline with type-appropriate displays.
 
   Background:
@@ -268,7 +270,7 @@ Feature: I/O multimodal content rendering
 # ATTRIBUTES SECTION
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Trace attributes accordion
+Rule: Trace attributes accordion
   Shows trace-level and resource attributes as key-value pairs.
 
   Background:
@@ -307,7 +309,7 @@ Feature: Trace attributes accordion
 # EXCEPTIONS SECTION
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Trace exceptions accordion
+Rule: Trace exceptions accordion
   Shows exceptions hoisted from all spans within the trace.
 
   Background:
@@ -362,7 +364,7 @@ Feature: Trace exceptions accordion
 # EVENTS SECTION
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Trace events accordion
+Rule: Trace events accordion
   Shows informational events hoisted from all spans within the trace.
 
   Background:
@@ -413,7 +415,7 @@ Feature: Trace events accordion
 # DATA GATING
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Trace summary data gating
+Rule: Trace summary data gating
   Empty or missing data is handled gracefully with appropriate messaging.
 
   Background:
@@ -449,7 +451,7 @@ Feature: Trace summary data gating
 # STATE PERSISTENCE
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Trace summary accordion state persistence
+Rule: Trace summary accordion state persistence
   Accordion open/close state is preserved across tab switches within a drawer session.
 
   Background:

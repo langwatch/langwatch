@@ -7,7 +7,9 @@
 # CHECKBOX COLUMN
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Selection checkbox column
+Feature: Bulk actions
+
+Rule: Selection checkbox column
   A leading checkbox column lets the user pick rows for bulk actions.
 
   Background:
@@ -73,7 +75,7 @@ Feature: Selection checkbox column
 # SELECTION STATE
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Selection persistence and lifecycle
+Rule: Selection persistence and lifecycle
   Selection state survives scrolling and pagination but resets when filters change.
 
   Background:
@@ -117,7 +119,7 @@ Feature: Selection persistence and lifecycle
 # BULK ACTION BAR
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Bulk action bar
+Rule: Bulk action bar
   A contextual action bar appears above the table whenever rows are selected.
 
   Background:
@@ -174,7 +176,7 @@ Feature: Bulk action bar
 # EXPORT
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Export traces
+Rule: Export traces
   Export is available for all matching traces or for a specific selection.
   Reuses the existing /api/export/traces/download endpoint.
 
@@ -232,7 +234,7 @@ Feature: Export traces
 # ADD TO DATASET
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Add selected traces to a dataset
+Rule: Add selected traces to a dataset
   Reuses the existing AddDatasetRecordDrawerV2 with selectedTraceIds.
 
   Background:
@@ -273,7 +275,7 @@ Feature: Add selected traces to a dataset
 # KEYBOARD AND ACCESSIBILITY
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Keyboard support for selection
+Rule: Keyboard support for selection
   Selection works via keyboard for accessibility and power-user flows.
 
   Background:

@@ -6,7 +6,9 @@
 # COLUMNS AND LAYOUT
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Span list columns
+Feature: Span list
+
+Rule: Span list columns
   The span list displays every span in a trace as a flat, sortable table.
 
   Background:
@@ -62,7 +64,7 @@ Feature: Span list columns
 # COLUMN VISIBILITY
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Span list column visibility
+Rule: Span list column visibility
   Redundant columns can be hidden when filtering to a single type.
 
   Background:
@@ -85,7 +87,7 @@ Feature: Span list column visibility
 # SORTING
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Span list sorting
+Rule: Span list sorting
   Users can sort spans by any column to answer specific questions.
 
   Background:
@@ -124,7 +126,7 @@ Feature: Span list sorting
 # TYPE FILTER
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Span list type filter
+Rule: Span list type filter
   Users can filter spans by type to focus on specific span categories.
 
   Background:
@@ -163,7 +165,7 @@ Feature: Span list type filter
 # NAME SEARCH
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Span list name search
+Rule: Span list name search
   Users can search spans by name to find specific spans quickly.
 
   Background:
@@ -190,7 +192,7 @@ Feature: Span list name search
 # COMBINED FILTERS
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Span list combined filters
+Rule: Span list combined filters
   Type filter and name search compose together to narrow results.
 
   Background:
@@ -207,7 +209,7 @@ Feature: Span list combined filters
 # SPAN COUNT DISPLAY
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Span list count display
+Rule: Span list count display
   The span count always shows how many spans match the current filters.
 
   Background:
@@ -225,7 +227,7 @@ Feature: Span list count display
 # FOOTER AGGREGATES
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Span list footer aggregates
+Rule: Span list footer aggregates
   A footer row shows totals for the visible spans.
 
   Background:
@@ -249,7 +251,7 @@ Feature: Span list footer aggregates
 # DUPLICATE SPAN NAMES
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Span list duplicate span names
+Rule: Span list duplicate span names
   Traces with duplicate span names are handled naturally by the flat table.
 
   Background:
@@ -279,7 +281,7 @@ Feature: Span list duplicate span names
 # CROSS-VIEW LINKING FROM WATERFALL
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Span list cross-view linking
+Rule: Span list cross-view linking
   Sibling groups in the waterfall can open in the span list for comparison.
 
   Background:
@@ -301,7 +303,7 @@ Feature: Span list cross-view linking
 # ROW INTERACTIONS
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Span list row interactions
+Rule: Span list row interactions
   Users can interact with rows to select spans and see details.
 
   Background:
@@ -325,7 +327,7 @@ Feature: Span list row interactions
 # PERFORMANCE
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Span list performance
+Rule: Span list performance
   The span list handles large traces efficiently with virtualization.
 
   Scenario: Small traces render all rows
@@ -354,7 +356,7 @@ Feature: Span list performance
 # DATA GATING AND EDGE CASES
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Span list data gating
+Rule: Span list data gating
   The span list handles missing data and edge cases gracefully.
 
   Background:

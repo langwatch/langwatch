@@ -7,7 +7,9 @@
 # TRACE-LEVEL PROMPT CHIP
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Trace-level prompt chip
+Feature: Prompt integration
+
+Rule: Trace-level prompt chip
   Each unique managed prompt referenced by any span in the trace renders as
   a chip in the drawer header. Driven by the trace-summary projection's
   `langwatch.prompt_ids` aggregation — no per-span fetch is needed.
@@ -45,7 +47,7 @@ Feature: Trace-level prompt chip
 # PROMPTS DRAWER TAB
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Prompts drawer tab
+Rule: Prompts drawer tab
   When the trace used at least one managed prompt, a "Prompts" tab joins
   the Trace / LLM tabs. The panel groups all prompt usage by reference so
   the user can compare variables and see which spans called each prompt.
@@ -99,7 +101,7 @@ Feature: Prompts drawer tab
 # DETECTION
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Prompt accordion detection
+Rule: Prompt accordion detection
   The Prompt accordion appears only when a span has managed prompt attributes.
 
   Background:
@@ -136,7 +138,7 @@ Feature: Prompt accordion detection
 # ACCORDION LAYOUT AND ORDER
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Prompt accordion layout
+Rule: Prompt accordion layout
   The Prompt accordion sits between I/O and Attributes in the span tab.
 
   Background:
@@ -157,7 +159,7 @@ Feature: Prompt accordion layout
 # HEADER
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Prompt accordion header
+Rule: Prompt accordion header
   The header shows prompt name, version, and active status.
 
   Background:
@@ -187,7 +189,7 @@ Feature: Prompt accordion header
 # TEMPLATE
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Prompt template display
+Rule: Prompt template display
   The template section shows the full prompt template with highlighted variables.
 
   Background:
@@ -232,7 +234,7 @@ Feature: Prompt template display
 # VARIABLES
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Prompt variables display
+Rule: Prompt variables display
   The variables section shows the values filled into template placeholders.
 
   Background:
@@ -280,7 +282,7 @@ Feature: Prompt variables display
 # VERSION MISMATCH WARNING
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Version mismatch warning
+Rule: Version mismatch warning
   A warning appears when the span used a prompt version that is not currently active.
 
   Background:
@@ -322,7 +324,7 @@ Feature: Version mismatch warning
 # ACTIONS
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Prompt accordion actions
+Rule: Prompt accordion actions
   Action buttons at the bottom of the accordion provide contextual navigation.
 
   Background:
@@ -364,7 +366,7 @@ Feature: Prompt accordion actions
 # AUTO-OPEN RULES
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Prompt accordion auto-open rules
+Rule: Prompt accordion auto-open rules
   The accordion opens automatically when there is a version mismatch.
 
   Background:
@@ -393,7 +395,7 @@ Feature: Prompt accordion auto-open rules
 # DATA GATING
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Prompt accordion data gating
+Rule: Prompt accordion data gating
   The accordion gracefully handles missing or partial prompt data.
 
   Background:

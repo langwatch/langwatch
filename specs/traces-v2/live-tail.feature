@@ -8,7 +8,9 @@
 # CONNECTION LIFECYCLE
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Live Tail connection
+Feature: Live tail
+
+Rule: Live Tail connection
   The Live Tail page establishes a real-time streaming connection when opened
   and tears it down when the user navigates away.
 
@@ -45,7 +47,7 @@ Feature: Live Tail connection
 # STREAM BEHAVIOR
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Live Tail stream behavior
+Rule: Live Tail stream behavior
   New traces stream into the list in real-time, with buffering and rate limiting
   to keep the UI responsive at high throughput.
 
@@ -97,7 +99,7 @@ Feature: Live Tail stream behavior
 # FILTERING
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Live Tail filtering
+Rule: Live Tail filtering
   Filters use the same search syntax as the Observe page and apply to
   the stream in real-time.
 
@@ -141,7 +143,7 @@ Feature: Live Tail filtering
 # CONTROLS
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Live Tail controls
+Rule: Live Tail controls
   Pause, clear, and settings controls for managing the live stream.
 
   Background:
@@ -197,7 +199,7 @@ Feature: Live Tail controls
 # STATUS BAR
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Live Tail status bar
+Rule: Live Tail status bar
   A fixed status bar at the bottom shows real-time stream metrics.
 
   Background:
@@ -228,7 +230,7 @@ Feature: Live Tail status bar
 # TRACE ROWS
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Live Tail trace rows
+Rule: Live Tail trace rows
   Trace rows use compact single-line format with absolute timestamps.
 
   Background:
@@ -257,7 +259,7 @@ Feature: Live Tail trace rows
 # DRAWER INTEGRATION
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Live Tail drawer integration
+Rule: Live Tail drawer integration
   The trace drawer opens from Live Tail rows and auto-pauses the stream
   to prevent the list from jumping while reading.
 
@@ -306,7 +308,7 @@ Feature: Live Tail drawer integration
 # NAVIGATION
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Live Tail navigation
+Rule: Live Tail navigation
   Live Tail is a sibling page to Observe with its own route and
   independent filter state.
 
@@ -337,7 +339,7 @@ Feature: Live Tail navigation
 # LOADING STATES
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Live Tail loading states
+Rule: Live Tail loading states
   Different visual states are shown as the connection progresses from
   connecting through to active streaming.
 
@@ -372,7 +374,7 @@ Feature: Live Tail loading states
 # DATA GATING
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Live Tail data gating
+Rule: Live Tail data gating
   Handles edge cases: empty projects, empty filter results, and very
   high volume streams.
 
@@ -403,7 +405,7 @@ Feature: Live Tail data gating
 # ACCESSIBILITY
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Live Tail accessibility
+Rule: Live Tail accessibility
   Keyboard navigation, screen reader support, and reduced motion
   handling for the live stream.
 

@@ -45,9 +45,7 @@ Feature: Prompt facets in traces v2
   Scenario: No prompt attributes leaves all prompt fields null
     Given a trace has spans but no prompt attributes anywhere
     When the trace summary is built
-    Then "SelectedPromptId", "SelectedPromptSpanId",
-         "LastUsedPromptId", "LastUsedPromptVersionNumber",
-         "LastUsedPromptVersionId", "LastUsedPromptSpanId" are all null
+    Then "SelectedPromptId", "SelectedPromptSpanId", "LastUsedPromptId", "LastUsedPromptVersionNumber", "LastUsedPromptVersionId", and "LastUsedPromptSpanId" are all null
     And "ContainsPrompt" is false
 
   Scenario: ContainsPrompt is true when any prompt attribute is present

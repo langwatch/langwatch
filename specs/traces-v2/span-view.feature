@@ -8,7 +8,9 @@
 # SPAN TAB ACTIVATION AND CLOSING
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Span tab activation
+Feature: Span view
+
+Rule: Span tab activation
   Clicking a span in the visualization opens a span tab showing span-level data.
 
   Background:
@@ -77,7 +79,7 @@ Feature: Span tab activation
 # SPAN TAB LABEL
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Span tab label
+Rule: Span tab label
   The span tab shows span identity and key metrics inline.
 
   Background:
@@ -134,7 +136,7 @@ Feature: Span tab label
 # I/O ACCORDION
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Span I/O accordion
+Rule: Span I/O accordion
   Shows the selected span's input and output with format toggles.
 
   Background:
@@ -185,7 +187,7 @@ Feature: Span I/O accordion
 # ATTRIBUTES ACCORDION
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Span attributes accordion
+Rule: Span attributes accordion
   Shows span and resource attributes as key-value pairs with Flat and JSON views.
 
   Background:
@@ -243,7 +245,7 @@ Feature: Span attributes accordion
 # EXCEPTIONS ACCORDION
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Span exceptions accordion
+Rule: Span exceptions accordion
   Shows exceptions originating from the selected span only.
 
   Background:
@@ -276,7 +278,7 @@ Feature: Span exceptions accordion
 # EVENTS ACCORDION
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Span events accordion
+Rule: Span events accordion
   Shows informational events originating from the selected span only.
 
   Background:
@@ -308,7 +310,7 @@ Feature: Span events accordion
 # EVALS ACCORDION
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Span evals accordion
+Rule: Span evals accordion
   Shows evaluation results that ran on the selected span only.
 
   Background:
@@ -337,7 +339,7 @@ Feature: Span evals accordion
 # ACCORDION ORDER AND AUTO-OPEN RULES
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Span accordion ordering and auto-open behavior
+Rule: Span accordion ordering and auto-open behavior
   Accordions follow a fixed order and auto-open based on span context.
 
   Background:
@@ -384,7 +386,7 @@ Feature: Span accordion ordering and auto-open behavior
 # DATA GATING
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Span view data gating
+Rule: Span view data gating
   Missing data is handled with placeholders or hidden accordions.
 
   Background:
@@ -422,7 +424,7 @@ Feature: Span view data gating
 # RELATIONSHIP TO TRACE SUMMARY
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Span view relationship to Trace Summary
+Rule: Span view relationship to Trace Summary
   The span tab shows span-scoped data while Trace Summary shows trace-wide data.
 
   Background:

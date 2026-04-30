@@ -7,7 +7,9 @@
 # TIME RANGE SELECTOR
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Time range selector
+Feature: Search and filter system
+
+Rule: Time range selector
   The time range picker sits in the toolbar strip and controls the date window for queries.
 
   Background:
@@ -61,7 +63,7 @@ Feature: Time range selector
 # SEARCH BAR LAYOUT AND BEHAVIOR
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Search bar layout and behavior
+Rule: Search bar layout and behavior
   A single input field spanning the full width below the nav bar for query input.
 
   Background:
@@ -98,7 +100,7 @@ Feature: Search bar layout and behavior
 # SEARCH BAR KEYBOARD SHORTCUTS
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Search bar keyboard shortcuts
+Rule: Search bar keyboard shortcuts
   Keyboard shortcuts for efficient search interaction.
 
   Background:
@@ -133,7 +135,7 @@ Feature: Search bar keyboard shortcuts
 # QUERY SYNTAX
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Query syntax
+Rule: Query syntax
   The query language supports field expressions, free text, boolean operators, and grouping.
 
   Background:
@@ -201,7 +203,7 @@ Feature: Query syntax
 # SUPPORTED SEARCH FIELDS
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Supported search fields
+Rule: Supported search fields
   The query language supports specific fields for filtering traces.
 
   Background:
@@ -261,7 +263,7 @@ Feature: Supported search fields
 # AUTOCOMPLETE
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Search bar autocomplete
+Rule: Search bar autocomplete
   Autocomplete assists users with field names and known values.
 
   Background:
@@ -295,21 +297,22 @@ Feature: Search bar autocomplete
 # FILTER COLUMN LAYOUT
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Filter column layout
+Rule: Filter column layout
   A scrollable sidebar with categorical facets and range sliders.
 
   Background:
     Given the user is authenticated with "traces:view" permission
     And the project has traces with varied attributes
 
-  Scenario: Filter sidebar renders standard facets in fixed order
+  Scenario: Filter sidebar renders facet groups in fixed order
     When the Observe page loads
-    Then the filter sidebar shows facets in this order: Origin, Status, Span Type, Model, Service
-    And range facets appear at the bottom: Tokens, Cost, Latency
+    Then the filter sidebar shows groups in this order: Trace, Subjects, Span, Evaluators, Metrics, Prompts
+    And the Trace group leads with Origin, Status, Error message, Guardrail, Contains AI
+    And range facets (Duration, Cost, Tokens, …) live in the Metrics group at the bottom
 
   Scenario: Dynamic facets appear only when data exists
     Given traces include user IDs
-    Then the User facet section appears between Service and range facets
+    Then the User facet section appears in the Subjects group
     Given no traces have label data
     Then the Labels facet section is not rendered
 
@@ -336,7 +339,7 @@ Feature: Filter column layout
 # FILTER COLUMN COLLAPSE AND EXPAND
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Filter column collapse and expand
+Rule: Filter column collapse and expand
   The entire filter sidebar can be collapsed to a narrow strip.
 
   Background:
@@ -383,7 +386,7 @@ Feature: Filter column collapse and expand
 # FILTER CHIP BAR
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Filter chip bar
+Rule: Filter chip bar
   A horizontal chip bar appears when the sidebar is collapsed and filters are active.
 
   Background:
@@ -433,7 +436,7 @@ Feature: Filter chip bar
 # CATEGORICAL FACETS — THREE-STAGE CHECKBOXES
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Categorical facet three-stage checkboxes
+Rule: Categorical facet three-stage checkboxes
   Each facet value has a three-state checkbox cycling through neutral, include, and exclude.
 
   Background:
@@ -484,7 +487,7 @@ Feature: Categorical facet three-stage checkboxes
 # FILTER ITEM ROW LAYOUT
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Filter item row layout
+Rule: Filter item row layout
   Every filter item follows a consistent layout: checkbox, optional color dot, label, count.
 
   Background:
@@ -515,7 +518,7 @@ Feature: Filter item row layout
 # CATEGORICAL FACET SELECTION LOGIC
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Categorical facet selection logic
+Rule: Categorical facet selection logic
   Selections within a facet are OR; selections across facets are AND.
 
   Background:
@@ -541,7 +544,7 @@ Feature: Categorical facet selection logic
 # RANGE FACETS
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Range facets
+Rule: Range facets
   Double-handled sliders for Tokens, Cost, and Latency filtering.
 
   Background:
@@ -590,7 +593,7 @@ Feature: Range facets
 # ORIGIN-SPECIFIC FACETS
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Origin-specific facets
+Rule: Origin-specific facets
   Additional facets appear when a specific origin is selected.
 
   Background:
@@ -625,7 +628,7 @@ Feature: Origin-specific facets
 # LENS-LOCKED FILTERS
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Lens-locked filters
+Rule: Lens-locked filters
   Presets can lock facet values, preventing user modification.
 
   Background:
@@ -650,7 +653,7 @@ Feature: Lens-locked filters
 # TWO-WAY SYNC — CHECKBOX TO SEARCH BAR
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Two-way sync from sidebar to search bar
+Rule: Two-way sync from sidebar to search bar
   Checking a checkbox updates the AST and serializes to the search bar.
 
   Background:
@@ -684,7 +687,7 @@ Feature: Two-way sync from sidebar to search bar
 # TWO-WAY SYNC — SEARCH BAR TO SIDEBAR
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Two-way sync from search bar to sidebar
+Rule: Two-way sync from search bar to sidebar
   Typing a query updates the AST and projects onto sidebar controls.
 
   Background:
@@ -722,7 +725,7 @@ Feature: Two-way sync from search bar to sidebar
 # TWO-WAY SYNC — ROUND-TRIP FIDELITY
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Two-way sync round-trip fidelity
+Rule: Two-way sync round-trip fidelity
   The parse-AST-serialize cycle produces the same query string.
 
   Background:
@@ -750,7 +753,7 @@ Feature: Two-way sync round-trip fidelity
 # TWO-WAY SYNC — EDGE CASES
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Two-way sync edge cases
+Rule: Two-way sync edge cases
   Handling of invalid queries, cross-facet OR, and rapid interactions.
 
   Background:
@@ -802,7 +805,7 @@ Feature: Two-way sync edge cases
 # FACET COUNT UPDATES
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Facet count updates
+Rule: Facet count updates
   Facet counts reflect the currently filtered dataset.
 
   Background:
@@ -826,7 +829,7 @@ Feature: Facet count updates
 # FACET COUNT DISPLAY AND APPROXIMATION
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Facet count display and approximation
+Rule: Facet count display and approximation
   Counts are exact for small result sets and approximate for large ones.
 
   Background:
@@ -862,7 +865,7 @@ Feature: Facet count display and approximation
 # ZERO-COUNT VALUES AFTER FILTERING
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Zero-count values after filtering
+Rule: Zero-count values after filtering
   Facet values with zero matches are hidden unless actively selected.
 
   Background:
@@ -889,7 +892,7 @@ Feature: Zero-count values after filtering
 # HIGH-CARDINALITY FACETS (10+ VALUES)
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: High-cardinality facets
+Rule: High-cardinality facets
   Facets with 10 or more values show top 10 with expand and search capabilities.
 
   Background:
@@ -933,7 +936,7 @@ Feature: High-cardinality facets
 # VERY HIGH-CARDINALITY FACETS (50+ VALUES)
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Very high-cardinality facets
+Rule: Very high-cardinality facets
   Facets with 50 or more values cap visible items and rely on search.
 
   Background:
@@ -957,16 +960,16 @@ Feature: Very high-cardinality facets
     When the user clears the search input
     Then the top 10 values are displayed again
 
-  Scenario: SpanName is not a sidebar facet
-    Then no "Span Name" facet section appears in the sidebar
-    And span names are only searchable via the search bar
+  Scenario: SpanName is a sidebar facet under Span
+    Then a "Span Name" facet section appears in the Span group
+    And it surfaces the most-frequent span names with counts
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # DATA GATING
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Data gating
+Rule: Data gating
   Facet values are populated from actual data, not hardcoded.
 
   Background:
@@ -990,7 +993,7 @@ Feature: Data gating
 # ERROR STATES
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Error states
+Rule: Error states
   Graceful handling of query errors, timeouts, and data failures.
 
   Background:
@@ -1024,7 +1027,7 @@ Feature: Error states
 # PERFORMANCE
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Performance
+Rule: Performance
   Debouncing, batching, and approximation keep the UI responsive.
 
   Background:
@@ -1053,7 +1056,7 @@ Feature: Performance
 # AI QUERY (FUTURE — PHASE 3)
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: AI query future placeholder
+Rule: AI query future placeholder
   Phase 1 accepts only structured query syntax. Natural language is deferred to Phase 3.
 
   Background:
@@ -1076,7 +1079,7 @@ Feature: AI query future placeholder
 # Enter is contextual: dropdown open → accept, dropdown closed → submit.
 # Blur always submits.
 
-Feature: Dropdown open and close based on cursor position
+Rule: Dropdown open and close based on cursor position
   The autocomplete dropdown is bound to cursor context, not focus alone.
 
   Background:
@@ -1125,7 +1128,7 @@ Feature: Dropdown open and close based on cursor position
     Then the dropdown stays closed throughout
 
 
-Feature: Enter is contextual based on dropdown state
+Rule: Enter is contextual based on dropdown state
   Enter accepts when the dropdown is open; Enter submits when it is closed.
 
   Background:
@@ -1173,7 +1176,7 @@ Feature: Enter is contextual based on dropdown state
     Then the AST is cleared
 
 
-Feature: Tab and click mirror Enter for suggestion accept
+Rule: Tab and click mirror Enter for suggestion accept
   Tab and click are alternative ways to accept a highlighted suggestion.
 
   Background:
@@ -1205,7 +1208,7 @@ Feature: Tab and click mirror Enter for suggestion accept
     And the query "@status:error" is submitted via blur
 
 
-Feature: Escape is hierarchical
+Rule: Escape is hierarchical
   Escape closes the dropdown first; only when the dropdown is already closed does Escape blur the editor.
 
   Background:
@@ -1232,7 +1235,7 @@ Feature: Escape is hierarchical
     Then the query "@status:err" is submitted as typed
 
 
-Feature: Blur always submits
+Rule: Blur always submits
   Any cause of blur — clicking out, tabbing out, programmatic focus change — submits the current text.
 
   Background:
@@ -1269,7 +1272,7 @@ Feature: Blur always submits
     Then "applyQueryText" is invoked at most once with the same text
 
 
-Feature: Suggestion accept replaces only the active token
+Rule: Suggestion accept replaces only the active token
   Accepting a suggestion never disturbs surrounding clauses.
 
   Background:
@@ -1289,7 +1292,7 @@ Feature: Suggestion accept replaces only the active token
     And the dropdown reopens in value mode for field "status"
 
 
-Feature: Page-level focus shortcut
+Rule: Page-level focus shortcut
   The slash key focuses the search bar from anywhere on the page.
 
   Background:
@@ -1307,3 +1310,203 @@ Feature: Page-level focus shortcut
     When the user presses "/"
     Then a "/" is typed into that input as normal
     And the search bar does not steal focus
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# SUBJECTS GROUP — IDENTITY-AXIS FACETS
+# ─────────────────────────────────────────────────────────────────────────────
+# The Subjects group answers "who or what is this trace about?" — the user,
+# conversation thread, paying customer, and (when produced by a simulator)
+# the scenario run that emitted the trace. Splits these out of the Trace
+# block so the sidebar reads as two distinct axes: trace-shape vs identity.
+
+Rule: Subjects sidebar group
+  Identity-axis facets sit in their own Subjects group between Trace and Span.
+
+  Background:
+    Given the user is authenticated with "traces:view" permission
+    And the project has traces with user, conversation, customer, and scenario data
+
+  Scenario: Subjects group renders between Trace and Span
+    When the Observe page loads
+    Then a "Subjects" group is visible in the filter sidebar
+    And it sits between the Trace group and the Span group
+
+  Scenario: Subjects group lists user, conversation, customer, scenarioRun in that order
+    When the Observe page loads
+    Then the Subjects group contains the User, Conversation, Customer, and Scenario run sections in that order
+
+  Scenario: User and Conversation no longer appear in the Trace group
+    When the Observe page loads
+    Then no "User" or "Conversation" sections appear under the Trace group
+    And those sections appear under the Subjects group instead
+
+  Scenario: Customer facet filters by langwatch.customer_id
+    When the user selects a customer value under Subjects
+    Then the search bar shows "@customer:<id>"
+    And the trace table filters to traces matching that customer ID
+
+  Scenario: ScenarioRun facet filters simulator-produced traces
+    Given the project has traces from scenario runs
+    When the user selects a scenario run value under Subjects
+    Then the search bar shows "@scenarioRun:<id>"
+    And the trace table filters to traces emitted by that scenario run
+
+  Scenario: has and none toggles work for customer
+    When the user types "@has:customer" and presses Enter
+    Then only traces with a non-empty langwatch.customer_id are shown
+    When the user types "@none:customer" and presses Enter
+    Then only traces without a langwatch.customer_id are shown
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# DYNAMIC ATTRIBUTE PREFIXES — TRACE / SPAN / EVENT
+# ─────────────────────────────────────────────────────────────────────────────
+# Three dynamic-prefix namespaces let users filter on any attribute key
+# present in the data without registering it up front:
+#   trace.attribute.<key>:<value>   — direct match on trace_summaries.Attributes
+#   span.attribute.<key>:<value>    — any-span match on stored_spans.SpanAttributes
+#   event.attribute.<key>:<value>   — any-event match on stored_spans.Events.Attributes
+# A legacy `attribute.<key>` form aliases trace.attribute.<key>; new UIs
+# should suggest the namespaced form.
+
+Rule: Dynamic attribute prefix discovery
+  Typing one of the dynamic prefixes opens a key-discovery dropdown listing
+  attribute keys actually present in the time window.
+
+  Background:
+    Given the user is authenticated with "traces:view" permission
+    And the project has traces with trace, span, and event attributes
+
+  Scenario: Field-mode dropdown surfaces dynamic prefixes as first-class entries
+    When the user opens the search bar dropdown in field mode
+    Then "trace.attribute.<key>", "span.attribute.<key>", and "event.attribute.<key>" appear as suggestion rows
+    And each row is grouped under its respective Trace / Span / Event header
+
+  Scenario: Typing trace.attribute. opens a key-discovery dropdown
+    When the user types "trace.attribute." in the search bar
+    Then the dropdown lists discovered trace-attribute keys ranked by frequency
+
+  Scenario: Typing span.attribute. opens span-attribute key discovery
+    When the user types "span.attribute." in the search bar
+    Then the dropdown lists discovered span-attribute keys ranked by frequency
+
+  Scenario: Typing event.attribute. opens event-attribute key discovery
+    When the user types "event.attribute." in the search bar
+    Then the dropdown lists discovered event-attribute keys ranked by frequency
+
+  Scenario: Typing a dynamic-prefix key with colon opens value-mode for that key
+    When the user types "trace.attribute.langwatch.origin:" in the search bar
+    Then the dropdown opens in value mode for that key
+    And the dropdown lists the most-frequent values for that attribute key
+
+  Scenario: Wildcard glob in a dynamic-prefix value matches by prefix
+    When the user types "trace.attribute.langwatch.origin:appl*" and presses Enter
+    Then traces whose langwatch.origin attribute starts with "appl" are shown
+
+  Scenario: Legacy attribute. form parses but is not suggested
+    When the user types "attribute.langwatch.origin:application" and presses Enter
+    Then the query parses to the same SQL as "trace.attribute.langwatch.origin:application"
+    But the field-mode dropdown does not suggest the bare "attribute." prefix
+
+
+Rule: Dynamic prefix sidebar parity
+  Discovered attribute keys also surface as expandable sections in the sidebar.
+
+  Background:
+    Given the user is authenticated with "traces:view" permission
+    And the project has traces with trace, span, and event attributes
+
+  Scenario: Trace attributes section lives in the Trace group
+    Then a "Trace attributes" section appears in the Trace group
+    And expanding a key reveals its top values with counts
+    And toggling a value writes "@attribute.<key>:<value>" into the search bar
+
+  Scenario: Span attributes section lives in the Span group
+    Then a "Span attributes" section appears in the Span group
+    And toggling a value writes "@span.attribute.<key>:<value>" into the search bar
+
+  Scenario: Event attributes section lives in the Trace group alongside event names
+    Then an "Event attributes" section appears in the Trace group
+    And toggling a value writes "@event.attribute.<key>:<value>" into the search bar
+
+
+Rule: Unknown field handling for typo'd prefixes
+  A typo in a dynamic prefix (e.g. "atrace.attribute.x") produces a clear
+  parse error rather than a silent empty result.
+
+  Background:
+    Given the user is authenticated with "traces:view" permission
+    And the project has traces
+
+  Scenario: Typo'd prefix shows the parse error and preserves input
+    When the user types "atrace.attribute.x:foo" and presses Enter
+    Then the search bar shows a red outline with "Unknown field: atrace.attribute.x"
+    And the typed text is preserved for the user to fix
+    And no query is executed
+
+  Scenario: Typo'd prefix dropdown surfaces a did-you-mean suggestion
+    When the user types "atrace.attribute." in the search bar
+    Then the dropdown surfaces "trace.attribute.<key>" as a "Did you mean?" suggestion
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# EDITING EXISTING TOKENS — DROPDOWN REOPENS IN-PLACE
+# ─────────────────────────────────────────────────────────────────────────────
+# Most search-bar work today happens by editing existing chips. Placing the
+# cursor inside an already-typed token must reopen the dropdown for that
+# token's mode (field vs value vs dynamic-prefix key) — including for
+# dynamic prefixes, which is the path the sidebar tooling and saved-query
+# loading both produce.
+
+Rule: Editing an existing token reopens the dropdown
+  The dropdown follows the cursor — placing it inside any existing token
+  opens the right mode for that token's shape.
+
+  Background:
+    Given the user is authenticated with "traces:view" permission
+    And the project has traces
+
+  Scenario: Cursor inside the field part of a static chip opens field mode
+    Given the search bar contains "@status:error"
+    When the user clicks inside "stat" of the field name
+    Then the dropdown reopens in field mode with query "stat"
+
+  Scenario: Cursor inside the value of a static chip opens value mode
+    Given the search bar contains "@status:error"
+    When the user clicks inside "err" of the value
+    Then the dropdown reopens in value mode for field "status" with query "err"
+    And the dropdown lists known values for "status"
+
+  Scenario: Cursor inside the value of a dynamic trace-attribute chip opens value mode for that key
+    Given the search bar contains "@trace.attribute.langwatch.origin:application"
+    When the user clicks inside "app" of the value
+    Then the dropdown reopens in value mode for field "trace.attribute.langwatch.origin" with query "app"
+    And the dropdown lists discovered values for that attribute key
+
+  Scenario: Cursor inside the key part of a dynamic trace-attribute chip opens key discovery
+    Given the search bar contains "@trace.attribute.langwatch.origin:application"
+    When the user clicks inside "lang" of the key
+    Then the dropdown reopens in key-discovery mode for the trace.attribute prefix
+    And the dropdown lists matching trace-attribute keys
+
+  Scenario: Cursor inside the value of a dynamic span-attribute chip opens value mode
+    Given the search bar contains "@span.attribute.gen_ai.request.model:gpt-4o"
+    When the user clicks inside "gpt" of the value
+    Then the dropdown reopens in value mode for field "span.attribute.gen_ai.request.model" with query "gpt"
+
+  Scenario: Cursor inside the value of a dynamic event-attribute chip opens value mode
+    Given the search bar contains "@event.attribute.exception.type:ValueError"
+    When the user clicks inside "Value" of the value
+    Then the dropdown reopens in value mode for field "event.attribute.exception.type" with query "Value"
+
+  Scenario: Wildcard-only value still opens value mode
+    Given the search bar contains "@trace.attribute.langwatch.origin:*"
+    When the user clicks inside the value
+    Then the dropdown reopens in value mode for that key
+    And the dropdown lists every discovered value for that key
+
+  Scenario: Cursor moves out of the token via arrow keys closes the dropdown
+    Given the search bar contains "@trace.attribute.langwatch.origin:application" with the dropdown open
+    When the user presses the right arrow until the cursor sits past the token
+    Then the dropdown closes

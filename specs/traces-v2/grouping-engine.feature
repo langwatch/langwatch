@@ -7,7 +7,9 @@
 # GROUPING SELECTOR
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Grouping selector dropdown
+Feature: Grouping engine
+
+Rule: Grouping selector dropdown
   A toolbar dropdown lets the user switch between flat and grouped table views.
 
   Background:
@@ -44,7 +46,7 @@ Feature: Grouping selector dropdown
 # LOCKED GROUPING ON BUILT-IN LENSES
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Locked grouping on built-in lenses
+Rule: Locked grouping on built-in lenses
   Built-in lenses with a fixed grouping dimension lock the selector.
 
   Background:
@@ -96,7 +98,7 @@ Feature: Locked grouping on built-in lenses
 # ACCORDION GROUP RENDERING
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Accordion group rendering
+Rule: Accordion group rendering
   Grouped views render as collapsible accordion sections with aggregate headers.
 
   Background:
@@ -135,7 +137,7 @@ Feature: Accordion group rendering
 # COLUMN AGGREGATE FUNCTIONS
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Column aggregate functions in group headers
+Rule: Column aggregate functions in group headers
   Each column type displays an automatic aggregate value in the group header.
 
   Background:
@@ -187,7 +189,7 @@ Feature: Column aggregate functions in group headers
 # CATEGORICAL COLUMN AGGREGATES
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Categorical column aggregates
+Rule: Categorical column aggregates
   String columns like Service, Model, and User show mode or variant count.
 
   Background:
@@ -211,7 +213,7 @@ Feature: Categorical column aggregates
 # SESSION GROUPING (CONVERSATIONS)
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Session grouping for Conversations
+Rule: Session grouping for Conversations
   The by-session grouping uses specialized aggregates and a two-line header.
 
   Background:
@@ -242,7 +244,7 @@ Feature: Session grouping for Conversations
 # EXPAND AND COLLAPSE BEHAVIOR
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Expand and collapse behavior
+Rule: Expand and collapse behavior
   Groups start collapsed and can be toggled individually or all at once.
 
   Background:
@@ -278,7 +280,7 @@ Feature: Expand and collapse behavior
 # GROUP SORT ORDER
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Group sort order
+Rule: Group sort order
   Groups are sorted by trace count descending; traces within groups follow the lens sort.
 
   Background:
@@ -297,7 +299,7 @@ Feature: Group sort order
 # EMPTY GROUPS
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Empty groups after filtering
+Rule: Empty groups after filtering
   Groups with no matching traces are hidden.
 
   Background:
@@ -316,7 +318,7 @@ Feature: Empty groups after filtering
 # CONVERSATIONS PRESET REFACTORING
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Conversations preset uses the grouping engine
+Rule: Conversations preset uses the grouping engine
   The Conversations preset is refactored to use the generalized grouping engine internally.
 
   Background:
@@ -337,7 +339,7 @@ Feature: Conversations preset uses the grouping engine
 # INTERACTION WITH FILTERS
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Grouping interaction with filters
+Rule: Grouping interaction with filters
   Filters apply within groups and update group counts dynamically.
 
   Background:
@@ -362,7 +364,7 @@ Feature: Grouping interaction with filters
 # INTERACTION WITH PAGINATION
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Grouping interaction with pagination
+Rule: Grouping interaction with pagination
   Pagination operates on groups, not individual traces within groups.
 
   Background:
@@ -389,7 +391,7 @@ Feature: Grouping interaction with pagination
 # PERFORMANCE
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Grouping engine performance
+Rule: Grouping engine performance
   Group aggregates are server-computed and trace rows are lazily fetched.
 
   Background:
@@ -418,7 +420,7 @@ Feature: Grouping engine performance
 # DATA GATING
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Data gating for grouping dimensions
+Rule: Data gating for grouping dimensions
   The engine handles missing data, single-value dimensions, and high cardinality.
 
   Background:
@@ -445,7 +447,7 @@ Feature: Data gating for grouping dimensions
 # CONDITIONAL FORMATTING ON GROUP HEADERS
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Conditional formatting on group header aggregates
+Rule: Conditional formatting on group header aggregates
   Aggregate values in group headers respect conditional formatting rules.
 
   Background:
@@ -461,7 +463,7 @@ Feature: Conditional formatting on group header aggregates
 # KEYBOARD NAVIGATION
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Keyboard navigation in grouped view
+Rule: Keyboard navigation in grouped view
   Arrow keys and Enter navigate and toggle groups and trace rows.
 
   Background:

@@ -6,7 +6,9 @@
 # SUPPORTED COLUMNS
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Conditional formatting supported columns
+Feature: Conditional formatting
+
+Rule: Conditional formatting supported columns
   Only numeric columns support conditional formatting rules.
 
   Background:
@@ -41,7 +43,7 @@ Feature: Conditional formatting supported columns
 # RULE SCHEMA
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Conditional formatting rule schema
+Rule: Conditional formatting rule schema
   Rules define color, operator, and threshold for numeric cells.
 
   Background:
@@ -83,7 +85,7 @@ Feature: Conditional formatting rule schema
 # VISUAL RENDERING — CELL BACKGROUND
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Conditional formatting cell background
+Rule: Conditional formatting cell background
   Matching cells get a subtle colored background tint.
 
   Background:
@@ -115,7 +117,7 @@ Feature: Conditional formatting cell background
 # VISUAL RENDERING — GROUP HEADER STATS
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Conditional formatting on group headers
+Rule: Conditional formatting on group headers
   Group header aggregate stats receive conditional formatting when rules exist.
 
   Background:
@@ -139,7 +141,7 @@ Feature: Conditional formatting on group headers
 # VISUAL RENDERING — COLUMN HEADER INDICATOR
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Conditional formatting column header indicator
+Rule: Conditional formatting column header indicator
   Columns with formatting rules show colored dot indicators in the header.
 
   Background:
@@ -163,7 +165,7 @@ Feature: Conditional formatting column header indicator
 # CREATING RULES — ENTRY POINT
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Conditional formatting entry point
+Rule: Conditional formatting entry point
   Users access conditional formatting via column header context menu.
 
   Background:
@@ -191,7 +193,7 @@ Feature: Conditional formatting entry point
 # CREATING RULES — FORMATTING POPOVER
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Conditional formatting popover
+Rule: Conditional formatting popover
   The formatting popover lets users define threshold rules for a column.
 
   Background:
@@ -257,7 +259,7 @@ Feature: Conditional formatting popover
 # CREATING RULES — PRE-POPULATED DEFAULTS
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Conditional formatting pre-populated defaults
+Rule: Conditional formatting pre-populated defaults
   Columns with no existing rules suggest sensible defaults when opened.
 
   Background:
@@ -309,7 +311,7 @@ Feature: Conditional formatting pre-populated defaults
 # REMOVING RULES
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Removing conditional formatting rules
+Rule: Removing conditional formatting rules
   Users can remove individual rules or clear all rules for a column.
 
   Background:
@@ -343,7 +345,7 @@ Feature: Removing conditional formatting rules
 # INTERACTION WITH LENSES
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Conditional formatting lens interaction
+Rule: Conditional formatting lens interaction
   Formatting rules are stored per-lens and follow lens lifecycle.
 
   Background:
@@ -384,7 +386,7 @@ Feature: Conditional formatting lens interaction
 # INTERACTION WITH GROUPING
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Conditional formatting with grouping
+Rule: Conditional formatting with grouping
   Formatting applies to both individual rows and group header aggregates.
 
   Background:
@@ -410,7 +412,7 @@ Feature: Conditional formatting with grouping
 # DATA GATING
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Conditional formatting data gating
+Rule: Conditional formatting data gating
   Edge cases for null, estimated, hidden, and zero values.
 
   Background:
@@ -448,7 +450,7 @@ Feature: Conditional formatting data gating
 # PERFORMANCE
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Conditional formatting performance
+Rule: Conditional formatting performance
   Formatting is evaluated client-side with negligible overhead.
 
   Background:
@@ -473,7 +475,7 @@ Feature: Conditional formatting performance
 # KEYBOARD AND ACCESSIBILITY
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Conditional formatting accessibility
+Rule: Conditional formatting accessibility
   Formatted cells and column headers are accessible to screen readers.
 
   Background:

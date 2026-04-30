@@ -6,7 +6,9 @@
 # PULL-TAB ACTIVATION
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Pull-tab trigger
+Feature: Trace peek
+
+Rule: Pull-tab trigger
   A two-step intentional trigger prevents accidental peek activation while scanning trace rows.
 
   Background:
@@ -51,7 +53,7 @@ Feature: Pull-tab trigger
 # PEEK PANEL DISPLAY
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Peek panel display
+Rule: Peek panel display
   The peek panel overlays table rows inline without affecting layout or the drawer.
 
   Background:
@@ -95,7 +97,7 @@ Feature: Peek panel display
 # PEEK CONTENT
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Peek content
+Rule: Peek content
   The peek shows a compact, read-only trace summary with all sections visible at once.
 
   Background:
@@ -156,7 +158,7 @@ Feature: Peek content
 # PEEK CONTENT EXCLUSIONS
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Peek content exclusions
+Rule: Peek content exclusions
   The peek intentionally omits detailed data that belongs in the drawer.
 
   Background:
@@ -187,7 +189,7 @@ Feature: Peek content exclusions
 # DISMISSING THE PEEK
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Dismissing the peek
+Rule: Dismissing the peek
   The peek is ephemeral and dismisses naturally when the user stops interacting with it.
 
   Background:
@@ -221,7 +223,7 @@ Feature: Dismissing the peek
 # PEEK DOES NOT FOLLOW BETWEEN ROWS
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Peek standalone behavior
+Rule: Peek standalone behavior
   Each peek is a standalone action that does not auto-follow when moving to another row.
 
   Background:
@@ -245,7 +247,7 @@ Feature: Peek standalone behavior
 # PEEK AND DRAWER COEXISTENCE
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Peek and drawer coexistence
+Rule: Peek and drawer coexistence
   The peek and drawer operate independently, allowing side-by-side comparison.
 
   Background:
@@ -273,7 +275,7 @@ Feature: Peek and drawer coexistence
 # CONVERSATION CONTEXT IN PEEK
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Conversation context in peek
+Rule: Conversation context in peek
   Traces belonging to a conversation show a subtle indicator without full conversation view.
 
   Background:
@@ -301,7 +303,7 @@ Feature: Conversation context in peek
 # KEYBOARD INTERACTION
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Keyboard interaction for peek
+Rule: Keyboard interaction for peek
   Keyboard shortcuts provide accessible peek activation and navigation.
 
   Background:
@@ -349,7 +351,7 @@ Feature: Keyboard interaction for peek
 # DATA FETCHING
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Peek data fetching
+Rule: Peek data fetching
   The peek reuses table data when possible and fetches minimally when needed.
 
   Background:
@@ -378,7 +380,7 @@ Feature: Peek data fetching
 # LOADING STATE
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Peek loading state
+Rule: Peek loading state
   The peek shows a graceful loading state when additional data must be fetched.
 
   Background:
@@ -401,7 +403,7 @@ Feature: Peek loading state
 # DATA GATING
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Peek data gating
+Rule: Peek data gating
   Sections gracefully adapt to missing or inapplicable data.
 
   Background:

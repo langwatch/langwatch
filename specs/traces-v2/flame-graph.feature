@@ -6,7 +6,9 @@
 # BLOCK LAYOUT
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Flame graph block layout
+Feature: Flame graph
+
+Rule: Flame graph block layout
   Stacked blocks where parent spans sit on top and children below, with width proportional to duration.
 
   Background:
@@ -39,7 +41,7 @@ Feature: Flame graph block layout
 # BLOCK CONTENT AND LABELS
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Flame graph block content
+Rule: Flame graph block content
   Each block displays contextual information based on available space.
 
   Background:
@@ -71,7 +73,7 @@ Feature: Flame graph block content
 # CLICK-TO-ZOOM
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Flame graph click-to-zoom
+Rule: Flame graph click-to-zoom
   Clicking any block zooms in so it fills the full width and only its children are shown below.
 
   Background:
@@ -107,7 +109,7 @@ Feature: Flame graph click-to-zoom
 # DRAG-TO-ZOOM
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Flame graph drag-to-zoom
+Rule: Flame graph drag-to-zoom
   Click and drag horizontally to zoom into a specific time range.
 
   Background:
@@ -131,7 +133,7 @@ Feature: Flame graph drag-to-zoom
 # BREADCRUMBS AND ZOOM NAVIGATION
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Flame graph breadcrumbs and zoom navigation
+Rule: Flame graph breadcrumbs and zoom navigation
   Breadcrumbs and controls allow navigating between zoom levels.
 
   Background:
@@ -159,7 +161,7 @@ Feature: Flame graph breadcrumbs and zoom navigation
 # HOVER INTERACTIONS
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Flame graph hover behavior
+Rule: Flame graph hover behavior
   Hovering blocks highlights relationships and shows tooltips.
 
   Background:
@@ -183,7 +185,7 @@ Feature: Flame graph hover behavior
 # SIBLING GROUPING
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Flame graph sibling grouping
+Rule: Flame graph sibling grouping
   When a span has many children with the same name, they are grouped into a single summary block.
 
   Background:
@@ -215,7 +217,7 @@ Feature: Flame graph sibling grouping
 # EDGE CASES
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Flame graph edge cases
+Rule: Flame graph edge cases
   Handles unusual span structures gracefully.
 
   Background:
@@ -260,7 +262,7 @@ Feature: Flame graph edge cases
 # TIME SCALE AND MINIMAP
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Flame graph time scale
+Rule: Flame graph time scale
   The time axis matches the trace duration and rescales when zoomed.
 
   Background:
@@ -283,7 +285,7 @@ Feature: Flame graph time scale
 # MOUSE INTERACTIONS SUMMARY
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Flame graph mouse interactions
+Rule: Flame graph mouse interactions
   Mouse actions on blocks produce consistent behaviors.
 
   Background:
@@ -299,7 +301,7 @@ Feature: Flame graph mouse interactions
 # KEYBOARD NAVIGATION
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Flame graph keyboard navigation
+Rule: Flame graph keyboard navigation
   Keyboard shortcuts for navigating and interacting with the flame graph when it has focus.
 
   Background:
@@ -352,7 +354,7 @@ Feature: Flame graph keyboard navigation
 # PERFORMANCE
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Flame graph performance strategies
+Rule: Flame graph performance strategies
   Rendering strategies adapt to span count for smooth interaction.
 
   Background:
@@ -378,7 +380,7 @@ Feature: Flame graph performance strategies
 # DATA GATING
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Flame graph data gating
+Rule: Flame graph data gating
   Handles degenerate or incomplete trace data gracefully.
 
   Background:

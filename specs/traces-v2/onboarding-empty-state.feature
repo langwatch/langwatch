@@ -7,6 +7,8 @@
 # ─────────────────────────────────────────────────────────────────────────────
 
 Feature: Onboarding empty state
+
+Rule: Onboarding empty state
   When a project has no traces, the Observe page replaces the trace table
   with a setup flow that helps the user send their first trace, while
   keeping the page chrome (search bar, filters, toolbar) visible in an
@@ -39,7 +41,7 @@ Feature: Onboarding empty state
 # SETUP PATH: VIA THE PLATFORM
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Via the Platform setup path
+Rule: Via the Platform setup path
   Configure everything directly from the LangWatch dashboard.
 
   Background:
@@ -48,7 +50,7 @@ Feature: Via the Platform setup path
 
   Scenario: Platform body lists product capabilities
     Then a grid of capability cards is shown
-    Including "Traces & Analytics", "Evaluations", "Prompts", "Scenarios", "Datasets", "Model Providers"
+    And the grid includes cards for "Traces & Analytics", "Evaluations", "Prompts", "Scenarios", "Datasets", "Model Providers"
     And each card links to the matching dashboard area for the active project
 
 
@@ -56,7 +58,7 @@ Feature: Via the Platform setup path
 # SETUP PATH: VIA CODING AGENT
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Via Coding Agent setup path
+Rule: Via Coding Agent setup path
   Set up using prompts, skills, or MCP from a coding agent — Claude Code,
   Cursor, Windsurf, Copilot, OpenAI Codex.
 
@@ -73,7 +75,7 @@ Feature: Via Coding Agent setup path
 # SETUP PATH: VIA MCP
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Via MCP setup path
+Rule: Via MCP setup path
   Connect any MCP client — Claude Desktop, ChatGPT, plus other compatible clients.
 
   Background:
@@ -90,7 +92,7 @@ Feature: Via MCP setup path
 # SETUP PATH: MANUALLY
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Manually setup path
+Rule: Manually setup path
   Direct SDK integration with platform/framework code snippets.
 
   Background:
@@ -113,7 +115,7 @@ Feature: Manually setup path
 # PERSONAL ACCESS TOKEN GENERATION
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Generate access token for setup
+Rule: Generate access token for setup
   The Manually tab exposes a "Generate access token" card so the user can
   mint a PAT scoped to the current project without leaving the page.
 
@@ -153,7 +155,7 @@ Feature: Generate access token for setup
 # SAMPLE DATA
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Sample data exploration
+Rule: Sample data exploration
   Users can explore the UI with realistic data before integrating their
   own app. Sample traces are minted client-side via Foundry's trace
   generator and POSTed to the standard OTLP endpoint, so every downstream
@@ -196,7 +198,7 @@ Feature: Sample data exploration
 # FIRST REAL TRACE CELEBRATION
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: First trace celebration
+Rule: First trace celebration
   When real traces arrive for the first time, the user sees a celebration.
 
   Background:

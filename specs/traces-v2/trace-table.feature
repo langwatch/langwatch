@@ -8,7 +8,9 @@
 # PAGE LAYOUT
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Trace table page layout
+Feature: Trace table
+
+Rule: Trace table page layout
   The trace table sits in the center column between the filter sidebar
   and the trace drawer.
 
@@ -45,7 +47,7 @@ Feature: Trace table page layout
 # ORIGIN FILTER
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Origin filter in sidebar
+Rule: Origin filter in sidebar
   Origin is the first facet in the filter sidebar, not a separate control.
 
   Background:
@@ -96,7 +98,7 @@ Feature: Origin filter in sidebar
 # TOOLBAR STRIP
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Toolbar strip
+Rule: Toolbar strip
   A single horizontal strip below the search bar with all table-level controls.
 
   Background:
@@ -130,7 +132,7 @@ Feature: Toolbar strip
 # LENS TABS — ALL TRACES
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: All Traces lens (default)
+Rule: All Traces lens (default)
   The default view showing a flat list of all traces.
 
   Background:
@@ -159,7 +161,7 @@ Feature: All Traces lens (default)
 # LENS TABS — CONVERSATIONS
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Conversations lens
+Rule: Conversations lens
   Traces grouped by conversation ID showing aggregate data per conversation.
 
   Background:
@@ -244,7 +246,7 @@ Feature: Conversations lens
 # LENS TABS — ERRORS
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Errors lens
+Rule: Errors lens
   Shows only traces with error status, with error detail sub-rows.
 
   Background:
@@ -290,7 +292,7 @@ Feature: Errors lens
 # COLUMNS — DEFAULT SET & STATUS INDICATOR
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Default columns and status indicator
+Rule: Default columns and status indicator
   The table has a fixed set of default columns plus a status indicator
   rendered as a left border, not a column.
 
@@ -367,7 +369,7 @@ Feature: Default columns and status indicator
 # ROW FORMAT — TWO-ZONE ROWS
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Two-zone row format
+Rule: Two-zone row format
   Every row has a header line in the column grid. LLM traces get
   additional I/O detail lines below the header.
 
@@ -425,7 +427,7 @@ Feature: Two-zone row format
 # COLUMN VISIBILITY & REORDER
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Column visibility and reorder
+Rule: Column visibility and reorder
   Users can show/hide columns and drag to reorder them.
 
   Background:
@@ -470,7 +472,7 @@ Feature: Column visibility and reorder
 # EVAL & EVENT COLUMNS
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Evaluation and event column display
+Rule: Evaluation and event column display
   Eval columns show scores with colored indicators. Event columns show
   counts with exception flags.
 
@@ -534,7 +536,7 @@ Feature: Evaluation and event column display
 # ROW BEHAVIOR
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Row click and selection behavior
+Rule: Row click and selection behavior
   Clicking a row opens the trace drawer. Keyboard navigation is supported.
 
   Background:
@@ -576,7 +578,7 @@ Feature: Row click and selection behavior
 # DENSITY TOGGLE
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Density toggle
+Rule: Density toggle
   Users switch between compact and comfortable row density.
 
   Background:
@@ -605,7 +607,7 @@ Feature: Density toggle
 # PAGINATION
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Pagination
+Rule: Pagination
   The trace table uses explicit pagination, not infinite scroll.
 
   Background:
@@ -635,7 +637,7 @@ Feature: Pagination
 # REAL-TIME UPDATES
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Real-time trace updates via polling
+Rule: Real-time trace updates via polling
   The Observe page polls for new traces and shows a non-disruptive banner.
 
   Background:
@@ -689,7 +691,7 @@ Feature: Real-time trace updates via polling
 # LOADING STATES
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Table loading states
+Rule: Table loading states
   Loading indicators vary by context to avoid jarring transitions.
 
   Background:
@@ -717,7 +719,7 @@ Feature: Table loading states
 # DATA GATING
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Data gating and null handling
+Rule: Data gating and null handling
   Different empty/null states are handled with appropriate messages.
 
   Background:

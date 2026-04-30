@@ -6,7 +6,9 @@
 # COLUMN VISIBILITY
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Column visibility toggle
+Feature: Column configuration
+
+Rule: Column visibility toggle
   Users show or hide columns via the Columns dropdown to customize the trace table.
 
   Background:
@@ -41,7 +43,7 @@ Feature: Column visibility toggle
 # COLUMN DRAG-TO-REORDER
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Column drag-to-reorder
+Rule: Column drag-to-reorder
   Users drag column headers to rearrange the display order of columns.
 
   Background:
@@ -87,7 +89,7 @@ Feature: Column drag-to-reorder
 # COLUMN DRAG-TO-REORDER ACCESSIBILITY
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Column reorder keyboard and screen reader support
+Rule: Column reorder keyboard and screen reader support
   Users can reorder columns via keyboard and receive screen reader announcements.
 
   Background:
@@ -115,7 +117,7 @@ Feature: Column reorder keyboard and screen reader support
 # COLUMN RESIZE
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Column resize
+Rule: Column resize
   Users drag column borders to adjust column widths.
 
   Background:
@@ -161,7 +163,7 @@ Feature: Column resize
 # PINNED COLUMN RESIZE
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Pinned column resize
+Rule: Pinned column resize
   Pinned columns can be resized even though they cannot be reordered.
 
   Background:
@@ -181,7 +183,7 @@ Feature: Pinned column resize
 # COLUMN STATE IN LENSCONFIG
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Column state in LensConfig
+Rule: Column state in LensConfig
   The columns array in LensConfig defines the complete column layout including order, width, and pinning.
 
   Background:
@@ -212,7 +214,7 @@ Feature: Column state in LensConfig
 # DEFAULT COLUMN SET
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Default column set
+Rule: Default column set
   New lenses and reset-to-defaults use a standard set of columns and widths.
 
   Background:
@@ -251,7 +253,7 @@ Feature: Default column set
 # INTERACTION WITH LENSES
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Column changes interact with lenses
+Rule: Column changes interact with lenses
   Column modifications put lenses into draft state with save and revert options.
 
   Background:
@@ -289,7 +291,7 @@ Feature: Column changes interact with lenses
 # DATA GATING
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Data gating for columns with missing data
+Rule: Data gating for columns with missing data
   Columns with no data render gracefully without being hidden automatically.
 
   Background:
@@ -319,7 +321,7 @@ Feature: Data gating for columns with missing data
 # PERFORMANCE
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Column configuration performance
+Rule: Column configuration performance
   Drag-to-reorder and resize interactions remain smooth without full table re-renders.
 
   Background:

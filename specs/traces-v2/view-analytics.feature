@@ -6,7 +6,9 @@
 # LENS LIFECYCLE EVENTS
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Lens lifecycle event tracking
+Feature: Lens analytics
+
+Rule: Lens lifecycle event tracking
   When a user creates, saves, deletes, renames, duplicates, or reverts a lens,
   the system silently logs a corresponding analytics event.
 
@@ -44,7 +46,7 @@ Feature: Lens lifecycle event tracking
 # LENS SWITCHING EVENTS
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Lens switching event tracking
+Rule: Lens switching event tracking
   When a user switches between lens tabs, each switch is logged
   to track exploration patterns.
 
@@ -65,7 +67,7 @@ Feature: Lens switching event tracking
 # COLUMN EVENTS
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Column interaction event tracking
+Rule: Column interaction event tracking
   When a user toggles, reorders, or resizes columns, the system
   logs per-column analytics events.
 
@@ -102,7 +104,7 @@ Feature: Column interaction event tracking
 # GROUPING EVENTS
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Grouping change event tracking
+Rule: Grouping change event tracking
   When a user changes the grouping dropdown, the system logs the transition.
 
   Background:
@@ -118,7 +120,7 @@ Feature: Grouping change event tracking
 # CONDITIONAL FORMATTING EVENTS
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Conditional formatting event tracking
+Rule: Conditional formatting event tracking
   When a user adds or removes conditional formatting rules, the system logs
   the configuration details.
 
@@ -139,7 +141,7 @@ Feature: Conditional formatting event tracking
 # DRAFT DISCARD EVENTS
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Draft discard event tracking
+Rule: Draft discard event tracking
   When a user navigates away from a modified lens without saving,
   the system silently tracks the discard.
 
@@ -156,7 +158,7 @@ Feature: Draft discard event tracking
 # EVENT SCHEMA
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Analytics event schema
+Rule: Analytics event schema
   Every analytics event includes automatic metadata fields
   and references the originating lens config.
 
@@ -174,7 +176,7 @@ Feature: Analytics event schema
 # LOCAL STORAGE
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: localStorage event storage
+Rule: localStorage event storage
   Phase 2 stores analytics events in localStorage as a JSON array,
   with no user-facing UI for viewing them.
 
@@ -201,7 +203,7 @@ Feature: localStorage event storage
 # FIFO CAP
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: FIFO event cap
+Rule: FIFO event cap
   The localStorage event buffer is capped at 1000 events.
   Oldest events are dropped when the cap is reached.
 
@@ -226,7 +228,7 @@ Feature: FIFO event cap
 # DATA GATING
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Analytics data gating
+Rule: Analytics data gating
   Analytics is best-effort and never blocks the UI.
   Failures are handled silently.
 
@@ -254,7 +256,7 @@ Feature: Analytics data gating
 # MIGRATION PATH
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: trackLensEvent migration interface
+Rule: trackLensEvent migration interface
   The analytics module exposes a single function that components call.
   The implementation changes between phases but the interface stays the same.
 
@@ -275,7 +277,7 @@ Feature: trackLensEvent migration interface
 # PRIVACY
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Analytics privacy guarantees
+Rule: Analytics privacy guarantees
   Events contain only structural metadata about lens configuration.
   No trace content, user data, or PII is included.
 

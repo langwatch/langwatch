@@ -6,7 +6,9 @@
 # LENS TABS UI
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Lens tab bar layout
+Feature: Lens system
+
+Rule: Lens tab bar layout
   Lenses appear as tabs in the toolbar area above the table.
 
   Background:
@@ -44,7 +46,7 @@ Feature: Lens tab bar layout
 # BUILT-IN LENSES
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Built-in lenses
+Rule: Built-in lenses
   Phase 2 ships six built-in lenses that cannot be modified or deleted.
 
   Background:
@@ -110,7 +112,7 @@ Feature: Built-in lenses
 # CREATING A LENS
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Creating a custom lens
+Rule: Creating a custom lens
   Users create lenses to save a table configuration for reuse.
 
   Background:
@@ -178,7 +180,7 @@ Feature: Creating a custom lens
 # DRAFT STATE
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Draft state on custom lenses
+Rule: Draft state on custom lenses
   Custom lenses show a dot indicator when they have unsaved changes.
 
   Background:
@@ -248,7 +250,7 @@ Feature: Draft state on custom lenses
 # DRAFT STATE: CONTEXT MENUS
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Lens tab context menus
+Rule: Lens tab context menus
   Context menus provide draft actions and lens management options.
 
   Background:
@@ -283,7 +285,7 @@ Feature: Lens tab context menus
 # NAVIGATE AWAY: SILENT DISCARD
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Navigating away from a modified lens
+Rule: Navigating away from a modified lens
   Switching tabs silently discards unsaved changes without confirmation.
 
   Background:
@@ -305,7 +307,7 @@ Feature: Navigating away from a modified lens
 # EDITING A CUSTOM LENS
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Editing custom lenses
+Rule: Editing custom lenses
   Users can rename, duplicate, and delete custom lenses.
 
   Background:
@@ -350,7 +352,7 @@ Feature: Editing custom lenses
 # PERSISTENCE
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Lens persistence in localStorage
+Rule: Lens persistence in localStorage
   Custom lenses are stored in localStorage scoped to the project.
 
   Background:
@@ -389,7 +391,7 @@ Feature: Lens persistence in localStorage
 # DATA GATING
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Data gating and edge cases
+Rule: Data gating and edge cases
   The lens system handles missing data, corruption, and storage limits gracefully.
 
   Background:
@@ -430,7 +432,7 @@ Feature: Data gating and edge cases
 # KEYBOARD SHORTCUTS
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Lens keyboard shortcuts
+Rule: Lens keyboard shortcuts
   Users can switch lenses with keyboard shortcuts.
 
   Background:

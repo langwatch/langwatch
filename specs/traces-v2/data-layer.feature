@@ -6,7 +6,9 @@
 # TRACE LIST (Level 0)
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Trace list data fetching
+Feature: Data layer
+
+Rule: Trace list data fetching
   The trace table fetches paginated, filtered, sorted data from trace_summaries.
 
   Background:
@@ -45,7 +47,7 @@ Feature: Trace list data fetching
     And both components receive the same data
 
 
-Feature: Trace list grouped
+Rule: Trace list grouped
   Grouped views show traces organized by a dimension.
 
   Background:
@@ -62,7 +64,7 @@ Feature: Trace list grouped
     And each group contains its trace rows
 
 
-Feature: New trace count polling
+Rule: New trace count polling
   A poll detects new traces for the "N new traces" banner.
 
   Scenario: Polls every 30 seconds
@@ -82,7 +84,7 @@ Feature: New trace count polling
 # FACETS (Level 0)
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Facet counts
+Rule: Facet counts
   The filter sidebar shows counts for each facet value.
 
   Scenario: Facets load with the trace list
@@ -108,7 +110,7 @@ Feature: Facet counts
 # SEARCH AUTOCOMPLETE (Level 0)
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Search autocomplete
+Rule: Search autocomplete
   The search bar suggests field names and values.
 
   Scenario: Field name suggestions
@@ -135,7 +137,7 @@ Feature: Search autocomplete
 # FILTER FIELD REGISTRY (strongly typed)
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Strongly typed filter field registry
+Rule: Strongly typed filter field registry
   Every filterable field is defined once. The registry drives autocomplete,
   sidebar facets, AST validation, and ClickHouse query translation.
 
@@ -190,7 +192,7 @@ Feature: Strongly typed filter field registry
 # FILTER STATE MACHINE
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Filter AST as single source of truth
+Rule: Filter AST as single source of truth
   All filter state flows through the AST. No two-way sync.
 
   Scenario: Sidebar checkbox updates AST, search bar, and URL
@@ -236,7 +238,7 @@ Feature: Filter AST as single source of truth
 # DRAWER DATA (Levels 1-3)
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Progressive drawer loading
+Rule: Progressive drawer loading
   The drawer loads data in thin slices as the user drills deeper.
 
   Scenario: Clicking a trace row opens drawer and fetches header + span skeleton
@@ -301,7 +303,7 @@ Feature: Progressive drawer loading
 # PREFETCH ON HOVER
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Hover prefetch for instant drawer opens
+Rule: Hover prefetch for instant drawer opens
   Hovering a trace row prefetches its drawer data.
 
   Scenario: Hover triggers prefetch after delay
@@ -324,7 +326,7 @@ Feature: Hover prefetch for instant drawer opens
 # LOADING STATES
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Loading state behavior
+Rule: Loading state behavior
   Never show loading when there is data to display.
 
   Scenario: First load shows skeleton
@@ -359,7 +361,7 @@ Feature: Loading state behavior
 # ERROR BOUNDARIES
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Per-level error boundaries
+Rule: Per-level error boundaries
   Errors at one level don't crash other levels.
 
   Scenario: Span detail error does not crash drawer
@@ -386,7 +388,7 @@ Feature: Per-level error boundaries
 # DOMAIN ERRORS
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Typed domain error handling
+Rule: Typed domain error handling
   Every error has a kind, and the frontend renders specific messages.
 
   Scenario: trace_not_found renders actionable message
@@ -427,7 +429,7 @@ Feature: Typed domain error handling
 # URL STATE SYNC
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: URL state synchronization
+Rule: URL state synchronization
   App state is serialized to URL. Shareable links. Back/forward works.
 
   Scenario: URL reflects current state
@@ -478,7 +480,7 @@ Feature: URL state synchronization
 # SSE LIVE TAIL
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Live tail via SSE
+Rule: Live tail via SSE
   Real-time trace streaming on the Live Tail page.
 
   Scenario: SSE connects when Live Tail page opens
@@ -519,7 +521,7 @@ Feature: Live tail via SSE
 # STREAMING (httpBatchStreamLink)
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Streamed batch responses
+Rule: Streamed batch responses
   Multiple queries batch into one HTTP request with JSON-L streaming.
 
   Scenario: Drawer open batches header and span summary
@@ -540,7 +542,7 @@ Feature: Streamed batch responses
 # CACHE LIFECYCLE
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Cache lifecycle management
+Rule: Cache lifecycle management
   TanStack Query manages stale times, garbage collection, and deduplication.
 
   Scenario: Drawer data survives across open/close cycles
@@ -573,7 +575,7 @@ Feature: Cache lifecycle management
 # RACE CONDITIONS
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Race condition handling
+Rule: Race condition handling
   Concurrent state changes do not produce inconsistent UI.
 
   Scenario: Filter change while drawer is open
@@ -610,7 +612,7 @@ Feature: Race condition handling
 # SECURITY
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Security and data isolation
+Rule: Security and data isolation
   All queries are tenant-scoped and permission-checked.
 
   Scenario: TenantId injected server-side

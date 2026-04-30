@@ -8,7 +8,9 @@
 # LAYOUT AND VIEW SWITCHING
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Visualization layout and view switching
+Feature: Visualizations
+
+Rule: Visualization layout and view switching
   The visualization section sits between the header/alerts and the tab bar,
   offering three views of the same span data.
 
@@ -69,7 +71,7 @@ Feature: Visualization layout and view switching
 # SPAN SELECTION (SHARED)
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Span selection across all views
+Rule: Span selection across all views
   Clicking a span opens the span tab; clicking it again closes the tab.
   Selection state is synchronized across views.
 
@@ -103,7 +105,7 @@ Feature: Span selection across all views
 # HOVER BEHAVIOR (SHARED)
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Hover tooltips and cross-highlighting
+Rule: Hover tooltips and cross-highlighting
   Hovering spans shows a tooltip and highlights related elements in
   the Trace Summary tab.
 
@@ -140,7 +142,7 @@ Feature: Hover tooltips and cross-highlighting
 # COLOR CODING BY SPAN TYPE (SHARED)
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Color coding by span type
+Rule: Color coding by span type
   Every span is color-coded by type, consistent across all three views.
 
   Background:
@@ -185,7 +187,7 @@ Feature: Color coding by span type
 # MULTI-ROOT TRACES (SHARED)
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Multi-root traces
+Rule: Multi-root traces
   Traces with two or more root spans are rendered as a forest,
   not forced into a single tree.
 
@@ -211,7 +213,7 @@ Feature: Multi-root traces
 # ORPHANED SPANS (SHARED)
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Orphaned spans
+Rule: Orphaned spans
   Spans whose parents are not in the trace are shown at root level
   with an indicator, never hidden.
 
@@ -237,7 +239,7 @@ Feature: Orphaned spans
 # ZERO-DURATION SPANS (SHARED)
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Zero-duration spans
+Rule: Zero-duration spans
   Spans with 0ms duration are always visible and clickable,
   never invisible.
 
@@ -264,7 +266,7 @@ Feature: Zero-duration spans
 # COLLAPSED STATE (SHARED)
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Collapsed visualization state
+Rule: Collapsed visualization state
   When collapsed, the visualization shows a compressed overview
   that conveys the trace shape without labels.
 
@@ -292,7 +294,7 @@ Feature: Collapsed visualization state
 # WATERFALL VIEW: SPAN TREE (LEFT SIDE)
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Waterfall span tree
+Rule: Waterfall span tree
   The left side of the Waterfall view shows a collapsible tree of spans
   with icons, names, durations, and optional LLM metadata.
 
@@ -361,7 +363,7 @@ Feature: Waterfall span tree
 # WATERFALL VIEW: TIMELINE (RIGHT SIDE)
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Waterfall timeline
+Rule: Waterfall timeline
   The right side of the Waterfall view shows horizontal bars on a time axis,
   positioned by each span's start time and sized by duration.
 
@@ -402,7 +404,7 @@ Feature: Waterfall timeline
 # WATERFALL VIEW: TIME SCALE
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Waterfall time scale
+Rule: Waterfall time scale
   The time scale adapts to the bimodal distribution of span durations,
   with zoom, pan, and a minimap for navigation.
 
@@ -453,7 +455,7 @@ Feature: Waterfall time scale
 # WATERFALL VIEW: SIBLING GROUPING
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Waterfall sibling grouping
+Rule: Waterfall sibling grouping
   When a parent has more than five children with the same span name,
   they are collapsed into a summary group row.
 
@@ -502,7 +504,7 @@ Feature: Waterfall sibling grouping
 # WATERFALL VIEW: INTERACTIONS
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Waterfall interactions
+Rule: Waterfall interactions
   Clickable, hoverable, and draggable elements in the Waterfall view.
 
   Background:
@@ -531,7 +533,7 @@ Feature: Waterfall interactions
 # WATERFALL VIEW: PERFORMANCE
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Waterfall performance
+Rule: Waterfall performance
   Rendering strategy adapts to span count, using virtualization
   and auto-collapsing for large traces.
 
@@ -563,7 +565,7 @@ Feature: Waterfall performance
 # DATA GATING
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Data gating for edge cases
+Rule: Data gating for edge cases
   The visualization handles incomplete or minimal data gracefully,
   never hiding information.
 
