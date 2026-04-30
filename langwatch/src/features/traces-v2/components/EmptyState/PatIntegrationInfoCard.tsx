@@ -1,7 +1,17 @@
-import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
+import {
+  Box,
+  Button,
+  Flex,
+  HStack,
+  Icon,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
 import { RoleBindingScopeType, TeamUserRole } from "@prisma/client";
-import { Key } from "lucide-react";
-import { useState } from "react";
+import { Key, Sparkles } from "lucide-react";
+import { AnimatePresence, motion } from "motion/react";
+import { useEffect, useState } from "react";
+import { Kbd } from "~/components/ops/shared/Kbd";
 import { toaster } from "~/components/ui/toaster";
 import { CodePreview } from "~/features/onboarding/components/sections/observability/CodePreview";
 import { CLOUD_ENDPOINT } from "~/features/onboarding/components/sections/shared/build-mcp-config";
@@ -66,14 +76,14 @@ function buildEnvLines({
   endpoint: string;
   showEndpoint: boolean;
 }): EnvLine[] {
-  // Every line in this block is something the user has to copy into their
-  // environment, so all of them get the highlight treatment. ENDPOINT is
-  // only emitted (and only highlighted) when self-hosted — on cloud the
-  // SDK falls back to the default URL and surfacing the line would just be
-  // noise.
+  // Every line in this block is something the user has to copy into
+  // their environment, so all of them get the highlight treatment.
+  // `ENDPOINT` is only emitted (and only highlighted) when self-hosted —
+  // on cloud the SDK falls back to the default URL, so surfacing the
+  // line at all would just be noise.
   const lines: EnvLine[] = [
     { key: "LANGWATCH_API_KEY", value: token, highlight: true },
-    { key: "LANGWATCH_PROJECT_ID", value: projectId, highlight: true },
+    { key: "X-Project-Id", value: projectId, highlight: true },
   ];
   if (showEndpoint) {
     lines.push({ key: "LANGWATCH_ENDPOINT", value: endpoint, highlight: true });
@@ -88,7 +98,7 @@ function renderEnv(lines: EnvLine[]): string {
 /**
  * Generate-token card for the traces-v2 empty state. Mints a Personal
  * Access Token scoped to the caller's role bindings, then renders the
- * `LANGWATCH_API_KEY` / `LANGWATCH_PROJECT_ID` / `LANGWATCH_ENDPOINT`
+ * `LANGWATCH_API_KEY` / `X-Project-Id` / `LANGWATCH_ENDPOINT`
  * env block exactly once. The parent owns the token so other setup
  * paths (Coding Agent, MCP) can render with the same credential.
  *
@@ -142,104 +152,125 @@ export function PatIntegrationInfoCard({
     );
   };
 
-  if (token) {
-    const lines = buildEnvLines({ token, projectId, endpoint, showEndpoint });
-    const code = renderEnv(lines);
-    const highlightLines = lines
-      .map((l, i) => (l.highlight ? i + 1 : -1))
-      .filter((n) => n > 0);
+  // `G` triggers Generate when the button is on screen. Skipped when a
+  // token is already minted (button disappears) or while another mutation
+  // is in flight, and suppressed for typing targets so it doesn't fire
+  // when the user is in an input elsewhere on the page.
+  useEffect(() => {
+    if (token || createMutation.isLoading) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      const t = e.target as HTMLElement | null;
+      if (
+        t?.tagName === "INPUT" ||
+        t?.tagName === "TEXTAREA" ||
+        t?.isContentEditable
+      ) {
+        return;
+      }
+      if (e.key.toLowerCase() === "g") {
+        e.preventDefault();
+        handleGenerate();
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+    // handleGenerate closes over fresh deps each render; rebinding on
+    // token / loading transitions is enough.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, createMutation.isLoading]);
 
-    return (
-      <VStack align="stretch" gap={4}>
-        <VStack align="stretch" gap={0.5}>
-          <Text fontSize="md" fontWeight="semibold" letterSpacing="-0.01em">
-            Your access token
-          </Text>
-          <Text fontSize="xs" color="orange.fg" fontWeight="600">
-            Copy this token now. You won&apos;t be able to see it again.
-          </Text>
-        </VStack>
+  // Pre-generation preview uses a non-secret obvious placeholder so the
+  // blurred text doesn't accidentally read as a real key.
+  const PLACEHOLDER_TOKEN = "sk-lw-xxxxxxxxxxxxxxxxxxxxxxxx";
+  const realLines = buildEnvLines({
+    token: token ?? PLACEHOLDER_TOKEN,
+    projectId,
+    endpoint,
+    showEndpoint,
+  });
+  const code = renderEnv(realLines);
+  const highlightLines = realLines
+    .map((l, i) => (l.highlight ? i + 1 : -1))
+    .filter((n) => n > 0);
+
+  // Single advisory: "you just generated, save it now" — fades in
+  // after the user mints a token. `null` reserves no space pre-gen so
+  // the card doesn't reserve a row for an empty advisory.
+  const advisoryKey = token ? "post-gen" : "none";
+
+  return (
+    <VStack align="stretch" gap={2}>
+      <Box position="relative">
         <Box
-          // Recolor shiki's default line highlight to LangWatch's tracing
-          // orange. Two systems can land a tint on the highlighted span:
-          // shiki's transformer adds `class="highlighted"`, and Chakra's
-          // CodeBlock adapter adds `data-highlight=""` (see
-          // node_modules/.../code-block/adapters.js). Cover both, plus the
-          // `.line` span variant shiki sometimes wraps. Override
-          // `background-color` directly — the `background` shorthand
-          // alone doesn't beat Chakra's recipe-level token. The negative
-          // margin / positive padding stretches the tint to the edge of
-          // the code surface so it reads as a row, not a typo.
-          //
-          // Shiki's bash grammar also paints token-level backgrounds on
-          // string values (the PAT, for instance), so we explicitly
-          // clear `background` on every descendant span within a
-          // highlighted line — otherwise the inner blue/yellow string
-          // tint layers on top of the row's orange and you see
-          // half-blue lines.
-          css={{
-            "& [data-highlight], & .highlighted, & .line[data-highlight], & .line.highlighted":
-              {
-                background: "rgba(237,137,38,0.18) !important",
-                backgroundColor: "rgba(237,137,38,0.18) !important",
-                borderLeft:
-                  "2px solid var(--chakra-colors-orange-500, rgba(237,137,38,0.85)) !important",
-                display: "inline-block",
-                width: "100%",
-                paddingLeft: "calc(1ch - 2px)",
-                marginLeft: "-1ch",
-                paddingRight: "1ch",
-                marginRight: "-1ch",
-              },
-            "& [data-highlight] *, & .highlighted *, & .line[data-highlight] *, & .line.highlighted *":
-              {
-                background: "transparent !important",
-                backgroundColor: "transparent !important",
-              },
-          }}
+          filter={token ? undefined : "blur(5px)"}
+          opacity={token ? undefined : 0.55}
+          pointerEvents={token ? undefined : "none"}
+          userSelect={token ? undefined : "none"}
+          aria-hidden={token ? undefined : "true"}
+          transition="filter 0.2s ease, opacity 0.2s ease"
         >
           <CodePreview
             code={code}
             filename=".env"
             codeLanguage="bash"
             highlightLines={highlightLines}
-            sensitiveValue={token}
-            enableVisibilityToggle
+            sensitiveValue={token ?? undefined}
+            enableVisibilityToggle={!!token}
             isVisible={revealed}
             onToggleVisibility={() => setRevealed((v) => !v)}
           />
         </Box>
-        <Text fontSize="xs" color="fg.muted" lineHeight="tall">
-          We&apos;ve pre-filled this token into the setup steps below. The
-          highlighted lines are the ones to copy into your environment.
-        </Text>
-      </VStack>
-    );
-  }
+        {!token && (
+          <Flex
+            position="absolute"
+            inset={0}
+            align="center"
+            justify="center"
+            paddingX={3}
+          >
+            <Button
+              colorPalette="orange"
+              variant="surface"
+              onClick={handleGenerate}
+              loading={createMutation.isLoading}
+              boxShadow="lg"
+            >
+              <Key size={14} />
+              Generate access token
 
-  return (
-    <VStack align="stretch" gap={4}>
-      <VStack align="stretch" gap={0.5}>
-        <Text fontSize="md" fontWeight="semibold" letterSpacing="-0.01em">
-          Generate an access token
-        </Text>
-        <Text fontSize="xs" color="fg.muted" lineHeight="tall">
-          Creates a Personal Access Token scoped to read and write traces and
-          prompts on this project. We&apos;ll plumb it into every setup option
-          below.
-        </Text>
-      </VStack>
-      <HStack>
-        <Button
-          size="sm"
-          colorPalette="orange"
-          onClick={handleGenerate}
-          loading={createMutation.isLoading}
-        >
-          <Key size={14} />
-          Generate access token
-        </Button>
-      </HStack>
+              <Kbd>G</Kbd>
+            </Button>
+          </Flex>
+        )}
+      </Box>
+      <AnimatePresence mode="wait" initial={false}>
+        {advisoryKey === "post-gen" && (
+          <motion.div
+            key="post-gen"
+            initial={{ opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4 }}
+            transition={{ duration: 0.18, ease: "easeOut" }}
+          >
+            <HStack gap={1.5} align="flex-start" color="fg.muted">
+              <Icon
+                as={Sparkles}
+                boxSize={3}
+                color="orange.fg"
+                flexShrink={0}
+                marginTop={0.5}
+              />
+              <Text fontSize="xs" lineHeight="tall">
+                <Text as="span" color="orange.fg" fontWeight="semibold">
+                  Copy this token before you move on.
+                </Text>{" "}
+                If you lose it? You can Mint another from Settings!
+              </Text>
+            </HStack>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </VStack>
   );
 }

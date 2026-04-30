@@ -1,8 +1,10 @@
-import { Box, Skeleton, VStack } from "@chakra-ui/react";
+import { Box, CodeBlock, Skeleton, VStack } from "@chakra-ui/react";
 import { motion } from "motion/react";
 import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useColorMode } from "~/components/ui/color-mode";
 import { Drawer } from "~/components/ui/drawer";
 import { Tooltip } from "~/components/ui/tooltip";
+import { useShikiAdapter } from "./markdownView/shikiAdapter";
 import { useDrawer, useDrawerParams } from "~/hooks/useDrawer";
 import { useConversationContext } from "../../hooks/useConversationContext";
 import { useConversationPrefetch } from "../../hooks/useConversationPrefetch";
@@ -46,6 +48,13 @@ export interface TraceV2DrawerShellProps {
 export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
   const { closeDrawer } = useDrawer();
   const params = useDrawerParams();
+  const { colorMode } = useColorMode();
+  // One Shiki adapter for the whole drawer. All `<RenderedMarkdown>`,
+  // `<ShikiCodeBlock>`, and the JSON tokenizer consume this — without it,
+  // each consumer span up its own highlighter (theme + lang JSON +
+  // Oniguruma engine), which got expensive once the chunked LLM panel
+  // and conversation markdown views started mounting many siblings.
+  const shikiAdapter = useShikiAdapter(colorMode);
 
   const traceId = params.traceId;
   const occurredAtMsParam = useMemo(() => {
@@ -207,11 +216,18 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
       size={isMaximized ? "full" : "lg"}
       onOpenChange={() => handleClose()}
     >
+      <CodeBlock.AdapterProvider value={shikiAdapter}>
       <Drawer.Content
         ref={drawerContentRef}
         paddingX={0}
         maxWidth={isMaximized ? undefined : "45%"}
         transition="max-width 0.2s ease"
+        // Anchor for the empty-state onboarding tour: a global
+        // CSS rule keyed off `body[data-traces-tour-stage]`
+        // applies a soft blue glow to this element during
+        // `drawerOverview` so the user knows where the tour copy
+        // is pointing. No-op outside the onboarding journey.
+        data-tour-target="drawer"
       >
         <ResizeEdgeGrip onDoubleClick={toggleMaximized} />
         <Drawer.Body
@@ -290,7 +306,7 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
                           borderTopWidth="1px"
                           borderBottomWidth="1px"
                           borderColor="border.muted"
-                          paddingY={2}
+                          paddingY={5}
                         >
                           <ConversationContext
                             conversationId={trace.conversationId}
@@ -363,6 +379,7 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
           </VStack>
         </Drawer.Body>
       </Drawer.Content>
+      </CodeBlock.AdapterProvider>
       <KeyboardShortcutsHelp
         open={shortcutsOpen}
         onClose={() => setShortcutsOpen(false)}
@@ -389,6 +406,12 @@ function ResizeEdgeGrip({ onDoubleClick }: { onDoubleClick: () => void }) {
         onDoubleClick={onDoubleClick}
         _hover={{ "& > [data-edge-grip]": { opacity: 1 } }}
         aria-label="Drag edge to resize, double-click to toggle"
+        // Doubles as the anchor point for the empty-state
+        // onboarding hero during drawer-tour stages — the hero
+        // queries `[data-edge-grip="true"]` and pins its right
+        // boundary to this element's left edge so it never slides
+        // under the drawer regardless of drawer width.
+        data-edge-grip="true"
       >
         <Box
           data-edge-grip

@@ -1,5 +1,6 @@
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
+import { isPreviewTraceId } from "../components/EmptyState/samplePreviewTraces";
 import { useDrawerStore } from "../stores/drawerStore";
 
 export function useSpanDetail() {
@@ -16,7 +17,11 @@ export function useSpanDetail() {
       ...(occurredAtMs !== null ? { occurredAtMs } : {}),
     },
     {
-      enabled: !!project?.id && !!traceId && !!spanId,
+      enabled:
+        !!project?.id &&
+        !!traceId &&
+        !!spanId &&
+        !isPreviewTraceId(traceId),
       staleTime: 300_000,
     },
   );

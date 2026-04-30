@@ -77,8 +77,12 @@ const traceColumnDefs = {
   service: traceCol.accessor("serviceName", {
     id: "service",
     header: "Service",
-    size: 100,
-    minSize: 90,
+    // Bumped from 100→160 so the common case (`fraud-risk-checker`,
+    // `user-profile-service`, `vercel-ai-app`) reads end-to-end without
+    // truncating mid-word. Customers still resize/hide columns from
+    // the toolbar; this is just a more useful default.
+    size: 160,
+    minSize: 110,
     enableSorting: false,
   }),
   duration: traceCol.accessor("durationMs", {
@@ -112,8 +116,8 @@ const traceColumnDefs = {
   model: traceCol.accessor((row) => row.models[0] ?? "", {
     id: "model",
     header: "Model",
-    size: 120,
-    minSize: 110,
+    size: 180,
+    minSize: 140,
     enableSorting: false,
   }),
   evaluations: traceCol.accessor((row) => row.evaluations.length, {
@@ -248,8 +252,8 @@ const conversationColumnDefs: Record<
   service: convCol.accessor("serviceName", {
     id: "service",
     header: "Service",
-    size: 100,
-    minSize: 100,
+    size: 160,
+    minSize: 110,
   }),
   status: convCol.accessor("worstStatus", {
     id: "status",

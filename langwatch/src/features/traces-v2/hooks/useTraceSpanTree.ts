@@ -1,5 +1,6 @@
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
+import { isPreviewTraceId } from "../components/EmptyState/samplePreviewTraces";
 
 /**
  * Span tree for a specific trace. Used by table-row peek expansions and
@@ -13,6 +14,10 @@ export function useTraceSpanTree(traceId: string) {
   const { project } = useOrganizationTeamProject();
   return api.tracesV2.spanTree.useQuery(
     { projectId: project?.id ?? "", traceId },
-    { enabled: !!project?.id && !!traceId, staleTime: 300_000 },
+    {
+      enabled:
+        !!project?.id && !!traceId && !isPreviewTraceId(traceId),
+      staleTime: 300_000,
+    },
   );
 }

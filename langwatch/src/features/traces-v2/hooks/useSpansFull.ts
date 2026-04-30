@@ -1,5 +1,6 @@
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
+import { isPreviewTraceId } from "../components/EmptyState/samplePreviewTraces";
 import { useDrawerStore } from "../stores/drawerStore";
 
 export function useSpansFull(enabled: boolean) {
@@ -14,7 +15,11 @@ export function useSpansFull(enabled: boolean) {
       ...(occurredAtMs !== null ? { occurredAtMs } : {}),
     },
     {
-      enabled: enabled && !!project?.id && !!traceId,
+      enabled:
+        enabled &&
+        !!project?.id &&
+        !!traceId &&
+        !isPreviewTraceId(traceId),
       staleTime: 300_000,
       // Hold the span tree in cache for 30 min after the last observer
       // unmounts. Lets users flip between recently-viewed traces in the

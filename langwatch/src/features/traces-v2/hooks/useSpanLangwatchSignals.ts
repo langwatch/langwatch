@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { LangwatchSignalBucket } from "~/server/api/routers/tracesV2.schemas";
 import { api } from "~/utils/api";
+import { isPreviewTraceId } from "../components/EmptyState/samplePreviewTraces";
 import { LIVE_REFETCH_MS, LIVE_WINDOW_MS } from "../constants/freshness";
 import { useDrawerStore } from "../stores/drawerStore";
 
@@ -26,7 +27,8 @@ export function useSpanLangwatchSignals() {
       ...(occurredAtMs !== null ? { occurredAtMs } : {}),
     },
     {
-      enabled: !!project?.id && !!traceId,
+      enabled:
+        !!project?.id && !!traceId && !isPreviewTraceId(traceId),
       staleTime: 300_000,
       cacheTime: 1_800_000,
       keepPreviousData: true,

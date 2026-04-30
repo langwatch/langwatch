@@ -1,5 +1,6 @@
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
+import { isPreviewTraceId } from "../components/EmptyState/samplePreviewTraces";
 import { useDrawerStore } from "../stores/drawerStore";
 
 export function useTraceEvals() {
@@ -13,7 +14,11 @@ export function useTraceEvals() {
       traceId: traceId ?? "",
     },
     {
-      enabled: !!project?.id && !!traceId && evalsExpanded,
+      enabled:
+        !!project?.id &&
+        !!traceId &&
+        evalsExpanded &&
+        !isPreviewTraceId(traceId),
       staleTime: 60_000,
       cacheTime: 1_800_000,
     },

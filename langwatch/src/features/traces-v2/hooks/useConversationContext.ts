@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
+import { isPreviewTraceId } from "../components/EmptyState/samplePreviewTraces";
 import type { TraceListItem } from "../types/trace";
 
 export interface ConversationTurn {
@@ -49,7 +50,16 @@ export function useConversationContext(
 ): ConversationContextResult {
   const { project } = useOrganizationTeamProject();
 
-  const enabled = !!project?.id && !!conversationId;
+  // Conversation context for preview-mode traces is seeded
+  // directly into the cache by `useOpenTraceDrawer`. We disable
+  // the *fetch* (so a real network call doesn't clobber the seed
+  // with an empty result) but still consume cached data through
+  // the same `useQuery` instance — `enabled: false` doesn't blank
+  // the cache; we just have to be careful not to short-circuit
+  // *before* reading `query.data` below.
+  const isPreview = !!traceId && isPreviewTraceId(traceId);
+  const fetchEnabled =
+    !!project?.id && !!conversationId && !isPreview;
 
   const query = api.tracesV2.conversationContext.useQuery(
     {
@@ -57,7 +67,7 @@ export function useConversationContext(
       conversationId: conversationId ?? "",
     },
     {
-      enabled,
+      enabled: fetchEnabled,
       staleTime: 30_000,
       cacheTime: 1_800_000,
       keepPreviousData: true,
@@ -66,7 +76,7 @@ export function useConversationContext(
   );
 
   return useMemo<ConversationContextResult>(() => {
-    if (!enabled) return NULL_RESULT;
+    if (!project?.id || !conversationId) return NULL_RESULT;
     if (!query.data) {
       return {
         ...NULL_RESULT,
@@ -86,5 +96,5 @@ export function useConversationContext(
         idx >= 0 && idx < turns.length - 1 ? (turns[idx + 1] ?? null) : null,
       isLoading: false,
     };
-  }, [enabled, query.data, query.isLoading, conversationId, traceId]);
+  }, [project?.id, query.data, query.isLoading, conversationId, traceId]);
 }

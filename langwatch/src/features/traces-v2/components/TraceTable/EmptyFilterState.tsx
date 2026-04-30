@@ -8,8 +8,12 @@ import {
   Text,
 } from "@chakra-ui/react";
 import type React from "react";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { useProjectHasTraces } from "../../hooks/useProjectHasTraces";
 import type { TimeRange } from "../../stores/filterStore";
 import { useFilterStore } from "../../stores/filterStore";
+import { useOnboardingStageStore } from "../../stores/onboardingStageStore";
+import { useUIStore } from "../../stores/uiStore";
 import { useViewStore } from "../../stores/viewStore";
 
 const LangWatchMark: React.FC = () => (
@@ -87,10 +91,16 @@ function emptyContent({
       description: `The current range covers ${hours} hour${hours === 1 ? "" : "s"}.`,
     };
   }
+  // Else branch: not errors/conversations lens, no filters, range is
+  // days-or-more. The project has had traces at some point (otherwise
+  // the empty-state journey would have intercepted via firstMessage=
+  // false) — there just aren't any in *this* window. Action-oriented
+  // copy beats the old new-user-y "Once your app starts sending
+  // traces…" line, which read like the project had never seen data.
   return {
-    title: "No traces yet",
+    title: "Nothing in this range",
     description:
-      "Once your app starts sending traces they'll appear here in real time.",
+      "Try a wider time window, or expand your query — your traces might just be outside this view.",
   };
 }
 
@@ -117,6 +127,23 @@ export const EmptyFilterState: React.FC = () => {
   const setTimeRange = useFilterStore((s) => s.setTimeRange);
   const activeLensId = useViewStore((s) => s.activeLensId);
   const selectLens = useViewStore((s) => s.selectLens);
+  const { project } = useOrganizationTeamProject();
+  const { hasAnyTraces } = useProjectHasTraces();
+  const setupDismissed = !!useUIStore((s) =>
+    project ? s.setupDismissedByProject[project.id] : false,
+  );
+  const setSetupDismissedForProject = useUIStore(
+    (s) => s.setSetupDismissedForProject,
+  );
+  const resetOnboardingStage = useOnboardingStageStore((s) => s.reset);
+  // Only offer the rewatch link in the "real, but empty" state — the
+  // user dismissed the onboarding card (`setupDismissed`) and the
+  // project hasn't received a real trace yet. Once any real trace
+  // arrives this affordance disappears; education isn't something we
+  // expect users to need, just something we leave out for the
+  // genuinely curious.
+  const showRewatchIntro =
+    hasAnyTraces === false && setupDismissed && !!project;
 
   const hasFilters = queryText.trim().length > 0;
   const rangeHours = (timeRange.to - timeRange.from) / MS_PER_HOUR;
@@ -187,6 +214,23 @@ export const EmptyFilterState: React.FC = () => {
               </Button>
             ))}
           </HStack>
+        )}
+
+        {showRewatchIntro && (
+          <Button
+            variant="plain"
+            size="xs"
+            color="fg.subtle"
+            padding={0}
+            minHeight="auto"
+            _hover={{ color: "fg.muted" }}
+            onClick={() => {
+              resetOnboardingStage();
+              setSetupDismissedForProject(project!.id, false);
+            }}
+          >
+            ↻ Rewatch the intro
+          </Button>
         )}
       </Stack>
     </Flex>

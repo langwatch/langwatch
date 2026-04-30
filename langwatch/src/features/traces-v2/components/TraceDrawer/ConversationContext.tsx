@@ -9,7 +9,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { AnimatePresence, motion, type Variants } from "motion/react";
-import { memo, useCallback, useEffect, useMemo, useRef } from "react";
+import { memo, useCallback, useMemo } from "react";
 import {
   LuArrowLeft,
   LuArrowRight,
@@ -33,12 +33,21 @@ interface ConversationContextProps {
   traceId: string;
 }
 
-/** Display row built from a turn — user or assistant side. */
+/**
+ * Display row built from a turn — represents BOTH halves (user + assistant)
+ * because a "turn" in chat is an exchange, not a single message. Earlier
+ * versions rendered one row per side and missed the user-prompt half on
+ * the current turn, which made the context strip read as half a
+ * conversation. Now each slot shows both halves stacked: user on top,
+ * assistant below.
+ */
 interface ConversationRow {
   key: string;
   traceId: string;
-  role: "user" | "assistant";
-  text: string;
+  /** Pre-extracted user prompt text, or null when there isn't one. */
+  userText: string | null;
+  /** Pre-extracted assistant response text, or null when there isn't one. */
+  assistantText: string | null;
   /** "previous" / "current" / "next" relative to the visible trace */
   position: "previous" | "current" | "next";
   status: ConversationTurn["status"];
@@ -54,9 +63,9 @@ const MAX_PREVIEW = 140;
 // variants object (and so `motion` doesn't see fresh references and
 // re-evaluate variants resolution unnecessarily).
 const SLIDE_VARIANTS: Variants = {
-  enter: (dir: number) => ({ y: dir * 16, opacity: 0 }),
-  center: { y: 0, opacity: 1 },
-  exit: (dir: number) => ({ y: -dir * 16, opacity: 0 }),
+  enter: { opacity: 0 },
+  center: { opacity: 1 },
+  exit: { opacity: 0 },
 };
 
 // Quick tween instead of a spring — tested settle was 250-350ms with the
@@ -181,68 +190,35 @@ function buildRows({
   ): ConversationRow => ({
     key: `${pos}-placeholder`,
     traceId: "",
-    role: "user",
-    text:
-      boundary === "start"
-        ? "Start of conversation"
-        : "End of conversation",
+    userText: null,
+    assistantText:
+      boundary === "start" ? "Start of conversation" : "End of conversation",
     position: pos,
     status: "ok",
     isPlaceholder: true,
     boundary,
   });
 
-  let prevRow: ConversationRow;
-  if (previous) {
-    const text =
-      extractReadableSnippet(previous.input, "user") ||
-      extractReadableSnippet(previous.output, "assistant") ||
-      "(empty)";
-    prevRow = {
-      key: `prev-${previous.traceId}`,
-      traceId: previous.traceId,
-      role: previous.input ? "user" : "assistant",
-      text,
-      position: "previous",
-      status: previous.status,
-    };
-  } else {
-    prevRow = placeholder("previous", "start");
-  }
+  const buildSlot = (
+    turn: ConversationTurn,
+    position: "previous" | "current" | "next",
+    keyPrefix: string,
+  ): ConversationRow => ({
+    key: `${keyPrefix}-${turn.traceId}`,
+    traceId: turn.traceId,
+    userText: extractReadableSnippet(turn.input, "user") || null,
+    assistantText: extractReadableSnippet(turn.output, "assistant") || null,
+    position,
+    status: turn.status,
+  });
 
-  let currRow: ConversationRow | null = null;
-  if (current) {
-    const text =
-      extractReadableSnippet(current.output, "assistant") ||
-      extractReadableSnippet(current.input, "user") ||
-      "(empty)";
-    currRow = {
-      key: `curr-${current.traceId}`,
-      traceId: current.traceId,
-      role: current.output ? "assistant" : "user",
-      text,
-      position: "current",
-      status: current.status,
-    };
-  }
-
-  let nextRow: ConversationRow;
-  if (next) {
-    const text =
-      extractReadableSnippet(next.input, "user") ||
-      extractReadableSnippet(next.output, "assistant") ||
-      "(empty)";
-    nextRow = {
-      key: `next-${next.traceId}`,
-      traceId: next.traceId,
-      role: next.input ? "user" : "assistant",
-      text,
-      position: "next",
-      status: next.status,
-    };
-  } else {
-    nextRow = placeholder("next", "end");
-  }
+  const prevRow = previous
+    ? buildSlot(previous, "previous", "prev")
+    : placeholder("previous", "start");
+  const currRow = current ? buildSlot(current, "current", "curr") : null;
+  const nextRow = next
+    ? buildSlot(next, "next", "next")
+    : placeholder("next", "end");
 
   return currRow ? [prevRow, currRow, nextRow] : [];
 }
@@ -254,28 +230,6 @@ export const ConversationContext = memo(function ConversationContext({
   const { navigateToTrace } = useTraceDrawerNavigation();
   const viewMode = useDrawerStore((s) => s.viewMode);
   const ctx = useConversationContext(conversationId, traceId);
-
-  // Direction the user is moving in the conversation thread, derived from
-  // change in thread position. Drives the bookshelf slide on the row strip:
-  // +1 = forward (J), -1 = backward (K). The sign feeds AnimatePresence's
-  // `custom`, which the variants use as: enter at y = dir*24 (forward
-  // means new content enters from below, sliding up into place; backward
-  // means it enters from above).
-  const prevPosRef = useRef<number | null>(null);
-  const lastDirectionRef = useRef<-1 | 1>(1);
-  const navDirection: -1 | 1 = (() => {
-    const prev = prevPosRef.current;
-    const next = ctx.position;
-    if (prev == null || !next || prev === next) {
-      return lastDirectionRef.current;
-    }
-    return next > prev ? 1 : -1;
-  })();
-  // Commit refs after the render so the next render's compute sees them.
-  useEffect(() => {
-    prevPosRef.current = ctx.position;
-    lastDirectionRef.current = navDirection;
-  });
 
   // Memo before the early `null` return so the hook order stays stable
   // when this component goes from "no conversation" → "conversation".
@@ -389,14 +343,9 @@ export const ConversationContext = memo(function ConversationContext({
           bg="bg.panel"
           overflow="hidden"
         >
-          <AnimatePresence
-            mode="popLayout"
-            initial={false}
-            custom={navDirection}
-          >
+          <AnimatePresence mode="popLayout" initial={false}>
             <motion.div
               key={traceId}
-              custom={navDirection}
               variants={SLIDE_VARIANTS}
               initial="enter"
               animate="center"
@@ -437,19 +386,9 @@ const ConversationRow = memo(function ConversationRow({
     if (isPlaceholder || isCurrent) return;
     onSelect(row.traceId);
   }, [isPlaceholder, isCurrent, onSelect, row.traceId]);
-  // Scenario mode swaps icon + accent so the prev/curr/next chips line up
-  // with the bubble headers in the body of the drawer.
-  const visuals = useDisplayRoleVisuals(row.role);
-  const RoleIcon = isPlaceholder
-    ? row.boundary === "start"
-      ? LuFlag
-      : LuCircleDashed
-    : visuals.Icon;
-  const iconColor = isPlaceholder
-    ? "fg.subtle"
-    : visuals.displayRole === "assistant"
-      ? "blue.fg"
-      : "fg.muted";
+  // Visuals for both halves of a turn — user on top, assistant below.
+  const userVisuals = useDisplayRoleVisuals("user");
+  const assistantVisuals = useDisplayRoleVisuals("assistant");
   const Affordance =
     !isPlaceholder && row.position === "previous"
       ? LuArrowLeft
@@ -459,6 +398,7 @@ const ConversationRow = memo(function ConversationRow({
   const statusColor = STATUS_COLORS[row.status] as string;
 
   if (isPlaceholder) {
+    const PlaceholderIcon = row.boundary === "start" ? LuFlag : LuCircleDashed;
     return (
       <Flex
         align="center"
@@ -471,7 +411,12 @@ const ConversationRow = memo(function ConversationRow({
         cursor="default"
       >
         <Box width="18px" flexShrink={0} />
-        <Icon as={RoleIcon} boxSize={3.5} color={iconColor} flexShrink={0} />
+        <Icon
+          as={PlaceholderIcon}
+          boxSize={3.5}
+          color="fg.subtle"
+          flexShrink={0}
+        />
         <Text
           textStyle="xs"
           color="fg.subtle"
@@ -480,7 +425,7 @@ const ConversationRow = memo(function ConversationRow({
           flex={1}
           minWidth={0}
         >
-          {row.text}
+          {row.assistantText ?? row.userText ?? ""}
         </Text>
       </Flex>
     );
@@ -488,12 +433,12 @@ const ConversationRow = memo(function ConversationRow({
 
   return (
     <Tooltip
-      content={`View the trace of the ${row.position} message in the conversation`}
+      content={`View the trace of the ${row.position} turn in the conversation`}
       disabled={row.position === "current"}
     >
       <Flex
         as={isCurrent ? "div" : "button"}
-        align="center"
+        align="stretch"
         gap={2.5}
         paddingX={3}
         paddingY={2}
@@ -506,9 +451,6 @@ const ConversationRow = memo(function ConversationRow({
         transition="background 0.12s ease"
         textAlign="left"
         width="full"
-        // One-shot pulse on the current row whenever it (re)mounts — the
-        // row's key includes the trace id, so navigating to a sibling
-        // remounts this element and the animation re-fires.
         css={
           isCurrent
             ? {
@@ -532,29 +474,116 @@ const ConversationRow = memo(function ConversationRow({
             : undefined
         }
       >
-        <TraceIdPeek traceId={row.traceId} />
-        <Icon as={RoleIcon} boxSize={3.5} color={iconColor} flexShrink={0} />
-        <Text
-          textStyle="xs"
-          color={isCurrent ? "fg" : "fg.muted"}
-          fontWeight={isCurrent ? "medium" : "normal"}
-          truncate
-          flex={1}
-          minWidth={0}
-        >
-          {row.text}
-        </Text>
-        {isCurrent ? (
-          <Circle size="8px" bg={statusColor} flexShrink={0} />
-        ) : Affordance ? (
-          <Icon
-            as={Affordance}
-            boxSize={3.5}
-            color="fg.subtle"
-            flexShrink={0}
+        <Flex direction="column" align="center" gap={1} paddingTop={0.5}>
+          <TraceIdPeek traceId={row.traceId} />
+          {isCurrent ? (
+            <Circle size="8px" bg={statusColor} flexShrink={0} />
+          ) : Affordance ? (
+            <Icon
+              as={Affordance}
+              boxSize={3.5}
+              color="fg.subtle"
+              flexShrink={0}
+            />
+          ) : null}
+        </Flex>
+        <VStack align="stretch" gap={1.5} flex={1} minWidth={0}>
+          <TurnLine
+            icon={userVisuals.Icon}
+            iconColor="fg"
+            text={row.userText}
+            emphasised={isCurrent}
+            placeholder="(no user message)"
+            kind="user"
           />
-        ) : null}
+          <TurnLine
+            icon={assistantVisuals.Icon}
+            iconColor="blue.fg"
+            text={row.assistantText}
+            emphasised={isCurrent}
+            placeholder="(no assistant response)"
+            kind="assistant"
+          />
+        </VStack>
       </Flex>
     </Tooltip>
   );
 });
+
+/**
+ * Single line in a turn slot — either user or assistant half. The two
+ * lines are visually distinct in three ways so the eye can parse a turn
+ * at a glance:
+ *
+ *   1. The user line keeps the slot's background; the assistant line gets
+ *      a subtle `bg.muted` tint that marks it as the reply card within
+ *      the turn. One bar, two backgrounds — same idea you'd find in
+ *      message threads (quoted reply on a tinted strip).
+ *   2. The assistant line is indented and prefixed with a `↳` reply
+ *      glyph so the hierarchy reads "this is the response to that".
+ *   3. Icon colours differ per role: user = `fg` (full neutral), assistant
+ *      = `blue.fg`. The reply text itself stays muted regardless of
+ *      whether the slot is current, so the user prompt always reads as
+ *      the louder of the two — which matches how people scan a chat
+ *      ("what was asked, then what was answered").
+ *
+ * The `↳` glyph is `aria-hidden` because the user/bot icon already names
+ * the role for assistive tech.
+ */
+const TurnLine: React.FC<{
+  icon: React.ElementType;
+  iconColor: string;
+  text: string | null;
+  emphasised: boolean;
+  placeholder: string;
+  kind: "user" | "assistant";
+}> = ({ icon, iconColor, text, emphasised, placeholder, kind }) => {
+  const isAssistant = kind === "assistant";
+  return (
+    <HStack
+      gap={1.5}
+      align="center"
+      paddingY={1}
+      paddingX={isAssistant ? 2 : 1}
+      paddingLeft={isAssistant ? 5 : 1}
+      borderRadius="sm"
+      bg={isAssistant ? "bg.muted" : undefined}
+      position="relative"
+    >
+      {isAssistant && (
+        <Text
+          as="span"
+          aria-hidden
+          color="fg.subtle"
+          textStyle="xs"
+          position="absolute"
+          left={1.5}
+          top="50%"
+          transform="translateY(-50%)"
+        >
+          ↳
+        </Text>
+      )}
+      <Icon as={icon} boxSize={3.5} color={iconColor} flexShrink={0} />
+      <Text
+        textStyle="xs"
+        color={
+          text
+            ? isAssistant
+              ? "fg.muted"
+              : emphasised
+                ? "fg"
+                : "fg.muted"
+            : "fg.subtle"
+        }
+        fontStyle={text ? "normal" : "italic"}
+        fontWeight={emphasised && text && !isAssistant ? "medium" : "normal"}
+        truncate
+        flex={1}
+        minWidth={0}
+      >
+        {text ?? placeholder}
+      </Text>
+    </HStack>
+  );
+};

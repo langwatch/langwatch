@@ -114,8 +114,7 @@ export const EvalChip: React.FC<{ eval_: TraceEvalResult }> = ({ eval_ }) => {
             maxWidth="220px"
             padding={3}
             borderRadius="lg"
-            background="bg.panel/90"
-            backdropFilter="blur(8px)"
+            background="bg.panel"
             boxShadow="lg"
           >
             <VStack align="stretch" gap={1.5}>

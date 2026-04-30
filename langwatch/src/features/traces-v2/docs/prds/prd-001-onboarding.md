@@ -20,7 +20,7 @@ Renders inside the main content area (replacing the trace table) via `TracesEmpt
 │  ┌────────────────────────────────────────────────────────────────┐ │
 │  │  PatIntegrationInfoCard                                        │ │
 │  │  • mints a Personal Access Token inline                        │ │
-│  │  • shows env block (LANGWATCH_API_KEY + LANGWATCH_PROJECT_ID)  │ │
+│  │  • shows env block (LANGWATCH_API_KEY + X-Project-Id)  │ │
 │  └────────────────────────────────────────────────────────────────┘ │
 │                                                                      │
 │  ┌────────────────────────────────────────────────────────────────┐ │
@@ -50,7 +50,7 @@ The three setup-path tabs render blurred + non-interactive until a PAT has been 
 ### Step 1: PAT Minting (always visible)
 `PatIntegrationInfoCard` mints a Personal Access Token in-place and surfaces:
 - the freshly minted token (one-time view + copy)
-- env block with `LANGWATCH_API_KEY` and `LANGWATCH_PROJECT_ID`
+- env block with `LANGWATCH_API_KEY` and `X-Project-Id`
 
 The token is propagated to every tab through `ActiveProjectProvider`, which overrides the project's `apiKey` so the lifted onboarding screens render with the new credential without needing to be modified.
 
