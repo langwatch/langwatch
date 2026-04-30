@@ -36,7 +36,6 @@ export const ThemeToggle = ({ showLabel = true }: ThemeToggleProps) => {
     setTheme(nextOption.value);
   };
 
-  // Collapsed mode: single icon that cycles through themes on click
   if (!showLabel) {
     return (
       <Box width="full" py={1}>
@@ -62,8 +61,6 @@ export const ThemeToggle = ({ showLabel = true }: ThemeToggleProps) => {
     );
   }
 
-  // Expanded mode: three icons spread across the row with a soft circle that
-  // slides behind the active one. No bordered container, no shared chrome.
   return (
     <Box width="full" px={2} py={3}>
       <HStack
@@ -74,8 +71,6 @@ export const ThemeToggle = ({ showLabel = true }: ThemeToggleProps) => {
         position="relative"
         height="32px"
       >
-        {/* Soft sliding indicator. Width is one-third of the row, so the icon
-            it sits under stays centred as it animates between positions. */}
         <Box
           position="absolute"
           top="50%"

@@ -17,6 +17,12 @@ interface IsolatedErrorBoundaryProps {
    * re-attempts rendering instead of staying stuck on the error.
    */
   resetKeys?: ReadonlyArray<unknown>;
+  /**
+   * Optional telemetry hook — fires once on each caught error before the
+   * fallback renders. Wire to PostHog/Sentry/etc. at the call site so the
+   * boundary itself stays UI-only.
+   */
+  onError?: (error: Error, info: { componentStack?: string | null }) => void;
   children: React.ReactNode;
 }
 
@@ -30,11 +36,19 @@ interface IsolatedErrorBoundaryProps {
 export const IsolatedErrorBoundary: React.FC<IsolatedErrorBoundaryProps> = ({
   scope,
   resetKeys,
+  onError,
   children,
 }) => (
   <ErrorBoundary
     FallbackComponent={(props) => <InlineError {...props} scope={scope} />}
     resetKeys={resetKeys ? [...resetKeys] : undefined}
+    onError={(error, info) => {
+      // Default-log so dev tooling and any session-replay / log scraper
+      // catch it even when no explicit telemetry hook is wired.
+      // eslint-disable-next-line no-console
+      console.error("[IsolatedErrorBoundary]", scope ?? "(no scope)", error);
+      onError?.(error, info);
+    }}
   >
     {children}
   </ErrorBoundary>

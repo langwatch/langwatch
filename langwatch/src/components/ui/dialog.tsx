@@ -53,7 +53,6 @@ export const DialogContent = React.forwardRef<
       {backdrop && (
         <ChakraDialog.Backdrop
           backdropFilter="blur(8px)"
-          background="blackAlpha.400/10"
           {...backdropProps}
         />
       )}

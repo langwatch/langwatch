@@ -818,8 +818,7 @@ export const system = createSystem(defaultConfig, {
         slots: ["item", "content"],
         base: {
           content: {
-            background: "bg.panel/75",
-            backdropFilter: "blur(8px)",
+            background: "bg.panel",
             border: "1px solid",
             borderColor: "border",
             borderRadius: "lg",
@@ -1083,8 +1082,7 @@ export const system = createSystem(defaultConfig, {
         slots: ["content"],
         base: {
           content: {
-            background: "bg.panel/75",
-            backdropFilter: "blur(8px)",
+            background: "bg.panel",
             border: "1px solid",
             borderColor: "border",
             borderRadius: "lg",
