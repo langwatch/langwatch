@@ -22,6 +22,7 @@ import {
   markJourneyCompleted,
   useOnboardingStore,
 } from "../store/onboardingStore";
+import { BeadStrip } from "./BeadStrip";
 import { DensitySpotlight } from "./DensitySpotlight";
 import { HotkeyBindings } from "./HotkeyBindings";
 import { IntegrateDrawer } from "./IntegrateDrawer";
@@ -348,6 +349,23 @@ export function TracesEmptyOnboarding(): React.ReactElement {
             </motion.div>
           ) : null}
         </AnimatePresence>
+
+        {/* Chapter progress beads — small dots under the hero that
+            show "you are here" across the six-chapter arc. Hidden on
+            `settle` (no copy yet, the user hasn't been told there's
+            a journey at all) so they don't appear before any
+            narrative beat lands. The strip is intentionally quiet
+            and non-clickable — it's an indicator, not navigation;
+            jumping is offered separately via `ReturningUserHub`. */}
+        {stage !== "settle" && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.5, delay: 0.2 }}
+          >
+            <BeadStrip stage={stage} />
+          </motion.div>
+        )}
 
         {/* Tour gate — `tourGate` stage offers an explicit
             opt-in choice: take the drawer tour, or skip straight
