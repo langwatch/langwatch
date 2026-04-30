@@ -85,8 +85,7 @@ export const TraceIdPeek: React.FC<TraceIdPeekProps> = ({ traceId }) => {
             width="320px"
             padding={0}
             borderRadius="lg"
-            background="bg.panel/95"
-            backdropFilter="blur(8px)"
+            background="bg.panel"
             boxShadow="lg"
           >
             {hasHovered && <PeekPopoverContent traceId={traceId} />}

@@ -29,7 +29,9 @@ import { AnnotationsView } from "./AnnotationsView";
 import { ChatTurnRow } from "./ChatTurnRow";
 import { EMPTY_TURNS, type Mode, type ParsedTurn } from "./types";
 import {
-  buildConversationMarkdown,
+  buildConversationMarkdownChunks,
+  type ConversationMarkdownChunk,
+  joinConversationMarkdown,
   parseLastUserText,
   parseSystemPrompt,
 } from "./utils";
@@ -45,6 +47,16 @@ const EMPTY_ANNOTATION_ITEMS: AnnotationItem[] = [];
 const VIRTUALIZE_AT = 12;
 /** Estimated row height for the virtualizer; refined by measureElement. */
 const ESTIMATED_TURN_HEIGHT = 220;
+
+/**
+ * Pre-measure estimate per markdown chunk. Picked to overshoot rather than
+ * undershoot — undershooting tells the virtualizer more chunks fit than
+ * really do, mounting extra rows on every render. Real heights replace this
+ * once `measureElement` runs on the rendered chunk.
+ */
+const MARKDOWN_CHUNK_ESTIMATE_PX = 360;
+
+const EMPTY_CHUNKS: ConversationMarkdownChunk[] = [];
 
 interface ConversationViewProps {
   conversationId: string;
@@ -72,6 +84,8 @@ export const ConversationView = memo(function ConversationView({
         traceIds.length > 0 &&
         hasPermission("annotations:view"),
       keepPreviousData: true,
+      staleTime: 5 * 60_000,
+      refetchOnWindowFocus: false,
     },
   );
   const annotationsByTrace = useMemo<AnnotationsByTrace>(() => {
@@ -141,9 +155,9 @@ export const ConversationView = memo(function ConversationView({
   useEffect(() => {
     if (mode === "markdown") setHasViewedMarkdown(true);
   }, [mode]);
-  const markdown = useMemo(() => {
-    if (!hasViewedMarkdown) return "";
-    return buildConversationMarkdown(conversationId, parsedTurns);
+  const markdownChunks = useMemo<ConversationMarkdownChunk[]>(() => {
+    if (!hasViewedMarkdown) return EMPTY_CHUNKS;
+    return buildConversationMarkdownChunks(conversationId, parsedTurns);
   }, [hasViewedMarkdown, conversationId, parsedTurns]);
 
   // Only show the skeleton on the very first load. With keepPreviousData
@@ -186,7 +200,7 @@ export const ConversationView = memo(function ConversationView({
           currentTraceId={currentTraceId}
         />
       ) : (
-        <MarkdownConversationView markdown={markdown} />
+        <MarkdownConversationView chunks={markdownChunks} />
       )}
     </VStack>
   );
@@ -535,16 +549,26 @@ const SystemPromptBanner: React.FC<{ text: string }> = ({ text }) => {
   );
 };
 
-const MarkdownConversationView: React.FC<{ markdown: string }> = ({
-  markdown,
-}) => {
+const MarkdownConversationView: React.FC<{
+  chunks: ConversationMarkdownChunk[];
+}> = ({ chunks }) => {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = useCallback(() => {
-    void navigator.clipboard.writeText(markdown);
+    void navigator.clipboard.writeText(joinConversationMarkdown(chunks));
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
-  }, [markdown]);
+  }, [chunks]);
+
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const virtualizer = useVirtualizer({
+    count: chunks.length,
+    getScrollElement: () => scrollRef.current,
+    estimateSize: () => MARKDOWN_CHUNK_ESTIMATE_PX,
+    overscan: 2,
+    measureElement: (el) => el.getBoundingClientRect().height,
+    getItemKey: (index) => chunks[index]?.id ?? index,
+  });
 
   return (
     <VStack align="stretch" gap={0} flex={1} minHeight={0}>
@@ -571,8 +595,34 @@ const MarkdownConversationView: React.FC<{ markdown: string }> = ({
           {copied ? "Copied" : "Copy"}
         </Button>
       </HStack>
-      <Box flex={1} overflow="auto" bg="bg.panel">
-        <RenderedMarkdown markdown={markdown} paddingX={4} paddingY={3} />
+      <Box ref={scrollRef} flex={1} minHeight={0} overflow="auto" bg="bg.panel">
+        <Box
+          height={`${virtualizer.getTotalSize()}px`}
+          width="full"
+          position="relative"
+        >
+          {virtualizer.getVirtualItems().map((row) => {
+            const chunk = chunks[row.index]!;
+            return (
+              <Box
+                key={row.key}
+                ref={virtualizer.measureElement}
+                data-index={row.index}
+                position="absolute"
+                top={0}
+                left={0}
+                width="full"
+                transform={`translateY(${row.start}px)`}
+              >
+                <RenderedMarkdown
+                  markdown={chunk.markdown}
+                  paddingX={4}
+                  paddingY={2}
+                />
+              </Box>
+            );
+          })}
+        </Box>
       </Box>
     </VStack>
   );

@@ -1,5 +1,5 @@
 import { Accordion, Badge, Box, HStack, Text } from "@chakra-ui/react";
-import type { ReactNode } from "react";
+import { useRef, type ReactNode } from "react";
 import { PresenceSection } from "~/features/presence/components/PresenceSection";
 import { SectionPresenceDot } from "~/features/presence/components/SectionPresenceDot";
 import { useSectionPresenceStore } from "./sectionPresence";
@@ -31,6 +31,7 @@ export function Section({
   empty,
   children,
   isFirst,
+  open,
 }: {
   value: string;
   title: string;
@@ -43,10 +44,19 @@ export function Section({
   empty?: boolean;
   children: ReactNode;
   isFirst?: boolean;
+  /**
+   * When provided, defers mounting `children` until the section has been
+   * opened at least once. After first open, children stay mounted so toggling
+   * collapsed/open is cheap. Omit to fall back to the eager-mount default.
+   */
+  open?: boolean;
 }) {
   const presenceTraceId = useSectionPresenceStore((s) => s.traceId);
   const presenceTab = useSectionPresenceStore((s) => s.tab);
   const trackPresence = !!(presenceTraceId && presenceTab);
+  const hasOpenedRef = useRef(open ?? true);
+  if (open) hasOpenedRef.current = true;
+  const renderChildren = open === undefined || hasOpenedRef.current;
   return (
     <Accordion.Item
       value={value}
@@ -101,12 +111,12 @@ export function Section({
         {trackPresence ? (
           <PresenceSection id={value}>
             <Box paddingX={4} paddingY={2} paddingBottom={3}>
-              {children}
+              {renderChildren ? children : null}
             </Box>
           </PresenceSection>
         ) : (
           <Box paddingX={4} paddingY={2} paddingBottom={3}>
-            {children}
+            {renderChildren ? children : null}
           </Box>
         )}
       </Accordion.ItemContent>

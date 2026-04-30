@@ -100,6 +100,7 @@ export function TraceSummaryAccordions({
       <AccordionShell value={openSections} onValueChange={setOpenSections}>
         {sections.map((id, idx) => {
           const isFirst = idx === 0;
+          const isOpen = openSections.includes(id);
           if (id === "io") {
             return (
               <Section
@@ -108,6 +109,7 @@ export function TraceSummaryAccordions({
                 title="Input and Output"
                 empty={!hasIO}
                 isFirst={isFirst}
+                open={isOpen}
               >
                 {hasIO ? (
                   <VStack align="stretch" gap={2}>
@@ -145,6 +147,7 @@ export function TraceSummaryAccordions({
                 count={attrCount}
                 empty={!hasAttributes && !resources.isLoading}
                 isFirst={isFirst}
+                open={isOpen}
               >
                 {hasAttributes ? (
                   <AttributeTable
@@ -171,6 +174,7 @@ export function TraceSummaryAccordions({
                 value="scope"
                 title="Instrumentation Scope"
                 isFirst={isFirst}
+                open={isOpen}
               >
                 <ScopeBlock scope={resources.scope} />
               </Section>
@@ -183,6 +187,7 @@ export function TraceSummaryAccordions({
                 value="exceptions"
                 title="Exceptions"
                 isFirst={isFirst}
+                open={isOpen}
               >
                 <HStack
                   gap={2}
@@ -226,6 +231,7 @@ export function TraceSummaryAccordions({
                   pendingCount === 0
                 }
                 isFirst={isFirst}
+                open={isOpen}
               >
                 {evalsLoading ? (
                   <EmptyHint>Loading evaluations…</EmptyHint>
@@ -255,6 +261,7 @@ export function TraceSummaryAccordions({
               count={traceEvents.length > 0 ? traceEvents.length : undefined}
               empty={traceEvents.length === 0}
               isFirst={isFirst}
+              open={isOpen}
             >
               {traceEvents.length > 0 ? (
                 <VStack align="stretch" gap={1}>

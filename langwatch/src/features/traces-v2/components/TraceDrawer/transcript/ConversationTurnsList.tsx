@@ -1,6 +1,6 @@
 import { Box } from "@chakra-ui/react";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 import { ThreadedTurnView } from "./ThreadedTurnView";
 import { TurnView } from "./TurnView";
 import {
@@ -59,6 +59,21 @@ function InlineList({
   layout: ChatLayout;
   collapseTools: boolean;
 }) {
+  // Pin the *latest* turn to the visible bottom on mount. As a chat-style
+  // input grows (each turn carries the whole prefix), the panel fills with
+  // history the operator has already seen — what they actually want is the
+  // newest message, which conventionally lives at the bottom in any chat
+  // UI. We let the parent scroll container do the scrolling (the inline
+  // path doesn't bound its own height), so we ask the last child to scroll
+  // itself into view via `scrollIntoView({ block: "end" })`. Behaviour is
+  // "auto" — instantaneous on mount; smooth scrolling here would draw the
+  // operator's eye through every prior message, defeating the point.
+  const tailRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    tailRef.current?.scrollIntoView({ block: "end" });
+    // Only on mount + when the turn count changes (new trace opened).
+  }, [turns.length]);
+
   return (
     <Box>
       {turns.map((turn, i) => (
@@ -71,6 +86,7 @@ function InlineList({
           collapseTools={collapseTools}
         />
       ))}
+      <Box ref={tailRef} aria-hidden />
     </Box>
   );
 }
@@ -94,6 +110,19 @@ function VirtualizedList({
     overscan: 3,
     measureElement: (el) => el.getBoundingClientRect().height,
   });
+
+  // Same idea as InlineList — start scrolled to the latest turn so the
+  // operator lands on what's new, not a wall of carried-forward context.
+  // We use the virtualizer's `scrollToIndex` rather than `scrollIntoView`
+  // because the rows are absolutely positioned inside a virtual sizer and
+  // most of them aren't mounted on first render anyway. `align: "end"`
+  // matches the chat convention (latest message bottom-aligned).
+  useEffect(() => {
+    if (turns.length === 0) return;
+    virtualizer.scrollToIndex(turns.length - 1, { align: "end" });
+    // Re-pin only when the turn count changes — manual scroll-up to read
+    // history shouldn't be undone by a render.
+  }, [turns.length, virtualizer]);
 
   return (
     <Box

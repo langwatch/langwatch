@@ -43,7 +43,12 @@ export function AnnotationsView({
 
   const annotations = api.annotation.getByTraceIds.useQuery(
     { projectId: project?.id ?? "", traceIds },
-    { enabled: !!project?.id && traceIds.length > 0 && hasPermission("annotations:view") },
+    {
+      enabled:
+        !!project?.id && traceIds.length > 0 && hasPermission("annotations:view"),
+      staleTime: 5 * 60_000,
+      refetchOnWindowFocus: false,
+    },
   );
 
   // Group annotations by trace so each turn's notes cluster together.

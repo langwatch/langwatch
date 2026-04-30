@@ -105,19 +105,19 @@ const HOISTED_AUTO_PINS: HoistedPinDef[] = [
   // ThreadProgressIndicator in row 2 when this trace lives in a multi-turn
   // conversation. The auto-pins below stay as the fallback for single-turn
   // traces — the resolution logic skips them when the indicator is showing.
+  //
+  // Only `Conversation` is hoisted. The legacy `Thread` chip used to live
+  // here and fell back to `conversationId` when no explicit thread was set,
+  // which produced two chips with the same value side-by-side in the
+  // header. Conversation is the canonical concept for callers; thread is
+  // an implementation detail that can still be inspected via the
+  // attributes section if it's actually set.
   {
     key: "gen_ai.conversation.id",
     label: "Conversation",
     category: "identity",
     resolve: (trace) =>
       trace.conversationId ?? trace.attributes["gen_ai.conversation.id"],
-  },
-  {
-    key: "langwatch.thread_id",
-    label: "Thread",
-    category: "identity",
-    resolve: (trace) =>
-      trace.attributes["langwatch.thread_id"] ?? trace.conversationId,
   },
   {
     key: "langwatch.user_id",

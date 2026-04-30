@@ -98,6 +98,8 @@ function useAnnotationsChip(trace: TraceHeader): ChipDef | null {
     {
       enabled:
         !!project?.id && traceIds.length > 0 && hasPermission("annotations:view"),
+      staleTime: 5 * 60_000,
+      refetchOnWindowFocus: false,
     },
   );
 

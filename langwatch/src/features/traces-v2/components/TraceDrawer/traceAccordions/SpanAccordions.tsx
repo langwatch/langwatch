@@ -115,6 +115,7 @@ export function SpanAccordions({
         <AccordionShell value={openSections} onValueChange={setOpenSections}>
           {sections.map((id, idx) => {
             const isFirst = idx === 0;
+            const isOpen = openSections.includes(id);
             if (id === "io") {
               return (
                 <Section
@@ -123,6 +124,7 @@ export function SpanAccordions({
                   title="Input and Output"
                   empty={!detailQuery.isLoading && !hasIO}
                   isFirst={isFirst}
+                  open={isOpen}
                 >
                   {detailQuery.isLoading ? (
                     <EmptyHint>Loading…</EmptyHint>
@@ -156,6 +158,7 @@ export function SpanAccordions({
                   value="prompt"
                   title="Prompt"
                   isFirst={isFirst}
+                  open={isOpen}
                 >
                   {detail && <PromptAccordion span={detail} />}
                 </Section>
@@ -178,6 +181,7 @@ export function SpanAccordions({
                     !detailQuery.isLoading
                   }
                   isFirst={isFirst}
+                  open={isOpen}
                 >
                   {hasAttributes ? (
                     <AttributeTable
@@ -208,6 +212,7 @@ export function SpanAccordions({
                   value="scope"
                   title="Instrumentation Scope"
                   isFirst={isFirst}
+                  open={isOpen}
                 >
                   <ScopeBlock scope={spanScope} />
                 </Section>
@@ -220,6 +225,7 @@ export function SpanAccordions({
                   value="exceptions"
                   title="Exceptions"
                   isFirst={isFirst}
+                  open={isOpen}
                 >
                   {detail?.error ? (
                     <VStack align="stretch" gap={2}>
@@ -283,6 +289,7 @@ export function SpanAccordions({
                 count={hasEvents ? detail!.events.length : undefined}
                 empty={!detailQuery.isLoading && !hasEvents}
                 isFirst={isFirst}
+                open={isOpen}
               >
                 {hasEvents ? (
                   <VStack align="stretch" gap={1}>
