@@ -19,3 +19,26 @@ export const filterOutEmptyFilters = (
     }),
   ) as Record<FilterField, FilterParam>;
 };
+
+// Recursively checks whether a filter value has any non-empty leaf arrays,
+// meaning it would actually produce query conditions.
+const hasActiveConditions = (value: FilterParam | string): boolean => {
+  if (typeof value === "string") return !!value;
+  if (Array.isArray(value)) return value.length > 0;
+  return Object.values(value).some((v) => hasActiveConditions(v));
+};
+
+/**
+ * Counts filters that have actual query conditions (non-empty leaf arrays).
+ * Use this for badge counts instead of filterOutEmptyFilters which is
+ * intentionally shallow to preserve intermediate UI state like
+ * "evaluator selected, sub-option pending".
+ */
+export const countActiveFilters = (
+  filters: Partial<Record<FilterField, FilterParam | string>> | undefined,
+): number => {
+  if (!filters) return 0;
+  return Object.values(filters).filter(
+    (f) => f != null && hasActiveConditions(f),
+  ).length;
+};
