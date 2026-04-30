@@ -135,7 +135,7 @@ jobs:
       - name: Run npx @langwatch/server in a sandbox
         id: start
         env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY_CI }}
+          OPENAI_API_KEY: ${{ secrets.NPX_SERVER_OPENAI_API_KEY }}
         run: |
           set -e
           mkdir -p "$LANGWATCH_HOME"
@@ -248,15 +248,15 @@ jobs:
       - name: Probe a workflow execution end-to-end
         # `secrets.*` is not available in step-level `if:` expressions
         # (only `env`, `inputs`, `github`, `runner`, etc. are valid there).
-        # We pass the secret through job-level env via `OPENAI_API_KEY_CI`,
-        # then short-circuit inside the script when it's empty. Net effect
-        # matches the original "skip if no key" intent without invalid YAML.
+        # We expose the secret as a step-env var, then short-circuit inside
+        # the script when it's empty. Net effect matches the original
+        # "skip if no key" intent without invalid YAML.
         env:
-          OPENAI_API_KEY_CI: ${{ secrets.OPENAI_API_KEY_CI }}
+          OPENAI_API_KEY: ${{ secrets.NPX_SERVER_OPENAI_API_KEY }}
         run: |
           set -e
-          if [[ -z "$OPENAI_API_KEY_CI" ]]; then
-            echo "OPENAI_API_KEY_CI not set — skipping workflow execution probe."
+          if [[ -z "$OPENAI_API_KEY" ]]; then
+            echo "NPX_SERVER_OPENAI_API_KEY not set — skipping workflow execution probe."
             exit 0
           fi
           # Posts a minimal workflow execution that hits langwatch_nlp.
