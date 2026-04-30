@@ -5,8 +5,8 @@ export {
 } from "./buildTraceMarkdown";
 export { MarkdownConfigurePopover } from "./MarkdownConfigurePopover";
 export { MarkdownCopyButton } from "./MarkdownCopyButton";
-export { MarkdownView, RenderedMarkdown } from "./RenderedMarkdown";
-export { ShikiCodeBlock, ShikiHighlight } from "./ShikiHighlight";
+export { RenderedMarkdown } from "./RenderedMarkdown";
+export { ShikiCodeBlock } from "./ShikiHighlight";
 export {
   DEFAULT_MARKDOWN_CONFIG,
   type MarkdownConfig,

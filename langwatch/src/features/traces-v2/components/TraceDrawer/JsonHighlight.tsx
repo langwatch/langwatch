@@ -1,111 +1,60 @@
-import { Box } from "@chakra-ui/react";
+import { Box, ClientOnly, CodeBlock } from "@chakra-ui/react";
 import { useMemo } from "react";
-
-interface JsonToken {
-  type: "key" | "string" | "number" | "boolean" | "null" | "punctuation";
-  value: string;
-}
-
-const TOKEN_REGEX =
-  /("(?:\\.|[^"\\])*")\s*:|("(?:\\.|[^"\\])*")|(true|false)|(null)|(-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)|([{}[\]:,])|(\s+)/g;
-
-const TOKEN_COLORS: Record<JsonToken["type"], string> = {
-  key: "blue.fg",
-  string: "green.fg",
-  number: "orange.fg",
-  boolean: "purple.fg",
-  null: "fg.subtle",
-  punctuation: "fg.muted",
-};
+import { useColorMode } from "~/components/ui/color-mode";
 
 const KEY_LINE_REGEX = /^"([^"]+)":/;
 const OPENS_OBJECT_REGEX = /\{$/;
 const CLOSES_OBJECT_REGEX = /^\}/;
 
-function tokenizeJson(json: string): JsonToken[] {
-  const tokens: JsonToken[] = [];
-  TOKEN_REGEX.lastIndex = 0;
-  let match;
-  while ((match = TOKEN_REGEX.exec(json)) !== null) {
-    if (match[1] !== undefined) {
-      tokens.push({ type: "key", value: match[1] });
-      tokens.push({ type: "punctuation", value: ":" });
-    } else if (match[2] !== undefined) {
-      tokens.push({ type: "string", value: match[2] });
-    } else if (match[3] !== undefined) {
-      tokens.push({ type: "boolean", value: match[3] });
-    } else if (match[4] !== undefined) {
-      tokens.push({ type: "null", value: match[4] });
-    } else if (match[5] !== undefined) {
-      tokens.push({ type: "number", value: match[5] });
-    } else if (match[6] !== undefined) {
-      tokens.push({ type: "punctuation", value: match[6] });
-    } else if (match[7] !== undefined) {
-      tokens.push({ type: "punctuation", value: match[7] });
-    }
-  }
-  return tokens;
-}
-
+/**
+ * Tolerant prettifier — when `JSON.parse` fails (truncated payloads, NDJSON
+ * fragments, single-line crammed objects), fall back to a structural
+ * indenter that at least produces line-per-key output without erroring.
+ */
 function tolerantPrettyJson(content: string): string {
   const indentUnit = "  ";
   let depth = 0;
   let inString = false;
   let escaped = false;
   let out = "";
-
   const indent = (level: number) => indentUnit.repeat(Math.max(level, 0));
 
   for (const ch of content) {
     if (inString) {
       out += ch;
-      if (escaped) {
-        escaped = false;
-      } else if (ch === "\\") {
-        escaped = true;
-      } else if (ch === '"') {
-        inString = false;
-      }
+      if (escaped) escaped = false;
+      else if (ch === "\\") escaped = true;
+      else if (ch === '"') inString = false;
       continue;
     }
-
     if (ch === '"') {
       inString = true;
       out += ch;
       continue;
     }
-
-    if (ch === " " || ch === "\t" || ch === "\n" || ch === "\r") {
-      continue;
-    }
-
+    if (ch === " " || ch === "\t" || ch === "\n" || ch === "\r") continue;
     if (ch === "{" || ch === "[") {
       out += ch;
       depth += 1;
       out += "\n" + indent(depth);
       continue;
     }
-
     if (ch === "}" || ch === "]") {
       depth = Math.max(depth - 1, 0);
       out += "\n" + indent(depth) + ch;
       continue;
     }
-
     if (ch === ",") {
       out += ch;
       out += "\n" + indent(depth);
       continue;
     }
-
     if (ch === ":") {
       out += ": ";
       continue;
     }
-
     out += ch;
   }
-
   return out;
 }
 
@@ -117,31 +66,20 @@ export function safePrettyJson(content: string): string {
   }
 }
 
-function HighlightedJson({ json }: { json: string }) {
-  const tokens = useMemo(() => tokenizeJson(json), [json]);
-  return (
-    <>
-      {tokens.map((token, i) => (
-        <Box as="span" key={i} color={TOKEN_COLORS[token.type]}>
-          {token.value}
-        </Box>
-      ))}
-    </>
-  );
-}
-
-interface DecoratedLine {
-  line: string;
-  pinned: boolean;
-}
-
-function decorateLines(
+/**
+ * Walk pretty-printed JSON lines once to compute the 1-indexed line numbers
+ * that should be highlighted given a set of pinned dot-paths. A line is
+ * marked when its own key matches a pinned path *or* any of its object
+ * ancestors does — pinning a parent visually hits the whole subtree.
+ */
+function computeHighlightLines(
   lines: string[],
   pinnedKeys: ReadonlySet<string>,
-): DecoratedLine[] {
+): number[] {
   const path: string[] = [];
-  return lines.map((line) => {
-    const trimmed = line.trim();
+  const out: number[] = [];
+  for (let i = 0; i < lines.length; i++) {
+    const trimmed = lines[i]!.trim();
     const keyMatch = KEY_LINE_REGEX.exec(trimmed);
     const key = keyMatch?.[1];
     const opensObject = OPENS_OBJECT_REGEX.test(trimmed);
@@ -153,18 +91,25 @@ function decorateLines(
     const pinned =
       fullPath != null &&
       (pinnedKeys.has(fullPath) ||
-        path.some((_, i) => pinnedKeys.has(path.slice(0, i + 1).join("."))));
+        path.some((_, j) => pinnedKeys.has(path.slice(0, j + 1).join("."))));
+
+    if (pinned) out.push(i + 1); // 1-indexed for shiki/Chakra `meta.highlightLines`
 
     if (key && opensObject) path.push(key);
-    return { line, pinned };
-  });
+  }
+  return out;
 }
 
 /**
  * JSON viewer with a left-rail accent on lines whose key matches one of
- * `pinnedKeys`. Uses our regex tokeniser so we can render line-by-line and
- * decorate each row independently — Shiki produces a single HTML blob,
- * which doesn't lend itself to per-line overlays.
+ * `pinnedKeys`. We hand Shiki the highlight line numbers via Chakra's
+ * `meta.highlightLines` and let the adapter mark them with `.highlighted`
+ * / `data-highlight=""`. CSS below recolours the default highlight to our
+ * blue tracing accent — same approach the empty-state card uses for its
+ * orange highlight on env-block lines.
+ *
+ * Tokenisation goes through the ambient `<CodeBlock.AdapterProvider>` at
+ * `TraceV2DrawerShell` (one shared Highlighter for the whole drawer).
  */
 export function PinnedAwareJsonView({
   content,
@@ -173,35 +118,65 @@ export function PinnedAwareJsonView({
   content: string;
   pinnedKeys: ReadonlySet<string>;
 }) {
+  const { colorMode } = useColorMode();
   const formatted = useMemo(() => safePrettyJson(content), [content]);
-  const decoratedLines = useMemo(
-    () => decorateLines(formatted.split("\n"), pinnedKeys),
+  const highlightLines = useMemo(
+    () => computeHighlightLines(formatted.split("\n"), pinnedKeys),
     [formatted, pinnedKeys],
   );
 
+  // The orange highlight is applied globally in `pages/_app.tsx` via
+  // `--highlight-bg` + the `::after` pseudo on `[data-line][data-highlight]`
+  // — every Chakra `CodeBlock` with `meta.highlightLines` picks it up.
   return (
-    <Box
-      as="pre"
-      textStyle="xs"
-      fontFamily="mono"
-      color="fg"
-      whiteSpace="pre-wrap"
-      wordBreak="break-all"
-      lineHeight="tall"
-      margin={0}
-    >
-      {decoratedLines.map(({ line, pinned }, i) => (
+    <ClientOnly
+      fallback={
         <Box
-          key={i}
-          paddingLeft={2}
-          marginLeft={-2}
-          borderLeftWidth="2px"
-          borderLeftColor={pinned ? "blue.solid" : "transparent"}
-          bg={pinned ? "blue.solid/8" : "transparent"}
+          as="pre"
+          textStyle="xs"
+          fontFamily="mono"
+          color="fg"
+          whiteSpace="pre-wrap"
+          wordBreak="break-all"
+          lineHeight="tall"
+          margin={0}
         >
-          <HighlightedJson json={line} />
+          {formatted}
         </Box>
-      ))}
-    </Box>
+      }
+    >
+      {() => (
+        <CodeBlock.Root
+          size="sm"
+          code={formatted}
+          language="json"
+          meta={{ highlightLines, colorScheme: colorMode }}
+          bg="transparent"
+          borderWidth={0}
+          borderRadius={0}
+          overflow="hidden"
+        >
+          <CodeBlock.Content
+            paddingX={0}
+            paddingY={0}
+            css={{
+              "& pre, & code": {
+                background: "transparent !important",
+                fontSize: "0.78em",
+                lineHeight: "1.6",
+                padding: "0 !important",
+                margin: "0 !important",
+                whiteSpace: "pre-wrap",
+                wordBreak: "break-all",
+              },
+            }}
+          >
+            <CodeBlock.Code>
+              <CodeBlock.CodeText />
+            </CodeBlock.Code>
+          </CodeBlock.Content>
+        </CodeBlock.Root>
+      )}
+    </ClientOnly>
   );
 }

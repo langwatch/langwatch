@@ -11,16 +11,15 @@ export function JsonHighlight({
   /**
    * 1-indexed line numbers to call out with a background tint. Used by
    * the empty-state onboarding to flag the env-var lines (API key,
-   * project id, endpoint) the user actually has to copy.
+   * project id, endpoint) the user actually has to copy. Highlight
+   * styling itself comes from the global rule in `pages/_app.tsx`
+   * (`[data-line][data-highlight]:after`) so every code block in the
+   * app shares the same orange accent.
    */
   highlightLines?: number[];
 }): React.ReactElement {
   const { colorMode } = useColorMode();
   const adapter = useShikiAdapter(colorMode);
-  const highlightBg =
-    colorMode === "dark"
-      ? "rgba(237,137,38,0.18)"
-      : "rgba(237,137,38,0.12)";
 
   return (
     <CodeBlock.AdapterProvider value={adapter}>
@@ -38,7 +37,7 @@ export function JsonHighlight({
             letterSpacing="0.01em"
             color="fg"
             whiteSpace="pre"
-            overflowX="hidden"
+            overflowX="auto"
           >
             {code}
           </Box>
@@ -47,19 +46,23 @@ export function JsonHighlight({
         {() => (
           <CodeBlock.Root
             size="sm"
+            colorPalette="orange"
             code={code}
             language="json"
             meta={{ colorScheme: colorMode, highlightLines }}
             bg="transparent"
-            overflowX="hidden"
-            css={{
-              "--code-block-highlight-bg": highlightBg,
-              "--code-block-highlight-border": "rgba(237,137,38,0.6)",
-            }}
+            // MCP configs carry long absolute paths and arg arrays — without
+            // horizontal scroll, lines past the container width clipped
+            // silently because `whiteSpace: pre` keeps everything on one
+            // line. `auto` reveals a scrollbar only when needed.
+            overflowX="auto"
           >
             <CodeBlock.Content
-              paddingX={5}
               paddingY={4}
+              paddingLeft={5}
+              // 48px right keeps a gutter for the floating Copy button so
+              // it doesn't sit on top of the last code column when the
+              // block happens to be exactly container-wide.
               paddingRight={12}
               css={{
                 "& pre, & code": {

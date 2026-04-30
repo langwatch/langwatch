@@ -26,6 +26,19 @@ export const system = createSystem(defaultConfig, {
       // @ts-expect-error
       bg: null,
     },
+    // Chakra's `CodeBlock` paints highlighted lines via an absolutely
+    // positioned `::after` pseudo on `[data-line][data-highlight]`,
+    // backed by the `--highlight-bg` custom property and a hardcoded
+    // gray inline-start border. Override both globally so every code
+    // block (env-block in onboarding, pinned attributes in the trace
+    // drawer, …) lights up in the LangWatch tracing orange.
+    "[data-line][data-highlight], [data-line][data-diff]": {
+      "--highlight-bg": "rgba(237, 137, 38, 0.18)",
+    },
+    "[data-line][data-highlight]::after, [data-line][data-diff]::after": {
+      borderInlineStartColor: "#ED8926 !important",
+      background: 'color-mix(in srgb, var(--chakra-colors-orange-emphasized) 20%, transparent) !important',
+    },
   },
   theme: {
     tokens: {
