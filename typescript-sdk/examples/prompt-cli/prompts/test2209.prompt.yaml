@@ -1,8 +1,0 @@
-model: openai/gpt-5
-modelParameters:
-  temperature: 0.7
-messages:
-  - role: system
-    content: You are a helpful assistant 3
-  - role: user
-    content: "{{input}}"
