@@ -320,7 +320,8 @@
       "ra-i18n-polyglot": "5.13.1",
       "ra-ui-materialui": "5.13.1",
       "ra-language-english": "5.13.1",
-      "ai": "^6.0.161"
+      "ai": "^6.0.161",
+      "liquidjs": ">=10.25.7"
     }
   },
   "ct3aMetadata": {
