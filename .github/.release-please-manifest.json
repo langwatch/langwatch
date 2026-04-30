@@ -3,7 +3,7 @@
   "sdk-go": "0.2.0",
   "typescript-sdk": "0.27.0",
   "python-sdk": "0.22.0",
-  "mcp-server": "0.7.0",
+  "mcp-server": "3.2.1",
   "langevals": "2.2.0",
   ".": "3.2.0",
   "skills": "0.4.1"
