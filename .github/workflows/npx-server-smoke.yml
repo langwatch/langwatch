@@ -246,17 +246,17 @@ jobs:
           fi
 
       - name: Probe a workflow execution end-to-end
-        # Read the secret directly in the if-check. Step-level `env:` is
-        # populated AFTER the if-check is evaluated, so `env.OPENAI_API_KEY_CI`
-        # in the condition was always empty → the step was always skipped.
-        if: ${{ secrets.OPENAI_API_KEY_CI != '' }}
         env:
           OPENAI_API_KEY_CI: ${{ secrets.OPENAI_API_KEY_CI }}
         run: |
           # Posts a minimal workflow execution that hits langwatch_nlp.
-          # If OPENAI_API_KEY_CI isn't set, this step is skipped and the
-          # smoke flow stays gateable on infrastructure alone.
+          # GitHub does not allow `secrets.*` in step `if:` expressions, so
+          # gate the optional OpenAI-backed probe inside the shell instead.
           set -e
+          if [ -z "${OPENAI_API_KEY_CI:-}" ]; then
+            echo "OPENAI_API_KEY_CI is not set; skipping OpenAI-backed probe."
+            exit 0
+          fi
           base=${RESOLVED_BASE}
           # TODO: replace with a real workflow execution once the smoke fixture lands.
           curl -fsS -X POST "http://127.0.0.1:$((base + 1))/health"
