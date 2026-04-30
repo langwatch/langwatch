@@ -125,7 +125,7 @@ def main():
 
             print(f"   Model: {prompt.model}")  # from the prompt data itself
             assert (
-                prompt.model == "openai/gpt-5"
+                prompt.model == "openai/gpt-5-mini"
             ), "Prompt model should be openai/gpt-4o-mini"
 
             # 5. Test compile the prompt

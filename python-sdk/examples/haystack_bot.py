@@ -99,7 +99,7 @@ class TrackedOpenAIGenerator(OpenAIGenerator):
 
 
 llm = TrackedOpenAIGenerator(
-    api_key=Secret.from_token(os.environ["OPENAI_API_KEY"]), model="gpt-5"
+    api_key=Secret.from_token(os.environ["OPENAI_API_KEY"]), model="gpt-5-mini"
 )
 
 rag_pipeline = Pipeline()

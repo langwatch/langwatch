@@ -45,7 +45,7 @@ async def on_chat_start():
     # )
 
     tools = [retriever_tool]
-    model = ChatOpenAI(model="gpt-5", streaming=True)
+    model = ChatOpenAI(model="gpt-5-mini", streaming=True)
 
     agent = create_agent(
         model=model,

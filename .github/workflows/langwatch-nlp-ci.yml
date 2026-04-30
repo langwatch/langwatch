@@ -134,7 +134,7 @@ jobs:
         if: github.actor != 'dependabot[bot]' || github.event_name == 'pull_request_target'
         working-directory: langwatch_nlp
         env:
-          OPENAI_API_KEY: ${{ secrets.PYTHON_SDK_OPENAI_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.LANGWATCH_NLP_OPENAI_API_KEY }}
           AZURE_OPENAI_ENDPOINT: ${{ secrets.PYTHON_SDK_AZURE_OPENAI_ENDPOINT }}
           AZURE_OPENAI_API_KEY: ${{ secrets.PYTHON_SDK_AZURE_OPENAI_API_KEY }}
         run: make test-integration

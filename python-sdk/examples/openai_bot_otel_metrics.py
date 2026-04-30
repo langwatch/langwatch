@@ -42,7 +42,7 @@ time_to_first_token_hist = meter.create_histogram(
 async def do_call_llm(content: str, msg):
     start_time = time.time()
     completion = client.chat.completions.create(
-        model="gpt-5",
+        model="gpt-5-mini",
         messages=[
             {
                 "role": "system",
@@ -85,5 +85,5 @@ def record_first_token_latency(milliseconds: float):
     seconds = milliseconds / 1000.0
     print(f"Record first token latency: {seconds} seconds")
     time_to_first_token_hist.record(
-        seconds, attributes={"model": "gpt-5", "request.status": "success"}
+        seconds, attributes={"model": "gpt-5-mini", "request.status": "success"}
     )
