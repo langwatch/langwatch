@@ -54,10 +54,10 @@ describe("PLAN_LIMITS", () => {
         (_planType, plan) => {
           for (const field of NUMERIC_LIMIT_FIELDS) {
             const value = plan[field];
-            expect(value, `${_planType}.${field} is undefined`).toBeDefined();
-            expect(typeof value, `${_planType}.${field} is not a number`).toBe(
-              "number",
-            );
+            expect(
+              Number.isFinite(value),
+              `${_planType}.${field} is not a finite number`,
+            ).toBe(true);
           }
         },
       );
@@ -90,10 +90,10 @@ describe("PLAN_LIMITS", () => {
 
         for (const field of NUMERIC_LIMIT_FIELDS) {
           const value = plan[field];
-          expect(value, `license.${field} is undefined`).toBeDefined();
-          expect(typeof value, `license.${field} is not a number`).toBe(
-            "number",
-          );
+          expect(
+            Number.isFinite(value),
+            `license.${field} is not a finite number`,
+          ).toBe(true);
         }
       });
 
