@@ -95,29 +95,6 @@ Feature: Table display and interaction features
   # ============================================================================
   # Compact/Expanded Row Mode
   # ============================================================================
-
-  @unimplemented
-  Scenario: Row height toggle is accessible via popover
-    Then I see a settings icon button in the header toolbar
-    When I click the settings icon
-    Then a popover opens with row height options
-    And I see "Compact" and "Expanded" options
-
-  @unimplemented
-  Scenario: Default row mode is compact
-    Given the dataset has rows with long content
-    Then the table starts in compact mode
-    And rows have a fixed maximum height
-    And overflow content shows a fade overlay at the bottom
-
-  @unimplemented
-  Scenario: Switch to expanded mode
-    Given the table is in compact mode
-    When I click the settings icon
-    And I select "Expanded" mode
-    Then all rows expand to show their full content
-    And the fade overlays disappear
-
   @unimplemented
   Scenario: Expand individual cell in compact mode
     Given the table is in compact mode
@@ -150,15 +127,6 @@ Feature: Table display and interaction features
     When I hover over the cell at (0, "input")
     Then the collapse/resize bar becomes visible
     And I can drag it to expand the cell
-
-  @unimplemented
-  Scenario: Switching modes clears individual expansions
-    Given the table is in compact mode
-    And cell (0, "input") is individually expanded
-    When I switch to expanded mode
-    Then individual expansion state is cleared
-    When I switch back to compact mode
-    Then all cells start in compact state
 
   @unimplemented
   Scenario: Fade overlay matches cell background on hover
