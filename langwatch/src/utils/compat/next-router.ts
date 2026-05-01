@@ -44,6 +44,7 @@ const ROUTE_PATTERNS = [
   "/:project/messages/:trace/:openTab",
   "/:project/messages/:trace",
   "/:project/messages",
+  "/:project/traces",
   "/:project/analytics/custom/:id",
   "/:project/analytics/custom",
   "/:project/analytics/evaluations",

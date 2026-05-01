@@ -1,0 +1,108 @@
+/**
+ * Render-only role overrides for traces emitted under the Scenario SDK.
+ *
+ * In a Scenario run the chat data flips relative to a normal trace: the
+ * `user` role messages are produced by an LLM driving the conversation as
+ * the simulated user, and the `assistant` role messages are emitted by the
+ * agent under test. Reading that raw trace feels backwards — the agent
+ * (the subject of the trace) shows up as "assistant" while the simulator
+ * shows up as "user".
+ *
+ * This helper visually swaps user ↔ assistant sides in the v2 trace drawer
+ * so the agent reads as the trace's "user" (left/blue) and the simulator
+ * reads as the "assistant" (right/purple, marked with a flask icon to
+ * signal it isn't a real human). The underlying chat payloads, exports,
+ * and parsing stay untouched.
+ */
+import { type ReactNode, useEffect } from "react";
+import type { IconType } from "react-icons";
+import { LuBot, LuFlaskConical, LuUser } from "react-icons/lu";
+import { create } from "zustand";
+
+interface ScenarioRoleState {
+  isScenario: boolean;
+  setIsScenario: (value: boolean) => void;
+}
+
+const useScenarioRoleStore = create<ScenarioRoleState>((set) => ({
+  isScenario: false,
+  setIsScenario: (value) => set({ isScenario: value }),
+}));
+
+/**
+ * Sets the scenario flag for the lifetime of the wrapping component.
+ * Replaces a prior React Context (banned by traces-v2 STANDARDS §2). Only
+ * one drawer mounts at a time, so the single shared store is safe.
+ */
+export function ScenarioRoleProvider({
+  isScenario,
+  children,
+}: {
+  isScenario: boolean;
+  children: ReactNode;
+}) {
+  const setIsScenario = useScenarioRoleStore((s) => s.setIsScenario);
+  useEffect(() => {
+    setIsScenario(isScenario);
+    return () => setIsScenario(false);
+  }, [isScenario, setIsScenario]);
+  return <>{children}</>;
+}
+
+export function useIsScenarioRole(): boolean {
+  return useScenarioRoleStore((s) => s.isScenario);
+}
+
+export type SourceRole = "user" | "assistant";
+export type DisplayRole = "user" | "assistant";
+
+export interface DisplayRoleVisuals {
+  /** Side / tone the bubble or chip should render as. */
+  displayRole: DisplayRole;
+  /** UPPERCASE label, suitable for role chips. */
+  label: string;
+  /** Title-cased label, suitable for chat-bubble headers. */
+  bubbleLabel: string;
+  /** Icon component (react-icons/lu). */
+  Icon: IconType;
+}
+
+export function getDisplayRoleVisuals(
+  role: SourceRole,
+  { isScenario }: { isScenario: boolean },
+): DisplayRoleVisuals {
+  if (!isScenario) {
+    return role === "user"
+      ? {
+          displayRole: "user",
+          label: "USER",
+          bubbleLabel: "User",
+          Icon: LuUser,
+        }
+      : {
+          displayRole: "assistant",
+          label: "ASSISTANT",
+          bubbleLabel: "Assistant",
+          Icon: LuBot,
+        };
+  }
+  return role === "user"
+    ? {
+        displayRole: "assistant",
+        label: "SIMULATOR",
+        bubbleLabel: "Simulator",
+        Icon: LuFlaskConical,
+      }
+    : {
+        displayRole: "user",
+        label: "AGENT",
+        bubbleLabel: "Agent",
+        Icon: LuBot,
+      };
+}
+
+/** Hook variant — consumes scenario state and returns visuals in one call. */
+export function useDisplayRoleVisuals(role: SourceRole): DisplayRoleVisuals {
+  const isScenario = useIsScenarioRole();
+  return getDisplayRoleVisuals(role, { isScenario });
+}

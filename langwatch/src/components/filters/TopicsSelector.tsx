@@ -24,16 +24,22 @@ export function TopicsSelector({ showTitle = true }: { showTitle?: boolean }) {
   const { filterParams, queryOpts } = useFilterParams();
 
   useEffect(() => {
-    if (router.query.topics) {
-      setSelectedTopics((router.query.topics as string).split(","));
+    const topics = router.query.topics;
+    if (topics) {
+      setSelectedTopics(
+        Array.isArray(topics) ? topics : topics.split(","),
+      );
     } else {
       setSelectedTopics([]);
     }
   }, [router.query.topics]);
 
   useEffect(() => {
-    if (router.query.subtopics) {
-      setSelectedSubtopics((router.query.subtopics as string).split(","));
+    const subtopics = router.query.subtopics;
+    if (subtopics) {
+      setSelectedSubtopics(
+        Array.isArray(subtopics) ? subtopics : subtopics.split(","),
+      );
     } else {
       setSelectedSubtopics([]);
     }
@@ -96,20 +102,18 @@ export function TopicsSelector({ showTitle = true }: { showTitle?: boolean }) {
       : selectedSubtopics.filter((t) => t !== subtopicId);
     const subtopicsQuery =
       newSubtopics.length > 0 ? newSubtopics.join(",") : undefined;
-    setTimeout(() => {
-      void router.push(
-        {
-          query: {
-            ...router.query,
-            subtopics: subtopicsQuery,
-          },
-        },
-        undefined,
-        { shallow: true },
-      );
-    }, 0);
-
     setSelectedSubtopics(newSubtopics);
+
+    void router.push(
+      {
+        query: {
+          ...router.query,
+          subtopics: subtopicsQuery,
+        },
+      },
+      undefined,
+      { shallow: true },
+    );
   };
 
   const topicSelectorRef = useRef<HTMLDivElement>(null);
@@ -131,7 +135,7 @@ export function TopicsSelector({ showTitle = true }: { showTitle?: boolean }) {
       width="full"
       gap={4}
       ref={topicSelectorRef}
-      minHeight={`${minHeight}px`}
+      minHeight={minHeight ? `${minHeight}px` : undefined}
     >
       {showTitle && (
         <Heading fontSize="sm" as="h2">
@@ -148,14 +152,15 @@ export function TopicsSelector({ showTitle = true }: { showTitle?: boolean }) {
         ) : topicCountsQuery.data ? (
           topicCountsQuery.data.topicCounts.length > 0 ? (
             topicCountsQuery.data.topicCounts
-              .sort((a, b) => (a.name > b.name ? 1 : -1))
-              .sort((a, b) => (a.count > b.count ? -1 : 1))
+              .toSorted((a, b) => (a.name > b.name ? 1 : -1))
+              .toSorted((a, b) => (a.count > b.count ? -1 : 1))
               .map((topic) => (
                 <React.Fragment key={topic.id}>
                   <HStack
                     gap={1}
                     width="full"
                     paddingX={2}
+                    cursor="pointer"
                     fontWeight={
                       selectedTopics.includes(topic.id) ? "500" : "normal"
                     }
@@ -184,8 +189,8 @@ export function TopicsSelector({ showTitle = true }: { showTitle?: boolean }) {
                   </HStack>
                   {selectedTopics.includes(topic.id) &&
                     topicCountsQuery.data.subtopicCounts
-                      .sort((a, b) => (a.name > b.name ? 1 : -1))
-                      .sort((a, b) => (a.count > b.count ? -1 : 1))
+                      .toSorted((a, b) => (a.name > b.name ? 1 : -1))
+                      .toSorted((a, b) => (a.count > b.count ? -1 : 1))
                       .filter((subtopic) => subtopic.parentId === topic.id)
                       .map((subtopic) => (
                         <HStack
@@ -194,6 +199,7 @@ export function TopicsSelector({ showTitle = true }: { showTitle?: boolean }) {
                           width="full"
                           paddingX={2}
                           paddingLeft={8}
+                          cursor="pointer"
                           fontWeight="normal"
                         >
                           <Checkbox

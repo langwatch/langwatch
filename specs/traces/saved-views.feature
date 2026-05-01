@@ -43,8 +43,10 @@ Feature: Saved Views on Traces List
   # filter definitions, and filter conditions. The "application" value is
   # absence-based — traces with no origin attribute are "application".
   #
-  # Feature gate: The saved views bar and origin column are only shown
-  # for projects with ClickHouse enabled (featureClickHouseDataSourceTraces).
+  # Feature gate (planned, not implemented): The saved views bar and origin
+  # column are intended to only show for projects with ClickHouse enabled
+  # (featureClickHouseDataSourceTraces). As of 2026-05-01, DashboardLayout
+  # gates the bar only on the path being /messages or /analytics.
   #
   # Colors: Origin values use colors from featureIcons. Custom/user-defined
   # view names use getColorForString hash-based colors.
@@ -102,24 +104,31 @@ Feature: Saved Views on Traces List
     And the badge color matches the centralized origin color mapping
 
   @integration @unimplemented
-  Scenario: Origin column shows "application" for traces without explicit origin
-    Given a trace exists with no langwatch.origin attribute
+  Scenario: Origin column hides the badge for traces without explicit origin
+    Given a trace exists with no langwatch.origin attribute (or empty string)
     When I view it in table view
-    Then the Origin column shows "application" with the traces blue color
+    Then no origin badge is rendered in the Origin column
+    # MessagesTable.tsx:583-598 only renders the badge when `displayOrigin`
+    # (raw langwatch.origin) is a non-empty string.
 
   @unit @unimplemented
-  Scenario: Origin colors follow centralized featureIcons mapping
+  Scenario: Origin colors follow the centralized originColors mapping
     Then the origin color mapping is:
-      | origin      | color       | source concept |
-      | application | blue.500    | traces         |
-      | evaluation  | orange.500  | evaluations    |
-      | simulation  | pink.500    | simulations    |
-      | playground  | purple.500  | prompts        |
-      | workflow    | green.500   | workflows      |
+      | origin      | background      | foreground         |
+      | application | blue.subtle     | blue.emphasized    |
+      | evaluation  | green.subtle    | green.emphasized   |
+      | simulation  | pink.subtle     | pink.emphasized    |
+      | playground  | teal.subtle     | teal.emphasized    |
+      | gateway     | purple.subtle   | purple.emphasized  |
+      | workflow    | cyan.subtle     | cyan.emphasized    |
+    # See src/utils/originColors.ts (subtle/emphasized token pairs);
+    # unknown origins fall back to getColorForString.
 
   # ─── Step 0c: Feature Gate ──────────────────────────────────────────
 
-  @integration @unimplemented
+  @planned
+  # Not yet implemented as of 2026-05-01: DashboardLayout.tsx:356-359 gates the
+  # bar only on `isTracesOrAnalyticsPage`; there is no ClickHouse feature check.
   Scenario: Saved views bar hidden when ClickHouse is not enabled
     Given the project does not have ClickHouse enabled for traces
     When the traces list page renders
@@ -179,9 +188,11 @@ Feature: Saved Views on Traces List
   Scenario: Save current filters as a new view
     Given I have applied filters for model "gpt-4" and label "production"
     When I open the filter sidebar
-    Then I see a "Save as view" button at the bottom of the sidebar
+    Then I see a "Save as view" action button next to the "Filters" heading
+    # SaveAsViewButton lives in FieldsFilters' actionButton slot
+    # (FieldsFilters.tsx:64), not at the bottom of the sidebar.
     When I click "Save as view"
-    Then a dialog opens with a name input
+    Then a dialog opens with a name input and a scope selector (project vs personal)
     When I type "GPT-4 Production" and click Save
     Then a new "GPT-4 Production" badge appears in the saved views bar
     And it appears after the existing views
@@ -333,11 +344,14 @@ Feature: Saved Views on Traces List
     Then the name is truncated to 50 characters
 
   @unit @unimplemented
-  Scenario: Empty custom views list shows only All Traces plus seeds
+  Scenario: First-visit projects auto-seed and show All Traces plus 4 seed views
     Given the project has no saved views in the database
-    When the bar renders
-    Then seed views are created and shown alongside "All Traces"
+    When the bar renders for the first time
+    Then 4 seed views are auto-created (Application, Evaluations, Simulations, Playground)
+    And they are shown alongside "All Traces"
     And the three-dot menu is still visible
+    # The "Empty custom views list" wording was removed: saved-view.service.ts
+    # auto-seeds 4 views on first access, so the bar is never empty after load.
 
   # ─── Step 6: tRPC Endpoints ─────────────────────────────────────────
 

@@ -6,7 +6,7 @@ import {
   Icon,
   IconButton,
 } from "@chakra-ui/react";
-import { Eye, EyeOff, WandSparkles } from "lucide-react";
+import { Check, Copy, Eye, EyeOff, WandSparkles } from "lucide-react";
 import type React from "react";
 import { useMemo, useState } from "react";
 import type { HighlighterGeneric } from "shiki";
@@ -50,7 +50,7 @@ export function CodePreview({
       async load() {
         const { createHighlighter } = await import("shiki");
         return createHighlighter({
-          langs: ["typescript", "python", "go", "yaml", "bash"],
+          langs: ["typescript", "python", "go", "yaml", "bash", "json"],
           themes: ["github-dark", "github-light"],
         });
       },
@@ -111,13 +111,14 @@ export function CodePreview({
         {() => (
           <CodeBlock.Root
             size="sm"
+            colorPalette="orange"
             code={displayCode}
             language={chakraLanguage}
             meta={{ highlightLines, colorScheme: colorMode }}
             transition="all 0.3s ease"
             borderRadius="xl"
             border="1px solid"
-            borderColor="gray.200"
+            borderColor="border.emphasized"
             bg="bg.panel/60"
             backdropFilter="blur(20px) saturate(1.3)"
             boxShadow="0 4px 30px rgba(0,0,0,0.06)"
@@ -176,8 +177,10 @@ export function CodePreview({
                   </Tooltip>
                 )}
                 <CodeBlock.CopyTrigger asChild>
-                  <IconButton variant="ghost" size="2xs">
-                    <CodeBlock.CopyIndicator copied={code} />
+                  <IconButton variant="ghost" size="2xs" aria-label="Copy">
+                    <CodeBlock.CopyIndicator copied={<Check size={14} />}>
+                      <Copy size={14} />
+                    </CodeBlock.CopyIndicator>
                   </IconButton>
                 </CodeBlock.CopyTrigger>
               </HStack>

@@ -1,10 +1,12 @@
 import { vi } from "vitest";
 
-import type { NormalizedAttributes, NormalizedEvent } from "../../../../../event-sourcing/pipelines/trace-processing/schemas/spans";
+import type {
+  NormalizedAttributes,
+  NormalizedEvent,
+} from "../../../../../event-sourcing/pipelines/trace-processing/schemas/spans";
+import { parseJsonStringValues as parseJsonStringAttrs } from "../../../../../event-sourcing/pipelines/trace-processing/utils/traceRequest.utils";
 import { SpanDataBag } from "../../spanDataBag";
 import type { ExtractorContext } from "../_types";
-
-import { parseJsonStringValues as parseJsonStringAttrs } from "../../../../../event-sourcing/pipelines/trace-processing/utils/traceRequest.utils";
 
 export { parseJsonStringAttrs };
 

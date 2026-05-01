@@ -87,7 +87,9 @@ export function MessagesList() {
 
   const {
     period: { startDate, endDate },
+    mode,
     setPeriod,
+    setRelativePeriod,
   } = usePeriodSelector();
 
   useEffect(() => {
@@ -132,8 +134,6 @@ export function MessagesList() {
       // New traces in card view: no pending UI, they appear on next manual refresh
     },
     enabled: !!project,
-    pageOffset: navigationFooter.pageOffset,
-    cursorPageNumber: navigationFooter.cursorPageNumber,
   });
 
   return (
@@ -157,7 +157,12 @@ export function MessagesList() {
         <Spacer />
         <ToggleTableView />
         <GroupingSelector />
-        <PeriodSelector period={{ startDate, endDate }} setPeriod={setPeriod} />
+        <PeriodSelector
+          period={{ startDate, endDate }}
+          mode={mode}
+          setPeriod={setPeriod}
+          setRelativePeriod={setRelativePeriod}
+        />
         <FilterToggle defaultShowFilters={true} />
         <ToggleAnalytics />
       </PageLayout.Header>

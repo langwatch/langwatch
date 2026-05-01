@@ -79,8 +79,7 @@ export class OpenInferenceExtractor implements CanonicalAttributesExtractor {
     const tags = attrs.take(ATTR_KEYS.OPENINFERENCE_TAG_TAGS);
     if (tags !== undefined) {
       // Normalize to string for consistency with langwatch.labels format
-      const labelsStr =
-        typeof tags === "string" ? tags : JSON.stringify(tags);
+      const labelsStr = typeof tags === "string" ? tags : JSON.stringify(tags);
       ctx.setAttrIfAbsent(ATTR_KEYS.LANGWATCH_LABELS, labelsStr);
       ctx.recordRule(`${this.id}:tag.tags`);
     }

@@ -50,22 +50,26 @@ export class TraceloopExtractor implements CanonicalAttributesExtractor {
     // ─────────────────────────────────────────────────────────────────────────
     // Input Messages (from traceloop.entity.input)
     // ─────────────────────────────────────────────────────────────────────────
-    if (extractInputMessages(
-      ctx,
-      [{ type: "attr", keys: [ATTR_KEYS.TRACELOOP_ENTITY_INPUT] }],
-      `${this.id}:entity.input->gen_ai.input.messages`,
-    )) {
+    if (
+      extractInputMessages(
+        ctx,
+        [{ type: "attr", keys: [ATTR_KEYS.TRACELOOP_ENTITY_INPUT] }],
+        `${this.id}:entity.input->gen_ai.input.messages`,
+      )
+    ) {
       recordValueType(ctx, ATTR_KEYS.GEN_AI_INPUT_MESSAGES, "chat_messages");
     }
 
     // ─────────────────────────────────────────────────────────────────────────
     // Output Messages (from traceloop.entity.output)
     // ─────────────────────────────────────────────────────────────────────────
-    if (extractOutputMessages(
-      ctx,
-      [{ type: "attr", keys: [ATTR_KEYS.TRACELOOP_ENTITY_OUTPUT] }],
-      `${this.id}:entity.output->gen_ai.output.messages`,
-    )) {
+    if (
+      extractOutputMessages(
+        ctx,
+        [{ type: "attr", keys: [ATTR_KEYS.TRACELOOP_ENTITY_OUTPUT] }],
+        `${this.id}:entity.output->gen_ai.output.messages`,
+      )
+    ) {
       recordValueType(ctx, ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES, "chat_messages");
     }
   }

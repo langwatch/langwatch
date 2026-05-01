@@ -5,12 +5,19 @@ import { createLogger } from "~/utils/logger/server";
 import { BroadcasterNotActiveError } from "./errors";
 import { TenantRateLimiter } from "./tenant-rate-limiter";
 
-export type BroadcastEventType = "trace_updated" | "simulation_updated" | "export_progress";
+export type BroadcastEventType =
+  | "trace_updated"
+  | "simulation_updated"
+  | "export_progress"
+  | "presence_updated"
+  | "presence_cursor";
 
 const ALL_EVENT_TYPES: BroadcastEventType[] = [
   "trace_updated",
   "simulation_updated",
   "export_progress",
+  "presence_updated",
+  "presence_cursor",
 ];
 
 function redisChannel(eventType: BroadcastEventType): string {

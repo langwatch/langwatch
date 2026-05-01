@@ -1,7 +1,8 @@
 import type { OtlpSpan } from "../../event-sourcing/pipelines/trace-processing/schemas/otlp";
-import type { TokenizerClient } from "../clients/tokenizer/tokenizer.client";
 import { KILL_SWITCH_CACHE_TTL_MS } from "../../featureFlag/constants";
 import type { FeatureFlagServiceInterface } from "../../featureFlag/types";
+import type { TokenizerClient } from "../clients/tokenizer/tokenizer.client";
+import { extractModelName } from "./utils/spanModel";
 
 /**
  * Attribute keys checked for model name (priority order).
@@ -17,14 +18,8 @@ const MODEL_ATTRIBUTE_KEYS = [
  * Attribute keys that indicate token counts are already present.
  */
 const TOKEN_COUNT_KEYS = {
-  input: [
-    "gen_ai.usage.input_tokens",
-    "gen_ai.usage.prompt_tokens",
-  ],
-  output: [
-    "gen_ai.usage.output_tokens",
-    "gen_ai.usage.completion_tokens",
-  ],
+  input: ["gen_ai.usage.input_tokens", "gen_ai.usage.prompt_tokens"],
+  output: ["gen_ai.usage.output_tokens", "gen_ai.usage.completion_tokens"],
 } as const;
 
 const GLOBAL_KILL_SWITCH_KEY = "token-estimation-killswitch";
@@ -78,7 +73,7 @@ export class OtlpSpanTokenEstimationService {
 
     if (!this.isLlmSpan(span)) return;
 
-    const model = this.extractModelName(span);
+    const model = extractModelName(span, MODEL_ATTRIBUTE_KEYS);
     if (!model) return;
 
     const hasInputTokens = this.hasTokenCountAttribute({
@@ -185,21 +180,6 @@ export class OtlpSpanTokenEstimationService {
     return false;
   }
 
-  private extractModelName(span: OtlpSpan): string | null {
-    for (const key of MODEL_ATTRIBUTE_KEYS) {
-      for (const attr of span.attributes) {
-        if (
-          attr.key === key &&
-          typeof attr.value.stringValue === "string" &&
-          attr.value.stringValue.length > 0
-        ) {
-          return attr.value.stringValue;
-        }
-      }
-    }
-    return null;
-  }
-
   private hasTokenCountAttribute({
     span,
     direction,
@@ -210,8 +190,7 @@ export class OtlpSpanTokenEstimationService {
     const keys = TOKEN_COUNT_KEYS[direction];
     for (const attr of span.attributes) {
       if ((keys as readonly string[]).includes(attr.key)) {
-        const val =
-          attr.value.intValue ?? attr.value.doubleValue;
+        const val = attr.value.intValue ?? attr.value.doubleValue;
         if (val !== undefined && val !== null) return true;
       }
     }

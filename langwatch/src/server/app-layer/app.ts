@@ -10,6 +10,7 @@ export class App {
   readonly config: AppConfig;
 
   readonly broadcast: AppDependencies["broadcast"];
+  readonly presence: AppDependencies["presence"];
   readonly traces: AppDependencies["traces"] & AppCommands["traces"];
   readonly evaluations: AppDependencies["evaluations"] &
     AppCommands["evaluations"];
@@ -18,6 +19,7 @@ export class App {
   readonly simulations: AppDependencies["simulations"] & AppCommands["simulations"];
   readonly suiteRuns: AppDependencies["suiteRuns"] & AppCommands["suiteRuns"];
   readonly experiments: AppDependencies["experiments"];
+  readonly triggers: AppDependencies["triggers"];
   readonly organizations: AppDependencies["organizations"];
   readonly projects: AppDependencies["projects"];
   readonly tokenizer: AppDependencies["tokenizer"];
@@ -45,6 +47,7 @@ export class App {
   constructor(deps: AppDependencies) {
     this.config = deps.config;
     this.experiments = deps.experiments;
+    this.triggers = deps.triggers;
     this.organizations = deps.organizations;
     this.projects = deps.projects;
     this.tokenizer = deps.tokenizer;
@@ -57,6 +60,7 @@ export class App {
     this.nurturing = deps.nurturing;
     this.usageLimits = deps.usageLimits;
     this.broadcast = deps.broadcast;
+    this.presence = deps.presence;
     this.traces = { ...deps.traces, ...deps.commands.traces };
     this.evaluations = { ...deps.evaluations, ...deps.commands.evaluations };
     this.experimentRuns = deps.commands.experimentRuns;

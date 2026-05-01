@@ -63,6 +63,12 @@ export interface SpanException {
   stackTrace?: string;
 }
 
+export interface SpanEvent {
+  name: string;
+  attributes: Record<string, unknown>;
+  offsetMs?: number;
+}
+
 export interface LLMConfig {
   requestModel?: string;
   responseModel?: string;
@@ -77,8 +83,24 @@ export interface RAGConfig {
 }
 
 export interface PromptConfig {
+  /**
+   * Runtime prompt reference — what actually ran. Either a bare handle
+   * ("customer-support") or `handle:version_or_tag` shorthand. Bare
+   * handles are auto-combined with `version` / `versionId` at emit time.
+   */
   promptId?: string;
+  /** Numeric version. Combined into `langwatch.prompt.id` when promptId is bare. */
+  version?: number;
+  /** Database id of the version row — emitted as `langwatch.prompt.version.id`. */
   versionId?: string;
+  /**
+   * The pin the developer set on the call site, in shorthand form
+   * ("handle:production"). Emitted as `langwatch.prompt.selected.id`,
+   * which the trace-summary projection records into `SelectedPromptId`.
+   * When this differs from the resolved runtime prompt, the drawer
+   * surfaces a drift warning.
+   */
+  selectedId?: string;
   variables?: Record<string, string>;
 }
 
@@ -95,6 +117,8 @@ export interface SpanConfig {
   output?: SpanInputOutput;
   attributes: Record<string, string | number | boolean>;
   exception?: SpanException;
+
+  events?: SpanEvent[];
 
   llm?: LLMConfig;
   rag?: RAGConfig;

@@ -210,7 +210,10 @@ describe("MastraExtractor", () => {
     it("extracts last user message as langwatch.input", () => {
       const messages = JSON.stringify([
         { role: "system", content: "You are a weather assistant" },
-        { role: "user", content: [{ type: "text", text: "what's the weather in london?" }] },
+        {
+          role: "user",
+          content: [{ type: "text", text: "what's the weather in london?" }],
+        },
       ]);
       const ctx = createExtractorContext(
         {
@@ -381,7 +384,9 @@ describe("MastraExtractor", () => {
         {
           [ATTR_KEYS.MASTRA_SPAN_TYPE]: "agent_run",
           "mastra.metadata.runId": "run-42",
-          "mastra.metadata.headers": JSON.stringify({ "content-type": "application/json" }),
+          "mastra.metadata.headers": JSON.stringify({
+            "content-type": "application/json",
+          }),
           "mastra.metadata.body": JSON.stringify({ key: "value" }),
         },
         mastraScope,
@@ -530,7 +535,9 @@ describe("MastraExtractor", () => {
 
       extractor.apply(ctx);
 
-      const valueTypes = ctx.out[ATTR_KEYS.LANGWATCH_RESERVED_VALUE_TYPES] as string[];
+      const valueTypes = ctx.out[
+        ATTR_KEYS.LANGWATCH_RESERVED_VALUE_TYPES
+      ] as string[];
       expect(valueTypes).toContain("gen_ai.output.messages=chat_messages");
     });
 
@@ -697,7 +704,9 @@ describe("MastraExtractor", () => {
 
       extractor.apply(ctx);
 
-      const valueTypes = ctx.out[ATTR_KEYS.LANGWATCH_RESERVED_VALUE_TYPES] as string[];
+      const valueTypes = ctx.out[
+        ATTR_KEYS.LANGWATCH_RESERVED_VALUE_TYPES
+      ] as string[];
       expect(valueTypes).toContain("gen_ai.input.messages=chat_messages");
     });
 
@@ -858,7 +867,10 @@ describe("MastraExtractor", () => {
         body: {
           model: "grok-3-mini",
           messages: [
-            { role: "system", content: "Score the translation quality from 0-10" },
+            {
+              role: "system",
+              content: "Score the translation quality from 0-10",
+            },
             { role: "user", content: "Original: Hello. Translation: Bonjour." },
           ],
         },
@@ -893,9 +905,10 @@ describe("MastraExtractor", () => {
 
       extractor.apply(ctx);
 
-      expect(ctx.out[ATTR_KEYS.LANGWATCH_OUTPUT]).toEqual(
-        { score: 9, reason: "Accurate translation" },
-      );
+      expect(ctx.out[ATTR_KEYS.LANGWATCH_OUTPUT]).toEqual({
+        score: 9,
+        reason: "Accurate translation",
+      });
     });
 
     it("falls back to text when no object output", () => {
@@ -997,7 +1010,10 @@ describe("MastraExtractor", () => {
       const input = JSON.stringify({
         body: {
           model: "grok-3-mini",
-          response_format: { type: "json_schema", json_schema: { name: "response" } },
+          response_format: {
+            type: "json_schema",
+            json_schema: { name: "response" },
+          },
           messages: [
             { role: "system", content: "You are an expert evaluator" },
             { role: "user", content: "Evaluate this" },

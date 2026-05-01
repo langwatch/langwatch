@@ -33,6 +33,23 @@ export const opsRouter = createTRPCRouter({
       return ops.metricsCollector.getDashboardData();
     }),
 
+  /**
+   * Cheap counts-only query for the global ops badge in the main menu.
+   * Returns just the two integers the badge renders (blocked groups +
+   * DLQ jobs), bypassing the full dashboard aggregation. Use this for
+   * always-on polling; reach for `getDashboardSnapshot` only on the
+   * ops route itself.
+   */
+  getBadgeCounts: protectedProcedure
+    .use(opsViewPermission)
+    .query(() => {
+      const ops = getApp().ops;
+      if (!ops?.metricsCollector) {
+        return { blockedCount: 0, dlqCount: 0 };
+      }
+      return ops.metricsCollector.getBadgeCounts();
+    }),
+
   listQueues: protectedProcedure
     .use(opsViewPermission)
     .query(async () => {

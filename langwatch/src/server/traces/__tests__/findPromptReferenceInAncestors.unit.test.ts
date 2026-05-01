@@ -35,6 +35,7 @@ describe("findPromptReferenceInAncestors()", () => {
         promptHandle: "team/sample-prompt",
         promptVersionNumber: 3,
         promptTag: null,
+        promptVersionId: null,
         promptVariables: { name: "Alice" },
       });
     });
@@ -74,6 +75,7 @@ describe("findPromptReferenceInAncestors()", () => {
         promptHandle: "org/deep-prompt",
         promptVersionNumber: 7,
         promptTag: null,
+        promptVersionId: null,
         promptVariables: null,
       });
     });
@@ -113,6 +115,7 @@ describe("findPromptReferenceInAncestors()", () => {
         promptHandle: "team/sibling-prompt",
         promptVersionNumber: 1,
         promptTag: null,
+        promptVersionId: null,
         promptVariables: null,
       });
     });
@@ -179,6 +182,7 @@ describe("findPromptReferenceInAncestors()", () => {
         promptHandle: "team/compiled-prompt",
         promptVersionNumber: 2,
         promptTag: null,
+        promptVersionId: null,
         promptVariables: null,
       });
     });
@@ -226,6 +230,7 @@ describe("findPromptReferenceInAncestors()", () => {
         promptHandle: "team/late-prompt",
         promptVersionNumber: 2,
         promptTag: null,
+        promptVersionId: null,
         promptVariables: null,
       });
     });
@@ -305,6 +310,7 @@ describe("findPromptReferenceInAncestors()", () => {
         promptHandle: "team/sibling-prompt",
         promptVersionNumber: 1,
         promptTag: null,
+        promptVersionId: null,
         promptVariables: null,
       });
     });
@@ -387,6 +393,7 @@ describe("findPromptReferenceInAncestors()", () => {
         promptHandle: "team/old-prompt",
         promptVersionNumber: 2,
         promptTag: null,
+        promptVersionId: null,
         promptVariables: null,
       });
     });
@@ -428,6 +435,7 @@ describe("findPromptReferenceInAncestors()", () => {
         promptHandle: "team/nearest",
         promptVersionNumber: 2,
         promptTag: null,
+        promptVersionId: null,
         promptVariables: null,
       });
     });
@@ -548,6 +556,7 @@ describe("findPromptReferenceInAncestors()", () => {
       expect(result).toEqual({
         promptHandle: "team/same-time-prompt",
         promptTag: null,
+        promptVersionId: null,
         promptVersionNumber: 1,
         promptVariables: null,
       });
@@ -591,6 +600,7 @@ describe("findPromptReferenceInAncestors()", () => {
       expect(result).toEqual({
         promptHandle: "tea-prompt",
         promptTag: null,
+        promptVersionId: null,
         promptVersionNumber: 4,
         promptVariables: null,
       });
@@ -646,6 +656,7 @@ describe("findPromptReferenceInAncestors()", () => {
       expect(result).toEqual({
         promptHandle: "tea-prompt",
         promptTag: null,
+        promptVersionId: null,
         promptVersionNumber: 4,
         promptVariables: null,
       });
@@ -702,6 +713,7 @@ describe("findPromptReferenceInAncestors()", () => {
         promptHandle: "tea-prompt",
         promptVersionNumber: 4,
         promptTag: null,
+        promptVersionId: null,
         promptVariables: null,
       });
     });
@@ -749,6 +761,7 @@ describe("findPromptReferenceInAncestors()", () => {
         promptHandle: "team/nested-prompt",
         promptVersionNumber: 5,
         promptTag: null,
+        promptVersionId: null,
         promptVariables: null,
       });
     });

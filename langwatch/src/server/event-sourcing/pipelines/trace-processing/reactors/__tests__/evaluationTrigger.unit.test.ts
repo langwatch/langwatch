@@ -51,6 +51,8 @@ function makeContext(
       totalCompletionTokens: 0,
       occurredAt: Date.now(),
       blockedByGuardrail: false,
+      rootSpanType: null,
+      containsAi: false,
       attributes: attributeOverrides,
       labels: [],
     } as unknown as TraceSummaryData,

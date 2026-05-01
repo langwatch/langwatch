@@ -52,7 +52,7 @@ export class TraceSummaryStore
     aggregateId: string,
     context: ProjectionStoreContext,
   ): Promise<TraceSummaryData | null> {
-    return await this.repo.getByTraceId(
+    return await this.repo.findByTraceId(
       String(context.tenantId),
       aggregateId,
     );

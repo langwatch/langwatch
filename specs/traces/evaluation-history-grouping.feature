@@ -40,14 +40,14 @@ Feature: Evaluation history grouping in trace details
   # Expanding history
   # ============================================================================
 
-  @e2e @unimplemented
+  @integration @unimplemented
   Scenario: Expanding history shows previous runs
     When I click the history indicator on "Toxicity Check"
     Then the entry expands to show all 3 runs
     And the runs are ordered from most recent to oldest
     And each run shows its own score, status, and timestamp
 
-  @e2e @unimplemented
+  @integration @unimplemented
   Scenario: Collapsing history hides previous runs
     Given I expanded the history for "Toxicity Check"
     When I click the history indicator again

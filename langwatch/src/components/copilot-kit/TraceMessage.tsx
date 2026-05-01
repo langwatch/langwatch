@@ -7,6 +7,7 @@ import {
   Text,
 } from "@chakra-ui/react";
 import { LuListTree, LuRefreshCw } from "react-icons/lu";
+import { TraceIdPeek } from "~/features/traces-v2/components/TraceIdPeek";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
@@ -76,6 +77,7 @@ function TraceSuccessState({
         <LuListTree />
         View Trace
       </Button>
+      <TraceIdPeek traceId={traceId} />
     </HStack>
   );
 }

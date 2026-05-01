@@ -18,10 +18,7 @@ function createLogfireContext(
   }));
 
   const parsed = parseJsonStringAttrs(attrs);
-  const bag = new SpanDataBag(
-    parsed as NormalizedAttributes,
-    normalizedEvents,
-  );
+  const bag = new SpanDataBag(parsed as NormalizedAttributes, normalizedEvents);
   const out: NormalizedAttributes = {};
 
   const setAttr = vi.fn((key: string, value: unknown) => {
@@ -86,20 +83,22 @@ describe("LogfireExtractor", () => {
 
   describe("when gen_ai.choice events are present", () => {
     it("extracts message/content/text from events as output messages", () => {
-      const ctx = createLogfireContext(
-        {},
-        [
-          {
-            name: "gen_ai.choice",
-            attributes: { message: JSON.stringify({ role: "assistant", content: "Hi there" }) },
+      const ctx = createLogfireContext({}, [
+        {
+          name: "gen_ai.choice",
+          attributes: {
+            message: JSON.stringify({ role: "assistant", content: "Hi there" }),
           },
-        ],
-      );
+        },
+      ]);
 
       extractor.apply(ctx);
 
       expect(ctx.out[ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES]).toEqual([
-        { role: "assistant", content: { role: "assistant", content: "Hi there" } },
+        {
+          role: "assistant",
+          content: { role: "assistant", content: "Hi there" },
+        },
       ]);
     });
   });

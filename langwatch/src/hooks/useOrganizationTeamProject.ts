@@ -86,6 +86,12 @@ export const useOrganizationTeamProject = (
       staleTime: keepFetching ? 0 : 30_000,
       refetchOnWindowFocus: true,
       refetchInterval: keepFetching ? 5_000 : undefined,
+      // Skip the HTTP batch link: this query is mounted at the app shell and
+      // refetches on focus/route change, so left in the batch it would drag
+      // the drawer-open burst (organization.getAll + 7 trace procedures —
+      // measured at ~2.5s, blocked by the slowest). On its own connection it
+      // runs in parallel without affecting the trace fan-out.
+      trpc: { context: { skipBatch: true } },
     },
   );
 

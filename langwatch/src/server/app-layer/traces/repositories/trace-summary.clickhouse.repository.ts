@@ -1,10 +1,12 @@
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import type { WithDateWrites } from "~/server/clickhouse/types";
-import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
 import { TRACE_SUMMARY_PROJECTION_VERSION_LATEST } from "~/server/event-sourcing/pipelines/trace-processing/schemas/constants";
 import { IdUtils } from "~/server/event-sourcing/pipelines/trace-processing/utils/id.utils";
+import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
 import { createLogger } from "~/utils/logger/server";
+import { validateBatchTenants } from "../../_shared/clickhouse-batch";
 import type { TraceSummaryData } from "../types";
+import type { TraceSummaryFieldsBase } from "./_summary-fields.types";
 import type { TraceSummaryRepository } from "./trace-summary.repository";
 
 const TABLE_NAME = "trace_summaries" as const;
@@ -13,52 +15,31 @@ const logger = createLogger(
   "langwatch:app-layer:traces:trace-summary-repository",
 );
 
-type ClickHouseSummaryWriteRecord = WithDateWrites<
-  ClickHouseSummaryRecord,
-  "OccurredAt" | "CreatedAt" | "UpdatedAt" | "LastEventOccurredAt"
->;
+type ClickHouseSummaryWriteRecord = Omit<
+  WithDateWrites<
+    ClickHouseSummaryRecord,
+    "OccurredAt" | "CreatedAt" | "UpdatedAt" | "LastEventOccurredAt"
+  >,
+  "Events.Timestamp"
+> & {
+  "Events.Timestamp": Date[];
+};
 
-interface ClickHouseSummaryRecord {
+interface ClickHouseSummaryRecord extends TraceSummaryFieldsBase {
   ProjectionId: string;
-  TenantId: string;
-  TraceId: string;
   Version: string;
   Attributes: Record<string, string>;
-  OccurredAt: number;
-  CreatedAt: number;
-  UpdatedAt: number;
-  ComputedIOSchemaVersion: string;
-  ComputedInput: string | null;
-  ComputedOutput: string | null;
-  TimeToFirstTokenMs: number | null;
-  TimeToLastTokenMs: number | null;
-  TotalDurationMs: number;
-  TokensPerSecond: number | null;
-  SpanCount: number;
-  ContainsErrorStatus: number;
-  ContainsOKStatus: number;
-  ErrorMessage: string | null;
-  Models: string[];
-  TotalCost: number | null;
-  TokensEstimated: boolean;
-  TotalPromptTokenCount: number | null;
-  TotalCompletionTokenCount: number | null;
-  OutputFromRootSpan: number;
-  OutputSpanEndTimeMs: number;
-  BlockedByGuardrail: number;
-  TopicId: string | null;
-  SubTopicId: string | null;
-  AnnotationIds: string[];
   HasAnnotation: number | null;
-  ScenarioRoleCosts: Record<string, number>;
-  ScenarioRoleLatencies: Record<string, number>;
-  TraceName: string;
-  ScenarioRoleSpans: Record<string, string>;
-  SpanCosts: Record<string, number>;
+  "Events.SpanId": string[];
+  "Events.Timestamp": string[];
+  "Events.Name": string[];
+  "Events.Attributes": Record<string, string>[];
   LastEventOccurredAt: number;
 }
 
-export class TraceSummaryClickHouseRepository implements TraceSummaryRepository {
+export class TraceSummaryClickHouseRepository
+  implements TraceSummaryRepository
+{
   constructor(private readonly resolveClient: ClickHouseClientResolver) {}
 
   async upsert(data: TraceSummaryData, tenantId: string): Promise<void> {
@@ -88,7 +69,6 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
         format: "JSONEachRow",
         clickhouse_settings: { async_insert: 1, wait_for_async_insert: 0 },
       });
-
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
@@ -105,19 +85,10 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
   ): Promise<void> {
     if (entries.length === 0) return;
 
-    const tenantId = entries[0]!.tenantId;
-    EventUtils.validateTenantId(
-      { tenantId },
+    const tenantId = validateBatchTenants(
+      entries,
       "TraceSummaryClickHouseRepository.upsertBatch",
     );
-
-    const mixedTenant = entries.find((e) => e.tenantId !== tenantId);
-    if (mixedTenant) {
-      throw new Error(
-        `Mixed tenants in upsertBatch: expected ${tenantId}, got ${mixedTenant.tenantId}. ` +
-        `Each batch must contain a single tenant to ensure correct DB routing.`,
-      );
-    }
 
     try {
       const client = await this.resolveClient(tenantId);
@@ -153,94 +124,43 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
     }
   }
 
-  async getByTraceId(
+  async findByTraceId(
     tenantId: string,
     traceId: string,
+    options?: { occurredAtMs?: number },
   ): Promise<TraceSummaryData | null> {
     EventUtils.validateTenantId(
       { tenantId },
-      "TraceSummaryClickHouseRepository.getByTraceId",
+      "TraceSummaryClickHouseRepository.findByTraceId",
     );
 
+    // First attempt: when the caller has a rough timestamp, narrow the
+    // scan to a ±2-day window around it for partition pruning. The
+    // IO/Attributes columns are heavy and without pruning ClickHouse
+    // scans every partition including cold S3 tier — this trims drawer-
+    // open latency from ~1s to ~100ms.
+    //
+    // The hint is *best-effort*. If the hint window misses (clock skew,
+    // stale URL, the row's `timestamp` ≠ trace's actual OccurredAt) we
+    // fall back to an unconstrained scan so the drawer doesn't 404 on a
+    // trace that genuinely exists. The fallback is the slow path; the
+    // happy path stays fast.
+    const PARTITION_WINDOW_MS = 2 * 24 * 60 * 60 * 1000;
+    const hasHint = options?.occurredAtMs !== undefined;
+
     try {
-      const client = await this.resolveClient(tenantId);
-      // IN-tuple dedup over the ReplacingMergeTree: the inner SELECT scans
-      // only (TenantId, TraceId, UpdatedAt) — small, sparse — to find the
-      // latest version, then the outer SELECT pulls the heavy columns
-      // (ComputedInput, ComputedOutput, Attributes, etc.) for that one row.
-      //
-      // Do not "simplify" to `ORDER BY UpdatedAt DESC LIMIT 1`: with many
-      // unmerged versions per (TenantId, TraceId) it forces the engine to
-      // read every version *with* the heavy columns just to sort them in
-      // memory. Called per-event during the trace-summary projection apply,
-      // so a 100× read amplification compounds fast under load.
-      //
-      // Outer SELECT references columns via the `t.` alias because the
-      // SELECT projects `toUnixTimestamp64Milli(UpdatedAt) AS UpdatedAt`
-      // (and similar for Created/OccurredAt). Without the alias the
-      // IN-tuple's `UpdatedAt` could resolve to the projected UInt64 alias
-      // instead of the raw DateTime64 column and the type comparison would
-      // break. See dev/docs/best_practices/clickhouse-queries.md.
-      const result = await client.query({
-        query: `
-          SELECT
-            t.ProjectionId AS ProjectionId,
-            t.TenantId AS TenantId,
-            t.TraceId AS TraceId,
-            t.Version AS Version,
-            t.Attributes AS Attributes,
-            toUnixTimestamp64Milli(t.OccurredAt) AS OccurredAt,
-            toUnixTimestamp64Milli(t.CreatedAt) AS CreatedAt,
-            toUnixTimestamp64Milli(t.UpdatedAt) AS UpdatedAt,
-            t.ComputedIOSchemaVersion AS ComputedIOSchemaVersion,
-            t.ComputedInput AS ComputedInput,
-            t.ComputedOutput AS ComputedOutput,
-            t.TimeToFirstTokenMs AS TimeToFirstTokenMs,
-            t.TimeToLastTokenMs AS TimeToLastTokenMs,
-            t.TotalDurationMs AS TotalDurationMs,
-            t.TokensPerSecond AS TokensPerSecond,
-            t.SpanCount AS SpanCount,
-            t.ContainsErrorStatus AS ContainsErrorStatus,
-            t.ContainsOKStatus AS ContainsOKStatus,
-            t.ErrorMessage AS ErrorMessage,
-            t.Models AS Models,
-            t.TotalCost AS TotalCost,
-            t.TokensEstimated AS TokensEstimated,
-            t.TotalPromptTokenCount AS TotalPromptTokenCount,
-            t.TotalCompletionTokenCount AS TotalCompletionTokenCount,
-            t.OutputFromRootSpan AS OutputFromRootSpan,
-            t.OutputSpanEndTimeMs AS OutputSpanEndTimeMs,
-            t.BlockedByGuardrail AS BlockedByGuardrail,
-            t.TopicId AS TopicId,
-            t.SubTopicId AS SubTopicId,
-            t.AnnotationIds AS AnnotationIds,
-            t.HasAnnotation AS HasAnnotation,
-            t.ScenarioRoleCosts AS ScenarioRoleCosts,
-            t.ScenarioRoleLatencies AS ScenarioRoleLatencies,
-            t.TraceName AS TraceName,
-            t.ScenarioRoleSpans AS ScenarioRoleSpans,
-            t.SpanCosts AS SpanCosts
-          FROM ${TABLE_NAME} AS t
-          WHERE t.TenantId = {tenantId:String}
-            AND t.TraceId = {traceId:String}
-            AND (t.TenantId, t.TraceId, t.UpdatedAt) IN (
-              SELECT TenantId, TraceId, max(UpdatedAt)
-              FROM ${TABLE_NAME}
-              WHERE TenantId = {tenantId:String}
-                AND TraceId = {traceId:String}
-              GROUP BY TenantId, TraceId
-            )
-          LIMIT 1
-        `,
-        query_params: { tenantId, traceId },
-        format: "JSONEachRow",
-      });
-
-      const rows = await result.json<ClickHouseSummaryRecord>();
-      const row = rows[0];
-      if (!row) return null;
-
-      return this.fromClickHouseRecord(row);
+      if (hasHint) {
+        const hinted = await this.queryByTraceId(tenantId, traceId, {
+          fromMs: options!.occurredAtMs! - PARTITION_WINDOW_MS,
+          toMs: options!.occurredAtMs! + PARTITION_WINDOW_MS,
+        });
+        if (hinted) return hinted;
+        logger.debug(
+          { tenantId, traceId, occurredAtMs: options!.occurredAtMs },
+          "Trace summary not found in hint window — retrying without partition prune",
+        );
+      }
+      return await this.queryByTraceId(tenantId, traceId);
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
@@ -250,6 +170,104 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
       );
       throw error;
     }
+  }
+
+  private async queryByTraceId(
+    tenantId: string,
+    traceId: string,
+    window?: { fromMs: number; toMs: number },
+  ): Promise<TraceSummaryData | null> {
+    const outerTimeFilter = window
+      ? "AND t.OccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64}) " +
+        "AND t.OccurredAt <= fromUnixTimestamp64Milli({toMs:Int64})"
+      : "";
+    const innerTimeFilter = window
+      ? "AND OccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64}) " +
+        "AND OccurredAt <= fromUnixTimestamp64Milli({toMs:Int64})"
+      : "";
+
+    const client = await this.resolveClient(tenantId);
+    // IN-tuple dedup over the ReplacingMergeTree: the inner SELECT scans
+    // only (TenantId, TraceId, UpdatedAt) — small, sparse — to find the
+    // latest version, then the outer SELECT pulls the heavy columns
+    // (ComputedInput, ComputedOutput, Attributes, etc.) for that one row.
+    // See dev/docs/best_practices/clickhouse-queries.md.
+    const result = await client.query({
+      query: `
+        SELECT
+          t.ProjectionId AS ProjectionId,
+          t.TenantId AS TenantId,
+          t.TraceId AS TraceId,
+          t.Version AS Version,
+          t.Attributes AS Attributes,
+          toUnixTimestamp64Milli(t.OccurredAt) AS OccurredAt,
+          toUnixTimestamp64Milli(t.CreatedAt) AS CreatedAt,
+          toUnixTimestamp64Milli(t.UpdatedAt) AS UpdatedAt,
+          t.ComputedIOSchemaVersion AS ComputedIOSchemaVersion,
+          t.ComputedInput AS ComputedInput,
+          t.ComputedOutput AS ComputedOutput,
+          t.TimeToFirstTokenMs AS TimeToFirstTokenMs,
+          t.TimeToLastTokenMs AS TimeToLastTokenMs,
+          t.TotalDurationMs AS TotalDurationMs,
+          t.TokensPerSecond AS TokensPerSecond,
+          t.SpanCount AS SpanCount,
+          t.ContainsErrorStatus AS ContainsErrorStatus,
+          t.ContainsOKStatus AS ContainsOKStatus,
+          t.ErrorMessage AS ErrorMessage,
+          t.Models AS Models,
+          t.TotalCost AS TotalCost,
+          t.TokensEstimated AS TokensEstimated,
+          t.TotalPromptTokenCount AS TotalPromptTokenCount,
+          t.TotalCompletionTokenCount AS TotalCompletionTokenCount,
+          t.OutputFromRootSpan AS OutputFromRootSpan,
+          t.OutputSpanEndTimeMs AS OutputSpanEndTimeMs,
+          t.BlockedByGuardrail AS BlockedByGuardrail,
+          t.RootSpanType AS RootSpanType,
+          t.ContainsAi AS ContainsAi,
+          t.ContainsPrompt AS ContainsPrompt,
+          t.SelectedPromptId AS SelectedPromptId,
+          t.SelectedPromptSpanId AS SelectedPromptSpanId,
+          t.LastUsedPromptId AS LastUsedPromptId,
+          t.LastUsedPromptVersionNumber AS LastUsedPromptVersionNumber,
+          t.LastUsedPromptVersionId AS LastUsedPromptVersionId,
+          t.LastUsedPromptSpanId AS LastUsedPromptSpanId,
+          t.TopicId AS TopicId,
+          t.SubTopicId AS SubTopicId,
+          t.AnnotationIds AS AnnotationIds,
+          t.HasAnnotation AS HasAnnotation,
+          t.ScenarioRoleCosts AS ScenarioRoleCosts,
+          t.ScenarioRoleLatencies AS ScenarioRoleLatencies,
+          t.ScenarioRoleSpans AS ScenarioRoleSpans,
+          t.SpanCosts AS SpanCosts,
+          t.TraceName AS TraceName,
+          t.\`Events.SpanId\` AS \`Events.SpanId\`,
+          t.\`Events.Timestamp\` AS \`Events.Timestamp\`,
+          t.\`Events.Name\` AS \`Events.Name\`,
+          t.\`Events.Attributes\` AS \`Events.Attributes\`
+        FROM ${TABLE_NAME} AS t
+        WHERE t.TenantId = {tenantId:String}
+          AND t.TraceId = {traceId:String}
+          ${outerTimeFilter}
+          AND (t.TenantId, t.TraceId, t.UpdatedAt) IN (
+            SELECT TenantId, TraceId, max(UpdatedAt)
+            FROM ${TABLE_NAME}
+            WHERE TenantId = {tenantId:String}
+              AND TraceId = {traceId:String}
+              ${innerTimeFilter}
+            GROUP BY TenantId, TraceId
+          )
+        LIMIT 1
+      `,
+      query_params: window
+        ? { tenantId, traceId, fromMs: window.fromMs, toMs: window.toMs }
+        : { tenantId, traceId },
+      format: "JSONEachRow",
+    });
+
+    const rows = await result.json<ClickHouseSummaryRecord>();
+    const row = rows[0];
+    if (!row) return null;
+    return this.fromClickHouseRecord(row);
   }
 
   private fromClickHouseRecord(
@@ -276,6 +294,18 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
       outputFromRootSpan: !!record.OutputFromRootSpan,
       outputSpanEndTimeMs: Number(record.OutputSpanEndTimeMs),
       blockedByGuardrail: !!record.BlockedByGuardrail,
+      rootSpanType: record.RootSpanType,
+      containsAi: !!record.ContainsAi,
+      containsPrompt: !!record.ContainsPrompt,
+      selectedPromptId: record.SelectedPromptId,
+      selectedPromptSpanId: record.SelectedPromptSpanId,
+      // Internal tiebreakers are not persisted; reconstruct as null on read.
+      selectedPromptStartTimeMs: null,
+      lastUsedPromptId: record.LastUsedPromptId,
+      lastUsedPromptVersionNumber: record.LastUsedPromptVersionNumber,
+      lastUsedPromptVersionId: record.LastUsedPromptVersionId,
+      lastUsedPromptSpanId: record.LastUsedPromptSpanId,
+      lastUsedPromptStartTimeMs: null,
       topicId: record.TopicId,
       subTopicId: record.SubTopicId,
       annotationIds: record.AnnotationIds ?? [],
@@ -285,6 +315,12 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
       scenarioRoleLatencies: record.ScenarioRoleLatencies ?? {},
       scenarioRoleSpans: record.ScenarioRoleSpans ?? {},
       spanCosts: record.SpanCosts ?? {},
+      events: (record["Events.SpanId"] ?? []).map((spanId, i) => ({
+        spanId,
+        timestamp: new Date(record["Events.Timestamp"]![i]!).getTime(),
+        name: record["Events.Name"]![i]!,
+        attributes: record["Events.Attributes"]![i] ?? {},
+      })),
       occurredAt: record.OccurredAt,
       createdAt: record.CreatedAt,
       updatedAt: record.UpdatedAt,
@@ -307,14 +343,23 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
       OccurredAt: new Date(data.occurredAt),
       CreatedAt: new Date(data.createdAt),
       UpdatedAt: new Date(data.updatedAt),
-      LastEventOccurredAt: data.lastEventOccurredAt ? new Date(data.lastEventOccurredAt) : new Date(0),
+      LastEventOccurredAt: data.lastEventOccurredAt
+        ? new Date(data.lastEventOccurredAt)
+        : new Date(0),
       ComputedIOSchemaVersion: data.computedIOSchemaVersion,
       ComputedInput: data.computedInput,
       ComputedOutput: data.computedOutput,
-      TimeToFirstTokenMs: data.timeToFirstTokenMs != null ? Math.round(data.timeToFirstTokenMs) : null,
-      TimeToLastTokenMs: data.timeToLastTokenMs != null ? Math.round(data.timeToLastTokenMs) : null,
+      TimeToFirstTokenMs:
+        data.timeToFirstTokenMs != null
+          ? Math.round(data.timeToFirstTokenMs)
+          : null,
+      TimeToLastTokenMs:
+        data.timeToLastTokenMs != null
+          ? Math.round(data.timeToLastTokenMs)
+          : null,
       TotalDurationMs: Math.round(data.totalDurationMs),
-      TokensPerSecond: data.tokensPerSecond != null ? Math.round(data.tokensPerSecond) : null,
+      TokensPerSecond:
+        data.tokensPerSecond != null ? Math.round(data.tokensPerSecond) : null,
       SpanCount: data.spanCount,
       ContainsErrorStatus: data.containsErrorStatus ? 1 : 0,
       ContainsOKStatus: data.containsOKStatus ? 1 : 0,
@@ -327,6 +372,15 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
       OutputFromRootSpan: data.outputFromRootSpan ? 1 : 0,
       OutputSpanEndTimeMs: data.outputSpanEndTimeMs,
       BlockedByGuardrail: data.blockedByGuardrail ? 1 : 0,
+      RootSpanType: data.rootSpanType,
+      ContainsAi: data.containsAi ? 1 : 0,
+      ContainsPrompt: data.containsPrompt ? 1 : 0,
+      SelectedPromptId: data.selectedPromptId,
+      SelectedPromptSpanId: data.selectedPromptSpanId,
+      LastUsedPromptId: data.lastUsedPromptId,
+      LastUsedPromptVersionNumber: data.lastUsedPromptVersionNumber,
+      LastUsedPromptVersionId: data.lastUsedPromptVersionId,
+      LastUsedPromptSpanId: data.lastUsedPromptSpanId,
       TopicId: data.topicId,
       SubTopicId: data.subTopicId,
       AnnotationIds: data.annotationIds,
@@ -336,6 +390,10 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
       ScenarioRoleLatencies: data.scenarioRoleLatencies ?? {},
       ScenarioRoleSpans: data.scenarioRoleSpans ?? {},
       SpanCosts: data.spanCosts ?? {},
+      "Events.SpanId": (data.events ?? []).map((e) => e.spanId),
+      "Events.Timestamp": (data.events ?? []).map((e) => new Date(e.timestamp)),
+      "Events.Name": (data.events ?? []).map((e) => e.name),
+      "Events.Attributes": (data.events ?? []).map((e) => e.attributes),
     };
   }
 }

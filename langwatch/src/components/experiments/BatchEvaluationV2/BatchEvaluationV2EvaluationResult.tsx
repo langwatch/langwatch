@@ -8,9 +8,10 @@ import type {
 } from "@ag-grid-community/core";
 import { ModuleRegistry } from "@ag-grid-community/core";
 import { AgGridReact } from "@ag-grid-community/react";
-import { Box, Button } from "@chakra-ui/react";
+import { Box, Button, HStack } from "@chakra-ui/react";
 import numeral from "numeral";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { TraceIdPeek } from "~/features/traces-v2/components/TraceIdPeek";
 import { useDrawer } from "~/hooks/useDrawer";
 import type { ExperimentRunWithItems } from "../../../server/evaluations-v3/services/types";
 import { formatMilliseconds } from "../../../utils/formatMilliseconds";
@@ -379,19 +380,22 @@ export function BatchEvaluationV2EvaluationResult({
         cellRenderer: (p: any) => {
           const traceId = getRowData(p).datasetEntry?.traceId;
           return traceId ? (
-            <Button
-              size="xs"
-              colorPalette="gray"
-              onClick={(e) => {
-                e.preventDefault();
-                openDrawer("traceDetails", {
-                  traceId,
-                  selectedTab: "traceDetails",
-                });
-              }}
-            >
-              View
-            </Button>
+            <HStack gap={1}>
+              <Button
+                size="xs"
+                colorPalette="gray"
+                onClick={(e) => {
+                  e.preventDefault();
+                  openDrawer("traceDetails", {
+                    traceId,
+                    selectedTab: "traceDetails",
+                  });
+                }}
+              >
+                View
+              </Button>
+              <TraceIdPeek traceId={traceId} />
+            </HStack>
           ) : (
             "-"
           );

@@ -14,9 +14,9 @@ import {
 } from "lucide-react";
 import { useRouter } from "~/utils/compat/next-router";
 import React, { useState } from "react";
-import { useFeatureFlag } from "../hooks/useFeatureFlag";
 import { useOpsPermission } from "../hooks/useOpsPermission";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
+import { useFeatureFlag } from "../hooks/useFeatureFlag";
 import { usePublicEnv } from "../hooks/usePublicEnv";
 import { api } from "../utils/api";
 import { featureIcons } from "../utils/featureIcons";
@@ -24,6 +24,7 @@ import { projectRoutes } from "../utils/routes";
 import { useTableView } from "./messages/HeaderButtons";
 import { CollapsibleMenuGroup } from "./sidebar/CollapsibleMenuGroup";
 import { SideMenuLink } from "./sidebar/SideMenuLink";
+import { PresenceToggle } from "./sidebar/PresenceToggle";
 import { SupportMenu } from "./sidebar/SupportMenu";
 import { ThemeToggle } from "./sidebar/ThemeToggle";
 import { UsageIndicator } from "./sidebar/UsageIndicator";
@@ -43,6 +44,11 @@ export const MainMenu = React.memo(function MainMenu({
   const { project, hasPermission, isPublicRoute } =
     useOrganizationTeamProject();
   const [isHovered, setIsHovered] = useState(false);
+
+  const { enabled: tracesV2Enabled } = useFeatureFlag(
+    "release_ui_traces_v2_enabled",
+    { projectId: project?.id, enabled: !!project },
+  );
 
   const pendingItemsCount = api.annotation.getPendingItemsCount.useQuery(
     { projectId: project?.id ?? "" },
@@ -93,7 +99,24 @@ export const MainMenu = React.memo(function MainMenu({
           width={MENU_WIDTH_EXPANDED}
           justifyContent="space-between"
         >
-          <VStack width="full" gap={0.5} align="start">
+          <VStack
+            width="full"
+            gap={0.5}
+            align="start"
+            flex={1}
+            minHeight={0}
+            overflowY="auto"
+            overflowX="hidden"
+            css={{
+              scrollbarWidth: "thin",
+              "&::-webkit-scrollbar": { width: "4px" },
+              "&::-webkit-scrollbar-thumb": {
+                background: "var(--chakra-colors-border-emphasized)",
+                borderRadius: "2px",
+              },
+              "&::-webkit-scrollbar-track": { background: "transparent" },
+            }}
+          >
             <PageMenuLink
               path={projectRoutes.home.path}
               icon={featureIcons.home.icon}
@@ -134,6 +157,18 @@ export const MainMenu = React.memo(function MainMenu({
               isActive={router.pathname.includes("/messages")}
               showLabel={showExpanded}
             />
+            {tracesV2Enabled && (
+              <PageMenuLink
+                path={projectRoutes.traces_v2.path}
+                icon={featureIcons.traces_v2.icon}
+                label={projectRoutes.traces_v2.title}
+                project={project}
+                isActive={router.pathname.includes("/traces")}
+                showLabel={showExpanded}
+                beta="Traces v2 is in beta — expect rough edges. Share feedback or report issues on Slack, or open one at https://github.com/langwatch/langwatch/issues/new/choose."
+                betaLabel="Beta"
+              />
+            )}
 
             <Text
               fontSize="11px"
@@ -388,6 +423,7 @@ export const MainMenu = React.memo(function MainMenu({
               />
             )}
             <SupportMenu showLabel={showExpanded} />
+            <PresenceToggle showLabel={showExpanded} />
             <ThemeToggle showLabel={showExpanded} />
           </VStack>
         </VStack>
@@ -404,8 +440,20 @@ const OpsSection = ({ showExpanded }: { showExpanded: boolean }) => {
   const isOnOpsRoute = router.pathname.startsWith("/ops");
   const shouldShow = hasAccess && (alwaysShow || isOnOpsRoute);
 
+  // Two-tier polling so the always-on global badge doesn't drag the full
+  // dashboard aggregation into every tRPC batch. tRPC's `httpBatchLink`
+  // bundles multiple queries that fire in the same ~10ms window into one
+  // HTTP request and waits on every procedure before responding — so a
+  // slow `getDashboardSnapshot` call running in the background here would
+  // stall every page-level query batched alongside it. Off-route we ask
+  // only for the two integers the badge renders; on-route we lift to the
+  // full snapshot since the user actually wants the data.
+  const opsBadge = api.ops.getBadgeCounts.useQuery(undefined, {
+    enabled: shouldShow && !isOnOpsRoute,
+    refetchInterval: 60000,
+  });
   const opsData = api.ops.getDashboardSnapshot.useQuery(undefined, {
-    enabled: shouldShow,
+    enabled: shouldShow && isOnOpsRoute,
     refetchInterval: 10000,
   });
 
@@ -422,10 +470,15 @@ const OpsSection = ({ showExpanded }: { showExpanded: boolean }) => {
 
   if (!shouldShow) return null;
 
-  const blockedCount =
-    opsData.data?.queues.reduce((sum, q) => sum + q.blockedGroupCount, 0) ?? 0;
-  const dlqCount =
-    opsData.data?.queues.reduce((sum, q) => sum + q.dlqCount, 0) ?? 0;
+  // On-route: derive from the full snapshot the dashboard already loaded.
+  // Off-route: read from the lightweight badge counts. Either way the
+  // badge stays in sync.
+  const blockedCount = isOnOpsRoute
+    ? opsData.data?.queues.reduce((sum, q) => sum + q.blockedGroupCount, 0) ?? 0
+    : opsBadge.data?.blockedCount ?? 0;
+  const dlqCount = isOnOpsRoute
+    ? opsData.data?.queues.reduce((sum, q) => sum + q.dlqCount, 0) ?? 0
+    : opsBadge.data?.dlqCount ?? 0;
 
   return (
     <>
@@ -493,6 +546,8 @@ type PageMenuLinkProps = {
   badgeNumber?: number;
   isActive: boolean;
   showLabel?: boolean;
+  beta?: string | boolean;
+  betaLabel?: string;
 };
 
 const PageMenuLink = ({
@@ -503,6 +558,8 @@ const PageMenuLink = ({
   badgeNumber,
   isActive,
   showLabel = true,
+  beta,
+  betaLabel,
 }: PageMenuLinkProps) => {
   const { isTableView } = useTableView();
 
@@ -524,6 +581,8 @@ const PageMenuLink = ({
       isActive={isActive}
       badgeNumber={badgeNumber}
       showLabel={showLabel}
+      beta={beta}
+      betaLabel={betaLabel}
     />
   );
 };

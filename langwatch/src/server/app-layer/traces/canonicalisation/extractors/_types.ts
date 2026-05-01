@@ -6,7 +6,10 @@
  * interface.
  */
 
-import type { NormalizedAttributes, NormalizedSpan } from "../../../../event-sourcing/pipelines/trace-processing/schemas/spans";
+import type {
+  NormalizedAttributes,
+  NormalizedSpan,
+} from "../../../../event-sourcing/pipelines/trace-processing/schemas/spans";
 import type { SpanDataBag } from "../spanDataBag";
 
 /**

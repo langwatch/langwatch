@@ -4,7 +4,8 @@ import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
 import { EVALUATION_PROJECTION_VERSIONS } from "~/server/event-sourcing/pipelines/evaluation-processing/schemas/constants";
 import { IdUtils } from "~/server/event-sourcing/pipelines/evaluation-processing/utils/id.utils";
 import { createLogger } from "~/utils/logger/server";
-import type { EvaluationRunData } from "../types";
+import { validateBatchTenants } from "../../_shared/clickhouse-batch";
+import type { EvalSummary, EvaluationRunData } from "../types";
 import type { EvaluationRunRepository } from "./evaluation-run.repository";
 
 const TABLE_NAME = "evaluation_runs" as const;
@@ -39,12 +40,12 @@ interface ClickHouseEvaluationRunRecord {
   CompletedAt: number | null;
   CostId: string | null;
   LastProcessedEventId: string;
-  LastEventOccurredAt: number;
+  lastEventOccurredAt: number;
 }
 
 type ClickHouseEvaluationRunWriteRecord = WithDateWrites<
   ClickHouseEvaluationRunRecord,
-  "CreatedAt" | "UpdatedAt" | "ArchivedAt" | "ScheduledAt" | "StartedAt" | "CompletedAt" | "LastEventOccurredAt"
+  "CreatedAt" | "UpdatedAt" | "ArchivedAt" | "ScheduledAt" | "StartedAt" | "CompletedAt" | "lastEventOccurredAt"
 >;
 
 export class EvaluationRunClickHouseRepository
@@ -98,19 +99,10 @@ export class EvaluationRunClickHouseRepository
   ): Promise<void> {
     if (entries.length === 0) return;
 
-    const tenantId = entries[0]!.tenantId;
-    EventUtils.validateTenantId(
-      { tenantId },
+    const tenantId = validateBatchTenants(
+      entries,
       "EvaluationRunClickHouseRepository.upsertBatch",
     );
-
-    const mixedTenant = entries.find((e) => e.tenantId !== tenantId);
-    if (mixedTenant) {
-      throw new Error(
-        `Mixed tenants in upsertBatch: expected ${tenantId}, got ${mixedTenant.tenantId}. ` +
-        `Each batch must contain a single tenant to ensure correct DB routing.`,
-      );
-    }
 
     try {
       const client = await this.resolveClient(tenantId);
@@ -206,11 +198,13 @@ export class EvaluationRunClickHouseRepository
           FROM ${TABLE_NAME} AS t
           WHERE t.TenantId = {tenantId:String}
             AND t.EvaluationId = {evaluationId:String}
+            AND t.ScheduledAt >= now() - INTERVAL 7 DAY
             AND (t.TenantId, t.EvaluationId, t.UpdatedAt) IN (
               SELECT TenantId, EvaluationId, max(UpdatedAt)
               FROM ${TABLE_NAME}
               WHERE TenantId = {tenantId:String}
                 AND EvaluationId = {evaluationId:String}
+                AND ScheduledAt >= now() - INTERVAL 7 DAY
               GROUP BY TenantId, EvaluationId
             )
           LIMIT 1
@@ -230,6 +224,180 @@ export class EvaluationRunClickHouseRepository
       logger.error(
         { tenantId, evaluationId, error: errorMessage },
         "Failed to get evaluation run from ClickHouse",
+      );
+      throw error;
+    }
+  }
+
+  async findByTraceId(
+    tenantId: string,
+    traceId: string,
+  ): Promise<EvaluationRunData[]> {
+    EventUtils.validateTenantId(
+      { tenantId },
+      "EvaluationRunClickHouseRepository.findByTraceId",
+    );
+
+    try {
+      const client = await this.resolveClient(tenantId);
+      const result = await client.query({
+        query: `
+          SELECT
+            ProjectionId,
+            TenantId,
+            EvaluationId,
+            Version,
+            EvaluatorId,
+            EvaluatorType,
+            EvaluatorName,
+            TraceId,
+            IsGuardrail,
+            Status,
+            Score,
+            Passed,
+            Label,
+            Details,
+            Inputs,
+            Error,
+            ErrorDetails,
+            toUnixTimestamp64Milli(CreatedAt) AS CreatedAt,
+            toUnixTimestamp64Milli(UpdatedAt) AS UpdatedAt,
+            toUnixTimestamp64Milli(ArchivedAt) AS ArchivedAt,
+            toUnixTimestamp64Milli(ScheduledAt) AS ScheduledAt,
+            toUnixTimestamp64Milli(StartedAt) AS StartedAt,
+            toUnixTimestamp64Milli(CompletedAt) AS CompletedAt,
+            CostId,
+            LastProcessedEventId,
+            toUnixTimestamp64Milli(LastEventOccurredAt) AS LastEventOccurredAt
+          FROM ${TABLE_NAME}
+          WHERE TenantId = {tenantId:String}
+            AND ScheduledAt >= now() - INTERVAL 7 DAY
+            AND TraceId = {traceId:String}
+            AND (TenantId, EvaluationId, UpdatedAt) IN (
+              SELECT TenantId, EvaluationId, max(UpdatedAt)
+              FROM ${TABLE_NAME}
+              WHERE TenantId = {tenantId:String}
+                AND ScheduledAt >= now() - INTERVAL 7 DAY
+                AND TraceId = {traceId:String}
+              GROUP BY TenantId, EvaluationId
+            )
+          ORDER BY UpdatedAt DESC
+        `,
+        query_params: { tenantId, traceId },
+        format: "JSONEachRow",
+      });
+
+      const rows = await result.json<ClickHouseEvaluationRunRecord>();
+      // Dedup is enforced by the IN-tuple subquery on (EvaluationId, max(UpdatedAt))
+      // — heavy columns (Inputs/Details/ErrorDetails) are only materialized for
+      // the surviving rows, not for every duplicate.
+      return rows.map((row) => this.fromClickHouseRecord(row));
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      logger.error(
+        { tenantId, traceId, error: errorMessage },
+        "Failed to find evaluation runs by trace ID in ClickHouse",
+      );
+      throw error;
+    }
+  }
+
+  async findSummariesByTraceIds(
+    tenantId: string,
+    traceIds: string[],
+    since: number,
+  ): Promise<Record<string, EvalSummary[]>> {
+    if (traceIds.length === 0) return {};
+
+    EventUtils.validateTenantId(
+      { tenantId },
+      "EvaluationRunClickHouseRepository.findSummariesByTraceIds",
+    );
+
+    try {
+      const client = await this.resolveClient(tenantId);
+      const result = await client.query({
+        query: `
+          SELECT
+            EvaluationId,
+            EvaluatorId,
+            EvaluatorType,
+            EvaluatorName,
+            TraceId,
+            IsGuardrail,
+            Status,
+            Score,
+            Passed,
+            Label
+          FROM ${TABLE_NAME}
+          WHERE TenantId = {tenantId:String}
+            AND ScheduledAt >= fromUnixTimestamp64Milli({since:Int64})
+            AND TraceId IN ({traceIds:Array(String)})
+            AND (TenantId, EvaluationId, UpdatedAt) IN (
+              SELECT TenantId, EvaluationId, max(UpdatedAt)
+              FROM ${TABLE_NAME}
+              WHERE TenantId = {tenantId:String}
+                AND ScheduledAt >= fromUnixTimestamp64Milli({since:Int64})
+                AND TraceId IN ({traceIds:Array(String)})
+              GROUP BY TenantId, EvaluationId
+            )
+          ORDER BY UpdatedAt DESC
+        `,
+        query_params: { tenantId, traceIds, since },
+        format: "JSONEachRow",
+      });
+
+      interface SlimRow {
+        EvaluationId: string;
+        EvaluatorId: string;
+        EvaluatorType: string;
+        EvaluatorName: string | null;
+        TraceId: string | null;
+        IsGuardrail: number;
+        Status: string;
+        Score: number | null;
+        Passed: number | null;
+        Label: string | null;
+      }
+
+      const rows = await result.json<SlimRow>();
+
+      const byTrace: Record<string, EvalSummary[]> = {};
+
+      // Dedup is now enforced by the IN-tuple subquery — no JS-side `seen` set.
+      for (const row of rows) {
+        const traceId = row.TraceId;
+        if (!traceId) continue;
+
+        const summary: EvalSummary = {
+          evaluationId: row.EvaluationId,
+          evaluatorId: row.EvaluatorId,
+          evaluatorType: row.EvaluatorType,
+          evaluatorName: row.EvaluatorName,
+          traceId,
+          isGuardrail: !!row.IsGuardrail,
+          status: row.Status as EvalSummary["status"],
+          score: row.Score,
+          passed: row.Passed === null ? null : !!row.Passed,
+          label: row.Label,
+        };
+
+        const arr = byTrace[traceId];
+        if (arr) {
+          arr.push(summary);
+        } else {
+          byTrace[traceId] = [summary];
+        }
+      }
+
+      return byTrace;
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      logger.error(
+        { tenantId, traceIdCount: traceIds.length, error: errorMessage },
+        "Failed to find evaluation summaries by trace IDs in ClickHouse",
       );
       throw error;
     }
@@ -257,7 +425,7 @@ export class EvaluationRunClickHouseRepository
       errorDetails: record.ErrorDetails,
       createdAt: Number(record.CreatedAt),
       updatedAt: Number(record.UpdatedAt),
-      lastEventOccurredAt: Number(record.LastEventOccurredAt ?? 0),
+      lastEventOccurredAt: Number(record.lastEventOccurredAt ?? 0),
       archivedAt: record.ArchivedAt === null ? null : Number(record.ArchivedAt),
       scheduledAt:
         record.ScheduledAt === null ? null : Number(record.ScheduledAt),
@@ -294,7 +462,7 @@ export class EvaluationRunClickHouseRepository
       ErrorDetails: data.errorDetails,
       CreatedAt: new Date(data.createdAt),
       UpdatedAt: new Date(data.updatedAt),
-      LastEventOccurredAt: data.lastEventOccurredAt ? new Date(data.lastEventOccurredAt) : new Date(0),
+      lastEventOccurredAt: data.lastEventOccurredAt ? new Date(data.lastEventOccurredAt) : new Date(0),
       ArchivedAt: data.archivedAt != null ? new Date(data.archivedAt) : null,
       ScheduledAt: new Date(data.scheduledAt ?? data.createdAt),
       StartedAt: data.startedAt != null ? new Date(data.startedAt) : null,

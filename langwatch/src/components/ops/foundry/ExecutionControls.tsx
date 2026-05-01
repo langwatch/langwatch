@@ -5,7 +5,7 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useTraceStore } from "./traceStore";
 import { useExecutionStore } from "./executionStore";
 import { useFoundryProjectStore } from "./foundryProjectStore";
-import { executeTrace } from "./traceExecutor";
+import { getFoundryExecutor } from "./traceExecutor";
 
 export function ExecutionControls({ compact = false }: { compact?: boolean }) {
   const { batchCount, staggerMs, running, setBatchCount, setStaggerMs, setRunning, addLogEntry, updateLogEntry } = useExecutionStore();
@@ -17,22 +17,27 @@ export function ExecutionControls({ compact = false }: { compact?: boolean }) {
   async function handleSend() {
     if (running || !apiKey) return;
     setRunning(true);
-    for (let i = 0; i < batchCount; i++) {
-      const logId = `log-${Date.now()}-${i}`;
-      addLogEntry({ id: logId, traceId: logId, timestamp: Date.now(), status: "pending" });
-      try {
-        const traceId = await executeTrace({
-          trace,
-          apiKey,
-          endpoint: window.location.origin,
-        });
-        updateLogEntry(logId, { status: "success", traceId });
-      } catch (err) {
-        updateLogEntry(logId, { status: "error", error: err instanceof Error ? err.message : "Send failed" });
+    const executor = getFoundryExecutor({
+      apiKey,
+      endpoint: window.location.origin,
+      projectId: project?.id,
+      resourceAttributes: trace.resourceAttributes,
+    });
+    try {
+      for (let i = 0; i < batchCount; i++) {
+        const logId = `log-${Date.now()}-${i}`;
+        addLogEntry({ id: logId, traceId: logId, timestamp: Date.now(), status: "pending" });
+        try {
+          const traceId = await executor.executeTrace(trace);
+          updateLogEntry(logId, { status: "success", traceId });
+        } catch (err) {
+          updateLogEntry(logId, { status: "error", error: err instanceof Error ? err.message : "Send failed" });
+        }
+        if (staggerMs > 0 && i < batchCount - 1) await new Promise((r) => setTimeout(r, staggerMs));
       }
-      if (staggerMs > 0 && i < batchCount - 1) await new Promise((r) => setTimeout(r, staggerMs));
+    } finally {
+      setRunning(false);
     }
-    setRunning(false);
   }
 
   return (

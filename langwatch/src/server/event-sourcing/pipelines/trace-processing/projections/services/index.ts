@@ -12,3 +12,5 @@ export {
   OUTPUT_SOURCE,
 } from "./trace-io-accumulation.service";
 export { ScenarioRoleCostService } from "./scenario-role-cost.service";
+export { accumulateEvents } from "./trace-event-accumulation.service";
+export { TracePromptAccumulationService } from "./trace-prompt-accumulation.service";

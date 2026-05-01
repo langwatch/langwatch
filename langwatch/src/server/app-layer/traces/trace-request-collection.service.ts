@@ -2,8 +2,10 @@ import { SpanKind as ApiSpanKind } from "@opentelemetry/api";
 import type { IExportTraceServiceRequest } from "@opentelemetry/otlp-transformer";
 import { getLangWatchTracer } from "langwatch";
 import { createLogger } from "~/utils/logger/server";
-import type { PIIRedactionLevel } from "../../event-sourcing/pipelines/trace-processing/schemas/commands";
-import type { RecordSpanCommandData } from "../../event-sourcing/pipelines/trace-processing/schemas/commands";
+import type {
+  PIIRedactionLevel,
+  RecordSpanCommandData,
+} from "../../event-sourcing/pipelines/trace-processing/schemas/commands";
 import {
   instrumentationScopeSchema,
   type OtlpSpan,
@@ -12,6 +14,7 @@ import {
 } from "../../event-sourcing/pipelines/trace-processing/schemas/otlp";
 import { TraceRequestUtils } from "../../event-sourcing/pipelines/trace-processing/utils/traceRequest.utils";
 import type { SpanDedupService } from "./span-dedupe.service";
+
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 const SPAN_MAX_PAST_MS = 31 * ONE_DAY_MS;
 
@@ -123,10 +126,18 @@ export class TraceRequestCollectionService {
               });
 
               switch (result.status) {
-                case "collected": collectedSpanCount++; break;
-                case "dropped":   droppedSpanCount++;   break;
-                case "deduped":   dedupedSpanCount++;   break;
-                case "failed":    ingestionFailureCount++; break;
+                case "collected":
+                  collectedSpanCount++;
+                  break;
+                case "dropped":
+                  droppedSpanCount++;
+                  break;
+                case "deduped":
+                  dedupedSpanCount++;
+                  break;
+                case "failed":
+                  ingestionFailureCount++;
+                  break;
               }
               if (result.error) {
                 errors.push(result.error);
@@ -159,11 +170,18 @@ export class TraceRequestCollectionService {
   }: {
     tenantId: string;
     otelSpan: unknown;
-    resource: import("../../event-sourcing/pipelines/trace-processing/schemas/otlp").OtlpResource | null;
-    scope: import("../../event-sourcing/pipelines/trace-processing/schemas/otlp").OtlpInstrumentationScope | null;
+    resource:
+      | import("../../event-sourcing/pipelines/trace-processing/schemas/otlp").OtlpResource
+      | null;
+    scope:
+      | import("../../event-sourcing/pipelines/trace-processing/schemas/otlp").OtlpInstrumentationScope
+      | null;
     piiRedactionLevel: PIIRedactionLevel;
     otelSpanRef: import("@opentelemetry/api").Span;
-  }): Promise<{ status: "collected" | "dropped" | "deduped" | "failed"; error?: string }> {
+  }): Promise<{
+    status: "collected" | "dropped" | "deduped" | "failed";
+    error?: string;
+  }> {
     const spanParseResult = spanSchema.safeParse(otelSpan);
     if (!spanParseResult.success) {
       this.logger.warn(
@@ -179,12 +197,17 @@ export class TraceRequestCollectionService {
     }
 
     const startTimeUnixMs = TraceRequestUtils.convertUnixNanoToUnixMs(
-      TraceRequestUtils.normalizeOtlpUnixNano(spanParseResult.data.startTimeUnixNano),
+      TraceRequestUtils.normalizeOtlpUnixNano(
+        spanParseResult.data.startTimeUnixNano,
+      ),
     );
     const now = Date.now();
 
     if (startTimeUnixMs < now - SPAN_MAX_PAST_MS) {
-      return { status: "dropped", error: "span start time is more than 31 days in the past" };
+      return {
+        status: "dropped",
+        error: "span start time is more than 31 days in the past",
+      };
     }
 
     const normalizedSpan = normalizeSpanIds(spanParseResult.data);
@@ -227,8 +250,7 @@ export class TraceRequestCollectionService {
       }
 
       otelSpanRef.addEvent("span_ingestion_error", {
-        "error.message":
-          error instanceof Error ? error.message : String(error),
+        "error.message": error instanceof Error ? error.message : String(error),
         "tenant.id": tenantId,
       });
       this.logger.error(
