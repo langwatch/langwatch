@@ -193,7 +193,7 @@ wheels = [
 
 [[package]]
 name = "arize-phoenix"
-version = "12.33.1"
+version = "14.6.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aioitertools" },
@@ -211,23 +211,26 @@ dependencies = [
     { name = "httpx" },
     { name = "jinja2" },
     { name = "jmespath" },
+    { name = "jsonpath-ng" },
+    { name = "jsonschema" },
     { name = "ldap3" },
     { name = "numpy" },
     { name = "openinference-instrumentation" },
+    { name = "openinference-instrumentation-openai" },
     { name = "openinference-semantic-conventions" },
     { name = "opentelemetry-exporter-otlp" },
     { name = "opentelemetry-proto" },
     { name = "opentelemetry-sdk" },
-    { name = "opentelemetry-semantic-conventions" },
     { name = "orjson" },
     { name = "pandas" },
     { name = "prometheus-client" },
-    { name = "protobuf" },
     { name = "psutil" },
     { name = "pyarrow" },
     { name = "pydantic" },
+    { name = "pystache" },
     { name = "python-dateutil" },
     { name = "python-multipart" },
+    { name = "pyyaml" },
     { name = "scikit-learn" },
     { name = "scipy" },
     { name = "sqlalchemy", extra = ["asyncio"] },
@@ -239,14 +242,14 @@ dependencies = [
     { name = "uvicorn" },
     { name = "wrapt" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/94/9a/2bd87e148d962c9482c54f1ba4cd38396a839d908d2bc8b07da5e12f222b/arize_phoenix-12.33.1.tar.gz", hash = "sha256:40d7afd9755796bf089ef2db6798dbca147ae623198dcfadea004e244679ec79", size = 2393634, upload-time = "2026-01-30T03:14:20.314Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/94/27/ed9f1e257e978a4e6c2599094501c3eee5eaa2e1c73ccf34c90dba714b84/arize_phoenix-14.6.0.tar.gz", hash = "sha256:0203f5d0a2a94be60f5ca964f8f0b6cb1509b3ea7f123edad9269bcff28d9a38", size = 4696859, upload-time = "2026-04-15T16:17:31.592Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/71/48/1202e20a0a9989f4d5089fc56be58f912d6bd3562a9c7bc41089b8ddb9ac/arize_phoenix-12.33.1-py3-none-any.whl", hash = "sha256:b4a937894d2b259d4d4bdbb81340c64325300833e5728712f12b191a26f84f97", size = 2619811, upload-time = "2026-01-30T03:14:17.919Z" },
+    { url = "https://files.pythonhosted.org/packages/7d/17/68b2a8784353ba583c57e00629921313ada6f0065ca829caa74dd56060bd/arize_phoenix-14.6.0-py3-none-any.whl", hash = "sha256:9be8909a7c5c7807910becf6c1f1f7cdadf45eeaf59b9a7a22cef22e686ce47b", size = 5033664, upload-time = "2026-04-15T16:17:29.737Z" },
 ]
 
 [[package]]
 name = "arize-phoenix-client"
-version = "1.28.0"
+version = "2.6.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "httpx" },
@@ -257,14 +260,14 @@ dependencies = [
     { name = "tqdm" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/be/10/96f9dcb987630c21d376ab3c66307f11cb6d1f303e4dcbe56de3f8ad9ebb/arize_phoenix_client-1.28.0.tar.gz", hash = "sha256:014f3661e11d9adfbb1680278e9cfe01243e579a7c969a1fe178912afb3d58ee", size = 142706, upload-time = "2026-01-21T07:13:21.326Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/41/cf/082cbe58621a8327f18ed0f6c947eb70a60cec58fca288ba01c7edfc5103/arize_phoenix_client-2.6.0.tar.gz", hash = "sha256:fff19c3403f1876dff78a8cb659fae50b714ae7100a3fa65c665b08f4672cca6", size = 187144, upload-time = "2026-04-29T23:28:33.935Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/2c/0d/b68db9a21d7ced1bfe89561bc2481bf5a427963b9f7aad730bcde7d78fd3/arize_phoenix_client-1.28.0-py3-none-any.whl", hash = "sha256:a69f0d7667a8c0ff194b0304ba9b05f59c7b3b4f8167fd43f2d7a3363e7b004b", size = 149498, upload-time = "2026-01-21T07:13:19.92Z" },
+    { url = "https://files.pythonhosted.org/packages/1b/fa/039ea48e474613483102ead5536f5f4eae1b2cb9c8b735a935fa1f163561/arize_phoenix_client-2.6.0-py3-none-any.whl", hash = "sha256:5c6912e7d97515ca83fcef96898a9319045cdb3844b588822d540b503feeead8", size = 180156, upload-time = "2026-04-29T23:28:32.654Z" },
 ]
 
 [[package]]
 name = "arize-phoenix-evals"
-version = "2.9.0"
+version = "3.0.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "jsonpath-ng" },
@@ -277,14 +280,14 @@ dependencies = [
     { name = "tqdm" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/c7/f3/80d6157fc07f5a6bab6359cd34ebb7d18dc4c43d35d25438215b50101de2/arize_phoenix_evals-2.9.0.tar.gz", hash = "sha256:adc7f45d9ceaf9b0d8785aa94373eeb8d073f43f471c42c64a1d83d5ba1dc716", size = 117742, upload-time = "2026-02-03T04:11:05.966Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/99/32/46cd1615471c7d6159057b90d5c5b142bce0d949eba263e47bf1afbdf48e/arize_phoenix_evals-3.0.0.tar.gz", hash = "sha256:a131da035e029732f2e5ef99344d4bb01212fafc52e8830f80ddf6d6162299d9", size = 79207, upload-time = "2026-04-07T17:14:53.166Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/72/0f/1e091d6446840f28aca0eeda0c741a17c86c766045c73c0dd07bfa504191/arize_phoenix_evals-2.9.0-py3-none-any.whl", hash = "sha256:ed63891187fd71730d57e5c27f416fbfdb9c977d2bc996b47c1dd36c8493b499", size = 169650, upload-time = "2026-02-03T04:11:04.355Z" },
+    { url = "https://files.pythonhosted.org/packages/5b/08/bb2bda11ddd756e4f9d3940590766f5822e769677841ccff7eabff360eac/arize_phoenix_evals-3.0.0-py3-none-any.whl", hash = "sha256:0bfe48e6edd9bbb7fa6609814e4ff19f0c2d16222bbd20dc3a89534602874ba2", size = 115196, upload-time = "2026-04-07T17:14:51.416Z" },
 ]
 
 [[package]]
 name = "arize-phoenix-otel"
-version = "0.14.0"
+version = "0.16.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "openinference-instrumentation" },
@@ -296,9 +299,9 @@ dependencies = [
     { name = "typing-extensions" },
     { name = "wrapt" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/7c/17/ebd502f1bd8a0a6087ea28be8de8b765bcf34fb1b9bc4d6fd6d91bd822f1/arize_phoenix_otel-0.14.0.tar.gz", hash = "sha256:ad1368f0f52c242591ec554cedeccf718abda81383cf8c8d3ade218a7b20b955", size = 20155, upload-time = "2025-11-19T19:48:29.447Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/49/c8/f59e45a45ea25af242cc3726af2976787074e68101d44f8ae5501163dec0/arize_phoenix_otel-0.16.0.tar.gz", hash = "sha256:9436595f3cdff919d45a8cfd0acbd69b0821f836e913b5279bac50a90be832c2", size = 20875, upload-time = "2026-04-24T17:52:51.505Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/c0/be/e7ddb54c4ad6115d2d468b71e90d7a2718735fd217f05c50759799191bfe/arize_phoenix_otel-0.14.0-py3-none-any.whl", hash = "sha256:47bf5563b9342a931385a16609ca83ada44d56a00bf6ed3be199226792b9937f", size = 17708, upload-time = "2025-11-19T19:48:28.252Z" },
+    { url = "https://files.pythonhosted.org/packages/43/6f/593f8df242ff66e3b908ce9117edde0b5ae1f624704283e12256bbb6ad25/arize_phoenix_otel-0.16.0-py3-none-any.whl", hash = "sha256:c3c455cccb583d25f1976ad56f973e12506eec9d86f2c35f2bd6c17ccfaa9943", size = 17992, upload-time = "2026-04-24T17:52:50.153Z" },
 ]
 
 [[package]]
@@ -962,17 +965,18 @@ wheels = [
 
 [[package]]
 name = "fastapi"
-version = "0.128.0"
+version = "0.136.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "annotated-doc" },
     { name = "pydantic" },
     { name = "starlette" },
     { name = "typing-extensions" },
+    { name = "typing-inspection" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/52/08/8c8508db6c7b9aae8f7175046af41baad690771c9bcde676419965e338c7/fastapi-0.128.0.tar.gz", hash = "sha256:1cc179e1cef10a6be60ffe429f79b829dce99d8de32d7acb7e6c8dfdf7f2645a", size = 365682, upload-time = "2025-12-27T15:21:13.714Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/5d/45/c130091c2dfa061bbfe3150f2a5091ef1adf149f2a8d2ae769ecaf6e99a2/fastapi-0.136.1.tar.gz", hash = "sha256:7af665ad7acfa0a3baf8983d393b6b471b9da10ede59c60045f49fbc89a0fa7f", size = 397448, upload-time = "2026-04-23T16:49:44.046Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/5c/05/5cbb59154b093548acd0f4c7c474a118eda06da25aa75c616b72d8fcd92a/fastapi-0.128.0-py3-none-any.whl", hash = "sha256:aebd93f9716ee3b4f4fcfe13ffb7cf308d99c9f3ab5622d8877441072561582d", size = 103094, upload-time = "2025-12-27T15:21:12.154Z" },
+    { url = "https://files.pythonhosted.org/packages/5a/ff/2e4eca3ade2c22fe1dea7043b8ee9dabe47753349eb1b56a202de8af6349/fastapi-0.136.1-py3-none-any.whl", hash = "sha256:a6e9d7eeada96c93a4d69cb03836b44fa34e2854accb7244a1ece36cd4781c3f", size = 117683, upload-time = "2026-04-23T16:49:42.437Z" },
 ]
 
 [[package]]
@@ -2556,18 +2560,6 @@ wheels = [
 ]
 
 [[package]]
-name = "lia-web"
-version = "0.3.1"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "cross-web" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/05/3d/7d574a7a5cf5fbc5fc09c07ea3696dd400353b7702bc009cf596b8c12035/lia_web-0.3.1.tar.gz", hash = "sha256:7f551269eddd729f1437e9341ad21622a849eb0c0975d9232ccbbaadbdc74c06", size = 2021, upload-time = "2025-12-25T20:41:51.195Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/a1/8b/b628fc18658f94b3d094708a18b71083cf47628e85cbc6b9edba54d5b2d7/lia_web-0.3.1-py3-none-any.whl", hash = "sha256:e4e6e7a9381e228aca60a6f3d67dbae9a5f4638eced242d931f95797ddba3f8b", size = 5933, upload-time = "2025-12-25T20:41:52.289Z" },
-]
-
-[[package]]
 name = "lingua-language-detector"
 version = "2.1.1"
 source = { registry = "https://pypi.org/simple" }
@@ -3171,6 +3163,24 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/1c/0e/814f43679ace2de68c4b91eab24db08623dc3da447cd935caca7205d3b65/openinference_instrumentation_dspy-0.1.33.tar.gz", hash = "sha256:b4079a564b2866dfb37c71a9ba36661b8312141959e1110eb13db27e248e2cd8", size = 26803, upload-time = "2026-01-08T03:52:04.056Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/03/3c/7695eb832ffe7667e07911ad8ca8e92520e5c91562809ebbc2d8e15409c3/openinference_instrumentation_dspy-0.1.33-py3-none-any.whl", hash = "sha256:a0713d6c49f3f0178ff11acbe36785f2c09fdffa46e6442ca1d1c38b96d97526", size = 15360, upload-time = "2026-01-08T03:52:01.67Z" },
+]
+
+[[package]]
+name = "openinference-instrumentation-openai"
+version = "0.1.45"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "openinference-instrumentation" },
+    { name = "openinference-semantic-conventions" },
+    { name = "opentelemetry-api" },
+    { name = "opentelemetry-instrumentation" },
+    { name = "opentelemetry-semantic-conventions" },
+    { name = "typing-extensions" },
+    { name = "wrapt" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/fb/07/3a57798ecb3c678771f56038fd131e32fdde877d9f6f3cd53b898c74733d/openinference_instrumentation_openai-0.1.45.tar.gz", hash = "sha256:5101894ad4840adcf4f07243438f035fab041395b983a53286cbcafe2b6f4058", size = 23375, upload-time = "2026-04-22T00:39:26.948Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/42/cd/40aa28a8aced7d356b6916e6f983814e97ac71ed12c8b89d84ef044c9f37/openinference_instrumentation_openai-0.1.45-py3-none-any.whl", hash = "sha256:48f25d61a578783633f2277d1678322f984929660a84be7cccebeaf32fe0b064", size = 30895, upload-time = "2026-04-22T00:39:25.871Z" },
 ]
 
 [[package]]
@@ -4706,18 +4716,18 @@ wheels = [
 
 [[package]]
 name = "strawberry-graphql"
-version = "0.287.3"
+version = "0.314.3"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
+    { name = "cross-web" },
     { name = "graphql-core" },
-    { name = "lia-web" },
     { name = "packaging" },
     { name = "python-dateutil" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/e5/45/5a466ecd7503ad165ed5050e694f3a871b4df085cfaff5c357259bef0ccc/strawberry_graphql-0.287.3.tar.gz", hash = "sha256:c81126cc75102aa32417048f074429d6c5c8d096424aa939fdb8827b8c5f84a9", size = 211998, upload-time = "2025-12-12T11:50:23.266Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/00/4d/df1240ee4d8fe925d0b6f0eff15cf9947f0345ab44c39eb58355b6026425/strawberry_graphql-0.314.3.tar.gz", hash = "sha256:2a841c35af61e9d5df1e215ca991cfac364c00a05fc192d9f38d0733da163097", size = 222131, upload-time = "2026-04-08T18:04:42.727Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/7c/8e/ffd20e179cc8218465599922660323f453c7b955aca2b909e5b86ba61eb0/strawberry_graphql-0.287.3-py3-none-any.whl", hash = "sha256:2bb1f9b122ef1213f82f01cf27a095eb0776fda78e12af9e60c54de6e543797c", size = 309183, upload-time = "2025-12-12T11:50:20.574Z" },
+    { url = "https://files.pythonhosted.org/packages/be/25/13773a2944cc5975d44db58233b3610ddc88d4be49e6576adf7ed4b62250/strawberry_graphql-0.314.3-py3-none-any.whl", hash = "sha256:4ef4442cea79014487acd7a0d1a2ce55c9d2a42dcd34a307d4c01f2ab477ecfa", size = 324471, upload-time = "2026-04-08T18:04:44.088Z" },
 ]
 
 [[package]]
