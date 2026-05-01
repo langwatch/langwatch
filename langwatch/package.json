@@ -218,7 +218,7 @@
     "react-international-phone": "^4.8.0",
     "react-markdown": "^9.1.0",
     "react-papaparse": "^4.4.0",
-    "react-resizable-panels": "^2.1.9",
+    "react-resizable-panels": "^4.10.0",
     "react-router": "^7.14.1",
     "react-select": "^5.10.2",
     "react-spinners": "^0.17.0",
