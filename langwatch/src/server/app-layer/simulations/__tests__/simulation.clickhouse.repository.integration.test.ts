@@ -740,6 +740,49 @@ describe("SimulationClickHouseRepository (integration)", () => {
       });
     });
 
+    describe("when a stale non-archived row coexists with a newer archived row for the same run", () => {
+      // Regression for the ReplacingMergeTree(UpdatedAt) dedup gap: without
+      // dedup, an older `ArchivedAt IS NULL` version would match the filter
+      // even after the latest version archived the run, re-dispatching
+      // deletions for already-archived runs.
+      it("treats the run as archived and does not return its id", async () => {
+        const setId = `set-dedup-${nanoid()}`;
+        const archivedRunId = `run-archived-stale-${nanoid()}`;
+        const sharedBatchId = `batch-${nanoid()}`;
+
+        // Older version: ArchivedAt IS NULL, lower UpdatedAt.
+        await insertRow(ch, makeInsertRow({
+          ScenarioRunId: archivedRunId,
+          ScenarioSetId: setId,
+          BatchRunId: sharedBatchId,
+          UpdatedAt: new Date(now - 10_000),
+          ArchivedAt: null,
+        }));
+        // Newer version (same dedup key): ArchivedAt set, higher UpdatedAt.
+        await insertRow(ch, makeInsertRow({
+          ScenarioRunId: archivedRunId,
+          ScenarioSetId: setId,
+          BatchRunId: sharedBatchId,
+          UpdatedAt: new Date(now),
+          ArchivedAt: new Date(now),
+        }));
+
+        // A second, currently-active run in the same set acts as a positive
+        // control — confirms the query is otherwise wired up correctly.
+        const activeRunId = `run-active-${nanoid()}`;
+        await insertRow(ch, makeInsertRow({
+          ScenarioRunId: activeRunId,
+          ScenarioSetId: setId,
+          ArchivedAt: null,
+        }));
+
+        const result = await repo.getRunIdsForSet({ projectId: tenantId, scenarioSetId: setId });
+
+        expect(result.runIds).toContain(activeRunId);
+        expect(result.runIds).not.toContain(archivedRunId);
+      });
+    });
+
     describe("when rows exist in another project", () => {
       it("does not return cross-project run ids", async () => {
         const sharedSetName = `set-cross-${nanoid()}`;

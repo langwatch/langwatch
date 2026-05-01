@@ -866,8 +866,20 @@ export class SimulationClickHouseRepository implements SimulationRepository {
   }): Promise<{ runIds: string[]; reachedCap: boolean }> {
     const client = await this.getClient(projectId);
     const scenarioSetIds = expandSetIdFilter(scenarioSetId);
+    // Dedup to the latest version per run before applying ArchivedAt IS NULL.
+    // simulation_runs is ReplacingMergeTree(UpdatedAt); without dedup, an
+    // older non-archived row can satisfy the filter even after the run was
+    // archived, re-dispatching deletions for already-archived runs.
     const result = await client.query({
-      query: `SELECT DISTINCT ScenarioRunId FROM ${TABLE_NAME} WHERE TenantId = {tenantId:String} AND ArchivedAt IS NULL AND ScenarioSetId IN ({scenarioSetIds:Array(String)}) LIMIT ${RUN_ID_CAP}`,
+      query: `SELECT DISTINCT ScenarioRunId
+              FROM ${TABLE_NAME}
+              WHERE TenantId = {tenantId:String}
+                AND ScenarioSetId IN ({scenarioSetIds:Array(String)})
+                AND ArchivedAt IS NULL
+                ${simulationRunDedupPredicate(
+                  "TenantId = {tenantId:String} AND ScenarioSetId IN ({scenarioSetIds:Array(String)})",
+                )}
+              LIMIT ${RUN_ID_CAP}`,
       query_params: { tenantId: projectId, scenarioSetIds },
       format: "JSONEachRow",
     });
