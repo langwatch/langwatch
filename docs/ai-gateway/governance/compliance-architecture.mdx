@@ -85,14 +85,33 @@ ClickHouse TTL policy honours the class. The retention class is **system-derived
 
 See [Per-origin retention](/ai-gateway/governance/retention) for the full retention contract.
 
-### 3. RBAC via project membership
+### 3. RBAC — permission-driven, not role-driven
 
-Two roles at org scope:
+LangWatch's RBAC layer (`langwatch/src/server/api/rbac.ts`) is the single source of truth for governance access. Permissions are the abstraction; role enums (`OrganizationUserRole.{ADMIN, MEMBER, EXTERNAL}`) are just default permission bags. Custom roles compose any subset via the existing `CustomRolePermissions` JSON column without requiring a Prisma enum change.
 
-- **Org admin** — full read/write on IngestionSource, AnomalyRule, retention config, OCSF export
-- **Auditor** (read-only) — read access across all governance projections + OCSF export, no write
+**Governance permissions catalog** (added in this PR):
 
-Both roles map onto project-membership of the hidden Governance Project. Members of customer-visible projects do NOT inherit governance read access (governance is an org-wide concern, not a per-project one). Enforced at every tRPC procedure + every REST adapter.
+| Resource | Actions | What it gates |
+|---|---|---|
+| `governance` | `view` / `manage` | Top-level Govern section visibility + governance dashboard read/write |
+| `ingestionSources` | `view` / `create` / `update` / `delete` / `manage` | IngestionSource composer + per-source detail page + secret rotation |
+| `anomalyRules` | `view` / `create` / `update` / `delete` / `manage` | AnomalyRule composer + alert review |
+| `complianceExport` | `view` only (read-only resource) | OCSF v1.1 read API for SIEM forwarding |
+| `activityMonitor` | `view` only (read-only resource) | Activity Monitor cross-source KPI dashboard |
+
+`complianceExport` and `activityMonitor` are flagged read-only in `permissionsConfig.ts` because their rows are derived from fold projections (`governance_ocsf_events` / `governance_kpis`), never created through endpoints.
+
+**Default role attachment**:
+
+- `ORGANIZATION_ADMIN` — full set (all `view` + `manage` actions across all 5 governance resources)
+- `ORGANIZATION_MEMBER` — none (chrome hides Govern by default)
+- `ORGANIZATION_EXTERNAL` — none (lite-tier billing scope; future derivation reads from billing state)
+
+**Custom-role delegation surface** is the production-shape mechanism for finer-grained access. Example: an org wanting a "security_analyst" role gets it via a custom role granting `governance:view` + `activityMonitor:view` + `anomalyRules:view` — read-only governance access for the security team without admin-level org management capability. Configurable through the existing Roles UI.
+
+**Chrome visibility gates**: `hasPermission('governance:view') && release_ui_ai_governance_enabled` for the Govern sidebar section; `hasPermission('virtualKeys:view') && release_ui_ai_gateway_menu_enabled` for the AI Gateway sidebar section. The feature flags are operator rollout knobs; the permissions are the audience predicate. Two flags preserve pilot flexibility — Gateway and Governance can roll out independently per @rchaves directive 2026-04-29.
+
+**tRPC + REST enforcement**: every governance procedure currently checks `organization:manage` (broad). Granularization to the new dedicated permissions (`governance:manage`, `ingestionSources:manage`, etc.) is a deferred follow-up — existing checks still work; the catalog addition unblocks the gate-side migration.
 
 ### 4. Org-tenancy isolation
 
