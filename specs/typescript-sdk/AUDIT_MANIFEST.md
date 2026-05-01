@@ -1,8 +1,8 @@
 # typescript-sdk audit manifest
 
-Bundle: tail-b. Tracking: #3458. See AUDIT_BRIEF.md for the contract.
+Bundle: tail-b. Tracking: #3458.
 
-Survey result: every scenario in this domain describes behaviour that already lives in `typescript-sdk/`, with vitest coverage in the matching `__tests__` directories. They are tagged unimpl. because no `@scenario <name>` JSDoc tag binds them to a test yet — Phase 3 will add the JSDoc binding (no new test code). One scenario covers behaviour that no longer matches the implementation and is marked UPDATE.
+Survey result: every scenario in this domain describes behaviour that already lives in `typescript-sdk/`, with vitest coverage in the matching `__tests__` directories. They are tagged unimplemented because no `@scenario <name>` JSDoc tag binds them to a test yet — Phase 3 will add the JSDoc binding (no new test code). One scenario covers behaviour that no longer matches the implementation and is marked UPDATE.
 
 | File | Scenario | Class | Rationale |
 |------|----------|-------|-----------|

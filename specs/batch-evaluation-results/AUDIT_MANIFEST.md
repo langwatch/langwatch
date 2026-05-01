@@ -1,8 +1,8 @@
 # batch-evaluation-results audit manifest
 
-Bundle: tail-b. Tracking: #3458. See AUDIT_BRIEF.md for the contract.
+Bundle: tail-b. Tracking: #3458.
 
-Survey result: every scenario describes behaviour that already lives in the platform. UI tables, CSV export, comparison mode, run sidebar, trace cost folding (reactor + projection), python SDK target metadata API, and read-time cost enrichment are all implemented with vitest/pytest coverage. They are tagged unimpl. because no `@scenario <name>` JSDoc/pytest doctstring tag binds them to a test yet — Phase 3 will add bindings. (run-comparison.feature already has bindings — zero rows here.)
+Survey result: every scenario describes behaviour that already lives in the platform. UI tables, CSV export, comparison mode, run sidebar, trace cost folding (reactor + projection), python SDK target metadata API, and read-time cost enrichment are all implemented with vitest/pytest coverage. They are tagged unimplemented because no `@scenario <name>` JSDoc / pytest docstring tag binds them to a test yet — Phase 3 will add bindings. (run-comparison.feature already has bindings — zero rows here.)
 
 | File | Scenario | Class | Rationale |
 |------|----------|-------|-----------|

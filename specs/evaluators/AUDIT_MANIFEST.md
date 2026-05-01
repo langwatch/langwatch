@@ -1,8 +1,8 @@
 # evaluators audit manifest
 
-Bundle: tail-b. Tracking: #3458. See AUDIT_BRIEF.md for the contract.
+Bundle: tail-b. Tracking: #3458.
 
-Survey result: every scenario describes behaviour that already lives in the platform with vitest/pytest coverage. They are tagged unimpl. because no `@scenario <name>` JSDoc tag binds them to a test yet — Phase 3 will add bindings.
+Survey result: every scenario describes behaviour that already lives in the platform with vitest/pytest coverage. They are tagged unimplemented because no `@scenario <name>` JSDoc tag binds them to a test yet — Phase 3 will add bindings.
 
 | File | Scenario | Class | Rationale |
 |------|----------|-------|-----------|
