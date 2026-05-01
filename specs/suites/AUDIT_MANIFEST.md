@@ -1,7 +1,6 @@
 # Suites domain — unimplemented scenario audit
 
 **Issue**: #3458
-**Plan**: ~/workspace/orchard-codex/plans/unimpl-reduction-2026-04-25.md
 **Branch**: `audit/unimpl-suites-2026-04-25`
 **Scope**: every scenario tagged unimplemented under `specs/suites/` (112 total).
 
