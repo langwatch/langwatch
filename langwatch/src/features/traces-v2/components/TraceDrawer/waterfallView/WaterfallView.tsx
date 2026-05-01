@@ -1,4 +1,4 @@
-import { Box, Flex, HStack, Icon, Text } from "@chakra-ui/react";
+import { Box, chakra, Flex, HStack, Icon, Text } from "@chakra-ui/react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import type React from "react";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -273,10 +273,10 @@ export const WaterfallView = memo(function WaterfallView({
                 }
                 positioning={{ placement: "top" }}
               >
-                <Flex
-                  as="button"
-                  align="center"
-                  justify="center"
+                <chakra.button
+                  display="flex"
+                  alignItems="center"
+                  justifyContent="center"
                   width="20px"
                   height="20px"
                   borderRadius="sm"
@@ -293,7 +293,7 @@ export const WaterfallView = memo(function WaterfallView({
                   aria-pressed={showOnlyLangwatch}
                 >
                   <Icon as={LuSparkles} boxSize={3} />
-                </Flex>
+                </chakra.button>
               </Tooltip>
             )}
             <ToolbarIconButton

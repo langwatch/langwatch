@@ -287,7 +287,9 @@ describe("TraceIOExtractionService", () => {
         const result = service.extractRichIOFromSpan(span, "input");
 
         expect(result).not.toBeNull();
-        expect(result!.text).toBe(JSON.stringify(payload));
+        expect(result!.text).toBe(
+          "I think you should have some options for me to easily select, like 1, 2, 3",
+        );
         expect(result!.source).toBe("langwatch");
       });
     });
@@ -308,7 +310,7 @@ describe("TraceIOExtractionService", () => {
     });
 
     describe("when langwatch.output is a JSON-encoded string with 'output' key", () => {
-      it("returns the raw string as-is (strings bypass heuristic extraction)", () => {
+      it("parses the JSON and extracts the output field", () => {
         const encoded = JSON.stringify({
           output: "The answer is 42",
           trace_id: "abc",
@@ -322,7 +324,7 @@ describe("TraceIOExtractionService", () => {
         const result = service.extractRichIOFromSpan(span, "output");
 
         expect(result).not.toBeNull();
-        expect(result!.text).toBe(encoded);
+        expect(result!.text).toBe("The answer is 42");
       });
     });
 

@@ -47,7 +47,7 @@ export const IsolatedErrorBoundary: React.FC<IsolatedErrorBoundaryProps> = ({
       // catch it even when no explicit telemetry hook is wired.
       // eslint-disable-next-line no-console
       console.error("[IsolatedErrorBoundary]", scope ?? "(no scope)", error);
-      onError?.(error, info);
+      onError?.(error as Error, info);
     }}
   >
     {children}

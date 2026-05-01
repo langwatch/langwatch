@@ -1,4 +1,4 @@
-import { Badge, Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
+import { Badge, Box, Button, chakra, HStack, Text, VStack } from "@chakra-ui/react";
 import { BookOpen } from "lucide-react";
 import type React from "react";
 import { useMemo } from "react";
@@ -234,8 +234,7 @@ const SuggestionRowView: React.FC<SuggestionRowProps> = ({
       : undefined;
 
   return (
-    <Box
-      as="button"
+    <chakra.button
       type="button"
       display="flex"
       alignItems="center"
@@ -286,7 +285,7 @@ const SuggestionRowView: React.FC<SuggestionRowProps> = ({
           {count}
         </Text>
       )}
-    </Box>
+    </chakra.button>
   );
 };
 

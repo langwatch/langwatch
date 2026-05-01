@@ -176,14 +176,14 @@ describe("parse operator matrix", () => {
       ["<", "cost:<5", ":<", 5],
       ["<=", "cost:<=5", ":<=", 5],
     ])("parses `%s` as a Tag with the matching liqe operator", (_, query, op, value) => {
-      const ast = parse(query) as { type: string; operator: { operator: string }; expression: { value: number } };
+      const ast = parse(query) as unknown as { type: string; operator: { operator: string }; expression: { value: number } };
       expect(ast.type).toBe("Tag");
       expect(ast.operator.operator).toBe(op);
       expect(ast.expression.value).toBe(value);
     });
 
     it("parses `>=` with a decimal value", () => {
-      const ast = parse("cost:>=0.05") as { expression: { value: number } };
+      const ast = parse("cost:>=0.05") as unknown as { expression: { value: number } };
       expect(ast.expression.value).toBe(0.05);
     });
 

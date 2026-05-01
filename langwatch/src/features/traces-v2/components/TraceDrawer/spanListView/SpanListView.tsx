@@ -1,4 +1,4 @@
-import { Box, Flex, HStack, Icon, Input, Text } from "@chakra-ui/react";
+import { Box, chakra, Flex, HStack, Icon, Input, Text } from "@chakra-ui/react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -288,9 +288,9 @@ export const SpanListView = memo(function SpanListView({
               content="Show only spans with LangWatch instrumentation (prompts, scenarios, evaluations, etc.)"
               positioning={{ placement: "top" }}
             >
-              <Flex
-                as="button"
-                align="center"
+              <chakra.button
+                display="flex"
+                alignItems="center"
                 gap={1}
                 paddingX={2}
                 height="20px"
@@ -324,7 +324,7 @@ export const SpanListView = memo(function SpanListView({
                     {signalsBySpanId.size}
                   </Text>
                 )}
-              </Flex>
+              </chakra.button>
             </Tooltip>
           )}
         </HStack>

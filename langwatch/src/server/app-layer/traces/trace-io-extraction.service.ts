@@ -546,13 +546,16 @@ function stringifyForText(value: unknown): string | null {
  * stays array; a JSON string is parsed-and-renormalized when possible,
  * otherwise returned unchanged).
  */
-function normalizeChatPayload(value: unknown): unknown {
+function normalizeChatPayload(
+  value: unknown,
+  seen: WeakSet<object> = new WeakSet(),
+): unknown {
   if (typeof value === "string") {
     const trimmed = value.trim();
     if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
       try {
         const parsed = JSON.parse(trimmed);
-        return normalizeChatPayload(parsed);
+        return normalizeChatPayload(parsed, seen);
       } catch {
         // not parseable JSON — leave the raw string alone
       }
@@ -560,9 +563,13 @@ function normalizeChatPayload(value: unknown): unknown {
     return value;
   }
   if (Array.isArray(value)) {
-    return value.map((item) => normalizeChatPayload(item));
+    if (seen.has(value)) return null;
+    seen.add(value);
+    return value.map((item) => normalizeChatPayload(item, seen));
   }
   if (value && typeof value === "object") {
+    if (seen.has(value as object)) return null;
+    seen.add(value as object);
     const obj = value as Record<string, unknown>;
     // If this object IS a content block whose `text` is a JSON-encoded
     // typed block (with a non-text inner `type`), replace it with the
@@ -580,17 +587,20 @@ function normalizeChatPayload(value: unknown): unknown {
           ) {
             // Recurse into the unwrapped block in case the inner shape
             // also has nested wrappers (e.g. tool_result.content).
-            return normalizeChatPayload(inner);
+            return normalizeChatPayload(inner, seen);
           }
         } catch {
           // not clean JSON — fall through and keep the text wrapper
         }
       }
+      // Text block that wasn't unwrapped: preserve `text` verbatim so
+      // user-pasted JSON-looking content stays as the original string.
+      return obj;
     }
     // Otherwise: walk every property, normalizing in place.
     const out: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(obj)) {
-      out[k] = normalizeChatPayload(v);
+      out[k] = normalizeChatPayload(v, seen);
     }
     return out;
   }

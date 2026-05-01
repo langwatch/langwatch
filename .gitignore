@@ -11,9 +11,12 @@ quickwit-*
 /service
 
 # ClickHouse local data (created by local dev CH instance)
-store/
-data/
-metadata/
+/store/
+/data/
+/metadata/
+/langwatch/store/
+/langwatch/data/
+/langwatch/metadata/
 __pycache__
 dist/
 

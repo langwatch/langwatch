@@ -110,7 +110,6 @@ export function BeadStrip({
             const dot = (
               <Box
                 as={onJump ? "button" : "span"}
-                type={onJump ? "button" : undefined}
                 aria-label={chapter.label}
                 aria-current={isCurrent ? "step" : undefined}
                 onClick={onJump ? () => onJump(chapter.id) : undefined}

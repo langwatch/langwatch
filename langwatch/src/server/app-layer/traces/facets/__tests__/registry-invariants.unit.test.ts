@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   FACET_REGISTRY,
   TABLE_TIME_COLUMNS,
+  type DynamicKeysDef,
   type FacetDefinition,
+  type QueryBuilderCategoricalDef,
 } from "../../facet-registry";
 import { SEARCH_FIELDS } from "../../query-language/metadata";
 
@@ -14,10 +16,8 @@ const baseCtx = {
 };
 
 const queryBuilders = FACET_REGISTRY.filter(
-  (def): def is Extract<
-    FacetDefinition,
-    { queryBuilder: (...args: unknown[]) => unknown }
-  > => "queryBuilder" in def && typeof def.queryBuilder === "function",
+  (def): def is QueryBuilderCategoricalDef | DynamicKeysDef =>
+    "queryBuilder" in def && typeof def.queryBuilder === "function",
 );
 
 describe("SearchBar / sidebar parity", () => {

@@ -58,7 +58,7 @@ export function getSuggestionState(
   // Open field-mode whenever the active token looks like an identifier in
   // progress. The dropdown is invisible when no field name matches, so this
   // adds discoverability without spamming the UI for free-text queries.
-  if (!hadSigil && !/^[a-zA-Z][\w]*$/.test(remaining)) {
+  if (!hadSigil && !/^[a-zA-Z][\w.]*$/.test(remaining)) {
     return { open: false };
   }
   return { open: true, mode: "field", query: remaining, tokenStart };

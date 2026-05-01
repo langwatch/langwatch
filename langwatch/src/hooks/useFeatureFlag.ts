@@ -7,7 +7,7 @@ import { api } from "../utils/api";
 // freshness gain. 5 min keeps kill-switch propagation reasonable for an
 // active session while eliminating the per-drawer-open / per-poll-tick
 // re-fetch storm we observed on /traces.
-const CLIENT_FLAG_STALE_TIME_MS = 5 * 60_000;
+export const CLIENT_FLAG_STALE_TIME_MS = 5 * 60_000;
 
 interface UseFeatureFlagOptions {
   projectId?: string;

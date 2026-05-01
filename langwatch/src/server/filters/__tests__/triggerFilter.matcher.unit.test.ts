@@ -601,6 +601,7 @@ describe("buildPreconditionTraceDataFromFoldState", () => {
   it("extracts custom metadata from langwatch.metadata.* legacy keys", () => {
     const foldState = {
       traceId: "trace-1",
+      traceName: "",
       spanCount: 1,
       totalDurationMs: 100,
       computedIOSchemaVersion: "1",
@@ -656,6 +657,7 @@ describe("buildPreconditionTraceDataFromFoldState", () => {
   it("extracts custom metadata from bare OTEL resource attributes", () => {
     const foldState = {
       traceId: "trace-1",
+      traceName: "",
       spanCount: 1,
       totalDurationMs: 100,
       computedIOSchemaVersion: "1",
@@ -711,6 +713,7 @@ describe("buildPreconditionTraceDataFromFoldState", () => {
   it("prefers canonical metadata.* over langwatch.metadata.* and bare keys", () => {
     const foldState = {
       traceId: "trace-1",
+      traceName: "",
       spanCount: 1,
       totalDurationMs: 100,
       computedIOSchemaVersion: "1",
@@ -764,6 +767,7 @@ describe("buildPreconditionTraceDataFromFoldState", () => {
   it("excludes standard OTEL bare-key prefixes from custom metadata", () => {
     const foldState = {
       traceId: "trace-1",
+      traceName: "",
       spanCount: 1,
       totalDurationMs: 100,
       computedIOSchemaVersion: "1",
@@ -818,6 +822,7 @@ describe("buildPreconditionTraceDataFromFoldState", () => {
   it("extracts fields from fold state attributes", () => {
     const foldState = {
       traceId: "trace-1",
+      traceName: "",
       spanCount: 3,
       totalDurationMs: 1000,
       computedIOSchemaVersion: "1",
@@ -887,6 +892,7 @@ describe("buildPreconditionTraceDataFromFoldState", () => {
   it("extracts events from hoisted fold state events", () => {
     const foldState = {
       traceId: "trace-1",
+      traceName: "",
       spanCount: 1,
       totalDurationMs: 100,
       computedIOSchemaVersion: "1",
