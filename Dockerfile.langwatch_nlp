@@ -17,7 +17,7 @@ COPY cmd ./cmd
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH:-amd64} \
     go build -ldflags="-s -w" -o /out/service ./cmd/service
 
-FROM python:3.12-slim
+FROM python:3.14-slim
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libsndfile1 \
