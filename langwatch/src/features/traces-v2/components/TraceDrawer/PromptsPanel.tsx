@@ -191,9 +191,9 @@ export function PromptsPanel({
         </Text>
       </Box>
 
-      {/* Selected / Last-used callouts. PRD-023 surfaces both as projected
-          columns on the trace summary, with their source SpanIds, so the
-          drawer can deep-link without re-walking spans. */}
+      {/* Selected / Last-used callouts. Both are projected onto the trace
+          summary with their source SpanIds, so the drawer can deep-link
+          without re-walking spans. */}
       {(trace.selectedPromptId || trace.lastUsedPromptId) && (
         <SelectedVsLastUsedCallout
           trace={trace}

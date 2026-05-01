@@ -171,6 +171,7 @@ export function CommandBar() {
     query,
     publicEnv.data?.IS_SAAS,
     project?.id,
+    publicEnv.data?.NODE_ENV === "development",
   );
   const filteredProjects = useFilteredProjects(
     query,

@@ -37,6 +37,7 @@ import { EvaluatorHistoryDrawer } from "./evaluators/EvaluatorHistoryDrawer";
 import { EvaluatorListDrawer } from "./evaluators/EvaluatorListDrawer";
 import { EvaluatorTypeSelectorDrawer } from "./evaluators/EvaluatorTypeSelectorDrawer";
 import { WorkflowSelectorForEvaluatorDrawer } from "./evaluators/WorkflowSelectorForEvaluatorDrawer";
+import { FeatureFlagsDrawer } from "./drawers/FeatureFlagsDrawer";
 import { SdkRadarDrawer } from "./drawers/SdkRadarDrawer";
 // Lazy-loaded: FoundryDrawer transitively imports the OTel SDK which has
 // side effects that break React if evaluated eagerly at app startup.
@@ -110,6 +111,8 @@ export const drawers = {
   guardrails: GuardrailsDrawer,
   // SDK Radar
   sdkRadar: SdkRadarDrawer,
+  // Dev tools
+  featureFlags: FeatureFlagsDrawer,
   // Ops
   foundry: FoundryDrawer,
 } satisfies Record<string, React.FC<any>>;

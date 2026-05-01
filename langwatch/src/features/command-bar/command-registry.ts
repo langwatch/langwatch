@@ -39,6 +39,7 @@ import {
   FolderKanban,
   UserCog,
   Building2,
+  ToggleLeft,
 } from "lucide-react";
 import type { Command } from "./types";
 
@@ -472,6 +473,23 @@ export const actionCommands: Command[] = [
     icon: Stethoscope,
     category: "actions",
     keywords: ["sdk", "version", "update", "outdated", "radar", "upgrade"],
+  },
+  {
+    id: "action-feature-flags",
+    label: "Feature Flags (Dev)",
+    description: "Toggle feature flag overrides for this browser",
+    icon: ToggleLeft,
+    category: "actions",
+    keywords: [
+      "feature",
+      "flag",
+      "flags",
+      "toggle",
+      "dev",
+      "override",
+      "experiment",
+      "release",
+    ],
   },
 ];
 

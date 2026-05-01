@@ -240,7 +240,7 @@ describe("getSuggestionState", () => {
   describe("given an existing dynamic-prefix attribute chip", () => {
     describe("when the cursor sits inside the value of trace.attribute.langwatch.origin", () => {
       it("opens in value mode for the full prefix-qualified field so the resolver can fetch values for that key", () => {
-        // This is the chip-edit bug from PRD review: `attribute.langwatch.origin:application`
+        // Chip-edit regression: `attribute.langwatch.origin:application`
         // with the cursor mid-value used to return empty suggestions because
         // the static FIELD_VALUES has no entry for the prefixed field.
         const text = "trace.attribute.langwatch.origin:application";

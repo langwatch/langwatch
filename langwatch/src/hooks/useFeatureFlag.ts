@@ -1,5 +1,6 @@
 import type { FrontendFeatureFlag } from "../server/featureFlag/frontendFeatureFlags";
 import { api } from "../utils/api";
+import { useFeatureFlagOverrides } from "./useFeatureFlagOverrides";
 
 // Client-side React Query staleTime — independent of the server-side
 // PostHog cache TTL. The server already short-circuits with its own 5s
@@ -70,6 +71,9 @@ export function useFeatureFlag(
 ): UseFeatureFlagResult {
   const queryEnabled = options?.enabled ?? true;
 
+  const overrides = useFeatureFlagOverrides();
+  const override = overrides[flag];
+
   const { data, isLoading } = api.featureFlag.isEnabled.useQuery(
     {
       flag,
@@ -79,7 +83,9 @@ export function useFeatureFlag(
     {
       staleTime: CLIENT_FLAG_STALE_TIME_MS,
       refetchOnWindowFocus: false,
-      enabled: queryEnabled,
+      // Skip the network call when an override is set — the override wins
+      // anyway, and we don't want a refetch storm while toggling in dev.
+      enabled: queryEnabled && override === undefined,
       // Flag checks are mounted at app shell (MainMenu, command bar) and fire
       // alongside the page's data queries. Without splitting, an in-flight
       // tracesV2.list (~1s) would block the menu from rendering its links —
@@ -88,6 +94,10 @@ export function useFeatureFlag(
       trpc: { context: { skipBatch: true } },
     },
   );
+
+  if (override !== undefined) {
+    return { enabled: override, isLoading: false };
+  }
 
   return {
     enabled: data?.enabled ?? false,

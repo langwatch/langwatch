@@ -1,3 +1,4 @@
+import { ToggleLeft } from "lucide-react";
 import { useMemo } from "react";
 import { useRouter } from "~/utils/compat/next-router";
 import type { Command } from "../types";
@@ -12,7 +13,12 @@ import { MIN_SEARCH_QUERY_LENGTH, MIN_CATEGORY_MATCH_LENGTH } from "../constants
 import { getPlanManagementUrl } from "~/hooks/usePlanManagementUrl";
 import { getPageCommands } from "../pageCommands";
 import { useFeatureFlag } from "~/hooks/useFeatureFlag";
+import {
+  setFeatureFlagOverride,
+  useFeatureFlagOverrides,
+} from "~/hooks/useFeatureFlagOverrides";
 import { useOpsPermission } from "~/hooks/useOpsPermission";
+import { FRONTEND_FEATURE_FLAGS } from "~/server/featureFlag/frontendFeatureFlags";
 
 export interface FilteredCommands {
   navigation: Command[];
@@ -30,6 +36,7 @@ export function useFilteredCommands(
   query: string,
   isSaas: boolean | undefined,
   projectId: string | undefined,
+  isDevMode: boolean,
 ): FilteredCommands {
   const { enabled: isDarkModeEnabled } = useFeatureFlag(
     "release_ui_dark_mode_enabled",
@@ -69,13 +76,50 @@ export function useFilteredCommands(
     return filterCommands(availableNavCommands, query);
   }, [query, availableNavCommands]);
 
-  const availableActionCommands = useMemo(
-    () =>
-      hasOpsAccess
-        ? actionCommands
-        : actionCommands.filter((cmd) => cmd.id !== "action-send-trace"),
-    [hasOpsAccess],
-  );
+  const featureFlagOverrides = useFeatureFlagOverrides();
+  const featureFlagToggleCommands = useMemo<Command[]>(() => {
+    if (!isDevMode) return [];
+    return FRONTEND_FEATURE_FLAGS.map((flag) => {
+      const current = featureFlagOverrides[flag];
+      const stateLabel =
+        current === undefined
+          ? "server-resolved"
+          : current
+            ? "forced ON"
+            : "forced OFF";
+      return {
+        id: `action-feature-flag-toggle:${flag}`,
+        label: `Toggle ${flag}`,
+        description: `Currently ${stateLabel} — cycles default → on → off`,
+        icon: ToggleLeft,
+        category: "actions",
+        keywords: [
+          "feature",
+          "flag",
+          "flags",
+          "toggle",
+          "dev",
+          "override",
+          flag,
+        ],
+        action: () => {
+          const next =
+            current === undefined ? true : current === true ? false : undefined;
+          setFeatureFlagOverride(flag, next);
+        },
+      };
+    });
+  }, [isDevMode, featureFlagOverrides]);
+
+  const availableActionCommands = useMemo(() => {
+    let commands = hasOpsAccess
+      ? actionCommands
+      : actionCommands.filter((cmd) => cmd.id !== "action-send-trace");
+    if (!isDevMode) {
+      commands = commands.filter((cmd) => cmd.id !== "action-feature-flags");
+    }
+    return [...commands, ...featureFlagToggleCommands];
+  }, [hasOpsAccess, isDevMode, featureFlagToggleCommands]);
 
   const filteredActions = useMemo(() => {
     if (!query.trim()) return [];
