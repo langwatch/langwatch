@@ -82,7 +82,7 @@ function createFoldState(
     updatedAt: FIXED_OCCURRED_AT_MS,
     attributes,
     ...overrides,
-  };
+  } as TraceSummaryData;
 }
 
 const event: TraceProcessingEvent = {

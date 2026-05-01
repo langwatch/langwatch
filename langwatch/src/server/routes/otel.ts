@@ -7,6 +7,8 @@
  * - POST /api/otel/v1/metrics
  */
 import { SpanKind, SpanStatusCode } from "@opentelemetry/api";
+import type { IExportTraceServiceRequest } from "@opentelemetry/otlp-transformer";
+import * as root from "@opentelemetry/otlp-transformer/build/src/generated/root";
 import { getLangWatchTracer } from "langwatch";
 import { Hono } from "hono";
 import { loggerMiddleware } from "~/app/api/middleware/logger";
@@ -29,6 +31,9 @@ import {
 import { decodeBase64OpenTelemetryId } from "~/server/tracer/utils";
 import { createLogger } from "~/utils/logger/server";
 import { captureException } from "~/utils/posthogErrorCapture";
+
+const traceRequestType = (root as any).opentelemetry.proto.collector.trace.v1
+  .ExportTraceServiceRequest;
 
 const loggerTraces = createLogger("langwatch:otel:v1:traces");
 const loggerLogs = createLogger("langwatch:otel:v1:logs");
