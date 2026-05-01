@@ -77,24 +77,6 @@ Feature: Model Selector UX Improvements
     When I click the settings button
     Then it should open model provider settings in a new tab
 
-  # Keyboard Navigation
-  # no test - handled by Chakra UI Select component
-  @visual @unimplemented
-  Scenario: Supports keyboard navigation in dropdown
-    When I open the model selector dropdown
-    And I press the down arrow key
-    Then the next model option should be highlighted
-    When I press Enter
-    Then that model should be selected
-
-  # no test - handled by Chakra UI Select component
-  @visual @unimplemented
-  Scenario: Escape closes the dropdown
-    When I open the model selector dropdown
-    And I press Escape
-    Then the dropdown should close
-    And no model change should occur
-
   # Loading States
   @unimplemented
   Scenario: Shows loading state while fetching models
