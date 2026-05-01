@@ -20,20 +20,30 @@ export class SuiteRunClickHouseRepository implements SuiteRunReadRepository {
     // dev/docs/best_practices/clickhouse-queries.md). Inner SELECT scans only
     // the sparse (TenantId, BatchRunId, UpdatedAt) tuple to find the latest
     // version; outer SELECT pulls the full row for that one tuple.
+    //
+    // Outer references columns via the `t.` alias because UpdatedAt is also
+    // projected as `toUnixTimestamp64Milli(UpdatedAt) AS UpdatedAt` —
+    // without the alias the IN-tuple's `UpdatedAt` could resolve to the
+    // projected UInt64 alias instead of the raw DateTime64 column and the
+    // type comparison would break.
     const result = await client.query({
       query: `
         SELECT
-          SuiteRunId, BatchRunId, ScenarioSetId, SuiteId,
-          Status, Total, StartedCount, CompletedCount, FailedCount,
-          Progress, PassRateBps, PassedCount, GradedCount,
-          toUnixTimestamp64Milli(CreatedAt) AS CreatedAt,
-          toUnixTimestamp64Milli(UpdatedAt) AS UpdatedAt,
-          toUnixTimestamp64Milli(StartedAt) AS StartedAt,
-          toUnixTimestamp64Milli(FinishedAt) AS FinishedAt
-        FROM suite_runs
-        WHERE TenantId = {projectId:String}
-          AND BatchRunId = {batchRunId:String}
-          AND (TenantId, BatchRunId, UpdatedAt) IN (
+          t.SuiteRunId AS SuiteRunId, t.BatchRunId AS BatchRunId,
+          t.ScenarioSetId AS ScenarioSetId, t.SuiteId AS SuiteId,
+          t.Status AS Status, t.Total AS Total,
+          t.StartedCount AS StartedCount, t.CompletedCount AS CompletedCount,
+          t.FailedCount AS FailedCount, t.Progress AS Progress,
+          t.PassRateBps AS PassRateBps, t.PassedCount AS PassedCount,
+          t.GradedCount AS GradedCount,
+          toUnixTimestamp64Milli(t.CreatedAt) AS CreatedAt,
+          toUnixTimestamp64Milli(t.UpdatedAt) AS UpdatedAt,
+          toUnixTimestamp64Milli(t.StartedAt) AS StartedAt,
+          toUnixTimestamp64Milli(t.FinishedAt) AS FinishedAt
+        FROM suite_runs AS t
+        WHERE t.TenantId = {projectId:String}
+          AND t.BatchRunId = {batchRunId:String}
+          AND (t.TenantId, t.BatchRunId, t.UpdatedAt) IN (
             SELECT TenantId, BatchRunId, max(UpdatedAt)
             FROM suite_runs
             WHERE TenantId = {projectId:String}
