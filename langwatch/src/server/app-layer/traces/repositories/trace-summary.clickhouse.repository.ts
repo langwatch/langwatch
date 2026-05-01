@@ -164,6 +164,17 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
 
     try {
       const client = await this.resolveClient(tenantId);
+      // IN-tuple dedup over the ReplacingMergeTree: the inner SELECT scans
+      // only (TenantId, TraceId, UpdatedAt) — small, sparse — to find the
+      // latest version, then the outer SELECT pulls the heavy columns
+      // (ComputedInput, ComputedOutput, Attributes, etc.) for that one row.
+      //
+      // Do not "simplify" to `ORDER BY UpdatedAt DESC LIMIT 1`: with many
+      // unmerged versions per (TenantId, TraceId) it forces the engine to
+      // read every version *with* the heavy columns just to sort them in
+      // memory. Called per-event during the trace-summary projection apply,
+      // so a 100× read amplification compounds fast under load.
+      // See dev/docs/best_practices/clickhouse-queries.md.
       const result = await client.query({
         query: `
           SELECT
@@ -206,7 +217,13 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
           FROM ${TABLE_NAME}
           WHERE TenantId = {tenantId:String}
             AND TraceId = {traceId:String}
-          ORDER BY UpdatedAt DESC
+            AND (TenantId, TraceId, UpdatedAt) IN (
+              SELECT TenantId, TraceId, max(UpdatedAt)
+              FROM ${TABLE_NAME}
+              WHERE TenantId = {tenantId:String}
+                AND TraceId = {traceId:String}
+              GROUP BY TenantId, TraceId
+            )
           LIMIT 1
         `,
         query_params: { tenantId, traceId },

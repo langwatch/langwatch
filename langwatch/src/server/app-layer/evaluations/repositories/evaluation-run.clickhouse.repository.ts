@@ -158,6 +158,15 @@ export class EvaluationRunClickHouseRepository
 
     try {
       const client = await this.resolveClient(tenantId);
+      // IN-tuple dedup over the ReplacingMergeTree: the inner SELECT scans
+      // only (TenantId, EvaluationId, UpdatedAt) — small, sparse — to find
+      // the latest version, then the outer SELECT pulls the heavy columns
+      // (Inputs, Details, Error, ErrorDetails — ZSTD(3)) for that one row.
+      //
+      // Do not "simplify" to `ORDER BY UpdatedAt DESC LIMIT 1`: with many
+      // unmerged versions per (TenantId, EvaluationId) it forces the engine
+      // to read every version *with* the heavy columns just to sort them in
+      // memory. See dev/docs/best_practices/clickhouse-queries.md.
       const result = await client.query({
         query: `
           SELECT
@@ -189,7 +198,13 @@ export class EvaluationRunClickHouseRepository
           FROM ${TABLE_NAME}
           WHERE TenantId = {tenantId:String}
             AND EvaluationId = {evaluationId:String}
-          ORDER BY UpdatedAt DESC
+            AND (TenantId, EvaluationId, UpdatedAt) IN (
+              SELECT TenantId, EvaluationId, max(UpdatedAt)
+              FROM ${TABLE_NAME}
+              WHERE TenantId = {tenantId:String}
+                AND EvaluationId = {evaluationId:String}
+              GROUP BY TenantId, EvaluationId
+            )
           LIMIT 1
         `,
         query_params: { tenantId, evaluationId },
