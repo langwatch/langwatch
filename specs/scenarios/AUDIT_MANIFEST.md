@@ -2,7 +2,6 @@
 
 Phase 0 audit of every unimplemented-tagged scenario under `specs/scenarios/` (214 across 19 files).
 
-Plan doc: `~/workspace/orchard-codex/plans/unimpl-reduction-2026-04-25.md`
 Tracking: https://github.com/langwatch/langwatch/issues/3458
 
 ## TL;DR
