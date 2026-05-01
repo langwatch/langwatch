@@ -2,7 +2,6 @@
 
 Domain: `specs/model-providers/`
 Tracking issue: https://github.com/langwatch/langwatch/issues/3458
-Plan: `~/workspace/orchard-codex/plans/unimpl-reduction-2026-04-25.md`
 
 Each row is one unimplemented-tagged occurrence. Class is one of:
 
@@ -97,7 +96,7 @@ on the list page) so the default-provider copies are flagged for removal in Phas
 | specs/model-providers/onboarding-flow.feature | "Handle OpenAI-specific validation in onboarding" | KEEP | `validateOpenAi` in `ModelProviderSetup` permits a non-default base URL without an API key. Logic exact; unbound. |
 | specs/model-providers/onboarding-flow.feature | "Show OpenAI validation error when using default URL without key" | KEEP | `validateOpenAi` sets `setOpenAiValidationError("API Key is required when using the default OpenAI base URL")` exact-match. Unbound. |
 | specs/model-providers/onboarding-flow.feature | "Clear OpenAI validation error when user starts typing" | KEEP | `handleOpenAiValidationClear` is called from `ModelProviderCredentialFields.onChange`. Unbound. |
-| specs/model-providers/onboarding-flow.feature | "Show loading state while saving in onboarding" | KEEP | Save button has `loading={state.isSaving || isValidatingApiKey}` driven by hook state. Behavior exists; no scenario-bound test. |
+| specs/model-providers/onboarding-flow.feature | "Show loading state while saving in onboarding" | KEEP | Save button has `loading={state.isSaving \|\| isValidatingApiKey}` driven by hook state. Behavior exists; no scenario-bound test. |
 | specs/model-providers/onboarding-flow.feature | "Handle save errors gracefully in onboarding" | KEEP | `useProviderFormSubmit` swallows mutation errors, surfaces them via `errors.customKeysRoot`; the user remains on the step. Unbound. |
 | specs/model-providers/onboarding-flow.feature | "Validate API key before saving in onboarding" | KEEP | `validateApiKey()` called in `handleSaveAndContinue` before `submit`; on `false` we bail. Unbound. |
 | specs/model-providers/onboarding-flow.feature | "Validate env var API key in onboarding" | KEEP | `validateWithCustomUrl()` (no args) handles env-var validation against default URL. Unbound. |
@@ -129,7 +128,5 @@ on the list page) so the default-provider copies are flagged for removal in Phas
 | specs/model-providers/provider-list.feature | "Show \"Default Model\" badge when default model belongs to provider" | KEEP | `isDefaultProvider(provider.provider)` (calls `shouldAutoEnableAsDefault`) renders `<Badge colorPalette="blue">Default Model</Badge>`. Unbound. (Canonical home of badge spec — the duplicate in default-provider.feature is flagged for deletion.) |
 | specs/model-providers/provider-list.feature | "Hide \"Default Model\" badge when default model does not belong to provider" | KEEP | Same badge predicate evaluates false; row renders without badge. Unbound. (Canonical home; duplicate in default-provider.feature flagged for deletion.) |
 | specs/model-providers/provider-list.feature | "Filter \"Add Model Provider\" menu to show only non-enabled providers" | KEEP | `notEnabledProviders` memoizes `Object.keys(modelProvidersRegistry).filter(key => !providers[key]?.enabled)`. Menu renders only those entries. Unbound. |
-| specs/model-providers/provider-list.feature | "Disable \"Add Model Provider\" button without manage permission" | KEEP | `PageLayout.HeaderButton` `disabled={!hasModelProvidersManagePermission || …}` with `<Tooltip>` showing "You need model provider manage permissions to add new providers." Unbound. |
+| specs/model-providers/provider-list.feature | "Disable \"Add Model Provider\" button without manage permission" | KEEP | `PageLayout.HeaderButton` `disabled={!hasModelProvidersManagePermission \|\| …}` with `<Tooltip>` showing "You need model provider manage permissions to add new providers." Unbound. |
 | specs/model-providers/provider-list.feature | "Disable \"Add Model Provider\" button when all providers enabled" | KEEP | Same disabled predicate includes `notEnabledProviders.length === 0`. Unbound. |
-</content>
-</invoke>
