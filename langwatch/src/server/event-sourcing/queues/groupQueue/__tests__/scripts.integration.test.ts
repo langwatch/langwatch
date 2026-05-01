@@ -94,12 +94,11 @@ describe("GroupStagingScripts", () => {
         expect(data).toEqual({ j1: payload });
       });
 
-      it("adds group to ready set with sqrt(1) score", async () => {
-        await scripts.stage(makeJob());
+      it("adds group to ready set with score = earliest pending dispatchAfter", async () => {
+        await scripts.stage(makeJob({ dispatchAfterMs: 1000 }));
 
         const ready = await inspectReadySet();
-        // sqrt(1) = 1
-        expect(ready).toEqual(["group-a", "1"]);
+        expect(ready).toEqual(["group-a", "1000"]);
       });
 
       it("pushes signal", async () => {
@@ -803,24 +802,29 @@ describe("GroupStagingScripts", () => {
         expect(jobs).toEqual([]);
       });
 
-      it("recalculates ready score or removes group", async () => {
+      it("re-scores ready set with future activeUntil after dispatch", async () => {
         await scripts.stage(makeJob({ stagedJobId: "j1", dispatchAfterMs: 100 }));
         await scripts.stage(makeJob({ stagedJobId: "j2", dispatchAfterMs: 200 }));
 
-        await scripts.dispatch({ nowMs: 300, activeTtlSec: 60 });
+        const nowMs = 300;
+        const activeTtlSec = 60;
+        await scripts.dispatch({ nowMs, activeTtlSec });
 
-        // One job left → score should be sqrt(1) = 1
+        // Group is now active → score = nowMs + activeTtlSec*1000 (suppresses redispatch)
         const ready = await inspectReadySet();
-        expect(ready).toEqual(["group-a", "1"]);
+        expect(ready).toEqual(["group-a", String(nowMs + activeTtlSec * 1000)]);
       });
 
-      it("removes group from ready set when no jobs remain", async () => {
+      it("keeps group in ready with future activeUntil score after dispatch (no pending left)", async () => {
         await scripts.stage(makeJob({ stagedJobId: "j1", dispatchAfterMs: 100 }));
 
-        await scripts.dispatch({ nowMs: 200, activeTtlSec: 60 });
+        const nowMs = 200;
+        const activeTtlSec = 60;
+        await scripts.dispatch({ nowMs, activeTtlSec });
 
+        // Group is active even though no jobs remain — completion removes it from ready.
         const ready = await inspectReadySet();
-        expect(ready).toEqual([]);
+        expect(ready).toEqual(["group-a", String(nowMs + activeTtlSec * 1000)]);
       });
 
       it("returns jobDataJson from data hash", async () => {
@@ -844,7 +848,7 @@ describe("GroupStagingScripts", () => {
         await scripts.stage(makeJob({ stagedJobId: "j1", groupId: "group-a", dispatchAfterMs: 100 }));
         await scripts.stage(makeJob({ stagedJobId: "j2", groupId: "group-b", dispatchAfterMs: 100 }));
 
-        // Dispatch from group with highest score (both have 1 job → same score, order is deterministic by ZREVRANGE)
+        // Dispatch picks groups by ZRANGEBYSCORE (lowest dispatchAfter first); both groups have the same score.
         const first = await scripts.dispatch({ nowMs: 200, activeTtlSec: 60 });
         expect(first).not.toBeNull();
 
@@ -911,7 +915,7 @@ describe("GroupStagingScripts", () => {
         expect(signals.length).toBeGreaterThanOrEqual(1);
       });
 
-      it("recalculates ready score if more jobs exist", async () => {
+      it("recalculates ready score from earliest pending job after completion", async () => {
         await scripts.stage(makeJob({ stagedJobId: "j1", dispatchAfterMs: 100 }));
         await scripts.stage(makeJob({ stagedJobId: "j2", dispatchAfterMs: 200 }));
 
@@ -921,9 +925,9 @@ describe("GroupStagingScripts", () => {
           stagedJobId: dispatched.stagedJobId,
         });
 
-        // j2 still pending → ready score should be sqrt(1) = 1
+        // j2 still pending → ready score should equal j2's dispatchAfterMs (200)
         const ready = await inspectReadySet();
-        expect(ready).toContain("group-a");
+        expect(ready).toEqual(["group-a", "200"]);
       });
 
       it("removes group from ready set if no jobs remain", async () => {
