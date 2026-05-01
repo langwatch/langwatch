@@ -94,12 +94,11 @@ describe("GroupStagingScripts", () => {
         expect(data).toEqual({ j1: payload });
       });
 
-      it("adds group to ready set with sqrt(1) score", async () => {
-        await scripts.stage(makeJob());
+      it("adds group to ready set with score = earliest pending dispatchAfter", async () => {
+        await scripts.stage(makeJob({ dispatchAfterMs: 1000 }));
 
         const ready = await inspectReadySet();
-        // sqrt(1) = 1
-        expect(ready).toEqual(["group-a", "1"]);
+        expect(ready).toEqual(["group-a", "1000"]);
       });
 
       it("pushes signal", async () => {
@@ -617,6 +616,56 @@ describe("GroupStagingScripts", () => {
         expect(data["j1"]).toBeUndefined();
       });
     });
+
+    describe("when group is currently active", () => {
+      it("does not lower ready score below the active-until window", async () => {
+        // Seed an active job and an active-until ready score
+        await scripts.stage(makeJob({ stagedJobId: "j1", dispatchAfterMs: 100 }));
+        const nowMs = 200;
+        const activeTtlSec = 60;
+        const activeUntil = nowMs + activeTtlSec * 1000;
+        await scripts.dispatch({ nowMs, activeTtlSec });
+
+        // Stage another job for the same group while it is processing
+        await scripts.stage(makeJob({ stagedJobId: "j2", dispatchAfterMs: 150 }));
+
+        // Ready score must remain at activeUntil so dispatch doesn't re-pick the group
+        const ready = await inspectReadySet();
+        expect(ready).toEqual(["group-a", String(activeUntil)]);
+      });
+
+      it("still stores the new job in the group jobs zset", async () => {
+        await scripts.stage(makeJob({ stagedJobId: "j1", dispatchAfterMs: 100 }));
+        await scripts.dispatch({ nowMs: 200, activeTtlSec: 60 });
+
+        await scripts.stage(makeJob({ stagedJobId: "j2", dispatchAfterMs: 150 }));
+
+        const jobs = await inspectGroupJobs("group-a");
+        expect(jobs).toContain("j2");
+      });
+    });
+
+    describe("when group is blocked", () => {
+      it("does not re-add a blocked group to the ready set", async () => {
+        await scripts.stage(makeJob({ stagedJobId: "j1", dispatchAfterMs: 100 }));
+        await scripts.dispatch({ nowMs: 200, activeTtlSec: 60 });
+        await scripts.restageAndBlock({
+          groupId: "group-a",
+          newStagedJobId: "j1/r/0",
+          score: 100,
+          jobDataJson: JSON.stringify({ retry: true }),
+        });
+
+        // Sanity: group is blocked and not in ready
+        expect(await inspectBlockedSet()).toContain("group-a");
+        expect(await inspectReadySet()).toEqual([]);
+
+        // Stage a new job for the blocked group — should not reinsert it
+        await scripts.stage(makeJob({ stagedJobId: "j2", dispatchAfterMs: 150 }));
+
+        expect(await inspectReadySet()).toEqual([]);
+      });
+    });
   });
 
   describe("stageBatch", () => {
@@ -803,24 +852,29 @@ describe("GroupStagingScripts", () => {
         expect(jobs).toEqual([]);
       });
 
-      it("recalculates ready score or removes group", async () => {
+      it("re-scores ready set with future activeUntil after dispatch", async () => {
         await scripts.stage(makeJob({ stagedJobId: "j1", dispatchAfterMs: 100 }));
         await scripts.stage(makeJob({ stagedJobId: "j2", dispatchAfterMs: 200 }));
 
-        await scripts.dispatch({ nowMs: 300, activeTtlSec: 60 });
+        const nowMs = 300;
+        const activeTtlSec = 60;
+        await scripts.dispatch({ nowMs, activeTtlSec });
 
-        // One job left → score should be sqrt(1) = 1
+        // Group is now active → score = nowMs + activeTtlSec*1000 (suppresses redispatch)
         const ready = await inspectReadySet();
-        expect(ready).toEqual(["group-a", "1"]);
+        expect(ready).toEqual(["group-a", String(nowMs + activeTtlSec * 1000)]);
       });
 
-      it("removes group from ready set when no jobs remain", async () => {
+      it("keeps group in ready with future activeUntil score after dispatch (no pending left)", async () => {
         await scripts.stage(makeJob({ stagedJobId: "j1", dispatchAfterMs: 100 }));
 
-        await scripts.dispatch({ nowMs: 200, activeTtlSec: 60 });
+        const nowMs = 200;
+        const activeTtlSec = 60;
+        await scripts.dispatch({ nowMs, activeTtlSec });
 
+        // Group is active even though no jobs remain — completion removes it from ready.
         const ready = await inspectReadySet();
-        expect(ready).toEqual([]);
+        expect(ready).toEqual(["group-a", String(nowMs + activeTtlSec * 1000)]);
       });
 
       it("returns jobDataJson from data hash", async () => {
@@ -844,7 +898,7 @@ describe("GroupStagingScripts", () => {
         await scripts.stage(makeJob({ stagedJobId: "j1", groupId: "group-a", dispatchAfterMs: 100 }));
         await scripts.stage(makeJob({ stagedJobId: "j2", groupId: "group-b", dispatchAfterMs: 100 }));
 
-        // Dispatch from group with highest score (both have 1 job → same score, order is deterministic by ZREVRANGE)
+        // Dispatch picks groups by ZRANGEBYSCORE (lowest dispatchAfter first); both groups have the same score.
         const first = await scripts.dispatch({ nowMs: 200, activeTtlSec: 60 });
         expect(first).not.toBeNull();
 
@@ -911,7 +965,7 @@ describe("GroupStagingScripts", () => {
         expect(signals.length).toBeGreaterThanOrEqual(1);
       });
 
-      it("recalculates ready score if more jobs exist", async () => {
+      it("recalculates ready score from earliest pending job after completion", async () => {
         await scripts.stage(makeJob({ stagedJobId: "j1", dispatchAfterMs: 100 }));
         await scripts.stage(makeJob({ stagedJobId: "j2", dispatchAfterMs: 200 }));
 
@@ -921,9 +975,9 @@ describe("GroupStagingScripts", () => {
           stagedJobId: dispatched.stagedJobId,
         });
 
-        // j2 still pending → ready score should be sqrt(1) = 1
+        // j2 still pending → ready score should equal j2's dispatchAfterMs (200)
         const ready = await inspectReadySet();
-        expect(ready).toContain("group-a");
+        expect(ready).toEqual(["group-a", "200"]);
       });
 
       it("removes group from ready set if no jobs remain", async () => {
@@ -991,6 +1045,54 @@ describe("GroupStagingScripts", () => {
         });
 
         expect(ok).toBe(false);
+      });
+    });
+
+    describe("when group was removed from ready (e.g. after blocking)", () => {
+      it("does not re-add the group to the ready set", async () => {
+        // Set up: group is processing a job, then gets blocked mid-flight
+        await scripts.stage(makeJob({ stagedJobId: "j1", dispatchAfterMs: 100 }));
+        await scripts.dispatch({ nowMs: 200, activeTtlSec: 60 });
+        await scripts.restageAndBlock({
+          groupId: "group-a",
+          newStagedJobId: "j1/r/0",
+          score: 100,
+          jobDataJson: JSON.stringify({ retry: true }),
+        });
+
+        // Sanity: group is no longer in ready
+        expect(await inspectReadySet()).toEqual([]);
+
+        // Heartbeat fires after blocking — must not reinsert the blocked group
+        const ok = await scripts.refreshActiveKey({
+          groupId: "group-a",
+          stagedJobId: "j1",
+          activeTtlSec: 60,
+        });
+
+        expect(ok).toBe(true);
+        expect(await inspectReadySet()).toEqual([]);
+      });
+    });
+
+    describe("when active and in ready", () => {
+      it("refreshes ready score to nowMs + activeTtlSec*1000", async () => {
+        await scripts.stage(makeJob({ stagedJobId: "j1", dispatchAfterMs: 100 }));
+        await scripts.dispatch({ nowMs: 200, activeTtlSec: 60 });
+
+        // ZADD with smaller score to simulate score drift; heartbeat should push it forward.
+        await redis.zadd(`${keyPrefix()}ready`, 200, "group-a");
+
+        const ok = await scripts.refreshActiveKey({
+          groupId: "group-a",
+          stagedJobId: "j1",
+          activeTtlSec: 120,
+        });
+
+        expect(ok).toBe(true);
+        const score = await redis.zscore(`${keyPrefix()}ready`, "group-a");
+        // Score must be in the future (nowMs + 120_000) — exact value depends on Date.now()
+        expect(Number(score)).toBeGreaterThan(Date.now());
       });
     });
   });
