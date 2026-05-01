@@ -112,7 +112,7 @@ def _poll_run_results(
                         if not require_cost or all(row.get("cost") for row in rows):
                             return last_body
         except (httpx.RequestError, ValueError):
-            pass
+            continue  # transient transport/parse error — retry on next tick
         time.sleep(interval)
     seen = len(last_body.get("dataset", [])) if last_body else 0
     warnings.warn(
