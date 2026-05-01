@@ -11,14 +11,10 @@ Feature: Suite Workflow — Create, Run, See Results
   # ============================================================================
   # Navigation
   # ============================================================================
-  # Navigation and URL routing scenarios moved to simulation-runs-page.feature
-
-  @integration @unimplemented
-  Scenario: Navigate to simulations page
-    When I click "Runs" in the main navigation
-    Then I am on the simulations page
-    And I see the sidebar with "+ New Run Plan" button
-    And I see "All Runs" link in the sidebar
+  # Navigation and URL routing scenarios moved to simulation-runs-page.feature.
+  # "Navigate to simulations page" — duplicate of simulation-runs-page.feature
+  # "Navigating to /simulations shows All Runs view" + "Sidebar shows \"Runs\" menu item without beta badge"
+  # (removed per AUDIT_MANIFEST.md, #3458).
 
   # ============================================================================
   # Empty State
@@ -242,11 +238,9 @@ Feature: Suite Workflow — Create, Run, See Results
   # Run Suite — Job Scheduling
   # ============================================================================
 
-  @unit @unimplemented
-  Scenario: Suite run generates correct number of jobs
-    Given a suite with 3 scenarios, 2 targets, and repeat count 1
-    When the suite run is triggered
-    Then 6 jobs are scheduled (3 scenarios × 2 targets)
+  # "Suite run generates correct number of jobs" — duplicate of
+  # archived-scenario-exclusion.feature "Job count reflects only active scenarios and targets"
+  # (removed per AUDIT_MANIFEST.md, #3458).
 
   @unit @unimplemented
   Scenario: Suite run respects repeat count
@@ -260,50 +254,21 @@ Feature: Suite Workflow — Create, Run, See Results
     When the suite run is triggered
     Then all jobs are scheduled with a suite-namespaced setId
 
-  @unit @unimplemented
-  Scenario: Suite run validates scenario references before scheduling
-    Given a suite references scenario "deleted-scenario" that no longer exists
-    When the suite run is triggered
-    Then the run fails with an error about invalid scenario references
+  # "Suite run validates scenario references before scheduling" — duplicate of
+  # archived-scenario-exclusion.feature "Deleted scenarios still cause validation errors" /
+  # suite-run-dependency-refactor.feature "Suite run fails when a scenario does not exist"
+  # (removed per AUDIT_MANIFEST.md, #3458).
 
-  @unit @unimplemented
-  Scenario: Suite run validates target references before scheduling
-    Given a suite references target "removed-target" that no longer exists
-    When the suite run is triggered
-    Then the run fails with an error about invalid target references
+  # "Suite run validates target references before scheduling" — duplicate of
+  # suite-run-dependency-refactor.feature "Suite run fails when HTTP target agent does not exist"
+  # (removed per AUDIT_MANIFEST.md, #3458).
 
   # ============================================================================
   # Run History — Queue Status Visibility
   # ============================================================================
-  #
-  # When a suite run is scheduled, jobs are queued in BullMQ (Redis).
-  # The RunHistoryList shows a status banner while jobs are pending/active.
-  #
-
-  @unit @unimplemented
-  Scenario: Queue status returns counts for pending and active jobs
-    Given a suite "Critical Path" has 3 pending and 1 active job in the queue
-    When I query the queue status for "Critical Path"
-    Then the status shows 3 waiting and 1 active
-
-  @unit @unimplemented
-  Scenario: Queue status returns zero counts when no jobs are queued
-    Given a suite "Critical Path" has no jobs in the queue
-    When I query the queue status for "Critical Path"
-    Then the status shows 0 waiting and 0 active
-
-  @integration @unimplemented
-  Scenario: Queue status banner appears when jobs are pending
-    Given a suite has 2 pending and 1 active job
-    When I view the run history
-    Then I see a status banner showing "2 pending, 1 running"
-    And the banner includes a spinner
-
-  @integration @unimplemented
-  Scenario: Queue status banner disappears when all jobs complete
-    Given a suite has 0 pending and 0 active jobs
-    When I view the run history
-    Then I do not see a queue status banner
+  # Queue status scenarios (counts/banner) deleted per AUDIT_MANIFEST.md (#3458):
+  # implementation took a different approach — single `pendingBatchRunId`
+  # placeholder rather than aggregate "X pending, Y running" counts/banner.
 
   # ============================================================================
   # Run History List
