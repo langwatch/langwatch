@@ -166,39 +166,47 @@ export class EvaluationRunClickHouseRepository
       // Do not "simplify" to `ORDER BY UpdatedAt DESC LIMIT 1`: with many
       // unmerged versions per (TenantId, EvaluationId) it forces the engine
       // to read every version *with* the heavy columns just to sort them in
-      // memory. See dev/docs/best_practices/clickhouse-queries.md.
+      // memory.
+      //
+      // Outer SELECT references columns via the `t.` alias because the
+      // SELECT projects `toUnixTimestamp64Milli(UpdatedAt) AS UpdatedAt`
+      // (and similar for Created/Archived/Scheduled/Started/CompletedAt).
+      // Without the alias the IN-tuple's `UpdatedAt` could resolve to the
+      // projected UInt64 alias instead of the raw DateTime64 column and the
+      // type comparison would break. See
+      // dev/docs/best_practices/clickhouse-queries.md.
       const result = await client.query({
         query: `
           SELECT
-            ProjectionId,
-            TenantId,
-            EvaluationId,
-            Version,
-            EvaluatorId,
-            EvaluatorType,
-            EvaluatorName,
-            TraceId,
-            IsGuardrail,
-            Status,
-            Score,
-            Passed,
-            Label,
-            Details,
-            Inputs,
-            Error,
-            ErrorDetails,
-            toUnixTimestamp64Milli(CreatedAt) AS CreatedAt,
-            toUnixTimestamp64Milli(UpdatedAt) AS UpdatedAt,
-            toUnixTimestamp64Milli(ArchivedAt) AS ArchivedAt,
-            toUnixTimestamp64Milli(ScheduledAt) AS ScheduledAt,
-            toUnixTimestamp64Milli(StartedAt) AS StartedAt,
-            toUnixTimestamp64Milli(CompletedAt) AS CompletedAt,
-            CostId,
-            LastProcessedEventId
-          FROM ${TABLE_NAME}
-          WHERE TenantId = {tenantId:String}
-            AND EvaluationId = {evaluationId:String}
-            AND (TenantId, EvaluationId, UpdatedAt) IN (
+            t.ProjectionId AS ProjectionId,
+            t.TenantId AS TenantId,
+            t.EvaluationId AS EvaluationId,
+            t.Version AS Version,
+            t.EvaluatorId AS EvaluatorId,
+            t.EvaluatorType AS EvaluatorType,
+            t.EvaluatorName AS EvaluatorName,
+            t.TraceId AS TraceId,
+            t.IsGuardrail AS IsGuardrail,
+            t.Status AS Status,
+            t.Score AS Score,
+            t.Passed AS Passed,
+            t.Label AS Label,
+            t.Details AS Details,
+            t.Inputs AS Inputs,
+            t.Error AS Error,
+            t.ErrorDetails AS ErrorDetails,
+            toUnixTimestamp64Milli(t.CreatedAt) AS CreatedAt,
+            toUnixTimestamp64Milli(t.UpdatedAt) AS UpdatedAt,
+            toUnixTimestamp64Milli(t.ArchivedAt) AS ArchivedAt,
+            toUnixTimestamp64Milli(t.ScheduledAt) AS ScheduledAt,
+            toUnixTimestamp64Milli(t.StartedAt) AS StartedAt,
+            toUnixTimestamp64Milli(t.CompletedAt) AS CompletedAt,
+            t.CostId AS CostId,
+            t.LastProcessedEventId AS LastProcessedEventId
+          FROM ${TABLE_NAME} AS t
+          WHERE t.TenantId = {tenantId:String}
+            AND t.EvaluationId = {evaluationId:String}
+            AND (t.TenantId, t.EvaluationId, t.UpdatedAt) IN (
               SELECT TenantId, EvaluationId, max(UpdatedAt)
               FROM ${TABLE_NAME}
               WHERE TenantId = {tenantId:String}
