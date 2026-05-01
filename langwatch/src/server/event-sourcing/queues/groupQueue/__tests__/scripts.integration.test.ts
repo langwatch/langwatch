@@ -616,6 +616,56 @@ describe("GroupStagingScripts", () => {
         expect(data["j1"]).toBeUndefined();
       });
     });
+
+    describe("when group is currently active", () => {
+      it("does not lower ready score below the active-until window", async () => {
+        // Seed an active job and an active-until ready score
+        await scripts.stage(makeJob({ stagedJobId: "j1", dispatchAfterMs: 100 }));
+        const nowMs = 200;
+        const activeTtlSec = 60;
+        const activeUntil = nowMs + activeTtlSec * 1000;
+        await scripts.dispatch({ nowMs, activeTtlSec });
+
+        // Stage another job for the same group while it is processing
+        await scripts.stage(makeJob({ stagedJobId: "j2", dispatchAfterMs: 150 }));
+
+        // Ready score must remain at activeUntil so dispatch doesn't re-pick the group
+        const ready = await inspectReadySet();
+        expect(ready).toEqual(["group-a", String(activeUntil)]);
+      });
+
+      it("still stores the new job in the group jobs zset", async () => {
+        await scripts.stage(makeJob({ stagedJobId: "j1", dispatchAfterMs: 100 }));
+        await scripts.dispatch({ nowMs: 200, activeTtlSec: 60 });
+
+        await scripts.stage(makeJob({ stagedJobId: "j2", dispatchAfterMs: 150 }));
+
+        const jobs = await inspectGroupJobs("group-a");
+        expect(jobs).toContain("j2");
+      });
+    });
+
+    describe("when group is blocked", () => {
+      it("does not re-add a blocked group to the ready set", async () => {
+        await scripts.stage(makeJob({ stagedJobId: "j1", dispatchAfterMs: 100 }));
+        await scripts.dispatch({ nowMs: 200, activeTtlSec: 60 });
+        await scripts.restageAndBlock({
+          groupId: "group-a",
+          newStagedJobId: "j1/r/0",
+          score: 100,
+          jobDataJson: JSON.stringify({ retry: true }),
+        });
+
+        // Sanity: group is blocked and not in ready
+        expect(await inspectBlockedSet()).toContain("group-a");
+        expect(await inspectReadySet()).toEqual([]);
+
+        // Stage a new job for the blocked group — should not reinsert it
+        await scripts.stage(makeJob({ stagedJobId: "j2", dispatchAfterMs: 150 }));
+
+        expect(await inspectReadySet()).toEqual([]);
+      });
+    });
   });
 
   describe("stageBatch", () => {
@@ -995,6 +1045,54 @@ describe("GroupStagingScripts", () => {
         });
 
         expect(ok).toBe(false);
+      });
+    });
+
+    describe("when group was removed from ready (e.g. after blocking)", () => {
+      it("does not re-add the group to the ready set", async () => {
+        // Set up: group is processing a job, then gets blocked mid-flight
+        await scripts.stage(makeJob({ stagedJobId: "j1", dispatchAfterMs: 100 }));
+        await scripts.dispatch({ nowMs: 200, activeTtlSec: 60 });
+        await scripts.restageAndBlock({
+          groupId: "group-a",
+          newStagedJobId: "j1/r/0",
+          score: 100,
+          jobDataJson: JSON.stringify({ retry: true }),
+        });
+
+        // Sanity: group is no longer in ready
+        expect(await inspectReadySet()).toEqual([]);
+
+        // Heartbeat fires after blocking — must not reinsert the blocked group
+        const ok = await scripts.refreshActiveKey({
+          groupId: "group-a",
+          stagedJobId: "j1",
+          activeTtlSec: 60,
+        });
+
+        expect(ok).toBe(true);
+        expect(await inspectReadySet()).toEqual([]);
+      });
+    });
+
+    describe("when active and in ready", () => {
+      it("refreshes ready score to nowMs + activeTtlSec*1000", async () => {
+        await scripts.stage(makeJob({ stagedJobId: "j1", dispatchAfterMs: 100 }));
+        await scripts.dispatch({ nowMs: 200, activeTtlSec: 60 });
+
+        // ZADD with smaller score to simulate score drift; heartbeat should push it forward.
+        await redis.zadd(`${keyPrefix()}ready`, 200, "group-a");
+
+        const ok = await scripts.refreshActiveKey({
+          groupId: "group-a",
+          stagedJobId: "j1",
+          activeTtlSec: 120,
+        });
+
+        expect(ok).toBe(true);
+        const score = await redis.zscore(`${keyPrefix()}ready`, "group-a");
+        // Score must be in the future (nowMs + 120_000) — exact value depends on Date.now()
+        expect(Number(score)).toBeGreaterThan(Date.now());
       });
     });
   });

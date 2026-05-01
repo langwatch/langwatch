@@ -11,6 +11,8 @@ local signalKey       = KEYS[3]
 local dedupKey        = KEYS[4]
 local dataKey         = KEYS[5]
 local totalPendingKey = KEYS[6]
+local activeKey       = KEYS[7]
+local blockedKey      = KEYS[8]
 
 local stagedJobId    = ARGV[1]
 local groupId        = ARGV[2]
@@ -20,6 +22,16 @@ local dedupTtlMs     = tonumber(ARGV[5])
 local jobDataJson    = ARGV[6]
 local shouldExtend   = tonumber(ARGV[7])
 local shouldReplace  = tonumber(ARGV[8])
+
+-- Skip ready-score updates while the group is processing (active key set) or
+-- blocked. In those states the ready score is owned by REFRESH_LUA / COMPLETE_LUA
+-- (active) or by UNBLOCK (blocked). Lowering it here would re-expose the group
+-- to ZRANGEBYSCORE before the next heartbeat refreshes it.
+local function shouldUpdateReady()
+  if redis.call("EXISTS", activeKey) == 1 then return false end
+  if redis.call("SISMEMBER", blockedKey, groupId) == 1 then return false end
+  return true
+end
 
 if dedupId ~= "" and dedupTtlMs > 0 then
   local existingJobId = redis.call("GET", dedupKey)
@@ -35,7 +47,9 @@ if dedupId ~= "" and dedupTtlMs > 0 then
       end
       redis.call("SET", dedupKey, existingJobId, "PX", dedupTtlMs)
       -- Score = earliest pending dispatchAfter (LT keeps the smallest score per group)
-      redis.call("ZADD", readyKey, "LT", dispatchAfter, groupId)
+      if shouldUpdateReady() then
+        redis.call("ZADD", readyKey, "LT", dispatchAfter, groupId)
+      end
       redis.call("LPUSH", signalKey, "1")
       redis.call("LTRIM", signalKey, 0, 999)
       return 0
@@ -53,7 +67,9 @@ if dedupId ~= "" and dedupTtlMs > 0 then
 end
 
 -- Score = earliest pending dispatchAfter (LT keeps the smallest score per group)
-redis.call("ZADD", readyKey, "LT", dispatchAfter, groupId)
+if shouldUpdateReady() then
+  redis.call("ZADD", readyKey, "LT", dispatchAfter, groupId)
+end
 
 redis.call("LPUSH", signalKey, "1")
 redis.call("LTRIM", signalKey, 0, 999)
@@ -128,9 +144,16 @@ for i = 1, count do
   end
 end
 
+local blockedKey = keyPrefix .. "blocked"
 for groupId, minScore in pairs(affectedGroups) do
-  -- Score = earliest pending dispatchAfter (LT keeps the smallest)
-  redis.call("ZADD", readyKey, "LT", minScore, groupId)
+  -- Score = earliest pending dispatchAfter (LT keeps the smallest).
+  -- Skip when the group is processing or blocked — the active heartbeat /
+  -- completion / unblock paths own the score in those states. Lowering it
+  -- here would re-expose the group to ZRANGEBYSCORE before the next refresh.
+  local activeKey = keyPrefix .. "group:" .. groupId .. ":active"
+  if redis.call("EXISTS", activeKey) == 0 and redis.call("SISMEMBER", blockedKey, groupId) == 0 then
+    redis.call("ZADD", readyKey, "LT", minScore, groupId)
+  end
 end
 
 redis.call("LPUSH", signalKey, "1")
@@ -158,76 +181,87 @@ local activeUntil = nowMs + activeTtlSec * 1000
 
 -- Pull only groups whose earliest job is due now (legacy entries with score=1 also pass).
 -- Active groups carry future scores (nowMs + activeTtlSec*1000) and are excluded.
-local groups = redis.call("ZRANGEBYSCORE", readyKey, "-inf", nowMs, "LIMIT", 0, 50)
-if #groups == 0 then return nil end
+-- Page through the ready zset so a head full of paused / blocked / legacy-drift
+-- entries does not cause dispatch to return nil while eligible work exists later.
+local pageSize = 200
+local scanBudget = 1000
+local offset = 0
 
-for _, groupId in ipairs(groups) do
-  if redis.call("SISMEMBER", blockedKey, groupId) == 0 then
-    local activeKey = keyPrefix .. "group:" .. groupId .. ":active"
-    -- Defensive activeKey check — covers legacy state during migration
-    -- and the small race between ZADD ready and ZADD active.
-    local activeJob = redis.call("GET", activeKey)
-    if not activeJob then
-      local jobsKey = keyPrefix .. "group:" .. groupId .. ":jobs"
-      local results = redis.call("ZRANGEBYSCORE", jobsKey, "-inf", nowMs, "WITHSCORES", "LIMIT", 0, 1)
+while offset < scanBudget do
+  local groups = redis.call("ZRANGEBYSCORE", readyKey, "-inf", nowMs, "LIMIT", offset, pageSize)
+  if #groups == 0 then return nil end
 
-      if #results >= 2 then
-        local stagedJobId = results[1]
-        local originalScore = results[2]
+  for _, groupId in ipairs(groups) do
+    if redis.call("SISMEMBER", blockedKey, groupId) == 0 then
+      local activeKey = keyPrefix .. "group:" .. groupId .. ":active"
+      -- Defensive activeKey check — covers legacy state during migration
+      -- and the small race between ZADD ready and ZADD active.
+      local activeJob = redis.call("GET", activeKey)
+      if not activeJob then
+        local jobsKey = keyPrefix .. "group:" .. groupId .. ":jobs"
+        local results = redis.call("ZRANGEBYSCORE", jobsKey, "-inf", nowMs, "WITHSCORES", "LIMIT", 0, 1)
 
-        -- Check pause status before dequeuing
-        local paused = false
-        if hasPauses then
-          local dataKey = keyPrefix .. "group:" .. groupId .. ":data"
-          local jobDataJson = redis.call("HGET", dataKey, stagedJobId)
-          if jobDataJson then
-            local ok, data = pcall(cjson.decode, jobDataJson)
-            if ok and type(data) == "table" then
-              local p = data["__pipelineName"]
-              local t = data["__jobType"]
-              local n = data["__jobName"]
-              local pIsStr = type(p) == "string"
-              local tIsStr = type(t) == "string"
-              local nIsStr = type(n) == "string"
-              if pIsStr then
-                if redis.call("SISMEMBER", pausedJobKey, p) == 1 then paused = true
-                elseif tIsStr and redis.call("SISMEMBER", pausedJobKey, p .. "/" .. t) == 1 then paused = true
-                elseif tIsStr and nIsStr and redis.call("SISMEMBER", pausedJobKey, p .. "/" .. t .. "/" .. n) == 1 then paused = true
+        if #results >= 2 then
+          local stagedJobId = results[1]
+          local originalScore = results[2]
+
+          -- Check pause status before dequeuing
+          local paused = false
+          if hasPauses then
+            local dataKey = keyPrefix .. "group:" .. groupId .. ":data"
+            local jobDataJson = redis.call("HGET", dataKey, stagedJobId)
+            if jobDataJson then
+              local ok, data = pcall(cjson.decode, jobDataJson)
+              if ok and type(data) == "table" then
+                local p = data["__pipelineName"]
+                local t = data["__jobType"]
+                local n = data["__jobName"]
+                local pIsStr = type(p) == "string"
+                local tIsStr = type(t) == "string"
+                local nIsStr = type(n) == "string"
+                if pIsStr then
+                  if redis.call("SISMEMBER", pausedJobKey, p) == 1 then paused = true
+                  elseif tIsStr and redis.call("SISMEMBER", pausedJobKey, p .. "/" .. t) == 1 then paused = true
+                  elseif tIsStr and nIsStr and redis.call("SISMEMBER", pausedJobKey, p .. "/" .. t .. "/" .. n) == 1 then paused = true
+                  end
                 end
               end
             end
           end
-        end
 
-        if not paused then
-          redis.call("ZREM", jobsKey, stagedJobId)
-          redis.call("SET", activeKey, stagedJobId, "EX", activeTtlSec)
+          if not paused then
+            redis.call("ZREM", jobsKey, stagedJobId)
+            redis.call("SET", activeKey, stagedJobId, "EX", activeTtlSec)
 
-          -- Mark group as actively-processing in ready zset (future score suppresses redispatch).
-          -- If process crashes, heartbeat stops, score becomes past, group becomes dispatchable again.
-          redis.call("ZADD", readyKey, activeUntil, groupId)
+            -- Mark group as actively-processing in ready zset (future score suppresses redispatch).
+            -- If process crashes, heartbeat stops, score becomes past, group becomes dispatchable again.
+            redis.call("ZADD", readyKey, activeUntil, groupId)
 
-          local dataKey = keyPrefix .. "group:" .. groupId .. ":data"
-          local jobDataJson = redis.call("HGET", dataKey, stagedJobId)
-          redis.call("HDEL", dataKey, stagedJobId)
+            local dataKey = keyPrefix .. "group:" .. groupId .. ":data"
+            local jobDataJson = redis.call("HGET", dataKey, stagedJobId)
+            redis.call("HDEL", dataKey, stagedJobId)
 
-          return {stagedJobId, groupId, jobDataJson or "", originalScore}
-        end
-      else
-        -- Group is in ready but has no due jobs — drift cleanup.
-        local pendingCount = redis.call("ZCARD", jobsKey)
-        if pendingCount == 0 then
-          redis.call("ZREM", readyKey, groupId)
+            return {stagedJobId, groupId, jobDataJson or "", originalScore}
+          end
         else
-          -- All jobs are future-scheduled; re-score ready with earliest job's score
-          local nextScore = redis.call("ZRANGE", jobsKey, 0, 0, "WITHSCORES")
-          if #nextScore >= 2 then
-            redis.call("ZADD", readyKey, tonumber(nextScore[2]), groupId)
+          -- Group is in ready but has no due jobs — drift cleanup.
+          local pendingCount = redis.call("ZCARD", jobsKey)
+          if pendingCount == 0 then
+            redis.call("ZREM", readyKey, groupId)
+          else
+            -- All jobs are future-scheduled; re-score ready with earliest job's score
+            local nextScore = redis.call("ZRANGE", jobsKey, 0, 0, "WITHSCORES")
+            if #nextScore >= 2 then
+              redis.call("ZADD", readyKey, tonumber(nextScore[2]), groupId)
+            end
           end
         end
       end
     end
   end
+
+  if #groups < pageSize then return nil end
+  offset = offset + pageSize
 end
 
 return nil
@@ -249,87 +283,96 @@ local results = {}
 local dispatched = 0
 
 -- Pull only groups whose earliest job is due now. Active groups carry future
--- scores so they are naturally excluded. Over-fetch by 3x (min 30) to leave
--- headroom for blocked/paused/legacy-drift groups.
-local scanLimit = maxJobs * 3
-if scanLimit < 30 then scanLimit = 30 end
+-- scores so they are naturally excluded. Over-fetch by 3x (min 30) per page to
+-- leave headroom for blocked/paused/legacy-drift groups, then page through up
+-- to scanBudget total entries so a head full of paused/blocked groups does
+-- not starve runnable groups deeper in the zset.
+local pageSize = maxJobs * 3
+if pageSize < 30 then pageSize = 30 end
+local scanBudget = pageSize * 5
+local offset = 0
 
-local groups = redis.call("ZRANGEBYSCORE", readyKey, "-inf", nowMs, "LIMIT", 0, scanLimit)
-if #groups == 0 then return results end
+while offset < scanBudget and dispatched < maxJobs do
+  local groups = redis.call("ZRANGEBYSCORE", readyKey, "-inf", nowMs, "LIMIT", offset, pageSize)
+  if #groups == 0 then break end
 
-for _, groupId in ipairs(groups) do
-  if dispatched >= maxJobs then break end
+  for _, groupId in ipairs(groups) do
+    if dispatched >= maxJobs then break end
 
-  if redis.call("SISMEMBER", blockedKey, groupId) == 0 then
-    local activeKey = keyPrefix .. "group:" .. groupId .. ":active"
-    -- Defensive activeKey check — covers legacy state during migration
-    -- and the small race between ZADD ready and ZADD active.
-    local activeJob = redis.call("GET", activeKey)
+    if redis.call("SISMEMBER", blockedKey, groupId) == 0 then
+      local activeKey = keyPrefix .. "group:" .. groupId .. ":active"
+      -- Defensive activeKey check — covers legacy state during migration
+      -- and the small race between ZADD ready and ZADD active.
+      local activeJob = redis.call("GET", activeKey)
 
-    if not activeJob then
-      local jobsKey = keyPrefix .. "group:" .. groupId .. ":jobs"
-      local jobResults = redis.call("ZRANGEBYSCORE", jobsKey, "-inf", nowMs, "WITHSCORES", "LIMIT", 0, 1)
+      if not activeJob then
+        local jobsKey = keyPrefix .. "group:" .. groupId .. ":jobs"
+        local jobResults = redis.call("ZRANGEBYSCORE", jobsKey, "-inf", nowMs, "WITHSCORES", "LIMIT", 0, 1)
 
-      if #jobResults >= 2 then
-        local stagedJobId = jobResults[1]
-        local originalScore = jobResults[2]
+        if #jobResults >= 2 then
+          local stagedJobId = jobResults[1]
+          local originalScore = jobResults[2]
 
-        -- Check pause status before dequeuing
-        local paused = false
-        if hasPauses then
-          local dataKey = keyPrefix .. "group:" .. groupId .. ":data"
-          local jobDataJson = redis.call("HGET", dataKey, stagedJobId)
-          if jobDataJson then
-            local ok, data = pcall(cjson.decode, jobDataJson)
-            if ok and type(data) == "table" then
-              local p = data["__pipelineName"]
-              local t = data["__jobType"]
-              local n = data["__jobName"]
-              local pIsStr = type(p) == "string"
-              local tIsStr = type(t) == "string"
-              local nIsStr = type(n) == "string"
-              if pIsStr then
-                if redis.call("SISMEMBER", pausedJobKey, p) == 1 then paused = true
-                elseif tIsStr and redis.call("SISMEMBER", pausedJobKey, p .. "/" .. t) == 1 then paused = true
-                elseif tIsStr and nIsStr and redis.call("SISMEMBER", pausedJobKey, p .. "/" .. t .. "/" .. n) == 1 then paused = true
+          -- Check pause status before dequeuing
+          local paused = false
+          if hasPauses then
+            local dataKey = keyPrefix .. "group:" .. groupId .. ":data"
+            local jobDataJson = redis.call("HGET", dataKey, stagedJobId)
+            if jobDataJson then
+              local ok, data = pcall(cjson.decode, jobDataJson)
+              if ok and type(data) == "table" then
+                local p = data["__pipelineName"]
+                local t = data["__jobType"]
+                local n = data["__jobName"]
+                local pIsStr = type(p) == "string"
+                local tIsStr = type(t) == "string"
+                local nIsStr = type(n) == "string"
+                if pIsStr then
+                  if redis.call("SISMEMBER", pausedJobKey, p) == 1 then paused = true
+                  elseif tIsStr and redis.call("SISMEMBER", pausedJobKey, p .. "/" .. t) == 1 then paused = true
+                  elseif tIsStr and nIsStr and redis.call("SISMEMBER", pausedJobKey, p .. "/" .. t .. "/" .. n) == 1 then paused = true
+                  end
                 end
               end
             end
           end
-        end
 
-        if not paused then
-          redis.call("ZREM", jobsKey, stagedJobId)
-          redis.call("SET", activeKey, stagedJobId, "EX", activeTtlSec)
+          if not paused then
+            redis.call("ZREM", jobsKey, stagedJobId)
+            redis.call("SET", activeKey, stagedJobId, "EX", activeTtlSec)
 
-          -- Mark group as actively-processing in ready zset (future score suppresses redispatch).
-          redis.call("ZADD", readyKey, activeUntil, groupId)
+            -- Mark group as actively-processing in ready zset (future score suppresses redispatch).
+            redis.call("ZADD", readyKey, activeUntil, groupId)
 
-          local dataKey = keyPrefix .. "group:" .. groupId .. ":data"
-          local jobDataJson = redis.call("HGET", dataKey, stagedJobId)
-          redis.call("HDEL", dataKey, stagedJobId)
+            local dataKey = keyPrefix .. "group:" .. groupId .. ":data"
+            local jobDataJson = redis.call("HGET", dataKey, stagedJobId)
+            redis.call("HDEL", dataKey, stagedJobId)
 
-          results[#results + 1] = stagedJobId
-          results[#results + 1] = groupId
-          results[#results + 1] = jobDataJson or ""
-          results[#results + 1] = tostring(originalScore)
-          dispatched = dispatched + 1
-        end
-      else
-        -- Group is in ready but has no due jobs — drift cleanup.
-        local pendingCount = redis.call("ZCARD", jobsKey)
-        if pendingCount == 0 then
-          redis.call("ZREM", readyKey, groupId)
+            results[#results + 1] = stagedJobId
+            results[#results + 1] = groupId
+            results[#results + 1] = jobDataJson or ""
+            results[#results + 1] = tostring(originalScore)
+            dispatched = dispatched + 1
+          end
         else
-          -- All jobs are future-scheduled; re-score ready with earliest job's score
-          local nextScore = redis.call("ZRANGE", jobsKey, 0, 0, "WITHSCORES")
-          if #nextScore >= 2 then
-            redis.call("ZADD", readyKey, tonumber(nextScore[2]), groupId)
+          -- Group is in ready but has no due jobs — drift cleanup.
+          local pendingCount = redis.call("ZCARD", jobsKey)
+          if pendingCount == 0 then
+            redis.call("ZREM", readyKey, groupId)
+          else
+            -- All jobs are future-scheduled; re-score ready with earliest job's score
+            local nextScore = redis.call("ZRANGE", jobsKey, 0, 0, "WITHSCORES")
+            if #nextScore >= 2 then
+              redis.call("ZADD", readyKey, tonumber(nextScore[2]), groupId)
+            end
           end
         end
       end
     end
   end
+
+  if #groups < pageSize then break end
+  offset = offset + pageSize
 end
 
 return results
@@ -401,10 +444,12 @@ local currentActive = redis.call("GET", activeKey)
 if currentActive == stagedJobId then
   redis.call("EXPIRE", activeKey, activeTtlSec)
   -- Refresh ready-zset score so it stays "active" until heartbeat stops or completion.
-  -- If the process crashes, the heartbeat stops, and the future score stays put until
-  -- it drifts into the past, at which point dispatch picks it up (defensive activeKey
-  -- check in dispatch handles the still-alive activeKey edge case).
-  redis.call("ZADD", readyKey, nowMs + activeTtlSec * 1000, groupId)
+  -- Only update if the group is currently in ready — if RESTAGE_AND_BLOCK_LUA fired
+  -- while this heartbeat was in flight, the group has been removed and we must not
+  -- reinsert it (would violate "blocked => not in ready").
+  if redis.call("ZSCORE", readyKey, groupId) then
+    redis.call("ZADD", readyKey, nowMs + activeTtlSec * 1000, groupId)
+  end
   return 1
 end
 return 0
@@ -560,16 +605,20 @@ export class GroupStagingScripts {
 
     const dataKey = `${this.keyPrefix}group:${groupId}:data`;
     const totalPendingKey = `${this.keyPrefix}stats:total-pending`;
+    const activeKey = `${this.keyPrefix}group:${groupId}:active`;
+    const blockedKey = `${this.keyPrefix}blocked`;
 
     const result = await this.redis.eval(
       STAGE_LUA,
-      6,
+      8,
       groupJobsKey,
       readyKey,
       signalKey,
       dedupKey,
       dataKey,
       totalPendingKey,
+      activeKey,
+      blockedKey,
       stagedJobId,
       groupId,
       String(dispatchAfterMs),
