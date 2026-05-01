@@ -84,7 +84,7 @@
         "langchain": ">=0.3.0 <2.0.0",
         "msw": "^2.10.4",
         "nock": "^14.0.8",
-        "openapi-msw": "^1.2.0",
+        "openapi-msw": "^2.0.0",
         "ts-to-zod": "4.0.1",
         "tsup": "^8.5.0",
         "typescript": "^5.9.2",
