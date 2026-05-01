@@ -16,6 +16,10 @@ export class SuiteRunClickHouseRepository implements SuiteRunReadRepository {
     batchRunId: string;
   }): Promise<SuiteRunStateData | null> {
     const client = await this.getClient(params.projectId);
+    // IN-tuple dedup over the ReplacingMergeTree (see
+    // dev/docs/best_practices/clickhouse-queries.md). Inner SELECT scans only
+    // the sparse (TenantId, BatchRunId, UpdatedAt) tuple to find the latest
+    // version; outer SELECT pulls the full row for that one tuple.
     const result = await client.query({
       query: `
         SELECT
@@ -29,7 +33,13 @@ export class SuiteRunClickHouseRepository implements SuiteRunReadRepository {
         FROM suite_runs
         WHERE TenantId = {projectId:String}
           AND BatchRunId = {batchRunId:String}
-        ORDER BY UpdatedAt DESC
+          AND (TenantId, BatchRunId, UpdatedAt) IN (
+            SELECT TenantId, BatchRunId, max(UpdatedAt)
+            FROM suite_runs
+            WHERE TenantId = {projectId:String}
+              AND BatchRunId = {batchRunId:String}
+            GROUP BY TenantId, BatchRunId
+          )
         LIMIT 1
       `,
       query_params: { projectId: params.projectId, batchRunId: params.batchRunId },

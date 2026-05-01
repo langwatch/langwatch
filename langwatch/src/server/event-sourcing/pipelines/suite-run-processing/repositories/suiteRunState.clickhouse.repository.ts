@@ -129,21 +129,36 @@ export class SuiteRunStateRepositoryClickHouse<
 
     try {
       const client = await this.resolveClient(context.tenantId);
+      // IN-tuple dedup over the ReplacingMergeTree (see
+      // dev/docs/best_practices/clickhouse-queries.md). UpdatedAt referenced
+      // via table alias because the column is also projected as
+      // `toUnixTimestamp64Milli(...) AS UpdatedAt`.
       const result = await client.query({
         query: `
           SELECT
-            ProjectionId, TenantId, SuiteRunId, BatchRunId, ScenarioSetId, SuiteId,
-            Version, Status, Total, StartedCount, CompletedCount, FailedCount, Progress,
-            PassRateBps, PassedCount, GradedCount,
-            toUnixTimestamp64Milli(CreatedAt) AS CreatedAt,
-            toUnixTimestamp64Milli(UpdatedAt) AS UpdatedAt,
-            toUnixTimestamp64Milli(StartedAt) AS StartedAt,
-            toUnixTimestamp64Milli(FinishedAt) AS FinishedAt,
-            toUnixTimestamp64Milli(LastEventOccurredAt) AS LastEventOccurredAt
-          FROM ${TABLE_NAME}
-          WHERE TenantId = {tenantId:String}
-            AND BatchRunId = {batchRunId:String}
-          ORDER BY UpdatedAt DESC
+            t.ProjectionId AS ProjectionId, t.TenantId AS TenantId,
+            t.SuiteRunId AS SuiteRunId, t.BatchRunId AS BatchRunId,
+            t.ScenarioSetId AS ScenarioSetId, t.SuiteId AS SuiteId,
+            t.Version AS Version, t.Status AS Status, t.Total AS Total,
+            t.StartedCount AS StartedCount, t.CompletedCount AS CompletedCount,
+            t.FailedCount AS FailedCount, t.Progress AS Progress,
+            t.PassRateBps AS PassRateBps, t.PassedCount AS PassedCount,
+            t.GradedCount AS GradedCount,
+            toUnixTimestamp64Milli(t.CreatedAt) AS CreatedAt,
+            toUnixTimestamp64Milli(t.UpdatedAt) AS UpdatedAt,
+            toUnixTimestamp64Milli(t.StartedAt) AS StartedAt,
+            toUnixTimestamp64Milli(t.FinishedAt) AS FinishedAt,
+            toUnixTimestamp64Milli(t.LastEventOccurredAt) AS LastEventOccurredAt
+          FROM ${TABLE_NAME} AS t
+          WHERE t.TenantId = {tenantId:String}
+            AND t.BatchRunId = {batchRunId:String}
+            AND (t.TenantId, t.BatchRunId, t.UpdatedAt) IN (
+              SELECT TenantId, BatchRunId, max(UpdatedAt)
+              FROM ${TABLE_NAME}
+              WHERE TenantId = {tenantId:String}
+                AND BatchRunId = {batchRunId:String}
+              GROUP BY TenantId, BatchRunId
+            )
           LIMIT 1
         `,
         query_params: { tenantId: context.tenantId, batchRunId },

@@ -262,34 +262,48 @@ export class DspyStepClickHouseRepository implements DspyStepRepository {
   ): Promise<DspyStepData | null> {
     try {
       const client = await this.resolveClient(tenantId);
+      // IN-tuple dedup over the ReplacingMergeTree (see
+      // dev/docs/best_practices/clickhouse-queries.md). Outer SELECT must
+      // reference UpdatedAt via a table alias because the column is also
+      // projected as `toString(...) AS UpdatedAt` — without the alias
+      // ClickHouse resolves UpdatedAt to the String projection in the WHERE
+      // clause and the type mismatch breaks the query.
       const result = await client.query({
         query: `
           SELECT
-            Id,
-            TenantId,
-            ExperimentId,
-            RunId,
-            StepIndex,
-            WorkflowVersionId,
-            Score,
-            Label,
-            OptimizerName,
-            OptimizerParameters,
-            Predictors,
-            Examples,
-            LlmCalls,
-            LlmCallsTotal,
-            toString(LlmCallsTotalTokens) AS LlmCallsTotalTokens,
-            LlmCallsTotalCost,
-            toString(toUnixTimestamp64Milli(CreatedAt)) AS CreatedAt,
-            toString(toUnixTimestamp64Milli(InsertedAt)) AS InsertedAt,
-            toString(toUnixTimestamp64Milli(UpdatedAt)) AS UpdatedAt
-          FROM ${TABLE_NAME}
-          WHERE TenantId = {tenantId:String}
-            AND ExperimentId = {experimentId:String}
-            AND RunId = {runId:String}
-            AND StepIndex = {stepIndex:String}
-          ORDER BY UpdatedAt DESC
+            t.Id AS Id,
+            t.TenantId AS TenantId,
+            t.ExperimentId AS ExperimentId,
+            t.RunId AS RunId,
+            t.StepIndex AS StepIndex,
+            t.WorkflowVersionId AS WorkflowVersionId,
+            t.Score AS Score,
+            t.Label AS Label,
+            t.OptimizerName AS OptimizerName,
+            t.OptimizerParameters AS OptimizerParameters,
+            t.Predictors AS Predictors,
+            t.Examples AS Examples,
+            t.LlmCalls AS LlmCalls,
+            t.LlmCallsTotal AS LlmCallsTotal,
+            toString(t.LlmCallsTotalTokens) AS LlmCallsTotalTokens,
+            t.LlmCallsTotalCost AS LlmCallsTotalCost,
+            toString(toUnixTimestamp64Milli(t.CreatedAt)) AS CreatedAt,
+            toString(toUnixTimestamp64Milli(t.InsertedAt)) AS InsertedAt,
+            toString(toUnixTimestamp64Milli(t.UpdatedAt)) AS UpdatedAt
+          FROM ${TABLE_NAME} AS t
+          WHERE t.TenantId = {tenantId:String}
+            AND t.ExperimentId = {experimentId:String}
+            AND t.RunId = {runId:String}
+            AND t.StepIndex = {stepIndex:String}
+            AND (t.TenantId, t.ExperimentId, t.RunId, t.StepIndex, t.UpdatedAt) IN (
+              SELECT TenantId, ExperimentId, RunId, StepIndex, max(UpdatedAt)
+              FROM ${TABLE_NAME}
+              WHERE TenantId = {tenantId:String}
+                AND ExperimentId = {experimentId:String}
+                AND RunId = {runId:String}
+                AND StepIndex = {stepIndex:String}
+              GROUP BY TenantId, ExperimentId, RunId, StepIndex
+            )
           LIMIT 1
         `,
         query_params: { tenantId, experimentId, runId, stepIndex },

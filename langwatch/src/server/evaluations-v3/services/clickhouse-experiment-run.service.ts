@@ -392,7 +392,11 @@ export class ClickHouseExperimentRunService {
         );
 
         try {
-          // Fetch run summary
+          // IN-tuple dedup over the ReplacingMergeTree (see
+          // dev/docs/best_practices/clickhouse-queries.md). Inner SELECT
+          // scans only the sparse key tuple to find max(UpdatedAt), outer
+          // SELECT pulls the heavy run row (Total/Progress/cost rollups) for
+          // that one match.
           const runResult = await clickHouseClient.query({
             query: `
               SELECT *
@@ -400,7 +404,14 @@ export class ClickHouseExperimentRunService {
               WHERE TenantId = {tenantId:String}
                 AND ExperimentId = {experimentId:String}
                 AND RunId = {runId:String}
-              ORDER BY UpdatedAt DESC
+                AND (TenantId, ExperimentId, RunId, UpdatedAt) IN (
+                  SELECT TenantId, ExperimentId, RunId, max(UpdatedAt)
+                  FROM experiment_runs
+                  WHERE TenantId = {tenantId:String}
+                    AND ExperimentId = {experimentId:String}
+                    AND RunId = {runId:String}
+                  GROUP BY TenantId, ExperimentId, RunId
+                )
               LIMIT 1
             `,
             query_params: {
