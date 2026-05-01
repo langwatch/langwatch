@@ -253,16 +253,15 @@ wheels = [
 
 [[package]]
 name = "azure-core"
-version = "1.35.1"
+version = "1.40.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "requests" },
-    { name = "six" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/15/6b/2653adc0f33adba8f11b1903701e6b1c10d34ce5d8e25dfa13a422f832b0/azure_core-1.35.1.tar.gz", hash = "sha256:435d05d6df0fff2f73fb3c15493bb4721ede14203f1ff1382aa6b6b2bdd7e562", size = 345290, upload-time = "2025-09-11T22:58:04.481Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/ce/d9/6f5972b44761277394527a3a76af5ae2ef82fc5f20ce351abf0c826eca67/azure_core-1.40.0.tar.gz", hash = "sha256:ecf5b6ddf2564471fae9d576147b7e77a4da285958b2d9f4fd6c3af104f3e9d7", size = 380057, upload-time = "2026-05-01T00:59:45.488Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/27/52/805980aa1ba18282077c484dba634ef0ede1e84eec8be9c92b2e162d0ed6/azure_core-1.35.1-py3-none-any.whl", hash = "sha256:12da0c9e08e48e198f9158b56ddbe33b421477e1dc98c2e1c8f9e254d92c468b", size = 211800, upload-time = "2025-09-11T22:58:06.281Z" },
+    { url = "https://files.pythonhosted.org/packages/ec/c9/25edc67692fb17523c7d29c73898be649b4d3c7ae13cc0f74f5c91938022/azure_core-1.40.0-py3-none-any.whl", hash = "sha256:7f3ea02579b1bb1d34e45043423b650621d11d7c2ea3b05e5554010080b78dfd", size = 220450, upload-time = "2026-05-01T00:59:47.17Z" },
 ]
 
 [[package]]
