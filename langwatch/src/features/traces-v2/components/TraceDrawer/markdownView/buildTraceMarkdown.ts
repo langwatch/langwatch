@@ -303,7 +303,7 @@ function splitThinkingFromText(text: string): TextSegment[] {
 /** Format a thinking string as a markdown-italic line with the 🧠 marker
  *  the DOM walker uses to attach the shimmer + "Thinking" tooltip. */
 function thinkingLine(content: string): string {
-  const escaped = content.replace(/\*/g, "\\*");
+  const escaped = content.replace(/\\/g, "\\\\").replace(/\*/g, "\\*");
   return `*🧠 ${truncate(escaped, 600)}*`;
 }
 

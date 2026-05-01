@@ -97,7 +97,10 @@ function pick<T>(arr: T[]): T {
 }
 
 function randInt(min: number, max: number): number {
-  return Math.floor(Math.random() * (max - min + 1)) + min;
+  const range = max - min + 1;
+  const buf = new Uint32Array(1);
+  crypto.getRandomValues(buf);
+  return min + (buf[0]! % range);
 }
 
 function makeExceptionEvent(
@@ -499,7 +502,6 @@ function buildSubtree(args: SubtreeArgs): { spans: SpanConfig[]; used: number } 
 
   while (used < budget) {
     const remaining = budget - used;
-    if (remaining <= 0) break;
 
     const isGenai = Math.random() < genaiRatio;
     const atMaxDepth = depth >= maxDepth - 1;

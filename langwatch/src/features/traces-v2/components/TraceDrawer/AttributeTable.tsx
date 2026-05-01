@@ -71,7 +71,7 @@ function buildNestedObject(
 
 function formatValue(val: unknown): string {
   if (val === undefined || val === null || val === "") return EM_DASH;
-  if (Array.isArray(val) || (typeof val === "object" && val !== null)) {
+  if (Array.isArray(val) || typeof val === "object") {
     return JSON.stringify(val);
   }
   return String(val);

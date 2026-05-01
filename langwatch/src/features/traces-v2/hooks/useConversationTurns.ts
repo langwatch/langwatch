@@ -33,7 +33,9 @@ export function useConversationTurns(conversationId: string | null) {
       page: 1,
       pageSize: 100,
       query: conversationId
-        ? `conversation:"${conversationId.replace(/"/g, '\\"')}"`
+        ? `conversation:"${conversationId
+            .replace(/\\/g, "\\\\")
+            .replace(/"/g, '\\"')}"`
         : "",
     },
     {

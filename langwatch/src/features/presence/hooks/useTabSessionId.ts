@@ -16,10 +16,7 @@ export function useTabSessionId(): string {
     if (cached) {
       ref.current = cached;
     } else {
-      ref.current =
-        typeof crypto !== "undefined" && "randomUUID" in crypto
-          ? crypto.randomUUID()
-          : `presence-${Math.random().toString(36).slice(2)}-${Date.now()}`;
+      ref.current = crypto.randomUUID();
       (window as { __lw_presence_session_id?: string }).__lw_presence_session_id =
         ref.current;
     }

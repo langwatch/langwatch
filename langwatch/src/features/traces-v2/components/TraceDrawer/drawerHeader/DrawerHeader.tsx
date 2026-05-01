@@ -383,7 +383,10 @@ export const DrawerHeader = memo(function DrawerHeader({
     if (trace.serviceName) parts.push(`service:"${trace.serviceName}"`);
     if (trace.status === "error") parts.push("status:error");
     if (trace.traceName) {
-      parts.push(`"${trace.traceName.replace(/"/g, '\\"')}"`);
+      const escaped = trace.traceName
+        .replace(/\\/g, "\\\\")
+        .replace(/"/g, '\\"');
+      parts.push(`"${escaped}"`);
     }
     return parts.join(" ");
   }, [trace.serviceName, trace.status, trace.traceName]);
