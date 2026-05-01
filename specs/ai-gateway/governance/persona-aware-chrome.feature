@@ -117,9 +117,9 @@ Feature: AI Gateway Governance — Persona-aware chrome (sidebar + header)
         keyed on its own product feature flag (the flags can roll out
         independently — customers may want Gateway without Governance,
         Governance without Gateway, or both):
-      | section  | permission predicate                      | feature-flag predicate                  |
-      | Govern   | user has organization:manage permission*  | release_ui_ai_governance_enabled = on   |
-      | Gateway  | user has virtualKeys:view permission      | release_ui_ai_gateway_menu_enabled = on |
+      | section  | permission predicate                  | feature-flag predicate                  |
+      | Govern   | user has governance:view permission   | release_ui_ai_governance_enabled = on   |
+      | Gateway  | user has virtualKeys:view permission  | release_ui_ai_gateway_menu_enabled = on |
     When the user opens any LLMOps page
     Then the sidebar shows the "Govern" section iff both Govern predicates are true
     And the sidebar shows the "Gateway" section iff both Gateway predicates are true
@@ -128,12 +128,13 @@ Feature: AI Gateway Governance — Persona-aware chrome (sidebar + header)
         gating on data presence creates a chicken-and-egg discoverability trap.
     And the feature flag is the operator's rollout knob; the permission is the audience predicate.
 
-    # *Note: organization:manage is a temporary stand-in until the dedicated
-    # `governance:view` permission lands (Lane-S RBAC drive-by). Once the new
-    # permission is in the rbac.ts catalog, this row swaps to:
-    #   user has governance:view permission
-    # ADMIN role default-grants governance:view; custom roles via the
-    # CustomRolePermissions JSON column compose any subset.
+    # `governance:view` is one of 5 governance Resources in the rbac.ts catalog
+    # (governance, ingestionSources, anomalyRules, complianceExport,
+    # activityMonitor). ADMIN role default-grants the full set; MEMBER +
+    # EXTERNAL get nothing by default; custom roles via the
+    # CustomRolePermissions JSON column compose any subset (e.g. a
+    # "security_analyst" custom role granting governance:view +
+    # activityMonitor:view + anomalyRules:view).
 
   @bdd @ui @persona-chrome @persona-4
   Scenario: Governance admin lands on /governance with the org-scope chrome

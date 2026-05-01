@@ -59,9 +59,9 @@ export const MainMenu = React.memo(function MainMenu({
     { projectId: project?.id, enabled: !!project },
   );
 
-  // Governance + AI Gateway sections are gated symmetrically on:
-  //   (a) the user holds `organization:manage` permission, AND
-  //   (b) the relevant feature flag is enabled
+  // Governance section is gated on:
+  //   (a) the user holds `governance:view` permission, AND
+  //   (b) the `release_ui_ai_governance_enabled` flag is on
   // No additional gating on hasIngestionSources / hasPersonalVKs / etc.
   // Admins must see Govern to bootstrap their first IngestionSource —
   // gating on data presence creates a chicken-and-egg discoverability
@@ -72,7 +72,7 @@ export const MainMenu = React.memo(function MainMenu({
     { projectId: project?.id, enabled: !!project },
   );
   const showGovernanceEntry =
-    governancePreviewEnabled && hasPermission("organization:manage");
+    governancePreviewEnabled && hasPermission("governance:view");
 
   // In compact mode, show expanded view on hover
   const showExpanded = !isCompact || isHovered;
