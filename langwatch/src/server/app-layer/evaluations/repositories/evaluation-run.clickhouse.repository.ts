@@ -6,7 +6,7 @@ import { IdUtils } from "~/server/event-sourcing/pipelines/evaluation-processing
 import { createLogger } from "~/utils/logger/server";
 import { validateBatchTenants } from "../../_shared/clickhouse-batch";
 import type { EvalSummary, EvaluationRunData } from "../types";
-import type { EvaluationRunRepository } from "./evaluation-run.repository";
+import type { EvaluationRunRepository, GetByEvaluationIdHints } from "./evaluation-run.repository";
 
 const TABLE_NAME = "evaluation_runs" as const;
 
@@ -142,6 +142,7 @@ export class EvaluationRunClickHouseRepository
   async getByEvaluationId(
     tenantId: string,
     evaluationId: string,
+    hints?: GetByEvaluationIdHints,
   ): Promise<EvaluationRunData | null> {
     EventUtils.validateTenantId(
       { tenantId },
@@ -150,23 +151,41 @@ export class EvaluationRunClickHouseRepository
 
     try {
       const client = await this.resolveClient(tenantId);
-      // IN-tuple dedup over the ReplacingMergeTree: the inner SELECT scans
-      // only (TenantId, EvaluationId, UpdatedAt) — small, sparse — to find
-      // the latest version, then the outer SELECT pulls the heavy columns
-      // (Inputs, Details, Error, ErrorDetails — ZSTD(3)) for that one row.
+
+      // IN-tuple dedup over the ReplacingMergeTree, with two ClickHouse-
+      // specific shapes that matter under load:
       //
-      // Do not "simplify" to `ORDER BY UpdatedAt DESC LIMIT 1`: with many
-      // unmerged versions per (TenantId, EvaluationId) it forces the engine
-      // to read every version *with* the heavy columns just to sort them in
-      // memory.
+      // 1. PREWHERE on the IN-tuple — runs the predicate before SELECT-column
+      //    reads, so the heavy ZSTD(3) columns (Inputs, Details, Error,
+      //    ErrorDetails) only get decompressed for the one row that wins
+      //    max(UpdatedAt). With plain WHERE the engine reads heavy columns
+      //    for every unmerged version of the matched key range first, then
+      //    filters — which on `evaluation_runs` was observed at ~5.8 MB
+      //    decompressed per call even for a single-row lookup.
       //
-      // Outer SELECT references columns via the `t.` alias because the
+      // 2. Partition predicate on ScheduledAt when the caller knows it. The
+      //    table is `PARTITION BY toYearWeek(ScheduledAt)`; without a bound
+      //    the engine scans every weekly partition (incl. cold storage on
+      //    S3). The default ±7 day window covers the typical eval lifetime
+      //    (schedule → run → archive) without missing late status updates.
+      //
+      // Outer SELECT/WHERE references columns via the `t.` alias because the
       // SELECT projects `toUnixTimestamp64Milli(UpdatedAt) AS UpdatedAt`
       // (and similar for Created/Archived/Scheduled/Started/CompletedAt).
       // Without the alias the IN-tuple's `UpdatedAt` could resolve to the
       // projected UInt64 alias instead of the raw DateTime64 column and the
       // type comparison would break. See
       // dev/docs/best_practices/clickhouse-queries.md.
+
+      const slackMs = hints?.scheduledAtSlackMs ?? 7 * 24 * 60 * 60 * 1000;
+      const scheduledAtMs = hints?.scheduledAt?.getTime();
+      const partitionPredicate = scheduledAtMs !== undefined
+        ? "AND t.ScheduledAt >= fromUnixTimestamp64Milli({scheduledAtFrom:Int64}) AND t.ScheduledAt <= fromUnixTimestamp64Milli({scheduledAtTo:Int64})"
+        : "";
+      const innerPartitionPredicate = scheduledAtMs !== undefined
+        ? "AND ScheduledAt >= fromUnixTimestamp64Milli({scheduledAtFrom:Int64}) AND ScheduledAt <= fromUnixTimestamp64Milli({scheduledAtTo:Int64})"
+        : "";
+
       const result = await client.query({
         query: `
           SELECT
@@ -196,20 +215,27 @@ export class EvaluationRunClickHouseRepository
             t.CostId AS CostId,
             t.LastProcessedEventId AS LastProcessedEventId
           FROM ${TABLE_NAME} AS t
+          PREWHERE (t.TenantId, t.EvaluationId, t.UpdatedAt) IN (
+            SELECT TenantId, EvaluationId, max(UpdatedAt)
+            FROM ${TABLE_NAME}
+            WHERE TenantId = {tenantId:String}
+              AND EvaluationId = {evaluationId:String}
+              ${innerPartitionPredicate}
+            GROUP BY TenantId, EvaluationId
+          )
           WHERE t.TenantId = {tenantId:String}
             AND t.EvaluationId = {evaluationId:String}
-            AND t.ScheduledAt >= now() - INTERVAL 7 DAY
-            AND (t.TenantId, t.EvaluationId, t.UpdatedAt) IN (
-              SELECT TenantId, EvaluationId, max(UpdatedAt)
-              FROM ${TABLE_NAME}
-              WHERE TenantId = {tenantId:String}
-                AND EvaluationId = {evaluationId:String}
-                AND ScheduledAt >= now() - INTERVAL 7 DAY
-              GROUP BY TenantId, EvaluationId
-            )
+            ${partitionPredicate}
           LIMIT 1
         `,
-        query_params: { tenantId, evaluationId },
+        query_params: scheduledAtMs !== undefined
+          ? {
+              tenantId,
+              evaluationId,
+              scheduledAtFrom: scheduledAtMs - slackMs,
+              scheduledAtTo: scheduledAtMs + slackMs,
+            }
+          : { tenantId, evaluationId },
         format: "JSONEachRow",
       });
 
