@@ -66,19 +66,19 @@ const LEGACY_UNBOUND: string[] = [
   // nlp-go workflow engine (introduced by #3483) — scenarios document the
   // Go port of the NLP workflow engine. Tests live in services/aigateway
   // and langwatch_nlp; bindings have not been backfilled yet.
-  "specs/nlp-go/code-block.feature",
-  "specs/nlp-go/dataset-block.feature",
-  "specs/nlp-go/engine.feature",
-  "specs/nlp-go/feature-flag.feature",
-  "specs/nlp-go/front-door.feature",
-  "specs/nlp-go/http-block.feature",
-  "specs/nlp-go/llm-block.feature",
-  "specs/nlp-go/parallel-deployment.feature",
-  "specs/nlp-go/proxy.feature",
-  "specs/nlp-go/telemetry.feature",
-  "specs/nlp-go/topic-clustering.feature",
-  "specs/nlp-go/tracing-parity.feature",
-  "specs/studio/dataset-creation-regression.feature",
+  // "specs/nlp-go/code-block.feature",
+  // "specs/nlp-go/dataset-block.feature",
+  // "specs/nlp-go/engine.feature",
+  // "specs/nlp-go/feature-flag.feature",
+  // "specs/nlp-go/front-door.feature",
+  // "specs/nlp-go/http-block.feature",
+  // "specs/nlp-go/llm-block.feature",
+  // "specs/nlp-go/parallel-deployment.feature",
+  // "specs/nlp-go/proxy.feature",
+  // "specs/nlp-go/telemetry.feature",
+  // "specs/nlp-go/topic-clustering.feature",
+  // "specs/nlp-go/tracing-parity.feature",
+  // "specs/studio/dataset-creation-regression.feature",
 ];
 
 const TEST_FILE_RE = /\.test\.tsx?$/;
