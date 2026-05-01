@@ -109,7 +109,7 @@ def _poll_run_results(
                     if len(rows) >= expected_items:
                         if not require_cost or all(row.get("cost") for row in rows):
                             return last_body
-        except Exception as exc:
+        except (httpx.RequestError, ValueError) as exc:
             last_error = exc
         time.sleep(interval)
     seen = len(last_body.get("dataset", [])) if last_body else 0

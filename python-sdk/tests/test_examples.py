@@ -4,6 +4,7 @@ import importlib
 import random
 import inspect
 from typing import Optional, Sequence, cast
+import httpx
 import pytest
 import asyncio
 
@@ -243,6 +244,6 @@ async def test_example(example_file: str):
         else:
             try:
                 trace_urls[example_file] = trace.share()
-            except Exception:
+            except (httpx.TimeoutException, httpx.ConnectError):
                 trace_urls[example_file] = trace.trace_id or "share-failed"
         print(json.dumps(trace_urls, indent=2))
