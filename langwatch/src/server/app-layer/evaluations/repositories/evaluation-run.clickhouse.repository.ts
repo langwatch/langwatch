@@ -6,7 +6,7 @@ import { IdUtils } from "~/server/event-sourcing/pipelines/evaluation-processing
 import { createLogger } from "~/utils/logger/server";
 import { validateBatchTenants } from "../../_shared/clickhouse-batch";
 import type { EvalSummary, EvaluationRunData } from "../types";
-import type { EvaluationRunRepository, GetByEvaluationIdHints } from "./evaluation-run.repository";
+import type { EvaluationRunRepository, GetByEvaluationIdParams } from "./evaluation-run.repository";
 
 const TABLE_NAME = "evaluation_runs" as const;
 
@@ -139,11 +139,11 @@ export class EvaluationRunClickHouseRepository
     }
   }
 
-  async getByEvaluationId(
-    tenantId: string,
-    evaluationId: string,
-    hints?: GetByEvaluationIdHints,
-  ): Promise<EvaluationRunData | null> {
+  async getByEvaluationId({
+    tenantId,
+    evaluationId,
+    hints,
+  }: GetByEvaluationIdParams): Promise<EvaluationRunData | null> {
     EventUtils.validateTenantId(
       { tenantId },
       "EvaluationRunClickHouseRepository.getByEvaluationId",
