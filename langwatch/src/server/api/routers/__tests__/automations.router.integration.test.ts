@@ -24,14 +24,18 @@ vi.mock("~/server/license-enforcement", async (importOriginal) => {
   };
 });
 
-vi.mock("../../rbac", () => ({
-  checkProjectPermission: vi.fn().mockImplementation(() => {
-    return async ({ ctx, next }: any) =>
-      next({
-        ctx: { ...ctx, permissionChecked: true },
-      });
-  }),
-}));
+vi.mock("../../rbac", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../rbac")>();
+  return {
+    ...actual,
+    checkProjectPermission: vi.fn().mockImplementation(() => {
+      return async ({ ctx, next }: any) =>
+        next({
+          ctx: { ...ctx, permissionChecked: true },
+        });
+    }),
+  };
+});
 
 vi.mock("~/server/auditLog", () => ({
   auditLog: vi.fn().mockResolvedValue(undefined),

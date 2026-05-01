@@ -17,8 +17,32 @@
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
+
+// SearchBar pulls in tRPC via useOrganizationTeamProject + useModelProvidersSettings
+// (used by the global AI shortcut). These tests don't wrap with withTRPC, so
+// stub them out to keep the smoke render free of provider boilerplate.
+vi.mock("~/hooks/useOrganizationTeamProject", () => ({
+  useOrganizationTeamProject: () => ({
+    project: undefined,
+    organization: undefined,
+    team: undefined,
+    isFetching: false,
+  }),
+}));
+
+vi.mock("~/hooks/useModelProvidersSettings", () => ({
+  useModelProvidersSettings: () => ({
+    modelProviders: [],
+    customDefaultModel: null,
+    isLoading: false,
+  }),
+}));
+
+vi.mock("../../../hooks/useTraceFacets", () => ({
+  useTraceFacets: () => ({ data: [], isLoading: false }),
+}));
 
 import { useFilterStore } from "../../../stores/filterStore";
 import { SearchBar } from "../SearchBar";

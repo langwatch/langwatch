@@ -23,6 +23,18 @@ vi.mock("~/utils/posthogErrorCapture", () => ({
   captureException: vi.fn(),
 }));
 
+// Heavy I/O bound dependencies pulled in transitively via dispatchTriggerAction
+// (email render + SES, Slack webhook, dataset row mapping). They throw on any
+// unconfigured env in CI, which would short-circuit dispatch before
+// `updateLastRunAt`. Stub them out so dispatch can complete its bookkeeping.
+vi.mock("~/server/mailer/triggerEmail", () => ({
+  sendTriggerEmail: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock("~/server/triggers/sendSlackWebhook", () => ({
+  sendSlackWebhook: vi.fn().mockResolvedValue(undefined),
+}));
+
 function createEvalFoldState(
   overrides: Partial<EvaluationRunData> = {},
 ): EvaluationRunData {
