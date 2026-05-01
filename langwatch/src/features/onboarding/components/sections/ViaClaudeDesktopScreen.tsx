@@ -13,7 +13,7 @@ import {
 } from "./shared/build-mcp-config";
 import { TabButton } from "./shared/TabButton";
 
-const MotionVStack = motion(VStack);
+const MotionVStack = motion.create(VStack);
 
 type AppKey = "claude-desktop" | "codex" | "gemini";
 

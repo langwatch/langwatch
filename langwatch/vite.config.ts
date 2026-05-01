@@ -79,6 +79,21 @@ function loadDevHttpsCredentials():
 
 const devHttpsCredentials = loadDevHttpsCredentials();
 
+// Diagnostic: when Vite hot-restarts on a config change, the https block is
+// re-evaluated but in-process TLS state can land in a broken pair (server
+// listening, TLS handshake failing with `ERR_SSL_PROTOCOL_ERROR`). This log
+// makes the post-restart scheme observable in `server.log`, so a "blank
+// page after editing config" failure mode is easy to diagnose without
+// digging into TLS errors. Drop in `pnpm dev:clean` to reset both the Vite
+// module graph and `.dev-certs/` if the cert pair is suspected.
+if (USE_HTTP2) {
+  console.log(
+    `[vite-config] HTTP/2 enabled; https credentials ${devHttpsCredentials ? "loaded" : "MISSING"}`,
+  );
+} else {
+  console.log("[vite-config] HTTPS disabled (set LANGWATCH_DEV_HTTP2=1)");
+}
+
 // object-inspect's index.js does `var inspectCustom = require('./util.inspect')`
 // and the package.json sets `"browser": { "./util.inspect.js": false }`. Vite
 // turns `false` into a Proxy stub that throws on ANY property access — which

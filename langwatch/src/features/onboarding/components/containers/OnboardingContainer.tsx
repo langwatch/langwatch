@@ -17,9 +17,9 @@ import { Tooltip } from "~/components/ui/tooltip";
 import { OnboardingMeshBackground } from "../OnboardingMeshBackground";
 import SpookyScarySkeleton from "../SpookyScarySkeleton";
 
-const MotionBox = motion(Box);
-const MotionCenter = motion(Center);
-const MotionText = motion(Text);
+const MotionBox = motion.create(Box);
+const MotionCenter = motion.create(Center);
+const MotionText = motion.create(Text);
 
 interface OnboardingContainerProps extends React.PropsWithChildren {
   loading?: boolean;

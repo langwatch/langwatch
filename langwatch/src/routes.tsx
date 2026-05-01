@@ -453,9 +453,20 @@ const routes: RouteObject[] = [
   },
 ];
 
+// React Router v7 expects a HydrateFallback when the root route is async; the
+// app uses lazy() per-route and never blocks hydration, but RR still emits a
+// console warning if no fallback is declared. An empty fragment is correct
+// here — InnerProviders + Suspense already render the right shell once
+// children resolve, and showing nothing for the few ms before that is the
+// existing behaviour.
+function HydrateFallback() {
+  return null;
+}
+
 export const router = createBrowserRouter([
   {
     Component: RootLayout,
+    HydrateFallback,
     // ErrorBoundary catches render + loader throws anywhere below this node
     // and renders the same fallback used by the catch-all 404 route.
     ErrorBoundary: NotFoundOrErrorPage,

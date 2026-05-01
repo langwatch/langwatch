@@ -75,12 +75,18 @@ export function useTraceEvaluations(): TraceEvaluationsResult {
   const { project } = useOrganizationTeamProject();
   const traceId = useDrawerStore((s) => s.traceId);
 
+  // TODO(traces-v2): migrate to `tracesV2.evals` once the v2 schema carries
+  // `spanId`, `errorStacktrace`, and `retries` — the rich evaluations panel
+  // surfaces all three. Until then, keep the v1 endpoint but split it off
+  // the drawer batch so it doesn't block the 7 other v2 procedures the
+  // drawer fires on open.
   const query = api.traces.getEvaluations.useQuery(
     { projectId: project?.id ?? "", traceId: traceId ?? "" },
     {
       enabled: !!project?.id && !!traceId,
       staleTime: 30_000,
       refetchOnWindowFocus: false,
+      trpc: { context: { skipBatch: true } },
     },
   );
 

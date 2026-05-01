@@ -5,7 +5,7 @@ import type React from "react";
 import { api } from "~/utils/api";
 import type { ProductSelection } from "../../types/types";
 
-const MotionBox = motion(Box);
+const MotionBox = motion.create(Box);
 
 interface ProductOption {
   key: ProductSelection;

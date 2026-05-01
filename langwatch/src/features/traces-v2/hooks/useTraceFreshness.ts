@@ -1,10 +1,17 @@
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useTraceUpdateListener } from "~/hooks/useTraceUpdateListener";
 import { api } from "~/utils/api";
 import { useDrawerStore } from "../stores/drawerStore";
 import { useRefreshUIStore } from "../stores/refreshUIStore";
 import { useSseStatusStore } from "../stores/sseStatusStore";
+
+// Facets (`tracesV2.discover`) are ~10x more expensive than the table list
+// (~1.2s vs ~0.1s in our perf capture) and they only change when a *new*
+// attribute value appears — far less frequently than a trace update. Coalesce
+// invalidations into a longer window so a steady stream of new traces
+// doesn't keep the sidebar permanently refetching.
+const DISCOVER_INVALIDATE_DEBOUNCE_MS = 30_000;
 
 /**
  * Coordinator hook that bridges SSE trace events into TanStack Query
@@ -26,6 +33,17 @@ export function useTraceFreshness() {
   );
   const setLastEventAt = useSseStatusStore((s) => s.setLastEventAt);
   const pulse = useRefreshUIStore((s) => s.pulse);
+  const discoverInvalidateTimer = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
+
+  useEffect(() => {
+    return () => {
+      if (discoverInvalidateTimer.current) {
+        clearTimeout(discoverInvalidateTimer.current);
+      }
+    };
+  }, []);
 
   const onTraceSummaryUpdated = useCallback(
     (traceIds: string[]) => {
@@ -36,8 +54,15 @@ export function useTraceFreshness() {
 
       // Table-level invalidation — TQ only refetches mounted queries
       void trpcUtils.tracesV2.list.invalidate();
-      void trpcUtils.tracesV2.discover.invalidate();
       void trpcUtils.tracesV2.newCount.invalidate();
+      // Discover (facets) is heavy. Coalesce into a 30s window so a steady
+      // trace stream doesn't keep it permanently refetching.
+      if (!discoverInvalidateTimer.current) {
+        discoverInvalidateTimer.current = setTimeout(() => {
+          discoverInvalidateTimer.current = null;
+          void trpcUtils.tracesV2.discover.invalidate();
+        }, DISCOVER_INVALIDATE_DEBOUNCE_MS);
+      }
 
       // Reset adaptive polling to fast interval
       requestFastPoll();

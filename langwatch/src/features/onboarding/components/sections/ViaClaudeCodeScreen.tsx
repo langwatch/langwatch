@@ -4,7 +4,7 @@ import { AnimatePresence, motion } from "motion/react";
 import type React from "react";
 import { useMemo, useState } from "react";
 
-const MotionVStack = motion(VStack);
+const MotionVStack = motion.create(VStack);
 import { usePublicEnv } from "~/hooks/usePublicEnv";
 import { Tooltip } from "../../../../components/ui/tooltip";
 import { useActiveProject } from "../../contexts/ActiveProjectContext";

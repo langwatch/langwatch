@@ -12,7 +12,7 @@ export const editorStyles: SystemStyleObject = {
     caretColor: "var(--chakra-colors-fg-DEFAULT)",
   },
   "& .tiptap p": { margin: 0 },
-  "& .tiptap p.is-editor-empty:first-child::before": {
+  "& .tiptap p.is-editor-empty:first-of-type::before": {
     color: "var(--chakra-colors-fg-subtle)",
     content: "attr(data-placeholder)",
     float: "left",

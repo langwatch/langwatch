@@ -24,6 +24,7 @@
     "postinstall": "make -C .. setup-hooks 2>/dev/null || true",
     "dev": "NODE_ENV=development START_WORKERS=true ./scripts/check-ports.sh && pnpm run start:prepare:files && NODE_ENV=development START_WORKERS=true FORCE_COLOR=1 pnpm start 2>&1 | tee server.log",
     "dev:vite": "vite",
+    "dev:clean": "rm -rf node_modules/.vite .dev-certs && echo 'Vite cache and dev certs cleared. Restart dev server.'",
     "start": "./scripts/start.sh",
     "start:app": "tsx src/server.mts",
     "start:quickwit": "cd quickwit && ./quickwit run",
