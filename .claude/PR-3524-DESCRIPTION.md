@@ -7,6 +7,28 @@
 
 ---
 
+## Current status (iter29 — 2026-05-01)
+
+> **Backend GA gate: FULLY GREEN.** All 6 lane-S slices closed (3a/3b/3c/3d/3e/3f) with backend GA verified at unit + integration depth (16 anomaly tests + 56/56 RBAC tests + per-slice integration suites).
+>
+> **Customer-facing docs flip: COMPLETE** end-to-end against ADR-018 unified-substrate framing. 4 waves shipped:
+> - Wave 1 (`1e34cd9ef`): `trace-vs-activity-ingestion.mdx` reframed
+> - Wave 2 (`f13c33e20`): NEW `compliance-architecture.mdx` + `retention.mdx` + `ocsf-export.mdx`
+> - Wave 3 (`5bca796f2`): 8 ingestion-source pages reframed end-to-end
+> - Wave 4 (`0b4f4d90e`): `personal-keys.mdx` storyboard refresh
+>
+> **Persona-aware experience: SHIPPED.** Initial 1.5b-viii claim ("persona-aware home") was scoped too narrowly to the URL redirect; iter29 dogfood review surfaced the chrome was unchanged from LLMOps defaults (`/me` rendered with two stacked selectors + irrelevant LLMOps sidebar). Cross-lane fix landed end-to-end:
+> - `a935d707e` chrome refactor — new `PersonalSidebar`; `DashboardLayout` swaps to WorkspaceSwitcher + PersonalSidebar on personal scope; `MyLayout` shrinks; `MainMenu` drops chicken-and-egg `hasIngestionSources` predicate
+> - `b311d1ca5` BDD spec FF correction (two-flag shape locked per @rchaves directive)
+> - `385c95e89` AI Governance permissions catalog (5 new Resources × actions added to `rbac.ts`; ADMIN gets full set; MEMBER + EXTERNAL get none; custom-role JSON column = the production-shape delegation surface)
+> - `043726430` chrome gate consumes `governance:view` permission instead of broad `organization:manage`
+>
+> **Persona-3 regression-safety invariant locked**: LLMOps majority (~90% of users today, no AI gateway) sees ZERO chrome change. DashboardLayout untouched for project_only persona. Verified via BDD spec.
+>
+> **Rollout sequence (per @rchaves directive)**: two-phase FF rollout. Phase 1 → flip `release_ui_ai_gateway_menu_enabled` ON → Gateway menu + personal-key flow visible. Phase 2 (later) → flip `release_ui_ai_governance_enabled` ON → Governance dashboard + ingestion-sources + anomaly-rules + OCSF export visible. Two flags, not one — preserves pilot flexibility (gateway-only vs governance-only customer rollouts).
+
+---
+
 ## The pitch — what this PR ships
 
 > "Your engineers are running AI through Workato Genies, Claude for Work, Copilot
@@ -231,7 +253,7 @@ codify this.
 
 ---
 
-## BDD specs — the executable contract (8 files / ~1,382 LOC)
+## BDD specs — the executable contract (9 files / ~1,580 LOC)
 
 Spec-first, code-follows. The full architecture lock is captured as testable
 scenarios before the code lands. All committed to `specs/ai-gateway/governance/`:
@@ -246,6 +268,7 @@ scenarios before the code lands. All committed to `specs/ai-gateway/governance/`
 | `folds.feature` | Lane S (Sergey) | governance_kpis + governance_ocsf_events fold derivation; anomaly reactor reads fold not raw spans; fold rebuild from event_log |
 | `retention.feature` | Lane S (Sergey) | Per-IngestionSource retention class (30d / 1y / 7y); CH TTL enforcement; org plan ceiling |
 | `event-log-durability.feature` | Lane S (Sergey) | Append-only event_log foundation for non-repudiation; folds rebuildable; tamper-evidence deferred |
+| `persona-aware-chrome.feature` (197 LOC, NEW iter29) | Lane B (Alexis) | Persona-aware chrome contract — sidebar + header per 4 personas; persona-3 regression-invariant FIRST in file; gateway.md Screen 6 layout; chicken-and-egg fix codified; FF-off split scenarios for two-flag pilot flexibility; single-chip-in-header invariant prevents iter29 dogfood-bug recurrence |
 
 Cross-references: each spec cites siblings rather than duplicating scenarios.
 Andre's `compliance-baseline.feature` references my `retention.feature` +
@@ -318,6 +341,25 @@ pipeline) to the unified-trace direction. Honest history:
 | `cb3702cd2` | test(governance): step 3c-iv — per-origin retention TTL integration test (Lane S — 7 scenarios covering write-side + table metadata invariants). **3c chain CLOSED end-to-end across both install modes (self-hosted no-cold + SaaS cold).** |
 | `5fa23f900` | feat(governance): step 3d-i — governance_ocsf_events CH migration (Lane S — OCSF v1.1 / OWASP AOS shape Actor / Action / Target / Time / Severity / Event ID per `siem-export.feature` spec) |
 | `ee5159879` | feat(governance): step 3d-ii — governanceOcsfEventsSync reactor + CH repository + pipeline registration (Lane S — populates the OCSF fold downstream of trace_summary fold; mirrors 3b-ii pattern) |
+| `50ebe34b3` | test(governance): step 3d-iii — governanceOcsfEventsSync reactor unit tests, 13 cases (Lane S) |
+| `220336f3f` | docs(governance): fold iter28 Screen 4 success ceremony + iter28 discoveries + 3d-i/3d-ii commit refs (Lane A) |
+| `be89d872a` | fix(governance): defensive scope normalization in RoutingPolicyService.create (Lane B — dogfood-found) |
+| `07bd07deb` | feat(governance): step 3f — OCSF export tRPC procedure for SIEM forwarding (Lane S — `api.governance.ocsfExport` cursor-paginated, org-tenancy isolation, auth-scoped) |
+| `37f3a8b3e` | chore(docs): rename llms.txt.sh → llms.txt.cjs (Node 24 ESM-loader compat — pre-commit hook fix) |
+| `1e34cd9ef` | docs(governance): wave 1 — flip `trace-vs-activity-ingestion.mdx` to unified-substrate framing per ADR-018 (Lane A) |
+| `7cb933841` | chore(dogfood): `seed-anomaly-fixture.ts` for iter28-followup live-data pass (Lane B) |
+| `3d2404170` | feat(governance): step 3e-i — `SpendSpikeAnomalyEvaluator` service (Lane S) |
+| `f13c33e20` | docs(governance): wave 2 — NEW `compliance-architecture.mdx` (~165 LOC) + `retention.mdx` (~85 LOC) + `ocsf-export.mdx` (~120 LOC, locked against Sergey's 3f wire shape) (Lane A) |
+| `4a4b806db` | feat(governance): step 3e-ii — scheduled anomaly-detection BullMQ worker + queue (every 5 min) (Lane S) |
+| `b906d1c15` | test(governance): step 3e-iii — `SpendSpikeAnomalyEvaluator` 12 unit tests covering pure decision logic (Lane S) |
+| `5bca796f2` | docs(governance): wave 3 — 8 ingestion-source pages reframed end-to-end with OTLP-shape table + sed-replaced stale terms (Lane A) |
+| `0b4f4d90e` | docs(governance): wave 4 — `personal-keys.mdx` storyboard refresh: 40-second pitch + accurate `formatLoginCeremony` output + `langwatch request-increase` UX + cross-references to wave-2 pages (Lane A) |
+| `3ecd1181d` | fix(governance): `seed-anomaly-fixture.ts` schema fix (config→thresholdConfig per AnomalyRule contract — would've blown up first 3e-iv re-run) (Lane B) |
+| `a935d707e` | feat(governance): persona-aware chrome — /me uses `PersonalSidebar` + `WorkspaceSwitcher`. New 90-LOC component; `DashboardLayout` swaps `ProjectSelector→WorkspaceSwitcher` + `MainMenu→PersonalSidebar` on `isPersonalScopeRoute`; `MyLayout` shrinks (drops redundant in-page chip + 'MY WORKSPACE' eyebrow); `MainMenu` drops `hasIngestionSources` predicate (chicken-and-egg fix). Plus 197-LOC `persona-aware-chrome.feature` BDD spec (Lane B) |
+| `b311d1ca5` | docs(governance): `persona-aware-chrome.feature` spec — fix FF table per two-flag lock (Govern→`release_ui_ai_governance_enabled`, Gateway→`release_ui_ai_gateway_menu_enabled`); FF-off scenarios split into two independent ones (Lane B) |
+| `840377ace` | test(governance): step 3e-iv — `SpendSpikeAnomalyEvaluator` I/O integration test, 4/4 in 8s (covers happy/dedup/source-scope-mismatch/archived-rule-excluded; per-ruleId alert queries vs global counters for shared-test-PG determinism) (Lane S) |
+| `385c95e89` | feat(rbac): add AI Governance permissions catalog (org-level) — 5 new Resources (`governance`, `ingestionSources`, `anomalyRules`, `complianceExport`, `activityMonitor`) × actions; ADMIN default-grant; MEMBER + EXTERNAL get nothing; read-only resources flagged in `permissionsConfig.ts`; 5 new test cases — 56/56 `rbac.test.ts` green (Lane S) |
+| `043726430` | feat(governance): chrome gate uses `governance:view` permission — swaps the temporary `organization:manage` placeholder for the production `governance:view` check on the Govern sidebar entry; spec table updated to reflect production permission strings (Lane B) |
 
 Earlier (pre-correction) commits on the branch are preserved for the audit
 trail. The mechanical delete commit (`f3de1ae07`) is the boundary between
@@ -333,19 +375,22 @@ trail. The mechanical delete commit (`f3de1ae07`) is the boundary between
 |---|---|---|
 | `ActivityMonitorService` rewire onto trace_summaries + log_records with origin filter | Lane S | ✅ shipped `fd118131c` (step 3a) |
 | Step 3a integration test (ingest → trace_summaries → ActivityMonitorService.summary) | Lane S | ✅ shipped `66c897a08` (7 scenarios + cross-org Layer-1) |
-| `governance_kpis` fold projection (step 3b) | Lane S | ⏳ next |
-| Per-origin retention TTL hook on recorded_spans + log_records (step 3c) | Lane S | ⏳ next |
-| `governance_ocsf_events` fold projection (step 3d) | Lane S | ⏳ next |
-| Anomaly reactor rewire onto `governance_kpis` fold (step 3e) | Lane S | ⏳ next |
-| OCSF read tRPC procedure for SIEM forwarding (step 3f) | Lane S | ⏳ next |
+| `governance_kpis` fold projection (step 3b) | Lane S | ✅ shipped `769c67395` + `789c5cbb7` + `8073888bd` (migration revs) + `b54696d95` (reactor) + `d2c544ec5` (unit tests) + `e709cfbc8` (volume regression) |
+| Per-origin retention TTL hook on recorded_spans + log_records (step 3c) | Lane S | ✅ shipped `3156b9e17` (3c-i migration) + `629c50734` (3c-ii write-side) + `8325a5262` (3c-iii ttlReconciler combine, Option Y) + `cb3702cd2` (3c-iv integration test) — chain CLOSED across self-hosted + SaaS cold-storage modes |
+| `governance_ocsf_events` fold projection (step 3d) | Lane S | ✅ shipped `5fa23f900` (migration) + `ee5159879` (reactor + repo + pipeline reg) + `50ebe34b3` (13 unit tests) |
+| Anomaly reactor — `SpendSpikeAnomalyEvaluator` + scheduled BullMQ worker (step 3e) | Lane S | ✅ shipped `3d2404170` (service) + `4a4b806db` (worker + queue) + `b906d1c15` (12 unit tests) + `840377ace` (3e-iv I/O integration test, 4/4 in 8s) |
+| OCSF read tRPC procedure for SIEM forwarding (step 3f) | Lane S | ✅ shipped `07bd07deb` (`api.governance.ocsfExport`, cursor-paginated, org-tenancy isolation, auth-scoped to org admin / auditor) |
+| **AI Governance RBAC permissions catalog** | Lane S | ✅ shipped `385c95e89` (5 new Resources × actions, ADMIN-only default, 56/56 `rbac.test.ts` green) |
 | End-to-end HTTP receiver integration test | Lane A | ✅ shipped `d20a1b403` (13 tests) |
-| Layer-2 per-consumer integration test | Lane B | superseded — Layer-1 + Andre's helper composition + UI dogfood cover the invariant; further per-consumer assertions deferred to post-step-3/3 when the consumer registry has more surfaces to assert against |
-| UI verification screenshots | Lane B | ✅ shipped — 8 screenshots embedded below (iter22 + iter23 drawer) |
-| Customer-facing docs flip + per-platform mapping page | Lane A | gated on step 3b/3c |
-| Live-data dashboard dogfood (replace iter22 $0/0 with real numbers post-3a) | Lane B | ⏳ next, unblocked |
-| **License relocation: governance modules → `langwatch/ee/governance/`** (4a) | Lane S+B | ⏳ NEW per rchaves directive 2026-04-28 |
-| **UI gating: enterprise-locked surfaces (3-tier) + service-layer 403 + CLI 402 envelope** (4b) | Lane S+B+A | ⏳ NEW per rchaves directive 2026-04-28 |
-| **License-gate assertion test: non-enterprise org → 403 on every `api.governance.*` proc** (4c) | Lane S | ⏳ NEW per rchaves directive 2026-04-28 |
+| Layer-2 per-consumer integration test | Lane B | superseded — Layer-1 + Andre's helper composition + UI dogfood cover the invariant |
+| UI verification screenshots | Lane B | ✅ shipped — iter22 (8 screenshots) + iter29 persona-chrome dogfood (4 screenshots in `.monitor-logs/persona-chrome-screenshots/`) |
+| Customer-facing docs flip — 4 waves | Lane A | ✅ shipped — `1e34cd9ef` + `f13c33e20` + `5bca796f2` + `0b4f4d90e` |
+| **Persona-aware chrome rework** | Lane B | ✅ shipped `a935d707e` (chrome refactor + new PersonalSidebar) + `b311d1ca5` (spec FF correction) + `043726430` (gate consumes `governance:view`) |
+| Live-data dashboard dogfood | Lane B | ✅ shipped — 4 persona-chrome screenshots prove live data path |
+| **License relocation: governance modules → `langwatch/ee/governance/`** (4a) | Lane S+B | ⏳ deferred to follow-up PR (rchaves directive: ship behavior in this PR, file relocation in a separate cosmetic-only PR) |
+| **UI gating: enterprise-locked surfaces (3-tier) + service-layer 403 + CLI 402 envelope** (4b) | Lane S+B+A | ⏳ deferred to follow-up PR (paired with 4a) |
+| **License-gate assertion test** (4c) | Lane S | ⏳ deferred to follow-up PR (paired with 4a) |
+| **tRPC procedure permission granularization** (`organization:manage` → `governance:manage` per-route swap) | Lane S | ⏳ deferred to follow-up PR — existing checks still work; granularization is a separate sweep |
 
 ---
 
@@ -514,6 +559,21 @@ server post-`33a8cf6d0` (full receiver rewire shipped):
 | 6. WorkspaceSwitcher post-helper | Hidden Governance Project never leaks into user-visible Project surfaces, **proven against real DB state** | `architecture-invariants.feature` "hidden Gov Project never appears in user-visible Project surfaces" + Layer-1 filter at `getAllForUser` |
 | 7. Anomaly rules list | AnomalyRule + AnomalyAlert read paths render against real PG state | `architecture-invariants.feature` AnomalyRule lifecycle |
 | 8. Anomaly composer | Composer offers retention-class + scope + threshold; Preview-rule-type framing matches spec contract | `ui-contract.feature` composer scenarios |
+
+### Persona-aware chrome dogfood (iter29 — post `a935d707e` + `043726430`)
+
+The persona-aware home routing claim from 1.5b-viii (`e40ee0045`) was scoped only to the URL redirect — the chrome (sidebar + selectors) remained LLMOps-default. iter29 dogfood under @rchaves review surfaced the gap: a personal-only user landing at `/me` saw two stacked selectors + an irrelevant LLMOps sidebar + "My Usage" buried as a sub-page.
+
+Cross-lane fix shipped in 4 commits (`a935d707e` + `b311d1ca5` + `385c95e89` + `043726430`); 4 live-data screenshots prove the chrome works end-to-end (local paths shown — img402.dev upload pending Lane-B's post-rebase pass for inline embed, same pattern as iter22 shots above):
+
+| Shot | Proves | File |
+|---|---|---|
+| 9. /me with PersonalSidebar | Persona-1 chrome — ONE chip in header (`My Workspace ▼`), PersonalSidebar with "My Usage" + "Settings" only, NO ProjectSelector, NO redundant in-page chip, NO 'MY WORKSPACE' eyebrow header (literal gateway.md Screen 6 layout) | `.monitor-logs/persona-chrome-screenshots/persona1-me-personal.png` |
+| 10. Admin home with Govern + Gateway | Persona-4 chrome — admin lands on project context with full LLMOps sidebar + Govern (Preview) + Gateway (Beta) sections both visible (admin role + 2 FFs on) | `.monitor-logs/persona-chrome-screenshots/persona4-admin-home.png` |
+| 11. /governance with org-scope chrome | Persona-4 governance home — org chip ("Acme P4") + "Organization-scoped" banner + Govern active in sidebar + setup checklist (define routing policy / connect ingestion source / anomaly rules) visible to admin **without any IngestionSource yet** — chicken-and-egg gate fix VALIDATED | `.monitor-logs/persona-chrome-screenshots/persona4-governance.png` |
+| 12. AI Gateway page (Beta) | Persona-4 gateway surface — AI Gateway menu + Virtual Keys / Providers / Budgets / Routing Policies / Cache Rules sub-nav visible (admin role + `release_ui_ai_gateway_menu_enabled` on) | `.monitor-logs/persona-chrome-screenshots/persona4-ai-gateway.png` |
+
+**Regression-safety invariant locked**: Persona-3 (LLMOps majority — ~90% of users today, no AI gateway) sees ZERO chrome change. `DashboardLayout` is untouched for `project_only` persona. Codified in `persona-aware-chrome.feature` as the FIRST scenario in the file.
 
 ---
 
@@ -685,14 +745,16 @@ The Jane at Acme 8-screen storyboard from `gateway.md` is the **trial-wedge demo
 | ⏳ | 🅑 | 1.5b-iv: Screen 6 — `/me` layout refresh — *scope reduced ~3x post-iter27 audit: layout already production-ready; minor polish only* |
 | ⏳ | 🅑 | 1.5b-v: Screen 7 — `/me/settings` polish — *scope reduced ~3x post-iter27 audit: managed-by-your-company chrome already in place; minor polish only* |
 | ⏳ | 🅑 | 1.5b-vi: Screen 8 — `BudgetExceededBanner` web-side enrichment to match storyboard tone |
-| ⏳ | 🅑 | 1.5b-vii: WorkspaceSwitcher v2 — Personal/Team/Project visual + "managed by your company" indicator |
+| ✅ | 🅑 | 1.5b-vii: WorkspaceSwitcher v2 — Personal/Team/Project visual + "managed by your company" indicator (already storyboard-shape; verified iter29) |
 | ✅ | 🅑 | 1.5b-viii: Persona resolver service + `/` redirect + tRPC router + regression test — `e40ee0045` (12/12 unit tests, BDD spec, regression invariant for LLMOps majority locked) |
 | ✅ | 🅑 | 1.5b-ix: BDD spec `persona-home-resolver.feature` (shipped with `e40ee0045`) |
-| ⏳ | 🅑 | 1.5b-x: Live-data dogfood post-resolver — capture all 8 screens in one Playwright run |
+| ✅ | 🅑 | 1.5b-x: Live-data dogfood post-resolver — 4 persona-chrome screenshots captured in `.monitor-logs/persona-chrome-screenshots/` (persona1-me-personal, persona4-admin-home, persona4-governance, persona4-ai-gateway) |
+| ✅ | 🅑 | **1.5b-xi: Persona-aware chrome rework** — initial 1.5b-viii resolver shipped routing only; iter29 dogfood surfaced chrome was unchanged (two-selector bug, irrelevant LLMOps sidebar on /me). Cross-lane fix: `a935d707e` (PersonalSidebar + DashboardLayout chrome swap + MyLayout shrink + chicken-and-egg gate fix) + `b311d1ca5` (BDD spec FF correction, two-flag shape) + `043726430` (gate consumes `governance:view` permission post-rbac.ts catalog) + 197-LOC `persona-aware-chrome.feature` BDD spec |
+| ✅ | 🅢 | **1.5s-rbac: AI Governance RBAC permissions catalog** — `385c95e89` (5 new Resources × actions in `rbac.ts`; ADMIN default-grant; MEMBER + EXTERNAL get nothing; `CustomRolePermissions` JSON column = the production-shape delegation surface) |
 | ✅ | 🅢 | 1.5s: `setupState.hasApplicationTraces` flag — `9d2688c84` (consumed by 1.5b-viii via `api.governance.setupState`) |
 | ✅ | 🅐+🅢 | 1.5a-cli-1: CLI Screen 4 ceremony — `b8b21bb79` (formatLoginCeremony helper, 15 unit tests) + `32cad11ae` (api.user.cliBootstrap tRPC) + `5c0816bb0` (CliBootstrapService extract + REST adapter) + `d38ba422e` (CLI fold-in via getCliBootstrap, 4 new unit tests). End-to-end rich Screen 4 ceremony (providers + budget) live on this branch. |
 | ✅ | 🅐 | 1.5a-cli-2: CLI Screen 8 budget-limit-reached + `langwatch request-increase` (existing — `commands/request-increase.ts` + `utils/governance/budget.ts` `renderBudgetExceeded` + `checkBudget` pre-exec probe + 16 unit tests). *Audit gap caught — was already shipped before Phase 1B.5 fold.* |
-| ⏳ | 🅐 | 1.5a-docs: `docs/getting-started/personal-ide-keys.mdx` reframed as the storyboard walkthrough — gitignored draft at `.monitor-logs/lane-a-personal-ide-keys-storyboard-draft.md` (~270 LOC). **3c retention TTL chain CLOSED end-to-end (3c-i + 3c-ii + 3c-iii + 3c-iv all shipped) — fold to public docs is now UNBLOCKED.** Gated next on the 8 ingestion-source pages reframe + new compliance-architecture.mdx + retention.mdx + ocsf-export.mdx + observability/trace-vs-activity-ingestion.mdx flip. |
+| ✅ | 🅐 | 1.5a-docs: Customer-facing docs flip COMPLETE — 4 waves: wave 1 `1e34cd9ef` (`trace-vs-activity-ingestion.mdx` reframed) + wave 2 `f13c33e20` (NEW `compliance-architecture.mdx` + `retention.mdx` + `ocsf-export.mdx`) + wave 3 `5bca796f2` (8 ingestion-source pages reframed) + wave 4 `0b4f4d90e` (`personal-keys.mdx` storyboard refresh with 40-second pitch + `formatLoginCeremony` output + `langwatch request-increase` UX + cross-references to wave-2 pages) |
 | ⏳ | 🅐 | 1.5a-marketing: Marketing-page outline for the open-core / personal IDE keys offering — gitignored draft at `.monitor-logs/lane-a-marketing-outline-draft.md` (~250 LOC, 9-section structure: hero / pain / solution / how-it-works / features / compliance / open-core pitch / pricing / footer CTA). Lives in `.monitor-logs/` until rchaves picks the home (probably the langwatch.ai marketing repo). |
 
 ### Phase 2A — Multi-source ingestion (Direction 2, P1) — UNIFIED SUBSTRATE (mostly Apache 2.0; multi-source fleet `ee/`)
@@ -715,13 +777,14 @@ The Jane at Acme 8-screen storyboard from `gateway.md` is the **trial-wedge demo
 | ✅ | 🅐 | ADR-018 governance unified observability substrate (`53a5c4af9`) |
 | ✅ | 🅢 | ActivityMonitorService rewire onto trace_summaries + log_records (step 3a, `fd118131c`) |
 | ✅ | 🅢 | Step 3a integration test — 7 scenarios + cross-org Layer-1 (`66c897a08`) |
-| ⏳ | 🅢 | Step 3b: `governance_kpis` fold projection on trace-processing pipeline (~1d, 2 commits) |
-| ⏳ | 🅢 | Step 3c: Per-origin retention TTL hook on `recorded_spans` + `log_records` (CH TTL keyed off `Attributes['langwatch.governance.retention_class']`) |
-| ⏳ | 🅢 | Step 3d: `governance_ocsf_events` fold projection (Actor / Action / Target / Time / Severity) |
-| ⏳ | 🅢 | Step 3e: Anomaly reactor rewire onto `governance_kpis` fold |
-| ⏳ | 🅢 | Step 3f: OCSF v1.1 read tRPC procedure + REST adapter |
-| ⏳ | 🅑 | Live-data dashboard dogfood pass (post-3a) — replace iter22 $0/0 with real numbers |
-| ⏳ | 🅐 | Customer-facing docs flip (8 ingestion-source pages reframe + new compliance-architecture.mdx + retention.mdx + ocsf-export.mdx + observability/trace-vs-activity-ingestion.mdx flip) |
+| ✅ | 🅢 | Step 3b: `governance_kpis` fold projection — `769c67395` migration + revisions + `b54696d95` reactor + `d2c544ec5` unit tests + `e709cfbc8` volume regression |
+| ✅ | 🅢 | Step 3c: Per-origin retention TTL hook — `3156b9e17` (3c-i migration) + `629c50734` (3c-ii write-side) + `8325a5262` (3c-iii cold-storage combine via ttlReconciler) + `cb3702cd2` (3c-iv integration test). Chain closed end-to-end across both install modes. |
+| ✅ | 🅢 | Step 3d: `governance_ocsf_events` fold projection — `5fa23f900` migration + `ee5159879` reactor + `50ebe34b3` unit tests |
+| ✅ | 🅢 | Step 3e: `SpendSpikeAnomalyEvaluator` + scheduled BullMQ worker — `3d2404170` (service) + `4a4b806db` (worker) + `b906d1c15` (12 unit tests) + `840377ace` (3e-iv I/O integration test, 4/4 passing in 8s) |
+| ✅ | 🅢 | Step 3f: OCSF v1.1 read tRPC procedure for SIEM forwarding — `07bd07deb` (cursor-paginated, org-tenancy isolation) |
+| ✅ | 🅢 | AI Governance RBAC permissions catalog — `385c95e89` (5 new Resources, ADMIN default-grant, custom-role JSON for delegation) |
+| ✅ | 🅑 | Live-data dashboard dogfood pass — 4 persona-chrome screenshots (`.monitor-logs/persona-chrome-screenshots/`) |
+| ✅ | 🅐 | Customer-facing docs flip — 4 waves shipped (`1e34cd9ef` wave 1 + `f13c33e20` wave 2 + `5bca796f2` wave 3 + `0b4f4d90e` wave 4) |
 
 ### Phase 4 — License relocation + UI gating (NEW per rchaves directive 2026-04-28)
 
