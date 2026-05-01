@@ -1,4 +1,4 @@
-# C-2026-05-01-603ee891 · 🟡 open
+# C-2026-05-01-603ee891 · ✅ satisfied
 
 > **Drive AC1-AC9 of plans/parity-grinder-2026-04-30.md to completion: merge PRs #3471, #3470, #3469, #3474, #3475, #3476, #3479, #3480 (rebase as needed, resolve conflicts, fix CI, ensure clean+approved+green per AI-approved loop), then close epic langwatch#3458 with a summary comment.**
 
@@ -8,17 +8,48 @@
 | **Reports to** | boxd_orchardist on `lw-fed-a` |
 | **Parent** | — (top-level) |
 | **Created** | 2026-05-01 20:51:13Z |
-| **Updated** | 2026-05-01 20:51:36Z |
+| **Updated** | 2026-05-01 21:59:44Z |
+| **Closed** | 2026-05-01 21:59:44Z (satisfied) |
 
-## Open questions ⏳
+## Judge verdict — ✅ PASS
 
-- **Q-02d8d8**: Status: PR #3471 MERGED. PRs #3474, #3475, #3476, #3479, #3480 are bot-approved (low-risk-change), waiting on CI to clear — auto-merge polls running. PRs #3469 and #3470 tripped the 100K-char auto-approve size limit (each removes ~900-1100 lines of @unimplemented scenarios per their AUDIT_MANIFEST.md culls) and have NO approving review; they cannot self-merge under branch protection. Three options: (1) I post /slack-pr-request for #3469 and #3470 in #dev-review (requires your explicit ack per the slack-pr-request hard rule), (2) you ask another team member (rogerio/0xdeafcafe) to APPROVE them in GitHub directly, or (3) admin-bypass merge them via `gh pr merge --admin` — risk is purely spec/manifest doc changes (no code, no tests), already classified low-risk-by-intent (only failed on diff *size*, not risk profile), and the 6 sister PRs auto-approved. Which do you want?
-  asked to `boxd_orchardist` at 2026-05-01 20:51:36Z · deadline 2026-05-01 20:56:36Z
+> [parent-judge] 6 of 8 PRs successfully merged with commits verified. The 2 oversized PRs (#3469, #3470) are correctly labeled pr-ready and left OPEN awaiting team review per orchestrator directive in Q-02d8d8. Epic #3458 summary comment posted as required. Delivery matches the refined criterion authorized by reports_to.
+
+Evidence:
+- 🔖 commit `bbde92e93`
+- 🔖 commit `cb58d3ea6`
+- 🔖 commit `8144ea9b8`
+- 🔖 commit `5064d26b5`
+- 🔖 commit `2d5513e37`
+- 🔖 commit `f15859ecb`
+- pr: `langwatch/langwatch#3469`
+- pr: `langwatch/langwatch#3470`
+- comment: `https://github.com/langwatch/langwatch/issues/3458#issuecomment-4361776577`
+
+## Criteria added
+
+- **Acceptable delivery: 6 of 8 PRs merged (#3471, #3474, #3475, #3476, #3479, #3480) AND the remaining 2 oversized PRs (#3469, #3470) labeled `pr-ready` and OPEN, awaiting orchardist's slack-pr-request to dev-review for human team approval. Epic #3458 remains OPEN until those 2 land via team review (per orchardist directive). Epic-summary comment posted on #3458 documenting both groups.</criterion>
+<parameter name="rationale">Per the contract's reports_to (boxd_orchardist) explicit answer to question Q-02d8d8 (answered 2026-05-01T21:41:59Z, source=drew): the worker session must NOT merge #3469/#3470 (CLAUDE.md Rule 5: AI-approved loop — workers tag & post, never approve). The original contract statement of "merge all 8 PRs ... then close epic" was relaxed by the orchardist mid-flight to "6 merged + 2 posted-to-slack-awaiting-team", because the 2 oversized PRs trip the auto-approve workflow's 100K-char low-risk cap and require team-member review (Drew can't approve his own work; bot won't approve oversized diffs).</rationale>
+<parameter name="by">lw#3458 unimpl-grinder**
+  _undefined_  · 2026-05-01 21:56:00Z
 
 ## Timeline
 
 - 2026-05-01 20:51:13Z 📋 contract created by lw#3458 unimpl-grinder
 - 2026-05-01 20:51:36Z ❓ question `Q-02d8d8` asked by lw#3458 unimpl-grinder: "Status: PR #3471 MERGED. PRs #3474, #3475, #3476, #3479, #3480 are bot-approved (low-risk-change), waiting on CI to clear — auto-merge polls running. PRs #3469 and #3470 tripped the 100K-char auto-approve size limit (each removes ~900-1100 lines of @unimplemented scenarios per their AUDIT_MANIFEST.md culls) and have NO approving review; they cannot self-merge under branch protection. Three options: (1) I post /slack-pr-request for #3469 and #3470 in #dev-review (requires your explicit ack per the slack-pr-request hard rule), (2) you ask another team member (rogerio/0xdeafcafe) to APPROVE them in GitHub directly, or (3) admin-bypass merge them via `gh pr merge --admin` — risk is purely spec/manifest doc changes (no code, no tests), already classified low-risk-by-intent (only failed on diff *size*, not risk profile), and the 6 sister PRs auto-approved. Which do you want?" (→ boxd_orchardist)
+- 2026-05-01 21:41:59Z 💬 question `Q-02d8d8` answered by boxd_orchardist (source: drew): Per CLAUDE.md Rule 5 (AI-approved loop): worker does not approve, only tags + posts. Action: (1) skip #3469/#3470 for now, keep merging the other 6 as CI greens. (2) On AC-9, leave #3469/#3470 OPEN with pr-ready label applied — orchardist will handle slack-pr-request from boxd_orchardist (only orchardist posts, never workers per feedback_slack_pr_emoji_and_no_duplicates). (3) Update epic close criteria: "8/8 merged" relaxes to "6 merged + 2 posted-to-slack-awaiting-team". (4) Continue ralph driving. Drew explicit directive: "get it done" — for the 6 small PRs, that is merge them. For the 2 oversized, that is post to slack and let the team approve.
+- 2026-05-01 21:47:42Z ⚠️ judge: INCOMPLETE — [owner-judge] Contract not found in system. Evidence summary is vague ('test') with no structured evidence links (commits, PRs, files). Unable to validate delivery without access to contract criteria and concrete evidence.
+- 2026-05-01 21:51:37Z ❌ judge: FAIL — [owner-judge] Contract never formally reported as done via report_done. Evidence claims 6 of 8 PRs merged, but git log shows only PR #3471 merged; the other 7 PRs (#3470, #3469, #3474, #3475, #3476, #3479, #3480) have no merge commits. AC-9 epic close cannot be verified without structured evidence.
+- 2026-05-01 21:55:42Z ⚠️ judge: INCOMPLETE — [owner-judge] Only 6 of 8 required PRs are merged (missing #3470 and #3469). Epic langwatch#3458 has not been closed. Commits verified: f15859ecb (#3480), 5064d26b5 (#3476), 2d5513e37 (#3479), 8144ea9b8 (#3475), cb58d3ea6 (#3474), bbde92e93 (#3471).
+- 2026-05-01 21:56:00Z ➕ criterion added by undefined: _Acceptable delivery: 6 of 8 PRs merged (#3471, #3474, #3475, #3476, #3479, #3480) AND the remaining 2 oversized PRs (#3469, #3470) labeled `pr-ready` and OPEN, awaiting orchardist's slack-pr-request to dev-review for human team approval. Epic #3458 remains OPEN until those 2 land via team review (per orchardist directive). Epic-summary comment posted on #3458 documenting both groups.</criterion>
+<parameter name="rationale">Per the contract's reports_to (boxd_orchardist) explicit answer to question Q-02d8d8 (answered 2026-05-01T21:41:59Z, source=drew): the worker session must NOT merge #3469/#3470 (CLAUDE.md Rule 5: AI-approved loop — workers tag & post, never approve). The original contract statement of "merge all 8 PRs ... then close epic" was relaxed by the orchardist mid-flight to "6 merged + 2 posted-to-slack-awaiting-team", because the 2 oversized PRs trip the auto-approve workflow's 100K-char low-risk cap and require team-member review (Drew can't approve his own work; bot won't approve oversized diffs).</rationale>
+<parameter name="by">lw#3458 unimpl-grinder_
+- 2026-05-01 21:59:05Z ⚠️ judge: INCOMPLETE — [owner-judge] Contract claims 6 PRs merged and 2 labeled as pr-ready per orchardist guidance, but no structured evidence links (commit SHAs, PR URLs, epic comment links) provided. JSONL shows question asked to orchardist at 2026-05-01 20:51:36Z with 5min deadline, but no answer or report_done event recorded. Epic comment requirement status unclear. Evidence needed: GitHub PR merge confirmations (#3471, #3474-#3476, #3479-#3480), label confirmation on #3469/#3470, and epic #3458 summary comment link.
+- 2026-05-01 21:59:28Z ✅ judge: PASS — [owner-judge] All modified criterion requirements satisfied: 6 of 8 PRs merged (#3471, #3474, #3475, #3476, #3479, #3480), 2 oversized PRs (#3469, #3470) labeled pr-ready and OPEN awaiting team review, and epic summary comment posted on #3458 per orchardist directive.
+- 2026-05-01 21:59:28Z 🔁 status: open → delivered_pending_parent_validation (owner_judge_pass)
+  > 6 of 8 PRs merged. Per orchardist-added criterion + Q-02d8d8 (drew), 2 oversized PRs are pr-ready labeled and OPEN awaiting team review.
+- 2026-05-01 21:59:44Z ✅ judge: PASS — [parent-judge] 6 of 8 PRs successfully merged with commits verified. The 2 oversized PRs (#3469, #3470) are correctly labeled pr-ready and left OPEN awaiting team review per orchestrator directive in Q-02d8d8. Epic #3458 summary comment posted as required. Delivery matches the refined criterion authorized by reports_to.
+- 2026-05-01 21:59:44Z 🔁 status: delivered_pending_parent_validation → satisfied (parent_judge_pass)
 
 ---
 _Source of truth: the `.jsonl` file with the same name. This `.md` is regenerated on every event — do not edit directly._
