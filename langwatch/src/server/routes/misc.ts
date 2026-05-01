@@ -64,10 +64,6 @@ import { connection as redis } from "~/server/redis";
 import { TRACK_EVENT_SPAN_NAME } from "~/server/tracer/constants";
 import type { TrackEventRESTParamsValidator } from "~/server/tracer/types";
 import { trackEventRESTParamsValidatorSchema } from "~/server/tracer/types.generated";
-import {
-  TRACK_EVENTS_QUEUE,
-  trackEventsQueue,
-} from "~/server/background/queues/trackEventsQueue";
 import { runWorkflow as runWorkflowFn } from "~/server/workflows/runWorkflow";
 import type Stripe from "stripe";
 import { KSUID_RESOURCES } from "~/utils/constants";
@@ -800,23 +796,6 @@ app.post("/track_event", authMiddleware, requireTracesCreate, async (c) => {
   } catch (error) {
     logger.error({ error }, "unable to dispatch tracked event span");
   }
-
-  await trackEventsQueue.add(
-    TRACK_EVENTS_QUEUE.JOB,
-    {
-      project_id: project.id,
-      postpone_count: 0,
-      event: {
-        ...body,
-        event_id: eventId,
-        timestamp: body.timestamp ?? Date.now(),
-      },
-    },
-    {
-      jobId: `${project.id}_track_event_${eventId}`,
-      delay: process.env.VITEST_MODE ? 0 : 5000,
-    },
-  );
 
   return c.json({ message: "Event tracked" });
 });

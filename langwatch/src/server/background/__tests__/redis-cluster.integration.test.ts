@@ -22,7 +22,6 @@ import {
   COLLECTOR_QUEUE,
   EVALUATIONS_QUEUE,
   TOPIC_CLUSTERING_QUEUE,
-  TRACK_EVENTS_QUEUE,
   USAGE_STATS_QUEUE,
 } from "../queues/constants";
 import { makeQueueName } from "../queues/makeQueueName";
@@ -61,7 +60,6 @@ describe("BullMQ Redis Cluster Compatibility", () => {
       ["COLLECTOR_QUEUE", COLLECTOR_QUEUE.NAME],
       ["EVALUATIONS_QUEUE", EVALUATIONS_QUEUE.NAME],
       ["TOPIC_CLUSTERING_QUEUE", TOPIC_CLUSTERING_QUEUE.NAME],
-      ["TRACK_EVENTS_QUEUE", TRACK_EVENTS_QUEUE.NAME],
       ["USAGE_STATS_QUEUE", USAGE_STATS_QUEUE.NAME],
     ])("%s contains a hash tag", (_label, queueName) => {
       expect(hasHashTag(queueName)).toBe(true);
