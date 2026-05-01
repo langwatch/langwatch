@@ -164,49 +164,72 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
 
     try {
       const client = await this.resolveClient(tenantId);
+      // IN-tuple dedup over the ReplacingMergeTree: the inner SELECT scans
+      // only (TenantId, TraceId, UpdatedAt) — small, sparse — to find the
+      // latest version, then the outer SELECT pulls the heavy columns
+      // (ComputedInput, ComputedOutput, Attributes, etc.) for that one row.
+      //
+      // Do not "simplify" to `ORDER BY UpdatedAt DESC LIMIT 1`: with many
+      // unmerged versions per (TenantId, TraceId) it forces the engine to
+      // read every version *with* the heavy columns just to sort them in
+      // memory. Called per-event during the trace-summary projection apply,
+      // so a 100× read amplification compounds fast under load.
+      //
+      // Outer SELECT references columns via the `t.` alias because the
+      // SELECT projects `toUnixTimestamp64Milli(UpdatedAt) AS UpdatedAt`
+      // (and similar for Created/OccurredAt). Without the alias the
+      // IN-tuple's `UpdatedAt` could resolve to the projected UInt64 alias
+      // instead of the raw DateTime64 column and the type comparison would
+      // break. See dev/docs/best_practices/clickhouse-queries.md.
       const result = await client.query({
         query: `
           SELECT
-            ProjectionId,
-            TenantId,
-            TraceId,
-            Version,
-            Attributes,
-            toUnixTimestamp64Milli(OccurredAt) AS OccurredAt,
-            toUnixTimestamp64Milli(CreatedAt) AS CreatedAt,
-            toUnixTimestamp64Milli(UpdatedAt) AS UpdatedAt,
-            ComputedIOSchemaVersion,
-            ComputedInput,
-            ComputedOutput,
-            TimeToFirstTokenMs,
-            TimeToLastTokenMs,
-            TotalDurationMs,
-            TokensPerSecond,
-            SpanCount,
-            ContainsErrorStatus,
-            ContainsOKStatus,
-            ErrorMessage,
-            Models,
-            TotalCost,
-            TokensEstimated,
-            TotalPromptTokenCount,
-            TotalCompletionTokenCount,
-            OutputFromRootSpan,
-            OutputSpanEndTimeMs,
-            BlockedByGuardrail,
-            TopicId,
-            SubTopicId,
-            AnnotationIds,
-            HasAnnotation,
-            ScenarioRoleCosts,
-            ScenarioRoleLatencies,
-            TraceName,
-            ScenarioRoleSpans,
-            SpanCosts
-          FROM ${TABLE_NAME}
-          WHERE TenantId = {tenantId:String}
-            AND TraceId = {traceId:String}
-          ORDER BY UpdatedAt DESC
+            t.ProjectionId AS ProjectionId,
+            t.TenantId AS TenantId,
+            t.TraceId AS TraceId,
+            t.Version AS Version,
+            t.Attributes AS Attributes,
+            toUnixTimestamp64Milli(t.OccurredAt) AS OccurredAt,
+            toUnixTimestamp64Milli(t.CreatedAt) AS CreatedAt,
+            toUnixTimestamp64Milli(t.UpdatedAt) AS UpdatedAt,
+            t.ComputedIOSchemaVersion AS ComputedIOSchemaVersion,
+            t.ComputedInput AS ComputedInput,
+            t.ComputedOutput AS ComputedOutput,
+            t.TimeToFirstTokenMs AS TimeToFirstTokenMs,
+            t.TimeToLastTokenMs AS TimeToLastTokenMs,
+            t.TotalDurationMs AS TotalDurationMs,
+            t.TokensPerSecond AS TokensPerSecond,
+            t.SpanCount AS SpanCount,
+            t.ContainsErrorStatus AS ContainsErrorStatus,
+            t.ContainsOKStatus AS ContainsOKStatus,
+            t.ErrorMessage AS ErrorMessage,
+            t.Models AS Models,
+            t.TotalCost AS TotalCost,
+            t.TokensEstimated AS TokensEstimated,
+            t.TotalPromptTokenCount AS TotalPromptTokenCount,
+            t.TotalCompletionTokenCount AS TotalCompletionTokenCount,
+            t.OutputFromRootSpan AS OutputFromRootSpan,
+            t.OutputSpanEndTimeMs AS OutputSpanEndTimeMs,
+            t.BlockedByGuardrail AS BlockedByGuardrail,
+            t.TopicId AS TopicId,
+            t.SubTopicId AS SubTopicId,
+            t.AnnotationIds AS AnnotationIds,
+            t.HasAnnotation AS HasAnnotation,
+            t.ScenarioRoleCosts AS ScenarioRoleCosts,
+            t.ScenarioRoleLatencies AS ScenarioRoleLatencies,
+            t.TraceName AS TraceName,
+            t.ScenarioRoleSpans AS ScenarioRoleSpans,
+            t.SpanCosts AS SpanCosts
+          FROM ${TABLE_NAME} AS t
+          WHERE t.TenantId = {tenantId:String}
+            AND t.TraceId = {traceId:String}
+            AND (t.TenantId, t.TraceId, t.UpdatedAt) IN (
+              SELECT TenantId, TraceId, max(UpdatedAt)
+              FROM ${TABLE_NAME}
+              WHERE TenantId = {tenantId:String}
+                AND TraceId = {traceId:String}
+              GROUP BY TenantId, TraceId
+            )
           LIMIT 1
         `,
         query_params: { tenantId, traceId },
