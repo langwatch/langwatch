@@ -519,6 +519,100 @@ describe("RBAC Permission System", () => {
         expect(permissions).not.toContain("organization:delete");
       });
     });
+
+    describe("AI Governance permissions (org-level)", () => {
+      it("grants ORGANIZATION_ADMIN the full governance permission set", () => {
+        const permissions = getOrganizationRolePermissions(
+          OrganizationUserRole.ADMIN,
+        );
+        // Top-level Govern section visibility
+        expect(permissions).toContain("governance:view");
+        expect(permissions).toContain("governance:manage");
+        // Ingestion source CRUD (admins bootstrap their first source here)
+        expect(permissions).toContain("ingestionSources:view");
+        expect(permissions).toContain("ingestionSources:create");
+        expect(permissions).toContain("ingestionSources:manage");
+        // Anomaly rule CRUD
+        expect(permissions).toContain("anomalyRules:view");
+        expect(permissions).toContain("anomalyRules:create");
+        expect(permissions).toContain("anomalyRules:manage");
+        // Read-only surfaces
+        expect(permissions).toContain("complianceExport:view");
+        expect(permissions).toContain("activityMonitor:view");
+      });
+
+      it("does NOT grant ORGANIZATION_MEMBER any governance permissions by default", () => {
+        // MEMBER role is mostly historical per rchaves directive 2026-04-29:
+        // 'admin and member is mostly historical, rbac permissions governs
+        // everything'. Custom roles via CustomRolePermissions JSON column are
+        // the production-shape delegation surface — not bolted-on later.
+        const permissions = getOrganizationRolePermissions(
+          OrganizationUserRole.MEMBER,
+        );
+        expect(permissions).not.toContain("governance:view");
+        expect(permissions).not.toContain("governance:manage");
+        expect(permissions).not.toContain("ingestionSources:view");
+        expect(permissions).not.toContain("anomalyRules:view");
+        expect(permissions).not.toContain("complianceExport:view");
+        expect(permissions).not.toContain("activityMonitor:view");
+      });
+
+      it("does NOT grant ORGANIZATION_EXTERNAL (lite member) any governance permissions", () => {
+        // EXTERNAL is a billing-tier marker (lite member) per rchaves
+        // 2026-04-29 — not a permission concept. Lite members get zero
+        // governance UI surface by default.
+        const permissions = getOrganizationRolePermissions(
+          OrganizationUserRole.EXTERNAL,
+        );
+        expect(permissions).not.toContain("governance:view");
+        expect(permissions).not.toContain("ingestionSources:view");
+        expect(permissions).not.toContain("anomalyRules:view");
+        expect(permissions).not.toContain("complianceExport:view");
+        expect(permissions).not.toContain("activityMonitor:view");
+      });
+
+      it("supports manage→view hierarchy on governance permissions", () => {
+        // Admin holds governance:manage; the chrome may check
+        // governance:view at render time. Hierarchy must let manage
+        // satisfy the view check (mirror of workflows:* etc).
+        const permissions = getOrganizationRolePermissions(
+          OrganizationUserRole.ADMIN,
+        );
+        expect(hasPermissionWithHierarchy(permissions, "governance:view")).toBe(
+          true,
+        );
+        expect(
+          hasPermissionWithHierarchy(permissions, "ingestionSources:update"),
+        ).toBe(true);
+        expect(hasPermissionWithHierarchy(permissions, "anomalyRules:delete")).toBe(
+          true,
+        );
+      });
+
+      it("custom-role assignment via CustomRolePermissions can grant security-analyst-style read-only access", () => {
+        // The future delegation surface: an org admin creates a custom role
+        // (e.g. "security_analyst") that grants governance:view +
+        // activityMonitor:view + anomalyRules:view but not :manage. The
+        // rbac.ts catalog must already expose those permissions for the
+        // custom-role JSON column to reference them — that's what this PR
+        // ships.
+        const customPermissions: Permission[] = [
+          "governance:view",
+          "activityMonitor:view",
+          "anomalyRules:view",
+        ];
+        expect(
+          hasPermissionWithHierarchy(customPermissions, "governance:view"),
+        ).toBe(true);
+        // But the security analyst MUST NOT see manage-level surfaces
+        expect(
+          hasPermissionWithHierarchy(customPermissions, "governance:manage"),
+        ).toBe(false);
+        expect(
+          hasPermissionWithHierarchy(customPermissions, "anomalyRules:create"),
+        ).toBe(false);
+      });
+    });
   });
 
   describe("Demo Project Functionality", () => {
