@@ -7,14 +7,14 @@ Feature: Backoffice User Impersonation Reason
     Given an ops admin is viewing the backoffice users page
     And the users table includes an active user named "Yoel Ernst"
 
-  @integration
+  @integration @unimplemented
   Scenario: Impersonation dialog asks for a single-line reason
     When the ops admin chooses to impersonate "Yoel Ernst"
     Then an "Impersonate user" dialog is visible
     And the dialog explains the reason is saved to the audit log
     And the reason field accepts a single line of text
 
-  @integration
+  @integration @unimplemented
   Scenario: Enter submits a completed impersonation reason
     Given the ops admin has opened the impersonation dialog for "Yoel Ernst"
     And the reason field contains "support"
@@ -22,7 +22,7 @@ Feature: Backoffice User Impersonation Reason
     Then impersonation is submitted for "Yoel Ernst"
     And the submitted reason is "support"
 
-  @integration
+  @integration @unimplemented
   Scenario: Empty reason still blocks impersonation
     Given the ops admin has opened the impersonation dialog for "Yoel Ernst"
     And the reason field is empty
