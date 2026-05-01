@@ -1,6 +1,6 @@
 # model-config audit manifest (unimpl tag classification)
 
-Audit of every `@unimpl`​`emented` scenario in `specs/model-config/`. Each row classifies a scenario for Phase 1 / Phase 3 action per `~/workspace/orchard-codex/plans/unimpl-reduction-2026-04-25.md`.
+Audit of every `@unimpl`​`emented` scenario in `specs/model-config/`. Each row classifies a scenario for Phase 1 / Phase 3 action per the unimpl-reduction plan tracked in `langwatch/langwatch#3458`.
 
 Classes:
 - **KEEP** — scenario describes intended behavior; bind a test in Phase 3.
@@ -160,5 +160,3 @@ Investigation anchors:
 | specs/model-config/unified-reasoning.feature | "Falls back through provider-specific fields if reasoning not set" | DUPLICATE | Covered by `reasoningBoundary.unit.test.ts` — `normalizes effort to reasoning` and the priority-order tests |
 | specs/model-config/unified-reasoning.feature | "Falls back in priority order reasoning > reasoning_effort > thinkingLevel > effort" | DUPLICATE | Covered by `reasoningBoundary.unit.test.ts` — `follows priority: reasoning > reasoning_effort > thinkingLevel > effort` |
 | specs/model-config/unified-reasoning.feature | "Returns undefined when no reasoning fields are set" | DUPLICATE | Covered by `reasoningBoundary.unit.test.ts` — `returns undefined when all fields are undefined` |
-</content>
-</invoke>
