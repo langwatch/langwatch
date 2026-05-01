@@ -139,8 +139,8 @@ importers:
         specifier: 7.0.0-dev.20260426.1
         version: 7.0.0-dev.20260426.1
       '@vercel/otel':
-        specifier: ^1.13.0
-        version: 1.13.0(@opentelemetry/api-logs@0.205.0)(@opentelemetry/api@1.9.0)(@opentelemetry/instrumentation@0.212.0(@opentelemetry/api@1.9.0))(@opentelemetry/resources@2.7.0(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-logs@0.205.0(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-metrics@2.6.0(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-base@2.1.0(@opentelemetry/api@1.9.0))
+        specifier: ^2.1.2
+        version: 2.1.2(@opentelemetry/api-logs@0.205.0)(@opentelemetry/api@1.9.0)(@opentelemetry/instrumentation@0.212.0(@opentelemetry/api@1.9.0))(@opentelemetry/resources@2.7.0(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-logs@0.205.0(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-metrics@2.6.0(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-base@2.1.0(@opentelemetry/api@1.9.0))
       '@vitest/coverage-v8':
         specifier: 3.2.4
         version: 3.2.4(vitest@3.2.4(@types/debug@4.1.12)(@types/node@24.5.2)(msw@2.12.10(@types/node@24.5.2)(typescript@5.9.2))(yaml@2.8.1))
@@ -1291,16 +1291,16 @@ packages:
     peerDependencies:
       typescript: '*'
 
-  '@vercel/otel@1.13.0':
-    resolution: {integrity: sha512-esRkt470Y2jRK1B1g7S1vkt4Csu44gp83Zpu8rIyPoqy2BKgk4z7ik1uSMswzi45UogLHFl6yR5TauDurBQi4Q==}
-    engines: {node: '>=18'}
+  '@vercel/otel@2.1.2':
+    resolution: {integrity: sha512-PbGyq1lLwWbnftylNcQ6KFxc7DLc8LJdnaU3snM43bgXiWkWsHrgaU/LdUD8sHaSgG8UKuydX/aymNt3J+hzuA==}
+    engines: {node: ^18.19.0 || >=20.6.0}
     peerDependencies:
       '@opentelemetry/api': ^1.9.0
       '@opentelemetry/api-logs': 0.205.0
       '@opentelemetry/instrumentation': 0.212.0
       '@opentelemetry/resources': ^2.0.1
       '@opentelemetry/sdk-logs': 0.205.0
-      '@opentelemetry/sdk-metrics': '>=1.19.0 <2.0.0'
+      '@opentelemetry/sdk-metrics': '>=2.0.0 <3.0.0'
       '@opentelemetry/sdk-trace-base': ^2.0.1
 
   '@vitest/coverage-v8@3.2.4':
@@ -4068,7 +4068,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@vercel/otel@1.13.0(@opentelemetry/api-logs@0.205.0)(@opentelemetry/api@1.9.0)(@opentelemetry/instrumentation@0.212.0(@opentelemetry/api@1.9.0))(@opentelemetry/resources@2.7.0(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-logs@0.205.0(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-metrics@2.6.0(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-base@2.1.0(@opentelemetry/api@1.9.0))':
+  '@vercel/otel@2.1.2(@opentelemetry/api-logs@0.205.0)(@opentelemetry/api@1.9.0)(@opentelemetry/instrumentation@0.212.0(@opentelemetry/api@1.9.0))(@opentelemetry/resources@2.7.0(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-logs@0.205.0(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-metrics@2.6.0(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-base@2.1.0(@opentelemetry/api@1.9.0))':
     dependencies:
       '@opentelemetry/api': 1.9.0
       '@opentelemetry/api-logs': 0.205.0
