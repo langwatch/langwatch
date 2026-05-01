@@ -1791,7 +1791,7 @@ examples = [
     { name = "langgraph", specifier = ">=1.0.0,<2.0.0" },
     { name = "langsmith", specifier = ">=0.6.3" },
     { name = "litellm", specifier = ">=1.52.1" },
-    { name = "nltk", specifier = ">=3.9.3" },
+    { name = "nltk", specifier = ">=3.9.4" },
     { name = "openai", specifier = ">=1.68.2,<2.8.0" },
     { name = "openinference-instrumentation-dspy", specifier = ">=0.1.23,<0.2.0" },
     { name = "openinference-instrumentation-litellm", specifier = ">=0.1.19" },
