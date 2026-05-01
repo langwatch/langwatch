@@ -1,11 +1,20 @@
 # Conditional Formatting — Gherkin Spec
-# Based on PRD-020: Conditional Formatting
 # Covers: supported columns, rule schema, visual rendering, creating rules, removing rules, lens interaction, grouping interaction, data gating, accessibility
+#
+# STATUS as of 2026-05-01: Not yet implemented.
+#   - No `conditionalFormatting` field on `LensConfig` (see stores/viewStore.ts).
+#   - No "Format column…" entry in any column-header context menu.
+#   - No formatting popover, no rule schema, no per-cell tinting, no header dot indicator.
+#   - No formatting state in `lensDraftStore` or the lens Zod schema.
+#
+# All scenarios below describe the intended Phase 2 design; nothing here renders
+# in the current build.
 
 # ─────────────────────────────────────────────────────────────────────────────
 # SUPPORTED COLUMNS
 # ─────────────────────────────────────────────────────────────────────────────
 
+@planned
 Feature: Conditional formatting
 
 Rule: Conditional formatting supported columns

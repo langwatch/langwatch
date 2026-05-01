@@ -133,13 +133,10 @@ Feature: Explicit application origin for race condition prevention
 
   # --- Precondition matcher changes ---
 
-  @unit @unimplemented
-  Scenario: Precondition matcher does not default empty origin to "application"
-    Given a precondition: traces.origin is "application"
-    And a trace with no langwatch.origin attribute in the fold state
-    When the precondition matcher evaluates the trace
-    Then the precondition fails
-    Because empty origin means "pending", not "application"
+  # Removed scenario: "Precondition matcher does not default empty origin to application"
+  # Contradicts current code as of 2026-05-01: normalizePreconditionTraceData in
+  # precondition-matchers.ts:223 intentionally defaults empty/undefined origin to
+  # "application" (preconditions.unit.test.ts:55-65 documents the OPPOSITE assertion).
 
   @unit @unimplemented
   Scenario: Precondition matcher matches explicit application origin
@@ -204,12 +201,10 @@ Feature: Explicit application origin for race condition prevention
   # The ClickHouse filter builder must match the new semantics:
   # origin = "application" matches ONLY explicit "application", not empty/NULL.
 
-  @unit @unimplemented
-  Scenario: ClickHouse filter for origin "application" matches only explicit value
-    Given a trace filter with traces.origin = "application"
-    When the filter is compiled to ClickHouse SQL
-    Then the WHERE clause matches ts.Attributes['langwatch.origin'] = 'application'
-    And does NOT match empty or NULL values
+  # Removed scenario: "ClickHouse filter for origin application matches only explicit value"
+  # Contradicts current code as of 2026-05-01: filter-translator.ts:286-289 matches
+  # `'' OR IS NULL OR = 'application'` and filter-translator.test.ts:105-111 explicitly
+  # asserts the opposite behavior — the design defaults missing origin to application.
 
   @unit @unimplemented
   Scenario: Frontend renders "Application" tag for explicit application origin
@@ -227,19 +222,10 @@ Feature: Explicit application origin for race condition prevention
   # Race condition scenarios (the core problem this feature prevents)
   # ===========================================================================
 
-  @integration @unimplemented
-  Scenario: Child spans arriving before root span do not trigger evaluations prematurely
-    Given an online evaluation monitor is enabled for the project
-    And a trace's child spans arrive first without langwatch.origin
-    And the child spans carry sdk.name = "langwatch" in resource attributes
-    When the fold projection processes the child spans
-    Then it infers langwatch.origin = "application" (SDK heuristic)
-    And when the evaluation trigger reactor fires at normal debounce
-    Then evaluation commands are dispatched for matching monitors
-    # Old SDK child spans carry SDK info → fold projection infers immediately
-    # If the root span arrives later with origin = "evaluation", the fold
-    # projection updates the origin but the evaluation was already dispatched —
-    # acceptable for the transitional case, evaluation dedup handles re-fires
+  # Removed scenario: "Child spans arriving before root span do not trigger evaluations prematurely"
+  # Contradicts current code as of 2026-05-01: trace-origin.service.ts:117 restricts
+  # the SDK heuristic to root spans only; traceSummaryOrigin.unit.test.ts:339-351
+  # asserts the OPPOSITE (heuristic does NOT fire on child spans).
 
   @integration @unimplemented
   Scenario: New SDK child spans before root span are handled correctly

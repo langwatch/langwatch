@@ -1,5 +1,4 @@
 # Span List — Gherkin Spec
-# Based on PRD-014: Span List
 # Covers: columns, sorting, filtering, aggregates, duplicate spans, cross-view linking, interactions, performance, data gating
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -16,16 +15,17 @@ Rule: Span list columns
     And the Span List view is selected
 
   Scenario: All default columns are visible
-    Then the table shows columns Name, Type, Duration, Cost, Tokens, Model, Status, and Start
+    Then the table shows columns Name, Type, Duration, Model, Status, and Start
+    # Cost and Tokens columns were removed because the span tree payload doesn't carry them
+    # (those numbers live on the heavier per-span detail query — see columns.ts).
 
   Scenario: Name column displays full span name in monospace
     Then each span name is rendered in monospace font
-    And span names are not truncated
-    And the table scrolls horizontally if names exceed available width
+    And long names truncate within the cell with the full name available via the row tooltip
 
   Scenario: Type column shows colored badges
     Then each span displays its type as a colored badge
-    And the badge values include LLM, Tool, Agent, RAG, Guard, Eval, and Span
+    And the badge label is the span type uppercased (LLM, TOOL, AGENT, RAG, GUARDRAIL, EVALUATION, CHAIN, SPAN)
 
   Scenario: Duration column formats values by magnitude
     Given a span with duration 1100ms
@@ -33,26 +33,16 @@ Rule: Span list columns
     And a span with duration 0ms
     Then durations display as "1.1s", "340ms", and "<1ms" respectively
 
-  Scenario: Cost column shows dollar amounts or dash
-    Given a span with cost 0.002
-    And a span with no cost
-    Then costs display as "$0.002" and a dash respectively
-    And costs are right-aligned in monospace font
-
-  Scenario: Tokens column shows input and output counts
-    Given an LLM span with 520 input tokens and 380 output tokens
-    And a Tool span with no token data
-    Then tokens display as "520→380" and a dash respectively
-
-  Scenario: Model column shows model name or dash
-    Given an LLM span using model "gpt-4o"
+  Scenario: Model column shows the trailing segment of the model id
+    Given an LLM span using model "openai/gpt-4o"
     And a Tool span with no model
-    Then models display as "gpt-4o" and a dash respectively
+    Then models display as "gpt-4o" and an em-dash respectively
 
-  Scenario: Status column shows colored dot
+  Scenario: Status column shows a colored dot
     Given a span with OK status
     And a span with Error status
-    Then each status displays as a colored dot
+    Then each status displays as an 8px circle in the per-status color
+    And the column header has no label (only an icon-sized cell)
 
   Scenario: Start column shows offset from trace start
     Given a span starting at the same time as the trace
@@ -72,7 +62,7 @@ Rule: Span list column visibility
     And the Span List view is selected
 
   Scenario: All columns visible by default
-    Then all eight columns are visible
+    Then all six columns are visible
 
   Scenario: Type column hides when filtered to a single type
     When the user filters to only LLM spans
@@ -113,9 +103,9 @@ Rule: Span list sorting
     Given two spans with the same duration
     Then those spans are ordered by start time ascending
 
-  Scenario: Error status sorts first
+  Scenario: Status sort orders by status string
     When the user sorts by Status
-    Then spans with Error status appear before spans with OK status
+    Then spans are ordered by status string (the actual order depends on locale string compare of "ok" / "error" / "warning")
 
   Scenario: Zero-millisecond spans sort as zero
     Given a span with 0ms duration
@@ -127,37 +117,33 @@ Rule: Span list sorting
 # ─────────────────────────────────────────────────────────────────────────────
 
 Rule: Span list type filter
-  Users can filter spans by type to focus on specific span categories.
+  Type filtering uses an inline chip strip above the table — one chip per type that appears in the trace, plus an "All" chip. Chips are click-to-toggle and compose multi-select.
 
   Background:
-    Given the user is viewing a trace with 2 LLM spans, 1 Tool span, 1 Agent span, and 1 Guard span
+    Given the user is viewing a trace with 2 LLM spans, 1 Tool span, 1 Agent span, and 1 Guardrail span
     And the Span List view is selected
 
-  Scenario: Type filter defaults to All
-    Then the Type filter dropdown shows "All"
+  Scenario: All chip is active by default
+    Then the "All" chip shows "(5)" and is the active chip
     And all 5 spans are visible in the table
 
-  Scenario: Type filter dropdown shows counts per type
-    When the user opens the Type filter dropdown
-    Then each type shows its span count in parentheses
-    And LLM shows "(2)" and Tool shows "(1)"
+  Scenario: Type chips show counts per type
+    Then each type chip shows its span count
+    And LLM shows count "2" and TOOL shows count "1"
 
-  Scenario: Types with zero spans are greyed out
-    When the user opens the Type filter dropdown
-    Then types with 0 spans are greyed out but visible
-
-  Scenario: Selecting a single type filters the list
-    When the user selects LLM in the Type filter
+  Scenario: Clicking a type chip toggles that type into the filter
+    When the user clicks the LLM chip
     Then only LLM spans are visible in the table
+    And the LLM chip becomes active and the "All" chip becomes inactive
 
-  Scenario: Multi-select shows multiple types
-    When the user selects both LLM and Tool in the Type filter
-    Then LLM and Tool spans are visible
-    And Agent and Guard spans are hidden
+  Scenario: Multi-select adds another type to the filter
+    When the user clicks LLM, then clicks TOOL
+    Then LLM and TOOL spans are visible
+    And AGENT and GUARDRAIL spans are hidden
 
-  Scenario: Selecting All unchecks individual selections
-    Given the user has selected LLM and Tool
-    When the user selects All
+  Scenario: Clicking the All chip clears the type filter
+    Given the user has LLM and TOOL active
+    When the user clicks the "All" chip
     Then all individual type selections are cleared
     And all spans are visible
 
@@ -217,7 +203,7 @@ Rule: Span list count display
     And the Span List view is selected
 
   Scenario: Unfiltered count shows total
-    Then the span count reads "5 of 5 spans"
+    Then the span count reads "5 spans"
 
   Scenario: Filtered count shows matching and total
     When the user filters to only LLM spans and 2 match
@@ -234,18 +220,15 @@ Rule: Span list footer aggregates
     Given the user is viewing a trace with multiple spans
     And the Span List view is selected
 
-  Scenario: Unfiltered footer shows trace-level totals
-    Then the footer row label reads "Totals:"
-    And the footer duration shows the trace total duration with an asterisk
-    And a footnote reads "trace duration"
-    And the footer cost shows the sum of all span costs
-    And the footer tokens shows the sum of all span tokens
+  Scenario: Unfiltered footer shows trace duration only
+    Then the footer Name cell reads "Totals:"
+    And the footer Duration cell shows the trace total duration suffixed with "*" and a tooltip "Trace duration"
+    # Cost and tokens are not summarized in the footer because the table no longer has those columns.
 
-  Scenario: Filtered footer shows filtered totals
+  Scenario: Filtered footer shows the duration span of filtered rows
     When the user filters to only LLM spans
-    Then the footer row label reads "Filtered totals:"
-    And the footer cost shows the sum of only LLM span costs
-    And the footer tokens shows the sum of only LLM span tokens
+    Then the footer Name cell reads "Filtered totals:"
+    And the footer Duration cell shows (max(end) − min(start)) of the filtered rows with a tooltip "Sum of filtered spans"
 
 # ─────────────────────────────────────────────────────────────────────────────
 # DUPLICATE SPAN NAMES
@@ -271,7 +254,7 @@ Rule: Span list duplicate span names
 
   Scenario: Span ID shown on hover tooltip
     When the user hovers over a "tool.search" row
-    Then a tooltip shows the span ID
+    Then a tooltip shows "Span ID: <first 16 chars of spanId>"
     And the span ID is not shown as a table column
 
   Scenario: No artificial index numbers
@@ -319,6 +302,11 @@ Rule: Span list row interactions
     When the user hovers over a span row
     Then the row shows a subtle highlight
 
+  Scenario: Clicking the same row again clears the selection
+    Given a row is currently selected
+    When the user clicks that same row again
+    Then the selection is cleared and the span tab closes
+
   Scenario: Hovering a row shows span ID tooltip
     When the user hovers over a span row
     Then a tooltip displays the span ID
@@ -330,22 +318,21 @@ Rule: Span list row interactions
 Rule: Span list performance
   The span list handles large traces efficiently with virtualization.
 
-  Scenario: Small traces render all rows
-    Given a trace with fewer than 100 spans
+  Scenario: All trace sizes use row virtualization
+    Given any trace size
     When the Span List view is selected
-    Then all rows are rendered in the DOM
+    Then visible rows are rendered and off-screen rows are recycled by the virtualizer (overscan ~10)
 
-  Scenario: Medium traces use row virtualization
-    Given a trace with between 100 and 500 spans
-    When the Span List view is selected
-    Then only visible rows are rendered and off-screen rows are recycled
-
+  @planned
+  # Not yet implemented as of 2026-05-01 — there is no "Load more" gate; virtualization handles all sizes from a fully-loaded list.
   Scenario: Large traces show load-more threshold
     Given a trace with more than 500 spans
     When the Span List view is selected
     Then the first 200 spans are shown
     And a message reads "Showing first 200 of N. Load more."
 
+  @planned
+  # Not yet implemented as of 2026-05-01
   Scenario: Loading more spans in a large trace
     Given a trace with more than 500 spans
     And the first 200 spans are shown
@@ -366,17 +353,17 @@ Rule: Span list data gating
     Given a trace with exactly one span
     Then the table shows a single row with that span's data
 
-  Scenario: Missing cost tokens and model show dashes
-    Given a span with no cost, no tokens, and no model
-    Then the Cost, Tokens, and Model cells display a dash
-    And those columns are not hidden
+  Scenario: Missing model shows an em-dash
+    Given a span with no model
+    Then the Model cell displays an em-dash
+    And the column is not hidden
 
   Scenario: All spans filtered out shows empty message
     Given the user has applied filters that match zero spans
     Then the table displays "No spans match the current filter"
-    And a link to clear filters is visible
+    And a "Clear filters" link is visible
 
   Scenario: Clearing filters from empty state restores all spans
     Given the table displays "No spans match the current filter"
-    When the user clicks the clear filter link
+    When the user clicks the "Clear filters" link
     Then all spans are visible again

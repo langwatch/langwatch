@@ -1,11 +1,21 @@
 # Lens Analytics — Gherkin Spec
-# Based on PRD-021: Lens Analytics
 # Covers: event firing, event schema, debounce rules, localStorage storage, FIFO cap, data gating, migration path, privacy
+#
+# STATUS as of 2026-05-01: Not yet implemented.
+#   - No `trackLensEvent` function exists anywhere under `langwatch/src/features/traces-v2/`.
+#   - No PostHog / analytics calls fire from the lens / column / grouping / formatting flows.
+#   - No `langwatch:lensAnalytics:{projectId}` localStorage key is written.
+#   - Conditional formatting itself (referenced in some scenarios) is also unimplemented,
+#     so the formatting-event scenarios are doubly aspirational.
+#
+# Treat this entire feature file as the design intent for Phase 2/3A analytics; it
+# describes target behavior, not current behavior.
 
 # ─────────────────────────────────────────────────────────────────────────────
 # LENS LIFECYCLE EVENTS
 # ─────────────────────────────────────────────────────────────────────────────
 
+@planned
 Feature: Lens analytics
 
 Rule: Lens lifecycle event tracking

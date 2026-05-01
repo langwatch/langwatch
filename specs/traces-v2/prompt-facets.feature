@@ -1,5 +1,4 @@
 # Prompt Facets — Gherkin Spec
-# Based on PRD-023: Prompt Facets
 # Covers: ingest-time projection, span back-references, sidebar facet rendering,
 # query-language fields, autocomplete, edge cases.
 
@@ -25,6 +24,8 @@ Feature: Prompt facets in traces v2
     When the trace summary is built
     Then "trace_summaries.SelectedPromptId" is "billing-bot"
     And "trace_summaries.SelectedPromptSpanId" is the SpanId of span 3
+    # `TracePromptAccumulationService` picks the latest span by
+    # `startTimeUnixMs`, with `SpanId` as a deterministic tiebreaker.
 
   Scenario: Last-used prompt is taken from the latest span with langwatch.prompt.id
     Given a trace has two spans
@@ -41,6 +42,8 @@ Feature: Prompt facets in traces v2
     When the trace summary is built
     Then "trace_summaries.LastUsedPromptId" is "support-bot"
     And "trace_summaries.LastUsedPromptVersionNumber" is 2
+    # `parsePromptReference` resolves to `promptHandle` whether the source
+    # was `langwatch.prompt.id` (split on ":") or `langwatch.prompt.handle`.
 
   Scenario: No prompt attributes leaves all prompt fields null
     Given a trace has spans but no prompt attributes anywhere
@@ -65,10 +68,10 @@ Feature: Prompt facets in traces v2
   # SIDEBAR FACETS
   # ───────────────────────────────────────────────────────────────────────────
 
-  Scenario: Prompts group is visible above Metrics in the sidebar
+  Scenario: Prompts group is the last group in the sidebar
     When the filter sidebar renders
-    Then a "Prompts" group is shown
-    And it contains "Selected prompt", "Last used prompt", "Prompt version" sections
+    Then a "Prompts" group is shown after the Metrics group (it is the final entry in `FACET_GROUPS`)
+    And its keys are ["selectedPrompt", "lastUsedPrompt", "promptVersion"]
 
   Scenario: Selecting a value in Selected prompt narrows the result set
     Given the project has traces with selected prompt "support-bot" and "billing-bot"
@@ -81,7 +84,13 @@ Feature: Prompt facets in traces v2
     Then the query parses without error
     And only traces with LastUsedPromptVersionNumber >= 3 are returned
 
+  @planned
   Scenario: Drawer opens to the source span when a facet hit is clicked
+    # Not yet implemented as of 2026-05-01 — the trace drawer's URL/state
+    # syncing does not consult the active sidebar facet to pre-select the
+    # corresponding `SelectedPromptSpanId` / `LastUsedPromptSpanId`. The
+    # span IDs are exposed on `TraceHeader` and surfaced in chips and the
+    # Prompts panel, but not auto-selected on drawer open.
     Given the user is viewing the "Selected prompt" facet
     And a trace shows up under handle "billing-bot"
     When the user opens that trace's drawer
@@ -93,8 +102,8 @@ Feature: Prompt facets in traces v2
 
   Scenario Outline: Prompt query fields parse and execute
     When the user enters "<query>" in the search bar
-    Then the query parses
-    And the result set matches the documented backend filter for "<facetField>"
+    Then the query parses against `FIELD_METADATA` with the listed facet field
+    And the backend translates the predicate against the listed `trace_summaries` column
 
     Examples:
       | query                          | facetField                  |
@@ -104,7 +113,12 @@ Feature: Prompt facets in traces v2
       | promptVersion:[3 TO 7]         | LastUsedPromptVersionNumber |
       | -selectedPrompt:billing-bot    | SelectedPromptId (negated)  |
 
+  @planned
   Scenario: Autocomplete suggests known prompt handles
+    # Not yet implemented as of 2026-05-01 — `FIELD_VALUES` in
+    # query-language/metadata only includes `origin` and `status`. There
+    # is no curated list of prompt handles surfaced through the search
+    # suggestion dropdown for `selectedPrompt:` / `lastUsedPrompt:`.
     Given the project has prompts "support-bot", "billing-bot", "onboarding-bot"
     When the user types "selectedPrompt:" in the search bar
     Then the suggestion dropdown lists those three handles, alphabetically
@@ -113,7 +127,8 @@ Feature: Prompt facets in traces v2
   # BACK-COMPAT
   # ───────────────────────────────────────────────────────────────────────────
 
-  Scenario: Legacy prompt: field still works
+  Scenario: Legacy `prompt:` field still works
     When the user enters "prompt:support-bot"
-    Then the query continues to match the existing metadata.prompt_ids array
+    Then the query is registered as a text field on `metadata` group
+    And `meta-handlers` translates it to a `has(JSONExtract(Attributes['langwatch.prompt_ids'], 'Array(String)'), {p:String})` predicate
     And no error is shown

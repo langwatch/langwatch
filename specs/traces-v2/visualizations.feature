@@ -1,5 +1,4 @@
 # Visualizations — Gherkin Spec
-# Based on PRD-007: Visualizations — Shared Behavior & Waterfall
 # Covers: layout, view switching, span selection, hover, color coding, multi-root traces,
 #         orphaned spans, 0ms spans, collapsed state, waterfall tree, timeline, time scale,
 #         sibling grouping, interactions, performance, data gating
@@ -18,9 +17,9 @@ Rule: Visualization layout and view switching
     Given the user is authenticated with "traces:view" permission
     And a trace with multiple spans is open in the trace drawer
 
-  Scenario: Three view tabs are visible
+  Scenario: Five view tabs are visible
     When the visualization section renders
-    Then tab buttons for "Waterfall", "Flame", and "Span List" are visible
+    Then tab buttons for "Waterfall", "Flame", "Span List", "Topology", and "Sequence" are visible
 
   Scenario: Waterfall is the default view
     When the trace drawer opens
@@ -38,6 +37,10 @@ Rule: Visualization layout and view switching
     Then the Flame view is active
     When the user presses "3"
     Then the Span List view is active
+    When the user presses "4"
+    Then the Topology view is active
+    When the user presses "5"
+    Then the Sequence view is active
 
   Scenario: Selected view persists across drawer reopens
     Given the user switched to the Span List view
@@ -54,16 +57,20 @@ Rule: Visualization layout and view switching
     Then the visualization area is approximately 250px tall
 
   Scenario: Collapsed height mode
-    When the user collapses the visualization section
-    Then the visualization area is approximately 120px tall
+    When the visualization section is at its minimum height
+    Then the visualization area is approximately 80px tall
 
   Scenario: Expanded height mode
-    When the user expands the visualization section
-    Then the visualization area is at least 450px tall
+    When the user cycles to the expanded height
+    Then the visualization area is approximately 480px tall
+
+  Scenario: Minimized height mode
+    When the user clicks the cycle-size control while expanded
+    Then the visualization area collapses to 0px and only the tab bar is visible
 
   Scenario: Draggable resize handle between visualization and tab bar
-    When the user drags the resize handle between the visualization and the tab bar
-    Then the visualization area height changes proportionally
+    When the user drags the grip handle below the visualization
+    Then the visualization area height changes proportionally up to a 700px maximum
     And the tab bar and accordions below adjust accordingly
 
 
@@ -81,11 +88,11 @@ Rule: Span selection across all views
 
   Scenario: Clicking a span opens the span tab
     When the user clicks a span in the visualization
-    Then the span tab opens with a fade animation
+    Then the span tab opens
     And the span detail is displayed
 
-  Scenario: Clicking the same span again closes the span tab
-    Given a span is selected
+  Scenario: Clicking the same span again closes the span tab in the Waterfall and Span List views
+    Given a span is selected and the user is on the Waterfall or Span List view
     When the user clicks the same span again
     Then the span tab closes
     And the Trace Summary is displayed
@@ -100,6 +107,11 @@ Rule: Span selection across all views
     When the user switches to the Flame view
     Then the same span is highlighted in the Flame view
 
+  Scenario: Selected span can be pinned as a persistent tab
+    Given a span is selected and an ephemeral span tab is open
+    When the user clicks the pin icon on the span tab
+    Then the span tab becomes a pinned tab that survives selecting a different span
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # HOVER BEHAVIOR (SHARED)
@@ -113,25 +125,27 @@ Rule: Hover tooltips and cross-highlighting
     Given the user is authenticated with "traces:view" permission
     And a trace with multiple spans is open in the trace drawer
 
-  Scenario: Tooltip on span hover
-    When the user hovers over a span in the visualization
-    Then a tooltip displays the span name, type badge, and duration
+  Scenario: Tooltip on span hover in the Waterfall view
+    When the user hovers over a span in the Waterfall view
+    Then a tooltip displays the span name, duration, offset from trace start, span ID, and (when available) % of trace
+    And LLM spans include the model name in the row
 
+  @planned
+  # Not yet implemented as of 2026-05-01 — only the Waterfall tooltip exists; tooltips do not include cost, and there is no cross-highlighting between spans and Trace Summary entries.
   Scenario: Tooltip shows cost for spans with cost data
     Given the trace has an LLM span with cost data
     When the user hovers over that LLM span
     Then the tooltip includes the cost
 
-  Scenario: Tooltip shows model for LLM spans
-    Given the trace has an LLM span with a model name
-    When the user hovers over that LLM span
-    Then the tooltip includes the model name
-
+  @planned
+  # Not yet implemented as of 2026-05-01
   Scenario: Hovering a span highlights related links in Trace Summary
     Given the Trace Summary tab is visible
     When the user hovers over a span in the visualization
     Then the corresponding span origin links in the Trace Summary events and evals are highlighted
 
+  @planned
+  # Not yet implemented as of 2026-05-01
   Scenario: Hovering a span origin link in Trace Summary highlights the span in the visualization
     Given the Trace Summary tab is visible
     When the user hovers over a span origin link in the Trace Summary
@@ -151,31 +165,35 @@ Rule: Color coding by span type
 
   Scenario: LLM spans are blue
     Given the trace contains an LLM span
-    Then the LLM span is rendered in blue with a diamond icon
+    Then the LLM span is rendered in blue with a brain icon
 
   Scenario: Tool spans are green
     Given the trace contains a Tool span
-    Then the Tool span is rendered in green with a gear icon
+    Then the Tool span is rendered in green with a wrench icon
 
   Scenario: Agent spans are purple
     Given the trace contains an Agent span
-    Then the Agent span is rendered in purple with a bullseye icon
+    Then the Agent span is rendered in purple with a bot icon
 
-  Scenario: RAG spans are orange
+  Scenario: RAG spans are teal
     Given the trace contains a RAG span
-    Then the RAG span is rendered in orange
+    Then the RAG span is rendered in teal with a database icon
 
-  Scenario: Guardrail spans are yellow
+  Scenario: Guardrail spans are orange
     Given the trace contains a Guardrail span
-    Then the Guardrail span is rendered in yellow
+    Then the Guardrail span is rendered in orange with a shield icon
 
-  Scenario: Evaluation spans are teal
+  Scenario: Evaluation spans are pink
     Given the trace contains an Evaluation span
-    Then the Evaluation span is rendered in teal
+    Then the Evaluation span is rendered in pink with a clipboard-check icon
+
+  Scenario: Chain spans are cyan
+    Given the trace contains a Chain span
+    Then the Chain span is rendered in cyan with a link icon
 
   Scenario: Generic spans are gray
     Given the trace contains a Generic span
-    Then the Generic span is rendered in gray
+    Then the Generic span is rendered in gray with a circle icon
 
   Scenario: Error spans have a red border but keep their type fill color
     Given the trace contains an LLM span with an error status
@@ -227,7 +245,8 @@ Rule: Orphaned spans
 
   Scenario: Orphaned spans show a missing-parent indicator
     When the visualization renders
-    Then orphaned spans display a broken-link icon and "parent not in trace" indicator
+    Then orphaned spans display a broken-link icon (LuUnlink) on the row
+    And the row tooltip shows the "Parent not in trace" warning
 
   Scenario: Orphaned spans are not hidden even when they are the only spans
     Given a trace contains only orphaned spans
@@ -249,12 +268,12 @@ Rule: Zero-duration spans
 
   Scenario: 0ms span in the Waterfall timeline
     When the Waterfall view renders
-    Then the 0ms span appears as a thin vertical line or diamond marker
+    Then the 0ms span appears as a small rotated diamond marker
     And the 0ms span is clickable
 
   Scenario: 0ms span in the Flame view
     When the Flame view renders
-    Then the 0ms span appears as a minimum-width block of at least 4px
+    Then the 0ms span renders at a minimum block width
     And the span details are visible on hover
 
   Scenario: 0ms span in the Span List
@@ -274,18 +293,18 @@ Rule: Collapsed visualization state
     Given the user is authenticated with "traces:view" permission
     And a trace is open in the trace drawer
 
-  Scenario: Collapsed state shows mini timing bars
-    When the visualization section is collapsed
-    Then a compressed overview of mini timing bars is shown
-    And no text labels are displayed
+  Scenario: Collapsed state shows a mini timing-bar overview
+    When the visualization section is at its minimum height
+    Then a single horizontal track is rendered with a colored mark per span positioned by start time and sized by duration
+    And no text labels are displayed except a "Click to expand" hint
 
   Scenario: Collapsed state reflects errors
     Given the trace contains spans with errors
-    When the visualization section is collapsed
-    Then error spans are distinguishable by color in the compressed overview
+    When the visualization section is at its minimum height
+    Then error spans are filled with red in the compressed overview
 
   Scenario: Clicking collapsed state expands it
-    When the visualization section is collapsed
+    When the visualization section is at its minimum height
     And the user clicks anywhere on the collapsed overview
     Then the visualization expands to the default height
 
@@ -330,21 +349,20 @@ Rule: Waterfall span tree
     When the Waterfall view renders
     Then each span row shows its duration right-aligned in monospace
 
-  Scenario: LLM span metadata line
-    Given the trace has an LLM span with model, tokens, and cost data
+  Scenario: LLM span shows abbreviated model on a second line
+    Given the trace has an LLM span with a model
     When the Waterfall view renders
-    Then the LLM span shows a second line with model name, token count as in-to-out, and cost
-    And the metadata line is slightly indented and in muted text
+    Then the LLM span shows a second muted-text line with the abbreviated model name (token count and cost are not shown on this line)
 
-  Scenario: LLM metadata line only appears when data exists
-    Given the trace has an LLM span with no model or token data
+  Scenario: LLM metadata line only appears when a model is set
+    Given the trace has an LLM span with no model
     When the Waterfall view renders
     Then no metadata line appears below that LLM span
 
   Scenario: Error indicator on span row
     Given the trace has a span with error status
     When the Waterfall view renders
-    Then the error span row shows a red warning icon
+    Then the error span row shows a red warning triangle icon (LuTriangleAlert)
 
   Scenario: Indentation per nesting level
     When the Waterfall view renders
@@ -397,7 +415,7 @@ Rule: Waterfall timeline
   Scenario: Tree-timeline divider is resizable
     When the user drags the divider between the tree and timeline
     Then the tree and timeline columns resize proportionally
-    And the default split is approximately 40% tree and 60% timeline
+    And the default split is approximately 38% tree and 62% timeline
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -416,39 +434,52 @@ Rule: Waterfall time scale
   Scenario: Default linear scale fits the trace duration
     When the Waterfall view renders
     Then the timeline uses a linear scale that fits the full trace duration
+    And evenly-spaced time markers are shown across the top
 
+  Scenario: Wheel events on the timeline scroll the tree vertically
+    When the user scrolls the wheel over the timeline panel
+    Then the scroll is forwarded to the tree's vertical scroll (timeline does not zoom)
+
+  @planned
+  # Not yet implemented as of 2026-05-01 — Waterfall has a static linear scale; zoom/pan/minimap/idle-gap compression only exist in the Flame view.
   Scenario: Scroll to zoom in and out on the timeline
     When the user scrolls on the timeline
     Then the timeline zooms in or out
 
+  @planned
+  # Not yet implemented as of 2026-05-01
   Scenario: Drag to pan the timeline
     When the user drags on the timeline
     Then the visible portion of the timeline pans
 
+  @planned
+  # Not yet implemented as of 2026-05-01
   Scenario: Idle gaps are compressed with a break indicator
     Given the trace has a mix of very short and very long spans with idle gaps
     When the Waterfall view renders
     Then long idle gaps are compressed with a subtle zigzag break indicator
     And short spans remain visible
 
+  @planned
+  # Not yet implemented as of 2026-05-01 — no Waterfall minimap exists.
   Scenario: Minimap appears when zoomed in
     When the user zooms into the timeline
     Then a minimap bar appears at the top of the timeline showing the full trace
     And a semi-transparent rectangle indicates the current viewport
 
+  @planned
+  # Not yet implemented as of 2026-05-01
   Scenario: Clicking the minimap jumps the viewport
     Given the timeline is zoomed in and the minimap is visible
     When the user clicks a position on the minimap
     Then the viewport jumps to that position
 
+  @planned
+  # Not yet implemented as of 2026-05-01
   Scenario: Dragging the minimap viewport pans smoothly
     Given the timeline is zoomed in and the minimap is visible
     When the user drags the viewport rectangle on the minimap
     Then the timeline pans smoothly to follow
-
-  Scenario: Minimap is hidden when not zoomed
-    When the timeline is at default zoom
-    Then the minimap is not visible
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -476,7 +507,7 @@ Rule: Waterfall sibling grouping
   Scenario: Group row shows count and aggregate stats
     Given a parent span has 77 children all named "Scenario Turn"
     When the Waterfall view renders
-    Then the group row shows the span name, count as "x77", average duration, and duration range
+    Then the group row shows the span name, count as "×77", average duration, and duration range
 
   Scenario: Group row shows error count when some siblings have errors
     Given a parent span has 20 children named "step" and 3 of them have errors
@@ -486,7 +517,7 @@ Rule: Waterfall sibling grouping
   Scenario: Group timeline bar spans the full range of grouped spans
     Given siblings are grouped
     When the Waterfall view renders
-    Then the timeline shows a dense or hatched bar spanning from the earliest start to the latest end of the grouped spans
+    Then the timeline shows a hatched/striped bar spanning from the earliest start to the latest end of the grouped spans
 
   Scenario: Expanding a group shows all sibling spans
     Given siblings are grouped into a group row
@@ -541,24 +572,22 @@ Rule: Waterfall performance
     Given the user is authenticated with "traces:view" permission
     And the Waterfall view is active
 
-  Scenario: Small traces render all spans immediately
-    Given a trace with fewer than 50 spans
+  Scenario: All trace sizes virtualize rows
     When the Waterfall view renders
-    Then all spans are rendered immediately without virtualization
+    Then visible rows are rendered and off-screen rows are recycled by the virtualizer (overscan ~15)
 
-  Scenario: Medium traces virtualize off-screen rows
-    Given a trace with between 50 and 200 spans
+  Scenario: Sibling auto-grouping always applies above the threshold
+    Given any parent span has more than 5 children with the same name
     When the Waterfall view renders
-    Then visible spans are rendered
-    And off-screen rows are virtualized
+    Then those children collapse into a single group row regardless of total trace size
 
-  Scenario: Large traces auto-collapse deep children and auto-group siblings
+  @planned
+  # Not yet implemented as of 2026-05-01 — no depth-based auto-collapse for large traces; virtualizer is the only size-adaptive strategy.
+  Scenario: Large traces auto-collapse deep children
     Given a trace with more than 200 spans
     When the Waterfall view renders
     Then children deeper than 2 levels are auto-collapsed
-    And sibling groups with more than 5 same-named spans are auto-grouped
     And a message indicates "N spans collapsed" with an expand button
-    And rows are virtualized
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -579,16 +608,18 @@ Rule: Data gating for edge cases
     Then one span row and one timeline bar are visible
     And the visualization section is not hidden
 
+  @planned
+  # Not yet implemented as of 2026-05-01 — span data shape always carries start/end timestamps; there is no "no timing data" muted-text branch in TreeRow/TimelineBar.
   Scenario: Span with no timing data shows in tree only
     Given a trace has a span with no timing data
     When the Waterfall view renders
     Then the span appears in the tree without a timeline bar
     And the span shows muted text "no timing data"
 
-  Scenario: 0ms span shows as a thin marker in the timeline
+  Scenario: 0ms span shows as a diamond marker in the timeline
     Given a trace has a span with 0ms duration
     When the Waterfall view renders
-    Then the span appears as a thin vertical line or diamond marker in the timeline
+    Then the span appears as a small rotated diamond marker positioned at its start time
     And the marker is clickable
 
   Scenario: Orphaned spans appear at root level with indicator

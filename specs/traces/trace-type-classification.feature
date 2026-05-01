@@ -217,19 +217,12 @@ Feature: Trace origin classification
   # The old metadata fields (platform, environment) are no longer set by
   # new code. The old origin names (langwatch-evaluation) are standardized.
 
-  @unit @unimplemented
-  Scenario: execute_flow no longer sets metadata.platform
-    Given a workflow executes via execute_flow after the cleanup
-    When the trace is sent to LangWatch
-    Then the root span does not contain metadata key "platform"
-    And the root span contains attribute "langwatch.origin" = "workflow"
-
-  @unit @unimplemented
-  Scenario: execute_component no longer sets metadata.platform
-    Given a studio component executes after the cleanup
-    When the trace is sent to LangWatch
-    Then the root span does not contain metadata key "platform"
-    And the root span does not contain metadata key "environment"
+  # Removed scenarios: "execute_flow no longer sets metadata.platform" and
+  # "execute_component no longer sets metadata.platform".
+  # Aspirational cleanup. As of 2026-05-01, execute_flow.py and
+  # execute_component.py still set metadata.platform / metadata.environment
+  # alongside langwatch.origin (preamble lines 43-49 in this file confirm this).
+  # No roadmap item to drop them; legacy markers remain dual-set.
 
   @unit @unimplemented
   Scenario: Python SDK experiment no longer uses langwatch-evaluation origin name
@@ -245,12 +238,10 @@ Feature: Trace origin classification
     Then the tracer scope name is "langwatch" (not "langwatch-evaluation")
     And the root span contains attribute "langwatch.origin" = "evaluation"
 
-  @unit @unimplemented
-  Scenario: Scenario tool no longer relies on labels for origin identification
-    Given a scenario test runs after the cleanup
-    When the test sends traces to LangWatch
-    Then the root span contains attribute "langwatch.origin" = "simulation"
-    And the origin is NOT communicated via metadata.labels or scenario.labels
+  # Removed scenario: "Scenario tool no longer relies on labels for origin identification"
+  # Aspirational cleanup of an external scenario package. No roadmap item.
+  # Legacy `metadata.labels=scenario-runner` and resource `scenario.labels`
+  # markers continue to flow alongside langwatch.origin = "simulation".
 
   # ===========================================================================
   # Step 1d: Strip legacy markers from projection on new traces
@@ -422,36 +413,43 @@ Feature: Trace origin classification
   # Step 5 (future): Trace list quick filters
   # ===========================================================================
 
+  # The "quick filter chips" UI was replaced by SavedViewsBar (seeded
+  # origin views). The behavior described below now lives behind that bar;
+  # see specs/traces/saved-views.feature for the canonical scenarios.
+
   @e2e @unimplemented
-  Scenario: User filters traces by origin using quick filter chips
+  Scenario: User filters traces by origin via the saved views bar
     Given I am on the traces list page
     And there are traces with origin "application", "evaluation", and "simulation"
-    When I click the "Application" quick filter chip
-    Then only traces with "langwatch.origin" = "application" or without the attribute are shown
-    And the "Application" chip appears selected
+    When I click the "Application" view badge in the saved views bar
+    Then only traces with "langwatch.origin" = "application" (or empty/null) are shown
+    And the "Application" badge appears selected
 
   @e2e @unimplemented
-  Scenario: "All traces" quick filter shows everything
+  Scenario: "All Traces" view resets origin filtering
     Given I am on the traces list page
-    And the "Application" quick filter is currently active
-    When I click the "All traces" quick filter chip
-    Then all traces are shown regardless of scope
+    And the "Application" saved view is currently active
+    When I click the "All Traces" view badge
+    Then all traces are shown regardless of origin
+    # Resets via useSavedViews.resetAllFilters; see savedViewsLogic.ts:47.
 
   # ===========================================================================
-  # Step 6 (future): Online evaluation pre-filtering
+  # Step 6: Online evaluation origin handling (reactor + preconditions)
   # ===========================================================================
 
-  # The evaluationTrigger reactor currently checks:
-  #   attrs["langwatch.platform"] === "optimization_studio" &&
-  #   attrs["langwatch.environment"] === "development"
-  # This is replaced by a single check on langwatch.origin.
+  # As of 2026-05-01, the evaluationTrigger reactor no longer rejects traces
+  # based on origin — it dispatches for any known origin and lets the
+  # precondition matcher (precondition-matchers.ts) filter per monitor config.
+  # The exception is empty origin with no SDK info: that path schedules a
+  # deferred check via originGate.reactor.ts.
 
   @unit @unimplemented
-  Scenario: Online evaluations skip evaluation traces
+  Scenario: Online evaluations dispatch for evaluation-origin traces (preconditions filter)
     Given an online evaluation monitor is enabled for the project
     And a trace arrives with "langwatch.origin" = "evaluation"
     When the evaluation trigger reactor processes the trace
-    Then no evaluation is triggered for this trace
+    Then evaluation commands are dispatched
+    And precondition matchers filter based on the monitor's configured origin
 
   @unit @unimplemented
   Scenario: Online evaluations run on application traces
@@ -461,30 +459,18 @@ Feature: Trace origin classification
     Then evaluations are triggered normally
 
   @unit @unimplemented
-  Scenario: Online evaluations skip traces with empty origin
+  Scenario: Online evaluations skip traces with empty origin and no SDK info
     Given an online evaluation monitor is enabled for the project
-    And a trace arrives without "langwatch.origin" set
+    And a trace arrives without "langwatch.origin" and without sdk.name
     When the evaluation trigger reactor processes the trace
-    Then no evaluation is triggered for this trace
-    And the trace is deferred for later evaluation
+    Then no evaluation is triggered immediately
+    And a deferred origin-resolution check is scheduled (originGate.reactor)
 
   @unit @unimplemented
-  Scenario: Online evaluations skip simulation traces
+  Scenario: Online evaluations dispatch for simulation/workflow/playground traces (preconditions filter)
     Given an online evaluation monitor is enabled for the project
-    And a trace arrives with "langwatch.origin" = "simulation"
+    And a trace arrives with "langwatch.origin" in {simulation, workflow, playground}
     When the evaluation trigger reactor processes the trace
-    Then no evaluation is triggered for this trace
-
-  @unit @unimplemented
-  Scenario: Online evaluations skip workflow traces
-    Given an online evaluation monitor is enabled for the project
-    And a trace arrives with "langwatch.origin" = "workflow"
-    When the evaluation trigger reactor processes the trace
-    Then no evaluation is triggered for this trace
-
-  @unit @unimplemented
-  Scenario: Online evaluations skip playground traces
-    Given an online evaluation monitor is enabled for the project
-    And a trace arrives with "langwatch.origin" = "playground"
-    When the evaluation trigger reactor processes the trace
-    Then no evaluation is triggered for this trace
+    Then evaluation commands are dispatched
+    And precondition matchers reject the trace if the monitor's configured
+    origin does not match (server/evaluations/preconditions.ts)

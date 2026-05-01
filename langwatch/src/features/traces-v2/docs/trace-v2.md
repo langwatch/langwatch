@@ -112,11 +112,11 @@ The foundation gives you something to put behind the feature flag immediately. T
 ### Phase 1: Onboarding + Trace Drawer
 - Empty state / onboarding view: what does this look like when you have no data? Educate users on what the product does and what they'll see when data flows in. This view adapts based on what the user wants from the product.
 - Trace detail drawer: three visualization modes (Waterfall, Flame Graph, Span List — see ADR-001). Tab model for span selection (Trace Summary tab + ephemeral span tab). Rich metadata panel. This is the constant — every persona, every entry point opens this same drawer. Make it beautiful.
-- Covered by PRDs 001-016. See [docs/README.md](../README.md) for the full index.
+- Acceptance criteria for these surfaces live in `specs/traces-v2/` at the repo root.
 
 ### Definitions
 
-A **lens** (internal term) is a named config object containing: columns, grouping, default filters, sort order, conditional formatting rules, and visualization mode. A **view** (user-facing term) is a lens rendered as a tab in the UI. A **built-in view** is a hardcoded lens shipped with the product. **Custom views** are user-created and saved. See PRD-017 for the full LensConfig TypeScript schema.
+A **lens** (internal term) is a named config object containing: columns, grouping, default filters, sort order, conditional formatting rules, and visualization mode. A **view** (user-facing term) is a lens rendered as a tab in the UI. A **built-in view** is a hardcoded lens shipped with the product. **Custom views** are user-created and saved. The full LensConfig schema lives in `langwatch/src/features/traces-v2/lens/schema.ts`.
 
 ### Phase 0: Schema Validation (COMPLETED)
 
@@ -156,8 +156,7 @@ Queried the dev ClickHouse instance. Results:
 - 3 additional built-in views: "By Model", "By Service", "By User"
 - Conditional formatting: color-code cells by value thresholds
 - View analytics: invisible instrumentation tracking view usage patterns
-- Covered by PRDs 017-021. See [docs/README.md](../README.md) for the full index.
-- Phase 2 design decisions and LensConfig schema are captured in PRDs 017-021 and [CHANGELOG-PRDS.md](../CHANGELOG-PRDS.md).
+- Acceptance criteria for each component live in `specs/traces-v2/` at the repo root.
 
 ### Phase 3A: App Networking Layer (production repo)
 - State management: TanStack Query (server state via @trpc/tanstack-query) + Zustand with 4 slices (filter, view, drawer, UI)

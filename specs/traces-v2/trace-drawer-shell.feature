@@ -1,8 +1,25 @@
 # Trace Drawer Shell — Gherkin Spec
-# Based on PRD-004: Trace Drawer Shell
-# Covers: drawer layout, overlay/maximise, unified drawer model, span selection tab model,
-#         mode switch, context peek, conversation mode, contextual alerts, loading states,
-#         animation, navigation, keyboard shortcuts, deep linking, responsive behavior
+# Implementation:
+#   langwatch/src/features/traces-v2/components/TraceDrawer/**
+#   langwatch/src/features/traces-v2/stores/drawerStore.ts
+#   langwatch/src/features/traces-v2/hooks/{useDrawerUrlSync,useTraceDrawerShortcuts,useTraceDrawerNavigation}.ts
+#   langwatch/src/features/traces-v2/hooks/traceDrawerShortcutTable.ts
+#
+# Audited 2026-05-01: drift between spec and code was significant.
+#   - Drawer tabs are SUMMARY / LLM-OPTIMIZED / PROMPTS (the latter only when
+#     the trace touched a managed prompt) plus zero-or-more pinned span tabs
+#     and an ephemeral "selected but not pinned" span tab. The spec said
+#     "Trace Summary" + at most ONE span tab — wrong.
+#   - DrawerTab union: "summary" | "span" | "llm" | "prompts".
+#   - VizTab union: "waterfall" | "flame" | "spanlist" | "topology" | "sequence".
+#     Number-key shortcuts are 1..5 (was 1..3 in spec).
+#   - URL params are namespaced `drawer.X` (e.g. `drawer.traceId`,
+#     `drawer.mode`, `drawer.viz`, `drawer.tab`, `drawer.span`,
+#     `drawer.t`). Flat `?trace=…` was never the format.
+#   - Mode switch shortcuts are T (trace view) and C (conversation view), not
+#     a single T toggle.
+#   - Header chips strip is real but not "composed from an array of dimension
+#     descriptors" — see useTraceHeaderChips.
 
 # ─────────────────────────────────────────────────────────────────────────────
 # DRAWER LAYOUT
@@ -29,11 +46,11 @@ Rule: Drawer layout
     And the table continues to render at full width underneath the drawer
     And the drawer does not push or resize the table
 
-  Scenario: Drawer shows all shell sections in order
+  Scenario: Drawer shows shell sections in order
     When the drawer is open in Trace mode
-    Then the drawer contains sections in this order: Header, Mode Switch, Contextual Alerts, Context Peek, Visualization, Tab Bar, Accordions
-    And the Header shows trace name, status, metrics, and tags
-    And the Mode Switch is only visible when the trace belongs to a conversation
+    Then the drawer contains sections in this order: DrawerHeader, ConversationContext (when the trace has a conversationId), Visualisation, SpanTabBar, then either the active TraceAccordions / LlmPanel / PromptsPanel
+    And the DrawerHeader shows the trace name, status, metrics, the Mode Switch tabs, and the chip strip
+    # ContextualAlerts is not yet a discrete shell section — see the contextual alerts rule below.
 
   Scenario: Close button is visible with Escape badge
     When the drawer is open
@@ -52,21 +69,20 @@ Rule: Drawer maximise and restore
     Given the user is authenticated
     And the drawer is open in overlay mode
 
-  Scenario: Maximise drawer by double-clicking header
-    When the user double-clicks the drawer header
-    Then the drawer expands to full content width
-    And the filter column and trace table are hidden
-    And a restore button is visible
+  Scenario: Maximise drawer by double-clicking header or edge grip
+    When the user double-clicks the drawer header (or the left-edge grip)
+    Then `drawerStore.toggleMaximized()` runs
+    And `Drawer.Content.maxWidth` becomes `calc(100vw - 10px)`
+    And a left-edge w-resize cursor + bouncing affordance signals "drag to restore"
 
-  Scenario: Maximise drawer by clicking maximise button
-    When the user clicks the maximise button
-    Then the drawer expands to full content width
+  Scenario: Maximise drawer with the M shortcut
+    When the user presses M
+    Then `drawerStore.toggleMaximized()` runs
 
   Scenario: Restore drawer to overlay mode
     Given the drawer is maximised
-    When the user clicks the restore button
-    Then the drawer returns to overlay width
-    And the filter column and trace table are visible again
+    When the user double-clicks the edge grip (or presses M again)
+    Then `Drawer.Content.maxWidth` returns to "45%"
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -112,71 +128,58 @@ Rule: Unified drawer model
 # SPAN SELECTION TAB MODEL
 # ─────────────────────────────────────────────────────────────────────────────
 
-Rule: Span selection tab model
-  Span selection uses a tab bar between the visualization and the accordions.
+Rule: Drawer tab bar
+  The SpanTabBar sits below the visualisation and is the active-tab control
+  for `drawerStore.activeTab` (one of "summary" | "llm" | "prompts" | "span").
+  Spans can be opened ephemerally (one selected-but-not-pinned span tab) or
+  pinned, with a "+N more" overflow menu when more than 4 are pinned.
 
   Background:
     Given the user is authenticated
     And the drawer is open in Trace mode
 
-  Scenario: Trace Summary tab is always present
-    Then the tab bar shows a "Trace Summary" tab
-    And the Trace Summary tab cannot be closed
-    And it shows trace-level data including I/O, Attributes, Exceptions, Events, and Evals
+  Scenario: Summary tab is always present
+    Then the tab bar shows a "Summary" tab labelled with shortcut "O"
+    And clicking it sets `activeTab` to "summary"
 
-  Scenario: Clicking a span in the visualization opens a span tab
+  Scenario: LLM-Optimized tab is always present
+    Then the tab bar shows an "LLM-Optimized" tab labelled with shortcut "L"
+
+  Scenario: Prompts tab is conditional on managed-prompt usage
+    Given the trace's `containsPrompt` is true (or `langwatch.prompt_ids` is non-empty)
+    Then a "Prompts" tab is shown with shortcut "P" and a count badge
+
+  Scenario: Clicking a span in the visualization selects an ephemeral span tab
     When the user clicks a span in the visualization
-    Then a span tab appears next to the Trace Summary tab
-    And the span tab shows the span name, type badge, key metrics, and a close button
-    And the accordion content switches to span-level data with I/O and Attributes
+    Then `selectSpan(spanId)` runs, setting `selectedSpanId` and `activeTab="span"`
+    And an ephemeral span tab is rendered with the span name, type badge, model (when LLM), duration, and a Pin + Close action
 
-  Scenario: Clicking a different span updates the span tab
-    Given a span tab is open for "llm.openai.chat"
-    When the user clicks a different span "tool.search_db" in the visualization
-    Then the span tab updates to show "tool.search_db"
-    And only one span tab exists at a time
+  Scenario: Pinning a span tab persists it
+    Given an ephemeral span tab is shown for span X
+    When the user clicks the Pin action
+    Then `pinSpan(X)` runs and X is added to `pinnedSpanIds`
+    And the ephemeral tab is replaced by a pinned tab for X (with an Unpin action)
 
-  Scenario: Clicking the same span again closes the span tab
-    Given a span tab is open for "llm.openai.chat"
-    When the user clicks the same span "llm.openai.chat" in the visualization
-    Then the span tab closes
-    And the Trace Summary tab is active
+  Scenario: Pinned span tabs overflow into a dropdown after the inline limit
+    Given more than 4 spans are pinned
+    Then only the first 3 pinned spans render inline
+    And the rest collapse into a "+N more" dropdown menu
 
-  Scenario: Closing the span tab with the close button
-    Given a span tab is open
-    When the user clicks the close button on the span tab
-    Then the span tab closes
-    And the Trace Summary tab is active
+  Scenario: Closing the ephemeral span tab clears the selection
+    Given the ephemeral span tab is shown
+    When the user clicks the Close action
+    Then `clearSpan()` runs, dropping `selectedSpanId` and switching `activeTab` back to "summary"
 
-  Scenario: Switching to Trace Summary tab keeps the span tab
-    Given a span tab is open for "llm.openai.chat"
-    When the user clicks the Trace Summary tab
-    Then the accordion content shows trace-level data
-    And the span tab remains visible in the tab bar
-    And the user can click back to the span tab
-
-  Scenario: Escape closes the span tab
+  Scenario: Escape clears the active span tab before closing the drawer
     Given a span tab is open
     When the user presses Escape
-    Then the span tab is removed
-    And the Trace Summary tab is active
-
-  Scenario: Clicking empty space in the visualization closes the span tab
-    Given a span tab is open
-    When the user clicks empty space in the visualization
-    Then the span tab closes
-    And the Trace Summary tab is active
-
-  Scenario: Trace Summary tab content is unaffected by span selection
-    Given a span tab is open
-    When the user switches between the Trace Summary tab and the span tab
-    Then the Trace Summary tab always shows the same trace-level data regardless of which span is selected
+    Then `clearSpan()` runs (the span tab clears) and the drawer remains open
 
   Scenario: Persistent sections remain visible during tab switching
-    Given a span tab is open
-    When the user switches between tabs
-    Then the Header, Mode Switch, Contextual Alerts, Context Peek, and Visualization remain visible
-    And only the accordion content below the tab bar changes
+    Given the drawer is open
+    When `activeTab` changes
+    Then the DrawerHeader, ModeSwitch, ConversationContext, Visualisation, and SpanTabBar remain mounted
+    And only the panel below the tab bar swaps between LlmPanel / PromptsPanel / TraceAccordions
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -184,10 +187,11 @@ Rule: Span selection tab model
 # ─────────────────────────────────────────────────────────────────────────────
 
 Rule: Header chip strip
-  Trace metadata renders as a strip of pill-shaped chips above the mode
-  switch. The strip is composed from an array — each chip is one entry —
-  so adding a new dimension (prompt, scenario, sdk, …) is one entry, not
-  a JSX edit in the header.
+  Trace metadata renders as a strip of pill-shaped chips. The chips are
+  produced by `useTraceHeaderChipDefs`, which yields a discriminated
+  `TraceHeaderChipData` array (kinds: service, origin, scenario, sdk,
+  promptSelected, …). `<TraceHeaderChips>` renders one Chip component per
+  array entry.
 
   Background:
     Given the user is authenticated with "traces:view" permission
@@ -232,32 +236,31 @@ Rule: Mode switch
 
   Scenario: Mode tabs use an inline underline indicator
     Then "Trace" and "Conversation" render as text tabs with a 2px underline
-    And the active tab paints the underline; the inactive tab does not
-    And there is no bordered segmented-control box around the tabs
+    And the active tab paints a `blue.solid` underline; the inactive tab paints transparent
+    And the tab text shows a Kbd badge for "T" and "C" respectively
 
   Scenario: Scenario is not a third tab
     Given the trace has a scenario run
-    Then no "Scenario" tab is shown in the mode switch
+    Then no "Scenario" tab is shown in the ModeSwitch
     And the scenario lives as a chip in the header strip instead
 
   Scenario: Turn position indicator in Trace mode
-    When Trace mode is active
-    Then a "turn 3 of 6" label is visible next to the tabs
+    When `viewMode === "trace"` and a `turnLabel` is provided
+    Then a "turn N of M" label is visible to the right of the tabs
 
   Scenario: Conversation tab is disabled for traces without a conversation
     Given the trace does not belong to a conversation
-    Then the "Conversation" tab is shown but disabled
+    Then the "Conversation" tab is rendered with `disabled` styling
     And hovering it shows "This trace is not part of a conversation"
 
-  Scenario: Switching from Trace to Conversation mode
-    Given Trace mode is active
-    When the user clicks "Conversation"
-    Then the content below the tabs fades out and the conversation view fades in
+  Scenario: Switching to Conversation mode with the C shortcut
+    Given the trace belongs to a conversation
+    When the user presses C
+    Then `setViewMode("conversation")` runs
 
-  Scenario: Switching from Conversation to Trace mode
-    Given Conversation mode is active
-    When the user clicks "Trace"
-    Then the content below the tabs fades out and the trace view fades in
+  Scenario: Switching to Trace mode with the T shortcut
+    When the user presses T
+    Then `setViewMode("trace")` runs (the shortcut is set-not-toggle)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -349,6 +352,11 @@ Rule: Conversation mode layout
 # CONVERSATION MODE — TOOL CALLS WITHIN TURNS
 # ─────────────────────────────────────────────────────────────────────────────
 
+# Not yet implemented as of 2026-05-01 — `ConversationView` renders chat
+# turns (user / assistant) only. There is no "system activity (N spans)"
+# collapsed group inside individual turns, and there is no per-turn span-tab
+# pre-selection.
+@planned
 Rule: Tool calls within conversation turns
   Tool calls, guardrails, and RAG spans are shown as collapsed system activity
   within each turn.
@@ -455,43 +463,50 @@ Rule: Conversation navigation
 # ─────────────────────────────────────────────────────────────────────────────
 
 Rule: Long conversation handling
-  Conversations with 20 or more turns receive additional navigation aids
-  and performance optimizations.
+  ConversationView switches to a TanStack `useVirtualizer` once a
+  conversation has more than `VIRTUALIZE_AT = 12` turns. There is no
+  "Collapse earlier turns" affordance and no jump-to-turn dropdown.
 
   Background:
     Given the user is authenticated
     And the drawer is open in Conversation mode
 
-  Scenario: All turns are rendered without pagination
-    Given the conversation has 25 turns
-    Then all 25 turns are rendered in the scrollable container
+  Scenario: Inline rendering for short conversations
+    Given the conversation has 12 or fewer turns
+    Then every turn is rendered inline in the scrollable container
 
-  Scenario: Virtual scrolling for very long conversations
-    Given the conversation has 50 or more turns
-    Then virtual scrolling is used to keep the DOM manageable
+  Scenario: Virtualised rendering at the threshold
+    Given the conversation has more than 12 turns
+    Then ConversationView mounts a `useVirtualizer` keyed on the turn list
+    And only the visible window of turns is mounted in the DOM
 
+  # Not yet implemented as of 2026-05-01.
+  @planned
   Scenario: Jump-to-turn dropdown shows turn previews
-    Given the conversation has 20 or more turns
-    Then the jump-to-turn selector becomes a dropdown
-    And each option shows the turn number and the first few words of the user message
+    Given a long conversation
+    Then a jump-to-turn dropdown lets the user pick any turn
 
+  @planned
   Scenario: Collapsing earlier turns
-    Given the conversation has more than 5 turns
-    Then a "Collapse earlier turns" control appears after the first 5 turns
-    When the user clicks "Collapse earlier turns"
-    Then earlier turns collapse into a summary line showing the count of collapsed turns
-    And the most recent 5 turns remain visible
+    Given a long conversation
+    When the user collapses early turns
+    Then earlier turns hide behind a summary line
 
+  @planned
   Scenario: Expanding collapsed turns
-    Given earlier turns are collapsed
-    When the user clicks the collapsed turns summary
-    Then all turns expand and become visible
+    Given collapsed earlier turns
+    When the user expands them
+    Then all turns are visible
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # CONVERSATION MODE — DETAIL ACCORDIONS
 # ─────────────────────────────────────────────────────────────────────────────
 
+# Not yet implemented as of 2026-05-01 — Conversation mode does not show
+# accordion sections below the conversation area. The whole rule is tagged
+# @planned.
+@planned
 Rule: Conversation detail accordions
   Below the conversation area, accordion sections show conversation-level
   aggregated data.
@@ -581,6 +596,10 @@ Rule: Entry points and navigation
     When the user clicks a trace in the All Traces preset
     Then the drawer opens in Trace mode
 
+  # Not yet implemented as of 2026-05-01 — `useOpenTraceDrawer` opens the
+  # drawer in Trace mode regardless of which lens the click came from. The
+  # erroring span is not pre-selected in the SpanTabBar.
+  @planned
   Scenario: Clicking a trace in Errors preset opens Trace mode with span pre-selected
     When the user clicks a trace in the Errors preset
     Then the drawer opens in Trace mode
@@ -596,23 +615,31 @@ Rule: Entry points and navigation
     And the conversation toggle is visible
 
   Scenario: Deep link to a trace opens Trace mode
-    When the user navigates to a deep link containing a trace ID
+    When the URL contains `drawer.open=traceV2Details&drawer.traceId=…`
     Then the drawer opens in Trace mode for that trace
 
+  # Not yet implemented as of 2026-05-01 — see Deep linking rule below.
+  @planned
   Scenario: Deep link to a thread opens Conversation mode
-    When the user navigates to a deep link containing a thread ID
-    Then the drawer opens in Conversation mode
+    Given a URL contains only a thread id
+    Then the drawer opens directly in Conversation mode
 
-  Scenario: Back button returns to the originating table view
-    Given the drawer is open
-    When the user clicks the back button
-    Then the drawer closes and the table view the user came from is restored
+  Scenario: Per-drawer back stack
+    Given the drawer is open and the user navigated through several traces
+    When the user presses B (or clicks the back arrow in the header)
+    Then `popTraceHistory` rewinds to the previous entry in `traceBackStack`
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # CONTEXTUAL ALERTS
 # ─────────────────────────────────────────────────────────────────────────────
 
+# Not yet implemented as of 2026-05-01 — contextual alerts (slow trace
+# warnings, prompt-version mismatches, dismissible alert ribbons) have no
+# implementation under traces-v2. Errors are surfaced in the Exceptions
+# accordion / status border on the row instead. The whole rule below is
+# tagged @planned.
+@planned
 Rule: Contextual alerts
   Rule-based alerts shown below the header in Trace mode only.
 
@@ -731,59 +758,89 @@ Rule: Animation and transitions
 # ─────────────────────────────────────────────────────────────────────────────
 
 Rule: Keyboard shortcuts
-  Keyboard shortcuts for navigating the drawer follow the Focus Zone Model.
+  All drawer keyboard shortcuts are defined in `TRACE_DRAWER_SHORTCUTS` in
+  `hooks/traceDrawerShortcutTable.ts` and dispatched by
+  `useTraceDrawerShortcuts`. They are ignored when an INPUT/TEXTAREA is
+  focused or when the user is holding Ctrl/Cmd/Alt.
 
   Background:
     Given the user is authenticated
     And the drawer is open
 
-  Scenario: Escape cascade — close span tab
-    Given a span tab is open and the flame graph is not zoomed
+  Scenario: Escape cascade — close shortcuts dialog first
+    Given the keyboard shortcuts help dialog is open
     When the user presses Escape
-    Then the span tab closes and Trace Summary is active
+    Then the help dialog closes (the drawer stays open)
 
-  Scenario: Escape cascade — close drawer
-    Given no span tab is open and the flame graph is not zoomed
+  Scenario: Escape cascade — clear span selection second
+    Given no help dialog and a span is selected
+    When the user presses Escape
+    Then `clearSpan()` runs (selectedSpanId clears, activeTab → "summary")
+
+  Scenario: Escape cascade — close drawer last
+    Given no help dialog and no selected span
     When the user presses Escape
     Then the drawer closes
 
-  Scenario: Escape cascade — zoom out flame graph first
-    Given the flame graph is zoomed in
-    When the user presses Escape
-    Then the flame graph zooms out one level
-    And the drawer remains open
+  Scenario: Arrow Left / Right navigate traces in the conversation
+    Given the trace belongs to a conversation with neighbours
+    When the user presses ArrowRight
+    Then the drawer navigates to the next conversation trace via `navigateToTrace`
+    When the user presses ArrowLeft
+    Then the drawer navigates to the previous conversation trace
 
-  Scenario: J and K navigate traces
-    When the user presses J
-    Then the drawer updates to show the next trace in the list
-    When the user presses K
-    Then the drawer updates to show the previous trace in the list
-
-  Scenario: Bracket keys navigate conversation turns
-    Given the trace belongs to a conversation
+  Scenario: Bracket keys navigate spans within the trace
     When the user presses ]
-    Then the drawer navigates to the next conversation turn
+    Then `selectSpan` advances by one in `spanTree`
     When the user presses [
-    Then the drawer navigates to the previous conversation turn
+    Then `selectSpan` decreases by one in `spanTree`
 
   Scenario: Number keys switch visualization tabs
-    Given the drawer is in Trace mode
-    When the user presses 1
-    Then the Waterfall visualization is active
-    When the user presses 2
-    Then the Flame visualization is active
-    When the user presses 3
-    Then the Span List visualization is active
+    When the user presses 1 / 2 / 3 / 4 / 5
+    Then `setVizTab` becomes "waterfall" / "flame" / "spanlist" / "topology" / "sequence" respectively
 
-  Scenario: T toggles between Trace and Conversation modes
-    Given the trace belongs to a conversation
+  Scenario: T sets Trace mode
     When the user presses T
-    Then the drawer toggles between Trace and Conversation modes
+    Then `setViewMode("trace")` runs (it does not toggle)
 
-  Scenario: O switches to Trace Summary tab
-    Given a span tab is open
+  Scenario: C switches to Conversation mode
+    Given the trace belongs to a conversation
+    When the user presses C
+    Then `setViewMode("conversation")` runs
+
+  Scenario: O switches to the Summary panel
     When the user presses O
-    Then the Trace Summary tab becomes active
+    Then `setActiveTab("summary")` runs
+
+  Scenario: L switches to the LLM-Optimized panel
+    When the user presses L
+    Then `setViewMode("trace")` then `setActiveTab("llm")` runs
+
+  Scenario: P switches to the Prompts panel when available
+    Given the trace touched a managed prompt
+    When the user presses P
+    Then `setViewMode("trace")` then `setActiveTab("prompts")` runs
+
+  Scenario: M toggles maximize / restore
+    When the user presses M
+    Then `toggleMaximized()` runs
+
+  Scenario: B navigates back through the per-drawer history stack
+    Given `traceBackStack` is non-empty
+    When the user presses B
+    Then the back-navigation handler pops the stack and opens the previous trace
+
+  Scenario: R refreshes the active trace
+    When the user presses R
+    Then the scaffold's `refreshActiveTrace` runs
+
+  Scenario: Y copies the trace ID to the clipboard
+    When the user presses Y
+    Then `navigator.clipboard.writeText(trace.traceId)` runs
+
+  Scenario: ? opens the keyboard shortcuts dialog
+    When the user presses ?
+    Then `setShortcutsOpen(!current)` runs
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -791,46 +848,64 @@ Rule: Keyboard shortcuts
 # ─────────────────────────────────────────────────────────────────────────────
 
 Rule: Deep linking
-  Drawer state is reflected in the URL so pages can be loaded with the drawer
-  pre-configured.
+  Drawer state is mirrored to the URL via `useDrawerUrlSync`. The URL
+  parameters are namespaced under `drawer.X` (the `useDrawer`/Drawer system
+  prefixes drawer state with `drawer.`). The drawer key is
+  `traceV2Details`, so the activation flag is `drawer.open=traceV2Details`.
 
   Background:
     Given the user is authenticated
 
   Scenario: Opening a trace via URL
-    When the user navigates to "/observe?trace=abc123"
-    Then the drawer opens in Trace mode with the Trace Summary tab active
+    When the user navigates to "/observe?drawer.open=traceV2Details&drawer.traceId=abc123"
+    Then the drawer opens in Trace mode with the Summary tab active
+
+  Scenario: Opening a trace with the partition-pruning hint
+    When the URL also contains `drawer.t=1714476000000`
+    Then `drawerStore.occurredAtMs` is hydrated with that timestamp
+    And per-trace queries forward it as the partition hint
 
   Scenario: Opening a trace in conversation mode via URL
-    When the user navigates to "/observe?trace=abc123&mode=conversation"
-    Then the drawer opens in Conversation mode
+    When the URL contains `drawer.mode=conversation`
+    Then `viewMode` hydrates to "conversation"
 
   Scenario: Opening a specific span via URL
-    When the user navigates to "/observe?trace=abc123&span=def456"
-    Then the drawer opens with the span tab active for span "def456"
+    When the URL contains `drawer.span=def456`
+    Then `selectedSpanId` is "def456"
+    And `activeTab` falls back to "span" if `drawer.tab` is missing
 
   Scenario: Opening a specific visualization via URL
-    When the user navigates to "/observe?trace=abc123&viz=waterfall"
-    Then the drawer opens with the Waterfall visualization active
+    When the URL contains `drawer.viz=flame`
+    Then `vizTab` is "flame"
 
-  Scenario: Opening a specific accordion tab via URL
-    When the user navigates to "/observe?trace=abc123&tab=events"
-    Then the drawer opens with the Events accordion expanded
-
-  Scenario: Opening a thread directly via URL
-    When the user navigates to "/observe?thread=xyz789"
-    Then the drawer opens in Conversation mode for that thread
+  Scenario: Opening a specific drawer panel via URL
+    When the URL contains `drawer.tab=llm` (or "summary" / "span" / "prompts")
+    Then `activeTab` matches that value
 
   Scenario: URL updates as drawer state changes
     Given the drawer is open
-    When the user selects a span or changes the visualization
-    Then the URL updates to reflect the current drawer state
+    When the user changes mode, viz tab, active tab, or selected span
+    Then `useDrawerUrlSync` pushes a diff into the URL via `updateDrawerParams`
+
+  # Not yet implemented as of 2026-05-01 — there is no `?thread=` (or
+  # `drawer.threadId`) deep link. Conversation mode is opened by passing
+  # `drawer.mode=conversation` on a trace inside that conversation.
+  @planned
+  Scenario: Opening a thread directly via URL
+    Given a deep link contains a thread / conversation id
+    When the user navigates to that URL
+    Then the drawer opens directly in Conversation mode for that thread
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # RESPONSIVE BEHAVIOR
 # ─────────────────────────────────────────────────────────────────────────────
 
+# Not yet implemented as of 2026-05-01 — there are no container queries on
+# the drawer; `Drawer.Content` uses a fixed `maxWidth="45%"` (or
+# `calc(100vw - 10px)` when maximized). The breakpoints below are
+# aspirational.
+@planned
 Rule: Responsive behavior
   The drawer layout adapts based on container width using Chakra v3 container
   queries, not viewport media queries.

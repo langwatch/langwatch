@@ -27,6 +27,8 @@ Rule: Selection checkbox column
     Then the header checkbox is unchecked when no rows are selected
     And the header checkbox is in a partial (indeterminate) state when 1–49 rows are selected
     And the header checkbox is fully checked when all 50 rows are selected
+    # SelectHeaderCheckbox derives state from `traceIdSet` plus `mode` —
+    # in `all-matching` mode the header always reads as fully checked.
 
   Scenario: Toggling a row checkbox does not open the drawer
     When the user clicks a row's checkbox
@@ -61,14 +63,18 @@ Rule: Selection checkbox column
     When the user toggles a group row's checkbox
     Then every trace within the group toggles to the same state
 
+  @planned
   Scenario: Onboarding empty state hides the checkbox column
+    # Not yet implemented as of 2026-05-01 — the onboarding/empty path renders
+    # `EmptyFilterState` instead of the table, so the checkbox column is
+    # naturally absent. There is no explicit gate on the column itself.
     Given the project has zero traces
     Then the checkbox column is not rendered
 
-  Scenario: Empty filter state hides the checkbox column header
+  Scenario: Header checkbox is hidden when no rows are visible
     Given filters are active
     And no traces match the current filters
-    Then the header checkbox is not rendered
+    Then `SelectHeaderCheckbox` short-circuits to null when `traceIds` is empty
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -93,20 +99,22 @@ Rule: Selection persistence and lifecycle
     And the user navigates back to page 1
     Then the same 10 rows are still selected
 
-  Scenario: Selection clears when filters change
+  Scenario: Selection clears when the filter query text changes
     Given 10 rows are selected
-    When the user adds a filter
-    Then the selection is cleared
+    When the user changes the debounced query text
+    Then `useResetSelectionOnViewChange` clears the selection
     And the bulk action bar disappears
 
   Scenario: Selection clears when the time range changes
     Given 10 rows are selected
-    When the user changes the time range
+    When the user changes the time range (label or absolute from/to)
     Then the selection is cleared
+    # While a relative-time label is active, the rolling from/to ticking is
+    # collapsed onto the label so selection is not cleared every minute.
 
-  Scenario: Selection clears when the lens changes
+  Scenario: Selection clears when the active lens changes
     Given 10 rows are selected
-    When the user switches lens
+    When the user switches the active lens
     Then the selection is cleared
 
   Scenario: Selection survives column visibility toggles
@@ -132,18 +140,18 @@ Rule: Bulk action bar
 
   Scenario: Bulk action bar appears when at least one row is selected
     When the user selects a row
-    Then the bulk action bar appears between the toolbar and the table
+    Then the bulk action bar appears as a fixed-position floating bar at the bottom-centre of the viewport
     And it shows "1 selected"
-    And it offers "Export selected", "Add to dataset", and "Clear" actions
+    And it offers "Export selected", "Add to dataset", and an X icon to clear
 
   Scenario: Bulk action bar count updates as selection changes
     Given 1 row is selected
     When the user selects 4 more rows
     Then the bulk action bar shows "5 selected"
 
-  Scenario: Clear button empties the selection
+  Scenario: X button clears the selection
     Given 5 rows are selected
-    When the user clicks "Clear"
+    When the user clicks the X "Clear selection" button
     Then no rows are selected
     And the bulk action bar disappears
 
@@ -169,7 +177,8 @@ Rule: Bulk action bar
     Given the filtered query has 25,000 matching traces
     When the user activates select-all-matching
     Then the bulk action bar shows "10,000 selected (max)"
-    And a tooltip explains the 10,000-trace cap
+    # `SELECT_ALL_MATCHING_CAP = 10_000` matches the export endpoint cap.
+    # No tooltip is currently rendered to explain the cap.
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -242,33 +251,39 @@ Rule: Add selected traces to a dataset
     And the project has traces
     And at least one dataset exists
 
-  Scenario: Add-to-dataset is only available when rows are selected
+  Scenario: Add-to-dataset only appears in the floating bulk action bar
     When zero rows are selected
-    Then no "Add to dataset" action is visible in the toolbar
+    Then the bulk action bar (and its "Add to dataset" button) is not rendered
+    # There is no toolbar-level "Add to dataset" entry — the action lives
+    # exclusively on `BulkActionBar`.
 
   Scenario: Add selected traces opens the dataset drawer
     Given 3 rows are selected
     When the user clicks "Add to dataset" in the bulk action bar
-    Then the AddDatasetRecord drawer opens
-    And the drawer is preloaded with the 3 selected trace IDs
+    Then `openDrawer("addDatasetRecord", { selectedTraceIds: [...] })` is called with the 3 selected ids
 
+  Scenario: Add-to-dataset with select-all-matching is disabled
+    Given select-all-matching is active for 1,234 traces
+    Then the "Add to dataset" button has `disabled` set
+    And a tooltip reads "Disabled — add to dataset requires explicit row selection."
+
+  @planned
   Scenario: Drawer maps selected traces to the chosen dataset columns
+    # Behaviour lives inside `AddDatasetRecordDrawerV2`; not gated by traces-v2.
     Given the AddDatasetRecord drawer is open with 3 selected traces
     When the user picks a dataset
     Then the drawer shows column mappings for the 3 traces
     And the user can confirm to insert the records
 
+  @planned
   Scenario: Successful insert clears the selection and closes the drawer
+    # `BulkActionBar` does not subscribe to a post-insert success event.
+    # Explicit selection clearing on success is not yet wired.
     Given the user has selected 3 traces and opened the dataset drawer
     When the insert succeeds
     Then the drawer closes
     And the selection is cleared
     And a success toast confirms the insert
-
-  Scenario: Add-to-dataset with select-all-matching is not supported
-    Given select-all-matching is active for 1,234 traces
-    Then the "Add to dataset" action is disabled
-    And a tooltip explains that explicit selection is required
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -282,23 +297,38 @@ Rule: Keyboard support for selection
     Given the user is authenticated with "traces:view" permission
     And the project has traces
 
+  Scenario: Header checkbox has an accessible label
+    Then the header `SelectHeaderCheckbox` exposes `aria-label="Select all on this page"`
+    And exposes `aria-checked` of "true" / "false" / "mixed" mapped from the selection state
+
+  @planned
   Scenario: Space toggles selection on the focused row
+    # Not yet implemented as of 2026-05-01 — there is no keyboard handler
+    # that toggles the focused row's selection on Space.
     Given a row is keyboard-focused
     When the user presses Space
     Then that row's selection toggles
     And the drawer does not open
 
+  @planned
   Scenario: Shift-click selects a contiguous range
+    # Not yet implemented as of 2026-05-01 — `SelectHeaderCheckbox` /
+    # row checkboxes don't track an anchor for shift-click range selection.
     Given the user has clicked a row's checkbox
     When the user shift-clicks another row's checkbox
     Then every row between the two (inclusive) becomes selected
 
+  @planned
   Scenario: Escape clears the selection when the bulk action bar is focused
+    # Not yet implemented as of 2026-05-01 — `BulkActionBar` has no Escape
+    # listener; clearing happens via the X icon button or upstream state.
     Given 5 rows are selected
     When the user focuses the bulk action bar
     And presses Escape
     Then the selection is cleared
 
-  Scenario: Checkboxes have accessible labels
+  @planned
+  Scenario: Per-row checkbox aria labels
+    # Not yet implemented as of 2026-05-01 — row cells render the Checkbox
+    # primitive without a per-trace aria-label identifying the row.
     Then each row checkbox has an aria-label identifying the trace
-    And the header checkbox has an aria-label "Select all on this page"

@@ -1,6 +1,15 @@
 # Accessibility & Responsive Behavior — Gherkin Spec
-# Based on PRD-011: Accessibility & Responsive Behavior
-# Covers: keyboard navigation, focus zones, escape cascade, focus management, ARIA, shortcut hints, color contrast, touch targets, responsive breakpoints
+# Covers: page-level shortcuts, drawer-level shortcuts, ARIA landmarks
+#
+# The shipped keyboard model is "global page shortcuts" + "global
+# drawer shortcuts" listening on `document.keydown`, gated only by
+# whether the user is typing in an input. There is no focus-zone
+# router. Drawer shortcuts: `[`/`]` for previous/next span, `←`/`→`
+# for previous/next trace in conversation, `1`-`5` for viz tabs,
+# `T`/`C` for trace vs conversation modes (NOT a single toggle),
+# `?` for help, etc. See `useTraceDrawerShortcuts.ts` and
+# `traceDrawerShortcutTable.ts` for the canonical list. Anything
+# beyond that (focus zones, per-element ARIA, etc.) is `@planned`.
 
 # ─────────────────────────────────────────────────────────────────────────────
 # FOCUS ZONE MODEL
@@ -8,8 +17,13 @@
 
 Feature: Accessibility and responsive behavior
 
+@planned
 Rule: Focus zone model
-  Keyboard shortcuts are scoped to focus zones so the same key means different things in different parts of the UI.
+  # Not yet implemented as of 2026-05-01.
+  # Page and drawer shortcuts are wired as global `document.keydown`
+  # listeners with an `isTextInput`/`isTypingTarget` guard — they don't
+  # consult focus zones. There is no concept of "table zone has focus"
+  # vs "viz zone has focus" in code.
 
   Scenario: Only the focused zone responds to shortcuts
     Given the table zone has focus
@@ -44,455 +58,215 @@ Rule: Focus zone model
     When the user presses Shift+Tab
     Then focus moves to the accordions
 
-  Scenario: Global shortcuts work regardless of focus zone
-    Given the viz zone has focus inside the drawer
-    When the user presses /
-    Then the search bar receives focus
-
 # ─────────────────────────────────────────────────────────────────────────────
-# ESCAPE CASCADE
+# ESCAPE BEHAVIOUR (DRAWER)
 # ─────────────────────────────────────────────────────────────────────────────
 
-Rule: Escape cascade
-  Escape always exits the current context one level at a time in a strictly ordered cascade.
+Rule: Drawer Escape behaviour
+  Inside the drawer, Escape unwinds drawer-internal state in this order:
+  shortcuts-help dialog → selected span → close drawer. The flame-graph
+  zoom level is NOT part of the cascade as of 2026-05-01.
 
-  Scenario: Escape zooms out the flame graph when zoomed
+  Background:
     Given the drawer is open
-    And the flame graph is zoomed into a block
+
+  Scenario: Escape closes the shortcuts-help dialog when it is open
+    Given the drawer's "?" shortcuts-help dialog is open
     When the user presses Escape
-    Then the flame graph zooms out one level
+    Then the shortcuts-help dialog closes
+    And the drawer remains open
 
-  Scenario: Escape closes the span tab when open
-    Given the drawer is open
-    And a span tab is open
-    And the flame graph is not zoomed
+  Scenario: Escape clears the selected span when no help dialog is open
+    Given a span is selected in the drawer
+    And the shortcuts-help dialog is not open
     When the user presses Escape
-    Then the span tab closes
-    And the drawer returns to the Trace Summary tab
+    Then the span selection is cleared
+    And the drawer remains open
 
-  Scenario: Escape closes the drawer when no nested state remains
-    Given the drawer is open
-    And no span tab is open
-    And the flame graph is not zoomed
+  Scenario: Escape closes the drawer when no span is selected and no help is open
+    Given no span is selected
+    And the shortcuts-help dialog is not open
     When the user presses Escape
     Then the drawer closes
-    And focus returns to the previously selected table row
 
-  Scenario: Escape unfocuses the search bar
-    Given the search bar has focus
-    And the drawer is not open
+  Scenario: Escape clears the bulk selection before any drawer or modal handler runs
+    Given the user has at least one trace row selected via the bulk selection
     When the user presses Escape
-    Then the search bar loses focus
-
-  Scenario: Escape is a no-op when nothing is active
-    Given the drawer is not open
-    And the search bar does not have focus
-    When the user presses Escape
-    Then nothing happens
-
-  Scenario: Repeated Escape unwinds all nested state in order
-    Given the drawer is open
-    And the flame graph is zoomed into a block
-    And a span tab is open
-    When the user presses Escape three times
-    Then the first press zooms out the flame graph
-    And the second press closes the span tab
-    And the third press closes the drawer
+    Then the bulk selection is cleared
+    And the drawer Escape handler does not run for this key event
 
 # ─────────────────────────────────────────────────────────────────────────────
-# ZONE: PAGE (GLOBAL)
+# PAGE-LEVEL KEYBOARD SHORTCUTS
 # ─────────────────────────────────────────────────────────────────────────────
 
 Rule: Page-level keyboard shortcuts
-  Global shortcuts that work from any focus zone on the page.
+  Global shortcuts listed in `PAGE_GROUPS` (PageKeyboardShortcuts.tsx)
+  and registered via `useKeyboardShortcuts.ts`. All listeners bail when
+  the event target is an input/textarea/contentEditable element.
 
-  Scenario: Slash focuses the search bar from anywhere
-    Given the table zone has focus
-    When the user presses /
-    Then the search bar receives focus
+  Scenario: "[" toggles the filter sidebar
+    Given the user is not typing in an input
+    When the user presses "["
+    Then the filter sidebar's collapsed state toggles in `uiStore`
 
-  Scenario: Slash focuses the search bar from inside the drawer
-    Given the drawer is open
-    And the viz zone has focus
-    When the user presses /
-    Then the search bar receives focus
+  Scenario: "?" opens the page-level shortcuts-help dialog
+    Given the trace drawer is closed
+    When the user presses "?"
+    Then `uiStore.shortcutsHelpOpen` toggles
+    # When the drawer IS open, the page-level "?" handler bails so the
+    # drawer's own "?" handler owns the key.
+
+  Scenario: Cmd/Ctrl+F opens the in-page Find overlay
+    Given the Find overlay is closed
+    When the user presses Cmd/Ctrl+F
+    Then `findStore.open()` is called and the overlay opens
+    And the browser's native find is suppressed for that key event
+
+  Scenario: Cmd/Ctrl+F again closes Find and lets the browser handle the next press
+    Given the Find overlay is open
+    When the user presses Cmd/Ctrl+F
+    Then `findStore.close()` is called and the overlay closes
+    And `preventDefault` is NOT called, so a follow-up press surfaces native browser find
+
+  Scenario: D toggles density between compact and comfortable
+    Given the user is not typing in an input
+    When the user presses "d" or "D"
+    Then `densityStore` flips between "compact" and "comfortable"
+
+  # @planned — "/" focusing the search bar from anywhere is not wired
+  # in `useKeyboardShortcuts.ts` as of 2026-05-01. The SearchBar
+  # advertises "/" as its hint but only handles it while already focused.
 
 # ─────────────────────────────────────────────────────────────────────────────
-# ZONE: SEARCH BAR
+# DRAWER-LEVEL KEYBOARD SHORTCUTS
 # ─────────────────────────────────────────────────────────────────────────────
 
-Rule: Search bar keyboard shortcuts
-  Keyboard shortcuts available when the search bar has focus.
+Rule: Drawer-level keyboard shortcuts
+  Single `document.keydown` listener registered by `useTraceDrawerShortcuts`
+  while the drawer is mounted with a trace. Shortcuts come from the
+  central `TRACE_DRAWER_SHORTCUTS` table; the help dialog reads the
+  same table so they cannot drift.
 
   Background:
-    Given the search bar has focus
-
-  Scenario: Enter executes the query
-    When the user types a search term and presses Enter
-    Then the search query executes
-
-  Scenario: Escape unfocuses the search bar and returns focus to the table
-    When the user presses Escape
-    Then the search bar loses focus
-    And the table zone receives focus
-
-  Scenario: Up and Down navigate autocomplete suggestions
-    Given autocomplete suggestions are visible
-    When the user presses Down
-    Then the next suggestion is highlighted
-    When the user presses Up
-    Then the previous suggestion is highlighted
-
-  Scenario: Tab accepts the autocomplete suggestion
-    Given an autocomplete suggestion is highlighted
-    When the user presses Tab
-    Then the highlighted suggestion is accepted into the search input
-
-# ─────────────────────────────────────────────────────────────────────────────
-# ZONE: FILTER SIDEBAR
-# ─────────────────────────────────────────────────────────────────────────────
-
-Rule: Filter sidebar keyboard shortcuts
-  Keyboard shortcuts available when the filter sidebar has focus.
-
-  Background:
-    Given the filter sidebar has focus
-
-  Scenario: Space toggles the focused checkbox
-    Given a filter checkbox is focused
-    When the user presses Space
-    Then the checkbox toggles its checked state
-
-  Scenario: Tab moves to the next facet section
-    Given the user is in a facet section
-    When the user presses Tab
-    Then focus moves to the next facet section
-
-  Scenario: Shift+Tab moves to the previous facet section
-    Given the user is in a facet section
-    When the user presses Shift+Tab
-    Then focus moves to the previous facet section
-
-# ─────────────────────────────────────────────────────────────────────────────
-# ZONE: TABLE
-# ─────────────────────────────────────────────────────────────────────────────
-
-Rule: Table keyboard shortcuts
-  Keyboard shortcuts available when the trace table has focus.
-
-  Background:
-    Given the table zone has focus
-    And the trace table has rows
-
-  Scenario: Up and Down navigate between trace rows
-    Given a trace row is focused
-    When the user presses Down
-    Then the next trace row receives focus
-    When the user presses Up
-    Then the previous trace row receives focus
-
-  Scenario: Enter opens the drawer for the focused row
-    Given a trace row is focused
-    When the user presses Enter
-    Then the drawer opens showing the trace detail for that row
-
-  Scenario: Shift+Enter opens the trace peek for the focused row
-    Given a trace row is focused
-    When the user presses Shift+Enter
-    Then the trace peek opens for that row
-
-# ─────────────────────────────────────────────────────────────────────────────
-# ZONE: DRAWER (CHROME)
-# ─────────────────────────────────────────────────────────────────────────────
-
-Rule: Drawer chrome keyboard shortcuts
-  Shortcuts that work anywhere in the drawer regardless of which sub-zone has focus.
-
-  Background:
-    Given the drawer is open
-
-  Scenario: T toggles between Trace and Conversation mode
-    Given the trace has a conversation
-    When the user presses T
-    Then the drawer toggles between Trace and Conversation mode
-
-  Scenario: T does nothing when no conversation exists
-    Given the trace has no conversation
-    When the user presses T
-    Then nothing happens
-
-  Scenario: O switches to Trace Summary tab when a span tab is open
-    Given a span tab is open
-    When the user presses O
-    Then the drawer switches to the Trace Summary tab
-
-  Scenario: Escape follows the cascade from the drawer
-    When the user presses Escape
-    Then the escape cascade behavior applies
-
-# ─────────────────────────────────────────────────────────────────────────────
-# ZONE: VIZ — SPAN TREE (WATERFALL)
-# ─────────────────────────────────────────────────────────────────────────────
-
-Rule: Span tree keyboard shortcuts
-  Keyboard shortcuts available when the span tree in the waterfall view has focus.
-
-  Background:
-    Given the drawer is open
-    And the span tree view is active
-    And the span tree has focus
-
-  Scenario: Up and Down navigate between visible spans
-    Given a span is focused
-    When the user presses Down
-    Then the next visible span receives focus
-    When the user presses Up
-    Then the previous visible span receives focus
-
-  Scenario: Left collapses the current span or moves to parent
-    Given a span is focused and expanded
-    When the user presses Left
-    Then the span collapses
-    When the user presses Left again
-    Then focus moves to the parent span
-
-  Scenario: Right expands the current span or moves to first child
-    Given a span is focused and collapsed with children
-    When the user presses Right
-    Then the span expands
-    When the user presses Right again
-    Then focus moves to the first child span
-
-  Scenario: Enter selects the span and opens the span tab
-    Given a span is focused
-    When the user presses Enter
-    Then the span is selected
-    And the span tab opens showing detail for that span
-
-  Scenario: Home jumps to the first span
-    Given a span deep in the tree is focused
-    When the user presses Home
-    Then the first span in the tree receives focus
-
-  Scenario: End jumps to the last span
-    Given a span near the top of the tree is focused
-    When the user presses End
-    Then the last span in the tree receives focus
-
-# ─────────────────────────────────────────────────────────────────────────────
-# ZONE: VIZ — FLAME GRAPH
-# ─────────────────────────────────────────────────────────────────────────────
-
-Rule: Flame graph keyboard shortcuts
-  Keyboard shortcuts available when the flame graph has focus.
-
-  Background:
-    Given the drawer is open
-    And the flame graph view is active
-    And the flame graph has focus
-
-  Scenario: Enter zooms into the focused block
-    Given a block is focused
-    When the user presses Enter
-    Then the flame graph zooms into that block
-
-  Scenario: Space selects the focused block and opens the span tab without zooming
-    Given a block is focused
-    When the user presses Space
-    Then the block is selected
-    And the span tab opens for that block
-    And the flame graph does not zoom
-
-  Scenario: Backspace zooms out one level
-    Given the flame graph is zoomed into a block
-    When the user presses Backspace
-    Then the flame graph zooms out one level
-
-  Scenario: Escape zooms out when the flame graph is zoomed
-    Given the flame graph is zoomed into a block
-    When the user presses Escape
-    Then the flame graph zooms out one level
-
-  Scenario: Escape cascades when the flame graph is not zoomed
-    Given the flame graph is not zoomed
-    When the user presses Escape
-    Then the escape cascade continues to the next level
-
-  Scenario: Up moves to the parent block
-    Given a child block is focused
-    When the user presses Up
-    Then the parent block receives focus
-
-  Scenario: Down moves to the first child block
-    Given a block with children is focused
-    When the user presses Down
-    Then the first child block receives focus
-
-  Scenario: Left and Right navigate between sibling blocks
-    Given a block with siblings is focused
-    When the user presses Right
-    Then the next sibling block receives focus
-    When the user presses Left
-    Then the previous sibling block receives focus
-
-# ─────────────────────────────────────────────────────────────────────────────
-# ZONE: VIZ — SPAN LIST
-# ─────────────────────────────────────────────────────────────────────────────
-
-Rule: Span list keyboard shortcuts
-  Keyboard shortcuts available when the span list table has focus.
-
-  Background:
-    Given the drawer is open
-    And the span list view is active
-    And the span list has focus
-
-  Scenario: Up and Down navigate between span rows
-    Given a span row is focused
-    When the user presses Down
-    Then the next span row receives focus
-    When the user presses Up
-    Then the previous span row receives focus
-
-  Scenario: Enter selects the span and opens the span tab
-    Given a span row is focused
-    When the user presses Enter
-    Then the span is selected
-    And the span tab opens showing detail for that span
-
-# ─────────────────────────────────────────────────────────────────────────────
-# ZONE: TAB BAR
-# ─────────────────────────────────────────────────────────────────────────────
-
-Rule: Tab bar keyboard shortcuts
-  Keyboard shortcuts available when the tab bar has focus.
-
-  Background:
-    Given the drawer is open
-    And the tab bar has focus
-
-  Scenario: Left and Right switch between tabs
-    Given the Trace Summary tab is selected
-    And a span tab exists
-    When the user presses Right
-    Then the span tab is selected
-    When the user presses Left
-    Then the Trace Summary tab is selected
-
-# ─────────────────────────────────────────────────────────────────────────────
-# ZONE: ACCORDIONS
-# ─────────────────────────────────────────────────────────────────────────────
-
-Rule: Accordion keyboard shortcuts
-  Keyboard shortcuts available when the accordion section has focus.
-
-  Background:
-    Given the drawer is open
-    And the accordions zone has focus
-
-  Scenario: Up and Down navigate between accordion sections
-    Given an accordion section is focused
-    When the user presses Down
-    Then the next accordion section receives focus
-    When the user presses Up
-    Then the previous accordion section receives focus
-
-  Scenario: Enter toggles an accordion open or closed
-    Given an accordion section is focused and collapsed
-    When the user presses Enter
-    Then the accordion section expands
-    When the user presses Enter again
-    Then the accordion section collapses
-
-# ─────────────────────────────────────────────────────────────────────────────
-# FOCUS MANAGEMENT
-# ─────────────────────────────────────────────────────────────────────────────
-
-Rule: Focus management
-  Focus moves predictably when UI elements open, close, or change.
-
-  Scenario: Opening the drawer moves focus to the drawer header
-    Given the drawer is closed
-    When the user opens the drawer
-    Then focus moves to the drawer header
-    And "Trace detail panel opened" is announced to assistive technology
-
-  Scenario: Closing the drawer returns focus to the table row
-    Given the drawer is open for a trace row
-    When the drawer closes
-    Then focus returns to the trace row that was selected in the table
-
-  Scenario: Opening a span tab moves focus to the span tab label
-    Given the drawer is open
-    When a span tab opens
-    Then focus moves to the span tab label in the tab bar
-
-  Scenario: Trace/Conversation toggle keeps focus on the toggle
-    Given the drawer is open
-    And the trace has a conversation
-    When the user toggles between Trace and Conversation mode
-    Then focus stays on the toggle control
-
-  Scenario: Switching tabs keeps focus on the tab button
-    Given the drawer is open
-    When the user switches tabs in the tab bar
-    Then focus stays on the active tab button
-
-  Scenario: Switching accordions keeps focus on the accordion button
-    Given the drawer is open
-    When the user toggles an accordion section
-    Then focus stays on the accordion button
-
-  Scenario: Clicking inside a visualization moves focus to that viz zone
-    Given the drawer is open
-    When the user clicks inside the waterfall visualization
-    Then the span tree viz zone receives focus
-
-  Scenario: Drawer does not trap focus at wide viewports
-    Given the container width is 1400px or wider
-    And the drawer is open
-    When the user presses Tab repeatedly
-    Then focus can move back to the table outside the drawer
-
-  Scenario: Drawer traps focus at narrow viewports
-    Given the container width is below 1024px
-    And the drawer is open as a full-screen panel
-    When the user presses Tab repeatedly
-    Then focus remains trapped within the drawer
+    Given the drawer is open with a trace
+
+  Scenario: "?" toggles the drawer's keyboard-shortcut help dialog
+    When the user presses "?"
+    Then `drawerStore.shortcutsOpen` toggles
+
+  Scenario: "[" and "]" navigate between spans in the current trace
+    Given the trace has a non-empty span tree
+    When the user presses "]"
+    Then the next span in the tree is selected
+    When the user presses "["
+    Then the previous span in the tree is selected
+
+  Scenario: ← and → navigate between turns in a conversation
+    Given the trace is part of a conversation with previous and next turns
+    When the user presses "→"
+    Then the drawer navigates to the next trace in the conversation
+    When the user presses "←"
+    Then the drawer navigates to the previous trace in the conversation
+
+  Scenario: 1, 2, 3, 4, 5 switch between visualisation tabs
+    When the user presses "1" / "2" / "3" / "4" / "5"
+    Then the active viz tab becomes Waterfall / Flame / Span list / Topology / Sequence respectively
+
+  Scenario: O returns to the Trace Summary accordion tab
+    When the user presses "o" or "O"
+    Then `drawerStore.activeTab` is set to "summary"
+
+  Scenario: T switches the drawer to Trace mode
+    When the user presses "t" or "T"
+    Then `drawerStore.viewMode` is set to "trace"
+
+  Scenario: C switches to Conversation mode when the trace has a conversation
+    Given the trace has a `conversationId`
+    When the user presses "c" or "C"
+    Then `drawerStore.viewMode` is set to "conversation"
+
+  Scenario: C is a no-op when the trace has no conversation
+    Given the trace has no `conversationId`
+    When the user presses "c" or "C"
+    Then nothing happens (the shortcut entry's guard rejects the key)
+
+  Scenario: P opens the Prompts tab when the trace touches a managed prompt
+    Given the trace has `containsPrompt = true` or carries `langwatch.prompt_ids`
+    When the user presses "p" or "P"
+    Then `viewMode` becomes "trace" and `activeTab` becomes "prompts"
+
+  Scenario: L opens the LLM tab
+    When the user presses "l" or "L"
+    Then `viewMode` becomes "trace" and `activeTab` becomes "llm"
+
+  Scenario: M toggles the maximised drawer state
+    When the user presses "m" or "M"
+    Then `drawerStore.maximized` toggles
+
+  Scenario: R refreshes the active trace
+    When the user presses "r" or "R"
+    Then `refreshActiveTrace()` is invoked
+
+  Scenario: Y copies the trace ID to the clipboard
+    When the user presses "y" or "Y"
+    Then `navigator.clipboard.writeText(trace.traceId)` is called
+
+  Scenario: B navigates back to the previous trace if the back stack is non-empty
+    Given the back-history stack has at least one prior trace
+    When the user presses "b" or "B"
+    Then `goBack()` is invoked
+
+  Scenario: Drawer shortcuts skip OS chords and typing targets
+    When the event has `ctrl`, `meta`, or `alt` modifier set, OR the event target is an input/textarea/contentEditable
+    Then no drawer shortcut runs for that event
 
 # ─────────────────────────────────────────────────────────────────────────────
 # ARIA LANDMARKS
 # ─────────────────────────────────────────────────────────────────────────────
 
 Rule: ARIA landmarks
-  Regions of the page are marked with appropriate ARIA roles and labels.
+  Top-level page regions are marked with ARIA roles and labels in
+  `TracesPage.tsx`.
 
-  Scenario: Filter sidebar has the correct ARIA role and label
-    Given the filter sidebar is visible
-    Then it has role "complementary"
-    And aria-label "Trace filters"
+  Scenario: Outermost VStack has role "application" and label "Trace explorer"
+    Given the Observe page is loaded
+    Then the outermost wrapper has role "application" and aria-label "Trace explorer"
 
-  Scenario: Trace table has the correct ARIA role and label
-    Given the trace table is visible
-    Then it has role "main"
-    And aria-label "Trace list"
-
-  Scenario: Drawer has the correct ARIA role and label
-    Given the drawer is open
-    Then it has role "complementary"
-    And aria-label "Trace detail"
-
-  Scenario: Search bar has the correct ARIA role and label
+  Scenario: Search bar wrapper has role "search" and label "Trace search"
     Given the search bar is visible
-    Then it has role "search"
-    And aria-label "Filter traces"
+    Then its wrapper has role "search" and aria-label "Trace search"
+
+  Scenario: Filter sidebar has role "complementary" and label "Trace filters"
+    Given the filter sidebar is visible
+    Then the aside has role "complementary" and aria-label "Trace filters"
+
+  Scenario: Results pane has role "main" and label "Trace results"
+    Given the results pane is visible
+    Then the wrapper has role "main" and aria-label "Trace results"
+
+  # @planned — A dedicated `role="complementary"` + aria-label
+  # "Trace detail" on the trace drawer is not present in
+  # `TraceDrawerShell.tsx` as of 2026-05-01.
 
 # ─────────────────────────────────────────────────────────────────────────────
-# ARIA LABELS
+# ARIA LABELS / LIVE REGIONS
 # ─────────────────────────────────────────────────────────────────────────────
 
-Rule: ARIA labels on interactive elements
-  Individual elements carry descriptive ARIA attributes for assistive technology.
+Rule: ARIA live region for new-trace count
+  The "N new" scroll-up indicator above the table is a live region.
+
+  Scenario: New-traces indicator announces itself politely
+    Given the user has scrolled past the threshold and new traces have arrived
+    Then `NewTracesScrollUpIndicator` is rendered with role "status" and aria-live "polite"
+    And its aria-label reads "{count} new trace(s) above — scroll up"
+
+@planned
+Rule: ARIA labels on status dots, span icons, timing bars, accordions, rows
+  # Not yet implemented as of 2026-05-01.
+  # Per-status dot / per-span-type icon / per-timing-bar aria-labels
+  # do not exist in the current trace table or waterfall components.
+  # `aria-expanded`/`aria-selected` on accordion sections and
+  # selected rows are also not wired.
 
   Scenario: Status dot has an aria-label describing the status
     Given a trace row with an error status is visible
@@ -518,21 +292,9 @@ Rule: ARIA labels on interactive elements
     Then the row has aria-selected "true"
     And other rows have aria-selected "false"
 
-  Scenario: Origin facet checkboxes are grouped with a label
-    Given the filter sidebar is visible
-    Then the origin facet checkboxes have role "group"
-    And aria-label "Filter by origin"
-
-  Scenario: Density toggle has an aria-label
-    Given the density toggle is visible
-    Then it has aria-label "Display density"
-
-# ─────────────────────────────────────────────────────────────────────────────
-# ARIA LIVE REGIONS
-# ─────────────────────────────────────────────────────────────────────────────
-
-Rule: ARIA live regions
-  Dynamic content changes are announced to assistive technology.
+@planned
+Rule: ARIA live announcements for filter changes, drawer load, errors
+  # Not yet implemented as of 2026-05-01.
 
   Scenario: Filter change announces the updated trace count
     Given the user applies a filter
@@ -552,54 +314,37 @@ Rule: ARIA live regions
 # ─────────────────────────────────────────────────────────────────────────────
 
 Rule: Keyboard shortcut hint badges
-  Every interactive element with a keyboard shortcut displays a visible hint badge.
+  Hint badges (`<Kbd>`) are sprinkled on visible surfaces wherever a
+  shortcut is bound. Validated cases below; the rest are aspirational.
 
-  Scenario: Search bar displays the slash shortcut hint
-    Given the search bar is visible
-    Then a Kbd badge showing "/" appears at the right edge of the input
+  Scenario: Integrate drawer tabs show their letter shortcuts
+    Given the Integrate drawer is open
+    Then each tab trigger renders a `<Kbd>` with "S", "M", "P", or "I"
 
-  Scenario: Viz tabs display numeric shortcut hints
-    Given the drawer is open
-    Then the Waterfall tab shows a Kbd badge "1"
-    And the Flame tab shows a Kbd badge "2"
-    And the Span List tab shows a Kbd badge "3"
+  Scenario: Empty-state Integrate CTA shows its "I" shortcut
+    Given the empty-state journey shows the Integrate CTA
+    Then the "Integrate my code" button renders a `<Kbd>` with "I"
 
-  Scenario: Trace/Conversation toggle displays the T shortcut hint
-    Given the drawer is open
-    And the trace has a conversation
-    Then the Trace label shows a Kbd badge "T"
+  Scenario: Empty-state Skip footer button shows its "K" shortcut
+    Given the empty-state journey footer is visible
+    Then the "Skip for now" button renders a `<Kbd>` with "K"
 
-  Scenario: Trace Summary tab displays the O shortcut hint when span tab is open
-    Given the drawer is open
-    And a span tab is open
-    Then the Trace Summary label shows a Kbd badge "O"
-
-  Scenario: Close drawer area displays the Esc shortcut hint
-    Given the drawer is open
-    Then the close button area shows a Kbd badge "Esc"
-
-  Scenario: Prev/next trace shows J and K shortcut hints in drawer header
-    Given the drawer is open
-    Then the drawer header area shows Kbd badges "J" and "K"
-
-  Scenario: Prev/next turn shows bracket shortcut hints in context peek
-    Given the drawer is open in conversation mode
-    Then the context peek area shows Kbd badges "[" and "]"
-
-  Scenario: Shortcut badges are always visible, not hover-only
-    Given the drawer is open
-    Then all shortcut Kbd badges are visible without hovering
-
-  Scenario: Shortcut badges use muted styling
-    Given the drawer is open
-    Then shortcut Kbd badges use muted color so they do not compete with primary labels
+  # @planned — Per-viz-tab "1"/"2"/"3"/"4"/"5" Kbd badges, drawer-header
+  # "J"/"K" badges, and conversation-context "[" / "]" badges are not
+  # present in `SpanTabBar.tsx`, `DrawerHeader.tsx`, or
+  # `ConversationContext.tsx` as of 2026-05-01.
 
 # ─────────────────────────────────────────────────────────────────────────────
 # COLOR CONTRAST
 # ─────────────────────────────────────────────────────────────────────────────
 
+@planned
 Rule: Color contrast and non-color differentiation
-  The UI meets WCAG 2.1 AA contrast requirements and does not rely on color alone.
+  # Not yet verified by automated tests as of 2026-05-01.
+  # The codebase uses Chakra v3 semantic tokens (`fg`, `bg.surface`,
+  # `border`, etc.) which the design system claims meets WCAG AA, but
+  # there are no automated contrast assertions or per-spec
+  # status-label fallbacks for status-dot colour reliance.
 
   Scenario: Body text meets WCAG AA contrast ratio
     Given body text is displayed
@@ -628,8 +373,12 @@ Rule: Color contrast and non-color differentiation
 # TOUCH TARGETS
 # ─────────────────────────────────────────────────────────────────────────────
 
+@planned
 Rule: Touch targets
-  Interactive elements meet minimum touch target sizes for tablet users.
+  # Not yet implemented as of 2026-05-01.
+  # The compact / comfortable density toggle exists, but there is no
+  # tablet-viewport detection that auto-switches to comfortable, and no
+  # 44px minimum-touch-target guarantees for all interactive elements.
 
   Scenario: Interactive elements meet the 44px minimum on tablet viewports
     Given the user is on a tablet viewport
@@ -652,8 +401,14 @@ Rule: Touch targets
 # RESPONSIVE BREAKPOINTS
 # ─────────────────────────────────────────────────────────────────────────────
 
+@planned
 Rule: Responsive breakpoints using container queries
-  The layout adapts based on content area width using Chakra container queries.
+  # Not yet implemented as of 2026-05-01.
+  # `TracesPage.tsx` uses fixed sidebar widths (220px expanded /
+  # 40px collapsed) and a static three-column flex layout. There are
+  # no Chakra container queries in the traces-v2 layout, no
+  # auto-collapse-on-drawer-open behaviour at medium widths, no
+  # column-priority hiding rules, and no full-width mobile drawer.
 
   Background:
     Given the Observe page is loaded
@@ -703,8 +458,12 @@ Rule: Responsive breakpoints using container queries
 # COLUMN PRIORITY
 # ─────────────────────────────────────────────────────────────────────────────
 
+@planned
 Rule: Table column priority when width decreases
-  Columns hide progressively as the table narrows.
+  # Not yet implemented as of 2026-05-01.
+  # Columns are configured per lens via `useTraceLensColumns` and
+  # resized manually via `ColumnResizeGrip`; there is no width-driven
+  # progressive-hide priority list.
 
   Background:
     Given the Observe page is loaded
@@ -726,8 +485,11 @@ Rule: Table column priority when width decreases
 # DRAWER AT NARROW VIEWPORTS
 # ─────────────────────────────────────────────────────────────────────────────
 
+@planned
 Rule: Drawer behavior at narrow viewports
-  The drawer adapts its layout when the container is narrow.
+  # Not yet implemented as of 2026-05-01. The drawer uses an
+  # edge-resize grip and a "maximize" toggle (the M shortcut), but no
+  # automatic full-screen mode below 1024px.
 
   Scenario: Drawer becomes full-screen below 1024px
     Given the container width is below 1024px

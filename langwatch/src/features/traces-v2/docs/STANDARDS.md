@@ -145,7 +145,7 @@ features/traces-v2/
 │   └── index.ts
 └── docs/
     ├── STANDARDS.md               ← this file
-    ├── prds/                      ← PRDs (what to build)
+    ├── trace-v2.md                ← design doc
     └── decisions/                 ← ADRs
 ```
 
@@ -556,23 +556,21 @@ Density changes are instant — no transition (CSS vars update synchronously).
 
 Specs live in `specs/traces-v2/`. Gherkin `.feature` files. Code-focused.
 
-PRDs (in `docs/prds/`) describe WHAT to build: layout, content, behavior, design intent.
-Specs (in `specs/traces-v2/`) describe HOW it works: component behavior, data contracts,
-state transitions, acceptance criteria. Specs are the bridge between PRD and test code.
+Specs are the single source of truth: they describe both WHAT each surface
+does (layout, content, behavior) and HOW it works (component behavior, data
+contracts, state transitions, acceptance criteria). Specs are the bridge
+between requirements and test code.
 
 ### File naming
 
 ```
 specs/traces-v2/
-├── onboarding-empty-state.feature    ← matches PRD-001
-├── trace-table.feature               ← matches PRD-002
-├── search-bar.feature                ← matches PRD-003
-├── trace-drawer.feature              ← matches PRD-004
-├── filter-sidebar.feature
-├── density-toggle.feature
-└── data-hooks/
-    ├── trace-list.feature
-    └── trace-facets.feature
+├── onboarding-empty-state.feature
+├── trace-table.feature
+├── search.feature
+├── trace-drawer-shell.feature
+├── filter-sidebar.feature  (covered under data-layer / view-system)
+└── ...
 ```
 
 Kebab-case filenames. One feature file per component or hook domain.
@@ -772,7 +770,7 @@ describe("useTraceList", () => {
 - Arrow keys for table row navigation.
 - Escape to close drawer.
 - `/` to focus search bar.
-- Documented in PRD-011 (Accessibility).
+- See `specs/traces-v2/accessibility.feature` for the full keyboard contract.
 
 ### Imports
 

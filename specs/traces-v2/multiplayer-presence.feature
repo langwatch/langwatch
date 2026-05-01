@@ -1,12 +1,35 @@
 # Multiplayer Presence — Gherkin Spec
-# Based on PRD-016: Multiplayer Presence
 # Covers: view-level presence, trace-level presence dots, drawer-level presence, span-level presence, interaction states, mock data
 
 # ─────────────────────────────────────────────────────────────────────────────
-# VIEW-LEVEL PRESENCE (PRESET TABS)
+# IMPLEMENTATION STATUS (audited 2026-05-01)
 # ─────────────────────────────────────────────────────────────────────────────
+# Real multiplayer presence IS implemented (SSE-backed, not mock data) and
+# lives in `~/features/presence/`. It powers:
+#   - `TracePresenceAvatars` — an avatar stack on each trace row's name cell
+#     (NOT a single coloured 8px dot with hover fan-out).
+#   - `useTracesV2Presence` — broadcasts the current viewer's lens / trace /
+#     span / view-mode / panel / tab to peers via the `presence` tRPC router.
+#   - `presenceUserColor` — colours are seeded from the user's display name
+#     via `getColorForString` (rotating palette), NOT a hand-curated set
+#     (Sarah=pink / Alex=teal / etc.).
+#
+# Almost EVERY scenario below is aspirational — they describe a mock-data
+# design with named teammates (Sarah, Alex, Mike, Priya, Jordan), preset-
+# tab presence, single-dot-with-fan-out interactions, a separate "Also
+# viewing" drawer-header treatment, and span-level dots positioned before
+# the expand/collapse toggle. None of that visual model exists today.
+#
+# The whole feature is tagged `@planned` until the specs are rewritten to
+# describe the actual avatar-stack + SSE behaviour.
 
+@planned
 Feature: Multiplayer presence
+  # Not yet implemented as of 2026-05-01.
+  # The real implementation uses peer avatar stacks seeded from session
+  # identity (no mock data, no preset-tab presence, no fan-out animation,
+  # no span-row dots, no "Also viewing" header label). Scenarios below
+  # match the design-doc roadmap, not the shipped behaviour.
 
 Rule: View-level presence in preset tab bar
   Shows teammate avatars for people on the same lens/preset, right-aligned in the tab bar.

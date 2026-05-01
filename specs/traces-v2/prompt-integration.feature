@@ -1,5 +1,4 @@
 # Prompt Integration — Gherkin Spec
-# Based on PRD-010: Prompt Integration
 # Covers: detection, accordion layout, header, template, variables, version mismatch, actions, auto-open rules, data gating
 # Plus trace-level surfacing: header chips and the dedicated Prompts tab.
 
@@ -9,38 +8,46 @@
 
 Feature: Prompt integration
 
-Rule: Trace-level prompt chip
-  Each unique managed prompt referenced by any span in the trace renders as
-  a chip in the drawer header. Driven by the trace-summary projection's
-  `langwatch.prompt_ids` aggregation — no per-span fetch is needed.
+Rule: Trace-level prompt chips (Selected + Last used)
+  The drawer header surfaces up to two prompt chips, derived from the
+  trace-summary projection's `selectedPromptId` / `lastUsedPromptId`
+  fields (rolled up at ingest from `langwatch.prompt.selected.id` and
+  `langwatch.prompt.id` span attributes). A "Selected" chip + a "Last
+  used" / "Prompt" chip are emitted by `useTraceHeaderChipDefs`.
 
   Background:
     Given the user is authenticated with "traces:view" permission
     And the drawer is open in Trace mode
 
-  Scenario: Chip appears once per unique prompt + version
-    Given two spans on the trace each used "refund-policy v4"
-    And one span used "summary-bot v2"
-    When the header renders
-    Then exactly two prompt chips are visible: "refund-policy v4" and "summary-bot v2"
+  Scenario: One chip per derived prompt identity (selected and/or last used)
+    Given the trace summary has selectedPromptId = "billing-helper" and lastUsedPromptId = "billing-helper" (same handle)
+    Then a single "Prompt" chip is shown (Selected and Last used collapsed when identical)
 
-  Scenario: Chip uses the version when known, the tag otherwise
-    Given a span used the prompt id "billing-helper:7"
-    Then the chip reads "billing-helper v7"
-    Given another span used the prompt id "billing-helper:production"
-    Then a separate chip reads "billing-helper production"
+  Scenario: Selected and last-used handles diverge, two chips render
+    Given the trace summary has selectedPromptId = "billing-helper" and lastUsedPromptId = "fallback-bot"
+    Then a "Selected" chip is shown for "billing-helper"
+    And a "Last used" chip is shown for "fallback-bot" with a yellow tone (drift)
 
-  Scenario: Clicking a prompt chip opens a popover
-    When the user clicks a prompt chip
-    Then a popover shows the handle, version, and links to "View in Prompts tab" and "Open in Prompts"
+  Scenario: Last-used chip includes the version number when known
+    Given the trace summary has lastUsedPromptVersionNumber = 7
+    Then the chip value reads "<handle> v7"
 
-  Scenario: "View in Prompts tab" switches the drawer tab
-    When the user clicks "View in Prompts tab" in the popover
-    Then the drawer's Prompts tab becomes the active accordion tab
+  Scenario: Clicking the last-used chip selects the source span (or opens Prompts tab)
+    When the user clicks the last-used prompt chip
+    Then if `lastUsedPromptSpanId` is set, the drawer selects that span
+    And otherwise the drawer's active tab switches to "prompts"
 
   Scenario: No chip for traces without managed prompts
-    Given no span on the trace referenced a managed prompt
-    Then no prompt chips render in the header strip
+    Given the trace summary has no selectedPromptId or lastUsedPromptId
+    Then no prompt chips are emitted by `useTraceHeaderChipDefs`
+
+  @planned
+  Scenario: Per-prompt-version chip popover with deep links
+    # Not yet implemented as of 2026-05-01 — chips render a tooltip with
+    # contextual prose, but no popover with explicit "View in Prompts tab"
+    # / "Open in Prompts" buttons.
+    When the user clicks a prompt chip
+    Then a popover shows links to "View in Prompts tab" and "Open in Prompts"
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -48,52 +55,67 @@ Rule: Trace-level prompt chip
 # ─────────────────────────────────────────────────────────────────────────────
 
 Rule: Prompts drawer tab
-  When the trace used at least one managed prompt, a "Prompts" tab joins
-  the Trace / LLM tabs. The panel groups all prompt usage by reference so
-  the user can compare variables and see which spans called each prompt.
+  When the trace contains a managed prompt (containsPrompt or fallback
+  trace.attributes["langwatch.prompt_ids"]), a "Prompts" tab joins the
+  Trace / LLM tabs. The panel groups all prompt usage by reference so the
+  user can compare variables and see which spans called each prompt.
 
   Background:
     Given the user is authenticated with "traces:view" permission
     And the drawer is open in Trace mode
 
   Scenario: Tab appears only when the trace has managed prompts
-    Given the trace has at least one managed prompt
-    Then a "Prompts" tab is visible in the tab bar with a count badge
+    Given the trace has at least one managed prompt (`containsPrompt = true` or `langwatch.prompt_ids` populated)
+    Then a "Prompts" tab is visible in the tab bar
     Given another trace with no managed prompts
     Then the "Prompts" tab is not shown
 
   Scenario: Panel header shows the prompt count
-    Given the trace used 3 distinct prompt references
+    Given the aggregated `usages.length` is 3
     When the user activates the Prompts tab
     Then the panel header reads "3 prompts in this trace"
 
-  Scenario: Prompts are grouped by handle + version
+  Scenario: Prompts are aggregated by promptReferenceKey (handle + version + tag)
     Given the trace has 5 spans referencing "refund-policy v4"
     And the trace has 1 span referencing "summary-bot v2"
     When the Prompts panel renders
-    Then exactly two prompt cards are visible
+    Then exactly two `PromptUsageCard`s are visible
     And the "refund-policy v4" card lists 5 spans
     And the "summary-bot v2" card lists 1 span
 
-  Scenario: Variable values surface alphabetically
+  Scenario: Variable values render alphabetically
     Given a prompt's spans captured variables {"topic": "refunds", "company": "Acme"}
     When the Prompts panel renders the prompt card
     Then the variables list shows "company" before "topic"
 
   Scenario: Spans not yet loaded show a skeleton
-    Given the trace summary lists a prompt id but spansFull has not loaded
+    Given the trace summary lists a prompt id but `useSpansFull` is still loading
     When the Prompts panel renders that prompt card
     Then the spans section shows a skeleton placeholder
-    And the variables section is hidden until spans arrive
 
-  Scenario: Clicking a span row focuses that span in the trace
+  Scenario: Clicking a span row focuses that span via onSelectSpan
     Given a prompt card lists 3 spans
     When the user clicks a span row
-    Then the drawer selects that span and switches to the span tab
+    Then `onSelectSpan(spanId)` is invoked
 
-  Scenario: "Open in Prompts" deep-links to the prompt management page
-    When the user clicks "Open in Prompts" on a prompt card
-    Then a new tab opens at the project's prompts page
+  Scenario: "Open prompt" opens the prompt editor drawer
+    When the user clicks "Open prompt" on a prompt card
+    Then `openDrawer("promptEditor", { promptId: handle })` is called
+    # No new browser tab — the prompt editor drawer overlays the current page.
+
+  Scenario: Selected vs Last-used callout banner
+    Given the trace's selectedPromptId differs from its lastUsedPromptId
+    When the Prompts panel renders
+    Then a yellow "Pinned prompt drifted at runtime" callout appears at the top of the panel
+
+  Scenario: Out-of-date prompt warning when latest > recorded version
+    Given lastUsedPromptVersionNumber is 4 and `usePromptByHandle` reports latestVersion = 6
+    When the Prompts panel renders
+    Then a yellow "Trace ran an out-of-date prompt" callout appears
+
+  Scenario: Missing prompt callout when handle no longer exists
+    Given `usePromptByHandle` returns missing=true for the lastUsedPromptId
+    Then a "Prompt no longer exists in this project" callout appears
 
 
 
@@ -102,33 +124,24 @@ Rule: Prompts drawer tab
 # ─────────────────────────────────────────────────────────────────────────────
 
 Rule: Prompt accordion detection
-  The Prompt accordion appears only when a span has managed prompt attributes.
+  The Prompt accordion appears only when a span carries any
+  `langwatch.prompt.*` attribute (`hasPromptMetadata`).
 
   Background:
     Given the user is authenticated with "traces:view" permission
     And the user has selected a span in the trace visualization
 
-  Scenario: Accordion appears when span has prompt name attribute
-    Given the span has a "langwatch.prompt.name" attribute
+  Scenario: Accordion appears when any langwatch.prompt.* attribute is present
+    Given the span has at least one of `langwatch.prompt.id`, `langwatch.prompt.handle`, `langwatch.prompt.version.number`, `langwatch.prompt.selected.id`, or `langwatch.prompt.variables`
     When the span tab renders
-    Then the Prompt accordion is visible
-
-  Scenario: Accordion appears when span has prompt version attribute
-    Given the span has a "langwatch.prompt.version" attribute
-    When the span tab renders
-    Then the Prompt accordion is visible
-
-  Scenario: Accordion appears when span has prompt id attribute
-    Given the span has a "langwatch.prompt.id" attribute
-    When the span tab renders
-    Then the Prompt accordion is visible
+    Then the Prompt accordion section is included in the span accordion list
 
   Scenario: Accordion hidden when span has no prompt attributes
-    Given the span has no prompt-related attributes
+    Given the span has no `langwatch.prompt.*` attributes
     When the span tab renders
     Then the Prompt accordion is not shown
 
-  Scenario: Detection uses attributes not span type
+  Scenario: Detection uses attributes, not span type
     Given the span type is "LLM" but has no prompt attributes
     When the span tab renders
     Then the Prompt accordion is not shown
@@ -147,12 +160,14 @@ Rule: Prompt accordion layout
 
   Scenario: Accordion order with prompt metadata
     When the span tab renders
-    Then the accordion order is "I/O", "Prompt", "Attributes"
+    Then the accordion sections are "Input and Output", "Prompt", "Attributes", "Events"
+    # `Exceptions` may be inserted before or after I/O depending on whether
+    # the span errored and whether it has I/O.
 
   Scenario: Accordion order without prompt metadata
     Given the user has selected a span without prompt metadata
     When the span tab renders
-    Then the accordion order is "I/O", "Attributes"
+    Then the accordion sections are "Input and Output", "Attributes", "Events"
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -160,37 +175,47 @@ Rule: Prompt accordion layout
 # ─────────────────────────────────────────────────────────────────────────────
 
 Rule: Prompt accordion header
-  The header shows prompt name, version, and active status.
+  The header shows the prompt handle, version badge, and (when present) tag badge.
 
   Background:
     Given the user is authenticated with "traces:view" permission
     And the user has selected a span with prompt metadata
 
-  Scenario: Header displays prompt name and version
-    Given the span has prompt name "refund-policy-agent" and version "1.4"
+  Scenario: Header displays prompt handle and version badge
+    Given the span has prompt handle "refund-policy-agent" and version number 4
     When the Prompt accordion renders
     Then the header shows "refund-policy-agent" in monospace bold
-    And the header shows "v1.4" in monospace
+    And a "v4" subtle Badge is rendered
 
-  Scenario: Active indicator when span version matches active version
-    Given the span used version "1.4"
-    And the currently active version is "1.4"
+  Scenario: Header shows tag badge when present
+    Given the span has prompt handle "refund-policy-agent" and tag "production"
+    Then the header shows a "production" outline badge with a blue palette
+
+  Scenario: Header gracefully handles missing handle
+    Given the span has variables-only prompt metadata
+    Then the header shows "Prompt (no handle on span)" in muted tone
+
+  @planned
+  Scenario: Active-version indicator on the accordion header
+    # Not yet implemented as of 2026-05-01 — span-level PromptAccordion
+    # does not call `usePromptByHandle` and therefore renders no
+    # active/inactive indicator. Active-version comparison happens at the
+    # trace-level Prompts panel (see `SelectedVsLastUsedCallout`).
+    Given the span used version "1.4" and the currently active version is "1.4"
     When the Prompt accordion renders
     Then the header shows a green dot with "active"
-
-  Scenario: Active indicator when span version differs from active version
-    Given the span used version "1.4"
-    And the currently active version is "1.6"
-    When the Prompt accordion renders
-    Then the header shows a yellow dot with "v1.6 active"
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # TEMPLATE
 # ─────────────────────────────────────────────────────────────────────────────
 
+@planned
 Rule: Prompt template display
-  The template section shows the full prompt template with highlighted variables.
+  Not yet implemented as of 2026-05-01 — `PromptAccordion` does not render
+  any prompt template body. Only handle, version, tag, variables, and
+  actions render. The scenarios below describe target behaviour for when
+  span-level template payloads are wired through.
 
   Background:
     Given the user is authenticated with "traces:view" permission
@@ -242,82 +267,79 @@ Rule: Prompt variables display
     And the user has selected a span with prompt metadata
     And the Prompt accordion is expanded
 
-  Scenario: Variables shown as key-value table
+  Scenario: Variables shown as a key-value list
     Given the span has variables {"company": "Acme Corp", "topic": "refund policy"}
     When the variables section renders
-    Then the variables are displayed as a key-value table
-    And each row shows the variable name and its value
+    Then the variables are displayed as a key-value list inside a bordered Box
+    And each row shows the variable name (mono, muted) and its value (mono, fg)
 
   Scenario: Variables sorted alphabetically
     Given the span has variables {"topic": "refund policy", "company": "Acme Corp", "context": "..."}
     When the variables section renders
     Then the variables are ordered "company", "context", "topic"
 
-  Scenario: Each variable value has a copy button
+  Scenario: Each variable value has a hover-revealed copy button
     Given the span has variables with values
-    When the variables section renders
-    Then each variable row has a copy button
+    When the user hovers a variable row
+    Then a copy button becomes visible on the right end of that row
 
   Scenario: Copying a variable value
     When the user clicks the copy button for a variable
-    Then that variable's value is copied to the clipboard
+    Then `navigator.clipboard.writeText(value)` is called
 
-  Scenario: Long variable values are truncated
+  Scenario: Variables section hidden when no variables exist
+    Given the span has no variables on its prompt reference
+    When the Prompt accordion renders
+    Then the variables section is not shown
+
+  @planned
+  Scenario: Long variable values truncated with a "Show full" expander
+    # Not yet implemented as of 2026-05-01 — long values render with
+    # `truncate` only; there is no expand/collapse affordance.
     Given the span has a variable with a value longer than the display limit
     When the variables section renders
     Then the value is truncated with a "Show full" expander
-
-  Scenario: Expanding a truncated variable value
-    Given a variable value is truncated
-    When the user clicks "Show full"
-    Then the full variable value is displayed
-
-  Scenario: Variables section hidden when no variables exist
-    Given the span has no variables attribute
-    When the Prompt accordion renders
-    Then the variables section is not shown
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # VERSION MISMATCH WARNING
 # ─────────────────────────────────────────────────────────────────────────────
 
-Rule: Version mismatch warning
-  A warning appears when the span used a prompt version that is not currently active.
+Rule: Version drift / out-of-date warnings (trace-level only)
+  Drift and out-of-date warnings live in the trace-level Prompts panel
+  (`SelectedVsLastUsedCallout` + last-used header chip tone), not on the
+  span-level PromptAccordion.
 
   Background:
     Given the user is authenticated with "traces:view" permission
-    And the user has selected a span with prompt metadata
 
-  Scenario: Warning banner shown on version mismatch
-    Given the span used version "1.4"
-    And the currently active version is "1.6"
+  Scenario: Drift callout when selected and last-used differ
+    Given the trace summary has selectedPromptId != lastUsedPromptId
+    When the Prompts panel renders
+    Then a yellow "Pinned prompt drifted at runtime" callout is shown
+
+  Scenario: Out-of-date callout when latest version > recorded
+    Given lastUsedPromptVersionNumber=4 and latestVersion=6 from `usePromptByHandle`
+    Then a yellow "Trace ran an out-of-date prompt" callout is shown
+
+  Scenario: Last-used header chip turns yellow when drifted or out-of-date
+    Given the last-used prompt is drifted or out-of-date
+    Then `buildLastUsedPromptChipDef` emits the chip with `tone="yellow"` and a `LuTriangleAlert` icon
+
+  Scenario: No warnings when versions match and no drift
+    Given selectedPromptId == lastUsedPromptId and latestVersion == lastUsedPromptVersionNumber
+    Then neither callout is shown
+    And the last-used chip uses the blue tone with the `LuHistory` icon
+
+  @planned
+  Scenario: Span-level version-mismatch banner with diff link
+    # Not yet implemented as of 2026-05-01 — `PromptAccordion` does not
+    # compare span version to the active prompt version, does not render
+    # a yellow mismatch banner, and exposes no diff/compare action.
+    Given the span used version "1.4" and the currently active version is "1.6"
     When the Prompt accordion renders
-    Then a yellow warning banner appears at the top of the accordion
-    And it reads "This span used v1.4 but v1.6 is active"
-
-  Scenario: Warning includes version notes when available
-    Given the span used version "1.4" and the active version is "1.6"
-    And version "1.6" has changelog notes
-    When the Prompt accordion renders
-    Then the warning banner shows a one-line summary of the version notes
-
-  Scenario: Warning includes link to view version diff
-    Given the span used version "1.4" and the active version is "1.6"
-    When the Prompt accordion renders
-    Then a "View diff between v1.4 and v1.6" link is visible
-    And clicking it opens the prompt comparison UI
-
-  Scenario: No warning when span version matches active version
-    Given the span used version "1.4"
-    And the currently active version is "1.4"
-    When the Prompt accordion renders
-    Then no version mismatch warning is shown
-
-  Scenario: Trace-level contextual alert on version mismatch
-    Given the span used version "1.4" and the active version is "1.6"
-    When the trace drawer renders
-    Then a contextual alert reads "Span used prompt v1.4 but v1.6 is active"
+    Then a yellow banner reads "This span used v1.4 but v1.6 is active"
+    And a "View diff between v1.4 and v1.6" link is visible
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -325,41 +347,41 @@ Rule: Version mismatch warning
 # ─────────────────────────────────────────────────────────────────────────────
 
 Rule: Prompt accordion actions
-  Action buttons at the bottom of the accordion provide contextual navigation.
+  Action buttons at the bottom of the span-level accordion. Only rendered
+  when the span carries a parseable handle.
 
   Background:
     Given the user is authenticated with "traces:view" permission
     And the user has selected a span with prompt metadata
     And the Prompt accordion is expanded
 
-  Scenario: Open in Playground pre-fills span data
-    When the user clicks "Open in Playground"
-    Then the prompt playground opens in a new tab
-    And it is pre-filled with the span's prompt template
-    And it is pre-filled with the span's variable values
-    And it is pre-filled with the span's model and parameters
-    And it is pre-filled with the span's input messages
+  Scenario: "Open prompt" opens the prompt editor drawer
+    When the user clicks "Open prompt"
+    Then `openDrawer("promptEditor", { promptId: handle })` is called
 
-  Scenario: Compare Versions opens side-by-side comparison
+  Scenario: "Open in Playground" is rendered but currently disabled
+    When the Prompt accordion renders for a span with a handle
+    Then a disabled "Open in Playground" button is shown
+    # Disabled until the playground drawer accepts span input + variables
+    # as deep-link params.
+
+  Scenario: No actions render when the span has no parseable handle
+    Given the span has variables-only prompt metadata
+    Then neither "Open prompt" nor "Open in Playground" is rendered
+
+  @planned
+  Scenario: Open in Playground pre-fills span data
+    # Not yet implemented as of 2026-05-01 — the button is disabled.
+    When the user clicks "Open in Playground"
+    Then the playground drawer opens pre-filled with the span's prompt, variables, and messages
+
+  @planned
+  Scenario: Compare Versions side-by-side
+    # Not yet implemented as of 2026-05-01 — there is no Compare Versions
+    # action on the span-level PromptAccordion.
     Given the span used version "1.4" and the active version is "1.6"
     When the user clicks "Compare Versions"
     Then the prompt comparison UI opens
-    And it shows version "1.4" alongside version "1.6"
-
-  Scenario: Compare Versions hidden when versions match
-    Given the span used version "1.4"
-    And the currently active version is "1.4"
-    When the Prompt accordion renders
-    Then the "Compare Versions" button is not shown
-
-  Scenario: Edit opens the prompt editor
-    When the user clicks "Edit"
-    Then the prompt editor opens in a new tab for this template
-
-  Scenario: Open in Playground hidden when playground not available
-    Given the prompt playground feature is not available
-    When the Prompt accordion renders
-    Then the "Open in Playground" button is not shown
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -367,28 +389,32 @@ Rule: Prompt accordion actions
 # ─────────────────────────────────────────────────────────────────────────────
 
 Rule: Prompt accordion auto-open rules
-  The accordion opens automatically when there is a version mismatch.
+  `useAutoOpenSections` opens the Prompt section whenever the span has
+  any prompt metadata — there is no version-mismatch heuristic at the
+  span level today.
 
   Background:
     Given the user is authenticated with "traces:view" permission
     And the user has selected a span with prompt metadata
 
-  Scenario: Accordion starts closed when no version mismatch
-    Given the span used version "1.4"
-    And the currently active version is "1.4"
+  Scenario: Accordion auto-opens whenever the span has prompt metadata
+    Given the span carries any `langwatch.prompt.*` attribute
     When the span tab renders
-    Then the Prompt accordion is closed
-
-  Scenario: Accordion auto-opens on version mismatch
-    Given the span used version "1.4"
-    And the currently active version is "1.6"
-    When the span tab renders
-    Then the Prompt accordion is open
+    Then the Prompt section is included in the auto-open content map and starts expanded
 
   Scenario: Accordion hidden for spans without prompt metadata
     Given the user has selected a span without prompt metadata
     When the span tab renders
-    Then the Prompt accordion is not shown
+    Then the Prompt section is not added to the accordion list
+
+  @planned
+  Scenario: Auto-open only on version mismatch
+    # Not yet implemented as of 2026-05-01 — auto-open is presence-based,
+    # not mismatch-based. Migrating to mismatch-only would require span-level
+    # access to the active prompt version.
+    Given the span used a version that differs from the currently active one
+    When the span tab renders
+    Then the Prompt accordion is auto-opened
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -408,36 +434,31 @@ Rule: Prompt accordion data gating
     Then the Prompt accordion is not shown
     And no "No prompt data" empty state is displayed
 
-  Scenario: Prompt name without template shows header and actions
-    Given the span has prompt name "refund-policy-agent" and version "1.4"
-    But the span has no template attribute
+  Scenario: Handle without variables shows the header + actions only
+    Given the span has prompt handle and version but no variables
     When the Prompt accordion renders
-    Then the header shows the prompt name and version
-    And the template section shows "Template not captured."
-    And the action buttons are visible
+    Then the header (handle + version) and action buttons render
+    And the variables section is omitted
 
-  Scenario: Prompt name without template still shows variables if available
-    Given the span has prompt name and version but no template
-    And the span has variables {"company": "Acme Corp"}
+  Scenario: Variables-only payload still renders the variables block
+    Given the span has variables but no parseable handle
     When the Prompt accordion renders
-    Then the variables section is visible with the variable data
+    Then the variables section renders the values
+    And the header reads "Prompt (no handle on span)" in muted tone
+    And the action buttons are not rendered (no handle to act on)
 
-  Scenario: No variables hides the variables section
-    Given the span has prompt name, version, and template
-    But the span has no variables attribute
-    When the Prompt accordion renders
-    Then the variables section is not shown
+  Scenario: Variables-only with no parseable reference falls back to a hint
+    Given the span carries `langwatch.prompt.*` keys but neither a parseable handle nor variables
+    Then a muted hint reads "Span carries prompt metadata but no parseable handle or variables — likely an incomplete SDK emit."
 
-  Scenario: Active version check fails gracefully
-    Given the span has prompt metadata
-    And the API call to check the active version fails
-    When the Prompt accordion renders
-    Then the prompt data is shown without the active indicator
+  @planned
+  Scenario: Active version check fails gracefully on the trace-level Prompts panel
+    # `usePromptByHandle` already swallows errors via `retry: false` and
+    # surfaces `missing` only on NOT_FOUND. There is no dedicated
+    # "Could not check active version." tooltip — failure renders as the
+    # non-warning default. This scenario is captured for spec parity but
+    # is not currently observable as a separate UI state.
+    Given the trace's lastUsedPrompt API call errors transiently
+    When the Prompts panel renders
+    Then the panel shows the prompt without the out-of-date callout
     And a tooltip reads "Could not check active version."
-
-  Scenario: Playground unavailable hides playground button
-    Given the span has prompt metadata
-    And the prompt playground feature is not available
-    When the Prompt accordion renders
-    Then the "Open in Playground" button is not shown
-    And the "Edit" button is still visible

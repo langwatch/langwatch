@@ -2,11 +2,11 @@
 
 Status: ACCEPTED
 Date: 2026-04-22
-Relates to: PRD-007, PRD-013, PRD-014
+Relates to: `specs/traces-v2/visualizations.feature`, `flame-graph.feature`, `span-list.feature`
 
 ## Context
 
-We need to decide which visualizations to offer in the trace drawer for viewing span data. The existing draft (PRD-007) had three views — Tree, Waterfall, and Flame — but they were too similar. The Tree was a collapsible hierarchy with small inline timing bars. The Waterfall was horizontal timing bars with indentation. The Flame was essentially the Waterfall with labels moved to the left. All three showed hierarchy + timing with minor layout differences.
+We need to decide which visualizations to offer in the trace drawer for viewing span data. The existing draft had three views — Tree, Waterfall, and Flame — but they were too similar. The Tree was a collapsible hierarchy with small inline timing bars. The Waterfall was horizontal timing bars with indentation. The Flame was essentially the Waterfall with labels moved to the left. All three showed hierarchy + timing with minor layout differences.
 
 We also analyzed our ClickHouse span data to understand the actual shape of traces in production, which directly informed the decision.
 
@@ -104,7 +104,7 @@ Among traces with duplicates, most (19,983) have a max of 2 repetitions of one n
 
 Replace the three similar views (Tree, Waterfall, Flame) with three genuinely different views:
 
-### 1. Waterfall (default) — PRD-007
+### 1. Waterfall (default)
 
 Combines the old Tree and Waterfall into one view. Left side: collapsible tree with span names, type icons, metrics. Right side: horizontal timing bars on a time axis.
 
@@ -117,7 +117,7 @@ Combines the old Tree and Waterfall into one view. Left side: collapsible tree w
 - 0ms spans as thin vertical lines (6.4% of spans)
 - Orphaned spans at root level with indicator
 
-### 2. Flame Graph — PRD-013
+### 2. Flame Graph
 
 Stacked blocks, parent on top, children below. Width proportional to duration.
 
@@ -131,7 +131,7 @@ Stacked blocks, parent on top, children below. Width proportional to duration.
 - Zoom naturally solves the bimodal duration problem (time axis rescales)
 - Minimum-width blocks for 0ms spans
 
-### 3. Span List — PRD-014
+### 3. Span List
 
 Flat sortable table. No hierarchy, no timeline.
 
@@ -166,4 +166,4 @@ Considered but deferred. Langfuse offers a node graph showing logical flow, whic
 - **Waterfall is the default** — optimized for the 79% of traces with ≤5 spans
 - **Sibling grouping** is essential across waterfall and flame — driven by the data showing complex traces are flat-wide with repetitive siblings
 - **Span List cross-link** from waterfall sibling groups enables a smooth workflow for analyzing repeated spans
-- **Shared behavior** (colors, selection, hover, edge cases) is documented once in PRD-007 and referenced by PRD-013/014
+- **Shared behavior** (colors, selection, hover, edge cases) is documented in `specs/traces-v2/visualizations.feature` and referenced by `flame-graph.feature` and `span-list.feature`

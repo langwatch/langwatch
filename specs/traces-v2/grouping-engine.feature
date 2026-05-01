@@ -1,7 +1,11 @@
 # Grouping Engine — Gherkin Spec
-# Based on PRD-019: Grouping Engine
 # Covers: grouping selector, accordion rendering, column aggregates, session grouping,
 #         expand/collapse, sorting, filtering, pagination, performance, data gating, keyboard
+#
+# Audited against `langwatch/src/features/traces-v2/{stores/viewStore.ts,
+# components/Toolbar/GroupingSelector.tsx, components/TraceTable/{GroupLensBody.tsx,
+# conversationGroups.ts, registry/cells/group/types.ts}}` on 2026-05-01.
+# Scenarios that describe behavior not implemented today are tagged `@planned`.
 
 # ─────────────────────────────────────────────────────────────────────────────
 # GROUPING SELECTOR
@@ -18,34 +22,42 @@ Rule: Grouping selector dropdown
 
   Scenario: Grouping selector appears in the toolbar
     When the Observe page loads
-    Then a grouping dropdown appears in the toolbar to the right of the lens tabs
+    Then a grouping dropdown appears on the right side of the toolbar (Layers icon + chevron)
 
-  Scenario: Grouping selector defaults to flat for All Traces
-    When the user views the "All Traces" lens
-    Then the grouping dropdown reads "Group: flat"
+  Scenario: Grouping selector defaults to flat for the All lens
+    When the user views the "All" lens
+    Then the grouping selector's active value is "flat"
+    And the trigger renders as an outline button (the visual cue for the flat state)
 
   Scenario: Grouping selector lists all grouping options
     When the user opens the grouping dropdown
-    Then the options are "Flat (no grouping)", "By Session", "By Service", "By User", and "By Model"
+    Then the options are "Flat", "By Conversation", "By Service", "By User", and "By Model"
 
   Scenario: Selecting a grouping transforms the table
     When the user selects "By Model" from the grouping dropdown
-    Then the table renders as accordion-grouped sections by model
-    And the lens enters draft state
+    Then the table renders as grouped sections by model
+    And the change is recorded as a draft on the active lens (orange dot appears)
 
-  Scenario: Dropdown label reflects the active grouping
-    When the user selects "By Service" from the grouping dropdown
-    Then the dropdown label updates to "Group: by service"
+  Scenario: Selector trigger reflects the active grouping
+    When the user selects a non-flat grouping
+    Then the trigger switches to the "subtle" button variant
+    And its `aria-label` reads "Group rows — currently <Label>" (e.g. "By Service")
+    # The trigger does NOT show a "Group: by X" text label — only an icon + chevron.
 
   Scenario: Selecting flat restores the ungrouped table
     Given the user has selected "By Model" grouping
-    When the user selects "Flat (no grouping)" from the grouping dropdown
+    When the user selects "Flat" from the grouping dropdown
     Then the table renders as a flat list of traces
 
 # ─────────────────────────────────────────────────────────────────────────────
 # LOCKED GROUPING ON BUILT-IN LENSES
 # ─────────────────────────────────────────────────────────────────────────────
 
+@planned
+# The current GroupingSelector never disables itself or shows a lock icon.
+# Built-in lenses with a fixed grouping dimension (Conversations, By Model)
+# can be edited locally just like any other lens — the change shows up as a
+# draft (orange dot) and the user can revert.
 Rule: Locked grouping on built-in lenses
   Built-in lenses with a fixed grouping dimension lock the selector.
 
@@ -53,142 +65,129 @@ Rule: Locked grouping on built-in lenses
     Given the user is authenticated with "traces:view" permission
     And the project has traces
 
-  Scenario: Conversations lens locks grouping to by-session
+  Scenario: Conversations lens locks grouping to by-conversation
     When the user views the "Conversations" lens
-    Then the grouping dropdown shows "Group: by session" with a lock icon
-    And the dropdown is disabled
+    Then the grouping selector is disabled with a lock icon
 
   Scenario: By Model lens locks grouping to by-model
     When the user views the "By Model" lens
-    Then the grouping dropdown shows "Group: by model" with a lock icon
-    And the dropdown is disabled
+    Then the grouping selector is disabled with a lock icon
 
-  Scenario: By Service lens locks grouping to by-service
-    When the user views the "By Service" lens
-    Then the grouping dropdown shows "Group: by service" with a lock icon
-    And the dropdown is disabled
-
-  Scenario: By User lens locks grouping to by-user
-    When the user views the "By User" lens
-    Then the grouping dropdown shows "Group: by user" with a lock icon
-    And the dropdown is disabled
-
-  Scenario: Clicking a locked dropdown shows a tooltip
-    When the user clicks the locked grouping dropdown on a built-in lens
+  Scenario: Clicking a locked selector shows a tooltip
+    When the user clicks the locked grouping selector on a built-in lens
     Then a tooltip reads "Grouping is fixed for this lens. Create a custom lens to change it."
 
-  Scenario: Errors lens has unlocked grouping defaulting to flat
-    When the user views the "Errors" lens
-    Then the grouping dropdown is enabled
-    And the default grouping is "Flat (no grouping)"
+# Behaviour that IS implemented today around grouping + lenses:
 
-  Scenario: Custom lenses have unlocked grouping showing saved value
-    Given a custom lens exists with grouping "By User"
+Rule: Grouping is editable on every lens (no lock today)
+
+  Background:
+    Given the user is authenticated with "traces:view" permission
+    And the project has traces
+
+  Scenario: Errors lens defaults to flat grouping
+    When the user views the "Errors" lens
+    Then the grouping selector is enabled and the active value is "flat"
+
+  Scenario: Custom lenses load with their saved grouping
+    Given a custom lens exists with grouping "by-user"
     When the user views that custom lens
-    Then the grouping dropdown is enabled
-    And the dropdown shows "Group: by user"
+    Then the grouping selector is enabled and the active value is "by-user"
 
   Scenario: Saving a custom lens with a chosen grouping
-    Given the user views the "All Traces" lens
+    Given the user views the "All" lens
     When the user selects "By Model" from the grouping dropdown
-    And saves as a new custom lens
-    Then the custom lens retains the "By Model" grouping
+    And saves the changes as a new custom lens
+    Then the new custom lens persists with grouping "by-model"
+
+  Scenario: Changing grouping on a built-in lens marks the lens as dirty
+    Given the user views the "All" lens
+    When the user picks a non-flat grouping
+    Then the "All" tab shows the orange draft dot
+    And the menu's "Revert local changes" item becomes enabled
 
 # ─────────────────────────────────────────────────────────────────────────────
 # ACCORDION GROUP RENDERING
 # ─────────────────────────────────────────────────────────────────────────────
 
-Rule: Accordion group rendering
-  Grouped views render as collapsible accordion sections with aggregate headers.
+Rule: Group row rendering
+  Grouped views render the data via the trace-table shell + group registry.
+  Group rows can be expanded to reveal their member traces as an addon.
 
   Background:
     Given the user is authenticated with "traces:view" permission
     And the project has traces spanning multiple models
     And the user selects "By Model" grouping
 
-  Scenario: Groups render as collapsed accordion sections
-    Then each distinct model appears as a collapsed group header row
-    And the group header rows use the same column grid as trace rows
+  Scenario: Groups render as collapsed rows
+    Then each distinct model appears as a collapsed group row
+    And the columns shown are those defined by the group capability (Service/Model/User label, Traces count, Avg duration, Total cost, Total tokens, Errors)
 
-  Scenario: Group header shows expand toggle and trace count
-    Then each group header shows a collapsed toggle icon
-    And the group key value in bold
-    And the trace count in parentheses in muted text
+  Scenario: Group rows start collapsed
+    Then `openKeys` starts empty so every group is collapsed by default
 
-  Scenario: Group header background distinguishes from trace rows
-    Then group header rows have a subtle tinted background
+  Scenario: Clicking a group row toggles expansion
+    When the user clicks a group row
+    Then `toggleExpanded(group.key)` runs and the group expands to show its member traces (via the `group-traces` addon)
+    When the user clicks the same group row again
+    Then the group collapses
 
+  @planned
+  # Group rows do not currently use a sticky header within their scroll
+  # context — they scroll with the table.
   Scenario: Group headers are sticky within scroll context
     Given a group is expanded with many trace rows
     When the user scrolls within the expanded group
     Then the group header remains sticky at the top of its scroll context
 
-  Scenario: Clicking anywhere on a group header toggles expand/collapse
-    When the user clicks on a group header row
-    Then the group expands to show its trace rows
-    When the user clicks the same group header row again
-    Then the group collapses
-
-  Scenario: Hovering a group header highlights it
-    When the user hovers over a group header row
-    Then the row shows the same hover background as trace rows
-
 # ─────────────────────────────────────────────────────────────────────────────
 # COLUMN AGGREGATE FUNCTIONS
 # ─────────────────────────────────────────────────────────────────────────────
 
-Rule: Column aggregate functions in group headers
-  Each column type displays an automatic aggregate value in the group header.
+Rule: Column aggregates available on group rows
+  For service/model/user grouping, the group capability exposes a fixed set
+  of columns: a label column, trace count, average duration, total cost,
+  total tokens, and error count. Tokens In/Out, TTFT, eval scores, events,
+  and span count are NOT aggregated on group rows in this build.
 
   Background:
     Given the user is authenticated with "traces:view" permission
     And the project has traces with varied durations, costs, tokens, and models
-    And a grouping is active
+    And the user has selected "By Model" / "By Service" / "By User" grouping
 
-  Scenario: Time column shows the range of the group
-    Then the Time column in each group header shows the time range from most recent to oldest trace
+  Scenario: Trace count column
+    Then the "Traces" column shows the number of traces in the group
 
-  Scenario: Time column shows single timestamp when all traces match
-    Given all traces in a group share the same timestamp
-    Then the Time column shows that single timestamp
+  Scenario: Avg duration column
+    Then the "Avg Dur" column shows the average duration across the group's traces
 
-  Scenario: Duration column shows average with prefix
-    Then the Duration column in each group header shows "avg " followed by the average duration
+  Scenario: Total cost column
+    Then the "Total Cost" column shows the sum of `totalCost` across the group's traces
 
-  Scenario: Cost column shows sum without prefix
-    Then the Cost column in each group header shows the total cost across all traces
+  Scenario: Total tokens column
+    Then the "Total Tokens" column shows the sum of `totalTokens` across the group's traces
 
-  Scenario: Tokens column shows sum without prefix
-    Then the Tokens column in each group header shows the total token count
+  Scenario: Errors column
+    Then the "Errors" column shows the number of traces with status "error" in the group
 
-  Scenario: Tokens In and Tokens Out columns show sums
-    Then the Tokens In column shows the sum of input tokens
-    And the Tokens Out column shows the sum of output tokens
+  Scenario: Group label column
+    Then the first column shows the group key value (the service / model / user) and uses the `dotColorForIndex` palette
 
-  Scenario: Status column shows error count when errors exist
-    Given a group contains traces with errors
-    Then the Status column in that group header shows the error count with a warning icon
-
-  Scenario: Status column shows green dot when no errors
-    Given a group contains only successful traces
-    Then the Status column in that group header shows a green dot
-
-  Scenario: TTFT column shows average with prefix
-    Then the TTFT column in each group header shows "avg " followed by the average TTFT
-
-  Scenario: Eval scores column shows average with prefix
-    Then the Eval scores column in each group header shows "avg " followed by the average score
-
-  Scenario: Events column shows sum without prefix
-    Then the Events column in each group header shows the total event count
-
-  Scenario: Span count column shows average with prefix
-    Then the Span count column in each group header shows "avg " followed by the average span count
+  @planned
+  # Group rows do not currently expose Time, Tokens In/Out, TTFT, Eval scores,
+  # Events, or Span count aggregates. The group capability only ships the six
+  # columns above.
+  Scenario: Additional aggregate columns on group rows
+    Then the group row also exposes Time range, Tokens In, Tokens Out, TTFT, Eval scores, Events, and Span count aggregates
 
 # ─────────────────────────────────────────────────────────────────────────────
 # CATEGORICAL COLUMN AGGREGATES
 # ─────────────────────────────────────────────────────────────────────────────
 
+@planned
+# Categorical aggregates (mode / variant count / hover tooltip listing
+# distinct values) are not implemented for service/model/user group rows.
+# The label column simply shows the group key as plain text.
 Rule: Categorical column aggregates
   String columns like Service, Model, and User show mode or variant count.
 
@@ -213,157 +212,182 @@ Rule: Categorical column aggregates
 # SESSION GROUPING (CONVERSATIONS)
 # ─────────────────────────────────────────────────────────────────────────────
 
-Rule: Session grouping for Conversations
-  The by-session grouping uses specialized aggregates and a two-line header.
+Rule: Conversation grouping (by-conversation)
+  The `by-conversation` grouping uses a separate code path
+  (`ConversationLensBody` + `groupTracesByConversation`) and exposes
+  conversation-level aggregates rather than session-level ones.
 
   Background:
     Given the user is authenticated with "traces:view" permission
-    And the project has traces with session IDs
-    And the user views the "Conversations" lens or selects "By Session" grouping
+    And the project has traces with conversation IDs
+    And the user views the "Conversations" lens or selects "By Conversation" grouping
 
-  Scenario: Session group header shows conversation ID and turn count
-    Then each group header shows the conversation ID and the turn count labeled as "turns"
+  Scenario: Conversation rows reflect the conversation columns capability
+    Then the available columns are Conversation (pinned), Turns, Started, Last Turn, Duration, Cost, Tokens, Model, Service, Status
 
-  Scenario: Session group header shows wall-clock duration
-    Then the Duration column shows the wall-clock span from first to last trace
+  Scenario: Conversation row shows turn count
+    Then the Turns column shows the number of traces (turns) in the conversation
 
-  Scenario: Session group header shows sum of cost
-    Then the Cost column shows the sum of costs across all turns
+  Scenario: Conversation row totals duration / cost / tokens
+    Then the Duration column shows `totalDuration` (sum of `durationMs`)
+    And the Cost column shows `totalCost` (sum of trace costs)
+    And the Tokens column shows `totalTokens` (sum of trace tokens)
 
-  Scenario: Session group header shows worst status
-    Then the Status column shows the worst status across all turns in the session
+  Scenario: Conversation row shows worst status
+    Then the Status column shows the worst status across the conversation
+      (error > warning > ok)
 
-  Scenario: Session group header has a summary sub-row
-    Then each session group header displays a second sub-row with message counts and metadata
+  Scenario: Conversation row shows primary model and service
+    Then the Model column shows the most-frequent model across the conversation's traces
+    And the Service column shows the service name when all traces share one (else blank)
 
-  Scenario: Expanded session group shows turn rows
-    When the user expands a session group
-    Then the traces appear as numbered turn rows with user and assistant messages
+  Scenario: Only traces with a conversation ID participate
+    Then traces without a `conversationId` are skipped when building the conversation groups
+
+  @planned
+  # The conversation row does not currently render a second "summary"
+  # sub-row with message counts and metadata.
+  Scenario: Conversation group header has a summary sub-row
+    Then each conversation header displays a second sub-row with message counts and metadata
+
+  Scenario: Expanded conversation group shows turn rows
+    When the user enables the "conversation-turns" addon
+    Then expanding a conversation reveals its traces as turn rows below the row
 
 # ─────────────────────────────────────────────────────────────────────────────
 # EXPAND AND COLLAPSE BEHAVIOR
 # ─────────────────────────────────────────────────────────────────────────────
 
 Rule: Expand and collapse behavior
-  Groups start collapsed and can be toggled individually or all at once.
+  Groups start collapsed and can be toggled individually.
 
   Background:
     Given the user is authenticated with "traces:view" permission
     And a grouping is active with multiple groups
 
   Scenario: All groups start collapsed
-    Then every group is in the collapsed state
+    Then every group row is in the collapsed state (`openKeys` is empty)
 
-  Scenario: Expanding a group shows its trace rows
+  Scenario: Expanding a group reveals its member traces
     When the user expands a group
-    Then the trace rows for that group appear below the header
-    And the traces have standard table behavior including click-to-open-drawer and hover states
+    Then the member traces for that group appear below the row via the `group-traces` addon
 
   Scenario: Multiple groups can be open simultaneously
     When the user expands two different groups
     Then both groups remain expanded
 
-  Scenario: Expand all button opens every group
+  @planned
+  # The traces toolbar does not have "Expand all" / "Collapse all" buttons
+  # for grouped views. Those controls only exist on the trace-drawer
+  # waterfall view.
+  Scenario: Expand all / Collapse all toolbar buttons
+    Given grouping is active
     When the user clicks "Expand all" in the toolbar
     Then every group expands to show its trace rows
-
-  Scenario: Collapse all button closes every group
-    Given several groups are expanded
     When the user clicks "Collapse all" in the toolbar
     Then every group collapses
-
-  Scenario: Expand all and Collapse all buttons only appear when grouping is active
-    Given the grouping is set to "Flat (no grouping)"
-    Then the "Expand all" and "Collapse all" buttons are not visible in the toolbar
 
 # ─────────────────────────────────────────────────────────────────────────────
 # GROUP SORT ORDER
 # ─────────────────────────────────────────────────────────────────────────────
 
 Rule: Group sort order
-  Groups are sorted by trace count descending; traces within groups follow the lens sort.
+  GroupLensBody seeds tanstack-table sorting with the active lens's sort.
+  The default sort for service/model/user grouping is "count desc".
 
   Background:
     Given the user is authenticated with "traces:view" permission
     And a grouping is active
 
-  Scenario: Groups are sorted by trace count descending
+  Scenario: Default sort for group rows is trace count descending
+    Given the active lens uses the group capability's default sort
     Then the group with the most traces appears first
-    And the group with the fewest traces appears last
 
-  Scenario: Traces within a group follow the lens sort column
-    When the user expands a group
-    Then the traces within it are sorted by the lens sort column in descending order
+  Scenario: User-selected sort drives group order
+    Given the lens sort is "cost desc"
+    Then groups are ordered by total cost descending
+
+  Scenario: Member traces inside an expanded group inherit the trace ordering
+    Given the user expands a group
+    Then the member traces are listed in `buildGroups`'s reverse-chronological order (most recent first)
+    # Member traces are NOT re-sorted by the lens's sort column today; they
+    # follow the descending-timestamp order set in `buildGroups`.
 
 # ─────────────────────────────────────────────────────────────────────────────
 # EMPTY GROUPS
 # ─────────────────────────────────────────────────────────────────────────────
 
 Rule: Empty groups after filtering
-  Groups with no matching traces are hidden.
+  Groups are derived from the filtered trace list, so a group with no
+  matching traces simply isn't built.
 
   Background:
     Given the user is authenticated with "traces:view" permission
     And a grouping is active
 
-  Scenario: Groups with zero matching traces are hidden
+  Scenario: Groups with zero matching traces are not built
     Given a filter is applied that excludes all traces in a group
-    Then that group does not appear in the table
+    Then that group is absent from the rendered set (its key never makes it into `buildGroups`)
 
-  Scenario: All groups empty after filtering shows empty state
-    Given filters are applied that exclude all traces in every group
-    Then the table shows "No traces match the current filters"
+  Scenario: No groups at all renders the "No traces to group" message
+    Given filters are applied such that no traces remain
+    Then `GroupLensBody` renders "No traces to group."
 
 # ─────────────────────────────────────────────────────────────────────────────
 # CONVERSATIONS PRESET REFACTORING
 # ─────────────────────────────────────────────────────────────────────────────
 
+@planned
+# The Conversations lens still uses its own dedicated body
+# (`ConversationLensBody`) and `groupTracesByConversation` aggregator —
+# it has NOT been refactored onto the shared `GroupLensBody` /
+# `buildGroups` pipeline. The two paths produce different aggregate
+# shapes (`ConversationGroup` vs `TraceGroup`).
 Rule: Conversations preset uses the grouping engine
   The Conversations preset is refactored to use the generalized grouping engine internally.
 
   Background:
     Given the user is authenticated with "traces:view" permission
-    And the project has traces with session IDs
+    And the project has traces with conversation IDs
 
-  Scenario: Conversations preset renders through the accordion engine
+  Scenario: Conversations preset renders through the shared grouping engine
     When the user views the "Conversations" lens
-    Then the table renders as accordion-grouped sections by session
-    And the grouping engine handles the accordion rendering
-
-  Scenario: Conversations preset UX is unchanged
-    When the user views the "Conversations" lens
-    Then collapsed rows show conversation summary with ID, last message, turns, duration, cost, and status
-    And expanded rows show numbered turn rows with user and assistant messages
+    Then it renders via `GroupLensBody` instead of its own conversation body
 
 # ─────────────────────────────────────────────────────────────────────────────
 # INTERACTION WITH FILTERS
 # ─────────────────────────────────────────────────────────────────────────────
 
 Rule: Grouping interaction with filters
-  Filters apply within groups and update group counts dynamically.
+  Groups are built from the already-filtered trace list, so filter changes
+  propagate to group membership and counts automatically.
 
   Background:
     Given the user is authenticated with "traces:view" permission
     And the user groups by model
 
   Scenario: Filters apply within groups
-    When the user applies a filter for error status
-    Then each group shows only its error traces
-    And groups with no error traces disappear
+    When the user applies a filter (e.g. for error status)
+    Then each group is built only from traces that pass the filter
+    And groups whose filtered trace set is empty are not rendered
 
   Scenario: Facet counts reflect trace-level counts not group counts
     When a grouping is active
     Then facet counts in the sidebar show trace-level counts
 
   Scenario: Group trace counts update when filters change
-    Given a group header shows a trace count
+    Given a group row shows a trace count
     When the user applies a filter that reduces the matching traces in that group
-    Then the group header trace count updates to reflect the filtered count
+    Then the group's trace count updates on the next render
 
 # ─────────────────────────────────────────────────────────────────────────────
 # INTERACTION WITH PAGINATION
 # ─────────────────────────────────────────────────────────────────────────────
 
+@planned
+# Pagination today operates on the underlying trace list (not on groups).
+# Groups are derived client-side from whatever traces are currently loaded;
+# there is no "Show more" affordance inside an expanded group.
 Rule: Grouping interaction with pagination
   Pagination operates on groups, not individual traces within groups.
 
@@ -392,50 +416,71 @@ Rule: Grouping interaction with pagination
 # ─────────────────────────────────────────────────────────────────────────────
 
 Rule: Grouping engine performance
-  Group aggregates are server-computed and trace rows are lazily fetched.
+  Group aggregates are computed CLIENT-side from the already-loaded trace
+  list; expansion does not trigger any additional fetches.
 
   Background:
     Given the user is authenticated with "traces:view" permission
     And a grouping is active
 
-  Scenario: Group aggregates are computed server-side
+  Scenario: Group aggregates are computed client-side
     When the grouped table loads
-    Then group header aggregates are computed via server-side queries
-    And the frontend does not aggregate trace rows client-side
+    Then `buildGroups` (or `groupTracesByConversation`) iterates the loaded trace list and produces the aggregates client-side
+    And no extra server query is issued for grouping
 
+  Scenario: Outer group rows are virtualised via the trace-table virtualizer
+    When many groups are present
+    Then `useTraceTableVirtualizer` virtualises the outer group rows
+
+  @planned
+  # Group expansion today reuses the already-loaded trace data — no
+  # per-group fetch is triggered. Within-group rows are not separately
+  # virtualised either.
   Scenario: Collapsed groups do not fetch trace rows
     When the grouped table loads with all groups collapsed
     Then no trace row data is fetched for any group
 
+  @planned
   Scenario: Expanding a group triggers a query for its traces
     When the user expands a group
     Then a query fetches that group's trace rows
 
-  Scenario: Expanded group with many traces virtualizes rows
+  @planned
+  Scenario: Expanded group with many traces virtualises member rows
     Given a group has over 100 traces
     When the user expands that group
-    Then the trace rows within the group are virtualized
+    Then the trace rows within the group are virtualised
 
 # ─────────────────────────────────────────────────────────────────────────────
 # DATA GATING
 # ─────────────────────────────────────────────────────────────────────────────
 
 Rule: Data gating for grouping dimensions
-  The engine handles missing data, single-value dimensions, and high cardinality.
+  Missing values are bucketed under "(unknown)"; there is no high-cardinality
+  cap on the number of groups today.
 
   Background:
     Given the user is authenticated with "traces:view" permission
 
-  Scenario: Grouping by a dimension with no data shows a message
+  Scenario: Missing dimension values fall back to "(unknown)"
+    Given some traces have no user ID
+    When the user selects "By User" grouping
+    Then those traces are bucketed into a group keyed "(unknown)"
+
+  Scenario: All traces missing a dimension produce a single "(unknown)" group
     Given no traces have a user ID
     When the user selects "By User" grouping
-    Then the table shows "No user data found. Traces appear here when they include a user ID."
+    Then a single "(unknown)" group is rendered with all traces
 
   Scenario: Single-value dimension shows one group
     Given all traces have the same service name
     When the user selects "By Service" grouping
-    Then one group appears with aggregate stats for all traces
+    Then one group is rendered with aggregate stats for all traces
 
+  @planned
+  # `buildGroups` does not cap or sort-truncate the group set; every
+  # distinct value becomes a group. There is no "Show all" overflow link
+  # for high-cardinality dimensions.
   Scenario: High cardinality dimension shows top groups with overflow link
     Given grouping by model produces more than 20 groups
     When the user selects "By Model" grouping
@@ -443,10 +488,16 @@ Rule: Data gating for grouping dimensions
     And a message indicates how many more groups exist
     And a "Show all" link is available to reveal the remaining groups
 
+  Scenario: Grouping by a dimension with no data shows a message
+    Given the resulting group list is empty (e.g. after filtering)
+    Then `GroupLensBody` renders "No traces to group."
+
 # ─────────────────────────────────────────────────────────────────────────────
 # CONDITIONAL FORMATTING ON GROUP HEADERS
 # ─────────────────────────────────────────────────────────────────────────────
 
+@planned
+# Conditional formatting is not implemented (see conditional-formatting.feature).
 Rule: Conditional formatting on group header aggregates
   Aggregate values in group headers respect conditional formatting rules.
 
@@ -463,6 +514,10 @@ Rule: Conditional formatting on group header aggregates
 # KEYBOARD NAVIGATION
 # ─────────────────────────────────────────────────────────────────────────────
 
+@planned
+# `useTraceLensKeyboard` and the page-level shortcuts handle find / density /
+# sidebar / drawer keys, but grouped views do not have arrow-key navigation
+# between group rows or Enter-to-toggle bindings yet.
 Rule: Keyboard navigation in grouped view
   Arrow keys and Enter navigate and toggle groups and trace rows.
 

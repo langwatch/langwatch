@@ -1,5 +1,4 @@
 # Column Configuration — Gherkin Spec
-# Based on PRD-018: Column Configuration
 # Covers: column visibility, drag-to-reorder, column resize, lens state persistence, defaults, data gating
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -24,44 +23,42 @@ Rule: Column visibility toggle
     Given the Columns dropdown is open
     And the "Service" column is hidden
     When the user checks the "Service" checkbox
-    Then the "Service" column appears in the trace table
-    And it is added at the end of the column order before any right-pinned column
+    Then `viewStore.toggleColumn("service")` runs
+    And `columnOrder` gains "service" appended at the end
+    And the trace table renders the Service column
 
   Scenario: Toggling a column off removes it from the table
     Given the Columns dropdown is open
     And the "Cost" column is visible
     When the user unchecks the "Cost" checkbox
-    Then the "Cost" column is removed from the trace table
+    Then "cost" is removed from `columnOrder`
+    And the column disappears from the table
+
+  Scenario: Pinned columns cannot be toggled off
+    Given a column has `pinned="left"` (e.g. Time)
+    Then its checkbox is disabled in the dropdown
 
   Scenario: Toggling a column puts the lens into draft state
     Given the Columns dropdown is open
     When the user toggles any column checkbox
-    Then the active lens enters draft state with a dot indicator on its tab
+    Then `viewStore.draftState` gains an entry for the active lens (`isDraft(lensId)` returns true)
+    And the lens tab shows the draft indicator
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # COLUMN DRAG-TO-REORDER
 # ─────────────────────────────────────────────────────────────────────────────
+# Not yet implemented as of 2026-05-01 — `viewStore.reorderColumns` exists but
+# no column-header DnD handler is wired up in `TraceTableShell`. The order
+# only changes today via toggling columns on/off.
 
+@planned
 Rule: Column drag-to-reorder
   Users drag column headers to rearrange the display order of columns.
 
   Background:
     Given the user is authenticated with "traces:view" permission
     And a lens is active with columns Time, Trace, Duration, Cost, Tokens, and Model visible
-
-  Scenario: Column header shows grab cursor on hover
-    When the user hovers over a non-pinned column header
-    Then the cursor changes to grab
-
-  Scenario: Dragging a column shows visual feedback
-    When the user drags the "Cost" column header
-    Then a semi-transparent ghost of the column header follows the cursor
-    And the cursor changes to grabbing
-
-  Scenario: Drop target shows a blue insertion line
-    When the user drags "Cost" between "Trace" and "Duration"
-    Then a blue vertical insertion line appears between "Trace" and "Duration"
 
   Scenario: Dropping a column reorders the table
     When the user drags "Cost" and drops it before "Duration"
@@ -72,45 +69,12 @@ Rule: Column drag-to-reorder
     Then the active lens enters draft state with a dot indicator on its tab
 
   Scenario: Pinned column cannot be dragged
-    When the user hovers over the Time column header
-    Then the cursor does not change to grab
-    And dragging the Time column has no effect
-
-  Scenario: Column cannot be dragged before a left-pinned column
-    When the user drags "Cost" to the left of the Time column
-    Then the column snaps to the nearest valid position after Time
+    When the user attempts to drag the Time (left-pinned) column
+    Then the column does not move
 
   Scenario: Column order persists in the LensConfig columns array
     When the user reorders columns
     Then the columns array order in the LensConfig matches the new display order
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# COLUMN DRAG-TO-REORDER ACCESSIBILITY
-# ─────────────────────────────────────────────────────────────────────────────
-
-Rule: Column reorder keyboard and screen reader support
-  Users can reorder columns via keyboard and receive screen reader announcements.
-
-  Background:
-    Given the user is authenticated with "traces:view" permission
-    And a lens is active with multiple columns visible
-
-  Scenario: Keyboard reorder via arrow keys
-    When the user focuses a column header and presses Enter
-    And presses the Right arrow key
-    Then the column moves one position to the right
-    And pressing Enter confirms the new position
-
-  Scenario: Cancelling keyboard reorder with Escape
-    When the user focuses a column header and presses Enter
-    And presses the Right arrow key
-    And presses Escape
-    Then the column returns to its original position
-
-  Scenario: Screen reader announces reorder mode
-    When the user activates reorder mode on a column header
-    Then the screen reader announces "Move [column name] column. Use left and right arrows to reposition."
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -126,7 +90,7 @@ Rule: Column resize
 
   Scenario: Resize handle appears on column border hover
     When the user hovers over the right border of a column header
-    Then a 4px invisible hit area is active
+    Then a 6px hit area is active
     And the cursor changes to col-resize
 
   Scenario: Dragging the border resizes the column
@@ -140,23 +104,17 @@ Rule: Column resize
 
   Scenario: Column cannot be resized below its minimum width
     When the user drags the right border of a column to shrink it
-    Then the column width stops at its defined minimum width
+    Then the column width stops at its defined minimum width (TanStack `enableColumnResizing` clamps via `minSize`)
 
-  Scenario: Column has no maximum width
-    When the user drags the right border of a column far to the right
-    Then the column continues to widen without limit
+  Scenario: Double-clicking the resize grip resets the column to its default width
+    When the user double-clicks the right-edge resize grip on a column header
+    Then `header.column.resetSize()` runs and the column returns to its default width
+    # NOTE: this is "reset to default", not "auto-fit content"
 
-  Scenario: Double-clicking the border auto-fits column width
-    When the user double-clicks the right border of a column header
-    Then the column width adjusts to fit the widest content in visible rows plus 16px padding
-
-  Scenario: Resizing puts the lens into draft state
-    When the user resizes any column
-    Then the active lens enters draft state with a dot indicator on its tab
-
-  Scenario: Column width persists in the LensConfig
-    When the user resizes the "Trace" column to 350px
-    Then the width field for "Trace" in the LensConfig columns array reads 350
+  Scenario: Column width persists per (lens × rowKind) in localStorage
+    When the user resizes the "Trace" column
+    Then `columnSizingStore.setSizing(getColumnSizingKey(lensId, rowKind), …)` is called
+    And the new width is persisted under `langwatch:traces-v2:column-sizing:v1`
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -183,31 +141,29 @@ Rule: Pinned column resize
 # COLUMN STATE IN LENSCONFIG
 # ─────────────────────────────────────────────────────────────────────────────
 
-Rule: Column state in LensConfig
-  The columns array in LensConfig defines the complete column layout including order, width, and pinning.
+Rule: Column state split between LensConfig and columnSizingStore
+  `LensConfig.columns: string[]` defines visible column ids (and their order).
+  Per-column widths live in `columnSizingStore`, keyed by (lensId, rowKind).
+  Pinning is intrinsic to the column definition (via `pinned: "left"` on
+  `STANDARD_COLUMNS`), not stored per-lens.
 
   Background:
     Given the user is authenticated with "traces:view" permission
     And a lens is active
 
   Scenario: Array order determines display order
-    Given the LensConfig columns array lists Trace before Duration
+    Given `LensConfig.columns` lists "trace" before "duration"
     When the trace table renders
     Then the Trace column appears to the left of the Duration column
 
   Scenario: Columns not in the array are hidden
-    Given the LensConfig columns array does not include "Service"
+    Given `LensConfig.columns` does not include "service"
     When the trace table renders
-    Then the "Service" column is not visible in the table
-
-  Scenario: Toggling a column on adds it before the last pinned-right column
-    Given the LensConfig columns array ends with a right-pinned column
-    When the user toggles a hidden column on
-    Then the new column is inserted before the right-pinned column
+    Then the Service column is not visible
 
   Scenario: Toggling a column off removes it from the array
     When the user hides the "Cost" column
-    Then "Cost" is removed from the LensConfig columns array
+    Then "cost" is removed from `viewStore.columnOrder` (and from the saved LensConfig on save)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -221,32 +177,29 @@ Rule: Default column set
     Given the user is authenticated with "traces:view" permission
 
   Scenario: New lens has default columns visible
-    When the user creates a new lens
-    Then the visible columns are Time, Trace, Duration, Cost, Tokens, and Model
-    And the Service column is hidden by default
+    When the user creates a new lens with grouping="flat" (the trace capability)
+    Then `defaultColumns` are: time, trace, service, duration, cost, tokens, model
+    # See LENS_CAPABILITIES.flat in `lens/capabilities.ts`
 
-  Scenario: New lens has default column widths
+  Scenario: New lens has default minimum column widths
     When the user creates a new lens
-    Then Time has a width of 80px
-    And Trace has a width of 300px
-    And Duration has a width of 80px
-    And Cost has a width of 80px
-    And Tokens has a width of 80px
-    And Model has a width of 100px
+    Then `STANDARD_COLUMNS` minWidths are: time 80, trace 300, service 120, duration 80, cost 80, tokens 80, model 100
+    # Note: these are minimums (TanStack `minSize`), not fixed widths. Actual rendered widths come from columnSizingStore overrides on top of TanStack defaults.
 
   Scenario: Time column is pinned left by default
     When the user creates a new lens
-    Then the Time column is pinned to the left
+    Then the Time column entry has `pinned: "left"` in `STANDARD_COLUMNS`
 
-  Scenario: Additional columns are available but hidden
-    When the user opens the Columns dropdown on a new lens
-    Then columns like TTFT, User ID, Conversation ID, Origin, and Environment are listed
-    And they are unchecked by default
+  Scenario: Additional columns are available but hidden by default
+    When the user opens the Columns dropdown
+    Then optional columns are listed: TTFT, User ID, Conversation ID, Origin, Tokens In, Tokens Out, Spans, Status
+    And they are unchecked by default (each entry's `visible: false`)
 
-  Scenario: Resetting a lens restores default columns
-    Given the user has customized columns on a lens
-    When the user resets the lens to defaults
-    Then the column set returns to the default visibility, order, and widths
+  Scenario: Reverting a lens restores its committed configuration
+    Given the user has customized columns on a built-in lens
+    When the user clicks Revert
+    Then `viewStore.revertLens(activeLensId)` clears the draftState entry
+    And `columnOrder` resets back to the lens's saved `columns` array
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -310,11 +263,12 @@ Rule: Data gating for columns with missing data
     Then the column header renders normally
     And every row shows "—"
 
-  Scenario: Column width below minimum after restore is clamped
-    Given a saved LensConfig has a column width below the defined minimum
-    When the lens is loaded
-    Then the column width is clamped to the minimum width
-    And no error is raised
+  Scenario: Persisted column widths survive reload
+    Given the user resized columns on a previous session
+    When the page reloads
+    Then `columnSizingStore` reads `langwatch:traces-v2:column-sizing:v1` from localStorage
+    And applies sizes for the active (lensId, rowKind) key
+    And invalid/non-positive entries are dropped silently
 
 
 # ─────────────────────────────────────────────────────────────────────────────

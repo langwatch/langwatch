@@ -1,5 +1,4 @@
 # Search & Filter System — Gherkin Spec
-# Based on PRD-003: Search & Filter System
 # Covers: search bar, query syntax, autocomplete, filter sidebar, facets, range sliders,
 #         two-way sync, time range selector, error states, performance, facet density
 
@@ -16,47 +15,39 @@ Rule: Time range selector
     Given the user is authenticated with "traces:view" permission
     And the project has traces spanning the last 30 days
 
-  Scenario: Default time range is last 24 hours
+  Scenario: Default time range is last 30 days
     When the Observe page loads
-    Then the time range selector displays "Last 24 hours"
-    And the trace table shows only traces from the last 24 hours
+    Then the time range selector displays "30d"
+    And the trace table shows only traces from the last 30 days
 
   Scenario: Selecting a preset time range
     When the user opens the time range selector
-    Then presets are available for "Last 15 min", "Last 1 hour", "Last 6 hours", "Last 24 hours", "Last 7 days", and "Last 30 days"
+    Then rolling presets are available for "Last 15 minutes", "Last 1 hour", "Last 4 hours", "Last 24 hours", "Last 7 days", "Last 30 days", and "Last 60 days"
+    And period-to-date presets are available for "This week", "This month", and "This quarter"
 
   Scenario: Applying a preset filters traces to that range
     When the user selects "Last 7 days"
     Then the trace table shows traces from the last 7 days
-    And the time range selector label updates to "Last 7 days"
+    And the time range selector label updates to "7d"
 
-  Scenario: Custom range with absolute dates
-    When the user selects "Custom"
-    Then a date/time picker popover opens with start and end fields
-    When the user enters "Apr 20 14:00" as start and "Apr 21 14:00" as end
+  Scenario: Absolute range entered in the picker
+    When the user opens the time range selector
+    Then the popover shows an "Absolute range" panel with From and To datetime-local fields alongside the preset list
+    When the user enters absolute From/To values and clicks Apply
     Then the trace table shows traces within that absolute range
 
-  Scenario: Custom range with relative expression
-    When the user selects "Custom"
-    And enters "last 3 hours" as a relative range
-    Then the trace table shows traces from the last 3 hours
-
-  Scenario: Time range is reflected in URL parameters
+  Scenario: Time range preset is reflected in the URL fragment
     When the user selects "Last 1 hour"
-    Then the URL contains "from=now-1h&to=now"
+    Then the URL fragment encodes the active lens id and "preset=1h"
 
-  Scenario: Absolute custom range is reflected in URL parameters
-    When the user sets a custom range from "2026-04-20T14:00:00Z" to "2026-04-21T14:00:00Z"
-    Then the URL contains the corresponding absolute timestamps
+  Scenario: Absolute custom range is reflected in URL fragment
+    When the user sets an absolute range via the From/To fields
+    Then the URL fragment encodes the absolute from/to timestamps
 
-  Scenario: Time range is restored from localStorage on page load
-    Given the user previously selected "Last 7 days"
-    When the user navigates away and returns to the Observe page
-    Then the time range selector displays "Last 7 days"
-
-  Scenario: Live Tail does not use the time range selector
-    When the user navigates to the Live Tail page
-    Then the time range selector is not visible
+  Scenario: Time range is restored from the URL fragment on page load
+    Given the user previously selected "Last 7 days" (encoded into the URL fragment)
+    When the user reloads or navigates back to the Observe page
+    Then the time range selector displays "7d"
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -73,7 +64,7 @@ Rule: Search bar layout and behavior
   Scenario: Search bar renders with placeholder text
     When the Observe page loads
     Then the search bar spans the full width below the nav bar
-    And the placeholder text reads "Filter traces... @status:error AND @model:gpt-4 OR \"timeout\""
+    And the placeholder text reads "Search filters, free text, or Ask AI…"
 
   Scenario: Search bar shows the current active query
     Given the search bar contains "@status:error AND @model:gpt-4o"
@@ -183,16 +174,17 @@ Rule: Query syntax
     Then only traces with cost greater than 0.01 are shown
 
   Scenario: Range syntax with less-than
-    When the user searches for "@duration:<500ms"
+    When the user searches for "@duration:<500"
     Then only traces with duration less than 500ms are shown
 
-  Scenario: Range syntax with double-dot interval
-    When the user searches for "@cost:0.01..1.00"
+  Scenario: Range syntax with bracketed interval
+    When the user searches for "@cost:[0.01 TO 1.00]"
     Then only traces with cost between 0.01 and 1.00 are shown
 
-  Scenario: Duration range with units
-    When the user searches for "@duration:1s..5s"
-    Then only traces with duration between 1 second and 5 seconds are shown
+  # Negation shorthand: liqe accepts "-field:value" in addition to "NOT field:value"
+  Scenario: Hyphen prefix is shorthand for NOT
+    When the user searches for "-@status:error"
+    Then traces with status "error" are excluded from results
 
   Scenario: Unquoted free text is treated as full-text search
     When the user types "timeout" without quotes or @ prefix
@@ -227,7 +219,7 @@ Rule: Supported search fields
     Then only traces from the "finance" service are shown
 
   Scenario: Filter by span type
-    When the user searches for "@type:agent"
+    When the user searches for "@spanType:agent"
     Then only traces containing agent spans are shown
 
   Scenario: Filter by user ID
@@ -243,10 +235,16 @@ Rule: Supported search fields
     Then only traces with more than 1000 tokens are shown
 
   Scenario: Existence check with @has
-    When the user searches for "@has:feedback"
-    Then only traces that have feedback attached are shown
+    When the user searches for "@has:annotation"
+    Then only traces that have an annotation attached are shown
 
-  Scenario: Filter by event type
+  # @has and @none accept the closed enum: error, eval, feedback, annotation,
+  # conversation, user, customer, topic, subtopic, label
+  Scenario: Negative existence check with @none
+    When the user searches for "@none:user"
+    Then only traces without a user identifier are shown
+
+  Scenario: Filter by event name
     When the user searches for "@event:user.feedback"
     Then only traces with a "user.feedback" event are shown
 
@@ -255,7 +253,7 @@ Rule: Supported search fields
     Then only traces with a "faithfulness" evaluation are shown
 
   Scenario: Filter by trace ID
-    When the user searches for "@trace:a3f8c2d1"
+    When the user searches for "@traceId:a3f8c2d1"
     Then only the trace with that exact ID is shown
 
 
@@ -270,27 +268,23 @@ Rule: Search bar autocomplete
     Given the user is authenticated with "traces:view" permission
     And the project has traces
 
-  Scenario: Typing @ shows available field names
-    When the user types "@" in the search bar
-    Then a dropdown appears listing available field names
+  Scenario: Focusing the empty search bar shows all field names
+    When the user focuses the empty search bar
+    Then the dropdown opens in field mode listing every known field grouped by Trace / Span / Event / Eval / Metrics / Scenario
 
   Scenario: Typing a partial field name filters the dropdown
-    When the user types "@mo" in the search bar
-    Then the dropdown shows "@model" as a matching field
+    When the user types "mo" in the search bar
+    Then the dropdown shows "model" as a matching field
 
-  Scenario: Typing @field: shows known values for that field
-    When the user types "@model:" in the search bar
-    Then a dropdown appears listing known model values from the data
+  Scenario: Typing field: shows known values for that field
+    When the user types "model:" in the search bar
+    Then the dropdown opens in value mode for "model"
+    And it lists known model values from the discover payload (facet topValues)
 
-  Scenario: Autocomplete values fail to load gracefully
-    Given the autocomplete value endpoint is unavailable
-    When the user types "@model:" in the search bar
-    Then the dropdown shows "Could not load suggestions" in muted text
-    And the user can continue typing manually
-
-  Scenario: No matching autocomplete values
-    When the user types "@model:nonexistent" in the search bar
-    Then the dropdown shows "No values found for @model"
+  # Static enum values come from FIELD_VALUES in metadata.ts
+  Scenario: Closed enum fields autocomplete from static values
+    When the user types "status:" in the search bar
+    Then the dropdown lists "error", "warning", and "ok"
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -305,34 +299,29 @@ Rule: Filter column layout
     And the project has traces with varied attributes
 
   Scenario: Filter sidebar renders facet groups in fixed order
-    When the Observe page loads
+    When the Observe page loads (and the user has expanded the sidebar)
     Then the filter sidebar shows groups in this order: Trace, Subjects, Span, Evaluators, Metrics, Prompts
-    And the Trace group leads with Origin, Status, Error message, Guardrail, Contains AI
-    And range facets (Duration, Cost, Tokens, …) live in the Metrics group at the bottom
+    And the Trace group leads with Origin, Status, Error message, Guardrail, Contains AI, Root span type, Trace name, Model, Service, Topic, Subtopic, Label, Event
+    And range facets (Duration, Cost, Tokens, Prompt tokens, Completion tokens, TTFT, TTLT, Tokens/sec, Tokens estimated, Span count) live in the Metrics group
+
+  Scenario: Group headers can be reordered via drag-and-drop
+    When the user drags a group header to a new position
+    Then the FACET_GROUPS order updates in the sidebar
+    But sections within a group keep their registry order
 
   Scenario: Dynamic facets appear only when data exists
     Given traces include user IDs
     Then the User facet section appears in the Subjects group
     Given no traces have label data
-    Then the Labels facet section is not rendered
+    Then the Label facet section is not rendered
 
   Scenario: Facet sections are collapsible
     When the user clicks a facet section heading
     Then the section collapses, showing only the heading
 
-  Scenario: Collapsed section shows active filter count
-    Given the user has selected "gpt-4o" under Model
-    When the user collapses the Model section
-    Then the heading shows "MODEL (1 selected)"
-
-  Scenario: Default collapsed state for sections
-    When the Observe page loads
-    Then Origin, Status, and Span Type sections are expanded by default
-    And Model, Service, User, Labels, and range slider sections are collapsed by default
-
-  Scenario: Sticky section headers during scroll
-    When the user scrolls the filter column
-    Then section headers stick to the top of the scroll area
+  Scenario: Auto-expand small sections
+    Given a section has at most AUTO_EXPAND_THRESHOLD (5) values
+    Then the section is auto-expanded when first rendered
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -346,90 +335,40 @@ Rule: Filter column collapse and expand
     Given the user is authenticated with "traces:view" permission
     And the project has traces
 
-  Scenario: Collapsing the filter sidebar with the chevron button
-    When the user clicks the collapse chevron button on the sidebar
-    Then the sidebar collapses to a 40px wide strip
-    And section abbreviations are shown: O, S, T, Sv, M, Tk, $, Lt
+  Scenario: Sidebar starts collapsed by default
+    When the Observe page loads for the first time
+    Then the sidebar is collapsed (default `sidebarCollapsed=true` in `uiStore`)
+    And it renders as a narrow icon rail
+
+  Scenario: Collapsed sidebar shows facet icons grouped by section
+    Given the sidebar is collapsed
+    Then each facet section is represented by its lucide icon (from FACET_ICONS), not a letter abbreviation
+    And clusters are visually separated by SectionGroup
 
   Scenario: Expanding the collapsed sidebar with the chevron
     Given the sidebar is collapsed
-    When the user clicks the expand chevron
+    When the user clicks the "Expand sidebar" chevron icon button
     Then the sidebar expands to its full width
 
-  Scenario: Expanding by clicking a section abbreviation
+  Scenario: Expanding by clicking a section icon
     Given the sidebar is collapsed
-    When the user clicks a section abbreviation
+    When the user clicks any facet icon
     Then the sidebar expands to its full width
 
   Scenario: Keyboard shortcut toggles sidebar collapse
-    Given the search bar is not focused
+    Given the search bar (and any other text input) is not focused
     When the user presses "["
-    Then the sidebar collapse state toggles
+    Then `useUIStore.toggleSidebar` fires and the sidebar collapse state toggles
 
-  Scenario: Active filter dots in collapsed state
+  Scenario: Active filter badge in collapsed state
     Given the sidebar is collapsed
-    And the user has an include filter active on Status
-    Then the Status section shows a blue dot
-
-  Scenario: Exclude filter dot takes priority in collapsed state
-    Given the sidebar is collapsed
-    And the user has an exclude filter active on Status
-    Then the Status section shows a red dot
+    And the user has any include or exclude filter active on Status
+    Then the Status icon shows an active-count badge
 
   Scenario: Collapsed state is persisted in localStorage
-    Given the user collapses the sidebar
+    Given the user collapses or expands the sidebar
     When the user navigates away and returns to the Observe page
-    Then the sidebar remains collapsed
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# FILTER CHIP BAR
-# ─────────────────────────────────────────────────────────────────────────────
-
-Rule: Filter chip bar
-  A horizontal chip bar appears when the sidebar is collapsed and filters are active.
-
-  Background:
-    Given the user is authenticated with "traces:view" permission
-    And the project has traces
-
-  Scenario: Chip bar appears when sidebar is collapsed with active filters
-    Given the sidebar is collapsed
-    And the user has "@status:error" active
-    Then a horizontal chip bar appears between the toolbar and the trace table
-    And it shows a chip "Status: error" with a blue indicator
-
-  Scenario: Chip bar is hidden when sidebar is expanded
-    Given the sidebar is expanded
-    And filters are active
-    Then the chip bar is not visible
-
-  Scenario: Chip bar is hidden when no filters are active
-    Given the sidebar is collapsed
-    And no filters are active
-    Then the chip bar is not visible
-
-  Scenario: Dismissing a chip clears that specific filter
-    Given the chip bar is visible with a "Status: error" chip
-    When the user clicks the dismiss button on the "Status: error" chip
-    Then the "@status:error" filter is removed
-    And the chip disappears
-
-  Scenario: Exclude filter chips show a red indicator
-    Given the sidebar is collapsed
-    And the user has "NOT @status:error" active
-    Then the chip bar shows a chip "Status: error" with a red indicator
-
-  Scenario: Clear all button removes all filters from the chip bar
-    Given the chip bar shows multiple chips
-    When the user clicks "Clear all" on the chip bar
-    Then all filters are cleared
-    And the chip bar disappears
-
-  Scenario: Clicking a chip expands the sidebar
-    Given the chip bar is visible
-    When the user clicks a chip label (not the dismiss button)
-    Then the sidebar expands
+    Then the sidebar restores from `langwatch:traces-v2:ui` in localStorage
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -448,23 +387,21 @@ Rule: Categorical facet three-stage checkboxes
     Then all facet checkboxes are in neutral state (unchecked, muted text)
 
   Scenario: First click sets include state
-    When the user clicks the "Error" checkbox under Status
-    Then the checkbox enters include state (checked, blue, white text)
-    And the query adds "@status:error"
+    When the user clicks the "Error" row under Status
+    Then `filterStore.toggleFacet("status","error")` runs
+    And the search bar text gains a "status:error" clause
     And the trace table filters to show only error traces
 
   Scenario: Second click sets exclude state
-    Given the "Error" checkbox is in include state
+    Given the "Error" row is in include state
     When the user clicks it again
-    Then the checkbox enters exclude state (indeterminate, red, white text)
-    And the query changes to "NOT @status:error"
+    Then the clause becomes "NOT status:error"
     And the trace table filters to show all traces except errors
 
   Scenario: Third click returns to neutral state
-    Given the "Error" checkbox is in exclude state
+    Given the "Error" row is in exclude state
     When the user clicks it again
-    Then the checkbox returns to neutral state
-    And the "@status:error" clause is removed from the query
+    Then the "status:error" clause is removed from the query
 
   Scenario: Include whitelist mode filters to matching traces only
     When the user includes "Error" and "Warning" under Status
@@ -553,18 +490,18 @@ Rule: Range facets
 
   Scenario: Tokens slider adjusts token range filter
     When the user adjusts the Tokens slider to 500..5000
-    Then the query contains "@tokens:500..5000"
+    Then the query contains "tokens:[500 TO 5000]"
     And only traces within that token range are shown
 
   Scenario: Cost slider adjusts cost range filter
     When the user adjusts the Cost slider to 0.01..1.00
-    Then the query contains "@cost:0.01..1.00"
+    Then the query contains "cost:[0.01 TO 1.00]"
     And only traces within that cost range are shown
 
-  Scenario: Latency slider adjusts latency range filter
-    When the user adjusts the Latency slider to 1s..10s
-    Then the query contains "@duration:1s..10s"
-    And only traces within that latency range are shown
+  Scenario: Latency slider adjusts duration range filter
+    When the user adjusts the Duration slider to 1000..10000
+    Then the query contains "duration:[1000 TO 10000]"
+    And only traces within that duration range are shown
 
   Scenario: Slider min and max are derived from actual data
     Given the maximum observed cost is $2.50
@@ -593,6 +530,9 @@ Rule: Range facets
 # ORIGIN-SPECIFIC FACETS
 # ─────────────────────────────────────────────────────────────────────────────
 
+# Not yet implemented as of 2026-05-01 — no origin-aware facet expansion logic
+# in FilterSidebar; scenario/eval facets are always visible from the registry.
+@planned
 Rule: Origin-specific facets
   Additional facets appear when a specific origin is selected.
 
@@ -614,20 +554,14 @@ Rule: Origin-specific facets
     When the user selects "Application" under Origin
     Then no additional origin-specific facets appear
 
-  Scenario: Origin-specific facets are additive to standard facets
-    When the user selects "Simulation" under Origin
-    Then standard facets (Status, Span Type, Model, Service) remain visible
-    And origin-specific facets appear alongside them
-
-  Scenario: Origin-specific facets are expanded by default
-    When the user selects "Simulation" under Origin
-    Then the Scenario and Verdict facets are expanded by default
-
 
 # ─────────────────────────────────────────────────────────────────────────────
 # LENS-LOCKED FILTERS
 # ─────────────────────────────────────────────────────────────────────────────
 
+# Not yet implemented as of 2026-05-01 — lenses store filterText only, no
+# lock semantics; the sidebar always renders fully editable controls.
+@planned
 Rule: Lens-locked filters
   Presets can lock facet values, preventing user modification.
 
@@ -675,7 +609,7 @@ Rule: Two-way sync from sidebar to search bar
 
   Scenario: Moving a slider updates the search bar
     When the user adjusts the Cost slider to 0.01..1.00
-    Then the search bar shows "@cost:0.01..1.00"
+    Then the search bar shows "cost:[0.01 TO 1.00]"
 
   Scenario: Sidebar changes preserve existing free text clauses
     Given the search bar contains "\"refund\""
@@ -707,7 +641,7 @@ Rule: Two-way sync from search bar to sidebar
     Then the Error checkbox under Status is set to exclude state (red indeterminate)
 
   Scenario: Typing a range clause positions the slider
-    When the user types "@cost:0.01..1.00" and presses Enter
+    When the user types "cost:[0.01 TO 1.00]" and presses Enter
     Then the Cost slider is positioned at 0.01 to 1.00
 
   Scenario: Deleting a clause from the search bar unchecks the corresponding checkbox
@@ -829,6 +763,9 @@ Rule: Facet count updates
 # FACET COUNT DISPLAY AND APPROXIMATION
 # ─────────────────────────────────────────────────────────────────────────────
 
+# Not yet implemented as of 2026-05-01 — sidebar shows raw integer counts;
+# no approximate-count "~" formatting, no >10K threshold, no tooltip.
+@planned
 Rule: Facet count display and approximation
   Counts are exact for small result sets and approximate for large ones.
 
@@ -843,11 +780,6 @@ Rule: Facet count display and approximation
     Given the filtered result set exceeds 10,000 traces
     Then facet counts display with a "~" prefix (e.g., "~12.3K")
 
-  Scenario: Approximate count tooltip
-    Given a facet count displays "~12.3K"
-    When the user hovers over the count
-    Then a tooltip reads "Approximate count (>10K results)"
-
   Scenario: Count formatting with K suffix
     Given a facet value has 1,200 matching traces
     Then the count displays as "1.2K"
@@ -855,10 +787,6 @@ Rule: Facet count display and approximation
   Scenario: Count formatting with M suffix
     Given a facet value has 1,200,000 matching traces
     Then the count displays as "1.2M"
-
-  Scenario: Count formatting below 1,000
-    Given a facet value has 45 matching traces
-    Then the count displays as "45"
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -913,9 +841,9 @@ Rule: High-cardinality facets
     When the user clicks "Show less"
     Then only the top 10 values are visible again
 
-  Scenario: Search input appears for facets with 10+ values
-    Then a small search input appears below the Model facet values
-    And placeholder text reads "Filter..."
+  Scenario: Search input appears for facets with 5+ values
+    Given a facet has at least SEARCHABLE_VALUE_THRESHOLD (5) values
+    Then an inline filter input appears in the section
 
   Scenario: Typing in facet search filters the value list
     When the user types "gpt" in the Model facet search
@@ -1053,24 +981,35 @@ Rule: Performance
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# AI QUERY (FUTURE — PHASE 3)
+# AI QUERY COMPOSER
 # ─────────────────────────────────────────────────────────────────────────────
 
-Rule: AI query future placeholder
-  Phase 1 accepts only structured query syntax. Natural language is deferred to Phase 3.
+Rule: AI query composer (Ask AI)
+  Natural-language → query translation runs in a separate FloatingAiBar mode,
+  not inline in the structured search bar.
 
   Background:
     Given the user is authenticated with "traces:view" permission
     And the project has traces
 
-  Scenario: Unrecognized text without @ or quotes is treated as free text
-    When the user types "show me all errors" without quotes or @ prefix
-    Then it is treated as a free-text search, not a natural language query
-    And no NLP parsing is attempted
+  Scenario: Free-text in the structured bar stays free-text
+    When the user types "show me all errors" in the structured search bar
+    Then it is treated as a free-text search clause; no NLP parsing runs
+
+  Scenario: Ask AI button enters AI mode
+    When the user clicks "Ask AI" (or presses ⌘I / Ctrl+I)
+    Then the structured bar is replaced by a FloatingAiBar
+    And submitting a prompt calls `tracesV2.aiAction` (or `tracesV2.aiQuery`)
+
+  Scenario: Ask AI is gated on a configured model provider
+    Given the project has no enabled model provider
+    When the user clicks the Ask AI button
+    Then a primer popover points the user at /settings/model-providers
+    And AI mode is not entered
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# SEARCH BAR INPUT — KEYBOARD & SUGGESTION MODEL (PRD-003a)
+# SEARCH BAR INPUT — KEYBOARD & SUGGESTION MODEL
 # ─────────────────────────────────────────────────────────────────────────────
 # Defines the precise keyboard behaviour around the autocomplete dropdown.
 # Core rule: the dropdown is open if and only if the cursor sits inside an
@@ -1086,15 +1025,15 @@ Rule: Dropdown open and close based on cursor position
     Given the user is authenticated with "traces:view" permission
     And the project has traces
 
-  Scenario: Empty focused editor shows no dropdown
+  Scenario: Empty focused editor opens the field-name dropdown
     When the user focuses the empty search bar
-    Then no autocomplete dropdown is visible
+    Then the dropdown opens in field-name mode listing every known field
 
-  Scenario: Typing @ opens the field-name dropdown
+  Scenario: Typing @ keeps the field-name dropdown open
     Given the search bar is empty and focused
     When the user types "@"
-    Then the dropdown opens in field-name mode
-    And the dropdown lists known field names
+    Then the dropdown stays open in field-name mode
+    And the @ sigil is stripped at parse time (it is purely an input affordance)
 
   Scenario: Typing a partial field name filters the dropdown
     Given the search bar is empty and focused
@@ -1107,10 +1046,10 @@ Rule: Dropdown open and close based on cursor position
     Then the dropdown opens in value mode for field "status"
     And the dropdown lists known values for "status"
 
-  Scenario: Typing whitespace inside an @-token closes the dropdown
-    Given the search bar contains "@status" and the dropdown is open
+  Scenario: Typing whitespace inside a token closes the dropdown
+    Given the search bar contains "status" and the dropdown is open
     When the user types " " (space)
-    Then the dropdown closes
+    Then the dropdown closes (whitespace ends the active token)
 
   Scenario: Cursor moving out of an @-token closes the dropdown
     Given the search bar contains "@status:error AND foo" with cursor inside "@status:error"
@@ -1201,11 +1140,11 @@ Rule: Tab and click mirror Enter for suggestion accept
     Then the input becomes "@status:"
     And the dropdown reopens in value mode for field "status"
 
-  Scenario: Tab when dropdown is closed moves focus out and submits via blur
-    Given the search bar contains "@status:error" and the dropdown is closed
+  Scenario: Tab when dropdown is closed is a no-op inside the editor
+    Given the search bar contains "status:error" and the dropdown is closed
     When the user presses Tab
-    Then focus moves to the next focusable element
-    And the query "@status:error" is submitted via blur
+    Then handleKey returns noop and the browser's native focus traversal runs
+    And any resulting blur submits via the blur path
 
 
 Rule: Escape is hierarchical

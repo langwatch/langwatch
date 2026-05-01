@@ -1,118 +1,133 @@
-# Trace View (Trace Summary Tab) — Gherkin Spec
-# Based on PRD-005: Trace View (Trace Summary Tab)
-# Covers: accordion layout, I/O rendering, attributes, exceptions, events, auto-open rules, data gating, state persistence
+# Trace View (Summary Tab) — Gherkin Spec
+# Implementation:
+#   langwatch/src/features/traces-v2/components/TraceDrawer/traceAccordions/TraceSummaryAccordions.tsx
+#   langwatch/src/features/traces-v2/components/TraceDrawer/IOViewer.tsx
+#   langwatch/src/features/traces-v2/components/TraceDrawer/AttributeTable.tsx
+#   langwatch/src/features/traces-v2/components/TraceDrawer/useIOViewerState.ts
+#
+# Audited 2026-05-01:
+#   - The drawer tab is "Summary" (`activeTab === "summary"`), not
+#     "Trace Summary".
+#   - Accordion section ids are: io | attributes | scope | evals | events
+#     | exceptions. The header label "Attributes" was renamed to
+#     "Metadata" in the UI; "Trace Attributes" / "Resource Attributes"
+#     are sub-section labels inside that single accordion.
+#   - Section order is computed: when error+IO both present →
+#     [io, exceptions, attributes, evals, events]; when error only and no
+#     IO → [exceptions, io, attributes, evals, events]; otherwise
+#     [io, attributes, evals, events]. There's no Instrumentation Scope
+#     accordion in the live render — the scope is shown as a chip above
+#     the accordions when `resources.scope?.name` is set.
+#   - I/O format toggle is a four-mode `ViewFormat`:
+#     "pretty" | "text" | "json" | "markdown" (was three in the spec).
+#   - Empty events accordion shows the `EmptyEventsState` component,
+#     not the literal "No events recorded" string.
 
 # ─────────────────────────────────────────────────────────────────────────────
 # ACCORDION LAYOUT
 # ─────────────────────────────────────────────────────────────────────────────
 
-Feature: Trace view (trace summary tab)
+Feature: Trace view (summary tab)
 
-Rule: Trace summary accordion layout
-  The trace detail section uses collapsible accordions that can be open simultaneously.
+Rule: Summary tab accordion layout
+  The summary panel uses collapsible accordions that can be open simultaneously.
 
   Background:
     Given the user is authenticated with "traces:view" permission
     And a trace is selected in the drawer
 
-  Scenario: Trace summary tab is active by default when the drawer opens
-    When the trace drawer opens
-    Then the Trace Summary tab is active
-    And the detail section renders below the visualization
+  Scenario: Summary tab is active by default when the drawer opens
+    When the drawer opens with no `drawer.span` and no `drawer.tab` URL hint
+    Then `drawerStore.activeTab === "summary"`
+    And `<TraceSummaryAccordions>` renders below the SpanTabBar
 
-  Scenario: Returning to the trace summary tab from a span tab
-    Given the user is viewing a span tab
-    When the user clicks the "Trace Summary" tab
-    Then the Trace Summary detail section renders
+  Scenario: Returning to the summary tab from a span tab
+    Given a span tab is active
+    When the user clicks the "Summary" tab (or presses O)
+    Then `setActiveTab("summary")` runs and the summary accordions render
 
-  Scenario: Closing a span tab returns to trace summary
-    Given the user is viewing a span tab
-    When the user closes the span tab
-    Then the Trace Summary tab becomes active
+  Scenario: Clearing the span selection returns to summary
+    Given a span tab is active
+    When `clearSpan()` runs (X button, Escape, or empty-space click)
+    Then `activeTab` is "summary" and the summary panel renders
 
-  Scenario: Accordions appear in the correct order
-    When the Trace Summary tab is active
-    Then the accordions appear in order: I/O, Attributes, Exceptions, Events, Evals
+  Scenario: Default accordion order with both error and I/O
+    Given the trace status is "error" with an error message
+    And the trace has either input or output
+    Then the section order is: io, exceptions, attributes, evals, events
+
+  Scenario: Default accordion order with error and no I/O
+    Given the trace status is "error" and no input/output is captured
+    Then the section order is: exceptions, io, attributes, evals, events
+
+  Scenario: Default accordion order without an error
+    Given the trace has status "ok" or "warning"
+    Then the section order is: io, attributes, evals, events
 
   Scenario: Multiple accordions can be open at once
     Given the I/O accordion is open
     When the user opens the Events accordion
-    Then both I/O and Events accordions are open
+    Then both are open in `openSections`
 
   Scenario: User can manually open and close any accordion
-    Given the I/O accordion is open
-    When the user clicks the I/O accordion header
-    Then the I/O accordion closes
+    Given a section is open
+    When the user clicks its header
+    Then it toggles closed (and the new openSections is persisted via `useAutoOpenSections`)
 
   Scenario: Collapsed accordion shows item count badge
     Given the trace has 3 events
     And the Events accordion is collapsed
-    Then the Events accordion header reads "Events (3)"
+    Then the Events accordion header shows the count "3"
 
-  Scenario: Expanded accordion hides item count badge
-    Given the trace has 3 events
-    And the Events accordion is expanded
-    Then the Events accordion header reads "Events" without a count
-
-  Scenario: I/O and Attributes accordions do not show count badges
-    When the Trace Summary tab is active
-    Then the I/O accordion header does not show a count badge
-    And the Attributes accordion header does not show a count badge
+  Scenario: I/O and Metadata count badges
+    Then the I/O ("Input and Output") section never shows a count badge
+    And the Metadata section shows a count derived from `countFlatLeaves(traceAttributes) + countFlatLeaves(resourceAttributes)`
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # AUTO-OPEN RULES
 # ─────────────────────────────────────────────────────────────────────────────
 
-Rule: Trace summary auto-open rules
-  Accordions auto-open based on trace context to surface the most relevant data.
+Rule: Auto-open rules
+  `useAutoOpenSections` opens every section that currently has content on
+  identity change (new traceId), and adds newly-populated sections within
+  the same identity. The "only I/O auto-opens" model from the original
+  spec was never implemented.
 
   Background:
     Given the user is authenticated with "traces:view" permission
 
-  Scenario: Normal trace opens only I/O
-    Given a trace with no errors, no failed evals, and has I/O
-    When the trace drawer opens
-    Then the I/O accordion is open
-    And the Attributes, Exceptions, Events, and Evals accordions are closed
+  Scenario: Sections with content auto-open on first render
+    Given a trace has I/O, trace attributes, evals, and events
+    When the drawer opens
+    Then the io, attributes, evals, and events accordions are all open
+    And empty sections are closed
 
-  Scenario: Trace with error auto-opens Exceptions
-    Given a trace that has errors
-    When the trace drawer opens
-    Then the I/O accordion is open
-    And the Exceptions accordion is open
-    And the Attributes, Events, and Evals accordions are closed
+  Scenario: Metadata only auto-opens when trace attributes are present
+    Given a trace has only resource attributes (no trace attributes)
+    Then the Metadata accordion is closed initially
+    # Resource-only attribute dumps are usually noise — see TraceSummaryAccordions L78-79
 
-  Scenario: Trace with failed eval auto-opens Evals
-    Given a trace that has a failed evaluation
-    When the trace drawer opens
-    Then the I/O accordion is open
-    And the Evals accordion is open
-    And the Attributes, Exceptions, and Events accordions are closed
+  Scenario: Exceptions auto-opens for errored traces
+    Given a trace has status "error" with an error message
+    When the drawer opens
+    Then the exceptions accordion is open
 
-  Scenario: Trace opened from the Errors preset auto-opens Exceptions
-    Given the user navigated from the Errors filter preset
-    When the trace drawer opens
-    Then the I/O accordion is open
-    And the Exceptions accordion is open
+  Scenario: Async-arriving content opens its section
+    Given the drawer opened with no evals available yet
+    When evals stream in for the same trace
+    Then the evals accordion auto-opens
+    And sections the user manually closed remain closed
 
-  Scenario: Trace with no I/O opens Attributes instead
-    Given a trace with no input and no output
-    When the trace drawer opens
-    Then the I/O accordion is closed
-    And the Attributes accordion is open
+  Scenario: User overrides persist within an identity
+    Given the drawer is open with auto-open defaults
+    When the user closes the I/O accordion
+    Then the closed state is preserved across span-tab toggles for the same trace
 
-  Scenario: User overrides persist within a drawer session
-    Given the trace drawer is open with auto-open defaults
-    When the user manually closes the I/O accordion
-    And the user switches to a span tab and back to Trace Summary
-    Then the I/O accordion remains closed
-
-  Scenario: Opening a new trace resets accordion state
-    Given the user manually opened the Events accordion on trace A
-    When the user selects a different trace B that is a normal trace
-    Then the accordion state resets to auto-open defaults for trace B
-    And the Events accordion is closed
+  Scenario: Switching trace resets accordion state
+    Given the user manually opened a section on trace A
+    When the user opens trace B
+    Then `useAutoOpenSections` resets to auto-open defaults for trace B
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -120,42 +135,50 @@ Rule: Trace summary auto-open rules
 # ─────────────────────────────────────────────────────────────────────────────
 
 Rule: Trace I/O accordion
-  Shows computed input and output for the entire trace with format toggling.
+  The "Input and Output" accordion shows the trace's computed input + output
+  via `<IOViewer>`. Each viewer instance is owned by its own
+  `useIOViewerState`, so input and output can be in different formats.
 
   Background:
     Given the user is authenticated with "traces:view" permission
     And a trace is selected in the drawer
-    And the I/O accordion is open
+    And the "Input and Output" accordion is open
 
-  Scenario: I/O accordion shows input and output sections
-    Then the I/O accordion contains an INPUT section
-    And the I/O accordion contains an OUTPUT section
+  Scenario: I/O accordion mounts an IOViewer per side that has content
+    Then an Input IOViewer is rendered when `trace.input` is non-empty
+    And an Output IOViewer is rendered when `trace.output` is non-empty
+    And the output viewer is constructed with `mode="output"`
 
-  Scenario: Format toggle defaults to Pretty mode
-    Then the format toggle shows Pretty as the active mode
-    And Text and JSON modes are available
+  Scenario: Format toggle defaults to Pretty
+    Then `useIOViewerState` initialises with `format = "pretty"`
+    And the SegmentedToggle exposes "pretty" | "text" | "json" | "markdown"
 
   Scenario: Switching to Text mode shows raw content
     When the user selects the Text format toggle
-    Then input and output render as raw plain text
-    And no formatting, role icons, or syntax highlighting is applied
+    Then input/output render as raw plain text
+    And no role icons or syntax highlighting are applied
 
-  Scenario: Switching to JSON mode shows raw JSON
+  Scenario: Switching to JSON mode shows syntax-highlighted JSON
     When the user selects the JSON format toggle
-    Then input and output render as syntax-highlighted JSON
-    And collapsible nodes are available for nested structures
+    Then input/output render via `JsonHighlight`/`safePrettyJson`
 
-  Scenario: Copy-to-clipboard on each section
-    Then a copy-to-clipboard button is visible on the INPUT section
-    And a copy-to-clipboard button is visible on the OUTPUT section
+  Scenario: Markdown mode has rendered/source sub-mode
+    When the user selects the Markdown format
+    Then a sub-toggle exposes `markdownSubmode = "rendered" | "source"`
+    And "rendered" applies the Shiki adapter for code fences
 
-  Scenario: Empty input shows placeholder
+  Scenario: Both viewers expose Copy and Annotate when traceId is provided
+    Given the IOViewer was passed a `traceId` prop
+    Then a copy-to-clipboard button is visible
+    And Annotate + Suggest-correction actions are wired into the AnnotationPopover
+
+  Scenario: Empty input/output is gracefully omitted
     Given the trace has no input
-    Then the INPUT section shows "No input captured" in muted text
-
-  Scenario: Empty output shows placeholder
+    Then no Input IOViewer is rendered
     Given the trace has no output
-    Then the OUTPUT section shows "No output captured" in muted text
+    Then no Output IOViewer is rendered
+    Given the trace has neither
+    Then the section body shows `<EmptyHint>No I/O captured for this trace</EmptyHint>`
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -226,15 +249,15 @@ Rule: I/O content display rules
     Given the format toggle is set to JSON
     Then expand-all and collapse-all controls are available
 
-  Scenario: Long text content truncates with expander
-    Given the format toggle is set to Text
-    And the content exceeds 5000 characters
-    Then the content is truncated
-    And a "Show full output" expander is visible
+  Scenario: Very long content is truncated at the IOViewer cap
+    Given the content exceeds 100,000 characters
+    Then the rendered body is truncated and an expander reveals the remaining tail
+    # `TRUNCATE_AT = 100_000` and `TRUNCATE_TAIL_MIN = 1_000` in IOViewer.tsx;
+    # the original spec's "5000 character" threshold was wrong.
 
   Scenario: Expanding truncated content shows the full text
     Given the content is truncated
-    When the user clicks "Show full output"
+    When the user clicks the "Show remaining …" expander
     Then the full content is displayed
 
 
@@ -242,6 +265,10 @@ Rule: I/O content display rules
 # I/O MULTIMODAL CONTENT
 # ─────────────────────────────────────────────────────────────────────────────
 
+# Not yet implemented as of 2026-05-01 — IOViewer's transcript layer does
+# not branch on `image_url`/`audio` content types. Multimodal items are
+# rendered as their JSON shape only.
+@planned
 Rule: I/O multimodal content rendering
   Multimodal content items render inline with type-appropriate displays.
 
@@ -270,39 +297,39 @@ Rule: I/O multimodal content rendering
 # ATTRIBUTES SECTION
 # ─────────────────────────────────────────────────────────────────────────────
 
-Rule: Trace attributes accordion
-  Shows trace-level and resource attributes as key-value pairs.
+Rule: Trace metadata accordion
+  Shows trace-level and resource attributes as key-value pairs via
+  `<AttributeTable>`. The accordion's section title is "Metadata".
 
   Background:
     Given the user is authenticated with "traces:view" permission
     And a trace is selected in the drawer
-    And the Attributes accordion is open
+    And the Metadata accordion is open
 
-  Scenario: Attributes accordion label reads "Trace Attributes"
-    Then the section label reads "Trace Attributes"
+  Scenario: Section title reads "Metadata"
+    Then the accordion header label reads "Metadata"
 
-  Scenario: Two sub-sections for trace and resource attributes
-    Then a "Trace Attributes" sub-section shows attributes from the root span
-    And a "Resource Attributes" sub-section shows resource attributes
+  Scenario: AttributeTable receives both attribute maps
+    Then `<AttributeTable>` is rendered with `attributes={trace.attributes}`
+    And `resourceAttributes={resources.resourceAttributes}` (or undefined when empty)
+    And `title="Trace Attributes"` (rendered as a sub-section heading inside the table)
 
+  # Pinned / promoted-attribute filtering happens in the chip strip; the
+  # AttributeTable still renders the full set. The de-duplication promised
+  # by the original spec is not enforced.
+  @planned
   Scenario: Promoted attributes are not duplicated
-    Given an attribute is promoted to the trace header
-    Then that attribute does not appear in the Attributes accordion
+    Given an attribute is promoted to the header chip strip
+    Then that attribute does not appear in the Metadata accordion
 
-  Scenario: Flat/JSON toggle is available
-    Then a Flat/JSON toggle is available for attribute display
+  Scenario: Resources still loading
+    Given resource attributes are still loading
+    Then the section body shows `<EmptyHint>Loading metadata…</EmptyHint>`
 
-  Scenario: Search and filter within attributes
-    When the user types a search term in the attributes filter
-    Then only attributes matching the search term are shown
-
-  Scenario: Copy-to-clipboard per attribute value
-    Then each attribute value has a copy-to-clipboard button
-
-  Scenario: No attributes shows empty message
-    Given the trace has no attributes
-    Then the Attributes section shows "No attributes recorded"
-    And the accordion is auto-closed
+  Scenario: No metadata captured
+    Given the trace has no trace attributes and no resource attributes
+    Then the section body shows `<EmptyHint>No metadata recorded</EmptyHint>`
+    And the section is collapsed by default
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -310,54 +337,47 @@ Rule: Trace attributes accordion
 # ─────────────────────────────────────────────────────────────────────────────
 
 Rule: Trace exceptions accordion
-  Shows exceptions hoisted from all spans within the trace.
+  Shows the trace's top-level error message. The current implementation
+  renders a single red-tinted block with the trace's `error` text — it does
+  NOT iterate over per-span exception entries.
 
   Background:
     Given the user is authenticated with "traces:view" permission
     And a trace is selected in the drawer
 
-  Scenario: Exceptions accordion is hidden when there are no exceptions
-    Given the trace has no exceptions
-    Then the Exceptions accordion is not visible
+  Scenario: Exceptions accordion is rendered only when there is an error
+    Given the trace status is "error" with an error message
+    Then the exceptions section is included in the section list
+    Given the trace has no error
+    Then no exceptions section is rendered
 
-  Scenario: Exceptions accordion shows exception count
-    Given the trace has 2 exceptions
-    And the Exceptions accordion is collapsed
-    Then the Exceptions accordion header reads "Exceptions (2)"
-
-  Scenario: Each exception shows type, message, and timing
+  Scenario: Exceptions section shows the trace error in a red-tinted block
     Given the Exceptions accordion is open
-    Then each exception shows an error icon
-    And the exception type name is displayed
-    And the exception message is displayed
-    And a timing offset from the trace start is shown
+    Then a red-tinted HStack shows a `LuCircleX` icon and the trace's `error` text
+    And the text is rendered with `fontFamily="mono"` and `whiteSpace="pre-wrap"`
 
-  Scenario: Exception has a red left border
-    Given the Exceptions accordion is open
-    Then each exception entry has a red left border
+  # The bullet-per-exception model with type, message, timing, stack trace,
+  # span origin link, and hover-highlight is not implemented today.
+  @planned
+  Scenario: Per-exception list with type, message, timing, and stack trace
+    Given the trace has multiple span-level exceptions
+    Then each exception is listed with type, message, timing offset, and a collapsible stack trace
 
-  Scenario: Stack trace is shown in a collapsible monospace block
-    Given an exception has a stack trace
-    Then the stack trace renders in a collapsible monospace block
-
-  Scenario: Exceptions are sorted by timestamp ascending
+  @planned
+  Scenario: Exceptions sorted by timestamp ascending
     Given the trace has exceptions at +0.5s and +1.2s
     Then the exception at +0.5s appears before the exception at +1.2s
 
-  Scenario: Exception shows span origin link
-    Given an exception originated from a span named "llm.openai.chat"
-    And the Exceptions accordion is open
-    Then a muted line reads "from llm.openai.chat" with a truncated span ID
+  @planned
+  Scenario: Exception span-origin link
+    Given an exception originated from a named span
+    Then a "from <span name>" link is shown next to the exception
 
-  Scenario: Clicking span origin link opens that span tab
-    Given an exception has a span origin link
-    When the user clicks the span name in the origin link
-    Then that span's tab opens
-
+  @planned
   Scenario: Hovering span origin link highlights the span in the visualization
-    Given an exception has a span origin link
-    When the user hovers over the span origin link
-    Then the corresponding span in the visualization above is highlighted
+    Given an exception has a span-origin link
+    When the user hovers the link
+    Then the corresponding span is highlighted in the visualisation
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -372,43 +392,49 @@ Rule: Trace events accordion
     And a trace is selected in the drawer
     And the Events accordion is open
 
-  Scenario: Each event shows icon, name, and timing offset
+  Scenario: Each event renders name and timing offset
     Given the trace has events
-    Then each event shows an info icon
-    And the event name is displayed
-    And a timing offset from the trace start is shown
+    Then each event row shows the event name (medium weight)
+    And a "+Nms" offset computed as `evt.timestamp - trace.timestamp`
+    And a "View span" button when an `onSelectSpan` callback is wired
 
-  Scenario: Events are sorted by timestamp ascending
-    Given the trace has events at +0.1s, +1.2s, and +2.0s
-    Then the events appear in chronological order
+  Scenario: Events render in `traceEvents` order
+    Given `trace.events` contains entries at +100ms and +1200ms
+    Then they appear in the order delivered by the server
+    # The component does not re-sort events; ordering depends on the
+    # backend response. Original spec promised "by timestamp ascending"
+    # — accurate for normal data but not enforced client-side.
 
-  Scenario: Event shows span origin link
-    Given an event originated from a span named "tool.search_db"
-    Then a muted line reads "from tool.search_db" with a truncated span ID
+  Scenario: Clicking "View span" opens that span tab
+    When the user clicks "View span" on an event row
+    Then `onSelectSpan(evt.spanId)` is invoked
+    And the SpanTabBar focuses that span
 
-  Scenario: Clicking event span origin link opens that span tab
-    Given an event has a span origin link
-    When the user clicks the span name in the origin link
-    Then that span's tab opens
-
-  Scenario: Hovering event span origin link highlights the span in the visualization
-    Given an event has a span origin link
-    When the user hovers over the span origin link
-    Then the corresponding span in the visualization above is highlighted
-
-  Scenario: Event attributes render as collapsible key-value block
-    Given an event has attributes
-    Then the event attributes render in a collapsible key-value block
-    And a Flat/JSON toggle is available for the attributes
-
-  Scenario: User feedback renders as an event
-    Given the trace has a user feedback event with thumbs up
-    Then the event shows a thumbs-up icon
-    And the event name reads "user.feedback"
-
-  Scenario: No events shows empty message
+  Scenario: No events shows empty state component
     Given the trace has no events
-    Then the Events section shows "No events recorded"
+    Then the section body renders `<EmptyEventsState />`
+
+  # The following affordances are not yet implemented:
+  @planned
+  Scenario: Event icon and span-origin "from <span>" link
+    Given an event originates from a named span
+    Then the event row shows an info icon and a "from <span>" link
+
+  @planned
+  Scenario: Hovering event span-origin link highlights the span in the visualization
+    Given an event has a span-origin link
+    When the user hovers the link
+    Then the corresponding span is highlighted in the visualisation
+
+  @planned
+  Scenario: Event attributes render as a collapsible key-value block
+    Given an event has attributes
+    Then a collapsible block under the event renders the attributes (Flat/JSON toggle)
+
+  @planned
+  Scenario: User feedback events get a thumbs-up icon
+    Given the trace has a `user.feedback` thumbs-up event
+    Then the event row shows a thumbs-up icon
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -422,37 +448,35 @@ Rule: Trace summary data gating
     Given the user is authenticated with "traces:view" permission
     And a trace is selected in the drawer
 
-  Scenario: No input or output shows muted placeholder
+  Scenario: No input or output shows EmptyHint
     Given the trace has no input and no output
-    Then the I/O accordion shows "No input/output captured" in muted text
-    And the I/O accordion is auto-closed
+    Then the I/O section renders `<EmptyHint>No I/O captured for this trace</EmptyHint>`
 
-  Scenario: No attributes shows muted placeholder
-    Given the trace has no attributes
-    Then the Attributes accordion shows "No attributes recorded"
-    And the Attributes accordion is auto-closed
+  Scenario: No metadata shows EmptyHint
+    Given the trace has no trace attributes and no resource attributes
+    Then the Metadata section renders `<EmptyHint>No metadata recorded</EmptyHint>`
 
   Scenario: No exceptions hides the section entirely
-    Given the trace has no exceptions
-    Then the Exceptions accordion is not shown at all
+    Given the trace has no error
+    Then no exceptions section is added to the section list
 
-  Scenario: No events shows muted placeholder
+  Scenario: No events renders EmptyEventsState
     Given the trace has no events
-    Then the Events accordion shows "No events recorded"
-    And the Events accordion is auto-closed
+    Then the Events section body renders `<EmptyEventsState />`
 
-  Scenario: Estimated cost shows approximate prefix with tooltip
+  Scenario: Estimated cost shows approximate prefix
     Given the trace cost is estimated
-    Then the cost displays with a "~" prefix
-    And hovering the cost shows a tooltip explaining it is estimated
+    Then the header cost MetricPill shows the cost with a "~" prefix
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # STATE PERSISTENCE
 # ─────────────────────────────────────────────────────────────────────────────
 
-Rule: Trace summary accordion state persistence
-  Accordion open/close state is preserved across tab switches within a drawer session.
+Rule: Summary accordion state persistence
+  `useAutoOpenSections` keeps the open-set in `useState` keyed by `traceId`,
+  so user toggles within the same trace stick across tab switches; switching
+  trace identity resets to the auto-open defaults.
 
   Background:
     Given the user is authenticated with "traces:view" permission
@@ -462,11 +486,11 @@ Rule: Trace summary accordion state persistence
     Given the user manually opened the Events accordion
     And the user manually closed the I/O accordion
     When the user switches to a span tab
-    And the user switches back to the Trace Summary tab
+    And the user switches back to the Summary tab
     Then the Events accordion is still open
     And the I/O accordion is still closed
 
   Scenario: Opening a different trace resets accordion state
-    Given the user manually opened the Events accordion on the current trace
-    When the user selects a different trace
-    Then the accordion state resets to auto-open defaults for the new trace
+    Given the user manually opened a section on the current trace
+    When the user opens a different trace (identity changes)
+    Then `useAutoOpenSections` re-derives the open list from the new trace's content map

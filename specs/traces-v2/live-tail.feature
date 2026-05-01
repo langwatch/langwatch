@@ -1,14 +1,45 @@
 # Live Tail — Gherkin Spec
-# Based on PRD-015: Live Tail
 # Covers: connection lifecycle, stream behavior, filtering, controls, status bar,
 #         trace rows, drawer integration, navigation, loading states, data gating,
 #         accessibility
 
 # ─────────────────────────────────────────────────────────────────────────────
-# CONNECTION LIFECYCLE
+# IMPLEMENTATION STATUS (audited 2026-05-01)
 # ─────────────────────────────────────────────────────────────────────────────
+# There is no `/live-tail` route, no LiveTail page component, no Pause /
+# Resume / Clear controls, no traces-per-minute status bar, no settings
+# popover, no sound-alert toggle, and no "View in Observe" affordance.
+#
+# What DOES exist on the regular Observe page (and powers the same "new
+# data is here" idea):
+#   - `useTraceFreshness` — opens a tRPC SSE subscription via
+#     `useTraceUpdateListener` and invalidates list / facets / drawer
+#     queries when `trace_summary_updated` / `span_stored` events arrive.
+#   - `useTraceNewCount` — polls `tracesV2.newCount` with adaptive
+#     backoff when SSE is connecting/disconnected.
+#   - `NewTracesScrollUpIndicator` — renders an orb-shaped "N new"
+#     button after the user scrolls down past 80px; clicking scrolls
+#     to top and acknowledges the new count.
+#   - `sseStatusStore` — tracks `connecting | connected | disconnected
+#     | error` connection state.
+#
+# Nothing visualises a live indicator dot, paused state, sampling
+# warning, or the per-row "absolute timestamp + service + cost" compact
+# layout described below. Filters do NOT stream server-side; they
+# refetch via the standard list query.
+#
+# The whole feature is tagged `@planned` until either (a) a dedicated
+# Live Tail page ships or (b) the spec is rewritten to describe the
+# Observe-page freshness affordances.
 
+@planned
 Feature: Live tail
+  # Not yet implemented as of 2026-05-01.
+  # Observe page has SSE-driven cache invalidation + a "scroll up to see
+  # N new" indicator (`NewTracesScrollUpIndicator` + `useTraceNewCount`),
+  # but there is no separate Live Tail page, no pause/resume/clear,
+  # and no streaming server-side filter. Scenarios below describe the
+  # design-doc roadmap, not the shipped behaviour.
 
 Rule: Live Tail connection
   The Live Tail page establishes a real-time streaming connection when opened

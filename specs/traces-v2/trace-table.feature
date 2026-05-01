@@ -1,8 +1,17 @@
 # Trace Table — Gherkin Spec
-# Based on PRD-002: Trace Table
-# Covers: layout, toolbar, lens tabs, columns, row format, row behavior,
-#         conversations, errors preset, pagination, real-time updates,
-#         density, column management, loading states, data gating
+# Implementation: langwatch/src/features/traces-v2/components/TraceTable/**
+#                 langwatch/src/features/traces-v2/components/TracesPage/TracesPage.tsx
+#                 langwatch/src/features/traces-v2/stores/{filterStore,viewStore,selectionStore}.ts
+#                 langwatch/src/features/traces-v2/hooks/useTraceListQuery.ts
+# Audited 2026-05-01: scenarios that described unimplemented behaviour have
+# been deleted or tagged @planned. The big movers were
+#   - default columns / column ordering (now sourced from viewStore.builtInLenses)
+#   - origin facet behaviour (origin is a regular facet; sim/eval don't reveal
+#     extra sections — those facets are always rendered)
+#   - real-time updates (SSE-driven via useTraceFreshness, NOT 30s polling
+#     with a "↑ N new traces" banner)
+#   - row format (single-line; the LLM I/O sub-row was the original All-Traces
+#     vision but hasn't been implemented as a sub-row in the live grid).
 
 # ─────────────────────────────────────────────────────────────────────────────
 # PAGE LAYOUT
@@ -37,6 +46,10 @@ Rule: Trace table page layout
     And an expand button "»" appears
     And clicking any abbreviation expands the sidebar
 
+  # Not yet implemented as of 2026-05-01 — collapsed sidebar today shows
+  # facet abbreviations with active dots; there is no separate horizontal
+  # chip bar above the table.
+  @planned
   Scenario: Filter chip bar when sidebar collapsed with active filters
     Given the filter sidebar is collapsed
     And filters are active
@@ -79,16 +92,23 @@ Rule: Origin filter in sidebar
     Then traces from both origins are shown
     And the search bar shows "@origin:application @origin:simulation"
 
+  # The following three scenarios describe origin-conditional facet sections
+  # (Scenario / Verdict / Eval Type / Score Range) that are not implemented
+  # — the sidebar always renders the same facet sections regardless of which
+  # origin is checked.
+  @planned
   Scenario: Simulation origin reveals additional facets
     When the user checks "Simulation"
     Then additional facets appear below the standard ones: Scenario, Verdict
     And standard facets remain visible
 
+  @planned
   Scenario: Evaluation origin reveals additional facets
     When the user checks "Evaluation"
     Then additional facets appear below the standard ones: Eval Type, Score Range
     And standard facets remain visible
 
+  @planned
   Scenario: Application origin shows standard facets only
     When the user checks "Application"
     Then no additional facets appear beyond the standard ones
@@ -105,12 +125,13 @@ Rule: Toolbar strip
     Given the user is authenticated with "traces:view" permission
     And the Observe page is loaded
 
-  Scenario: Toolbar renders all controls at consistent height
-    Then the toolbar shows controls left to right: view tabs, grouping selector, time range picker, density toggle, columns dropdown, "+ sim" button
-    And all controls are 26px tall
+  Scenario: Toolbar renders the expected controls
+    Then the toolbar shows lens tabs flushed left
+    And the right cluster includes (in order): tour button, live indicator, time range picker, columns dropdown, grouping selector, density toggle, find button, keyboard shortcuts button
+    And the toolbar row is 36px minimum height
 
-  Scenario: View tabs take remaining horizontal space
-    Then the lens/preset tabs flex to fill remaining space after other controls
+  Scenario: Lens tabs take remaining horizontal space
+    Then the lens tabs flex to fill remaining space before the right cluster
 
   Scenario: Grouping selector shows checkmark on selected item
     When the user opens the grouping dropdown
@@ -123,6 +144,9 @@ Rule: Toolbar strip
     And the current timezone is displayed
     And a copy button is available
 
+  # Not yet implemented as of 2026-05-01 — there is no "+ sim" button in the
+  # current Toolbar.
+  @planned
   Scenario: "+ sim" button is de-emphasized
     Then the "+ sim" button is positioned far right
     And it has de-emphasized styling
@@ -144,13 +168,14 @@ Rule: All Traces lens (default)
     Then the "All" tab is active
     And traces are shown in a flat list with no grouping
 
-  Scenario: Default sort is timestamp descending
+  Scenario: Default sort is by time descending
     When the All Traces lens is active
-    Then traces are sorted by timestamp descending (newest first)
+    Then `viewStore.sort` is `{ columnId: "time", direction: "desc" }`
 
-  Scenario: All default columns are visible
+  Scenario: All-traces default columns
     When the All Traces lens is active
-    Then columns Time, Trace, Duration, Cost, Tokens, and Model are visible
+    Then the visible columns are: Time, Trace, Service, Duration, Cost, Tokens, Spans, Model, Evals, Events
+    And the lens addons include "io-preview" and "expanded-peek"
 
   Scenario: No filters are locked
     When the All Traces lens is active
@@ -169,10 +194,13 @@ Rule: Conversations lens
     And the project has traces with conversation IDs
 
   Scenario: Switching to Conversations groups traces by conversation ID
-    When the user clicks the "Conv" tab
+    When the user clicks the "Conversations" tab
     Then traces are grouped by conversation ID
     And each group appears as a collapsed conversation row
 
+  # Not yet implemented as of 2026-05-01 — Conversations lens does not lock
+  # conversation-related facet sections in the sidebar.
+  @planned
   Scenario: Conversation-related filters are locked
     When the Conversations lens is active
     Then conversation-related filter sections show a lock icon
@@ -233,7 +261,7 @@ Rule: Conversations lens
 
   Scenario: Conversation columns differ from All Traces
     When the Conversations lens is active
-    Then the columns are: Conversation (280px min), Turns, Duration, Cost, Tokens, Model, Service, Status
+    Then the visible columns are: Conversation (320px min), Turns, Duration, Cost, Tokens, Model, Service, Status
 
   Scenario: Empty state when no conversations exist
     Given no traces have conversation IDs in the current time range
@@ -255,8 +283,12 @@ Rule: Errors lens
 
   Scenario: Switching to Errors shows only error traces
     When the user clicks the "Errors" tab
-    Then only traces with error status are shown
+    Then the lens injects `status:error` into the query text
+    And only traces with error status are shown
 
+  # Not yet implemented as of 2026-05-01 — the Errors lens injects its filter
+  # via queryText, not by locking a sidebar facet section.
+  @planned
   Scenario: Status filter is locked in Errors lens
     When the Errors lens is active
     Then the Status facet section is collapsed and locked
@@ -301,7 +333,16 @@ Rule: Default columns and status indicator
     And the Observe page is loaded with traces
 
   Scenario: Default columns are displayed
-    Then the table shows columns: Time (80px min), Trace (300px min), Service (120px min), Duration (80px min), Cost (80px min), Tokens (80px min), Model (100px min)
+    Then the table shows columns from the all-traces lens with these widths:
+      | id       | size | minSize |
+      | time     | 60   | 60      |
+      | trace    | 560  | 320     |
+      | service  | 160  | 110     |
+      | duration | 80   | 70      |
+      | cost     | 80   | 70      |
+      | tokens   | 65   | 55      |
+      | spans    | 60   | 50      |
+      | model    | 180  | 140     |
 
   Scenario: Time column shows relative time with absolute on hover
     Given a trace occurred 2 minutes ago
@@ -369,24 +410,30 @@ Rule: Default columns and status indicator
 # ROW FORMAT — TWO-ZONE ROWS
 # ─────────────────────────────────────────────────────────────────────────────
 
-Rule: Two-zone row format
-  Every row has a header line in the column grid. LLM traces get
-  additional I/O detail lines below the header.
+Rule: Two-zone row format (compact density only)
+  When the all-traces / errors lens is active and density is "compact",
+  the IOPreviewAddon renders an extra row below the header showing the
+  trace's input + output preview.
 
   Background:
     Given the user is authenticated with "traces:view" permission
     And the Observe page is loaded
+    And density is "compact"
 
-  Scenario: LLM trace row shows header plus I/O sub-rows
-    Given a trace has ComputedInput and ComputedOutput
-    Then the row shows a header line with all column values
-    And below the header, I/O detail lines span from the Trace column to end of row
-    And the Time column shows a dotted connector linking detail to header
+  Scenario: LLM trace row renders the IOPreviewAddon below the header
+    Given a trace has both `input` and `output` populated
+    And the row is not expanded
+    Then a sub-row is rendered with `colSpan` matching the column count
+    And the sub-row body is the IOPreview component
+    And the sub-row inherits the row's status border colour on the left edge
 
   Scenario: Non-LLM trace row shows header only
-    Given a trace has no ComputedInput or ComputedOutput
-    Then the row shows only the header line
-    And no I/O sub-rows are rendered
+    Given a trace is missing either `input` or `output`
+    Then no IOPreview sub-row is rendered
+
+  Scenario: Comfortable density disables the I/O sub-row
+    Given density is "comfortable"
+    Then no IOPreview sub-row is rendered for any row
 
   Scenario: Chat messages I/O shows user and assistant with role icons
     Given a trace I/O is a chat messages array with role and content
@@ -441,7 +488,11 @@ Rule: Column visibility and reorder
 
   Scenario: Standard columns are always available
     When the columns dropdown is open
-    Then Standard section lists: Time, Trace, Duration, Cost, Tokens, Model, Status, Service, TTFT, User ID, Conversation ID, Origin, Environment, Tokens In, Tokens Out, Span count
+    # Source: traceColumnDefs in components/TraceTable/columns.ts
+    Then the Standard section lists every id in `allTraceColumnIds`:
+      time, trace, service, duration, cost, tokens, spans, model,
+      evaluations, events, status, ttft, userId, conversationId,
+      origin, tokensIn, tokensOut
 
   Scenario: Evaluations section is dynamic
     Given the project has evaluations for Faithfulness and Toxicity
@@ -458,9 +509,9 @@ Rule: Column visibility and reorder
     Then a blue top-border indicator shows the drop target
     And releasing reorders the column in the table
 
-  Scenario: Time column cannot be reordered
-    Then the Time column is pinned left
-    And it has no drag handle in the dropdown
+  Scenario: Time column cannot be resized
+    Then the Time column has `enableResizing: false`
+    And dragging its resize grip is a no-op
 
   Scenario: Column preferences persist
     When the user hides the Tokens column
@@ -500,6 +551,10 @@ Rule: Evaluation and event column display
     Given a trace has no Faithfulness eval
     Then the Faithfulness column shows "—"
 
+  # Not yet implemented as of 2026-05-01 — `makeEvalColumnDef` sets
+  # `enableSorting: false`. The backend SORT_COLUMN_MAP doesn't cover eval
+  # columns either, so the UI suppresses the header click affordance.
+  @planned
   Scenario: Eval column is sortable
     When the user clicks the Faithfulness column header
     Then traces are sorted by Faithfulness score
@@ -562,16 +617,28 @@ Rule: Row click and selection behavior
     Then it has a left border accent and a subtle background tint
 
   Scenario: Keyboard navigation with arrow keys
+    Given the table body is focused
     When the user presses the Down arrow key
-    Then the next row is focused
+    Then `focusedIndex` advances by one (clamped to the last row)
 
     When the user presses the Up arrow key
-    Then the previous row is focused
+    Then `focusedIndex` decreases by one (clamped to 0)
 
-  Scenario: Enter key opens the drawer for focused row
+  Scenario: Enter key toggles the drawer for the focused row
     Given a row is focused via keyboard navigation
     When the user presses Enter
-    Then the trace drawer opens for that row
+    Then `useTraceLensKeyboard.toggleTrace` runs for that row
+    And the drawer opens (or closes, if it was already open for this trace)
+
+  Scenario: Escape closes the drawer
+    Given the drawer is open
+    When the user presses Escape while the table is focused
+    Then `closeDrawer()` is invoked
+
+  Scenario: "p" toggles the inline peek for the focused row
+    Given a row is focused via keyboard navigation
+    When the user presses "p"
+    Then the focused row's `expandedTraceId` toggles
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -614,10 +681,14 @@ Rule: Pagination
     Given the user is authenticated with "traces:view" permission
     And the project has 583 traces
 
-  Scenario: First page shows 50 traces
+  Scenario: Default page size is 50
     When the Observe page loads
-    Then 50 traces are displayed
+    Then `filterStore.pageSize` is 50
     And pagination shows "Page 1 of 12 (583 traces)"
+
+  Scenario: Page size selector exposes the supported sizes
+    Then the pagination row exposes page-size buttons for 25, 50, 100, 250, 500, 1000
+    And the active size is rendered semibold
 
   Scenario: Next page navigates forward
     Given the user is on page 1
@@ -637,54 +708,48 @@ Rule: Pagination
 # REAL-TIME UPDATES
 # ─────────────────────────────────────────────────────────────────────────────
 
-Rule: Real-time trace updates via polling
-  The Observe page polls for new traces and shows a non-disruptive banner.
+Rule: Real-time trace updates via SSE
+  Updates are pushed via the trace-update SSE stream and applied to the
+  TanStack Query cache by `useTraceFreshness`. There is no polling loop
+  and no "↑ N new traces" inline banner — newly-arrived ids are tracked
+  by `useNewlyArrivedTraceIds` and surfaced via the
+  `NewTracesScrollUpIndicator` floating control.
 
   Background:
     Given the user is authenticated with "traces:view" permission
-    And the Observe page is loaded on page 1
+    And the Observe page is loaded
 
-  Scenario: Polling runs every 30 seconds on page 1
-    Then the page polls for new traces every 30 seconds
-    And the poll checks for traces newer than the most recent visible trace
+  Scenario: SSE event invalidates the table query
+    When a `trace_summary_updated` event arrives via SSE
+    Then `useTraceFreshness` invalidates `tracesV2.list` and `tracesV2.newCount`
+    And the refresh icon pulses to acknowledge the update
 
-  Scenario: New traces show a banner instead of jumping the table
-    Given 5 new traces arrive during a poll
-    Then a banner appears above the first table row: "↑ 5 new traces" with a "Show" button
-    And the table does not jump or reorder
+  Scenario: Open drawer is invalidated for affected traces
+    Given the drawer is open for trace "abc123"
+    When a `trace_summary_updated` event arrives that includes "abc123"
+    Then `tracesV2.header`, `tracesV2.spanTree`, and `tracesV2.evals` are invalidated for that trace
 
-  Scenario: Clicking Show inserts new traces
-    Given the "5 new traces" banner is showing
-    When the user clicks "Show"
-    Then the new traces smoothly slide into the top of the table
-    And the banner dismisses
+  Scenario: Newly-arrived ids surface a scroll-up indicator
+    Given the user has scrolled away from the top of the table
+    When SSE delivers new traces that land above the current viewport
+    Then `NewTracesScrollUpIndicator` becomes visible with the count of unseen traces
+    When the user clicks the indicator
+    Then the table scrolls back to the top
 
+  # Not yet implemented as of 2026-05-01 — there is no inline banner row at
+  # the top of the table; the scroll-up indicator is the only surface.
+  @planned
+  Scenario: Inline "↑ N new traces" banner with Show action
+    Given new traces have arrived
+    Then a banner reading "↑ N new traces" with a "Show" button appears at the top of the table
+
+  # Not yet implemented as of 2026-05-01 — the table does not auto-insert
+  # rows; the SSE invalidation just refetches the page.
+  @planned
   Scenario: Auto-insert when user is not interacting
-    Given the user is on page 1 with no filters
-    And the mouse/focus is NOT on the table
+    Given the user is not hovering or focused on the table
     When new traces arrive
-    Then they auto-insert at the top without a banner
-
-  Scenario: Auto-insert stops when mouse enters the table
-    Given new traces are auto-inserting
-    When the mouse enters the table area
-    Then auto-inserting stops
-    And any queued traces show as a banner
-
-  Scenario: Banner count updates as more traces arrive
-    Given the banner shows "↑ 3 new traces"
-    When 2 more traces arrive in the next poll
-    Then the banner updates to "↑ 5 new traces"
-
-  Scenario: No auto-insert on page 2 or later
-    Given the user is on page 2
-    When new traces arrive
-    Then only the banner is shown, never auto-insert
-
-  Scenario: No auto-insert when filters are active
-    Given the user has active filters
-    When new traces arrive that match the filters
-    Then only the banner is shown, never auto-insert
+    Then they are auto-inserted at the top
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -739,13 +804,17 @@ Rule: Data gating and null handling
     Given a trace has no service set
     Then the Service column shows "—"
 
+  # Not yet implemented as of 2026-05-01 — `tracesV2.list` returns the same
+  # base shape (TraceListItem) regardless of which columns are visible. Eval
+  # scores are bundled into the same response via `evaluations`. Toggling a
+  # column on does not trigger a separate fetch.
+  @planned
   Scenario: Data fetching only queries visible columns
-    Given only default columns are enabled
-    When the trace list loads
-    Then the backend query only includes fields for visible columns
-    And eval scores and event counts are not included
+    Given only the default columns are visible
+    Then the backend query only fetches fields for visible columns
 
+  @planned
   Scenario: Enabling an optional column triggers data fetch
     Given the Events column was hidden
     When the user enables the Events column
-    Then event count data is fetched for visible traces
+    Then event count data is fetched for the visible traces
