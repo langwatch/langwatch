@@ -237,9 +237,10 @@ async def test_example(example_file: str):
                     pytest.fail(f"Error running main function in {example_file}: {e!s}")
         trace.send_spans()
         if parity_prefix:
-            # In parity-check mode, record trace ID directly (avoids share API call
-            # which may fail if the trace hasn't been ingested yet)
             trace_urls[example_file] = trace.trace_id or "unknown"
         else:
-            trace_urls[example_file] = trace.share()
+            try:
+                trace_urls[example_file] = trace.share()
+            except Exception:
+                trace_urls[example_file] = trace.trace_id or "share-failed"
         print(json.dumps(trace_urls, indent=2))

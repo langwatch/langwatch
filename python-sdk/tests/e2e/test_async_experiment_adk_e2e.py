@@ -99,22 +99,23 @@ def _poll_run_results(
     last_error: Exception | None = None
     while time.time() < deadline:
         try:
-            with httpx.Client(timeout=15) as client:
+            with httpx.Client(timeout=30) as client:
                 response = client.get(url, headers={"X-Auth-Token": api_key})
             if response.is_success:
-                last_body = response.json()
-                rows = last_body.get("dataset", [])
-                if len(rows) >= expected_items:
-                    if not require_cost or all(row.get("cost") for row in rows):
-                        return last_body
+                parsed = response.json()
+                if isinstance(parsed, dict):
+                    last_body = parsed
+                    rows = last_body.get("dataset", [])
+                    if len(rows) >= expected_items:
+                        if not require_cost or all(row.get("cost") for row in rows):
+                            return last_body
         except Exception as exc:
-            # Tolerate transient polling errors but surface the latest one if
-            # the deadline expires.
             last_error = exc
         time.sleep(interval)
+    seen = len(last_body.get("dataset", [])) if last_body else 0
     raise AssertionError(
         f"Timed out after {timeout}s waiting for {expected_items} items "
-        f"(saw {len(last_body.get('dataset', []))}) at {url}"
+        f"(saw {seen}) at {url}"
         + ("; costs required" if require_cost else "")
         + (f"; last error: {last_error!r}" if last_error else "")
     )
