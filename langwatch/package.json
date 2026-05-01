@@ -230,7 +230,7 @@
     "semver": "^7.7.4",
     "shiki": "^3.23.0",
     "slugify": "^1.6.9",
-    "stripe": "^15.12.0",
+    "stripe": "^22.1.0",
     "superjson": "^1.13.3",
     "tiktoken": "^1.0.22",
     "ts-pattern": "^5.9.0",
