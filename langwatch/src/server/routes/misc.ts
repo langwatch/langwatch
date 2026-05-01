@@ -15,14 +15,11 @@
  * - src/pages/api/trigger/slack.ts
  * - src/pages/api/webhooks/stripe.ts
  */
-import { generate } from "@langwatch/ksuid";
 import { AlertType, ExperimentType, TriggerAction } from "@prisma/client";
 import type { Project } from "@prisma/client";
-import { SpanStatusCode } from "@opentelemetry/api";
-import { ESpanKind } from "@opentelemetry/otlp-transformer-next/build/esm/trace/internal-types";
 import { OpenAI } from "openai";
 import { nanoid } from "nanoid";
-import { randomUUID, createHash } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import crypto from "crypto";
 import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
@@ -61,7 +58,12 @@ import { getPayloadSizeHistogram } from "~/server/metrics";
 import { getPostHogInstance } from "~/server/posthog";
 import { getServerAuthSession } from "~/server/auth";
 import { connection as redis } from "~/server/redis";
-import { TRACK_EVENT_SPAN_NAME } from "~/server/tracer/constants";
+import {
+  generateTrackedEventId,
+  predefinedEventTypes,
+  predefinedEventsSchemas,
+  recordTrackedEventSpan,
+} from "~/server/app-layer/events/track-event.service";
 import type { TrackEventRESTParamsValidator } from "~/server/tracer/types";
 import { trackEventRESTParamsValidatorSchema } from "~/server/tracer/types.generated";
 import {
@@ -70,7 +72,6 @@ import {
 } from "~/server/background/queues/trackEventsQueue";
 import { runWorkflow as runWorkflowFn } from "~/server/workflows/runWorkflow";
 import type Stripe from "stripe";
-import { KSUID_RESOURCES } from "~/utils/constants";
 import { encrypt } from "~/utils/encryption";
 import { slugify } from "~/utils/slugify";
 import { captureException } from "~/utils/posthogErrorCapture";
@@ -647,40 +648,10 @@ app.all("/start_workers", async (c) => {
 // =============================================
 // POST /api/track_event
 // =============================================
-const thumbsUpDownSchema = z.object({
-  trace_id: z.string(),
-  event_type: z.literal("thumbs_up_down"),
-  metrics: z.object({ vote: z.number().min(-1).max(1) }),
-  event_details: z
-    .object({ feedback: z.string().nullish() })
-    .optional(),
-});
-
-const selectedTextSchema = z.object({
-  trace_id: z.string(),
-  event_type: z.literal("selected_text"),
-  metrics: z.object({ text_length: z.number().positive() }),
-  event_details: z
-    .object({ selected_text: z.string().optional() })
-    .optional(),
-});
-
-const waitedToFinishSchema = z.object({
-  trace_id: z.string(),
-  event_type: z.literal("waited_to_finish"),
-  metrics: z.object({ finished: z.number().min(0).max(1) }),
-  event_details: z.object({}).optional(),
-});
-
-export const predefinedEventsSchemas = z.union([
-  thumbsUpDownSchema,
-  selectedTextSchema,
-  waitedToFinishSchema,
-]);
-
-const predefinedEventTypes = predefinedEventsSchemas.options.map(
-  (schema) => schema.shape.event_type.value,
-);
+//
+// Legacy URL kept for backwards compatibility. The canonical endpoint is
+// `POST /api/events/track` (src/app/api/events/[[...route]]/app.ts). Both
+// routes share `recordTrackedEventSpan` so behaviour stays identical.
 
 app.post("/track_event", authMiddleware, requireTracesCreate, async (c) => {
   const project = c.get("project");
@@ -719,84 +690,10 @@ app.post("/track_event", authMiddleware, requireTracesCreate, async (c) => {
     }
   }
 
-  const eventId =
-    body.event_id ??
-    generate(KSUID_RESOURCES.TRACKED_EVENT).toString();
+  const eventId = body.event_id ?? generateTrackedEventId();
 
   try {
-    const timestampMs = body.timestamp ?? Date.now();
-    const timestampNano = String(timestampMs * 1_000_000);
-    const spanId = createHash("sha256")
-      .update(`${body.trace_id}:${eventId}`)
-      .digest("hex")
-      .slice(0, 16);
-
-    const attributes: {
-      key: string;
-      value: { stringValue?: string; doubleValue?: number };
-    }[] = [
-      { key: "event.type", value: { stringValue: body.event_type } },
-      { key: "event.id", value: { stringValue: eventId } },
-    ];
-
-    for (const [key, value] of Object.entries(body.metrics)) {
-      attributes.push({
-        key: `event.metrics.${key}`,
-        value: { doubleValue: value },
-      });
-    }
-
-    if (body.event_details) {
-      for (const [key, value] of Object.entries(body.event_details)) {
-        if (typeof value === "string") {
-          attributes.push({
-            key: `event.details.${key}`,
-            value: { stringValue: value },
-          });
-        } else if (typeof value === "number") {
-          attributes.push({
-            key: `event.details.${key}`,
-            value: { doubleValue: value },
-          });
-        } else if (value != null) {
-          attributes.push({
-            key: `event.details.${key}`,
-            value: { stringValue: String(value) },
-          });
-        }
-      }
-    }
-
-    await getApp().traces.recordSpan({
-      tenantId: project.id,
-      span: {
-        traceId: body.trace_id,
-        spanId,
-        traceState: null,
-        parentSpanId: null,
-        name: TRACK_EVENT_SPAN_NAME,
-        kind: ESpanKind.SPAN_KIND_INTERNAL,
-        startTimeUnixNano: timestampNano,
-        endTimeUnixNano: timestampNano,
-        attributes,
-        events: [
-          {
-            name: body.event_type,
-            timeUnixNano: timestampNano,
-            attributes,
-          },
-        ],
-        links: [],
-        status: { code: SpanStatusCode.OK as 1 },
-        droppedAttributesCount: null,
-        droppedEventsCount: null,
-        droppedLinksCount: null,
-      },
-      resource: { attributes: [] },
-      instrumentationScope: { name: TRACK_EVENT_SPAN_NAME },
-      piiRedactionLevel: project.piiRedactionLevel,
-      occurredAt: Date.now(),
-    });
+    await recordTrackedEventSpan({ project, body, eventId });
   } catch (error) {
     logger.error({ error }, "unable to dispatch tracked event span");
   }
