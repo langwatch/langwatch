@@ -422,6 +422,9 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
           ? encrypt(input.elasticsearchApiKey)
           : null,
         s3Bucket: input.s3Bucket,
+        ...(input.presenceEnabled !== undefined
+          ? { presenceEnabled: input.presenceEnabled }
+          : {}),
       },
     });
   }

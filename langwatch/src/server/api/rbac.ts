@@ -174,6 +174,7 @@ const TEAM_ROLE_PERMISSIONS: Record<TeamUserRole, Permission[]> = {
   [TeamUserRole.MEMBER]: [
     // Projects
     "project:view",
+    "project:create",
     "project:update",
     // Analytics
     "analytics:view",

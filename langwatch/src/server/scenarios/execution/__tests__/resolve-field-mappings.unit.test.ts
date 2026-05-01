@@ -24,6 +24,7 @@ const makeAgentInput = (
 
 describe("resolveFieldMappings", () => {
   describe("when mapping type is source with path input", () => {
+    /** @scenario resolveFieldMappings resolves source mappings from agent input */
     it("resolves query to the last user message content", () => {
       const fieldMappings: Record<string, FieldMapping> = {
         query: { type: "source", sourceId: "scenario", path: ["input"] },
@@ -65,6 +66,7 @@ describe("resolveFieldMappings", () => {
   });
 
   describe("when mapping type is source with path messages", () => {
+    /** @scenario resolveFieldMappings resolves messages as JSON string */
     it("resolves history to a JSON string of the messages array", () => {
       const messages = [
         { role: "user" as const, content: "Hello" },
@@ -82,6 +84,7 @@ describe("resolveFieldMappings", () => {
   });
 
   describe("when mapping type is source with path threadId", () => {
+    /** @scenario resolveFieldMappings resolves threadId */
     it("resolves tid to the thread ID", () => {
       const fieldMappings: Record<string, FieldMapping> = {
         tid: { type: "source", sourceId: "scenario", path: ["threadId"] },
@@ -106,6 +109,7 @@ describe("resolveFieldMappings", () => {
   });
 
   describe("when mapping type is value", () => {
+    /** @scenario resolveFieldMappings resolves static values */
     it("resolves context to the literal value string", () => {
       const fieldMappings: Record<string, FieldMapping> = {
         context: { type: "value", value: "Use the knowledge base" },
@@ -162,6 +166,7 @@ describe("resolveFieldMappings", () => {
 
 describe("computeBestMatchMappings", () => {
   describe("when agent has a single input named 'input'", () => {
+    /** @scenario Single-input agent generates default fieldMappings */
     it("maps it to input (alias match)", () => {
       const result = computeBestMatchMappings({
         inputs: [{ identifier: "input" }],
@@ -199,6 +204,7 @@ describe("computeBestMatchMappings", () => {
   });
 
   describe("when agent has inputs with no alias match and multiple inputs", () => {
+    /** @scenario Multi-input agent has no default fieldMappings */
     it("leaves unmatched inputs unmapped", () => {
       const result = computeBestMatchMappings({
         inputs: [{ identifier: "query" }, { identifier: "custom_field" }],

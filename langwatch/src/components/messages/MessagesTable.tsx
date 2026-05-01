@@ -94,7 +94,9 @@ export function MessagesTable({
 
   const {
     period: { startDate, endDate },
+    mode,
     setPeriod,
+    setRelativePeriod,
   } = usePeriodSelector();
 
   const navigationFooter = useNavigationFooter();
@@ -227,8 +229,6 @@ export function MessagesTable({
       }
     },
     enabled: !!project,
-    pageOffset: navigationFooter.pageOffset,
-    cursorPageNumber: navigationFooter.cursorPageNumber,
   });
 
   // Wrap acceptPending to also bump liveEndDate (component-level concern)
@@ -1136,7 +1136,12 @@ export function MessagesTable({
         </Popover.Root>
         {/** Column selector - end */}
 
-        <PeriodSelector period={{ startDate, endDate }} setPeriod={setPeriod} />
+        <PeriodSelector
+          period={{ startDate, endDate }}
+          mode={mode}
+          setPeriod={setPeriod}
+          setRelativePeriod={setRelativePeriod}
+        />
         <FilterToggle />
         {!hideAnalyticsToggle && <ToggleAnalytics />}
       </PageLayout.Header>

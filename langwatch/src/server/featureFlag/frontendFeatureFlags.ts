@@ -61,6 +61,7 @@ export const FRONTEND_FEATURE_FLAGS = [
   // gateway product ships unblocked while governance keeps cooking.
   // Force-enable in dev: `FEATURE_FLAG_FORCE_ENABLE=release_ui_ai_governance_enabled`.
   "release_ui_ai_governance_enabled",
+  "release_ui_traces_v2_enabled",
 ] as const;
 
 /**

@@ -323,6 +323,11 @@
           "type": "json",
           "path": "langwatch/package.json",
           "jsonpath": "$.version"
+        },
+        {
+          "type": "json",
+          "path": "package.json",
+          "jsonpath": "$.version"
         }
       ]
     },

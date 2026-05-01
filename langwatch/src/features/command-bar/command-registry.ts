@@ -2,6 +2,7 @@ import {
   Activity,
   Anvil,
   Bell,
+  Bird,
   BookOpen,
   Bot,
   BookText,
@@ -38,6 +39,7 @@ import {
   FolderKanban,
   UserCog,
   Building2,
+  ToggleLeft,
 } from "lucide-react";
 import type { Command } from "./types";
 
@@ -72,6 +74,15 @@ export const navigationCommands: Command[] = [
     category: "navigation",
     keywords: ["messages", "logs", "requests", "history"],
     path: "/[project]/messages",
+  },
+  {
+    id: "nav-traces-v2",
+    label: "Traces Evolved",
+    description: "Open the new traces experience (alpha)",
+    icon: Bird,
+    category: "navigation",
+    keywords: ["traces", "v2", "evolved", "new", "alpha", "messages", "logs"],
+    path: "/[project]/traces",
   },
   {
     id: "nav-simulations",
@@ -463,6 +474,23 @@ export const actionCommands: Command[] = [
     category: "actions",
     keywords: ["sdk", "version", "update", "outdated", "radar", "upgrade"],
   },
+  {
+    id: "action-feature-flags",
+    label: "Feature Flags (Dev)",
+    description: "Toggle feature flag overrides for this browser",
+    icon: ToggleLeft,
+    category: "actions",
+    keywords: [
+      "feature",
+      "flag",
+      "flags",
+      "toggle",
+      "dev",
+      "override",
+      "experiment",
+      "release",
+    ],
+  },
 ];
 
 /**
@@ -588,6 +616,7 @@ const topLevelNavIds = new Set([
   "nav-home",
   "nav-analytics",
   "nav-traces",
+  "nav-traces-v2",
   "nav-simulations",
   "nav-evaluations",
   "nav-annotations",

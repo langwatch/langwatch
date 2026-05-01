@@ -20,6 +20,7 @@ import { isTeamRoleAllowedForOrganizationRole, type TeamRoleValue } from "~/util
 import { getApp } from "~/server/app-layer/app";
 import { trackServerEvent } from "~/server/posthog";
 import { fireTeamMemberInvitedNurturing } from "~/../ee/billing/nurturing/hooks/featureAdoption";
+import { fireInviteAcceptedNurturingCalls } from "~/../ee/billing/nurturing/hooks/inviteAcceptance";
 import { elasticsearchMigrate } from "../../../tasks/elasticMigrate";
 import {
   InviteService,
@@ -271,6 +272,7 @@ export const organizationRouter = createTRPCRouter({
           elasticsearchNodeUrl: z.string().optional(),
           elasticsearchApiKey: z.string().optional(),
           s3Bucket: z.string().optional(),
+          presenceEnabled: z.boolean().optional(),
         })
         .refine((data) => {
           const hasNodeUrl = !!data.elasticsearchNodeUrl?.trim();
@@ -322,6 +324,7 @@ export const organizationRouter = createTRPCRouter({
         elasticsearchNodeUrl: input.elasticsearchNodeUrl,
         elasticsearchApiKey: input.elasticsearchApiKey,
         s3Bucket: input.s3Bucket,
+        presenceEnabled: input.presenceEnabled,
       });
 
       if (input.elasticsearchNodeUrl && input.elasticsearchApiKey) {
@@ -1059,6 +1062,22 @@ export const organizationRouter = createTRPCRouter({
           err,
         );
       }
+
+      void getApp()
+        .notifications.sendSlackSignupEvent({
+          userName: session.user.name,
+          userEmail: session.user.email,
+          organizationName: invite.organization.name,
+        })
+        .catch(captureException);
+
+      fireInviteAcceptedNurturingCalls({
+        userId: session.user.id,
+        email: session.user.email,
+        name: session.user.name,
+        organizationId: invite.organization.id,
+        organizationName: invite.organization.name,
+      });
 
       const inviteService = InviteService.create(prisma);
       const projectSlug = await inviteService.findLandingProjectSlug(invite);

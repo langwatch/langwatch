@@ -55,6 +55,16 @@ func NewBifrostRouter(ctx context.Context, opts BifrostOptions) (*BifrostRouter,
 	return &BifrostRouter{bf: bf, logger: opts.Logger}, nil
 }
 
+// Close releases the underlying Bifrost connection pool. Safe to call
+// once at process shutdown; subsequent dispatches after Close return
+// undefined results from Bifrost.
+func (r *BifrostRouter) Close() {
+	if r == nil || r.bf == nil {
+		return
+	}
+	r.bf.Shutdown()
+}
+
 // Dispatch sends a non-streaming request through bifrost.
 //
 // For /v1/chat/completions (RequestTypeChat) the inbound body is

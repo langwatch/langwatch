@@ -33,6 +33,7 @@ function makeContext(
     aggregateId: "trace-1",
     foldState: {
       traceId: "trace-1",
+      traceName: "",
       spanCount: 1,
       totalDurationMs: 100,
       computedIOSchemaVersion: "2025-12-18",
@@ -50,6 +51,8 @@ function makeContext(
       totalCompletionTokens: 0,
       occurredAt: Date.now(),
       blockedByGuardrail: false,
+      rootSpanType: null,
+      containsAi: false,
       attributes: attributeOverrides,
       labels: [],
     } as unknown as TraceSummaryData,
@@ -63,6 +66,7 @@ function makeMonitor(overrides: Partial<MonitorSummary> = {}): MonitorSummary {
     checkType: "custom/basic",
     name: "Test Monitor",
     threadIdleTimeout: null,
+    evaluator: null,
     ...overrides,
   };
 }
@@ -163,6 +167,42 @@ describe("evaluationTrigger reactor", () => {
       expect(options).toBeDefined();
       expect(options!.deduplication!.ttlMs).toBe(DEFERRED_CHECK_DELAY_MS + 60_000);
       expect(options!.delay).toBeUndefined();
+    });
+  });
+
+  describe("when monitor has a linked evaluator", () => {
+    it("uses evaluator name instead of monitor name", async () => {
+      const monitor = makeMonitor({
+        name: "Monitor Name",
+        evaluator: { name: "Evaluator Name" },
+      });
+      const deps = createDeps();
+      vi.mocked(deps.monitors.getEnabledOnMessageMonitors).mockResolvedValue([monitor]);
+
+      const reactor = createEvaluationTriggerReactor(deps);
+      await reactor.handle(makeEvent(), makeContext());
+
+      expect(deps.evaluation).toHaveBeenCalledTimes(1);
+      const [payload] = vi.mocked(deps.evaluation).mock.calls[0]!;
+      expect(payload.evaluatorName).toBe("Evaluator Name");
+    });
+  });
+
+  describe("when monitor has no linked evaluator", () => {
+    it("falls back to monitor name", async () => {
+      const monitor = makeMonitor({
+        name: "Legacy Monitor",
+        evaluator: null,
+      });
+      const deps = createDeps();
+      vi.mocked(deps.monitors.getEnabledOnMessageMonitors).mockResolvedValue([monitor]);
+
+      const reactor = createEvaluationTriggerReactor(deps);
+      await reactor.handle(makeEvent(), makeContext());
+
+      expect(deps.evaluation).toHaveBeenCalledTimes(1);
+      const [payload] = vi.mocked(deps.evaluation).mock.calls[0]!;
+      expect(payload.evaluatorName).toBe("Legacy Monitor");
     });
   });
 });

@@ -88,11 +88,39 @@ type Options struct {
 	// SampleRatio controls the fraction of traces sampled (0.0–1.0).
 	// 0 means "use default" (AlwaysSample). Set explicitly via config.
 	SampleRatio float64
+	// MultiTenant=true installs a per-request, per-tenant span router
+	// (TenantRouter) instead of the standard static-headers exporter.
+	// Required for nlpgo: each Studio event arrives with its own
+	// `workflow.api_key`, and a single Lambda container can serve
+	// multiple projects back-to-back. Spans must reach LangWatch's
+	// /api/otel/v1/traces with the originating project's
+	// `X-Auth-Token` — never another tenant's key, never a static
+	// admin token. When true, OTLPHeaders is ignored (the per-tenant
+	// processors set their own auth).
+	MultiTenant bool
 }
 
 // Provider holds the configured OTel SDK providers.
 type Provider struct {
 	tp *sdktrace.TracerProvider
+}
+
+// buildResourceAttrs assembles the standard service.* + node.id
+// resource attributes used by both the static and multi-tenant span
+// pipelines. Kept as a helper so the two branches in New() stay in
+// lockstep without copy-paste drift.
+func buildResourceAttrs(serviceName, serviceVersion, environment, nodeID string) []attribute.KeyValue {
+	attrs := []attribute.KeyValue{
+		semconv.ServiceName(serviceName),
+		semconv.ServiceVersion(serviceVersion),
+	}
+	if environment != "" {
+		attrs = append(attrs, attribute.String("deployment.environment.name", environment))
+	}
+	if nodeID != "" {
+		attrs = append(attrs, attribute.String("node.id", nodeID))
+	}
+	return attrs
 }
 
 // New creates the telemetry provider. If TraceEndpoint is empty, a noop
@@ -124,6 +152,34 @@ func New(ctx context.Context, opts Options) (*Provider, error) {
 		return &Provider{}, nil
 	}
 
+	if opts.MultiTenant {
+		// nlpgo path: a TenantRouter is the only span processor.
+		// Per-tenant otlptracehttp exporters are constructed lazily
+		// inside it, each with its own `X-Auth-Token` header sourced
+		// from the Studio event's `workflow.api_key`. Static
+		// OTLPHeaders are intentionally NOT applied here — they would
+		// be wrong for every tenant after the first.
+		attrs := buildResourceAttrs(serviceName, serviceVersion, environment, opts.NodeID)
+		res, _ := resource.Merge(
+			resource.Default(),
+			resource.NewWithAttributes(semconv.SchemaURL, attrs...),
+		)
+		var rootSampler sdktrace.Sampler
+		if opts.SampleRatio > 0 && opts.SampleRatio < 1.0 {
+			rootSampler = sdktrace.TraceIDRatioBased(opts.SampleRatio)
+		} else {
+			rootSampler = sdktrace.AlwaysSample()
+		}
+		router := NewTenantRouter(opts.OTLPEndpoint)
+		tp := sdktrace.NewTracerProvider(
+			sdktrace.WithResource(res),
+			sdktrace.WithSpanProcessor(router),
+			sdktrace.WithSampler(sdktrace.ParentBased(rootSampler)),
+		)
+		otelapi.SetTracerProvider(tp)
+		return &Provider{tp: tp}, nil
+	}
+
 	exporterOpts := []otlptracehttp.Option{
 		otlptracehttp.WithEndpointURL(opts.OTLPEndpoint),
 	}
@@ -147,16 +203,7 @@ func New(ctx context.Context, opts Options) (*Provider, error) {
 	otelapi.SetErrorHandler(startupFilter)
 	wrappedExp := healthyExporterWrap(exp, startupFilter.markHealthy)
 
-	attrs := []attribute.KeyValue{
-		semconv.ServiceName(serviceName),
-		semconv.ServiceVersion(serviceVersion),
-	}
-	if environment != "" {
-		attrs = append(attrs, attribute.String("deployment.environment.name", environment))
-	}
-	if opts.NodeID != "" {
-		attrs = append(attrs, attribute.String("node.id", opts.NodeID))
-	}
+	attrs := buildResourceAttrs(serviceName, serviceVersion, environment, opts.NodeID)
 
 	res, _ := resource.Merge(
 		resource.Default(),
@@ -196,6 +243,28 @@ func New(ctx context.Context, opts Options) (*Provider, error) {
 func (p *Provider) Shutdown(ctx context.Context) error {
 	if p.tp != nil {
 		return p.tp.Shutdown(ctx)
+	}
+	return nil
+}
+
+// ForceFlush exports any pending spans synchronously. Safe to call on
+// a noop provider.
+//
+// Mirrors langwatch_nlp commit 1f1d62f55 ("flush spans immediately
+// after workflow execution to avoid ~180s ingestion delay caused by
+// Lambda freezing the BatchSpanProcessor background thread"). On
+// Lambda, the runtime freezes the process between invocations — any
+// background-thread flush queued by the BatchSpanProcessor never
+// runs, and spans only ship on the next thaw. Callers (request
+// handlers) should `defer p.ForceFlush(ctx)` so spans for the just-
+// finished request reach the collector before the freeze.
+//
+// Outside Lambda the cost is one extra exporter call per request —
+// negligible vs the alternative of losing observability for the
+// requests that triggered the failure path.
+func (p *Provider) ForceFlush(ctx context.Context) error {
+	if p.tp != nil {
+		return p.tp.ForceFlush(ctx)
 	}
 	return nil
 }

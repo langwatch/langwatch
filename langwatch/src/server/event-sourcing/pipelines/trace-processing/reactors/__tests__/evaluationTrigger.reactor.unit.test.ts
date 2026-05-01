@@ -13,6 +13,7 @@ function createFoldState(
 ): TraceSummaryData {
   return {
     traceId: "trace-1",
+    traceName: "",
     spanCount: 1,
     totalDurationMs: 100,
     computedIOSchemaVersion: "2025-12-18",
@@ -32,9 +33,20 @@ function createFoldState(
     outputFromRootSpan: false,
     outputSpanEndTimeMs: 0,
     blockedByGuardrail: false,
+    rootSpanType: null,
+    containsAi: false,
     topicId: null,
     subTopicId: null,
     annotationIds: [],
+    containsPrompt: false,
+    selectedPromptId: null,
+    selectedPromptSpanId: null,
+    selectedPromptStartTimeMs: null,
+    lastUsedPromptId: null,
+    lastUsedPromptVersionNumber: null,
+    lastUsedPromptVersionId: null,
+    lastUsedPromptSpanId: null,
+    lastUsedPromptStartTimeMs: null,
     lastEventOccurredAt: 0,
     occurredAt: Date.now(),
     createdAt: Date.now(),
@@ -78,7 +90,7 @@ function createDeps(
   return {
     monitors: {
       getEnabledOnMessageMonitors: vi.fn().mockResolvedValue([
-        { id: "mon-1", checkType: "llm/boolean", name: "Test Monitor" },
+        { id: "mon-1", checkType: "llm/boolean", name: "Test Monitor", evaluator: null },
       ]),
     } as unknown as EvaluationTriggerReactorDeps["monitors"],
     evaluation: vi.fn().mockResolvedValue(undefined),

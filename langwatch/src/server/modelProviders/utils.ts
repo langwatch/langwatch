@@ -6,6 +6,7 @@ import {
   prepareLitellmParams,
 } from "../api/routers/modelProviders.utils";
 import { prisma } from "../db";
+import { nlpgoProxyBaseURL } from "../nlpgo/nlpgoFetch";
 import type { MaybeStoredModelProvider } from "./registry";
 
 export const getVercelAIModel = async (projectId: string, model?: string) => {
@@ -52,10 +53,19 @@ export const getVercelAIModel = async (projectId: string, model?: string) => {
     ]),
   );
 
+  // FF-gated: Go playground proxy when release_nlp_go_engine_enabled is
+  // on, legacy LiteLLM proxy otherwise. Same wire shape (x-litellm-*
+  // headers + OpenAI body) — the Go side reads x-litellm-* via the
+  // gatewayproxy package and dispatches in-process; the Python side
+  // does what it did before.
+  const baseURL = await nlpgoProxyBaseURL({
+    projectId,
+    baseURL: env.LANGWATCH_NLP_SERVICE!,
+  });
   const vercelProvider = createOpenAICompatible({
     name: `${providerKey}`,
     apiKey: litellmParams.api_key,
-    baseURL: `${env.LANGWATCH_NLP_SERVICE}/proxy/v1`,
+    baseURL,
     headers,
   });
 

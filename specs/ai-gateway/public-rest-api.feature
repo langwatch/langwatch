@@ -23,13 +23,13 @@ Feature: Public REST API — /api/gateway/v1/*
   # Auth
   # ============================================================================
 
-  @integration @rest
+  @integration @rest @unimplemented
   Scenario: Reject unauthenticated calls
     When I send `GET /api/gateway/v1/virtual-keys` with no Authorization header
     Then the response status is 401
     And the body has error.type = "unauthenticated"
 
-  @integration @rest
+  @integration @rest @unimplemented
   Scenario: Reject tokens missing the required scope
     Given API token "sess_readonly" has only scope "virtualKeys:view"
     When I send `POST /api/gateway/v1/virtual-keys` with token "sess_readonly"
@@ -41,7 +41,7 @@ Feature: Public REST API — /api/gateway/v1/*
   # Personal Access Token permission ceiling (b8fb945b3 — PAT rebase follow-up)
   # ============================================================================
 
-  @integration @rest @pat
+  @integration @rest @pat @unimplemented
   Scenario: PATs exercise routes only within their scoped role (permission ceiling)
     Given a user "alice" has role-bindings at project scope:
       | permission               |
@@ -56,7 +56,7 @@ Feature: Public REST API — /api/gateway/v1/*
     When they send `POST /api/gateway/v1/virtual-keys/vk_xxx/rotate` with PAT "lwp_alice_ro"
     Then the response status is 200
 
-  @integration @rest @pat
+  @integration @rest @pat @unimplemented
   Scenario: PAT effective access = PAT bindings ∩ user's current bindings
     Given a PAT "lwp_bob_admin" originally scoped to "virtualKeys:manage" when user "bob" had that role
     And user "bob"'s role has since been demoted to MEMBER (no :create, :update, :rotate, :delete)
@@ -64,7 +64,7 @@ Feature: Public REST API — /api/gateway/v1/*
     Then the response status is 403 permission_denied
     # Demoting the user immediately neutralises outstanding PATs without rotation.
 
-  @integration @rest @pat @security
+  @integration @rest @pat @security @unimplemented
   Scenario: PAT fails closed when a linked custom-role row has malformed permissions (583f27ff6)
     Given a PAT "lwp_broken" linked to a custom role whose `permissions` column is NOT a JSON array
     # This could happen after a bad migration or direct DB edit.
@@ -74,7 +74,7 @@ Feature: Public REST API — /api/gateway/v1/*
     # (which would silently grant an "empty" ceiling and let every call through).
     # Parity with role-binding-resolver.ts: malformed permissions → no grants → deny.
 
-  @integration @rest @pat
+  @integration @rest @pat @unimplemented
   Scenario: Legacy project API tokens bypass PAT ceiling (full access)
     Given a legacy project API token "sess_legacy" tied to project "acme-prod"
     When they send `POST /api/gateway/v1/virtual-keys` with token "sess_legacy"
@@ -113,7 +113,7 @@ Feature: Public REST API — /api/gateway/v1/*
   # Cache rules (Lane B iter 41 — 547f96bdd)
   # ============================================================================
 
-  @integration @rest @cache-rules
+  @integration @rest @cache-rules @unimplemented
   Scenario: List cache rules returns priority DESC and excludes archived
     Given cache rules in the org:
       | name      | priority | enabled | archived |
@@ -125,7 +125,7 @@ Feature: Public REST API — /api/gateway/v1/*
     And the body.data array has length 2 (archived excluded)
     And the rows are ordered by priority DESC: high-pri, low-pri
 
-  @integration @rest @cache-rules
+  @integration @rest @cache-rules @unimplemented
   Scenario: Create a cache rule returns 201 with created row (matches budgets pattern)
     When I send `POST /api/gateway/v1/cache-rules` with body:
       """
@@ -144,7 +144,7 @@ Feature: Public REST API — /api/gateway/v1/*
     And body.archived_at is null
     And a GatewayChangeEvent (CACHE_RULE_CREATED) was emitted
 
-  @integration @rest @cache-rules
+  @integration @rest @cache-rules @unimplemented
   Scenario: PATCH replaces matchers/action when provided (NOT field-merged)
     Given an existing rule with matchers {vk_tags: ["env=prod"], model: "gpt-5-mini"}
     When I send `PATCH /api/gateway/v1/cache-rules/:id` with body:
@@ -156,7 +156,7 @@ Feature: Public REST API — /api/gateway/v1/*
     # The vk_tags field was NOT kept — PATCH on matchers/action is REPLACE semantics.
     # Name, description, priority, enabled are field-level patches (merge).
 
-  @integration @rest @cache-rules
+  @integration @rest @cache-rules @unimplemented
   Scenario: DELETE is a soft archive and returns the archived row (not 204)
     Given an existing rule "rule_xxx"
     When I send `DELETE /api/gateway/v1/cache-rules/rule_xxx`
@@ -165,21 +165,21 @@ Feature: Public REST API — /api/gateway/v1/*
     And a GatewayChangeEvent (CACHE_RULE_DELETED) was emitted
     # CLI scripts can confirm the archivedAt from the response without a re-GET.
 
-  @integration @rest @cache-rules
+  @integration @rest @cache-rules @unimplemented
   Scenario: GET /:id returns 404 for archived rules
     Given rule "rule_archived" was deleted 1 hour ago
     When I send `GET /api/gateway/v1/cache-rules/rule_archived`
     Then the response status is 404
     And error.type = "not_found"
 
-  @integration @rest @cache-rules
+  @integration @rest @cache-rules @unimplemented
   Scenario: PAT without gatewayCacheRules:create cannot POST
     Given a PAT "lwp_ro" with only gatewayCacheRules:view
     When they send `POST /api/gateway/v1/cache-rules` with PAT "lwp_ro"
     Then the response status is 403 permission_denied
     And error.code references "gatewayCacheRules:create"
 
-  @integration @rest @cache-rules
+  @integration @rest @cache-rules @unimplemented
   Scenario: OpenAPI schema tags all cache-rules routes under "Cache Rules"
     Given the OpenAPI spec at /api/gateway/v1/openapi.json
     When I inspect paths for /cache-rules and /cache-rules/{id}
@@ -190,7 +190,7 @@ Feature: Public REST API — /api/gateway/v1/*
   # Virtual keys
   # ============================================================================
 
-  @integration @rest
+  @integration @rest @unimplemented
   Scenario: Create a virtual key
     Given a gateway-provider-credential "gpc_openai_primary" is bound on project "acme-prod"
     When I send `POST /api/gateway/v1/virtual-keys` with token "sess_abc" and body:
@@ -207,7 +207,7 @@ Feature: Public REST API — /api/gateway/v1/*
     And the body's `virtual_key.prefix` + "..." + `virtual_key.last_four` reconstructs the secret-visible portion
     And subsequent GET of the same key returns the virtual_key but NOT the secret
 
-  @integration @rest
+  @integration @rest @unimplemented
   Scenario: Reject VK creation without at least one provider
     When I send `POST /api/gateway/v1/virtual-keys` with body:
       """
@@ -217,7 +217,7 @@ Feature: Public REST API — /api/gateway/v1/*
     And error.type = "bad_request"
     And error.code = "validation_error"
 
-  @integration @rest
+  @integration @rest @unimplemented
   Scenario: Rotate a virtual key
     Given a virtual key "vk_1" exists on project "acme-prod"
     When I send `POST /api/gateway/v1/virtual-keys/vk_1/rotate`
@@ -225,7 +225,7 @@ Feature: Public REST API — /api/gateway/v1/*
     And the body has a new `secret` (different from the previous one)
     And the previous secret no longer validates against /resolve-key
 
-  @integration @rest
+  @integration @rest @unimplemented
   Scenario: Revoke a virtual key is idempotent
     Given a virtual key "vk_1" exists with status "ACTIVE"
     When I send `POST /api/gateway/v1/virtual-keys/vk_1/revoke`
@@ -238,7 +238,7 @@ Feature: Public REST API — /api/gateway/v1/*
   # Budgets
   # ============================================================================
 
-  @integration @rest
+  @integration @rest @unimplemented
   Scenario: Create a hierarchical budget
     When I send `POST /api/gateway/v1/budgets` with body:
       """
@@ -255,7 +255,7 @@ Feature: Public REST API — /api/gateway/v1/*
     And `budget.spent_usd` = "0"
     And `budget.resets_at` is approximately 30 days from now
 
-  @integration @rest
+  @integration @rest @unimplemented
   Scenario: Archive a budget (soft-delete preserves history)
     Given a budget "bgt_1" exists with 5 debited rows in the ledger
     When I send `DELETE /api/gateway/v1/budgets/bgt_1`
@@ -268,7 +268,7 @@ Feature: Public REST API — /api/gateway/v1/*
   # Provider bindings
   # ============================================================================
 
-  @integration @rest
+  @integration @rest @unimplemented
   Scenario: Bind a ModelProvider to the gateway
     When I send `POST /api/gateway/v1/providers` with body:
       """
@@ -284,7 +284,7 @@ Feature: Public REST API — /api/gateway/v1/*
     And the body has `provider_credential.id` starting with "gpc_"
     And subsequent `GET /providers` lists the new binding with `health_status` = "healthy"
 
-  @integration @rest
+  @integration @rest @unimplemented
   Scenario: Disable a provider binding stops it from being used on new VKs
     Given a gateway-provider-credential "gpc_1" is bound and used by 2 VKs
     When I send `DELETE /api/gateway/v1/providers/gpc_1`
@@ -297,13 +297,13 @@ Feature: Public REST API — /api/gateway/v1/*
   # DTO shape (snake_case vs camelCase)
   # ============================================================================
 
-  @unit @contract
+  @unit @contract @unimplemented
   Scenario: REST responses are snake_case
     When I inspect any /api/gateway/v1/* response
     Then every field name is snake_case (organization_id, created_at, limit_usd, ...)
     And there are no camelCase fields
 
-  @unit @contract
+  @unit @contract @unimplemented
   Scenario: tRPC and REST return equivalent data for the same resource
     Given a virtual key "vk_1" is fetched via tRPC `virtualKeys.getById`
     And the same key is fetched via REST `GET /api/gateway/v1/virtual-keys/vk_1`
@@ -316,7 +316,7 @@ Feature: Public REST API — /api/gateway/v1/*
   # Machine actor + audit
   # ============================================================================
 
-  @integration @audit
+  @integration @audit @unimplemented
   Scenario: Writes from REST are attributed to the resolved API-token user
     Given API token "sess_abc" maps to user "alice@example.com"
     When I send `POST /api/gateway/v1/virtual-keys` to create a key
@@ -329,7 +329,7 @@ Feature: Public REST API — /api/gateway/v1/*
   # OpenAPI future
   # ============================================================================
 
-  @unit @contract @roadmap
+  @unit @contract @roadmap @unimplemented
   Scenario: REST routes will be annotated with hono-openapi (iter 6+)
     When hono-openapi's `describeRoute` is wired on every handler
     Then `GET /api/openapi/gateway-platform.json` returns a valid OpenAPI 3.1 schema

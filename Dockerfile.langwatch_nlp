@@ -1,3 +1,22 @@
+# Build the nlpgo Go binary. Lives in services/nlpgo/ + cmd/service/.
+# The binary is a subcommand of the cmd/service multi-binary; we run
+# `service nlpgo` at runtime via the entrypoint.
+#
+# Go version pinned to match go.mod (`go 1.26.2`). Mirror of the build
+# stage in Dockerfile.langwatch_nlp.lambda — same install pattern, same
+# entrypoint script — only difference is target arch (let Docker pick
+# from TARGETARCH so the dev image works on linux/amd64 + linux/arm64).
+FROM --platform=$BUILDPLATFORM golang:1.26.2-bookworm AS nlpgo-build
+ARG TARGETARCH
+WORKDIR /src
+COPY go.mod go.sum ./
+RUN go mod download
+COPY pkg ./pkg
+COPY services ./services
+COPY cmd ./cmd
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH:-amd64} \
+    go build -ldflags="-s -w" -o /out/service ./cmd/service
+
 FROM python:3.12-slim
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -28,6 +47,27 @@ ENV RUNNING_IN_DOCKER=true
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONPYCACHEPREFIX=/tmp/pycache
 
+# Bring in the nlpgo binary as the front door (parallel deployment with
+# the existing uvicorn process — see specs/nlp-go/_shared/contract.md §3).
+# `service` is a multi-binary; the entrypoint runs it as the nlpgo
+# subcommand. Set NLPGO_BYPASS=1 to skip it and run uvicorn directly.
+COPY --from=nlpgo-build /out/service /usr/local/bin/nlpgo-service
+RUN chmod +x /usr/local/bin/nlpgo-service \
+    && printf '#!/bin/sh\nexec /usr/local/bin/nlpgo-service nlpgo "$@"\n' > /usr/local/bin/nlpgo \
+    && chmod +x /usr/local/bin/nlpgo
+
+COPY langwatch_nlp/scripts/entrypoint.sh /usr/local/bin/nlpgo-entrypoint.sh
+RUN chmod +x /usr/local/bin/nlpgo-entrypoint.sh
+
+# Compose service exposes :5561 (see compose.dev.yml:42 — main app
+# reads `LANGWATCH_NLP_SERVICE: http://langwatch_nlp:5561`). nlpgo
+# becomes the front door at :5561 and runs uvicorn as a child on a
+# different localhost port (6561) so the two don't collide.
+ENV PORT=5561
+ENV NLPGO_CHILD_ARGS="--no-cache run --no-sync --no-editable uvicorn langwatch_nlp.main:app --host 127.0.0.1 --port 6561 --timeout-keep-alive 4500"
+ENV NLPGO_CHILD_UPSTREAM_URL=http://127.0.0.1:6561
+ENV NLPGO_CHILD_HEALTH_URL=http://127.0.0.1:6561/health
+
 EXPOSE 5561
 
-CMD ["sh", "-c", "uv --no-cache run --no-sync --no-editable uvicorn langwatch_nlp.main:app --host 0.0.0.0 --port 5561 --timeout-keep-alive ${NLP_UVICORN_KEEP_ALIVE_SECONDS:-4500} | tee /var/log/uvicorn.log"]
+CMD ["/usr/local/bin/nlpgo-entrypoint.sh"]

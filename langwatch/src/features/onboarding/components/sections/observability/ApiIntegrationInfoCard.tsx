@@ -3,6 +3,7 @@ import type React from "react";
 import { usePublicEnv } from "~/hooks/usePublicEnv";
 import { toaster } from "../../../../../components/ui/toaster";
 import { useActiveProject } from "../../../contexts/ActiveProjectContext";
+import { CLOUD_ENDPOINT } from "../shared/build-mcp-config";
 import { CopyableInputWithPrefix } from "./CopyableInputWithPrefix";
 
 export function ApiIntegrationInfoCard(): React.ReactElement {
@@ -85,16 +86,24 @@ export function ApiIntegrationInfoCard(): React.ReactElement {
         onCopy={copyApiKey}
       />
 
-      {effectiveEndpoint &&
-        effectiveEndpoint !== "https://app.langwatch.ai" && (
-          <CopyableInputWithPrefix
-            prefix="LANGWATCH_ENDPOINT="
-            value={effectiveEndpoint}
-            ariaLabel="Your LangWatch Endpoint"
-            showVisibilityToggle={false}
-            onCopy={copyEndpoint}
-          />
-        )}
+      {/*
+       * Mirror the rule used by the empty-state PAT card and
+       * `buildMcpConfig`: only surface `LANGWATCH_ENDPOINT` when the
+       * deployment differs from the public cloud default. Cloud users
+       * never need this in their .env (it's the SDK's default), and
+       * shipping it here would make a no-op line look like a required
+       * value. Routed through the shared `CLOUD_ENDPOINT` constant so
+       * the cloud comparison can never drift between surfaces.
+       */}
+      {effectiveEndpoint && effectiveEndpoint !== CLOUD_ENDPOINT && (
+        <CopyableInputWithPrefix
+          prefix="LANGWATCH_ENDPOINT="
+          value={effectiveEndpoint}
+          ariaLabel="Your LangWatch Endpoint"
+          showVisibilityToggle={false}
+          onCopy={copyEndpoint}
+        />
+      )}
     </VStack>
   );
 }

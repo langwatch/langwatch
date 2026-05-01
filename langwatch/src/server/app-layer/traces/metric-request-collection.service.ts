@@ -5,12 +5,12 @@ import { createLogger } from "~/utils/logger/server";
 import type { DeepPartial } from "~/utils/types";
 import {
   type MetricType,
-  type RecordMetricCommandData,
   piiRedactionLevelSchema,
+  type RecordMetricCommandData,
 } from "../../event-sourcing/pipelines/trace-processing/schemas/commands";
 import {
-  TraceRequestUtils,
   normalizeOtlpAttributeMap,
+  TraceRequestUtils,
 } from "../../event-sourcing/pipelines/trace-processing/utils/traceRequest.utils";
 import { decodeBase64OpenTelemetryId } from "../../tracer/utils";
 export interface MetricRequestCollectionDeps {
@@ -101,7 +101,8 @@ export class MetricRequestCollectionService {
                     timeUnixMs: dp.timeUnixMs,
                     attributes: dp.attributes,
                     resourceAttributes: resourceAttrs,
-                    piiRedactionLevel: piiRedactionLevelSchema.parse(piiRedactionLevel),
+                    piiRedactionLevel:
+                      piiRedactionLevelSchema.parse(piiRedactionLevel),
                     occurredAt: Date.now(),
                   });
 
@@ -130,7 +131,6 @@ export class MetricRequestCollectionService {
       },
     );
   }
-
 }
 
 /**
@@ -256,9 +256,7 @@ function extractSimpleDataPoint({
   if (!dp) return null;
 
   // Simple data points may have exemplars with traceId/spanId
-  const exemplars = dp.exemplars as
-    | Array<Record<string, unknown>>
-    | undefined;
+  const exemplars = dp.exemplars as Array<Record<string, unknown>> | undefined;
   if (exemplars?.length) {
     for (const exemplar of exemplars) {
       if (!exemplar) continue;

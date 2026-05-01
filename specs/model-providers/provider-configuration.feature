@@ -43,7 +43,7 @@ Feature: Model Provider Configuration
     When I open the model provider configuration drawer for "openai"
     Then I do not see an "Extra Headers" section
 
-  @integration
+  @integration @unimplemented
   Scenario: Configure API keys with manual input
     Given I open the model provider configuration drawer for "openai"
     When I enter "sk-test123" in the "OPENAI_API_KEY" field
@@ -52,14 +52,14 @@ Feature: Model Provider Configuration
     And the provider is saved with the API key
     And the drawer closes
 
-  @integration
+  @integration @unimplemented
   Scenario: API key masking when editing existing provider
     Given I have "openai" provider configured with API key "sk-actual123"
     When I open the model provider configuration drawer for "openai"
     Then the "OPENAI_API_KEY" field shows "HAS_KEY••••••••••••••••••••••••"
     And the actual API key value is not displayed
 
-  @integration
+  @integration @unimplemented
   Scenario: Preserve original API key when saving with masked placeholder
     Given I have "openai" provider configured with API key "sk-actual123"
     When I open the model provider configuration drawer for "openai"
@@ -69,7 +69,7 @@ Feature: Model Provider Configuration
     Then the original API key "sk-actual123" is preserved
     And the base URL is updated to "https://custom.openai.com/v1"
 
-  @integration
+  @integration @unimplemented
   Scenario: Configure API keys from environment variables
     Given I have "openai" provider enabled via environment variable "OPENAI_API_KEY"
     And the provider has no stored customKeys
@@ -77,7 +77,7 @@ Feature: Model Provider Configuration
     Then the "OPENAI_API_KEY" field shows "HAS_KEY••••••••••••••••••••••••"
     And the field indicates the key comes from environment variables
 
-  @integration
+  @integration @unimplemented
   Scenario: Add custom model through dialog
     Given I open the model provider configuration drawer for "openai"
     When I click the "+ Add" button in the Custom Models section
@@ -89,7 +89,7 @@ Feature: Model Provider Configuration
     Then "gpt-5-custom" is added to the provider's custom models
     And the model appears as "openai/gpt-5-custom" in model selectors
 
-  @integration
+  @integration @unimplemented
   Scenario: Configure extra headers for Azure provider
     Given I open the model provider configuration drawer for "azure"
     When I add an extra header with key "api-key" and value "test-value"
@@ -97,14 +97,14 @@ Feature: Model Provider Configuration
     Then the extra header is saved
     And the header is included in API requests
 
-  @integration
+  @integration @unimplemented
   Scenario: Configure extra headers for Custom provider
     Given I open the model provider configuration drawer for "custom"
     When I add an extra header with key "X-Custom-Header" and value "custom-value"
     And I click "Save"
     Then the extra header is saved
 
-  @integration
+  @integration @unimplemented
   Scenario: Toggle API Gateway for Azure provider
     Given I open the model provider configuration drawer for "azure"
     When I toggle "Use API Gateway" to enabled
@@ -113,7 +113,7 @@ Feature: Model Provider Configuration
     And I do not see "AZURE_OPENAI_API_KEY" field
     And I do not see "AZURE_OPENAI_ENDPOINT" field
 
-  @integration
+  @integration @unimplemented
   Scenario: Toggle API Gateway off for Azure provider
     Given I have Azure provider configured with API Gateway enabled
     When I open the model provider configuration drawer for "azure"
@@ -122,7 +122,7 @@ Feature: Model Provider Configuration
     And I see "AZURE_OPENAI_ENDPOINT" field
     And I do not see "AZURE_API_GATEWAY_BASE_URL" field
 
-  @integration
+  @integration @unimplemented
   Scenario: Configure base URL for provider
     Given I open the model provider configuration drawer for "openai"
     When I enter "https://custom.openai.com/v1" in the "OPENAI_BASE_URL" field
@@ -130,7 +130,7 @@ Feature: Model Provider Configuration
     Then the base URL is saved
     And API requests use the custom base URL
 
-  @integration
+  @integration @unimplemented
   Scenario: Add custom embeddings model through dialog
     Given I open the model provider configuration drawer for "openai"
     When I click the "+ Add" button in the Custom Models section
@@ -142,7 +142,7 @@ Feature: Model Provider Configuration
     Then "text-embedding-custom" is added to the provider's custom embeddings models
     And the model appears as "openai/text-embedding-custom" in embedding model selectors
 
-  @integration
+  @integration @unimplemented
   Scenario: Show field validation errors for invalid input
     Given I open the model provider configuration drawer for "openai"
     When I leave the required "OPENAI_API_KEY" field empty
@@ -150,7 +150,7 @@ Feature: Model Provider Configuration
     Then I see a validation error for "OPENAI_API_KEY"
     And the provider is not saved
 
-  @integration
+  @integration @unimplemented
   Scenario: Clear validation errors when user starts typing
     Given I open the model provider configuration drawer for "openai"
     And I see a validation error for "OPENAI_API_KEY"

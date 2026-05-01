@@ -37,6 +37,7 @@ import { EvaluatorHistoryDrawer } from "./evaluators/EvaluatorHistoryDrawer";
 import { EvaluatorListDrawer } from "./evaluators/EvaluatorListDrawer";
 import { EvaluatorTypeSelectorDrawer } from "./evaluators/EvaluatorTypeSelectorDrawer";
 import { WorkflowSelectorForEvaluatorDrawer } from "./evaluators/WorkflowSelectorForEvaluatorDrawer";
+import { FeatureFlagsDrawer } from "./drawers/FeatureFlagsDrawer";
 import { SdkRadarDrawer } from "./drawers/SdkRadarDrawer";
 // Lazy-loaded: FoundryDrawer transitively imports the OTel SDK which has
 // side effects that break React if evaluated eagerly at app startup.
@@ -53,6 +54,8 @@ import { LLMModelCostDrawer } from "./settings/LLMModelCostDrawer";
 import { ScenarioRunDetailDrawer } from "./simulations/ScenarioRunDetailDrawer";
 import { SuiteFormDrawer } from "./suites/SuiteFormDrawer";
 import { TraceDetailsDrawer } from "./TraceDetailsDrawer";
+// Traces V2 drawers
+import { TraceV2DrawerShell } from "../features/traces-v2/components/TraceDrawer";
 // Evaluations V3 drawers
 import { TargetTypeSelectorDrawer } from "./targets/TargetTypeSelectorDrawer";
 
@@ -62,6 +65,7 @@ import { TargetTypeSelectorDrawer } from "./targets/TargetTypeSelectorDrawer";
  */
 export const drawers = {
   traceDetails: TraceDetailsDrawer,
+  traceV2Details: TraceV2DrawerShell,
   batchEvaluation: BatchEvaluationDrawer,
   automation: AutomationDrawer,
   editModelProvider: EditModelProviderDrawer,
@@ -107,6 +111,8 @@ export const drawers = {
   guardrails: GuardrailsDrawer,
   // SDK Radar
   sdkRadar: SdkRadarDrawer,
+  // Dev tools
+  featureFlags: FeatureFlagsDrawer,
   // Ops
   foundry: FoundryDrawer,
 } satisfies Record<string, React.FC<any>>;

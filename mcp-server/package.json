@@ -43,7 +43,7 @@
   "devDependencies": {
     "@ai-sdk/anthropic": "^3.0.44",
     "@anthropic-ai/claude-code": "^2.1.72",
-    "@eslint/js": "^9.4.0",
+    "@eslint/js": "^10.0.1",
     "@langwatch/scenario": "^0.4.6",
     "@types/debug": "^4.1.12",
     "@types/eslint__js": "^8.42.3",
@@ -75,5 +75,10 @@
   },
   "bin": {
     "langwatch-mcp-server": "./dist/index.js"
+  },
+  "pnpm": {
+    "overrides": {
+      "protobufjs": ">=7.5.5 <8.0.0 || >=8.0.1"
+    }
   }
 }

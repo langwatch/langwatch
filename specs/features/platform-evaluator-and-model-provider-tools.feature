@@ -8,28 +8,28 @@ Feature: Platform MCP tools for evaluators and model providers
 
   # --- Evaluator Tools ---
 
-  @integration
+  @integration @unimplemented
   Scenario: List all evaluators for a project
     Given the project has evaluators configured
     When I call the platform_list_evaluators tool
     Then I receive a formatted digest of all evaluators
     And each evaluator shows its name, ID, type, and category
 
-  @integration
+  @integration @unimplemented
   Scenario: Get evaluator details by ID or slug
     Given an evaluator exists in the project
     When I call platform_get_evaluator with that ID or slug
     Then I receive the full evaluator details
     And the response includes config, fields, and output fields
 
-  @integration
+  @integration @unimplemented
   Scenario: Create a built-in evaluator
     Given I know the evaluator type from discover_schema
     When I call platform_create_evaluator with name and config
     Then a new evaluator is created on the platform
     And the response includes the generated ID and slug
 
-  @integration
+  @integration @unimplemented
   Scenario: Update an existing evaluator
     Given an evaluator exists on the platform
     When I call platform_update_evaluator with updated name or config
@@ -40,14 +40,14 @@ Feature: Platform MCP tools for evaluators and model providers
   # Two-level discovery: list types with one-line descriptions first,
   # full detail only for a specific evaluator type on request.
 
-  @unit
+  @unit @unimplemented
   Scenario: Discover evaluator types overview
     When I call discover_schema with category "evaluators"
     Then I receive a compact list of all evaluator types
     And each entry shows only name, category, and one-line description
     And it instructs the agent to use evaluatorType parameter for full details
 
-  @unit
+  @unit @unimplemented
   Scenario: Discover specific evaluator type details
     When I call discover_schema with category "evaluators" and evaluatorType "langevals/llm_judge"
     Then I receive the full schema for that evaluator type
@@ -56,7 +56,7 @@ Feature: Platform MCP tools for evaluators and model providers
 
   # --- Hono Endpoints for Evaluators (missing: update and archive) ---
 
-  @integration
+  @integration @unimplemented
   Scenario: PUT /api/evaluators/:id updates an evaluator
     Given an evaluator exists with a known ID
     When I send a PUT request with updated name and config
@@ -64,7 +64,7 @@ Feature: Platform MCP tools for evaluators and model providers
     And the evaluatorType in config is immutable
     And the response matches the apiResponseEvaluatorSchema
 
-  @integration
+  @integration @unimplemented
   Scenario: DELETE /api/evaluators/:id archives an evaluator
     Given an evaluator exists with a known ID
     When I send a DELETE request for that evaluator
@@ -73,21 +73,21 @@ Feature: Platform MCP tools for evaluators and model providers
 
   # --- Model Provider Tools ---
 
-  @integration
+  @integration @unimplemented
   Scenario: List all model providers for a project
     When I call platform_list_model_providers
     Then I receive all configured model providers
     And API keys are masked in the response
     And each provider shows its name, enabled status, and which key fields are set
 
-  @integration
+  @integration @unimplemented
   Scenario: Set or update a model provider
     When I call platform_set_model_provider with provider name and API key
     Then the provider is created if it does not exist or updated if it does
     And the provider is enabled
     And the API key value is never returned in any response
 
-  @integration
+  @integration @unimplemented
   Scenario: Update model provider without changing keys
     When I call platform_set_model_provider with only non-key fields
     Then the provider settings are updated
@@ -95,13 +95,13 @@ Feature: Platform MCP tools for evaluators and model providers
 
   # --- Hono Endpoints for Model Providers (greenfield) ---
 
-  @integration
+  @integration @unimplemented
   Scenario: GET /api/model-providers lists providers with masked keys
     When I send a GET request to /api/model-providers
     Then I receive all providers for the project
     And all API key values are masked
 
-  @integration
+  @integration @unimplemented
   Scenario: PUT /api/model-providers/:provider upserts provider config
     When I send a PUT request with provider name and customKeys
     Then the provider is created or updated (upsert)

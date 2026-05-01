@@ -8,6 +8,7 @@ Feature: Pending Mappings Validation
     Given I am creating an online evaluation
     And trace level is selected
 
+  @unimplemented
   Scenario: All fields auto-mapped - can save immediately
     Given I selected evaluator "Exact Match" requiring "input", "output"
     When the evaluator is selected
@@ -16,6 +17,7 @@ Feature: Pending Mappings Validation
     And no pending mapping warning should show
     And the Save button should be enabled
 
+  @unimplemented
   Scenario: Some fields cannot be auto-mapped - editor opens
     Given I selected evaluator "Custom Eval" requiring "custom_field"
     And "custom_field" cannot be auto-mapped from trace
@@ -25,6 +27,7 @@ Feature: Pending Mappings Validation
     And the mapping input should have yellow/orange border
     And the placeholder should say "Required"
 
+  @unimplemented
   Scenario: User closes editor without completing mappings
     Given the evaluator editor is open with pending mappings
     When I close the editor without mapping "custom_field"
@@ -33,12 +36,14 @@ Feature: Pending Mappings Validation
     And the warning should say "1 field needs mapping"
     And the warning should be clickable
 
+  @unimplemented
   Scenario: Click warning banner to re-open editor
     Given a warning banner is shown for pending mappings
     When I click the warning banner
     Then the evaluator editor should re-open
     And the pending field should still be highlighted
 
+  @unimplemented
   Scenario: Thread level always opens editor
     Given I have an evaluator with auto-mappable fields "input", "output"
     And I have selected it at trace level (auto-mapped)
@@ -47,12 +52,14 @@ Feature: Pending Mappings Validation
     Because thread mappings cannot be auto-inferred
     And the mapping sources should now show thread options
 
+  @unimplemented
   Scenario: Cannot save with pending mappings
     Given I have pending mappings for "expected_output"
     Then the Save button should be disabled
     When I hover over the Save button
     Then a tooltip should explain "Complete all mappings first"
 
+  @unimplemented
   Scenario: Save button enables after completing mappings
     Given I have pending mappings for "expected_output"
     And the Save button is disabled
@@ -61,6 +68,7 @@ Feature: Pending Mappings Validation
     Then the warning banner should disappear
     And the Save button should be enabled
 
+  @unimplemented
   Scenario: Multiple pending fields
     Given I selected an evaluator requiring "field1", "field2", "field3"
     And only "field1" can be auto-mapped
@@ -69,12 +77,14 @@ Feature: Pending Mappings Validation
     And "field2" and "field3" should be highlighted as pending
     And the warning should say "2 fields need mapping"
 
+  @unimplemented
   Scenario: Remove evaluator clears pending state
     Given I have an evaluator with pending mappings
     When I remove the evaluator from the selection box
     Then the pending mapping warning should disappear
     And the Save button should be disabled (no evaluator selected)
 
+  @unimplemented
   Scenario: Change evaluator resets mappings
     Given I have evaluator A with complete mappings
     When I select evaluator B which has different required fields
@@ -82,12 +92,14 @@ Feature: Pending Mappings Validation
     And auto-inference should run for evaluator B
     And pending mappings should be recalculated
 
+  @unimplemented
   Scenario: Evaluator with no required fields
     Given I select an evaluator with no required or optional fields
     Then no mappings UI should be shown
     And no editor should open automatically
     And the Save button should be enabled
 
+  @unimplemented
   Scenario: Optional fields not required for save
     Given I select an evaluator with required field "input" and optional field "metadata"
     And "input" is auto-mapped
@@ -95,6 +107,7 @@ Feature: Pending Mappings Validation
     Then the Save button should still be enabled
     Because optional fields don't block saving
 
+  @unimplemented
   Scenario: Visual distinction between required and optional pending fields
     Given an evaluator has required field "input" pending
     And optional field "extra_context" pending

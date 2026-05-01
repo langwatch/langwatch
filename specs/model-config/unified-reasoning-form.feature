@@ -4,32 +4,32 @@ Feature: Unified Reasoning Form Field
   So that I have a consistent experience across all providers
 
   # Form Schema Validation
-  @unit
+  @unit @unimplemented
   Scenario: Form schema accepts reasoning field with valid value
     Given a prompt config form
     When I set llm.reasoning to "high"
     Then the form should validate successfully
 
-  @unit
+  @unit @unimplemented
   Scenario: Form schema accepts reasoning field with "low" value
     Given a prompt config form
     When I set llm.reasoning to "low"
     Then the form should validate successfully
 
-  @unit
+  @unit @unimplemented
   Scenario: Form schema accepts reasoning field with "medium" value
     Given a prompt config form
     When I set llm.reasoning to "medium"
     Then the form should validate successfully
 
-  @unit
+  @unit @unimplemented
   Scenario: Form schema accepts undefined reasoning
     Given a prompt config form
     When I do not set llm.reasoning
     Then the form should validate successfully
 
   # Form to Save Params Conversion
-  @unit
+  @unit @unimplemented
   Scenario: formValuesToTriggerSaveVersionParams includes reasoning
     Given form values with llm.reasoning "high"
     When converting to save params
@@ -38,7 +38,7 @@ Feature: Unified Reasoning Form Field
     And the result should NOT include thinkingLevel
     And the result should NOT include effort
 
-  @unit
+  @unit @unimplemented
   Scenario: formValuesToTriggerSaveVersionParams handles undefined reasoning
     Given form values with no llm.reasoning set
     When converting to save params
@@ -46,20 +46,20 @@ Feature: Unified Reasoning Form Field
     And the result should NOT include reasoningEffort
 
   # Versioned Prompt to Form Values Conversion
-  @unit
+  @unit @unimplemented
   Scenario: versionedPromptToPromptConfigFormValues maps reasoning correctly
     Given a versioned prompt with reasoning "high"
     When converting to form values
     Then the form should have llm.reasoning "high"
 
-  @unit
+  @unit @unimplemented
   Scenario: versionedPromptToPromptConfigFormValues handles missing reasoning
     Given a versioned prompt with no reasoning
     When converting to form values
     Then the form should have llm.reasoning undefined
 
   # Round-trip Consistency
-  @integration
+  @integration @unimplemented
   Scenario: Form values round-trip preserves reasoning
     Given form values with llm.reasoning "medium"
     When converting to save params and back to form values

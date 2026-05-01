@@ -42,7 +42,7 @@ Feature: Model Provider List Management
     Then I see a spinner
     And the provider list is not visible
 
-  @integration
+  @integration @unimplemented
   Scenario: Display enabled providers with icons and names
     Given I navigate to the Model Providers settings page
     When the page loads
@@ -50,7 +50,7 @@ Feature: Model Provider List Management
     And each provider row shows the provider icon
     And each provider row shows the provider name
 
-  @integration
+  @integration @unimplemented
   Scenario: Show "Default Model" badge when default model belongs to provider
     Given I have a project with default model "openai/gpt-4o"
     And I have "openai" provider enabled
@@ -59,7 +59,7 @@ Feature: Model Provider List Management
     And the "openai" provider row shows a "Default Model" badge
     And the badge has blue color palette
 
-  @integration
+  @integration @unimplemented
   Scenario: Hide "Default Model" badge when default model does not belong to provider
     Given I have a project with default model "anthropic/claude-sonnet-4"
     And I have "openai" provider enabled
@@ -67,7 +67,7 @@ Feature: Model Provider List Management
     Then I see the "openai" provider in the list
     And the "openai" provider row does not show a "Default Model" badge
 
-  @integration
+  @integration @unimplemented
   Scenario: "Add Model Provider" menu lists every provider regardless of existing rows
     Given I have "openai" provider with one row configured
     And I have "anthropic" provider not configured
@@ -77,7 +77,7 @@ Feature: Model Provider List Management
     # See scope-and-multi-instance.feature — multiple rows per provider type
     # are a first-class concept now.
 
-  @integration
+  @integration @unimplemented
   Scenario: Disable "Add Model Provider" button without manage permission
     Given I do not have "project:manage" permission
     When I navigate to the Model Providers settings page

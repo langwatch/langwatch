@@ -32,6 +32,7 @@ export const TRACE_ANALYTICS_COLUMNS = [
   "TotalPromptTokenCount",
   "TotalCompletionTokenCount",
   "TokensPerSecond",
+  "TraceName",
   "ContainsErrorStatus",
   "ErrorMessage",
   "TopicId",
@@ -135,6 +136,13 @@ export const fieldMappings: Record<string, FieldMapping> = {
     table: "trace_summaries",
     column: "TenantId",
     description: "Project/tenant identifier",
+  },
+
+  // ===== Trace Name =====
+  trace_name: {
+    table: "trace_summaries",
+    column: "TraceName",
+    description: "Name of the root span (trace name)",
   },
 
   // ===== Timestamp Fields =====

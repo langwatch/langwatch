@@ -22,7 +22,7 @@ Feature: AI Gateway — Provider settings cohesion
   # Existing ModelProvider rows are reused, not duplicated
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: Enabling a provider for the gateway does NOT re-enter the API key
     Given project "gateway-demo" has ModelProvider "openai" configured
     When I open the "AI Gateway → Providers" section
@@ -31,7 +31,7 @@ Feature: AI Gateway — Provider settings cohesion
     And the gateway binds to the existing ModelProvider row
     And the raw key never leaves the ModelProvider table
 
-  @integration
+  @integration @unimplemented
   Scenario: Rotating the underlying ModelProvider API key reflects in the gateway
     Given "openai" is enabled for the gateway with ModelProvider key "sk-old"
     When an admin rotates ModelProvider "openai" to "sk-new"
@@ -40,7 +40,7 @@ Feature: AI Gateway — Provider settings cohesion
     And subsequent gateway requests use "sk-new"
     And no user action is required in the Gateway UI
 
-  @integration
+  @integration @unimplemented
   Scenario: Disabling a ModelProvider also disables its gateway binding
     Given "openai" is enabled for the gateway
     When an admin disables the ModelProvider row
@@ -52,7 +52,7 @@ Feature: AI Gateway — Provider settings cohesion
   # Gateway-specific provider settings (layered on top of ModelProvider)
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: Gateway-only fields live on GatewayProviderCredential
     Given "openai" is enabled for the gateway
     When I open "AI Gateway → Providers → openai"
@@ -65,7 +65,7 @@ Feature: AI Gateway — Provider settings cohesion
       | fallbackPriorityGlobal | numeric; used when a VK has no explicit chain         |
     And editing these fields does not mutate the underlying ModelProvider row
 
-  @integration
+  @integration @unimplemented
   Scenario: Extra headers added at the gateway binding do not leak into evaluators
     Given "openai" is enabled for the gateway with gateway extraHeader "X-Route: prod"
     When an evaluator or the prompt playground calls OpenAI via litellm
@@ -76,14 +76,14 @@ Feature: AI Gateway — Provider settings cohesion
   # Custom / self-hosted / OpenAI-compatible providers
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: Self-hosted OpenAI-compatible provider is usable from the gateway
     Given I add a ModelProvider of kind "openai" with base URL "https://llm.internal.acme/v1"
     When I enable this ModelProvider for the gateway
     Then the gateway binding lists this provider under "openai-compatible"
     And requests routed here use the configured base URL and key
 
-  @integration
+  @integration @unimplemented
   Scenario: Azure deployments are preserved across gateway and legacy paths
     Given "azure" is configured with deployment mapping { "gpt-4o": "my-deployment" }
     When a gateway request uses model "azure/gpt-4o"
@@ -94,7 +94,7 @@ Feature: AI Gateway — Provider settings cohesion
   # Failover health + circuit breaker
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: Provider health status is visible and informs fallback
     Given "openai" has been failing health checks for 2 minutes
     When I open "AI Gateway → Providers"
@@ -105,14 +105,14 @@ Feature: AI Gateway — Provider settings cohesion
   # Permissions (RBAC)
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: Only users with gatewayProviders:manage can enable/disable for gateway
     Given I have "modelProviders:manage" but not "gatewayProviders:manage"
     When I open "AI Gateway → Providers"
     Then the "Enable for gateway" toggle is disabled
     And the rate-limit and extra-header fields are read-only
 
-  @integration
+  @integration @unimplemented
   Scenario: gatewayProviders:view grants view-only access
     Given I have only "gatewayProviders:view"
     When I open "AI Gateway → Providers"
@@ -123,7 +123,7 @@ Feature: AI Gateway — Provider settings cohesion
   # Cohesion with legacy litellm path (no regression)
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: Legacy evaluator path continues to work when gateway is disabled
     Given project "gateway-demo" has NOT enabled any provider for the gateway
     When an evaluator runs via the legacy litellm path

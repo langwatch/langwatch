@@ -1,9 +1,5 @@
 import { z } from "zod";
 
-// ---------------------------------------------------------------------------
-// Span Insert (write path)
-// ---------------------------------------------------------------------------
-
 export const spanInsertDataSchema = z.object({
   id: z.string(),
   tenantId: z.string(),
@@ -47,10 +43,6 @@ export const spanInsertDataSchema = z.object({
 
 export type SpanInsertData = z.infer<typeof spanInsertDataSchema>;
 
-// ---------------------------------------------------------------------------
-// Trace Summary (write + read)
-// ---------------------------------------------------------------------------
-
 export const traceSummaryDataSchema = z.object({
   traceId: z.string(),
   spanCount: z.number(),
@@ -72,6 +64,19 @@ export const traceSummaryDataSchema = z.object({
   outputFromRootSpan: z.boolean(),
   outputSpanEndTimeMs: z.number(),
   blockedByGuardrail: z.boolean(),
+  rootSpanType: z.string().nullable(),
+  containsAi: z.boolean(),
+  containsPrompt: z.boolean(),
+  selectedPromptId: z.string().nullable(),
+  selectedPromptSpanId: z.string().nullable(),
+  /** Tracks the latest source span's startTimeUnixMs — internal bookkeeping
+   * to disambiguate which span won the "latest" race. Not surfaced. */
+  selectedPromptStartTimeMs: z.number().nullable(),
+  lastUsedPromptId: z.string().nullable(),
+  lastUsedPromptVersionNumber: z.number().nullable(),
+  lastUsedPromptVersionId: z.string().nullable(),
+  lastUsedPromptSpanId: z.string().nullable(),
+  lastUsedPromptStartTimeMs: z.number().nullable(),
   topicId: z.string().nullable(),
   subTopicId: z.string().nullable(),
   annotationIds: z.array(z.string()),
@@ -81,6 +86,20 @@ export const traceSummaryDataSchema = z.object({
   scenarioRoleSpans: z.record(z.string(), z.string()).optional(),
   /** Per-span costs for retroactive role assignment when parent arrives after children. Internal bookkeeping. */
   spanCosts: z.record(z.string(), z.number()).optional(),
+  traceName: z.string(),
+  /** Start time of the root span that set traceName, used for deterministic tie-breaking when multiple root spans exist. Internal bookkeeping. */
+  rootSpanStartTimeMs: z.number().optional(),
+  /** LangWatch SDK events hoisted from spans during fold projection. */
+  events: z
+    .array(
+      z.object({
+        spanId: z.string(),
+        timestamp: z.number(),
+        name: z.string(),
+        attributes: z.record(z.string(), z.string()),
+      }),
+    )
+    .optional(),
   occurredAt: z.number(),
   createdAt: z.number(),
   updatedAt: z.number(),

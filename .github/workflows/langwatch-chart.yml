@@ -5,6 +5,7 @@ on:
     paths:
       - "charts/langwatch/**"
       - "charts/clickhouse-serverless/**"
+      - "charts/gateway/**"
       - "charts/lib/**"
       - ".github/workflows/langwatch-chart.yml"
   push:
@@ -12,6 +13,7 @@ on:
     paths:
       - "charts/langwatch/**"
       - "charts/clickhouse-serverless/**"
+      - "charts/gateway/**"
       - "charts/lib/**"
       - ".github/workflows/langwatch-chart.yml"
 
@@ -50,7 +52,7 @@ jobs:
             flags: "-f examples/values-scalable-prod.yaml"
     steps:
       - uses: actions/checkout@v4
-      - uses: azure/setup-helm@v4
+      - uses: azure/setup-helm@v5
         with:
           version: v3.12.0
       - run: helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
@@ -80,7 +82,7 @@ jobs:
         working-directory: charts/langwatch
     steps:
       - uses: actions/checkout@v4
-      - uses: azure/setup-helm@v4
+      - uses: azure/setup-helm@v5
         with:
           version: v3.12.0
       - name: Build clickhouse-serverless image

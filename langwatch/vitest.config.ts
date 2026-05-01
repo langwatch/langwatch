@@ -16,6 +16,7 @@ export default defineConfig({
       ...configDefaults.exclude,
       "**/*.integration.test.ts",
       "**/*.stress.test.ts",
+      "**/*.browser.test.{ts,tsx}",
       ".next/**/*",
       ".next-saas/**/*",
       "**/e2e/**/*",

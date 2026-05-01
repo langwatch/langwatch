@@ -24,6 +24,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       relevant: ${{ steps.detect.outputs.relevant }}
+      feature-parity: ${{ steps.detect.outputs.feature-parity }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
       - uses: ./.github/actions/detect-changes
@@ -35,6 +36,10 @@ jobs:
               - '.github/workflows/langwatch-app-ci.yml'
               - '.github/.release-please-manifest.json'
               - '.github/scripts/**'
+            feature-parity:
+              - 'langwatch/**'
+              - 'specs/**'
+              - '.github/workflows/langwatch-app-ci.yml'
 
   typecheck:
     needs: changes
@@ -218,73 +223,9 @@ jobs:
         run: bash .github/scripts/install-goose.sh
 
       - name: Start ClickHouse with storage policy
-        run: |
-          # Create storage policy config file
-          # Note: Storage policies can only be loaded at server startup, not via SYSTEM RELOAD CONFIG
-          # Each disk must have a unique name AND path - we define 'hot' and 'cold' disks with different paths
-          cat > /tmp/storage_policy.xml << 'EOF'
-          <clickhouse>
-              <storage_configuration>
-                  <disks>
-                      <hot>
-                          <path>/var/lib/clickhouse/hot/</path>
-                      </hot>
-                      <cold>
-                          <path>/var/lib/clickhouse/cold/</path>
-                      </cold>
-                  </disks>
-                  <policies>
-                      <local_primary>
-                          <volumes>
-                              <hot>
-                                  <disk>hot</disk>
-                              </hot>
-                              <cold>
-                                  <disk>cold</disk>
-                              </cold>
-                          </volumes>
-                      </local_primary>
-                  </policies>
-              </storage_configuration>
-          </clickhouse>
-          EOF
-
-          # Start ClickHouse container with config mounted (loads at startup)
-          docker run -d \
-            --name clickhouse \
-            --network host \
-            -e CLICKHOUSE_DB=default \
-            -e CLICKHOUSE_USER=default \
-            -e CLICKHOUSE_PASSWORD=ci_password \
-            -v /tmp/storage_policy.xml:/etc/clickhouse-server/config.d/storage_policy.xml:ro \
-            clickhouse/clickhouse-server:latest
-
-          # Wait for ClickHouse to be ready (use HTTP port — native port 9000 is unreliable with --network host)
-          echo "Waiting for ClickHouse to be ready..."
-          for i in {1..60}; do
-            if curl -sf "http://localhost:8123/?user=default&password=ci_password" -d "SELECT 1" >/dev/null 2>&1; then
-              echo "ClickHouse is ready"
-              break
-            fi
-            echo "Attempt $i: Waiting for ClickHouse..."
-            sleep 1
-          done
-
-          # Verify storage policy is available. The HTTP-readiness probe above can
-          # return success before system.storage_policies is queryable (race against
-          # config-load), so retry briefly instead of failing on the first transient
-          # connection-reset/exit-7. Observed flake on shard 2 of run 24928953505.
-          echo "Verifying storage policy..."
-          for i in {1..15}; do
-            if curl -sf "http://localhost:8123/?user=default&password=ci_password" -d "SELECT policy_name, volume_name, disks FROM system.storage_policies WHERE policy_name = 'local_primary'"; then
-              break
-            fi
-            if [ "$i" -eq 15 ]; then
-              echo "storage policy never became queryable" >&2
-              exit 1
-            fi
-            sleep 1
-          done
+        env:
+          CLICKHOUSE_PASSWORD: ci_password
+        run: bash .github/scripts/start-clickhouse-with-storage-policy.sh
 
       - name: Run ClickHouse migrations
         working-directory: langwatch
@@ -357,6 +298,30 @@ jobs:
           SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL: ${{ secrets.SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL }}
           GH_TOKEN: ${{ github.token }}
         run: bash .github/scripts/notify-slack-job-failure.sh lint
+
+  feature-parity:
+    needs: changes
+    if: needs.changes.outputs.feature-parity == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - uses: ./.github/actions/setup-pnpm-node
+        with:
+          cache-dependency-path: "langwatch/pnpm-lock.yaml"
+          install-dir: langwatch
+
+      - name: Check feature-file parity
+        working-directory: langwatch
+        run: pnpm check:feature-parity
+
+      - name: Notify Slack on failure
+        if: failure() && github.ref == 'refs/heads/main'
+        env:
+          SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL: ${{ secrets.SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL }}
+          GH_TOKEN: ${{ github.token }}
+        run: bash .github/scripts/notify-slack-job-failure.sh feature-parity
 
   build:
     needs: changes
@@ -451,6 +416,9 @@ jobs:
       - name: Test extract-failures.sh
         run: bash .github/scripts/__tests__/extract-failures.test.sh
 
+      - name: Test start-clickhouse-with-storage-policy.sh
+        run: bash .github/scripts/__tests__/start-clickhouse-with-storage-policy.test.sh
+
   ci-self-test:
     needs: changes
     if: needs.changes.outputs.relevant == 'true'
@@ -496,11 +464,11 @@ jobs:
           cat langwatch/test-failures.txt
 
   langwatch-app-complete:
-    needs: [changes, typecheck, test-unit, test-integration, lint, build, ci-scripts-test, ci-self-test]
+    needs: [changes, typecheck, test-unit, test-integration, lint, feature-parity, build, ci-scripts-test, ci-self-test]
     if: always()
     runs-on: ubuntu-latest
     steps:
       - uses: re-actors/alls-green@05ac9388f0aebcb5727afa17fcccfecd6f8ec5fe # v1.2.2
         with:
           jobs: ${{ toJSON(needs) }}
-          allowed-skips: typecheck, test-unit, test-integration, lint, build, ci-scripts-test, ci-self-test
+          allowed-skips: typecheck, test-unit, test-integration, lint, feature-parity, build, ci-scripts-test, ci-self-test

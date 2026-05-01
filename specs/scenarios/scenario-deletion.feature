@@ -17,7 +17,7 @@ Feature: Scenario Archiving
   # E2E: Happy Paths — Full User Workflows
   # ============================================================================
 
-  @e2e
+  @e2e @unimplemented
   Scenario: Archive a single scenario via row action menu
     When I am on the scenarios list page
     And I open the row action menu for "Angry double-charge refund"
@@ -27,7 +27,7 @@ Feature: Scenario Archiving
     Then "Angry double-charge refund" no longer appears in the scenarios list
     And the remaining 4 scenarios are still visible
 
-  @e2e
+  @e2e @unimplemented
   Scenario: Batch archive multiple selected scenarios
     When I am on the scenarios list page
     And I select the checkbox for "Cross-doc synthesis question"
@@ -43,7 +43,7 @@ Feature: Scenario Archiving
   # Integration: Row Selection UI
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: Select all checkbox toggles all visible rows
     When I am on the scenarios list page
     And I click the "select all" checkbox in the table header
@@ -51,14 +51,14 @@ Feature: Scenario Archiving
     When I click the "select all" checkbox again
     Then all visible scenario row checkboxes are unchecked
 
-  @integration
+  @integration @unimplemented
   Scenario: Select all with active filter only selects visible rows
     When I am on the scenarios list page
     And I filter by label "billing"
     And I click the "select all" checkbox in the table header
     Then only the filtered scenario checkboxes are checked
 
-  @integration
+  @integration @unimplemented
   Scenario: Deselecting all rows hides the batch action bar
     When I am on the scenarios list page
     And I select the checkbox for "SaaS documentation guidance"
@@ -70,13 +70,13 @@ Feature: Scenario Archiving
   # Integration: Single Archive via Row Action Menu
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: Row action menu contains archive option
     When I am on the scenarios list page
     And I open the row action menu for "Angry double-charge refund"
     Then I see an "Archive" option in the menu
 
-  @integration
+  @integration @unimplemented
   Scenario: Single archive confirmation modal shows scenario name
     When I am on the scenarios list page
     And I open the row action menu for "Angry double-charge refund"
@@ -86,7 +86,7 @@ Feature: Scenario Archiving
     And the modal shows "Archived scenarios will no longer appear in the library."
     And the modal has "Cancel" and "Archive" buttons
 
-  @integration
+  @integration @unimplemented
   Scenario: Cancel single archive dismisses modal without archiving
     When I am on the scenarios list page
     And I open the row action menu for "Angry double-charge refund"
@@ -99,7 +99,7 @@ Feature: Scenario Archiving
   # Integration: Batch Archive
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: Batch archive confirmation modal lists all selected scenarios
     When I am on the scenarios list page
     And I select 2 scenarios
@@ -109,7 +109,7 @@ Feature: Scenario Archiving
     And the modal shows "Archived scenarios will no longer appear in the library."
     And the modal has "Cancel" and "Archive" buttons
 
-  @integration
+  @integration @unimplemented
   Scenario: Cancel batch archive dismisses modal and preserves selection
     When I am on the scenarios list page
     And I select 2 scenarios
@@ -123,7 +123,7 @@ Feature: Scenario Archiving
   # Integration: Soft Archive Backend Behavior
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: Archived scenario is soft-deleted, not permanently removed
     Given I am authenticated in project "test-project"
     And scenario "To Archive" exists
@@ -131,21 +131,21 @@ Feature: Scenario Archiving
     Then "To Archive" is marked as archived
     And "To Archive" still exists in the database
 
-  @integration
+  @integration @unimplemented
   Scenario: Archived scenario does not appear in the scenario list
     Given I am authenticated in project "test-project"
     And scenario "Archived Scenario" has been archived
     When I view the scenario list for the project
     Then "Archived Scenario" is not in the list
 
-  @integration
+  @integration @unimplemented
   Scenario: Archived scenario is still accessible for historical lookups
     Given I am authenticated in project "test-project"
     And scenario "Archived Scenario" has been archived
     When I look up "Archived Scenario" including archived
     Then "Archived Scenario" is returned and marked as archived
 
-  @integration
+  @integration @unimplemented
   Scenario: Batch archive marks all selected scenarios as archived
     Given I am authenticated in project "test-project"
     And scenarios "Scenario A" and "Scenario B" exist
@@ -153,7 +153,7 @@ Feature: Scenario Archiving
     Then both scenarios are marked as archived
     And neither appears in the scenario list
 
-  @integration
+  @integration @unimplemented
   Scenario: Batch archive reports individual failures
     Given I am authenticated in project "test-project"
     And scenario "Valid Scenario" exists
@@ -166,7 +166,7 @@ Feature: Scenario Archiving
   # Integration: Archived Scenario Guardrails
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: Run again is blocked for archived scenarios
     Given I am authenticated in project "test-project"
     And scenario "Archived Runner" has been archived
@@ -174,7 +174,7 @@ Feature: Scenario Archiving
     Then the "Run again" button is disabled
     And I see a message indicating the scenario has been archived
 
-  @integration
+  @integration @unimplemented
   Scenario: Archived scenarios do not count against license limits
     Given I am authenticated in project "test-project"
     And the project has a scenario limit of 5
@@ -186,21 +186,21 @@ Feature: Scenario Archiving
   # Integration: Negative Paths
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: Archiving an already-archived scenario is idempotent
     Given I am authenticated in project "test-project"
     And scenario "Already Archived" has been archived
     When I archive "Already Archived"
     Then the request succeeds without error
 
-  @integration
+  @integration @unimplemented
   Scenario: Cannot archive a scenario from a different project
     Given I am authenticated in project "project-a"
     And scenario "Foreign Scenario" exists in project "project-b"
     When I archive "Foreign Scenario"
     Then I receive a not found error
 
-  @integration
+  @integration @unimplemented
   Scenario: Archiving a non-existent scenario returns not found
     Given I am authenticated in project "test-project"
     When I archive "nonexistent-id"
@@ -210,32 +210,32 @@ Feature: Scenario Archiving
   # Unit: Selection State Logic
   # ============================================================================
 
-  @unit
+  @unit @unimplemented
   Scenario: Toggling selection adds a scenario
     Given no scenarios are selected
     When I toggle selection for "scen_1"
     Then "scen_1" is selected
 
-  @unit
+  @unit @unimplemented
   Scenario: Toggling selection removes an already-selected scenario
     Given "scen_1" is selected
     When I toggle selection for "scen_1"
     Then no scenarios are selected
 
-  @unit
+  @unit @unimplemented
   Scenario: Select all selects all visible scenarios
     Given 5 scenarios are visible
     And no scenarios are selected
     When I select all
     Then all 5 scenarios are selected
 
-  @unit
+  @unit @unimplemented
   Scenario: Deselect all clears the selection
     Given 3 scenarios are selected
     When I deselect all
     Then no scenarios are selected
 
-  @unit
+  @unit @unimplemented
   Scenario: Selection count reflects number of selected scenarios
     Given "scen_1" and "scen_2" are selected
     Then the selection count is 2

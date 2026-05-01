@@ -35,13 +35,8 @@ class UserConfigError extends Error {
     this.name = "UserConfigError";
   }
 }
-import {
-  getProjectModelProviders,
-  prepareEnvKeys,
-  prepareLitellmParams,
-} from "../../api/routers/modelProviders.utils";
-import { resolveMaxTokensCeiling } from "../../modelProviders/resolveMaxTokensCeiling";
-import { clampMaxTokens } from "../../../utils/clampMaxTokens";
+import { EvaluatorConfigError } from "~/server/app-layer/evaluations/errors";
+import { setupModelEnv } from "~/server/app-layer/evaluations/evaluation-execution.factories";
 import { prisma } from "../../db";
 import {
   DEFAULT_MAPPINGS,
@@ -71,9 +66,9 @@ import {
 import { formatSpansDigest } from "../../tracer/spanToReadableSpan";
 import {
   AZURE_SAFETY_NOT_CONFIGURED_MESSAGE,
-  getAzureSafetyEnvFromProject,
   isAzureEvaluatorType,
 } from "../../app-layer/evaluations/azure-safety-env";
+import { getAzureSafetyEnvFromProject } from "../../app-layer/evaluations/azure-safety-env.server";
 import { runEvaluationWorkflow } from "../../workflows/runWorkflow";
 import {
   EVALUATIONS_QUEUE,
@@ -550,77 +545,6 @@ export const runEvaluation = async ({
     );
   }
 
-  const setupModelEnv = async (
-    model: string,
-    embeddings: boolean,
-    settings?: Record<string, unknown>,
-  ) => {
-    const modelProviders = await getProjectModelProviders(projectId);
-    const provider = model.split("/")[0]!;
-    const modelProvider = modelProviders[provider];
-    if (!modelProvider) {
-      throw `Provider ${provider} is not configured`;
-    }
-    if (!modelProvider.enabled) {
-      throw new UserConfigError(`Provider ${provider} is not enabled`);
-    }
-    const model_ = model.split("/").slice(1).join("/");
-    const modelList = embeddings
-      ? modelProvider.embeddingsModels
-      : modelProvider.models;
-    if (modelList && modelList.length > 0 && !modelList.includes(model_)) {
-      throw new UserConfigError(
-        `Model ${model_} is not in the ${
-          embeddings ? "embedding models" : "models"
-        } list for ${provider}, please select another model for running this evaluation`,
-      );
-    }
-    const params = await prepareLitellmParams({
-      model,
-      modelProvider,
-      projectId,
-    });
-
-    let env = Object.fromEntries(
-      Object.entries(params).map(([key, value]) => [
-        embeddings ? `X_LITELLM_EMBEDDINGS_${key}` : `X_LITELLM_${key}`,
-        value,
-      ]),
-    );
-
-    // Add generation params from settings (temperature, max_tokens, reasoning_effort, etc.)
-    // These will be injected by litellm_patch.py in langevals
-    const generationParams = [
-      "temperature",
-      "max_tokens",
-      "top_p",
-      "frequency_penalty",
-      "presence_penalty",
-      "seed",
-      "reasoning_effort",
-    ];
-    const maxTokensCeiling = resolveMaxTokensCeiling(model, modelProvider);
-    for (const param of generationParams) {
-      let value = settings?.[param];
-      if (value !== undefined && value !== null) {
-        if (param === "max_tokens" && typeof value === "number") {
-          value = clampMaxTokens(value, maxTokensCeiling);
-        }
-        const envKey = embeddings
-          ? `X_LITELLM_EMBEDDINGS_${param}`
-          : `X_LITELLM_${param}`;
-        env[envKey] = String(value);
-      }
-    }
-
-    // TODO: adapt embeddings_model_to_langchain on langevals to also use litellm and not need this
-    if (embeddings) {
-      env = { ...env, ...prepareEnvKeys(modelProvider) };
-    }
-
-    return env;
-  };
-
   if (
     settings &&
     "model" in settings &&
@@ -629,7 +553,7 @@ export const runEvaluation = async ({
   ) {
     evaluatorEnv = {
       ...evaluatorEnv,
-      ...(await setupModelEnv(settings.model, false, settings)),
+      ...(await setupModelEnv(settings.model, false, projectId, settings)),
     };
   }
 
@@ -640,7 +564,12 @@ export const runEvaluation = async ({
   ) {
     evaluatorEnv = {
       ...evaluatorEnv,
-      ...(await setupModelEnv(settings.embeddings_model, true, settings)),
+      ...(await setupModelEnv(
+        settings.embeddings_model,
+        true,
+        projectId,
+        settings,
+      )),
     };
   }
 
@@ -866,7 +795,7 @@ export const startEvaluationsWorker = (
 
   traceChecksWorker.on("failed", async (job, err) => {
     getJobProcessingCounter("evaluations", "failed").inc();
-    if (err instanceof UserConfigError) {
+    if (err instanceof UserConfigError || err instanceof EvaluatorConfigError) {
       logger.warn({ jobId: job?.id, error: err }, "job failed due to user configuration");
     } else {
       logger.error({ jobId: job?.id, error: err }, "job failed");

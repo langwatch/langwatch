@@ -1,4 +1,5 @@
 import { CanonicalizeSpanAttributesService } from "~/server/app-layer/traces/canonicalisation";
+import { ATTR_KEYS } from "~/server/app-layer/traces/canonicalisation/extractors/_constants";
 import {
   enrichRagContextIds,
   SpanNormalizationPipelineService,
@@ -41,6 +42,8 @@ import {
   TraceAttributeAccumulationService,
   TraceIOAccumulationService,
   ScenarioRoleCostService,
+  TracePromptAccumulationService,
+  accumulateEvents,
   shouldOverrideOutput,
   extractIOFromLogRecord,
   OUTPUT_SOURCE,
@@ -48,7 +51,10 @@ import {
 
 export type { TraceSummaryData };
 
-const COMPUTED_IO_SCHEMA_VERSION = "2025-12-18" as const;
+// 2026-04-28: trim trailing assistant from chat-shaped input
+const COMPUTED_IO_SCHEMA_VERSION = "2026-04-28" as const;
+
+const AI_SPAN_TYPES = new Set(["llm", "agent", "tool", "rag"]);
 
 // ─── Main composition ───────────────────────────────────────────────
 
@@ -67,6 +73,7 @@ const traceIOAccumulationService = new TraceIOAccumulationService(
   traceIOExtractionService,
 );
 const scenarioRoleCostService = new ScenarioRoleCostService(spanCostService);
+const tracePromptAccumulationService = new TracePromptAccumulationService();
 
 // ─── Main composition ───────────────────────────────────────────────
 
@@ -109,6 +116,38 @@ export function applySpanToSummary({
     span,
   });
 
+  // Pick the canonical root span. Precedence:
+  //   1. Named roots win over empty-named roots ("" = not set yet)
+  //   2. Among multiple named roots, earliest startTimeUnixMs wins
+  // After checkpoint reload, rootSpanStartTimeMs is undefined so the first
+  // root we see post-reload wins on tie. `traceName`, `rootSpanType`, and
+  // `rootSpanStartTimeMs` move together — they all describe the same span.
+  const isRootSpan = span.parentSpanId === null;
+  const spanStartMs = span.startTimeUnixMs;
+  const spanType = String(span.spanAttributes[ATTR_KEYS.SPAN_TYPE] ?? "");
+
+  let traceName = state.traceName;
+  let rootSpanType = state.rootSpanType;
+  let rootSpanStartTimeMs = state.rootSpanStartTimeMs;
+  if (isRootSpan) {
+    const haveNamedRoot = traceName !== "";
+    const isEarlierNamedRoot =
+      span.name !== "" &&
+      rootSpanStartTimeMs !== undefined &&
+      spanStartMs < rootSpanStartTimeMs;
+    if (!haveNamedRoot || isEarlierNamedRoot) {
+      traceName = span.name;
+      rootSpanType = spanType || null;
+      rootSpanStartTimeMs = spanStartMs;
+    }
+  }
+
+  const containsAi = state.containsAi || AI_SPAN_TYPES.has(spanType);
+
+  const events = accumulateEvents({ state, span });
+
+  const promptRollup = tracePromptAccumulationService.accumulate({ state, span });
+
   return {
     ...state,
     traceId: state.traceId || span.traceId,
@@ -117,6 +156,8 @@ export function applySpanToSummary({
     occurredAt: timing.occurredAt,
     totalDurationMs: timing.totalDurationMs,
     models,
+    traceName,
+    rootSpanStartTimeMs,
     ...tokens,
     ...status,
     computedInput: io.computedInput,
@@ -124,8 +165,12 @@ export function applySpanToSummary({
     outputFromRootSpan: io.outputFromRootSpan,
     outputSpanEndTimeMs: io.outputSpanEndTimeMs,
     blockedByGuardrail: io.blockedByGuardrail,
+    rootSpanType,
+    containsAi,
+    ...promptRollup,
     attributes,
     ...roleAccumulation,
+    events,
   };
 }
 
@@ -186,10 +231,24 @@ export class TraceSummaryFoldProjection
       outputFromRootSpan: false,
       outputSpanEndTimeMs: 0,
       blockedByGuardrail: false,
+      rootSpanType: null,
+      containsAi: false,
+      containsPrompt: false,
+      selectedPromptId: null,
+      selectedPromptSpanId: null,
+      selectedPromptStartTimeMs: null,
+      lastUsedPromptId: null,
+      lastUsedPromptVersionNumber: null,
+      lastUsedPromptVersionId: null,
+      lastUsedPromptSpanId: null,
+      lastUsedPromptStartTimeMs: null,
       topicId: null,
       subTopicId: null,
       annotationIds: [],
+      traceName: "",
+      rootSpanStartTimeMs: undefined,
       attributes: {},
+      events: [],
       scenarioRoleCosts: {},
       scenarioRoleLatencies: {},
       scenarioRoleSpans: {},

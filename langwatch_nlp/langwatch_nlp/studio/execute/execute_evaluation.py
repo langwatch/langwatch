@@ -1,4 +1,5 @@
 import logging
+import os
 import time
 from typing import Optional, cast
 import dspy
@@ -67,7 +68,10 @@ async def execute_evaluation(
             module = Module(run_evaluations=True)
             module.prevent_crashes()
 
-            langwatch.setup(workflow.api_key)
+            langwatch.setup(
+                api_key=workflow.api_key,
+                endpoint_url=os.environ.get("LANGWATCH_ENDPOINT"),
+            )
 
             origin = event.origin or "evaluation"
 

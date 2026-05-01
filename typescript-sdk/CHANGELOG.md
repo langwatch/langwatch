@@ -1,5 +1,39 @@
 # Changelog
 
+## [0.27.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v0.26.0...typescript-sdk@v0.27.0) (2026-04-30)
+
+
+### Features
+
+* **ai-gateway:** ship v1 GA — virtual keys, budgets, guardrails, Go data plane ([#3327](https://github.com/langwatch/langwatch/issues/3327)) ([bd6ce5b](https://github.com/langwatch/langwatch/commit/bd6ce5b09492d31471ce2120401dd97751348821))
+
+
+### Bug Fixes
+
+* align TS SDK setRAGContexts with backend canonical attribute key ([#3394](https://github.com/langwatch/langwatch/issues/3394)) ([e9b502f](https://github.com/langwatch/langwatch/commit/e9b502f286aec75db62933bf8e9c65dad1500b52))
+* **sdk:** bump protobufjs and liquidjs to patch high/critical CVEs ([#3608](https://github.com/langwatch/langwatch/issues/3608)) ([7d1180c](https://github.com/langwatch/langwatch/commit/7d1180c4ed9e6e8d4d6173dfbc12801315ab2fb9))
+
+
+### Miscellaneous
+
+* **deps-dev:** bump @eslint/js from 9.36.0 to 9.39.4 in /typescript-sdk ([#2098](https://github.com/langwatch/langwatch/issues/2098)) ([050bcf5](https://github.com/langwatch/langwatch/commit/050bcf5a0a6307af9976f9c7a141ca77ba67e81c))
+* **deps-dev:** bump @eslint/js in /typescript-sdk ([050bcf5](https://github.com/langwatch/langwatch/commit/050bcf5a0a6307af9976f9c7a141ca77ba67e81c))
+* **deps-dev:** bump @opentelemetry/sdk-trace-web from 2.1.0 to 2.6.0 in /typescript-sdk ([#2103](https://github.com/langwatch/langwatch/issues/2103)) ([f717283](https://github.com/langwatch/langwatch/commit/f71728360b64870461002ae0f48fed3616323932))
+* **deps-dev:** bump @opentelemetry/sdk-trace-web in /typescript-sdk ([f717283](https://github.com/langwatch/langwatch/commit/f71728360b64870461002ae0f48fed3616323932))
+* **deps-dev:** bump msw from 2.11.3 to 2.12.10 in /typescript-sdk ([#2091](https://github.com/langwatch/langwatch/issues/2091)) ([e6f387e](https://github.com/langwatch/langwatch/commit/e6f387ef643f1ea9bd7813b786573d80621bc891))
+* **deps-dev:** bump nock from 14.0.10 to 14.0.11 in /typescript-sdk ([#2102](https://github.com/langwatch/langwatch/issues/2102)) ([faa599a](https://github.com/langwatch/langwatch/commit/faa599acd2bee219a4a79a09f0f7723d6959e7c3))
+* **deps-dev:** bump nock from 14.0.11 to 14.0.13 in /typescript-sdk ([#3497](https://github.com/langwatch/langwatch/issues/3497)) ([45617f3](https://github.com/langwatch/langwatch/commit/45617f35ba6c4484739719c8c69e04a8e994f9d8))
+* **deps:** bump @opentelemetry/resources from 2.5.1 to 2.6.0 in /typescript-sdk ([#2104](https://github.com/langwatch/langwatch/issues/2104)) ([5a89f3e](https://github.com/langwatch/langwatch/commit/5a89f3eb25daec41b4fc5d5cb03b3ac36debe660))
+* **deps:** bump @opentelemetry/resources in /typescript-sdk ([5a89f3e](https://github.com/langwatch/langwatch/commit/5a89f3eb25daec41b4fc5d5cb03b3ac36debe660))
+* **deps:** bump @opentelemetry/sdk-metrics from 2.1.0 to 2.6.0 in /typescript-sdk ([#2095](https://github.com/langwatch/langwatch/issues/2095)) ([05cb1d5](https://github.com/langwatch/langwatch/commit/05cb1d5ab82db16565a4a809b8a30c5595d74cf4))
+* **deps:** bump @opentelemetry/sdk-metrics in /typescript-sdk ([05cb1d5](https://github.com/langwatch/langwatch/commit/05cb1d5ab82db16565a4a809b8a30c5595d74cf4))
+* **deps:** bump @opentelemetry/semantic-conventions from 1.39.0 to 1.40.0 in /typescript-sdk ([#2086](https://github.com/langwatch/langwatch/issues/2086)) ([f64ef11](https://github.com/langwatch/langwatch/commit/f64ef11bef640382c4f729935b9c94a2dc72ec54))
+* **deps:** bump @opentelemetry/semantic-conventions in /typescript-sdk ([f64ef11](https://github.com/langwatch/langwatch/commit/f64ef11bef640382c4f729935b9c94a2dc72ec54))
+* **deps:** bump liquidjs from 10.24.0 to 10.25.0 in /typescript-sdk ([#2100](https://github.com/langwatch/langwatch/issues/2100)) ([b63c592](https://github.com/langwatch/langwatch/commit/b63c592be2dfe23a5d15ace1980c081de4008458))
+* **deps:** bump the npm_and_yarn group across 1 directory with 2 updates ([#2361](https://github.com/langwatch/langwatch/issues/2361)) ([11336a7](https://github.com/langwatch/langwatch/commit/11336a703482f90a827b7cca1befef66d1f9becf))
+* **deps:** bump the npm_and_yarn group across 4 directories with 6 updates ([#3401](https://github.com/langwatch/langwatch/issues/3401)) ([63d21c7](https://github.com/langwatch/langwatch/commit/63d21c734d47dc629db6d3228d39976acf8b06cf))
+* **deps:** bump the npm_and_yarn group across 7 directories with 8 updates ([#3286](https://github.com/langwatch/langwatch/issues/3286)) ([6939c5c](https://github.com/langwatch/langwatch/commit/6939c5cce6112b132a82f0c3105e86aab6568f45))
+
 ## [0.26.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v0.25.0...typescript-sdk@v0.26.0) (2026-04-22)
 
 

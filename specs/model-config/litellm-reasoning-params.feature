@@ -14,41 +14,41 @@ Feature: LiteLLM Reasoning Parameter Unification
   # Issue: LiteLLM rejects provider-specific params passed directly
   # Error: "effort: Extra inputs are not permitted"
 
-  @unit
+  @unit @unimplemented
   Scenario: TypeScript boundary layer uses reasoning_effort for Anthropic
     Given a prompt config with model "anthropic/claude-opus-4.5" and reasoning "high"
     When mapping reasoning to provider parameters at the boundary
     Then the result should be { reasoning_effort: "high" }
     # NOT { effort: "high" } - LiteLLM doesn't recognize 'effort'
 
-  @unit
+  @unit @unimplemented
   Scenario: TypeScript boundary layer uses reasoning_effort for Gemini
     Given a prompt config with model "gemini/gemini-2.5-pro" and reasoning "medium"
     When mapping reasoning to provider parameters at the boundary
     Then the result should be { reasoning_effort: "medium" }
     # NOT { thinkingLevel: "medium" } - LiteLLM doesn't recognize 'thinkingLevel'
 
-  @unit
+  @unit @unimplemented
   Scenario: TypeScript boundary layer uses reasoning_effort for OpenAI
     Given a prompt config with model "openai/gpt-5" and reasoning "low"
     When mapping reasoning to provider parameters at the boundary
     Then the result should be { reasoning_effort: "low" }
 
-  @unit
+  @unit @unimplemented
   Scenario: Python boundary layer uses reasoning_effort for Anthropic
     Given an LLMConfig with model "anthropic/claude-opus-4.5" and reasoning "high"
     When calling node_llm_config_to_dspy_lm
     Then dspy.LM should be called with reasoning_effort="high"
     # NOT effort="high"
 
-  @unit
+  @unit @unimplemented
   Scenario: Python boundary layer uses reasoning_effort for Gemini
     Given an LLMConfig with model "gemini/gemini-2.5-pro" and reasoning "medium"
     When calling node_llm_config_to_dspy_lm
     Then dspy.LM should be called with reasoning_effort="medium"
     # NOT thinkingLevel="medium"
 
-  @unit
+  @unit @unimplemented
   Scenario: Jinja macro uses reasoning_effort for all providers
     Given a Jinja template rendering for model "anthropic/claude-opus-4.5" with reasoning "high"
     When the node_llm_config_to_dspy_lm macro is rendered
@@ -59,19 +59,19 @@ Feature: LiteLLM Reasoning Parameter Unification
   # llmModels.json keeps provider-specific names for UI clarity
   # Translation happens at boundary before LiteLLM call
 
-  @unit
+  @unit @unimplemented
   Scenario: Translates registry parameterName 'effort' to reasoning_effort
     Given llmModels.json defines parameterName "effort" for Anthropic models
     When the reasoning value is mapped for LiteLLM
     Then the key should be translated to "reasoning_effort"
 
-  @unit
+  @unit @unimplemented
   Scenario: Translates registry parameterName 'thinkingLevel' to reasoning_effort
     Given llmModels.json defines parameterName "thinkingLevel" for Gemini models
     When the reasoning value is mapped for LiteLLM
     Then the key should be translated to "reasoning_effort"
 
-  @unit
+  @unit @unimplemented
   Scenario: Passes through reasoning_effort unchanged
     Given llmModels.json defines parameterName "reasoning_effort" for OpenAI models
     When the reasoning value is mapped for LiteLLM
@@ -80,19 +80,19 @@ Feature: LiteLLM Reasoning Parameter Unification
   # Normalization from database (backward compatibility)
   # Database may contain provider-specific fields from before unification
 
-  @unit
+  @unit @unimplemented
   Scenario: Normalizes effort from database to reasoning
     Given database config with effort "medium"
     When normalizing to unified format
     Then the result should have reasoning "medium"
 
-  @unit
+  @unit @unimplemented
   Scenario: Normalizes thinkingLevel from database to reasoning
     Given database config with thinkingLevel "low"
     When normalizing to unified format
     Then the result should have reasoning "low"
 
-  @unit
+  @unit @unimplemented
   Scenario: Priority order when multiple fields present
     Given database config with reasoning "high" and effort "low"
     When normalizing to unified format

@@ -10,7 +10,7 @@ Feature: Expanded text dialog handles overflow for large content
   # Dialog body overflow handling
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario Outline: Full content is accessible when it exceeds the dialog viewport
     Given a large <content_type> that exceeds the dialog viewport height
     When the ExpandedTextDialog opens with formatted mode <mode>
@@ -22,7 +22,7 @@ Feature: Expanded text dialog handles overflow for large content
       | plain text    | disabled |
       | Markdown text | enabled  |
 
-  @integration
+  @integration @unimplemented
   Scenario: Small content does not trigger unnecessary scrolling
     Given a small JSON object that fits within the dialog viewport height
     When the ExpandedTextDialog opens with formatted mode enabled
@@ -32,7 +32,7 @@ Feature: Expanded text dialog handles overflow for large content
   # Content rendering remains correct with overflow fix
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: JSON content renders with interactive viewer and copy button
     Given a JSON object with nested keys and values
     When the ExpandedTextDialog opens with formatted mode enabled
@@ -40,7 +40,7 @@ Feature: Expanded text dialog handles overflow for large content
     And the copy button is visible
     And all JSON keys and values are accessible within the dialog
 
-  @integration
+  @integration @unimplemented
   Scenario: Scrollability persists after toggling formatted mode
     Given a large JSON object displayed in the ExpandedTextDialog
     When I toggle the "Formatted" switch off

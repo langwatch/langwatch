@@ -8,6 +8,9 @@ import { PipelineRegistry, type AppCommands } from "../event-sourcing/pipelineRe
 import type { ScenarioExecutionReactorHandle } from "../event-sourcing/pipelines/simulation-processing/reactors/scenarioExecution.reactor";
 import { App, getApp, globalForApp, initializeApp } from "./app";
 import { BroadcastService } from "./broadcast/broadcast.service";
+import { PresenceService } from "./presence/presence.service";
+import { RedisPresenceRepository } from "./presence/repositories/presence.redis.repository";
+import { InMemoryPresenceRepository } from "./presence/repositories/presence.memory.repository";
 import { createClickHouseClientFromConfig } from "./clients/clickhouse.factory";
 import { GatewayBudgetRepository } from "~/server/gateway/budget.repository";
 import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
@@ -27,6 +30,9 @@ import { EvaluationRunClickHouseRepository } from "./evaluations/repositories/ev
 import { NullEvaluationRunRepository } from "./evaluations/repositories/evaluation-run.repository";
 import { MonitorService } from "./monitors/monitor.service";
 import { PrismaMonitorRepository } from "./monitors/repositories/monitor.prisma.repository";
+import { TriggerService } from "./triggers/trigger.service";
+import { PrismaTriggerRepository } from "./triggers/repositories/trigger.prisma.repository";
+import { NullTriggerRepository } from "./triggers/repositories/trigger.repository";
 import { ExperimentService } from "../experiments/experiment.service";
 import { OrganizationService } from "./organizations/organization.service";
 import { PrismaOrganizationRepository } from "./organizations/repositories/organization.prisma.repository";
@@ -54,6 +60,12 @@ import { TokenizerService } from "./traces/tokenizer.service";
 import { LogRequestCollectionService } from "./traces/log-request-collection.service";
 import { MetricRequestCollectionService } from "./traces/metric-request-collection.service";
 import { TraceRequestCollectionService } from "./traces/trace-request-collection.service";
+import { TraceListService } from "./traces/trace-list.service";
+import { TraceListClickHouseRepository } from "./traces/repositories/trace-list.clickhouse.repository";
+import { NullTraceListRepository } from "./traces/repositories/trace-list.repository";
+import { PrismaTopicRepository } from "./topics/topic.prisma.repository";
+import { NullTopicRepository } from "./topics/null-topic.repository";
+import { TopicService } from "./topics/topic.service";
 import { TraceSummaryService } from "./traces/trace-summary.service";
 import { TraceSummaryClickHouseRepository } from "./traces/repositories/trace-summary.clickhouse.repository";
 import { NullTraceSummaryRepository } from "./traces/repositories/trace-summary.repository";
@@ -143,6 +155,15 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
   });
 
   const broadcast = new BroadcastService(redis);
+  const projects = traced(
+    new ProjectService(new PrismaProjectRepository(prisma)),
+    "ProjectService",
+  );
+  const presence = new PresenceService(
+    redis ? new RedisPresenceRepository(redis) : new InMemoryPresenceRepository(),
+    broadcast,
+    projects,
+  );
   const spanDedup = createSpanDedupeService(redis);
 
   const traceSummary = traced(
@@ -150,6 +171,24 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
       clickhouseEnabled ? new TraceSummaryClickHouseRepository(resolveClickHouseClient) : new NullTraceSummaryRepository(),
     ),
     "TraceSummaryService",
+  );
+  const evaluationRuns = traced(
+    new EvaluationRunService(
+      clickhouseEnabled ? new EvaluationRunClickHouseRepository(resolveClickHouseClient) : new NullEvaluationRunRepository(),
+    ),
+    "EvaluationRunService",
+  );
+  const topics = traced(
+    new TopicService(new PrismaTopicRepository(prisma)),
+    "TopicService",
+  );
+  const traceList = traced(
+    new TraceListService(
+      clickhouseEnabled ? new TraceListClickHouseRepository(resolveClickHouseClient) : new NullTraceListRepository(),
+      evaluationRuns,
+      topics,
+    ),
+    "TraceListService",
   );
   const spanStorage = traced(
     new SpanStorageService(
@@ -170,13 +209,6 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     "MetricRecordStorageService",
   );
 
-  const evaluationRuns = traced(
-    new EvaluationRunService(
-      clickhouseEnabled ? new EvaluationRunClickHouseRepository(resolveClickHouseClient) : new NullEvaluationRunRepository(),
-    ),
-    "EvaluationRunService",
-  );
-
   const experiments = traced(
     ExperimentService.create(prisma),
     "ExperimentService",
@@ -188,11 +220,6 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     ),
     "OrganizationService",
   );
-  const projects = traced(
-    new ProjectService(new PrismaProjectRepository(prisma)),
-    "ProjectService",
-  );
-
   const traceService = TraceService.create(prisma);
 
   const evaluationExecution = traced(
@@ -289,6 +316,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     new MonitorService(new PrismaMonitorRepository(prisma)),
     "MonitorService",
   );
+  const triggers = new TriggerService(new PrismaTriggerRepository(prisma));
   const tokenizer = new TokenizerService(
     config.disableTokenization ? new NullTokenizerClient() : new TiktokenClient(),
   );
@@ -367,6 +395,8 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     broadcast,
     projects,
     monitors,
+    triggers,
+    prisma,
     organizations,
     traces: { summary: traceSummary, spans: spanStorage },
     evaluations: { runs: evaluations.runs, execution: evaluations.execution },
@@ -411,6 +441,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
 
   const traces = {
     summary: traceSummary,
+    list: traceList,
     spans: spanStorage,
     logRecords: logRecordStorage,
     metricRecords: metricRecordStorage,
@@ -494,9 +525,11 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
   return initializeApp({
     config,
     broadcast,
+    presence,
     traces,
     evaluations,
     experiments,
+    triggers,
     dspySteps: { steps: dspySteps },
     simulations: { runs: simulationReads },
     suiteRuns: { runs: suiteRunService },
@@ -540,40 +573,51 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
     "ProjectService",
   );
 
+  const testBroadcast = new BroadcastService(null);
   return new App({
     config,
-    broadcast: new BroadcastService(null),
-    traces: {
-      summary: traced(new TraceSummaryService(new NullTraceSummaryRepository()), "TraceSummaryService"),
-      spans: traced(new SpanStorageService(new NullSpanStorageRepository()), "SpanStorageService"),
-      logRecords: traced(new LogRecordStorageService(new NullLogRecordStorageRepository()), "LogRecordStorageService"),
-      metricRecords: traced(new MetricRecordStorageService(new NullMetricRecordStorageRepository()), "MetricRecordStorageService"),
-      collection: traced(
-        new TraceRequestCollectionService({
-          dedup: createSpanDedupeService(null),
-          recordSpan: noop,
-        }),
-        "TraceRequestCollectionService",
-      ),
-      logCollection: traced(
-        new LogRequestCollectionService({
-          recordLog: noop,
-        }),
-        "LogRequestCollectionService",
-      ),
-      metricCollection: traced(
-        new MetricRequestCollectionService({
-          recordMetric: noop,
-        }),
-        "MetricRequestCollectionService",
-      ),
-    },
+    broadcast: testBroadcast,
+    presence: new PresenceService(
+      new InMemoryPresenceRepository(),
+      testBroadcast,
+      nullProjects,
+    ),
+    traces: (() => {
+      const nullEvalRuns = new EvaluationRunService(new NullEvaluationRunRepository());
+      return {
+        summary: traced(new TraceSummaryService(new NullTraceSummaryRepository()), "TraceSummaryService"),
+        list: traced(new TraceListService(new NullTraceListRepository(), nullEvalRuns, new TopicService(new NullTopicRepository())), "TraceListService"),
+        spans: traced(new SpanStorageService(new NullSpanStorageRepository()), "SpanStorageService"),
+        logRecords: traced(new LogRecordStorageService(new NullLogRecordStorageRepository()), "LogRecordStorageService"),
+        metricRecords: traced(new MetricRecordStorageService(new NullMetricRecordStorageRepository()), "MetricRecordStorageService"),
+        collection: traced(
+          new TraceRequestCollectionService({
+            dedup: createSpanDedupeService(null),
+            recordSpan: noop,
+          }),
+          "TraceRequestCollectionService",
+        ),
+        logCollection: traced(
+          new LogRequestCollectionService({
+            recordLog: noop,
+          }),
+          "LogRequestCollectionService",
+        ),
+        metricCollection: traced(
+          new MetricRequestCollectionService({
+            recordMetric: noop,
+          }),
+          "MetricRequestCollectionService",
+        ),
+      };
+    })(),
     evaluations: {
       runs: traced(new EvaluationRunService(new NullEvaluationRunRepository()), "EvaluationRunService"),
       execution: void 0 as unknown as AppDependencies["evaluations"]["execution"],
     },
     dspySteps: { steps: new DspyStepService(new NullDspyStepRepository()) },
     experiments: ExperimentService.create(testPrisma),
+    triggers: new TriggerService(new NullTriggerRepository()),
     simulations: { runs: SimulationRunService.create(null) },
     suiteRuns: { runs: SuiteRunService.create({ resolveClickHouseClient: null, startSuiteRun: noop, queueSimulationRun: noop }) },
     organizations: nullOrganizations,

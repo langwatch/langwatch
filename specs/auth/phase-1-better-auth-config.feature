@@ -16,6 +16,7 @@ Feature: BetterAuth config (unmounted)
   # Provider selection via NEXTAUTH_PROVIDER env
   # ============================================================================
 
+  @unimplemented
   Scenario: Credentials-only on-prem mode
     Given NEXTAUTH_PROVIDER is "email"
     And AUTH0_* envs are not set
@@ -23,6 +24,7 @@ Feature: BetterAuth config (unmounted)
     Then email-and-password signin is enabled
     And no social providers are configured
 
+  @unimplemented
   Scenario: Auth0 enterprise mode
     Given NEXTAUTH_PROVIDER is "auth0"
     And AUTH0_CLIENT_ID, AUTH0_CLIENT_SECRET, AUTH0_ISSUER are set
@@ -30,6 +32,7 @@ Feature: BetterAuth config (unmounted)
     Then the generic-oauth plugin lists an "auth0" provider
     And email-and-password is still enabled for admin fallback
 
+  @unimplemented
   Scenario: Google mode
     Given NEXTAUTH_PROVIDER is "google"
     And GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET are set
@@ -40,24 +43,28 @@ Feature: BetterAuth config (unmounted)
   # SSO domain + provider matching (ported from NextAuth signIn callback)
   # ============================================================================
 
+  @unimplemented
   Scenario: isSsoProviderMatch — Auth0 prefix match
     Given an organization with ssoProvider "waad|acme-azure-connection"
     And an OAuth account with providerId "auth0" and providerAccountId "waad|acme-azure-connection|user-123"
     When I call isSsoProviderMatch(org, account)
     Then it returns true
 
+  @unimplemented
   Scenario: isSsoProviderMatch — direct provider name match
     Given an organization with ssoProvider "google"
     And an OAuth account with providerId "google" and providerAccountId "google-id-123"
     When I call isSsoProviderMatch(org, account)
     Then it returns true
 
+  @unimplemented
   Scenario: isSsoProviderMatch — wrong provider rejected
     Given an organization with ssoProvider "okta"
     And an OAuth account with providerId "google" and providerAccountId "google-id-123"
     When I call isSsoProviderMatch(org, account)
     Then it returns false
 
+  @unimplemented
   Scenario: isSsoProviderMatch — org without ssoProvider
     Given an organization with ssoProvider null
     And any OAuth account
@@ -68,16 +75,19 @@ Feature: BetterAuth config (unmounted)
   # signIn guards (ported from NextAuth signIn callback)
   # ============================================================================
 
+  @unimplemented
   Scenario: Deactivated user is blocked
     Given a user exists with deactivatedAt set to yesterday
     When that user signs in via any provider
     Then the signin is rejected with an error
 
+  @unimplemented
   Scenario: DIFFERENT_EMAIL_NOT_ALLOWED guard
     Given a logged-in user with email "a@example.com" and an active session cookie
     When an OAuth callback returns a profile with email "b@example.com"
     Then the signin is rejected with a DIFFERENT_EMAIL_NOT_ALLOWED error
 
+  @unimplemented
   Scenario: New user with matching SSO domain joins the SSO org
     Given an organization with ssoDomain "acme.com" exists
     And no user exists with email "new@acme.com"
@@ -86,6 +96,7 @@ Feature: BetterAuth config (unmounted)
     And the user is added to the organization as a MEMBER
     And an Account row is created for the OAuth account
 
+  @unimplemented
   Scenario: Existing user with correct SSO provider auto-links
     Given an organization with ssoDomain "acme.com" and ssoProvider "google" exists
     And a user exists with email "existing@acme.com" and pendingSsoSetup=false
@@ -93,6 +104,7 @@ Feature: BetterAuth config (unmounted)
     Then the Account row is upserted
     And pendingSsoSetup remains false
 
+  @unimplemented
   Scenario: Existing user with wrong SSO provider gets pending flag
     Given an organization with ssoDomain "acme.com" and ssoProvider "okta" exists
     And a user exists with email "existing@acme.com" and pendingSsoSetup=false
@@ -113,6 +125,7 @@ Feature: BetterAuth config (unmounted)
   # active on each request.
   # ============================================================================
 
+  @unimplemented
   Scenario: The BetterAuth admin plugin is intentionally omitted
     Given the BetterAuth instance is initialized
     When I inspect the configured plugins
@@ -124,12 +137,14 @@ Feature: BetterAuth config (unmounted)
   # bcrypt-compatible password verification
   # ============================================================================
 
+  @unimplemented
   Scenario: Legacy bcrypt hashes still verify
     Given an existing user has a bcrypt hash from the NextAuth system stored in the database
     When that user tries to sign in with the correct plaintext password
     Then BetterAuth's credentials provider verifies the bcrypt hash successfully
     And the signin succeeds
 
+  @unimplemented
   Scenario: Wrong password is rejected
     Given an existing user has a bcrypt hash
     When that user signs in with the wrong plaintext password
@@ -146,6 +161,7 @@ Feature: BetterAuth config (unmounted)
   # detailed cutover assertions.
   # ============================================================================
 
+  @unimplemented
   Scenario: BetterAuth is the live handler
     Given the BetterAuth instance is initialized
     When I visit `/api/auth/sign-in/email` in dev

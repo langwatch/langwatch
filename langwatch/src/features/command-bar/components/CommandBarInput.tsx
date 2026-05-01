@@ -22,7 +22,7 @@ export function CommandBarInput({
 }: CommandBarInputProps) {
   return (
     <HStack px={4} py={3} gap={3}>
-      <Box color="fg.muted" flexShrink={0}>
+      <Box color="fg.subtle" flexShrink={0}>
         <Search size={20} />
       </Box>
       <Input
@@ -37,7 +37,7 @@ export function CommandBarInput({
         background="transparent"
         fontSize="15px"
         flex={1}
-        _placeholder={{ color: "fg.muted" }}
+        _placeholder={{ color: "fg.subtle" }}
         _focus={{
           boxShadow: "none",
           outline: "none",
@@ -45,7 +45,7 @@ export function CommandBarInput({
         }}
       />
       {isLoading && query.length >= MIN_SEARCH_QUERY_LENGTH && (
-        <Spinner size="sm" color="fg.muted" />
+        <Spinner size="sm" color="fg.subtle" />
       )}
     </HStack>
   );

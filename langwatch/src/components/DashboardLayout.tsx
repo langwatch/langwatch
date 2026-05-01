@@ -11,38 +11,33 @@ import {
   useBreakpointValue,
   VStack,
 } from "@chakra-ui/react";
-import { OrganizationUserRole } from "@prisma/client";
-import type { Organization, Project, Team } from "@prisma/client";
+import { OrganizationUserRole, type Organization, type Project, type Team } from "@prisma/client";
 import { Activity, Building2, ChevronDown, ChevronRight, Info, KeyRound, Plus } from "lucide-react";
+import numeral from "numeral";
+import React, { useState } from "react";
 import { ErrorBoundary } from "react-error-boundary";
-import { PageErrorFallback } from "./ui/PageErrorFallback";
 import { NotFoundScene } from "~/components/NotFoundScene";
 import Head from "~/utils/compat/next-head";
 import { useRouter } from "~/utils/compat/next-router";
-import { signOut } from "~/utils/auth-client";
-import numeral from "numeral";
-import React, { useState } from "react";
+import { ImpersonationBanner } from "../../ee/admin/ImpersonationBanner";
+import { ImpersonationSwitchBackMenuItem } from "../../ee/admin/ImpersonationSwitchBackMenuItem";
+import { CommandBarTrigger } from "../features/command-bar";
 import { useDrawer } from "../hooks/useDrawer";
 import { useFeatureFlag } from "../hooks/useFeatureFlag";
 import { useLiteMemberGuard } from "../hooks/useLiteMemberGuard";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
-import { useUpgradeModalStore } from "../stores/upgradeModalStore";
-import { UpgradeModal } from "./UpgradeModal";
 import { usePlanManagementUrl } from "../hooks/usePlanManagementUrl";
 import { usePostHogIdentify } from "../hooks/usePostHogIdentify";
 import { usePublicEnv } from "../hooks/usePublicEnv";
 import { useRequiredSession } from "../hooks/useRequiredSession";
-import { ImpersonationBanner } from "../../ee/admin/ImpersonationBanner";
-import { ImpersonationSwitchBackMenuItem } from "../../ee/admin/ImpersonationSwitchBackMenuItem";
+import { SavedViewsProvider } from "../hooks/useSavedViews";
 import type { FullyLoadedOrganization } from "../server/app-layer/organizations/repositories/organization.repository";
+import { useUpgradeModalStore } from "../stores/upgradeModalStore";
 import { api } from "../utils/api";
 import { findCurrentRoute, projectRoutes, type Route } from "../utils/routes";
 import { trackEvent } from "../utils/tracking";
-import { CurrentDrawer } from "./CurrentDrawer";
-import { SavedViewsBar } from "./messages/SavedViewsBar";
 import { AnnouncementBanner } from "./AnnouncementBanner";
-import { SdkRadarBanner } from "./SdkRadarBanner";
-import { SavedViewsProvider } from "../hooks/useSavedViews";
+import { CurrentDrawer } from "./CurrentDrawer";
 import { FullLogo } from "./icons/FullLogo";
 import { LogoIcon } from "./icons/LogoIcon";
 import { LoadingScreen } from "./LoadingScreen";
@@ -51,9 +46,12 @@ import { PersonalSidebar } from "./PersonalSidebar";
 import { ProjectAvatar } from "./ProjectAvatar";
 import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
 import { useWorkspaceData } from "./useWorkspaceData";
+import { SavedViewsBar } from "./messages/SavedViewsBar";
+import { SdkRadarBanner } from "./SdkRadarBanner";
+import { UpgradeModal } from "./UpgradeModal";
 import { Link } from "./ui/link";
 import { Menu } from "./ui/menu";
-import { CommandBarTrigger } from "../features/command-bar";
+import { PageErrorFallback } from "./ui/PageErrorFallback";
 
 const Breadcrumbs = ({ currentRoute }: { currentRoute: Route | undefined }) => {
   // No redirects from the breadcrumb path — it only reads `project` for the
@@ -161,8 +159,7 @@ export const ProjectSelector = React.memo(function ProjectSelector({
         <Box zIndex="popover" padding={0}>
           {open && (
             <Menu.Content>
-              <>
-                {projectGroups
+              {projectGroups
                   .filter((projectGroup) => {
                     // Org admins created via RoleBinding-only flow have no TeamUser row
                     // but still have full access. Resolve the current user's
@@ -269,7 +266,6 @@ export const ProjectSelector = React.memo(function ProjectSelector({
                       />
                     </Menu.ItemGroup>
                   ))}
-              </>
             </Menu.Content>
           )}
         </Box>
@@ -425,7 +421,7 @@ export const DashboardLayout = ({
       <Head>
         <title>
           LangWatch{project ? ` - ${project.name}` : ""}
-          {currentRoute && currentRoute.title != "Home"
+          {currentRoute && currentRoute.title !== "Home"
             ? ` - ${currentRoute?.title}`
             : ""}
         </title>
@@ -662,7 +658,7 @@ export const DashboardLayout = ({
         width="full"
         alignItems="stretch"
         gap={0}
-        minHeight="calc(100vh - 60px)"
+        minHeight="calc(100vh - 56px)"
       >
         {isPersonalScopeRoute ? (
           <PersonalSidebar isCompact={compactMenu} />
@@ -674,11 +670,6 @@ export const DashboardLayout = ({
           width="full"
           height="full"
           background="bg.page"
-          borderTopLeftRadius="xl"
-          boxShadow="-4px -2px 12px 0px rgba(0, 0, 0, 0.06)"
-          _dark={{
-            boxShadow: "-4px -2px 16px 0px rgba(0, 0, 0, 0.4)",
-          }}
           minHeight="calc(100vh - 56px)"
           maxHeight="calc(100vh - 56px)"
           maxWidth={`calc(100vw - ${menuWidth})`}
@@ -692,6 +683,7 @@ export const DashboardLayout = ({
           display="flex"
           minHeight="calc(100vh - 56px)"
           maxHeight="calc(100vh - 56px)"
+          position="relative"
         >
           <VStack width="full" gap={0} {...props}>
             {/* Alert banners */}

@@ -13,6 +13,29 @@ import { api } from "../utils/api";
 import { usePublicEnv } from "./usePublicEnv";
 import { noOrgBouncerRoutes, publicRoutes, useRequiredSession } from "./useRequiredSession";
 
+/** @internal Exported for testing only */
+export function resolveProjectRedirectSubPath({
+  pathname,
+  oldProject,
+}: {
+  pathname: string;
+  oldProject: string;
+}): string {
+  const decodedPrefix = `/${oldProject}`;
+  const encodedPrefix = `/${encodeURIComponent(oldProject)}`;
+
+  const matchSegmentPrefix = (prefix: string): string | null => {
+    if (!pathname.startsWith(prefix)) return null;
+    const rest = pathname.slice(prefix.length);
+    if (rest !== "" && !rest.startsWith("/")) return null;
+    return rest;
+  };
+
+  return matchSegmentPrefix(decodedPrefix)
+    ?? matchSegmentPrefix(encodedPrefix)
+    ?? "";
+}
+
 export const useOrganizationTeamProject = (
   {
     redirectToOnboarding,
@@ -56,8 +79,19 @@ export const useOrganizationTeamProject = (
     { isDemo: isDemo },
     {
       enabled: !!session.data || !isPublicRoute,
-      staleTime: keepFetching ? undefined : Infinity,
+      // Small reference query that drives load-bearing client state (current
+      // project incl. defaultModel). Cheap to refetch — prefer freshness over
+      // a "cache forever" default. Background refetch on focus picks up edits
+      // made via SDK, API, or another tab.
+      staleTime: keepFetching ? 0 : 30_000,
+      refetchOnWindowFocus: true,
       refetchInterval: keepFetching ? 5_000 : undefined,
+      // Skip the HTTP batch link: this query is mounted at the app shell and
+      // refetches on focus/route change, so left in the batch it would drag
+      // the drawer-open burst (organization.getAll + 7 trace procedures —
+      // measured at ~2.5s, blocked by the slowest). On its own connection it
+      // runs in parallel without affecting the trace fan-out.
+      trpc: { context: { skipBatch: true } },
     },
   );
 
@@ -259,11 +293,14 @@ export const useOrganizationTeamProject = (
       finalProject.slug !== router.query.project
     ) {
       // Preserve the sub-path so /bad-slug/messages → /good-slug/messages
+      // query.project is decoded by React Router (%5Bproject%5D → [project]),
+      // but asPath keeps percent-encoding. Match both forms, always slice from
+      // the original encoded pathname to avoid decoding characters in the sub-path.
       const url = new URL(router.asPath, window.location.origin);
-      const oldPrefix = `/${router.query.project as string}`;
-      const subPath = url.pathname.startsWith(oldPrefix)
-        ? url.pathname.slice(oldPrefix.length)
-        : "";
+      const subPath = resolveProjectRedirectSubPath({
+        pathname: url.pathname,
+        oldProject: router.query.project as string,
+      });
       void router.push(`/${finalProject.slug}${subPath}${url.search}`);
     }
   }, [

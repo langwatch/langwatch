@@ -30,3 +30,18 @@ export const evaluationRunDataSchema = z.object({
 });
 
 export type EvaluationRunData = z.infer<typeof evaluationRunDataSchema>;
+
+export const evalSummarySchema = evaluationRunDataSchema.pick({
+  evaluationId: true,
+  evaluatorId: true,
+  evaluatorType: true,
+  evaluatorName: true,
+  traceId: true,
+  isGuardrail: true,
+  status: true,
+  score: true,
+  passed: true,
+  label: true,
+});
+
+export type EvalSummary = z.infer<typeof evalSummarySchema>;

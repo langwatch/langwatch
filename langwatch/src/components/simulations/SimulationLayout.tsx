@@ -6,7 +6,12 @@ import {
   Text,
 } from "@chakra-ui/react";
 import { ArrowLeft } from "react-feather";
-import { PeriodSelector, type Period } from "~/components/PeriodSelector";
+import {
+  PeriodSelector,
+  type Period,
+  type PeriodMode,
+  type RelativePresetKey,
+} from "~/components/PeriodSelector";
 import { useSimulationRouter } from "~/hooks/simulations";
 import {
   isOnPlatformSet,
@@ -19,15 +24,24 @@ import { SetRunHistorySidebar } from "./set-run-history-sidebar";
 export const SimulationLayout = ({
   children,
   period,
+  mode,
   setPeriod,
+  setRelativePeriod,
 }: {
   children: React.ReactNode;
   period: Period;
+  mode: PeriodMode;
   setPeriod: (startDate: Date, endDate: Date) => void;
+  setRelativePeriod: (presetKey: RelativePresetKey) => void;
 }) => {
   return (
     <DashboardLayout>
-      <Header period={period} setPeriod={setPeriod} />
+      <Header
+        period={period}
+        mode={mode}
+        setPeriod={setPeriod}
+        setRelativePeriod={setRelativePeriod}
+      />
       <HStack w="full" h="full" alignItems="stretch" gap={0} bg="bg.surface">
         <Box
           w="340px"
@@ -58,10 +72,14 @@ export const SimulationLayout = ({
 
 const Header = ({
   period,
+  mode,
   setPeriod,
+  setRelativePeriod,
 }: {
   period: Period;
+  mode: PeriodMode;
   setPeriod: (startDate: Date, endDate: Date) => void;
+  setRelativePeriod: (presetKey: RelativePresetKey) => void;
 }) => {
   const { scenarioSetId, goToSimulationSets } = useSimulationRouter();
   const displayName =
@@ -85,7 +103,12 @@ const Header = ({
           {displayName}
         </Text>
         <Spacer />
-        <PeriodSelector period={period} setPeriod={setPeriod} />
+        <PeriodSelector
+          period={period}
+          mode={mode}
+          setPeriod={setPeriod}
+          setRelativePeriod={setRelativePeriod}
+        />
       </HStack>
     </Box>
   );

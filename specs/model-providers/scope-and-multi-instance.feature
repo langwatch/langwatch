@@ -62,7 +62,7 @@ Feature: Model Provider Scope and Multi-Instance
     And I have only "project:manage" on "web-app"
     Then the Scope field is pre-filled with project "web-app"
 
-  @integration
+  @integration @unimplemented
   Scenario: Save a provider with multiple scopes
     Given I open the Create Model Provider drawer for "openai"
     When I set the name to "OpenAI Production"
@@ -75,7 +75,7 @@ Feature: Model Provider Scope and Multi-Instance
       | ORGANIZATION | acme_org_id   |
       | TEAM         | platform_team |
 
-  @integration
+  @integration @unimplemented
   Scenario: Scope is editable on an existing row
     Given I have a ModelProvider "OpenAI Production" scoped to org "acme"
     When I open its edit drawer
@@ -88,7 +88,7 @@ Feature: Model Provider Scope and Multi-Instance
     # Editing scope of a row with saved credentials does NOT rotate the key;
     # we only add/remove scope rows.
 
-  @integration
+  @integration @unimplemented
   Scenario: Removing the last scope prevents save
     Given I have a ModelProvider "OpenAI Production"
     When I clear every scope entry in the picker
@@ -96,14 +96,14 @@ Feature: Model Provider Scope and Multi-Instance
     Then I see a validation error "Provider must have at least one scope"
     And the row is not modified
 
-  @integration
+  @integration @unimplemented
   Scenario: Adding an ORGANIZATION scope requires organization:manage
     Given I am a member of org "acme" without "organization:manage"
     When I open the Create Model Provider drawer
     Then the Organization group in the Scope picker is disabled
     And hovering shows "You need organization:manage permission"
 
-  @integration
+  @integration @unimplemented
   Scenario: Adding a TEAM scope requires team:manage for that team
     Given I have "team:manage" on team "platform" but not on team "marketing"
     When I open the Create Model Provider drawer
@@ -120,7 +120,7 @@ Feature: Model Provider Scope and Multi-Instance
   # check. Users disambiguate duplicates through the scope chips on the
   # list page and the scope-grouped header in model selectors.
 
-  @integration
+  @integration @unimplemented
   Scenario: Create a second OpenAI row under a different scope
     Given the org "acme" already has a ModelProvider named "OpenAI" scoped to project "web-app"
     When I open the Create Model Provider drawer and select provider "openai"
@@ -130,7 +130,7 @@ Feature: Model Provider Scope and Multi-Instance
     Then two ModelProviders now exist with name "OpenAI"
     And each one is disambiguated by its distinct scope set
 
-  @integration
+  @integration @unimplemented
   Scenario: Users can edit the name to something custom
     Given I am editing a ModelProvider row
     When I change the Name field to "Production OpenAI"
@@ -157,7 +157,7 @@ Feature: Model Provider Scope and Multi-Instance
     When I navigate to the Model Providers settings page
     Then I do not see a ProjectSelector in the page header
 
-  @integration
+  @integration @unimplemented
   Scenario: Model Providers page lists all accessible rows across scopes
     Given I have access to org "acme" with team "platform" and projects "web-app", "mobile-app"
     And the following ModelProvider rows exist:
@@ -170,7 +170,7 @@ Feature: Model Provider Scope and Multi-Instance
     Then I see all four rows listed
     And each row shows the scope chips corresponding to its ModelProviderScope entries
 
-  @integration
+  @integration @unimplemented
   Scenario: Rows outside my permission are hidden
     Given a ModelProvider "OpenAI Other Team" scoped to team "marketing"
     And I have no access to team "marketing"
@@ -181,7 +181,7 @@ Feature: Model Provider Scope and Multi-Instance
   # Model selectors: grouping + wire format
   # ────────────────────────────────────────────────────────────────────────────
 
-  @integration
+  @integration @unimplemented
   Scenario: Model selector groups options by MP name when duplicates exist
     Given I have two openai ModelProviders: "OpenAI Shared" (ORG) and "OpenAI Mobile" (PROJECT=mobile-app)
     When I open the model picker in the Prompt Playground
@@ -190,14 +190,14 @@ Feature: Model Provider Scope and Multi-Instance
     And choosing a model from "OpenAI Shared" saves the wire value as "{OpenAIShared.id}/gpt-5"
     And choosing a model from "OpenAI Mobile" saves the wire value as "{OpenAIMobile.id}/gpt-5"
 
-  @integration
+  @integration @unimplemented
   Scenario: Model selector hides grouping when a provider has only one row
     Given I have one "OpenAI" ModelProvider and one "Anthropic" ModelProvider
     When I open the model picker
     Then options are grouped per provider ("OpenAI", "Anthropic")
     And the wire value saved for gpt-5 is the canonical "{OpenAI.id}/gpt-5"
 
-  @integration
+  @integration @unimplemented
   Scenario: Legacy "provider/model" wire value resolves when exactly one MP matches
     Given I have exactly one accessible "openai" ModelProvider "OpenAI Shared"
     And a previously-saved Prompt with model "openai/gpt-5"
@@ -205,7 +205,7 @@ Feature: Model Provider Scope and Multi-Instance
     Then it resolves against "OpenAI Shared"
     And subsequent save-operations persist the canonical "{OpenAIShared.id}/gpt-5"
 
-  @integration
+  @integration @unimplemented
   Scenario: Legacy wire value errors when multiple MPs match
     Given I have two accessible "openai" ModelProviders "OpenAI Shared" and "OpenAI Mobile"
     And a Prompt previously saved with the legacy value "openai/gpt-5"
@@ -213,7 +213,7 @@ Feature: Model Provider Scope and Multi-Instance
     Then the UI shows a banner "Ambiguous provider — re-select your model"
     And the model picker surfaces a clear error state
 
-  @integration
+  @integration @unimplemented
   Scenario: Legacy wire value errors when no MPs match
     Given I have no accessible "cohere" ModelProvider
     And a Prompt was saved long ago with "cohere/command-r"
@@ -224,7 +224,7 @@ Feature: Model Provider Scope and Multi-Instance
   # Integrations: bind / langwatch_nlp / langevals / workflow
   # ────────────────────────────────────────────────────────────────────────────
 
-  @integration
+  @integration @unimplemented
   Scenario: Gateway provider-binding drawer lists every accessible MP
     Given I have two openai ModelProviders "OpenAI Shared" (ORG) and "OpenAI Mobile" (PROJECT)
     And I am creating a GatewayProviderCredential in project "mobile-app"
@@ -232,14 +232,14 @@ Feature: Model Provider Scope and Multi-Instance
     Then both rows appear, each showing their name and scope chips
     And choosing one persists GatewayProviderCredential.modelProviderId accordingly
 
-  @integration
+  @integration @unimplemented
   Scenario: langwatch_nlp receives resolved credentials, not MP ids
     Given a Workflow node selects "{OpenAIShared.id}/gpt-5"
     When the workflow executes
     Then langwatch_nlp receives a provider + api_key + base_url payload for that MP row
     And the payload shape is unchanged from the legacy flow (langwatch_nlp has zero changes)
 
-  @integration
+  @integration @unimplemented
   Scenario: Evaluator runs against the MP the user selected
     Given I pick "OpenAI Production / gpt-5" in an evaluator config
     When the evaluator runs
@@ -260,7 +260,7 @@ Feature: Model Provider Scope and Multi-Instance
   #      (scopeType, scopeId) pairs from the user's membership set; rows whose
   #      every scope falls outside that set are never read.
 
-  @integration @security
+  @integration @security @unimplemented
   Scenario: Service rejects assigning an MP to an org the user is not a member of
     Given I am a member of org "acme" only
     And I tamper with a tRPC payload to set scopes to ORGANIZATION=beta
@@ -270,7 +270,7 @@ Feature: Model Provider Scope and Multi-Instance
     And no ModelProviderScope row is created
     And an audit log entry is written with outcome FAILED_AUTHZ
 
-  @integration @security
+  @integration @security @unimplemented
   Scenario: Service rejects assigning an MP to a team the user cannot manage
     Given I am a member of team "platform" in org "acme"
     And I have no manage permission on team "marketing" in the same org
@@ -278,7 +278,7 @@ Feature: Model Provider Scope and Multi-Instance
     Then the service throws "Forbidden: team:manage required on marketing"
     And the row is not created
 
-  @integration @security
+  @integration @security @unimplemented
   Scenario: Service rejects updating scopes to add a team the user cannot manage
     Given I own an MP scoped to TEAM=platform
     When I submit an update that replaces scopes with [TEAM=platform, TEAM=marketing]
@@ -288,7 +288,7 @@ Feature: Model Provider Scope and Multi-Instance
     # Partial-success is explicitly disallowed — either every scope passes authz
     # or the whole write fails.
 
-  @integration @security
+  @integration @security @unimplemented
   Scenario: listAccessibleForUser never returns rows outside the user's membership
     Given a ModelProvider "X" scoped to team "marketing"
     And I have no access to team "marketing" or any scope that intersects it
@@ -297,7 +297,7 @@ Feature: Model Provider Scope and Multi-Instance
     And even the row's id is absent from the response
     # This protects enumeration: we don't want clients probing ids.
 
-  @integration @security
+  @integration @security @unimplemented
   Scenario: getById rejects reading an MP outside the user's scope
     Given a ModelProvider "Y" scoped to team "marketing"
     And I have no access to team "marketing"
@@ -306,7 +306,7 @@ Feature: Model Provider Scope and Multi-Instance
     # Returning 404 instead of 403 prevents information leakage about whether
     # a given id exists across tenants.
 
-  @integration @security
+  @integration @security @unimplemented
   Scenario: Deletion requires manage permission on EVERY current scope of the MP
     Given a ModelProvider "Z" scoped to [ORG=acme, TEAM=platform]
     And I have team:manage on platform but not organization:manage on acme
@@ -315,7 +315,7 @@ Feature: Model Provider Scope and Multi-Instance
     And the row is unmodified
     # A narrower-scope manager cannot silently demolish an org-shared credential.
 
-  @integration @security
+  @integration @security @unimplemented
   Scenario: UI disables scope options the user cannot manage
     Given I am a member of org "acme" with only project:manage on project "web-app"
     When I open the Create Model Provider drawer from "web-app"
@@ -323,7 +323,7 @@ Feature: Model Provider Scope and Multi-Instance
     And the Teams group is disabled
     And only project "web-app" is selectable under Projects
 
-  @integration @security
+  @integration @security @unimplemented
   Scenario: Gateway bind picker only lists MPs the user can read
     Given a ModelProvider "X" scoped to team "marketing" I cannot access
     And a ModelProvider "Y" scoped to org "acme" I can access

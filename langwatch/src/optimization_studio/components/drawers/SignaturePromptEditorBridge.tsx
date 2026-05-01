@@ -191,15 +191,15 @@ export function SignaturePromptEditorBridge({
     if (signatureNode.data.localPromptConfig) {
       return signatureNode.data.localPromptConfig;
     }
-    // If the node has a promptId, the drawer fetches the prompt from DB
-    if (signatureNode.data.promptId) {
-      return undefined;
-    }
-    // No promptId and no localPromptConfig - check for inline parameters
+    // Fall back to extracting config from inline parameters.
+    // When promptId is set and the prompt exists in DB, the drawer will use
+    // the DB data and ignore this. When the prompt is NOT found (e.g. after
+    // importing a workflow from another project), this provides the fallback
+    // so the drawer can display the node's actual inline configuration
+    // instead of an empty "New Prompt" form.
     return nodeDataToLocalPromptConfig(signatureNode.data);
   }, [
     signatureNode.data.localPromptConfig,
-    signatureNode.data.promptId,
     signatureNode.data,
   ]);
 

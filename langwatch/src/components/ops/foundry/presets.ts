@@ -1,5 +1,5 @@
 import { shortId } from "./types";
-import type { Preset, SpanConfig } from "./types";
+import type { Preset, SpanConfig, SpanEvent } from "./types";
 
 function span(
   overrides: Partial<SpanConfig> & { name: string; type: SpanConfig["type"] }
@@ -556,6 +556,7 @@ export const builtInPresets: Preset[] = [
               durationMs: 50,
               prompt: {
                 promptId: "customer-support-v2",
+                version: 3,
                 versionId: "ver-abc123",
                 variables: {
                   customer_name: "Alice",
@@ -1308,4 +1309,649 @@ export const builtInPresets: Preset[] = [
       ],
     },
   },
+
+  // === Feature-specific presets ===
+
+  {
+    id: "user-feedback-events",
+    name: "User Feedback (Thumbs Up/Down)",
+    description: "A chatbot trace with thumbs up, thumbs down, and custom feedback events",
+    builtIn: true,
+    config: {
+      id: "user-feedback-events",
+      name: "User Feedback (Thumbs Up/Down)",
+      resourceAttributes: { "service.name": "feedback-chatbot" },
+      metadata: { userId: "user-feedback-1", threadId: "conv-feedback-1" },
+      spans: [
+        span({
+          name: "conversation",
+          type: "chain",
+          durationMs: 4000,
+          children: [
+            span({
+              name: "turn-1",
+              type: "llm",
+              durationMs: 600,
+              llm: {
+                requestModel: "gpt-4o",
+                messages: [
+                  { role: "user", content: "How do I reset my password?" },
+                  { role: "assistant", content: "To reset your password, go to Settings > Security > Change Password. You'll need to verify your email first." },
+                ],
+                metrics: { promptTokens: 25, completionTokens: 35 },
+              },
+              events: [
+                {
+                  name: "langwatch.track_event",
+                  offsetMs: 650,
+                  attributes: {
+                    "langwatch.event.type": "thumbs_up_down",
+                    "langwatch.event.metrics": JSON.stringify({ vote: 1 }),
+                    "langwatch.event.details": JSON.stringify({ comment: "Very helpful, thanks!" }),
+                  },
+                },
+              ],
+            }),
+            span({
+              name: "turn-2",
+              type: "llm",
+              durationMs: 800,
+              offsetMs: 1000,
+              llm: {
+                requestModel: "gpt-4o",
+                messages: [
+                  { role: "user", content: "What about two-factor authentication?" },
+                  { role: "assistant", content: "I'm sorry, but I don't have specific information about your 2FA setup. Please contact our support team for assistance." },
+                ],
+                metrics: { promptTokens: 60, completionTokens: 40 },
+              },
+              events: [
+                {
+                  name: "langwatch.track_event",
+                  offsetMs: 850,
+                  attributes: {
+                    "langwatch.event.type": "thumbs_up_down",
+                    "langwatch.event.metrics": JSON.stringify({ vote: -1 }),
+                    "langwatch.event.details": JSON.stringify({ reason: "unhelpful", comment: "Should know about 2FA" }),
+                  },
+                },
+              ],
+            }),
+            span({
+              name: "turn-3",
+              type: "llm",
+              durationMs: 700,
+              offsetMs: 2200,
+              llm: {
+                requestModel: "gpt-4o",
+                messages: [
+                  { role: "user", content: "Can you at least tell me where to find the 2FA settings?" },
+                  { role: "assistant", content: "Yes! Go to Settings > Security > Two-Factor Authentication. You can enable SMS or authenticator app verification there." },
+                ],
+                metrics: { promptTokens: 95, completionTokens: 35 },
+              },
+              events: [
+                {
+                  name: "langwatch.track_event",
+                  offsetMs: 750,
+                  attributes: {
+                    "langwatch.event.type": "thumbs_up_down",
+                    "langwatch.event.metrics": JSON.stringify({ vote: 1 }),
+                  },
+                },
+                {
+                  name: "langwatch.track_event",
+                  offsetMs: 800,
+                  attributes: {
+                    "langwatch.event.type": "user_score",
+                    "langwatch.event.metrics": JSON.stringify({ score: 4.5 }),
+                    "langwatch.event.details": JSON.stringify({ max_score: "5" }),
+                  },
+                },
+              ],
+            }),
+          ],
+        }),
+      ],
+    },
+  },
+  {
+    id: "multiple-evaluations",
+    name: "Multiple Evaluations",
+    description: "A trace with sentiment analysis, toxicity, faithfulness, and other evaluation results",
+    builtIn: true,
+    config: {
+      id: "multiple-evaluations",
+      name: "Multiple Evaluations",
+      resourceAttributes: { "service.name": "evaluated-chatbot" },
+      metadata: { userId: "user-eval-1", labels: ["evaluated", "production"] },
+      spans: [
+        span({
+          name: "rag-with-evaluations",
+          type: "chain",
+          durationMs: 3500,
+          children: [
+            span({
+              name: "retrieval",
+              type: "rag",
+              durationMs: 400,
+              rag: {
+                contexts: [
+                  { document_id: "policy-doc", chunk_id: "returns-1", content: "Items can be returned within 30 days of purchase with a valid receipt. Refunds are processed within 5-7 business days." },
+                  { document_id: "policy-doc", chunk_id: "returns-2", content: "Electronics have a 15-day return window. Opened software cannot be returned." },
+                ],
+              },
+              input: { type: "text", value: "What is the return policy?" },
+            }),
+            span({
+              name: "generate-response",
+              type: "llm",
+              durationMs: 900,
+              offsetMs: 450,
+              llm: {
+                requestModel: "gpt-4o",
+                messages: [
+                  { role: "system", content: "Answer based on the provided context about return policies." },
+                  { role: "user", content: "What is the return policy?" },
+                  { role: "assistant", content: "Our return policy allows returns within 30 days with a receipt. Electronics have a shorter 15-day window, and opened software cannot be returned. Refunds take 5-7 business days to process." },
+                ],
+                temperature: 0.2,
+                metrics: { promptTokens: 150, completionTokens: 55, cost: 0.008 },
+              },
+              events: evaluationEvents([
+                { name: "sentiment_analysis", score: 0.72, label: "neutral", passed: true },
+                { name: "toxicity", score: 0.03, label: "safe", passed: true },
+                { name: "faithfulness", score: 0.95, label: "faithful", passed: true },
+                { name: "answer_relevancy", score: 0.88, label: "relevant", passed: true },
+                { name: "ragas_context_precision", score: 0.91, label: "precise", passed: true },
+                { name: "tone_consistency", score: 0.85, label: "professional", passed: true },
+              ]),
+            }),
+            span({
+              name: "pii-check",
+              type: "guardrail",
+              durationMs: 150,
+              offsetMs: 1400,
+              input: { type: "text", value: "Our return policy allows returns within 30 days..." },
+              output: { type: "json", value: { passed: true, piiDetected: false } },
+              events: evaluationEvents([
+                { name: "pii_detection", score: 1.0, label: "clean", passed: true },
+              ]),
+            }),
+          ],
+        }),
+      ],
+    },
+  },
+  {
+    id: "prompt-heavy",
+    name: "Multiple Prompts",
+    description: "A trace using several managed prompts with variables and versioning",
+    builtIn: true,
+    config: {
+      id: "prompt-heavy",
+      name: "Multiple Prompts",
+      resourceAttributes: { "service.name": "prompt-managed-app" },
+      metadata: { userId: "user-prompt-1", labels: ["prompts", "managed"] },
+      spans: [
+        span({
+          name: "multi-prompt-pipeline",
+          type: "workflow",
+          durationMs: 4000,
+          children: [
+            span({
+              name: "classify-intent",
+              type: "prompt",
+              durationMs: 30,
+              prompt: {
+                promptId: "intent-classifier",
+                version: 3,
+                versionId: "ver-ic-prod-3",
+                variables: { user_message: "I want to cancel my subscription and get a refund" },
+              },
+              input: { type: "json", value: { template: "Classify the intent of: {{user_message}}" } },
+              output: { type: "text", value: "Classify the intent of: I want to cancel my subscription and get a refund" },
+            }),
+            span({
+              name: "intent-llm",
+              type: "llm",
+              durationMs: 400,
+              offsetMs: 50,
+              llm: {
+                requestModel: "gpt-4o-mini",
+                messages: [
+                  { role: "system", content: "Classify the intent of: I want to cancel my subscription and get a refund" },
+                  { role: "assistant", content: '{"intent": "cancellation_refund", "confidence": 0.97}' },
+                ],
+                metrics: { promptTokens: 25, completionTokens: 15 },
+              },
+            }),
+            span({
+              name: "render-cancellation-prompt",
+              type: "prompt",
+              durationMs: 25,
+              offsetMs: 500,
+              prompt: {
+                promptId: "cancellation-handler",
+                version: 7,
+                versionId: "ver-ch-v7",
+                variables: {
+                  customer_name: "Sarah Chen",
+                  subscription_type: "Pro Annual",
+                  months_remaining: "4",
+                  retention_offer: "20% discount for 3 months",
+                },
+              },
+              input: {
+                type: "json",
+                value: { template: "Handle cancellation for {{customer_name}} on {{subscription_type}} plan. {{months_remaining}} months remaining. Offer: {{retention_offer}}" },
+              },
+              output: {
+                type: "text",
+                value: "Handle cancellation for Sarah Chen on Pro Annual plan. 4 months remaining. Offer: 20% discount for 3 months",
+              },
+            }),
+            span({
+              name: "cancellation-llm",
+              type: "llm",
+              durationMs: 800,
+              offsetMs: 550,
+              llm: {
+                requestModel: "gpt-4o",
+                messages: [
+                  { role: "system", content: "Handle cancellation for Sarah Chen on Pro Annual plan. 4 months remaining. Offer: 20% discount for 3 months" },
+                  { role: "user", content: "I want to cancel my subscription and get a refund" },
+                  { role: "assistant", content: "I understand you'd like to cancel, Sarah. Before we proceed, I'd like to offer you 20% off for the next 3 months on your Pro Annual plan. You still have 4 months of value remaining. Would you like to consider this offer?" },
+                ],
+                temperature: 0.5,
+                metrics: { promptTokens: 120, completionTokens: 65, cost: 0.007 },
+              },
+            }),
+            span({
+              name: "render-follow-up-prompt",
+              type: "prompt",
+              durationMs: 20,
+              offsetMs: 1400,
+              prompt: {
+                promptId: "empathetic-follow-up:2",
+                variables: {
+                  agent_response: "I understand you'd like to cancel...",
+                  customer_sentiment: "frustrated",
+                  escalation_threshold: "0.3",
+                },
+              },
+              input: { type: "json", value: { template: "Generate empathetic follow-up given sentiment: {{customer_sentiment}}" } },
+              output: { type: "text", value: "Generate empathetic follow-up given sentiment: frustrated" },
+            }),
+            span({
+              name: "render-summary-prompt",
+              type: "prompt",
+              durationMs: 20,
+              offsetMs: 1450,
+              prompt: {
+                promptId: "conversation-summarizer",
+                version: 1,
+                versionId: "ver-cs-latest",
+                variables: {
+                  conversation: "[user: cancel subscription] [agent: retention offer]",
+                  format: "bullet_points",
+                },
+              },
+              input: { type: "json", value: { template: "Summarize conversation in {{format}} format:\n{{conversation}}" } },
+              output: { type: "text", value: "Summarize conversation in bullet_points format:\n[user: cancel subscription] [agent: retention offer]" },
+            }),
+            span({
+              name: "summary-llm",
+              type: "llm",
+              durationMs: 500,
+              offsetMs: 1500,
+              llm: {
+                requestModel: "gpt-4o-mini",
+                messages: [
+                  { role: "assistant", content: "- Customer Sarah Chen requested cancellation of Pro Annual plan\n- 4 months remaining on subscription\n- Retention offer presented: 20% discount for 3 months\n- Awaiting customer response" },
+                ],
+                metrics: { promptTokens: 80, completionTokens: 50 },
+              },
+            }),
+          ],
+        }),
+      ],
+    },
+  },
+  {
+    id: "data-format-showcase",
+    name: "Data Format Showcase",
+    description: "Demonstrates all input/output formats: text, JSON, chat_messages, raw, and list",
+    builtIn: true,
+    config: {
+      id: "data-format-showcase",
+      name: "Data Format Showcase",
+      resourceAttributes: { "service.name": "format-demo" },
+      metadata: { userId: "user-formats", labels: ["formats", "testing"] },
+      spans: [
+        span({
+          name: "format-pipeline",
+          type: "workflow",
+          durationMs: 5000,
+          children: [
+            span({
+              name: "text-input-output",
+              type: "llm",
+              durationMs: 400,
+              llm: {
+                requestModel: "gpt-4o",
+                messages: [
+                  { role: "user", content: "Translate 'hello' to French" },
+                  { role: "assistant", content: "Bonjour" },
+                ],
+                metrics: { promptTokens: 10, completionTokens: 5 },
+              },
+              input: { type: "text", value: "Translate 'hello' to French" },
+              output: { type: "text", value: "Bonjour" },
+            }),
+            span({
+              name: "json-structured-output",
+              type: "tool",
+              durationMs: 300,
+              offsetMs: 450,
+              input: {
+                type: "json",
+                value: {
+                  action: "search",
+                  filters: { category: "electronics", priceRange: { min: 100, max: 500 }, inStock: true },
+                  sort: { field: "relevance", order: "desc" },
+                  limit: 10,
+                },
+              },
+              output: {
+                type: "json",
+                value: {
+                  results: [
+                    { id: "prod-1", name: "Wireless Headphones", price: 149.99, rating: 4.5 },
+                    { id: "prod-2", name: "USB-C Hub", price: 79.99, rating: 4.8 },
+                  ],
+                  totalCount: 42,
+                  page: 1,
+                },
+              },
+            }),
+            span({
+              name: "chat-messages-full",
+              type: "llm",
+              durationMs: 800,
+              offsetMs: 800,
+              llm: {
+                requestModel: "gpt-4o",
+                messages: [
+                  { role: "system", content: "You are a coding assistant. Respond with code examples." },
+                  { role: "user", content: "Show me a TypeScript interface for a User" },
+                  { role: "assistant", content: "```typescript\ninterface User {\n  id: string;\n  name: string;\n  email: string;\n  createdAt: Date;\n}\n```" },
+                  { role: "user", content: "Add an optional avatar field" },
+                  { role: "assistant", content: "```typescript\ninterface User {\n  id: string;\n  name: string;\n  email: string;\n  avatar?: string;\n  createdAt: Date;\n}\n```" },
+                ],
+                temperature: 0.3,
+                metrics: { promptTokens: 80, completionTokens: 60 },
+              },
+              input: {
+                type: "chat_messages",
+                value: [
+                  { role: "system", content: "You are a coding assistant. Respond with code examples." },
+                  { role: "user", content: "Show me a TypeScript interface for a User" },
+                  { role: "assistant", content: "```typescript\ninterface User {\n  id: string;\n  name: string;\n  email: string;\n  createdAt: Date;\n}\n```" },
+                  { role: "user", content: "Add an optional avatar field" },
+                ],
+              },
+              output: {
+                type: "chat_messages",
+                value: [
+                  { role: "assistant", content: "```typescript\ninterface User {\n  id: string;\n  name: string;\n  email: string;\n  avatar?: string;\n  createdAt: Date;\n}\n```" },
+                ],
+              },
+            }),
+            span({
+              name: "tool-call-messages",
+              type: "llm",
+              durationMs: 600,
+              offsetMs: 1700,
+              llm: {
+                requestModel: "gpt-4o",
+                messages: [
+                  { role: "user", content: "What's the weather in London?" },
+                  { role: "assistant", content: "Let me check the weather for you." },
+                  { role: "tool", content: '{"temperature": 15, "condition": "partly cloudy", "humidity": 72}' },
+                  { role: "assistant", content: "It's 15°C and partly cloudy in London with 72% humidity." },
+                ],
+                metrics: { promptTokens: 40, completionTokens: 30 },
+              },
+              input: {
+                type: "chat_messages",
+                value: [
+                  { role: "user", content: "What's the weather in London?" },
+                ],
+              },
+              output: {
+                type: "text",
+                value: "It's 15°C and partly cloudy in London with 72% humidity.",
+              },
+            }),
+            span({
+              name: "raw-binary-output",
+              type: "tool",
+              durationMs: 200,
+              offsetMs: 2400,
+              input: {
+                type: "json",
+                value: { format: "png", width: 512, height: 512, prompt: "a sunset" },
+              },
+              output: {
+                type: "raw",
+                value: "<binary image data: 245KB PNG, 512x512px>",
+              },
+            }),
+            span({
+              name: "list-output",
+              type: "tool",
+              durationMs: 250,
+              offsetMs: 2650,
+              input: { type: "text", value: "List all active users" },
+              output: {
+                type: "list",
+                value: [
+                  { type: "json", value: { id: "u1", name: "Alice", status: "active", lastSeen: "2025-04-24T10:30:00Z" } },
+                  { type: "json", value: { id: "u2", name: "Bob", status: "active", lastSeen: "2025-04-24T09:15:00Z" } },
+                  { type: "json", value: { id: "u3", name: "Charlie", status: "active", lastSeen: "2025-04-24T11:00:00Z" } },
+                ],
+              },
+            }),
+            span({
+              name: "openai-function-calling",
+              type: "llm",
+              durationMs: 700,
+              offsetMs: 2950,
+              llm: {
+                requestModel: "gpt-4o",
+                messages: [
+                  { role: "system", content: "You have access to functions: get_weather, search_products, create_ticket" },
+                  { role: "user", content: "Create a support ticket for order #12345 with priority high" },
+                  { role: "assistant", content: '{"function_call": {"name": "create_ticket", "arguments": "{\"order_id\": \"12345\", \"priority\": \"high\", \"description\": \"Customer support request for order #12345\"}"}}' },
+                  { role: "tool", content: '{"ticket_id": "TKT-789", "status": "created", "assigned_to": "support-team-1"}' },
+                  { role: "assistant", content: "I've created support ticket TKT-789 for order #12345 with high priority. It's been assigned to our support team." },
+                ],
+                metrics: { promptTokens: 120, completionTokens: 80 },
+              },
+              input: {
+                type: "chat_messages",
+                value: [
+                  { role: "system", content: "You have access to functions: get_weather, search_products, create_ticket" },
+                  { role: "user", content: "Create a support ticket for order #12345 with priority high" },
+                ],
+              },
+              output: {
+                type: "json",
+                value: {
+                  message: "I've created support ticket TKT-789 for order #12345 with high priority.",
+                  function_call: { name: "create_ticket", result: { ticket_id: "TKT-789", status: "created" } },
+                },
+              },
+            }),
+            span({
+              name: "deeply-nested-json",
+              type: "tool",
+              durationMs: 150,
+              offsetMs: 3700,
+              input: {
+                type: "json",
+                value: { query: "aggregation pipeline" },
+              },
+              output: {
+                type: "json",
+                value: {
+                  pipeline: {
+                    stages: [
+                      { $match: { status: "active", "metadata.region": "us-east-1" } },
+                      { $group: { _id: "$category", total: { $sum: "$amount" }, count: { $sum: 1 }, avgAmount: { $avg: "$amount" } } },
+                      { $sort: { total: -1 } },
+                      { $limit: 10 },
+                    ],
+                    options: { allowDiskUse: true, maxTimeMS: 30000 },
+                  },
+                  results: {
+                    executionStats: { nReturned: 10, executionTimeMillis: 142, totalDocsExamined: 50000 },
+                  },
+                },
+              },
+            }),
+          ],
+        }),
+      ],
+    },
+  },
+  {
+    id: "spans-with-events",
+    name: "Spans with Events",
+    description:
+      "A trace with custom events attached to spans for tracking user actions and system signals",
+    builtIn: true,
+    config: {
+      id: "spans-with-events",
+      name: "Spans with Events",
+      resourceAttributes: { "service.name": "event-demo" },
+      metadata: { userId: "user-events-1" },
+      spans: [
+        span({
+          name: "process-request",
+          type: "span",
+          durationMs: 2000,
+          input: { type: "text", value: "Handle incoming user request" },
+          output: { type: "text", value: "Request processed successfully" },
+          events: [
+            {
+              name: "request.received",
+              offsetMs: 0,
+              attributes: {
+                "http.method": "POST",
+                "http.url": "/api/chat",
+                "request.size_bytes": 1240,
+              },
+            },
+            {
+              name: "auth.validated",
+              offsetMs: 15,
+              attributes: {
+                "auth.method": "bearer_token",
+                "auth.user_id": "user-events-1",
+              },
+            },
+            {
+              name: "rate_limit.checked",
+              offsetMs: 25,
+              attributes: {
+                "rate_limit.remaining": 98,
+                "rate_limit.limit": 100,
+                "rate_limit.window_seconds": 60,
+              },
+            },
+          ],
+          children: [
+            span({
+              name: "generate-response",
+              type: "llm",
+              durationMs: 1200,
+              offsetMs: 50,
+              llm: {
+                requestModel: "gpt-4o",
+                messages: [
+                  { role: "user", content: "What are the benefits of event-driven architecture?" },
+                  {
+                    role: "assistant",
+                    content:
+                      "Event-driven architecture offers loose coupling, scalability, and real-time processing capabilities.",
+                  },
+                ],
+                metrics: { promptTokens: 20, completionTokens: 25, cost: 0.002 },
+              },
+              events: [
+                {
+                  name: "llm.cache.miss",
+                  offsetMs: 5,
+                  attributes: { "cache.key": "chat-abc123" },
+                },
+                {
+                  name: "llm.stream.first_token",
+                  offsetMs: 180,
+                  attributes: { "stream.latency_ms": 180 },
+                },
+                {
+                  name: "llm.stream.complete",
+                  offsetMs: 1200,
+                  attributes: { "stream.total_tokens": 45 },
+                },
+              ],
+            }),
+            span({
+              name: "post-process",
+              type: "span",
+              durationMs: 300,
+              offsetMs: 1300,
+              events: [
+                {
+                  name: "content_filter.passed",
+                  offsetMs: 50,
+                  attributes: {
+                    "filter.categories_checked": 3,
+                    "filter.flagged": false,
+                  },
+                },
+                {
+                  name: "response.sent",
+                  offsetMs: 280,
+                  attributes: {
+                    "response.status": 200,
+                    "response.size_bytes": 890,
+                  },
+                },
+              ],
+            }),
+          ],
+        }),
+      ],
+    },
+  },
 ];
+
+function evaluationEvents(
+  evals: Array<{ name: string; score: number; label: string; passed: boolean }>
+): SpanEvent[] {
+  return evals.map((ev, i) => ({
+    name: "langwatch.evaluation.custom",
+    offsetMs: i * 50,
+    attributes: {
+      json_encoded_event: JSON.stringify({
+        name: ev.name,
+        score: ev.score,
+        label: ev.label,
+        passed: ev.passed,
+      }),
+    },
+  }));
+}

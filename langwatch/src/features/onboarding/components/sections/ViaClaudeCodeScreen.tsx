@@ -1,10 +1,10 @@
-import { Box, HStack, Text, VStack } from "@chakra-ui/react";
-import { Clipboard, Terminal } from "lucide-react";
+import { Box, Grid, HStack, Text, VStack } from "@chakra-ui/react";
+import { Check, Clipboard, Terminal } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import type React from "react";
 import { useMemo, useState } from "react";
 
-const MotionVStack = motion(VStack);
+const MotionVStack = motion.create(VStack);
 import { usePublicEnv } from "~/hooks/usePublicEnv";
 import { Tooltip } from "../../../../components/ui/tooltip";
 import { useActiveProject } from "../../contexts/ActiveProjectContext";
@@ -17,7 +17,11 @@ import {
   PROMPT_TRACING,
 } from "./code-prompts";
 import { maskApiKey } from "./shared/api-key-utils";
-import { buildMcpJson, CLOUD_ENDPOINT } from "./shared/build-mcp-config";
+import {
+  buildMcpJson,
+  CLOUD_ENDPOINT,
+  findLangwatchEnvLines,
+} from "./shared/build-mcp-config";
 import { copyToClipboard } from "./shared/copy-to-clipboard";
 import { InlineCopyButton } from "./shared/InlineCopyButton";
 import { JsonHighlight } from "./shared/JsonHighlight";
@@ -95,29 +99,18 @@ const EDITOR_PATHS: EditorPath[] = [
   },
 ];
 
-function glassCard({
-  highlight,
-}: {
-  highlight?: boolean;
-}): Record<string, unknown> {
+function glassCard(): Record<string, unknown> {
   return {
     borderRadius: "xl",
     border: "1px solid",
-    borderColor: highlight
-      ? { base: "orange.200", _dark: "orange.800" }
-      : "border.subtle",
+    borderColor: "border.subtle",
     bg: "bg.panel/70",
     backdropFilter: "blur(20px) saturate(1.3)",
     boxShadow: "sm",
     transition: "all 0.17s ease",
     _hover: {
-      borderColor: highlight ? "orange.emphasized" : "border.emphasized",
-      boxShadow: highlight
-        ? {
-            base: "0 0 0 1px var(--chakra-colors-orange-200)",
-            _dark: "0 8px 32px rgba(237,137,38,0.12)",
-          }
-        : "md",
+      borderColor: "orange.emphasized",
+      boxShadow: "md",
       transform: "translateY(-1px)",
     },
   };
@@ -128,24 +121,57 @@ function PromptRow({
 }: {
   skill: SkillItem;
 }): React.ReactElement {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async (): Promise<void> => {
+    const ok = await copyToClipboard({
+      text: skill.prompt,
+      successMessage: "Prompt copied to clipboard",
+    });
+    if (ok) {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  // Whole-row button: clicking anywhere on the card copies the prompt
+  // and triggers the Check-icon animation. Matches SkillRow's
+  // click-anywhere-on-install-row pattern so prompt + skill share the
+  // same affordance.
   return (
     <HStack
+      asChild
       justify="space-between"
       align="center"
-      px={5}
-      py={3.5}
-      gap={4}
-      {...glassCard({ highlight: true })}
+      px={4}
+      py={2.5}
+      gap={3}
+      cursor="pointer"
+      {...glassCard()}
     >
-      <Text
-        fontSize="sm"
-        color="fg.DEFAULT"
-        fontWeight={skill.highlight ? "semibold" : "medium"}
-        letterSpacing="-0.01em"
+      <button
+        type="button"
+        onClick={() => void handleCopy()}
+        aria-label="Copy prompt"
       >
-        {skill.label}
-      </Text>
-      <InlineCopyButton text={skill.prompt} label="Prompt" />
+        <Text
+          fontSize="sm"
+          color="fg"
+          fontWeight={skill.highlight ? "semibold" : "medium"}
+          letterSpacing="-0.01em"
+          truncate
+          flex={1}
+          minW={0}
+          textAlign="left"
+        >
+          {skill.label}
+        </Text>
+        {copied ? (
+          <Check size={14} color="var(--chakra-colors-green-fg)" />
+        ) : (
+          <Clipboard size={14} color="var(--chakra-colors-fg-muted)" />
+        )}
+      </button>
     </HStack>
   );
 }
@@ -158,43 +184,29 @@ function SkillRow({
   return (
     <VStack
       align="stretch"
-      px={5}
-      py={4}
-      gap={3}
-      {...glassCard({ highlight: true })}
+      px={4}
+      py={2.5}
+      gap={1}
+      {...glassCard()}
     >
-      <Text
-        fontSize="sm"
-        color="fg.DEFAULT"
-        fontWeight={skill.highlight ? "semibold" : "medium"}
-        letterSpacing="-0.01em"
-      >
-        {skill.label}
-      </Text>
-      <HStack gap={2} align="center">
-        <Terminal size={12} color="var(--chakra-colors-fg-muted)" />
-        <Text fontSize="xs" fontFamily="mono" color="fg.muted" flex={1}>
-          {skill.installCommand}
-        </Text>
-        <InlineCopyButton text={skill.installCommand} label="Command" />
-      </HStack>
-      <HStack
-        gap={2}
-        align="center"
-        px={3}
-        py={2}
-        borderRadius="lg"
-        bg="bg.panel/60"
-        border="1px solid"
-        borderColor="border.subtle"
-      >
-        <Text fontSize="xs" color="fg.muted">
-          Then use
+      <HStack gap={2} align="baseline" minW={0}>
+        <Text
+          fontSize="sm"
+          color="fg"
+          fontWeight={skill.highlight ? "semibold" : "medium"}
+          letterSpacing="-0.01em"
+          truncate
+          flex={1}
+          minW={0}
+        >
+          {skill.label}
         </Text>
         <HStack
           asChild
-          gap={0.5}
+          gap={1}
           align="center"
+          flexShrink={0}
+          color="orange.fg"
           cursor="pointer"
           _hover={{ opacity: 0.7 }}
           transition="opacity 0.15s ease"
@@ -209,22 +221,83 @@ function SkillRow({
               });
             }}
           >
+            <Text fontSize="xs" fontFamily="mono" fontWeight="semibold">
+              {skill.slashCommand}
+            </Text>
+            <Clipboard size={10} />
+          </button>
+        </HStack>
+      </HStack>
+      <Tooltip
+        content="Click to copy the install command"
+        positioning={{ placement: "top" }}
+        showArrow
+        openDelay={300}
+      >
+        <HStack
+          asChild
+          gap={1.5}
+          align="center"
+          minW={0}
+          paddingX={2}
+          paddingY={1}
+          marginInline={-2}
+          borderRadius="md"
+          cursor="pointer"
+          _hover={{ bg: "bg.muted/60" }}
+          transition="background 0.15s ease"
+        >
+          <button
+            type="button"
+            aria-label={`Copy install command: ${skill.installCommand}`}
+            onClick={() => {
+              void copyToClipboard({
+                text: skill.installCommand,
+                successMessage: "Install command copied to clipboard",
+              });
+            }}
+          >
+            <Terminal size={11} color="var(--chakra-colors-fg-subtle)" />
             <Text
               fontSize="xs"
               fontFamily="mono"
-              fontWeight="semibold"
-              color="orange.400"
+              color="fg.subtle"
+              truncate
+              flex={1}
+              minW={0}
+              textAlign="left"
             >
-              {skill.slashCommand}
+              {skill.installCommand}
             </Text>
-            <Clipboard size={10} color="var(--chakra-colors-orange-300)" />
+            <Clipboard size={10} color="var(--chakra-colors-fg-subtle)" />
           </button>
         </HStack>
-        <Text fontSize="xs" color="fg.muted">
-          in your coding agent
-        </Text>
-      </HStack>
+      </Tooltip>
     </VStack>
+  );
+}
+
+/**
+ * Splits a shell command at credential-bearing segments (LANGWATCH_* env
+ * assignments and the `--api-key` flag) so they can be rendered with a
+ * subtle orange accent. Everything else passes through untouched.
+ */
+function accentCredentialSegments(command: string): React.ReactNode[] {
+  const re =
+    /(--api-key \S+|LANGWATCH_(?:API_KEY|PROJECT_ID|ENDPOINT)=\S+)/g;
+  return command.split(re).map((part, i) =>
+    i % 2 === 1 ? (
+      <Text
+        as="span"
+        key={i}
+        color="orange.fg"
+        fontWeight="semibold"
+      >
+        {part}
+      </Text>
+    ) : (
+      part
+    ),
   );
 }
 
@@ -243,18 +316,18 @@ function QuickCommand({
       align="center"
       px={4}
       py={3}
-      {...glassCard({ highlight: true })}
+      {...glassCard()}
     >
       <HStack gap={2.5} align="center" minW={0}>
         <Box flexShrink={0} display="flex" alignItems="center">
           <Terminal size={13} color="var(--chakra-colors-fg-muted)" />
         </Box>
         <VStack align="start" gap={0} minW={0}>
-          <Text fontSize="xs" fontWeight="semibold" color="fg.DEFAULT">
+          <Text fontSize="xs" fontWeight="semibold" color="fg">
             {label}
           </Text>
           <Text fontSize="xs" fontFamily="mono" color="fg.muted" wordBreak="break-all">
-            {displayCommand}
+            {accentCredentialSegments(displayCommand)}
           </Text>
         </VStack>
       </HStack>
@@ -269,38 +342,50 @@ function McpTab({
   apiKey,
   maskedKey,
   endpoint,
+  projectId,
 }: {
   mcpJson: string;
   displayConfigJson: string;
   apiKey: string;
   maskedKey: string;
   endpoint: string | undefined;
+  projectId: string | undefined;
 }): React.ReactElement {
   const isSelfHosted = endpoint && endpoint !== CLOUD_ENDPOINT;
   const endpointFlag = isSelfHosted ? ` --endpoint ${endpoint}` : "";
   const maskedEndpointFlag = isSelfHosted ? ` --endpoint ${endpoint}` : "";
+  // PROJECT_ID is plumbed through `claude mcp add`'s own --env flag (set
+  // before `--`) so the MCP server inherits it via its environment, with
+  // no dependency on a `--project-id` CLI flag we don't control. Codex
+  // already uses --env consistently, so we just append.
+  const projectIdEnvBefore = projectId
+    ? ` --env LANGWATCH_PROJECT_ID=${projectId}`
+    : "";
+  const projectIdEnvAfter = projectId
+    ? ` --env LANGWATCH_PROJECT_ID=${projectId}`
+    : "";
 
   return (
     <VStack align="stretch" gap={4}>
       {/* Quick shortcuts */}
       <VStack align="stretch" gap={2}>
-        <Text fontSize="xs" fontWeight="semibold" color="fg.DEFAULT">
+        <Text fontSize="xs" fontWeight="semibold" color="fg">
           Quick setup
         </Text>
         <QuickCommand
           label="Claude Code"
-          displayCommand={`claude mcp add langwatch -- npx -y @langwatch/mcp-server --api-key ${maskedKey}${maskedEndpointFlag}`}
-          copyCommand={`claude mcp add langwatch -- npx -y @langwatch/mcp-server --api-key ${apiKey}${endpointFlag}`}
+          displayCommand={`claude mcp add langwatch${projectIdEnvBefore} -- npx -y @langwatch/mcp-server --api-key ${maskedKey}${maskedEndpointFlag}`}
+          copyCommand={`claude mcp add langwatch${projectIdEnvBefore} -- npx -y @langwatch/mcp-server --api-key ${apiKey}${endpointFlag}`}
         />
         <QuickCommand
           label="OpenAI Codex"
-          displayCommand={`codex mcp add langwatch --env LANGWATCH_API_KEY=${maskedKey}${isSelfHosted ? ` --env LANGWATCH_ENDPOINT=${endpoint}` : ""} -- npx -y @langwatch/mcp-server`}
-          copyCommand={`codex mcp add langwatch --env LANGWATCH_API_KEY=${apiKey}${isSelfHosted ? ` --env LANGWATCH_ENDPOINT=${endpoint}` : ""} -- npx -y @langwatch/mcp-server`}
+          displayCommand={`codex mcp add langwatch --env LANGWATCH_API_KEY=${maskedKey}${projectIdEnvAfter}${isSelfHosted ? ` --env LANGWATCH_ENDPOINT=${endpoint}` : ""} -- npx -y @langwatch/mcp-server`}
+          copyCommand={`codex mcp add langwatch --env LANGWATCH_API_KEY=${apiKey}${projectIdEnvAfter}${isSelfHosted ? ` --env LANGWATCH_ENDPOINT=${endpoint}` : ""} -- npx -y @langwatch/mcp-server`}
         />
       </VStack>
 
       {/* JSON config */}
-      <Text fontSize="xs" fontWeight="semibold" color="fg.DEFAULT">
+      <Text fontSize="xs" fontWeight="semibold" color="fg">
         Or paste into your config file
       </Text>
       <Box
@@ -308,17 +393,20 @@ function McpTab({
         borderRadius="xl"
         overflow="hidden"
         border="1px solid"
-        borderColor={{ base: "border.subtle", _dark: "orange.800" }}
+        borderColor="border.subtle"
         bg="bg.panel/70"
         backdropFilter="blur(20px) saturate(1.3)"
-        boxShadow="0 1px 3px rgba(0,0,0,0.04)"
+        boxShadow="xs"
         transition="all 0.17s ease"
         _hover={{
           borderColor: "orange.emphasized",
-          boxShadow: "0 6px 28px rgba(237,137,38,0.06)",
+          boxShadow: "md",
         }}
       >
-        <JsonHighlight code={displayConfigJson} />
+        <JsonHighlight
+          code={displayConfigJson}
+          highlightLines={findLangwatchEnvLines(displayConfigJson)}
+        />
         <Box position="absolute" top={2.5} right={2.5}>
           <InlineCopyButton text={mcpJson} label="Config" />
         </Box>
@@ -351,7 +439,7 @@ function McpTab({
               }}
             >
               <button type="button" aria-label={`Copy ${ep.editor} config path`}>
-                <Text fontSize="2xs" fontWeight="medium" color="fg.DEFAULT">
+                <Text fontSize="2xs" fontWeight="medium" color="fg">
                   {ep.editor}
                 </Text>
                 <Clipboard size={9} color="var(--chakra-colors-gray-400)" />
@@ -364,31 +452,99 @@ function McpTab({
   );
 }
 
-export function ViaClaudeCodeScreen(): React.ReactElement {
+/**
+ * Just the prompt list — no surrounding tabs / description / container
+ * chrome. Used by the traces-v2 empty state which surfaces Prompt as a
+ * top-level setup path instead of nesting it under "Via Coding Agent".
+ */
+export function PromptList(): React.ReactElement {
+  return (
+    <Grid
+      templateColumns={{ base: "1fr", md: "repeat(2, 1fr)" }}
+      gap={3}
+    >
+      {SKILLS.map((skill) => (
+        <PromptRow key={skill.id} skill={skill} />
+      ))}
+    </Grid>
+  );
+}
+
+/**
+ * Just the skill list — same as PromptList but renders the install +
+ * `/command` rows for the "Skill" top-level path.
+ */
+export function SkillList(): React.ReactElement {
+  return (
+    <Grid
+      templateColumns={{ base: "1fr", lg: "repeat(2, 1fr)" }}
+      gap={3}
+    >
+      {SKILLS.map((skill) => (
+        <SkillRow key={skill.id} skill={skill} />
+      ))}
+    </Grid>
+  );
+}
+
+interface ViaClaudeCodeScreenProps {
+  /**
+   * When false, the MCP sub-tab is hidden. Used by the traces-v2 empty
+   * state, which surfaces MCP setup as its own top-level tab and doesn't
+   * want the duplicate. Defaults to true for the original onboarding flow.
+   */
+  showMcpTab?: boolean;
+}
+
+export function ViaClaudeCodeScreen({
+  showMcpTab = true,
+}: ViaClaudeCodeScreenProps = {}): React.ReactElement {
   const { project } = useActiveProject();
   const publicEnv = usePublicEnv();
   const [activeTab, setActiveTab] = useState<TabKey>("prompt");
 
   const effectiveApiKey = project?.apiKey ?? "";
   const effectiveEndpoint = publicEnv.data?.BASE_HOST;
+  const effectiveProjectId = project?.id;
 
   const maskedApiKey = maskApiKey(effectiveApiKey);
 
   const mcpJson = useMemo(
     () =>
-      buildMcpJson({ apiKey: effectiveApiKey, endpoint: effectiveEndpoint }),
-    [effectiveApiKey, effectiveEndpoint],
+      buildMcpJson({
+        apiKey: effectiveApiKey,
+        endpoint: effectiveEndpoint,
+        projectId: effectiveProjectId,
+      }),
+    [effectiveApiKey, effectiveEndpoint, effectiveProjectId],
   );
 
   const displayConfigJson = useMemo(
     () =>
-      buildMcpJson({ apiKey: maskedApiKey, endpoint: effectiveEndpoint }),
-    [maskedApiKey, effectiveEndpoint],
+      buildMcpJson({
+        apiKey: maskedApiKey,
+        endpoint: effectiveEndpoint,
+        projectId: effectiveProjectId,
+      }),
+    [maskedApiKey, effectiveEndpoint, effectiveProjectId],
   );
 
   return (
     <>
-      <VStack align="stretch" gap={4} mb={20} w="640px" maxW="100%" mx="auto">
+      <VStack
+        align="stretch"
+        gap={4}
+        mb={20}
+        // 640px keeps the prompt/MCP focus narrow; widen on prompt/skill
+        // tabs so the 2-column row grids breathe and SkillRow's nested
+        // command strips don't force-wrap.
+        w={{
+          base: "100%",
+          md: activeTab === "skill" ? "880px" : "640px",
+        }}
+        maxW="100%"
+        mx="auto"
+      >
         <HStack
           justify="center"
           gap={1}
@@ -400,7 +556,7 @@ export function ViaClaudeCodeScreen(): React.ReactElement {
           borderColor="border.subtle"
           bg="bg.panel/70"
           backdropFilter="blur(20px) saturate(1.3)"
-          boxShadow="0 2px 16px rgba(0,0,0,0.04)"
+          boxShadow="sm"
         >
           <TabButton
             label="Prompt"
@@ -412,11 +568,13 @@ export function ViaClaudeCodeScreen(): React.ReactElement {
             active={activeTab === "skill"}
             onClick={() => setActiveTab("skill")}
           />
-          <TabButton
-            label="MCP"
-            active={activeTab === "mcp"}
-            onClick={() => setActiveTab("mcp")}
-          />
+          {showMcpTab && (
+            <TabButton
+              label="MCP"
+              active={activeTab === "mcp"}
+              onClick={() => setActiveTab("mcp")}
+            />
+          )}
         </HStack>
 
         {/* Description — stays fixed, only text swaps */}
@@ -429,8 +587,8 @@ export function ViaClaudeCodeScreen(): React.ReactElement {
             transition={{ duration: 0.12, ease: "easeOut" }}
           >
             {activeTab === "prompt" && (
-              <Text fontSize="sm" color="fg.DEFAULT/70" lineHeight="tall">
-                <Text as="span" fontWeight="semibold" color="fg.DEFAULT">
+              <Text fontSize="sm" color="fg/70" lineHeight="tall">
+                <Text as="span" fontWeight="semibold" color="fg">
                   Zero setup.
                 </Text>{" "}
                 Copy a prompt, paste it into your coding agent, and it handles
@@ -438,20 +596,20 @@ export function ViaClaudeCodeScreen(): React.ReactElement {
               </Text>
             )}
             {activeTab === "skill" && (
-              <Text fontSize="sm" color="fg.DEFAULT/70" lineHeight="tall">
-                <Text as="span" fontWeight="semibold" color="fg.DEFAULT">
+              <Text fontSize="sm" color="fg/70" lineHeight="tall">
+                <Text as="span" fontWeight="semibold" color="fg">
                   Install once, reuse anytime.
                 </Text>{" "}
                 Run the install command, then type{" "}
-                <Text as="span" fontFamily="mono" fontWeight="semibold" color="orange.400">
+                <Text as="span" fontFamily="mono" fontWeight="semibold" color="orange.fg">
                   /command
                 </Text>{" "}
                 in your coding agent whenever you need it.
               </Text>
             )}
-            {activeTab === "mcp" && (
-              <Text fontSize="sm" color="fg.DEFAULT/70" lineHeight="tall">
-                <Text as="span" fontWeight="semibold" color="fg.DEFAULT">
+            {showMcpTab && activeTab === "mcp" && (
+              <Text fontSize="sm" color="fg/70" lineHeight="tall">
+                <Text as="span" fontWeight="semibold" color="fg">
                   Live connection.
                 </Text>{" "}
                 Give your agent direct access to your LangWatch dashboard.
@@ -472,21 +630,40 @@ export function ViaClaudeCodeScreen(): React.ReactElement {
             transition={{ duration: 0.12, ease: "easeOut" }}
           >
             {activeTab === "prompt" && (
-              <VStack align="stretch" gap={3}>
+              <Grid
+                templateColumns={{
+                  base: "1fr",
+                  md: "repeat(2, 1fr)",
+                }}
+                gap={3}
+              >
                 {SKILLS.map((skill) => (
                   <PromptRow key={skill.id} skill={skill} />
                 ))}
-              </VStack>
+              </Grid>
             )}
             {activeTab === "skill" && (
-              <VStack align="stretch" gap={3}>
+              <Grid
+                templateColumns={{
+                  base: "1fr",
+                  lg: "repeat(2, 1fr)",
+                }}
+                gap={3}
+              >
                 {SKILLS.map((skill) => (
                   <SkillRow key={skill.id} skill={skill} />
                 ))}
-              </VStack>
+              </Grid>
             )}
-            {activeTab === "mcp" && (
-              <McpTab mcpJson={mcpJson} displayConfigJson={displayConfigJson} apiKey={effectiveApiKey} maskedKey={maskedApiKey} endpoint={effectiveEndpoint} />
+            {showMcpTab && activeTab === "mcp" && (
+              <McpTab
+                mcpJson={mcpJson}
+                displayConfigJson={displayConfigJson}
+                apiKey={effectiveApiKey}
+                maskedKey={maskedApiKey}
+                endpoint={effectiveEndpoint}
+                projectId={effectiveProjectId}
+              />
             )}
           </MotionVStack>
         </AnimatePresence>

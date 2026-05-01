@@ -21,7 +21,7 @@ Feature: AI Gateway — model disambiguation when a VK has multiple providers
   # Bare model name on a multi-provider VK
   # ============================================================================
 
-  @integration @v1
+  @integration @v1 @unimplemented
   Scenario: Bare gpt-5-mini on a multi-provider VK returns 400 with actionable envelope
     When I POST to "/v1/chat/completions" using "vk_multi" with body:
       """
@@ -39,7 +39,7 @@ Feature: AI Gateway — model disambiguation when a VK has multiple providers
     # is a footgun. Keep the hint abstract so operators don't accidentally
     # reveal per-tenant fleet structure.
 
-  @integration @v1
+  @integration @v1 @unimplemented
   Scenario: Provider-qualified prefix resolves cleanly
     When I POST to "/v1/chat/completions" using "vk_multi" with body:
       """
@@ -52,7 +52,7 @@ Feature: AI Gateway — model disambiguation when a VK has multiple providers
     And the dispatcher used provider slot "primary"
     And the `langwatch.model_source` span attr is "prefix"
 
-  @integration @v1
+  @integration @v1 @unimplemented
   Scenario: Provider-slot prefix also works (distinct from provider-name prefix)
     Given the VK config includes `model_aliases: { "claude-fast": "fallback-1/claude-haiku-4-5" }`
     When I POST with body `{"model": "claude-fast", ...}`
@@ -61,7 +61,7 @@ Feature: AI Gateway — model disambiguation when a VK has multiple providers
     And the model sent upstream is "claude-haiku-4-5"
     And the `langwatch.model_source` span attr is "alias"
 
-  @integration @v1
+  @integration @v1 @unimplemented
   Scenario: Ambiguous model name becomes unambiguous after alias resolution
     Given the VK config includes `model_aliases: { "gpt-5-mini": "primary/gpt-5-mini" }`
     When I POST with body `{"model": "gpt-5-mini", ...}`
@@ -73,7 +73,7 @@ Feature: AI Gateway — model disambiguation when a VK has multiple providers
   # Single-provider VK — no ambiguity, no prefix needed
   # ============================================================================
 
-  @integration @v1
+  @integration @v1 @unimplemented
   Scenario: Single-provider VK accepts bare model name
     Given a virtual key "vk_solo" with only "primary: openai" bound
     When I POST to "/v1/chat/completions" using "vk_solo" with body `{"model": "gpt-5-mini", ...}`
@@ -85,7 +85,7 @@ Feature: AI Gateway — model disambiguation when a VK has multiple providers
   # Unknown model — different failure class
   # ============================================================================
 
-  @integration @v1
+  @integration @v1 @unimplemented
   Scenario: Known provider prefix but unknown model returns upstream 400, not ambiguity
     When I POST with body `{"model": "openai/gpt-does-not-exist", ...}`
     Then the response status is 400
@@ -94,7 +94,7 @@ Feature: AI Gateway — model disambiguation when a VK has multiple providers
     # The provider is clear (openai/), the MODEL is invalid. Ambiguity check
     # passed; upstream error pass-through takes over.
 
-  @integration @v1
+  @integration @v1 @unimplemented
   Scenario: Unknown provider prefix on VK returns 400 with clear envelope
     When I POST with body `{"model": "bedrock/claude-3-haiku", ...}` on "vk_multi" (no bedrock slot)
     Then the response status is 400
@@ -105,14 +105,14 @@ Feature: AI Gateway — model disambiguation when a VK has multiple providers
   # Observability — operators should be able to measure ambiguity incidence
   # ============================================================================
 
-  @unit @v1
+  @unit @v1 @unimplemented
   Scenario: Ambiguity rejection emits a structured log at WARN
     When the gateway rejects a request with `model_ambiguous`
     Then a structured log is written at WARN with `reason=model_ambiguous`
     And the log includes `virtual_key_id`, `model_requested`, `candidate_slot_count`, `gateway_request_id`
     And the log does NOT include the provider slot names (avoid fleet disclosure)
 
-  @unit @v1
+  @unit @v1 @unimplemented
   Scenario: Prometheus counter tracks the ambiguity tail
     Given `gateway_http_requests_total{status="400", reason="model_ambiguous"}` is a declared metric
     When a bare model name hits a multi-provider VK

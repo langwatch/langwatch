@@ -6,10 +6,7 @@ describe("generateDocumentId", () => {
   describe("when content is a plain string", () => {
     it("returns MD5 hash of the trimmed content", () => {
       const content = "hello world";
-      const expected = crypto
-        .createHash("md5")
-        .update(content)
-        .digest("hex");
+      const expected = crypto.createHash("md5").update(content).digest("hex");
 
       expect(generateDocumentId(content)).toBe(expected);
     });

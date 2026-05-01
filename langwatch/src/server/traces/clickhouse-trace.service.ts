@@ -1430,6 +1430,7 @@ export class ClickHouseTraceService {
                 ts.ComputedInput AS ts_ComputedInput,
                 ts.ComputedOutput AS ts_ComputedOutput,
                 ts.Attributes AS ts_Attributes,
+                ts.TraceName AS ts_TraceName,
                 toUnixTimestamp64Milli(ts.OccurredAt) AS ts_OccurredAt,
                 toUnixTimestamp64Milli(ts.CreatedAt) AS ts_CreatedAt,
                 toUnixTimestamp64Milli(ts.UpdatedAt) AS ts_UpdatedAt
@@ -1522,9 +1523,21 @@ export class ClickHouseTraceService {
       outputFromRootSpan: row.ts_OutputFromRootSpan ?? false,
       outputSpanEndTimeMs: row.ts_OutputSpanEndTimeMs ?? 0,
       blockedByGuardrail: false,
+      rootSpanType: null,
+      containsAi: false,
+      containsPrompt: false,
+      selectedPromptId: null,
+      selectedPromptSpanId: null,
+      selectedPromptStartTimeMs: null,
+      lastUsedPromptId: null,
+      lastUsedPromptVersionNumber: null,
+      lastUsedPromptVersionId: null,
+      lastUsedPromptSpanId: null,
+      lastUsedPromptStartTimeMs: null,
       topicId: row.ts_TopicId,
       subTopicId: row.ts_SubTopicId,
       annotationIds: row.ts_AnnotationIds ?? [],
+      traceName: row.ts_TraceName ?? "",
       attributes: row.ts_Attributes,
       lastEventOccurredAt: 0,
       occurredAt: row.ts_OccurredAt,
@@ -1652,6 +1665,7 @@ export class ClickHouseTraceService {
           HasAnnotation AS ts_HasAnnotation,
           AnnotationIds AS ts_AnnotationIds,
           Attributes AS ts_Attributes,
+          TraceName AS ts_TraceName,
           toUnixTimestamp64Milli(OccurredAt) AS ts_OccurredAt,
           toUnixTimestamp64Milli(CreatedAt) AS ts_CreatedAt,
           toUnixTimestamp64Milli(UpdatedAt) AS ts_UpdatedAt
@@ -1803,9 +1817,21 @@ export class ClickHouseTraceService {
       outputFromRootSpan: row.ts_OutputFromRootSpan ?? false,
       outputSpanEndTimeMs: row.ts_OutputSpanEndTimeMs ?? 0,
       blockedByGuardrail: false,
+      rootSpanType: null,
+      containsAi: false,
+      containsPrompt: false,
+      selectedPromptId: null,
+      selectedPromptSpanId: null,
+      selectedPromptStartTimeMs: null,
+      lastUsedPromptId: null,
+      lastUsedPromptVersionNumber: null,
+      lastUsedPromptVersionId: null,
+      lastUsedPromptSpanId: null,
+      lastUsedPromptStartTimeMs: null,
       topicId: row.ts_TopicId,
       subTopicId: row.ts_SubTopicId,
       annotationIds: row.ts_AnnotationIds ?? [],
+      traceName: row.ts_TraceName ?? "",
       attributes: row.ts_Attributes,
       lastEventOccurredAt: 0,
       occurredAt: row.ts_OccurredAt,
@@ -2021,6 +2047,7 @@ interface TraceSummaryRow {
   ts_HasAnnotation: boolean | null;
   ts_AnnotationIds: string[];
   ts_Attributes: Record<string, string>;
+  ts_TraceName?: string | null;
   ts_OccurredAt: number;
   ts_CreatedAt: number;
   ts_UpdatedAt: number;
@@ -2065,7 +2092,9 @@ interface JoinedTraceSpanRow extends TraceSummaryRow {
 /**
  * Transform traces to include guardrail information
  */
-function transformTracesWithGuardrails(traces: Trace[]): TraceWithGuardrail[] {
+function transformTracesWithGuardrails(
+  traces: Trace[],
+): TraceWithGuardrail[] {
   return traces.map((trace) => {
     return {
       ...trace,

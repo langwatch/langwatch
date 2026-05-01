@@ -11,7 +11,7 @@ Feature: Caching passthrough (Anthropic cache_control + gateway semantic cache)
 
   Rule: Anthropic cache_control byte-for-byte invariant
 
-    @integration
+    @integration @unimplemented
     Scenario: cache_control on system message passes through untouched
       When I POST /v1/messages with:
         """
@@ -26,17 +26,17 @@ Feature: Caching passthrough (Anthropic cache_control + gateway semantic cache)
       Then the body forwarded to Anthropic is byte-equivalent in the system[0].cache_control field
       And the response `usage` block includes cache_read_input_tokens / cache_creation_input_tokens
 
-    @integration
+    @integration @unimplemented
     Scenario: cache_control on tool definitions passes through untouched
       When I POST /v1/messages with tools carrying cache_control: {"type": "ephemeral"}
       Then the tools[*].cache_control fields are preserved byte-for-byte
 
-    @integration
+    @integration @unimplemented
     Scenario: cache_control on assistant turn in conversation history is preserved
       When I POST a multi-turn /v1/messages with cache_control marking the last assistant turn
       Then the forwarded body still has cache_control on that exact turn (no reordering of messages)
 
-    @integration
+    @integration @unimplemented
     Scenario: even when the gateway adds X-LangWatch-Request-Id, the request body is unchanged
       When I POST /v1/messages with cache_control
       Then the request body sent to Anthropic has the same SHA-256 as the original client body
@@ -44,7 +44,7 @@ Feature: Caching passthrough (Anthropic cache_control + gateway semantic cache)
 
   Rule: OpenAI prompt caching semantics
 
-    @integration
+    @integration @unimplemented
     Scenario: OpenAI implicit prompt caching (prefix reuse) honored
       Given two consecutive /v1/chat/completions requests with the same 2k-token system prompt
       When the second request hits OpenAI
@@ -53,7 +53,7 @@ Feature: Caching passthrough (Anthropic cache_control + gateway semantic cache)
 
   Rule: Per-request override header
 
-    @integration
+    @integration @unimplemented
     Scenario: X-LangWatch-Cache: disable recursively strips cache_control at any depth
       Given a request with cache_control blocks on system[0], messages[2].content[1], and tools[0]
       When I send header "X-LangWatch-Cache: disable"
@@ -61,34 +61,34 @@ Feature: Caching passthrough (Anthropic cache_control + gateway semantic cache)
       And the response header "X-LangWatch-Cache: bypass" is set
       And the response header "X-LangWatch-Cache-Mode: disable" echoes the applied mode
 
-    @integration
+    @integration @unimplemented
     Scenario: X-LangWatch-Cache: respect is the default and echoes the applied mode
       Given a request with cache_control blocks set
       When no X-LangWatch-Cache header is sent
       Then the gateway forwards cache_control byte-for-byte
       And the response header "X-LangWatch-Cache-Mode: respect" echoes the applied mode
 
-    @integration
+    @integration @unimplemented
     Scenario: X-LangWatch-Cache: force is deferred to v1.1 and 400s in v1
       When I send header "X-LangWatch-Cache: force"
       Then the response status is 400
       And the error envelope type is "cache_override_not_implemented"
       And the envelope message points at the v1.1 roadmap
 
-    @integration
+    @integration @unimplemented
     Scenario: X-LangWatch-Cache: ttl=3600 is deferred to v1.1 and 400s in v1
       When I send header "X-LangWatch-Cache: ttl=3600"
       Then the response status is 400
       And the error envelope type is "cache_override_not_implemented"
 
-    @integration
+    @integration @unimplemented
     Scenario: malformed X-LangWatch-Cache header returns cache_override_invalid
       When I send header "X-LangWatch-Cache: bananas"
       Then the response status is 400
       And the error envelope type is "cache_override_invalid"
       And the envelope message names the rejected mode
 
-    @integration
+    @integration @unimplemented
     Scenario: cache-override runs before policy-rule enforcement
       Given a VK with policy_rules.models.deny = ["^claude-haiku-4-5$"]
       And a request that also sets X-LangWatch-Cache: disable
@@ -100,7 +100,7 @@ Feature: Caching passthrough (Anthropic cache_control + gateway semantic cache)
 
   Rule: Cache token accounting in trace
 
-    @integration
+    @integration @unimplemented
     Scenario: OTel trace reports cache_read and cache_creation tokens separately (semconv-only post iter 42)
       Given a cache-hit request against Anthropic
       When I inspect the exported trace

@@ -143,9 +143,17 @@ jobs:
         working-directory: langwatch
         run: CI=true pnpm install --frozen-lockfile
 
+      # `--ignore-workspace` because agentic-e2e-tests sits one level under
+      # the repo-root pnpm-workspace.yaml introduced by the @langwatch/server
+      # CLI in packages/. Without the flag, pnpm walks up, finds the root
+      # workspace, scopes the install to `packages/*` only, and never lands
+      # @playwright/test in agentic-e2e-tests/node_modules — the next step
+      # then fails with `ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL Command
+      # "playwright" not found`. agentic-e2e-tests is intentionally a
+      # standalone pnpm project (see its self-contained pnpm-lock.yaml).
       - name: Install E2E test dependencies
         working-directory: agentic-e2e-tests
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --ignore-workspace
 
       - name: Install Playwright browsers
         working-directory: agentic-e2e-tests

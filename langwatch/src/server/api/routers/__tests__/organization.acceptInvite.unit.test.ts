@@ -45,6 +45,15 @@ vi.mock("../../../governance/personalWorkspace.service", () => ({
   },
 }));
 
+vi.mock("../../../app-layer/app", () => ({
+  getApp: () => ({
+    notifications: {
+      sendSlackSignupEvent: vi.fn().mockResolvedValue(undefined),
+    },
+    nurturing: null,
+  }),
+}));
+
 vi.mock("../../rbac", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../rbac")>();
   return {

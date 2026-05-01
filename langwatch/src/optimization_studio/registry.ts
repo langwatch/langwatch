@@ -75,10 +75,8 @@ const code: Code = {
     {
       identifier: "code",
       type: "code",
-      value: `import dspy
-
-class Code(dspy.Module):
-    def forward(self, ${defaultInput?.identifier ?? "input"}: str):
+      value: `class Code:
+    def __call__(self, ${defaultInput?.identifier ?? "input"}: str):
         # Your code goes here
 
         return {"${defaultOutput?.identifier ?? "output"}": "Hello world!"}

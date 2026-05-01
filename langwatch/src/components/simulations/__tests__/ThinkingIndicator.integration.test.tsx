@@ -35,7 +35,7 @@ describe("<ThinkingIndicator/>", () => {
       render(<ThinkingIndicator />, { wrapper: Wrapper });
 
       const container = screen.getByRole("status");
-      expect(container).toHaveStyle({ "justify-content": "flex-start" });
+      expect(container).toHaveStyle({ justifyContent: "flex-start" });
     });
   });
 });

@@ -33,6 +33,9 @@
       "node-pty",
       "esbuild",
       "protobufjs"
-    ]
+    ],
+    "overrides": {
+      "protobufjs": ">=7.5.5 <8.0.0 || >=8.0.1"
+    }
   }
 }

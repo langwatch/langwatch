@@ -34,4 +34,5 @@ export const projectFactory = Factory.define<Project>(({ sequence }) => ({
   archivedAt: null,
   isPersonal: false,
   ownerUserId: null,
+  presenceEnabled: false,
 }));

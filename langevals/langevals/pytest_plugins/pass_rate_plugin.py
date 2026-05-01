@@ -85,7 +85,13 @@ def pytest_runtest_logreport(report):
 
 
 def pytest_sessionfinish(session, exitstatus):
-    for group_name, data in session.pass_rates.items():
+    # `pass_rates` is set in pytest_collection_modifyitems which only runs
+    # if collection succeeds. If collection errors out (import failure,
+    # missing dep, etc.) sessionfinish still runs and would AttributeError
+    # here, masking the real failure with an unhelpful traceback. Default
+    # to {} so the underlying collection error remains visible.
+    pass_rates = getattr(session, "pass_rates", {})
+    for group_name, data in pass_rates.items():
         pass_rate = len(data["passed"]) / data["total"]
         required_rate = data["required_rate"]
         if pass_rate < required_rate:

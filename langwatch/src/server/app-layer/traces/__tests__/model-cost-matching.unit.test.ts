@@ -46,7 +46,9 @@ describe("computeSpanCost", () => {
   describe("when model has provider subtype and date suffix", () => {
     it("resolves cost via cascading fallback", () => {
       const result = computeSpanCost({
-        attrs: { "gen_ai.request.model": "openai.responses/gpt-5-mini-2025-08-07" },
+        attrs: {
+          "gen_ai.request.model": "openai.responses/gpt-5-mini-2025-08-07",
+        },
         promptTokens: 1000,
         completionTokens: 500,
       });

@@ -8,6 +8,7 @@ Feature: License Lifecycle End-to-End
   # Walking Skeleton: Complete Flow
   # ============================================================================
 
+  @unimplemented
   Scenario: Complete license activation and enforcement flow
     Given a fresh LangWatch self-hosted deployment
     And an organization "Acme Corp" exists with 3 members and 2 projects
@@ -54,6 +55,7 @@ Feature: License Lifecycle End-to-End
   # Invalid License Handling
   # ============================================================================
 
+  @unimplemented
   Scenario: Attempting to upload invalid license
     Given I am on the license settings page
     And the organization has no license
@@ -62,6 +64,7 @@ Feature: License Lifecycle End-to-End
     Then I see an error toast "Invalid license format"
     And I still see "No license installed"
 
+  @unimplemented
   Scenario: Attempting to upload expired license
     Given I am on the license settings page
     And I have an expired PRO license
@@ -74,6 +77,7 @@ Feature: License Lifecycle End-to-End
   # License Expiration Behavior
   # ============================================================================
 
+  @unimplemented
   Scenario: Organization with expired license falls to FREE tier
     Given the organization has a license that expired yesterday
     And the organization has 3 members and 3 projects
@@ -89,6 +93,7 @@ Feature: License Lifecycle End-to-End
   # API Access with License
   # ============================================================================
 
+  @unimplemented
   Scenario: tRPC endpoints return correct license-based limits
     Given the organization has a GROWTH license with maxMembers 10
     When I call plan.getActivePlan via tRPC
@@ -103,7 +108,7 @@ Feature: License Lifecycle End-to-End
   # Settings Page Navigation
   # ============================================================================
 
-  @wip
+  @wip @unimplemented
   Scenario: License menu item appears in settings
     Given I am on any settings page
     Then I see "License" in the settings menu

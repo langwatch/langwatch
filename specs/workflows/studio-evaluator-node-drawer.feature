@@ -21,7 +21,7 @@ Feature: Studio Evaluator Node Drawer
 
   # --- Opening the Drawer ---
 
-  @integration
+  @integration @unimplemented
   Scenario: Clicking evaluator node opens evaluator editor drawer
     When I click on the evaluator node
     Then the evaluator editor drawer opens
@@ -29,7 +29,7 @@ Feature: Studio Evaluator Node Drawer
     And the drawer shows the evaluator settings form
     And the drawer does not show a right-sidebar properties panel
 
-  @integration
+  @integration @unimplemented
   Scenario: Drawer shows correct evaluator type description
     Given the evaluator is of type "langevals/llm_boolean"
     When I open the evaluator drawer
@@ -38,14 +38,14 @@ Feature: Studio Evaluator Node Drawer
 
   # --- Settings Editing ---
 
-  @integration
+  @integration @unimplemented
   Scenario: Changing evaluator settings stores local state
     When I open the evaluator drawer
     And I change a setting (e.g., "max_tokens" for an LLM-based evaluator)
     Then the change is stored as localConfig on the workflow node
     And the DB evaluator record is not modified
 
-  @integration
+  @integration @unimplemented
   Scenario: Changing evaluator name stores local state
     When I open the evaluator drawer
     And I change the evaluator name to "My Custom Evaluator"
@@ -54,13 +54,13 @@ Feature: Studio Evaluator Node Drawer
 
   # --- Mappings in Studio Context ---
 
-  @integration
+  @integration @unimplemented
   Scenario: Evaluator drawer shows variable mappings section
     When I open the evaluator drawer
     Then the drawer shows a "Variable Mappings" section
     And the available sources include outputs from other nodes in the workflow
 
-  @integration
+  @integration @unimplemented
   Scenario: Available mapping sources include workflow node outputs
     Given the workflow has an LLM node "Chatbot" with outputs "output" and "reasoning"
     And the workflow has an entry node with input "user_query"
@@ -68,7 +68,7 @@ Feature: Studio Evaluator Node Drawer
     Then the mapping sources include "Chatbot > output" and "Chatbot > reasoning"
     And the mapping sources include "Entry > user_query"
 
-  @integration
+  @integration @unimplemented
   Scenario: Changing a mapping is stored on the workflow node
     When I open the evaluator drawer
     And I map the "input" field to "Chatbot > output"
@@ -77,7 +77,7 @@ Feature: Studio Evaluator Node Drawer
 
   # --- Workflow Evaluator Type ---
 
-  @integration
+  @integration @unimplemented
   Scenario: Workflow-type evaluators show a link to the workflow
     Given the evaluator is of type "workflow"
     When I open the evaluator drawer
@@ -86,7 +86,7 @@ Feature: Studio Evaluator Node Drawer
 
   # --- Backward Compatibility ---
 
-  @unit
+  @unit @unimplemented
   Scenario: Old inline evaluator config uses legacy editing path
     Given a workflow has an evaluator node with old inline config (no evaluators/ prefix)
     When I click on the evaluator node

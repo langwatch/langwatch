@@ -9,7 +9,7 @@ Feature: Scenario Failure Handler
   # The handler ensures failure events are emitted to Elasticsearch when
   # scenario jobs fail (child process crash, timeout, prefetch error).
 
-  @unit
+  @unit @unimplemented
   Scenario: Emit both RUN_STARTED and RUN_FINISHED when no events exist
     Given a scenario job failed with error "Child process exited with code 1"
     And no events exist in Elasticsearch for this batchRunId
@@ -19,7 +19,7 @@ Feature: Scenario Failure Handler
     And the RUN_FINISHED event includes the error message
     And both events share the same scenarioRunId
 
-  @unit
+  @unit @unimplemented
   Scenario: Use pre-assigned scenarioRunId when no events exist in Elasticsearch
     Given a scenario job failed with error "Child process exited with code 1"
     And no events exist in Elasticsearch for this batchRunId
@@ -28,7 +28,7 @@ Feature: Scenario Failure Handler
     Then the pre-assigned scenarioRunId is used for both events
     And no new scenarioRunId is generated
 
-  @unit
+  @unit @unimplemented
   Scenario: Emit only RUN_FINISHED when RUN_STARTED exists
     Given a scenario job failed with error "Scenario execution timed out"
     And a RUN_STARTED event exists for this batchRunId
@@ -38,7 +38,7 @@ Feature: Scenario Failure Handler
     And the RUN_FINISHED uses the existing scenarioRunId from RUN_STARTED
     And no new RUN_STARTED event is emitted
 
-  @unit
+  @unit @unimplemented
   Scenario: Idempotent - no action when RUN_FINISHED already exists
     Given a scenario job failed
     And both RUN_STARTED and RUN_FINISHED events exist for this batchRunId
@@ -46,14 +46,14 @@ Feature: Scenario Failure Handler
     Then no events are emitted
     And the handler returns successfully
 
-  @unit
+  @unit @unimplemented
   Scenario: Generate synthetic scenarioRunId with correct format
     Given a scenario job failed
     And no events exist in Elasticsearch
     When the handler generates a synthetic scenarioRunId
     Then the ID follows the pattern "scenariorun_{nanoid}"
 
-  @unit
+  @unit @unimplemented
   Scenario: Include job metadata in failure events
     Given a scenario job failed with:
       | projectId  | proj_123     |
@@ -75,7 +75,7 @@ Feature: Scenario Failure Handler
   # The processor's completed handler should call the failure handler
   # when result.success is false.
 
-  @integration
+  @integration @unimplemented
   Scenario: Worker calls failure handler on job failure
     Given a scenario job completes with result.success = false
     And the result includes error "Prefetch failed: Scenario not found"
@@ -83,13 +83,13 @@ Feature: Scenario Failure Handler
     Then ScenarioFailureHandler.ensureFailureEventsEmitted is called
     And the handler receives the job data and error message
 
-  @integration
+  @integration @unimplemented
   Scenario: Worker does not call failure handler on success
     Given a scenario job completes with result.success = true
     When the worker's completed event fires
     Then ScenarioFailureHandler is not invoked
 
-  @integration
+  @integration @unimplemented
   Scenario: Failure handler errors do not crash worker
     Given a scenario job completes with result.success = false
     And ScenarioFailureHandler throws an error
@@ -103,7 +103,7 @@ Feature: Scenario Failure Handler
   # Update pollForScenarioRun to return early on RUN_STARTED instead of
   # waiting for messages, and properly handle error states.
 
-  @unit
+  @unit @unimplemented
   Scenario: Return success when RUN_STARTED exists with IN_PROGRESS status
     Given a scenario run exists with:
       | scenarioRunId | run_123      |
@@ -113,7 +113,7 @@ Feature: Scenario Failure Handler
     Then it returns success with scenarioRunId "run_123"
     And does not continue polling
 
-  @unit
+  @unit @unimplemented
   Scenario: Return error when run has ERROR status
     Given a scenario run exists with:
       | scenarioRunId | run_123      |
@@ -122,7 +122,7 @@ Feature: Scenario Failure Handler
     Then it returns failure with error "run_error"
     And includes scenarioRunId "run_123"
 
-  @unit
+  @unit @unimplemented
   Scenario: Return error when run has FAILED status
     Given a scenario run exists with:
       | scenarioRunId | run_123      |
@@ -131,7 +131,7 @@ Feature: Scenario Failure Handler
     Then it returns failure with error "run_error"
     And includes scenarioRunId "run_123"
 
-  @unit
+  @unit @unimplemented
   Scenario: Continue polling when no runs exist yet
     Given no scenario runs exist for the batchRunId
     When pollForScenarioRun is called
@@ -143,7 +143,7 @@ Feature: Scenario Failure Handler
   # ============================================================================
   # Verify the complete flow from job failure to frontend error display.
 
-  @e2e
+  @e2e @unimplemented
   Scenario: Frontend displays error instead of timeout on job failure
     Given I am logged into project "my-project"
     And scenario "Broken Config" exists with invalid prompt configuration
@@ -153,7 +153,7 @@ Feature: Scenario Failure Handler
     And I see an error message explaining the failure
     And I do not see "took too long to start"
 
-  @e2e
+  @e2e @unimplemented
   Scenario: Frontend displays error when child process crashes
     Given I am logged into project "my-project"
     And scenario "Crash Test" exists
@@ -163,7 +163,7 @@ Feature: Scenario Failure Handler
     And I see the error from the child process
     And the run status shows ERROR
 
-  @e2e
+  @e2e @unimplemented
   Scenario: Run history shows failed runs with error details
     Given scenario "Problematic" has a failed run
     When I view the run history
@@ -178,14 +178,14 @@ Feature: Scenario Failure Handler
   # the child. The failure handler then emits ERROR events so the UI shows
   # the failure.
 
-  @unit
+  @unit @unimplemented
   Scenario: Timed-out child process triggers failure handler
     Given a scenario child process has been running for over 5 minutes
     When the scenario processor timeout fires
     Then the child process is killed
     And the failure handler emits ERROR events
 
-  @integration
+  @integration @unimplemented
   Scenario: Scenario processor logs timeout with error level
     Given a scenario child process is running
     When the 5-minute processor timeout fires

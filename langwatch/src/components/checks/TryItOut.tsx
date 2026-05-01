@@ -65,7 +65,9 @@ export function TryItOut({
   const [query, setQuery] = useDebounceValue("", 300);
   const {
     period: { startDate, endDate },
+    mode,
     setPeriod,
+    setRelativePeriod,
   } = usePeriodSelector();
   const { filterParams } = useFilterParams();
   const { openDrawer } = useDrawer();
@@ -271,7 +273,12 @@ export function TryItOut({
             onChange={(e) => setQuery(e.target.value)}
           />
         </InputGroup>
-        <PeriodSelector period={{ startDate, endDate }} setPeriod={setPeriod} />
+        <PeriodSelector
+          period={{ startDate, endDate }}
+          mode={mode}
+          setPeriod={setPeriod}
+          setRelativePeriod={setRelativePeriod}
+        />
         <FilterToggle />
       </HStack>
       {evaluatorType === "presidio/pii_detection" && (

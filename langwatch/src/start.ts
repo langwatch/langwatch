@@ -1,6 +1,66 @@
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
 import promBundle from "express-prom-bundle";
 import { createServer, type IncomingMessage, type ServerResponse } from "http";
+import { createSecureServer } from "http2";
 import path from "path";
+
+/**
+ * Auto-mints a self-signed cert pair for the local dev HTTPS+HTTP/2 server.
+ * Cached at `<repo>/.dev-certs/` so the same cert is reused across boots —
+ * means you only see the browser's "untrusted certificate" prompt once per
+ * machine, then Chrome remembers it.
+ *
+ * Worktrees can share a single cert by setting `LANGWATCH_DEV_CERT_DIR`
+ * to a stable path (otherwise each worktree mints + trusts its own).
+ *
+ * Override the auto-generated pair by setting `DEV_HTTPS_CERT` and
+ * `DEV_HTTPS_KEY` to file paths — useful when teammates prefer mkcert
+ * (which gets auto-trusted via the system root store, no prompts).
+ */
+async function loadDevHttpsCredentials(
+  repoDir: string,
+): Promise<{ cert: Buffer; key: Buffer }> {
+  if (process.env.DEV_HTTPS_CERT && process.env.DEV_HTTPS_KEY) {
+    return {
+      cert: readFileSync(process.env.DEV_HTTPS_CERT),
+      key: readFileSync(process.env.DEV_HTTPS_KEY),
+    };
+  }
+
+  const cacheDir =
+    process.env.LANGWATCH_DEV_CERT_DIR ?? path.join(repoDir, ".dev-certs");
+  const certPath = path.join(cacheDir, "dev.pem");
+  const keyPath = path.join(cacheDir, "dev-key.pem");
+
+  if (existsSync(certPath) && existsSync(keyPath)) {
+    return { cert: readFileSync(certPath), key: readFileSync(keyPath) };
+  }
+
+  const { generate } = await import("selfsigned");
+  const pems = generate(
+    [{ name: "commonName", value: "localhost" }],
+    {
+      days: 825, // Apple's max accepted lifetime for trusted certs.
+      keySize: 2048,
+      extensions: [
+        {
+          name: "subjectAltName",
+          altNames: [
+            { type: 2, value: "localhost" },
+            { type: 2, value: "*.localhost" },
+            { type: 7, ip: "127.0.0.1" },
+            { type: 7, ip: "::1" },
+          ],
+        },
+      ],
+    },
+  );
+
+  mkdirSync(cacheDir, { recursive: true });
+  writeFileSync(certPath, pems.cert);
+  writeFileSync(keyPath, pems.private);
+  return { cert: Buffer.from(pems.cert), key: Buffer.from(pems.private) };
+}
 import { register } from "prom-client";
 import { getApp } from "./server/app-layer/app";
 import { initializeWebApp } from "./server/app-layer/presets";
@@ -14,6 +74,7 @@ import { createLogger } from "./utils/logger/server";
 import type { Hono } from "hono";
 import { createApiRouter } from "./server/api-router";
 import { serveStaticOrFallback } from "./server/static-handler";
+import { setupTRPCWebSocket } from "./server/websockets/trpc-ws";
 
 const logger = createLogger("langwatch:start");
 
@@ -125,8 +186,20 @@ export const startApp = async (dir = path.dirname(__dirname)) => {
     ...(!dev ? { "Strict-Transport-Security": "max-age=31536000; includeSubDomains" } : {}),
   };
 
+  // Optional HTTPS + HTTP/2 path for local dev. Set
+  // `LANGWATCH_DEV_HTTP2=1` and a self-signed cert is auto-generated on
+  // first boot (cached in `.dev-certs/` so subsequent boots reuse).
+  // Browsers only negotiate h2 over TLS, so HTTPS is mandatory; first
+  // visit shows a one-time untrusted-cert warning, then Chrome
+  // remembers. `allowHTTP1: true` keeps non-h2 clients (curl,
+  // older tools) working over the same port.
+  //
+  // Default off — `pnpm dev` keeps using plain HTTP/1.1 so nobody who
+  // hasn't opted in sees a breaking change.
+  const useHttp2 = dev && process.env.LANGWATCH_DEV_HTTP2 === "1";
+
   // eslint-disable-next-line @typescript-eslint/no-misused-promises
-  const server = createServer(async (req, res) => {
+  const handler = async (req: IncomingMessage, res: ServerResponse) => {
     try {
       // Collapse runs of slashes so paths like `//authorize` resolve to `/authorize`
       // instead of failing the absolute-path guard on the SPA fallback below.
@@ -192,7 +265,29 @@ export const startApp = async (dir = path.dirname(__dirname)) => {
       res.statusCode = 500;
       res.end("internal server error");
     }
-  });
+  };
+
+  let server: ReturnType<typeof createServer> | ReturnType<typeof createSecureServer>;
+  if (useHttp2) {
+    const { cert, key } = await loadDevHttpsCredentials(dir);
+    // Node's http2 compat-API hands us the same IncomingMessage /
+    // ServerResponse shapes the http server uses, so the handler
+    // body doesn't need to know which transport it's on.
+    // eslint-disable-next-line @typescript-eslint/no-misused-promises
+    server = createSecureServer(
+      { cert, key, allowHTTP1: true },
+      handler as unknown as Parameters<typeof createSecureServer>[1],
+    );
+    logger.info("HTTP/2 + TLS enabled (LANGWATCH_DEV_HTTP2=1)");
+  } else {
+    // eslint-disable-next-line @typescript-eslint/no-misused-promises
+    server = createServer(handler);
+  }
+
+  // Bind the tRPC router to a WebSocket transport on the same HTTP server.
+  // Lets high-frequency procedures (presence cursor today) escape the
+  // browser's 6-connection HTTP cap by riding a single long-lived socket.
+  const wsHandle = setupTRPCWebSocket(server as ReturnType<typeof createServer>);
 
   server.once("error", (err) => {
     logger.error({ error: err }, "error occurred on server");
@@ -209,14 +304,20 @@ export const startApp = async (dir = path.dirname(__dirname)) => {
 ███████╗██║  ██║██║ ╚████║╚██████╔╝╚███╔███╔╝██║  ██║   ██║   ╚██████╗██║  ██║
 ╚══════╝╚═╝  ╚═╝╚═╝  ╚═══╝ ╚═════╝  ╚══╝╚══╝ ╚═╝  ╚═╝   ╚═╝    ╚═════╝╚═╝  ╚═╝
 `;
+    // Print the banner via raw stdout instead of through pino — pino
+    // would JSON-encode the multi-line art into a single escaped `msg`
+    // string, which is unreadable when piped through prefixed log streams
+    // (npx-server, docker logs with prefixes, etc.). Metadata still goes
+    // through the structured logger for log aggregators downstream.
+    process.stdout.write(asciiArt);
     logger.info(
       {
         hostname,
         port,
-        fullUrl: `http://${hostname === "0.0.0.0" ? "localhost" : hostname}:${port}`,
+        fullUrl: `${useHttp2 ? "https" : "http"}://${hostname === "0.0.0.0" ? "localhost" : hostname}:${port}`,
         mode: dev ? `development (API only — Vite on :${basePort})` : "production",
       },
-      asciiArt
+      "langwatch listening",
     );
   });
 
@@ -228,8 +329,17 @@ export const startApp = async (dir = path.dirname(__dirname)) => {
       process.exit(1);
     }, 5_000);
     forceExitTimer.unref();
+    // Politely tell WS clients to reconnect *before* tearing down the
+    // socket — gives them tRPC's staggered reconnect path instead of a
+    // hard TCP RST and a thundering herd on the next pod.
+    try {
+      wsHandle.broadcastReconnectNotification();
+      await wsHandle.close();
+    } catch (error) {
+      logger.warn({ error }, "error while closing tRPC websocket server");
+    }
     server.close();
-    server.closeAllConnections();
+    if ("closeAllConnections" in server) server.closeAllConnections();
     mcpHandler.closeAllSessions();
     try {
       await Promise.all([getApp().close(), shutdownPostHog()]);

@@ -16,17 +16,20 @@ Feature: Variable insertion menu
   # Opening the menu via {{ trigger
   # ============================================================================
 
+  @unimplemented
   Scenario: Typing {{ opens the insertion menu
     Given the textarea is focused
     When I type "Hello {{"
     Then the variable insertion menu appears
     And the menu is positioned near the cursor
 
+  @unimplemented
   Scenario: Typing { alone does not open menu
     Given the textarea is focused
     When I type "Hello {"
     Then the variable insertion menu does not appear
 
+  @unimplemented
   Scenario: Typing {{ at start of textarea
     Given the textarea is empty and focused
     When I type "{{"
@@ -36,10 +39,12 @@ Feature: Variable insertion menu
   # Menu content and structure
   # ============================================================================
 
+  @unimplemented
   Scenario: Menu shows search input
     Given the insertion menu is open
     Then I see a search input at the top of the menu
 
+  @unimplemented
   Scenario: Menu shows sources grouped by name
     Given the insertion menu is open
     Then I see sources grouped under their names
@@ -47,11 +52,13 @@ Feature: Variable insertion menu
     And I see "Web research agent" as a group header
     And I see "Workflow Input" as a group header
 
+  @unimplemented
   Scenario: Fields show type icons
     Given the insertion menu is open
     Then field "input" shows a string type icon
     And field "output_text" shows a string type icon
 
+  @unimplemented
   Scenario: Fields show type badges
     Given the insertion menu is open
     Then field "input" shows a "STRING" type badge
@@ -61,6 +68,7 @@ Feature: Variable insertion menu
   # Searching and filtering
   # ============================================================================
 
+  @unimplemented
   Scenario: Search filters fields
     Given the insertion menu is open
     When I type "output" in the search input
@@ -70,17 +78,20 @@ Feature: Variable insertion menu
     And I see "output_parsed" under "Web research agent"
     And I do not see "input" fields
 
+  @unimplemented
   Scenario: Search is case-insensitive
     Given the insertion menu is open
     When I type "OUTPUT" in the search input
     Then fields containing "output" are still shown
 
+  @unimplemented
   Scenario: Empty search shows all fields
     Given the insertion menu is open
     And I have typed "test" in search
     When I clear the search input
     Then all fields from all sources are shown
 
+  @unimplemented
   Scenario: No results message
     Given the insertion menu is open
     When I type "nonexistent" in the search input
@@ -90,6 +101,7 @@ Feature: Variable insertion menu
   # Selecting a field
   # ============================================================================
 
+  @unimplemented
   Scenario: Click to select a field
     Given the insertion menu is open
     And the cursor is after "Hello {{"
@@ -98,12 +110,14 @@ Feature: Variable insertion menu
     And the menu closes
     And the textarea shows "Hello {{input}}"
 
+  @unimplemented
   Scenario: Keyboard navigation and Enter to select
     Given the insertion menu is open
     When I press ArrowDown to highlight "input"
     And I press Enter
     Then the field is inserted and menu closes
 
+  @unimplemented
   Scenario: Escape closes menu without inserting
     Given the insertion menu is open
     When I press Escape
@@ -115,6 +129,7 @@ Feature: Variable insertion menu
   # Auto-create variable on selection
   # ============================================================================
 
+  @unimplemented
   Scenario: Selecting field creates new variable
     Given the insertion menu is open
     And no variable named "input" exists
@@ -122,12 +137,14 @@ Feature: Variable insertion menu
     Then a new variable "input" is created in the Variables section
     And the variable has type "str"
 
+  @unimplemented
   Scenario: Selecting field sets mapping automatically
     Given the insertion menu is open
     And showMappings is true
     When I select field "input" from "Test Data"
     Then the new variable "input" has mapping to "Test Data.input"
 
+  @unimplemented
   Scenario: Selecting does not duplicate existing variable
     Given a variable "input" already exists
     And the insertion menu is open
@@ -135,6 +152,7 @@ Feature: Variable insertion menu
     Then no duplicate variable is created
     And the existing variable's mapping is updated
 
+  @unimplemented
   Scenario: Type is derived from source field
     Given the insertion menu is open
     And field "count" from "Test Data" has type "number"
@@ -145,22 +163,26 @@ Feature: Variable insertion menu
   # "Add context" button (alternative trigger)
   # ============================================================================
 
+  @unimplemented
   Scenario: Add context button appears on hover
     Given the textarea is not focused
     When I hover over the textarea
     Then an "Add context" button appears at the bottom-right
 
+  @unimplemented
   Scenario: Add context button opens menu
     When I click the "Add context" button
     Then the variable insertion menu appears
     And the menu shows all available sources
 
+  @unimplemented
   Scenario: Add context inserts at end of textarea
     Given the textarea contains "Hello"
     When I click the "Add context" button
     And I select field "input" from "Test Data"
     Then the textarea shows "Hello {{input}}"
 
+  @unimplemented
   Scenario: Add context button not shown when typing
     Given the textarea is focused
     And I am typing
@@ -170,12 +192,14 @@ Feature: Variable insertion menu
   # Creating new variable from menu
   # ============================================================================
 
+  @unimplemented
   Scenario: Option to create new variable
     Given the insertion menu is open
     And I have typed "custom_var" in search
     And no field matches "custom_var"
     Then I see an option "Create variable 'custom_var'"
 
+  @unimplemented
   Scenario: Create custom variable from menu
     Given the insertion menu is open
     And I type "my_custom" in search
@@ -189,6 +213,7 @@ Feature: Variable insertion menu
   # Edge cases
   # ============================================================================
 
+  @unimplemented
   Scenario: Multiple {{ insertions in same text
     Given the textarea contains "{{input}} and {{"
     And the cursor is at the end
@@ -196,11 +221,13 @@ Feature: Variable insertion menu
     When I select "expected_output"
     Then the textarea shows "{{input}} and {{expected_output}}"
 
+  @unimplemented
   Scenario: Menu closes when clicking outside
     Given the insertion menu is open
     When I click outside the menu and textarea
     Then the menu closes
 
+  @unimplemented
   Scenario: Closing brace completes variable
     Given I typed "{{input" without selecting from menu
     When I type "}}"

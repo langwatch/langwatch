@@ -128,8 +128,8 @@ describe("trace dedup OOM safety", () => {
         expect(body).not.toMatch(/SELECT\s+\*\s+FROM\s+stored_spans/i);
       });
 
-      it("uses max(StartTime) GROUP BY for span dedup", () => {
-        expect(body).toContain("max(StartTime)");
+      it("uses max(UpdatedAt) GROUP BY for span dedup", () => {
+        expect(body).toContain("max(UpdatedAt)");
         expect(body).toMatch(
           /GROUP BY\s+TenantId,\s*TraceId,\s*SpanId/,
         );
@@ -152,15 +152,21 @@ describe("trace dedup OOM safety", () => {
     );
     const spanStorageSource = fs.readFileSync(spanStoragePath, "utf-8");
     const body = extractMethodBody(spanStorageSource, "getSpansByTraceId");
+    const dedupHelper = extractFunctionBody(spanStorageSource, "dedupInTuple");
 
     describe("when the stored_spans query SQL is inspected", () => {
       it("does not use LIMIT 1 BY for deduplication", () => {
         expect(body).not.toContain("LIMIT 1 BY");
+        expect(dedupHelper).not.toContain("LIMIT 1 BY");
       });
 
-      it("uses max(StartTime) GROUP BY for span dedup", () => {
-        expect(body).toContain("max(StartTime)");
-        expect(body).toMatch(
+      it("delegates dedup to the IN-tuple helper", () => {
+        expect(body).toContain("dedupInTuple");
+      });
+
+      it("uses max(UpdatedAt) GROUP BY for span dedup", () => {
+        expect(dedupHelper).toContain("max(UpdatedAt)");
+        expect(dedupHelper).toMatch(
           /GROUP BY\s+TenantId,\s*TraceId,\s*SpanId/,
         );
       });
@@ -182,15 +188,21 @@ describe("trace dedup OOM safety", () => {
     );
     const spanStorageSource = fs.readFileSync(spanStoragePath, "utf-8");
     const body = extractMethodBody(spanStorageSource, "getEventsByTraceId");
+    const dedupHelper = extractFunctionBody(spanStorageSource, "dedupInTuple");
 
     describe("when the stored_spans query SQL is inspected", () => {
       it("does not use LIMIT 1 BY for deduplication", () => {
         expect(body).not.toContain("LIMIT 1 BY");
+        expect(dedupHelper).not.toContain("LIMIT 1 BY");
       });
 
-      it("uses max(StartTime) GROUP BY for span dedup", () => {
-        expect(body).toContain("max(StartTime)");
-        expect(body).toMatch(
+      it("delegates dedup to the IN-tuple helper", () => {
+        expect(body).toContain("dedupInTuple");
+      });
+
+      it("uses max(UpdatedAt) GROUP BY for span dedup", () => {
+        expect(dedupHelper).toContain("max(UpdatedAt)");
+        expect(dedupHelper).toMatch(
           /GROUP BY\s+TenantId,\s*TraceId,\s*SpanId/,
         );
       });

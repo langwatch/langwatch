@@ -16,7 +16,7 @@ import { motion } from "motion/react";
 import { LuBookOpen, LuCircleCheck, LuExternalLink } from "react-icons/lu";
 import { useColorModeValue } from "../ui/color-mode";
 
-const MotionBox = motion(Box);
+const MotionBox = motion.create(Box);
 
 const ScenarioInfoCard: React.FC = () => {
   const bgGradient = useColorModeValue(

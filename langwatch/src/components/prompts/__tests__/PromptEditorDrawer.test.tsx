@@ -1098,6 +1098,7 @@ describe("PromptEditorDrawer", () => {
       expect(mockOpenUpgradeModal).toHaveBeenCalledWith("prompts", 3, 3);
     });
 
+    /** @scenario Allows prompt creation when under limit */
     it("allows prompt creation when under limit", () => {
       // Default mock state: allowed
       mockIsAllowed = true;

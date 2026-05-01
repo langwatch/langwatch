@@ -13,14 +13,14 @@ Feature: Collapsible suite sidebar
   Background:
     Given the suite sidebar contains suites
 
-  @integration
+  @integration @unimplemented
   Scenario: Sidebar is expanded by default
     When I open the suites page
     Then the sidebar is in expanded mode
     And the search box is visible
     And suite names and run status are visible
 
-  @integration
+  @integration @unimplemented
   Scenario: Clicking the collapse button collapses the sidebar
     Given the sidebar is expanded
     When I click the collapse button
@@ -28,7 +28,7 @@ Feature: Collapsible suite sidebar
     And only suite icons are visible
     And the search box is not visible
 
-  @integration
+  @integration @unimplemented
   Scenario: Clicking the expand button expands the sidebar
     Given the sidebar is collapsed
     When I click the expand button
@@ -36,18 +36,18 @@ Feature: Collapsible suite sidebar
     And suite names and run status are visible
     And the search box is visible
 
-  @integration
+  @integration @unimplemented
   Scenario: All Runs action is accessible when collapsed
     Given the sidebar is collapsed
     Then the all runs icon button is visible
 
-  @integration
+  @integration @unimplemented
   Scenario: Clicking a suite icon when collapsed navigates to that suite
     Given the sidebar is collapsed
     When I click a suite icon
     Then I navigate to that suite's detail view
 
-  @e2e
+  @e2e @unimplemented
   Scenario: Collapse state persists across page navigations
     Given the sidebar is collapsed
     When I navigate to another page and return

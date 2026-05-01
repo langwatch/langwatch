@@ -120,39 +120,39 @@ Feature: Trace origin classification
   # The platform sets "langwatch.origin" in root span metadata.
   # This replaces the old metadata.platform / metadata.environment pattern.
 
-  @unit
+  @unit @unimplemented
   Scenario: Workflow execution in production sets origin "workflow"
     Given a workflow executes with enable_tracing=true and manual_execution_mode=false
     When the trace is sent to LangWatch
     Then the root span contains attribute "langwatch.origin" = "workflow"
 
-  @unit
+  @unit @unimplemented
   Scenario: Workflow execution in development sets origin "workflow"
     Given a workflow executes with enable_tracing=true and manual_execution_mode=true
     When the trace is sent to LangWatch
     Then the root span contains attribute "langwatch.origin" = "workflow"
 
-  @unit
+  @unit @unimplemented
   Scenario: Component execution in studio sets origin "workflow"
     Given a studio component executes from the optimization studio canvas
     When the trace is sent to LangWatch
     Then the root span contains attribute "langwatch.origin" = "workflow"
 
-  @unit
+  @unit @unimplemented
   Scenario: Evaluations-v3 execution sets origin "evaluation" not "workflow"
     Given an evaluation runs from the evaluations-v3 workbench
     And the evaluation orchestrator builds a workflow and dispatches to execute_flow
     When the trace is sent to LangWatch
     Then the root span contains attribute "langwatch.origin" = "evaluation"
 
-  @unit
+  @unit @unimplemented
   Scenario: Prompt playground execution sets origin "playground"
     Given a prompt playground session executes via PromptStudioAdapter
     And PromptStudioAdapter sends an execute_component event to the studio backend
     When the trace is sent to LangWatch
     Then the root span contains attribute "langwatch.origin" = "playground"
 
-  @unit
+  @unit @unimplemented
   Scenario: Platform scenario simulation sets origin "simulation"
     Given a scenario simulation runs from the platform via SimulationRunnerService
     When the trace is sent to LangWatch
@@ -166,43 +166,43 @@ Feature: Trace origin classification
   # This replaces the old instrumentationScope.name="langwatch-evaluation"
   # pattern and the scenario labels pattern.
 
-  @unit
+  @unit @unimplemented
   Scenario: Python SDK experiment sets origin "evaluation"
     Given a Python SDK experiment runs with langwatch.experiment()
     When the experiment target is called and a trace is created
     Then the root span contains attribute "langwatch.origin" = "evaluation"
 
-  @unit
+  @unit @unimplemented
   Scenario: TypeScript SDK experiment sets origin "evaluation"
     Given a TypeScript SDK experiment runs
     When the experiment target is called and a trace is created
     Then the root span contains attribute "langwatch.origin" = "evaluation"
 
-  @unit
+  @unit @unimplemented
   Scenario: Scenario tool (Python) test run sets origin "simulation"
     Given a scenario pytest test runs via the scenario Python package
     When the test sends traces to LangWatch
     Then the root span contains attribute "langwatch.origin" = "simulation"
 
-  @unit
+  @unit @unimplemented
   Scenario: Scenario tool (JavaScript) test run sets origin "simulation"
     Given a scenario vitest test runs via the @langwatch/scenario package
     When the test sends traces to LangWatch
     Then the root span contains attribute "langwatch.origin" = "simulation"
 
-  @unit
+  @unit @unimplemented
   Scenario: Python SDK regular trace sets origin "application"
     Given a user application instrumented with the LangWatch Python SDK
     When the application sends a trace to LangWatch via langwatch.trace()
     Then the root span contains attribute "langwatch.origin" = "application"
 
-  @unit
+  @unit @unimplemented
   Scenario: TypeScript SDK regular trace sets origin "application"
     Given a user application instrumented with the LangWatch TypeScript SDK
     When the application sends a trace to LangWatch
     Then the root span contains attribute "langwatch.origin" = "application"
 
-  @unit
+  @unit @unimplemented
   Scenario: Third-party OTEL instrumentation with no LangWatch SDK
     Given a user sends traces via a generic OTEL exporter without the LangWatch SDK
     When the trace arrives at LangWatch
@@ -217,40 +217,31 @@ Feature: Trace origin classification
   # The old metadata fields (platform, environment) are no longer set by
   # new code. The old origin names (langwatch-evaluation) are standardized.
 
-  @unit
-  Scenario: execute_flow no longer sets metadata.platform
-    Given a workflow executes via execute_flow after the cleanup
-    When the trace is sent to LangWatch
-    Then the root span does not contain metadata key "platform"
-    And the root span contains attribute "langwatch.origin" = "workflow"
+  # Removed scenarios: "execute_flow no longer sets metadata.platform" and
+  # "execute_component no longer sets metadata.platform".
+  # Aspirational cleanup. As of 2026-05-01, execute_flow.py and
+  # execute_component.py still set metadata.platform / metadata.environment
+  # alongside langwatch.origin (preamble lines 43-49 in this file confirm this).
+  # No roadmap item to drop them; legacy markers remain dual-set.
 
-  @unit
-  Scenario: execute_component no longer sets metadata.platform
-    Given a studio component executes after the cleanup
-    When the trace is sent to LangWatch
-    Then the root span does not contain metadata key "platform"
-    And the root span does not contain metadata key "environment"
-
-  @unit
+  @unit @unimplemented
   Scenario: Python SDK experiment no longer uses langwatch-evaluation origin name
     Given a Python SDK experiment runs after the cleanup
     When the experiment creates a tracer
     Then the tracer scope name is "langwatch" (same as regular traces)
     And the root span contains attribute "langwatch.origin" = "evaluation"
 
-  @unit
+  @unit @unimplemented
   Scenario: TypeScript SDK experiment no longer uses langwatch-evaluation origin name
     Given a TypeScript SDK experiment runs after the cleanup
     When the experiment creates a tracer
     Then the tracer scope name is "langwatch" (not "langwatch-evaluation")
     And the root span contains attribute "langwatch.origin" = "evaluation"
 
-  @unit
-  Scenario: Scenario tool no longer relies on labels for origin identification
-    Given a scenario test runs after the cleanup
-    When the test sends traces to LangWatch
-    Then the root span contains attribute "langwatch.origin" = "simulation"
-    And the origin is NOT communicated via metadata.labels or scenario.labels
+  # Removed scenario: "Scenario tool no longer relies on labels for origin identification"
+  # Aspirational cleanup of an external scenario package. No roadmap item.
+  # Legacy `metadata.labels=scenario-runner` and resource `scenario.labels`
+  # markers continue to flow alongside langwatch.origin = "simulation".
 
   # ===========================================================================
   # Step 1d: Strip legacy markers from projection on new traces
@@ -264,7 +255,7 @@ Feature: Trace origin classification
   # Leave generic keys (environment, etc.) untouched.
   # TODO(2027): remove this stripping code once all clients are upgraded.
 
-  @unit
+  @unit @unimplemented
   Scenario: Projection strips metadata.platform "optimization_studio" on new traces
     Given a new trace with "langwatch.origin" = "workflow"
     And metadata.platform = "optimization_studio" is set on a span
@@ -272,7 +263,7 @@ Feature: Trace origin classification
     Then the trace summary attributes contain "langwatch.origin" = "workflow"
     And the trace summary attributes do not contain "langwatch.platform"
 
-  @unit
+  @unit @unimplemented
   Scenario: Projection strips metadata.labels "scenario-runner" on new traces
     Given a new trace with "langwatch.origin" = "simulation"
     And metadata.labels contains "scenario-runner"
@@ -280,13 +271,13 @@ Feature: Trace origin classification
     Then the trace summary attributes contain "langwatch.origin" = "simulation"
     And the trace summary attributes do not contain "scenario-runner" in labels
 
-  @unit
+  @unit @unimplemented
   Scenario: Projection preserves user-set metadata.platform values
     Given a trace with metadata.platform = "my-custom-platform"
     When the fold projection processes the span
     Then the trace summary attributes contain "langwatch.platform" = "my-custom-platform"
 
-  @unit
+  @unit @unimplemented
   Scenario: Projection preserves generic metadata keys like environment
     Given a new trace with "langwatch.origin" = "workflow"
     And metadata.environment = "production" is set on a span
@@ -303,34 +294,34 @@ Feature: Trace origin classification
   # sets langwatch.origin. If the root span doesn't set it, the value
   # from child spans is preserved.
 
-  @unit
+  @unit @unimplemented
   Scenario: Origin is hoisted from root span to trace summary
     Given a trace with root span containing "langwatch.origin" = "evaluation"
     And child spans that do not contain "langwatch.origin"
     When the fold projection processes all spans
     Then the trace summary attributes contain "langwatch.origin" = "evaluation"
 
-  @unit
+  @unit @unimplemented
   Scenario: Root span overrides child span origin when it has an opinion
     Given a trace where a child span arrives first with "langwatch.origin" = "evaluation"
     And the root span arrives later with "langwatch.origin" = "simulation"
     When the fold projection processes all spans in arrival order
     Then the trace summary attributes contain "langwatch.origin" = "simulation"
 
-  @unit
+  @unit @unimplemented
   Scenario: Root span without origin preserves child span origin
     Given a trace where a child span sets "langwatch.origin" = "evaluation"
     And the root span arrives later without "langwatch.origin"
     When the fold projection processes all spans in arrival order
     Then the trace summary attributes contain "langwatch.origin" = "evaluation"
 
-  @unit
+  @unit @unimplemented
   Scenario: Traces without any origin attribute remain unset
     Given a trace where no span sets "langwatch.origin"
     When the fold projection processes all spans
     Then the trace summary attributes do not contain key "langwatch.origin"
 
-  @unit
+  @unit @unimplemented
   Scenario: Black-box scenario trace propagates origin through traceparent
     Given a scenario simulation sends a request with traceparent header
     And the root span of the trace has "langwatch.origin" = "simulation"
@@ -354,21 +345,21 @@ Feature: Trace origin classification
   #   7. span attribute evaluation.run_id present → "evaluation"
   #   8. No signal → unset (treated as "application" at query time)
 
-  @unit
+  @unit @unimplemented
   Scenario: Infer origin from instrumentationScope.name "langwatch-evaluation"
     Given a trace from an older Python SDK that does not set "langwatch.origin"
     And the root span has instrumentationScope.name = "langwatch-evaluation"
     When the fold projection processes the span
     Then the trace summary attributes contain "langwatch.origin" = "evaluation"
 
-  @unit
+  @unit @unimplemented
   Scenario: Infer origin from instrumentationScope.name "@langwatch/scenario"
     Given a trace from an older scenario tool that does not set "langwatch.origin"
     And spans have instrumentationScope.name = "@langwatch/scenario"
     When the fold projection processes the spans
     Then the trace summary attributes contain "langwatch.origin" = "simulation"
 
-  @unit
+  @unit @unimplemented
   Scenario: Infer origin from metadata.platform "optimization_studio"
     Given a trace from an older platform version
     And metadata.platform = "optimization_studio" is set
@@ -376,7 +367,7 @@ Feature: Trace origin classification
     When the fold projection processes the span
     Then the trace summary attributes contain "langwatch.origin" = "workflow"
 
-  @unit
+  @unit @unimplemented
   Scenario: Infer origin from metadata.labels containing "scenario-runner"
     Given a trace from an older platform scenario execution
     And metadata.labels contains "scenario-runner"
@@ -384,7 +375,7 @@ Feature: Trace origin classification
     When the fold projection processes the span
     Then the trace summary attributes contain "langwatch.origin" = "simulation"
 
-  @unit
+  @unit @unimplemented
   Scenario: Infer origin from resource attribute scenario.labels
     Given a trace from an older scenario tool
     And resource attributes contain "scenario.labels"
@@ -392,7 +383,7 @@ Feature: Trace origin classification
     When the fold projection processes the span
     Then the trace summary attributes contain "langwatch.origin" = "simulation"
 
-  @unit
+  @unit @unimplemented
   Scenario: Infer origin from span attribute evaluation.run_id
     Given a trace from an older SDK experiment
     And a span contains attribute "evaluation.run_id"
@@ -400,7 +391,7 @@ Feature: Trace origin classification
     When the fold projection processes the span
     Then the trace summary attributes contain "langwatch.origin" = "evaluation"
 
-  @unit
+  @unit @unimplemented
   Scenario: Explicit langwatch.origin takes precedence over all inferred signals
     Given a trace where the root span sets "langwatch.origin" = "evaluation"
     And metadata.platform = "optimization_studio" is also set
@@ -412,7 +403,7 @@ Feature: Trace origin classification
   # Step 4: ClickHouse storage
   # ===========================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: Origin is persisted in ClickHouse trace_summaries
     Given a trace with "langwatch.origin" = "evaluation"
     When the trace summary is stored in ClickHouse
@@ -422,69 +413,64 @@ Feature: Trace origin classification
   # Step 5 (future): Trace list quick filters
   # ===========================================================================
 
-  @e2e
-  Scenario: User filters traces by origin using quick filter chips
+  # The "quick filter chips" UI was replaced by SavedViewsBar (seeded
+  # origin views). The behavior described below now lives behind that bar;
+  # see specs/traces/saved-views.feature for the canonical scenarios.
+
+  @e2e @unimplemented
+  Scenario: User filters traces by origin via the saved views bar
     Given I am on the traces list page
     And there are traces with origin "application", "evaluation", and "simulation"
-    When I click the "Application" quick filter chip
-    Then only traces with "langwatch.origin" = "application" or without the attribute are shown
-    And the "Application" chip appears selected
+    When I click the "Application" view badge in the saved views bar
+    Then only traces with "langwatch.origin" = "application" (or empty/null) are shown
+    And the "Application" badge appears selected
 
-  @e2e
-  Scenario: "All traces" quick filter shows everything
+  @e2e @unimplemented
+  Scenario: "All Traces" view resets origin filtering
     Given I am on the traces list page
-    And the "Application" quick filter is currently active
-    When I click the "All traces" quick filter chip
-    Then all traces are shown regardless of scope
+    And the "Application" saved view is currently active
+    When I click the "All Traces" view badge
+    Then all traces are shown regardless of origin
+    # Resets via useSavedViews.resetAllFilters; see savedViewsLogic.ts:47.
 
   # ===========================================================================
-  # Step 6 (future): Online evaluation pre-filtering
+  # Step 6: Online evaluation origin handling (reactor + preconditions)
   # ===========================================================================
 
-  # The evaluationTrigger reactor currently checks:
-  #   attrs["langwatch.platform"] === "optimization_studio" &&
-  #   attrs["langwatch.environment"] === "development"
-  # This is replaced by a single check on langwatch.origin.
+  # As of 2026-05-01, the evaluationTrigger reactor no longer rejects traces
+  # based on origin — it dispatches for any known origin and lets the
+  # precondition matcher (precondition-matchers.ts) filter per monitor config.
+  # The exception is empty origin with no SDK info: that path schedules a
+  # deferred check via originGate.reactor.ts.
 
-  @unit
-  Scenario: Online evaluations skip evaluation traces
+  @unit @unimplemented
+  Scenario: Online evaluations dispatch for evaluation-origin traces (preconditions filter)
     Given an online evaluation monitor is enabled for the project
     And a trace arrives with "langwatch.origin" = "evaluation"
     When the evaluation trigger reactor processes the trace
-    Then no evaluation is triggered for this trace
+    Then evaluation commands are dispatched
+    And precondition matchers filter based on the monitor's configured origin
 
-  @unit
+  @unit @unimplemented
   Scenario: Online evaluations run on application traces
     Given an online evaluation monitor is enabled for the project
     And a trace arrives with "langwatch.origin" = "application"
     When the evaluation trigger reactor processes the trace
     Then evaluations are triggered normally
 
-  @unit
-  Scenario: Online evaluations skip traces with empty origin
+  @unit @unimplemented
+  Scenario: Online evaluations skip traces with empty origin and no SDK info
     Given an online evaluation monitor is enabled for the project
-    And a trace arrives without "langwatch.origin" set
+    And a trace arrives without "langwatch.origin" and without sdk.name
     When the evaluation trigger reactor processes the trace
-    Then no evaluation is triggered for this trace
-    And the trace is deferred for later evaluation
+    Then no evaluation is triggered immediately
+    And a deferred origin-resolution check is scheduled (originGate.reactor)
 
-  @unit
-  Scenario: Online evaluations skip simulation traces
+  @unit @unimplemented
+  Scenario: Online evaluations dispatch for simulation/workflow/playground traces (preconditions filter)
     Given an online evaluation monitor is enabled for the project
-    And a trace arrives with "langwatch.origin" = "simulation"
+    And a trace arrives with "langwatch.origin" in {simulation, workflow, playground}
     When the evaluation trigger reactor processes the trace
-    Then no evaluation is triggered for this trace
-
-  @unit
-  Scenario: Online evaluations skip workflow traces
-    Given an online evaluation monitor is enabled for the project
-    And a trace arrives with "langwatch.origin" = "workflow"
-    When the evaluation trigger reactor processes the trace
-    Then no evaluation is triggered for this trace
-
-  @unit
-  Scenario: Online evaluations skip playground traces
-    Given an online evaluation monitor is enabled for the project
-    And a trace arrives with "langwatch.origin" = "playground"
-    When the evaluation trigger reactor processes the trace
-    Then no evaluation is triggered for this trace
+    Then evaluation commands are dispatched
+    And precondition matchers reject the trace if the monitor's configured
+    origin does not match (server/evaluations/preconditions.ts)

@@ -48,6 +48,7 @@ describe("CodeAgentDataSchema", () => {
 
 describe("suiteTargetSchema", () => {
   describe("when type is code with a referenceId", () => {
+    /** @scenario Suite target schema allows code agent type */
     it("validates successfully", () => {
       const result = suiteTargetSchema.safeParse({
         type: "code",
@@ -59,6 +60,8 @@ describe("suiteTargetSchema", () => {
   });
 
   describe("when only type and referenceId are provided", () => {
+    /** @scenario Suite target schema ignores unknown fields for backwards compatibility */
+    /** @scenario Existing suites without fieldMappings parse successfully */
     it("validates successfully without fieldMappings", () => {
       const result = suiteTargetSchema.safeParse({
         type: "prompt",
@@ -70,6 +73,7 @@ describe("suiteTargetSchema", () => {
   });
 
   describe("when extra fields are present", () => {
+    /** @scenario Suite target schema ignores unknown fields for backwards compatibility */
     it("strips unknown fields per Zod default behavior", () => {
       const result = suiteTargetSchema.safeParse({
         type: "http",
@@ -95,6 +99,15 @@ describe("TargetConfigSchema", () => {
   });
 
   describe("when all valid target types are used", () => {
+    /** @scenario Suite target schema accepts all valid target types */
+    it("accepts every valid target type", () => {
+      for (const type of ["prompt", "http", "code", "workflow"] as const) {
+        expect(
+          TargetConfigSchema.safeParse({ type, referenceId: `${type}_ref` }).success,
+        ).toBe(true);
+      }
+    });
+
     it("accepts prompt type", () => {
       expect(TargetConfigSchema.safeParse({ type: "prompt", referenceId: "p1" }).success).toBe(true);
     });
@@ -111,6 +124,8 @@ describe("TargetConfigSchema", () => {
 
 describe("ChildProcessJobDataSchema", () => {
   describe("when scenarioMappings are on adapterData", () => {
+    /** @scenario fieldMappings threads through scenario job schema */
+    /** @scenario fieldMappings threads through child process data schema */
     it("validates and preserves scenarioMappings in parsed output", () => {
       const payload = {
         context: {

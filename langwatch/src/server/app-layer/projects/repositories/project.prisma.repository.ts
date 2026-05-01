@@ -1,5 +1,6 @@
 import type { PrismaClient, Project } from "@prisma/client";
 import type {
+  PresenceConfig,
   ProjectRepository,
   ProjectWithOrgAdmin,
   ProjectWithTeam,
@@ -55,6 +56,23 @@ export class PrismaProjectRepository implements ProjectRepository {
       firstMessage: project.firstMessage,
       organizationId: org?.id ?? null,
       adminUserId: org?.members?.[0]?.userId ?? null,
+    };
+  }
+
+  async getPresenceConfig(id: string): Promise<PresenceConfig | null> {
+    const project = await this.prisma.project.findUnique({
+      where: { id },
+      select: {
+        presenceEnabled: true,
+        team: {
+          select: { organization: { select: { presenceEnabled: true } } },
+        },
+      },
+    });
+    if (!project) return null;
+    return {
+      orgEnabled: project.team.organization.presenceEnabled,
+      projectEnabled: project.presenceEnabled,
     };
   }
 

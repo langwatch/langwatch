@@ -2,6 +2,7 @@ import { MessagesTable } from "~/components/messages/MessagesTable";
 import { DashboardLayout } from "../../components/DashboardLayout";
 import { useTableView } from "../../components/messages/HeaderButtons";
 import { MessagesList } from "../../components/messages/MessagesList";
+import { NewTracesPromo } from "../../components/messages/NewTracesPromo";
 import { withPermissionGuard } from "../../components/WithPermissionGuard";
 import WelcomeLayout from "../../components/welcome/WelcomeLayout";
 import { useFieldRedaction } from "../../hooks/useFieldRedaction";
@@ -32,6 +33,7 @@ function MessagesOrIntegrationGuideContent() {
 
   return (
     <DashboardLayout>
+      <NewTracesPromo />
       {isTableView ? <MessagesTable /> : <MessagesList />}
     </DashboardLayout>
   );

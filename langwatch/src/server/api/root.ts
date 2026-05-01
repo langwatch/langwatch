@@ -28,6 +28,7 @@ import { onboardingRouter } from "./routers/onboarding/onboarding.router";
 import { optimizationRouter } from "./routers/optimization";
 import { organizationRouter } from "./routers/organization";
 import { planRouter } from "./routers/plan";
+import { presenceRouter } from "./routers/presence";
 import { projectRouter } from "./routers/project";
 import { promptsRouter } from "./routers/prompts";
 import { promptTagsRouter } from "./routers/prompt-tags.trpc-router";
@@ -44,6 +45,7 @@ import { spansRouter } from "./routers/spans";
 import { teamRouter } from "./routers/team";
 import { topicsRouter } from "./routers/topics";
 import { tracesRouter } from "./routers/traces";
+import { tracesV2Router } from "./routers/tracesV2";
 import { translateRouter } from "./routers/translate";
 import { automationRouter } from "./routers/automations";
 import { scimTokenRouter } from "./routers/scimToken";
@@ -73,11 +75,13 @@ const coreRouters = {
   project: projectRouter,
   team: teamRouter,
   traces: tracesRouter,
+  tracesV2: tracesV2Router,
   spans: spansRouter,
   analytics: analyticsRouter,
   monitors: monitorsRouter,
   costs: costsRouter,
   plan: planRouter,
+  presence: presenceRouter,
   topics: topicsRouter,
   dataset: datasetRouter,
   datasetRecord: datasetRecordRouter,

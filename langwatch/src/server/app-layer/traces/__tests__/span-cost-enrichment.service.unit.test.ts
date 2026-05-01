@@ -1,19 +1,21 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-
+import {
+  matchModelCostWithFallbacks,
+  stripProviderSubtype,
+} from "~/server/background/workers/collector/cost";
 import type { MaybeStoredLLMModelCost } from "~/server/modelProviders/llmModelCost";
+import { getStaticModelCosts } from "~/server/modelProviders/llmModelCost";
 import type { OtlpSpan } from "../../../event-sourcing/pipelines/trace-processing/schemas/otlp";
 import {
   OtlpSpanCostEnrichmentService,
   type OtlpSpanCostEnrichmentServiceDependencies,
 } from "../span-cost-enrichment.service";
-import {
-  matchModelCostWithFallbacks,
-  stripProviderSubtype,
-} from "~/server/background/workers/collector/cost";
-import { getStaticModelCosts } from "~/server/modelProviders/llmModelCost";
 
 function createTestSpan(
-  attributes: Array<{ key: string; value: { stringValue?: string; doubleValue?: number } }> = [],
+  attributes: Array<{
+    key: string;
+    value: { stringValue?: string; doubleValue?: number };
+  }> = [],
 ): OtlpSpan {
   return {
     traceId: "trace-1",
@@ -97,7 +99,10 @@ describe("OtlpSpanCostEnrichmentService", () => {
         const deps = createMockDeps([customCost]);
         const service = new OtlpSpanCostEnrichmentService(deps);
         const span = createTestSpan([
-          { key: "gen_ai.request.model", value: { stringValue: "claude-3-5-sonnet" } },
+          {
+            key: "gen_ai.request.model",
+            value: { stringValue: "claude-3-5-sonnet" },
+          },
         ]);
 
         await service.enrichSpan(span, "project-1");
@@ -155,12 +160,15 @@ describe("OtlpSpanCostEnrichmentService", () => {
           model: "gpt-4o-2024-08-06",
           regex: "^gpt-4o-2024-08-06$",
           inputCostPerToken: 0.000003,
-          outputCostPerToken: 0.000010,
+          outputCostPerToken: 0.00001,
         };
         const deps = createMockDeps([customCost]);
         const service = new OtlpSpanCostEnrichmentService(deps);
         const span = createTestSpan([
-          { key: "gen_ai.response.model", value: { stringValue: "gpt-4o-2024-08-06" } },
+          {
+            key: "gen_ai.response.model",
+            value: { stringValue: "gpt-4o-2024-08-06" },
+          },
         ]);
 
         await service.enrichSpan(span, "project-1");
@@ -181,7 +189,10 @@ describe("OtlpSpanCostEnrichmentService", () => {
         const deps = createMockDeps([customCost]);
         const service = new OtlpSpanCostEnrichmentService(deps);
         const span = createTestSpan([
-          { key: "gen_ai.request.model", value: { stringValue: "openai.responses/gpt-5-mini" } },
+          {
+            key: "gen_ai.request.model",
+            value: { stringValue: "openai.responses/gpt-5-mini" },
+          },
         ]);
 
         await service.enrichSpan(span, "project-1");
@@ -205,7 +216,10 @@ describe("OtlpSpanCostEnrichmentService", () => {
         const deps = createMockDeps([customCost]);
         const service = new OtlpSpanCostEnrichmentService(deps);
         const span = createTestSpan([
-          { key: "gen_ai.request.model", value: { stringValue: "openai.responses/gpt-5-mini-2025-08-07" } },
+          {
+            key: "gen_ai.request.model",
+            value: { stringValue: "openai.responses/gpt-5-mini-2025-08-07" },
+          },
         ]);
 
         await service.enrichSpan(span, "project-1");
@@ -221,7 +235,9 @@ describe("OtlpSpanCostEnrichmentService", () => {
 
 describe("stripProviderSubtype", () => {
   it("strips subtype from provider prefix", () => {
-    expect(stripProviderSubtype("openai.responses/gpt-5-mini")).toBe("openai/gpt-5-mini");
+    expect(stripProviderSubtype("openai.responses/gpt-5-mini")).toBe(
+      "openai/gpt-5-mini",
+    );
   });
 
   it("strips subtype from azure.chat prefix", () => {
@@ -319,7 +335,10 @@ describe("matchModelCostWithFallbacks", () => {
 
     describe("when model has non-standard date suffixes (@regression)", () => {
       it("matches gpt-5.2-20260315 (YYYYMMDD) to openai/gpt-5.2", () => {
-        const result = matchModelCostWithFallbacks("gpt-5.2-20260315", realCosts);
+        const result = matchModelCostWithFallbacks(
+          "gpt-5.2-20260315",
+          realCosts,
+        );
         expect(result?.model).toBe("openai/gpt-5.2");
       });
 
@@ -334,7 +353,10 @@ describe("matchModelCostWithFallbacks", () => {
       });
 
       it("matches mistral-small-2603 (YYMM) to mistralai/mistral-small-2603", () => {
-        const result = matchModelCostWithFallbacks("mistral-small-2603", realCosts);
+        const result = matchModelCostWithFallbacks(
+          "mistral-small-2603",
+          realCosts,
+        );
         expect(result?.model).toBe("mistralai/mistral-small-2603");
       });
     });
@@ -353,12 +375,18 @@ describe("matchModelCostWithFallbacks", () => {
 
     describe("when model has provider subtype and non-standard date suffix (@regression)", () => {
       it("matches openai.responses/gpt-5.2-0315 to openai/gpt-5.2", () => {
-        const result = matchModelCostWithFallbacks("openai.responses/gpt-5.2-0315", realCosts);
+        const result = matchModelCostWithFallbacks(
+          "openai.responses/gpt-5.2-0315",
+          realCosts,
+        );
         expect(result?.model).toBe("openai/gpt-5.2");
       });
 
       it("matches openai.responses/gpt-5.3-chat-latest to openai/gpt-5.3-chat", () => {
-        const result = matchModelCostWithFallbacks("openai.responses/gpt-5.3-chat-latest", realCosts);
+        const result = matchModelCostWithFallbacks(
+          "openai.responses/gpt-5.3-chat-latest",
+          realCosts,
+        );
         expect(result?.model).toBe("openai/gpt-5.3-chat");
       });
     });

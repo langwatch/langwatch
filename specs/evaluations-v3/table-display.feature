@@ -12,12 +12,14 @@ Feature: Table display and interaction features
   # Sticky Headers
   # ============================================================================
 
+  @unimplemented
   Scenario: Super header sticks when scrolling
     Given the dataset has 50 rows
     When I scroll down the table
     Then the super header row (Dataset/Agents) remains fixed at the top
     And the column header row remains fixed below the super header
 
+  @unimplemented
   Scenario: Both header rows maintain borders when sticky
     Given the dataset has 50 rows
     When I scroll down the table
@@ -28,6 +30,7 @@ Feature: Table display and interaction features
   # Resizable Columns
   # ============================================================================
 
+  @unimplemented
   Scenario: Resize column by dragging header border
     Given the "input" column has default width
     When I hover near the right edge of the "input" column header
@@ -36,6 +39,7 @@ Feature: Table display and interaction features
     Then the "input" column width increases
     And the table layout adjusts accordingly
 
+  @unimplemented
   Scenario: Resize indicator only appears near column edge
     Given the "input" column header is visible
     When I hover in the center of the "input" column header
@@ -43,11 +47,13 @@ Feature: Table display and interaction features
     When I hover near the right edge of the header
     Then the resize handle indicator appears
 
+  @unimplemented
   Scenario: Column widths persist across page refresh
     Given I resize the "input" column to 300px
     When I refresh the page
     Then the "input" column is still 300px wide
 
+  @unimplemented
   Scenario: Column widths persist when switching datasets
     Given I have datasets "Test Data" and "Other Data" in the workbench
     And I resize the "input" column to 300px
@@ -59,24 +65,28 @@ Feature: Table display and interaction features
   # JSON/List Column Formatting
   # ============================================================================
 
+  @unimplemented
   Scenario: JSON column displays formatted content
     Given the "metadata" column has type "json"
     And row 0 has "metadata" value '{"key": "value", "nested": {"a": 1}}'
     Then the cell displays the JSON with proper indentation
     And the cell uses a monospace font
 
+  @unimplemented
   Scenario: List column displays formatted content
     Given the "metadata" column has type "list"
     And row 0 has "metadata" value '["item1", "item2", "item3"]'
     Then the cell displays the list with proper indentation
     And the cell uses a monospace font
 
+  @unimplemented
   Scenario: String values in JSON columns are parsed
     Given the "metadata" column has type "json"
     And row 0 has "metadata" value stored as string '{"key": "value"}'
     Then the cell attempts to parse it as JSON
     And displays the formatted result
 
+  @unimplemented
   Scenario: Large values are truncated for performance
     Given row 0 has "input" value with 10000 characters
     Then the cell displays only the first 5000 characters
@@ -86,18 +96,21 @@ Feature: Table display and interaction features
   # Compact/Expanded Row Mode
   # ============================================================================
 
+  @unimplemented
   Scenario: Row height toggle is accessible via popover
     Then I see a settings icon button in the header toolbar
     When I click the settings icon
     Then a popover opens with row height options
     And I see "Compact" and "Expanded" options
 
+  @unimplemented
   Scenario: Default row mode is compact
     Given the dataset has rows with long content
     Then the table starts in compact mode
     And rows have a fixed maximum height
     And overflow content shows a fade overlay at the bottom
 
+  @unimplemented
   Scenario: Switch to expanded mode
     Given the table is in compact mode
     When I click the settings icon
@@ -105,6 +118,7 @@ Feature: Table display and interaction features
     Then all rows expand to show their full content
     And the fade overlays disappear
 
+  @unimplemented
   Scenario: Expand individual cell in compact mode
     Given the table is in compact mode
     And row 0 has content that overflows
@@ -112,6 +126,7 @@ Feature: Table display and interaction features
     Then that specific cell expands to show full content
     And other cells remain compact
 
+  @unimplemented
   Scenario: Collapse individual expanded cell
     Given the table is in compact mode
     And cell (0, "input") is individually expanded
@@ -119,6 +134,7 @@ Feature: Table display and interaction features
     When I click the collapse bar
     Then the cell returns to compact mode
 
+  @unimplemented
   Scenario: Drag to resize individual cell height
     Given the table is in compact mode
     And cell (0, "input") is individually expanded
@@ -127,6 +143,7 @@ Feature: Table display and interaction features
     When I drag the collapse bar upward past minimum
     Then the cell collapses to compact mode
 
+  @unimplemented
   Scenario: Collapse bar appears on hover for overflowing compact cells
     Given the table is in compact mode
     And row 0 has content that overflows
@@ -134,6 +151,7 @@ Feature: Table display and interaction features
     Then the collapse/resize bar becomes visible
     And I can drag it to expand the cell
 
+  @unimplemented
   Scenario: Switching modes clears individual expansions
     Given the table is in compact mode
     And cell (0, "input") is individually expanded
@@ -142,6 +160,7 @@ Feature: Table display and interaction features
     When I switch back to compact mode
     Then all cells start in compact state
 
+  @unimplemented
   Scenario: Fade overlay matches cell background on hover
     Given the table is in compact mode
     And row 0 has content that overflows

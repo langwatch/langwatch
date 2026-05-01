@@ -324,6 +324,10 @@ const routes: RouteObject[] = [
     ...page(() => import("./pages/[project]/messages")),
   },
   {
+    path: "/:project/traces",
+    ...page(() => import("./pages/[project]/traces")),
+  },
+  {
     path: "/:project/messages/:trace",
     ...page(() => import("./pages/[project]/messages/[trace]/index")),
   },
@@ -492,17 +496,27 @@ const routes: RouteObject[] = [
     ...page(() => import("./pages/@project/[...path]/index")),
   },
 
-  // Catch-all 404 — must stay last. Replaces the React Router dev fallback
-  // (the raw "Hey developer 👋" string) with a styled page.
+  // Catch-all 404 — must stay last.
   {
     path: "*",
-    ...page(() => import("./pages/_not-found")),
+    ...page(() => import("./pages/not-found")),
   },
 ];
+
+// React Router v7 expects a HydrateFallback when the root route is async; the
+// app uses lazy() per-route and never blocks hydration, but RR still emits a
+// console warning if no fallback is declared. An empty fragment is correct
+// here — InnerProviders + Suspense already render the right shell once
+// children resolve, and showing nothing for the few ms before that is the
+// existing behaviour.
+function HydrateFallback() {
+  return null;
+}
 
 export const router = createBrowserRouter([
   {
     Component: RootLayout,
+    HydrateFallback,
     // ErrorBoundary catches render + loader throws anywhere below this node
     // and renders the same fallback used by the catch-all 404 route.
     ErrorBoundary: NotFoundOrErrorPage,

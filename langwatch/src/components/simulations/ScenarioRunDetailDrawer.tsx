@@ -402,7 +402,7 @@ export function ScenarioRunDetailDrawer({
                 position="relative"
                 className="group"
                 css={{
-                  "& > div:first-child": { borderRadius: 0, minHeight: "100%", height: "100%" },
+                  "& > div:first-of-type": { borderRadius: 0, minHeight: "100%", height: "100%" },
                 }}
               >
                 <SimulationConsole
