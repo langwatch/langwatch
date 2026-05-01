@@ -68,7 +68,7 @@
     "date-fns": "^4.1.0",
     "express": "^5.2.1",
     "node-pty": "^1.0.0",
-    "vitest": "^3.2.4",
+    "vitest": "^4.1.5",
     "yargs": "^17.7.2",
     "zod": "^4.3.6",
     "zod-validation-error": "^5.0.0"
