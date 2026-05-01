@@ -4,7 +4,7 @@ import { type ZodError, z } from "zod";
 import { fromZodError } from "zod-validation-error";
 import type { DeepPartial } from "../../utils/types";
 import { openTelemetryLogsRequestToTracesForCollection } from "./otel.logs";
-import { spanSchema } from "./types.generated";
+import { spanSchema } from "./types";
 
 const springAICompleteChatRequest: DeepPartial<IExportLogsServiceRequest> = {
   resourceLogs: [

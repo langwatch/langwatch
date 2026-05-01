@@ -12,7 +12,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { EvaluatorEditorDrawer } from "../EvaluatorEditorDrawer";
 
-// Mock AVAILABLE_EVALUATORS
+// Mock AVAILABLE_EVALUATORS and evaluatorsSchema (both from same module)
 vi.mock("~/server/evaluations/evaluators.generated", () => ({
   AVAILABLE_EVALUATORS: {
     "langevals/exact_match": {
@@ -26,16 +26,10 @@ vi.mock("~/server/evaluations/evaluators.generated", () => ({
       },
     },
   },
+  evaluatorsSchema: {
+    shape: {},
+  },
 }));
-
-// Mock evaluatorsSchema - minimal mock
-vi.mock("~/server/evaluations/evaluators.zod.generated", () => {
-  return {
-    evaluatorsSchema: {
-      shape: {},
-    },
-  };
-});
 
 // Mock getEvaluator
 vi.mock("~/server/evaluations/getEvaluator", () => ({

@@ -4,7 +4,7 @@ import { type ZodError, z } from "zod";
 import { fromZodError } from "zod-validation-error";
 import type { DeepPartial } from "../../utils/types";
 import { openTelemetryMetricsRequestToTracesForCollection } from "./otel.metrics";
-import { spanSchema } from "./types.generated";
+import { spanSchema } from "./types";
 
 const timeToFirstTokenMetricsRequest: DeepPartial<IExportMetricsServiceRequest> =
   {

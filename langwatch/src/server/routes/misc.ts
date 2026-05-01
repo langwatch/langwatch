@@ -44,11 +44,11 @@ import {
   matchModelCostWithFallbacks,
 } from "~/server/background/workers/collector/cost";
 import { prisma } from "~/server/db";
-import type {
-  DSPyLLMCall,
-  DSPyStepRESTParams,
+import {
+  type DSPyLLMCall,
+  type DSPyStepRESTParams,
+  dSPyStepRESTParamsSchema,
 } from "~/server/experiments/types";
-import { dSPyStepRESTParamsSchema } from "~/server/experiments/types.generated";
 import { filterFieldsEnum } from "~/server/filters/types";
 import { createLicenseEnforcementService } from "~/server/license-enforcement";
 import { LimitExceededError } from "~/server/license-enforcement/errors";
@@ -62,8 +62,10 @@ import { getPostHogInstance } from "~/server/posthog";
 import { getServerAuthSession } from "~/server/auth";
 import { connection as redis } from "~/server/redis";
 import { TRACK_EVENT_SPAN_NAME } from "~/server/tracer/constants";
-import type { TrackEventRESTParamsValidator } from "~/server/tracer/types";
-import { trackEventRESTParamsValidatorSchema } from "~/server/tracer/types.generated";
+import {
+  type TrackEventRESTParamsValidator,
+  trackEventRESTParamsValidatorSchema,
+} from "~/server/tracer/types";
 import {
   TRACK_EVENTS_QUEUE,
   trackEventsQueue,

@@ -5,13 +5,25 @@ import {
   lLMSpanSchema,
   rAGChunkSchema,
   rAGSpanSchema,
-} from "../tracer/types.generated";
+} from "../tracer/types";
 
-// Strict type for records from database - ID is always present
-export type DatasetRecordEntry = { id: string } & Record<string, any>;
+// --- Zod-first schemas ---
 
-// Input type for creating new records - ID is optional (backend generates with nanoid)
-export type DatasetRecordInput = { id?: string } & Record<string, any>;
+export const datasetRecordEntrySchema = z
+  .object({
+    id: z.string(),
+  })
+  .and(z.record(z.string(), z.any()));
+
+export type DatasetRecordEntry = z.infer<typeof datasetRecordEntrySchema>;
+
+export const datasetRecordInputSchema = z
+  .object({
+    id: z.string().optional(),
+  })
+  .and(z.record(z.string(), z.any()));
+
+export type DatasetRecordInput = z.infer<typeof datasetRecordInputSchema>;
 
 // TODO: fix this list being repeated 3 times
 export const datasetColumnTypeSchema = z.union([
@@ -29,19 +41,7 @@ export const datasetColumnTypeSchema = z.union([
   z.literal("image"),
 ]);
 
-export type DatasetColumnType =
-  | "string"
-  | "boolean"
-  | "number"
-  | "date"
-  | "list"
-  | "json"
-  | "spans"
-  | "rag_contexts"
-  | "chat_messages"
-  | "annotations"
-  | "evaluations"
-  | "image";
+export type DatasetColumnType = z.infer<typeof datasetColumnTypeSchema>;
 
 export const DATASET_COLUMN_TYPES = [
   "string",
@@ -58,15 +58,21 @@ export const DATASET_COLUMN_TYPES = [
   "image",
 ] as const;
 
-export type DatasetColumns = { name: string; type: DatasetColumnType }[];
+export const datasetColumnsSchema = z.array(
+  z.object({
+    name: z.string(),
+    type: datasetColumnTypeSchema,
+  }),
+);
 
-export type DatasetRecordForm = {
-  /**
-   * @minLength 1
-   */
-  name: string;
-  columnTypes: DatasetColumns;
-};
+export type DatasetColumns = z.infer<typeof datasetColumnsSchema>;
+
+export const datasetRecordFormSchema = z.object({
+  name: z.string().min(1),
+  columnTypes: datasetColumnsSchema,
+});
+
+export type DatasetRecordForm = z.infer<typeof datasetRecordFormSchema>;
 
 export const annotationScoreSchema = z.object({
   label: z.string().optional(),
