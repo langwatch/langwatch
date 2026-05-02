@@ -213,7 +213,8 @@ export class EvaluationRunClickHouseRepository
             toUnixTimestamp64Milli(t.StartedAt) AS StartedAt,
             toUnixTimestamp64Milli(t.CompletedAt) AS CompletedAt,
             t.CostId AS CostId,
-            t.LastProcessedEventId AS LastProcessedEventId
+            t.LastProcessedEventId AS LastProcessedEventId,
+            toUnixTimestamp64Milli(t.LastEventOccurredAt) AS lastEventOccurredAt
           FROM ${TABLE_NAME} AS t
           PREWHERE (t.TenantId, t.EvaluationId, t.UpdatedAt) IN (
             SELECT TenantId, EvaluationId, max(UpdatedAt)
