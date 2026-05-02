@@ -104,6 +104,37 @@ attribute usage to the right person without leaking tokens.
 - Per-user JWT claims and trace attribution land everywhere
   automatically.
 
+## Rollout & permissions
+
+Governance ships behind two independent feature flags so pilots can
+turn on the data plane (gateway) without committing to the full
+governance UI surface:
+
+- `release_ui_ai_gateway_menu_enabled` — exposes the AI Gateway nav
+  surface (virtual keys, providers, routing policies). Ships first.
+- `release_ui_ai_governance_enabled` — unlocks the Governance home
+  (`/govern`), ingestion sources, anomaly rules, compliance export.
+  Ships after gateway adoption is proven in the org.
+
+Both flags are PostHog-controlled. Self-hosted deployers can force
+either one on with `FEATURE_FLAG_FORCE_ENABLE=release_ui_ai_gateway_menu_enabled`
+in `langwatch/.env`.
+
+When a gateway is wired up, the chrome is **persona-aware**: admins
+land on the org switcher + governance KPIs; engineers using a CLI
+land on personal-key management; LLMOps users (the majority) see the
+existing dashboard with zero chrome change. See
+[Personal IDE keys](/ai-gateway/governance/personal-keys) for the
+full storyboard.
+
+Permissions are governed by an RBAC catalog (not by ADMIN/MEMBER
+role alone): `governance:view/manage`, `ingestionSources:manage`,
+`anomalyRules:manage`, `complianceExport:manage`,
+`activityMonitor:view` — assignable via the existing
+`CustomRolePermissions` JSON column for delegation. Default role
+attachments + delegation surface are documented in
+[Compliance architecture](/ai-gateway/governance/compliance-architecture#3-rbac--permission-driven-not-role-driven).
+
 ## Where Personal IDE keys sit in the bigger picture
 
 Personal IDE keys are **Tier 1** — the proxy tier — of LangWatch's
