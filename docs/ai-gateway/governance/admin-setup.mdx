@@ -248,6 +248,44 @@ The reference server passes all of:
 - `/logout` is idempotent — passing an unknown / already-revoked refresh
   token still returns `200 { ok: true }`
 
+## Try it locally (dogfood loop)
+
+Want to see real spend land in `/me/usage` and the governance
+dashboard before rolling out to your team? The repo ships dogfood
+helpers that mint a personal virtual key and fire a real completion
+through your local Go gateway.
+
+```bash
+# 1. Bring up the stack (postgres + redis + app + gateway)
+make dev
+make service svc=aigateway   # in a second terminal
+
+# 2. Sign up a persona-4 admin (uses /api/auth/sign-up/email)
+curl -X POST http://localhost:5560/api/auth/sign-up/email \
+  -H 'content-type: application/json' \
+  -d '{"email":"jane@acme.test","password":"...","name":"Jane Acme"}'
+
+# 3. Seed the persona's personal team + project + VK
+pnpm tsx scripts/dogfood/seed-personas.ts \
+  --email jane@acme.test --persona p4 --mint-vk
+# → prints VK secret to stdout (capture it; it's shown once)
+
+# 4. Fire a real completion through the gateway
+pnpm tsx scripts/dogfood/fire-completion.ts \
+  --vk lw_vk_live_<...> \
+  --model claude-sonnet-4 \
+  --prompt "Write a haiku about retrieval-augmented generation."
+
+# 5. Wait ~5s for the trace pipeline, then visit:
+#    /me/usage      — real spend, not empty-state
+#    /govern        — admin's governance home with live activity
+```
+
+The `seed-personas.ts` helper covers persona 1 (admin), persona 3
+(LLMOps majority — no chrome change), and persona 4 (admin who also
+uses the CLI). Add `--mint-vk` to the latter two to get a usable
+personal VK.
+
 ## What's next
 
 - [Routing policies](/ai-gateway/governance/routing-policies) for the
