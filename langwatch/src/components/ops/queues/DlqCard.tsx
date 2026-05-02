@@ -104,6 +104,10 @@ export function DlqCard({ queueNames }: { queueNames: string[] }) {
                   rowHeight={DLQ_ROW_HEIGHT}
                   columnCount={hasAccess ? 6 : 5}
                   scrollContainer={scrollContainer}
+                  getItemKey={(i) => {
+                    const g = groups[i]!;
+                    return `${g.queueName}:${g.groupId}`;
+                  }}
                   renderRow={(i) => {
                     const group = groups[i]!;
                     return (

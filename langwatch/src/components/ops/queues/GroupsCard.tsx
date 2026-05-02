@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Badge,
   Box,
@@ -76,6 +76,14 @@ export function GroupsCard({ queueNames }: { queueNames: string[] }) {
     }
     return { all: allGroups.length, ok, blocked, stale, active };
   }, [allGroups]);
+
+  // Filter changes shrink the visible row count without re-mounting the
+  // scroll container, so the virtualizer's total height drops while
+  // scrollTop holds its old value — leaving blank space below the rows
+  // until the user scrolls. Snap back to the top on every filter change.
+  useEffect(() => {
+    if (scrollContainer) scrollContainer.scrollTop = 0;
+  }, [statusFilter, search, scrollContainer]);
 
   const isLoading = !!primaryQueue && groupsQuery.isLoading;
 
@@ -164,6 +172,10 @@ export function GroupsCard({ queueNames }: { queueNames: string[] }) {
                     rowHeight={GROUPS_ROW_HEIGHT}
                     columnCount={hasAccess ? 7 : 6}
                     scrollContainer={scrollContainer}
+                    getItemKey={(i) => {
+                      const g = filteredGroups[i]!;
+                      return `${g.queueName}:${g.groupId}`;
+                    }}
                     renderRow={(i) => {
                       const group = filteredGroups[i]!;
                       const overdue = !group.isBlocked && isOverdue(group.oldestJobMs);

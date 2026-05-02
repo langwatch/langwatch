@@ -111,10 +111,15 @@ export function BlockedCard({ queueNames }: { queueNames: string[] }) {
                   rowHeight={BLOCKED_ROW_HEIGHT}
                   columnCount={5}
                   scrollContainer={scrollContainer}
+                  getItemKey={(i) => {
+                    const c = clusters[i]!;
+                    return `${c.queueName}::${c.normalizedMessage}`;
+                  }}
                   renderRow={(i) => {
                     const cluster = clusters[i]!;
+                    const rowKey = `${cluster.queueName}::${cluster.normalizedMessage}`;
                     return (
-                      <Table.Row key={i}>
+                      <Table.Row key={rowKey}>
                         <Table.Cell textAlign="end">
                           <Text color="red.500" fontWeight="medium" textStyle="xs">{cluster.count}</Text>
                         </Table.Cell>

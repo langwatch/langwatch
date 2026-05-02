@@ -17,6 +17,14 @@ interface Props {
   columnCount: number;
   scrollContainer: HTMLElement | null;
   renderRow: (index: number) => ReactNode;
+  /**
+   * Stable per-row key. Without this, react-virtual falls back to the row
+   * index, so `vi.key` (which is what wraps each rendered row) reuses DOM
+   * across reorders — a row that moves from index 3 to index 5 keeps the
+   * DOM node from index 3, leaking state. Pass something like
+   * `(i) => list[i].id` whenever the underlying list can reorder.
+   */
+  getItemKey?: (index: number) => string | number;
   /** Skip virtualization for short lists (default: 30). */
   threshold?: number;
   overscan?: number;
@@ -28,6 +36,7 @@ export function VirtualizedTableRows({
   columnCount,
   scrollContainer,
   renderRow,
+  getItemKey,
   threshold = 30,
   overscan = 6,
 }: Props) {
@@ -45,6 +54,7 @@ export function VirtualizedTableRows({
     estimateSize,
     overscan,
     enabled: shouldVirtualize,
+    getItemKey,
   });
 
   if (!shouldVirtualize) {
