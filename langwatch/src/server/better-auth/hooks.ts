@@ -3,8 +3,11 @@ import { APIError } from "better-auth/api";
 import { generate } from "@langwatch/ksuid";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { createLogger } from "../../utils/logger/server";
+import { captureException } from "../../utils/posthogErrorCapture";
 import { isSsoProviderMatch, extractEmailDomain } from "./sso";
 import { InviteService } from "~/server/invites/invite.service";
+import { getApp } from "~/server/app-layer/app";
+import { fireSsoAutoAddNurturingCalls } from "../../../ee/billing/nurturing/hooks/ssoAutoAdd";
 
 const logger = createLogger("langwatch:better-auth:hooks");
 
@@ -102,7 +105,7 @@ export const afterUserCreate = async ({
   user,
 }: {
   prisma: PrismaClient;
-  user: { id: string; email: string };
+  user: { id: string; email: string; name: string };
 }): Promise<void> => {
   const domain = extractEmailDomain(user.email);
   if (!domain) return;
@@ -159,6 +162,22 @@ export const afterUserCreate = async ({
           ? "Applied pending invite on SSO signup"
           : "Auto-added new user to SSO organization (default MEMBER)",
       );
+
+      void getApp()
+        .notifications.sendSlackSignupEvent({
+          userName: user.name,
+          userEmail: user.email,
+          organizationName: org.name,
+        })
+        .catch(captureException);
+
+      fireSsoAutoAddNurturingCalls({
+        userId: user.id,
+        email: user.email,
+        name: user.name,
+        organizationId: org.id,
+        organizationName: org.name,
+      });
     } catch (err) {
       // P2002 (unique constraint) means another concurrent OAuth callback
       // or a retry already created this membership. Idempotent success.
