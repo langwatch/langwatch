@@ -306,9 +306,12 @@ describe("Per-origin retention class — write-side population + TTL clauses", (
       expect(norm).toMatch(/retentionclass\s*=\s*'thirty_days'/);
       expect(norm).toMatch(/retentionclass\s*=\s*'one_year'/);
       expect(norm).toMatch(/retentionclass\s*=\s*'seven_years'/);
-      expect(norm).toMatch(/interval\s+30\s+day/);
-      expect(norm).toMatch(/interval\s+1\s+year/);
-      expect(norm).toMatch(/interval\s+7\s+year/);
+      // ClickHouse normalises `INTERVAL N UNIT` → `toIntervalUnit(N)` when
+      // serialising engine_full from system.tables. Match either form so
+      // the assertion survives CH parser changes across versions.
+      expect(norm).toMatch(/interval\s+30\s+day|tointervalday\(30\)/);
+      expect(norm).toMatch(/interval\s+1\s+year|tointervalyear\(1\)/);
+      expect(norm).toMatch(/interval\s+7\s+year|tointervalyear\(7\)/);
     });
 
     it("stored_log_records engine_full contains all 3 per-class DELETE TTL clauses", async () => {
