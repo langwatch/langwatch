@@ -383,7 +383,7 @@ trail. The mechanical delete commit (`f3de1ae07`) is the boundary between
 | **AI Governance RBAC permissions catalog** | Lane S | ✅ shipped `385c95e89` (5 new Resources × actions, ADMIN-only default, 56/56 `rbac.test.ts` green) |
 | End-to-end HTTP receiver integration test | Lane A | ✅ shipped `d20a1b403` (13 tests) |
 | Layer-2 per-consumer integration test | Lane B | superseded — Layer-1 + Andre's helper composition + UI dogfood cover the invariant |
-| UI verification screenshots | Lane B | ✅ shipped — iter22 (8 screenshots) + iter29 persona-chrome dogfood (4 screenshots in `.monitor-logs/persona-chrome-screenshots/`) |
+| UI verification screenshots | Lane B | ✅ shipped — iter22 (8 screenshots, hosted via img402.dev) + iter29 persona-chrome dogfood (3 screenshots, hosted via img402.dev, embedded in §UI verification screenshots) |
 | Customer-facing docs flip — 4 waves | Lane A | ✅ shipped — `1e34cd9ef` + `f13c33e20` + `5bca796f2` + `0b4f4d90e` |
 | **Persona-aware chrome rework** | Lane B | ✅ shipped `a935d707e` (chrome refactor + new PersonalSidebar) + `b311d1ca5` (spec FF correction) + `043726430` (gate consumes `governance:view`) |
 | Live-data dashboard dogfood | Lane B | ✅ shipped — 4 persona-chrome screenshots prove live data path |
@@ -564,14 +564,15 @@ server post-`33a8cf6d0` (full receiver rewire shipped):
 
 The persona-aware home routing claim from 1.5b-viii (`e40ee0045`) was scoped only to the URL redirect — the chrome (sidebar + selectors) remained LLMOps-default. iter29 dogfood under @rchaves review surfaced the gap: a personal-only user landing at `/me` saw two stacked selectors + an irrelevant LLMOps sidebar + "My Usage" buried as a sub-page.
 
-Cross-lane fix shipped in 4 commits (`a935d707e` + `b311d1ca5` + `385c95e89` + `043726430`); 4 live-data screenshots prove the chrome works end-to-end (local paths shown — img402.dev upload pending Lane-B's post-rebase pass for inline embed, same pattern as iter22 shots above):
+Cross-lane fix shipped in 4 commits (`a935d707e` + `b311d1ca5` + `385c95e89` + `043726430`); 3 live-data screenshots prove the chrome works end-to-end. Hosted via img402.dev (7-day free tier; same pattern as iter22 shots above):
 
-| Shot | Proves | File |
+| Shot | Proves | Image |
 |---|---|---|
-| 9. /me with PersonalSidebar | Persona-1 chrome — ONE chip in header (`My Workspace ▼`), PersonalSidebar with "My Usage" + "Settings" only, NO ProjectSelector, NO redundant in-page chip, NO 'MY WORKSPACE' eyebrow header (literal gateway.md Screen 6 layout) | `.monitor-logs/persona-chrome-screenshots/persona1-me-personal.png` |
-| 10. Admin home with Govern + Gateway | Persona-4 chrome — admin lands on project context with full LLMOps sidebar + Govern (Preview) + Gateway (Beta) sections both visible (admin role + 2 FFs on) | `.monitor-logs/persona-chrome-screenshots/persona4-admin-home.png` |
-| 11. /governance with org-scope chrome | Persona-4 governance home — org chip ("Acme P4") + "Organization-scoped" banner + Govern active in sidebar + setup checklist (define routing policy / connect ingestion source / anomaly rules) visible to admin **without any IngestionSource yet** — chicken-and-egg gate fix VALIDATED | `.monitor-logs/persona-chrome-screenshots/persona4-governance.png` |
-| 12. AI Gateway page (Beta) | Persona-4 gateway surface — AI Gateway menu + Virtual Keys / Providers / Budgets / Routing Policies / Cache Rules sub-nav visible (admin role + `release_ui_ai_gateway_menu_enabled` on) | `.monitor-logs/persona-chrome-screenshots/persona4-ai-gateway.png` |
+| 9. /me with PersonalSidebar | Persona-1 chrome — ONE chip in header (`My Workspace ▼`), PersonalSidebar with "My Usage" + "Settings" only, NO ProjectSelector, NO redundant in-page chip, NO 'MY WORKSPACE' eyebrow header (literal gateway.md Screen 6 layout) | ![persona-1 /me chrome](https://i.img402.dev/jhzp1bqwql.png) |
+| 10. Admin home with Govern + Gateway | Persona-4 chrome — admin lands on project context with full LLMOps sidebar + Govern (Preview) + Gateway (Beta) sections both visible (admin role + 2 FFs on) | ![persona-4 admin home](https://i.img402.dev/vtjtf3wj7o.png) |
+| 11. /governance with org-scope chrome | Persona-4 governance home — org chip ("Acme P4") + "Organization-scoped" banner + Govern active in sidebar + setup checklist (define routing policy / connect ingestion source / anomaly rules) visible to admin **without any IngestionSource yet** — chicken-and-egg gate fix VALIDATED | ![persona-4 /governance](https://i.img402.dev/rtulyk7esy.png) |
+
+The AI Gateway product-surface screenshot (originally planned as #12) is already covered by iter22 shots #1–#10 above (VK list / drawer / detail / usage / audit / providers / cache rules / budgets) — a single chrome shot of that surface would be redundant. The chrome rework's ship-claim rests on the 3 shots above.
 
 **Regression-safety invariant locked**: Persona-3 (LLMOps majority — ~90% of users today, no AI gateway) sees ZERO chrome change. `DashboardLayout` is untouched for `project_only` persona. Codified in `persona-aware-chrome.feature` as the FIRST scenario in the file.
 
@@ -748,7 +749,7 @@ The Jane at Acme 8-screen storyboard from `gateway.md` is the **trial-wedge demo
 | ✅ | 🅑 | 1.5b-vii: WorkspaceSwitcher v2 — Personal/Team/Project visual + "managed by your company" indicator (already storyboard-shape; verified iter29) |
 | ✅ | 🅑 | 1.5b-viii: Persona resolver service + `/` redirect + tRPC router + regression test — `e40ee0045` (12/12 unit tests, BDD spec, regression invariant for LLMOps majority locked) |
 | ✅ | 🅑 | 1.5b-ix: BDD spec `persona-home-resolver.feature` (shipped with `e40ee0045`) |
-| ✅ | 🅑 | 1.5b-x: Live-data dogfood post-resolver — 4 persona-chrome screenshots captured in `.monitor-logs/persona-chrome-screenshots/` (persona1-me-personal, persona4-admin-home, persona4-governance, persona4-ai-gateway) |
+| ✅ | 🅑 | 1.5b-x: Live-data dogfood post-resolver — 3 persona-chrome screenshots uploaded to img402.dev + embedded inline in §UI verification screenshots (persona1-me-personal, persona4-admin-home, persona4-governance) |
 | ✅ | 🅑 | **1.5b-xi: Persona-aware chrome rework** — initial 1.5b-viii resolver shipped routing only; iter29 dogfood surfaced chrome was unchanged (two-selector bug, irrelevant LLMOps sidebar on /me). Cross-lane fix: `a935d707e` (PersonalSidebar + DashboardLayout chrome swap + MyLayout shrink + chicken-and-egg gate fix) + `b311d1ca5` (BDD spec FF correction, two-flag shape) + `043726430` (gate consumes `governance:view` permission post-rbac.ts catalog) + 197-LOC `persona-aware-chrome.feature` BDD spec |
 | ✅ | 🅢 | **1.5s-rbac: AI Governance RBAC permissions catalog** — `385c95e89` (5 new Resources × actions in `rbac.ts`; ADMIN default-grant; MEMBER + EXTERNAL get nothing; `CustomRolePermissions` JSON column = the production-shape delegation surface) |
 | ✅ | 🅢 | 1.5s: `setupState.hasApplicationTraces` flag — `9d2688c84` (consumed by 1.5b-viii via `api.governance.setupState`) |
@@ -783,7 +784,7 @@ The Jane at Acme 8-screen storyboard from `gateway.md` is the **trial-wedge demo
 | ✅ | 🅢 | Step 3e: `SpendSpikeAnomalyEvaluator` + scheduled BullMQ worker — `3d2404170` (service) + `4a4b806db` (worker) + `b906d1c15` (12 unit tests) + `840377ace` (3e-iv I/O integration test, 4/4 passing in 8s) |
 | ✅ | 🅢 | Step 3f: OCSF v1.1 read tRPC procedure for SIEM forwarding — `07bd07deb` (cursor-paginated, org-tenancy isolation) |
 | ✅ | 🅢 | AI Governance RBAC permissions catalog — `385c95e89` (5 new Resources, ADMIN default-grant, custom-role JSON for delegation) |
-| ✅ | 🅑 | Live-data dashboard dogfood pass — 4 persona-chrome screenshots (`.monitor-logs/persona-chrome-screenshots/`) |
+| ✅ | 🅑 | Live-data dashboard dogfood pass — 3 persona-chrome screenshots embedded inline in §UI verification screenshots (img402.dev hosted) |
 | ✅ | 🅐 | Customer-facing docs flip — 4 waves shipped (`1e34cd9ef` wave 1 + `f13c33e20` wave 2 + `5bca796f2` wave 3 + `0b4f4d90e` wave 4) |
 
 ### Phase 4 — License relocation + UI gating (NEW per rchaves directive 2026-04-28)
