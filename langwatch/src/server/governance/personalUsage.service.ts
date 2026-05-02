@@ -363,13 +363,19 @@ export class PersonalUsageService {
     const result = await client.query({
       query: `
         SELECT
-          arrayJoin(Models)        AS Model,
-          countDistinct(TraceId)   AS Requests
-        FROM trace_summaries
-        WHERE TenantId = {tenantId:String}
-          AND OccurredAt >= {fromMs:DateTime64(3, 'UTC')}
-          AND OccurredAt <  {toMs:DateTime64(3, 'UTC')}
-          AND notEmpty(Models)
+          Model,
+          count() AS Requests
+        FROM (
+          SELECT
+            TraceId,
+            arrayJoin(argMax(Models, UpdatedAt)) AS Model
+          FROM trace_summaries
+          WHERE TenantId = {tenantId:String}
+            AND OccurredAt >= {fromMs:DateTime64(3, 'UTC')}
+            AND OccurredAt <  {toMs:DateTime64(3, 'UTC')}
+            AND notEmpty(Models)
+          GROUP BY TraceId
+        )
         GROUP BY Model
         ORDER BY Requests DESC
         LIMIT 1

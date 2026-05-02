@@ -468,7 +468,6 @@ export const userRouter = createTRPCRouter({
 
       const policyService = new RoutingPolicyService(ctx.prisma);
       const defaultPolicy = await policyService.resolveDefaultForUser({
-        userId,
         organizationId: input.organizationId,
         personalTeamId: workspace.team.id,
       });

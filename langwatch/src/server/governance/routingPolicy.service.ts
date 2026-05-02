@@ -196,14 +196,13 @@ export class RoutingPolicyService {
    * the TEAM-default-beats-ORG-default rule from the spec.
    *
    * Returns null if the org has no default policy at any tier — caller
-   * is expected to fall back to a no-policy VK.
+   * is expected to translate to a 409 `no_default_routing_policy`
+   * (see `NoDefaultRoutingPolicyError` in personalVirtualKey.service).
    */
   async resolveDefaultForUser({
-    userId,
     organizationId,
     personalTeamId,
   }: {
-    userId: string;
     organizationId: string;
     personalTeamId?: string;
   }): Promise<RoutingPolicy | null> {
@@ -236,8 +235,15 @@ export class RoutingPolicyService {
     const policy = await this.prisma.routingPolicy.findUnique({
       where: { id },
     });
+    // Collapse "not found" + "found-but-wrong-org" into the same NOT_FOUND
+    // response — leaking the distinction would tell an attacker that an
+    // id exists in a foreign org. tRPC maps this to HTTP 404 instead of
+    // the bare-Error → 500 the caller previously got.
     if (!policy || policy.organizationId !== organizationId) {
-      throw new Error(`RoutingPolicy ${id} not found in org ${organizationId}`);
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message: `RoutingPolicy ${id} not found in this organization`,
+      });
     }
     return policy;
   }

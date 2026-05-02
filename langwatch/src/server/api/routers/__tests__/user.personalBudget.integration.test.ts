@@ -12,7 +12,11 @@
  *
  *   1. Org-membership guard (rejected when caller is not in the org).
  *   2. {status: "ok"} graceful fallback when no personal workspace.
- *   3. {status: "ok"} graceful fallback when no personal VK.
+ *
+ * The "no personal VK" graceful-fallback case lives upstream — the
+ * tRPC procedure short-circuits BEFORE the VK lookup when the
+ * workspace itself is missing, so the no-workspace describe below
+ * already exercises the same branch from the user's perspective.
  */
 import {
   OrganizationUserRole,

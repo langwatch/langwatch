@@ -279,7 +279,6 @@ describe("RoutingPolicyService", () => {
       // Org-scoped default already exists from setDefault test above
       // (now: evaluator-only). Resolution with no team policy returns org default.
       const orgFallback = await service.resolveDefaultForUser({
-        userId: USER_ID,
         organizationId: ORG_ID,
         personalTeamId: TEAM_ID,
       });
@@ -299,7 +298,6 @@ describe("RoutingPolicyService", () => {
       });
 
       const teamWins = await service.resolveDefaultForUser({
-        userId: USER_ID,
         organizationId: ORG_ID,
         personalTeamId: TEAM_ID,
       });
@@ -314,7 +312,6 @@ describe("RoutingPolicyService", () => {
       });
       try {
         const resolved = await service.resolveDefaultForUser({
-          userId: USER_ID,
           organizationId: otherOrgId,
           personalTeamId: undefined,
         });

@@ -154,10 +154,23 @@ export class PersonalVirtualKeyService {
           ? await this.routingPolicy.findById(routingPolicyId)
           : null
         : await this.routingPolicy.resolveDefaultForUser({
-            userId,
             organizationId,
             personalTeamId,
           });
+
+    // Cross-org-policy guard. The tRPC caller (issuePersonal) accepts
+    // a user-controlled routingPolicyId — without an org-scope check
+    // here, a user could attach a policy from another organization
+    // they discovered the id of. Today the only path to this branch
+    // is the issuePersonal mutation; the device-exchange flow goes
+    // through resolveDefaultForUser which is already org-scoped.
+    if (
+      routingPolicyId &&
+      policy &&
+      policy.organizationId !== organizationId
+    ) {
+      throw new PersonalVirtualKeyNotFoundError(routingPolicyId);
+    }
 
     // Spec contract (specs/ai-gateway/governance/personal-keys.feature
     // lines 57-63): when the caller relied on default-policy resolution
