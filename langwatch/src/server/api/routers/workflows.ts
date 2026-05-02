@@ -11,10 +11,10 @@ import {
   type Workflow,
   workflowJsonSchema,
 } from "../../../optimization_studio/types/dsl";
-import { mergeLocalConfigsIntoDsl } from "../../../optimization_studio/utils/mergeLocalConfigs";
 import { migrateDSLVersion } from "../../../optimization_studio/types/migrate";
 import {
   clearDsl,
+  prepareDslForPersistence,
   recursiveAlphabeticallySortedKeys,
 } from "../../../optimization_studio/utils/dslUtils";
 import type { Unpacked } from "../../../utils/types";
@@ -1310,16 +1310,7 @@ export const saveOrCommitWorkflowVersion = async ({
   const [versionMajor] = (latestVersion?.version ?? "0.0").split(".");
   const nextVersion = `${parseInt(versionMajor ?? "0") + 1}`;
 
-  // Cast required: input.dsl.nodes is z.array(z.any()) from the Zod schema,
-  // while mergeLocalConfigsIntoDsl expects Node<Component>[]. The Zod schema
-  // uses z.any() for nodes because the DSL node types are too polymorphic
-  // for a single Zod discriminated union.
-  const dslWithMergedConfigs = {
-    ...input.dsl,
-    nodes: mergeLocalConfigsIntoDsl(input.dsl.nodes as any) as any,
-    state: {},
-  };
-  const dslWithoutStates = JSON.parse(JSON.stringify(dslWithMergedConfigs));
+  const dslWithoutStates = prepareDslForPersistence(input.dsl);
   const data = {
     commitMessage,
     authorId: ctx.session.user.id,
