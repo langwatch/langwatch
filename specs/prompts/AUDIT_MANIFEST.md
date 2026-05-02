@@ -3,7 +3,6 @@
 **Scope**: every `@unimplemented`-tagged scenario under `specs/prompts/` (250 occurrences across 14 files).
 **Method**: each scenario classified by reading the surrounding feature file, source code under `langwatch/src/prompts`, `langwatch/src/server/prompt-config`, `langwatch/src/components/prompts`, `langwatch/src/hooks/prompts`, related routers/APIs, and existing tests.
 **Phase**: 0 (audit only). Phase 1 soldiers will execute the actions implied by the `Class` column.
-**Plan**: `~/workspace/orchard-codex/plans/unimpl-reduction-2026-04-25.md`
 **Tracking issue**: https://github.com/langwatch/langwatch/issues/3458
 
 ## Class definitions
