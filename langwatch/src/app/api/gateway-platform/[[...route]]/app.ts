@@ -40,73 +40,73 @@ import {
 } from "../../middleware";
 import { loggerMiddleware } from "../../middleware/logger";
 import { tracerMiddleware } from "../../middleware/tracer";
-import { requirePatPermission } from "~/server/pat/auth-middleware";
+import { requireApiKeyPermission } from "~/server/api-key/auth-middleware";
 
 // PAT permission ceilings for every gateway-platform route. Legacy project
 // API tokens bypass the ceiling (full access — current behaviour); PATs must
 // have the matching RBAC permission at the project scope. Same pattern as
 // `src/server/routes/misc.ts` (analytics / workflows / traces / triggers).
-const requireVirtualKeysView = requirePatPermission({
+const requireVirtualKeysView = requireApiKeyPermission({
   prisma,
   permission: "virtualKeys:view",
 });
-const requireVirtualKeysCreate = requirePatPermission({
+const requireVirtualKeysCreate = requireApiKeyPermission({
   prisma,
   permission: "virtualKeys:create",
 });
-const requireVirtualKeysUpdate = requirePatPermission({
+const requireVirtualKeysUpdate = requireApiKeyPermission({
   prisma,
   permission: "virtualKeys:update",
 });
-const requireVirtualKeysRotate = requirePatPermission({
+const requireVirtualKeysRotate = requireApiKeyPermission({
   prisma,
   permission: "virtualKeys:rotate",
 });
-const requireVirtualKeysDelete = requirePatPermission({
+const requireVirtualKeysDelete = requireApiKeyPermission({
   prisma,
   permission: "virtualKeys:delete",
 });
-const requireGatewayProvidersView = requirePatPermission({
+const requireGatewayProvidersView = requireApiKeyPermission({
   prisma,
   permission: "gatewayProviders:view",
 });
-const requireGatewayProvidersUpdate = requirePatPermission({
+const requireGatewayProvidersUpdate = requireApiKeyPermission({
   prisma,
   permission: "gatewayProviders:update",
 });
-const requireGatewayProvidersManage = requirePatPermission({
+const requireGatewayProvidersManage = requireApiKeyPermission({
   prisma,
   permission: "gatewayProviders:manage",
 });
-const requireGatewayBudgetsView = requirePatPermission({
+const requireGatewayBudgetsView = requireApiKeyPermission({
   prisma,
   permission: "gatewayBudgets:view",
 });
-const requireGatewayBudgetsCreate = requirePatPermission({
+const requireGatewayBudgetsCreate = requireApiKeyPermission({
   prisma,
   permission: "gatewayBudgets:create",
 });
-const requireGatewayBudgetsUpdate = requirePatPermission({
+const requireGatewayBudgetsUpdate = requireApiKeyPermission({
   prisma,
   permission: "gatewayBudgets:update",
 });
-const requireGatewayBudgetsDelete = requirePatPermission({
+const requireGatewayBudgetsDelete = requireApiKeyPermission({
   prisma,
   permission: "gatewayBudgets:delete",
 });
-const requireGatewayCacheRulesView = requirePatPermission({
+const requireGatewayCacheRulesView = requireApiKeyPermission({
   prisma,
   permission: "gatewayCacheRules:view",
 });
-const requireGatewayCacheRulesCreate = requirePatPermission({
+const requireGatewayCacheRulesCreate = requireApiKeyPermission({
   prisma,
   permission: "gatewayCacheRules:create",
 });
-const requireGatewayCacheRulesUpdate = requirePatPermission({
+const requireGatewayCacheRulesUpdate = requireApiKeyPermission({
   prisma,
   permission: "gatewayCacheRules:update",
 });
-const requireGatewayCacheRulesDelete = requirePatPermission({
+const requireGatewayCacheRulesDelete = requireApiKeyPermission({
   prisma,
   permission: "gatewayCacheRules:delete",
 });

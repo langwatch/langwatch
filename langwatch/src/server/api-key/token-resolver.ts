@@ -1,6 +1,6 @@
 import type { PrismaClient, Project } from "@prisma/client";
-import { getTokenType } from "./pat-token.utils";
-import { PatService } from "./pat.service";
+import { getTokenType } from "./api-key-token.utils";
+import { ApiKeyService } from "./api-key.service";
 
 /**
  * The result of resolving a token. Contains enough context to set up the
@@ -8,28 +8,29 @@ import { PatService } from "./pat.service";
  */
 export type ResolvedToken =
   | {
-      type: "legacy";
+      type: "legacyProjectKey";
       project: Project & { team: { id: string; organizationId: string } };
     }
   | {
-      type: "pat";
-      patId: string;
-      userId: string;
+      type: "apiKey";
+      apiKeyId: string;
+      userId: string | null;
       organizationId: string;
       project: Project & { team: { id: string; organizationId: string } };
     };
 
 /**
  * Strategy-based token resolver. Routes tokens to the correct verification
- * path based on prefix:
- *   - sk-lw-* → legacy project API key lookup (unchanged)
- *   - pat-lw-* → PAT lookup + project resolution
+ * path based on prefix and structure:
+ *   - pat-lw-* → API key lookup (old PAT format, backward compat)
+ *   - sk-lw-{id}_{secret} → API key lookup (new format)
+ *   - sk-lw-* (no underscore) → legacy project key lookup
  */
 export class TokenResolver {
-  private readonly patService: PatService;
+  private readonly apiKeyService: ApiKeyService;
 
   constructor(private readonly prisma: PrismaClient) {
-    this.patService = PatService.create(prisma);
+    this.apiKeyService = ApiKeyService.create(prisma);
   }
 
   static create(prisma: PrismaClient): TokenResolver {
@@ -39,8 +40,8 @@ export class TokenResolver {
   /**
    * Resolves a token to a project context.
    *
-   * For legacy keys, projectId is implicit (from the key itself).
-   * For PATs, projectId must be provided separately (from Basic Auth,
+   * For legacy project keys, projectId is implicit (from the key itself).
+   * For API keys, projectId must be provided separately (from Basic Auth,
    * X-Project-Id header, or URL).
    */
   async resolve({
@@ -53,17 +54,17 @@ export class TokenResolver {
     const tokenType = getTokenType(token);
 
     switch (tokenType) {
-      case "legacy":
-        return this.resolveLegacy(token);
-      case "pat":
-        return this.resolvePat(token, projectId ?? null);
+      case "legacyProjectKey":
+        return this.resolveLegacyProjectKey(token);
+      case "apiKey":
+        return this.resolveApiKey(token, projectId ?? null);
       default:
         // Unknown prefix — try legacy lookup as fallback
-        return this.resolveLegacy(token);
+        return this.resolveLegacyProjectKey(token);
     }
   }
 
-  private async resolveLegacy(
+  private async resolveLegacyProjectKey(
     apiKey: string,
   ): Promise<ResolvedToken | null> {
     const project = await this.prisma.project.findUnique({
@@ -75,19 +76,19 @@ export class TokenResolver {
 
     if (!project) return null;
 
-    return { type: "legacy", project };
+    return { type: "legacyProjectKey", project };
   }
 
-  private async resolvePat(
+  private async resolveApiKey(
     token: string,
     projectId: string | null,
   ): Promise<ResolvedToken | null> {
-    const pat = await this.patService.verify({ token });
-    if (!pat) return null;
+    const apiKey = await this.apiKeyService.verify({ token });
+    if (!apiKey) return null;
 
     if (!projectId) return null;
 
-    // Look up the project and verify it belongs to the PAT's organization
+    // Look up the project and verify it belongs to the API key's organization
     const project = await this.prisma.project.findUnique({
       where: { id: projectId, archivedAt: null },
       include: {
@@ -97,24 +98,23 @@ export class TokenResolver {
 
     if (!project) return null;
 
-    // Verify the project belongs to the same organization as the PAT
-    if (project.team.organizationId !== pat.organizationId) return null;
+    // Verify the project belongs to the same organization as the API key
+    if (project.team.organizationId !== apiKey.organizationId) return null;
 
     return {
-      type: "pat",
-      patId: pat.id,
-      userId: pat.userId,
-      organizationId: pat.organizationId,
+      type: "apiKey",
+      apiKeyId: apiKey.id,
+      userId: apiKey.userId,
+      organizationId: apiKey.organizationId,
       project,
     };
   }
 
   /**
-   * Marks a PAT as used. Callers should invoke this only after the request
-   * is fully validated (body parsed, params accepted) so lastUsedAt reflects
-   * successful authenticated use, not merely successful authentication.
+   * Marks an API key as used. Callers should invoke this only after the request
+   * is fully validated so lastUsedAt reflects successful authenticated use.
    */
-  markUsed({ patId }: { patId: string }): void {
-    this.patService.markUsed({ id: patId });
+  markUsed({ apiKeyId }: { apiKeyId: string }): void {
+    this.apiKeyService.markUsed({ id: apiKeyId });
   }
 }

@@ -18,6 +18,7 @@ export function CodeBlock({
   revealedDisplay,
   copyToastTitle,
   ariaLabel,
+  defaultRevealed = false,
 }: {
   label?: string;
   display: string;
@@ -25,15 +26,16 @@ export function CodeBlock({
   revealedDisplay?: string;
   copyToastTitle?: string;
   ariaLabel?: string;
+  defaultRevealed?: boolean;
 }) {
-  const [revealed, setRevealed] = useState(false);
+  const [revealed, setRevealed] = useState(defaultRevealed);
   const canReveal = Boolean(revealedDisplay);
   const shown = revealed && revealedDisplay ? revealedDisplay : display;
 
   const handleCopy = () => {
     if (!navigator.clipboard) {
       toaster.create({
-        title: "Clipboard not available — copy manually",
+        title: "Clipboard not available. Copy manually.",
         type: "error",
         duration: 3000,
         meta: { closable: true },

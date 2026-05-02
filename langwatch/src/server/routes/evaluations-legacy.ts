@@ -71,11 +71,11 @@ import { createLogger } from "~/utils/logger/server";
 import { findOrCreateExperiment } from "~/pages/api/experiment/init";
 import type { Permission } from "~/server/api/rbac";
 import {
-  enforcePatCeiling,
+  enforceApiKeyCeiling,
   extractCredentials,
-  patCeilingDenialResponse,
-} from "~/server/pat/auth-middleware";
-import { TokenResolver } from "~/server/pat/token-resolver";
+  apiKeyCeilingDenialResponse,
+} from "~/server/api-key/auth-middleware";
+import { TokenResolver } from "~/server/api-key/token-resolver";
 
 const logger = createLogger("langwatch:evaluations-legacy");
 const tokenResolver = TokenResolver.create(prisma);
@@ -116,15 +116,15 @@ async function authenticateRequest(
   }
 
   try {
-    await enforcePatCeiling({ prisma, resolved, permission });
+    await enforceApiKeyCeiling({ prisma, resolved, permission });
   } catch (error) {
-    const denial = patCeilingDenialResponse(error);
+    const denial = apiKeyCeilingDenialResponse(error);
     return { error: denial.message, status: denial.status };
   }
 
   const markUsed = () => {
-    if (resolved.type === "pat") {
-      tokenResolver.markUsed({ patId: resolved.patId });
+    if (resolved.type === "apiKey") {
+      tokenResolver.markUsed({ apiKeyId: resolved.apiKeyId });
     }
   };
 
@@ -168,7 +168,7 @@ app.post(
     if ("error" in auth) {
       return c.json({ message: auth.error }, auth.status);
     }
-    const { project } = auth;
+    const { project, markUsed } = auth;
 
     const contentType = c.req.header("content-type");
     if (!contentType || !contentType.includes("application/json")) {
@@ -269,6 +269,7 @@ app.post(
       }
     }
 
+    markUsed();
     return c.json({ message: "ok" });
   },
 );
@@ -309,6 +310,7 @@ app.post("/dataset/evaluate", async (c) => {
   if ("error" in auth) {
     return c.json({ message: auth.error }, auth.status);
   }
+  const { markUsed } = auth;
   // dataset/evaluate needs the full team relation for downstream queries.
   const project = await prisma.project.findUnique({
     where: { id: auth.project.id },
@@ -468,6 +470,7 @@ app.post("/dataset/evaluate", async (c) => {
     },
   });
 
+  markUsed();
   return c.json(result);
 });
 
@@ -606,7 +609,7 @@ async function handleEvaluatorCall(
   if ("error" in auth) {
     return c.json({ message: auth.error }, auth.status);
   }
-  const { project } = auth;
+  const { project, markUsed } = auth;
 
   let body: Record<string, any>;
   try {
@@ -950,6 +953,7 @@ async function handleEvaluatorCall(
             ...(isGuardrail ? { passed: result!.passed ?? true } : {}),
           };
 
+  markUsed();
   return c.json(resultWithoutTraceback);
 }
 

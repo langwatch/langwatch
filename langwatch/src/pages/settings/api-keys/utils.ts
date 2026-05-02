@@ -30,6 +30,102 @@ export function formatEnvLines(
     .join("\n");
 }
 
+export const STANDARD_ROLES = ["ADMIN", "MEMBER", "VIEWER"] as const;
+
+export const ROLE_LABELS: Record<string, string> = {
+  ADMIN: "Admin",
+  MEMBER: "Member",
+  VIEWER: "Viewer",
+  NONE: "None",
+};
+
+/** Returns the list of standard roles at or below the given role in the hierarchy, plus "None". */
+export function rolesAtOrBelow(
+  role: string,
+): Array<{ label: string; value: string }> {
+  const idx = STANDARD_ROLES.indexOf(
+    role as (typeof STANDARD_ROLES)[number],
+  );
+  if (idx === -1) return [];
+  const roles: Array<{ label: string; value: string }> =
+    STANDARD_ROLES.slice(idx).map((r) => ({
+      label: ROLE_LABELS[r] ?? r,
+      value: r,
+    }));
+  roles.push({ label: "None", value: "NONE" });
+  return roles;
+}
+
+export type PermissionMode = "all" | "readonly" | "restricted";
+
+type BindingInput = {
+  id: string;
+  role: string;
+  customRoleId: string | null;
+  scopeType: string;
+  scopeId: string;
+};
+
+type BindingOutput = {
+  role: string;
+  customRoleId: string | null | undefined;
+  scopeType: string;
+  scopeId: string;
+};
+
+/** Computes the effective bindings array based on the selected permission mode. */
+export function computeBindings({
+  data,
+  permissionMode,
+  roleOverrides,
+}: {
+  data: BindingInput[] | undefined;
+  permissionMode: PermissionMode;
+  roleOverrides: Record<string, string>;
+}): BindingOutput[] {
+  if (!data) return [];
+  switch (permissionMode) {
+    case "all":
+      return data.map((b) => ({
+        role: b.role,
+        customRoleId: b.customRoleId,
+        scopeType: b.scopeType,
+        scopeId: b.scopeId,
+      }));
+    case "readonly":
+      return data.map((b) => ({
+        role: "VIEWER" as const,
+        customRoleId: null,
+        scopeType: b.scopeType,
+        scopeId: b.scopeId,
+      }));
+    case "restricted":
+      return data
+        .filter((b) => (roleOverrides[b.id] ?? b.role) !== "NONE")
+        .map((b) => {
+          const overriddenRole = roleOverrides[b.id];
+          if (overriddenRole && overriddenRole !== b.role) {
+            return {
+              role: overriddenRole,
+              customRoleId: null,
+              scopeType: b.scopeType,
+              scopeId: b.scopeId,
+            };
+          }
+          return {
+            role: b.role,
+            customRoleId: b.customRoleId,
+            scopeType: b.scopeType,
+            scopeId: b.scopeId,
+          };
+        });
+    default: {
+      const _exhaustive: never = permissionMode;
+      return _exhaustive;
+    }
+  }
+}
+
 /** One-line summary of a role-binding set for table display. */
 export function roleSummary(
   bindings: Array<{

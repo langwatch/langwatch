@@ -2,37 +2,37 @@ import { Button, HStack, Text, VStack } from "@chakra-ui/react";
 import { Dialog } from "../../../components/ui/dialog";
 
 /**
- * Confirmation modal for revoking a PAT. Open when `patId` is non-null; the
- * parent clears `patId` to close.
+ * Confirmation modal for revoking an API key. Open when `apiKeyId` is non-null;
+ * the parent clears `apiKeyId` to close.
  */
 export function RevokeConfirmDialog({
-  patId,
+  apiKeyId,
   isRevoking,
   onCancel,
   onConfirm,
 }: {
-  patId: string | null;
+  apiKeyId: string | null;
   isRevoking: boolean;
   onCancel: () => void;
-  onConfirm: (patId: string) => void;
+  onConfirm: (apiKeyId: string) => void;
 }) {
   return (
     <Dialog.Root
       size="lg"
-      open={!!patId}
+      open={!!apiKeyId}
       onOpenChange={({ open }) => {
         if (!open) onCancel();
       }}
     >
       <Dialog.Content>
         <Dialog.Header>
-          <Dialog.Title>Revoke Token</Dialog.Title>
+          <Dialog.Title>Revoke API Key</Dialog.Title>
         </Dialog.Header>
         <Dialog.CloseTrigger />
         <Dialog.Body paddingBottom={6}>
           <VStack gap={4} align="start">
             <Text>
-              Are you sure you want to revoke this token? Any integration
+              Are you sure you want to revoke this API key? Any integration
               using it will stop working immediately.
             </Text>
             <HStack width="full" justify="end" gap={2}>
@@ -41,7 +41,7 @@ export function RevokeConfirmDialog({
               </Button>
               <Button
                 colorPalette="red"
-                onClick={() => patId && onConfirm(patId)}
+                onClick={() => apiKeyId && onConfirm(apiKeyId)}
                 disabled={isRevoking}
               >
                 Revoke

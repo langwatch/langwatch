@@ -8,11 +8,11 @@ import { createLicenseEnforcementService } from "~/server/license-enforcement";
 import { LimitExceededError } from "~/server/license-enforcement/errors";
 import { buildResourceLimitMessage } from "~/server/license-enforcement/limit-message";
 import {
-  enforcePatCeiling,
+  enforceApiKeyCeiling,
   extractCredentials,
-  patCeilingDenialResponse,
-} from "~/server/pat/auth-middleware";
-import { TokenResolver } from "~/server/pat/token-resolver";
+  apiKeyCeilingDenialResponse,
+} from "~/server/api-key/auth-middleware";
+import { TokenResolver } from "~/server/api-key/token-resolver";
 import { captureException } from "~/utils/posthogErrorCapture";
 import { slugify } from "~/utils/slugify";
 import { createLogger } from "../../../utils/logger/server";
@@ -72,13 +72,13 @@ export default async function handler(
   // by workflows today, so `workflows:manage` is the closest existing
   // ceiling — VIEWER is correctly blocked, ADMIN/MEMBER pass through.
   try {
-    await enforcePatCeiling({
+    await enforceApiKeyCeiling({
       prisma,
       resolved,
       permission: "workflows:manage",
     });
   } catch (error) {
-    const denial = patCeilingDenialResponse(error);
+    const denial = apiKeyCeilingDenialResponse(error);
     return res.status(denial.status).json({ message: denial.message });
   }
 
@@ -141,8 +141,8 @@ export default async function handler(
   // Late markUsed: response has been fully built, the PAT was genuinely used
   // for a successful request. Fire-and-forget; a DB hiccup must not mask the
   // experiment creation.
-  if (resolved.type === "pat") {
-    tokenResolver.markUsed({ patId: resolved.patId });
+  if (resolved.type === "apiKey") {
+    tokenResolver.markUsed({ apiKeyId: resolved.apiKeyId });
   }
 
   return res.status(200).json({

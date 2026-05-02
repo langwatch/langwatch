@@ -28,12 +28,12 @@ import {
 } from "../tracer/types.generated";
 import { CollectorSpanUtils } from "../traces/collectorSpan.utils";
 import { createLogger } from "../../utils/logger/server";
-import { TokenResolver } from "../pat/token-resolver";
+import { TokenResolver } from "../api-key/token-resolver";
 import {
-  enforcePatCeiling,
+  enforceApiKeyCeiling,
   extractCredentials,
-  patCeilingDenialResponse,
-} from "../pat/auth-middleware";
+  apiKeyCeilingDenialResponse,
+} from "../api-key/auth-middleware";
 
 const logger = createLogger("langwatch.collector");
 const tokenResolver = TokenResolver.create(prisma);
@@ -58,8 +58,8 @@ app.post(
 
       return c.json(
         {
-          message:
-            "Authentication token is required. Use X-Auth-Token header or Authorization: Bearer token.",
+          error: "Unauthorized",
+          message: "Invalid credentials",
         },
         401,
       );
@@ -95,23 +95,23 @@ app.post(
         "collector request is not authenticated, invalid auth token",
       );
 
-      return c.json({ message: "Invalid auth token." }, 401);
+      return c.json({ error: "Unauthorized", message: "Invalid credentials" }, 401);
     }
 
     // Enforce PAT ceiling (legacy tokens bypass). `traces:create` gates write
     // access — ADMIN and MEMBER have it; VIEWER does not, preventing
     // read-only PATs from ingesting traces.
     try {
-      await enforcePatCeiling({
+      await enforceApiKeyCeiling({
         prisma,
         resolved,
         permission: "traces:create",
       });
     } catch (error) {
-      const denial = patCeilingDenialResponse(error);
+      const denial = apiKeyCeilingDenialResponse(error);
       logger.warn(
-        { projectId: resolved.project.id, patId: resolved.type === "pat" ? resolved.patId : undefined },
-        "collector request denied by PAT ceiling",
+        { projectId: resolved.project.id, apiKeyId: resolved.type === "apiKey" ? resolved.apiKeyId : undefined },
+        "collector request denied by API key ceiling",
       );
       return c.json({ message: denial.message }, denial.status);
     }
@@ -266,8 +266,8 @@ app.post(
 
     // Body successfully validated — mark PAT as used if this request was
     // authenticated via PAT
-    if (resolved.type === "pat") {
-      tokenResolver.markUsed({ patId: resolved.patId });
+    if (resolved.type === "apiKey") {
+      tokenResolver.markUsed({ apiKeyId: resolved.apiKeyId });
     }
 
     const { trace_id: nullableTraceId, expected_output: expectedOutput } =

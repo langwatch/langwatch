@@ -58,9 +58,9 @@ const EXEMPT_MODELS = [
   "GroupMembership",
   "RoleBinding",
   /**
-   * PATs are organization-level, scoped by organizationId + userId.
+   * API keys are organization-level, scoped by organizationId + userId.
    */
-  "PersonalAccessToken",
+  "ApiKey",
   /**
    * AI Gateway models. Budgets are organization-level (scopeType +
    * scopeId identifies which target); ledger rows descend from VirtualKey
