@@ -6,13 +6,6 @@ Feature: Prompt soft-delete
   Background:
     Given I am logged into project "my-project"
 
-  @unit @unimplemented
-  Scenario: Deleting a prompt marks it as deleted but preserves the record
-    Given a prompt "Support Bot v2" exists
-    When the prompt is deleted
-    Then the prompt is no longer available but can still be referenced by existing suites
-    And the prompt no longer appears in the prompts listing
-
   @integration @unimplemented
   Scenario: A user can reuse the handle of an archived prompt for a new prompt
     Given a prompt with handle "support-bot" exists
