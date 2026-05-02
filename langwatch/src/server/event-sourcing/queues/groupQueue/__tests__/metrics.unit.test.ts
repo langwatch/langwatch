@@ -14,6 +14,7 @@ import {
   gqJobsExhaustedTotal,
   gqJobsNonRetryableTotal,
   gqGroupsBlockedTotal,
+  gqBlockedGroups,
 } from "../metrics";
 
 const routingLabels = {
@@ -62,6 +63,11 @@ describe("GroupQueue metrics", () => {
       const metric = register.getSingleMetric(
         "gq_oldest_pending_age_milliseconds",
       );
+      expect(metric).toBeDefined();
+    });
+
+    it("registers gq_blocked_groups gauge", () => {
+      const metric = register.getSingleMetric("gq_blocked_groups");
       expect(metric).toBeDefined();
     });
   });
@@ -191,6 +197,22 @@ describe("GroupQueue metrics", () => {
     it("sets gauge to zero when no pending jobs", () => {
       expect(() =>
         gqOldestPendingAgeMilliseconds.set({ queue_name: "test-queue" }, 0),
+      ).not.toThrow();
+    });
+  });
+
+  describe("when blocked groups gauge is set", () => {
+    it("exposes the value with the queue_name label", async () => {
+      gqBlockedGroups.set({ queue_name: "test-queue" }, 3);
+
+      const lines = await register.getSingleMetricAsString("gq_blocked_groups");
+      expect(lines).toContain('queue_name="test-queue"');
+      expect(lines).toContain("3");
+    });
+
+    it("can be reset to zero when no groups are blocked", () => {
+      expect(() =>
+        gqBlockedGroups.set({ queue_name: "test-queue" }, 0),
       ).not.toThrow();
     });
   });
