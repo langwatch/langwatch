@@ -1396,7 +1396,7 @@ clickhouse:
   ## and passes it to the subchart via auth.existingSecret. This ensures the full connection URL
   ## (with embedded credentials) is stored as a Kubernetes Secret, never interpolated in manifests.
   auth:
-    ## @param clickhouse.auth.password [string] ClickHouse password (auto-generated when empty).
+    ## @param clickhouse.auth.password [string] ClickHouse password (auto-generated on install, required on upgrade without cluster access).
     password: ""
     ## @param clickhouse.auth.existingSecret [string] Name of existing secret containing the password. Supports tpl expressions.
     existingSecret: '{{ printf "%s-clickhouse" .Release.Name }}'

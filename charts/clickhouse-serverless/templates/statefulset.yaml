@@ -19,9 +19,15 @@ spec:
       labels:
         {{- include "clickhouse-serverless.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: clickhouse
-      {{- with .Values.podAnnotations }}
+      {{- $authSecret := lookup "v1" "Secret" .Release.Namespace (include "clickhouse-serverless.secretName" .) }}
+      {{- if or $authSecret .Values.podAnnotations }}
       annotations:
+        {{- with .Values.podAnnotations }}
         {{- toYaml . | nindent 8 }}
+        {{- end }}
+        {{- if $authSecret }}
+        checksum/auth-secret: {{ $authSecret.data | toJson | sha256sum }}
+        {{- end }}
       {{- end }}
     spec:
       serviceAccountName: {{ include "clickhouse-serverless.serviceAccountName" . }}
