@@ -21,14 +21,6 @@ Feature: Project Limit Enforcement with License
     Then the project is created successfully
 
   @unimplemented
-  Scenario: Blocks project creation when at limit
-    Given the organization has a license with maxProjects 3
-    And the organization has 3 projects
-    When I create a project named "New Project"
-    Then the request fails with FORBIDDEN
-    And the error message contains "maximum number of projects"
-
-  @unimplemented
   Scenario: Blocks project creation when over limit
     Given the organization has a license with maxProjects 2
     And the organization has 3 projects

@@ -233,60 +233,6 @@ Feature: Member Limit Enforcement with License
   # Member Type Classification Helper Functions
   # ============================================================================
 
-  @unit @unimplemented
-  Scenario: isViewOnlyPermission identifies view-only permissions
-    Given the permission "project:view"
-    When I check if the permission is view-only
-    Then the result is true
-
-  @unit @unimplemented
-  Scenario: isViewOnlyPermission identifies non-view permissions
-    Given the permission "project:manage"
-    When I check if the permission is view-only
-    Then the result is false
-
-  @unit @unimplemented
-  Scenario: isViewOnlyCustomRole returns true for view-only role
-    Given a custom role with permissions ["project:view", "analytics:view", "traces:view"]
-    When I check if the role is view-only
-    Then the result is true
-
-  @unit @unimplemented
-  Scenario: isViewOnlyCustomRole returns false for role with manage permission
-    Given a custom role with permissions ["project:view", "project:manage"]
-    When I check if the role is view-only
-    Then the result is false
-
-  @unit @unimplemented
-  Scenario: classifyMemberType returns MemberLite for EXTERNAL role
-    Given a user with OrganizationUserRole EXTERNAL
-    When I classify the member type
-    Then the result is "MemberLite"
-
-  @unit @unimplemented
-  Scenario: classifyMemberType returns FullMember for ADMIN role
-    Given a user with OrganizationUserRole ADMIN
-    When I classify the member type
-    Then the result is "FullMember"
-
-  @unit @unimplemented
-  Scenario: classifyMemberType returns FullMember for MEMBER role
-    Given a user with OrganizationUserRole MEMBER
-    When I classify the member type
-    Then the result is "FullMember"
-
-  @unit @unimplemented
-  Scenario: classifyMemberType returns MemberLite for view-only custom role
-    Given a user with EXTERNAL role and custom role with permissions ["project:view"]
-    When I classify the member type
-    Then the result is "MemberLite"
-
-  @unit @unimplemented
-  Scenario: classifyMemberType returns FullMember for custom role with non-view permission
-    Given a user with EXTERNAL role and custom role with permissions ["project:view", "project:update"]
-    When I classify the member type
-    Then the result is "FullMember"
-
   # ============================================================================
   # UI: Click-then-Modal Pattern
   # ============================================================================
@@ -349,23 +295,6 @@ Feature: Member Limit Enforcement with License
     Then the update succeeds
 
   @unimplemented
-  Scenario: Blocks downgrade from full member to Lite Member when at lite limit
-    Given the organization has 2 Full Members including "member@example.com"
-    And the organization has 1 Lite Member
-    And the organization has a license with maxMembersLite 1
-    When I update "member@example.com" org role to EXTERNAL
-    Then the request fails with FORBIDDEN
-    And the error message contains "Lite Member limit reached"
-
-  @unimplemented
-  Scenario: Allows downgrade from full member to Lite Member when under limit
-    Given the organization has 2 Full Members including "member@example.com"
-    And the organization has 0 Lite Member users
-    And the organization has a license with maxMembersLite 1
-    When I update "member@example.com" org role to EXTERNAL
-    Then the update succeeds
-
-  @unimplemented
   Scenario: Blocks custom role change that would exceed full member limit
     Given the organization has 3 Full Members
     And the organization has 1 Lite Member with view-only custom role "viewer-role"
@@ -374,49 +303,7 @@ Feature: Member Limit Enforcement with License
     Then the request fails with FORBIDDEN
     And the error message contains "member limit reached"
 
-  @unimplemented
-  Scenario: Allows custom role change when member type unchanged
-    Given the organization has 2 Full Members
-    And the organization has a license with maxMembers 3
-    When a Full Member's custom role is changed to another non-view role
-    Then the update succeeds
-
   # ============================================================================
   # Role Change Type Detection (Unit)
   # ============================================================================
 
-  @unit @unimplemented
-  Scenario: getRoleChangeType returns no-change when both roles are Full Member
-    Given a user with role ADMIN and no custom permissions
-    When I check the role change type to MEMBER with no custom permissions
-    Then the result is "no-change"
-
-  @unit @unimplemented
-  Scenario: getRoleChangeType returns no-change when both roles are Lite Member
-    Given a user with role EXTERNAL and view-only permissions ["project:view"]
-    When I check the role change type to EXTERNAL with view-only permissions ["analytics:view"]
-    Then the result is "no-change"
-
-  @unit @unimplemented
-  Scenario: getRoleChangeType returns lite-to-full when upgrading EXTERNAL to MEMBER
-    Given a user with role EXTERNAL and no custom permissions
-    When I check the role change type to MEMBER with no custom permissions
-    Then the result is "lite-to-full"
-
-  @unit @unimplemented
-  Scenario: getRoleChangeType returns lite-to-full when view-only role gets manage permission
-    Given a user with role EXTERNAL and view-only permissions ["project:view"]
-    When I check the role change type to EXTERNAL with permissions ["project:view", "project:manage"]
-    Then the result is "lite-to-full"
-
-  @unit @unimplemented
-  Scenario: getRoleChangeType returns full-to-lite when downgrading MEMBER to EXTERNAL
-    Given a user with role MEMBER and no custom permissions
-    When I check the role change type to EXTERNAL with no custom permissions
-    Then the result is "full-to-lite"
-
-  @unit @unimplemented
-  Scenario: getRoleChangeType returns full-to-lite when non-view role becomes view-only
-    Given a user with role EXTERNAL and permissions ["project:manage"]
-    When I check the role change type to EXTERNAL with view-only permissions ["project:view"]
-    Then the result is "full-to-lite"

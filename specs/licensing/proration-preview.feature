@@ -16,28 +16,6 @@ Feature: Proration Preview Before Seat Update
   # Backend: Proration Preview Query
   # ============================================================================
 
-  @integration @unimplemented
-  Scenario: Preview proration returns upcoming invoice details
-    Given the organization has a Stripe subscription with 5 seats
-    When I request a proration preview for 7 total seats
-    Then the preview returns the prorated amount due
-    And the preview returns line items with credits and charges
-    And the preview returns the new recurring total
-
-  @integration @unimplemented
-  Scenario: Preview proration fails without active subscription
-    Given the organization has no active subscription
-    When I request a proration preview for 3 total seats
-    Then the request fails with PRECONDITION_FAILED
-    And the error message indicates no active subscription
-
-  @integration @unimplemented
-  Scenario: Preview proration fails without seat line item
-    Given the organization has a Stripe subscription without a seat price item
-    When I request a proration preview for 5 total seats
-    Then the request fails with PRECONDITION_FAILED
-    And the error message indicates no seat item found
-
   # ============================================================================
   # Upgrade Modal: Limit Mode (Backward Compatibility)
   # ============================================================================
@@ -80,16 +58,6 @@ Feature: Proration Preview Before Seat Update
     And the "Confirm & Update" button is disabled
 
   @integration @unimplemented
-  Scenario: Confirming seat update executes the update and charges immediately
-    Given I have triggered a seat update from 5 to 7 seats
-    And the proration preview modal is open with preview data
-    When I click "Confirm & Update"
-    Then the seat update is executed
-    And the prorated amount is charged immediately via Stripe
-    And the modal closes
-    And I see a success toast "Seats updated successfully"
-
-  @integration @unimplemented
   Scenario: Cancelling proration preview does nothing
     Given I have triggered a seat update from 5 to 7 seats
     And the proration preview modal is open
@@ -100,15 +68,6 @@ Feature: Proration Preview Before Seat Update
   # ============================================================================
   # Subscription Page: Trigger Proration Modal
   # ============================================================================
-
-  @integration @unimplemented
-  Scenario: Adding seats on subscription page opens proration preview
-    Given I am on the subscription page
-    And the organization has an active Growth subscription with 5 seats
-    When I add 2 seats in the seat management drawer
-    And I click "Update subscription"
-    Then the proration preview modal opens
-    And it shows the update from 5 to 7 seats
 
   @integration @unimplemented
   Scenario: Subscription page update uses plan maxMembers as base
@@ -124,33 +83,6 @@ Feature: Proration Preview Before Seat Update
   # Members Page: Trigger Proration Modal
   # ============================================================================
 
-  @integration @unimplemented
-  Scenario: Inviting core members beyond maxMembers opens proration preview
-    Given I am on the members page
-    And the organization has an active Growth subscription with maxMembers 5
-    And the organization has 5 accepted core members
-    When I invite 2 new core members
-    Then the proration preview modal opens
-    And it shows the update from 5 to 7 seats
-
-  @integration @unimplemented
-  Scenario: Inviting lite members does not trigger proration preview
-    Given I am on the members page
-    And the organization has an active Growth subscription with maxMembers 5
-    And the organization has 5 accepted core members
-    When I invite 1 new lite member (EXTERNAL role)
-    Then no proration preview modal opens
-    And the invite is created directly
-
-  @integration @unimplemented
-  Scenario: Inviting core members within maxMembers does not trigger proration
-    Given I am on the members page
-    And the organization has an active Growth subscription with maxMembers 5
-    And the organization has 3 accepted core members
-    When I invite 1 new core member
-    Then no proration preview modal opens
-    And the invite is created directly
-
   # ============================================================================
   # Business Logic: Seat Update Calculation
   # ============================================================================
@@ -162,45 +94,7 @@ Feature: Proration Preview Before Seat Update
     When calculating the new total for 2 additional seats
     Then the new total is 7 (maxMembers 5 + 2 seats available)
 
-  @unit @unimplemented
-  Scenario: Proration is needed when new core invites exceed maxMembers
-    Given a subscription with maxMembers 5
-    And 5 current core members
-    When checking if 2 new core invites need proration
-    Then proration is needed
-
-  @unit @unimplemented
-  Scenario: Proration is not needed when core invites stay within maxMembers
-    Given a subscription with maxMembers 5
-    And 3 current core members
-    When checking if 1 new core invite needs proration
-    Then proration is not needed
-
-  @unit @unimplemented
-  Scenario: Lite member invites never trigger proration check
-    Given a subscription with maxMembers 5
-    And 5 current core members
-    When checking if 2 new lite member invites need proration
-    Then proration is not needed
-
   # ============================================================================
   # Store: Discriminated Variant
   # ============================================================================
 
-  @unit @unimplemented
-  Scenario: Store open() opens modal in limit enforcement mode
-    When open() is called with limitType "members" current 3 max 5
-    Then isOpen is true
-    And the modal is in limit enforcement mode
-
-  @unit @unimplemented
-  Scenario: Store openSeats() opens modal in seats confirmation mode
-    When openSeats() is called with organizationId currentSeats 5 newSeats 7 and onConfirm callback
-    Then isOpen is true
-    And the modal is in seats confirmation mode
-
-  @unit @unimplemented
-  Scenario: Store close() closes the modal
-    Given the store has an open modal
-    When close() is called
-    Then isOpen is false

@@ -36,29 +36,6 @@ Feature: Dual Pricing Model — Seat+Usage Billing
   # Stripe Utility: Growth Seat Usage helpers
   # ============================================================================
 
-  @unit @unimplemented
-  Scenario: Identifies growth seat usage price correctly
-    Given the Growth Seat Usage price ID
-    When I check if it is a growth seat usage price
-    Then the result is true
-
-  @unit @unimplemented
-  Scenario: Rejects non-growth-seat-usage price
-    Given a LAUNCH users price ID
-    When I check if it is a growth seat usage price
-    Then the result is false
-
-  @unit @unimplemented
-  Scenario: Creates checkout line items for core members
-    When I create checkout line items for 3 core members
-    Then the result contains one line item with the growth seat usage price
-    And the quantity is 3
-
-  @unit @unimplemented
-  Scenario: Calculates max members from quantity directly
-    When I calculate max members from quantity 5
-    Then the result is 5
-
   # ============================================================================
   # Subscription API: Create mutation routing
   # ============================================================================
@@ -106,26 +83,9 @@ Feature: Dual Pricing Model — Seat+Usage Billing
     When the webhook processes the event
     Then the subscription's maxMembers is set to 5
 
-  @integration @unimplemented
-  Scenario: Webhook computes maxMembers for legacy LAUNCH subscription
-    Given a customer.subscription.updated event
-    And the subscription has a LAUNCH users price item with quantity 4
-    And the subscription plan is "LAUNCH"
-    When the webhook processes the event
-    Then the subscription's maxMembers is set to 7
-    # 4 extra + 3 base LAUNCH members
-
   # ============================================================================
   # SubscriptionPage: Real checkout
   # ============================================================================
-
-  @integration @unimplemented
-  Scenario: Clicking upgrade triggers Stripe checkout
-    Given the organization has no active paid subscription
-    And I have added 2 core member seats
-    When I click "Upgrade now"
-    Then the subscription.create mutation is called with plan "GROWTH_SEAT_EVENT"
-    And the mutation is called with the total core member count
 
   @integration @unimplemented
   Scenario: Shows success state after checkout completion
@@ -148,33 +108,6 @@ Feature: Dual Pricing Model — Seat+Usage Billing
   # ============================================================================
   # TIERED → SEAT_EVENT: Lazy Upgrade
   # ============================================================================
-
-  @integration @unimplemented
-  Scenario: TIERED paid org sees upgrade block on subscription page
-    Given the organization has pricingModel "TIERED"
-    And the organization has an active ACCELERATE subscription
-    When the subscription page loads
-    Then a deprecated pricing notice is shown
-    And an upgrade block is shown with SEAT_EVENT pricing
-    And the upgrade block shows the current active member count
-
-  @integration @unimplemented
-  Scenario: TIERED paid org upgrade creates SEAT_EVENT checkout
-    Given the organization has pricingModel "TIERED"
-    And the organization has an active LAUNCH subscription with 6 active members
-    When I click "Upgrade now" on the subscription page
-    Then subscription.create is called with plan "GROWTH_SEAT_EVENT"
-    And membersToAdd equals the current active member count
-
-  @integration @unimplemented
-  Scenario: After SEAT_EVENT payment old TIERED subscription is cancelled with proration
-    Given the organization has pricingModel "TIERED"
-    And the organization has an active ACCELERATE subscription
-    And a GROWTH_SEAT_EVENT checkout was completed successfully
-    When the invoice.payment_succeeded webhook fires for the SEAT_EVENT subscription
-    Then the organization pricingModel is set to "SEAT_EVENT"
-    And the old ACCELERATE subscription is cancelled via Stripe with proration
-    And the old subscription status is CANCELLED in the database
 
   @integration @unimplemented
   Scenario: TIERED paid org can plan seats before upgrading
@@ -201,13 +134,6 @@ Feature: Dual Pricing Model — Seat+Usage Billing
     And the organization pricingModel is still "TIERED"
 
   @unit @unimplemented
-  Scenario: Stale PENDING subscriptions are cleaned up before new checkout
-    Given the organization has a PENDING GROWTH_SEAT_EVENT subscription from an abandoned checkout
-    When I start a new GROWTH_SEAT_EVENT checkout
-    Then the stale PENDING subscription is cancelled
-    And a new PENDING subscription is created with the correct seat count
-
-  @unit @unimplemented
   Scenario: maxMembers is set on PENDING subscription creation
     When I create a GROWTH_SEAT_EVENT checkout for 5 members
     Then the PENDING subscription has maxMembers set to 5
@@ -220,24 +146,3 @@ Feature: Dual Pricing Model — Seat+Usage Billing
     And when the subscription.updated webhook fires with quantity 5
     Then maxMembers remains 5
 
-  @unit @unimplemented
-  Scenario: Proration preview shows prorated amount separate from recurring total
-    Given the organization has an active GROWTH_SEAT_EVENT subscription with 1 seat
-    When I preview proration for 4 total seats
-    Then the prorated amount reflects only the mid-cycle charge for added seats
-    And the recurring total reflects the full next-period cost for all seats
-
-  @integration @unimplemented
-  Scenario: ENTERPRISE org does not see deprecated notice or upgrade block
-    Given the organization has pricingModel "TIERED"
-    And the organization has an active ENTERPRISE subscription
-    When the subscription page loads
-    Then a deprecated pricing notice is not shown
-    And an upgrade block is not shown
-
-  @unit @unimplemented
-  Scenario: Duplicate subscription.deleted webhook for already-cancelled sub is idempotent
-    Given the organization had a TIERED subscription cancelled during upgrade
-    When a subscription.deleted webhook arrives for the already-cancelled subscription
-    Then no database update is performed
-    And the subscription limits are not nulled out
