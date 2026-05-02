@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
-import { replayEvents, FoldAccumulator } from "../replayExecutor";
+import { replayEvents, FoldAccumulator, MapAccumulator } from "../replayExecutor";
 import type { FoldProjectionDefinition } from "../../projections/foldProjection.types";
+import type { MapProjectionDefinition } from "../../projections/mapProjection.types";
 import type { ReplayEvent } from "../replayEventLoader";
 
 /**
@@ -293,6 +294,164 @@ describe("FoldAccumulator", () => {
 
       expect(accumulator.processed).toBe(0);
       expect(storeBatchSpy).not.toHaveBeenCalled();
+    });
+  });
+});
+
+function createTestMapProjection(opts?: { eventTypes?: string[] }) {
+  const bulkAppendSpy = vi.fn().mockResolvedValue(undefined);
+  const appendSpy = vi.fn().mockResolvedValue(undefined);
+
+  const projection: MapProjectionDefinition<{ doubled: number }, any> = {
+    name: "testMapProjection",
+    eventTypes: opts?.eventTypes ?? ["test.event"],
+    map: (event: any) => ({ doubled: (event.data?.value ?? 0) * 2 }),
+    store: {
+      append: appendSpy,
+      bulkAppend: bulkAppendSpy,
+    },
+  };
+
+  return { projection, bulkAppendSpy, appendSpy };
+}
+
+describe("MapAccumulator", () => {
+  it("buffers records and flushes via bulkAppend", async () => {
+    const { projection, bulkAppendSpy } = createTestMapProjection();
+    const acc = new MapAccumulator(projection);
+
+    acc.apply(makeEvent({ data: { value: 5 } }));
+    acc.apply(makeEvent({ data: { value: 10 } }));
+    acc.apply(makeEvent({ data: { value: 15 } }));
+
+    expect(acc.processed).toBe(3);
+    expect(bulkAppendSpy).not.toHaveBeenCalled();
+
+    await acc.flush();
+
+    expect(bulkAppendSpy).toHaveBeenCalledOnce();
+    const records = bulkAppendSpy.mock.calls[0]![0] as Array<{ doubled: number }>;
+    expect(records).toEqual([{ doubled: 10 }, { doubled: 20 }, { doubled: 30 }]);
+  });
+
+  describe("when event type does not match", () => {
+    it("skips non-matching events", async () => {
+      const { projection, bulkAppendSpy } = createTestMapProjection({
+        eventTypes: ["test.event"],
+      });
+      const acc = new MapAccumulator(projection);
+
+      acc.apply(makeEvent({ type: "other.event", data: { value: 100 } }));
+      acc.apply(makeEvent({ type: "test.event", data: { value: 5 } }));
+
+      expect(acc.processed).toBe(1);
+
+      await acc.flush();
+
+      const records = bulkAppendSpy.mock.calls[0]![0] as Array<{ doubled: number }>;
+      expect(records).toEqual([{ doubled: 10 }]);
+    });
+  });
+
+  describe("when map returns null", () => {
+    it("skips null records", async () => {
+      const appendSpy = vi.fn().mockResolvedValue(undefined);
+      const projection: MapProjectionDefinition<{ doubled: number }, any> = {
+        name: "nullMap",
+        eventTypes: ["test.event"],
+        map: (event: any) =>
+          (event.data?.value ?? 0) > 10 ? { doubled: (event.data?.value ?? 0) * 2 } : null,
+        store: { append: appendSpy, bulkAppend: vi.fn().mockResolvedValue(undefined) },
+      };
+      const acc = new MapAccumulator(projection);
+
+      acc.apply(makeEvent({ data: { value: 5 } }));
+      acc.apply(makeEvent({ data: { value: 20 } }));
+
+      expect(acc.processed).toBe(1);
+
+      await acc.flush();
+
+      const bulkSpy = projection.store.bulkAppend as ReturnType<typeof vi.fn>;
+      const records = bulkSpy.mock.calls[0]![0] as Array<{ doubled: number }>;
+      expect(records).toEqual([{ doubled: 40 }]);
+    });
+  });
+
+  describe("when events span multiple tenants", () => {
+    it("groups records by tenant for separate bulk inserts", async () => {
+      const { projection, bulkAppendSpy } = createTestMapProjection();
+      const acc = new MapAccumulator(projection);
+
+      acc.apply(makeEvent({ tenantId: "t-A", data: { value: 1 } }));
+      acc.apply(makeEvent({ tenantId: "t-B", data: { value: 2 } }));
+      acc.apply(makeEvent({ tenantId: "t-A", data: { value: 3 } }));
+
+      await acc.flush();
+
+      expect(bulkAppendSpy).toHaveBeenCalledTimes(2);
+
+      const allRecords = bulkAppendSpy.mock.calls.flatMap(
+        (call: unknown[]) => call[0] as Array<{ doubled: number }>,
+      );
+      expect(allRecords).toHaveLength(3);
+      expect(allRecords).toContainEqual({ doubled: 2 });
+      expect(allRecords).toContainEqual({ doubled: 4 });
+      expect(allRecords).toContainEqual({ doubled: 6 });
+    });
+  });
+
+  describe("when store has no bulkAppend", () => {
+    it("falls back to sequential append calls", async () => {
+      const appendSpy = vi.fn().mockResolvedValue(undefined);
+      const projection: MapProjectionDefinition<{ doubled: number }, any> = {
+        name: "noBulk",
+        eventTypes: ["test.event"],
+        map: (event: any) => ({ doubled: (event.data?.value ?? 0) * 2 }),
+        store: { append: appendSpy },
+      };
+      const acc = new MapAccumulator(projection);
+
+      acc.apply(makeEvent({ data: { value: 5 } }));
+      acc.apply(makeEvent({ data: { value: 10 } }));
+
+      await acc.flush();
+
+      expect(appendSpy).toHaveBeenCalledTimes(2);
+      expect(appendSpy.mock.calls[0]![0]).toEqual({ doubled: 10 });
+      expect(appendSpy.mock.calls[1]![0]).toEqual({ doubled: 20 });
+    });
+  });
+
+  describe("when writeBatchSize chunks the output", () => {
+    it("splits bulk writes by writeBatchSize", async () => {
+      const { projection, bulkAppendSpy } = createTestMapProjection();
+      const acc = new MapAccumulator(projection);
+
+      for (let i = 0; i < 5; i++) {
+        acc.apply(makeEvent({ data: { value: i } }));
+      }
+
+      await acc.flush(2);
+
+      // 5 records / batch of 2 = 3 calls (2 + 2 + 1)
+      expect(bulkAppendSpy).toHaveBeenCalledTimes(3);
+      expect(bulkAppendSpy.mock.calls[0]![0]).toHaveLength(2);
+      expect(bulkAppendSpy.mock.calls[1]![0]).toHaveLength(2);
+      expect(bulkAppendSpy.mock.calls[2]![0]).toHaveLength(1);
+    });
+  });
+
+  describe("when no events are applied", () => {
+    it("skips store on flush", async () => {
+      const { projection, bulkAppendSpy, appendSpy } = createTestMapProjection();
+      const acc = new MapAccumulator(projection);
+
+      await acc.flush();
+
+      expect(acc.processed).toBe(0);
+      expect(bulkAppendSpy).not.toHaveBeenCalled();
+      expect(appendSpy).not.toHaveBeenCalled();
     });
   });
 });

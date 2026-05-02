@@ -1,4 +1,5 @@
 import type { FoldProjectionDefinition } from "../projections/foldProjection.types";
+import type { MapProjectionDefinition } from "../projections/mapProjection.types";
 import type { Event } from "../domain/types";
 
 export interface RegisteredFoldProjection {
@@ -12,6 +13,19 @@ export interface RegisteredFoldProjection {
   targetTable?: string;
 }
 
+export interface RegisteredMapProjection {
+  projectionName: string;
+  pipelineName: string;
+  aggregateType: string;
+  source: "pipeline" | "global";
+  definition: MapProjectionDefinition<any, Event>;
+  pauseKey: string;
+  /** ClickHouse table name for OPTIMIZE after replay. Omit for non-CH stores. */
+  targetTable?: string;
+}
+
+export type ProjectionKind = "fold" | "map";
+
 export type BatchPhase = "mark" | "pause" | "drain" | "cutoff" | "replay" | "write" | "unmark";
 
 export interface ReplayProgress {
@@ -19,6 +33,7 @@ export interface ReplayProgress {
 
   // Projection context
   currentProjectionName: string;
+  currentProjectionKind: ProjectionKind;
   currentProjectionIndex: number;
   totalProjections: number;
 
@@ -44,6 +59,7 @@ export interface ReplayProgress {
 
 export interface BatchCompleteInfo {
   projectionName: string;
+  projectionKind: ProjectionKind;
   batchNum: number;
   totalBatches: number;
   aggregatesInBatch: number;
@@ -53,6 +69,7 @@ export interface BatchCompleteInfo {
 
 export interface ReplayConfig {
   projections: RegisteredFoldProjection[];
+  mapProjections?: RegisteredMapProjection[];
   tenantIds: string[];
   since: string;
   aggregateIds?: string[];

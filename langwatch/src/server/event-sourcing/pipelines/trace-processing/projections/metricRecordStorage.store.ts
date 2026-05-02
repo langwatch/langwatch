@@ -14,4 +14,12 @@ export class MetricRecordAppendStore
   ): Promise<void> {
     await this.repo.insertMetricRecord(record);
   }
+
+  async bulkAppend(
+    records: NormalizedMetricRecord[],
+    _context: ProjectionStoreContext,
+  ): Promise<void> {
+    if (records.length === 0) return;
+    await this.repo.insertMetricRecords(records);
+  }
 }

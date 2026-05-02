@@ -70,4 +70,7 @@ export interface MapProjectionOptions {
 export interface AppendStore<Record> {
   /** Appends a single record to the store. */
   append(record: Record, context: ProjectionStoreContext): Promise<void>;
+
+  /** Appends multiple records in a single batch. Used by replay for bulk writes. */
+  bulkAppend?(records: Record[], context: ProjectionStoreContext): Promise<void>;
 }

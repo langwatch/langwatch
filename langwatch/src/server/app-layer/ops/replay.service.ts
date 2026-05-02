@@ -131,8 +131,11 @@ export class ReplayService {
       const selectedProjections = runtime.projections.filter((p) =>
         params.projectionNames.includes(p.projectionName),
       );
+      const selectedMapProjections = runtime.mapProjections.filter((p) =>
+        params.projectionNames.includes(p.projectionName),
+      );
 
-      if (selectedProjections.length === 0) {
+      if (selectedProjections.length === 0 && selectedMapProjections.length === 0) {
         await this.finalizeWithError({
           runId: params.runId,
           errorMessage: "No matching projections found",
@@ -153,6 +156,7 @@ export class ReplayService {
       const result = await runtime.service.replayOptimized(
         {
           projections: selectedProjections,
+          mapProjections: selectedMapProjections,
           tenantIds: params.tenantIds,
           since: params.since,
           aggregateIds: params.aggregateIds,
