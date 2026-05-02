@@ -11,12 +11,39 @@
 
 import type { AgentInput } from "@langwatch/scenario";
 import { AgentAdapter, AgentRole } from "@langwatch/scenario";
+import { SpanKind } from "@opentelemetry/api";
 import { randomBytes } from "crypto";
+import { getLangWatchTracer } from "langwatch";
 import { resolveFieldMappings } from "../resolve-field-mappings";
 import type { CodeAgentData } from "../types";
 
 /** Timeout for NLP service requests (2 minutes) */
 const NLP_FETCH_TIMEOUT_MS = 120_000;
+
+/** Categories for adapter failures, surfaced as the `error.kind` span attribute. */
+type AdapterErrorKind = "timeout" | "fetch" | "http" | "nlp_error";
+
+/**
+ * Adapter-level error that always carries a structured `kind` so the parent
+ * span/trace can distinguish a timeout from a network failure or a non-2xx
+ * response from the NLP service. See lw#3438.
+ */
+export class SerializedCodeAgentAdapterError extends Error {
+  readonly kind: AdapterErrorKind;
+  readonly httpStatus?: number;
+
+  constructor(
+    message: string,
+    options: { kind: AdapterErrorKind; httpStatus?: number; cause?: unknown },
+  ) {
+    super(message, options.cause === undefined ? undefined : { cause: options.cause });
+    this.name = "SerializedCodeAgentAdapterError";
+    this.kind = options.kind;
+    this.httpStatus = options.httpStatus;
+  }
+}
+
+const tracer = getLangWatchTracer("langwatch.scenarios.code-agent-adapter");
 
 /**
  * Serialized code agent adapter that uses pre-fetched configuration.
@@ -183,6 +210,12 @@ export class SerializedCodeAgentAdapter extends AgentAdapter {
    *
    * Uses execute_flow (not execute_component) because /execute_sync only
    * monitors ExecutionStateChange events, which are emitted by execute_flow.
+   *
+   * The whole call is wrapped in an OTel span so that timeouts and fetch
+   * failures always leave a footprint in the trace (lw#3438). The span's
+   * `setStatus(ERROR)` + `recordException` are handled by `withActiveSpan`,
+   * and we annotate `error.kind` + `http.status_code` so the failure mode
+   * is greppable without reading the message string.
    */
   private async executeOnNlpService(
     workflow: ReturnType<typeof this.buildWorkflow>,
@@ -200,55 +233,86 @@ export class SerializedCodeAgentAdapter extends AgentAdapter {
       },
     };
 
-    const controller = new AbortController();
-    const timeout = setTimeout(
-      () => controller.abort(),
-      NLP_FETCH_TIMEOUT_MS,
-    );
+    const url = `${this.nlpServiceUrl}/studio/execute_sync`;
 
-    try {
-      let response: Response;
-      try {
-        response = await fetch(
-          `${this.nlpServiceUrl}/studio/execute_sync`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(event),
-            signal: controller.signal,
-          },
-        );
-      } catch (fetchError) {
-        const cause = fetchError instanceof Error && "cause" in fetchError
-          ? ` (cause: ${String((fetchError as Error & { cause?: unknown }).cause)})`
-          : "";
-        throw new Error(
-          `Code execution failed: fetch to ${this.nlpServiceUrl}/studio/execute_sync failed - ${fetchError instanceof Error ? fetchError.message : String(fetchError)}${cause}`,
-        );
-      }
+    return tracer.withActiveSpan(
+      "SerializedCodeAgentAdapter.execute_nlp_request",
+      {
+        kind: SpanKind.CLIENT,
+        attributes: {
+          "scenario.agent.id": this.config.agentId,
+          "http.url": url,
+          "http.method": "POST",
+          "nlp.timeout_ms": NLP_FETCH_TIMEOUT_MS,
+        },
+      },
+      async (span) => {
+        const controller = new AbortController();
+        let timedOut = false;
+        const timeout = setTimeout(() => {
+          timedOut = true;
+          controller.abort();
+        }, NLP_FETCH_TIMEOUT_MS);
 
-      if (!response.ok) {
-        let errorMessage = "";
         try {
-          const errorBody = (await response.json()) as { detail?: string };
-          errorMessage = errorBody.detail ?? JSON.stringify(errorBody);
-        } catch {
-          errorMessage = await response.text().catch(() => "");
-        }
-        throw new Error(
-          `Code execution failed: HTTP ${response.status}${errorMessage ? ` - ${errorMessage}` : ""}`,
-        );
-      }
+          let response: Response;
+          try {
+            response = await fetch(url, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(event),
+              signal: controller.signal,
+            });
+          } catch (fetchError) {
+            if (timedOut) {
+              span.setAttribute("error.kind", "timeout" satisfies AdapterErrorKind);
+              throw new SerializedCodeAgentAdapterError(
+                `Code execution failed: NLP service ${url} did not respond within ${NLP_FETCH_TIMEOUT_MS}ms (request aborted).`,
+                { kind: "timeout", cause: fetchError },
+              );
+            }
+            span.setAttribute("error.kind", "fetch" satisfies AdapterErrorKind);
+            const cause = fetchError instanceof Error && "cause" in fetchError
+              ? ` (cause: ${String((fetchError as Error & { cause?: unknown }).cause)})`
+              : "";
+            throw new SerializedCodeAgentAdapterError(
+              `Code execution failed: fetch to ${url} failed - ${fetchError instanceof Error ? fetchError.message : String(fetchError)}${cause}`,
+              { kind: "fetch", cause: fetchError },
+            );
+          }
 
-      const result = (await response.json()) as {
-        trace_id: string;
-        status: string;
-        result: Record<string, unknown> | null;
-      };
-      return this.extractOutput(result.result);
-    } finally {
-      clearTimeout(timeout);
-    }
+          span.setAttribute("http.status_code", response.status);
+
+          if (!response.ok) {
+            let errorMessage = "";
+            try {
+              const errorBody = (await response.json()) as { detail?: string };
+              errorMessage = errorBody.detail ?? JSON.stringify(errorBody);
+            } catch {
+              errorMessage = await response.text().catch(() => "");
+            }
+            span.setAttribute("error.kind", "http" satisfies AdapterErrorKind);
+            throw new SerializedCodeAgentAdapterError(
+              `Code execution failed: HTTP ${response.status}${errorMessage ? ` - ${errorMessage}` : ""}`,
+              { kind: "http", httpStatus: response.status },
+            );
+          }
+
+          const result = (await response.json()) as {
+            trace_id: string;
+            status: string;
+            result: Record<string, unknown> | null;
+          };
+          span.setAttribute("nlp.status", result.status);
+          if (result.trace_id) {
+            span.setAttribute("nlp.trace_id", result.trace_id);
+          }
+          return this.extractOutput(result.result);
+        } finally {
+          clearTimeout(timeout);
+        }
+      },
+    );
   }
 
   /**

@@ -5,7 +5,58 @@
 import { AgentRole, type AgentInput } from "@langwatch/scenario";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { CodeAgentData } from "../../types";
-import { SerializedCodeAgentAdapter } from "../code-agent.adapter";
+
+// Capture withActiveSpan calls so the timeout/error paths can be verified.
+// (lw#3438: traced failures must always leave a span footprint.)
+const { withActiveSpanCalls } = vi.hoisted(() => {
+  const withActiveSpanCalls: Array<{
+    name: string;
+    options: { kind: number; attributes: Record<string, unknown> };
+    span: {
+      setAttribute: ReturnType<typeof vi.fn>;
+      setAttributes: ReturnType<typeof vi.fn>;
+      setStatus: ReturnType<typeof vi.fn>;
+      recordException: ReturnType<typeof vi.fn>;
+      end: ReturnType<typeof vi.fn>;
+    };
+  }> = [];
+  return { withActiveSpanCalls };
+});
+
+vi.mock("langwatch", () => ({
+  getLangWatchTracer: () => ({
+    withActiveSpan: async (
+      name: string,
+      opts: { kind: number; attributes: Record<string, unknown> },
+      fn: (span: {
+        setAttribute: ReturnType<typeof vi.fn>;
+        setAttributes: ReturnType<typeof vi.fn>;
+        setStatus: ReturnType<typeof vi.fn>;
+        recordException: ReturnType<typeof vi.fn>;
+        end: ReturnType<typeof vi.fn>;
+      }) => unknown,
+    ) => {
+      const span = {
+        setAttribute: vi.fn(),
+        setAttributes: vi.fn(),
+        setStatus: vi.fn(),
+        recordException: vi.fn(),
+        end: vi.fn(),
+      };
+      withActiveSpanCalls.push({ name, options: opts, span });
+      try {
+        return await fn(span);
+      } catch (err) {
+        span.setStatus({ code: 2, message: (err as Error)?.message });
+        span.recordException(err as Error);
+        span.end();
+        throw err;
+      }
+    },
+  }),
+}));
+
+import { SerializedCodeAgentAdapter, SerializedCodeAgentAdapterError } from "../code-agent.adapter";
 
 // Mock global fetch
 const mockFetch = vi.fn();
@@ -47,6 +98,7 @@ describe("SerializedCodeAgentAdapter", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    withActiveSpanCalls.length = 0;
     mockFetch.mockResolvedValue(
       nlpResponse({ output: "processed: Hello" }),
     );
