@@ -16,6 +16,11 @@ import { randomBytes } from "crypto";
 import { getLangWatchTracer } from "langwatch";
 import { resolveFieldMappings } from "../resolve-field-mappings";
 import type { CodeAgentData } from "../types";
+import {
+  formatFetchError,
+  formatHttpError,
+  type AdapterErrorContext,
+} from "./format-execution-error";
 
 /** Timeout for NLP service requests (2 minutes) */
 const NLP_FETCH_TIMEOUT_MS = 120_000;
@@ -24,22 +29,42 @@ const NLP_FETCH_TIMEOUT_MS = 120_000;
 type AdapterErrorKind = "timeout" | "fetch" | "http" | "nlp_error";
 
 /**
- * Adapter-level error that always carries a structured `kind` so the parent
- * span/trace can distinguish a timeout from a network failure or a non-2xx
- * response from the NLP service. See lw#3438.
+ * Failure surfaced by the adapter to the scenario runner.
+ *
+ * Carries two orthogonal classifications so both observability and customer
+ * debugging are served from a single thrown error:
+ * - `kind` (lw#3438): coarse failure category mirrored onto the parent span's
+ *   `error.kind` attribute so a timeout is greppable from a network failure or
+ *   a non-2xx response without reading the message string.
+ * - `source` (lw#3439): whether the failure came from the user's Python code
+ *   vs the NLP service/network, used to render the user-friendly message while
+ *   `rawDetail` keeps the original NLP payload for deep debugging.
  */
 export class SerializedCodeAgentAdapterError extends Error {
   readonly kind: AdapterErrorKind;
+  readonly source: "user_code" | "nlp_service" | "network" | "timeout";
+  readonly endpoint: string;
   readonly httpStatus?: number;
+  readonly rawDetail?: string;
 
   constructor(
     message: string,
-    options: { kind: AdapterErrorKind; httpStatus?: number; cause?: unknown },
+    options: {
+      kind: AdapterErrorKind;
+      source: SerializedCodeAgentAdapterError["source"];
+      endpoint: string;
+      httpStatus?: number;
+      rawDetail?: string;
+      cause?: unknown;
+    },
   ) {
     super(message, options.cause === undefined ? undefined : { cause: options.cause });
     this.name = "SerializedCodeAgentAdapterError";
     this.kind = options.kind;
+    this.source = options.source;
+    this.endpoint = options.endpoint;
     this.httpStatus = options.httpStatus;
+    this.rawDetail = options.rawDetail;
   }
 }
 
@@ -215,7 +240,10 @@ export class SerializedCodeAgentAdapter extends AgentAdapter {
    * failures always leave a footprint in the trace (lw#3438). The span's
    * `setStatus(ERROR)` + `recordException` are handled by `withActiveSpan`,
    * and we annotate `error.kind` + `http.status_code` so the failure mode
-   * is greppable without reading the message string.
+   * is greppable without reading the message string. The thrown error also
+   * carries a `source` + `rawDetail` so worker logs can render a
+   * user-friendly message while the original NLP payload stays available
+   * for deep debugging (lw#3439).
    */
   private async executeOnNlpService(
     workflow: ReturnType<typeof this.buildWorkflow>,
@@ -233,7 +261,8 @@ export class SerializedCodeAgentAdapter extends AgentAdapter {
       },
     };
 
-    const url = `${this.nlpServiceUrl}/go/studio/execute_sync`;
+    const endpoint = `${this.nlpServiceUrl}/go/studio/execute_sync`;
+    const ctx: AdapterErrorContext = { endpoint, method: "POST" };
 
     return tracer.withActiveSpan(
       "SerializedCodeAgentAdapter.execute_nlp_request",
@@ -241,7 +270,7 @@ export class SerializedCodeAgentAdapter extends AgentAdapter {
         kind: SpanKind.CLIENT,
         attributes: {
           "scenario.agent.id": this.config.agentId,
-          "http.url": url,
+          "http.url": endpoint,
           "http.method": "POST",
           "nlp.timeout_ms": NLP_FETCH_TIMEOUT_MS,
         },
@@ -257,7 +286,7 @@ export class SerializedCodeAgentAdapter extends AgentAdapter {
         try {
           let response: Response;
           try {
-            response = await fetch(url, {
+            response = await fetch(endpoint, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify(event),
@@ -267,34 +296,40 @@ export class SerializedCodeAgentAdapter extends AgentAdapter {
             if (timedOut) {
               span.setAttribute("error.kind", "timeout" satisfies AdapterErrorKind);
               throw new SerializedCodeAgentAdapterError(
-                `Code execution failed: NLP service ${url} did not respond within ${NLP_FETCH_TIMEOUT_MS}ms (request aborted).`,
-                { kind: "timeout", cause: fetchError },
+                formatFetchError({ ctx, cause: fetchError, timedOutAfterMs: NLP_FETCH_TIMEOUT_MS }),
+                { kind: "timeout", source: "timeout", endpoint, cause: fetchError },
               );
             }
             span.setAttribute("error.kind", "fetch" satisfies AdapterErrorKind);
-            const cause = fetchError instanceof Error && "cause" in fetchError
-              ? ` (cause: ${String((fetchError as Error & { cause?: unknown }).cause)})`
-              : "";
             throw new SerializedCodeAgentAdapterError(
-              `Code execution failed: fetch to ${url} failed - ${fetchError instanceof Error ? fetchError.message : String(fetchError)}${cause}`,
-              { kind: "fetch", cause: fetchError },
+              formatFetchError({ ctx, cause: fetchError }),
+              { kind: "fetch", source: "network", endpoint, cause: fetchError },
             );
           }
 
           span.setAttribute("http.status_code", response.status);
 
           if (!response.ok) {
-            let errorMessage = "";
+            let parsedDetail: string | undefined;
+            let rawBody = "";
             try {
               const errorBody = (await response.json()) as { detail?: string };
-              errorMessage = errorBody.detail ?? JSON.stringify(errorBody);
+              parsedDetail = errorBody.detail;
+              rawBody = errorBody.detail ?? JSON.stringify(errorBody);
             } catch {
-              errorMessage = await response.text().catch(() => "");
+              rawBody = await response.text().catch(() => "");
             }
+            const isUserCodeError = response.status === 500 && Boolean(parsedDetail);
             span.setAttribute("error.kind", "http" satisfies AdapterErrorKind);
             throw new SerializedCodeAgentAdapterError(
-              `Code execution failed: HTTP ${response.status}${errorMessage ? ` - ${errorMessage}` : ""}`,
-              { kind: "http", httpStatus: response.status },
+              formatHttpError({ ctx, status: response.status, rawBody, parsedDetail }),
+              {
+                kind: "http",
+                source: isUserCodeError ? "user_code" : "nlp_service",
+                endpoint,
+                httpStatus: response.status,
+                rawDetail: parsedDetail ?? rawBody,
+              },
             );
           }
 
