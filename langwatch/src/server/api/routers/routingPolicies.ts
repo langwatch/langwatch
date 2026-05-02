@@ -10,27 +10,11 @@ import { z } from "zod";
 
 import { RoutingPolicyService } from "~/server/governance/routingPolicy.service";
 
-import { checkOrganizationPermission, skipPermissionCheck } from "../rbac";
+import { checkOrganizationPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 const scopeSchema = z.enum(["organization", "team", "project"]);
 const strategySchema = z.enum(["priority", "cost", "latency", "round_robin"]);
-
-async function assertOrgMembership(
-  prisma: import("@prisma/client").PrismaClient,
-  userId: string,
-  organizationId: string,
-) {
-  const membership = await prisma.organizationUser.findUnique({
-    where: { userId_organizationId: { userId, organizationId } },
-  });
-  if (!membership) {
-    throw new TRPCError({
-      code: "FORBIDDEN",
-      message: `Not a member of organization ${organizationId}`,
-    });
-  }
-}
 
 export const routingPoliciesRouter = createTRPCRouter({
   /** List policies in an org, optionally filtered by scope. */
@@ -42,9 +26,8 @@ export const routingPoliciesRouter = createTRPCRouter({
         scopeId: z.string().optional(),
       }),
     )
-    .use(skipPermissionCheck)
+    .use(checkOrganizationPermission("organization:view"))
     .query(async ({ ctx, input }) => {
-      await assertOrgMembership(ctx.prisma, ctx.session.user.id, input.organizationId);
       const service = new RoutingPolicyService(ctx.prisma);
       return await service.list({
         organizationId: input.organizationId,
@@ -56,9 +39,8 @@ export const routingPoliciesRouter = createTRPCRouter({
   /** Get a single policy by id. */
   get: protectedProcedure
     .input(z.object({ organizationId: z.string(), id: z.string() }))
-    .use(skipPermissionCheck)
+    .use(checkOrganizationPermission("organization:view"))
     .query(async ({ ctx, input }) => {
-      await assertOrgMembership(ctx.prisma, ctx.session.user.id, input.organizationId);
       const policy = await ctx.prisma.routingPolicy.findUnique({
         where: { id: input.id },
       });
