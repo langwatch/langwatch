@@ -81,7 +81,7 @@ function makeState(
     occurredAt: 0,
     createdAt: 0,
     updatedAt: 0,
-    lastEventOccurredAt: 0,
+    LastEventOccurredAt: 0,
     ...overrides,
   };
 }

@@ -61,7 +61,7 @@ function createFoldState(
     lastUsedPromptVersionId: null,
     lastUsedPromptSpanId: null,
     lastUsedPromptStartTimeMs: null,
-    lastEventOccurredAt: 0,
+    LastEventOccurredAt: 0,
     occurredAt: 1700_000_000_000,
     createdAt: 1700_000_000_000,
     updatedAt: 1700_000_000_000,

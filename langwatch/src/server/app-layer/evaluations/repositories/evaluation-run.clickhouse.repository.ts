@@ -40,12 +40,12 @@ interface ClickHouseEvaluationRunRecord {
   CompletedAt: number | null;
   CostId: string | null;
   LastProcessedEventId: string;
-  lastEventOccurredAt: number;
+  LastEventOccurredAt: number;
 }
 
 type ClickHouseEvaluationRunWriteRecord = WithDateWrites<
   ClickHouseEvaluationRunRecord,
-  "CreatedAt" | "UpdatedAt" | "ArchivedAt" | "ScheduledAt" | "StartedAt" | "CompletedAt" | "lastEventOccurredAt"
+  "CreatedAt" | "UpdatedAt" | "ArchivedAt" | "ScheduledAt" | "StartedAt" | "CompletedAt" | "LastEventOccurredAt"
 >;
 
 export class EvaluationRunClickHouseRepository
@@ -214,7 +214,7 @@ export class EvaluationRunClickHouseRepository
             toUnixTimestamp64Milli(t.CompletedAt) AS CompletedAt,
             t.CostId AS CostId,
             t.LastProcessedEventId AS LastProcessedEventId,
-            toUnixTimestamp64Milli(t.LastEventOccurredAt) AS lastEventOccurredAt
+            toUnixTimestamp64Milli(t.LastEventOccurredAt) AS LastEventOccurredAt
           FROM ${TABLE_NAME} AS t
           PREWHERE (t.TenantId, t.EvaluationId, t.UpdatedAt) IN (
             SELECT TenantId, EvaluationId, max(UpdatedAt)
@@ -452,7 +452,7 @@ export class EvaluationRunClickHouseRepository
       errorDetails: record.ErrorDetails,
       createdAt: Number(record.CreatedAt),
       updatedAt: Number(record.UpdatedAt),
-      lastEventOccurredAt: Number(record.lastEventOccurredAt ?? 0),
+      LastEventOccurredAt: Number(record.LastEventOccurredAt ?? 0),
       archivedAt: record.ArchivedAt === null ? null : Number(record.ArchivedAt),
       scheduledAt:
         record.ScheduledAt === null ? null : Number(record.ScheduledAt),
@@ -489,7 +489,7 @@ export class EvaluationRunClickHouseRepository
       ErrorDetails: data.errorDetails,
       CreatedAt: new Date(data.createdAt),
       UpdatedAt: new Date(data.updatedAt),
-      lastEventOccurredAt: data.lastEventOccurredAt ? new Date(data.lastEventOccurredAt) : new Date(0),
+      LastEventOccurredAt: data.LastEventOccurredAt ? new Date(data.LastEventOccurredAt) : new Date(0),
       ArchivedAt: data.archivedAt != null ? new Date(data.archivedAt) : null,
       ScheduledAt: new Date(data.scheduledAt ?? data.createdAt),
       StartedAt: data.startedAt != null ? new Date(data.startedAt) : null,
