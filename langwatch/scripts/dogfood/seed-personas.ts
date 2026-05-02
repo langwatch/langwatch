@@ -23,6 +23,7 @@
 import { randomBytes } from "crypto";
 
 import { prisma } from "~/server/db";
+import { encrypt } from "~/utils/encryption";
 import { PersonalWorkspaceService } from "~/server/governance/personalWorkspace.service";
 import { PersonalVirtualKeyService } from "~/server/governance/personalVirtualKey.service";
 
@@ -103,6 +104,58 @@ async function main() {
 
   let vkOutput: { id: string; secret: string; baseUrl: string; personalProjectId: string } | null = null;
   if (args.mintVk) {
+    // Seed an org-default RoutingPolicy + ModelProvider so PersonalVK
+    // issuance has a chain to bind to. Without this the VK service
+    // falls into the "needs explicit credentials" branch and 400s
+    // ("At least one provider credential is required"). Idempotent
+    // per (org, scope, isDefault).
+    const openaiKey = process.env.OPENAI_API_KEY;
+    if (!openaiKey) {
+      throw new Error(
+        "OPENAI_API_KEY required in env for --mint-vk so seeded ModelProvider can route through Go gateway",
+      );
+    }
+    const modelProvider = await prisma.modelProvider.create({
+      data: {
+        projectId: project.id,
+        name: "OpenAI",
+        provider: "openai",
+        enabled: true,
+        // customKeys is an AES-GCM encrypted JSON blob, not a plain object —
+        // config.materialiser decrypts and pick()s OPENAI_API_KEY off it
+        // before handing the value to the gateway. An empty {} produces
+        // {api_key: ""} downstream and the gateway 504s with
+        // "provider is required". (Sergey root-cause, iter29 dogfood.)
+        customKeys: encrypt(JSON.stringify({ OPENAI_API_KEY: openaiKey })),
+        scopes: { create: [{ scopeType: "ORGANIZATION", scopeId: org.id }] },
+      },
+    });
+    // GatewayProviderCredential wraps ModelProvider for gateway routing —
+    // RoutingPolicy.providerCredentialIds expects GatewayProviderCredential
+    // ids, NOT ModelProvider ids.
+    const gatewayCred = await prisma.gatewayProviderCredential.create({
+      data: {
+        projectId: project.id,
+        modelProviderId: modelProvider.id,
+        slot: "primary",
+      },
+    });
+    const policy = await prisma.routingPolicy.create({
+      data: {
+        organizationId: org.id,
+        scope: "organization",
+        scopeId: org.id,
+        name: "developer-default",
+        isDefault: true,
+        strategy: "priority",
+        providerCredentialIds: [gatewayCred.id],
+        modelAllowlist: ["gpt-5-mini", "gpt-5", "gpt-4o", "gpt-4o-mini"],
+      },
+    });
+    process.stderr.write(
+      `[seed-personas] seeded org modelProvider=${modelProvider.id} gatewayCred=${gatewayCred.id} routing-policy=${policy.id} (org-default)\n`,
+    );
+
     const workspaceSvc = new PersonalWorkspaceService(prisma);
     const workspace = await workspaceSvc.ensure({
       userId: user.id,
