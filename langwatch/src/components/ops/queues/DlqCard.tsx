@@ -1,6 +1,7 @@
 import { useState } from "react";
 import {
   Badge,
+  Box,
   Button,
   Card,
   HStack,
@@ -11,8 +12,12 @@ import {
 } from "@chakra-ui/react";
 import { toaster } from "~/components/ui/toaster";
 import { ConfirmDialog } from "~/components/ops/shared/ConfirmDialog";
+import { VirtualizedTableRows } from "~/components/ops/shared/VirtualizedTableRows";
 import { useOpsPermission } from "~/hooks/useOpsPermission";
 import { api } from "~/utils/api";
+
+const DLQ_VIEWPORT_HEIGHT = 360;
+const DLQ_ROW_HEIGHT = 36;
 
 export function DlqCard({ queueNames }: { queueNames: string[] }) {
   const { hasAccess } = useOpsPermission();
@@ -24,6 +29,9 @@ export function DlqCard({ queueNames }: { queueNames: string[] }) {
   const [replayAllTarget, setReplayAllTarget] = useState<string | null>(null);
   const [canaryTarget, setCanaryTarget] = useState<string | null>(null);
   const [canaryCount, setCanaryCount] = useState(5);
+  const [scrollContainer, setScrollContainer] = useState<HTMLElement | null>(
+    null,
+  );
 
   const replayMutation = api.ops.replayFromDlq.useMutation({
     onSuccess: (data) => { toaster.create({ title: `Replayed ${data.jobsReplayed} jobs`, type: "success" }); setReplayTarget(null); void utils.ops.invalidate(); },
@@ -74,9 +82,13 @@ export function DlqCard({ queueNames }: { queueNames: string[] }) {
             )}
           </HStack>
 
-          <Table.ScrollArea>
+          <Box
+            ref={setScrollContainer}
+            maxHeight={`${DLQ_VIEWPORT_HEIGHT}px`}
+            overflowY="auto"
+          >
             <Table.Root size="sm" variant="line" css={{ "& tr:last-child td": { borderBottom: "none" } }}>
-              <Table.Header>
+              <Table.Header position="sticky" top={0} zIndex={1} bg="bg">
                 <Table.Row>
                   <Table.ColumnHeader>Queue</Table.ColumnHeader>
                   <Table.ColumnHeader>Group ID</Table.ColumnHeader>
@@ -87,23 +99,32 @@ export function DlqCard({ queueNames }: { queueNames: string[] }) {
                 </Table.Row>
               </Table.Header>
               <Table.Body>
-                {groups.map((group) => (
-                  <Table.Row key={`${group.queueName}:${group.groupId}`}>
-                    <Table.Cell><Badge size="xs" variant="subtle">{group.queueDisplayName}</Badge></Table.Cell>
-                    <Table.Cell><Text textStyle="xs" fontFamily="mono" truncate maxWidth="160px">{group.groupId}</Text></Table.Cell>
-                    <Table.Cell><Text textStyle="xs" color="fg.muted">{group.pipelineName ?? "\u2014"}</Text></Table.Cell>
-                    <Table.Cell><Text textStyle="xs" color="red.500" truncate maxWidth="220px" title={group.error ?? undefined}>{group.error ?? ""}</Text></Table.Cell>
-                    <Table.Cell textAlign="end"><Text textStyle="xs">{group.jobCount}</Text></Table.Cell>
-                    {hasAccess && (
-                      <Table.Cell>
-                        <Button variant="outline" size="2xs" colorPalette="green" onClick={() => setReplayTarget({ queueName: group.queueName, groupId: group.groupId })}>Replay</Button>
-                      </Table.Cell>
-                    )}
-                  </Table.Row>
-                ))}
+                <VirtualizedTableRows
+                  count={groups.length}
+                  rowHeight={DLQ_ROW_HEIGHT}
+                  columnCount={hasAccess ? 6 : 5}
+                  scrollContainer={scrollContainer}
+                  renderRow={(i) => {
+                    const group = groups[i]!;
+                    return (
+                      <Table.Row key={`${group.queueName}:${group.groupId}`}>
+                        <Table.Cell><Badge size="xs" variant="subtle">{group.queueDisplayName}</Badge></Table.Cell>
+                        <Table.Cell><Text textStyle="xs" fontFamily="mono" truncate maxWidth="160px">{group.groupId}</Text></Table.Cell>
+                        <Table.Cell><Text textStyle="xs" color="fg.muted">{group.pipelineName ?? "—"}</Text></Table.Cell>
+                        <Table.Cell><Text textStyle="xs" color="red.500" truncate maxWidth="220px" title={group.error ?? undefined}>{group.error ?? ""}</Text></Table.Cell>
+                        <Table.Cell textAlign="end"><Text textStyle="xs">{group.jobCount}</Text></Table.Cell>
+                        {hasAccess && (
+                          <Table.Cell>
+                            <Button variant="outline" size="2xs" colorPalette="green" onClick={() => setReplayTarget({ queueName: group.queueName, groupId: group.groupId })}>Replay</Button>
+                          </Table.Cell>
+                        )}
+                      </Table.Row>
+                    );
+                  }}
+                />
               </Table.Body>
             </Table.Root>
-          </Table.ScrollArea>
+          </Box>
         </Card.Body>
       </Card.Root>
 

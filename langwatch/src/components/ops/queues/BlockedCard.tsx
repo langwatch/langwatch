@@ -1,5 +1,6 @@
 import { useState } from "react";
 import {
+  Box,
   Button,
   Card,
   HStack,
@@ -10,8 +11,12 @@ import {
 } from "@chakra-ui/react";
 import { toaster } from "~/components/ui/toaster";
 import { ConfirmDialog } from "~/components/ops/shared/ConfirmDialog";
+import { VirtualizedTableRows } from "~/components/ops/shared/VirtualizedTableRows";
 import { useOpsPermission } from "~/hooks/useOpsPermission";
 import { api } from "~/utils/api";
+
+const BLOCKED_VIEWPORT_HEIGHT = 360;
+const BLOCKED_ROW_HEIGHT = 36;
 
 export function BlockedCard({ queueNames }: { queueNames: string[] }) {
   const { hasAccess } = useOpsPermission();
@@ -25,6 +30,9 @@ export function BlockedCard({ queueNames }: { queueNames: string[] }) {
   const [moveToDlqTarget, setMoveToDlqTarget] = useState<string | null>(null);
   const [canaryQueueTarget, setCanaryQueueTarget] = useState<string | null>(null);
   const [canaryCount, setCanaryCount] = useState(5);
+  const [scrollContainer, setScrollContainer] = useState<HTMLElement | null>(
+    null,
+  );
 
   const unblockAllMutation = api.ops.unblockAll.useMutation({
     onSuccess: (data) => { toaster.create({ title: `Unblocked ${data.unblockedCount} groups`, type: "success" }); setUnblockAllTarget(null); void utils.ops.invalidate(); },
@@ -48,13 +56,15 @@ export function BlockedCard({ queueNames }: { queueNames: string[] }) {
   if (blockedQuery.isLoading) return null;
   if (!blockedQuery.data || blockedQuery.data.clusters.length === 0) return null;
 
+  const clusters = blockedQuery.data.clusters;
+
   return (
     <>
       <Card.Root>
         <Card.Body padding={0}>
           <HStack paddingX={4} paddingY={2.5} borderBottom="1px solid" borderBottomColor="border" gap={2} flexWrap="wrap">
             <Text textStyle="sm" fontWeight="medium" color="red.500">
-              Blocked — {blockedQuery.data.totalBlocked} groups, {blockedQuery.data.clusters.length} error patterns
+              Blocked — {blockedQuery.data.totalBlocked} groups, {clusters.length} error patterns
             </Text>
             <Spacer />
             {hasAccess && (
@@ -80,9 +90,13 @@ export function BlockedCard({ queueNames }: { queueNames: string[] }) {
             )}
           </HStack>
 
-          <Table.ScrollArea>
+          <Box
+            ref={setScrollContainer}
+            maxHeight={`${BLOCKED_VIEWPORT_HEIGHT}px`}
+            overflowY="auto"
+          >
             <Table.Root size="sm" variant="line" css={{ "& tr:last-child td": { borderBottom: "none" } }}>
-              <Table.Header>
+              <Table.Header position="sticky" top={0} zIndex={1} bg="bg">
                 <Table.Row>
                   <Table.ColumnHeader width="60px" textAlign="end">Count</Table.ColumnHeader>
                   <Table.ColumnHeader>Error</Table.ColumnHeader>
@@ -92,35 +106,44 @@ export function BlockedCard({ queueNames }: { queueNames: string[] }) {
                 </Table.Row>
               </Table.Header>
               <Table.Body>
-                {blockedQuery.data.clusters.map((cluster, i) => (
-                  <Table.Row key={i}>
-                    <Table.Cell textAlign="end">
-                      <Text color="red.500" fontWeight="medium" textStyle="xs">{cluster.count}</Text>
-                    </Table.Cell>
-                    <Table.Cell>
-                      <Text textStyle="xs" truncate maxWidth="300px" title={cluster.sampleMessage}>{cluster.sampleMessage}</Text>
-                    </Table.Cell>
-                    <Table.Cell>
-                      <Text textStyle="xs" color="fg.muted">{cluster.pipelineName ?? "\u2014"}</Text>
-                    </Table.Cell>
-                    <Table.Cell>
-                      <Text textStyle="xs" fontFamily="mono" truncate maxWidth="160px">
-                        {cluster.sampleGroupIds.slice(0, 2).join(", ")}
-                        {cluster.sampleGroupIds.length > 2 ? ` +${cluster.sampleGroupIds.length - 2}` : ""}
-                      </Text>
-                    </Table.Cell>
-                    <Table.Cell>
-                      {cluster.sampleGroupIds[0] && (
-                        <Button variant="outline" size="2xs" colorPalette="red" onClick={() => setDrainTarget({ queueName: cluster.queueName, groupId: cluster.sampleGroupIds[0]! })}>
-                          Drain
-                        </Button>
-                      )}
-                    </Table.Cell>
-                  </Table.Row>
-                ))}
+                <VirtualizedTableRows
+                  count={clusters.length}
+                  rowHeight={BLOCKED_ROW_HEIGHT}
+                  columnCount={5}
+                  scrollContainer={scrollContainer}
+                  renderRow={(i) => {
+                    const cluster = clusters[i]!;
+                    return (
+                      <Table.Row key={i}>
+                        <Table.Cell textAlign="end">
+                          <Text color="red.500" fontWeight="medium" textStyle="xs">{cluster.count}</Text>
+                        </Table.Cell>
+                        <Table.Cell>
+                          <Text textStyle="xs" truncate maxWidth="300px" title={cluster.sampleMessage}>{cluster.sampleMessage}</Text>
+                        </Table.Cell>
+                        <Table.Cell>
+                          <Text textStyle="xs" color="fg.muted">{cluster.pipelineName ?? "—"}</Text>
+                        </Table.Cell>
+                        <Table.Cell>
+                          <Text textStyle="xs" fontFamily="mono" truncate maxWidth="160px">
+                            {cluster.sampleGroupIds.slice(0, 2).join(", ")}
+                            {cluster.sampleGroupIds.length > 2 ? ` +${cluster.sampleGroupIds.length - 2}` : ""}
+                          </Text>
+                        </Table.Cell>
+                        <Table.Cell>
+                          {cluster.sampleGroupIds[0] && (
+                            <Button variant="outline" size="2xs" colorPalette="red" onClick={() => setDrainTarget({ queueName: cluster.queueName, groupId: cluster.sampleGroupIds[0]! })}>
+                              Drain
+                            </Button>
+                          )}
+                        </Table.Cell>
+                      </Table.Row>
+                    );
+                  }}
+                />
               </Table.Body>
             </Table.Root>
-          </Table.ScrollArea>
+          </Box>
         </Card.Body>
       </Card.Root>
 

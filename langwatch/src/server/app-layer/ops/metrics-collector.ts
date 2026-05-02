@@ -1,7 +1,6 @@
 import * as os from "node:os";
 import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
-import type { NextApiResponse } from "~/types/next-stubs";
 import type {
   DashboardData,
   PipelineNode,
@@ -65,9 +64,18 @@ interface PersistedMetricsState {
   latestTotalFailed: number;
 }
 
+/**
+ * Minimal write-side interface for an SSE client. Both Node ServerResponse
+ * (Pages Router-style) and Hono-style ReadableStream wrappers can implement it.
+ */
+export interface SSEStream {
+  write(chunk: string): void;
+  end(): void;
+}
+
 interface SSEClient {
   id: string;
-  res: NextApiResponse;
+  stream: SSEStream;
 }
 
 const EMPTY_PHASE = {
@@ -341,32 +349,30 @@ class OpsMetricsCollector {
       this.heartbeatInterval = null;
     }
     for (const client of this.clients) {
-      client.res.end();
+      try {
+        client.stream.end();
+      } catch {
+        // already closed
+      }
     }
     this.clients = [];
   }
 
-  addClient(res: NextApiResponse): string {
+  addClient(stream: SSEStream): string {
     const id = `client-${++this.clientCounter}`;
-    const client: SSEClient = { id, res };
-    this.clients.push(client);
-
-    res.on("close", () => {
-      this.clients = this.clients.filter((c) => c.id !== id);
-    });
-
+    this.clients.push({ id, stream });
     return id;
   }
 
-  removeClient(res: NextApiResponse): void {
-    this.clients = this.clients.filter((c) => c.res !== res);
+  removeClient(stream: SSEStream): void {
+    this.clients = this.clients.filter((c) => c.stream !== stream);
   }
 
   private broadcast(event: string, data: unknown): void {
     const payload = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
     for (const client of this.clients) {
       try {
-        client.res.write(payload);
+        client.stream.write(payload);
       } catch {
         // client disconnected
       }
