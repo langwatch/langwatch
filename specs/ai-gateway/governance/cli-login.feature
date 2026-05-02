@@ -145,8 +145,8 @@ Feature: AI Gateway Governance — CLI login (RFC 8628 device-code flow)
   Scenario: `langwatch logout` revokes the refresh token and wipes local state
     Given the CLI is currently authenticated
     When I run "langwatch logout"
-    Then the CLI POSTs to "/api/auth/cli/refresh" with `{ revoke: true }` (or POSTs to /api/auth/cli/revoke)
-    And the server marks the refresh_token revoked
+    Then the CLI POSTs to "/api/auth/cli/logout"
+    And the server revokes both the access_token and refresh_token
     And the CLI deletes "~/.langwatch/config" and the OS keyring entry
     And the CLI prints "Logged out"
 

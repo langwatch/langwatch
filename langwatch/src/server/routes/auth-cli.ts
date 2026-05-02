@@ -38,6 +38,7 @@ import { getServerAuthSession } from "~/server/auth";
 import {
   PersonalVirtualKeyService,
   NoDefaultRoutingPolicyError,
+  PersonalVirtualKeyAlreadyExistsError,
 } from "~/server/governance/personalVirtualKey.service";
 import { PersonalWorkspaceService } from "~/server/governance/personalWorkspace.service";
 import { GatewayBudgetService } from "~/server/gateway/budget.service";
@@ -1047,7 +1048,7 @@ app.post("/approve", async (c: Context) => {
         409,
       );
     }
-    if (err instanceof Error && err.name === "PersonalVirtualKeyAlreadyExistsError") {
+    if (err instanceof PersonalVirtualKeyAlreadyExistsError) {
       // Issue an additional device-specific key instead so multiple
       // devices don't have to share the "default" key. Label includes
       // a short suffix from the user_code for human discoverability.
