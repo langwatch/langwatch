@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Badge,
   Box,
@@ -33,9 +33,7 @@ export function GroupsCard({ queueNames }: { queueNames: string[] }) {
 
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [search, setSearch] = useState("");
-  const [scrollContainer, setScrollContainer] = useState<HTMLElement | null>(
-    null,
-  );
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   // Use the first queue name for the groups query (most setups have a single queue)
   const primaryQueue = queueNames[0];
@@ -82,8 +80,8 @@ export function GroupsCard({ queueNames }: { queueNames: string[] }) {
   // scrollTop holds its old value — leaving blank space below the rows
   // until the user scrolls. Snap back to the top on every filter change.
   useEffect(() => {
-    if (scrollContainer) scrollContainer.scrollTop = 0;
-  }, [statusFilter, search, scrollContainer]);
+    if (scrollContainerRef.current) scrollContainerRef.current.scrollTop = 0;
+  }, [statusFilter, search]);
 
   const isLoading = !!primaryQueue && groupsQuery.isLoading;
 
@@ -150,7 +148,7 @@ export function GroupsCard({ queueNames }: { queueNames: string[] }) {
             </Box>
           ) : (
             <Box
-              ref={setScrollContainer}
+              ref={scrollContainerRef}
               maxHeight={`${GROUPS_VIEWPORT_HEIGHT}px`}
               overflowY="auto"
             >
@@ -171,7 +169,7 @@ export function GroupsCard({ queueNames }: { queueNames: string[] }) {
                     count={filteredGroups.length}
                     rowHeight={GROUPS_ROW_HEIGHT}
                     columnCount={hasAccess ? 7 : 6}
-                    scrollContainer={scrollContainer}
+                    scrollContainerRef={scrollContainerRef}
                     getItemKey={(i) => {
                       const g = filteredGroups[i]!;
                       return `${g.queueName}:${g.groupId}`;

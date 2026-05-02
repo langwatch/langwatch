@@ -9,13 +9,19 @@
  */
 import { Table } from "@chakra-ui/react";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { Fragment, type ReactNode, useCallback } from "react";
+import { Fragment, type ReactNode, type RefObject, useCallback } from "react";
 
 interface Props {
   count: number;
   rowHeight: number;
   columnCount: number;
-  scrollContainer: HTMLElement | null;
+  /**
+   * Ref to the scrolling element. Using a ref (rather than a stateful
+   * `HTMLElement | null`) keeps the DOM node out of React state — react-virtual
+   * reads `.current` lazily from inside its layout effects, so it picks up the
+   * element after the parent commits without needing a render to fire.
+   */
+  scrollContainerRef: RefObject<HTMLElement | null>;
   renderRow: (index: number) => ReactNode;
   /**
    * Stable per-row key. Without this, react-virtual falls back to the row
@@ -34,17 +40,17 @@ export function VirtualizedTableRows({
   count,
   rowHeight,
   columnCount,
-  scrollContainer,
+  scrollContainerRef,
   renderRow,
   getItemKey,
   threshold = 30,
   overscan = 6,
 }: Props) {
-  const shouldVirtualize = count > threshold && !!scrollContainer;
+  const shouldVirtualize = count > threshold;
 
   const getScrollElement = useCallback(
-    () => scrollContainer,
-    [scrollContainer],
+    () => scrollContainerRef.current,
+    [scrollContainerRef],
   );
   const estimateSize = useCallback(() => rowHeight, [rowHeight]);
 

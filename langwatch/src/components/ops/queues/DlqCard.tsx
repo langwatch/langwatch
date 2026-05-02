@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   Badge,
   Box,
@@ -29,9 +29,7 @@ export function DlqCard({ queueNames }: { queueNames: string[] }) {
   const [replayAllTarget, setReplayAllTarget] = useState<string | null>(null);
   const [canaryTarget, setCanaryTarget] = useState<string | null>(null);
   const [canaryCount, setCanaryCount] = useState(5);
-  const [scrollContainer, setScrollContainer] = useState<HTMLElement | null>(
-    null,
-  );
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const replayMutation = api.ops.replayFromDlq.useMutation({
     onSuccess: (data) => { toaster.create({ title: `Replayed ${data.jobsReplayed} jobs`, type: "success" }); setReplayTarget(null); void utils.ops.invalidate(); },
@@ -83,7 +81,7 @@ export function DlqCard({ queueNames }: { queueNames: string[] }) {
           </HStack>
 
           <Box
-            ref={setScrollContainer}
+            ref={scrollContainerRef}
             maxHeight={`${DLQ_VIEWPORT_HEIGHT}px`}
             overflowY="auto"
           >
@@ -103,7 +101,7 @@ export function DlqCard({ queueNames }: { queueNames: string[] }) {
                   count={groups.length}
                   rowHeight={DLQ_ROW_HEIGHT}
                   columnCount={hasAccess ? 6 : 5}
-                  scrollContainer={scrollContainer}
+                  scrollContainerRef={scrollContainerRef}
                   getItemKey={(i) => {
                     const g = groups[i]!;
                     return `${g.queueName}:${g.groupId}`;

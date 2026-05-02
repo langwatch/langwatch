@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   Box,
   Button,
@@ -30,9 +30,7 @@ export function BlockedCard({ queueNames }: { queueNames: string[] }) {
   const [moveToDlqTarget, setMoveToDlqTarget] = useState<string | null>(null);
   const [canaryQueueTarget, setCanaryQueueTarget] = useState<string | null>(null);
   const [canaryCount, setCanaryCount] = useState(5);
-  const [scrollContainer, setScrollContainer] = useState<HTMLElement | null>(
-    null,
-  );
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const unblockAllMutation = api.ops.unblockAll.useMutation({
     onSuccess: (data) => { toaster.create({ title: `Unblocked ${data.unblockedCount} groups`, type: "success" }); setUnblockAllTarget(null); void utils.ops.invalidate(); },
@@ -91,7 +89,7 @@ export function BlockedCard({ queueNames }: { queueNames: string[] }) {
           </HStack>
 
           <Box
-            ref={setScrollContainer}
+            ref={scrollContainerRef}
             maxHeight={`${BLOCKED_VIEWPORT_HEIGHT}px`}
             overflowY="auto"
           >
@@ -110,7 +108,7 @@ export function BlockedCard({ queueNames }: { queueNames: string[] }) {
                   count={clusters.length}
                   rowHeight={BLOCKED_ROW_HEIGHT}
                   columnCount={5}
-                  scrollContainer={scrollContainer}
+                  scrollContainerRef={scrollContainerRef}
                   getItemKey={(i) => {
                     const c = clusters[i]!;
                     return `${c.queueName}::${c.normalizedMessage}`;
