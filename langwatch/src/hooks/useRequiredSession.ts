@@ -45,6 +45,13 @@ export const noOrgBouncerRoutes = [
   // p1 storyboard.
   "/me",
   "/me/settings",
+  // The root index is responsible for picking the right home per
+  // persona (`pages/index.tsx` resolves via api.governance.resolveHome
+  // for org-having users + falls back to /me for org-less p1). The
+  // global no-org bouncer must defer to the index page's own logic
+  // here, otherwise CommandBar wins the race and dumps p1 on
+  // /onboarding/welcome before the resolver effect fires.
+  "/",
 ];
 
 export const useRequiredSession = (

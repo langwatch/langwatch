@@ -387,8 +387,12 @@ export const DashboardLayout = ({
     !publicPage &&
     (!session ||
       isLoading ||
-      !organization ||
-      !organizations ||
+      // Persona-1 (org-less CLI/IDE devs) are a first-class persona on
+      // /me — they legitimately have no organization. Don't trap them
+      // in LoadingScreen on personal-scope routes. Other route classes
+      // (project chrome, ops, governance/orgScope) still require an
+      // organization context.
+      (!isPersonalScopeRoute && (!organization || !organizations)) ||
       (!isOpsRoute && !isPersonalScopeRoute && !isOrgScopeRoute && (!team || !project)))
   ) {
     return <LoadingScreen />;
