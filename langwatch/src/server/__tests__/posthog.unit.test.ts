@@ -114,4 +114,47 @@ describe("trackServerEvent", () => {
       });
     });
   });
+
+  describe("when session indicates impersonation", () => {
+    it("skips capture", () => {
+      trackServerEvent({
+        userId: "user-123",
+        event: "evaluation_ran",
+        session: { user: { impersonator: { id: "admin-1" } } },
+      });
+
+      expect(mockCapture).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when session has no impersonator", () => {
+    it("captures normally", () => {
+      trackServerEvent({
+        userId: "user-123",
+        event: "evaluation_ran",
+        session: { user: { impersonator: null } },
+      });
+
+      expect(mockCapture).toHaveBeenCalledWith({
+        distinctId: "user-123",
+        event: "evaluation_ran",
+        properties: {},
+      });
+    });
+  });
+
+  describe("when session is not provided", () => {
+    it("captures normally (backwards compatible)", () => {
+      trackServerEvent({
+        userId: "user-123",
+        event: "evaluation_ran",
+      });
+
+      expect(mockCapture).toHaveBeenCalledWith({
+        distinctId: "user-123",
+        event: "evaluation_ran",
+        properties: {},
+      });
+    });
+  });
 });

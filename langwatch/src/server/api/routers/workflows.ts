@@ -98,19 +98,21 @@ export const workflowRouter = createTRPCRouter({
         });
       }
 
-      void ctx.prisma.workflow
-        .count({
-          where: { projectId: input.projectId, archivedAt: null },
-        })
-        .then((count) => {
-          fireWorkflowCreatedNurturing({
-            userId: ctx.session.user.id,
-            workflowCount: count,
-            workflowId: workflow.id,
-            projectId: input.projectId,
-          });
-        })
-        .catch(captureException);
+      if (!ctx.session.user.impersonator) {
+        void ctx.prisma.workflow
+          .count({
+            where: { projectId: input.projectId, archivedAt: null },
+          })
+          .then((count) => {
+            fireWorkflowCreatedNurturing({
+              userId: ctx.session.user.id,
+              workflowCount: count,
+              workflowId: workflow.id,
+              projectId: input.projectId,
+            });
+          })
+          .catch(captureException);
+      }
 
       return { workflow, version };
     }),

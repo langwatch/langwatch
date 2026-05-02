@@ -43,18 +43,26 @@ export function getPostHogInstance(): PostHog | null {
 /**
  * Fire-and-forget server-side event tracking.
  * Silently no-ops when POSTHOG_KEY is not set (self-hosted without PostHog).
+ *
+ * When `session` is provided and indicates impersonation (session.user.impersonator
+ * is set), the event is silently dropped to avoid polluting analytics with
+ * admin impersonation activity.
  */
 export function trackServerEvent({
   userId,
   event,
   properties,
   projectId,
+  session,
 }: {
   userId: string;
   event: string;
   properties?: Record<string, unknown>;
   projectId?: string;
+  session?: { user: { impersonator?: { id: string } | null } } | null;
 }) {
+  if (session?.user?.impersonator) return;
+
   const posthog = getPostHogInstance();
   if (!posthog) return;
   posthog.capture({

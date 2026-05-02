@@ -471,20 +471,23 @@ export const afterSessionCreate = async ({
   }
 
   // Nurturing hooks: fire-and-forget, must never block the response.
-  // Query via User._count.orgMemberships to bypass the
-  // dbOrganizationIdProtection middleware which blocks direct
-  // OrganizationUser queries without an organizationId in the where clause.
-  void prisma.user
-    .findUnique({
-      where: { id: userId },
-      select: { _count: { select: { orgMemberships: true } } },
-    })
-    .then((userWithCount) => {
-      const hasOrganization = (userWithCount?._count.orgMemberships ?? 0) > 0;
-      fireActivityTrackingNurturing({ userId, hasOrganization });
-      ensureUserSyncedToCio({ userId, hasOrganization });
-    })
-    .catch((err) => {
-      logger.error({ err, userId }, "Failed to fire nurturing hooks after session create");
-    });
+  // Skipped during impersonation to avoid polluting Customer.io with admin activity.
+  if (!isImpersonationSession) {
+    // Query via User._count.orgMemberships to bypass the
+    // dbOrganizationIdProtection middleware which blocks direct
+    // OrganizationUser queries without an organizationId in the where clause.
+    void prisma.user
+      .findUnique({
+        where: { id: userId },
+        select: { _count: { select: { orgMemberships: true } } },
+      })
+      .then((userWithCount) => {
+        const hasOrganization = (userWithCount?._count.orgMemberships ?? 0) > 0;
+        fireActivityTrackingNurturing({ userId, hasOrganization });
+        ensureUserSyncedToCio({ userId, hasOrganization });
+      })
+      .catch((err) => {
+        logger.error({ err, userId }, "Failed to fire nurturing hooks after session create");
+      });
+  }
 };
