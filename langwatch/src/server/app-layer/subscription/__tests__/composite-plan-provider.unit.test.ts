@@ -76,6 +76,8 @@ describe("createCompositePlanProvider", () => {
   });
 
   describe("when no valid license exists", () => {
+    /** @scenario Subscription-only organization uses SaaS limits */
+    /** @scenario Expired license falls through to SaaS subscription */
     it("selects SaaS plan", async () => {
       const provider = createCompositePlanProvider({
         licensePlanProvider: mockLicense,
@@ -113,6 +115,8 @@ describe("createCompositePlanProvider", () => {
       );
     });
 
+    /** @scenario License-only organization uses license limits */
+    /** @scenario Organization with both license and subscription uses license */
     it("selects license plan over SaaS plan", async () => {
       const provider = createCompositePlanProvider({
         licensePlanProvider: mockLicense,
@@ -153,7 +157,8 @@ describe("createCompositePlanProvider", () => {
       expect(plan.overrideAddingLimitations).toBe(false);
     });
 
-    it("is false for regular user without impersonator", async () => {
+    /** @scenario Override is false for non-impersonated user on SaaS plan */
+    it("is false for regular user without impersonator on SaaS plan", async () => {
       const provider = createCompositePlanProvider({
         licensePlanProvider: mockLicense,
         saasPlanProvider: mockSaas,
@@ -164,10 +169,12 @@ describe("createCompositePlanProvider", () => {
         user: { id: "u1", email: "user@example.com" },
       });
 
+      expect(plan.planSource).toBe("subscription");
       expect(plan.overrideAddingLimitations).toBe(false);
     });
 
-    it("is true when impersonated by admin", async () => {
+    /** @scenario Override is true for admin-impersonated user on SaaS plan */
+    it("is true when impersonated by admin on SaaS plan", async () => {
       const provider = createCompositePlanProvider({
         licensePlanProvider: mockLicense,
         saasPlanProvider: mockSaas,
@@ -182,6 +189,7 @@ describe("createCompositePlanProvider", () => {
         },
       });
 
+      expect(plan.planSource).toBe("subscription");
       expect(plan.overrideAddingLimitations).toBe(true);
     });
 
@@ -203,6 +211,7 @@ describe("createCompositePlanProvider", () => {
       expect(plan.overrideAddingLimitations).toBe(false);
     });
 
+    /** @scenario Override is true for admin-impersonated user on license plan */
     it("recomputes override even when license plan is selected", async () => {
       vi.mocked(mockLicense.getActivePlan).mockResolvedValue(
         ENTERPRISE_LICENSE_PLAN,
@@ -222,10 +231,12 @@ describe("createCompositePlanProvider", () => {
       });
 
       // License plan selected (ENTERPRISE), but override recomputed from context
+      expect(plan.planSource).toBe("license");
       expect(plan.type).toBe("ENTERPRISE");
       expect(plan.overrideAddingLimitations).toBe(true);
     });
 
+    /** @scenario Override is false for non-impersonated user on license plan */
     it("does not leak SaaS override value into license plan", async () => {
       // SaaS provider returns plan with override=true
       vi.mocked(mockSaas.getActivePlan).mockResolvedValue({
@@ -251,6 +262,67 @@ describe("createCompositePlanProvider", () => {
 
       expect(plan.type).toBe("ENTERPRISE");
       expect(plan.overrideAddingLimitations).toBe(false);
+    });
+  });
+
+  // License expiry is handled inside LicensePlanProvider — these scenarios
+  // verify that the composite provider correctly falls through when the
+  // license provider returns FREE_PLAN (the result of expiry or absence).
+  describe("when license provider returns FREE (expired or absent)", () => {
+    /** @scenario Expired license without subscription falls to FREE */
+    /** @scenario No license and no subscription falls to FREE */
+    it("falls to FREE when SaaS also returns FREE", async () => {
+      vi.mocked(mockSaas.getActivePlan).mockResolvedValue({
+        ...FREE_PLAN,
+        planSource: "free",
+      });
+
+      const provider = createCompositePlanProvider({
+        licensePlanProvider: mockLicense,
+        saasPlanProvider: mockSaas,
+      });
+
+      const plan = await provider.getActivePlan({
+        organizationId: "org-1",
+      });
+
+      expect(plan.planSource).toBe("free");
+      expect(plan.type).toBe("FREE");
+      expect(plan.free).toBe(true);
+      expect(plan.maxMembers).toBe(FREE_PLAN.maxMembers);
+    });
+  });
+
+  describe("when license is less generous than subscription", () => {
+    /** @scenario License wins even when subscription has more generous limits */
+    it("still selects license (license-first precedence)", async () => {
+      const modestLicensePlan: PlanInfo = {
+        ...ENTERPRISE_LICENSE_PLAN,
+        maxMembers: 10,
+        maxMessagesPerMonth: 10_000,
+      };
+      vi.mocked(mockLicense.getActivePlan).mockResolvedValue(modestLicensePlan);
+
+      const generousSubscription: PlanInfo = {
+        ...SAAS_PRO_PLAN,
+        maxMembers: 50,
+        maxMessagesPerMonth: 500_000,
+      };
+      vi.mocked(mockSaas.getActivePlan).mockResolvedValue(generousSubscription);
+
+      const provider = createCompositePlanProvider({
+        licensePlanProvider: mockLicense,
+        saasPlanProvider: mockSaas,
+      });
+
+      const plan = await provider.getActivePlan({
+        organizationId: "org-1",
+      });
+
+      expect(plan.planSource).toBe("license");
+      expect(plan.maxMembers).toBe(10);
+      expect(plan.maxMessagesPerMonth).toBe(10_000);
+      expect(mockSaas.getActivePlan).not.toHaveBeenCalled();
     });
   });
 
