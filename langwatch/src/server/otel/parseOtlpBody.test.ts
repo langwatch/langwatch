@@ -26,8 +26,6 @@ import {
 
 const traceRequestType = (root as any).opentelemetry.proto.collector.trace.v1
   .ExportTraceServiceRequest;
-const logRequestType = (root as any).opentelemetry.proto.collector.logs.v1
-  .ExportLogsServiceRequest;
 
 function buildTraceRequest(): {
   resourceSpans: Array<Record<string, unknown>>;
