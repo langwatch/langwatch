@@ -1070,14 +1070,23 @@ export const checkPermissionOrPubliclyShared =
 // OPS PERMISSION
 // ============================================================================
 
-export type OpsScope = { kind: "platform" };
+/**
+ * Discriminated scope every authenticated user has — `none` means "no ops
+ * access" (the honest answer for a non-ops user), `platform` means "full
+ * platform-wide access". Modeled this way so `getScope` can be a status
+ * probe that returns data instead of throwing FORBIDDEN on every page
+ * load (lw#3584).
+ */
+export type OpsScope = { kind: "none" } | { kind: "platform" };
 
 /**
- * Resolve the ops scope for a user. Returns null if the user has no ops access.
- * Shared between tRPC middleware and SSE endpoint.
+ * Resolve the ops scope for a user. Always returns a typed scope value;
+ * non-ops users get `{ kind: "none" }` instead of null. Shared between
+ * tRPC middleware (which still rejects non-ops callers via
+ * `checkOpsPermission`) and the SSE endpoint.
  *
- * Only users listed in ADMIN_EMAILS have ops access. All ops data is
- * platform-wide so no org-scoped tier exists.
+ * Only users listed in ADMIN_EMAILS get the `platform` scope. All ops
+ * data is platform-wide so no org-scoped tier exists.
  */
 export function resolveOpsScope({
   userEmail,
@@ -1086,12 +1095,12 @@ export function resolveOpsScope({
   userEmail: string | null | undefined;
   permission: Permission;
   prisma: unknown;
-}): OpsScope | null {
+}): OpsScope {
   if (isAdmin({ email: userEmail })) {
     return { kind: "platform" };
   }
 
-  return null;
+  return { kind: "none" };
 }
 
 export const checkOpsPermission =
