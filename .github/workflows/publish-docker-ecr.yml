@@ -1,0 +1,278 @@
+name: publish-docker-ecr
+
+# Mirrors the Docker Hub publish flow into the LangWatch artifacts AWS account ECR.
+#
+# Why this exists separately from publish-docker-app.yml:
+#   - Different trigger surface: ECR also publishes on every merge to main
+#     (so SaaS can pin to git-<sha>), while Docker Hub stays release/dispatch-only.
+#   - Different auth: OIDC role assumption into the artifacts account.
+#   - Different tag policy: never push :latest from here. SaaS still owns :latest
+#     on these repos until that pipeline is decommissioned.
+
+on:
+  release:
+    types: [published]
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: 'Custom image tag (default: git-<short-sha>)'
+        required: false
+        type: string
+
+permissions:
+  id-token: write   # required for OIDC
+  contents: read
+
+concurrency:
+  group: publish-docker-ecr-${{ github.ref_name }}
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: eu-central-1
+  ECR_REGISTRY: 857294630678.dkr.ecr.eu-central-1.amazonaws.com
+  OIDC_ROLE_ARN: arn:aws:iam::857294630678:role/langwatch-oss-ecr-push
+
+jobs:
+  extract-version:
+    runs-on: ubuntu-latest
+    if: >-
+      github.event_name != 'release'
+      || startsWith(github.event.release.tag_name, 'langwatch@')
+    outputs:
+      short_hash: ${{ steps.meta.outputs.short_hash }}
+      image_tag: ${{ steps.meta.outputs.image_tag }}
+      version: ${{ steps.meta.outputs.version }}
+      is_release: ${{ steps.meta.outputs.is_release }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Resolve tags
+        id: meta
+        run: |
+          SHORT_HASH=$(git rev-parse --short HEAD)
+          echo "short_hash=${SHORT_HASH}" >> "$GITHUB_OUTPUT"
+
+          if [ "${{ github.event_name }}" = "release" ]; then
+            VERSION=${GITHUB_REF#refs/tags/langwatch@v}
+            echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+            echo "is_release=true" >> "$GITHUB_OUTPUT"
+            echo "image_tag=git-${SHORT_HASH}" >> "$GITHUB_OUTPUT"
+          elif [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ inputs.image_tag }}" ]; then
+            echo "image_tag=${{ inputs.image_tag }}" >> "$GITHUB_OUTPUT"
+            echo "is_release=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "image_tag=git-${SHORT_HASH}" >> "$GITHUB_OUTPUT"
+            echo "is_release=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  # On push:[main] we want path-aware skipping so we don't burn 5x build minutes
+  # on docs-only commits. On release / workflow_dispatch we always build everything.
+  changes:
+    runs-on: ubuntu-latest
+    needs: extract-version
+    outputs:
+      langwatch-app:        ${{ github.event_name != 'push' || steps.filter.outputs.langwatch-app }}
+      langwatch-nlp-service: ${{ github.event_name != 'push' || steps.filter.outputs.langwatch-nlp-service }}
+      langwatch-nlp-lambda:  ${{ github.event_name != 'push' || steps.filter.outputs.langwatch-nlp-lambda }}
+      langwatch-langevals:   ${{ github.event_name != 'push' || steps.filter.outputs.langwatch-langevals }}
+      langwatch-gateway:  ${{ github.event_name != 'push' || steps.filter.outputs.langwatch-gateway }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3
+        if: github.event_name == 'push'
+        id: filter
+        with:
+          filters: |
+            langwatch-app:
+              - 'Dockerfile'
+              - 'langwatch/**'
+              - 'mcp-server/**'
+              - 'langevals/ts-integration/evaluators.generated.ts'
+              - 'typescript-sdk/package.json'
+              - 'python-sdk/pyproject.toml'
+            langwatch-nlp-service:
+              - 'Dockerfile.langwatch_nlp'
+              - 'langwatch_nlp/**'
+              - 'python-sdk/**'
+              - 'langevals/**'
+            langwatch-nlp-lambda:
+              - 'Dockerfile.langwatch_nlp.lambda'
+              - 'langwatch_nlp/**'
+              - 'python-sdk/**'
+              - 'langevals/**'
+            langwatch-langevals:
+              - 'Dockerfile.langevals'
+              - 'langevals/**'
+            langwatch-gateway:
+              - 'Dockerfile.go_service'
+              - 'cmd/**'
+              - 'pkg/**'
+              - 'services/**'
+              - 'go.mod'
+              - 'go.sum'
+
+  build-and-push:
+    needs: [extract-version, changes]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - image: langwatch-app
+            dockerfile: Dockerfile
+            platform: linux/amd64
+            runner: ubuntu-latest
+            arch: amd64
+            gate: langwatch-app
+          - image: langwatch-app
+            dockerfile: Dockerfile
+            platform: linux/arm64/v8
+            runner: arm64-runner-32gb
+            arch: arm64
+            gate: langwatch-app
+          - image: langwatch-nlp-service
+            dockerfile: Dockerfile.langwatch_nlp
+            platform: linux/amd64
+            runner: ubuntu-latest
+            arch: amd64
+            gate: langwatch-nlp-service
+          - image: langwatch-nlp-service
+            dockerfile: Dockerfile.langwatch_nlp
+            platform: linux/arm64/v8
+            runner: ubuntu-24.04-arm
+            arch: arm64
+            gate: langwatch-nlp-service
+          - image: langwatch-nlp-lambda
+            dockerfile: Dockerfile.langwatch_nlp.lambda
+            platform: linux/amd64
+            runner: ubuntu-latest
+            arch: amd64
+            gate: langwatch-nlp-lambda
+          - image: langwatch-nlp-lambda
+            dockerfile: Dockerfile.langwatch_nlp.lambda
+            platform: linux/arm64/v8
+            runner: ubuntu-24.04-arm
+            arch: arm64
+            gate: langwatch-nlp-lambda
+          - image: langwatch-langevals
+            dockerfile: Dockerfile.langevals
+            platform: linux/amd64
+            runner: ubuntu-latest
+            arch: amd64
+            gate: langwatch-langevals
+          - image: langwatch-langevals
+            dockerfile: Dockerfile.langevals
+            platform: linux/arm64/v8
+            runner: ubuntu-24.04-arm
+            arch: arm64
+            gate: langwatch-langevals
+          - image: langwatch-gateway
+            dockerfile: Dockerfile.go_service
+            platform: linux/amd64
+            runner: ubuntu-latest
+            arch: amd64
+            gate: langwatch-gateway
+          - image: langwatch-gateway
+            dockerfile: Dockerfile.go_service
+            platform: linux/arm64/v8
+            runner: ubuntu-24.04-arm
+            arch: arm64
+            gate: langwatch-gateway
+    runs-on: ${{ matrix.runner }}
+    if: needs.changes.outputs[matrix.gate] == 'true'
+    timeout-minutes: 60
+
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4
+        with:
+          role-to-assume: ${{ env.OIDC_ROLE_ARN }}
+          role-session-name: gha-publish-docker-ecr
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@183a1442edf41672e66566b7fc560e297a290896 # v2
+
+      - name: Build and push (${{ matrix.image }} / ${{ matrix.arch }})
+        uses: docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f # v7.1.0
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          push: true
+          platforms: ${{ matrix.platform }}
+          provenance: false
+          cache-from: type=gha,scope=${{ matrix.image }}-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image }}-${{ matrix.arch }}
+          tags: |
+            ${{ env.ECR_REGISTRY }}/${{ matrix.image }}:${{ needs.extract-version.outputs.image_tag }}-${{ matrix.arch }}
+
+  create-manifest:
+    runs-on: ubuntu-latest
+    needs: [extract-version, changes, build-and-push]
+    if: always() && needs.build-and-push.result == 'success'
+    steps:
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4
+        with:
+          role-to-assume: ${{ env.OIDC_ROLE_ARN }}
+          role-session-name: gha-publish-docker-ecr-manifest
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@183a1442edf41672e66566b7fc560e297a290896 # v2
+
+      - name: Create multi-arch manifests
+        env:
+          IMAGE_TAG: ${{ needs.extract-version.outputs.image_tag }}
+          IS_RELEASE: ${{ needs.extract-version.outputs.is_release }}
+          VERSION: ${{ needs.extract-version.outputs.version }}
+        run: |
+          set -euo pipefail
+          # Only assemble manifests for images whose per-arch builds actually ran.
+          declare -A GATES=(
+            [langwatch-app]=${{ needs.changes.outputs.langwatch-app }}
+            [langwatch-nlp-service]=${{ needs.changes.outputs.langwatch-nlp-service }}
+            [langwatch-nlp-lambda]=${{ needs.changes.outputs.langwatch-nlp-lambda }}
+            [langwatch-langevals]=${{ needs.changes.outputs.langwatch-langevals }}
+            [langwatch-gateway]=${{ needs.changes.outputs.langwatch-gateway }}
+          )
+          for IMAGE in "${!GATES[@]}"; do
+            if [ "${GATES[$IMAGE]}" != "true" ]; then
+              echo "Skip ${IMAGE} — build was gated off"
+              continue
+            fi
+            REPO="${{ env.ECR_REGISTRY }}/${IMAGE}"
+            echo "Assembling ${REPO}:${IMAGE_TAG}"
+            docker buildx imagetools create -t "${REPO}:${IMAGE_TAG}" \
+              "${REPO}:${IMAGE_TAG}-amd64" \
+              "${REPO}:${IMAGE_TAG}-arm64"
+
+            if [ "${IS_RELEASE}" = "true" ]; then
+              echo "Assembling ${REPO}:${VERSION} (release)"
+              docker buildx imagetools create -t "${REPO}:${VERSION}" \
+                "${REPO}:${IMAGE_TAG}-amd64" \
+                "${REPO}:${IMAGE_TAG}-arm64"
+            fi
+          done
+
+      - name: Summary
+        env:
+          IMAGE_TAG: ${{ needs.extract-version.outputs.image_tag }}
+        run: |
+          {
+            echo "## ECR publish summary"
+            echo
+            echo "| Image | Built | Tag |"
+            echo "|---|---|---|"
+            echo "| langwatch-app | ${{ needs.changes.outputs.langwatch-app }} | ${IMAGE_TAG} |"
+            echo "| langwatch-nlp-service | ${{ needs.changes.outputs.langwatch-nlp-service }} | ${IMAGE_TAG} |"
+            echo "| langwatch-nlp-lambda | ${{ needs.changes.outputs.langwatch-nlp-lambda }} | ${IMAGE_TAG} |"
+            echo "| langwatch-langevals | ${{ needs.changes.outputs.langwatch-langevals }} | ${IMAGE_TAG} |"
+            echo "| langwatch-gateway | ${{ needs.changes.outputs.langwatch-gateway }} | ${IMAGE_TAG} |"
+          } >> "$GITHUB_STEP_SUMMARY"
