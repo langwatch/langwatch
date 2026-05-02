@@ -165,7 +165,7 @@ export const MainMenu = React.memo(function MainMenu({
                 project={project}
                 isActive={router.pathname.includes("/traces")}
                 showLabel={showExpanded}
-                beta="Traces v2 is in beta — expect rough edges. Share feedback or report issues on Slack, or open one at https://github.com/langwatch/langwatch/issues/new/choose."
+                beta="Trace Explorer is in beta — expect rough edges. Share feedback or report issues on Slack, or open one at https://github.com/langwatch/langwatch/issues/new/choose."
                 betaLabel="Beta"
               />
             )}
