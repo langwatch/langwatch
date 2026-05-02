@@ -18,7 +18,7 @@ const SNOOZE_DAYS = 7;
 const SNOOZE_MS = SNOOZE_DAYS * 24 * 60 * 60 * 1000;
 // Versioned so prior dismissals from earlier copy/iterations don't keep the
 // banner permanently hidden. Bump when the message materially changes.
-const STORAGE_PREFIX = "langwatch:tracesV2-promo-dismissed:v8:";
+const STORAGE_PREFIX = "langwatch:tracesV2-promo-dismissed:v9:";
 
 type PromoMode = "try" | "request";
 
@@ -109,9 +109,9 @@ export function NewTracesPromo({
     : `/${projectSlug}/traces`;
 
   const requestAccessMailto = `mailto:support@langwatch.ai?subject=${encodeURIComponent(
-    "Early access to the new Trace View",
+    "Early access to the new Trace Explorer",
   )}&body=${encodeURIComponent(
-    "Hi! I'd like early access to the new Trace View" +
+    "Hi! I'd like early access to the new Trace Explorer" +
       (project?.slug ? ` for project "${project.slug}"` : "") +
       ".",
   )}`;
@@ -163,8 +163,8 @@ export function NewTracesPromo({
             truncate
           >
             {mode === "try"
-              ? "Try the new Trace View"
-              : "A new Trace View is on the way"}
+              ? "Try the new Trace Explorer"
+              : "A new Trace Explorer is on the way"}
           </Text>
           <Box
             paddingX={1.5}
@@ -204,7 +204,7 @@ export function NewTracesPromo({
         )}
       </VStack>
       {mode === "try" ? (
-        <Link href={v2Href} aria-label="Open new tracing experience">
+        <Link href={v2Href} aria-label="Open new Trace Explorer">
           <Button
             size={isCompact ? "xs" : "sm"}
             bg="white"
@@ -224,7 +224,7 @@ export function NewTracesPromo({
         <Link
           href={requestAccessMailto}
           onClick={handleRequestAccess}
-          aria-label="Request early access to the new Trace View"
+          aria-label="Request early access to the new Trace Explorer"
         >
           <Button
             size={isCompact ? "xs" : "sm"}

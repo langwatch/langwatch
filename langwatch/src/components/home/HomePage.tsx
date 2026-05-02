@@ -6,6 +6,7 @@ import { QuickAccessLinks } from "./QuickAccessLinks";
 import { RecentItemsSection } from "./RecentItemsSection";
 import { SdkRadarCard } from "./SdkRadarCard";
 import { TracesOverview } from "./TracesOverview";
+import { TracesV2HomeBanner } from "./TracesV2HomeBanner";
 import { WelcomeHeader } from "./WelcomeHeader";
 
 export function HomePage() {
@@ -14,6 +15,7 @@ export function HomePage() {
       <Container maxW="5xl" padding={6}>
         <VStack gap={6} width="full" align="start">
           <WelcomeHeader />
+          <TracesV2HomeBanner />
           <SdkRadarCard />
           <OnboardingProgress />
           <TracesOverview />

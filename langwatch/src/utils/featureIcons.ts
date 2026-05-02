@@ -73,7 +73,7 @@ export const featureIcons: Record<FeatureKey, FeatureConfig> = {
   traces_v2: {
     icon: Bird,
     color: "blue.500",
-    label: "Traces Evolved",
+    label: "Trace Explorer",
   },
   simulations: {
     icon: Play,
