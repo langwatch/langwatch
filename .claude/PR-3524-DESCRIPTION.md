@@ -694,10 +694,10 @@ Sergey's CodeRabbit triage calls out concrete code fixes where user-visible beha
 | D5 ✅ (batch 1) | 8 iter32-iter33 captures promoted to canonical `docs/images/ai-governance/{personas,admin}/...` paths; `overview.mdx` opens with hero + 6 captioned `<Frame>` blocks (admin home, IngestionSources list, AnomalyRules list, RoutingPolicies, /me, /me/settings). Two commits because pre-commit `llms.txt` hook silently dropped the .mdx changes from the first; followup recovered them. **D5b deferred (post-merge or rchaves-greenlight live captures)**: drawer captures (3), per-source configure shots (6), CLI capture (3), multi-step flow captures (4), architecture diagrams (5 mermaid-first inline). | 🅑 (`4caacc916` + `75f267023`) | ✓ |
 | D6 ✅ | 4 inbound cross-links from AI Gateway: `ai-gateway/overview` Next-steps adds entry #5 → AI Governance; `ai-gateway/budgets` opens with Tip → `ai-governance/anomaly-rules`; `ai-gateway/audit` See-also leads with OCSF/SIEM compliance link; `ai-gateway/cli/overview` opens with Tip → `cli-debug` 409 catalog | 🅑 (`def2904e8`) | |
 | D7 ✅ | Main entry points: `docs/introduction.mdx` top-level card retitled "AI Governance" + URL flipped to `/ai-governance/overview`; `integration/quick-start.mdx` adds "Next steps" footer with AI Governance pointer | 🅑 (`def2904e8`) | |
-| D8 | `pnpm docs:build` / mintlify dev + link check (catches redirect-stub mistakes early). Non-blocking for reviewer-readiness — pure cleanup pass. | 🅑 | ✓ |
-| D9 | 🅐 Andre folds each batch into PR body + re-PATCHes | 🅐 (`33a19a040` so far + this batch's fold) | |
+| D8 ✅ | `npx mintlify broken-links` ran clean across the entire AI Governance section + new D6/D7 inbound cross-links from AI Gateway + main entry points; 12 D2 redirects resolve. One MDX parse error caught + fixed in-line: `ai-governance/overview.mdx:24` `<Warning>` block had inline-bold on the opening tag line; restructured to standard Mintlify block pattern (open tag own line, content indented, close tag own line). | 🅑 (`14a0d399a`) | ✓ |
+| D9 | 🅐 Andre folds each batch into PR body + re-PATCHes | 🅐 (`33a19a040` + `ae5b76ed0` + this commit) | |
 
-Critical path: D1 → D2 → D5 → D8. **Phase 6 status: D1 ✅ D2 ✅ D3 ✅ D4 ✅ D5 ✅ D6 ✅ D7 ✅ — only D8 (link-check cleanup pass) remaining.**
+Critical path: D1 → D2 → D5 → D8. **Phase 6 status: D1–D8 ✅ — 100% complete + link-check validated.**
 
 ---
 
