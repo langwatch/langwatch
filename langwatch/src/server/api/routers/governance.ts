@@ -34,12 +34,17 @@ export const governanceRouter = createTRPCRouter({
    * Read-only governance setup-state summary. The single boolean
    * `governanceActive` is the persona-detection signal — UI nav
    * promotes /governance only when this is true AND the user has
-   * organization:manage. Per @master_orchestrator: don't auto-redirect
+   * `governance:view`. Per @master_orchestrator: don't auto-redirect
    * flagged admins; only promote when actual state exists.
+   *
+   * Permission: `governance:view` — only org ADMIN (or a custom role
+   * granting it) sees the persona-detection signal. MEMBER + EXTERNAL
+   * never call this; resolveHome below uses the service directly so
+   * identity-routing for non-admins still works.
    */
   setupState: protectedProcedure
     .input(z.object({ organizationId: z.string() }))
-    .use(checkOrganizationPermission("organization:view"))
+    .use(checkOrganizationPermission("governance:view"))
     .query(async ({ ctx, input }) => {
       const service = GovernanceSetupStateService.create(ctx.prisma);
       return await service.resolve(input.organizationId);
@@ -122,9 +127,12 @@ export const governanceRouter = createTRPCRouter({
    * Sumo Logic CSE / Google Chronicle. Returns up to N rows; client
    * passes back the last EventTime as the next cursor.
    *
-   * Permission: organization:manage (security team's role binding).
+   * Permission: complianceExport:view (security team's role binding).
    * Restricted because OCSF events expose actor identities + tool
-   * names — should not leak to read-only org members.
+   * names — should not leak to read-only org members. Default-attached
+   * to org ADMIN; delegate to security analysts via a CustomRole
+   * granting `complianceExport:view` (no other action — the resource
+   * is read-only by design).
    *
    * Empty-state safe: returns events=[] + nextCursor=null when the
    * org has no Gov Project (no governance ingest) or when no events
@@ -142,7 +150,7 @@ export const governanceRouter = createTRPCRouter({
         limit: z.number().int().min(1).max(1000).default(500),
       }),
     )
-    .use(checkOrganizationPermission("organization:manage"))
+    .use(checkOrganizationPermission("complianceExport:view"))
     .query(async ({ ctx, input }) => {
       const service = GovernanceOcsfExportService.create(ctx.prisma);
       return await service.list({

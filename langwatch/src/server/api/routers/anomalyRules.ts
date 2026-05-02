@@ -6,6 +6,12 @@
  * configuration entity ONLY so Alexis's anomaly-rules admin UI can
  * persist real rules instead of MOCK_RULES.
  *
+ * RBAC: gates on `anomalyRules:view` (reads) and `anomalyRules:manage`
+ * (mutations) per the catalog in api/rbac.ts. Only org ADMIN (or a
+ * custom role granting these permissions) can read or write. MEMBER +
+ * EXTERNAL get nothing — the previous `organization:view` gate leaked
+ * reads to every org member.
+ *
  * Spec: specs/ai-gateway/governance/anomaly-rules.feature
  */
 import { TRPCError } from "@trpc/server";
@@ -67,7 +73,7 @@ function toDto(row: {
 export const anomalyRulesRouter = createTRPCRouter({
   list: protectedProcedure
     .input(z.object({ organizationId: z.string() }))
-    .use(checkOrganizationPermission("organization:view"))
+    .use(checkOrganizationPermission("anomalyRules:view"))
     .query(async ({ ctx, input }) => {
       const service = AnomalyRuleService.create(ctx.prisma);
       const rows = await service.list(input.organizationId);
@@ -76,7 +82,7 @@ export const anomalyRulesRouter = createTRPCRouter({
 
   get: protectedProcedure
     .input(z.object({ organizationId: z.string(), id: z.string() }))
-    .use(checkOrganizationPermission("organization:view"))
+    .use(checkOrganizationPermission("anomalyRules:view"))
     .query(async ({ ctx, input }) => {
       const service = AnomalyRuleService.create(ctx.prisma);
       const row = await service.findById(input.id, input.organizationId);
@@ -99,7 +105,7 @@ export const anomalyRulesRouter = createTRPCRouter({
         status: statusSchema.optional(),
       }),
     )
-    .use(checkOrganizationPermission("organization:manage"))
+    .use(checkOrganizationPermission("anomalyRules:manage"))
     .mutation(async ({ ctx, input }) => {
       const service = AnomalyRuleService.create(ctx.prisma);
       const created = await service.createRule({
@@ -134,7 +140,7 @@ export const anomalyRulesRouter = createTRPCRouter({
         status: statusSchema.optional(),
       }),
     )
-    .use(checkOrganizationPermission("organization:manage"))
+    .use(checkOrganizationPermission("anomalyRules:manage"))
     .mutation(async ({ ctx, input }) => {
       const service = AnomalyRuleService.create(ctx.prisma);
       const updated = await service.updateRule({
@@ -155,7 +161,7 @@ export const anomalyRulesRouter = createTRPCRouter({
 
   archive: protectedProcedure
     .input(z.object({ organizationId: z.string(), id: z.string() }))
-    .use(checkOrganizationPermission("organization:manage"))
+    .use(checkOrganizationPermission("anomalyRules:manage"))
     .mutation(async ({ ctx, input }) => {
       const service = AnomalyRuleService.create(ctx.prisma);
       const archived = await service.archive(

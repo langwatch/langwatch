@@ -1,9 +1,12 @@
 /**
  * tRPC router for IngestionSource admin CRUD.
  *
- * RBAC: org-level "organization:manage" permission for mutations
- * (members can list with read-only fields). Mirrors the existing
- * routingPolicies router pattern.
+ * RBAC: gates on the resource-specific catalog
+ * (`ingestionSources:view` for reads, `ingestionSources:manage` for
+ * mutations). MEMBER + EXTERNAL roles get neither by default — only
+ * org ADMIN or a custom-role binding granting these permissions.
+ * The old `organization:view`/`organization:manage` gate leaked
+ * read access to MEMBER. Mirrors the catalog defined in api/rbac.ts.
  *
  * Spec: specs/ai-gateway/governance/ingestion-sources.feature
  *
@@ -83,7 +86,7 @@ export const ingestionSourcesRouter = createTRPCRouter({
   /** List configured sources for an org. */
   list: protectedProcedure
     .input(z.object({ organizationId: z.string() }))
-    .use(checkOrganizationPermission("organization:view"))
+    .use(checkOrganizationPermission("ingestionSources:view"))
     .query(async ({ ctx, input }) => {
       const service = IngestionSourceService.create(ctx.prisma);
       const rows = await service.list(input.organizationId);
@@ -93,7 +96,7 @@ export const ingestionSourcesRouter = createTRPCRouter({
   /** Get a single source by id (org-scoped). */
   get: protectedProcedure
     .input(z.object({ organizationId: z.string(), id: z.string() }))
-    .use(checkOrganizationPermission("organization:view"))
+    .use(checkOrganizationPermission("ingestionSources:view"))
     .query(async ({ ctx, input }) => {
       const service = IngestionSourceService.create(ctx.prisma);
       const row = await service.findById(input.id, input.organizationId);
@@ -120,7 +123,7 @@ export const ingestionSourcesRouter = createTRPCRouter({
         retentionClass: retentionClassSchema.optional(),
       }),
     )
-    .use(checkOrganizationPermission("organization:manage"))
+    .use(checkOrganizationPermission("ingestionSources:manage"))
     .mutation(async ({ ctx, input }) => {
       const service = IngestionSourceService.create(ctx.prisma);
       const created = await service.createSource({
@@ -154,7 +157,7 @@ export const ingestionSourcesRouter = createTRPCRouter({
         teamId: z.string().nullable().optional(),
       }),
     )
-    .use(checkOrganizationPermission("organization:manage"))
+    .use(checkOrganizationPermission("ingestionSources:manage"))
     .mutation(async ({ ctx, input }) => {
       const service = IngestionSourceService.create(ctx.prisma);
       const updated = await service.updateSource({
@@ -178,7 +181,7 @@ export const ingestionSourcesRouter = createTRPCRouter({
    */
   rotateSecret: protectedProcedure
     .input(z.object({ organizationId: z.string(), id: z.string() }))
-    .use(checkOrganizationPermission("organization:manage"))
+    .use(checkOrganizationPermission("ingestionSources:manage"))
     .mutation(async ({ ctx, input }) => {
       const service = IngestionSourceService.create(ctx.prisma);
       const rotated = await service.rotateSecret(
@@ -193,7 +196,7 @@ export const ingestionSourcesRouter = createTRPCRouter({
 
   archive: protectedProcedure
     .input(z.object({ organizationId: z.string(), id: z.string() }))
-    .use(checkOrganizationPermission("organization:manage"))
+    .use(checkOrganizationPermission("ingestionSources:manage"))
     .mutation(async ({ ctx, input }) => {
       const service = IngestionSourceService.create(ctx.prisma);
       const archived = await service.archive(

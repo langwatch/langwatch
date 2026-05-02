@@ -4,6 +4,12 @@
  * with real data from gateway_activity_events (CH) + IngestionSource
  * (PG).
  *
+ * RBAC: read-only — all procedures gate on `activityMonitor:view`
+ * per the catalog in api/rbac.ts. Only org ADMIN (or a custom role
+ * granting it) sees the dashboard. MEMBER + EXTERNAL roles get nothing
+ * by default — the previous `organization:view` gate leaked all spend
+ * + anomaly + ingestion-health views to every org member.
+ *
  * Spec: specs/ai-gateway/governance/activity-monitor.feature
  */
 import { z } from "zod";
@@ -32,7 +38,7 @@ export const activityMonitorRouter = createTRPCRouter({
         windowDays: z.number().int().min(1).max(365).default(30),
       }),
     )
-    .use(checkOrganizationPermission("organization:view"))
+    .use(checkOrganizationPermission("activityMonitor:view"))
     .query(async ({ ctx, input }) => {
       const service = ActivityMonitorService.create(ctx.prisma);
       return await service.summary({
@@ -52,7 +58,7 @@ export const activityMonitorRouter = createTRPCRouter({
         limit: z.number().int().min(1).max(500).default(50),
       }),
     )
-    .use(checkOrganizationPermission("organization:view"))
+    .use(checkOrganizationPermission("activityMonitor:view"))
     .query(async ({ ctx, input }) => {
       const service = ActivityMonitorService.create(ctx.prisma);
       return await service.spendByUser({
@@ -67,7 +73,7 @@ export const activityMonitorRouter = createTRPCRouter({
    */
   ingestionSourcesHealth: protectedProcedure
     .input(z.object({ organizationId: z.string() }))
-    .use(checkOrganizationPermission("organization:view"))
+    .use(checkOrganizationPermission("activityMonitor:view"))
     .query(async ({ ctx, input }) => {
       const service = ActivityMonitorService.create(ctx.prisma);
       return await service.ingestionSourcesHealth({
@@ -88,7 +94,7 @@ export const activityMonitorRouter = createTRPCRouter({
         limit: z.number().int().min(1).max(200).default(50),
       }),
     )
-    .use(checkOrganizationPermission("organization:view"))
+    .use(checkOrganizationPermission("activityMonitor:view"))
     .query(async ({ ctx, input }) => {
       const rows = await ctx.prisma.anomalyAlert.findMany({
         where: { organizationId: input.organizationId },
@@ -132,7 +138,7 @@ export const activityMonitorRouter = createTRPCRouter({
         beforeIso: z.string().optional(),
       }),
     )
-    .use(checkOrganizationPermission("organization:view"))
+    .use(checkOrganizationPermission("activityMonitor:view"))
     .query(async ({ ctx, input }) => {
       const service = ActivityMonitorService.create(ctx.prisma);
       return await service.eventsForSource(input);
@@ -149,7 +155,7 @@ export const activityMonitorRouter = createTRPCRouter({
         sourceId: z.string(),
       }),
     )
-    .use(checkOrganizationPermission("organization:view"))
+    .use(checkOrganizationPermission("activityMonitor:view"))
     .query(async ({ ctx, input }) => {
       const service = ActivityMonitorService.create(ctx.prisma);
       return await service.sourceHealthMetrics(input);
