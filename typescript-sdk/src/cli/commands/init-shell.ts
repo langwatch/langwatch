@@ -47,7 +47,12 @@ export const initShellCommand = async (
       break;
     case "cmd":
       for (const [k, v] of entries) {
-        process.stdout.write(`set ${k}=${v}\n`);
+        // cmd has no robust escape; quote and strip CR/LF defensively.
+        // Without quoting, values containing &, |, <, >, ^ would be
+        // parsed as cmd metacharacters — a legitimate URL query string
+        // (e.g. gateway_url with `?org=acme&env=prod`) would be split.
+        const sanitized = v.replace(/[\r\n]/g, "").replace(/"/g, '""');
+        process.stdout.write(`set "${k}=${sanitized}"\n`);
       }
       break;
     case "powershell":

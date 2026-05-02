@@ -1,4 +1,5 @@
 import chalk from "chalk";
+import open from "open";
 import { loadConfig, isLoggedIn } from "@/cli/utils/governance/config";
 
 /**
@@ -35,7 +36,6 @@ export const dashboardCommand = async (
 async function openInBrowser(url: string, override?: string): Promise<void> {
   const choice = override ?? process.env.LANGWATCH_BROWSER ?? process.env.BROWSER ?? "";
   if (choice === "none") return;
-  const open = (await import("open")).default;
   try {
     if (!choice || choice === "default") {
       await open(url);
