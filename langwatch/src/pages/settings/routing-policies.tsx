@@ -290,11 +290,12 @@ function RoutingPoliciesPage() {
             </HStack>
 
             <VStack align="stretch" gap={2}>
-              {grouped[scope].length === 0 && editingId !== "new" && (
-                <Text fontSize="sm" color="fg.muted">
-                  No policies defined at this scope.
-                </Text>
-              )}
+              {grouped[scope].length === 0 &&
+                !(editingId === "new" && composer?.scope === scope) && (
+                  <Text fontSize="sm" color="fg.muted">
+                    No policies defined at this scope.
+                  </Text>
+                )}
               {grouped[scope].map((p) =>
                 editingId === p.id ? (
                   <PolicyComposer

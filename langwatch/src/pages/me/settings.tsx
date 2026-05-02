@@ -279,17 +279,23 @@ export default function MySettingsPage() {
 
         <SectionCard title="Notifications">
           <VStack align="stretch" gap={2}>
+            <Text fontSize="xs" color="fg.muted">
+              Notification preferences are not yet persisted — UI preview only.
+              Coming in a follow-up release.
+            </Text>
             <CheckboxRow
               label="Alert me when I hit 80% of my monthly budget"
               checked={prefs.budgetThreshold80}
               onChange={(v) =>
                 setPrefs({ ...prefs, budgetThreshold80: v })
               }
+              disabled
             />
             <CheckboxRow
               label="Weekly usage summary"
               checked={prefs.weeklySummary}
               onChange={(v) => setPrefs({ ...prefs, weeklySummary: v })}
+              disabled
             />
             <CheckboxRow
               label="Each request over $1.00"
@@ -297,6 +303,7 @@ export default function MySettingsPage() {
               onChange={(v) =>
                 setPrefs({ ...prefs, perRequestOverOneDollar: v })
               }
+              disabled
             />
           </VStack>
         </SectionCard>
@@ -440,7 +447,7 @@ function ApiKeyRow({
             {apiKey.deviceHint} · Last used {fmtRelative(apiKey.lastUsedAt)}
           </Text>
           <Text fontSize="xs" color="fg.muted">
-            Created {apiKey.createdAt}
+            Created {fmtRelative(apiKey.createdAt)}
           </Text>
         </VStack>
         {!isPendingRevoke && (
@@ -559,17 +566,23 @@ function CheckboxRow({
   label,
   checked,
   onChange,
+  disabled = false,
 }: {
   label: string;
   checked: boolean;
   onChange: (v: boolean) => void;
+  disabled?: boolean;
 }) {
   return (
     <HStack
       paddingY={1}
-      cursor="pointer"
-      onClick={() => onChange(!checked)}
+      cursor={disabled ? "not-allowed" : "pointer"}
+      onClick={() => {
+        if (disabled) return;
+        onChange(!checked);
+      }}
       gap={3}
+      opacity={disabled ? 0.5 : 1}
     >
       <Box
         width="16px"

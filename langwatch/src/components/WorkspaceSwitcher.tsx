@@ -270,9 +270,19 @@ function SwitcherItem({
         href={entry.href}
         _hover={{ textDecoration: "none" }}
         onClick={(e) => {
-          // Let the onSelect handler manage the navigation so the menu
-          // closes synchronously; suppress the link's default to avoid a
-          // double-navigation.
+          // Cmd/Ctrl/Shift/Alt + click and middle-click are "open in new
+          // tab" gestures — let the browser handle them via the <a href>.
+          // Only intercept plain left-click so the menu can close
+          // synchronously and onSelect drives the navigation.
+          if (
+            e.metaKey ||
+            e.ctrlKey ||
+            e.shiftKey ||
+            e.altKey ||
+            e.button === 1
+          ) {
+            return;
+          }
           e.preventDefault();
         }}
       >

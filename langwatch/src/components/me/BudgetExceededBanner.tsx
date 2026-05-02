@@ -61,8 +61,13 @@ const SCOPE_LABEL: Record<string, string> = {
   organization: "organization",
 };
 
+const USD_FORMATTER = new Intl.NumberFormat("en-US", {
+  style: "currency",
+  currency: "USD",
+});
+
 function fmtUsd(n: number): string {
-  return `$${n.toFixed(2)}`;
+  return USD_FORMATTER.format(n);
 }
 
 export function BudgetExceededBanner({

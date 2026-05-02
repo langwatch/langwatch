@@ -89,7 +89,7 @@ export default function MyUsagePage() {
             adminEmail={budget.adminEmail}
           />
         )}
-        {budget.status === "warning" && (
+        {budget.status === "warning" && budget.limitUsd > 0 && (
           <BudgetBanner
             tone="yellow"
             title="Approaching budget"

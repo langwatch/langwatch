@@ -64,7 +64,16 @@ export default function CliAuthPage() {
     redirectToOnboarding: false,
   });
 
-  const userCode = (router.query.user_code as string | undefined) ?? "";
+  // router.query values can legitimately be string | string[] | undefined
+  // (Next.js parses repeated query keys as arrays). The CLI always emits a
+  // single user_code, but we defensively normalise rather than blind-cast.
+  const rawUserCode = router.query.user_code;
+  const userCode =
+    typeof rawUserCode === "string"
+      ? rawUserCode
+      : Array.isArray(rawUserCode)
+        ? (rawUserCode[0] ?? "")
+        : "";
 
   const [lookup, setLookup] = useState<LookupState>({ kind: "loading" });
   const [action, setAction] = useState<ActionState>({ kind: "idle" });
