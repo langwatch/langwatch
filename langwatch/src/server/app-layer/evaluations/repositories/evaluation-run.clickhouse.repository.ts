@@ -268,7 +268,7 @@ export class EvaluationRunClickHouseRepository
             toUnixTimestamp64Milli(CompletedAt) AS CompletedAt,
             CostId,
             LastProcessedEventId,
-            toUnixTimestamp64Milli(LastEventOccurredAt) AS LastEventOccurredAt
+            toUnixTimestamp64Milli(lastEventOccurredAt) AS lastEventOccurredAt
           FROM ${TABLE_NAME}
           WHERE TenantId = {tenantId:String}
             AND ScheduledAt >= now() - INTERVAL 7 DAY
