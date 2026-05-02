@@ -26,6 +26,7 @@ describe("<SearchInput/>", () => {
       });
     });
 
+    /** @scenario SearchInput renders with a search icon and placeholder */
     it("renders a search icon inside the input", () => {
       expect(
         screen.getByRole("img", { name: "Search" }),

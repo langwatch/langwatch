@@ -22,6 +22,7 @@ describe("<SearchInput/>", () => {
   });
 
   describe("when typing text into the input", () => {
+    /** @scenario SearchInput forwards typed text to the onChange handler */
     it("forwards the value to the onChange callback", async () => {
       const user = userEvent.setup();
       const onChange = vi.fn();

@@ -186,6 +186,7 @@ describe("<SuiteSidebar/>", () => {
     });
 
     describe("when typing 'billing' in the search box", () => {
+      /** @scenario Suite sidebar filters suites with search icon visible */
       it("filters to only show Billing Edge", async () => {
         const user = userEvent.setup();
 
