@@ -4,7 +4,23 @@
 
 ClickHouse tables use `ReplacingMergeTree` for deduplication. Until background merges complete, multiple versions of a row coexist. Queries must deduplicate at read time.
 
-### The OOM Pattern (DO NOT USE)
+### Anti-Pattern 1: `ORDER BY <version> DESC LIMIT 1` (DO NOT USE)
+
+```sql
+-- WRONG: load the latest version of one row by sorting all matching versions.
+SELECT <heavy_columns>
+FROM table
+WHERE TenantId = {tenantId:String}
+  AND <key> = {key:String}
+ORDER BY UpdatedAt DESC
+LIMIT 1
+```
+
+This is the most common form of the bug because it looks innocent — surely "give me the row with the largest UpdatedAt" is fine? It is not. ClickHouse must read **every unmerged version** of every row matching the WHERE *together with all heavy columns* (Messages.*, ComputedInput, Inputs, Details, etc.) into memory in order to sort by `UpdatedAt`.
+
+Under load, a single `(TenantId, key)` can have hundreds of unmerged versions of multi-MB rows. Production has observed individual `getByKey` calls reading 5+ MB and entire fleets driving 1+ GB/s of read traffic from these calls, saturating ClickHouse and stalling concurrent inserts. **Always use the IN-tuple form below for "latest version of one row" lookups.**
+
+### Anti-Pattern 2: `LIMIT 1 BY` over heavy columns (DO NOT USE)
 
 ```sql
 -- WRONG: reads Messages, RoleCosts, Metadata etc. for entire granule (~8K rows)
@@ -136,3 +152,15 @@ Keep both: the WHERE prunes partitions, the HAVING ensures exact filtering for t
 ## TenantId is Always Required
 
 Every ClickHouse query MUST include `WHERE TenantId = {tenantId:String}`. No other ID (ScenarioRunId, BatchRunId, TraceId, etc.) is unique across tenants.
+
+## Code Review Checklist
+
+When reviewing a PR that touches a `*.clickhouse.repository.ts` or any service hitting ClickHouse, scan for:
+
+- **`ORDER BY <version_col> DESC LIMIT 1`** against any `ReplacingMergeTree` table — replace with the IN-tuple dedup pattern above. Do not let "but it's a single-row lookup" rationalise it through.
+- **`LIMIT 1 BY <key>`** with any heavy column in the SELECT — replace with the IN-tuple form.
+- **`max(<column>)` used as a pagination cursor** instead of `argMax(<column>, UpdatedAt)` — pagination cursors derived from non-version columns can read stale values.
+- **Missing partition predicate** when a date range is available — every weekly-partitioned table (`trace_summaries`, `simulation_runs`, `stored_spans`, `evaluation_runs`, ...) needs a WHERE on its partition column to enable pruning.
+- **Heavy columns in dedup subqueries** — anything like `Messages.Content`, `Inputs`, `Details`, `ComputedInput`, `SpanAttributes`, `Examples`, `LlmCalls` belongs only in the outer SELECT, never in the dedup subquery.
+
+These checks belong in code review because they're query-shape problems, not type problems — typecheck and unit tests will not catch them. CI integration tests will pass while production grinds to a halt under merge backlog.

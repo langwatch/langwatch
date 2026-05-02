@@ -49,9 +49,9 @@ export class EvaluationRunStore
     aggregateId: string,
     context: ProjectionStoreContext,
   ): Promise<EvaluationRunData | null> {
-    return await this.repo.getByEvaluationId(
-      String(context.tenantId),
-      aggregateId,
-    );
+    return await this.repo.getByEvaluationId({
+      tenantId: String(context.tenantId),
+      evaluationId: aggregateId,
+    });
   }
 }

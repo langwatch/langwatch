@@ -52,7 +52,7 @@ function createFoldState(
     occurredAt: Date.now(),
     createdAt: Date.now(),
     updatedAt: Date.now(),
-    lastEventOccurredAt: Date.now(),
+    LastEventOccurredAt: Date.now(),
     attributes: {},
     ...overrides,
   };

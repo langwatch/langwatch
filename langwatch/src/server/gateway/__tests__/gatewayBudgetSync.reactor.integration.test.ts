@@ -86,7 +86,7 @@ function buildFoldState(attrs: Record<string, string>): TraceSummaryData {
     occurredAt: now,
     createdAt: now,
     updatedAt: now,
-    lastEventOccurredAt: now,
+    LastEventOccurredAt: now,
   };
 }
 
