@@ -44,6 +44,7 @@
 > - **C** — "Sharing presence" link in `PersonalSidebar` (post-merge add) reviewed; resolved by inspection — `PresenceToggle` is `MainMenu`-only by design (no teammates to share with in personal scope), architecturally correct.
 > - **D** — `/settings/routing-policies` 500 for fresh ORG ADMIN (read path drift). Fixed in `ff79b951d` (lane-B): `routingPolicy.list/get` now uses `checkOrganizationPermission('organization:view')` to match `costs/limits/ingestionSources` convention; the hand-rolled `assertOrgMembership` was unreachable due to `skipPermissionCheck`'s sensitive-input meta-rule rejecting `organizationId` before the fallback ran. Code-quality follow-up filed as [#3687](https://github.com/langwatch/langwatch/issues/3687) — `skipPermissionCheck` should throw a typed `PermissionMisconfiguredError` naming the offending key + suggesting `checkOrganizationPermission`, so the next project→org route migration that forgets to swap the helper fails loudly instead of with an opaque 500.
 > - **E** — Local dogfood `NotFoundScene` for `/governance` + `/settings/governance/*` despite the gateway flag being on. Fixed in `e303ec709` (lane-B, docs-only): `.env.example` `FEATURE_FLAG_FORCE_ENABLE` now lists both `release_ui_ai_gateway_menu_enabled` AND `release_ui_ai_governance_enabled` by default, with a 4-line explainer of the symptom. The two-flag runtime semantic is unchanged (still preserves pilot flexibility per @rchaves directive); only the local-dev default flipped to enable both. `admin-setup.mdx` dogfood loop step 1 also names both flags explicitly.
+> - **F** — RBAC defense-in-depth gap: sidebar gate (`a85ba27ff`) correctly hid Govern/Gateway for MEMBER but every governance read tRPC was still gating on `organization:view` (which MEMBER has) instead of the new resource-specific catalog (`385c95e89`). MEMBER calling those tRPCs directly leaked governance state. Fixed in `9e373c284` (lane-S): 4 routers re-wired to resource-specific permissions + new `governance.rbac.integration.test.ts` (11/11 green) proving MEMBER → UNAUTHORIZED on every governance read endpoint, ADMIN → 200, `resolveHome` regression-invariant preserved. Full mapping + evidence chain in §"RBAC defense-in-depth — router-layer enforcement" below.
 
 ---
 
@@ -326,7 +327,7 @@ For a reviewer asking "where's the proof for X?" — the highest-leverage accept
 | 5 | All ingestion writes flow through append-only `event_log`; folds + projections rebuildable | `architecture-invariants.feature` "All ingestion writes go through the append-only event_log" + `event-log-durability.feature` | `langwatch/src/server/event-sourcing/stores/repositories/eventRepositoryClickHouse.ts` + `event-sourcing/replay/replayEventLoader.ts` (CH schema in `00002_create_event_log.sql`) | `f25d713ab` 6/6 integration (round-trip + ALTER DELETE leaves log intact + payload fidelity post-view-deletion + cross-tenant isolation) | `compliance-architecture.mdx` §"1. Append-only event log" |
 | 6 | `governance_kpis` + `governance_ocsf_events` derive from unified store via reactors; anomaly reactor reads fold not raw spans | `architecture-invariants.feature` "Governance KPI dashboard reads from a fold projection" + "Anomaly reactor reads from the governance fold" + `folds.feature` | `langwatch/src/server/event-sourcing/pipelines/trace-processing/reactors/governanceKpisSync.reactor.ts` + `governanceOcsfEventsSync.reactor.ts` | `governanceKpisSync.reactor.unit.test.ts` + `activityMonitor.service.integration.test.ts` (9/9 post-iter32) | `compliance-architecture.mdx` §"The substrate, in one diagram" |
 | 7 | Per-IngestionSource retention class (30d / 1y / 7y); CH TTL enforced; system-derived per source | `retention.feature` (full file) | `langwatch/src/server/clickhouse/migrations/00026_add_retention_class.sql` + IngestionSource composer | `retentionClass.integration.test.ts` (TTL + write-side population) | `compliance-architecture.mdx` §"2. Per-origin retention class" + `retention.mdx` |
-| 8 | RBAC permission catalog: 5 governance resources × actions; ADMIN gets full set; MEMBER + EXTERNAL get only `organization:view` | `compliance-baseline.feature` + `persona-aware-chrome.feature` | `langwatch/src/server/api/rbac.ts` (5 new Resources, ORGANIZATION_ROLE_PERMISSIONS) | 56/56 RBAC test suite (`rbac.test.ts`) | `compliance-architecture.mdx` §"3. RBAC — permission-driven, not role-driven" + `overview.mdx` §"Rollout & permissions" |
+| 8 | RBAC permission catalog: 5 governance resources × actions; ADMIN gets full set; MEMBER + EXTERNAL get only `organization:view`; **enforced at the tRPC procedure layer** (sidebar gate + router gate; defense-in-depth) | `compliance-baseline.feature` + `persona-aware-chrome.feature` | `langwatch/src/server/api/rbac.ts` (5 new Resources) + governance.* / ingestionSources.* / anomalyRules.* / activityMonitor.* routers (`9e373c284`) | 56/56 RBAC unit (`rbac.test.ts`) + 11/11 router-layer integration (`governance.rbac.integration.test.ts`) | `compliance-architecture.mdx` §"3. RBAC — permission-driven, not role-driven" + `overview.mdx` §"Rollout & permissions" |
 | 9 | Persona-3 (LLMOps majority, ~90% of users today) sees ZERO chrome change | `persona-aware-chrome.feature` (regression-invariant FIRST in file) | `langwatch/src/components/DashboardLayout.tsx` (untouched for project_only persona) | `persona-aware-chrome.feature` BDD scenario | `personal-keys.mdx` storyboard |
 | 10 | Two-flag rollout (`release_ui_ai_gateway_menu_enabled` + `release_ui_ai_governance_enabled`) preserves Gateway-only vs Governance-only pilot flexibility | `persona-aware-chrome.feature` FF-off split scenarios + `b311d1ca5` | `langwatch/src/components/MainMenu.tsx` (chrome gates) + `useFeatureFlag` consumers | `persona-aware-chrome.feature` BDD | `overview.mdx` §"Rollout & permissions" + `compliance-architecture.mdx` §"Chrome visibility gates" + `admin-setup.mdx` dogfood-loop step 1 |
 | 11 | OCSF v1.1 read API for SIEM cron-pull (Splunk ES, Datadog Security, AWS Security Hub, Microsoft Sentinel, Elastic Security, Sumo Logic CSE) | `siem-export.feature` (full file) | `langwatch/src/server/governance/governanceOcsfExport.service.ts` + `governanceOcsfEvents.clickhouse.repository.ts` | `governanceOcsfExport.service.integration.test.ts` | `ocsf-export.mdx` |
@@ -335,23 +336,34 @@ For a reviewer asking "where's the proof for X?" — the highest-leverage accept
 
 **Coverage summary**: each row maps a load-bearing claim from the iter29 banner / pitch to a spec-or-feature-file evidence anchor + a code path + a test (where the criterion is unit-or-integration-testable) + a customer-facing doc page (where applicable). Rows 9 + 10 + 13 also have iter32 dogfood evidence in the dogfood-findings tracker above (chrome walk for 9; FF defaults for 10; live-fire for 13).
 
-### RBAC defense-in-depth — router-layer enforcement (iter32 in flight)
+### RBAC defense-in-depth — router-layer enforcement (iter32, fix landed `9e373c284`)
 
-> **Status: in flight as of post-`17657052d`.** @ai_gateway_sergey_2's iter32 access-gate dogfood pass surfaced a real defense-in-depth gap: the **sidebar gate** (`a85ba27ff`) correctly hides Govern/Gateway for MEMBER, but the **tRPC read endpoints** (`governance.setupState`, `ingestionSources.list/get`, `anomalyRules.list/get`, `activityMonitor.*`, `governance.ocsfExport`) gate on `organization:view` — which MEMBER has — instead of the new `governance:view` / `ingestionSources:view` / etc. catalog added in `385c95e89`. **A MEMBER calling those tRPCs directly (curl, browser devtools) currently succeeds.**
+> **Status: FIXED in `9e373c284`.** @ai_gateway_sergey_2's iter32 access-gate dogfood pass surfaced a real defense-in-depth gap: the **sidebar gate** (`a85ba27ff`) correctly hid Govern/Gateway for MEMBER, but the **tRPC read endpoints** still gated on `organization:view` — which MEMBER has — instead of the new `governance:view` / `ingestionSources:view` / etc. catalog added in `385c95e89`. **A MEMBER calling those tRPCs directly (curl, browser devtools) succeeded — the catalog declared the model but the routers were never rewired.**
 >
-> **Mutations are correct** — they gate on `organization:manage` (admin-only). Only the read paths drift.
+> **Mutations were already correct** — they gated on `organization:manage` (admin-only). Only the read paths drifted.
 >
-> **Fix in flight (lane-S, in this PR)**: rewire all governance read tRPC endpoints to gate on the matching `<resource>:view` permission. New regression test: as MEMBER session, every read endpoint must throw `TRPCError UNAUTHORIZED`. Mutations get the symmetric check on `<resource>:manage`.
+> **Router rewire in `9e373c284`** (was → now):
 >
-> **Evidence chain (will be folded once landed)**:
-> - **Spec contract**: `compliance-baseline.feature` + `persona-aware-chrome.feature` (ADMIN-only governance access already declared)
-> - **Catalog source**: `langwatch/src/server/api/rbac.ts` (5 governance Resources × actions, ADMIN bag full, MEMBER + EXTERNAL get only `organization:view`)
-> - **Router patch**: `<commit-pending>` — governance.* / ingestionSources.* / anomalyRules.* / activityMonitor.* / complianceExport router files
-> - **Regression test**: `<commit-pending>` — MEMBER session hitting every governance read tRPC expects `UNAUTHORIZED`
-> - **Browser dogfood evidence (lane-B, @ai_gateway_alexis_2)**: before/after screenshots — MEMBER signed in directly loads `/governance` + `/settings/governance/*` + `/settings/routing-policies` → expects `NotFoundScene` (or `PermissionAlert`) post-fix; sidebar already hidden in both states
-> - **iter32 tracker entry**: F (will be folded into A/B/C/D/E table once fix lands)
+> | Endpoint | Before | After |
+> |---|---|---|
+> | `governance.setupState` | `organization:view` | `governance:view` |
+> | `governance.ocsfExport` | `organization:manage` | `complianceExport:view` |
+> | `governance.resolveHome` | `organization:view` | **kept** `organization:view` (regression-invariant: MEMBER /home redirect must still work) |
+> | `ingestionSources.list/get` | `organization:view` | `ingestionSources:view` |
+> | `ingestionSources.{create,update,rotateSecret,archive}` | `organization:manage` | `ingestionSources:manage` |
+> | `anomalyRules.list/get` | `organization:view` | `anomalyRules:view` |
+> | `anomalyRules.{create,update,archive}` | `organization:manage` | `anomalyRules:manage` |
+> | `activityMonitor.*` (all 6 procedures) | `organization:view` | `activityMonitor:view` |
 >
-> **Why this matters for the reviewer**: the sidebar gate alone is UI shaping, not authorization. A reviewer auditing for SOC 2 / ISO 27001 RBAC controls needs both the surface gate (B fix `a85ba27ff`) AND the enforcement boundary (this fix) to claim defense-in-depth. The catalog declared the model in iter29 (`385c95e89`); the router rewire closes the loop. Row #8 of the criterion → evidence map above will be updated to reflect "+ enforced at the tRPC procedure layer" once the patch lands.
+> **Evidence chain**:
+> - **Spec contract**: `compliance-baseline.feature` + `persona-aware-chrome.feature` (ADMIN-only governance access declared)
+> - **Catalog source**: `langwatch/src/server/api/rbac.ts` (5 governance Resources × actions, ADMIN bag full, MEMBER + EXTERNAL get only `organization:view`) — `385c95e89`
+> - **Router patch**: `9e373c284` — 4 routers re-wired (governance, ingestionSources, anomalyRules, activityMonitor); 5 files / +320/-25
+> - **Regression test**: `langwatch/src/server/api/routers/__tests__/governance.rbac.integration.test.ts` (11/11 green) — MEMBER session → `UNAUTHORIZED` on every governance read endpoint; ADMIN session → 200 OK; `resolveHome` stays callable for MEMBER (regression invariant verified)
+> - **Browser dogfood evidence (lane-B, @ai_gateway_alexis_2)**: before/after screenshots in flight — MEMBER signed in directly loading `/governance` + `/settings/governance/*` + `/settings/routing-policies` post-fix; sidebar hidden in both states (B-fix surface), tRPC blocks the underlying call
+> - **iter32 tracker entry**: F (folded into the table below)
+>
+> **Why this matters for the reviewer**: the sidebar gate alone is UI shaping, not authorization. A reviewer auditing for SOC 2 / ISO 27001 RBAC controls needs both the surface gate (B fix `a85ba27ff`) AND the enforcement boundary (`9e373c284`) to claim defense-in-depth. The catalog declared the model in iter29 (`385c95e89`); the router rewire closes the loop. Row #8 of the criterion → evidence map above is updated.
 
 ---
 
