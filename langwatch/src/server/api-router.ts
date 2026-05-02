@@ -44,7 +44,6 @@ import { app as cronApp } from "./routes/cron";
 import { app as evaluationsLegacyApp } from "./routes/evaluations-legacy";
 import { app as healthApp } from "./routes/health";
 import { app as miscApp } from "./routes/misc";
-import { app as opsSseApp } from "./routes/ops-sse";
 import { app as sseApp } from "./routes/sse";
 import { app as tracesLegacyApp } from "./routes/traces-legacy";
 import { app as trpcApp } from "./routes/trpc";
@@ -106,7 +105,6 @@ export function createApiRouter() {
   api.route("/", evaluationsLegacyApp);
   api.route("/", healthApp);
   api.route("/", miscApp);
-  api.route("/", opsSseApp);
   api.route("/", sseApp);
   api.route("/", tracesLegacyApp);
   api.route("/", trpcApp);
