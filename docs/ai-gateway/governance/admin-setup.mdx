@@ -255,6 +255,17 @@ dashboard before rolling out to your team? The repo ships dogfood
 helpers that mint a personal virtual key and fire a real completion
 through your local Go gateway.
 
+Both feature flags must be force-enabled in `langwatch/.env`
+(`.env.example` ships them in the default block as of `e303ec709`):
+
+```env
+FEATURE_FLAG_FORCE_ENABLE=release_ui_ai_gateway_menu_enabled,release_ui_ai_governance_enabled
+```
+
+Without `release_ui_ai_governance_enabled`, `/governance` and
+`/settings/governance/{ingestion-sources,anomaly-rules}` render
+`NotFoundScene` even for an ORG ADMIN.
+
 ```bash
 # 1. Bring up the stack (postgres + redis + app + gateway)
 make dev
