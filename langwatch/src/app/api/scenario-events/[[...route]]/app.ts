@@ -149,7 +149,10 @@ export const route = app.delete(
     const { project } = c.var;
     const { scenarioSetId } = c.req.valid("query");
 
-    const result = await archiveScenarioSetRuns(project.id, scenarioSetId);
+    const result = await archiveScenarioSetRuns({
+      projectId: project.id,
+      scenarioSetId,
+    });
 
     return c.json(result, 200);
   },
