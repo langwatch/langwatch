@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { describeRoute } from "hono-openapi";
 import { resolver, validator as zValidator } from "hono-openapi/zod";
 import { z } from "zod";
+import { RoleBindingScopeType } from "@prisma/client";
 import { prisma } from "~/server/db";
 import { encrypt } from "~/utils/encryption";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
@@ -219,11 +220,15 @@ export const app = new Hono<{ Variables: Variables }>()
       const encryptedValue = encrypt(body.value);
 
       // API key auth has no user context — use first team member as owner
-      const teamUser = await prisma.teamUser.findFirst({
-        where: { teamId: project.teamId },
+      const binding = await prisma.roleBinding.findFirst({
+        where: {
+          scopeType: RoleBindingScopeType.TEAM,
+          scopeId: project.teamId,
+          userId: { not: null },
+        },
         select: { userId: true },
       });
-      const userId = teamUser?.userId ?? "system";
+      const userId = binding?.userId ?? "system";
 
       const secret = await prisma.projectSecret.create({
         data: {
