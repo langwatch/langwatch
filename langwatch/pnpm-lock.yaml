@@ -19,6 +19,7 @@ overrides:
   merge: '>=2.1.1 <3.0.0'
   picomatch: '>=4.0.4'
   vite@<7.3.2: 7.3.2
+  vite@>=8.0.0 <8.0.5: 8.0.5
 
 packageExtensionsChecksum: sha256-LBc1N1GezKyerwGBwpMHZPFoMYZTHjpxVKWJilBVvTU=
 
@@ -7132,7 +7133,7 @@ packages:
     peerDependencies:
       '@rolldown/plugin-babel': ^0.1.7 || ^0.2.0
       babel-plugin-react-compiler: ^1.0.0
-      vite: ^8.0.0
+      vite: 8.0.5
     peerDependenciesMeta:
       '@rolldown/plugin-babel':
         optional: true

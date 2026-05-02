@@ -31,6 +31,7 @@ overrides:
   "glob@>=10.2.0 <10.5.0": "10.5.0"
   # Security: vite WebSocket file read + server.fs.deny bypass (#783/#784)
   "vite@<7.3.2": "7.3.2"
+  "vite@>=8.0.0 <8.0.5": "8.0.5"
 
 packageExtensions:
   bullmq-otel:
