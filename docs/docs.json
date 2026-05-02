@@ -556,25 +556,9 @@
             "group": "Governance",
             "pages": [
               "ai-gateway/governance/overview",
-              "ai-gateway/governance/control-plane",
               "ai-gateway/governance/personal-keys",
               "ai-gateway/governance/admin-setup",
-              "ai-gateway/governance/routing-policies",
-              "ai-gateway/governance/anomaly-rules",
-              "ai-gateway/governance/cli-debug",
-              {
-                "group": "Ingestion sources",
-                "pages": [
-                  "ai-gateway/governance/ingestion-sources/index",
-                  "ai-gateway/governance/ingestion-sources/otel-generic",
-                  "ai-gateway/governance/ingestion-sources/claude-cowork",
-                  "ai-gateway/governance/ingestion-sources/workato",
-                  "ai-gateway/governance/ingestion-sources/s3-custom",
-                  "ai-gateway/governance/ingestion-sources/copilot-studio",
-                  "ai-gateway/governance/ingestion-sources/openai-compliance",
-                  "ai-gateway/governance/ingestion-sources/claude-compliance"
-                ]
-              }
+              "ai-gateway/governance/routing-policies"
             ]
           },
           {
@@ -655,6 +639,50 @@
               "ai-gateway/cookbooks/prometheus-alerts",
               "ai-gateway/cookbooks/grafana-dashboard",
               "ai-gateway/cookbooks/production-runbook"
+            ]
+          }
+        ]
+      },
+      {
+        "anchor": "AI Governance",
+        "icon": "shield-check",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "ai-governance/overview"
+            ]
+          },
+          {
+            "group": "Sources",
+            "pages": [
+              "ai-governance/ingestion-sources/index",
+              "ai-governance/ingestion-sources/otel-generic",
+              "ai-governance/ingestion-sources/claude-cowork",
+              "ai-governance/ingestion-sources/workato",
+              "ai-governance/ingestion-sources/s3-custom",
+              "ai-governance/ingestion-sources/copilot-studio",
+              "ai-governance/ingestion-sources/openai-compliance",
+              "ai-governance/ingestion-sources/claude-compliance"
+            ]
+          },
+          {
+            "group": "Detection",
+            "pages": [
+              "ai-governance/anomaly-rules"
+            ]
+          },
+          {
+            "group": "Compliance & Architecture",
+            "pages": [
+              "ai-governance/compliance-architecture",
+              "ai-governance/control-plane"
+            ]
+          },
+          {
+            "group": "Operations",
+            "pages": [
+              "ai-governance/cli-debug"
             ]
           }
         ]
@@ -1076,6 +1104,54 @@
     {
       "source": "/ai-gateway/cli/langwatch-cli",
       "destination": "/integration/cli"
+    },
+    {
+      "source": "/ai-gateway/governance/compliance-architecture",
+      "destination": "/ai-governance/compliance-architecture"
+    },
+    {
+      "source": "/ai-gateway/governance/control-plane",
+      "destination": "/ai-governance/control-plane"
+    },
+    {
+      "source": "/ai-gateway/governance/anomaly-rules",
+      "destination": "/ai-governance/anomaly-rules"
+    },
+    {
+      "source": "/ai-gateway/governance/cli-debug",
+      "destination": "/ai-governance/cli-debug"
+    },
+    {
+      "source": "/ai-gateway/governance/ingestion-sources/index",
+      "destination": "/ai-governance/ingestion-sources/index"
+    },
+    {
+      "source": "/ai-gateway/governance/ingestion-sources/otel-generic",
+      "destination": "/ai-governance/ingestion-sources/otel-generic"
+    },
+    {
+      "source": "/ai-gateway/governance/ingestion-sources/claude-cowork",
+      "destination": "/ai-governance/ingestion-sources/claude-cowork"
+    },
+    {
+      "source": "/ai-gateway/governance/ingestion-sources/workato",
+      "destination": "/ai-governance/ingestion-sources/workato"
+    },
+    {
+      "source": "/ai-gateway/governance/ingestion-sources/s3-custom",
+      "destination": "/ai-governance/ingestion-sources/s3-custom"
+    },
+    {
+      "source": "/ai-gateway/governance/ingestion-sources/copilot-studio",
+      "destination": "/ai-governance/ingestion-sources/copilot-studio"
+    },
+    {
+      "source": "/ai-gateway/governance/ingestion-sources/openai-compliance",
+      "destination": "/ai-governance/ingestion-sources/openai-compliance"
+    },
+    {
+      "source": "/ai-gateway/governance/ingestion-sources/claude-compliance",
+      "destination": "/ai-governance/ingestion-sources/claude-compliance"
     }
   ]
 }

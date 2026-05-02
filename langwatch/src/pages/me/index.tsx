@@ -56,7 +56,6 @@ export default function MyUsagePage() {
   }
 
   const isOverBudget = budget.status === "exceeded";
-  const is80Pct = budget.status === "warning";
 
   const maxDay = Math.max(...spendByDay.map((d) => d.usd), 0.01);
   const maxTool = Math.max(...spendByTool.map((t) => t.usd), 0.01);
