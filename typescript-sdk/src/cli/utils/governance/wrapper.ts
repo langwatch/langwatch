@@ -15,12 +15,8 @@
  */
 
 import { spawn } from "node:child_process";
-import {
-  GovernanceConfig,
-  loadConfig,
-  saveConfig,
-  isLoggedIn,
-} from "./config";
+import type { GovernanceConfig } from "./config";
+import { loadConfig, saveConfig, isLoggedIn } from "./config";
 import { checkBudget, renderBudgetExceeded } from "./budget";
 
 export interface ToolEnv {
