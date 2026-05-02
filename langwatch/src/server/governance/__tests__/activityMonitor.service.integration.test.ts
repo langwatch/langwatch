@@ -193,7 +193,10 @@ describe("ActivityMonitorService — read-side queries against unified trace sto
 
     const now = Date.now();
     const day = 24 * 60 * 60 * 1000;
-    const inWindow = new Date(now - 1 * day);
+    // 12h offset (not 24h) so the row stays inside the 24h window even when
+    // the test runner adds setup latency between fixture insert and query
+    // execution. The 7d/30d window assertions still include this row.
+    const inWindow = new Date(now - 12 * 60 * 60 * 1000);
     const outOfWindow = new Date(now - 14 * day);
 
     // Primary org governance traces — three users, two sources, mixed times

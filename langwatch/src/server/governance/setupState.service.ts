@@ -66,17 +66,17 @@ export class GovernanceSetupStateService {
       this.prisma.anomalyRule.count({
         where: { organizationId, archivedAt: null },
       }),
-      // Persona-3 detection: any application-kind project with at least
-      // one span ingested. Cheap PG query (Project.lastEventAt is
-      // already maintained by the trace pipeline). Excludes
-      // internal_governance projects so a freshly-minted Gov Project
-      // alone does not flip persona-3 to true.
+      // Persona-3 detection: any application-kind project that has ever
+      // received its first message (firstMessage flag is set by the
+      // collectorWorker + projectMetadata reactor on the first ingested
+      // span). Excludes internal_governance projects so a freshly-minted
+      // Gov Project alone does not flip persona-3 to true.
       this.prisma.project.count({
         where: {
           team: { organizationId },
           archivedAt: null,
           kind: { not: PROJECT_KIND.INTERNAL_GOVERNANCE },
-          lastEventAt: { not: null },
+          firstMessage: true,
         },
       }),
     ]);

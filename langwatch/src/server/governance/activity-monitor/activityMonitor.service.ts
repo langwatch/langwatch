@@ -242,11 +242,18 @@ export class ActivityMonitorService {
     const windowMs = input.windowDays * 24 * 60 * 60 * 1000;
     const limit = input.limit ?? 50;
 
+    // ClickHouse 25.x resolves bare column names in ORDER BY to outer
+    // aliases when the alias shadows a subquery column — so
+    // `ORDER BY sum(spendUsd)` against an outer alias of `spendUsd =
+    // toString(sum(...))` evaluates as sum-over-String and fails with
+    // ILLEGAL_TYPE_OF_ARGUMENT (43). Aliasing the outer string to a
+    // disjoint name (`spendUsdStr`) keeps the ORDER BY referring to the
+    // subquery's Float64 spendUsd column.
     const result = await ch.query({
       query: `
         SELECT
           actor,
-          toString(sum(spendUsd)) AS spendUsd,
+          toString(sum(spendUsd)) AS spendUsdStr,
           toString(count()) AS requests,
           toString(toUnixTimestamp64Milli(max(occurredAt))) AS lastActivityMs,
           any(model) AS mostUsedTarget
@@ -285,14 +292,14 @@ export class ActivityMonitorService {
     });
     const rows = (await result.json()) as Array<{
       actor: string;
-      spendUsd: string;
+      spendUsdStr: string;
       requests: string;
       lastActivityMs: string;
       mostUsedTarget: string | null;
     }>;
     return rows.map((r) => ({
       actor: r.actor,
-      spendUsd: Number(r.spendUsd),
+      spendUsd: Number(r.spendUsdStr),
       requests: Number(r.requests),
       lastActivityIso: new Date(Number(r.lastActivityMs)).toISOString(),
       // Trend-vs-previous needs a windowed CTE comparison; deferred to 3b.
