@@ -40,24 +40,7 @@
 >
 > **One open product question, captured as follow-up (not in this PR per @master_orchestrator)**: `/me/usage` shows zero spend until an admin attaches a Budget — the spend column is driven by `gateway_budget_ledger_events` fold, which only writes when a Budget applies. Lane-S recommendation (Sergey, iter32): separate the usage-display query from the Budget-limit machinery so `/me/usage` aggregates spans directly scoped by `principal_user_id` regardless of Budget binding ("Budget is the LIMIT machinery; usage display is independent"). Captured as a post-merge follow-up; not pulled into this PR. Documented in `admin-setup.mdx` Budget caveat note for the dogfood walkthrough.
 >
-> **In-PR fixes tracker (iter32-iter34 chrome polish + CodeRabbit review)**: UX bugs surfaced via dogfood loop (A–G) plus CodeRabbit review-driven critical/major fixes (H+), all closed in this PR:
-> - **A** — Docs `/governance/{ingestion-sources,anomaly-rules}` route drift (404 for fresh admins clicking through nav). Fixed in `0f9ccad2c` (lane-A): 8 doc files corrected to `/settings/governance/...`.
-> - **B** — GOVERN sidebar entry missing for fresh ORG ADMIN despite the new RBAC catalog. Fixed in `a85ba27ff` (lane-S): `useOrganizationTeamProject.hasPermission` org-prefix check now recognises all 5 governance resource families (was string-prefix-only on `organization:`).
-> - **C** — "Sharing presence" link in `PersonalSidebar` (post-merge add) reviewed; resolved by inspection — `PresenceToggle` is `MainMenu`-only by design (no teammates to share with in personal scope), architecturally correct.
-> - **D** — `/settings/routing-policies` 500 for fresh ORG ADMIN (read path drift). Fixed in `ff79b951d` (lane-B): `routingPolicy.list/get` now uses `checkOrganizationPermission('organization:view')` to match `costs/limits/ingestionSources` convention; the hand-rolled `assertOrgMembership` was unreachable due to `skipPermissionCheck`'s sensitive-input meta-rule rejecting `organizationId` before the fallback ran. Code-quality follow-up filed as [#3687](https://github.com/langwatch/langwatch/issues/3687) — `skipPermissionCheck` should throw a typed `PermissionMisconfiguredError` naming the offending key + suggesting `checkOrganizationPermission`, so the next project→org route migration that forgets to swap the helper fails loudly instead of with an opaque 500.
-> - **E** — Local dogfood `NotFoundScene` for `/governance` + `/settings/governance/*` despite the gateway flag being on. Fixed in `e303ec709` (lane-B, docs-only): `.env.example` `FEATURE_FLAG_FORCE_ENABLE` now lists both `release_ui_ai_gateway_menu_enabled` AND `release_ui_ai_governance_enabled` by default, with a 4-line explainer of the symptom. The two-flag runtime semantic is unchanged (still preserves pilot flexibility per @rchaves directive); only the local-dev default flipped to enable both. `admin-setup.mdx` dogfood loop step 1 also names both flags explicitly.
-> - **F** — RBAC defense-in-depth gap: sidebar gate (`a85ba27ff`) correctly hid Govern/Gateway for MEMBER but every governance read tRPC was still gating on `organization:view` (which MEMBER has) instead of the new resource-specific catalog (`385c95e89`). MEMBER calling those tRPCs directly leaked governance state. Fixed in `9e373c284` (lane-S): 4 routers re-wired to resource-specific permissions + new `governance.rbac.integration.test.ts` (11/11 green) proving MEMBER → UNAUTHORIZED on every governance read endpoint, ADMIN → 200, `resolveHome` regression-invariant preserved. Full mapping + evidence chain in §"RBAC defense-in-depth — router-layer enforcement" below.
-> - **G** — Persona-1 (org-less CLI/IDE dev) bounced to `/onboarding/welcome` on every navigation including direct-load of `/me`; spec says they should land at `/me`. Fixed in `c991006c3` + follow-up `071a416f8` (lane-B): four surgical edits closing a 4-layer race — (1) `/index` no-org bouncer fired before the persona resolver, (2) `/me` + `/me/settings` absent from `noOrgBouncerRoutes` so `CommandBar`'s global `useOrganizationTeamProject({redirectToOnboarding:true})` won the race, (3) `/me` + `/me/settings` FF gate `enabled:!!project` never fired for persona-1, (4) `DashboardLayout` `LoadingScreen` returned forever when `!organization` regardless of route class — fixed by skipping the org/orgs requirement when `isPersonalScopeRoute=true`; `/` itself also added to `noOrgBouncerRoutes`. **Browser-verified end-to-end (post-`071a416f8`)**: p1 personal-only signs in → `/` → resolves → `/me` → renders chrome (My Workspace switcher, My Usage / Settings sidebar, stat cards, "Run langwatch claude" onboarding hint).
-> - **H** — CodeRabbit review-driven fixes wave 1 (lane-S, `abd5fe5c6` + `0bf5781c4` + `fd800485e`): 2 critical + 3 major + 2 nitpick findings closed across 3 commits, all verified before fix:
->   - **`personalUsage.service.ts` — ClickHouse nested-aggregate runtime crash** (🔴 critical, CodeRabbit comment 3144510333+339): `dailyBuckets` + `breakdownByModel` queries used `sum(argMax(TotalCost, UpdatedAt))` inline, which CH 25 rejects with `code 184 ILLEGAL_AGGREGATION` — every `/me/usage` page load would throw at runtime. Fix: hoist per-trace `argMax` into a subquery, aggregate at outer level (matches the working pattern already in `querySummary`). Also documented the model-fanout cost-attribution semantic (multi-model trace contributes its full `TotalCost` to each model in its `Models` array — intentional attribution-by-presence; precise per-call billing lives in the gateway's per-call ledger).
->   - **`auth-cli.ts` — Redis cluster CROSSSLOT on multi-key dels** (🔴 critical, CodeRabbit comment 3144510348): three sites called `redis.del(deviceCodeKey, userCodeKey)` together. When `REDIS_CLUSTER_ENDPOINTS` is set (prod SaaS), the two keys can land on different hash slots → cluster rejects with CROSSSLOT. Fix: split into two single-key dels at all 3 sites (TTL expiry, denied, approval). One related but unflagged shape — `redis.multi().set(k1).set(k2).exec()` at line 426 — has the same cluster issue and is left for follow-up since it's a different fix shape (MULTI/EXEC across slots).
->   - **`personalVirtualKeys.ts` + `user.ts` — inline `import("@prisma/client").PrismaClient`** (🟠 major × 2): violated CLAUDE.md "no inline `import()`" rule. Hoisted to top-level `import type`; local helpers switched to named-args object destructuring (`assertOrgMembership({ prisma, userId, organizationId })`).
->   - **`organization.ts:1057` — silent failure swallowed by `console.warn`** (🟠 major): `PersonalWorkspaceService.ensure()` errors were lost to log noise. Replaced with `captureException` + structured extras (origin/userId/organizationId) for PostHog triage.
->
->   - **Nitpick cleanups** (`fd800485e`): 2 unused imports/vars flagged by github-code-quality bot — `randomUUID` in `auth-cli.ts` + `TEAM_ID` / `PROJECT_ID` constants in `auth-cli-budget-status.integration.test.ts`.
->
->   **Out-of-scope (deferred follow-up, not in this PR)**: `me/settings.tsx:64` notification-toggles persistence (lane-B/UI), `personalVirtualKey.service.ts:186` 409-contract for no-default-policy (needs spec re-read), `personalWorkspace.service.ts:153` race-condition/partial-unique-index (low impact), remaining github-code-quality unused-var nitpicks (batchable later).
-> - **I** — FF-loading flash (lane-B, `f84c3008e`): seven governance pages (`/me`, `/me/settings`, `/settings/governance`, `/settings/governance/{ingestion-sources,anomaly-rules,ingestion-source-detail}`, `/settings/routing-policies`) gated `if (!enabled) return <NotFoundScene/>` without checking `useFeatureFlag`'s `isLoading` — caused a `NotFoundScene` flash on every cold load (incl. refresh) for FF-enabled users until tRPC resolved (~200ms-1s). Fix: destructure `isLoading` + return `<LoadingScreen/>` while loading, only `<NotFoundScene/>` when actually disabled. Bonus: dropped leftover `enabled: !!project` from `/settings/routing-policies` (admin-in-empty-org bug, same shape as the iter32 `/me` fix). +57/-32 across 7 files, typecheck clean. Browser before/after screenshot pending dev-server rebuild.
+> **In-PR fixes tracker (iter32-iter34): A–I, all closed in this PR.** Detail moved to its own §"In-PR fixes tracker (iter32-iter34)" below — A/D/E/G/I dogfood-derived UX fixes (lanes A/B), B/F backend RBAC (lane-S), C architectural review, H CodeRabbit review-driven critical/major/nitpick wave 1 (lane-S, 3 commits). Browser-verified end-to-end. No deferred dogfood bugs from the chrome walks.
 
 ---
 
@@ -403,6 +386,48 @@ hands off to the existing trace/log pipeline).
 
 ---
 
+## In-PR fixes tracker (iter32-iter34)
+
+UX bugs surfaced via the live-fire dogfood loop (A–G, I) plus CodeRabbit review-driven critical/major/nitpick fixes (H, wave 1), all closed in this PR. Browser-verified end-to-end where the fix lands user-visible state. Reviewer narrative: every dogfood + automated-review finding got a fix-in-PR or a documented out-of-scope note; no deferred dogfood bugs from the chrome walks.
+
+| | Bug | Lane | Fix |
+|---|---|---|---|
+| **A** | Docs `/governance/{ingestion-sources,anomaly-rules}` route drift (404 for fresh admins clicking through nav) | A | `0f9ccad2c` — 8 doc files corrected to `/settings/governance/...` |
+| **B** | GOVERN sidebar entry missing for fresh ORG ADMIN despite the new RBAC catalog | S | `a85ba27ff` — `useOrganizationTeamProject.hasPermission` org-prefix check now recognises all 5 governance resource families (was string-prefix-only on `organization:`) |
+| **C** | "Sharing presence" link in `PersonalSidebar` (post-merge add) | B | Resolved by inspection — `PresenceToggle` is `MainMenu`-only by design (no teammates to share with in personal scope), architecturally correct |
+| **D** | `/settings/routing-policies` 500 for fresh ORG ADMIN (read path drift) | B | `ff79b951d` — `routingPolicy.list/get` now uses `checkOrganizationPermission('organization:view')` to match `costs/limits/ingestionSources` convention; the hand-rolled `assertOrgMembership` was unreachable due to `skipPermissionCheck`'s sensitive-input meta-rule rejecting `organizationId` before the fallback ran. Code-quality follow-up filed as [#3687](https://github.com/langwatch/langwatch/issues/3687) — `skipPermissionCheck` should throw a typed `PermissionMisconfiguredError` naming the offending key + suggesting `checkOrganizationPermission` |
+| **E** | Local dogfood `NotFoundScene` for `/governance` + `/settings/governance/*` despite the gateway flag being on | B (docs-only) | `e303ec709` — `.env.example` `FEATURE_FLAG_FORCE_ENABLE` now lists both `release_ui_ai_gateway_menu_enabled` AND `release_ui_ai_governance_enabled` by default, with a 4-line explainer of the symptom. Two-flag runtime semantic unchanged (still preserves pilot flexibility); only the local-dev default flipped to enable both. `admin-setup.mdx` dogfood loop step 1 also names both flags explicitly |
+| **F** | RBAC defense-in-depth gap: sidebar gate (B fix) correctly hid Govern/Gateway for MEMBER but every governance read tRPC was still gating on `organization:view` (which MEMBER has) instead of the new resource-specific catalog (`385c95e89`); MEMBER calling those tRPCs directly leaked governance state | S | `9e373c284` — 4 routers re-wired to resource-specific permissions + new `governance.rbac.integration.test.ts` (11/11 green) proving MEMBER → UNAUTHORIZED on every governance read endpoint, ADMIN → 200, `resolveHome` regression-invariant preserved. iter33 follow-up `d311c2f70` closed the seed-personas RoleBinding gap. Full mapping + evidence chain in §"RBAC defense-in-depth — router-layer enforcement" above |
+| **G** | Persona-1 (org-less CLI/IDE dev) bounced to `/onboarding/welcome` on every navigation including direct-load of `/me`; spec says they should land at `/me` | B | `c991006c3` + follow-up `071a416f8` — four surgical edits closing a 4-layer race: (1) `/index` no-org bouncer fired before the persona resolver, (2) `/me` + `/me/settings` absent from `noOrgBouncerRoutes` so `CommandBar`'s global `useOrganizationTeamProject({redirectToOnboarding:true})` won the race, (3) `/me` + `/me/settings` FF gate `enabled:!!project` never fired for persona-1, (4) `DashboardLayout` `LoadingScreen` returned forever when `!organization` regardless of route class — fixed by skipping the org/orgs requirement when `isPersonalScopeRoute=true`; `/` itself also added to `noOrgBouncerRoutes`. Browser-verified end-to-end (post-`071a416f8`) |
+| **H** | CodeRabbit review-driven fixes (waves 1+2: 2 critical + 5 major + 2 nitpick across 4 commits, all verified before fix) | S | `abd5fe5c6` + `0bf5781c4` + `fd800485e` + `49f81be4f` — see sub-list below |
+| **I** | FF-loading flash on 7 governance pages: `/me`, `/me/settings`, `/settings/governance`, `/settings/governance/{ingestion-sources,anomaly-rules,ingestion-source-detail}`, `/settings/routing-policies` gated `if (!enabled) return <NotFoundScene/>` without checking `useFeatureFlag`'s `isLoading` — caused a `NotFoundScene` flash on every cold load until tRPC resolved (~200ms-1s) | B | `f84c3008e` — destructure `isLoading` + return `<LoadingScreen/>` while loading, only `<NotFoundScene/>` when actually disabled. Bonus: dropped leftover `enabled: !!project` from `/settings/routing-policies` (admin-in-empty-org bug, same shape as the iter32 `/me` fix). +57/-32 across 7 files, typecheck clean |
+
+### H detail — CodeRabbit review-driven fixes (waves 1+2)
+
+**Wave 1** (`abd5fe5c6` + `0bf5781c4` + `fd800485e`):
+
+- **`personalUsage.service.ts` — ClickHouse nested-aggregate runtime crash** (🔴 critical, CodeRabbit comment 3144510333+339): `dailyBuckets` + `breakdownByModel` queries used `sum(argMax(TotalCost, UpdatedAt))` inline, which CH 25 rejects with `code 184 ILLEGAL_AGGREGATION` — every `/me/usage` page load would throw at runtime. Fix: hoist per-trace `argMax` into a subquery, aggregate at outer level (matches the working pattern already in `querySummary`). Also documented the model-fanout cost-attribution semantic (multi-model trace contributes its full `TotalCost` to each model in its `Models` array — intentional attribution-by-presence; precise per-call billing lives in the gateway's per-call ledger).
+- **`auth-cli.ts` — Redis cluster CROSSSLOT on multi-key dels** (🔴 critical, CodeRabbit comment 3144510348): three sites called `redis.del(deviceCodeKey, userCodeKey)` together. When `REDIS_CLUSTER_ENDPOINTS` is set (prod SaaS), the two keys can land on different hash slots → cluster rejects with CROSSSLOT. Fix: split into two single-key dels at all 3 sites (TTL expiry, denied, approval). One related but unflagged shape — `redis.multi().set(k1).set(k2).exec()` at line 426 — has the same cluster issue and is left for follow-up since it's a different fix shape (MULTI/EXEC across slots).
+- **`personalVirtualKeys.ts` + `user.ts` — inline `import("@prisma/client").PrismaClient`** (🟠 major × 2): violated CLAUDE.md "no inline `import()`" rule. Hoisted to top-level `import type`; local helpers switched to named-args object destructuring (`assertOrgMembership({ prisma, userId, organizationId })`).
+- **`organization.ts:1057` — silent failure swallowed by `console.warn`** (🟠 major): `PersonalWorkspaceService.ensure()` errors were lost to log noise. Replaced with `captureException` + structured extras (origin/userId/organizationId) for PostHog triage.
+- **Nitpick cleanups** (`fd800485e`): 2 unused imports/vars flagged by github-code-quality bot — `randomUUID` in `auth-cli.ts` + `TEAM_ID` / `PROJECT_ID` constants in `auth-cli-budget-status.integration.test.ts`.
+
+**Wave 2** (`49f81be4f` — both issues are spec-contract):
+
+- **`personalVirtualKey.service.ts:186` — 409 no_default_routing_policy contract** (🟠 major): the service was silently creating a bare VK with null policy when the caller relied on default-policy resolution and no default existed. Spec (`personal-keys.feature` lines 58-63) says 409 with body `{error: "no_default_routing_policy"}` and NO VK created. Added `NoDefaultRoutingPolicyError` class + 409 translation at 2 call sites (`auth-cli /approve` REST + `issuePersonal` tRPC). **Docs-tied** — see "AI Governance docs plan" below for required user-facing copy.
+- **`personalWorkspace.service.ts:153` — race-condition on `ensure()`** (🟠 major): concurrent first-mint calls both saw "no existing" → both attempted `team.create` → second hit Prisma P2002 unique-constraint → 500. Fix: try/catch P2002 + re-fetch-winner pattern (mirrors `085d084cb` from `governanceProject.service.ts`).
+
+**Out-of-scope (deferred follow-up, not in this PR)**: `me/settings.tsx:64` notification-toggles persistence (lane-B/UI), remaining github-code-quality unused-var nitpicks (batchable later). All other CodeRabbit-flagged items resolved across waves 1+2.
+
+### iter32-iter33 dogfood evidence (visual proof)
+
+Three highlight shots embedded in §"iter32-iter33 dogfood screenshots" below (full set in `dev/dogfood-screenshots/iter32-iter33/`):
+- Admin /governance after FF (closes E)
+- Persona-1 /me final (closes G)
+- MEMBER /governance after RBAC fix (closes F + d311c2f70)
+
+---
+
 ## Branch commit history — the unified-trace correction (this branch)
 
 The architecture pivoted mid-branch from a parallel governance-event backend
@@ -569,6 +594,79 @@ All `--json` modes contract-stable byte-for-byte with the equivalent tRPC proced
 - `docs/observability/trace-vs-activity-ingestion` — disambiguation page (two URLs, ONE substrate, IngestionSource as origin metadata)
 
 Plus the internal architecture decision record at [`dev/docs/adr/018-governance-unified-observability-substrate.md`](../dev/docs/adr/018-governance-unified-observability-substrate.md) (commit `53a5c4af9`) — captures the parallel-pipeline rip-out, the user directive that triggered it, the 6-point unified-substrate decision, 4 alternatives considered with rejection reasons, the per-source-type wire-shape table, the hidden Gov Project lifecycle diagram, and the branch-correction commit-trace from `f3de1ae07` through `33a8cf6d0`.
+
+---
+
+## AI Governance docs plan (Phase 6 — top-level docs section build-out)
+
+> **Status**: D1 scaffold + docs.json anchor in flight (lane-B, @ai_gateway_alexis_2). Pages don't ship in this PR; the structure, page outline, screenshot asset map, and cross-link contract do — so reviewers see the full v1 surface and Phase 6 has a clean atomic-task Gantt to execute against post-merge.
+
+### Why a peer-level top-level section, not a sub-section
+
+Today's governance docs live at `docs/ai-gateway/governance/` — useful for the gateway-first reading order, but governance is a peer-level product concern with its own audience (compliance officers, security teams, IT admins) who often don't enter through "AI Gateway" framing. Per @rchaves directive 2026-05-02, governance becomes a **top-level peer of `docs/ai-gateway/`**: `docs/ai-governance/`. Existing pages MOVE under the new root (with redirect stubs left behind, NOT duplicated); cross-links restored both directions.
+
+### v1 shape (locked by @master_orchestrator on @ai_gateway_alexis_2's outline)
+
+1. **No dedicated `routing-policies` admin page in v1.** The default-policy-required constraint (Sergey's `49f81be4f` flag) folds into `overview.mdx` Prerequisites + `cli-debug.mdx` 409-catalog + main quickstarts. Dedicated admin page becomes a v2 candidate if the constraint surface grows.
+2. **Promote/move with redirect stubs**, not duplicate. Single source of truth at the new path; old paths return a Mintlify redirect so existing inbound links + SEO survive.
+3. **Mermaid first** for architecture diagrams, SVG fallback only if Mintlify renderer fights it.
+4. **`claude-cowork` source moves too** for consistency with the rest of the ingestion-sources fleet.
+
+### Page outline — 12 pages flat under `docs/ai-governance/`
+
+| File | Owns | Screenshots | Key cross-links |
+|---|---|---|---|
+| `overview.mdx` | Landing — personas, feature map, **Admin prerequisites callout (default routing policy required)** per Sergey `49f81be4f` | `governance-hero`, `p1-personal-chrome`, governance-stack diagram | ↔ `ai-gateway/overview`, ← `introduction.mdx` |
+| `compliance-architecture.mdx` | End-to-end fold + retention + OCSF (promoted from `ai-gateway/governance/`) | compliance-flow + fold-pipeline diagrams, `ocsf-export-curl` | → `control-plane`, `ai-gateway/audit`, `ai-gateway/observability` |
+| `ingestion-sources/index.mdx` | Hub — what an IngestionSource is, supported types, lifecycle (promoted, refreshed per unified-substrate framing) | `sources-list`, `source-detail`, `source-create-drawer` | → 6 per-source pages, `ai-gateway/observability` |
+| `ingestion-sources/{otel-generic,workato,s3-custom,copilot-studio,openai-compliance,claude-compliance,claude-cowork}.mdx` | Per-source: configure + verify + troubleshoot (all promoted; `claude-cowork` included for fleet consistency) | 1 configure-drawer shot per source | → `index.mdx`, respective `ai-gateway/providers/*` where relevant |
+| `anomaly-rules.mdx` | Rule shapes, CRUD, fold pipeline (promoted) | `rules-list`, `create-drawer`, `anomaly-fold-output` terminal | → `compliance-architecture`, `ingestion-sources/index`, `ai-gateway/budgets` |
+| `cli-debug.mdx` | CLI workflow — `budget-status`, fold inspect, OCSF probe, **+ `langwatch login` 409 error catalog** (Sergey's `49f81be4f` flag) | `cli-budget-status`, `cli-anomaly-fold`, **`cli-login-409` (NEW)** | → `ai-gateway/cli/overview`, `overview.mdx#admin-prerequisites` |
+| `control-plane.mdx` | Next.js control plane ↔ Go data plane ↔ CH fold (promoted) | control-plane + activity-monitor diagrams | → `ai-gateway/overview`, `self-hosting/*`, `compliance-architecture` |
+
+### Screenshot asset map — 23 assets under `docs/images/ai-governance/<bucket>/`
+
+Bucket layout:
+- `personas/` (2 shots) · `admin/` (3) · `drawers/` (2) · `sources/` (6) · `flows/` (2) · `cli/` (3 incl. NEW `cli-login-409`) · `architecture/` (5 — mermaid inline first, SVG fallback if Mintlify struggles)
+
+Convention: docs-rendered + reusable in the PR description via raw GitHub URLs (`https://raw.githubusercontent.com/langwatch/langwatch/<branch>/docs/images/ai-governance/<bucket>/<state>.png`). iter32-iter33 dogfood evidence stays at `dev/dogfood-screenshots/iter32-iter33/` — separate purpose (review-time evidence vs customer-facing docs).
+
+### Cross-link contract — inbound + reciprocal
+
+| Entry point | Add | Why |
+|---|---|---|
+| `docs/introduction.mdx` | Peer card "AI Governance" alongside "AI Gateway" | Users entering from compliance / security framing land on the right top-level |
+| `docs/integration/quick-start.mdx` | Final-step pointer "Need governance / audit?" | Quickstart graduation path |
+| `docs/ai-gateway/overview` | Callout "Need org-wide governance, audit, anomaly detection?" | Reciprocal from gateway readers |
+| `docs/ai-gateway/budgets` | Link → `anomaly-rules` | Spend-spike complement |
+| `docs/ai-gateway/audit` | Link → `compliance-architecture` | OCSF export discoverability |
+| `docs/ai-gateway/cli/overview` | Link → `cli-debug` | CLI users find the governance subcommands |
+| `docs/observability/overview` | SIEM anchor → `ocsf-export` (folded into `compliance-architecture`) | Unified-substrate users |
+
+### Code-fix-tied-to-docs flags (folded as @ai_gateway_sergey_2 surfaces them)
+
+Sergey's CodeRabbit triage calls out concrete code fixes where user-visible behavior needs explicit docs coverage. These get folded here as they ship so Alexis pulls them into the right page:
+
+- **409 `no_default_routing_policy` error case (`49f81be4f`, lane-S)** — `langwatch login --device` + `issuePersonal` tRPC now return 409 with `{error: "no_default_routing_policy"}` when the caller relied on default-policy resolution and the org has no default policy. **Docs landing point**:
+  - `docs/ai-governance/cli-debug.mdx` — full 409 entry in the error catalog with the actionable next step ("ask your admin to publish a default routing policy via /settings/routing-policies"). New screenshot `cli/cli-login-409.png`.
+  - `docs/ai-governance/overview.mdx` — Prerequisites callout: "a default routing policy is required before users can sign in via the CLI."
+  - Main quickstarts (`integration/quick-start.mdx` if it covers `langwatch login`) — same note inline.
+
+### Phase 6 atomic-task Gantt — AI Governance docs (lane-B owns; lane-A folds into PR narrative)
+
+| Step | Description | Owner | Critical path |
+|---|---|---|---|
+| D1 | Scaffold `docs/ai-governance/` + `docs.json` navigation anchor | 🅑 | ✓ |
+| D2 | Move 9 existing `ai-gateway/governance/*` pages + redirect stubs | 🅑 | ✓ |
+| D3 | Write net-new `overview.mdx` (only net-new in trimmed cut) | 🅑 | |
+| D4 | Refresh moved pages (header "Pairs with" link, framing, Prerequisites callout per Sergey's flag) | 🅑 | |
+| D5 | Capture/move 23 assets to `docs/images/ai-governance/<bucket>/` | 🅑 | ✓ |
+| D6 | Cross-link 4 AI Gateway pages | 🅑 | |
+| D7 | Update `docs/introduction.mdx` + main quickstarts | 🅑 | |
+| D8 | `pnpm docs:build` + link check (catches the redirect-stub mistakes early) | 🅑 | ✓ |
+| D9 | 🅐 Andre folds into PR body + re-PATCHes | 🅐 | |
+
+Critical path: D1 → D2 → D5 → D8.
 
 ---
 
