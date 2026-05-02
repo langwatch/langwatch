@@ -355,6 +355,7 @@ describe("createSaaSPlanProvider", () => {
     });
 
     describe("when subscription is CANCELLED", () => {
+      /** @scenario Cancelled subscription resolves to free tier limits */
       it("resolves to free tier limits", async () => {
         // A CANCELLED subscription must not appear in active subscription query.
         // The findFirst query filters by status: ACTIVE, so cancelled subs are excluded.
