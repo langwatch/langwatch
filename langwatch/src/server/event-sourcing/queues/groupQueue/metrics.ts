@@ -4,6 +4,7 @@ import { Counter, Gauge, Histogram, register } from "prom-client";
 const metricNames = [
   "gq_active_groups",
   "gq_pending_groups",
+  "gq_blocked_groups",
   "gq_groups_blocked_total",
   "gq_jobs_staged_total",
   "gq_jobs_dispatched_total",
@@ -42,6 +43,12 @@ export const gqGroupsBlockedTotal = new Counter({
   name: "gq_groups_blocked_total",
   help: "Total number of groups that have been blocked due to exhausted retries",
   labelNames: ["queue_name", "pipeline_name", "job_type", "job_name"] as const,
+});
+
+export const gqBlockedGroups = new Gauge({
+  name: "gq_blocked_groups",
+  help: "Number of groups currently in the blocked state (jobs exhausted retries, awaiting manual unblock)",
+  labelNames: ["queue_name"] as const,
 });
 
 export const gqJobsStagedTotal = new Counter({
