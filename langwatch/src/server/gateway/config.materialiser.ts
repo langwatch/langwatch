@@ -230,6 +230,15 @@ export class GatewayConfigMaterialiser {
   private async loadProviderChain(
     vk: VirtualKeyWithChain,
   ): Promise<ProviderRow[]> {
+    // Personal VKs (and any centrally-governed VK) carry routing via
+    // RoutingPolicy.providerCredentialIds rather than embedding their
+    // own VirtualKeyProviderCredential rows. When routingPolicyId is
+    // set we materialise the chain from the policy. Mirrors the
+    // VirtualKeyService.create branch that accepts an empty
+    // providerCredentialIds list iff routingPolicyId is set.
+    if (vk.routingPolicyId) {
+      return this.loadProviderChainFromPolicy(vk);
+    }
     if (vk.providerCredentials.length === 0) return [];
     // projectId is threaded through so the multitenancy middleware's
     // guard is satisfied without adding GatewayProviderCredential to
@@ -246,6 +255,50 @@ export class GatewayConfigMaterialiser {
     const byId = new Map(rows.map((r) => [r.id, r]));
     return vk.providerCredentials
       .map((p) => byId.get(p.providerCredentialId))
+      .filter((r): r is ProviderRow => Boolean(r));
+  }
+
+  /**
+   * Resolve provider chain from RoutingPolicy.providerCredentialIds.
+   * RoutingPolicy is org-scoped and may reference GatewayProviderCredentials
+   * living in different projects of the same org (admin-published policy
+   * that personal VKs across the org's users all consume). We constrain
+   * the credential lookup to projects belonging to the policy's org so the
+   * tenancy boundary still holds — the middleware's projectId-guard would
+   * otherwise reject the cross-project findMany.
+   */
+  private async loadProviderChainFromPolicy(
+    vk: VirtualKeyWithChain,
+  ): Promise<ProviderRow[]> {
+    const policy = await this.prisma.routingPolicy.findUnique({
+      where: { id: vk.routingPolicyId! },
+    });
+    if (!policy) return [];
+    const credIds = parsePolicyCredentialIds(policy.providerCredentialIds);
+    if (credIds.length === 0) return [];
+
+    // Tenancy: find every project owned by the policy's organization,
+    // then constrain the credential lookup to that project set. The VK
+    // was already tenancy-checked upstream; this just satisfies the
+    // multitenancy middleware's projectId predicate without exempting
+    // GatewayProviderCredential from the guard.
+    const orgProjects = await this.prisma.project.findMany({
+      where: { team: { organizationId: policy.organizationId } },
+      select: { id: true },
+    });
+    const projectIds = orgProjects.map((p) => p.id);
+    if (projectIds.length === 0) return [];
+
+    const rows = await this.prisma.gatewayProviderCredential.findMany({
+      where: {
+        projectId: { in: projectIds },
+        id: { in: credIds },
+      },
+      include: { modelProvider: true },
+    });
+    const byId = new Map(rows.map((r) => [r.id, r]));
+    return credIds
+      .map((id) => byId.get(id))
       .filter((r): r is ProviderRow => Boolean(r));
   }
 
@@ -275,6 +328,17 @@ export class GatewayConfigMaterialiser {
 // encrypted string, legacy plaintext objects accepted for back-compat)
 // into a plain key/value map. Mirrors
 // modelProvider.repository.ts#decryptCustomKeys.
+/**
+ * RoutingPolicy.providerCredentialIds is a JSON array column; deserialise
+ * to a flat string[]. Defensive — bad values just produce an empty chain
+ * (and the gateway 404s "no provider configured" which is the right
+ * surface for a misconfigured policy).
+ */
+function parsePolicyCredentialIds(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.filter((v): v is string => typeof v === "string" && v.length > 0);
+}
+
 function decryptCustomKeys(raw: unknown): Record<string, unknown> {
   if (raw === null || raw === undefined) return {};
   if (typeof raw === "object") return raw as Record<string, unknown>;

@@ -292,6 +292,151 @@ describe("GatewayConfigMaterialiser", () => {
       });
     });
 
+    describe("when the VK is bound to a RoutingPolicy (personal VK path)", () => {
+      it("resolves provider chain from RoutingPolicy.providerCredentialIds, scoped to the policy's org projects", async () => {
+        // Personal VKs carry no VirtualKeyProviderCredential rows; the
+        // chain comes from the org-scoped policy. Mirrors the bug surfaced
+        // in iter30 dogfood: gateway 504 'provider is required' because
+        // the materialiser only consulted vk.providerCredentials.
+        const prisma = mockPrisma({
+          project: {
+            findUnique: async () => ({
+              id: "personal_proj_01",
+              teamId: "personal_team_01",
+              name: "Personal",
+              slug: "personal",
+              team: {
+                id: "personal_team_01",
+                name: "Personal",
+                organizationId: "org_01",
+              },
+            }),
+            findMany: async () => [
+              { id: "personal_proj_01" },
+              { id: "admin_proj_01" }, // policy may reference a cred living in admin's project
+            ],
+          } as any,
+          routingPolicy: {
+            findUnique: async () => ({
+              id: "rp_default",
+              organizationId: "org_01",
+              providerCredentialIds: ["pc_openai_admin"],
+            }),
+          } as any,
+          gatewayProviderCredential: {
+            findMany: async () => [
+              {
+                id: "pc_openai_admin",
+                slot: "primary",
+                rateLimitRpm: null,
+                rateLimitTpm: null,
+                rateLimitRpd: null,
+                healthStatus: "HEALTHY",
+                circuitOpenedAt: null,
+                providerConfig: null,
+                modelProvider: {
+                  provider: "openai",
+                  customKeys: null,
+                  deploymentMapping: null,
+                },
+              },
+            ],
+          } as any,
+          gatewayBudget: { findMany: async () => [] } as any,
+          gatewayCacheRule: { findMany: async () => [] } as any,
+        });
+        const sut = new GatewayConfigMaterialiser(prisma);
+
+        const bundle = await sut.materialise(
+          stubVk({
+            projectId: "personal_proj_01",
+            providerCredentials: [],
+            routingPolicyId: "rp_default",
+          }),
+        );
+
+        expect(bundle.providers).toHaveLength(1);
+        expect(bundle.providers[0]?.id).toBe("pc_openai_admin");
+        expect(bundle.providers[0]?.type).toBe("openai");
+        expect(bundle.fallback.chain).toEqual(["pc_openai_admin"]);
+      });
+
+      it("returns empty chain when the policy has no providerCredentialIds", async () => {
+        const prisma = mockPrisma({
+          project: {
+            findUnique: async () => ({
+              id: "personal_proj_01",
+              teamId: "personal_team_01",
+              name: "Personal",
+              slug: "personal",
+              team: {
+                id: "personal_team_01",
+                name: "Personal",
+                organizationId: "org_01",
+              },
+            }),
+            findMany: async () => [{ id: "personal_proj_01" }],
+          } as any,
+          routingPolicy: {
+            findUnique: async () => ({
+              id: "rp_empty",
+              organizationId: "org_01",
+              providerCredentialIds: [],
+            }),
+          } as any,
+          gatewayProviderCredential: { findMany: async () => [] } as any,
+          gatewayBudget: { findMany: async () => [] } as any,
+          gatewayCacheRule: { findMany: async () => [] } as any,
+        });
+        const sut = new GatewayConfigMaterialiser(prisma);
+
+        const bundle = await sut.materialise(
+          stubVk({
+            projectId: "personal_proj_01",
+            providerCredentials: [],
+            routingPolicyId: "rp_empty",
+          }),
+        );
+
+        expect(bundle.providers).toEqual([]);
+      });
+
+      it("returns empty chain when the policy is missing (deleted out from under a VK)", async () => {
+        const prisma = mockPrisma({
+          project: {
+            findUnique: async () => ({
+              id: "personal_proj_01",
+              teamId: "personal_team_01",
+              name: "Personal",
+              slug: "personal",
+              team: {
+                id: "personal_team_01",
+                name: "Personal",
+                organizationId: "org_01",
+              },
+            }),
+          } as any,
+          routingPolicy: {
+            findUnique: async () => null,
+          } as any,
+          gatewayProviderCredential: { findMany: async () => [] } as any,
+          gatewayBudget: { findMany: async () => [] } as any,
+          gatewayCacheRule: { findMany: async () => [] } as any,
+        });
+        const sut = new GatewayConfigMaterialiser(prisma);
+
+        const bundle = await sut.materialise(
+          stubVk({
+            projectId: "personal_proj_01",
+            providerCredentials: [],
+            routingPolicyId: "rp_deleted",
+          }),
+        );
+
+        expect(bundle.providers).toEqual([]);
+      });
+    });
+
     describe("when the project is missing", () => {
       it("throws a descriptive error", async () => {
         const prisma = mockPrisma({
