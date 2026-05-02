@@ -7,6 +7,7 @@
  * no project-level RBAC required because the personal project IS the
  * caller's by construction.
  */
+import type { PrismaClient } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
@@ -19,11 +20,15 @@ import { PersonalWorkspaceService } from "~/server/governance/personalWorkspace.
 import { checkOrganizationPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
-async function assertOrgMembership(
-  prisma: import("@prisma/client").PrismaClient,
-  userId: string,
-  organizationId: string,
-) {
+async function assertOrgMembership({
+  prisma,
+  userId,
+  organizationId,
+}: {
+  prisma: PrismaClient;
+  userId: string;
+  organizationId: string;
+}) {
   const membership = await prisma.organizationUser.findUnique({
     where: { userId_organizationId: { userId, organizationId } },
   });
@@ -44,7 +49,11 @@ export const personalVirtualKeysRouter = createTRPCRouter({
     .input(z.object({ organizationId: z.string() }))
     .use(checkOrganizationPermission("organization:view"))
     .query(async ({ ctx, input }) => {
-      await assertOrgMembership(ctx.prisma, ctx.session.user.id, input.organizationId);
+      await assertOrgMembership({
+        prisma: ctx.prisma,
+        userId: ctx.session.user.id,
+        organizationId: input.organizationId,
+      });
       const service = PersonalVirtualKeyService.create(ctx.prisma);
       const keys = await service.list({
         userId: ctx.session.user.id,
@@ -79,7 +88,11 @@ export const personalVirtualKeysRouter = createTRPCRouter({
     )
     .use(checkOrganizationPermission("organization:view"))
     .mutation(async ({ ctx, input }) => {
-      await assertOrgMembership(ctx.prisma, ctx.session.user.id, input.organizationId);
+      await assertOrgMembership({
+        prisma: ctx.prisma,
+        userId: ctx.session.user.id,
+        organizationId: input.organizationId,
+      });
 
       // Make sure the personal workspace exists (lazy backfill for users
       // who joined the org before we shipped this feature).
@@ -132,7 +145,11 @@ export const personalVirtualKeysRouter = createTRPCRouter({
     .input(z.object({ organizationId: z.string(), id: z.string() }))
     .use(checkOrganizationPermission("organization:view"))
     .mutation(async ({ ctx, input }) => {
-      await assertOrgMembership(ctx.prisma, ctx.session.user.id, input.organizationId);
+      await assertOrgMembership({
+        prisma: ctx.prisma,
+        userId: ctx.session.user.id,
+        organizationId: input.organizationId,
+      });
 
       const service = PersonalVirtualKeyService.create(ctx.prisma);
       try {

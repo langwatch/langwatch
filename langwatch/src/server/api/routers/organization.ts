@@ -1055,12 +1055,18 @@ export const organizationRouter = createTRPCRouter({
           displayEmail: session.user.email,
         });
       } catch (err) {
-        // Non-fatal — log and continue. Lazy backfill will recover on
-        // the user's next session resolution.
-        console.warn(
-          `[governance] failed to provision personal workspace for user=${session.user.id} org=${invite.organizationId}:`,
-          err,
-        );
+        // Non-fatal — capture and continue. Lazy backfill will recover
+        // on the user's next session resolution. PostHog signal lets
+        // operators catch systemic provisioning regressions (bad
+        // migration, schema drift, Prisma constraint violation) before
+        // users start complaining about missing personal workspaces.
+        captureException(err, {
+          extra: {
+            origin: "governance.acceptInvite",
+            userId: session.user.id,
+            organizationId: invite.organizationId,
+          },
+        });
       }
 
       void getApp()

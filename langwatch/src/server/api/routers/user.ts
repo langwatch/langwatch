@@ -1,3 +1,4 @@
+import type { PrismaClient } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { compare, hash } from "bcrypt";
 import { z } from "zod";
@@ -644,10 +645,10 @@ export const userRouter = createTRPCRouter({
           .sort((a, b) => b.pctUsed - a.pctUsed)[0];
       if (!blocker) return { status: "ok" as const };
 
-      const adminEmail = await resolveOrgAdminEmail(
-        ctx.prisma,
-        input.organizationId,
-      );
+      const adminEmail = await resolveOrgAdminEmail({
+        prisma: ctx.prisma,
+        organizationId: input.organizationId,
+      });
       const baseStatus =
         decision.decision === "hard_block"
           ? ("exceeded" as const)
@@ -739,10 +740,13 @@ function requestIncreaseUrl(opts: {
   return `${opts.baseUrl.replace(/\/$/, "")}/me/budget/request?${params.toString()}`;
 }
 
-async function resolveOrgAdminEmail(
-  prisma: import("@prisma/client").PrismaClient,
-  organizationId: string,
-): Promise<string | undefined> {
+async function resolveOrgAdminEmail({
+  prisma,
+  organizationId,
+}: {
+  prisma: PrismaClient;
+  organizationId: string;
+}): Promise<string | undefined> {
   const admin = await prisma.organizationUser.findFirst({
     where: { organizationId, role: "ADMIN" },
     include: { user: { select: { email: true } } },
