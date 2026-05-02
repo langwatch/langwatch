@@ -6,6 +6,8 @@ sidebarTitle: Overview
 
 The **LangWatch AI Governance** layer adds the org-wide controls that make a multi-team LangWatch deployment auditable, attributable, and compliance-ready. Where the [AI Gateway](/ai-gateway/overview) is the data plane in the path of every LLM call, AI Governance is the **control plane** that decides who can use it, what they can spend, where their telemetry lands, and how regulators see it.
 
+![Governance admin home](/images/ai-governance/personas/governance-hero.png)
+
 <Info>**Pairs with:** [AI Gateway → Overview](/ai-gateway/overview). The gateway emits the spans; governance reactors fold them into anomaly detection, budget aggregates, OCSF exports, and per-user workspaces.</Info>
 
 ## Two personas
@@ -59,6 +61,32 @@ flowchart LR
 - **Governance control plane** owns the configuration surface — IngestionSources, AnomalyRules, RoutingPolicies, Personal/Team/Project workspaces, RBAC.
 
 Same compose stack, same Helm chart — no separate service to deploy.
+
+## A tour of the surface
+
+<Frame caption="Admin: oversight dashboard at /governance — setup-state OR-of-flags promotes the Govern menu entry">
+  ![Governance home](/images/ai-governance/admin/governance-home.png)
+</Frame>
+
+<Frame caption="Admin: IngestionSources list at /settings/governance/ingestion-sources">
+  ![Ingestion sources list](/images/ai-governance/admin/ingestion-sources-list.png)
+</Frame>
+
+<Frame caption="Admin: AnomalyRules list at /settings/governance/anomaly-rules">
+  ![Anomaly rules list](/images/ai-governance/admin/anomaly-rules-list.png)
+</Frame>
+
+<Frame caption="Admin: RoutingPolicies at /settings/routing-policies (admin-in-empty-org exempted from the no-org bouncer)">
+  ![Routing policies list](/images/ai-governance/admin/routing-policies-list.png)
+</Frame>
+
+<Frame caption="End user: persona-aware chrome at /me — single-chip header, PersonalSidebar, Workspace Switcher (Personal/Team/Project)">
+  ![End-user /me](/images/ai-governance/personas/p1-me-final.png)
+</Frame>
+
+<Frame caption="End user: notifications + profile at /me/settings">
+  ![/me/settings](/images/ai-governance/personas/me-settings.png)
+</Frame>
 
 ## Where to next
 
