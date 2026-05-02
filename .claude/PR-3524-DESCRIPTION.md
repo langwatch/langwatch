@@ -36,6 +36,24 @@
 
 ---
 
+## Reviewer's quick read — where to start
+
+This PR is large (215+ commits, multi-week, 3-lane). If you have **30 minutes**, walk this trail in order — every step has a single concrete entry point:
+
+1. **The pitch (3 min)** — read the next section below ("What this PR ships"). It's the customer-facing one-paragraph framing; everything else justifies it.
+2. **The contract (5 min)** — open `specs/ai-gateway/governance/architecture-invariants.feature`. The unified-substrate decision is *this file*. Everything else is a consequence. Skim sibling `.feature` files to see the BDD trail (26 files in `specs/ai-gateway/governance/`).
+3. **The receiver code (5 min)** — `langwatch/src/server/routes/ingest/ingestionRoutes.ts` — both `POST /api/ingest/otel/:sourceId` (span-shaped) and `POST /api/ingest/webhook/:sourceId` (flat) live here as thin wrappers around the shared hardened parser at `langwatch/src/server/otel/parseOtlpBody.ts`. The decision tree in §"Architecture — at a glance" below maps directly to these two paths.
+4. **The hidden Governance Project (5 min)** — `langwatch/src/server/governance/governanceProject.service.ts`. The internal-only Project that makes the unified store viable. §"The hidden Governance Project — invariants" below names the Layer-1 + Layer-2 tests that enforce it never leaks to user-facing surfaces.
+5. **The fold projections (5 min)** — `langwatch/src/server/event-sourcing/pipelines/trace-processing/reactors/governanceKpisSync.reactor.ts` + `governanceOcsfEventsSync.reactor.ts`. Derived data, rebuildable from `event_log`. KPI reactor feeds anomaly + activity-monitor; OCSF reactor feeds SIEM export.
+6. **The persona-aware experience (5 min)** — `specs/ai-gateway/governance/persona-aware-chrome.feature` (BDD contract) + `langwatch/src/components/DashboardLayout.tsx` (the layout swap). Persona-3 (LLMOps majority, ~90% of users) regression-safety invariant is FIRST in the spec file by design.
+7. **The dogfood loop (2 min)** — `docs/ai-gateway/governance/admin-setup.mdx#try-it-locally-dogfood-loop` walks the full sign-up → seed-personas → fire-completion → /me/usage flow against your local stack. Reproducible by you, not just the team.
+
+If you have **5 minutes**, skip to step 7 (dogfood loop) and skim the screenshots in §"UI flows + screenshots" below.
+
+**What to push back on, if anything:** the `ee/` license-relocation Phase 4 is *deferred to a follow-up PR* per @rchaves vote H — the behavior ships here, the file moves ship next. If you want it done in-PR, flag it and we'll reopen the vote.
+
+---
+
 ## The pitch — what this PR ships
 
 > "Your engineers are running AI through Workato Genies, Claude for Work, Copilot
