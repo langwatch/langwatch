@@ -7,6 +7,12 @@ import { getProjectionMetadata, getReactorMetadata } from "~/server/event-sourci
 
 const opsViewPermission = checkOpsPermission("ops:view");
 
+// Status-probe variant of the ops:view middleware — populates `ctx.opsScope`
+// (with `kind: "none"` for non-ops users) without throwing FORBIDDEN. Lets
+// `getScope` be a probe that the global menu can poll on every page load
+// without spamming the console (lw#3584).
+const opsViewProbe = checkOpsPermission("ops:view", { throwOnDeny: false });
+
 const opsManagePermission = checkOpsPermission("ops:manage");
 
 function requireOps() {
@@ -21,7 +27,18 @@ function requireOps() {
 }
 
 export const opsRouter = createTRPCRouter({
-  getScope: protectedProcedure.use(opsViewPermission).query(({ ctx }) => {
+  /**
+   * Status probe — returns the calling user's ops scope. Always succeeds for
+   * any authenticated user; non-ops users get `{ scope: { kind: "none" } }`
+   * instead of FORBIDDEN. The hook (`useOpsPermission`) derives `hasAccess`
+   * from `scope.kind !== "none"` so the global menu can hide ops UI without
+   * spamming the console with permission errors on every page load
+   * (lw#3584).
+   *
+   * The mutating ops endpoints below still go through the throw-on-deny
+   * variant of `checkOpsPermission` — only this status probe relaxes it.
+   */
+  getScope: protectedProcedure.use(opsViewProbe).query(({ ctx }) => {
     return { scope: ctx.opsScope! };
   }),
 

@@ -1104,11 +1104,12 @@ export function resolveOpsScope({
 }
 
 export const checkOpsPermission =
-  (permission: Permission) =>
+  (permission: Permission, options: { throwOnDeny?: boolean } = {}) =>
   async ({
     ctx,
     next,
   }: PermissionMiddlewareParams<unknown>) => {
+    const { throwOnDeny = true } = options;
     const user = ctx.session?.user;
     if (!user) {
       throw new TRPCError({ code: "UNAUTHORIZED" });
@@ -1121,7 +1122,12 @@ export const checkOpsPermission =
       prisma: ctx.prisma,
     });
 
-    if (!opsScope) {
+    // For mutating endpoints, `kind: "none"` is a hard FORBIDDEN. For status
+    // probes that want to *report* "no access" without throwing (lw#3584
+    // — see ops.getScope), pass `{ throwOnDeny: false }` so the middleware
+    // populates `ctx.opsScope = { kind: "none" }` and the procedure handler
+    // can branch on it.
+    if (opsScope.kind === "none" && throwOnDeny) {
       throw new TRPCError({
         code: "FORBIDDEN",
         message: "You do not have permission to access ops resources",
