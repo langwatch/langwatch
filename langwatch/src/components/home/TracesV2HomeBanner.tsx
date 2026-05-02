@@ -1,13 +1,13 @@
 import {
-  Box,
-  Button,
-  chakra,
-  Heading,
-  HStack,
-  Icon,
-  IconButton,
-  Text,
-  VStack,
+	Box,
+	Button,
+	chakra,
+	Heading,
+	HStack,
+	Icon,
+	IconButton,
+	Text,
+	VStack,
 } from "@chakra-ui/react";
 import { MeshGradient } from "@paper-design/shaders-react";
 import { useEffect, useState } from "react";
@@ -18,51 +18,21 @@ import { useFeatureFlag } from "~/hooks/useFeatureFlag";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useReducedMotion } from "~/hooks/useReducedMotion";
 import { useColorModeValue } from "../ui/color-mode";
+import {
+	buildTraceExplorerEarlyAccessMailto,
+	isPromoSnoozed,
+	openCrispChat,
+	snoozePromo,
+	TRACE_PROMO_SNOOZE_DAYS,
+	type TracesPromoMode,
+	type TracesPromoSnoozeStore,
+} from "../promos/tracesPromoState";
 
-const SNOOZE_DAYS = 7;
-const SNOOZE_MS = SNOOZE_DAYS * 24 * 60 * 60 * 1000;
-const STORAGE_PREFIX = "langwatch:tracesV2-home-banner-dismissed:v2:";
-
-type PromoMode = "try" | "request";
-
-const storageKey = (projectId: string, mode: PromoMode) =>
-	`${STORAGE_PREFIX}${mode}:${projectId}`;
-
-function isSnoozed(projectId: string, mode: PromoMode): boolean {
-	if (typeof window === "undefined") return false;
-	try {
-		const raw = localStorage.getItem(storageKey(projectId, mode));
-		if (!raw) return false;
-		const expiresAt = Number(raw);
-		if (!Number.isFinite(expiresAt)) return false;
-		return expiresAt > Date.now();
-	} catch {
-		return false;
-	}
-}
-
-function snooze(projectId: string, mode: PromoMode) {
-	if (typeof window === "undefined") return;
-	try {
-		localStorage.setItem(
-			storageKey(projectId, mode),
-			String(Date.now() + SNOOZE_MS),
-		);
-	} catch {
-		// Best-effort dismissal.
-	}
-}
-
-function openCrispChat(): boolean {
-	if (typeof window === "undefined") return false;
-	const crisp = (
-		window as unknown as { $crisp?: { push: (args: unknown[]) => void } }
-	).$crisp;
-	if (!crisp) return false;
-	crisp.push(["do", "chat:show"]);
-	crisp.push(["do", "chat:toggle"]);
-	return true;
-}
+// Bump the version segment when the copy materially changes so prior
+// dismissals don't keep the new banner permanently hidden.
+const SNOOZE_STORE: TracesPromoSnoozeStore = {
+	prefix: "langwatch:tracesV2-home-banner-dismissed:v2:",
+};
 
 // Colours mirror the in-app NewTracesPromo banner so the two surfaces feel
 // like the same announcement. Resolved hex values are required because the
@@ -92,9 +62,9 @@ interface PreviewFrameProps {
  * origin and translates *up* — the top of the screenshot stays comfortably
  * inside the banner (no clipping at the banner's top edge), and the extra
  * height grows downward where it gets clipped by the banner's overflow.
- * Net effect: the user sees a much larger, clearer view of the toolbar /
- * trace list (the "top" of the product) without the preview spilling
- * awkwardly above the banner.
+ *
+ * The Link itself is the styled, focusable element (no inner Box wrapper)
+ * so keyboard focus and `_focusVisible` styles land on the same node.
  */
 function PreviewFrame({
 	href,
@@ -109,35 +79,33 @@ function PreviewFrame({
 			href={href}
 			onClick={onClick}
 			aria-label={ariaLabel}
-			style={{ display: "contents" }}
+			display={{ base: "none", sm: "block" }}
+			position="absolute"
+			right={{ base: 4, md: 8 }}
+			bottom={0}
+			width={{ base: "210px", md: "270px" }}
+			height={{ base: "123px", md: "158px" }}
+			zIndex={1}
+			cursor="pointer"
+			transformOrigin="top right"
+			transform="translateY(38%)"
+			transition="transform 380ms cubic-bezier(0.2, 0.8, 0.2, 1), filter 280ms ease"
+			textDecoration="none"
+			_hover={{
+				transform: hoverTransform,
+				filter: "brightness(1.05)",
+				zIndex: 5,
+				textDecoration: "none",
+			}}
+			_focusVisible={{
+				transform: hoverTransform,
+				zIndex: 5,
+				outline: "2px solid white",
+				outlineOffset: "4px",
+				borderRadius: "lg",
+			}}
 		>
-			<Box
-				position="absolute"
-				right={{ base: 4, md: 8 }}
-				bottom={0}
-				width={{ base: "210px", md: "270px" }}
-				height={{ base: "123px", md: "158px" }}
-				display={{ base: "none", sm: "block" }}
-				zIndex={1}
-				cursor="pointer"
-				transformOrigin="top right"
-				transform="translateY(38%)"
-				transition="transform 380ms cubic-bezier(0.2, 0.8, 0.2, 1), filter 280ms ease"
-				_hover={{
-					transform: hoverTransform,
-					filter: "brightness(1.05)",
-					zIndex: 5,
-				}}
-				_focusVisible={{
-					transform: hoverTransform,
-					zIndex: 5,
-					outline: "2px solid white",
-					outlineOffset: "4px",
-					borderRadius: "lg",
-				}}
-			>
-				{children}
-			</Box>
+			{children}
 		</Link>
 	);
 }
@@ -155,20 +123,23 @@ export function TracesV2HomeBanner() {
 	const [previewVariant, setPreviewVariant] =
 		useState<PreviewVariant>("simple");
 
-	useEffect(() => {
-		if (reduceMotion) return;
-		const id = setInterval(() => {
-			setPreviewVariant((v) => (v === "simple" ? "complex" : "simple"));
-		}, PREVIEW_CYCLE_MS);
-		return () => clearInterval(id);
-	}, [reduceMotion]);
-
 	const { enabled: tracesV2Enabled, isLoading: tracesV2FlagLoading } =
 		useFeatureFlag("release_ui_traces_v2_enabled", {
 			projectId,
 			enabled: !!projectId,
 		});
-	const mode: PromoMode = tracesV2Enabled ? "try" : "request";
+	const mode: TracesPromoMode = tracesV2Enabled ? "try" : "request";
+
+	// Only cycle the preview while it's actually rendered (request mode).
+	// Cycling in try mode would burn a render every 6s for nothing.
+	const cycleEnabled = !reduceMotion && mode === "request";
+	useEffect(() => {
+		if (!cycleEnabled) return;
+		const id = setInterval(() => {
+			setPreviewVariant((v) => (v === "simple" ? "complex" : "simple"));
+		}, PREVIEW_CYCLE_MS);
+		return () => clearInterval(id);
+	}, [cycleEnabled]);
 
 	const [dismissed, setDismissed] = useState(false);
 	const [hasMounted, setHasMounted] = useState(false);
@@ -178,7 +149,7 @@ export function TracesV2HomeBanner() {
 	}, []);
 
 	useEffect(() => {
-		if (projectId) setDismissed(isSnoozed(projectId, mode));
+		if (projectId) setDismissed(isPromoSnoozed(SNOOZE_STORE, projectId, mode));
 	}, [projectId, mode]);
 
 	if (!hasMounted || !projectSlug || tracesV2FlagLoading || dismissed) {
@@ -186,19 +157,12 @@ export function TracesV2HomeBanner() {
 	}
 
 	const handleDismiss = () => {
-		if (projectId) snooze(projectId, mode);
+		if (projectId) snoozePromo(SNOOZE_STORE, projectId, mode);
 		setDismissed(true);
 	};
 
 	const v2Href = `/${projectSlug}/traces`;
-
-	const requestAccessMailto = `mailto:support@langwatch.ai?subject=${encodeURIComponent(
-		"Early access to the new Trace Explorer",
-	)}&body=${encodeURIComponent(
-		"Hi! I'd like early access to the new Trace Explorer" +
-			(project?.slug ? ` for project "${project.slug}"` : "") +
-			".",
-	)}`;
+	const requestAccessMailto = buildTraceExplorerEarlyAccessMailto(projectSlug);
 
 	const handleRequestAccess = (e: React.MouseEvent<HTMLAnchorElement>) => {
 		if (openCrispChat()) {
@@ -306,57 +270,59 @@ export function TracesV2HomeBanner() {
 					</Text>
 					<HStack gap={2} marginTop={1.5}>
 						{mode === "try" ? (
-							<Link href={v2Href} aria-label="Open new Trace Explorer">
-								<Button
-									size="sm"
-									bg="white"
-									color="purple.700"
-									fontWeight="600"
-									paddingX={4}
-									boxShadow="0 1px 2px rgba(0,0,0,0.12)"
-									_hover={{ bg: "white/90", transform: "translateY(-1px)" }}
-									_active={{ bg: "white/80", transform: "translateY(0)" }}
-									transition="background-color 0.12s ease, transform 0.12s ease"
-								>
+							<Button
+								asChild
+								size="sm"
+								bg="white"
+								color="purple.700"
+								fontWeight="600"
+								paddingX={4}
+								boxShadow="0 1px 2px rgba(0,0,0,0.12)"
+								_hover={{ bg: "white/90", transform: "translateY(-1px)" }}
+								_active={{ bg: "white/80", transform: "translateY(0)" }}
+								transition="background-color 0.12s ease, transform 0.12s ease"
+							>
+								<Link href={v2Href} aria-label="Open new Trace Explorer">
 									Try the new Trace Explorer
 									<Icon as={LuArrowRight} boxSize={3.5} marginLeft={1} />
-								</Button>
-							</Link>
+								</Link>
+							</Button>
 						) : (
-							<Link
-								href={requestAccessMailto}
-								onClick={handleRequestAccess}
-								aria-label="Request early access to the new Trace Explorer"
+							<Button
+								asChild
+								size="sm"
+								bg="white"
+								color="purple.700"
+								fontWeight="600"
+								paddingX={4}
+								boxShadow="0 1px 2px rgba(0,0,0,0.12)"
+								_hover={{ bg: "white/90", transform: "translateY(-1px)" }}
+								_active={{ bg: "white/80", transform: "translateY(0)" }}
+								transition="background-color 0.12s ease, transform 0.12s ease"
 							>
-								<Button
-									size="sm"
-									bg="white"
-									color="purple.700"
-									fontWeight="600"
-									paddingX={4}
-									boxShadow="0 1px 2px rgba(0,0,0,0.12)"
-									_hover={{ bg: "white/90", transform: "translateY(-1px)" }}
-									_active={{ bg: "white/80", transform: "translateY(0)" }}
-									transition="background-color 0.12s ease, transform 0.12s ease"
+								<Link
+									href={requestAccessMailto}
+									onClick={handleRequestAccess}
+									aria-label="Request early access to the new Trace Explorer"
 								>
 									<Icon as={LuMessageCircle} boxSize={3.5} marginRight={1} />
 									Request early access
-								</Button>
-							</Link>
+								</Link>
+							</Button>
 						)}
 					</HStack>
 				</VStack>
 			</HStack>
 
 			{/*
-        Preview screenshot. Sits in the bottom-right corner and is pushed
-        below the banner edge so only its top portion is visible — the
-        SaaS "screenshot peeking up into the hero" pattern. Renders all
-        four light/dark × simple/complex variants stacked and toggles
-        opacity, so both the timed variant cycle and theme changes share
-        the same cross-fade. The screenshots already include their own
-        window chrome and drop shadow, so we don't add a frame here.
-      */}
+				Preview screenshot. Sits in the bottom-right corner and is pushed
+				below the banner edge so only its top portion is visible — the
+				SaaS "screenshot peeking up into the hero" pattern. Renders all
+				four light/dark × simple/complex variants stacked and toggles
+				opacity, so both the timed variant cycle and theme changes share
+				the same cross-fade. The screenshots already include their own
+				window chrome and drop shadow, so we don't add a frame here.
+			*/}
 			{mode === "request" && (
 				<PreviewFrame
 					href={requestAccessMailto}
@@ -390,7 +356,7 @@ export function TracesV2HomeBanner() {
 			)}
 
 			<Tooltip
-				content={`Hide for ${SNOOZE_DAYS} days`}
+				content={`Hide for ${TRACE_PROMO_SNOOZE_DAYS} days`}
 				positioning={{ placement: "top" }}
 			>
 				<IconButton

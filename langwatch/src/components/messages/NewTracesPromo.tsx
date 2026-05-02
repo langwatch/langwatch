@@ -13,54 +13,21 @@ import { Link } from "~/components/ui/link";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useFeatureFlag } from "~/hooks/useFeatureFlag";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import {
+  buildTraceExplorerEarlyAccessMailto,
+  isPromoSnoozed,
+  openCrispChat,
+  snoozePromo,
+  TRACE_PROMO_SNOOZE_DAYS,
+  type TracesPromoMode,
+  type TracesPromoSnoozeStore,
+} from "../promos/tracesPromoState";
 
-const SNOOZE_DAYS = 7;
-const SNOOZE_MS = SNOOZE_DAYS * 24 * 60 * 60 * 1000;
-// Versioned so prior dismissals from earlier copy/iterations don't keep the
-// banner permanently hidden. Bump when the message materially changes.
-const STORAGE_PREFIX = "langwatch:tracesV2-promo-dismissed:v9:";
-
-type PromoMode = "try" | "request";
-
-function storageKey(projectId: string, mode: PromoMode): string {
-  return `${STORAGE_PREFIX}${mode}:${projectId}`;
-}
-
-function isSnoozed(projectId: string, mode: PromoMode): boolean {
-  if (typeof window === "undefined") return false;
-  try {
-    const raw = localStorage.getItem(storageKey(projectId, mode));
-    if (!raw) return false;
-    const expiresAt = Number(raw);
-    if (!Number.isFinite(expiresAt)) return false;
-    return expiresAt > Date.now();
-  } catch {
-    return false;
-  }
-}
-
-function snooze(projectId: string, mode: PromoMode): void {
-  if (typeof window === "undefined") return;
-  try {
-    localStorage.setItem(
-      storageKey(projectId, mode),
-      String(Date.now() + SNOOZE_MS),
-    );
-  } catch {
-    // No-op: best-effort dismissal.
-  }
-}
-
-function openCrispChat(): boolean {
-  if (typeof window === "undefined") return false;
-  const crisp = (
-    window as unknown as { $crisp?: { push: (args: unknown[]) => void } }
-  ).$crisp;
-  if (!crisp) return false;
-  crisp.push(["do", "chat:show"]);
-  crisp.push(["do", "chat:toggle"]);
-  return true;
-}
+// Bump the version segment when the copy materially changes so prior
+// dismissals don't keep the banner permanently hidden.
+const SNOOZE_STORE: TracesPromoSnoozeStore = {
+  prefix: "langwatch:tracesV2-promo-dismissed:v9:",
+};
 
 interface NewTracesPromoProps {
   variant?: "full" | "compact";
@@ -83,7 +50,7 @@ export function NewTracesPromo({
       projectId,
       enabled: !!projectId,
     });
-  const mode: PromoMode = tracesV2Enabled ? "try" : "request";
+  const mode: TracesPromoMode = tracesV2Enabled ? "try" : "request";
   const [dismissed, setDismissed] = useState(false);
   const [hasMounted, setHasMounted] = useState(false);
 
@@ -92,7 +59,7 @@ export function NewTracesPromo({
   }, []);
 
   useEffect(() => {
-    if (projectId) setDismissed(isSnoozed(projectId, mode));
+    if (projectId) setDismissed(isPromoSnoozed(SNOOZE_STORE, projectId, mode));
   }, [projectId, mode]);
 
   if (!hasMounted || !projectSlug || tracesV2FlagLoading || dismissed) {
@@ -100,7 +67,7 @@ export function NewTracesPromo({
   }
 
   const handleDismiss = () => {
-    if (projectId) snooze(projectId, mode);
+    if (projectId) snoozePromo(SNOOZE_STORE, projectId, mode);
     setDismissed(true);
   };
 
@@ -108,13 +75,7 @@ export function NewTracesPromo({
     ? `/${projectSlug}/traces?drawer.open=traceV2Details&drawer.traceId=${encodeURIComponent(traceId)}`
     : `/${projectSlug}/traces`;
 
-  const requestAccessMailto = `mailto:support@langwatch.ai?subject=${encodeURIComponent(
-    "Early access to the new Trace Explorer",
-  )}&body=${encodeURIComponent(
-    "Hi! I'd like early access to the new Trace Explorer" +
-      (project?.slug ? ` for project "${project.slug}"` : "") +
-      ".",
-  )}`;
+  const requestAccessMailto = buildTraceExplorerEarlyAccessMailto(projectSlug);
 
   const handleRequestAccess = (e: React.MouseEvent<HTMLAnchorElement>) => {
     if (openCrispChat()) {
@@ -204,46 +165,48 @@ export function NewTracesPromo({
         )}
       </VStack>
       {mode === "try" ? (
-        <Link href={v2Href} aria-label="Open new Trace Explorer">
-          <Button
-            size={isCompact ? "xs" : "sm"}
-            bg="white"
-            color="purple.700"
-            fontWeight="600"
-            paddingX={isCompact ? 3 : 4}
-            boxShadow="0 1px 2px rgba(0, 0, 0, 0.12)"
-            _hover={{ bg: "white/90", transform: "translateY(-1px)" }}
-            _active={{ bg: "white/80", transform: "translateY(0)" }}
-            transition="background-color 0.12s ease, transform 0.12s ease"
-          >
+        <Button
+          asChild
+          size={isCompact ? "xs" : "sm"}
+          bg="white"
+          color="purple.700"
+          fontWeight="600"
+          paddingX={isCompact ? 3 : 4}
+          boxShadow="0 1px 2px rgba(0, 0, 0, 0.12)"
+          _hover={{ bg: "white/90", transform: "translateY(-1px)" }}
+          _active={{ bg: "white/80", transform: "translateY(0)" }}
+          transition="background-color 0.12s ease, transform 0.12s ease"
+        >
+          <Link href={v2Href} aria-label="Open new Trace Explorer">
             Try the new one
             <Icon as={LuArrowRight} boxSize={3.5} marginLeft={1} />
-          </Button>
-        </Link>
+          </Link>
+        </Button>
       ) : (
-        <Link
-          href={requestAccessMailto}
-          onClick={handleRequestAccess}
-          aria-label="Request early access to the new Trace Explorer"
+        <Button
+          asChild
+          size={isCompact ? "xs" : "sm"}
+          bg="white"
+          color="purple.700"
+          fontWeight="600"
+          paddingX={isCompact ? 3 : 4}
+          boxShadow="0 1px 2px rgba(0, 0, 0, 0.12)"
+          _hover={{ bg: "white/90", transform: "translateY(-1px)" }}
+          _active={{ bg: "white/80", transform: "translateY(0)" }}
+          transition="background-color 0.12s ease, transform 0.12s ease"
         >
-          <Button
-            size={isCompact ? "xs" : "sm"}
-            bg="white"
-            color="purple.700"
-            fontWeight="600"
-            paddingX={isCompact ? 3 : 4}
-            boxShadow="0 1px 2px rgba(0, 0, 0, 0.12)"
-            _hover={{ bg: "white/90", transform: "translateY(-1px)" }}
-            _active={{ bg: "white/80", transform: "translateY(0)" }}
-            transition="background-color 0.12s ease, transform 0.12s ease"
+          <Link
+            href={requestAccessMailto}
+            onClick={handleRequestAccess}
+            aria-label="Request early access to the new Trace Explorer"
           >
             <Icon as={LuMessageCircle} boxSize={3.5} marginRight={1} />
             Request early access
-          </Button>
-        </Link>
+          </Link>
+        </Button>
       )}
       <Tooltip
-        content={`Hide for ${SNOOZE_DAYS} days`}
+        content={`Hide for ${TRACE_PROMO_SNOOZE_DAYS} days`}
         positioning={{ placement: "top" }}
       >
         <IconButton
