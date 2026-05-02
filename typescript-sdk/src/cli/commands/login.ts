@@ -248,7 +248,7 @@ async function loginDeviceFlow(opts: { browser?: string }): Promise<void> {
       email: cfg.user?.email ?? result.user.email,
       organizationName: cfg.organization?.name,
       providers: bootstrap?.providers,
-      budget: bootstrap?.budget && bootstrap.budget.monthlyLimitUsd !== null
+      budget: bootstrap?.budget?.monthlyLimitUsd != null
         ? {
             period: bootstrap.budget.period,
             limitUsd: bootstrap.budget.monthlyLimitUsd,

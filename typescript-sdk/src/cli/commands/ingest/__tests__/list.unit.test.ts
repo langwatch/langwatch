@@ -7,6 +7,7 @@ import { buildTable, humanRelative } from "../list";
 // "preserves ANSI codes verbatim" assertion is meaningful.
 chalk.level = 1;
 
+// eslint-disable-next-line no-control-regex -- intentional: stripping ANSI escape codes from chalk output
 const stripAnsi = (s: string) => s.replace(/\x1b\[[0-9;]*m/g, "");
 
 describe("humanRelative", () => {

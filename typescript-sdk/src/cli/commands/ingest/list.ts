@@ -146,5 +146,6 @@ function printTable(rows: string[][]): void {
 }
 
 function stripAnsi(s: string): string {
+  // eslint-disable-next-line no-control-regex -- intentional: stripping ANSI escape codes from chalk output for column-width math
   return s.replace(/\x1b\[[0-9;]*m/g, "");
 }
