@@ -21,6 +21,7 @@
  * The secret is shown ONCE — capture it from script output.
  */
 import { randomBytes } from "crypto";
+import { RoleBindingScopeType, TeamUserRole } from "@prisma/client";
 
 import { prisma } from "~/server/db";
 import { encrypt } from "~/utils/encryption";
@@ -84,6 +85,39 @@ async function main() {
       organizationId: org.id,
       members: { create: { userId: user.id, role: teamRole } },
     },
+  });
+
+  // Mirror the production org-create flow (OrganizationPrismaRepository
+  // .createAndAssign at lines 217-237). Production seeds two RoleBindings
+  // per new org: ORGANIZATION-scoped + TEAM-scoped, both at the user's
+  // role. Without these the new `hasOrganizationPermission` resolver
+  // falls into the legacy TeamUser path which only consults
+  // `teamRoleHasPermission` — and the team-role bag has no
+  // `organization:view` entry, so the user 401s on every org-scoped
+  // procedure (incl. `governance.resolveHome`, the persona-aware
+  // `/` redirect path the chrome relies on). Iter33 chrome dogfood
+  // surfaced this when seed-personas-created MEMBER 401d on
+  // resolveHome despite the carve-out (see PR doc §"RBAC
+  // defense-in-depth → Open thread", `9e373c284`).
+  const rbRole =
+    teamRole === "ADMIN" ? TeamUserRole.ADMIN : TeamUserRole.MEMBER;
+  await prisma.roleBinding.createMany({
+    data: [
+      {
+        organizationId: org.id,
+        userId: user.id,
+        role: rbRole,
+        scopeType: RoleBindingScopeType.ORGANIZATION,
+        scopeId: org.id,
+      },
+      {
+        organizationId: org.id,
+        userId: user.id,
+        role: rbRole,
+        scopeType: RoleBindingScopeType.TEAM,
+        scopeId: team.id,
+      },
+    ],
   });
 
   const project = await prisma.project.create({
