@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { useMemo, useState } from "react";
 
+import { LoadingScreen } from "~/components/LoadingScreen";
 import { NotFoundScene } from "~/components/NotFoundScene";
 import SettingsLayout from "~/components/SettingsLayout";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
@@ -62,10 +63,15 @@ function RoutingPoliciesPage() {
     redirectToOnboarding: false,
   });
   const orgId = organization?.id ?? "";
-  const { enabled: governancePreviewEnabled } = useFeatureFlag(
-    "release_ui_ai_governance_enabled",
-    { projectId: project?.id, enabled: !!project },
-  );
+  // Admin-in-empty-org (org but no project) is exempted from the no-org
+  // bouncer for this route — the FF query must resolve on org alone, not
+  // gate on project. Project remains a hint for PostHog cohort targeting.
+  const { enabled: governancePreviewEnabled, isLoading: ffLoading } =
+    useFeatureFlag("release_ui_ai_governance_enabled", {
+      projectId: project?.id,
+      organizationId: orgId,
+      enabled: !!orgId,
+    });
 
   const policiesQuery = api.routingPolicy.list.useQuery(
     { organizationId: orgId },
@@ -225,6 +231,9 @@ function RoutingPoliciesPage() {
     }
   };
 
+  if (ffLoading) {
+    return <LoadingScreen />;
+  }
   if (!governancePreviewEnabled) {
     return <NotFoundScene />;
   }

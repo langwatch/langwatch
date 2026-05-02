@@ -19,6 +19,7 @@ import numeral from "numeral";
 import Head from "~/utils/compat/next-head";
 
 import GovernanceLayout from "~/components/governance/GovernanceLayout";
+import { LoadingScreen } from "~/components/LoadingScreen";
 import { NotFoundScene } from "~/components/NotFoundScene";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { Link } from "~/components/ui/link";
@@ -64,14 +65,12 @@ function GovernanceOverviewPage() {
     redirectToOnboarding: false,
   });
   const orgId = organization?.id ?? "";
-  const { enabled: governancePreviewEnabled } = useFeatureFlag(
-    "release_ui_ai_governance_enabled",
-    {
+  const { enabled: governancePreviewEnabled, isLoading: ffLoading } =
+    useFeatureFlag("release_ui_ai_governance_enabled", {
       projectId: project?.id,
       organizationId: orgId,
       enabled: !!orgId,
-    },
-  );
+    });
 
   const sourcesQuery = api.ingestionSources.list.useQuery(
     { organizationId: orgId },
@@ -98,6 +97,9 @@ function GovernanceOverviewPage() {
     { enabled: !!orgId, refetchOnWindowFocus: false },
   );
 
+  if (ffLoading) {
+    return <LoadingScreen />;
+  }
   if (!governancePreviewEnabled) {
     return <NotFoundScene />;
   }

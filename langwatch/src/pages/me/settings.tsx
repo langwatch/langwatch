@@ -18,6 +18,7 @@ import {
 import { useState } from "react";
 import Head from "~/utils/compat/next-head";
 
+import { LoadingScreen } from "~/components/LoadingScreen";
 import { NotFoundScene } from "~/components/NotFoundScene";
 import MyLayout from "~/components/me/MyLayout";
 import {
@@ -56,10 +57,10 @@ export default function MySettingsPage() {
   // /me/settings is the persona-1 (org-less CLI/IDE dev) home — must
   // resolve the FF without project context. See sibling /me/index for
   // the same fix.
-  const { enabled: governancePreviewEnabled } = useFeatureFlag(
-    "release_ui_ai_governance_enabled",
-    { projectId: project?.id },
-  );
+  const { enabled: governancePreviewEnabled, isLoading: ffLoading } =
+    useFeatureFlag("release_ui_ai_governance_enabled", {
+      projectId: project?.id,
+    });
   const ctx = usePersonalContext();
   const [prefs, setPrefs] = useState(ctx.notificationPrefs);
   const [newKeyLabel, setNewKeyLabel] = useState("");
@@ -132,6 +133,9 @@ export default function MySettingsPage() {
     revokeMutation.mutate({ organizationId: ctx.organizationId, id });
   };
 
+  if (ffLoading) {
+    return <LoadingScreen />;
+  }
   if (!governancePreviewEnabled) {
     return <NotFoundScene />;
   }

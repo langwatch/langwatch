@@ -14,6 +14,7 @@ import {
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 
+import { LoadingScreen } from "~/components/LoadingScreen";
 import { NotFoundScene } from "~/components/NotFoundScene";
 import SettingsLayout from "~/components/SettingsLayout";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
@@ -105,14 +106,12 @@ function AnomalyRulesPage() {
     redirectToOnboarding: false,
   });
   const orgId = organization?.id ?? "";
-  const { enabled: governancePreviewEnabled } = useFeatureFlag(
-    "release_ui_ai_governance_enabled",
-    {
+  const { enabled: governancePreviewEnabled, isLoading: ffLoading } =
+    useFeatureFlag("release_ui_ai_governance_enabled", {
       projectId: project?.id,
       organizationId: orgId,
       enabled: !!orgId,
-    },
-  );
+    });
 
   const rulesQuery = api.anomalyRules.list.useQuery(
     { organizationId: orgId },
@@ -246,6 +245,9 @@ function AnomalyRulesPage() {
     }
   };
 
+  if (ffLoading) {
+    return <LoadingScreen />;
+  }
   if (!governancePreviewEnabled) {
     return <NotFoundScene />;
   }

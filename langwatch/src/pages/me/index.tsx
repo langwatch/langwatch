@@ -10,6 +10,7 @@ import {
 import numeral from "numeral";
 import Head from "~/utils/compat/next-head";
 
+import { LoadingScreen } from "~/components/LoadingScreen";
 import { NotFoundScene } from "~/components/NotFoundScene";
 import { BudgetExceededBanner } from "~/components/me/BudgetExceededBanner";
 import MyLayout from "~/components/me/MyLayout";
@@ -33,10 +34,10 @@ export default function MyUsagePage() {
   // /me is the persona-1 (org-less CLI/IDE dev) home — must resolve the FF
   // without project context. Project param remains as a hint for PostHog
   // cohort targeting when present, but the query no longer gates on it.
-  const { enabled: governancePreviewEnabled } = useFeatureFlag(
-    "release_ui_ai_governance_enabled",
-    { projectId: project?.id },
-  );
+  const { enabled: governancePreviewEnabled, isLoading: ffLoading } =
+    useFeatureFlag("release_ui_ai_governance_enabled", {
+      projectId: project?.id,
+    });
   const ctx = usePersonalContext();
   const {
     summary,
@@ -47,6 +48,9 @@ export default function MyUsagePage() {
     organizationName,
   } = ctx;
 
+  if (ffLoading) {
+    return <LoadingScreen />;
+  }
   if (!governancePreviewEnabled) {
     return <NotFoundScene />;
   }
