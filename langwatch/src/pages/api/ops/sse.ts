@@ -28,7 +28,7 @@ export default async function handler(
     permission: "ops:view",
     prisma,
   });
-  if (!opsScope) {
+  if (opsScope.kind === "none") {
     res.status(403).end();
     return;
   }
