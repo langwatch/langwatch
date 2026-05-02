@@ -28,7 +28,7 @@
  */
 import type { Context } from "hono";
 import { Hono } from "hono";
-import { randomBytes, randomUUID } from "node:crypto";
+import { randomBytes } from "node:crypto";
 import { z } from "zod";
 
 import { env } from "~/env.mjs";

@@ -35,8 +35,6 @@ import { app } from "../auth-cli";
 const suffix = nanoid(8);
 const ORG_ID = `org-budget-status-${suffix}`;
 const USER_ID = `usr-budget-status-${suffix}`;
-const TEAM_ID = `team-budget-status-${suffix}`;
-const PROJECT_ID = `proj-budget-status-${suffix}`;
 
 const VALID_TOKEN = `lw_at_${"v".repeat(43)}-valid-${suffix}`;
 const ACCESS_TOKEN_KEY = `lwcli:access:${VALID_TOKEN}`;
