@@ -27,7 +27,7 @@
  *   - specs/ai-gateway/governance/receiver-shapes.feature
  *   - specs/ai-gateway/governance/retention.feature
  */
-import type { PrismaClient, Project } from "@prisma/client";
+import { Prisma, type PrismaClient, type Project } from "@prisma/client";
 import { nanoid } from "nanoid";
 
 import { generateApiKey } from "~/server/utils/apiKeyGenerator";
@@ -84,27 +84,44 @@ export async function ensureHiddenGovernanceProject(
     return bySlug;
   }
 
-  return prisma.project.create({
-    data: {
-      id: nanoid(),
-      name: "Governance (internal)",
-      slug,
-      apiKey: generateApiKey(),
-      teamId: team.id,
-      kind: PROJECT_KIND.INTERNAL_GOVERNANCE,
-      // Internal-only — these aren't real "I'm building an app"
-      // language/framework signals, but the Project model requires
-      // them. Stable values keep the row recognisable in operator
-      // queries.
-      language: "internal",
-      framework: "governance",
-      // PII redaction stays at the org's effective default; receiver
-      // can override per-source if compliance retention demands it.
-      // The trace pipeline reads piiRedactionLevel at write time.
-      piiRedactionLevel: "ESSENTIAL",
-      // Trace sharing disabled — governance data must not be sharable
-      // out of the org's RBAC perimeter via public-share links.
-      traceSharingEnabled: false,
-    },
-  });
+  // Two concurrent ensures can both pass the check above and reach create
+  // — the slug-uniqueness re-check closes the common case but not the
+  // window between the findUnique and the create. Catch P2002 (unique
+  // constraint) and re-fetch the row that won the race.
+  try {
+    return await prisma.project.create({
+      data: {
+        id: nanoid(),
+        name: "Governance (internal)",
+        slug,
+        apiKey: generateApiKey(),
+        teamId: team.id,
+        kind: PROJECT_KIND.INTERNAL_GOVERNANCE,
+        // Internal-only — these aren't real "I'm building an app"
+        // language/framework signals, but the Project model requires
+        // them. Stable values keep the row recognisable in operator
+        // queries.
+        language: "internal",
+        framework: "governance",
+        // PII redaction stays at the org's effective default; receiver
+        // can override per-source if compliance retention demands it.
+        // The trace pipeline reads piiRedactionLevel at write time.
+        piiRedactionLevel: "ESSENTIAL",
+        // Trace sharing disabled — governance data must not be sharable
+        // out of the org's RBAC perimeter via public-share links.
+        traceSharingEnabled: false,
+      },
+    });
+  } catch (err) {
+    if (
+      err instanceof Prisma.PrismaClientKnownRequestError &&
+      err.code === "P2002"
+    ) {
+      const winner = await prisma.project.findUnique({ where: { slug } });
+      if (winner && winner.kind === PROJECT_KIND.INTERNAL_GOVERNANCE) {
+        return winner;
+      }
+    }
+    throw err;
+  }
 }
