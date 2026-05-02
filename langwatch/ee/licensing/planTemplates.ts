@@ -54,7 +54,7 @@ export const PRO_TEMPLATE: LicensePlanLimits = {
   maxCustomGraphs: 50,
   maxAutomations: 50,
   canPublish: true,
-  usageUnit: "traces",
+  usageUnit: "events",
 };
 
 /**
@@ -82,7 +82,7 @@ export const ENTERPRISE_TEMPLATE: LicensePlanLimits = {
   maxCustomGraphs: 1000,
   maxAutomations: 1000,
   canPublish: true,
-  usageUnit: "traces",
+  usageUnit: "events",
 };
 
 /**

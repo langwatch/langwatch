@@ -395,8 +395,13 @@ describe("License Router Integration", () => {
         maxScenarios: 50,
         maxAgents: 50,
         maxExperiments: 50,
+        maxOnlineEvaluations: 50,
+        maxDatasets: 50,
+        maxDashboards: 50,
+        maxCustomGraphs: 50,
+        maxAutomations: 50,
         canPublish: true,
-        usageUnit: "traces" as const,
+        usageUnit: "events" as const,
       },
     });
 
@@ -427,13 +432,43 @@ describe("License Router Integration", () => {
       expect(parsedLicense?.data.email).toBe("admin@test.corp");
     });
 
-    it("includes correct plan limits in license", async () => {
+    /** @scenario All plan limit fields are included in generated license */
+    it("includes all plan limit fields in license", async () => {
       const result = await adminCaller.license.generate(getValidInput());
 
+      const plan = parseLicenseKey(result.licenseKey)?.data.plan;
+      expect(plan?.maxMembers).toBe(10);
+      expect(plan?.maxMembersLite).toBe(5);
+      expect(plan?.maxTeams).toBe(10);
+      expect(plan?.maxProjects).toBe(20);
+      expect(plan?.maxMessagesPerMonth).toBe(100000);
+      expect(plan?.maxWorkflows).toBe(50);
+      expect(plan?.maxPrompts).toBe(50);
+      expect(plan?.maxEvaluators).toBe(50);
+      expect(plan?.maxScenarios).toBe(50);
+      expect(plan?.maxAgents).toBe(50);
+      expect(plan?.maxExperiments).toBe(50);
+      expect(plan?.maxOnlineEvaluations).toBe(50);
+      expect(plan?.maxDatasets).toBe(50);
+      expect(plan?.maxDashboards).toBe(50);
+      expect(plan?.maxCustomGraphs).toBe(50);
+      expect(plan?.maxAutomations).toBe(50);
+    });
+
+    /** @scenario Generated license stores unlimited limits correctly */
+    it("stores unlimited limits when DEFAULT_LIMIT is used", async () => {
+      const input = getValidInput();
+      input.plan.maxMembers = Number.MAX_SAFE_INTEGER;
+
+      const result = await adminCaller.license.generate(input);
+      const plan = parseLicenseKey(result.licenseKey)?.data.plan;
+      expect(plan?.maxMembers).toBe(Number.MAX_SAFE_INTEGER);
+
       const parsedLicense = parseLicenseKey(result.licenseKey);
-      expect(parsedLicense?.data.plan.maxMembers).toBe(10);
-      expect(parsedLicense?.data.plan.maxProjects).toBe(20);
-      expect(parsedLicense?.data.plan.maxMessagesPerMonth).toBe(100000);
+      if (parsedLicense) {
+        const isValid = verifySignature(parsedLicense, TEST_PUBLIC_KEY);
+        expect(isValid).toBe(true);
+      }
     });
 
     it("generates unique license IDs for each call", async () => {
@@ -473,8 +508,13 @@ describe("License Router Integration", () => {
           maxScenarios: ENTERPRISE_TEMPLATE.maxScenarios ?? 1000,
           maxAgents: ENTERPRISE_TEMPLATE.maxAgents ?? 1000,
           maxExperiments: ENTERPRISE_TEMPLATE.maxExperiments ?? 1000,
+          maxOnlineEvaluations: ENTERPRISE_TEMPLATE.maxOnlineEvaluations ?? 1000,
+          maxDatasets: ENTERPRISE_TEMPLATE.maxDatasets ?? 1000,
+          maxDashboards: ENTERPRISE_TEMPLATE.maxDashboards ?? 1000,
+          maxCustomGraphs: ENTERPRISE_TEMPLATE.maxCustomGraphs ?? 1000,
+          maxAutomations: ENTERPRISE_TEMPLATE.maxAutomations ?? 1000,
           canPublish: true,
-          usageUnit: "traces" as const,
+          usageUnit: "events" as const,
         },
       });
 
@@ -526,7 +566,7 @@ describe("License Router Integration", () => {
       const result = await adminCaller.license.generate(getValidInput());
 
       const parsedLicense = parseLicenseKey(result.licenseKey);
-      expect(parsedLicense?.data.plan.usageUnit).toBe("traces");
+      expect(parsedLicense?.data.plan.usageUnit).toBe("events");
     });
 
     it("generates license with events usageUnit", async () => {
