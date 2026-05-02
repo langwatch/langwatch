@@ -327,7 +327,10 @@ app.post("/exchange", async (c: Context) => {
 
   // Server-side TTL check in case Redis hasn't evicted yet.
   if (Date.now() > record.expires_at) {
-    await redis.del(deviceCodeKey(device_code), userCodeKey(record.user_code));
+    // Per-key dels — Redis cluster CROSSSLOT-rejects multi-key ops
+    // when keys differ in hash slot.
+    await redis.del(deviceCodeKey(device_code));
+    await redis.del(userCodeKey(record.user_code));
     return c.json(
       { error: "expired_token", error_description: "Device code expired" },
       408,
@@ -335,7 +338,10 @@ app.post("/exchange", async (c: Context) => {
   }
 
   if (record.status === "denied") {
-    await redis.del(deviceCodeKey(device_code), userCodeKey(record.user_code));
+    // Per-key dels — Redis cluster CROSSSLOT-rejects multi-key ops
+    // when keys differ in hash slot.
+    await redis.del(deviceCodeKey(device_code));
+    await redis.del(userCodeKey(record.user_code));
     return c.json(
       {
         error: "access_denied",
@@ -430,7 +436,10 @@ app.post("/exchange", async (c: Context) => {
       .exec();
 
     // Single-use device_code: delete after successful exchange.
-    await redis.del(deviceCodeKey(device_code), userCodeKey(record.user_code));
+    // Per-key dels — Redis cluster CROSSSLOT-rejects multi-key ops
+    // when keys differ in hash slot.
+    await redis.del(deviceCodeKey(device_code));
+    await redis.del(userCodeKey(record.user_code));
 
     return c.json(
       {

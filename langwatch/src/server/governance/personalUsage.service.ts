@@ -124,13 +124,20 @@ export class PersonalUsageService {
       query: `
         SELECT
           toDate(OccurredAt) AS Day,
-          sum(argMax(TotalCost, UpdatedAt))    AS SpentUsd,
-          countDistinct(TraceId)               AS Requests
-        FROM trace_summaries
-        WHERE TenantId = {tenantId:String}
-          AND OccurredAt >= {fromMs:DateTime64(3, 'UTC')}
-          AND OccurredAt <  {toMs:DateTime64(3, 'UTC')}
-        GROUP BY Day, TraceId
+          sum(SpentUsd)      AS SpentUsd,
+          count()            AS Requests
+        FROM (
+          SELECT
+            TraceId,
+            argMax(OccurredAt, UpdatedAt) AS OccurredAt,
+            argMax(TotalCost, UpdatedAt)  AS SpentUsd
+          FROM trace_summaries
+          WHERE TenantId = {tenantId:String}
+            AND OccurredAt >= {fromMs:DateTime64(3, 'UTC')}
+            AND OccurredAt <  {toMs:DateTime64(3, 'UTC')}
+          GROUP BY TraceId
+        )
+        GROUP BY Day
         ORDER BY Day
         SETTINGS ${formatSettings(ANALYTICS_CLICKHOUSE_SETTINGS)}
       `,
@@ -159,7 +166,16 @@ export class PersonalUsageService {
   /**
    * Per-model spend breakdown. Powers the "By tool" / "By model"
    * card on /me. Models come from `trace_summaries.Models` (an array
-   * — we explode it via arrayJoin and sum cost per model).
+   * — we explode it via arrayJoin after the per-trace argMax dedup).
+   *
+   * Cost-attribution policy: a multi-model trace contributes its FULL
+   * TotalCost to each model that appears in its Models array (so a
+   * 3-model trace at $1 contributes $1 to each of the 3 models, total
+   * $3). This is attribution-by-presence — accurate for "which tools
+   * did the user actually invoke?" but inflates the per-model
+   * percentage view. The /me/usage card uses this for relative
+   * ordering (most-used model on top); precise per-model billing
+   * lives in the gateway's per-call ledger, not this rollup.
    */
   async breakdownByModel(
     input: PersonalUsageQueryInput,
@@ -172,15 +188,22 @@ export class PersonalUsageService {
     const result = await client.query({
       query: `
         SELECT
-          arrayJoin(Models)                AS Model,
-          sum(argMax(TotalCost, UpdatedAt)) AS SpentUsd,
-          countDistinct(TraceId)            AS Requests
-        FROM trace_summaries
-        WHERE TenantId = {tenantId:String}
-          AND OccurredAt >= {fromMs:DateTime64(3, 'UTC')}
-          AND OccurredAt <  {toMs:DateTime64(3, 'UTC')}
-          AND notEmpty(Models)
-        GROUP BY TraceId, Model
+          Model,
+          sum(SpentUsd) AS SpentUsd,
+          count()       AS Requests
+        FROM (
+          SELECT
+            TraceId,
+            arrayJoin(argMax(Models, UpdatedAt)) AS Model,
+            argMax(TotalCost, UpdatedAt)         AS SpentUsd
+          FROM trace_summaries
+          WHERE TenantId = {tenantId:String}
+            AND OccurredAt >= {fromMs:DateTime64(3, 'UTC')}
+            AND OccurredAt <  {toMs:DateTime64(3, 'UTC')}
+            AND notEmpty(Models)
+          GROUP BY TraceId
+        )
+        GROUP BY Model
         ORDER BY SpentUsd DESC
         LIMIT {lim:UInt32}
         SETTINGS ${formatSettings(ANALYTICS_CLICKHOUSE_SETTINGS)}
