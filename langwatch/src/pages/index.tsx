@@ -14,7 +14,8 @@ import { api } from "~/utils/api";
  * Spec: specs/ai-gateway/governance/persona-home-resolver.feature
  */
 export default function Index() {
-  const { project, organization } = useOrganizationTeamProject();
+  const { project, organization, organizations, isLoading } =
+    useOrganizationTeamProject({ redirectToOnboarding: false });
   const router = useRouter();
 
   const resolved = api.governance.resolveHome.useQuery(
@@ -33,8 +34,29 @@ export default function Index() {
     }
     if (resolved.isError && project) {
       void router.replace(`/${project.slug}`);
+      return;
     }
-  }, [resolved.data, resolved.isError, project, router]);
+    // Persona-1 (personal-only): authenticated user with no org membership.
+    // Their home is /me, NOT /onboarding/welcome — the persona-aware-chrome
+    // spec treats org-less CLI/IDE devs as a first-class persona, not as
+    // unfinished onboarding. Falls through to the org-creation bounce only
+    // if the user explicitly opens /onboarding/welcome themselves.
+    if (
+      !isLoading &&
+      !organization &&
+      (organizations?.length ?? 0) === 0
+    ) {
+      void router.replace("/me");
+    }
+  }, [
+    resolved.data,
+    resolved.isError,
+    project,
+    organization,
+    organizations,
+    isLoading,
+    router,
+  ]);
 
   return <LoadingScreen />;
 }

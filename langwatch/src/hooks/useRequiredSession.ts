@@ -36,6 +36,15 @@ export const noOrgBouncerRoutes = [
   "/settings/governance/ingestion-sources/[id]",
   "/settings/governance/anomaly-rules",
   "/settings/routing-policies",
+  // Personal-scope pages — persona-1 (org-less CLI/IDE devs) is a
+  // first-class persona per the persona-aware-chrome spec. They have
+  // a legitimate home at /me + /me/settings without needing to create
+  // an org first. Without this exemption, CommandBar's global
+  // useOrganizationTeamProject({redirectToOnboarding: true}) wins the
+  // race and dumps them on /onboarding/welcome — exact opposite of the
+  // p1 storyboard.
+  "/me",
+  "/me/settings",
 ];
 
 export const useRequiredSession = (

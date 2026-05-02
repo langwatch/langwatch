@@ -30,9 +30,12 @@ export default function MyUsagePage() {
     redirectToOnboarding: false,
     redirectToProjectOnboarding: false,
   });
+  // /me is the persona-1 (org-less CLI/IDE dev) home — must resolve the FF
+  // without project context. Project param remains as a hint for PostHog
+  // cohort targeting when present, but the query no longer gates on it.
   const { enabled: governancePreviewEnabled } = useFeatureFlag(
     "release_ui_ai_governance_enabled",
-    { projectId: project?.id, enabled: !!project },
+    { projectId: project?.id },
   );
   const ctx = usePersonalContext();
   const {

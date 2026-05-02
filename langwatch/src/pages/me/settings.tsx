@@ -53,9 +53,12 @@ export default function MySettingsPage() {
     redirectToOnboarding: false,
     redirectToProjectOnboarding: false,
   });
+  // /me/settings is the persona-1 (org-less CLI/IDE dev) home — must
+  // resolve the FF without project context. See sibling /me/index for
+  // the same fix.
   const { enabled: governancePreviewEnabled } = useFeatureFlag(
     "release_ui_ai_governance_enabled",
-    { projectId: project?.id, enabled: !!project },
+    { projectId: project?.id },
   );
   const ctx = usePersonalContext();
   const [prefs, setPrefs] = useState(ctx.notificationPrefs);
