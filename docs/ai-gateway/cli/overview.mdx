@@ -13,6 +13,8 @@ Setup is always the same two steps:
 
 The gateway exposes both OpenAI-compatible and Anthropic-compatible endpoints on the same port, so any CLI that speaks either dialect works unchanged.
 
+<Tip>**Debugging a CLI sign-in or fold pipeline?** See [AI Governance → CLI Debug](/ai-governance/cli-debug) — `langwatch governance status`, `langwatch ingest tail`, the `langwatch login` error catalog (incl. `409 no_default_routing_policy`), and OCSF probe.</Tip>
+
 ## At a glance
 
 The `langwatch` CLI ships wrappers for the 4 most common coding CLIs — they auto-inject the right env vars from your governance config so you don't have to. Native env-var setup still works everywhere if you prefer.
