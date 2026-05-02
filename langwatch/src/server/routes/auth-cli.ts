@@ -35,7 +35,10 @@ import { env } from "~/env.mjs";
 import { connection as redisConnection } from "~/server/redis";
 import { prisma } from "~/server/db";
 import { getServerAuthSession } from "~/server/auth";
-import { PersonalVirtualKeyService } from "~/server/governance/personalVirtualKey.service";
+import {
+  PersonalVirtualKeyService,
+  NoDefaultRoutingPolicyError,
+} from "~/server/governance/personalVirtualKey.service";
 import { PersonalWorkspaceService } from "~/server/governance/personalWorkspace.service";
 import { GatewayBudgetService } from "~/server/gateway/budget.service";
 import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
@@ -1031,6 +1034,19 @@ app.post("/approve", async (c: Context) => {
       displayEmail: session.user.email,
     });
   } catch (err) {
+    if (err instanceof NoDefaultRoutingPolicyError) {
+      // Spec — specs/ai-gateway/governance/personal-keys.feature lines
+      // 57-63: 409 with no_default_routing_policy and NO personal VK
+      // created. The CLI surfaces this as "ask your admin to publish
+      // a default routing policy".
+      return c.json(
+        {
+          error: "no_default_routing_policy",
+          message: err.message,
+        },
+        409,
+      );
+    }
     if (err instanceof Error && err.name === "PersonalVirtualKeyAlreadyExistsError") {
       // Issue an additional device-specific key instead so multiple
       // devices don't have to share the "default" key. Label includes

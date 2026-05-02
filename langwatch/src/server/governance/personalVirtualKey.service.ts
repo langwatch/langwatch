@@ -159,6 +159,19 @@ export class PersonalVirtualKeyService {
             personalTeamId,
           });
 
+    // Spec contract (specs/ai-gateway/governance/personal-keys.feature
+    // lines 57-63): when the caller relied on default-policy resolution
+    // (routingPolicyId omitted) and the org has no default policy, the
+    // device-exchange MUST 409 with `{ error: "no_default_routing_policy" }`
+    // and NO personal VK should be created. The earlier "create bare VK,
+    // gateway rejects later" approach contradicted that contract — calls
+    // would silently issue a VK secret that 4xxd at request time.
+    // Throw a typed error so the route translates it to the spec'd 409
+    // (see /api/auth/cli/exchange).
+    if (routingPolicyId === undefined && !policy) {
+      throw new NoDefaultRoutingPolicyError(organizationId);
+    }
+
     // Personal VKs delegate provider-chain resolution to the routing
     // policy at request time — no embedded VirtualKeyProviderCredential
     // rows. VirtualKeyService.create accepts an empty
@@ -166,12 +179,6 @@ export class PersonalVirtualKeyService {
     // skips the per-project ownership assertion in that case (policies
     // are org-scoped and may reference credentials living in other
     // projects of the same org).
-    //
-    // If no policy resolves we still create a "bare" VK; the gateway
-    // dispatcher will reject calls against it with a clear error
-    // until the admin configures a default policy. The alternative
-    // (refusing to create) is hostile UX for the common "first user
-    // in the org, no admin config yet" case.
     const vkService = VirtualKeyService.create(this.prisma);
     const { virtualKey, secret } = await vkService.create({
       projectId: personalProjectId,
@@ -349,5 +356,21 @@ export class PersonalVirtualKeyNotFoundError extends Error {
   constructor(public readonly virtualKeyId: string) {
     super(`Personal virtual key ${virtualKeyId} not found or not owned by caller`);
     this.name = "PersonalVirtualKeyNotFoundError";
+  }
+}
+
+/**
+ * Thrown by `issue()` when the caller relied on default-policy resolution
+ * (no `routingPolicyId` argument) and the organisation has no
+ * RoutingPolicy with `isDefault=true`. Routes / tRPC handlers should
+ * translate this to HTTP 409 with `{ error: "no_default_routing_policy" }`
+ * per specs/ai-gateway/governance/personal-keys.feature.
+ */
+export class NoDefaultRoutingPolicyError extends Error {
+  constructor(public readonly organizationId: string) {
+    super(
+      `Your organization admin must publish a default routing policy before personal keys can be issued.`,
+    );
+    this.name = "NoDefaultRoutingPolicyError";
   }
 }

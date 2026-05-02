@@ -14,6 +14,7 @@ import { z } from "zod";
 import {
   PersonalVirtualKeyService,
   PersonalVirtualKeyNotFoundError,
+  NoDefaultRoutingPolicyError,
 } from "~/server/governance/personalVirtualKey.service";
 import { PersonalWorkspaceService } from "~/server/governance/personalWorkspace.service";
 
@@ -121,14 +122,29 @@ export const personalVirtualKeysRouter = createTRPCRouter({
       }
 
       const service = PersonalVirtualKeyService.create(ctx.prisma);
-      const issued = await service.issue({
-        userId: ctx.session.user.id,
-        organizationId: input.organizationId,
-        personalProjectId: workspace.project.id,
-        personalTeamId: workspace.team.id,
-        label: input.label,
-        routingPolicyId: input.routingPolicyId,
-      });
+      let issued;
+      try {
+        issued = await service.issue({
+          userId: ctx.session.user.id,
+          organizationId: input.organizationId,
+          personalProjectId: workspace.project.id,
+          personalTeamId: workspace.team.id,
+          label: input.label,
+          routingPolicyId: input.routingPolicyId,
+        });
+      } catch (err) {
+        // Spec contract — no_default_routing_policy maps to 409 so the
+        // CLI / device-flow client can surface the actionable
+        // "ask your admin to publish a default policy" message.
+        if (err instanceof NoDefaultRoutingPolicyError) {
+          throw new TRPCError({
+            code: "CONFLICT",
+            message: err.message,
+            cause: err,
+          });
+        }
+        throw err;
+      }
 
       return {
         id: issued.virtualKey.id,

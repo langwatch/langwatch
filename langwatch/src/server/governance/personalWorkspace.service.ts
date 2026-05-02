@@ -77,6 +77,44 @@ export class PersonalWorkspaceService {
     displayName?: string | null;
     displayEmail?: string | null;
   }): Promise<PersonalWorkspace> {
+    try {
+      return await this.tryCreate({
+        userId,
+        organizationId,
+        displayName,
+        displayEmail,
+      });
+    } catch (err) {
+      // Concurrent ensure() race — partial unique idx
+      // `Team_organizationId_ownerUserId_personal_key` rejects the
+      // second create. Re-fetch the winner's row instead of bubbling
+      // a 500 to the caller (e.g. two near-simultaneous CLI logins
+      // for a brand-new user, or session resolver + invite-accept
+      // racing on first login).
+      if (
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === "P2002"
+      ) {
+        const winner = await this.findExisting({ userId, organizationId });
+        if (winner) {
+          return { ...winner, created: false };
+        }
+      }
+      throw err;
+    }
+  }
+
+  private async tryCreate({
+    userId,
+    organizationId,
+    displayName,
+    displayEmail,
+  }: {
+    userId: string;
+    organizationId: string;
+    displayName?: string | null;
+    displayEmail?: string | null;
+  }): Promise<PersonalWorkspace> {
     return await this.prisma.$transaction(async (tx) => {
       const existing = await this.findInTx(tx, { userId, organizationId });
       if (existing) {
