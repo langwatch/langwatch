@@ -33,6 +33,10 @@
 > - **Vote G** — Phase 1B.5 sequencing: **(a) parallel** — keep going as already running.
 > - **Vote H** — License relocation Phase 4 in this PR vs follow-up: **SPLIT** (3-lane consensus + locked earlier). This PR ships behavior; follow-up PR ships file relocation.
 > - **Vote I** — Persona-home rollout shape: **(a) feature-flag-gated** — `release_ui_ai_governance_enabled` defaults OFF on merge. Safer rollout; pilot per org via PostHog.
+>
+> **iter32 live-fire — END-TO-END CONFIRMED.** The dogfood loop now runs from scratch in one command and produces real spend in the trace store. Sergey's `1544b834f` closed the last gateway-side blocker (`GatewayConfigMaterialiser.loadProviderChain` now resolves the policy-side `providerCredentialIds` for personal VKs minted via RoutingPolicy, not just direct VK→credential bindings). Alexis verified end-to-end: fresh seeded P4 admin → `seed-personas --mint-vk` → 3 `gpt-4o-mini` completions through the local Go gateway → spans land in `langwatch.stored_spans` with `langwatch.virtual_key_id` + `gen_ai.usage.{input,output}_tokens` populated; `/governance` chrome loads with GOVERN sidebar visible; `/me/usage` chrome correct.
+>
+> **One open product question, captured as follow-up (not in this PR per @master_orchestrator)**: `/me/usage` shows zero spend until an admin attaches a Budget — the spend column is driven by `gateway_budget_ledger_events` fold, which only writes when a Budget applies. Lane-S recommendation (Sergey, iter32): separate the usage-display query from the Budget-limit machinery so `/me/usage` aggregates spans directly scoped by `principal_user_id` regardless of Budget binding ("Budget is the LIMIT machinery; usage display is independent"). Captured as a post-merge follow-up; not pulled into this PR. Documented in `admin-setup.mdx` Budget caveat note for the dogfood walkthrough.
 
 ---
 

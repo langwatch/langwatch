@@ -277,7 +277,7 @@ pnpm tsx scripts/dogfood/fire-completion.ts \
   --prompt "Write a haiku about retrieval-augmented generation."
 
 # 5. Wait ~5s for the trace pipeline, then visit:
-#    /me/usage      — real spend, not empty-state
+#    /me/usage      — see Budget caveat below
 #    /governance    — admin's governance home with live activity
 ```
 
@@ -285,6 +285,27 @@ The `seed-personas.ts` helper covers persona 1 (admin), persona 3
 (LLMOps majority — no chrome change), and persona 4 (admin who also
 uses the CLI). Add `--mint-vk` to the latter two to get a usable
 personal VK.
+
+<Note>
+  **Budget caveat for `/me/usage`**: spend is computed from the
+  `gateway_budget_ledger_events` fold, which only writes ledger rows
+  when a Budget applies to the request. A fresh `--mint-vk` seed
+  produces a working personal VK but no Budget binding by default,
+  so `/me/usage` shows `$0.00` even though real spans landed in the
+  trace store.
+
+  This matches production behavior — admins attach budgets in step 4
+  above, and `/me/usage` spend appears once a Budget is bound to the
+  user (or to the personal VK directly). To prove real spend in a
+  dogfood run today, attach a $0-limit tracking budget to the
+  seeded user (or to the personal team) before firing completions.
+
+  **Product follow-up**: separating the usage-display query from the
+  Budget-limit machinery (so `/me/usage` aggregates spans directly
+  scoped by `principal_user_id` regardless of Budget binding) is on
+  the post-merge follow-up list. Until then, `/me/usage` is
+  Budget-gated by design.
+</Note>
 
 ## What's next
 
