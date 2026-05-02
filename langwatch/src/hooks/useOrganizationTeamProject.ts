@@ -354,8 +354,19 @@ export const useOrganizationTeamProject = (
    * @example hasPermission("organization:manage")
    */
   const hasPermission = (permission: Permission) => {
-    // Check if this is an organization permission
-    const isOrgPermission = permission.startsWith("organization:");
+    // Org-scoped resources: organization itself + the AI Governance resource
+    // family (governance / ingestionSources / anomalyRules / complianceExport
+    // / activityMonitor — all live in ORGANIZATION_ROLE_PERMISSIONS, not in
+    // any team-role bag). Team admins do NOT get automatic governance perms;
+    // delegation flows through CustomRolePermissions JSON column at the team
+    // level if needed (matching the rest of the RBAC catalog).
+    const isOrgPermission =
+      permission.startsWith("organization:") ||
+      permission.startsWith("governance:") ||
+      permission.startsWith("ingestionSources:") ||
+      permission.startsWith("anomalyRules:") ||
+      permission.startsWith("complianceExport:") ||
+      permission.startsWith("activityMonitor:");
 
     if (isOrgPermission) {
       // Only check organization role - team admins do NOT get automatic organization permissions
