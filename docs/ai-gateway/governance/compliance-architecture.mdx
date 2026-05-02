@@ -103,9 +103,9 @@ LangWatch's RBAC layer (`langwatch/src/server/api/rbac.ts`) is the single source
 
 **Default role attachment**:
 
-- `ORGANIZATION_ADMIN` — full set (all `view` + `manage` actions across all 5 governance resources)
-- `ORGANIZATION_MEMBER` — none (chrome hides Govern by default)
-- `ORGANIZATION_EXTERNAL` — none (lite-tier billing scope; future derivation reads from billing state)
+- `OrganizationUserRole.ADMIN` — full set (all `view` + `manage` actions across all 5 governance resources)
+- `OrganizationUserRole.MEMBER` — no governance permissions (chrome hides Govern by default; only `organization:view` from the base bag)
+- `OrganizationUserRole.EXTERNAL` — no governance permissions (lite-tier billing scope; future derivation reads from billing state)
 
 **Custom-role delegation surface** is the production-shape mechanism for finer-grained access. Example: an org wanting a "security_analyst" role gets it via a custom role granting `governance:view` + `activityMonitor:view` + `anomalyRules:view` — read-only governance access for the security team without admin-level org management capability. Configurable through the existing Roles UI.
 

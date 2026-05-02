@@ -41,7 +41,7 @@ Different upstreams emit different event shapes:
 
 Independent of source type, the lifecycle is:
 
-1. Admin opens `/governance/ingestion-sources`, picks a source type, fills the per-type config form (including the [retention class](/ai-gateway/governance/retention)), clicks Create.
+1. Admin opens `/settings/governance/ingestion-sources`, picks a source type, fills the per-type config form (including the [retention class](/ai-gateway/governance/retention)), clicks Create.
 2. Backend mints a `lw_is_<base64url>` ingest secret, hashes it, persists the source with status `awaiting_first_event`. The secret is shown **once** in a one-time-reveal modal — it's never returned by the list/get endpoints again.
 3. Admin pastes the secret + per-source endpoint into the upstream platform (OTLP exporter URL, webhook destination, Azure app secret, S3 bucket policy, etc.).
 4. First event arrives at the receiver → receiver lazy-ensures the hidden Governance Project for the org (if not already), stamps `langwatch.origin.*` + `langwatch.governance.retention_class` attributes, hands off to the existing trace pipeline. Source status flips to `active` + `lastEventAt` updates.

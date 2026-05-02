@@ -4,7 +4,7 @@ description: Define detection rules that fire AnomalyAlerts when activity-event 
 sidebarTitle: Anomaly rules
 ---
 
-Anomaly rules are the "Detect" layer of the [governance control plane](/ai-gateway/governance/control-plane#tier-3--audit-log-ingest). The composer at `/governance/anomaly-rules` accepts a rule definition and persists it; the [event-sourcing reactor](/ai-gateway/governance/activity-monitor-event-sourcing) evaluates each rule against incoming events and produces an `AnomalyAlert` row when a violation is detected.
+Anomaly rules are the "Detect" layer of the [governance control plane](/ai-gateway/governance/control-plane#tier-3--audit-log-ingest). The composer at `/settings/governance/anomaly-rules` accepts a rule definition and persists it; the [event-sourcing reactor](/ai-gateway/governance/activity-monitor-event-sourcing) evaluates each rule against incoming events and produces an `AnomalyAlert` row when a violation is detected.
 
 This page documents what the reactor actually evaluates today vs what's preview-only, so you don't author rules that look "active" in the list but never fire.
 
@@ -31,7 +31,7 @@ If you need detection beyond `spend_spike` today, the recommended shape is one o
 
 ## Writing a working `spend_spike` rule
 
-Open `/governance/anomaly-rules` → click **New anomaly rule**.
+Open `/settings/governance/anomaly-rules` → click **New anomaly rule**.
 
 Fields the reactor reads:
 
@@ -41,7 +41,7 @@ Fields the reactor reads:
 | **Severity** | `warning` / `critical` | Drives the `/governance` KPI breakdown (`anomalyBreakdown.{critical,warning,info}`) and downstream dispatch routing once C3 ships. |
 | **Rule type** | `spend_spike` | Pick exactly this — see coverage table above. |
 | **Scope** | `organization` / `source_type` / `source` | Filters which IngestionSources the rule applies to (see Scope coverage below). |
-| **Scope ID** | (cuid) | Required when scope is `source_type` or `source`. The IngestionSource ID can be copied from `/governance/ingestion-sources/<id>` or the URL of the per-source detail page. |
+| **Scope ID** | (cuid) | Required when scope is `source_type` or `source`. The IngestionSource ID can be copied from `/settings/governance/ingestion-sources/<id>` or the URL of the per-source detail page. |
 | **Threshold config** | (JSON object — see below) | The reactor's per-rule-type tuning knobs. |
 | **Destination config** | `{}` (today) | Reserved for future Slack / PagerDuty / SIEM dispatch — see Dispatch coverage below. |
 

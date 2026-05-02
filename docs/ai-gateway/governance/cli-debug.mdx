@@ -205,7 +205,7 @@ Three surfaces, one backend:
 | Surface | Audience | Contract |
 |---------|----------|----------|
 | Web `/governance` admin oversight | Governance admin in a browser | tRPC: `api.governance.setupState`, `api.activityMonitor.*`, `api.ingestionSources.*` |
-| Web `/governance/ingestion-sources/:id` detail | Per-source SRE | tRPC: `api.activityMonitor.eventsForSource`, `api.activityMonitor.sourceHealthMetrics` |
+| Web `/settings/governance/ingestion-sources/:id` detail | Per-source SRE | tRPC: `api.activityMonitor.eventsForSource`, `api.activityMonitor.sourceHealthMetrics` |
 | **CLI `governance status` / `ingest list/health/tail`** | **Terminal-first SRE / on-call** | **REST: `GET /api/auth/cli/governance/*` — Bearer adapter that imports the same service classes the tRPC procedures use, byte-for-byte matching IO** |
 
 The REST endpoints are flag-gated implicitly: the CLI never registers the subcommands without `LANGWATCH_GOVERNANCE_PREVIEW=1`, and the endpoints reuse the existing `validateAccessToken()` Bearer helper that's been in production since the device-flow CLI shipped, so opening this surface doesn't introduce a new auth path.

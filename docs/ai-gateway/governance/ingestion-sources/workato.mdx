@@ -74,7 +74,7 @@ So the CLI tail row will look like:
 langwatch ingest tail <sourceId> --follow
 ```
 
-Hit a Workato recipe that's connected to the webhook — you should see one event row appear within ~3 s of the recipe completing. The per-source detail page at `/governance/ingestion-sources/<sourceId>` will show the same row; click to expand and inspect `rawPayload` to confirm Workato's envelope shape matches what you expect.
+Hit a Workato recipe that's connected to the webhook — you should see one event row appear within ~3 s of the recipe completing. The per-source detail page at `/settings/governance/ingestion-sources/<sourceId>` will show the same row; click to expand and inspect `rawPayload` to confirm Workato's envelope shape matches what you expect.
 
 If you want to dry-run without a Workato recipe:
 
