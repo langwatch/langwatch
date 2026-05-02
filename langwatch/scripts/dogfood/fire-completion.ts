@@ -59,6 +59,9 @@ function parseArgs(argv: string[]): Args {
 
 async function fireOpenAi(args: Args) {
   const url = `${args.baseUrl}/v1/chat/completions`;
+  const tokenParam = args.model.startsWith("gpt-5") || args.model.startsWith("o1") || args.model.startsWith("o3")
+    ? "max_completion_tokens"
+    : "max_tokens";
   const res = await fetch(url, {
     method: "POST",
     headers: {
@@ -68,7 +71,7 @@ async function fireOpenAi(args: Args) {
     body: JSON.stringify({
       model: args.model,
       messages: [{ role: "user", content: args.prompt }],
-      max_tokens: args.maxTokens,
+      [tokenParam]: args.maxTokens,
     }),
   });
   if (!res.ok) {
