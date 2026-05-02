@@ -21,16 +21,18 @@ The persona-aware chrome (single-chip header on `/me`, full sidebar on `/setting
 
 ## Admin prerequisites
 
-<Warning>**Publish a default routing policy before users sign in via CLI.**
+<Warning>
+  **Publish a default routing policy before users sign in via CLI.**
 
-The first time an end user runs `langwatch login`, the CLI provisions a Personal Virtual Key and binds it to your org's **default routing policy**. If no default policy exists, the CLI returns:
+  The first time an end user runs `langwatch login`, the CLI provisions a Personal Virtual Key and binds it to your org's **default routing policy**. If no default policy exists, the CLI returns:
 
-```
-HTTP 409 — error: "no_default_routing_policy"
-Ask your admin to publish a default routing policy at Settings → Routing Policies.
-```
+  ```
+  HTTP 409 — error: "no_default_routing_policy"
+  Ask your admin to publish a default routing policy at Settings → Routing Policies.
+  ```
 
-Publish at least one routing policy and mark it as `default` before opening CLI sign-in to your team. Cover details in [CLI debug → Error catalog](/ai-governance/cli-debug#error-catalog).</Warning>
+  Publish at least one routing policy and mark it as `default` before opening CLI sign-in to your team. Cover details in [CLI debug → Error catalog](/ai-governance/cli-debug#error-catalog).
+</Warning>
 
 ## What it gives you
 
