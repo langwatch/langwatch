@@ -26,6 +26,13 @@
 > **Persona-3 regression-safety invariant locked**: LLMOps majority (~90% of users today, no AI gateway) sees ZERO chrome change. DashboardLayout untouched for project_only persona. Verified via BDD spec.
 >
 > **Rollout sequence (per @rchaves directive)**: two-phase FF rollout. Phase 1 → flip `release_ui_ai_gateway_menu_enabled` ON → Gateway menu + personal-key flow visible. Phase 2 (later) → flip `release_ui_ai_governance_enabled` ON → Governance dashboard + ingestion-sources + anomaly-rules + OCSF export visible. Two flags, not one — preserves pilot flexibility (gateway-only vs governance-only customer rollouts).
+>
+> **Open vote resolution (per @rchaves 2026-05-02)**:
+> - **Vote D** — Personal-key SSO provisioning: **(a) Apache 2.0 / works for everyone**. Can restrict later via plan-cap follow-up (tracked separately as #3686).
+> - **Vote F** — BSL→Apache 2.0 license-flip timing: **(b) follow-up PR**. But this PR's design + docs + UX pretend Apache 2.0 floor is already in place (free-tier framing, demo-loop wedge copy, etc.).
+> - **Vote G** — Phase 1B.5 sequencing: **(a) parallel** — keep going as already running.
+> - **Vote H** — License relocation Phase 4 in this PR vs follow-up: **SPLIT** (3-lane consensus + locked earlier). This PR ships behavior; follow-up PR ships file relocation.
+> - **Vote I** — Persona-home rollout shape: **(a) feature-flag-gated** — `release_ui_ai_governance_enabled` defaults OFF on merge. Safer rollout; pilot per org via PostHog.
 
 ---
 
