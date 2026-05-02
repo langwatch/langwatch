@@ -29,6 +29,8 @@ overrides:
   "express-rate-limit@>=8.2.0 <8.2.2": "8.2.2"
   # Security: glob ReDoS (from mcp-server)
   "glob@>=10.2.0 <10.5.0": "10.5.0"
+  # Security: vite WebSocket file read + server.fs.deny bypass (#783/#784)
+  "vite@<7.3.2": "7.3.2"
 
 packageExtensions:
   bullmq-otel:
