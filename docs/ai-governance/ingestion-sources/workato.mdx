@@ -4,7 +4,9 @@ description: Webhook receiver works (envelope-only). Audit-shape parser is pendi
 sidebarTitle: Workato
 ---
 
-Workato pushes job-completed webhooks. The receiver is wired and persists each delivery as a single envelope event; the parser that turns Workato's recipe / job / connection events into precise Actor / Action / Target fields is the next step on the [adapter roadmap](/ai-gateway/governance/ingestion-sources#adapter-roadmap).
+<Info>**Pairs with:** [Ingestion Sources index](/ai-governance/ingestion-sources/index). Webhook envelope shape is shared with [`s3_custom`](/ai-governance/ingestion-sources/s3-custom) callback mode.</Info>
+
+Workato pushes job-completed webhooks. The receiver is wired and persists each delivery as a single envelope event; the parser that turns Workato's recipe / job / connection events into precise Actor / Action / Target fields is the next step on the [adapter roadmap](/ai-governance/ingestion-sources/index#adapter-roadmap).
 
 ## Currently implemented
 

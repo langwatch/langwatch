@@ -4,7 +4,9 @@ description: Per-platform integration matrix for LangWatch governance receivers.
 sidebarTitle: Ingestion sources
 ---
 
-LangWatch governance ingest accepts events from upstream agent and audit-log platforms and lands them in the **same `recorded_spans` + `log_records` tables** that power the rest of LangWatch — distinguished by `langwatch.origin.kind = "ingestion_source"` origin metadata stamped at the receiver edge. Same trace viewer, same compliance + RBAC + retention machinery, surfaced in the [governance dashboard](/ai-gateway/governance/control-plane), the per-source detail page, and the [`langwatch ingest tail`](/ai-gateway/governance/cli-debug) CLI.
+<Info>**Pairs with:** [AI Gateway → Observability](/ai-gateway/observability). The gateway is itself an ingestion source (its spans land in the same trace store); IngestionSources extend that substrate to platforms whose API key path you don't own (Workato, Copilot Studio, OpenAI/Anthropic compliance APIs).</Info>
+
+LangWatch governance ingest accepts events from upstream agent and audit-log platforms and lands them in the **same `recorded_spans` + `log_records` tables** that power the rest of LangWatch — distinguished by `langwatch.origin.kind = "ingestion_source"` origin metadata stamped at the receiver edge. Same trace viewer, same compliance + RBAC + retention machinery, surfaced in the [governance dashboard](/ai-governance/control-plane), the per-source detail page, and the [`langwatch ingest tail`](/ai-governance/cli-debug) CLI.
 
 <Note>**Governance ingestion is for third-party AI platforms your org runs.** If you want to send your *own application's* LLM traces to LangWatch, use [`/api/otel/v1/traces`](/integration/quick-start) with your project API key — that's the right home for traces from systems you own. See [Choosing the right OTel endpoint](/observability/trace-vs-activity-ingestion) for the full comparison.</Note>
 

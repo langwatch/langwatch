@@ -4,7 +4,9 @@ description: Receiver works on the Generic OTel path; Cowork-specific attribute 
 sidebarTitle: Anthropic Claude (Cowork)
 ---
 
-Claude Cowork pushes telemetry over OTLP/HTTP. The receiver is wired and accepts traffic; the per-attribute mapping that turns Cowork's `tool_use` taxonomy into precise governance KPI fields is the next step on the [adapter roadmap](/ai-gateway/governance/ingestion-sources#adapter-roadmap).
+<Info>**Pairs with:** [AI Gateway → Anthropic provider](/ai-gateway/providers/anthropic). Direct Anthropic API traffic flows through the gateway data plane; Cowork tool-use telemetry is a separate OTLP feed routed through this ingestion source.</Info>
+
+Claude Cowork pushes telemetry over OTLP/HTTP. The receiver is wired and accepts traffic; the per-attribute mapping that turns Cowork's `tool_use` taxonomy into precise governance KPI fields is the next step on the [adapter roadmap](/ai-governance/ingestion-sources/index#adapter-roadmap).
 
 ## Currently implemented
 

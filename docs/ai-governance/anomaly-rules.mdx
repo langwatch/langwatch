@@ -4,7 +4,9 @@ description: Define detection rules that fire AnomalyAlerts when activity-event 
 sidebarTitle: Anomaly rules
 ---
 
-Anomaly rules are the "Detect" layer of the [governance control plane](/ai-gateway/governance/control-plane#tier-3--audit-log-ingest). The composer at `/settings/governance/anomaly-rules` accepts a rule definition and persists it; the [event-sourcing reactor](/ai-gateway/governance/activity-monitor-event-sourcing) evaluates each rule against incoming events and produces an `AnomalyAlert` row when a violation is detected.
+<Info>**Pairs with:** [AI Gateway → Budgets](/ai-gateway/budgets). Budgets enforce hard spend limits; anomaly rules detect patterns *before* a budget breach (spend-spike, geo-mismatch, off-hours).</Info>
+
+Anomaly rules are the "Detect" layer of the [governance control plane](/ai-governance/control-plane#tier-3--audit-log-ingest). The composer at `/settings/governance/anomaly-rules` accepts a rule definition and persists it; the [event-sourcing reactor](/ai-gateway/governance/activity-monitor-event-sourcing) evaluates each rule against incoming events and produces an `AnomalyAlert` row when a violation is detected.
 
 This page documents what the reactor actually evaluates today vs what's preview-only, so you don't author rules that look "active" in the list but never fire.
 

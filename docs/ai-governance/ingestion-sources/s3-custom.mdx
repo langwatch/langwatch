@@ -4,6 +4,8 @@ description: Webhook callback receiver works (envelope-only). S3 puller + DSL pa
 sidebarTitle: Custom S3
 ---
 
+<Info>**Pairs with:** [LangWatch Self-Hosting](/self-hosting/overview). The S3 puller path requires bucket + IAM trust setup that overlaps with self-hosted deployment IAM; see your hosting playbook for the AWS-side prerequisites.</Info>
+
 `s3_custom` is the catch-all for homegrown agent systems writing audit logs to an S3 bucket — internal agents, CI tools, custom orchestrators. The data plane has two intended ingestion modes:
 
 1. **S3 polling** — the configured bucket + prefix is polled on a cadence; new objects are fetched and parsed via a customer-supplied DSL.

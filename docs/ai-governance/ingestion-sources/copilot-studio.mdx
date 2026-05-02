@@ -4,9 +4,11 @@ description: Setup contract only — Azure AD app registration is captured; the 
 sidebarTitle: Microsoft Copilot Studio
 ---
 
+<Info>**Pairs with:** [Ingestion Sources index](/ai-governance/ingestion-sources/index). Microsoft Copilot Studio is on the adapter roadmap; configuration contract is captured today, the Purview poller worker is pending.</Info>
+
 `copilot_studio` polls the Microsoft Purview Audit API for Copilot Studio activity. Today the source can be created and the per-platform credentials are persisted, but the cron worker that calls Purview hasn't shipped — events do not flow yet.
 
-This page documents the configuration contract so admins can pre-stage Azure AD app registrations and trust policies; the matching adapter is on the [roadmap](/ai-gateway/governance/ingestion-sources#adapter-roadmap).
+This page documents the configuration contract so admins can pre-stage Azure AD app registrations and trust policies; the matching adapter is on the [roadmap](/ai-governance/ingestion-sources/index#adapter-roadmap).
 
 ## Currently implemented
 

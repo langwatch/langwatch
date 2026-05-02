@@ -4,9 +4,11 @@ description: Setup contract only — S3 bucket + cross-account role config captu
 sidebarTitle: OpenAI Enterprise Compliance
 ---
 
+<Info>**Pairs with:** [AI Gateway → OpenAI provider](/ai-gateway/providers/openai). Direct OpenAI API traffic flows through the gateway data plane; OpenAI Enterprise Compliance API exports are a separate bulk feed routed through this ingestion source.</Info>
+
 `openai_compliance` pulls compliance JSONL drops from an S3 bucket OpenAI writes to (Enterprise Compliance API). Today the source can be created and the AWS credentials/S3 config are persisted, but the puller worker hasn't shipped — events do not flow yet.
 
-This page documents the configuration contract so admins can pre-stage IAM trust policies and bucket access; the matching adapter is on the [roadmap](/ai-gateway/governance/ingestion-sources#adapter-roadmap).
+This page documents the configuration contract so admins can pre-stage IAM trust policies and bucket access; the matching adapter is on the [roadmap](/ai-governance/ingestion-sources/index#adapter-roadmap).
 
 ## Currently implemented
 

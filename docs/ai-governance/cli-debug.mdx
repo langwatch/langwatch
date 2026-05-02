@@ -4,7 +4,9 @@ description: Inspect IngestionSources, tail recent OCSF events, and read the org
 sidebarTitle: CLI debug
 ---
 
-A small set of read-only commands for SREs, governance admins, and on-call engineers to answer "is data flowing?" without opening the web UI. They reuse the same backend the [admin oversight dashboard](/ai-gateway/governance/control-plane) and the [per-source detail page](/ai-gateway/governance/admin-setup#ingestion-sources) already render — so what you see in the terminal and what you see in the browser are guaranteed identical (byte-for-byte on `--json`).
+<Info>**Pairs with:** [AI Gateway → CLI Integrations](/ai-gateway/cli/overview). The `langwatch` CLI is shared between Gateway and Governance — `login`/`logout-device` are gateway-side, `ingest` and `governance status` subcommands are governance-side, both behind the same device-flow OAuth.</Info>
+
+A small set of read-only commands for SREs, governance admins, and on-call engineers to answer "is data flowing?" without opening the web UI. They reuse the same backend the [admin oversight dashboard](/ai-governance/control-plane) and the [per-source detail page](/ai-gateway/governance/admin-setup#ingestion-sources) already render — so what you see in the terminal and what you see in the browser are guaranteed identical (byte-for-byte on `--json`).
 
 ## When to use
 
@@ -198,6 +200,34 @@ Error: Session expired — re-run `langwatch login --device`
 
 The 401-on-expired-session path also clears the cached token, so the next invocation lands on the "not logged in" branch and the user sees a clear next step. All three error paths are asserted in `specs/ai-gateway/governance/cli-ingest-debug.feature` (12 scenarios).
 
+## Error catalog
+
+The `langwatch login` flow itself can fail before the device-flow handshake completes if the org isn't configured for CLI sign-in. Each entry below names the error code returned by `/api/auth/cli/personal-virtual-keys/approve`, the human-readable hint shown to the developer, and the admin remediation.
+
+### `409 no_default_routing_policy`
+
+Returned when the org has **no default routing policy** published. The CLI cannot bind the new Personal Virtual Key to a policy without a default, so it refuses to create the VK rather than creating an orphan.
+
+```text
+$ langwatch login --device
+… opening https://app.langwatch.ai/cli/auth?code=ABCD-EFGH …
+Error: HTTP 409 — no_default_routing_policy
+       Your organization has no default routing policy published.
+       Ask your admin to publish one at Settings → Routing Policies
+       (/settings/routing-policies), then re-run `langwatch login`.
+```
+
+**Admin remediation:**
+
+1. Sign in to the LangWatch web app as an org admin.
+2. Navigate to **Settings → Routing Policies** (`/settings/routing-policies`).
+3. Create at least one routing policy and toggle it to **Default**.
+4. Ask the developer to re-run `langwatch login --device`.
+
+The CLI does not fall back to a non-default policy; selection is explicit. See the [admin prerequisites callout in the AI Governance overview](/ai-governance/overview#admin-prerequisites) for the rest of the org-bootstrap checklist.
+
+The 409 contract is asserted in `specs/ai-gateway/governance/personal-keys.feature` (sign-in scenarios).
+
 ## How it fits
 
 Three surfaces, one backend:
@@ -210,4 +240,4 @@ Three surfaces, one backend:
 
 The REST endpoints are flag-gated implicitly: the CLI never registers the subcommands without `LANGWATCH_GOVERNANCE_PREVIEW=1`, and the endpoints reuse the existing `validateAccessToken()` Bearer helper that's been in production since the device-flow CLI shipped, so opening this surface doesn't introduce a new auth path.
 
-For the bigger picture — five-tier integration ladder, persona-based routing, the daily-use vs admin-authoring split — see [the control plane overview](/ai-gateway/governance/control-plane).
+For the bigger picture — five-tier integration ladder, persona-based routing, the daily-use vs admin-authoring split — see [the control plane overview](/ai-governance/control-plane).

@@ -4,6 +4,8 @@ description: How LangWatch AI Gateway governance underwrites SOC 2 Type II, ISO 
 sidebarTitle: Compliance architecture
 ---
 
+<Info>**Pairs with:** [AI Gateway → Audit](/ai-gateway/audit). The gateway emits the spans; governance reactors fold them into OCSF-mapped events for SIEM export.</Info>
+
 LangWatch AI Gateway governance is built on a **unified observability substrate** — every audit event, OTel span, webhook delivery, and S3 replay row lands in the same trace store that powers the rest of the platform. That single store is what underwrites the compliance posture below: one source of truth, one append-only event log, one set of retention controls, one set of access controls.
 
 This page maps each compliance framework you might need to which mechanisms in LangWatch underwrite it, and names what's deferred (and why).
