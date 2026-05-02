@@ -462,6 +462,7 @@ describe("PromptsFacade.tags.rename", () => {
   });
 
   describe("when renaming a tag", () => {
+    /** @scenario Facade tags.rename delegates to renameTag */
     it("delegates to promptsApiService.renameTag with old and new names", async () => {
       promptsApiService.renameTag.mockResolvedValue(undefined);
 
