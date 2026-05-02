@@ -233,38 +233,49 @@ function isStreamingEvent(type: string): boolean {
   );
 }
 
-export async function archiveScenarioSetRuns(
-  projectId: string,
-  scenarioSetId: string,
-): Promise<{ archived: number; failed: number; scenarioSetId: string; hasMore: boolean }> {
+export async function archiveScenarioSetRuns({
+  projectId,
+  scenarioSetId,
+}: {
+  projectId: string;
+  scenarioSetId: string;
+}): Promise<{ archived: number; failed: number; scenarioSetId: string; hasMore: boolean }> {
   const { runIds, reachedCap } = await getApp().simulations.runs.getRunIdsForSet({ projectId, scenarioSetId });
 
   const now = Date.now();
   let archived = 0;
   let failed = 0;
 
-  await pMapLimited(runIds, async (id) => {
-    try {
-      await getApp().simulations.deleteRun({
-        tenantId: projectId,
-        scenarioRunId: id,
-        occurredAt: now,
-      });
-      archived++;
-    } catch (err) {
-      failed++;
-      logger.warn({ projectId, scenarioRunId: id, err }, "Failed to dispatch deleteRun");
-    }
-  }, 8);
+  await pMapLimited({
+    items: runIds,
+    concurrency: 8,
+    fn: async (id) => {
+      try {
+        await getApp().simulations.deleteRun({
+          tenantId: projectId,
+          scenarioRunId: id,
+          occurredAt: now,
+        });
+        archived++;
+      } catch (err) {
+        failed++;
+        logger.warn({ projectId, scenarioRunId: id, err }, "Failed to dispatch deleteRun");
+      }
+    },
+  });
 
   return { archived, failed, scenarioSetId, hasMore: reachedCap };
 }
 
-async function pMapLimited<T>(
-  items: T[],
-  fn: (item: T) => Promise<void>,
-  concurrency: number,
-): Promise<void> {
+async function pMapLimited<T>({
+  items,
+  fn,
+  concurrency,
+}: {
+  items: T[];
+  fn: (item: T) => Promise<void>;
+  concurrency: number;
+}): Promise<void> {
   const executing = new Set<Promise<void>>();
   for (const item of items) {
     const p = fn(item).then(() => {

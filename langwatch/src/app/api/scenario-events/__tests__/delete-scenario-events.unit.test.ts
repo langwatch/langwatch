@@ -41,7 +41,7 @@ describe("archiveScenarioSetRuns()", () => {
       const runIds = ["run-1", "run-2", "run-3"];
       mockGetRunIdsForSet.mockResolvedValue({ runIds, reachedCap: false });
 
-      const result = await archiveScenarioSetRuns("project-a", "set-a");
+      const result = await archiveScenarioSetRuns({ projectId: "project-a", scenarioSetId: "set-a" });
 
       expect(result.archived).toBe(3);
       expect(result.failed).toBe(0);
@@ -61,7 +61,7 @@ describe("archiveScenarioSetRuns()", () => {
         .mockRejectedValueOnce(new Error("delete failed"))
         .mockResolvedValueOnce(undefined);
 
-      const result = await archiveScenarioSetRuns("project-a", "set-a");
+      const result = await archiveScenarioSetRuns({ projectId: "project-a", scenarioSetId: "set-a" });
 
       expect(result.archived).toBe(2);
       expect(result.failed).toBe(1);
@@ -73,7 +73,7 @@ describe("archiveScenarioSetRuns()", () => {
     it("returns hasMore: true", async () => {
       mockGetRunIdsForSet.mockResolvedValue({ runIds: ["run-1"], reachedCap: true });
 
-      const result = await archiveScenarioSetRuns("project-a", "set-big");
+      const result = await archiveScenarioSetRuns({ projectId: "project-a", scenarioSetId: "set-big" });
 
       expect(result.hasMore).toBe(true);
     });
@@ -83,7 +83,7 @@ describe("archiveScenarioSetRuns()", () => {
     it("returns hasMore: false", async () => {
       mockGetRunIdsForSet.mockResolvedValue({ runIds: ["run-1"], reachedCap: false });
 
-      const result = await archiveScenarioSetRuns("project-a", "set-small");
+      const result = await archiveScenarioSetRuns({ projectId: "project-a", scenarioSetId: "set-small" });
 
       expect(result.hasMore).toBe(false);
     });
@@ -112,7 +112,7 @@ describe("archiveScenarioSetRuns()", () => {
       });
 
       // Start archiving (will block until resolvers are called)
-      const archivePromise = archiveScenarioSetRuns("project-a", "set-32");
+      const archivePromise = archiveScenarioSetRuns({ projectId: "project-a", scenarioSetId: "set-32" });
 
       // Yield a macrotask tick so pMapLimited has time to start and fill
       // the first concurrency window (8 slots) before we start draining.
@@ -137,7 +137,7 @@ describe("archiveScenarioSetRuns()", () => {
     it("returns archived=0, failed=0, hasMore=false without calling deleteRun", async () => {
       mockGetRunIdsForSet.mockResolvedValue({ runIds: [], reachedCap: false });
 
-      const result = await archiveScenarioSetRuns("project-a", "ghost-set");
+      const result = await archiveScenarioSetRuns({ projectId: "project-a", scenarioSetId: "ghost-set" });
 
       expect(result.archived).toBe(0);
       expect(result.failed).toBe(0);
