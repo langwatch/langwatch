@@ -14,9 +14,45 @@ import { AgentAdapter, AgentRole } from "@langwatch/scenario";
 import { randomBytes } from "crypto";
 import { resolveFieldMappings } from "../resolve-field-mappings";
 import type { CodeAgentData } from "../types";
+import {
+  formatFetchError,
+  formatHttpError,
+  type AdapterErrorContext,
+} from "./format-execution-error";
 
 /** Timeout for NLP service requests (2 minutes) */
 const NLP_FETCH_TIMEOUT_MS = 120_000;
+
+/**
+ * Failure surfaced by the adapter to the scenario runner. Carries the raw
+ * NLP payload + structured fields so worker logs can render the user-friendly
+ * message while observability/debug surfaces still have the original blob
+ * (lw#3439).
+ */
+export class SerializedCodeAgentAdapterError extends Error {
+  readonly source: "user_code" | "nlp_service" | "network" | "timeout";
+  readonly endpoint: string;
+  readonly httpStatus?: number;
+  readonly rawDetail?: string;
+
+  constructor(
+    message: string,
+    options: {
+      source: SerializedCodeAgentAdapterError["source"];
+      endpoint: string;
+      httpStatus?: number;
+      rawDetail?: string;
+      cause?: unknown;
+    },
+  ) {
+    super(message, options.cause === undefined ? undefined : { cause: options.cause });
+    this.name = "SerializedCodeAgentAdapterError";
+    this.source = options.source;
+    this.endpoint = options.endpoint;
+    this.httpStatus = options.httpStatus;
+    this.rawDetail = options.rawDetail;
+  }
+}
 
 /**
  * Serialized code agent adapter that uses pre-fetched configuration.
@@ -200,43 +236,57 @@ export class SerializedCodeAgentAdapter extends AgentAdapter {
       },
     };
 
+    const endpoint = `${this.nlpServiceUrl}/studio/execute_sync`;
+    const ctx: AdapterErrorContext = { endpoint, method: "POST" };
+
     const controller = new AbortController();
-    const timeout = setTimeout(
-      () => controller.abort(),
-      NLP_FETCH_TIMEOUT_MS,
-    );
+    let timedOut = false;
+    const timeout = setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+    }, NLP_FETCH_TIMEOUT_MS);
 
     try {
       let response: Response;
       try {
-        response = await fetch(
-          `${this.nlpServiceUrl}/studio/execute_sync`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(event),
-            signal: controller.signal,
-          },
-        );
+        response = await fetch(endpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(event),
+          signal: controller.signal,
+        });
       } catch (fetchError) {
-        const cause = fetchError instanceof Error && "cause" in fetchError
-          ? ` (cause: ${String((fetchError as Error & { cause?: unknown }).cause)})`
-          : "";
-        throw new Error(
-          `Code execution failed: fetch to ${this.nlpServiceUrl}/studio/execute_sync failed - ${fetchError instanceof Error ? fetchError.message : String(fetchError)}${cause}`,
+        if (timedOut) {
+          throw new SerializedCodeAgentAdapterError(
+            formatFetchError({ ctx, cause: fetchError, timedOutAfterMs: NLP_FETCH_TIMEOUT_MS }),
+            { source: "timeout", endpoint, cause: fetchError },
+          );
+        }
+        throw new SerializedCodeAgentAdapterError(
+          formatFetchError({ ctx, cause: fetchError }),
+          { source: "network", endpoint, cause: fetchError },
         );
       }
 
       if (!response.ok) {
-        let errorMessage = "";
+        let parsedDetail: string | undefined;
+        let rawBody = "";
         try {
           const errorBody = (await response.json()) as { detail?: string };
-          errorMessage = errorBody.detail ?? JSON.stringify(errorBody);
+          parsedDetail = errorBody.detail;
+          rawBody = errorBody.detail ?? JSON.stringify(errorBody);
         } catch {
-          errorMessage = await response.text().catch(() => "");
+          rawBody = await response.text().catch(() => "");
         }
-        throw new Error(
-          `Code execution failed: HTTP ${response.status}${errorMessage ? ` - ${errorMessage}` : ""}`,
+        const isUserCodeError = response.status === 500 && Boolean(parsedDetail);
+        throw new SerializedCodeAgentAdapterError(
+          formatHttpError({ ctx, status: response.status, rawBody, parsedDetail }),
+          {
+            source: isUserCodeError ? "user_code" : "nlp_service",
+            endpoint,
+            httpStatus: response.status,
+            rawDetail: parsedDetail ?? rawBody,
+          },
         );
       }
 
