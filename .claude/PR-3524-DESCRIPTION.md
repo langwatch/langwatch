@@ -713,7 +713,40 @@ Critical path: D1 → D2 → D5 → D8. **Phase 6 status: D1–D8 ✅ — 100% c
 
 ---
 
-## UI flows + screenshots
+## §Screenshots — centralized taxonomy (persona × flow) — REORG IN FLIGHT
+
+> **Per rchaves directive 2026-05-03**: replacing scattered screenshot embedding (currently spread across iter32-iter33 + Phase 7 portal + enterprise-gating + persona-aware-chrome + per-page UI sections) with **ONE centralized index, organized by persona × flow**. ASCII wireframes are placeholders only — the real product must be fully developed end-to-end + dogfooded with real screenshots.
+>
+> **Status**: Asset-library capture in flight (Lane-B). Index reorg lands in a Lane-A doc-pass after the asset library is complete (no point reorganising while assets are still arriving). The grid below shows the target taxonomy + which cells are populated vs missing.
+
+| Persona ↓ / Flow → | Onboarding | `/me` portal | Sessions | Coding-assistant tile | Model-provider tile | External-tool tile | Admin catalog | Anomaly rules | Ingestion sources | Routing policies | Compliance posture | Privacy mode | Empty state | Error state |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| **Persona-1** (org-less developer) | TBD | ✅ `portal-hero-populated` | TBD (Phase 8) | ✅ `tile-claude-expanded` | ✅ `tile-anthropic-{form,issued}` | ✅ `tile-copilot-studio` | n/a | n/a | n/a | n/a | n/a | n/a | ✅ `portal-empty` | TBD |
+| **Persona-2** (LLMOps majority — chrome unchanged) | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a |
+| **Persona-3** (member of governed org) | TBD | ✅ `portal-hero-populated` | TBD (Phase 8) | ✅ `tile-claude-expanded` | ✅ `tile-anthropic-{form,issued}` | ✅ `tile-copilot-studio` | n/a (admin gated) | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
+| **Persona-4** (governance ADMIN) | TBD | ✅ `portal-hero-populated` | TBD (Phase 8 admin TTL) | ✅ `admin-add-tile-drawer` | ✅ `admin-scope-picker` | ✅ `admin-catalog-overview` | ✅ `admin-catalog-overview` | ✅ `non-enterprise-anomaly-rules` + `enterprise-anomaly-rules` | ✅ `non-enterprise-ingestion-sources` + `enterprise-ingestion-sources` | TBD | TBD | TBD (Phase 9) | ✅ `non-enterprise-tool-catalog-ungated` | TBD |
+| **Persona-5** (non-enterprise org viewing gated surfaces) | n/a | ✅ `portal-hero-populated` (works for everyone) | n/a | n/a | n/a | n/a | n/a (admin-only) | ✅ `non-enterprise-anomaly-rules` (upsell) | ✅ `non-enterprise-ingestion-sources` (upsell) | ✅ tool-catalog Apache-2.0 floor | TBD | TBD | n/a | n/a |
+
+**Asset libraries (current paths)**:
+- `docs/images/ai-governance/portal/` — 9 PNGs from Phase 7 B10 dogfood
+- `docs/images/ai-governance/enterprise-gating/` — 5 PNGs from Phase 5 browser-QA pass
+- `docs/images/ai-governance/personas/` — persona-aware-chrome shots
+- `docs/images/ai-governance/admin/`, `drawers/`, `flows/`, `cli/`, `architecture/` — Phase 7 D5b deferred (most empty until Lane-B captures land)
+- `docs/images/ai-governance/sessions/` — Phase 8 capture target (4 PNGs planned)
+- `docs/images/ai-governance/no-spy-mode/` — Phase 9 capture target (3 PNGs planned)
+- `docs/images/ai-governance/puller-framework/` — Phase 10 capture target (4 PNGs planned)
+
+**Reorg plan** (Lane-A, post-asset-library):
+1. Lane-B captures all TBD cells in the grid above + Phase 8/9/10 dogfood shots
+2. Lane-A consolidates this section into a flat persona-by-persona walkthrough (Persona-4 admin walkthrough top-to-bottom; Persona-3 member-with-CLI walkthrough top-to-bottom; etc.)
+3. Existing scattered screenshot placements throughout the PR doc → replaced with cross-links into this central section
+4. ASCII wireframes (Phase 7 §Architecture spine + ASCII wireframes) → marked as "design-time placeholders" with cross-links to the corresponding real-screenshot cells
+
+**Until reorg lands**, screenshots remain at their current scattered placements — the grid above is the canonical TODO list for Lane-B captures + Lane-A consolidation.
+
+---
+
+## UI flows + screenshots (LEGACY scattered placement — pending reorg into §Screenshots above)
 
 > Captured by Alexis during the iter22 governance dogfood pass against the
 > running dev server. All post-`33a8cf6d0` (full receiver rewire shipped).
@@ -1047,16 +1080,19 @@ The Jane at Acme 8-screen storyboard from `gateway.md` is the **trial-wedge demo
 | ✅ | 🅑 | Live-data dashboard dogfood pass — 3 persona-chrome screenshots embedded inline in §UI verification screenshots (img402.dev hosted) |
 | ✅ | 🅐 | Customer-facing docs flip — 4 waves shipped (`1e34cd9ef` wave 1 + `f13c33e20` wave 2 + `5bca796f2` wave 3 + `0b4f4d90e` wave 4) |
 
-### Phase 4 — License relocation + UI gating (NEW per rchaves directive 2026-04-28)
+### Phase 4 — License relocation + UI gating (rchaves directive 2026-04-28; **un-deferred 2026-05-03**)
+
+> **Vote H OVERRIDDEN per rchaves directive 2026-05-03**: everything in Phase 4 ships in THIS PR except the literal root `LICENSE` file change (4c-3), which is the only follow-up PR scope. 4a relocation + 4b UI gating + 4b-4/5 service-layer 403 + 4b-6 CLI 402 + 4b-7 docs + 4c-1 assertion test + 4c-2 per-file headers + 4c-4 README split + tRPC permission granularization all land here.
 
 | | Owner | Task |
 |---|---|---|
 | 🚧 | 🅐 | This PM proposal (license split + Gantt + product roundup) |
 | 🚧 | 🌐 | Cross-lane review of license-split + Gantt; pushback / consolidation |
 | 🚧 | 🅐 | Fold license-split + Gantt into PR-3524-DESCRIPTION.md (THIS COMMIT) |
-| ⏳ | 🅢 | 4a-1: `git mv` ingestion + helper + activity-monitor (cross-source split) → `langwatch/ee/governance/` |
-| ⏳ | 🅢 | 4a-2: `git mv` anomaly + folds (3b/3d) + retention (3c) + ocsf-export (3f) → `langwatch/ee/governance/` |
-| ⏳ | 🅑 | 4a-3: `git mv` governance UI components → `langwatch/ee/governance/dashboard/` |
+| ⏳ in-PR | 🅢 | **4a-1**: `git mv` governance services / repositories / activity-monitor → `langwatch/ee/governance/services/{,activity-monitor/}` (cross-source split). Mechanical pass 1; Sergey lane Slice 1 in flight. |
+| ⏳ in-PR | 🅢 | **4a-2**: `git mv` governance routers (`governance.ts`, `anomalyRules.ts`, `activityMonitor.ts`, `ingestionSources.ts`, `aiTools.ts`) → `langwatch/ee/governance/routers/`; trace-processing reactors (`gatewayBudgetSync`, `governanceKpisSync`, `governanceOcsfEventsSync`, `alertTrigger`) → `langwatch/ee/governance/reactors/`. ClickHouse migrations stay where the runner expects (per Sergey scope). |
+| ⏳ in-PR | 🅑 | **4a-3**: `git mv` governance UI components → `langwatch/ee/governance/dashboard/` (paired with Sergey's import-path sweep so Lane-B re-exports don't break). |
+| ⏳ in-PR | 🅢 | **4a-tRPC**: tRPC permission granularization sweep — `organization:manage` → `governance:manage` per-route on every governance router (post-relocation paths). Add `governance:manage` to ADMIN's RBAC bag if missing; per-route integration test extension. (Was previously in scoreboard as deferred; un-deferred per rchaves.) |
 | ✅ | 🅑 | **4b-1: `<EnterpriseLockedSurface>` + `<EnterpriseLockedKpi>` components** — `2c3435e64` (5 files, +140/-0). Both consume `useActivePlan().isEnterprise` (hook already in repo at `langwatch/src/hooks/useActivePlan.ts`); skeleton during `isLoading` (no flash); upsell card with `/settings/subscription` CTA on the full-page variant; `EnterpriseLockedKpi` is the compact tile variant exported-not-yet-consumed (lands for use on the governance landing dashboard's enterprise-only KPI tiles when those wire up). |
 | ✅ (narrowed) | 🅑 | **4b-2: Wire UI-1 wrap on existing governance surfaces** — `2c3435e64` wired `anomaly-rules.tsx` + `ingestion-sources.tsx` + `ingestion-source-detail.tsx` (each gets a `featureName` + tailored description copy). The other 5 surfaces from the original 4b-2 list (`alert-destinations`, `compliance-posture`, `ocsf-export`, `cache-rules`, `org-wide-audit`) are 📋 deferred — pages don't exist yet; wrapping is a 1-line addition when they ship. `groups`/`roles`/`scim` exist at `/settings/` but were left as out-of-governance-scope-PR per master_orchestrator narrowing. Per master_orchestrator: `tool-catalog` / `governance` landing / `routing-policies` remain Apache-2.0 floor (NOT gated). |
 | ✅ | 🅑 | **4b-3: IngestionSource composer source-type / retention dropdown gate** — `26f9a0f67` (+24/-2). Inline `useActivePlan()` filter on `SourceComposerDrawer`: source-type dropdown shows only `otel_generic` (filters from full `SOURCE_TYPE_OPTIONS`) for non-enterprise; retention-class dropdown shows only `thirty_days` (filters from `RETENTION_CLASS_OPTIONS`); per-dropdown helper text points to Enterprise upgrade for the filtered options. Pairs with Sergey's `f8eec569b` service-layer + router 403 — **UI prevents selection, backend rejects bypasses**. |
@@ -1065,9 +1101,9 @@ The Jane at Acme 8-screen storyboard from `gateway.md` is the **trial-wedge demo
 | ✅ | 🅐 | **4b-6: CLI 402 Payment Required envelope** — `f3e4a2cab` (4 files, +224/-4). New `ensureEnterpriseOr402` helper in `langwatch/src/server/routes/auth-cli.ts` mirrors the tRPC `requireEnterprisePlan` middleware shape but speaks REST 402 (RFC 7231 §6.5.2) — wired into all 4 governance routes (status / ingest sources list / events / health), positioned after `validateAccessToken` so 401 fires first (no plan-info leakage to anon callers). Body shape: `{ error: "payment_required", error_description, upgrade_url }`. CLI side: `typescript-sdk/src/cli/utils/governance/cli-api.ts` `getJSON` now handles 402 alongside 401/404, throwing a `GovernanceCliError` whose message includes the upgrade URL on a separate click-targetable line — existing `Error: ${err.message}` surface in `commands/ingest/list.ts` + sibling commands renders verbatim, no command-side edits needed. Test extension: `auth-cli-governance.integration.test.ts` adopts the `createTestApp({planProvider})` per-org plan resolver pattern (orgs A+B → ENTERPRISE keeping the 16 existing RBAC/tenancy tests green; org C → FREE for the new 4-scenario license-gate subdescribe). New BDD spec: `specs/ai-gateway/governance/cli-402-license-gate.feature` (7 scenarios). |
 | ✅ | 🅐 | **4b-7: "Available on Enterprise plans" docs callouts** — `071755498`. New "Open-core licensing" section in `/ai-governance/overview.mdx` with full Apache 2.0 / Enterprise split table; per-page `<Note>` callouts on `anomaly-rules.mdx`, `ingestion-sources/index.mdx`, `compliance-architecture.mdx` cross-linking back to the canonical split. |
 | ✅ | 🅢 | **4c-1: License-gate assertion test** — `f8eec569b`: new `license-gate-governance.integration.test.ts` (15 scenarios) + new `specs/ai-gateway/license-gate-governance.feature` BDD spec. Pinned: non-enterprise admin gets FORBIDDEN on every gated proc; MEMBER gets UNAUTHORIZED (RBAC fires first); Apache-2.0 floor stays open; service-layer `createSource` rejects direct calls; enterprise plan path validates allow-flow. 15 new + 11 existing governance.rbac tests + 15 existing ingestionRoutes tests all green. |
-| ⏳ | 🌐 | 4c-2: License headers — Apache 2.0 in `langwatch/src/`; Enterprise license in `langwatch/ee/` (per existing convention) |
-| ⏳ | 🅐 | 4c-3: Top-level `LICENSE` + `LICENSE-EE` files clarifying the split |
-| ⏳ | 🅐 | 4c-4: README.md update with open-core split + Apache 2.0 / Enterprise badges |
+| ⏳ in-PR | 🌐 | **4c-2**: Per-file license headers (Apache 2.0 in `langwatch/src/`; Enterprise in `langwatch/ee/`). Cross-lane rote sweep after 4a relocation lands; can split by directory. |
+| 📋 (only follow-up PR scope) | 🅐 | **4c-3**: Top-level `LICENSE` + `LICENSE-EE` files clarifying the split. **Per rchaves directive 2026-05-03, this is the ONLY item that ships on a separate cosmetic-only follow-up PR**. Everything else in Phase 4 lands in this PR. |
+| ⏳ in-PR | 🅐 | **4c-4**: `README.md` update with open-core split + Apache 2.0 / Enterprise badges + cross-link to `/ai-governance/overview#open-core-licensing`. Lane-A picks up after 4a relocation lands so paths reference real `langwatch/ee/` directories. |
 
 ### Phase 2C — Anomaly action layer (Direction 2, P2) — `ee/`
 
@@ -1390,10 +1426,110 @@ Quick state of the still-pending Phase 1B.5 / 2C / 2D / 4 / 5 work, surfaced for
 | **Phase 1B / 1B.5** | **Lane-S 1B closed** as of `4d83d4ff1` (PRINCIPAL cascade backend ✅ + CLI token revoke on deactivation ✅ + 2 BDD specs + 9 integration tests). **1B-followup-1 closed** as of `717745384` (PRINCIPAL admin UI in `BudgetCreateDrawer`). **Lane-B 1B.5 polish open**: 5 ⏳ (1.5b-ii Screen 2 single-input email-only `/signin-cli`, 1.5b-iii Screen 4 ceremony, 1.5b-iv Screen 6 polish, 1.5b-v Screen 7 polish, 1.5b-vi Screen 8 BudgetExceededBanner web-side enrichment, 1.5a-marketing draft). **Remaining follow-up (📋)**: 1B-followup-2 admin "revoke this user's CLI sessions" affordance (Phase 5 polish, deferred). | No | ✓ — Lane-B rotates between Screen polish + parallel 2C/2D/4/5 |
 | **Phase 2C** | 2 ⏳ in-PR scope (C3 dispatch — Slack/PagerDuty/SIEM/email; structured threshold-config schema per rule type) — both 🅢; 5 📋 backlog (Live rule types + revocation automations) | No | ✓ — Lane-S can rotate between portal backend + 2C dispatch |
 | **Phase 2D** | 5 ⏳ (3 puller workers — copilot_studio / openai_compliance / claude_compliance; 2 webhook adapters — workato job-array unwrap, s3_custom DSL) — all 🅢 | No | ✓ — pure Lane-S backend, fully parallel with portal |
-| **Phase 4** | License relocation (4a-1/2/3 + 4c-2/3/4) **deferred to follow-up PR per Vote H** (already locked). **In-PR 4b CLOSED end-to-end on all 3 lanes**: 4b-1 ✅ (`2c3435e64`) + 4b-2 ✅ narrowed (`2c3435e64`) + 4b-3 ✅ (`26f9a0f67`) + 4b-4 ✅ (`f8eec569b`) + 4b-5 ✅ (`f8eec569b`) + 4b-6 ✅ (`f3e4a2cab`) + 4b-7 ✅ (`071755498`) + 4c-1 ✅ (`f8eec569b`). | No | ✓ — Phase 4 closed |
+| **Phase 4** | **Vote H OVERRIDDEN per rchaves directive 2026-05-03 — everything except literal LICENSE root file is back in-PR.** 4b CLOSED on all 3 lanes (✅ 4b-1/2/3/4/5/6/7 + 4c-1, see Phase 4 detail above). **Newly un-deferred + still ⏳ in-PR**: 4a-1 + 4a-2 (🅢 Sergey, governance services + reactors `git mv` to `langwatch/ee/governance/`); 4a-3 (🅑 Alexis, governance UI components `git mv`); 4a-tRPC (🅢 permission granularization sweep); 4c-2 (🌐 per-file license headers); 4c-4 (🅐 README open-core split). **Only 4c-3 stays follow-up PR** (literal root LICENSE file). | Yes (gates GA per rchaves) | ✓ — Lane-S Slice 1 in flight as of channel post 2026-05-03; subsequent slices serialised on relocation paths |
+| **Phase 8 — Sessions/Devices** (NEW) | Architecture-spine row above. ⏳ — entire phase open (P8-arch in this commit; P8-schema/exchange/refresh-ttl/list-api/int-test on Sergey; P8-ui-sessions/admin-ttl/dogfood on Alexis; P8-spec-{sessions,admin-ttl} + P8-docs on Andre). | Yes (rchaves explicit ask) | ✓ — Lane-S has dependency: P8 backend ships AFTER 4a relocation paths land |
+| **Phase 9 — Gateway no-spy mode** (NEW) | Architecture-spine row above. ⏳ — entire phase open (P9-schema/strip-service/pipeline-wire/int-test on Sergey; P9-ui/dogfood on Alexis; P9-spec + P9-docs on Andre). | Yes (rchaves explicit ask) | ✓ — Independent of 4a relocation; can ship in parallel |
+| **Phase 10 — Pull-mode framework** (NEW) | Architecture-spine row above. ⏳ — entire phase open (P10-adapter-iface / http-adapter / s3-adapter / reference-impl / worker / schema / int-test on Sergey; P10-ui on Alexis; P10-spec + P10-docs on Andre). | Yes (rchaves explicit ask — closes the Phase 2D gap) | ✓ — Replaces the 5 ⏳ Phase 2D rows (per-platform puller workers + adapter sweeps); those become 📋 deferred since the universal framework subsumes them |
+| **Phase 11 — CLI wrapper e2e in CI** (NEW) | Architecture-spine row above. ⏳ — entire phase open (P11-harness / per-wrapper / ci on Sergey; P11-ui-handoff on Alexis; P11-spec + P11-docs on Andre). | Yes (rchaves explicit ask — keep the wrappers from silently breaking) | ✓ — Independent of all other phases; reuses `services/aigateway/` Bifrost test patterns |
 | **Phase 5** | 12 ⏳ — 8 🅢 (volume regression, cross-org concurrency, reactor backpressure, CH retention TTL atomicity, receiver auth rate limit, OCSF schema versioning) + 2 🅑 (browser-QA enterprise gating, cross-org HTTP isolation smoke) + 1 🅐 (self-hosted compliance docs) + 3 🌐 (E2E smoke in CI, CodeRabbit pass, squash+merge+release) | Yes (gates merge) | ✓ — most are independent test/doc work |
 
 **Net call**: Phase 7 launches without stalling 1B.5 / 2C / 2D / 4 / 5. Lane-B can interleave Phase 7 portal UI with the 5 remaining 1B.5 polish items; Lane-S has plenty of room across 2C / 2D + Phase 7 backend; Lane-A keeps folding + drives docs + handles 4b-6/7 + 5-self-hosted-compliance-docs in parallel.
+
+---
+
+### Phase 8 — Sessions / Devices dashboard (NEW per rchaves directive 2026-05-03)
+
+> **Concept**: When a user runs `langwatch login` to start a Claude Code / Codex / Cursor / Gemini CLI session, the device-flow exchange mints a personal Virtual Key behind the scenes. Today there's no way for the user to see "where am I logged in?" the way macOS shows logged-in devices, GitHub shows active sessions, or Apple ID shows trusted devices. This phase adds the inventory + revoke + admin-controlled max-session-TTL.
+>
+> **Lane split**: 🅢 backend (CliSession model, device-info capture in `/exchange`, list+revoke API, max-TTL enforcement at `/refresh`); 🅑 UI (`/me/sessions` page + admin org-setting for max session TTL); 🅐 BDD specs + docs page.
+
+| Step | Description | Owner | Critical path |
+|---|---|---|---|
+| P8-arch | Architecture spine + Gantt + BDD file list (THIS COMMIT — narrative) | 🅐 | ✓ |
+| P8-schema | Extend AccessTokenRecord + RefreshTokenRecord with `device_label` (user-friendly, e.g. "Bob's MacBook Pro") + `device_uname` (raw `uname -a`) + `client_platform` + `created_at` + `last_used_at`. New Prisma migration adds `Organization.maxSessionDurationDays Int @default(0)` (0 = unbounded). | 🅢 | ✓ |
+| P8-exchange | `auth-cli.ts /exchange` accepts `client_info: { device_label?, uname?, hostname?, platform? }` from request body; stamps both AccessToken + RefreshToken records. CLI side (typescript-sdk): `device-flow.ts` populates `client_info` from `os.hostname()` + `os.userInfo().username` + `os.platform()` so the backend captures real values without prompts. | 🅢 | ✓ |
+| P8-refresh-ttl | `auth-cli.ts /refresh` enforces `maxSessionDurationDays` — when the org has a TTL set and `(now - issued_at) > TTL`, return 401 + `error: "session_expired"` so the CLI prompts re-login. Default 0 = unbounded (no behavior change for orgs that don't set the cap). | 🅢 | |
+| P8-list-api | New `cliSessionInventory.service.ts` reads `lwcli:user:<userId>:tokens` Redis index (already exists from `4d83d4ff1`), enriches each entry with the persisted device metadata; new `personalSessions.{list,revoke,revokeAll}` tRPC router (mirrors `aiTools` pattern). | 🅢 | ✓ |
+| P8-int-test | `personalSessions.integration.test.ts` — list returns enriched metadata for current user only (cross-user isolation); revoke clears the targeted token + token disappears from list + subsequent `/budget/status` returns 401; revokeAll clears all sessions for the user; max-TTL `/refresh` rejection scenario. | 🅢 | ✓ |
+| P8-spec-sessions | `specs/ai-governance/sessions/personal-sessions.feature` — happy path (claude session created → visible at /me/sessions → revoke clears it); admin TTL enforcement; cross-user isolation. | 🅐 | |
+| P8-spec-admin-ttl | `specs/ai-governance/sessions/admin-max-ttl.feature` — admin sets `maxSessionDurationDays=7` → existing sessions older than 7d expire on next /refresh; new sessions get the cap. | 🅐 | |
+| P8-ui-sessions | `pages/me/sessions.tsx` (new page) — device-card grid showing platform icon (macOS/Linux/Windows from `client_platform`) + `device_label` (or fallback to `uname` if no label) + `created_at` (relative) + `last_used_at` (relative) + `Revoke ▸` button; bulk `Revoke all sessions` action; loading skeleton; error toast on revoke failure. Routes registration in `routes.tsx` per the post-Vite-migration audit lesson. | 🅑 | ✓ |
+| P8-ui-admin-ttl | Admin org-setting toggle — likely under `/settings/governance` "Security policies" section: `Maximum session duration` numeric input (days; 0 = unbounded) + helper text explaining the security trade-off. | 🅑 | |
+| P8-docs | `docs/ai-governance/personal-portal/sessions.mdx` — end-user walkthrough of the sessions surface + admin walkthrough of the TTL setting. Cross-link from `personal-portal/overview.mdx` + `personal-portal/end-user.mdx`. | 🅐 | |
+| P8-dogfood | Live-data dogfood — capture: empty sessions state, populated sessions grid (3 fake-device entries from cookbook script), revoke flow (before/after), admin TTL setting in `/settings/governance`. 4 PNGs at `docs/images/ai-governance/sessions/`. | 🅑 | ✓ |
+| P8-fold | 🅐 Andre folds each batch into PR body + re-PATCHes | 🅐 | |
+
+Critical path: **P8-arch → P8-schema → P8-exchange → P8-list-api → P8-int-test → P8-ui-sessions → P8-dogfood**.
+
+---
+
+### Phase 9 — Gateway no-spy mode (Privacy / drop-content admin setting) (NEW per rchaves directive 2026-05-03)
+
+> **Concept (rchaves quote, condensed)**: "many orgs can't spy on their employee chats". Today every gateway request lands its prompt + completion + system message in ClickHouse. Many enterprises have policies that prohibit storing conversational content even briefly. This phase adds an org/team-scoped admin setting that **completely drops** the content payload — never stored to ClickHouse, not even briefly.
+>
+> **Lane split**: 🅢 backend (org-scoped setting, receiver-side filter strips `gen_ai.prompt.*` / `gen_ai.completion.*` / `gen_ai.system_message.*` BEFORE CH ingest, integration test asserts CH never sees content); 🅑 UI (toggle in org settings + clear callout); 🅐 BDD specs + docs.
+
+| Step | Description | Owner | Critical path |
+|---|---|---|---|
+| P9-arch | Architecture spine + Gantt + BDD file list (THIS COMMIT — narrative) | 🅐 | ✓ |
+| P9-schema | New Prisma migration: `Organization.governanceLogContentMode String @default("full")` — values: `"full"` (current behavior) / `"strip_io"` (drop prompt + completion + system messages) / `"strip_all"` (also drop tool-call args + tool-result payloads). Per-team override field is a follow-up; org-level lands in this slice. | 🅢 | ✓ |
+| P9-strip-service | New `OtlpSpanContentStripService` (or extend existing `OtlpSpanPiiRedactionService`) — strips `gen_ai.prompt.*` + `gen_ai.completion.*` + `gen_ai.system_message.*` + (in `strip_all` mode) `gen_ai.tool_call.*` from spans BEFORE the trace-pipeline writes to CH. **Defense-in-depth**: source-of-truth event_log keeps the raw event for audit (the org explicitly trusts the gateway-internal pipeline; the no-spy guarantee is "no human-readable content in the searchable trace store"). | 🅢 | ✓ |
+| P9-pipeline-wire | Register `OtlpSpanContentStripService` in the trace-processing pipeline BEFORE the CH write step (after PII redaction so both run in sequence). Idempotent: if mode is `"full"`, the service is a no-op. | 🅢 | ✓ |
+| P9-int-test | `governanceContentStrip.integration.test.ts` — for each mode, post a gateway-origin span with `gen_ai.completion.0.content = "secret weather data"` → mode `full` keeps it; mode `strip_io` produces empty `gen_ai.completion.0.content` in CH; mode `strip_all` also strips tool-call args. **Critical assertion**: query CH directly with `SELECT SpanAttributes FROM recorded_spans WHERE … AND TenantId = …` — the field MUST NOT contain "secret weather data" in stripped modes. | 🅢 | ✓ |
+| P9-spec | `specs/ai-governance/no-spy-mode/no-spy-mode.feature` — 3 modes × happy path + cross-org isolation (org A `strip_io` doesn't affect org B `full`) + non-gateway-origin spans untouched (we don't strip user-app traces, only gateway-emitted ones). | 🅐 | |
+| P9-ui | UI toggle — 3-radio picker in `/settings/governance` "Privacy" section: **Full** ("All content stored — recommended for debugging-heavy teams") / **Strip inputs & outputs** ("Prompts + completions + system messages dropped before storage — recommended for orgs with conversational-content policies") / **Strip everything** ("Also drops tool-call arguments + tool-result payloads — strictest mode, may break some debugging flows"). Save fires `api.organization.update` mutation. | 🅑 | ✓ |
+| P9-docs | `docs/ai-governance/no-spy-mode.mdx` — what it is, when to use which mode, concrete what-gets-stripped table, defense-in-depth note about event_log retention. Cross-link from `compliance-architecture.mdx`. | 🅐 | |
+| P9-dogfood | Live-data dogfood — capture: 3-radio picker UI (default + post-toggle), trace viewer showing stripped completion in `strip_io` mode, ClickHouse query screenshot proving content absence. 3 PNGs at `docs/images/ai-governance/no-spy-mode/`. | 🅑 | ✓ |
+| P9-fold | 🅐 Andre folds each batch into PR body + re-PATCHes | 🅐 | |
+
+Critical path: **P9-arch → P9-schema → P9-strip-service → P9-pipeline-wire → P9-int-test → P9-ui → P9-dogfood**.
+
+---
+
+### Phase 10 — Pull-mode connector framework + sample worker (NEW per rchaves directive 2026-05-03)
+
+> **Concept (rchaves quote, condensed)**: copilot_studio / openai_compliance / claude_compliance are setup-contract-only today. Need a **sample puller worker actually working**, plus a **universal way for users to define pull logic** for arbitrary S3 / HTTP / etc. Industry-standard inspirations: Singer Tap, Airbyte CDK, Apache Camel, Kafka Connect.
+>
+> **Lane split**: 🅢 backend (`PullerAdapter` abstraction + 2 universal adapters — HTTP polling + S3 polling + 1 reference impl using one of them + BullMQ worker + Prisma schema field); 🅑 admin UI for "Add pull source" drawer w/ per-type config; 🅐 BDD specs + docs.
+
+| Step | Description | Owner | Critical path |
+|---|---|---|---|
+| P10-arch | Architecture spine + Gantt + BDD file list (THIS COMMIT — narrative) | 🅐 | ✓ |
+| P10-adapter-iface | `langwatch/ee/governance/services/pullers/PullerAdapter.ts` — base interface: `{ id, ingestionSourceId, runOnce(): Promise<PullResult>, validateConfig(): zod }`. PullResult = `{ events: NormalizedEvent[], cursor: string \| null, errorCount: number }`. Cursor-based pagination is mandatory (puller resumes from last cursor on restart); restart-safe via `IngestionSource.lastCursor` Prisma field. | 🅢 | ✓ |
+| P10-http-adapter | `HttpPollingPullerAdapter` — universal HTTP-polling adapter. Config: `{ url, method, headers (template-substituted), body (template), authMode: "bearer" \| "basic" \| "hmac", credentialRef, cursorJsonPath (where to find next-cursor in response), eventsJsonPath (where to find the events array), schedule (cron) }`. Mirrors Airbyte's HTTP source connector shape. | 🅢 | ✓ |
+| P10-s3-adapter | `S3PollingPullerAdapter` — universal S3-polling adapter. Config: `{ bucket, prefix, region, credentialRef, parser: "ndjson" \| "csv" \| "json-array", schedule }`. Cursor = lexicographic-max key seen so far; resume from there. | 🅢 | ✓ |
+| P10-reference-impl | `copilotStudio.puller.ts` — reference puller that uses `HttpPollingPullerAdapter` against the Copilot Studio audit-log API. Concrete config + per-event mapping to LangWatch's normalized event shape. Demonstrates the framework end-to-end. | 🅢 | ✓ |
+| P10-worker | New BullMQ worker `governancePullerWorker.ts` — picks scheduled puller jobs, instantiates the right adapter, calls `runOnce()`, persists events via the same path as webhook ingest, advances `lastCursor`, schedules next run per `schedule` config. | 🅢 | ✓ |
+| P10-schema | Prisma migration: `IngestionSource.pullConfig Json?` + `IngestionSource.lastCursor String?` + `IngestionSource.lastPolledAt DateTime?` + `IngestionSource.pullSchedule String?` (cron expression). | 🅢 | ✓ |
+| P10-int-test | `governancePuller.integration.test.ts` — fixture-backed: spin up local HTTP server returning a paginated audit-log response, run the puller against it, assert events land in the trace store, assert cursor advances, assert restart resumes from cursor. Also covers S3 adapter against a localstack S3 fixture. | 🅢 | ✓ |
+| P10-spec | `specs/ai-governance/puller-framework/{puller-adapter-contract,http-polling,s3-polling,copilot-studio-reference}.feature` — 4 specs covering the framework contract + 2 universal adapters + 1 reference impl. | 🅐 | |
+| P10-ui | Admin "Add pull source" drawer — extends existing `IngestionSourceComposer` with a new `type=pull` branch + per-adapter config form (HTTP: url+headers+jsonPath; S3: bucket+prefix+parser; copilot_studio: just credential picker since the reference impl has known shape). Schedule picker. | 🅑 | |
+| P10-docs | `docs/ai-governance/pull-mode-connectors.mdx` — overview + how to write a custom puller (TS module declaration + zod config schema) + reference table of built-in adapters. Cross-link from `ingestion-sources/index.mdx`. | 🅐 | |
+| P10-dogfood | Live-data dogfood — capture: admin drawer for HTTP + S3 + reference-impl setup; running pull worker logs; events appearing in trace viewer. 4 PNGs at `docs/images/ai-governance/puller-framework/`. | 🅑 | ✓ |
+| P10-fold | 🅐 Andre folds each batch into PR body + re-PATCHes | 🅐 | |
+
+Critical path: **P10-arch → P10-adapter-iface → P10-http-adapter → P10-reference-impl → P10-worker → P10-schema → P10-int-test → P10-ui → P10-dogfood**.
+
+---
+
+### Phase 11 — CLI wrapper end-to-end tests in CI (NEW per rchaves directive 2026-05-03)
+
+> **Concept (rchaves quote, condensed)**: For Claude / Codex / Cursor / Gemini / OpenCode wrappers (`langwatch claude` etc) — has the wrapper login been tested e2e? Dogfooded? Are there CI e2e tests to keep them working? Reuse anything from gateway AI work.
+>
+> **Lane split**: 🅢 backend (e2e harness per wrapper exercising login + token mint + provider request via wrapper, reusing `services/aigateway/` Bifrost test patterns + dispatcher_bifrost_e2e shape; CI integration); 🅑 browser-side verification of OAuth/device-flow handoff page. Most of the work is Lane-S since the wrappers are CLI binaries.
+
+| Step | Description | Owner | Critical path |
+|---|---|---|---|
+| P11-arch | Architecture spine + Gantt + BDD file list (THIS COMMIT — narrative) | 🅐 | ✓ |
+| P11-harness | `cli-wrappers.e2e.integration.test.ts` (or `services/aigateway/internal/dispatch/wrapper_e2e_test.go` mirror) — e2e harness that: mints a test org + user; runs `langwatch login --device` programmatically; spawns `langwatch <wrapper>` with a stubbed wrapped binary that records env vars + writes a fixture request; asserts: `ANTHROPIC_BASE_URL` (or equivalent per wrapper) points at the test gateway; bearer is the minted personal VK; the fixture request gets the right routing-policy resolution; the response carries the right OTel attributes back; trace lands in the trace store. | 🅢 | ✓ |
+| P11-per-wrapper | Per-wrapper assertion suite — claude (anthropic provider), codex (openai), cursor (anthropic + custom), gemini (google), opencode. Reuses the harness, varies the env-var check + the fixture provider. Each ~30 LOC of test once the harness exists. | 🅢 | ✓ |
+| P11-ci | CI job registration — wires the e2e suite into the langwatch-app-ci workflow (likely a separate shard since it's slower than unit/integration). May need a Bifrost mock or stub provider already used by the existing `dispatcher_bifrost_e2e_test.go`. | 🅢 | ✓ |
+| P11-spec | `specs/ai-gateway/wrapper-e2e/{claude,codex,cursor,gemini,opencode}.feature` — 5 specs (one per wrapper) pinning the env-var injection + bearer source + routing-policy resolution + trace landing. | 🅐 | |
+| P11-ui-handoff | Browser-side verification of the device-flow OAuth handoff page (`/cli/auth?user_code=…`) — Playwright test that ensures the page renders correctly for an SSO user, the user-code-confirm button works, and the post-confirm "you can close this window" state appears. | 🅑 | |
+| P11-docs | Update `/ai-governance/personal-keys.mdx` + `/ai-governance/cli-debug.mdx` with a "verified e2e in CI" note for each supported wrapper. | 🅐 | |
+| P11-fold | 🅐 Andre folds each batch into PR body + re-PATCHes | 🅐 | |
+
+Critical path: **P11-arch → P11-harness → P11-per-wrapper → P11-ci**.
 
 ---
 
