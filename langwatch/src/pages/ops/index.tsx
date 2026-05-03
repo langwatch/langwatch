@@ -26,7 +26,7 @@ export default function OpsPage() {
         </PageLayout.Header>
         <PageLayout.Container>
           {data ? (
-            <OpsDashboardContent data={data} />
+            <OpsDashboardContent data={data} connectionStatus={status} />
           ) : (
             <Center paddingY={20}>
               <EmptyState.Root>

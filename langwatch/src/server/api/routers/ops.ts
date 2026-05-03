@@ -494,6 +494,71 @@ export const opsRouter = createTRPCRouter({
       return ops.eventExplorer.getAggregateEvents(input);
     }),
 
+  getQueueOverview: protectedProcedure
+    .use(opsViewPermission)
+    .input(
+      z.object({
+        queueName: z.string(),
+        sliceN: z.number().int().min(1).max(200).optional(),
+      }),
+    )
+    .query(async ({ input }) => {
+      const ops = requireOps();
+      return ops.queues.getQueueOverview(input);
+    }),
+
+  searchPendingJobs: protectedProcedure
+    .use(opsViewPermission)
+    .input(
+      z.object({
+        queueName: z.string(),
+        filter: z
+          .object({
+            pipelineName: z.string().optional(),
+            jobType: z.string().optional(),
+            tenantId: z.string().optional(),
+            // "active" is omitted: in-flight jobs have their data HDEL'd from
+            // the group data hash so there's nothing to filter on. Surface
+            // active count via the overview chip instead.
+            state: z
+              .enum(["ready", "scheduled", "retrying", "blocked", "stale"])
+              .optional(),
+            groupIdContains: z.string().optional(),
+            ageGtMs: z.number().int().min(0).optional(),
+            ageLtMs: z.number().int().min(0).optional(),
+          })
+          .default({}),
+        sort: z.enum(["oldest", "youngest", "mostOverdue"]).default("oldest"),
+        page: z.number().int().min(1).default(1),
+        pageSize: z.number().int().min(1).max(200).default(50),
+      }),
+    )
+    .query(async ({ input }) => {
+      const ops = requireOps();
+      return ops.queues.searchPendingJobs(input);
+    }),
+
+  getPendingJobDetail: protectedProcedure
+    .use(opsViewPermission)
+    .input(
+      z.object({
+        queueName: z.string(),
+        groupId: z.string(),
+        jobId: z.string(),
+      }),
+    )
+    .query(async ({ input }) => {
+      const ops = requireOps();
+      const detail = await ops.queues.getPendingJobDetail(input);
+      if (!detail) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: `Job "${input.jobId}" not found in group "${input.groupId}"`,
+        });
+      }
+      return detail;
+    }),
+
   computeProjectionState: protectedProcedure
     .use(opsViewPermission)
     .input(
