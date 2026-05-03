@@ -146,3 +146,92 @@ export interface DashboardData {
 export type SSEEvent =
   | { type: "dashboard"; data: DashboardData }
   | { type: "heartbeat"; data: { timestamp: number } };
+
+export type JobState =
+  | "ready"
+  | "scheduled"
+  | "retrying"
+  | "active"
+  | "blocked"
+  | "stale";
+
+// Active jobs have their data HDEL'd from the group hash on dispatch, so
+// they aren't searchable via the per-job aggregator. Surface the count via
+// the overview chip instead.
+export type SearchableJobState = Exclude<JobState, "active">;
+
+export interface PendingJobSummary {
+  jobId: string;
+  groupId: string;
+  pipelineName: string | null;
+  jobType: string | null;
+  jobName: string | null;
+  tenantId: string | null;
+  score: number;
+  ageMs: number;
+  state: JobState;
+  retryCount: number | null;
+}
+
+export interface QueueOverview {
+  queueName: string;
+  generatedAtMs: number;
+  computedDurationMs: number;
+  groupsScanned: number;
+  totals: {
+    jobs: number;
+    groups: number;
+    ready: number;
+    scheduled: number;
+    retrying: number;
+    active: number;
+    blocked: number;
+    stale: number;
+    dlq: number;
+  };
+  byPipeline: Array<{ name: string; jobs: number; groups: number }>;
+  byJobType: Array<{ name: string; jobs: number }>;
+  byTenant: Array<{ tenantId: string; jobs: number; groups: number }>;
+  byState: Array<{ state: JobState; jobs: number }>;
+  oldestJobs: PendingJobSummary[];
+  youngestJobs: PendingJobSummary[];
+  mostOverduePerTenant: PendingJobSummary[];
+}
+
+export interface PendingJobFilter {
+  pipelineName?: string;
+  jobType?: string;
+  tenantId?: string;
+  state?: SearchableJobState;
+  groupIdContains?: string;
+  ageGtMs?: number;
+  ageLtMs?: number;
+}
+
+export type PendingJobSort = "oldest" | "youngest" | "mostOverdue";
+
+export interface PendingJobSearchResult {
+  jobs: PendingJobSummary[];
+  totalMatching: number;
+  scannedGroups: number;
+  truncated: boolean;
+  generatedAtMs: number;
+  computedDurationMs: number;
+}
+
+export interface PendingJobDetail {
+  jobId: string;
+  groupId: string;
+  queueName: string;
+  score: number | null;
+  state: JobState;
+  isActive: boolean;
+  isBlocked: boolean;
+  data: Record<string, unknown> | null;
+  rawData: string | null;
+  error: {
+    message: string | null;
+    stack: string | null;
+    timestamp: number | null;
+  } | null;
+}

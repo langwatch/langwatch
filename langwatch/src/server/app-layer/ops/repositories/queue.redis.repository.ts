@@ -1,6 +1,17 @@
 import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
-import type { GroupInfo, QueueInfo, ErrorCluster } from "../types";
+import type {
+  GroupInfo,
+  QueueInfo,
+  ErrorCluster,
+  QueueOverview,
+  PendingJobFilter,
+  PendingJobSort,
+  PendingJobSearchResult,
+  PendingJobDetail,
+  PendingJobSummary,
+  JobState,
+} from "../types";
 import type {
   QueueRepository,
   BlockedSummary,
@@ -9,8 +20,8 @@ import type {
   JobEntry,
 } from "./queue.repository";
 import { normalizeErrorMessage } from "../normalize-error-message";
+import { AGGREGATOR_SCRIPTS } from "./queue.aggregator.scripts";
 
-// ── Lua Scripts ──────────────────────────────────────────────────────
 
 const UNBLOCK_LUA = `
 local blockedKey = KEYS[1]
@@ -158,19 +169,315 @@ redis.call("LTRIM", signalKey, 0, 999)
 return count
 `;
 
-// ── Constants ────────────────────────────────────────────────────────
 
 const SUMMARY_TOP_N = 200;
 const DLQ_TTL_SECONDS = 604800;
 const SSCAN_BATCH = 500;
 
-// ── Helpers ──────────────────────────────────────────────────────────
+// Aggregator chunking — keeps each Lua call's wall time bounded.
+const AGGREGATOR_GROUP_CHUNK = 250;
+const AGGREGATOR_SLICE_N = 50;
+// Concurrency for chunked Lua dispatch. Redis is single-threaded so each Lua
+// call still serialises on the server, but parallel dispatch removes Node↔Redis
+// RTT stalls and overlaps JSON parse with the next eval. 4 keeps us from
+// monopolising the connection pool while still hiding latency.
+const AGGREGATOR_CONCURRENCY = 4;
+const SEARCH_MAX_RESULTS_PER_CHUNK = 200;
+const SEARCH_TOTAL_GROUP_BUDGET = 50_000;
+
 
 function stripHashTag(name: string): string {
   if (name.startsWith("{") && name.endsWith("}")) {
     return name.slice(1, -1);
   }
   return name;
+}
+
+function chunkArray<T>(items: T[], size: number): T[][] {
+  if (size <= 0) return [items];
+  const out: T[][] = [];
+  for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
+  return out;
+}
+
+async function runWithConcurrency<T>(
+  items: T[],
+  concurrency: number,
+  worker: (item: T) => Promise<void>,
+): Promise<void> {
+  let cursor = 0;
+  const runners = Array.from({ length: Math.min(concurrency, items.length) }, async () => {
+    while (cursor < items.length) {
+      const idx = cursor++;
+      await worker(items[idx]!);
+    }
+  });
+  await Promise.all(runners);
+}
+
+function deriveJobDetailState(
+  parsed: { isActive: boolean; isBlocked: boolean; score: number | null },
+  jobId: string,
+): JobState {
+  if (parsed.isActive) return "active";
+  if (parsed.isBlocked) return "blocked";
+  if (parsed.score === null) return "blocked";
+  if (/\/r\/(\d+)$/.test(jobId)) return "retrying";
+  return parsed.score <= Date.now() ? "ready" : "scheduled";
+}
+
+interface BucketEntry { jobs: number; groups: number }
+
+interface ChunkSummary {
+  jobId: string;
+  groupId: string;
+  score: number;
+  ageMs: number;
+  pipelineName: string;
+  jobType: string;
+  jobName: string;
+  tenantId: string;
+  state: JobState;
+  retryCount: number | null;
+}
+
+interface ChunkOverviewResult {
+  totals: {
+    ready: number;
+    scheduled: number;
+    retrying: number;
+    active: number;
+    blocked: number;
+    stale: number;
+    jobs: number;
+    groupsWithJobs: number;
+    blockedGroupsScanned: number;
+    activeGroupsScanned: number;
+  };
+  byPipeline: Record<string, BucketEntry>;
+  byJobType: Record<string, number>;
+  byTenant: Record<string, BucketEntry>;
+  byState: Record<JobState, number>;
+  oldest: ChunkSummary[];
+  youngest: ChunkSummary[];
+  perTenantOverdue: Record<string, ChunkSummary>;
+}
+
+interface ChunkSearchResult {
+  matched: ChunkSummary[];
+  matchedCount: number;
+  truncated: boolean;
+  scannedGroups: number;
+}
+
+interface ChunkJobDetailResult {
+  score: number | null;
+  data: string | null;
+  isActive: boolean;
+  isBlocked: boolean;
+  error: { message?: string; stack?: string; timestamp?: string } | null;
+}
+
+interface MergedOverview {
+  totals: {
+    ready: number;
+    scheduled: number;
+    retrying: number;
+    active: number;
+    blocked: number;
+    stale: number;
+    jobs: number;
+    groupsWithJobs: number;
+  };
+  byPipeline: Map<string, { jobs: number; groups: number }>;
+  byJobType: Map<string, number>;
+  byTenant: Map<string, { jobs: number; groups: number }>;
+  byState: Map<JobState, number>;
+  oldest: PendingJobSummary[];
+  youngest: PendingJobSummary[];
+  perTenantOverdue: Map<string, PendingJobSummary>;
+}
+
+// lua-cjson serialises an empty Lua table as the JSON object `{}`. When we
+// expect an array (matched, oldest, youngest), normalise back to one before
+// trying to iterate.
+function asArray<T>(value: T[] | Record<string, unknown> | null | undefined): T[] {
+  return Array.isArray(value) ? value : [];
+}
+
+function toSummary(c: ChunkSummary): PendingJobSummary {
+  return {
+    jobId: c.jobId,
+    groupId: c.groupId,
+    pipelineName: c.pipelineName === "unknown" ? null : c.pipelineName,
+    jobType: c.jobType === "unknown" ? null : c.jobType,
+    jobName: c.jobName === "unknown" ? null : c.jobName,
+    tenantId: c.tenantId === "unknown" ? null : c.tenantId,
+    score: c.score,
+    ageMs: c.ageMs,
+    state: c.state,
+    retryCount: typeof c.retryCount === "number" ? c.retryCount : null,
+  };
+}
+
+function mergeOverviewChunk(
+  merged: MergedOverview,
+  chunk: ChunkOverviewResult,
+  sliceN: number,
+): void {
+  merged.totals.ready += chunk.totals.ready;
+  merged.totals.scheduled += chunk.totals.scheduled;
+  merged.totals.retrying += chunk.totals.retrying;
+  merged.totals.blocked += chunk.totals.blocked;
+  merged.totals.stale += chunk.totals.stale;
+  merged.totals.jobs += chunk.totals.jobs;
+  merged.totals.groupsWithJobs += chunk.totals.groupsWithJobs;
+  // active count is per-group not per-job (unlike the others) — derived from
+  // active key existence, so it sums across chunks too
+  merged.totals.active += chunk.totals.activeGroupsScanned;
+
+  for (const [name, entry] of Object.entries(chunk.byPipeline ?? {})) {
+    const existing = merged.byPipeline.get(name);
+    if (existing) {
+      existing.jobs += entry.jobs;
+      existing.groups += entry.groups;
+    } else {
+      merged.byPipeline.set(name, { jobs: entry.jobs, groups: entry.groups });
+    }
+  }
+  for (const [name, count] of Object.entries(chunk.byJobType ?? {})) {
+    merged.byJobType.set(name, (merged.byJobType.get(name) ?? 0) + count);
+  }
+  for (const [tenantId, entry] of Object.entries(chunk.byTenant ?? {})) {
+    const existing = merged.byTenant.get(tenantId);
+    if (existing) {
+      existing.jobs += entry.jobs;
+      existing.groups += entry.groups;
+    } else {
+      merged.byTenant.set(tenantId, { jobs: entry.jobs, groups: entry.groups });
+    }
+  }
+  for (const [state, count] of Object.entries(chunk.byState ?? {})) {
+    merged.byState.set(
+      state as JobState,
+      (merged.byState.get(state as JobState) ?? 0) + count,
+    );
+  }
+
+  // lua-cjson encodes empty Lua arrays as `{}`, so guard before iterating.
+  for (const c of asArray(chunk.oldest)) {
+    insertSorted(merged.oldest, toSummary(c), sliceN, true);
+  }
+  for (const c of asArray(chunk.youngest)) {
+    insertSorted(merged.youngest, toSummary(c), sliceN, false);
+  }
+  for (const [tenantId, c] of Object.entries(chunk.perTenantOverdue ?? {})) {
+    const candidate = toSummary(c);
+    const existing = merged.perTenantOverdue.get(tenantId);
+    if (!existing || candidate.score < existing.score) {
+      merged.perTenantOverdue.set(tenantId, candidate);
+    }
+  }
+}
+
+function insertSorted(
+  arr: PendingJobSummary[],
+  candidate: PendingJobSummary,
+  capacity: number,
+  ascending: boolean,
+): void {
+  const cmp = (a: PendingJobSummary, b: PendingJobSummary) =>
+    ascending ? a.score - b.score : b.score - a.score;
+
+  if (arr.length < capacity) {
+    arr.push(candidate);
+    arr.sort(cmp);
+    return;
+  }
+  const worst = arr[arr.length - 1]!;
+  if ((ascending && candidate.score >= worst.score) ||
+      (!ascending && candidate.score <= worst.score)) {
+    return;
+  }
+  arr[arr.length - 1] = candidate;
+  arr.sort(cmp);
+}
+
+function finalizeOverview(
+  merged: MergedOverview,
+  meta: {
+    queueName: string;
+    generatedAtMs: number;
+    computedDurationMs: number;
+    groupsScanned: number;
+    dlqCount: number;
+    sliceN: number;
+  },
+): QueueOverview {
+  // Bucket names use the raw "unknown" sentinel from Lua so client-side filter
+  // values round-trip back to the same Lua match. The UI applies its own
+  // display-only mapping for "unknown".
+  const byPipeline = Array.from(merged.byPipeline.entries())
+    .map(([name, entry]) => ({ name, jobs: entry.jobs, groups: entry.groups }))
+    .sort((a, b) => b.jobs - a.jobs);
+
+  const byJobType = Array.from(merged.byJobType.entries())
+    .map(([name, jobs]) => ({ name, jobs }))
+    .sort((a, b) => b.jobs - a.jobs);
+
+  const byTenant = Array.from(merged.byTenant.entries())
+    .map(([tenantId, entry]) => ({ tenantId, jobs: entry.jobs, groups: entry.groups }))
+    .sort((a, b) => b.jobs - a.jobs);
+
+  // byState mirrors the per-job classification from Lua. "active" and
+  // "stale" are intentionally omitted — they're per-group concepts (the
+  // active key is set per group; stale describes blocked groups with no
+  // pending jobs) and would mix units with the per-job entries.
+  const byState: Array<{ state: JobState; jobs: number }> = (
+    ["ready", "scheduled", "retrying", "blocked"] as const
+  ).map((state) => ({ state, jobs: merged.byState.get(state) ?? 0 }));
+
+  const mostOverduePerTenant = Array.from(merged.perTenantOverdue.values())
+    .sort((a, b) => a.score - b.score);
+
+  return {
+    queueName: meta.queueName,
+    generatedAtMs: meta.generatedAtMs,
+    computedDurationMs: meta.computedDurationMs,
+    groupsScanned: meta.groupsScanned,
+    totals: {
+      jobs: merged.totals.jobs,
+      groups: merged.totals.groupsWithJobs,
+      ready: merged.totals.ready,
+      scheduled: merged.totals.scheduled,
+      retrying: merged.totals.retrying,
+      active: merged.totals.active,
+      blocked: merged.totals.blocked,
+      stale: merged.totals.stale,
+      dlq: meta.dlqCount,
+    },
+    byPipeline,
+    byJobType,
+    byTenant,
+    byState,
+    oldestJobs: merged.oldest.slice(0, meta.sliceN),
+    youngestJobs: merged.youngest.slice(0, meta.sliceN),
+    mostOverduePerTenant,
+  };
+}
+
+function sortPendingJobs(jobs: PendingJobSummary[], sort: PendingJobSort): void {
+  switch (sort) {
+    case "oldest":
+      jobs.sort((a, b) => a.score - b.score);
+      return;
+    case "youngest":
+      jobs.sort((a, b) => b.score - a.score);
+      return;
+    case "mostOverdue":
+      jobs.sort((a, b) => b.ageMs - a.ageMs);
+      return;
+  }
 }
 
 function parseRetryCount(id: string | null): number | null {
@@ -181,7 +488,6 @@ function parseRetryCount(id: string | null): number | null {
   return n < 1000 ? n : null;
 }
 
-// ── Repository Implementation ────────────────────────────────────────
 
 export class QueueRedisRepository implements QueueRepository {
   private readonly redis: IORedis | Cluster;
@@ -190,7 +496,6 @@ export class QueueRedisRepository implements QueueRepository {
     this.redis = redis;
   }
 
-  // ── Queue Discovery & Scanning ──────────────────────────────────
 
   async discoverQueueNames(): Promise<string[]> {
     const names = new Set<string>();
@@ -422,7 +727,6 @@ export class QueueRedisRepository implements QueueRepository {
     };
   }
 
-  // ── Job Browsing ────────────────────────────────────────────────
 
   async getGroupJobs(params: {
     queueName: string;
@@ -478,7 +782,6 @@ export class QueueRedisRepository implements QueueRepository {
     return { jobs, total };
   }
 
-  // ── Blocked Group Analysis ─────────────────────────────────────
 
   async getBlockedSummary(params: {
     queueNames: string[];
@@ -584,7 +887,6 @@ export class QueueRedisRepository implements QueueRepository {
     return { totalBlocked, clusters };
   }
 
-  // ── Actions ─────────────────────────────────────────────────────
 
   async unblockGroup(params: {
     queueName: string;
@@ -701,7 +1003,6 @@ export class QueueRedisRepository implements QueueRepository {
     return this.redis.smembers(`${params.queueName}:gq:paused-jobs`);
   }
 
-  // ── DLQ Operations ──────────────────────────────────────────────
 
   async moveToDlq(params: {
     queueName: string;
@@ -887,7 +1188,6 @@ export class QueueRedisRepository implements QueueRepository {
     return { replayedCount, jobsReplayed };
   }
 
-  // ── Canary Operations ───────────────────────────────────────────
 
   async canaryRedrive(params: {
     queueName: string;
@@ -1019,7 +1319,6 @@ export class QueueRedisRepository implements QueueRepository {
     return { unblockedCount, groupIds: unblockedIds };
   }
 
-  // ── DLQ Listing ─────────────────────────────────────────────────
 
   async listDlqGroups(params: {
     queueName: string;
@@ -1103,7 +1402,6 @@ export class QueueRedisRepository implements QueueRepository {
     return groups;
   }
 
-  // ── Preview ─────────────────────────────────────────────────────
 
   async drainAllBlockedPreview(params: {
     queueName: string;
@@ -1206,7 +1504,6 @@ export class QueueRedisRepository implements QueueRepository {
     };
   }
 
-  // ── Private Filter Helpers ──────────────────────────────────────
 
   private async filterByPipelineName(params: {
     prefix: string;
@@ -1311,6 +1608,211 @@ export class QueueRedisRepository implements QueueRepository {
       }
       return true;
     });
+  }
+
+  async getQueueOverview(params: {
+    queueName: string;
+    sliceN?: number;
+  }): Promise<QueueOverview> {
+    const startedAt = Date.now();
+    const sliceN = params.sliceN ?? AGGREGATOR_SLICE_N;
+    const prefix = `${params.queueName}:gq:`;
+    const blockedKey = `${prefix}blocked`;
+    const dlqKey = `${prefix}dlq`;
+
+    const [allGroupIds, dlqCount] = await Promise.all([
+      this.collectAllGroupIds(prefix),
+      this.redis.scard(dlqKey),
+    ]);
+
+    const merged: MergedOverview = {
+      totals: {
+        ready: 0, scheduled: 0, retrying: 0, active: 0, blocked: 0, stale: 0,
+        jobs: 0, groupsWithJobs: 0,
+      },
+      byPipeline: new Map(),
+      byJobType: new Map(),
+      byTenant: new Map(),
+      byState: new Map(),
+      oldest: [] as PendingJobSummary[],
+      youngest: [] as PendingJobSummary[],
+      perTenantOverdue: new Map<string, PendingJobSummary>(),
+    };
+
+    const chunks = chunkArray(allGroupIds, AGGREGATOR_GROUP_CHUNK);
+    await runWithConcurrency(chunks, AGGREGATOR_CONCURRENCY, async (chunk) => {
+      const raw = await this.redis.eval(
+        AGGREGATOR_SCRIPTS.OVERVIEW_CHUNK_LUA,
+        1,
+        blockedKey,
+        prefix,
+        String(Date.now()),
+        String(sliceN),
+        String(chunk.length),
+        ...chunk,
+      );
+      const parsed = JSON.parse(String(raw)) as ChunkOverviewResult;
+      mergeOverviewChunk(merged, parsed, sliceN);
+    });
+
+    return finalizeOverview(merged, {
+      queueName: params.queueName,
+      generatedAtMs: startedAt,
+      computedDurationMs: Date.now() - startedAt,
+      groupsScanned: allGroupIds.length,
+      dlqCount,
+      sliceN,
+    });
+  }
+
+  async searchPendingJobs(params: {
+    queueName: string;
+    filter: PendingJobFilter;
+    sort: PendingJobSort;
+    pageSize: number;
+    page: number;
+  }): Promise<PendingJobSearchResult> {
+    const startedAt = Date.now();
+    const prefix = `${params.queueName}:gq:`;
+    const blockedKey = `${prefix}blocked`;
+
+    const filtersJson = JSON.stringify(params.filter ?? {});
+    const allGroupIds = await this.collectAllGroupIds(prefix);
+    const groupIds = allGroupIds.slice(0, SEARCH_TOTAL_GROUP_BUDGET);
+
+    const collected: PendingJobSummary[] = [];
+    let totalMatching = 0;
+    let scannedGroups = 0;
+    let truncated = false;
+
+    const chunks = chunkArray(groupIds, AGGREGATOR_GROUP_CHUNK);
+    await runWithConcurrency(chunks, AGGREGATOR_CONCURRENCY, async (chunk) => {
+      const raw = await this.redis.eval(
+        AGGREGATOR_SCRIPTS.SEARCH_CHUNK_LUA,
+        1,
+        blockedKey,
+        prefix,
+        String(Date.now()),
+        filtersJson,
+        String(SEARCH_MAX_RESULTS_PER_CHUNK),
+        String(chunk.length),
+        ...chunk,
+      );
+      const parsed = JSON.parse(String(raw)) as ChunkSearchResult;
+      totalMatching += parsed.matchedCount ?? 0;
+      scannedGroups += parsed.scannedGroups ?? 0;
+      if (parsed.truncated) truncated = true;
+      // lua-cjson encodes an empty Lua table as `{}`, not `[]`; guard so
+      // a chunk that produced zero matches doesn't blow up the merge.
+      for (const match of asArray(parsed.matched)) {
+        collected.push(toSummary(match));
+      }
+    });
+
+    if (groupIds.length < allGroupIds.length) truncated = true;
+
+    sortPendingJobs(collected, params.sort);
+
+    const start = (params.page - 1) * params.pageSize;
+    const end = start + params.pageSize;
+    const slice = collected.slice(start, end);
+
+    return {
+      jobs: slice,
+      totalMatching,
+      scannedGroups,
+      truncated,
+      generatedAtMs: startedAt,
+      computedDurationMs: Date.now() - startedAt,
+    };
+  }
+
+  async getPendingJobDetail(params: {
+    queueName: string;
+    groupId: string;
+    jobId: string;
+  }): Promise<PendingJobDetail | null> {
+    const prefix = `${params.queueName}:gq:`;
+    const jobsKey = `${prefix}group:${params.groupId}:jobs`;
+    const dataKey = `${prefix}group:${params.groupId}:data`;
+    const activeKey = `${prefix}group:${params.groupId}:active`;
+    const blockedKey = `${prefix}blocked`;
+    const errorKey = `${prefix}group:${params.groupId}:error`;
+
+    const raw = await this.redis.eval(
+      AGGREGATOR_SCRIPTS.JOB_DETAIL_LUA,
+      5,
+      jobsKey,
+      dataKey,
+      activeKey,
+      blockedKey,
+      errorKey,
+      params.groupId,
+      params.jobId,
+    );
+    const parsed = JSON.parse(String(raw)) as ChunkJobDetailResult | null;
+    if (parsed === null) return null;
+
+    let parsedData: Record<string, unknown> | null = null;
+    if (parsed.data) {
+      try {
+        parsedData = JSON.parse(parsed.data);
+      } catch {
+        parsedData = null;
+      }
+    }
+
+    const state = deriveJobDetailState(parsed, params.jobId);
+
+    return {
+      jobId: params.jobId,
+      groupId: params.groupId,
+      queueName: params.queueName,
+      score: parsed.score ?? null,
+      state,
+      isActive: parsed.isActive,
+      isBlocked: parsed.isBlocked,
+      data: parsedData,
+      rawData: parsed.data ?? null,
+      error: parsed.error
+        ? {
+            message: parsed.error.message ?? null,
+            stack: parsed.error.stack ?? null,
+            timestamp: parsed.error.timestamp
+              ? parseFloat(parsed.error.timestamp)
+              : null,
+          }
+        : null,
+    };
+  }
+
+  /**
+   * Collect every group id that may carry pending or blocked work.
+   * Iterates the ready zset and the blocked set, deduping in Node — both
+   * are bounded by groups (not jobs) so this is cheap relative to the
+   * per-job scanning the aggregator does next.
+   */
+  private async collectAllGroupIds(prefix: string): Promise<string[]> {
+    const readyKey = `${prefix}ready`;
+    const blockedKey = `${prefix}blocked`;
+    const seen = new Set<string>();
+
+    const readyMembers = await this.redis.zrange(readyKey, 0, -1);
+    for (const id of readyMembers) seen.add(id);
+
+    let cursor = "0";
+    do {
+      const [next, members] = await this.redis.sscan(
+        blockedKey,
+        cursor,
+        "COUNT",
+        SSCAN_BATCH,
+      );
+      cursor = next;
+      for (const id of members) seen.add(id);
+    } while (cursor !== "0");
+
+    return Array.from(seen);
   }
 
   private async filterDlqGroups(params: {

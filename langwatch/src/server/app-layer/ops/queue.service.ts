@@ -1,4 +1,12 @@
-import type { GroupInfo, QueueSummaryInfo } from "./types";
+import type {
+  GroupInfo,
+  QueueSummaryInfo,
+  QueueOverview,
+  PendingJobFilter,
+  PendingJobSort,
+  PendingJobSearchResult,
+  PendingJobDetail,
+} from "./types";
 import type {
   QueueRepository,
   BlockedSummary,
@@ -6,6 +14,21 @@ import type {
   DrainPreview,
   JobEntry,
 } from "./repositories/queue.repository";
+import { TtlCache } from "~/server/utils/ttlCache";
+
+// Collapse bursts of identical aggregator calls onto a single Redis trip.
+// Short TTL keeps the dashboard close to live; the cache is mainly a backstop
+// against multi-user / multi-tab traffic, not a freshness ceiling.
+const overviewCache = new TtlCache<QueueOverview>(5_000, "ops:queues:overview:");
+const searchCache = new TtlCache<PendingJobSearchResult>(5_000, "ops:queues:search:");
+
+function stableStringify(input: unknown): string {
+  if (input === null || typeof input !== "object") return JSON.stringify(input);
+  if (Array.isArray(input)) return `[${input.map(stableStringify).join(",")}]`;
+  const obj = input as Record<string, unknown>;
+  const keys = Object.keys(obj).sort();
+  return `{${keys.map((k) => `${JSON.stringify(k)}:${stableStringify(obj[k])}`).join(",")}}`;
+}
 
 export class QueueService {
   constructor(readonly repo: QueueRepository) {}
@@ -233,5 +256,52 @@ export class QueueService {
     errorFilter?: string;
   }): Promise<DrainPreview> {
     return this.repo.drainAllBlockedPreview(params);
+  }
+
+  async getQueueOverview(params: {
+    queueName: string;
+    sliceN?: number;
+  }): Promise<QueueOverview> {
+    const key = `${params.queueName}:${params.sliceN ?? "default"}`;
+    const cached = await overviewCache.get(key);
+    if (cached) return cached;
+    const fresh = await this.repo.getQueueOverview(params);
+    await overviewCache.set(key, fresh);
+    return fresh;
+  }
+
+  async searchPendingJobs(params: {
+    queueName: string;
+    filter: PendingJobFilter;
+    sort: PendingJobSort;
+    pageSize: number;
+    page: number;
+  }): Promise<PendingJobSearchResult> {
+    // Cache the full scan keyed only on filter+sort. Pagination is applied
+    // here so different pages reuse the same scan.
+    const baseKey = `${params.queueName}:${params.sort}:${stableStringify(params.filter)}`;
+    let full = await searchCache.get(baseKey);
+    if (!full) {
+      full = await this.repo.searchPendingJobs({
+        ...params,
+        page: 1,
+        pageSize: 5_000,
+      });
+      await searchCache.set(baseKey, full);
+    }
+    const start = (params.page - 1) * params.pageSize;
+    const end = start + params.pageSize;
+    return {
+      ...full,
+      jobs: full.jobs.slice(start, end),
+    };
+  }
+
+  async getPendingJobDetail(params: {
+    queueName: string;
+    groupId: string;
+    jobId: string;
+  }): Promise<PendingJobDetail | null> {
+    return this.repo.getPendingJobDetail(params);
   }
 }
