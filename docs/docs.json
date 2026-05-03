@@ -658,7 +658,14 @@
             "pages": [
               "ai-governance/personal-portal/overview",
               "ai-governance/personal-portal/end-user",
-              "ai-governance/personal-portal/admin-catalog"
+              "ai-governance/personal-portal/admin-catalog",
+              "ai-governance/personal-portal/sessions"
+            ]
+          },
+          {
+            "group": "Privacy",
+            "pages": [
+              "ai-governance/no-spy-mode"
             ]
           },
           {
@@ -690,7 +697,8 @@
           {
             "group": "Operations",
             "pages": [
-              "ai-governance/cli-debug"
+              "ai-governance/cli-debug",
+              "ai-governance/pull-mode-connectors"
             ]
           }
         ]

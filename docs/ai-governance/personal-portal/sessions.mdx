@@ -1,0 +1,132 @@
+---
+title: AI Tools Portal — sessions / devices
+description: See where your CLI is signed in across machines (laptop, workstation, dev container, CI runner) — identify each session by device, see when it was last used, revoke any session in one click. Mirrors the macOS "Logged-in devices" / GitHub "Active sessions" / Apple ID "Trusted devices" pattern.
+sidebarTitle: Sessions
+---
+
+When you run `langwatch login` on a new machine, the device-flow exchange
+mints a Personal Virtual Key bound to your identity + the machine.
+**Sessions** is the inventory of where those keys are currently active —
+who you are on which device, when each session was started, when it was
+last used, and how to revoke any session you no longer need.
+
+<Info>**Pairs with:** [Personal IDE keys](/ai-gateway/governance/personal-keys) (the device-flow login that creates each session) and [Tile interactions → Coding-assistant tiles](/ai-governance/personal-portal/end-user#coding-assistant-tiles) (the wrapper commands that consume each session's VK).</Info>
+
+## What you see at /me/sessions
+
+```
+┌─ Your CLI sessions ─────────────────────────────────────────────────┐
+│  Active sessions on your account                                    │
+│                                                                      │
+│  ┌────────────────────────────────────────────────────┐             │
+│  │ 🍎 alice-mbp.local             macOS 24.0.0        │             │
+│  │ Active for 5 days · last used 2 minutes ago        │             │
+│  │                                          [Revoke ▸] │             │
+│  └────────────────────────────────────────────────────┘             │
+│                                                                      │
+│  ┌────────────────────────────────────────────────────┐             │
+│  │ 🐧 alice-desktop               Linux 6.6.10        │             │
+│  │ Active for 12 days · last used 3 hours ago         │             │
+│  │                                          [Revoke ▸] │             │
+│  └────────────────────────────────────────────────────┘             │
+│                                                                      │
+│  ┌────────────────────────────────────────────────────┐             │
+│  │ ⚙️ ci-runner-7c8d9            Linux 6.6.10         │             │
+│  │ Active for 30 days · last used 4 minutes ago       │             │
+│  │                                          [Revoke ▸] │             │
+│  └────────────────────────────────────────────────────┘             │
+│                                                                      │
+│                                       [Revoke all sessions]          │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+Each session is identified by:
+
+- **Platform icon** — macOS / Linux / Windows from the `client_platform`
+  captured at login.
+- **Device label** — the machine's hostname (e.g. `alice-mbp.local`),
+  populated from `os.hostname()` at login. If the CLI version is older
+  and didn't send a label, the entry shows `(unknown device)`.
+- **`uname -a`** — the raw kernel string, for power-users who want to
+  disambiguate sessions on machines with the same hostname.
+- **Active for** — relative since the session was created.
+- **Last used** — relative since the most recent CLI request hit the
+  gateway with this session's bearer.
+
+## How sessions get created
+
+Every successful `langwatch login --device` creates a new session. The
+first time the CLI POSTs `/api/auth/cli/exchange`, it sends a
+`client_info` block:
+
+```json
+{
+  "device_label": "alice-mbp.local",
+  "uname": "Darwin alice-mbp.local 24.0.0 Darwin Kernel Version 24.0.0 ...",
+  "platform": "darwin"
+}
+```
+
+The control plane stamps that metadata onto both the access-token record
+and the refresh-token record. When the access token rotates (every
+~hour), the refresh-token record carries the same metadata so the
+session survives rotation without re-prompting login.
+
+## Revoking a session
+
+Click **Revoke** on any session card. The corresponding access-token +
+refresh-token Redis keys are immediately deleted. The next CLI request
+from that device will return 401 — your CLI will print "Session expired
+— run `langwatch login --device`" and you'll need to re-authenticate.
+
+**Revoke all sessions** clears every active session in one action —
+useful if you suspect a compromise or are leaving the company.
+
+Revoking a session does NOT revoke any virtual key the session minted
+(those are persistent until you delete them via `/me`'s Personal Keys
+section). The session is the **right to mint + use**; the virtual keys
+themselves are separate inventory items.
+
+## Admin policy: max session lifetime
+
+Your IT admin can cap how long any one session stays valid:
+
+- **0 (default)** — no cap; sessions live until you revoke or until the
+  refresh token's natural 30-day TTL.
+- **N days** — refresh requests are rejected once `(now - issued_at) >
+  N days`. The CLI prints "Your CLI session is older than your
+  organization's policy. Please run `langwatch login` again."
+
+When the policy is set, existing too-old sessions don't disappear — they
+expire on their next refresh attempt (which happens automatically in the
+background, so the experience is "I came back from vacation and my CLI
+asked me to re-login").
+
+Recommended values:
+- **High-security orgs**: 7 days
+- **Standard enterprises**: 30 days
+- **Open-source / small teams**: 0 (unbounded)
+
+Admins set this at **Settings → Governance → Security policies →
+Maximum session duration**.
+
+## What about virtual keys themselves?
+
+Sessions and Personal Virtual Keys are separate but related:
+
+- A **session** is the right to mint + use VKs from one device. Created
+  by `langwatch login`; one per device.
+- A **Personal Virtual Key** is the credential the gateway accepts for
+  request authentication. Minted by a session; can be many per session
+  (one per coding-assistant typically).
+
+Revoking a session breaks the wrapper commands on that device. To
+revoke an individual VK without breaking the whole session, manage VKs
+under [/me's Personal Keys section](/ai-governance/personal-portal/end-user).
+
+## Where to next
+
+- [Personal IDE keys](/ai-gateway/governance/personal-keys) — the
+  device-flow login this surface inventories.
+- [Portal end-user walkthrough](/ai-governance/personal-portal/end-user)
+  — the broader `/me` surface this lives within.

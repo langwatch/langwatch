@@ -1,0 +1,102 @@
+---
+title: Gateway no-spy mode (privacy / drop-content)
+description: An org-level admin setting that completely drops gateway-emitted prompt + completion + system-message payloads from spans BEFORE they hit ClickHouse. Three modes — full / strip_io / strip_all — for orgs whose policies prohibit storing employee conversational content.
+sidebarTitle: No-spy mode
+---
+
+Many enterprises operate under policies that prohibit storing
+conversational content from employee LLM interactions, even briefly.
+Default LangWatch behavior stores prompt + completion + system-message
+payloads in ClickHouse so the trace viewer can show the full
+conversation. **No-spy mode** lets an org admin disable that storage
+at the gateway pipeline — the content is dropped before it ever lands
+in CH.
+
+<Info>**Pairs with:** [Compliance architecture](/ai-governance/compliance-architecture) (the unified observability substrate this filter operates against) and [Self-hosting compliance](/self-hosting/compliance) (where this fits in the SOC 2 / ISO 27001 / HIPAA mapping for orgs that need it).</Info>
+
+<Warning>**Available on Enterprise plans.** No-spy mode is part of the Enterprise governance feature set. Apache 2.0 self-hosted deployments retain the default `full` mode. See [Open-core licensing](/ai-governance/overview#open-core-licensing).</Warning>
+
+## Three modes
+
+Set at **Settings → Governance → Privacy → Conversation logging**:
+
+| Mode | What's stored | What's dropped | When to use |
+|---|---|---|---|
+| **`full`** (default) | Everything — prompts, completions, system messages, tool-call args, tool-result payloads | Nothing | Debugging-heavy teams; orgs where reading conversational content is permitted under policy |
+| **`strip_io`** | Model name, token counts, latency, cost, governance origin attrs, request/response IDs | Prompt content + completion content + system-message content | Most "no employee chat surveillance" policies; preserves all the metadata needed for cost attribution + governance + debugging-by-shape |
+| **`strip_all`** | Same as `strip_io` minus tool-call args + tool-result payloads | Everything in `strip_io` PLUS tool arguments + tool results | Strictest privacy posture; may break debugging flows that need to inspect tool I/O |
+
+## What gets stripped specifically (`strip_io`)
+
+- `gen_ai.prompt.<i>.content` — the user-typed message bodies
+- `gen_ai.completion.<i>.content` — the model's response bodies
+- `gen_ai.system_message.content` — the system-prompt text
+
+What stays:
+
+- `gen_ai.system` (provider name, e.g. "anthropic")
+- `gen_ai.request.model` (model identifier)
+- `gen_ai.usage.input_tokens` + `output_tokens`
+- `gen_ai.cost.usd` (cost attribution)
+- `langwatch.principal_id` + `organization_id` + `personal: true` (identity)
+- `langwatch.governance.retention_class`
+- All latency / status / error attributes
+
+So you can still answer "how much did Bob's Claude Code session spend
+this month?" and "did the gateway hit a 5xx?" — you just can't read
+what Bob asked or what Claude answered.
+
+## Defense-in-depth note
+
+The strip filter runs **before** the ClickHouse write step in the
+trace-processing pipeline. The CH-stored span attributes are what
+employees can be searched against; the strip guarantees those attributes
+never carry conversational content.
+
+The source-of-truth `event_log` (event-sourcing layer) keeps the raw
+event for the gateway-internal pipeline. The trust boundary the no-spy
+guarantee enforces is "no human-readable content in the **searchable**
+trace store" — not "no event ever touched memory". For orgs whose
+policy requires the latter, additional measures (e.g. running the
+gateway in a confidential-compute enclave, or using BYOK provider
+endpoints to skip LangWatch entirely) are required.
+
+## Mode flips are forward-looking only
+
+Switching from `full` → `strip_io` does NOT retroactively scrub
+historical spans. The next request after the flip emits a stripped
+span; existing rows remain as-stored. To purge historical content, use
+the [retention policies](/ai-governance/control-plane#retention-classes)
+to cycle the data out + ensure new ingest lands stripped.
+
+## Cross-org isolation
+
+The setting is per-organization. Two orgs on the same self-hosted
+deployment can hold different modes — `acme` on `strip_io` does not
+affect `globex` on `full`. The receiver-side filter looks up the
+acting org's mode per request.
+
+## What about user-app traces?
+
+Only **gateway-emitted** spans (origin: AI Gateway) are stripped — the
+no-spy guarantee applies to the gateway data plane.
+
+If your application sends its own traces via `/api/otel/v1/traces` with
+your project API key, those traces are NOT stripped (the org didn't
+opt-in for application traces; it opted in for gateway traces). The
+origin discriminator is `langwatch.origin.kind` — `gateway` is
+gated by the mode, `user_application` is not.
+
+## Permission gate
+
+Only org **ADMIN** can change the privacy mode. The setting is part of
+the governance ADMIN surface, not delegable via `CustomRolePermissions`
+in v1 (delegation may land in a follow-up).
+
+## Where to next
+
+- [Compliance architecture](/ai-governance/compliance-architecture) —
+  what each mode means for your SOC 2 / ISO 27001 / HIPAA / EU AI Act
+  posture.
+- [Self-hosting compliance](/self-hosting/compliance) — Apache 2.0 vs
+  Enterprise tier coverage.
