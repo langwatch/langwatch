@@ -1,5 +1,45 @@
 # Changelog
 
+## [0.23.0](https://github.com/langwatch/langwatch/compare/python-sdk@v0.22.0...python-sdk@v0.23.0) (2026-05-03)
+
+
+### Features
+
+* **npx-server:** npx @langwatch/server — single-command local LangWatch ([#3486](https://github.com/langwatch/langwatch/issues/3486)) ([0884d31](https://github.com/langwatch/langwatch/commit/0884d3145cd910fcd199e1e70f82f805c9d1c972))
+
+
+### Bug Fixes
+
+* **ci:** split OpenAI keys per workflow + drop sdk examples to gpt-5-mini ([#3641](https://github.com/langwatch/langwatch/issues/3641)) ([6b58467](https://github.com/langwatch/langwatch/commit/6b58467aa3063e10393ca34cc997b9585abb0c31))
+* **deps:** upgrade aiohttp, starlette, pillow, lxml ([#3564](https://github.com/langwatch/langwatch/issues/3564)) ([498847e](https://github.com/langwatch/langwatch/commit/498847e43c3088ef68b357c6b04d02d1005a5f9a))
+* **deps:** upgrade aiohttp, starlette, pillow, lxml (Python heavy) ([498847e](https://github.com/langwatch/langwatch/commit/498847e43c3088ef68b357c6b04d02d1005a5f9a))
+* **deps:** upgrade GitPython, protobuf, nbconvert (Dependabot) ([#3655](https://github.com/langwatch/langwatch/issues/3655)) ([060a3ae](https://github.com/langwatch/langwatch/commit/060a3aef67aebb822baed7853b2688455933f432))
+* **deps:** upgrade GitPython, protobuf, nbconvert to resolve security alerts ([060a3ae](https://github.com/langwatch/langwatch/commit/060a3aef67aebb822baed7853b2688455933f432))
+* **deps:** upgrade picomatch, merge, jupyterlab, notebook (Dependabot) ([#3658](https://github.com/langwatch/langwatch/issues/3658)) ([bf8cd9a](https://github.com/langwatch/langwatch/commit/bf8cd9ad47150e65f27e383d7f4d3659374d00b8))
+* **deps:** upgrade pyasn1, filelock, Pygments, nltk (Python patches) ([#3561](https://github.com/langwatch/langwatch/issues/3561)) ([27152ca](https://github.com/langwatch/langwatch/commit/27152ca723b2e31aa3ac760847b17d8e3dfc3714))
+* **deps:** upgrade PyJWT, pillow, onnx (Dependabot) ([#3656](https://github.com/langwatch/langwatch/issues/3656)) ([5eb44a3](https://github.com/langwatch/langwatch/commit/5eb44a3618930847a38abb38345a8d424b6c3021))
+* **deps:** upgrade PyJWT, pillow, onnx to resolve security alerts ([5eb44a3](https://github.com/langwatch/langwatch/commit/5eb44a3618930847a38abb38345a8d424b6c3021))
+* **deps:** upgrade tornado to 6.5.5 (Dependabot [#555](https://github.com/langwatch/langwatch/issues/555)) ([#3651](https://github.com/langwatch/langwatch/issues/3651)) ([7541e89](https://github.com/langwatch/langwatch/commit/7541e897fa29db23f534da1a9567a2750c90566a))
+* **deps:** upgrade tornado to 6.5.5 to resolve DoS vulnerability (CVE) ([7541e89](https://github.com/langwatch/langwatch/commit/7541e897fa29db23f534da1a9567a2750c90566a))
+* **deps:** upgrade tornado, urllib3, cryptography (Dependabot) ([#3657](https://github.com/langwatch/langwatch/issues/3657)) ([f8a2e9a](https://github.com/langwatch/langwatch/commit/f8a2e9a5cf6b836524bc2a170d589e1a01ad3921))
+* **deps:** upgrade tornado, urllib3, cryptography to resolve security alerts ([f8a2e9a](https://github.com/langwatch/langwatch/commit/f8a2e9a5cf6b836524bc2a170d589e1a01ad3921))
+* **release:** path-routed Release-As shadows for 6 polluted components ([#3627](https://github.com/langwatch/langwatch/issues/3627)) ([b39d59e](https://github.com/langwatch/langwatch/commit/b39d59e87ed6d87224d580271175650c1d4159a7))
+* **release:** scope Release-As to langwatch, restore other components ([#3618](https://github.com/langwatch/langwatch/issues/3618)) ([e259e79](https://github.com/langwatch/langwatch/commit/e259e796b50e4d060e5c7f42cad1927f1da8a83d))
+* **traces:** parse JSON-string langwatch.input when extracting primary I/O ([#3419](https://github.com/langwatch/langwatch/issues/3419)) ([1e87641](https://github.com/langwatch/langwatch/commit/1e87641060b872d9f924e1a583328f33590bd3ca))
+
+
+### Miscellaneous
+
+* **deps-dev:** bump faiss-cpu from 1.12.0 to 1.13.2 in /python-sdk ([#2096](https://github.com/langwatch/langwatch/issues/2096)) ([636ac8d](https://github.com/langwatch/langwatch/commit/636ac8dcff63fe89836d8d7bf0762885601f4e21))
+* **deps-dev:** bump streamlit from 1.48.1 to 1.57.0 in /python-sdk ([#2087](https://github.com/langwatch/langwatch/issues/2087)) ([21a1d24](https://github.com/langwatch/langwatch/commit/21a1d2467c9f6c2113e9b589ae0ffd738655cb1e))
+* **deps:** bump opentelemetry-api from 1.36.0 to 1.40.0 in /python-sdk ([#2090](https://github.com/langwatch/langwatch/issues/2090)) ([9d6bbc3](https://github.com/langwatch/langwatch/commit/9d6bbc37a933ac1842ba25632fffd4dae511d442))
+* **deps:** bump opentelemetry-instrumentation-crewai from 0.47.5 to 0.53.0 in /python-sdk ([#2094](https://github.com/langwatch/langwatch/issues/2094)) ([44dc407](https://github.com/langwatch/langwatch/commit/44dc40742f4ed78040b831a22db31368846676d6))
+* **deps:** bump opentelemetry-instrumentation-crewai in /python-sdk ([44dc407](https://github.com/langwatch/langwatch/commit/44dc40742f4ed78040b831a22db31368846676d6))
+* **python-sdk:** single-footer shadow Release-As 0.23.0 ([1002978](https://github.com/langwatch/langwatch/commit/10029788f52d3c0640ac6fe7660f22f7916f941c))
+* release as 3.2.1 ([ca9d7a9](https://github.com/langwatch/langwatch/commit/ca9d7a9231a7b3d9d8cf9a28a48fa494b1daeb4b))
+* release as 3.2.1 (override release-please from 3.3.0) ([#3615](https://github.com/langwatch/langwatch/issues/3615)) ([ca9d7a9](https://github.com/langwatch/langwatch/commit/ca9d7a9231a7b3d9d8cf9a28a48fa494b1daeb4b))
+* scope Release-As to langwatch, restore other components ([e259e79](https://github.com/langwatch/langwatch/commit/e259e796b50e4d060e5c7f42cad1927f1da8a83d))
+
 ## [0.22.0](https://github.com/langwatch/langwatch/compare/python-sdk@v0.21.0...python-sdk@v0.22.0) (2026-04-21)
 
 
