@@ -34,6 +34,15 @@ process.env.LW_GATEWAY_INTERNAL_SECRET =
 process.env.LW_GATEWAY_JWT_SECRET =
   process.env.LW_GATEWAY_JWT_SECRET ??
   "unit-test-gateway-jwt-secret-32-bytes!";
+// Disable the per-IP receiver rate-limit globally for integration tests.
+// Tests that fire many POSTs from one IP (volume regression, dogfood
+// smoke, auth-contract suite) would otherwise shed at the rate-limiter
+// before reaching the receiver hot path. Tests that specifically
+// exercise the rate-limiter override this back to "0" inside their own
+// beforeAll. Spec:
+// specs/ai-gateway/governance/receiver-auth-rate-limit.feature.
+process.env.LW_INGEST_RATE_LIMIT_DISABLED =
+  process.env.LW_INGEST_RATE_LIMIT_DISABLED ?? "1";
 
 if (process.env.CI && process.env.CI_REDIS_URL) {
   process.env.REDIS_URL = process.env.CI_REDIS_URL;

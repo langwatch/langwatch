@@ -49,6 +49,8 @@ import {
 } from "~/server/otel/parseOtlpBody";
 import { createLogger } from "~/utils/logger/server";
 
+import { checkIpRateLimit, extractClientIp } from "./rateLimit";
+
 /**
  * Stamp `langwatch.origin.*` + `langwatch.governance.*` attributes on
  * every span of the parsed OTLP request, in-place. The trace pipeline
@@ -184,6 +186,34 @@ async function authIngestionSource(c: Context) {
   return await service.findByIngestSecret(match[1]!);
 }
 
+/**
+ * Per-IP fixed-window rate-limit guard for the ingest receivers.
+ * Returns a 429 Response when the limit is exceeded; returns null
+ * when the request should pass through. Applied at the top of every
+ * POST handler — wedged before the DB findFirst on bearer-token
+ * lookup so brute-force scanners shed at L7 instead of pinging PG.
+ *
+ * Spec: specs/ai-gateway/governance/receiver-auth-rate-limit.feature
+ */
+async function rateLimitGuard(c: Context): Promise<Response | null> {
+  const ip = extractClientIp(c.req.raw.headers);
+  const decision = await checkIpRateLimit({ ip });
+  if (decision.allowed) return null;
+  logger.warn(
+    { ip, count: decision.count, retryAfterSec: decision.retryAfterSec },
+    "ingest rate-limit exceeded; rejecting with 429",
+  );
+  c.header("Retry-After", String(decision.retryAfterSec));
+  return c.json(
+    {
+      error: "rate_limited",
+      error_description:
+        "Too many requests from this client. Slow down and retry after the Retry-After window.",
+    },
+    429,
+  );
+}
+
 // ---------------------------------------------------------------------------
 // POST /api/ingest/otel/:sourceId
 // ---------------------------------------------------------------------------
@@ -208,6 +238,9 @@ async function authIngestionSource(c: Context) {
 //   - retention.feature (Lane-S)
 // ---------------------------------------------------------------------------
 app.post("/otel/:sourceId", async (c: Context) => {
+  const limited = await rateLimitGuard(c);
+  if (limited) return limited;
+
   const source = await authIngestionSource(c);
   if (!source) {
     return c.json({ error: "unauthorized" }, 401);
@@ -317,6 +350,9 @@ app.post("/otel/:sourceId", async (c: Context) => {
 //   - retention.feature origin-attribute-stamping scenarios
 // ---------------------------------------------------------------------------
 app.post("/webhook/:sourceId", async (c: Context) => {
+  const limited = await rateLimitGuard(c);
+  if (limited) return limited;
+
   const source = await authIngestionSource(c);
   if (!source) {
     return c.json({ error: "unauthorized" }, 401);
