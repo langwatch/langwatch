@@ -90,7 +90,7 @@ export type HttpPollingConfig = z.infer<typeof httpPollingConfigSchema>;
 export class HttpPollingPullerAdapter
   implements PullerAdapter<HttpPollingConfig>
 {
-  readonly id = "http_polling";
+  readonly id: string = "http_polling";
 
   validateConfig(config: unknown): HttpPollingConfig {
     return httpPollingConfigSchema.parse(config);

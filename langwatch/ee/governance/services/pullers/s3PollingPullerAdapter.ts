@@ -77,7 +77,7 @@ export type S3PollingConfig = z.infer<typeof s3PollingConfigSchema>;
 export class S3PollingPullerAdapter
   implements PullerAdapter<S3PollingConfig>
 {
-  readonly id = "s3_polling";
+  readonly id: string = "s3_polling";
 
   validateConfig(config: unknown): S3PollingConfig {
     return s3PollingConfigSchema.parse(config);

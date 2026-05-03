@@ -23,6 +23,7 @@
  *
  * Spec: specs/ai-governance/puller-framework/puller-adapter-contract.feature
  */
+import { Prisma } from "@prisma/client";
 import { type Job, Worker } from "bullmq";
 import { BullMQOtel } from "bullmq-otel";
 
@@ -212,11 +213,12 @@ export async function runIngestionPullerJob(
     );
   }
 
-  // Persist the new cursor + reset errorCount on success.
+  // Persist the new cursor + reset errorCount on success. JSON columns
+  // need Prisma.JsonNull for SQL NULL, not bare JS null.
   await prisma.ingestionSource.update({
     where: { id: ingestionSourceId },
     data: {
-      pollerCursor: result.cursor,
+      pollerCursor: result.cursor === null ? Prisma.JsonNull : result.cursor,
       errorCount: result.errorCount > 0 ? { increment: 1 } : 0,
       lastEventAt: result.events.length > 0 ? new Date() : undefined,
       status: source.status === "awaiting_first_event" && result.events.length > 0
