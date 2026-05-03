@@ -24032,7 +24032,9 @@ on which mechanisms you actually need on day one.
 The split is enforced at three layers — see
 [Open-core licensing](/ai-governance/overview#open-core-licensing) for
 the layered enforcement (UI gating + tRPC middleware + service-layer
-defense-in-depth + CLI 402 envelope).
+defense-in-depth + CLI 402 envelope), and
+[Per-file license headers](/ai-governance/overview#per-file-license-headers)
+for the canonical SPDX header text on each tier.
 
 ## SOC 2 Type II — what self-hosted underwrites
 

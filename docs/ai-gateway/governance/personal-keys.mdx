@@ -139,13 +139,16 @@ Same Claude Code experience as before — flags, terminal handling,
 exit codes are all identical because `langwatch claude` `exec`'s
 the underlying tool with the right env vars pre-injected.
 
-The same pattern works for Codex, Cursor, and Gemini CLI:
+The same pattern works for Codex, Cursor, Gemini CLI, and opencode:
 
 ```bash
-$ langwatch codex   "fix the failing tests"
+$ langwatch codex    "fix the failing tests"
 $ langwatch cursor                            # opens Cursor with gateway env
-$ langwatch gemini  "explain this stack trace"
+$ langwatch gemini   "explain this stack trace"
+$ langwatch opencode                          # opens opencode with gateway env
 ```
+
+<Info>**Verified end-to-end in CI.** `langwatch login` + each of the five wrappers above (`claude`, `codex`, `cursor`, `gemini`, `opencode`) is exercised in the `governance-wrapper.e2e.test.ts` Node-only e2e suite — fake control-plane, fake gateway, mocked tool binaries — covering login config write, env-var injection, routing with bearer-VK, budget pre-flight (402/200/5xx), and exit-code propagation. 16 scenarios, 3-second runtime, runs on every PR. See [CLI debug → e2e coverage](/ai-governance/cli-debug#cli-wrapper-e2e-coverage) for the assertion shape per tool.</Info>
 
 ### 4. Or, set it up always-on
 
