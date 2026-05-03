@@ -26,6 +26,7 @@ vi.mock("prom-client", () => {
       return { set: vi.fn() };
     }
     set(value: number) {}
+    reset() {}
   }
 
   return {
