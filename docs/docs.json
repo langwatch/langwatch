@@ -737,6 +737,7 @@
             "group": "Operations",
             "pages": [
               "self-hosting/security",
+              "self-hosting/compliance",
               "self-hosting/upgrade",
               "self-hosting/upgrade-v3"
             ]
