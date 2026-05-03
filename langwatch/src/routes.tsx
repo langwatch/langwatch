@@ -231,6 +231,10 @@ const routes: RouteObject[] = [
     path: "/me/settings",
     ...page(() => import("./pages/me/settings")),
   },
+  {
+    path: "/me/sessions",
+    ...page(() => import("./pages/me/sessions")),
+  },
 
   // CLI device-flow approval (RFC 8628 user-facing screen)
   {
