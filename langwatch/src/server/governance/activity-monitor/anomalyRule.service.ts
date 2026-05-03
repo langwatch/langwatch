@@ -11,6 +11,8 @@
  */
 import type { AnomalyRule, Prisma, PrismaClient } from "@prisma/client";
 
+import { validateThresholdConfig } from "./thresholdConfig.schema";
+
 export type RuleSeverity = "critical" | "warning" | "info";
 export type RuleScope =
   | "organization"
@@ -90,6 +92,14 @@ export class AnomalyRuleService {
     if (!SUPPORTED_SCOPES.includes(input.scope)) {
       throw new Error(`Unsupported scope: ${input.scope}`);
     }
+    // Strict per-rule-type validation. Throws ZodError on shape failure
+    // or a generic Error on unknown ruleType — both translate to
+    // BAD_REQUEST in the router. Spec:
+    // specs/ai-gateway/governance/anomaly-rule-threshold-schema.feature.
+    validateThresholdConfig({
+      ruleType: input.ruleType,
+      config: input.thresholdConfig ?? {},
+    });
     return this.prisma.anomalyRule.create({
       data: {
         organizationId: input.organizationId,
@@ -132,8 +142,28 @@ export class AnomalyRuleService {
     }
     if (input.scopeId !== undefined) data.scopeId = input.scopeId;
     if (input.thresholdConfig !== undefined) {
+      // Re-validate against the effective ruleType after this update.
+      // If the caller supplies a new ruleType, the new config must match
+      // its schema; if they keep the existing ruleType, the existing
+      // schema applies. Throws ZodError or a plain Error (unknown
+      // ruleType); router translates to BAD_REQUEST.
+      validateThresholdConfig({
+        ruleType: input.ruleType ?? existing.ruleType,
+        config: input.thresholdConfig,
+      });
       data.thresholdConfig =
         input.thresholdConfig as Prisma.InputJsonValue;
+    } else if (
+      input.ruleType !== undefined &&
+      input.ruleType !== existing.ruleType
+    ) {
+      // Switching ruleType without supplying a matching config would
+      // leave a row whose ruleType + thresholdConfig disagree. Reject
+      // up-front so the admin supplies the right shape.
+      validateThresholdConfig({
+        ruleType: input.ruleType,
+        config: existing.thresholdConfig,
+      });
     }
     if (input.destinationConfig !== undefined) {
       data.destinationConfig =

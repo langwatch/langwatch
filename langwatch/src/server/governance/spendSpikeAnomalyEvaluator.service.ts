@@ -35,6 +35,7 @@ import type { AnomalyRule, PrismaClient } from "@prisma/client";
 
 import { getClickHouseClientForOrganization } from "~/server/clickhouse/clickhouseClient";
 import { createLogger } from "~/utils/logger/server";
+import { safeParseSpendSpikeThresholdConfig } from "./activity-monitor/thresholdConfig.schema";
 import { PROJECT_KIND } from "./governanceProject.service";
 
 const logger = createLogger(
@@ -58,7 +59,13 @@ const BASELINE_WINDOWS = 6; // average over previous 6 windows
 export interface SpendSpikeEvaluationResult {
   ruleId: string;
   organizationId: string;
-  decision: "fire" | "skip_below_baseline" | "skip_below_threshold" | "skip_dedup" | "skip_no_data";
+  decision:
+    | "fire"
+    | "skip_below_baseline"
+    | "skip_below_threshold"
+    | "skip_dedup"
+    | "skip_no_data"
+    | "skip_invalid_config";
   reason: string;
   currentSpendUsd: number;
   baselineSpendUsd: number;
@@ -178,7 +185,39 @@ export class SpendSpikeAnomalyEvaluator {
     rule: AnomalyRule,
     now: Date,
   ): Promise<SpendSpikeEvaluationResult> {
-    const config = parseThresholdConfig(rule.thresholdConfig);
+    // Strict validation. Stale rows that pre-date the schema (Phase 2C
+    // structured threshold-config) are quarantined: skipped + warning
+    // logged so the misconfiguration surfaces in observability instead
+    // of silently substituting DEFAULT_SPEND_SPIKE_CONFIG and firing on
+    // the wrong threshold. Spec:
+    // specs/ai-gateway/governance/anomaly-rule-threshold-schema.feature.
+    const parsed = safeParseSpendSpikeThresholdConfig(rule.thresholdConfig);
+    if (!parsed.ok) {
+      logger.warn(
+        {
+          ruleId: rule.id,
+          organizationId: rule.organizationId,
+          ruleType: rule.ruleType,
+          issues: parsed.error.issues.map((i) => ({
+            path: i.path.join("."),
+            message: i.message,
+          })),
+        },
+        "spend_spike rule has invalid thresholdConfig — skipping evaluation. Re-save the rule from the admin UI to repair, or archive it.",
+      );
+      return {
+        ruleId: rule.id,
+        organizationId: rule.organizationId,
+        decision: "skip_invalid_config",
+        reason:
+          "thresholdConfig failed strict validation — see logged issues; rule is quarantined until repaired",
+        currentSpendUsd: 0,
+        baselineSpendUsd: 0,
+        windowStart: now,
+        windowEnd: now,
+      };
+    }
+    const config = parsed.data;
     const windowMs = config.windowSec * 1000;
     const windowEnd = now;
     const windowStart = new Date(now.getTime() - windowMs);
@@ -335,25 +374,6 @@ export class SpendSpikeAnomalyEvaluator {
       "spend_spike anomaly fired",
     );
   }
-}
-
-function parseThresholdConfig(raw: unknown): SpendSpikeThresholdConfig {
-  if (!raw || typeof raw !== "object") return DEFAULT_SPEND_SPIKE_CONFIG;
-  const c = raw as Record<string, unknown>;
-  return {
-    windowSec:
-      typeof c.windowSec === "number" && c.windowSec > 0
-        ? c.windowSec
-        : DEFAULT_SPEND_SPIKE_CONFIG.windowSec,
-    ratioVsBaseline:
-      typeof c.ratioVsBaseline === "number" && c.ratioVsBaseline > 0
-        ? c.ratioVsBaseline
-        : DEFAULT_SPEND_SPIKE_CONFIG.ratioVsBaseline,
-    minBaselineUsd:
-      typeof c.minBaselineUsd === "number" && c.minBaselineUsd >= 0
-        ? c.minBaselineUsd
-        : DEFAULT_SPEND_SPIKE_CONFIG.minBaselineUsd,
-  };
 }
 
 /**

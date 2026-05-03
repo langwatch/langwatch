@@ -34,6 +34,40 @@ const enterpriseGate = requireEnterprisePlan(
   ENTERPRISE_FEATURE_ERRORS.ANOMALY_RULES,
 );
 
+/**
+ * Translate threshold-config validation failures from the service
+ * layer into a TRPCError BAD_REQUEST. Mirrors the aiTools router
+ * pattern (`5a3219ae0`). Two error shapes are expected:
+ *   - z.ZodError when the config shape is wrong (missing fields, wrong
+ *     types, negative numbers)
+ *   - plain Error when ruleType is unknown
+ *
+ * Anything else re-throws unchanged so genuine internal errors stay
+ * visible.
+ */
+function translateConfigValidationError(err: unknown, ruleType?: string): never {
+  if (err instanceof z.ZodError) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: `Invalid thresholdConfig${
+        ruleType ? ` for ${ruleType}` : ""
+      }: ${err.issues.map((i) => i.message).join("; ")}`,
+      cause: err,
+    });
+  }
+  if (
+    err instanceof Error &&
+    /Unsupported ruleType/i.test(err.message)
+  ) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: err.message,
+      cause: err,
+    });
+  }
+  throw err;
+}
+
 const severitySchema = z.enum(
   SUPPORTED_SEVERITIES as readonly [string, ...string[]],
 );
@@ -119,20 +153,24 @@ export const anomalyRulesRouter = createTRPCRouter({
     .use(enterpriseGate)
     .mutation(async ({ ctx, input }) => {
       const service = AnomalyRuleService.create(ctx.prisma);
-      const created = await service.createRule({
-        organizationId: input.organizationId,
-        name: input.name,
-        description: input.description ?? null,
-        severity: input.severity as (typeof SUPPORTED_SEVERITIES)[number],
-        ruleType: input.ruleType,
-        scope: input.scope as (typeof SUPPORTED_SCOPES)[number],
-        scopeId: input.scopeId,
-        thresholdConfig: input.thresholdConfig,
-        destinationConfig: input.destinationConfig,
-        status: input.status,
-        actorUserId: ctx.session.user.id,
-      });
-      return toDto(created);
+      try {
+        const created = await service.createRule({
+          organizationId: input.organizationId,
+          name: input.name,
+          description: input.description ?? null,
+          severity: input.severity as (typeof SUPPORTED_SEVERITIES)[number],
+          ruleType: input.ruleType,
+          scope: input.scope as (typeof SUPPORTED_SCOPES)[number],
+          scopeId: input.scopeId,
+          thresholdConfig: input.thresholdConfig,
+          destinationConfig: input.destinationConfig,
+          status: input.status,
+          actorUserId: ctx.session.user.id,
+        });
+        return toDto(created);
+      } catch (err) {
+        throw translateConfigValidationError(err, input.ruleType);
+      }
     }),
 
   update: protectedProcedure
@@ -155,20 +193,24 @@ export const anomalyRulesRouter = createTRPCRouter({
     .use(enterpriseGate)
     .mutation(async ({ ctx, input }) => {
       const service = AnomalyRuleService.create(ctx.prisma);
-      const updated = await service.updateRule({
-        id: input.id,
-        organizationId: input.organizationId,
-        name: input.name,
-        description: input.description,
-        severity: input.severity as (typeof SUPPORTED_SEVERITIES)[number] | undefined,
-        ruleType: input.ruleType,
-        scope: input.scope as (typeof SUPPORTED_SCOPES)[number] | undefined,
-        scopeId: input.scopeId,
-        thresholdConfig: input.thresholdConfig,
-        destinationConfig: input.destinationConfig,
-        status: input.status,
-      });
-      return toDto(updated);
+      try {
+        const updated = await service.updateRule({
+          id: input.id,
+          organizationId: input.organizationId,
+          name: input.name,
+          description: input.description,
+          severity: input.severity as (typeof SUPPORTED_SEVERITIES)[number] | undefined,
+          ruleType: input.ruleType,
+          scope: input.scope as (typeof SUPPORTED_SCOPES)[number] | undefined,
+          scopeId: input.scopeId,
+          thresholdConfig: input.thresholdConfig,
+          destinationConfig: input.destinationConfig,
+          status: input.status,
+        });
+        return toDto(updated);
+      } catch (err) {
+        throw translateConfigValidationError(err, input.ruleType);
+      }
     }),
 
   archive: protectedProcedure
