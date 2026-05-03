@@ -43,7 +43,8 @@ import type { VizTab } from "../../stores/drawerStore";
 import { SPAN_TYPE_COLORS } from "../../utils/formatters";
 import { FlameView } from "./flameView";
 import { NewSpanFlash } from "./NewSpanFlash";
-import { SequenceSkeleton, TopologySkeleton } from "./sequenceView";
+import { SequenceSkeleton } from "./sequenceView/SequenceSkeleton";
+import { TopologySkeleton } from "./sequenceView/TopologySkeleton";
 import { SpanListView } from "./spanListView";
 import { WaterfallView } from "./waterfallView";
 
