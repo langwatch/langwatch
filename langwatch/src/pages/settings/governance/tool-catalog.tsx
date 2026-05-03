@@ -10,6 +10,7 @@ import { useState } from "react";
 import { LoadingScreen } from "~/components/LoadingScreen";
 import { NotFoundScene } from "~/components/NotFoundScene";
 import SettingsLayout from "~/components/SettingsLayout";
+import { AiToolEntryDrawer } from "~/components/settings/governance/AiToolEntryDrawer";
 import { ToolCatalogEditor } from "~/components/settings/governance/ToolCatalogEditor";
 import { useFeatureFlag } from "~/hooks/useFeatureFlag";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -34,8 +35,7 @@ export default function ToolCatalogPage() {
       projectId: project?.id,
     });
 
-  // TODO(B7): drawer state will live here
-  const [_drawerOpen, setDrawerOpen] = useState<
+  const [drawerState, setDrawerState] = useState<
     | { mode: "create"; type: AiToolEntry["type"] }
     | { mode: "edit"; entry: AiToolEntry }
     | null
@@ -66,10 +66,16 @@ export default function ToolCatalogPage() {
 
         <ToolCatalogEditor
           organizationId={organization.id}
-          onAddTile={(type) => setDrawerOpen({ mode: "create", type })}
-          onEditTile={(entry) => setDrawerOpen({ mode: "edit", entry })}
+          onAddTile={(type) => setDrawerState({ mode: "create", type })}
+          onEditTile={(entry) => setDrawerState({ mode: "edit", entry })}
         />
       </VStack>
+
+      <AiToolEntryDrawer
+        organizationId={organization.id}
+        state={drawerState}
+        onClose={() => setDrawerState(null)}
+      />
     </SettingsLayout>
   );
 }
