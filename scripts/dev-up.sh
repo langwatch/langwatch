@@ -40,6 +40,12 @@ BULLBOARD_PORT=$(find_free_port 3000)
 AI_SERVER_PORT=$(find_free_port 3456)
 export APP_PORT BULLBOARD_PORT AI_SERVER_PORT
 
+# Strip any stale http://localhost:<oldport> exports of NEXTAUTH_URL /
+# BASE_HOST so dynamic-port worktrees don't 403 on login (lw#3453). Real
+# overrides (e.g. boxd proxy URLs) are left alone — see comment in helper.
+. "$(dirname "$0")/lib/sanitize-dev-env.sh"
+sanitize_localhost_dev_env
+
 # ---------------------------------------------------------------------------
 # Ensure .env files exist
 # ---------------------------------------------------------------------------
