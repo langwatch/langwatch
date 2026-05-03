@@ -17,6 +17,7 @@ import { useMemo, useState } from "react";
 import { LoadingScreen } from "~/components/LoadingScreen";
 import { NotFoundScene } from "~/components/NotFoundScene";
 import SettingsLayout from "~/components/SettingsLayout";
+import { EnterpriseLockedSurface } from "~/components/enterprise/EnterpriseLockedSurface";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { Drawer } from "~/components/ui/drawer";
 import { Link } from "~/components/ui/link";
@@ -256,6 +257,10 @@ function AnomalyRulesPage() {
 
   return (
     <SettingsLayout>
+      <EnterpriseLockedSurface
+        featureName="Anomaly Rules"
+        description="Anomaly Rules let your governance team define thresholds that page on-call when ingestion drifts. Available on Enterprise plans."
+      >
       <VStack align="stretch" gap={6} width="full" maxW="container.xl">
         <HStack alignItems="end">
           <VStack align="start" gap={1}>
@@ -355,6 +360,7 @@ function AnomalyRulesPage() {
           );
         })}
       </VStack>
+      </EnterpriseLockedSurface>
     </SettingsLayout>
   );
 }

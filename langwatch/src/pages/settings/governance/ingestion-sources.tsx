@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { useMemo, useState } from "react";
 
+import { EnterpriseLockedSurface } from "~/components/enterprise/EnterpriseLockedSurface";
 import { LoadingScreen } from "~/components/LoadingScreen";
 import { NotFoundScene } from "~/components/NotFoundScene";
 import SettingsLayout from "~/components/SettingsLayout";
@@ -312,6 +313,10 @@ function IngestionSourcesPage() {
 
   return (
     <SettingsLayout>
+      <EnterpriseLockedSurface
+        featureName="Ingestion Sources"
+        description="Custom ingestion sources beyond the OTel generic endpoint require an Enterprise plan. Existing OTel ingestion remains available on every plan."
+      >
       <VStack align="stretch" gap={6} width="full" maxW="container.xl">
         <HStack alignItems="end">
           <VStack align="start" gap={0}>
@@ -427,6 +432,7 @@ function IngestionSourcesPage() {
         details={secretModal}
         onClose={() => setSecretModal(null)}
       />
+      </EnterpriseLockedSurface>
     </SettingsLayout>
   );
 }

@@ -24,6 +24,7 @@ import {
 import numeral from "numeral";
 import { useState } from "react";
 
+import { EnterpriseLockedSurface } from "~/components/enterprise/EnterpriseLockedSurface";
 import { LoadingScreen } from "~/components/LoadingScreen";
 import { NotFoundScene } from "~/components/NotFoundScene";
 import SettingsLayout from "~/components/SettingsLayout";
@@ -181,6 +182,10 @@ function IngestionSourceDetailPage() {
 
   return (
     <SettingsLayout>
+      <EnterpriseLockedSurface
+        featureName="Ingestion Source detail"
+        description="Source-level health metrics and event drill-downs are part of the Enterprise plan."
+      >
       <VStack align="stretch" gap={6} width="full" maxW="container.xl">
         <HStack alignItems="end">
           <VStack align="start" gap={1}>
@@ -309,6 +314,7 @@ function IngestionSourceDetailPage() {
         sourceType={source.sourceType}
         onClose={() => setSecretReveal(null)}
       />
+      </EnterpriseLockedSurface>
     </SettingsLayout>
   );
 }
