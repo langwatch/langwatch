@@ -41,6 +41,7 @@ import {
 import { Drawer } from "~/components/ui/drawer";
 import { Link } from "~/components/ui/link";
 import { toaster } from "~/components/ui/toaster";
+import { useActivePlan } from "~/hooks/useActivePlan";
 import { useFeatureFlag } from "~/hooks/useFeatureFlag";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api, type RouterOutputs } from "~/utils/api";
@@ -535,6 +536,17 @@ function SourceComposerDrawer({
   onClose: () => void;
 }) {
   const meta = SOURCE_TYPE_OPTIONS.find((o) => o.value === composer.sourceType);
+  // 4b-3 license gate: non-enterprise plans see only otel_generic +
+  // thirty_days. Surfaces the available-tier list in the dropdown so the
+  // upsell narrative aligns with the EnterpriseLockedSurface page-level
+  // gate already shipped in 4b-2.
+  const { isEnterprise } = useActivePlan();
+  const sourceTypeOptions = isEnterprise
+    ? SOURCE_TYPE_OPTIONS
+    : SOURCE_TYPE_OPTIONS.filter((o) => o.value === "otel_generic");
+  const retentionOptions = isEnterprise
+    ? RETENTION_CLASS_OPTIONS
+    : RETENTION_CLASS_OPTIONS.filter((o) => o.value === "thirty_days");
   return (
     <Drawer.Root
       open={isOpen}
@@ -575,12 +587,17 @@ function SourceComposerDrawer({
                 fontSize: "14px",
               }}
             >
-              {SOURCE_TYPE_OPTIONS.map((o) => (
+              {sourceTypeOptions.map((o) => (
                 <option key={o.value} value={o.value}>
                   {o.label} · {o.mode}
                 </option>
               ))}
             </select>
+            {!isEnterprise && (
+              <Text fontSize="xs" color="fg.muted">
+                Other source types are available on Enterprise plans.
+              </Text>
+            )}
           </VStack>
           <VStack align="stretch" gap={1} flex={2}>
             <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
@@ -644,7 +661,7 @@ function SourceComposerDrawer({
               fontSize: "14px",
             }}
           >
-            {RETENTION_CLASS_OPTIONS.map((o) => (
+            {retentionOptions.map((o) => (
               <option key={o.value} value={o.value}>
                 {o.label}
               </option>
@@ -655,6 +672,11 @@ function SourceComposerDrawer({
               (o) => o.value === composer.retentionClass,
             )?.blurb}
           </Text>
+          {!isEnterprise && (
+            <Text fontSize="xs" color="fg.muted">
+              Longer retention classes are available on Enterprise plans.
+            </Text>
+          )}
         </VStack>
 
           </VStack>
