@@ -69,8 +69,10 @@ interface SeededOrg {
 
 async function seedOrgWithIngestionSource({
   sourceType,
+  retentionClass,
 }: {
   sourceType: "otel_generic" | "claude_cowork" | "workato" | "s3_custom";
+  retentionClass?: "thirty_days" | "one_year" | "seven_years";
 }): Promise<SeededOrg> {
   const orgSuffix = nanoid(8);
   const org = await prisma.organization.create({
@@ -105,6 +107,7 @@ async function seedOrgWithIngestionSource({
     sourceType,
     name: `Source ${NS}-${orgSuffix}`,
     actorUserId: user.id,
+    retentionClass,
   });
   return {
     organizationId: org.id,
@@ -136,12 +139,31 @@ async function deleteSeededOrg(seed: SeededOrg | null): Promise<void> {
   await prisma.user.delete({ where: { id: seed.userId } }).catch(() => undefined);
 }
 
-function buildOtlpJsonBody(): {
+function buildOtlpJsonBody(
+  opts: { spanCount?: number; spanNamePrefix?: string } = {},
+): {
   body: ArrayBuffer;
   spanCount: number;
 } {
   const startNano = String(BigInt(Date.now()) * 1_000_000n);
   const endNano = String((BigInt(Date.now()) + 100n) * 1_000_000n);
+  const spanCount = opts.spanCount ?? 1;
+  const namePrefix = opts.spanNamePrefix ?? "ingest-canary-span";
+  const spans = Array.from({ length: spanCount }, (_, i) => ({
+    traceId: "0".repeat(31) + "1",
+    spanId: i.toString(16).padStart(16, "0"),
+    name: spanCount === 1 ? namePrefix : `${namePrefix}-${i}`,
+    kind: 1,
+    startTimeUnixNano: startNano,
+    endTimeUnixNano: endNano,
+    attributes: [
+      {
+        key: "user.email",
+        value: { stringValue: "test@example.com" },
+      },
+    ],
+    status: { code: 1 },
+  }));
   const payload = {
     resourceSpans: [
       {
@@ -149,23 +171,7 @@ function buildOtlpJsonBody(): {
         scopeSpans: [
           {
             scope: { name: "test", version: "1.0" },
-            spans: [
-              {
-                traceId: "0".repeat(31) + "1",
-                spanId: "0".repeat(15) + "1",
-                name: "ingest-canary-span",
-                kind: 1,
-                startTimeUnixNano: startNano,
-                endTimeUnixNano: endNano,
-                attributes: [
-                  {
-                    key: "user.email",
-                    value: { stringValue: "test@example.com" },
-                  },
-                ],
-                status: { code: 1 },
-              },
-            ],
+            spans,
           },
         ],
       },
@@ -173,7 +179,7 @@ function buildOtlpJsonBody(): {
   };
   const body = new TextEncoder().encode(JSON.stringify(payload))
     .buffer as ArrayBuffer;
-  return { body, spanCount: 1 };
+  return { body, spanCount };
 }
 
 const handleTraceSpy = vi.fn(
@@ -647,6 +653,162 @@ describe("/api/ingest/* — end-to-end HTTP receiver contract", () => {
 
         expect(record.body?.stringValue).toBe(envelope);
       });
+    });
+  });
+
+  // =========================================================================
+  // Phase 5 — CH retention TTL atomicity
+  // =========================================================================
+  // End-to-end receiver→handoff invariant: every span/log handed off
+  // to the trace pipeline MUST carry the right
+  // `langwatch.governance.retention_class` attribute matching the source's
+  // configured class. The CH write-side test
+  // (retentionClass.integration.test.ts) already pins the
+  // attribute→column mapping; this scenario closes the loop end-to-end
+  // through the receiver so a write-side bug, race, or upstream miss
+  // doesn't silently produce empty-RetentionClass rows that match no
+  // TTL clause and never delete (compliance gap for paying
+  // `seven_years` customers).
+  //
+  // Spec: specs/ai-gateway/governance/retention.feature
+  // =========================================================================
+  describe("retention atomicity: every handed-off span/log carries the source's retention class", () => {
+    type RetentionClass = "thirty_days" | "one_year" | "seven_years";
+    const retentionClasses: RetentionClass[] = [
+      "thirty_days",
+      "one_year",
+      "seven_years",
+    ];
+
+    describe("OTLP receiver", () => {
+      it.each(retentionClasses)(
+        "stamps every span with retention_class=%s when the source is configured for it",
+        async (retentionClass) => {
+          handleTraceSpy.mockClear();
+          const seed = await seedOrgWithIngestionSource({
+            sourceType: "otel_generic",
+            retentionClass,
+          });
+          try {
+            // Two-span body proves the stamping applies to ALL spans,
+            // not just the first one (catches a subtle for-of break /
+            // attribute-array-shared-reference bug).
+            const { body } = buildOtlpJsonBody({
+              spanCount: 2,
+              spanNamePrefix: `retention-${retentionClass}`,
+            });
+            const res = await ingestApp.request(
+              `/api/ingest/otel/${seed.ingestionSourceId}`,
+              {
+                method: "POST",
+                headers: {
+                  "content-type": "application/json",
+                  authorization: `Bearer ${seed.ingestSecret}`,
+                },
+                body: new Uint8Array(body),
+              },
+            );
+            expect(res.status).toBe(202);
+
+            expect(handleTraceSpy).toHaveBeenCalledTimes(1);
+            const handedOffRequest = handleTraceSpy.mock.calls[0]![1] as {
+              resourceSpans?: Array<{
+                scopeSpans?: Array<{
+                  spans?: Array<{
+                    attributes?: Array<{
+                      key: string;
+                      value?: { stringValue?: string };
+                    }>;
+                  }>;
+                }>;
+              }>;
+            };
+            const allSpans =
+              handedOffRequest.resourceSpans?.flatMap(
+                (rs) => rs.scopeSpans?.flatMap((ss) => ss.spans ?? []) ?? [],
+              ) ?? [];
+
+            // Every span must have the retention attribute, and it must
+            // equal the source's class. Empty-string / missing / wrong
+            // value all fail the compliance invariant.
+            expect(allSpans.length).toBeGreaterThan(0);
+            for (const span of allSpans) {
+              const retentionAttr = (span.attributes ?? []).find(
+                (a) => a.key === "langwatch.governance.retention_class",
+              );
+              expect(retentionAttr).toBeDefined();
+              expect(retentionAttr?.value?.stringValue).toBe(retentionClass);
+            }
+          } finally {
+            await deleteSeededOrg(seed);
+          }
+        },
+      );
+    });
+
+    describe("webhook receiver", () => {
+      it.each(retentionClasses)(
+        "stamps the synthesised log_record with retention_class=%s when the source is configured for it",
+        async (retentionClass) => {
+          handleLogSpy.mockClear();
+          const seed = await seedOrgWithIngestionSource({
+            sourceType: "workato",
+            retentionClass,
+          });
+          try {
+            const envelope = JSON.stringify({
+              event: "test",
+              retentionExpected: retentionClass,
+            });
+            const res = await ingestApp.request(
+              `/api/ingest/webhook/${seed.ingestionSourceId}`,
+              {
+                method: "POST",
+                headers: {
+                  "content-type": "application/json",
+                  authorization: `Bearer ${seed.ingestSecret}`,
+                },
+                body: envelope,
+              },
+            );
+            expect(res.status).toBe(202);
+
+            expect(handleLogSpy).toHaveBeenCalledTimes(1);
+            const handedOffArgs = handleLogSpy.mock.calls[0]![0] as {
+              tenantId: string;
+              logRequest: {
+                resourceLogs?: Array<{
+                  scopeLogs?: Array<{
+                    logRecords?: Array<{
+                      attributes?: Array<{
+                        key: string;
+                        value?: { stringValue?: string };
+                      }>;
+                    }>;
+                  }>;
+                }>;
+              };
+              piiRedactionLevel?: unknown;
+            };
+            const allLogs =
+              handedOffArgs.logRequest.resourceLogs?.flatMap(
+                (rl) =>
+                  rl.scopeLogs?.flatMap((sl) => sl.logRecords ?? []) ?? [],
+              ) ?? [];
+
+            expect(allLogs.length).toBeGreaterThan(0);
+            for (const log of allLogs) {
+              const retentionAttr = (log.attributes ?? []).find(
+                (a) => a.key === "langwatch.governance.retention_class",
+              );
+              expect(retentionAttr).toBeDefined();
+              expect(retentionAttr?.value?.stringValue).toBe(retentionClass);
+            }
+          } finally {
+            await deleteSeededOrg(seed);
+          }
+        },
+      );
     });
   });
 });
