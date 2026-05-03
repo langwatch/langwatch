@@ -176,6 +176,10 @@ export const setClickHouseBackupStatusCount = (
   count: number,
 ) => ensureBackupStatusTotal().labels(status).set(count);
 
+// Edge-triggered: collectStorageStats runs every 15s, so we'd otherwise
+// produce 5,760 identical warns/day if system.backups is unavailable.
+let backupStatsCollectionFailing = false;
+
 // ============================================================================
 // Disk Storage Metrics
 // ============================================================================
@@ -301,11 +305,26 @@ export async function collectStorageStats(
           }
         }
       }
+
+      if (backupStatsCollectionFailing) {
+        logger.info(
+          "ClickHouse backup stats collection recovered from previous failure",
+        );
+        backupStatsCollectionFailing = false;
+      }
     } catch (backupError) {
-      logger.warn(
-        { error: backupError },
-        "Failed to collect ClickHouse backup stats from system.backups",
-      );
+      if (!backupStatsCollectionFailing) {
+        logger.warn(
+          { error: backupError },
+          "Failed to collect ClickHouse backup stats from system.backups (further failures suppressed until recovery)",
+        );
+        backupStatsCollectionFailing = true;
+      } else {
+        logger.debug(
+          { error: backupError },
+          "Failed to collect ClickHouse backup stats from system.backups",
+        );
+      }
     }
 
     // Collect per-disk storage metrics
