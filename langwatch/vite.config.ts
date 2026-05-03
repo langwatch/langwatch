@@ -128,6 +128,7 @@ export default defineConfig({
       // Path aliases (matching tsconfig paths)
       "~": path.resolve(__dirname, "./src"),
       "@app": path.resolve(__dirname, "./src/server/app-layer"),
+      "@ee": path.resolve(__dirname, "./ee"),
 
       // Browser stubs for Node.js-only modules
       "pino-pretty": path.resolve(__dirname, "./src/noop-css.cjs"),

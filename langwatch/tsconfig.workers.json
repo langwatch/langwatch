@@ -3,7 +3,8 @@
 	"compilerOptions": {
 		"paths": {
 			"~/*": ["./src/*"],
-			"@app/*": ["./src/server/app-layer/*"]
+			"@app/*": ["./src/server/app-layer/*"],
+			"@ee/*": ["./ee/*"]
 		}
 	}
 }
