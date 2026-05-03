@@ -41,10 +41,10 @@ export default function ToolCatalogPage() {
     | null
   >(null);
 
-  if (ffLoading) {
+  if (ffLoading || !organization) {
     return <LoadingScreen />;
   }
-  if (!governancePreviewEnabled || !organization) {
+  if (!governancePreviewEnabled) {
     return <NotFoundScene />;
   }
 
