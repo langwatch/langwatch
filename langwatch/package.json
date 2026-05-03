@@ -172,7 +172,7 @@
     "fastq": "^1.20.1",
     "fetch-h2": "^3.0.2",
     "flat": "^6.0.1",
-    "geoip-country": "^5.0.202604142355",
+    "geoip-country": "^5.0.202605012358",
     "handlebars": "^4.7.9",
     "hono": "^4.12.15",
     "hono-openapi": "^0.4.8",
