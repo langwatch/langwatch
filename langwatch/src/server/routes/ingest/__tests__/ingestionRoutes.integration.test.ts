@@ -197,6 +197,14 @@ vi.mock("~/server/app-layer/app", async () => {
           collection: { handleOtlpTraceRequest: handleTraceSpy },
           logCollection: { handleOtlpLogRequest: handleLogSpy },
         },
+        // IngestionSourceService.createSource asserts an Enterprise plan
+        // (Phase 4b-4/5 service-layer 403). The seed flow below calls
+        // that service in beforeAll, so the mocked app needs a
+        // planProvider that returns ENTERPRISE — otherwise every seed
+        // throws TRPCError FORBIDDEN before the receiver tests run.
+        planProvider: {
+          getActivePlan: async () => ({ type: "ENTERPRISE" }),
+        },
       }) as never,
   };
 });

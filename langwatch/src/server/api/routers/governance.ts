@@ -24,6 +24,10 @@ import { UsageStatsService } from "~/server/license-enforcement/usage-stats.serv
 import { GovernanceOcsfExportService } from "~/server/governance/governanceOcsfExport.service";
 
 import {
+  ENTERPRISE_FEATURE_ERRORS,
+  requireEnterprisePlan,
+} from "../enterprise";
+import {
   checkOrganizationPermission,
   hasOrganizationPermission,
 } from "../rbac";
@@ -151,6 +155,7 @@ export const governanceRouter = createTRPCRouter({
       }),
     )
     .use(checkOrganizationPermission("complianceExport:view"))
+    .use(requireEnterprisePlan(ENTERPRISE_FEATURE_ERRORS.OCSF_EXPORT))
     .query(async ({ ctx, input }) => {
       const service = GovernanceOcsfExportService.create(ctx.prisma);
       return await service.list({

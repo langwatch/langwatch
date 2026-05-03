@@ -24,8 +24,16 @@ import {
   SUPPORTED_SOURCE_TYPES,
 } from "~/server/governance/activity-monitor/ingestionSource.service";
 
+import {
+  ENTERPRISE_FEATURE_ERRORS,
+  requireEnterprisePlan,
+} from "../enterprise";
 import { checkOrganizationPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
+
+const enterpriseGate = requireEnterprisePlan(
+  ENTERPRISE_FEATURE_ERRORS.INGESTION_SOURCES,
+);
 
 const retentionClassSchema = z.enum(
   SUPPORTED_RETENTION_CLASSES as readonly [string, ...string[]],
@@ -87,6 +95,7 @@ export const ingestionSourcesRouter = createTRPCRouter({
   list: protectedProcedure
     .input(z.object({ organizationId: z.string() }))
     .use(checkOrganizationPermission("ingestionSources:view"))
+    .use(enterpriseGate)
     .query(async ({ ctx, input }) => {
       const service = IngestionSourceService.create(ctx.prisma);
       const rows = await service.list(input.organizationId);
@@ -97,6 +106,7 @@ export const ingestionSourcesRouter = createTRPCRouter({
   get: protectedProcedure
     .input(z.object({ organizationId: z.string(), id: z.string() }))
     .use(checkOrganizationPermission("ingestionSources:view"))
+    .use(enterpriseGate)
     .query(async ({ ctx, input }) => {
       const service = IngestionSourceService.create(ctx.prisma);
       const row = await service.findById(input.id, input.organizationId);
@@ -124,6 +134,7 @@ export const ingestionSourcesRouter = createTRPCRouter({
       }),
     )
     .use(checkOrganizationPermission("ingestionSources:manage"))
+    .use(enterpriseGate)
     .mutation(async ({ ctx, input }) => {
       const service = IngestionSourceService.create(ctx.prisma);
       const created = await service.createSource({
@@ -158,6 +169,7 @@ export const ingestionSourcesRouter = createTRPCRouter({
       }),
     )
     .use(checkOrganizationPermission("ingestionSources:manage"))
+    .use(enterpriseGate)
     .mutation(async ({ ctx, input }) => {
       const service = IngestionSourceService.create(ctx.prisma);
       const updated = await service.updateSource({
@@ -182,6 +194,7 @@ export const ingestionSourcesRouter = createTRPCRouter({
   rotateSecret: protectedProcedure
     .input(z.object({ organizationId: z.string(), id: z.string() }))
     .use(checkOrganizationPermission("ingestionSources:manage"))
+    .use(enterpriseGate)
     .mutation(async ({ ctx, input }) => {
       const service = IngestionSourceService.create(ctx.prisma);
       const rotated = await service.rotateSecret(
@@ -197,6 +210,7 @@ export const ingestionSourcesRouter = createTRPCRouter({
   archive: protectedProcedure
     .input(z.object({ organizationId: z.string(), id: z.string() }))
     .use(checkOrganizationPermission("ingestionSources:manage"))
+    .use(enterpriseGate)
     .mutation(async ({ ctx, input }) => {
       const service = IngestionSourceService.create(ctx.prisma);
       const archived = await service.archive(

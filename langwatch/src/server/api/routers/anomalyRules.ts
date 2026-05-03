@@ -23,8 +23,16 @@ import {
   SUPPORTED_SEVERITIES,
 } from "~/server/governance/activity-monitor/anomalyRule.service";
 
+import {
+  ENTERPRISE_FEATURE_ERRORS,
+  requireEnterprisePlan,
+} from "../enterprise";
 import { checkOrganizationPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
+
+const enterpriseGate = requireEnterprisePlan(
+  ENTERPRISE_FEATURE_ERRORS.ANOMALY_RULES,
+);
 
 const severitySchema = z.enum(
   SUPPORTED_SEVERITIES as readonly [string, ...string[]],
@@ -74,6 +82,7 @@ export const anomalyRulesRouter = createTRPCRouter({
   list: protectedProcedure
     .input(z.object({ organizationId: z.string() }))
     .use(checkOrganizationPermission("anomalyRules:view"))
+    .use(enterpriseGate)
     .query(async ({ ctx, input }) => {
       const service = AnomalyRuleService.create(ctx.prisma);
       const rows = await service.list(input.organizationId);
@@ -83,6 +92,7 @@ export const anomalyRulesRouter = createTRPCRouter({
   get: protectedProcedure
     .input(z.object({ organizationId: z.string(), id: z.string() }))
     .use(checkOrganizationPermission("anomalyRules:view"))
+    .use(enterpriseGate)
     .query(async ({ ctx, input }) => {
       const service = AnomalyRuleService.create(ctx.prisma);
       const row = await service.findById(input.id, input.organizationId);
@@ -106,6 +116,7 @@ export const anomalyRulesRouter = createTRPCRouter({
       }),
     )
     .use(checkOrganizationPermission("anomalyRules:manage"))
+    .use(enterpriseGate)
     .mutation(async ({ ctx, input }) => {
       const service = AnomalyRuleService.create(ctx.prisma);
       const created = await service.createRule({
@@ -141,6 +152,7 @@ export const anomalyRulesRouter = createTRPCRouter({
       }),
     )
     .use(checkOrganizationPermission("anomalyRules:manage"))
+    .use(enterpriseGate)
     .mutation(async ({ ctx, input }) => {
       const service = AnomalyRuleService.create(ctx.prisma);
       const updated = await service.updateRule({
@@ -162,6 +174,7 @@ export const anomalyRulesRouter = createTRPCRouter({
   archive: protectedProcedure
     .input(z.object({ organizationId: z.string(), id: z.string() }))
     .use(checkOrganizationPermission("anomalyRules:manage"))
+    .use(enterpriseGate)
     .mutation(async ({ ctx, input }) => {
       const service = AnomalyRuleService.create(ctx.prisma);
       const archived = await service.archive(

@@ -37,11 +37,22 @@ import {
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { FREE_PLAN } from "../../../../../ee/licensing/constants";
+import type { PlanInfo } from "../../../../../ee/licensing/planInfo";
+import { PlanProviderService } from "~/server/app-layer/subscription/plan-provider";
+
 import { prisma } from "../../../db";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
+
+// The new requireEnterprisePlan middleware (Phase 4b-4/5) 403s every
+// gated governance procedure for non-enterprise plans. This test pins
+// RBAC behavior, not license behavior, so we override the plan provider
+// to ENTERPRISE for the duration. The license-gate behavior itself is
+// covered by license-gate-governance.integration.test.ts.
+const enterprisePlan: PlanInfo = { ...FREE_PLAN, type: "ENTERPRISE" };
 
 describe("governance routers — RBAC enforcement", () => {
     const ns = `gov-rbac-${nanoid(8)}`;
@@ -55,7 +66,11 @@ describe("governance routers — RBAC enforcement", () => {
       // singleton initialised. Other procedures don't need it but
       // initialising once keeps the test simple.
       resetApp();
-      globalForApp.__langwatch_app = createTestApp();
+      globalForApp.__langwatch_app = createTestApp({
+        planProvider: PlanProviderService.create({
+          getActivePlan: async () => enterprisePlan,
+        }),
+      });
 
       const organization = await prisma.organization.create({
         data: {

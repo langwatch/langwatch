@@ -16,8 +16,16 @@ import { z } from "zod";
 
 import { ActivityMonitorService } from "~/server/governance/activity-monitor/activityMonitor.service";
 
+import {
+  ENTERPRISE_FEATURE_ERRORS,
+  requireEnterprisePlan,
+} from "../enterprise";
 import { checkOrganizationPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
+
+const enterpriseGate = requireEnterprisePlan(
+  ENTERPRISE_FEATURE_ERRORS.ACTIVITY_MONITOR,
+);
 
 function extractSourceLabel(detail: unknown): string {
   const d = (detail as Record<string, unknown>) ?? {};
@@ -39,6 +47,7 @@ export const activityMonitorRouter = createTRPCRouter({
       }),
     )
     .use(checkOrganizationPermission("activityMonitor:view"))
+    .use(enterpriseGate)
     .query(async ({ ctx, input }) => {
       const service = ActivityMonitorService.create(ctx.prisma);
       return await service.summary({
@@ -59,6 +68,7 @@ export const activityMonitorRouter = createTRPCRouter({
       }),
     )
     .use(checkOrganizationPermission("activityMonitor:view"))
+    .use(enterpriseGate)
     .query(async ({ ctx, input }) => {
       const service = ActivityMonitorService.create(ctx.prisma);
       return await service.spendByUser({
@@ -74,6 +84,7 @@ export const activityMonitorRouter = createTRPCRouter({
   ingestionSourcesHealth: protectedProcedure
     .input(z.object({ organizationId: z.string() }))
     .use(checkOrganizationPermission("activityMonitor:view"))
+    .use(enterpriseGate)
     .query(async ({ ctx, input }) => {
       const service = ActivityMonitorService.create(ctx.prisma);
       return await service.ingestionSourcesHealth({
@@ -95,6 +106,7 @@ export const activityMonitorRouter = createTRPCRouter({
       }),
     )
     .use(checkOrganizationPermission("activityMonitor:view"))
+    .use(enterpriseGate)
     .query(async ({ ctx, input }) => {
       const rows = await ctx.prisma.anomalyAlert.findMany({
         where: { organizationId: input.organizationId },
@@ -139,6 +151,7 @@ export const activityMonitorRouter = createTRPCRouter({
       }),
     )
     .use(checkOrganizationPermission("activityMonitor:view"))
+    .use(enterpriseGate)
     .query(async ({ ctx, input }) => {
       const service = ActivityMonitorService.create(ctx.prisma);
       return await service.eventsForSource(input);
@@ -156,6 +169,7 @@ export const activityMonitorRouter = createTRPCRouter({
       }),
     )
     .use(checkOrganizationPermission("activityMonitor:view"))
+    .use(enterpriseGate)
     .query(async ({ ctx, input }) => {
       const service = ActivityMonitorService.create(ctx.prisma);
       return await service.sourceHealthMetrics(input);

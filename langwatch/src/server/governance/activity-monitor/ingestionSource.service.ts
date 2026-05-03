@@ -22,6 +22,10 @@ import { createHash, randomBytes } from "crypto";
 import type { IngestionSource, Prisma, PrismaClient } from "@prisma/client";
 
 import { env } from "~/env.mjs";
+import {
+  assertEnterprisePlan,
+  ENTERPRISE_FEATURE_ERRORS,
+} from "~/server/api/enterprise";
 import { ensureHiddenGovernanceProject } from "~/server/governance/governanceProject.service";
 
 export type SourceType =
@@ -172,6 +176,17 @@ export class IngestionSourceService {
   async createSource(
     input: CreateIngestionSourceInput,
   ): Promise<CreatedIngestionSource> {
+    // Defense-in-depth license gate. The tRPC router already gates with
+    // requireEnterprisePlan; this service-layer assertion catches any
+    // non-tRPC caller (background workers, future webhook adapters) so
+    // a non-enterprise org can never end up with an IngestionSource row,
+    // regardless of which entry point reached the service. Spec:
+    // specs/ai-gateway/license-gate-governance.feature.
+    await assertEnterprisePlan({
+      organizationId: input.organizationId,
+      errorMessage: ENTERPRISE_FEATURE_ERRORS.INGESTION_SOURCES,
+    });
+
     if (!SUPPORTED_SOURCE_TYPES.includes(input.sourceType)) {
       throw new Error(`Unsupported sourceType: ${input.sourceType}`);
     }
