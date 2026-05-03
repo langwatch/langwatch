@@ -21,6 +21,7 @@ describe("PromptsApiService.renameTag", () => {
     } as InternalConfig);
   });
 
+  /** @scenario renameTag calls PUT /api/prompts/tags/{tag} with new name */
   it("calls PUT /api/prompts/tags/{tag} with new name", async () => {
     mockPut.mockResolvedValue({ data: undefined, error: undefined });
     await service.renameTag({ tag: "old-name", name: "new-name" });
