@@ -1,5 +1,94 @@
 # Changelog
 
+## [0.23.0](https://github.com/langwatch/langwatch/compare/langwatch@v3.2.1...langwatch@v0.23.0) (2026-05-03)
+
+
+### Features
+
+* **analytics:** add trace name filter and group-by to dashboards ([#3346](https://github.com/langwatch/langwatch/issues/3346)) ([63b7b99](https://github.com/langwatch/langwatch/commit/63b7b991a2510aedd750fbb0fe8a43da6c0973f2))
+* **event-sourcing:** add gq_blocked_groups gauge for current blocked count ([#3712](https://github.com/langwatch/langwatch/issues/3712)) ([5a90cd2](https://github.com/langwatch/langwatch/commit/5a90cd22ecad97f61de9723f8cf921cb05b74af6))
+* **home:** add Trace Explorer announcement banner; rename "Traces Evolved" → "Trace Explorer" ([2a3f30c](https://github.com/langwatch/langwatch/commit/2a3f30c92a4aa0c2484ff15afa03f476a57df270))
+* **home:** add Trace Explorer announcement banner; rename to Trace Explorer / beta ([#3713](https://github.com/langwatch/langwatch/issues/3713)) ([2a3f30c](https://github.com/langwatch/langwatch/commit/2a3f30c92a4aa0c2484ff15afa03f476a57df270))
+* **scenarios:** entry-path UX — modal gate, cache fix, error UX ([#3530](https://github.com/langwatch/langwatch/issues/3530)) ([#3538](https://github.com/langwatch/langwatch/issues/3538)) ([bd2e18b](https://github.com/langwatch/langwatch/commit/bd2e18b2483af8a29c6cd66dfe6f64744b7276c6))
+* **tracing:** 2 trace 2 furious, tracing evolved ([#3528](https://github.com/langwatch/langwatch/issues/3528)) ([9ff4ef4](https://github.com/langwatch/langwatch/commit/9ff4ef418097c9aa6aaafe33d06b50c44ae989d2))
+
+
+### Bug Fixes
+
+* **ci:** split OpenAI keys per workflow + drop sdk examples to gpt-5-mini ([#3641](https://github.com/langwatch/langwatch/issues/3641)) ([6b58467](https://github.com/langwatch/langwatch/commit/6b58467aa3063e10393ca34cc997b9585abb0c31))
+* **clickhouse:** IN-tuple dedup on hot projection state reads ([#3664](https://github.com/langwatch/langwatch/issues/3664)) ([46aa6bd](https://github.com/langwatch/langwatch/commit/46aa6bd062671bd44904b11eecd23915eb5dbb8e))
+* **clickhouse:** in-tuple dedup sweep across remaining projection repos ([#3665](https://github.com/langwatch/langwatch/issues/3665)) ([f3858c5](https://github.com/langwatch/langwatch/commit/f3858c5897079e25065a850cd434ecd8339f7577))
+* **clickhouse:** lazy-register backup gauges so only workers report them ([#3747](https://github.com/langwatch/langwatch/issues/3747)) ([428b8fd](https://github.com/langwatch/langwatch/commit/428b8fd15671196140815f8f50b860a7b6c605d5))
+* **deps:** patch npm security vulnerabilities (liquidjs, postcss, fast-xml-parser, lodash) ([0d8e961](https://github.com/langwatch/langwatch/commit/0d8e9617ff625777cd860860ef3618d18b769a06))
+* **deps:** patch npm security vulnerabilities (postcss, fast-xml-parser, lodash) ([#3563](https://github.com/langwatch/langwatch/issues/3563)) ([0d8e961](https://github.com/langwatch/langwatch/commit/0d8e9617ff625777cd860860ef3618d18b769a06))
+* **deps:** pin next to &gt;= 15.5.15 via override (Dependabot [#872](https://github.com/langwatch/langwatch/issues/872)) ([5ea90c5](https://github.com/langwatch/langwatch/commit/5ea90c5f9ec85d17786c9ebc0941ff08847a6121))
+* **deps:** upgrade aiohttp, starlette, pillow, lxml ([#3564](https://github.com/langwatch/langwatch/issues/3564)) ([498847e](https://github.com/langwatch/langwatch/commit/498847e43c3088ef68b357c6b04d02d1005a5f9a))
+* **deps:** upgrade aiohttp, starlette, pillow, lxml (Python heavy) ([498847e](https://github.com/langwatch/langwatch/commit/498847e43c3088ef68b357c6b04d02d1005a5f9a))
+* **deps:** upgrade azure-core to 1.40.0 (Dependabot [#267](https://github.com/langwatch/langwatch/issues/267)) ([#3660](https://github.com/langwatch/langwatch/issues/3660)) ([9df8cce](https://github.com/langwatch/langwatch/commit/9df8cce2dd6f0622e72d70e380125538292189d9))
+* **deps:** upgrade azure-core to 1.40.0 to resolve security alert ([9df8cce](https://github.com/langwatch/langwatch/commit/9df8cce2dd6f0622e72d70e380125538292189d9))
+* **deps:** upgrade GitPython, protobuf, nbconvert (Dependabot) ([#3655](https://github.com/langwatch/langwatch/issues/3655)) ([060a3ae](https://github.com/langwatch/langwatch/commit/060a3aef67aebb822baed7853b2688455933f432))
+* **deps:** upgrade GitPython, protobuf, nbconvert to resolve security alerts ([060a3ae](https://github.com/langwatch/langwatch/commit/060a3aef67aebb822baed7853b2688455933f432))
+* **deps:** upgrade go-redis and aws-sdk-go-v2/s3 (Go patches) ([#3562](https://github.com/langwatch/langwatch/issues/3562)) ([94ec541](https://github.com/langwatch/langwatch/commit/94ec54104bd5910ee3b7e4efd6d6ffa540995d07))
+* **deps:** upgrade go-redis and aws-sdk-go-v2/s3 (Go patches) ([#3562](https://github.com/langwatch/langwatch/issues/3562)) ([e90e8e8](https://github.com/langwatch/langwatch/commit/e90e8e8c00b32cdb093520e19ec9f1c3dac60d45))
+* **deps:** upgrade google-cloud-aiplatform to &gt;= 1.133.0 ([#3706](https://github.com/langwatch/langwatch/issues/3706)) ([123511a](https://github.com/langwatch/langwatch/commit/123511a20f20c5d7a938f8574cb03571aa5f6524))
+* **deps:** upgrade next to &gt;= 15.5.15 (DoS CVE) ([#3710](https://github.com/langwatch/langwatch/issues/3710)) ([5ea90c5](https://github.com/langwatch/langwatch/commit/5ea90c5f9ec85d17786c9ebc0941ff08847a6121))
+* **deps:** upgrade nltk, authlib (Dependabot [#612](https://github.com/langwatch/langwatch/issues/612), [#522](https://github.com/langwatch/langwatch/issues/522), [#592](https://github.com/langwatch/langwatch/issues/592), [#593](https://github.com/langwatch/langwatch/issues/593), [#594](https://github.com/langwatch/langwatch/issues/594)) ([#3659](https://github.com/langwatch/langwatch/issues/3659)) ([0576cc0](https://github.com/langwatch/langwatch/commit/0576cc0bafa041bb83dd938e7d5c8f6df6d236ce))
+* **deps:** upgrade nltk, authlib to resolve security alerts ([0576cc0](https://github.com/langwatch/langwatch/commit/0576cc0bafa041bb83dd938e7d5c8f6df6d236ce))
+* **deps:** upgrade picomatch, merge, jupyterlab, notebook (Dependabot) ([#3658](https://github.com/langwatch/langwatch/issues/3658)) ([bf8cd9a](https://github.com/langwatch/langwatch/commit/bf8cd9ad47150e65f27e383d7f4d3659374d00b8))
+* **deps:** upgrade pyasn1, filelock, Pygments, nltk (Python patches) ([#3561](https://github.com/langwatch/langwatch/issues/3561)) ([27152ca](https://github.com/langwatch/langwatch/commit/27152ca723b2e31aa3ac760847b17d8e3dfc3714))
+* **deps:** upgrade PyJWT, pillow, onnx (Dependabot) ([#3656](https://github.com/langwatch/langwatch/issues/3656)) ([5eb44a3](https://github.com/langwatch/langwatch/commit/5eb44a3618930847a38abb38345a8d424b6c3021))
+* **deps:** upgrade PyJWT, pillow, onnx to resolve security alerts ([5eb44a3](https://github.com/langwatch/langwatch/commit/5eb44a3618930847a38abb38345a8d424b6c3021))
+* **deps:** upgrade tornado to 6.5.5 (Dependabot [#555](https://github.com/langwatch/langwatch/issues/555)) ([#3651](https://github.com/langwatch/langwatch/issues/3651)) ([7541e89](https://github.com/langwatch/langwatch/commit/7541e897fa29db23f534da1a9567a2750c90566a))
+* **deps:** upgrade tornado to 6.5.5 to resolve DoS vulnerability (CVE) ([7541e89](https://github.com/langwatch/langwatch/commit/7541e897fa29db23f534da1a9567a2750c90566a))
+* **deps:** upgrade tornado, urllib3, cryptography (Dependabot) ([#3657](https://github.com/langwatch/langwatch/issues/3657)) ([f8a2e9a](https://github.com/langwatch/langwatch/commit/f8a2e9a5cf6b836524bc2a170d589e1a01ad3921))
+* **deps:** upgrade tornado, urllib3, cryptography to resolve security alerts ([f8a2e9a](https://github.com/langwatch/langwatch/commit/f8a2e9a5cf6b836524bc2a170d589e1a01ad3921))
+* **deps:** upgrade vite to &gt;= 7.3.2 (file read CVEs) ([#3711](https://github.com/langwatch/langwatch/issues/3711)) ([b2b6b06](https://github.com/langwatch/langwatch/commit/b2b6b06066e3659ae1c70480a22e1c40ff974638))
+* **ops:** wire SSE through tRPC subscription and virtualize dashboard tables ([#3708](https://github.com/langwatch/langwatch/issues/3708)) ([161acf6](https://github.com/langwatch/langwatch/commit/161acf64a1b260922a31bc6a331f14dc87498227))
+* **release:** path-routed Release-As shadows for 6 polluted components ([#3627](https://github.com/langwatch/langwatch/issues/3627)) ([b39d59e](https://github.com/langwatch/langwatch/commit/b39d59e87ed6d87224d580271175650c1d4159a7))
+* **routing:** preserve percent-encoding in sub-path during project slug redirect ([#3599](https://github.com/langwatch/langwatch/issues/3599)) ([3dcb3d5](https://github.com/langwatch/langwatch/commit/3dcb3d5e49e7ee10e69498a4e1b20300d885fa5f))
+* **traces:** move filter row click handler from Checkbox to HStack ([#3749](https://github.com/langwatch/langwatch/issues/3749)) ([#3753](https://github.com/langwatch/langwatch/issues/3753)) ([bdc89a4](https://github.com/langwatch/langwatch/commit/bdc89a4ef899f7a8453cc7cca60c08040945fb82))
+* **ui:** defer mermaid + emoji-picker imports to prevent prod boot crash ([#3751](https://github.com/langwatch/langwatch/issues/3751)) ([e48a42a](https://github.com/langwatch/langwatch/commit/e48a42a6970fd9fd720a4ada2bb755f174e0c6f8))
+
+
+### Miscellaneous
+
+* **billing:** bind 3 [@unimplemented](https://github.com/unimplemented) scenarios to existing tests ([#3458](https://github.com/langwatch/langwatch/issues/3458)) ([#3693](https://github.com/langwatch/langwatch/issues/3693)) ([9e7ffa9](https://github.com/langwatch/langwatch/commit/9e7ffa98fa1c12b55fcea75eb47470bd9422dec1))
+* **charts:** regen Chart.lock for gateway 3.2.0 → 3.2.1 (post langwatch@3.2.1) ([a80c98f](https://github.com/langwatch/langwatch/commit/a80c98fca139a8f86fe1b8568512cc6ae7acdbe5))
+* **clickhouse-serverless:** single-footer shadow Release-As 0.3.0 ([f303109](https://github.com/langwatch/langwatch/commit/f30310999277d69e1580679c371ef74a159a7d5e))
+* **components:** bind 3/5 [@unimplemented](https://github.com/unimplemented) scenarios in search-input ([#3458](https://github.com/langwatch/langwatch/issues/3458)) ([#3695](https://github.com/langwatch/langwatch/issues/3695)) ([3c5ed34](https://github.com/langwatch/langwatch/commit/3c5ed34097f8b8360d90449862c4af0cbd6fece1))
+* **deps-dev:** bump @anthropic-ai/claude-code from 2.1.76 to 2.1.119 in /mcp-server ([#3508](https://github.com/langwatch/langwatch/issues/3508)) ([afc67fa](https://github.com/langwatch/langwatch/commit/afc67fa0bafc661aa65f31e9cb6bda670848f7fc))
+* **deps-dev:** bump streamlit from 1.48.1 to 1.57.0 in /python-sdk ([#2087](https://github.com/langwatch/langwatch/issues/2087)) ([21a1d24](https://github.com/langwatch/langwatch/commit/21a1d2467c9f6c2113e9b589ae0ffd738655cb1e))
+* **deps:** bump @react-email/container from 0.0.10 to 0.0.16 ([ccccd8e](https://github.com/langwatch/langwatch/commit/ccccd8ee473ab9ca1c1a4b235b8b8a6d440c0680))
+* **deps:** bump @react-email/container in /langwatch ([ccccd8e](https://github.com/langwatch/langwatch/commit/ccccd8ee473ab9ca1c1a4b235b8b8a6d440c0680))
+* **deps:** bump black from 25.9.0 to 26.3.1 in /langwatch_nlp ([#3727](https://github.com/langwatch/langwatch/issues/3727)) ([ab8c35e](https://github.com/langwatch/langwatch/commit/ab8c35e4937ea60023593b9546635bf50e62ebd5))
+* **deps:** bump geoip-country from 5.0.202604142355 to 5.0.202605012358 in /langwatch ([#3742](https://github.com/langwatch/langwatch/issues/3742)) ([cb8df50](https://github.com/langwatch/langwatch/commit/cb8df5028c6d95712742c7c4dcdbf89db25e5a69))
+* **deps:** bump geoip-country in /langwatch ([cb8df50](https://github.com/langwatch/langwatch/commit/cb8df5028c6d95712742c7c4dcdbf89db25e5a69))
+* **deps:** bump langchain-core from 1.2.19 to 1.2.28 in /langwatch_nlp ([#3452](https://github.com/langwatch/langwatch/issues/3452)) ([35accda](https://github.com/langwatch/langwatch/commit/35accda7daeab1cb882d946c90b874ed1cab0f9a))
+* **deps:** bump pytest-asyncio from 0.23.8 to 1.3.0 in /langwatch_nlp ([#2085](https://github.com/langwatch/langwatch/issues/2085)) ([c95ea2f](https://github.com/langwatch/langwatch/commit/c95ea2f83ef1c529ea0d4e1564a98a50ca21465b))
+* **deps:** bump the uv group across 1 directory with 4 updates ([#3639](https://github.com/langwatch/langwatch/issues/3639)) ([3a69101](https://github.com/langwatch/langwatch/commit/3a6910165be9d68d12e468bfad2ac67ba7e32e71))
+* **deps:** update sentry-sdk[fastapi] requirement from &lt;2,&gt;=1.45.1 to &gt;=2.58.0,&lt;3 in /langwatch_nlp ([#3723](https://github.com/langwatch/langwatch/issues/3723)) ([9f82808](https://github.com/langwatch/langwatch/commit/9f82808ab25d1996ccf72da5d0bba50e19ba8037))
+* **deps:** update sentry-sdk[fastapi] requirement in /langwatch_nlp ([9f82808](https://github.com/langwatch/langwatch/commit/9f82808ab25d1996ccf72da5d0bba50e19ba8037))
+* **evaluations-v3:** apply Phase 1 cull part 1/2 ([#3458](https://github.com/langwatch/langwatch/issues/3458)) ([#3681](https://github.com/langwatch/langwatch/issues/3681)) ([dacad6d](https://github.com/langwatch/langwatch/commit/dacad6df3ac180b0880c973b6c3bedfc1a2eaa01))
+* **evaluations-v3:** apply Phase 1 cull part 2/2 ([#3458](https://github.com/langwatch/langwatch/issues/3458)) ([#3682](https://github.com/langwatch/langwatch/issues/3682)) ([db70595](https://github.com/langwatch/langwatch/commit/db705952184f382992b90e6db92248fb28b998d2))
+* **licensing:** apply Phase 1 cull part 1/2 ([#3458](https://github.com/langwatch/langwatch/issues/3458)) ([#3688](https://github.com/langwatch/langwatch/issues/3688)) ([ef43710](https://github.com/langwatch/langwatch/commit/ef43710a176518c11cdbb17e6b6fe3ded433861e))
+* **licensing:** apply Phase 1 cull part 2/2 ([#3458](https://github.com/langwatch/langwatch/issues/3458)) ([#3689](https://github.com/langwatch/langwatch/issues/3689)) ([2df0b31](https://github.com/langwatch/langwatch/commit/2df0b313377c7766e4980b59de41908180effe06))
+* **model-config:** apply Phase 1 cull ([#3458](https://github.com/langwatch/langwatch/issues/3458)) ([#3474](https://github.com/langwatch/langwatch/issues/3474)) ([cb58d3e](https://github.com/langwatch/langwatch/commit/cb58d3ea64a87636ad3c3a535339f752a6cf524d))
+* **model-providers:** apply Phase 1 cull ([#3458](https://github.com/langwatch/langwatch/issues/3458)) ([#3475](https://github.com/langwatch/langwatch/issues/3475)) ([8144ea9](https://github.com/langwatch/langwatch/commit/8144ea9b8bc33699615a74b30cc0e4189f3543eb))
+* **prompts:** apply Phase 1 cull part 1/2 ([#3458](https://github.com/langwatch/langwatch/issues/3458)) ([#3690](https://github.com/langwatch/langwatch/issues/3690)) ([41ceb9e](https://github.com/langwatch/langwatch/commit/41ceb9e8342b401921df32b3ccf2e77c6f689cf7))
+* **prompts:** apply Phase 1 cull part 2/2 ([#3458](https://github.com/langwatch/langwatch/issues/3458)) ([#3691](https://github.com/langwatch/langwatch/issues/3691)) ([7cbaff6](https://github.com/langwatch/langwatch/commit/7cbaff658bb192a86fa77960c30affb7e08ea420))
+* **python-sdk:** single-footer shadow Release-As 0.23.0 ([1002978](https://github.com/langwatch/langwatch/commit/10029788f52d3c0640ac6fe7660f22f7916f941c))
+* remove leaked ${HOME/...} contracts directory ([#3752](https://github.com/langwatch/langwatch/issues/3752)) ([a4e110b](https://github.com/langwatch/langwatch/commit/a4e110b63c7c131fbf12d9d5c1701062729e6af7))
+* **scenarios:** apply Phase 1 cull part 1/2 ([#3458](https://github.com/langwatch/langwatch/issues/3458)) ([#3679](https://github.com/langwatch/langwatch/issues/3679)) ([9e0eb98](https://github.com/langwatch/langwatch/commit/9e0eb98eb11a0bf214968f5508bf51f70b8fe0d3))
+* **scenarios:** apply Phase 1 cull part 2/2 ([#3458](https://github.com/langwatch/langwatch/issues/3458)) ([#3680](https://github.com/langwatch/langwatch/issues/3680)) ([7c2eac8](https://github.com/langwatch/langwatch/commit/7c2eac8d8ae038f6531dbc79d8d29703b346f950))
+* **skills:** single-footer shadow Release-As 0.5.0 ([475f598](https://github.com/langwatch/langwatch/commit/475f598fcd0a2b9175ae021335a56568a6995894))
+* **studio:** bind 3 + cull 1 [@unimplemented](https://github.com/unimplemented) scenarios in studio ([#3458](https://github.com/langwatch/langwatch/issues/3458)) ([#3694](https://github.com/langwatch/langwatch/issues/3694)) ([f2fee09](https://github.com/langwatch/langwatch/commit/f2fee09d3c462ce3f8e4c08078caf274d8442ddc))
+* **suites:** apply Phase 1 cull ([#3458](https://github.com/langwatch/langwatch/issues/3458)) ([#3476](https://github.com/langwatch/langwatch/issues/3476)) ([5064d26](https://github.com/langwatch/langwatch/commit/5064d26b5faea53d88d0cbb47d178a2257739acc))
+
+
+### Code Refactoring
+
+* **backoffice:** impersonation reason field ([#3574](https://github.com/langwatch/langwatch/issues/3574)) ([b1997c8](https://github.com/langwatch/langwatch/commit/b1997c8ae4fac20f02901642da86fa8a115410ce))
+
 ## [3.2.1](https://github.com/langwatch/langwatch/compare/langwatch@v3.2.0...langwatch@v3.2.1) (2026-04-30)
 
 
