@@ -19,12 +19,29 @@ vi.mock("../../../utils/api", () => ({
 }));
 
 // Mock useFilterParams
+const mockUseFilterParams = vi.fn(() => ({
+  filterParams: {},
+  queryOpts: { enabled: true },
+  nonEmptyFilters: {},
+  setFilters: vi.fn(),
+}));
 vi.mock("../../../hooks/useFilterParams", () => ({
-  useFilterParams: () => ({
-    filterParams: {},
-    queryOpts: { enabled: true },
-    nonEmptyFilters: {},
-    setFilters: vi.fn(),
+  useFilterParams: () => mockUseFilterParams(),
+}));
+
+vi.mock("@tanstack/react-virtual", () => ({
+  useVirtualizer: ({ count }: { count: number }) => ({
+    getVirtualItems: () =>
+      Array.from({ length: count }, (_, i) => ({
+        index: i,
+        start: i * 36,
+        size: 36,
+        end: (i + 1) * 36,
+        key: i,
+        lane: 0,
+      })),
+    getTotalSize: () => count * 36,
+    measureElement: () => undefined,
   }),
 }));
 
@@ -157,3 +174,52 @@ describe("FieldsFilters", () => {
 // - Keyboard navigation (ArrowUp/Down) highlights options
 // - Enter key selects the highlighted option
 // - Custom value can be selected via click or keyboard
+
+// @regression #3749 — Checkbox onChange not fired in Chakra v3 (use onCheckedChange)
+describe("when the user clicks a filter option in the popover", () => {
+  beforeEach(() => {
+    mockUseQuery.mockReturnValue({
+      data: { options: mockFilterOptions },
+      isLoading: false,
+    });
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+  });
+
+  describe("given the user has opened a filter popover", () => {
+    describe("when they click an option", () => {
+      it("calls setFilters with the toggled value", async () => {
+        const user = userEvent.setup();
+        const setFilters = vi.fn();
+
+        renderComponent({
+          filters: {} as Record<FilterField, string[]>,
+          setFilters,
+        });
+
+        // Open the Label filter popover
+        const labelButton = screen.getByText("Label").closest("button");
+        expect(labelButton).toBeInTheDocument();
+        await user.click(labelButton!);
+
+        // The popover should now be open
+        expect(labelButton).toHaveAttribute("aria-expanded", "true");
+
+        // Click the "Production" option (field: "label-1")
+        const productionOption = screen.getByText("Production");
+        await user.click(productionOption);
+
+        // setFilters must have been called — this FAILS on the buggy code because
+        // Chakra v3 Checkbox.Root fires onCheckedChange, not onChange, so the
+        // click handler never executes.
+        expect(setFilters).toHaveBeenCalledOnce();
+        expect(setFilters).toHaveBeenCalledWith(
+          expect.objectContaining({ "metadata.labels": ["label-1"] }),
+        );
+      });
+    });
+  });
+});
