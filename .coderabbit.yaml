@@ -17,9 +17,8 @@ reviews:
   # Block obviously-broken paths from sneaking into the repo.
   # See PR #3752: a literal "${HOME/workspace/orchard-codex/contracts}"
   # directory leaked through #3476 because the default review didn't flag it.
-  path_filters:
-    - "!**/${*"   # any path segment starting with a literal "${"
-
+  # Note: path_filters can't exclude these — exclusion would skip the files
+  # entirely and path_instructions would never fire. Rely on the fail rule.
   path_instructions:
     - path: "**/*"
       instructions: |
