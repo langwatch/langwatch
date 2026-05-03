@@ -1,1 +1,0 @@
-export { QueuesContent } from "./QueuesContent";

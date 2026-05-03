@@ -2,6 +2,11 @@ import type {
   GroupInfo,
   QueueInfo,
   ErrorCluster,
+  QueueOverview,
+  PendingJobFilter,
+  PendingJobSort,
+  PendingJobSearchResult,
+  PendingJobDetail,
 } from "../types";
 
 export interface BlockedSummary {
@@ -126,6 +131,25 @@ export interface QueueRepository {
     pipelineFilter?: string;
     errorFilter?: string;
   }): Promise<DrainPreview>;
+
+  getQueueOverview(params: {
+    queueName: string;
+    sliceN?: number;
+  }): Promise<QueueOverview>;
+
+  searchPendingJobs(params: {
+    queueName: string;
+    filter: PendingJobFilter;
+    sort: PendingJobSort;
+    pageSize: number;
+    page: number;
+  }): Promise<PendingJobSearchResult>;
+
+  getPendingJobDetail(params: {
+    queueName: string;
+    groupId: string;
+    jobId: string;
+  }): Promise<PendingJobDetail | null>;
 }
 
 export class NullQueueRepository implements QueueRepository {
@@ -211,5 +235,47 @@ export class NullQueueRepository implements QueueRepository {
 
   async drainAllBlockedPreview(): Promise<DrainPreview> {
     return { totalAffected: 0, byPipeline: [], byError: [] };
+  }
+
+  async getQueueOverview(params: { queueName: string }): Promise<QueueOverview> {
+    return {
+      queueName: params.queueName,
+      generatedAtMs: Date.now(),
+      computedDurationMs: 0,
+      groupsScanned: 0,
+      totals: {
+        jobs: 0,
+        groups: 0,
+        ready: 0,
+        scheduled: 0,
+        retrying: 0,
+        active: 0,
+        blocked: 0,
+        stale: 0,
+        dlq: 0,
+      },
+      byPipeline: [],
+      byJobType: [],
+      byTenant: [],
+      byState: [],
+      oldestJobs: [],
+      youngestJobs: [],
+      mostOverduePerTenant: [],
+    };
+  }
+
+  async searchPendingJobs(): Promise<PendingJobSearchResult> {
+    return {
+      jobs: [],
+      totalMatching: 0,
+      scannedGroups: 0,
+      truncated: false,
+      generatedAtMs: Date.now(),
+      computedDurationMs: 0,
+    };
+  }
+
+  async getPendingJobDetail(): Promise<PendingJobDetail | null> {
+    return null;
   }
 }

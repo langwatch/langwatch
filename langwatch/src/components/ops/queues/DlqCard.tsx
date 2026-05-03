@@ -51,7 +51,7 @@ export function DlqCard({ queueNames }: { queueNames: string[] }) {
 
   return (
     <>
-      <Card.Root>
+      <Card.Root overflow="hidden">
         <Card.Body padding={0}>
           <HStack paddingX={4} paddingY={2.5} borderBottom="1px solid" borderBottomColor="border" gap={2} flexWrap="wrap">
             <Text textStyle="sm" fontWeight="medium" color="orange.500">
