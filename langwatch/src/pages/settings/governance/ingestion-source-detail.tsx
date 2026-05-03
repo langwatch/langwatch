@@ -171,7 +171,12 @@ function IngestionSourceDetailPage() {
   if (!source) {
     return (
       <SettingsLayout>
-        <Spinner size="sm" />
+        <EnterpriseLockedSurface
+          featureName="Ingestion Source detail"
+          description="Source-level health metrics and event drill-downs are part of the Enterprise plan."
+        >
+          <Spinner size="sm" />
+        </EnterpriseLockedSurface>
       </SettingsLayout>
     );
   }
