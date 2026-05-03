@@ -1343,7 +1343,7 @@ model AiToolCatalogEntry {
 
 Critical path: **P7-arch → P7-schema → P7-router (+ P7-vk-reuse, P7-rbac, P7-int-test) → P7-B1/B5 (portal shell + me/index embed) → P7-B3 (ModelProviderTile) → P7-B6 (admin route + list) → P7-B9 (wire-up) → P7-B10 (dogfood)**. **Phase 7 critical path CLEARED as of `25dea5fdd`** (P7-arch ✅ / P7-schema ✅ / P7-rbac ✅ / P7-router ✅ / P7-vk-reuse ✅ / P7-md-render ✅ via reuse / P7-int-test ✅ + 8/8 BDD specs ✅ + B1-B6 UI scaffolds ✅ + B7 admin drawer ✅ + B8 drag-reorder ✅ + B9 router-wire ✅ + B10 dogfood ✅ + docs scaffold ✅). Remaining items (B11 polish + B12 docs follow-up + P7-md-render reuse confirmation) are all non-blocking. **P7-starter-pack** stays deferred to v2.
 
-**Post-merge audit follow-up** (caught during B10 dogfood): the Vite migration killed Next.js Pages-router auto-discovery; `tool-catalog.tsx` 404'd until explicit registration was added in `routes.tsx` (`25dea5fdd`). Other governance sub-pages added since the migration may have the same gap — sweep `langwatch/src/pages/settings/governance/*.tsx` against `routes.tsx` post-merge. Known-OK as of B10: `anomaly-rules` + `ingestion-source-detail` (verified registered).
+**Post-merge audit follow-up CLEARED** (caught during B10 dogfood, swept by Alexis pre-B11): the Vite migration killed Next.js Pages-router auto-discovery; `tool-catalog.tsx` 404'd until explicit registration was added in `routes.tsx` (`25dea5fdd`). Audit sweep complete — all 4 governance subpages (`tool-catalog`, `anomaly-rules`, `ingestion-sources`, `ingestion-source-detail`) verified registered in `routes.tsx`. No further action required.
 
 #### BDD spec file list (8 files, 3 lane-S backend / 5 lane-B UX)
 
