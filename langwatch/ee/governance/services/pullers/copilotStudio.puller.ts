@@ -71,7 +71,7 @@ export const COPILOT_STUDIO_PULL_CONFIG: HttpPollingConfig = {
  * worker dispatches via the registry.
  */
 export class CopilotStudioReferencePuller extends HttpPollingPullerAdapter {
-  override readonly id = "copilot_studio";
+  override readonly id: string = "copilot_studio";
 
   /**
    * Override `validateConfig` to ignore caller-provided overrides

@@ -9,12 +9,14 @@
 import { CopilotStudioReferencePuller } from "./copilotStudio.puller";
 import { HttpPollingPullerAdapter } from "./httpPollingPullerAdapter";
 import { pullerAdapterRegistry } from "./pullerAdapter";
+import { S3PollingPullerAdapter } from "./s3PollingPullerAdapter";
 
 let registered = false;
 
 export function registerBuiltInPullers(): void {
   if (registered) return;
   pullerAdapterRegistry.register(new HttpPollingPullerAdapter());
+  pullerAdapterRegistry.register(new S3PollingPullerAdapter());
   pullerAdapterRegistry.register(new CopilotStudioReferencePuller());
   registered = true;
 }
@@ -22,11 +24,15 @@ export function registerBuiltInPullers(): void {
 export {
   CopilotStudioReferencePuller,
   HttpPollingPullerAdapter,
+  S3PollingPullerAdapter,
   pullerAdapterRegistry,
 };
 export type {
   HttpPollingConfig,
 } from "./httpPollingPullerAdapter";
+export type {
+  S3PollingConfig,
+} from "./s3PollingPullerAdapter";
 export type {
   NormalizedPullEvent,
   PullResult,
