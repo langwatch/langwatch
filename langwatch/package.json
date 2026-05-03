@@ -265,7 +265,7 @@
     "@biomejs/biome": "2.3.8",
     "@playwright/test": "^1.59.1",
     "@testcontainers/clickhouse": "^11.14.0",
-    "@testcontainers/redis": "^10.28.0",
+    "@testcontainers/redis": "^11.14.0",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.1",
