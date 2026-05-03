@@ -213,6 +213,18 @@ model Organization {
   /// this value, regardless of the underlying refresh-token TTL.
   /// Spec: specs/ai-governance/sessions/session-ttl.feature.
   maxSessionDurationDays Int                  @default(0)
+  /// Phase 9 — receiver-side gen_ai content stripping ("no-spy mode").
+  /// Values:
+  ///   "full"      (default) — store all content in CH (current behavior)
+  ///   "strip_io"  — drop gen_ai.prompt + gen_ai.completion + gen_ai.system_message
+  ///                 from gateway-origin spans BEFORE the CH write
+  ///   "strip_all" — strip_io + tool_call.arguments + tool_result.content
+  /// Forward-looking only: changes do not retroactively scrub historical
+  /// content; existing rows remain stored. Only applies to spans with
+  /// `langwatch.origin = "gateway"`; user-app traces are untouched so
+  /// customer-controlled data flows continue to work unchanged.
+  /// Spec: specs/ai-governance/no-spy-mode/no-spy-mode.feature.
+  governanceLogContentMode String              @default("full")
   signupData             Json?
   signedDPA              Boolean              @default(false)
   elasticsearchNodeUrl   String?

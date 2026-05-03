@@ -1,22 +1,28 @@
 /**
- * Org-scoped session policy — admin-tunable knobs that govern how long
- * CLI/device sessions stay alive. Read by `/exchange` to compute the
- * refresh-token TTL ceiling; written by the admin from the governance
- * settings page.
+ * Org-scoped governance policy — admin-tunable knobs flipped from
+ * `/settings/governance`:
  *
- * Field today: `maxSessionDurationDays` (0 = unbounded).
+ *   - `maxSessionDurationDays` (Phase 8): max lifetime of CLI/device
+ *     sessions before re-login is required. 0 = unbounded.
+ *   - `governanceLogContentMode` (Phase 9 "no-spy mode"): whether
+ *     gateway-emitted gen_ai prompt/completion/system-instruction
+ *     payloads land in ClickHouse. Values: full | strip_io | strip_all.
  *
- * Phase 9 will sibling-add `governanceLogContentMode` here once
- * Sergey's content-strip backend lands. Keeping the router scoped to
- * "things admins flip on the org" makes future additions cheap.
+ * Both surfaces share the same governance settings page and the same
+ * RBAC posture (`organization:view` to read, `organization:manage` to
+ * write), so co-location keeps the contract surface small without
+ * coupling the underlying Prisma fields.
  *
- * Spec: specs/ai-governance/sessions/personal-sessions.feature
- *       (Scenario: maxSessionDurationDays caps refresh-token TTL)
+ * Specs:
+ *   - specs/ai-governance/sessions/personal-sessions.feature
+ *   - specs/ai-governance/no-spy-mode/no-spy-mode.feature
  */
 import { z } from "zod";
 
 import { checkOrganizationPermission } from "~/server/api/rbac";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
+
+const contentModeSchema = z.enum(["full", "strip_io", "strip_all"]);
 
 export const sessionPolicyRouter = createTRPCRouter({
   get: protectedProcedure
@@ -25,10 +31,16 @@ export const sessionPolicyRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       const org = await ctx.prisma.organization.findUnique({
         where: { id: input.organizationId },
-        select: { maxSessionDurationDays: true },
+        select: {
+          maxSessionDurationDays: true,
+          governanceLogContentMode: true,
+        },
       });
       return {
         maxSessionDurationDays: org?.maxSessionDurationDays ?? 0,
+        contentMode: contentModeSchema.parse(
+          org?.governanceLogContentMode ?? "full",
+        ),
       };
     }),
 
@@ -48,6 +60,22 @@ export const sessionPolicyRouter = createTRPCRouter({
       await ctx.prisma.organization.update({
         where: { id: input.organizationId },
         data: { maxSessionDurationDays: input.maxSessionDurationDays },
+      });
+      return { ok: true };
+    }),
+
+  setContentMode: protectedProcedure
+    .input(
+      z.object({
+        organizationId: z.string(),
+        contentMode: contentModeSchema,
+      }),
+    )
+    .use(checkOrganizationPermission("organization:manage"))
+    .mutation(async ({ ctx, input }) => {
+      await ctx.prisma.organization.update({
+        where: { id: input.organizationId },
+        data: { governanceLogContentMode: input.contentMode },
       });
       return { ok: true };
     }),
