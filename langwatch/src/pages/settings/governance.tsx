@@ -281,6 +281,8 @@ function GovernanceOverviewPage() {
 
         <SessionPolicySection organizationId={orgId} />
 
+        <ContentModeSection organizationId={orgId} />
+
         <SectionCard
           title="By user"
           subline="Spend and activity per LangWatch member, last 30 days."
@@ -391,6 +393,113 @@ function SessionPolicySection({ organizationId }: { organizationId: string }) {
             Enter an integer between 0 and 365.
           </Text>
         )}
+      </VStack>
+    </SectionCard>
+  );
+}
+
+type ContentMode = "full" | "strip_io" | "strip_all";
+
+const CONTENT_MODE_COPY: Record<ContentMode, { title: string; helper: string }> = {
+  full: {
+    title: "Full",
+    helper:
+      "Default. Every gen_ai prompt, completion, and system message lands in ClickHouse. Use this if you need to inspect or debug LLM payloads.",
+  },
+  strip_io: {
+    title: "Strip prompts & completions",
+    helper:
+      "Drop user prompts and assistant completions before write — keep tokens, cost, model name, latency, and span shape intact for cost & ops dashboards. System messages still flow.",
+  },
+  strip_all: {
+    title: "Strip everything (no-spy)",
+    helper:
+      "Drop prompts, completions, AND system instructions. ClickHouse only sees metadata: tokens, cost, model, latency, and span structure. Strongest privacy posture; no LLM-content debugging from observability data.",
+  },
+};
+
+function ContentModeSection({ organizationId }: { organizationId: string }) {
+  const policyQuery = api.sessionPolicy.get.useQuery(
+    { organizationId },
+    { enabled: !!organizationId, refetchOnWindowFocus: false },
+  );
+  const utils = api.useUtils();
+  const setMutation = api.sessionPolicy.setContentMode.useMutation({
+    onSuccess: () => {
+      void utils.sessionPolicy.get.invalidate({ organizationId });
+      toaster.create({ title: "Content mode saved", type: "success" });
+    },
+    onError: (err) => {
+      toaster.create({
+        title: "Failed to save",
+        description: err.message,
+        type: "error",
+      });
+    },
+  });
+
+  const persisted: ContentMode = policyQuery.data?.contentMode ?? "full";
+
+  return (
+    <SectionCard
+      title="Content logging mode (no-spy)"
+      subline="Controls whether gen_ai prompt/completion/system payloads from gateway-origin spans are persisted to ClickHouse. The receiver strips before write — content never lands at rest, even briefly."
+    >
+      <VStack align="stretch" gap={2}>
+        {(Object.keys(CONTENT_MODE_COPY) as ContentMode[]).map((mode) => {
+          const copy = CONTENT_MODE_COPY[mode];
+          const isActive = persisted === mode;
+          const isPending = setMutation.isPending && setMutation.variables?.contentMode === mode;
+          return (
+            <Box
+              key={mode}
+              borderWidth="1px"
+              borderColor={isActive ? "orange.300" : "border.muted"}
+              backgroundColor={isActive ? "orange.50" : "transparent"}
+              borderRadius="sm"
+              padding={3}
+              cursor={isActive || isPending ? "default" : "pointer"}
+              opacity={isPending ? 0.6 : 1}
+              onClick={() => {
+                if (isActive || isPending || !organizationId) return;
+                setMutation.mutate({ organizationId, contentMode: mode });
+              }}
+            >
+              <HStack align="start" gap={3}>
+                <Box
+                  width="14px"
+                  height="14px"
+                  borderRadius="full"
+                  borderWidth="1px"
+                  borderColor={isActive ? "orange.500" : "border.emphasis"}
+                  backgroundColor={isActive ? "orange.500" : "transparent"}
+                  flexShrink={0}
+                  marginTop={1}
+                />
+                <VStack align="start" gap={0} flex={1}>
+                  <HStack gap={2}>
+                    <Text fontSize="sm" fontWeight={isActive ? "semibold" : "medium"}>
+                      {copy.title}
+                    </Text>
+                    {isActive && (
+                      <Badge variant="surface" colorPalette="orange" size="sm">
+                        active
+                      </Badge>
+                    )}
+                  </HStack>
+                  <Text fontSize="xs" color="fg.muted">
+                    {copy.helper}
+                  </Text>
+                </VStack>
+              </HStack>
+            </Box>
+          );
+        })}
+        <Text fontSize="xs" color="fg.muted">
+          Mode flips apply to new spans only. Spans already in ClickHouse are
+          NOT retroactively scrubbed — change before the data starts flowing
+          if you need a guarantee.
+        </Text>
       </VStack>
     </SectionCard>
   );
