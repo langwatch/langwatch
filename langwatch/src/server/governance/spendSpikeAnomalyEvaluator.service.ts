@@ -32,9 +32,11 @@
  */
 import type { ClickHouseClient } from "@clickhouse/client";
 import type { AnomalyRule, PrismaClient } from "@prisma/client";
+import type { Prisma } from "@prisma/client";
 
 import { getClickHouseClientForOrganization } from "~/server/clickhouse/clickhouseClient";
 import { createLogger } from "~/utils/logger/server";
+import { AnomalyAlertDispatcherService } from "./activity-monitor/anomalyAlertDispatcher.service";
 import { safeParseSpendSpikeThresholdConfig } from "./activity-monitor/thresholdConfig.schema";
 import { PROJECT_KIND } from "./governanceProject.service";
 
@@ -134,7 +136,10 @@ export function evaluateSpendSpike(input: {
  * the alert row when the pure evaluator says fire.
  */
 export class SpendSpikeAnomalyEvaluator {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(
+    private readonly prisma: PrismaClient,
+    private readonly dispatcher: AnomalyAlertDispatcherService = AnomalyAlertDispatcherService.create(),
+  ) {}
 
   static create(prisma: PrismaClient): SpendSpikeAnomalyEvaluator {
     return new SpendSpikeAnomalyEvaluator(prisma);
@@ -343,7 +348,11 @@ export class SpendSpikeAnomalyEvaluator {
     rule: AnomalyRule,
     result: SpendSpikeEvaluationResult,
   ): Promise<void> {
-    await this.prisma.anomalyAlert.create({
+    // Persist the alert FIRST so the authoritative signal lands
+    // regardless of dispatch outcome. Dispatch is best-effort
+    // observability layered on top — see C3 contract:
+    // specs/ai-gateway/governance/c3-alert-dispatch.feature.
+    const alert = await this.prisma.anomalyAlert.create({
       data: {
         organizationId: rule.organizationId,
         ruleId: rule.id,
@@ -359,7 +368,11 @@ export class SpendSpikeAnomalyEvaluator {
           windowSec:
             (result.windowEnd.getTime() - result.windowStart.getTime()) / 1000,
           reason: result.reason,
-          dispatch: "log_only",
+          // Filled in by the dispatch step below; kept as a
+          // placeholder so partial reads (e.g. concurrent dashboard
+          // queries between persist + dispatch) see something
+          // sensible instead of the field being absent.
+          dispatch: "pending",
         },
         state: "open",
       },
@@ -373,6 +386,41 @@ export class SpendSpikeAnomalyEvaluator {
       },
       "spend_spike anomaly fired",
     );
+
+    // Dispatch fan-out (C3). Failures here are logged + recorded in
+    // the alert's detail.dispatch but never propagate up — the
+    // evaluator stays log-only-equivalent on permanent webhook
+    // failures.
+    let dispatchTag = "log_only";
+    let dispatchOutcomes: Prisma.InputJsonValue = [];
+    try {
+      const dispatchResult = await this.dispatcher.dispatchAlert({ rule, alert });
+      dispatchTag = dispatchResult.dispatchTag;
+      dispatchOutcomes = dispatchResult.outcomes as unknown as Prisma.InputJsonValue;
+    } catch (err) {
+      logger.error(
+        {
+          ruleId: rule.id,
+          alertId: alert.id,
+          error: err instanceof Error ? err.message : String(err),
+        },
+        "anomaly alert dispatcher threw unexpectedly — alert is persisted, dispatch state recorded as failed",
+      );
+      dispatchTag = "failed_dispatcher_error";
+    }
+
+    // Patch the alert detail with the dispatch result so the dashboard
+    // / audit trail reflects the actual outcome.
+    await this.prisma.anomalyAlert.update({
+      where: { id: alert.id },
+      data: {
+        detail: {
+          ...(alert.detail as Record<string, unknown>),
+          dispatch: dispatchTag,
+          dispatchOutcomes,
+        },
+      },
+    });
   }
 }
 

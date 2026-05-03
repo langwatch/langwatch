@@ -11,6 +11,7 @@
  */
 import type { AnomalyRule, Prisma, PrismaClient } from "@prisma/client";
 
+import { validateDestinationConfig } from "./destinationConfig.schema";
 import { validateThresholdConfig } from "./thresholdConfig.schema";
 
 export type RuleSeverity = "critical" | "warning" | "info";
@@ -100,6 +101,14 @@ export class AnomalyRuleService {
       ruleType: input.ruleType,
       config: input.thresholdConfig ?? {},
     });
+    // Strict destinationConfig validation (Phase 2C C3 dispatch). Empty
+    // / undefined config is allowed — that's explicit log-only opt-out.
+    if (
+      input.destinationConfig !== undefined &&
+      Object.keys(input.destinationConfig).length > 0
+    ) {
+      validateDestinationConfig(input.destinationConfig);
+    }
     return this.prisma.anomalyRule.create({
       data: {
         organizationId: input.organizationId,
@@ -166,6 +175,12 @@ export class AnomalyRuleService {
       });
     }
     if (input.destinationConfig !== undefined) {
+      // Same allow-empty rule as create: empty `{}` clears destinations
+      // (back to log-only). Anything non-empty must round-trip the
+      // strict schema.
+      if (Object.keys(input.destinationConfig).length > 0) {
+        validateDestinationConfig(input.destinationConfig);
+      }
       data.destinationConfig =
         input.destinationConfig as Prisma.InputJsonValue;
     }

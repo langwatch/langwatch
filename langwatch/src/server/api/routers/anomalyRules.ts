@@ -47,10 +47,21 @@ const enterpriseGate = requireEnterprisePlan(
  */
 function translateConfigValidationError(err: unknown, ruleType?: string): never {
   if (err instanceof z.ZodError) {
+    // Detect which config the issues belong to so the error message
+    // points the admin at the right field. Both threshold-config and
+    // destination-config (Phase 2C C3) validation produce ZodError;
+    // the issue paths disambiguate (`destinations[*]` for the dispatch
+    // schema, scalar field names for threshold).
+    const isDestinationConfig = err.issues.some((i) =>
+      i.path.some((p) => p === "destinations"),
+    );
+    const configName = isDestinationConfig
+      ? "destinationConfig"
+      : "thresholdConfig";
     throw new TRPCError({
       code: "BAD_REQUEST",
-      message: `Invalid thresholdConfig${
-        ruleType ? ` for ${ruleType}` : ""
+      message: `Invalid ${configName}${
+        !isDestinationConfig && ruleType ? ` for ${ruleType}` : ""
       }: ${err.issues.map((i) => i.message).join("; ")}`,
       cause: err,
     });
