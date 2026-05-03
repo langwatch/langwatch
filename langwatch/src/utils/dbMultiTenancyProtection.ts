@@ -146,6 +146,16 @@ const EXEMPT_MODELS = [
    * organizationId before any mutation.
    */
   "AnomalyAlert",
+  /**
+   * AiToolEntry (iter governance-platform / Phase 7) is the org-scoped
+   * AI Tools Portal catalog. Entries can be scoped to organization or
+   * team via (scope, scopeId) but never carry a projectId — the portal
+   * surfaces tools at the org tier (cross-project / cross-team
+   * organization-default surface). Service layer authorises by
+   * organizationId membership before any mutation; team-scoped entries
+   * are authorised via TeamUser membership at read time.
+   */
+  "AiToolEntry",
 ];
 
 const _guardProjectId = ({ params }: { params: Prisma.MiddlewareParams }) => {

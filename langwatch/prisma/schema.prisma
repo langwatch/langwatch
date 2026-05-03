@@ -242,6 +242,7 @@ model Organization {
   ingestionSources       IngestionSource[]
   anomalyRules           AnomalyRule[]
   anomalyAlerts          AnomalyAlert[]
+  aiToolEntries          AiToolEntry[]
 
   @@index([ssoProvider])
 }
@@ -1904,6 +1905,74 @@ model AnomalyAlert {
   @@index([organizationId, detectedAt])
   @@index([ruleId])
   @@index([state])
+}
+
+/// Org-scoped catalog of AI tools surfaced on the personal home portal
+/// (/me) and managed by org admins at /settings/governance/tool-catalog.
+///
+/// Three first-class tile types via `type` discriminator:
+///   - "coding_assistant" — click expands to setup helper (e.g. `langwatch claude`)
+///   - "model_provider"   — click expands to inline personal-VK creation
+///   - "external_tool"    — click expands to admin-attached markdown + external link
+///
+/// Scoping: organization-default entries can be OVERRIDDEN at the team
+/// tier (same `slug` + `scope=team` + matching `scopeId`) so admins can
+/// hide or re-skin a globally-listed tool for a specific team. The
+/// user-facing `list` endpoint resolves this hierarchy at read time.
+///
+/// `config` is a discriminated JSON union per `type`:
+///   coding_assistant: { setupCommand, setupDocsUrl, helperText? }
+///   model_provider:   { providerKey, suggestedRoutingPolicyId?, defaultLabel?, projectSuggestionText? }
+///   external_tool:    { descriptionMarkdown, linkUrl, ctaLabel? }
+///
+/// Spec: specs/ai-governance/personal-portal/tool-catalog-*.feature
+model AiToolEntry {
+  id             String       @id @default(nanoid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  /// "organization" | "team". String not enum so new scopes ship
+  /// without migrations.
+  scope   String
+  /// organizationId or teamId, narrowing what scope this entry applies
+  /// to. Always equals organizationId when scope=organization.
+  scopeId String
+
+  /// "coding_assistant" | "model_provider" | "external_tool".
+  /// Discriminator drives the per-tile UX shape and validates
+  /// the `config` JSON column at the app layer.
+  type String
+
+  displayName String
+
+  /// Stable slug for icon lookup + team-overrides-org resolution
+  /// (a team-scoped entry with the same slug as an org-scoped one
+  /// hides the org default for users in that team).
+  slug    String
+  iconKey String?
+
+  /// Admin-curated sort within the user-facing portal grid.
+  order Int @default(0)
+
+  /// When false the entry is hidden from the user-facing list but
+  /// remains in the admin list (so admins can re-enable without
+  /// losing per-entry config). Disabled is "soft-hide", archived is
+  /// "soft-delete" (preserves audit trail + scope binding history).
+  enabled Boolean @default(true)
+
+  /// Per-type config JSON. Validated via zod discriminated union
+  /// at the service layer (see AiToolEntryService).
+  config Json @default("{}")
+
+  archivedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @default(now()) @updatedAt
+  createdById String?
+  updatedById String?
+
+  @@index([organizationId, scope, scopeId])
+  @@index([organizationId, enabled, archivedAt])
+  @@index([organizationId, type])
 }
 
 model GatewayProviderCredential {

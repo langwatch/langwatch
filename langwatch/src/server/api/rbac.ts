@@ -81,6 +81,13 @@ export const Resources = {
   ANOMALY_RULES: "anomalyRules",
   COMPLIANCE_EXPORT: "complianceExport",
   ACTIVITY_MONITOR: "activityMonitor",
+  // AI Tools Portal (Phase 7) — the customizable per-org card grid on
+  // /me. Two permissions:
+  //   - aiTools:view → ALL org roles. Portal must work for every member
+  //     so they can discover what's available + click through to setup.
+  //   - aiTools:manage → org ADMIN only. Catalog editor surface at
+  //     /settings/governance/tool-catalog (CRUD + reorder + enable).
+  AI_TOOLS: "aiTools",
 } as const;
 
 export type Resource = (typeof Resources)[keyof typeof Resources];
@@ -327,9 +334,15 @@ const ORGANIZATION_ROLE_PERMISSIONS: Record<
     "anomalyRules:manage",
     "complianceExport:view",
     "activityMonitor:view",
+    // AI Tools Portal — admin owns the catalog. View is implicit via
+    // the org-wide grant below (admins also see the user-facing portal).
+    "aiTools:view",
+    "aiTools:manage",
   ],
-  [OrganizationUserRole.MEMBER]: ["organization:view"],
-  [OrganizationUserRole.EXTERNAL]: ["organization:view"], // Limited view for Lite Member users
+  // MEMBER + EXTERNAL get aiTools:view so the /me portal renders for
+  // every org member. Catalog management stays admin-only.
+  [OrganizationUserRole.MEMBER]: ["organization:view", "aiTools:view"],
+  [OrganizationUserRole.EXTERNAL]: ["organization:view", "aiTools:view"],
 };
 
 /**

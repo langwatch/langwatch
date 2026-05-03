@@ -30,6 +30,9 @@ export const orderedResources: Resource[] = [
   Resources.ANOMALY_RULES,
   Resources.COMPLIANCE_EXPORT,
   Resources.ACTIVITY_MONITOR,
+  // AI Tools Portal (Phase 7) — view defaults to all org roles, manage
+  // is admin-only. Custom roles can grant manage to scoped editors.
+  Resources.AI_TOOLS,
   // Resources.PLAYGROUND, // Hidden intentionally
 ];
 
