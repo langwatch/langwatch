@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.27.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v0.27.0...typescript-sdk@v0.27.0) (2026-05-03)
+
+
+### Bug Fixes
+
+* **deps:** upgrade langchain and @langchain/core in TS SDK examples ([#3704](https://github.com/langwatch/langwatch/issues/3704)) ([ba3843a](https://github.com/langwatch/langwatch/commit/ba3843ae506a4c8fafee9f591af2d462584dad2a))
+* **release:** path-routed Release-As shadows for 6 polluted components ([#3627](https://github.com/langwatch/langwatch/issues/3627)) ([b39d59e](https://github.com/langwatch/langwatch/commit/b39d59e87ed6d87224d580271175650c1d4159a7))
+* **release:** scope Release-As to langwatch, restore other components ([#3618](https://github.com/langwatch/langwatch/issues/3618)) ([e259e79](https://github.com/langwatch/langwatch/commit/e259e796b50e4d060e5c7f42cad1927f1da8a83d))
+
+
+### Miscellaneous
+
+* **deps-dev:** bump @typescript/native-preview from 7.0.0-dev.20250804.1 to 7.0.0-dev.20260426.1 in /typescript-sdk ([#3505](https://github.com/langwatch/langwatch/issues/3505)) ([e21487a](https://github.com/langwatch/langwatch/commit/e21487a13e89f7b3ce393bb6171a24eb60e4ceeb))
+* **deps-dev:** bump @typescript/native-preview in /typescript-sdk ([e21487a](https://github.com/langwatch/langwatch/commit/e21487a13e89f7b3ce393bb6171a24eb60e4ceeb))
+* **deps:** bump @opentelemetry/exporter-logs-otlp-http ([a0f7b43](https://github.com/langwatch/langwatch/commit/a0f7b43ae07e3b0bbae87bd56345bec348074681))
+* **deps:** bump @opentelemetry/exporter-logs-otlp-http from 0.205.0 to 0.216.0 in /typescript-sdk ([#3495](https://github.com/langwatch/langwatch/issues/3495)) ([a0f7b43](https://github.com/langwatch/langwatch/commit/a0f7b43ae07e3b0bbae87bd56345bec348074681))
+* **deps:** bump the npm_and_yarn group across 1 directory with 4 updates ([#3609](https://github.com/langwatch/langwatch/issues/3609)) ([8c609a8](https://github.com/langwatch/langwatch/commit/8c609a899b884534a9fe6914aed250381547f824))
+* release as 3.2.1 ([ca9d7a9](https://github.com/langwatch/langwatch/commit/ca9d7a9231a7b3d9d8cf9a28a48fa494b1daeb4b))
+* release as 3.2.1 (override release-please from 3.3.0) ([#3615](https://github.com/langwatch/langwatch/issues/3615)) ([ca9d7a9](https://github.com/langwatch/langwatch/commit/ca9d7a9231a7b3d9d8cf9a28a48fa494b1daeb4b))
+* scope Release-As to langwatch, restore other components ([e259e79](https://github.com/langwatch/langwatch/commit/e259e796b50e4d060e5c7f42cad1927f1da8a83d))
+* **typescript-sdk:** single-footer shadow Release-As 0.27.0 ([a48b3eb](https://github.com/langwatch/langwatch/commit/a48b3eb2cdf7d355b56136a11f5092484b7ab169))
+
 ## [0.27.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v0.26.0...typescript-sdk@v0.27.0) (2026-04-30)
 
 
