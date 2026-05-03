@@ -1835,7 +1835,7 @@ requires-dist = [
 provides-extras = ["langchain", "dspy", "litellm", "dev", "tests"]
 
 [package.metadata.requires-dev]
-dev = [{ name = "black", specifier = ">=25.1.0" }]
+dev = [{ name = "black", specifier = ">=26.3.1" }]
 examples = [
     { name = "anthropic", specifier = ">=0.36.0,<0.37.0" },
     { name = "chainlit", specifier = ">=2.8.3,<3" },
