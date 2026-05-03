@@ -12,6 +12,7 @@ import Head from "~/utils/compat/next-head";
 
 import { LoadingScreen } from "~/components/LoadingScreen";
 import { NotFoundScene } from "~/components/NotFoundScene";
+import { AiToolsPortal } from "~/components/me/AiToolsPortal";
 import { BudgetExceededBanner } from "~/components/me/BudgetExceededBanner";
 import MyLayout from "~/components/me/MyLayout";
 import { usePersonalContext } from "~/components/me/usePersonalContext";
@@ -67,9 +68,20 @@ export default function MyUsagePage() {
       </Head>
 
       <VStack align="stretch" gap={6} width="full">
-        <HStack alignItems="end">
+        <VStack align="stretch" gap={3}>
+          <Heading as="h2" size="lg">
+            Your AI tools
+          </Heading>
+          <Text color="fg.muted" fontSize="sm">
+            Pick a tool to get started, or issue a virtual key for your own
+            integrations.
+          </Text>
+          <AiToolsPortal />
+        </VStack>
+
+        <HStack alignItems="end" paddingTop={4}>
           <VStack align="start" gap={0}>
-            <Heading as="h2" size="lg">
+            <Heading as="h3" size="md">
               My Usage
             </Heading>
             <Text color="fg.muted" fontSize="sm">
