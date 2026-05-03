@@ -181,6 +181,32 @@ export const aiToolsRouter = createTRPCRouter({
       });
     }),
 
+  /**
+   * Single-purpose enable/disable shorthand. Equivalent to calling
+   * `update({ id, enabled })` but exists as its own procedure so the
+   * admin catalog editor's per-row toggle has a clean intent-named
+   * mutation (matches the BDD spec contract — see
+   * specs/ai-governance/personal-portal/admin-catalog-editor.feature).
+   */
+  setEnabled: protectedProcedure
+    .input(
+      z.object({
+        organizationId: z.string(),
+        id: z.string(),
+        enabled: z.boolean(),
+      }),
+    )
+    .use(checkOrganizationPermission("aiTools:manage"))
+    .mutation(async ({ ctx, input }) => {
+      const service = AiToolEntryService.create(ctx.prisma);
+      return await service.update({
+        id: input.id,
+        organizationId: input.organizationId,
+        enabled: input.enabled,
+        actorUserId: ctx.session.user.id,
+      });
+    }),
+
   reorder: protectedProcedure
     .input(
       z.object({
