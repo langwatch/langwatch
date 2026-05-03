@@ -204,17 +204,17 @@ const routes: RouteObject[] = [
   },
   {
     path: "/settings/governance/ingestion-sources",
-    ...page(() => import("./pages/settings/governance/ingestion-sources")),
+    ...page(() => import("@ee/governance/dashboard/pages/ingestion-sources")),
   },
   {
     path: "/settings/governance/ingestion-sources/:id",
     ...page(() =>
-      import("./pages/settings/governance/ingestion-source-detail"),
+      import("@ee/governance/dashboard/pages/ingestion-source-detail"),
     ),
   },
   {
     path: "/settings/governance/anomaly-rules",
-    ...page(() => import("./pages/settings/governance/anomaly-rules")),
+    ...page(() => import("@ee/governance/dashboard/pages/anomaly-rules")),
   },
   {
     path: "/settings/governance/tool-catalog",
