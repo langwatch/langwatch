@@ -1,0 +1,90 @@
+---
+title: Workato
+description: Webhook receiver works (envelope-only). Audit-shape parser is pending.
+sidebarTitle: Workato
+---
+
+<Info>**Pairs with:** [Ingestion Sources index](/ai-governance/ingestion-sources/index). Webhook envelope shape is shared with [`s3_custom`](/ai-governance/ingestion-sources/s3-custom) callback mode.</Info>
+
+Workato pushes job-completed webhooks. The receiver is wired and persists each delivery as a single envelope event; the parser that turns Workato's recipe / job / connection events into precise Actor / Action / Target fields is the next step on the [adapter roadmap](/ai-governance/ingestion-sources/index#adapter-roadmap).
+
+## Currently implemented
+
+- **Receiver:** `POST /api/ingest/webhook/:sourceId`.
+- **Auth:** `Authorization: Bearer lw_is_<secret>`.
+- **Body:** any JSON payload (Workato's exact webhook envelope).
+- **Persistence:** one governance event per delivery, with `eventType: agent.action`, `actor`/`target` empty, and the verbatim payload in `rawPayload`. The CLI tail will show one row per Workato webhook hit and the per-source detail page will let you expand the row to see the raw envelope.
+- **Status flip:** flips `awaiting_first_event` → `active` after the first webhook is received.
+
+## What the admin configures upstream
+
+The composer collects:
+
+| Field | Required | Stored |
+|---|---|---|
+| Last 4 chars of the shared HMAC secret | yes | `IngestionSource.payloadConfig.sharedSecretLastFour` — purely cosmetic; helps the admin visually confirm which secret is configured upstream |
+
+The one-time-reveal modal exposes:
+
+| Field | Value |
+|---|---|
+| Webhook URL | `https://<your-langwatch>/api/ingest/webhook/<sourceId>` |
+| Bearer secret | `lw_is_<base64url>` |
+
+In Workato: **Connection Profile → Webhook destination**, paste the webhook URL and add an `Authorization: Bearer lw_is_<secret>` header. Save.
+
+## Event shape we accept today
+
+```json
+{
+  "tenantId": "<sourceId>",
+  "sourceType": "workato",
+  "sourceId": "<sourceId>",
+  "eventId": "envelope-<unix-ms>-<random8>",
+  "eventType": "agent.action",
+  "actor": "",
+  "action": "",
+  "target": "",
+  "costUsd": "0",
+  "tokensInput": 0,
+  "tokensOutput": 0,
+  "rawPayload": "<verbatim webhook body>",
+  "eventTimestamp": "<server receive time>"
+}
+```
+
+So the CLI tail row will look like:
+
+```text
+2026-04-27T08:00:00.000Z  agent.action   →
+```
+
+(empty `action → target` because the webhook envelope hasn't been parsed yet — the data is in `rawPayload`).
+
+## What is still envelope-only / follow-up work
+
+- **Recipe / job / connection event mapping.** Workato has a stable JSON envelope (`event`, `recipe_id`, `connection_id`, `data` blob). A Workato-specific normaliser will:
+  - Map `event` to `eventType` (e.g. `recipe.success` → `api.call`, `connection.error` → `auth.action`).
+  - Pull `recipe_id` / `connection_id` into `target`.
+  - Pull the trigger user / connection account into `actor`.
+- **HMAC signature verification.** Workato signs every webhook with the shared secret (HMAC-SHA256 in the `X-Workato-Signature` header). The receiver currently authenticates via the bearer secret but does NOT additionally verify the HMAC. This is fine for the foundation slice (bearer secret is unguessable) but the HMAC verify is on the roadmap as defence-in-depth.
+- **Per-event timestamp.** Today's persistence stamps `eventTimestamp` to server receive time. Once the audit-shape parser lands, it'll honour Workato's own `timestamp` field so historical replays land at the right time.
+
+## Verify with CLI + web
+
+```bash
+langwatch ingest tail <sourceId> --follow
+```
+
+Hit a Workato recipe that's connected to the webhook — you should see one event row appear within ~3 s of the recipe completing. The per-source detail page at `/settings/governance/ingestion-sources/<sourceId>` will show the same row; click to expand and inspect `rawPayload` to confirm Workato's envelope shape matches what you expect.
+
+If you want to dry-run without a Workato recipe:
+
+```bash
+curl -X POST https://<your-langwatch>/api/ingest/webhook/<sourceId> \
+  -H "Authorization: Bearer lw_is_<secret>" \
+  -H "Content-Type: application/json" \
+  -d '{"event":"recipe.success","recipe_id":42,"timestamp":"2026-04-27T08:00:00Z"}'
+```
+
+The receiver returns `202 Accepted` with `{accepted, bytes, eventId}`. The source's status flips to `active` and `langwatch ingest tail` picks up the row.

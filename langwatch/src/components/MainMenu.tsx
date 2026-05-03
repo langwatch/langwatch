@@ -3,6 +3,7 @@ import type { Project } from "@prisma/client";
 import {
   Activity,
   Anvil,
+  Eye,
   Film,
   Gauge,
   History,
@@ -63,6 +64,21 @@ export const MainMenu = React.memo(function MainMenu({
     "release_ui_ai_gateway_menu_enabled",
     { projectId: project?.id, enabled: !!project },
   );
+
+  // Governance section is gated on:
+  //   (a) the user holds `governance:view` permission, AND
+  //   (b) the `release_ui_ai_governance_enabled` flag is on
+  // No additional gating on hasIngestionSources / hasPersonalVKs / etc.
+  // Admins must see Govern to bootstrap their first IngestionSource —
+  // gating on data presence creates a chicken-and-egg discoverability
+  // trap. The feature flag is the operator's rollout knob.
+  // Spec: specs/ai-gateway/governance/persona-aware-chrome.feature
+  const { enabled: governancePreviewEnabled } = useFeatureFlag(
+    "release_ui_ai_governance_enabled",
+    { projectId: project?.id, enabled: !!project },
+  );
+  const showGovernanceEntry =
+    governancePreviewEnabled && hasPermission("governance:view");
 
   // In compact mode, show expanded view on hover
   const showExpanded = !isCompact || isHovered;
@@ -293,6 +309,49 @@ export const MainMenu = React.memo(function MainMenu({
               isActive={router.pathname.includes("/datasets")}
               showLabel={showExpanded}
             />
+
+            {showGovernanceEntry && (
+              <>
+                <HStack
+                  paddingX={2}
+                  paddingTop={3}
+                  paddingBottom={1}
+                  gap={1}
+                  align="center"
+                >
+                  <Text
+                    fontSize="11px"
+                    fontWeight="medium"
+                    textTransform="uppercase"
+                    color="gray.500"
+                  >
+                    {showExpanded ? "Govern" : <div>&nbsp;</div>}
+                  </Text>
+                  {showExpanded && (
+                    <Badge
+                      colorPalette="purple"
+                      variant="subtle"
+                      fontSize="2xs"
+                      paddingX={1.5}
+                      lineHeight={1.2}
+                    >
+                      Preview
+                    </Badge>
+                  )}
+                </HStack>
+                <SideMenuLink
+                  icon={Eye}
+                  label="Governance"
+                  href="/governance"
+                  isActive={
+                    router.pathname === "/governance" ||
+                    router.pathname === "/settings/governance" ||
+                    router.pathname.startsWith("/settings/governance/")
+                  }
+                  showLabel={showExpanded}
+                />
+              </>
+            )}
 
             {gatewayMenuEnabled && hasPermission("virtualKeys:view") && project && (
               <>

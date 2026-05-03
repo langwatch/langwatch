@@ -1,8 +1,12 @@
 import type { PrismaClient, User } from "@prisma/client";
 import { revokeAllSessionsForUser } from "../better-auth/revokeSessions";
+import { CliTokenRevocationService } from "../governance/cliTokenRevocation.service";
 
 export class UserService {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(
+    private readonly prisma: PrismaClient,
+    private readonly cliTokenRevocation: CliTokenRevocationService = CliTokenRevocationService.create(),
+  ) {}
 
   static create(prisma: PrismaClient): UserService {
     return new UserService(prisma);
@@ -87,16 +91,23 @@ export class UserService {
   }
 
   /**
-   * Deactivate a user AND force-logout all their existing sessions.
+   * Deactivate a user AND force-logout all their existing sessions
+   * (browser AND CLI).
    *
-   * The session revocation is critical: BetterAuth caches sessions in
-   * Redis and reads from cache before falling back to the DB, so a
-   * `deactivatedAt` update alone is invisible to ongoing sessions for
-   * up to 30 days. Every deactivation path (tRPC, SCIM webhook, SCIM
-   * provisioning sync) routes through here so they all benefit from the
-   * cache invalidation. See `src/server/better-auth/revokeSessions.ts`
-   * for the underlying mechanism and iter-24 progress notes for the
-   * full bug history.
+   * Browser revocation: BetterAuth caches sessions in Redis and reads
+   * from cache before falling back to the DB, so a `deactivatedAt`
+   * update alone is invisible to ongoing sessions for up to 30 days.
+   * Every deactivation path (tRPC, SCIM webhook, SCIM provisioning
+   * sync) routes through here so they all benefit from the cache
+   * invalidation. See `src/server/better-auth/revokeSessions.ts`.
+   *
+   * CLI revocation: device-flow access + refresh tokens live in Redis
+   * under `lwcli:access:*` / `lwcli:refresh:*` independently of
+   * BetterAuth (minted by `/api/auth/cli/exchange`). Without this call
+   * a deactivated user's CLI tokens would continue to authenticate
+   * against the control plane until their TTLs expired (1h access /
+   * 30d refresh). Spec:
+   * specs/ai-gateway/cli-token-revoke-on-deactivation.feature.
    */
   async deactivate({ id }: { id: string }): Promise<User> {
     const user = await this.prisma.user.update({
@@ -104,6 +115,7 @@ export class UserService {
       data: { deactivatedAt: new Date() },
     });
     await revokeAllSessionsForUser({ prisma: this.prisma, userId: id });
+    await this.cliTokenRevocation.revokeForUser({ userId: id });
     return user;
   }
 

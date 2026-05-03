@@ -24,6 +24,27 @@ vi.mock("../../../auditLog", () => ({
   auditLog: vi.fn(() => Promise.resolve()),
 }));
 
+// PersonalWorkspaceService.ensure() is hooked into acceptInvite (since
+// 651e0c1b2) and runs outside the invite tx for fault isolation. The
+// service opens its own Prisma transaction and walks Team/Project
+// findFirst+create methods that this test's invite-shape tx mock
+// doesn't provide. We stub the ensure() call at the test boundary —
+// the unit's purpose is acceptInvite status-guard behaviour, not
+// personal-workspace internals (those have their own integration
+// test at personalWorkspace.service.integration.test.ts).
+vi.mock("../../../governance/personalWorkspace.service", () => ({
+  PersonalWorkspaceService: class {
+    constructor(_prisma: unknown) {}
+    async ensure(_args: unknown) {
+      return {
+        team: { id: "stub-team", isPersonal: true, ownerUserId: "user-1" },
+        project: { id: "stub-project", isPersonal: true, ownerUserId: "user-1" },
+        created: false,
+      };
+    }
+  },
+}));
+
 vi.mock("../../../app-layer/app", () => ({
   getApp: () => ({
     notifications: {
@@ -120,6 +141,11 @@ describe("organization.acceptInvite", () => {
       const result = await caller.acceptInvite({ inviteCode: "test-code" });
 
       expect(result.success).toBe(true);
+      // Only ONE $transaction call is observed by the mock — the
+      // invite-apply tx. PersonalWorkspaceService is stubbed at the
+      // module boundary (above) so its internal tx never reaches the
+      // test's $transaction mock; that path is covered by
+      // personalWorkspace.service.integration.test.ts instead.
       expect(transactionMock).toHaveBeenCalledTimes(1);
     });
   });

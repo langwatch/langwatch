@@ -1,0 +1,123 @@
+---
+title: Anomaly rules
+description: Define detection rules that fire AnomalyAlerts when activity-event traffic crosses a threshold — what the reactor evaluates today, what is preview-only, and how to write a working rule.
+sidebarTitle: Anomaly rules
+---
+
+<Info>**Pairs with:** [AI Gateway → Budgets](/ai-gateway/budgets). Budgets enforce hard spend limits; anomaly rules detect patterns *before* a budget breach (spend-spike, geo-mismatch, off-hours).</Info>
+
+<Note>**Available on Enterprise plans.** Non-enterprise organizations see an upgrade card on `/settings/governance/anomaly-rules` instead of the composer. See [Open-core licensing](/ai-governance/overview#open-core-licensing) for the full Apache 2.0 / Enterprise split.</Note>
+
+Anomaly rules are the "Detect" layer of the [governance control plane](/ai-governance/control-plane#tier-3--audit-log-ingest). The composer at `/settings/governance/anomaly-rules` accepts a rule definition and persists it; the [event-sourcing reactor](/ai-gateway/governance/activity-monitor-event-sourcing) evaluates each rule against incoming events and produces an `AnomalyAlert` row when a violation is detected.
+
+This page documents what the reactor actually evaluates today vs what's preview-only, so you don't author rules that look "active" in the list but never fire.
+
+## Rule-type coverage
+
+The composer's rule-type dropdown surfaces every shape the schema can hold; the reactor only evaluates one of them today.
+
+| Rule type | Reactor coverage | What it detects | Threshold config keys |
+|-----------|------------------|------------------|------------------------|
+| **`spend_spike`** | ✅ Live | Cost-USD growth in a rolling window vs a baseline window | `windowSec`, `baselineOffsetSec`, `ratioVsBaseline`, `minBaselineUsd` |
+| `rate_limit` | ⏳ Preview | Volume of actions per actor per window | (config schema TBD) |
+| `tool_mismatch` | ⏳ Preview | Tool invocation outside the policy_rules.tools.allow set | (config schema TBD) |
+| `after_hours` | ⏳ Preview | Activity outside org-configured business-hours window | (config schema TBD) |
+| `unusual_model` | ⏳ Preview | Model used for actor that's not on their typical short-list | (config schema TBD) |
+| `pii_leak` | ⏳ Preview | Outbound payload matches a PII regex set | (config schema TBD) |
+| `custom` | ⏳ Preview | User-defined CEL / SQL predicate | (config schema TBD) |
+
+**⏳ Preview** rules can be created and the row will show `active` in the list, but the reactor logs `debug` and skips them — no AnomalyAlert is produced. Until the reactor slice for each ships, treat them as "save the rule for the future, don't expect alerts."
+
+If you need detection beyond `spend_spike` today, the recommended shape is one of:
+
+- Stand up Prometheus + Grafana against the gateway metrics endpoint — see [Cookbook · Prometheus alerts](/ai-gateway/cookbooks/prometheus-alerts) for the alert ruleset.
+- Hook your SIEM to the OTel trace stream LangWatch already emits per project.
+
+## Writing a working `spend_spike` rule
+
+Open `/settings/governance/anomaly-rules` → click **New anomaly rule**.
+
+Fields the reactor reads:
+
+| Field | Typical value | What it does |
+|-------|---------------|---------------|
+| **Name** | `Spend spike on Cowork prod` | Free-text label; surfaces in `recentAnomalies` and the alert dispatch payload. |
+| **Severity** | `warning` / `critical` | Drives the `/governance` KPI breakdown (`anomalyBreakdown.{critical,warning,info}`) and downstream dispatch routing once C3 ships. |
+| **Rule type** | `spend_spike` | Pick exactly this — see coverage table above. |
+| **Scope** | `organization` / `source_type` / `source` | Filters which IngestionSources the rule applies to (see Scope coverage below). |
+| **Scope ID** | (cuid) | Required when scope is `source_type` or `source`. The IngestionSource ID can be copied from `/settings/governance/ingestion-sources/<id>` or the URL of the per-source detail page. |
+| **Threshold config** | (JSON object — see below) | The reactor's per-rule-type tuning knobs. |
+| **Destination config** | `{}` (today) | Reserved for future Slack / PagerDuty / SIEM dispatch — see Dispatch coverage below. |
+
+### Threshold config — `spend_spike`
+
+```json
+{
+  "windowSec": 86400,
+  "baselineOffsetSec": 604800,
+  "ratioVsBaseline": 2.0,
+  "minBaselineUsd": 1.0
+}
+```
+
+| Key | Default | Meaning |
+|-----|---------|---------|
+| `windowSec` | `86400` (24 h) | The "current" window the reactor sums spend across, ending at the latest event timestamp. |
+| `baselineOffsetSec` | `604800` (7 d) | How far back from the current window the reactor pulls the baseline window from. With the defaults, the baseline is the same-shape 24-hour window from 7 days ago. |
+| `ratioVsBaseline` | `2.0` | Multiplier — the reactor fires when current spend ≥ baseline × ratio. `2.0` means "double the spend of last week's same-window." |
+| `minBaselineUsd` | `1.0` | Floor — the reactor skips evaluation when the baseline window is below this value. Prevents trivial alerts on cold sources where last week's spend was ~$0.01 and a 2× rise is meaningless. |
+
+Sensible starting values for most orgs:
+
+| Goal | `windowSec` | `baselineOffsetSec` | `ratioVsBaseline` | `minBaselineUsd` |
+|------|---------------|------------------------|----------------------|---------------------|
+| Day-over-week catch (default) | 86400 | 604800 | 2.0 | 1.0 |
+| Hour-over-day catch (tighter) | 3600 | 86400 | 3.0 | 0.10 |
+| Week-over-week catch (looser) | 604800 | 2592000 | 1.5 | 5.0 |
+
+## Scope coverage
+
+| Scope | Reactor coverage | Notes |
+|-------|------------------|-------|
+| `organization` | ✅ Evaluated | Fires on any IngestionSource in the org. Best default. |
+| `source_type` | ✅ Evaluated | Fires on every source whose `sourceType` matches (e.g. all `otel_generic` sources). |
+| `source` | ✅ Evaluated | Fires on a single named IngestionSource. |
+| `team` | ⏳ Preview | Persisted but not filtered by the reactor today. Don't rely on it. |
+| `project` | ⏳ Preview | Same. |
+
+## Dispatch coverage (C3 in flight)
+
+The composer's **Destination config** field accepts a JSON object describing where to push the alert. Today the reactor's dispatch path is **log-only** — alerts surface on the `/governance` dashboard's "Recent anomalies" section but no Slack message / PagerDuty page / SIEM event is generated.
+
+C3 (in flight on the [governance platform](https://github.com/langwatch/langwatch/pull/3524) branch) wires `triggerActionDispatch` so the destinationConfig values below start working:
+
+```json
+{
+  "slack":     { "webhookUrl": "https://hooks.slack.com/services/..." },
+  "pagerduty": { "routingKey": "..." },
+  "webhook":   { "url": "https://your-siem.example.com/ingest", "secret": "..." },
+  "email":     { "addresses": ["sec-on-call@your-company.com"] }
+}
+```
+
+Until C3 lands, leave destinationConfig empty (`{}`) and rely on the dashboard to surface alerts. Setting a real Slack webhook today does **nothing** — you'll think alerts are wired and they aren't.
+
+## Verify a rule is firing
+
+Two angles, same data:
+
+**Web** — open `/governance` and look for the rule's name in the "Recent anomalies" section. Each fire creates one row keyed by `(ruleId, triggerWindowStart)` so the reactor doesn't double-alert on a single window.
+
+**CLI** — `langwatch governance status` shows `hasAnomalyRules: true` once at least one rule exists. The `recentAnomalies` query is wired into the same `api.activityMonitor.recentAnomalies` tRPC procedure the dashboard reads.
+
+For a dogfood loop you can drive yourself:
+
+1. Create a `spend_spike` rule scoped to your test IngestionSource with `minBaselineUsd: 0.001` (tiny floor) and `ratioVsBaseline: 1.5`.
+2. Send one OTel event with `gen_ai.usage.cost_usd: 0.05` (baseline seed) — see [otel-generic — Test it now](/ai-gateway/governance/ingestion-sources/otel-generic#test-it-now--copy-paste-curl).
+3. Wait long enough for the baseline window to roll past the seed (default `windowSec: 86400` means 24h — so use the tighter values from the table above for fast iteration).
+4. Send a second event with `gen_ai.usage.cost_usd: 2.00` (the spike).
+5. Reload `/governance` — the alert should appear in "Recent anomalies" with `state: open` and a populated `detail.ratio`.
+
+## What's persisted vs what's evaluated
+
+A rule that's persisted but unevaluated is intentional — admins can pre-stage rules so when the reactor slice ships, no rework. But it's a real failure mode if you don't know which is which. The two coverage tables above are the source of truth: **only `spend_spike` + (`organization` | `source_type` | `source`) actually fires today**. Everything else is preview state.

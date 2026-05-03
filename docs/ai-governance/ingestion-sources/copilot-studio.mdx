@@ -1,0 +1,62 @@
+---
+title: Microsoft Copilot Studio (Purview)
+description: Setup contract only — Azure AD app registration is captured; the Purview Audit poller is pending.
+sidebarTitle: Microsoft Copilot Studio
+---
+
+<Info>**Pairs with:** [Ingestion Sources index](/ai-governance/ingestion-sources/index). Microsoft Copilot Studio is on the adapter roadmap; configuration contract is captured today, the Purview poller worker is pending.</Info>
+
+`copilot_studio` polls the Microsoft Purview Audit API for Copilot Studio activity. Today the source can be created and the per-platform credentials are persisted, but the cron worker that calls Purview hasn't shipped — events do not flow yet.
+
+This page documents the configuration contract so admins can pre-stage Azure AD app registrations and trust policies; the matching adapter is on the [roadmap](/ai-governance/ingestion-sources/index#adapter-roadmap).
+
+## Currently implemented
+
+- **CRUD:** the source can be created via the admin composer at `/settings/governance/ingestion-sources` and via `api.ingestionSources.create`. It will appear in `langwatch ingest list` with status `awaiting_first_event`.
+- **Receiver:** none. There is no `POST /api/ingest/copilot/:id` endpoint and the OTLP / webhook receivers reject `copilot_studio` sources with `400 wrong_endpoint`.
+- **Poller:** none.
+- **Normaliser:** none.
+- **Status flip:** the source will stay `awaiting_first_event` indefinitely until the poller ships.
+
+## What the admin configures upstream
+
+The composer collects:
+
+| Field | Required | Stored | Used by |
+|---|---|---|---|
+| Azure AD tenant ID | yes | `IngestionSource.payloadConfig.tenantId` | (future poller) |
+| App registration client ID | yes | `payloadConfig.clientId` | (future poller) |
+| App registration client secret | yes | `payloadConfig.clientSecret` (hashed server-side) | (future poller) |
+| Polling cadence (seconds) | no | `payloadConfig.pollEverySec` (default 300) | (future poller) |
+
+In the Azure portal:
+
+1. **App registrations → New registration**, name it `langwatch-copilot-audit-reader`.
+2. **API permissions → Add → Microsoft Graph → Application permissions → `AuditLog.Read.All`**, then **Grant admin consent**.
+3. **Certificates & secrets → New client secret**, copy the value into the LangWatch composer.
+4. Optionally restrict the app to specific Azure subscriptions / regions per your security policy.
+
+There is no LangWatch-side URL or bearer secret to paste back into Microsoft. The future poller will hold the relationship: LangWatch calls Purview's `manage.office.com` Audit API on a schedule using the app registration above.
+
+## What event shape we accept today
+
+None — no events flow until the poller ships. `langwatch ingest tail <sourceId>` will print:
+
+```text
+No events for this source yet. Once your upstream platform starts
+sending OTel/audit logs to /api/ingest/* with the source's bearer
+secret, events will land here.
+```
+
+(The hint mentions `/api/ingest/*` because that's the universal advice for push-mode sources; for `copilot_studio` specifically, no push endpoint exists. Once the poller lands, this empty-state hint will be replaced with poller-specific guidance.)
+
+## What is still envelope-only / follow-up work
+
+Everything below is the adapter slice that has not yet shipped:
+
+- **Purview poller worker.** A cron job that authenticates as the app registration, calls `https://manage.office.com/api/v1.0/<tenantId>/activity/feed/subscriptions/content` to pull new content blobs, and walks them for Copilot Studio activity (`RecordType` = Copilot* operations).
+- **Purview event → governance event mapping.** Purview's audit JSON has `Operation`, `UserId`, `RecordType`, `ResultStatus` etc. The mapping into Actor / Action / Target / `eventType` is pending and will live in a `purview.ts` normaliser alongside `otel.ts`.
+- **Subscription bootstrap.** Purview audit feed subscriptions need to be created via API on first connect (`PUT /subscriptions/start?contentType=Audit.General`). The bootstrap will live in the poller worker on first run, idempotent.
+- **Watermark + dedup.** Purview content blobs have stable IDs; the worker will track high-water content IDs in `IngestionSource.payloadConfig.watermark` to avoid replays.
+
+When the poller ships, this page is updated with the real event shape, the CLI verification flow, and the per-source detail behaviour.

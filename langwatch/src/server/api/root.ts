@@ -58,6 +58,13 @@ import { gatewayCacheRulesRouter } from "./routers/gatewayCacheRules";
 import { gatewayUsageRouter } from "./routers/gatewayUsage";
 import { gatewayProvidersRouter } from "./routers/gatewayProviders";
 import { virtualKeysRouter } from "./routers/virtualKeys";
+import { personalVirtualKeysRouter } from "./routers/personalVirtualKeys";
+import { routingPoliciesRouter } from "./routers/routingPolicies";
+import { ingestionSourcesRouter } from "./routers/ingestionSources";
+import { activityMonitorRouter } from "./routers/activityMonitor";
+import { anomalyRulesRouter } from "./routers/anomalyRules";
+import { aiToolsRouter } from "./routers/aiTools";
+import { governanceRouter } from "./routers/governance";
 import { workflowRouter } from "./routers/workflows";
 import { opsRouter } from "./routers/ops";
 
@@ -117,6 +124,13 @@ const coreRouters = {
   group: groupRouter,
   ops: opsRouter,
   virtualKeys: virtualKeysRouter,
+  personalVirtualKeys: personalVirtualKeysRouter,
+  routingPolicy: routingPoliciesRouter,
+  ingestionSources: ingestionSourcesRouter,
+  activityMonitor: activityMonitorRouter,
+  anomalyRules: anomalyRulesRouter,
+  aiTools: aiToolsRouter,
+  governance: governanceRouter,
   gatewayProviders: gatewayProvidersRouter,
   gatewayBudgets: gatewayBudgetsRouter,
   gatewayCacheRules: gatewayCacheRulesRouter,

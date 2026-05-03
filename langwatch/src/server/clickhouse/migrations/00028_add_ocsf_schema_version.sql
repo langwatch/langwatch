@@ -1,0 +1,51 @@
+-- +goose Up
+-- +goose ENVSUB ON
+--
+-- Forward-compat schema-version column on governance_ocsf_events.
+-- Today every row is implicitly OCSF v1.1 / OWASP AOS via the
+-- hard-coded ClassUid=6003. When OCSF v1.2 (or a vendor-specific
+-- variant — e.g. OWASP AOS-2) lands, rows written under the new
+-- shape need to be distinguishable from v1.1 rows so SIEM
+-- consumers can opt to filter, parse separately, or version-gate
+-- their downstream processing.
+--
+-- The column is LowCardinality because the codomain is small
+-- (~6 distinct strings for the foreseeable lifetime of this PR).
+-- That keeps codec / dictionary lookup fast on the SELECT path.
+--
+-- DEFAULT '1.1.0' means rows already in the table (written before
+-- this migration) materialize as '1.1.0' on read — which is
+-- correct: those rows WERE v1.1, the column is just adding the
+-- explicit label. No backfill required.
+--
+-- The position (AFTER TenantId) keeps the version near the
+-- multi-tenancy key so operators visually scanning a row see the
+-- schema-shape decision immediately.
+--
+-- Spec: specs/ai-gateway/governance/siem-export.feature
+--       specs/ai-gateway/governance/folds.feature §"governance_ocsf_events"
+--
+-- Population: the writer constant `OCSF_SCHEMA_VERSION` in
+-- governanceOcsfEvents.clickhouse.repository.ts is the single
+-- source of truth for the version string at write time. Future
+-- v1.2 lands by bumping that constant + (optionally) emitting a
+-- new ClassUid; the column lets downstream queries distinguish
+-- the two even if RawOcsfJson schemas drift.
+
+-- +goose StatementBegin
+ALTER TABLE ${CLICKHOUSE_DATABASE}.governance_ocsf_events
+  ADD COLUMN IF NOT EXISTS OcsfSchemaVersion LowCardinality(String) DEFAULT '1.1.0' AFTER TenantId;
+-- +goose StatementEnd
+
+-- +goose Down
+-- Down migration intentionally not provided — dropping
+-- OcsfSchemaVersion from governance_ocsf_events is supported but
+-- operator-only because dropping the column would lose the
+-- forward-compat signal that downstream SIEM consumers may
+-- already be filtering on. To roll back: uncomment and run
+-- manually after coordinating with operators.
+--
+-- -- +goose StatementBegin
+-- -- ALTER TABLE ${CLICKHOUSE_DATABASE}.governance_ocsf_events
+-- --   DROP COLUMN IF EXISTS OcsfSchemaVersion;
+-- -- +goose StatementEnd

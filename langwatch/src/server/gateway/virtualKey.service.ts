@@ -39,9 +39,24 @@ export type CreateVirtualKeyInput = {
   environment: "live" | "test";
   principalUserId?: string | null;
   actorUserId: string;
-  /** GatewayProviderCredential IDs in fallback-chain order. */
-  providerCredentialIds: string[];
+  /**
+   * GatewayProviderCredential IDs in fallback-chain order. Optional
+   * (defaults to `[]`) — callers using `routingPolicyId` should omit
+   * the field entirely; the policy is then the source of truth for
+   * the chain and the gateway dispatcher resolves it at request time.
+   */
+  providerCredentialIds?: string[];
   config?: Partial<VirtualKeyConfig>;
+  /**
+   * Optional RoutingPolicy reference. When set:
+   *   - `providerCredentialIds` may be empty (policy carries the chain)
+   *   - The per-project ownership assertion on those IDs is skipped
+   *     (policies are org-scoped and reference credentials that may
+   *     live in other projects of the same org)
+   *   - The VK row's routingPolicyId column is set in the same
+   *     transaction so create + bind are atomic
+   */
+  routingPolicyId?: string | null;
 };
 
 export type UpdateVirtualKeyInput = {
@@ -128,14 +143,56 @@ export class VirtualKeyService {
     const { displayPrefix } = parseVirtualKey(secret);
     const hashedSecret = hashVirtualKeySecret(secret);
 
-    // Validate provider credential ownership up front so we fail cleanly.
-    await this.assertProviderCredentialsBelongToProject(
-      input.projectId,
-      input.providerCredentialIds,
-    );
+    // Validate authorization for the provider chain.
+    //
+    // Two paths, both bounded:
+    //
+    // 1. Direct chain (no routingPolicyId): caller-supplied credential
+    //    IDs must belong to `input.projectId`.
+    //
+    // 2. Policy-bound (routingPolicyId set): the policy is the source
+    //    of truth for the chain, so we don't accept caller-supplied
+    //    credential IDs at all (`providerCredentialIds` MUST be empty).
+    //    The policy itself must belong to `input.organizationId` —
+    //    cross-org reuse is the exact privilege-escalation we're
+    //    guarding against. Per-project ownership of the policy's
+    //    credentials is enforced at policy create/update time by
+    //    RoutingPolicyService, not re-checked here.
+    const providerCredentialIds = input.providerCredentialIds ?? [];
+    if (input.routingPolicyId) {
+      if (providerCredentialIds.length > 0) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message:
+            "providerCredentialIds must be empty when routingPolicyId is set — the policy carries the chain",
+        });
+      }
+      const policy = await this.prisma.routingPolicy.findUnique({
+        where: { id: input.routingPolicyId },
+        select: { id: true, organizationId: true },
+      });
+      if (!policy) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: `Routing policy ${input.routingPolicyId} not found`,
+        });
+      }
+      if (policy.organizationId !== input.organizationId) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message:
+            "Routing policy belongs to a different organization than the virtual key",
+        });
+      }
+    } else {
+      await this.assertProviderCredentialsBelongToProject(
+        input.projectId,
+        providerCredentialIds,
+      );
+    }
 
     const id = this.nextVirtualKeyId();
-    const providerChain = input.providerCredentialIds.map((credId, index) => ({
+    const providerChain = providerCredentialIds.map((credId, index) => ({
       id: credId,
       priority: index,
     }));
@@ -157,6 +214,18 @@ export class VirtualKeyService {
         },
         tx,
       );
+      // Bind the routing policy in the same tx so create + bind is
+      // atomic and the dispatcher never observes a half-configured VK.
+      // projectId is required in the where clause to satisfy
+      // dbMultiTenancyProtection — VirtualKey is a project-scoped model
+      // and the middleware rejects updates that don't scope by it.
+      if (input.routingPolicyId) {
+        await tx.virtualKey.update({
+          where: { id: vk.id, projectId: input.projectId },
+          data: { routingPolicyId: input.routingPolicyId },
+        });
+        vk.routingPolicyId = input.routingPolicyId;
+      }
       await this.changeEvents.append(
         {
           organizationId: input.organizationId,

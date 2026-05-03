@@ -109,6 +109,53 @@ const EXEMPT_MODELS = [
    * `modelProviderId`). Same rationale as VirtualKeyProviderCredential.
    */
   "ModelProviderScope",
+  /**
+   * RoutingPolicy (iter governance-platform) is org-scoped:
+   * (organizationId, scope, scopeId, name) is the natural key. Scope
+   * may be 'organization' | 'team' | 'project', but the row itself
+   * doesn't carry a projectId column. Resolution paths
+   * (`resolveDefaultForUser`) query by organizationId + scope +
+   * scopeId — projectId enforcement would block the lookup.
+   *
+   * Same rationale as ModelProvider above (also (scopeType, scopeId)-
+   * keyed). Service layer authorises ownership via organizationId
+   * before any mutation; the middleware exemption only relaxes the
+   * SQL guard.
+   */
+  "RoutingPolicy",
+  /**
+   * IngestionSource (iter governance-platform / D2 foundation) is
+   * org-scoped: the natural key is (organizationId, name). Optional
+   * teamId narrows scope but no projectId — the entire point is a
+   * cross-platform feed at the org level. Service layer authorises
+   * by organizationId / teamId membership before any mutation.
+   */
+  "IngestionSource",
+  /**
+   * AnomalyRule (iter governance-platform / D2 anomaly authoring) is
+   * org-scoped: the natural key is (organizationId, name). The rule's
+   * `scope` field (organization|team|project|source_type|source) is
+   * an EVALUATION-time narrowing, not a tenancy boundary — service
+   * layer authorises by organizationId membership before any mutation.
+   */
+  "AnomalyRule",
+  /**
+   * AnomalyAlert (iter governance-platform / D2 anomaly detection) is
+   * org-scoped persisted detections. Same rationale as AnomalyRule —
+   * org-scoped, no projectId, service layer authorises by
+   * organizationId before any mutation.
+   */
+  "AnomalyAlert",
+  /**
+   * AiToolEntry (iter governance-platform / Phase 7) is the org-scoped
+   * AI Tools Portal catalog. Entries can be scoped to organization or
+   * team via (scope, scopeId) but never carry a projectId — the portal
+   * surfaces tools at the org tier (cross-project / cross-team
+   * organization-default surface). Service layer authorises by
+   * organizationId membership before any mutation; team-scoped entries
+   * are authorised via TeamUser membership at read time.
+   */
+  "AiToolEntry",
 ];
 
 const _guardProjectId = ({ params }: { params: Prisma.MiddlewareParams }) => {

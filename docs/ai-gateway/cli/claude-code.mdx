@@ -8,9 +8,20 @@ Claude Code is Anthropic's official agentic CLI. It speaks the Anthropic Message
 
 The LangWatch AI Gateway's `/v1/messages` endpoint is designed to be Claude-Code-compatible: tool-call deltas are forwarded byte-for-byte after the first chunk (see the [streaming contract](/ai-gateway/streaming)), `cache_control` blocks are passed through untouched (see [caching passthrough](/ai-gateway/caching-passthrough) — this is load-bearing because Claude Code uses prompt caching aggressively), and the `/v1/models` endpoint returns Anthropic-model shapes so Claude Code's model picker works.
 
-## Setup
+## Quick path — `langwatch claude` wrapper (recommended for personal IDE keys)
 
-Assuming you've minted a VK — `lw_vk_live_01HZX…` — in the LangWatch UI:
+If you've authenticated via `langwatch login --device` ([Personal IDE keys](/ai-gateway/governance/personal-keys)), the simplest invocation is the wrapper. It exec's Claude Code with the right env vars already pointing at your gateway:
+
+```bash
+langwatch claude              # interactive
+langwatch claude "fix tests"  # non-interactive prompt
+```
+
+All Claude Code flags pass through unchanged — `langwatch claude` is byte-for-byte equivalent to the bare `claude` invocation, just with `ANTHROPIC_BASE_URL` and `ANTHROPIC_AUTH_TOKEN` already set. No env vars to maintain.
+
+## Manual setup — service VK / shared workstation
+
+If you have a **service-virtual-key** for non-personal traffic, or you want every plain `claude` invocation in your shell to route through the gateway without the wrapper:
 
 ```bash
 export ANTHROPIC_BASE_URL="https://gateway.langwatch.ai"

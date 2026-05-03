@@ -1,0 +1,116 @@
+---
+title: LangWatch AI Governance — Overview
+description: Org-wide controls — workspaces, anomaly detection, ingestion sources, OCSF/SIEM export — built on top of the AI Gateway.
+sidebarTitle: Overview
+---
+
+The **LangWatch AI Governance** layer adds the org-wide controls that make a multi-team LangWatch deployment auditable, attributable, and compliance-ready. Where the [AI Gateway](/ai-gateway/overview) is the data plane in the path of every LLM call, AI Governance is the **control plane** that decides who can use it, what they can spend, where their telemetry lands, and how regulators see it.
+
+![Governance admin home](/images/ai-governance/personas/governance-hero.png)
+
+<Info>**Pairs with:** [AI Gateway → Overview](/ai-gateway/overview). The gateway emits the spans; governance reactors fold them into anomaly detection, budget aggregates, OCSF exports, and per-user workspaces.</Info>
+
+## Open-core licensing
+
+LangWatch is open-core. Some governance surfaces work for every self-hosted deployment under the **Apache 2.0** license; others require a paid **Enterprise** plan. Use this map when planning a rollout:
+
+| Surface | License | Notes |
+|---|---|---|
+| [Personal IDE keys](/ai-gateway/governance/personal-keys) | Apache 2.0 | Always available. The Personal Virtual Key + `langwatch login` flow is the open-core floor. |
+| [AI Tools Portal at `/me`](/ai-governance/personal-portal/overview) | Apache 2.0 | Always available. Catalog editor at `/settings/governance/tool-catalog`, three tile classes, admin-curated. |
+| [Routing Policies](/ai-gateway/governance/routing-policies) | Apache 2.0 | Always available. The gateway-side policy chain is core. |
+| [CLI debugging](/ai-governance/cli-debug) | Apache 2.0 | Always available. CLI 409 / 401 / 403 catalog. |
+| [Ingestion Sources](/ai-governance/ingestion-sources/index) | Enterprise | `otel_generic` source type + `thirty_days` retention are available on the Apache 2.0 floor; multi-source + extended retention require Enterprise. |
+| [Anomaly Rules](/ai-governance/anomaly-rules) | Enterprise | Admin-curated detection rules + dispatch (Slack / PagerDuty / SIEM). |
+| [Compliance architecture](/ai-governance/compliance-architecture) | Enterprise | OCSF/SIEM export, multi-class retention, tamper-evidence (post-GA follow-up). |
+| [Control plane & integration tiers](/ai-governance/control-plane) | Mixed | Reference page; describes both tiers. |
+
+In the LangWatch UI, Enterprise-only surfaces show an **"Available on Enterprise plans"** card with an upgrade CTA when the org isn't on an Enterprise plan; the same surfaces gray out source-type dropdowns to `otel_generic` and retention to `thirty_days` for non-enterprise users.
+
+## Two personas
+
+LangWatch governance is shaped around two people who never need the same screen:
+
+- **End user** — a developer or analyst who needs a Personal Virtual Key, wants to see their own usage and budget at `/me`, and sometimes switches between Personal / Team / Project workspaces. They never see the admin surface.
+- **Admin** — an org-level operator who configures [Ingestion Sources](/ai-governance/ingestion-sources/index), publishes [Routing Policies](/ai-gateway/governance/routing-policies), defines [Anomaly Rules](/ai-governance/anomaly-rules), and signs off on the [OCSF/SIEM export](/ai-governance/compliance-architecture). They never see the end-user `/me` chrome.
+
+The persona-aware chrome (single-chip header on `/me`, full sidebar on `/settings/governance/*`) keeps both surfaces clean — neither has to navigate around the other.
+
+## Admin prerequisites
+
+<Warning>
+  **Publish a default routing policy before users sign in via CLI.**
+
+  The first time an end user runs `langwatch login`, the CLI provisions a Personal Virtual Key and binds it to your org's **default routing policy**. If no default policy exists, the CLI returns:
+
+  ```
+  HTTP 409 — error: "no_default_routing_policy"
+  Ask your admin to publish a default routing policy at Settings → Routing Policies.
+  ```
+
+  Publish at least one routing policy and mark it as `default` before opening CLI sign-in to your team. Cover details in [CLI debug → Error catalog](/ai-governance/cli-debug#error-catalog).
+</Warning>
+
+## What it gives you
+
+- **Personal Virtual Keys + Workspaces** — every signed-in user gets a Personal VK and a Personal workspace at `/me`. No admin ticket required, governed by the same policy + budget engine. See [AI Gateway → Personal IDE keys](/ai-gateway/governance/personal-keys).
+- **Ingestion Sources** — a unified substrate for any telemetry that should land in a project's LangWatch workspace: gateway spans, OTLP collectors, Workato webhooks, S3 NDJSON drops, Microsoft Copilot Studio, and OpenAI/Anthropic compliance API exports. See [Ingestion Sources](/ai-governance/ingestion-sources/index).
+- **Anomaly Rules** — admin-defined detectors (spend-spike, geo-mismatch, off-hours) that fold from the same event stream as compliance and budget aggregates. See [Anomaly Rules](/ai-governance/anomaly-rules).
+- **Compliance & SIEM export** — every event is OCSF-mapped and replayable to a downstream SIEM with deterministic retention windows. See [Compliance Architecture](/ai-governance/compliance-architecture).
+- **Control plane / data plane split** — the Next.js control plane owns governance state (Postgres) and runs the fold reactors; the Go AI Gateway owns the request path. See [Control Plane](/ai-governance/control-plane).
+- **CLI debug** — `auth-cli budget-status`, anomaly-fold inspection, OCSF probe, and the `langwatch login` error catalog. See [CLI Debug](/ai-governance/cli-debug).
+
+## How it sits with AI Gateway
+
+```mermaid
+flowchart LR
+    A[Apps / SDKs / CLIs] -->|virtual key| GW[AI Gateway data plane]
+    GW -->|spans| FOLD[Fold pipeline]
+    FOLD --> CH[(ClickHouse)]
+    FOLD --> ANOM[Anomaly detection]
+    FOLD --> BUDG[Budget aggregates]
+    FOLD --> OCSF[OCSF export]
+    ADM[Admin / settings/governance/*] -->|configures| GOV[Governance control plane]
+    GOV -->|policy + scopes| GW
+    USR[End user / me] -->|reads workspace + Personal VK| GOV
+```
+
+- **Gateway** is the synchronous request path — sub-millisecond overhead, OpenAI/Anthropic compatible, every call carries a virtual key.
+- **Fold pipeline** is the asynchronous reactor topology that turns spans into the governance views (anomaly state, budget aggregates, OCSF events).
+- **Governance control plane** owns the configuration surface — IngestionSources, AnomalyRules, RoutingPolicies, Personal/Team/Project workspaces, RBAC.
+
+Same compose stack, same Helm chart — no separate service to deploy.
+
+## A tour of the surface
+
+<Frame caption="Admin: oversight dashboard at /governance — setup-state OR-of-flags promotes the Govern menu entry">
+  ![Governance home](/images/ai-governance/admin/governance-home.png)
+</Frame>
+
+<Frame caption="Admin: IngestionSources list at /settings/governance/ingestion-sources">
+  ![Ingestion sources list](/images/ai-governance/admin/ingestion-sources-list.png)
+</Frame>
+
+<Frame caption="Admin: AnomalyRules list at /settings/governance/anomaly-rules">
+  ![Anomaly rules list](/images/ai-governance/admin/anomaly-rules-list.png)
+</Frame>
+
+<Frame caption="Admin: RoutingPolicies at /settings/routing-policies (admin-in-empty-org exempted from the no-org bouncer)">
+  ![Routing policies list](/images/ai-governance/admin/routing-policies-list.png)
+</Frame>
+
+<Frame caption="End user: persona-aware chrome at /me — single-chip header, PersonalSidebar, Workspace Switcher (Personal/Team/Project)">
+  ![End-user /me](/images/ai-governance/personas/p1-me-final.png)
+</Frame>
+
+<Frame caption="End user: notifications + profile at /me/settings">
+  ![/me/settings](/images/ai-governance/personas/me-settings.png)
+</Frame>
+
+## Where to next
+
+- **Set up your first source** — [Ingestion Sources index](/ai-governance/ingestion-sources/index)
+- **Detect spend spikes or off-hours usage** — [Anomaly Rules](/ai-governance/anomaly-rules)
+- **Export to your SIEM** — [Compliance Architecture → OCSF](/ai-governance/compliance-architecture)
+- **Debug an end-user CLI sign-in failure** — [CLI Debug → Error catalog](/ai-governance/cli-debug#error-catalog)
+- **Self-host the stack** — [AI Gateway Self-Hosting](/ai-gateway/self-hosting/helm) (the same chart deploys both planes)

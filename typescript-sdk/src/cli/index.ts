@@ -7,6 +7,10 @@ config();
 import { Command } from "commander";
 import { parsePromptSpec } from "./types";
 import { formatApiErrorMessage } from "../client-sdk/services/_shared/format-api-error";
+import {
+  isGovernancePreviewEnabled,
+  GOVERNANCE_PREVIEW_DISABLED_MESSAGE,
+} from "./utils/governance/preview-flag";
 
 declare const __CLI_VERSION__: string;
 
@@ -26,7 +30,9 @@ const initCommand = async (): Promise<void> => {
   return initCommandImpl();
 };
 
-const loginCommand = async (options?: { apiKey?: string }): Promise<void> => {
+const loginCommand = async (
+  options?: { apiKey?: string; device?: boolean; browser?: string },
+): Promise<void> => {
   const { loginCommand: loginCommandImpl } = await import("./commands/login.js");
   return loginCommandImpl(options);
 };
@@ -122,19 +128,255 @@ program
   .showHelpAfterError()
   .showSuggestionAfterError();
 
+// AI Governance preview is gated by LANGWATCH_GOVERNANCE_PREVIEW=1 — when
+// unset, the new subcommands and the `login --device` option don't get
+// registered, so they're invisible to `langwatch --help` and behave as
+// "unknown command" if invoked. This keeps the long-lived governance
+// branch merge-able into main without exposing preview features to
+// users who haven't opted in. Mirrors the web app's
+// `release_ui_ai_governance_enabled` PostHog flag.
+const governancePreview = isGovernancePreviewEnabled();
+
 // Top-level commands
-program
+const loginCmd = program
   .command("login")
-  .description("Login to LangWatch and save API key. Get a key from https://app.langwatch.ai/authorize (or ${LANGWATCH_ENDPOINT}/authorize for self-hosted).")
-  .option("--api-key <key>", "Set API key non-interactively (for CI/CD and agents)")
-  .action(async (options: { apiKey?: string }) => {
+  .description(
+    governancePreview
+      ? "Login to LangWatch. By default, prompts for an API key (or pass --api-key for CI). Use --device to authenticate via your company SSO and provision a personal AI Gateway virtual key."
+      : "Login to LangWatch. Prompts for an API key, or pass --api-key for CI."
+  )
+  .option("--api-key <key>", "Set API key non-interactively (for CI/CD and agents)");
+
+if (governancePreview) {
+  loginCmd
+    .option(
+      "--device",
+      "RFC 8628 device-flow login via your company SSO; provisions a personal virtual key for Claude Code / Codex / Cursor / Gemini CLI",
+    )
+    .option(
+      "--browser <name>",
+      "browser to open for device-flow approval (chrome|chromium|firefox|safari|none|<path>)",
+    );
+}
+
+loginCmd.action(async (options: { apiKey?: string; device?: boolean; browser?: string }) => {
+  if (options.device && !governancePreview) {
+    console.error(GOVERNANCE_PREVIEW_DISABLED_MESSAGE);
+    process.exit(1);
+  }
+  try {
+    await loginCommand(options);
+  } catch (error) {
+    console.error(`Error: ${formatApiErrorMessage({ error })}`);
+    process.exit(1);
+  }
+});
+
+if (governancePreview) {
+// AI Gateway governance — read identity, deep-link, request budget increase.
+program
+  .command("whoami")
+  .description("Print the identity persisted by `langwatch login --device` (governance plane).")
+  .action(async () => {
     try {
-      await loginCommand(options);
+      const { whoamiCommand } = await import("./commands/whoami.js");
+      await whoamiCommand();
     } catch (error) {
       console.error(`Error: ${formatApiErrorMessage({ error })}`);
       process.exit(1);
     }
   });
+
+program
+  .command("me")
+  .description("Open your LangWatch personal dashboard (use --trace <id> to deep-link to a specific trace).")
+  .option("--trace <id>", "deep-link to a specific trace ID")
+  .option("--browser <name>", "browser to open (chrome|chromium|firefox|safari|none|<path>)")
+  .action(async (options: { trace?: string; browser?: string }) => {
+    try {
+      const { dashboardCommand } = await import("./commands/dashboard.js");
+      await dashboardCommand(options);
+    } catch (error) {
+      console.error(`Error: ${formatApiErrorMessage({ error })}`);
+      process.exit(1);
+    }
+  });
+
+program
+  .command("request-increase")
+  .description("Open the budget-increase request page (uses the gateway-issued signed URL when available).")
+  .option("--browser <name>", "browser to open (chrome|chromium|firefox|safari|none|<path>)")
+  .action(async (options: { browser?: string }) => {
+    try {
+      const { requestIncreaseCommand } = await import("./commands/request-increase.js");
+      await requestIncreaseCommand(options);
+    } catch (error) {
+      console.error(`Error: ${formatApiErrorMessage({ error })}`);
+      process.exit(1);
+    }
+  });
+
+// AI Gateway governance — wrapped tool runners.
+// Each `langwatch <tool>` exec's the underlying binary with the
+// right ANTHROPIC_*/OPENAI_*/GEMINI_* env vars injected pointing
+// at the gateway, after a Screen-8 budget pre-check.
+program
+  .command("claude")
+  .description("Run `claude` (Claude Code) routed through the LangWatch gateway.")
+  .allowUnknownOption(true)
+  .helpOption(false)
+  .action(async (_opts, cmd: { args?: string[] }) => {
+    try {
+      const { wrapClaude } = await import("./commands/wrap.js");
+      await wrapClaude(cmd.args ?? []);
+    } catch (error) {
+      console.error(`Error: ${formatApiErrorMessage({ error })}`);
+      process.exit(1);
+    }
+  });
+
+program
+  .command("codex")
+  .description("Run `codex` (OpenAI Codex CLI) routed through the LangWatch gateway.")
+  .allowUnknownOption(true)
+  .helpOption(false)
+  .action(async (_opts, cmd: { args?: string[] }) => {
+    try {
+      const { wrapCodex } = await import("./commands/wrap.js");
+      await wrapCodex(cmd.args ?? []);
+    } catch (error) {
+      console.error(`Error: ${formatApiErrorMessage({ error })}`);
+      process.exit(1);
+    }
+  });
+
+program
+  .command("cursor")
+  .description("Run `cursor` routed through the LangWatch gateway.")
+  .allowUnknownOption(true)
+  .helpOption(false)
+  .action(async (_opts, cmd: { args?: string[] }) => {
+    try {
+      const { wrapCursor } = await import("./commands/wrap.js");
+      await wrapCursor(cmd.args ?? []);
+    } catch (error) {
+      console.error(`Error: ${formatApiErrorMessage({ error })}`);
+      process.exit(1);
+    }
+  });
+
+program
+  .command("gemini")
+  .description("Run `gemini` (Gemini CLI) routed through the LangWatch gateway.")
+  .allowUnknownOption(true)
+  .helpOption(false)
+  .action(async (_opts, cmd: { args?: string[] }) => {
+    try {
+      const { wrapGemini } = await import("./commands/wrap.js");
+      await wrapGemini(cmd.args ?? []);
+    } catch (error) {
+      console.error(`Error: ${formatApiErrorMessage({ error })}`);
+      process.exit(1);
+    }
+  });
+
+program
+  .command("logout-device")
+  .description("Server-revoke the device-flow refresh token AND clear the local ~/.langwatch/config.json. Idempotent.")
+  .action(async () => {
+    try {
+      const { logoutDeviceCommand } = await import("./commands/logout-device.js");
+      await logoutDeviceCommand();
+    } catch (error) {
+      console.error(`Error: ${formatApiErrorMessage({ error })}`);
+      process.exit(1);
+    }
+  });
+
+program
+  .command("init-shell")
+  .description("Print an eval-able shell snippet so any shell session auto-exports the gateway env vars (alternative to `langwatch claude`).")
+  .argument("[shell]", "zsh|bash|fish|cmd|powershell", "zsh")
+  .action(async (shell: string) => {
+    try {
+      const { initShellCommand } = await import("./commands/init-shell.js");
+      await initShellCommand(shell);
+    } catch (error) {
+      console.error(`Error: ${formatApiErrorMessage({ error })}`);
+      process.exit(1);
+    }
+  });
+
+// `langwatch ingest *` — read-only debug tools for the IngestionSource
+// + Activity Monitor surfaces. Mirrors the web admin /settings/governance
+// flows for ops folks who live in terminal. Authoring stays browser-only.
+const ingestCmd = program
+  .command("ingest")
+  .description("Inspect IngestionSources and tail their recent OCSF-normalised events (read-only governance debug helpers).");
+
+ingestCmd
+  .command("list")
+  .description("List the org's IngestionSources (active by default; --all includes archived).")
+  .option("--all", "include archived sources")
+  .option("--json", "emit machine-readable JSON")
+  .action(async (options: { all?: boolean; json?: boolean }) => {
+    try {
+      const { ingestListCommand } = await import("./commands/ingest/list.js");
+      await ingestListCommand(options);
+    } catch (error) {
+      console.error(`Error: ${formatApiErrorMessage({ error })}`);
+      process.exit(1);
+    }
+  });
+
+ingestCmd
+  .command("tail <sourceId>")
+  .description("Stream the most recent events for an IngestionSource. --follow polls every 3s.")
+  .option("--limit <n>", "how many events to fetch on first poll (default 50)", (v) => parseInt(v, 10))
+  .option("--follow", "keep polling for new events; exit on Ctrl-C")
+  .option("--json", "emit machine-readable JSON")
+  .action(async (sourceId: string, options: { limit?: number; follow?: boolean; json?: boolean }) => {
+    try {
+      const { ingestTailCommand } = await import("./commands/ingest/tail.js");
+      await ingestTailCommand(sourceId, options);
+    } catch (error) {
+      console.error(`Error: ${formatApiErrorMessage({ error })}`);
+      process.exit(1);
+    }
+  });
+
+ingestCmd
+  .command("health <sourceId>")
+  .description("Show events received in the last 24h / 7d / 30d + last-success timestamp for one IngestionSource.")
+  .option("--json", "emit machine-readable JSON")
+  .action(async (sourceId: string, options: { json?: boolean }) => {
+    try {
+      const { ingestHealthCommand } = await import("./commands/ingest/health.js");
+      await ingestHealthCommand(sourceId, options);
+    } catch (error) {
+      console.error(`Error: ${formatApiErrorMessage({ error })}`);
+      process.exit(1);
+    }
+  });
+
+const governanceCmd = program
+  .command("governance")
+  .description("Inspect org-level governance state from the CLI (read-only).");
+
+governanceCmd
+  .command("status")
+  .description("Show the org's governance setup-state OR-of-flags (mirrors api.governance.setupState).")
+  .option("--json", "emit machine-readable JSON")
+  .action(async (options: { json?: boolean }) => {
+    try {
+      const { governanceStatusCommand } = await import("./commands/governance/status.js");
+      await governanceStatusCommand(options);
+    } catch (error) {
+      console.error(`Error: ${formatApiErrorMessage({ error })}`);
+      process.exit(1);
+    }
+  });
+} // end if (governancePreview)
 
 // Add prompt command group
 const promptCmd = program

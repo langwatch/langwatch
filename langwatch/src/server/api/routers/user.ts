@@ -1,15 +1,27 @@
+import type { PrismaClient } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { compare, hash } from "bcrypt";
 import { z } from "zod";
 import { env } from "../../../env.mjs";
 
-import { skipPermissionCheck } from "../rbac";
+import { checkOrganizationPermission, skipPermissionCheck } from "../rbac";
 import { createTRPCRouter, protectedProcedure, publicProcedure } from "../trpc";
 import { UserService } from "~/server/users/user.service";
 import { revokeOtherSessionsForUser } from "~/server/better-auth/revokeSessions";
 import { rateLimit } from "~/server/rateLimit";
 import { getClientIp } from "~/utils/getClientIp";
 import { isAdmin as checkIsAdmin } from "../../../../ee/admin/isAdmin";
+import { PersonalWorkspaceService } from "~/server/governance/personalWorkspace.service";
+import { PersonalVirtualKeyService } from "~/server/governance/personalVirtualKey.service";
+import { RoutingPolicyService } from "~/server/governance/routingPolicy.service";
+import { PersonalUsageService } from "~/server/governance/personalUsage.service";
+import { GatewayBudgetService } from "~/server/gateway/budget.service";
+import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
+import {
+  getClickHouseClientForProject,
+  isClickHouseEnabled,
+} from "~/server/clickhouse/clickhouseClient";
+import { CliBootstrapService } from "~/server/governance/cliBootstrap.service";
 import {
   Auth0ApiError,
   changeAuth0Password,
@@ -411,4 +423,333 @@ export const userRouter = createTRPCRouter({
       await UserService.create(ctx.prisma).reactivate({ id: input.userId });
       return { success: true };
     }),
+
+  /**
+   * Personal context for a user inside an organization. Backs the /me
+   * dashboard's `usePersonalContext` hook (see
+   * src/components/me/usePersonalContext.ts for the consumed shape).
+   *
+   * Lazily provisions the personal workspace on first call so existing
+   * users (who joined the org before this feature shipped) get one
+   * without re-accepting an invite.
+   *
+   * Cost / activity rollups are intentionally NOT computed here this
+   * iteration — the hook keeps its mocked data for those fields until
+   * the ClickHouse aggregations land in iter 2. This procedure ships
+   * the workspace identity + routing-policy resolution so the page
+   * and CLI both have a stable contract to wire against.
+   */
+  personalContext: protectedProcedure
+    .input(z.object({ organizationId: z.string() }))
+    .use(checkOrganizationPermission("organization:view"))
+    .query(async ({ ctx, input }) => {
+      const userId = ctx.session.user.id;
+
+      // Caller must be a member of the org.
+      const membership = await ctx.prisma.organizationUser.findUnique({
+        where: {
+          userId_organizationId: { userId, organizationId: input.organizationId },
+        },
+      });
+      if (!membership) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: `Not a member of organization ${input.organizationId}`,
+        });
+      }
+
+      const workspaceService = new PersonalWorkspaceService(ctx.prisma);
+      const workspace = await workspaceService.ensure({
+        userId,
+        organizationId: input.organizationId,
+        displayName: ctx.session.user.name,
+        displayEmail: ctx.session.user.email,
+      });
+
+      const policyService = new RoutingPolicyService(ctx.prisma);
+      const defaultPolicy = await policyService.resolveDefaultForUser({
+        organizationId: input.organizationId,
+        personalTeamId: workspace.team.id,
+      });
+
+      return {
+        workspace,
+        routingPolicy: defaultPolicy
+          ? { id: defaultPolicy.id, name: defaultPolicy.name }
+          : null,
+      };
+    }),
+
+  /**
+   * Per-user usage rollup powering the /me dashboard cards + charts +
+   * recent activity. ClickHouse-backed, scoped to the user's personal
+   * project (which by definition has only their traces — no cross-user
+   * contamination possible).
+   *
+   * Returns empty-state safe values (zeros, empty arrays, null model)
+   * when no traces exist yet, so the page can render before the user's
+   * first CLI request lands in CH.
+   */
+  personalUsage: protectedProcedure
+    .input(
+      z.object({
+        organizationId: z.string(),
+        /** Defaults to start-of-current-month → now if omitted. */
+        windowStartMs: z.number().optional(),
+        windowEndMs: z.number().optional(),
+      }),
+    )
+    .use(checkOrganizationPermission("organization:view"))
+    .query(async ({ ctx, input }) => {
+      const userId = ctx.session.user.id;
+      const membership = await ctx.prisma.organizationUser.findUnique({
+        where: {
+          userId_organizationId: { userId, organizationId: input.organizationId },
+        },
+      });
+      if (!membership) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: `Not a member of organization ${input.organizationId}`,
+        });
+      }
+
+      // Find the user's personal project. If none yet, return empty-state.
+      const workspaceService = new PersonalWorkspaceService(ctx.prisma);
+      const workspace = await workspaceService.findExisting({
+        userId,
+        organizationId: input.organizationId,
+      });
+      if (!workspace) {
+        return {
+          summary: {
+            spentUsd: 0,
+            requests: 0,
+            promptTokens: 0,
+            completionTokens: 0,
+            mostUsedModel: null,
+          },
+          dailyBuckets: [],
+          breakdownByModel: [],
+          recentActivity: [],
+        };
+      }
+
+      const window =
+        input.windowStartMs && input.windowEndMs
+          ? {
+              start: new Date(input.windowStartMs),
+              end: new Date(input.windowEndMs),
+            }
+          : undefined;
+
+      const usage = new PersonalUsageService();
+
+      // Run the four queries in parallel — they're independent and the
+      // CH server happily multiplexes. Cuts wall time roughly in half
+      // for the dashboard initial-render p95.
+      const [summary, dailyBuckets, breakdownByModel, recentActivity] =
+        await Promise.all([
+          usage.summary({ personalProjectId: workspace.project.id, window }),
+          usage.dailyBuckets({ personalProjectId: workspace.project.id, window }),
+          usage.breakdownByModel({
+            personalProjectId: workspace.project.id,
+            window,
+          }),
+          usage.recentActivity({
+            personalProjectId: workspace.project.id,
+            window,
+          }),
+        ]);
+
+      return {
+        summary,
+        dailyBuckets,
+        breakdownByModel,
+        recentActivity,
+      };
+    }),
+
+  /**
+   * Per-user budget state powering the /me dashboard's
+   * BudgetExceededBanner. Same wire shape as the CLI 402 payload
+   * (cli-reference.mdx "Budget pre-check") so client + CLI render
+   * with identical fields.
+   *
+   * Delegates to GatewayBudgetService.check() with projectedCostUsd=0
+   * — same code path the gateway uses at request time, so the UI's
+   * banner state and the CLI's pre-check decision can never disagree.
+   *
+   * Returns:
+   *   { status: "ok" }                                 nothing to render
+   *   { status: "warning", ...details }                soft_warn (≥80% used)
+   *   { status: "exceeded", ...details }               hard_block (≥100% used)
+   *
+   * Graceful-degradation cases that return {status: "ok"}:
+   *   - User has no personal workspace yet
+   *   - User has no personal VK yet
+   *   - ClickHouse not configured (smaller self-hosters)
+   */
+  personalBudget: protectedProcedure
+    .input(z.object({ organizationId: z.string() }))
+    .use(checkOrganizationPermission("organization:view"))
+    .query(async ({ ctx, input }) => {
+      const userId = ctx.session.user.id;
+
+      const workspaceService = new PersonalWorkspaceService(ctx.prisma);
+      const workspace = await workspaceService.findExisting({
+        userId,
+        organizationId: input.organizationId,
+      });
+      if (!workspace) return { status: "ok" as const };
+
+      const vkService = PersonalVirtualKeyService.create(ctx.prisma);
+      const vks = await vkService.list({
+        userId,
+        organizationId: input.organizationId,
+      });
+      const personalVk = vks[0];
+      if (!personalVk) return { status: "ok" as const };
+
+      const chRepo = isClickHouseEnabled()
+        ? new GatewayBudgetClickHouseRepository(async (projectId) => {
+            const client = await getClickHouseClientForProject(projectId);
+            if (!client) {
+              throw new Error(
+                `ClickHouse enabled but no client for project ${projectId}`,
+              );
+            }
+            return client;
+          })
+        : undefined;
+      const budgetService = GatewayBudgetService.create(ctx.prisma, chRepo);
+      const decision = await budgetService.check({
+        organizationId: input.organizationId,
+        teamId: workspace.team.id,
+        projectId: workspace.project.id,
+        virtualKeyId: personalVk.id,
+        principalUserId: userId,
+        projectedCostUsd: 0,
+      });
+
+      // Status mapping: hard_block → exceeded (red banner),
+      // soft_warn → warning (yellow banner), allow → ok (no banner).
+      if (decision.decision === "allow") return { status: "ok" as const };
+
+      const blocker =
+        decision.blockedBy[0] ??
+        decision.scopes
+          .map((s) => ({ ...s, pctUsed: percentUsed(s.spentUsd, s.limitUsd) }))
+          .filter((s) => s.pctUsed >= 80)
+          .sort((a, b) => b.pctUsed - a.pctUsed)[0];
+      if (!blocker) return { status: "ok" as const };
+
+      const adminEmail = await resolveOrgAdminEmail({
+        prisma: ctx.prisma,
+        organizationId: input.organizationId,
+      });
+      const baseStatus =
+        decision.decision === "hard_block"
+          ? ("exceeded" as const)
+          : ("warning" as const);
+      return {
+        status: baseStatus,
+        scope: normalizeScope(blocker.scope),
+        spentUsd: blocker.spentUsd,
+        limitUsd: blocker.limitUsd,
+        period: blocker.window.toLowerCase(),
+        requestIncreaseUrl: requestIncreaseUrl({
+          baseUrl: env.NEXTAUTH_URL ?? env.BASE_HOST ?? null,
+          scope: normalizeScope(blocker.scope),
+          scopeId: blocker.scopeId,
+          limitUsd: blocker.limitUsd,
+          spentUsd: blocker.spentUsd,
+        }),
+        adminEmail,
+      };
+    }),
+
+  /**
+   * CLI bootstrap data for the Storyboard Screen 4 login-completion
+   * ceremony. Returns inherited providers (with display name + model
+   * list) + monthly budget (limit + used). Powers the
+   * `formatLoginCeremony({ providers, budget })` rich-enrichment
+   * variant in typescript-sdk.
+   *
+   * Wire shape — every field always populated:
+   *   {
+   *     providers: Array<{ name, displayName, models[] }>;
+   *     budget: { monthlyLimitUsd: number | null, monthlyUsedUsd: number, period: string };
+   *   }
+   *
+   * Empty-state safe: returns providers=[] + budget={null, 0, MONTHLY}
+   * when the user has no personal workspace yet (fresh login,
+   * no admin VK provisioning yet).
+   *
+   * Per @ai_gateway_andre b8b21bb79 (1.5a-cli-1 ceremony) +
+   * Phase 1B.5 fold (5be9a5004).
+   */
+  cliBootstrap: protectedProcedure
+    .input(z.object({ organizationId: z.string() }))
+    .use(checkOrganizationPermission("organization:view"))
+    .query(async ({ ctx, input }) => {
+      const service = CliBootstrapService.create(ctx.prisma);
+      return await service.resolve({
+        userId: ctx.session.user.id,
+        organizationId: input.organizationId,
+      });
+    }),
 });
+
+// ---------------------------------------------------------------------------
+// personalBudget helpers
+// ---------------------------------------------------------------------------
+
+function percentUsed(spentUsd: string, limitUsd: string): number {
+  const limit = Number.parseFloat(limitUsd);
+  if (!Number.isFinite(limit) || limit <= 0) return 0;
+  const spent = Number.parseFloat(spentUsd);
+  return (spent / limit) * 100;
+}
+
+/** Map server-side scope codes to the wire-shape values the
+ *  BudgetExceededBanner + CLI Screen-8 box accept. */
+function normalizeScope(scope: string): string {
+  const s = scope.toLowerCase();
+  // VIRTUAL_KEY-scope blocks are surfaced as "personal" in the
+  // user-facing banner — that matches the CLI's normalization.
+  if (s === "virtual_key") return "personal";
+  return s;
+}
+
+function requestIncreaseUrl(opts: {
+  baseUrl: string | null;
+  scope: string;
+  scopeId: string;
+  limitUsd: string;
+  spentUsd: string;
+}): string | undefined {
+  if (!opts.baseUrl) return undefined;
+  const params = new URLSearchParams({
+    scope: opts.scope,
+    scope_id: opts.scopeId,
+    limit_usd: opts.limitUsd,
+    spent_usd: opts.spentUsd,
+  });
+  return `${opts.baseUrl.replace(/\/$/, "")}/me/budget/request?${params.toString()}`;
+}
+
+async function resolveOrgAdminEmail({
+  prisma,
+  organizationId,
+}: {
+  prisma: PrismaClient;
+  organizationId: string;
+}): Promise<string | undefined> {
+  const admin = await prisma.organizationUser.findFirst({
+    where: { organizationId, role: "ADMIN" },
+    include: { user: { select: { email: true } } },
+    orderBy: { createdAt: "asc" },
+  });
+  return admin?.user.email ?? undefined;
+}

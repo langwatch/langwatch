@@ -80,6 +80,7 @@ function makeService(opts: {
   updateReturn?: VirtualKeyWithChain;
   rotateReturn?: VirtualKeyWithChain;
   revokeReturn?: VirtualKeyWithChain;
+  routingPolicy?: { id: string; organizationId: string } | null;
 } = {}): Mocks {
   const existing = opts.existing === undefined ? stubVkRow() : opts.existing;
   const createReturn = opts.createReturn ?? stubVkRow();
@@ -97,6 +98,9 @@ function makeService(opts: {
   const changeAppend = vi.fn(async () => ({ revision: 1n }));
   const providerCount = vi.fn(async () => opts.providerCredentialCount ?? 1);
   const vkUpdateMock = vi.fn(async () => updateReturn);
+  const routingPolicyFindUnique = vi.fn(
+    async () => opts.routingPolicy ?? null,
+  );
 
   const repository = {
     findAll: async () => [],
@@ -115,6 +119,7 @@ function makeService(opts: {
   const prisma = {
     gatewayProviderCredential: { count: providerCount },
     virtualKey: { update: vkUpdateMock },
+    routingPolicy: { findUnique: routingPolicyFindUnique },
     $transaction: async (fn: (tx: unknown) => Promise<unknown>) =>
       fn({ virtualKey: { update: vkUpdateMock } }),
   } as unknown as PrismaClient;
@@ -220,6 +225,92 @@ describe("VirtualKeyService.create", () => {
       // Defaults survive the partial merge.
       expect(created.config.fallback.on).toContain("5xx");
       expect(created.config.guardrails.requestFailOpen).toBe(false);
+    });
+  });
+
+  describe("when routingPolicyId is set", () => {
+    describe("and providerCredentialIds is non-empty", () => {
+      it("throws BAD_REQUEST — policy is the source of truth, callers must not duplicate the chain", async () => {
+        const mocks = makeService({
+          routingPolicy: { id: "rp_01", organizationId: "org_01" },
+        });
+
+        await expect(
+          mocks.service.create({
+            ...baseCreate,
+            providerCredentialIds: ["gpc_01"],
+            routingPolicyId: "rp_01",
+          }),
+        ).rejects.toThrow(/providerCredentialIds must be empty/);
+        expect(mocks.createMock).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("and the policy belongs to a different organization", () => {
+      it("throws FORBIDDEN — cross-org policy reference is privilege escalation", async () => {
+        const mocks = makeService({
+          routingPolicy: { id: "rp_01", organizationId: "org_OTHER" },
+        });
+
+        await expect(
+          mocks.service.create({
+            ...baseCreate,
+            providerCredentialIds: [],
+            routingPolicyId: "rp_01",
+          }),
+        ).rejects.toMatchObject({ code: "FORBIDDEN" });
+        expect(mocks.createMock).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("and the policy does not exist", () => {
+      it("throws NOT_FOUND so the dispatcher never sees a dangling reference", async () => {
+        const mocks = makeService({ routingPolicy: null });
+
+        await expect(
+          mocks.service.create({
+            ...baseCreate,
+            providerCredentialIds: [],
+            routingPolicyId: "rp_missing",
+          }),
+        ).rejects.toMatchObject({ code: "NOT_FOUND" });
+      });
+    });
+
+    describe("and the policy is valid + IDs are empty (personal-VK happy path)", () => {
+      it("creates the VK and binds the policy in the same transaction", async () => {
+        const mocks = makeService({
+          routingPolicy: { id: "rp_01", organizationId: "org_01" },
+        });
+
+        await mocks.service.create({
+          ...baseCreate,
+          providerCredentialIds: [],
+          routingPolicyId: "rp_01",
+        });
+
+        // The per-project ownership check is skipped on the policy path.
+        expect(mocks.providerCount).not.toHaveBeenCalled();
+        // Repo.create runs inside the tx with no embedded chain.
+        expect(mocks.createMock).toHaveBeenCalledOnce();
+        const createArgs = mocks.createMock.mock.calls[0]?.[0] as {
+          providerCredentialIds: unknown[];
+        };
+        expect(createArgs.providerCredentialIds).toEqual([]);
+        // The VK row's routingPolicyId is set in the same tx (single
+        // virtualKey.update call inside $transaction).
+        expect(mocks.vkUpdateMock).toHaveBeenCalledOnce();
+        const updateArgs = mocks.vkUpdateMock.mock.calls[0]?.[0] as {
+          where: { id: string; projectId: string };
+          data: { routingPolicyId: string };
+        };
+        expect(updateArgs.data.routingPolicyId).toBe("rp_01");
+        // projectId MUST be in the where clause — dbMultiTenancyProtection
+        // rejects update queries on project-scoped models without it.
+        // (Bug #3: original patch used `where: { id: vk.id }` only and
+        // the middleware threw at runtime in PersonalVirtualKey flow.)
+        expect(updateArgs.where.projectId).toBe("proj_01");
+      });
     });
   });
 });

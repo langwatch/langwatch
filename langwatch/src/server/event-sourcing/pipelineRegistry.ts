@@ -53,6 +53,14 @@ import {
   createGatewayBudgetSyncReactor,
   type GatewayBudgetSyncReactorDeps,
 } from "./pipelines/trace-processing/reactors/gatewayBudgetSync.reactor";
+import {
+  createGovernanceKpisSyncReactor,
+  type GovernanceKpisSyncReactorDeps,
+} from "./pipelines/trace-processing/reactors/governanceKpisSync.reactor";
+import {
+  createGovernanceOcsfEventsSyncReactor,
+  type GovernanceOcsfEventsSyncReactorDeps,
+} from "./pipelines/trace-processing/reactors/governanceOcsfEventsSync.reactor";
 import type { ComputeExperimentRunMetricsCommandData } from "./pipelines/experiment-run-processing/schemas/commands";
 
 import { createElasticsearchBatchEvaluationRepository } from "../evaluations-v3/repositories/elasticsearchBatchEvaluation.repository";
@@ -180,6 +188,8 @@ export interface PipelineRegistryDeps {
   billingCheckpoints: BillingCheckpointService;
   usageReportingService?: UsageReportingService;
   gatewayBudgetSync?: GatewayBudgetSyncReactorDeps;
+  governanceKpisSync?: GovernanceKpisSyncReactorDeps;
+  governanceOcsfEventsSync?: GovernanceOcsfEventsSyncReactorDeps;
 }
 
 /**
@@ -371,6 +381,14 @@ export class PipelineRegistry {
       ? createGatewayBudgetSyncReactor(this.deps.gatewayBudgetSync)
       : undefined;
 
+    const governanceKpisSyncReactor = this.deps.governanceKpisSync
+      ? createGovernanceKpisSyncReactor(this.deps.governanceKpisSync)
+      : undefined;
+
+    const governanceOcsfEventsSyncReactor = this.deps.governanceOcsfEventsSync
+      ? createGovernanceOcsfEventsSyncReactor(this.deps.governanceOcsfEventsSync)
+      : undefined;
+
     const tracePipeline = this.deps.eventSourcing.register(
       createTraceProcessingPipeline({
         spanAppendStore: new SpanAppendStore(this.deps.traces.spans.repository),
@@ -387,6 +405,8 @@ export class PipelineRegistry {
         experimentMetricsSyncReactor,
         spanStorageBroadcastReactor,
         gatewayBudgetSyncReactor,
+        governanceKpisSyncReactor,
+        governanceOcsfEventsSyncReactor,
       }),
     );
 

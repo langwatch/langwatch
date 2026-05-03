@@ -14,6 +14,7 @@ export const projectFactory = Factory.define<Project>(({ sequence }) => ({
   teamId: nanoid(),
   language: "en",
   framework: "langchain",
+  kind: "application",
   firstMessage: false,
   integrated: false,
   createdAt: new Date(),
@@ -31,5 +32,7 @@ export const projectFactory = Factory.define<Project>(({ sequence }) => ({
   s3SecretAccessKey: null,
   s3Bucket: null,
   archivedAt: null,
+  isPersonal: false,
+  ownerUserId: null,
   presenceEnabled: false,
 }));

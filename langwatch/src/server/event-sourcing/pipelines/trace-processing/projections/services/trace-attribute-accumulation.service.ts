@@ -27,6 +27,17 @@ export const SPAN_ATTR_MAPPINGS = [
   // gateway_budget_ledger_events stays empty.
   ["langwatch.virtual_key_id", "langwatch.virtual_key_id"],
   ["langwatch.gateway_request_id", "langwatch.gateway_request_id"],
+  // Governance ingest markers — stamped on every span by the
+  // /api/ingest/otel/:sourceId receiver (langwatch/src/server/routes/ingest/ingestionRoutes.ts).
+  // Hoisted into trace_summaries so the ActivityMonitorService dashboard
+  // queries can roll up spend / users / events by ingestion source without
+  // having to scan stored_spans. The receiver is the only emitter of
+  // these keys; non-governance traces never carry them.
+  ["langwatch.origin.kind", "langwatch.origin.kind"],
+  ["langwatch.ingestion_source.id", "langwatch.ingestion_source.id"],
+  ["langwatch.ingestion_source.organization_id", "langwatch.ingestion_source.organization_id"],
+  ["langwatch.ingestion_source.source_type", "langwatch.ingestion_source.source_type"],
+  ["langwatch.governance.retention_class", "langwatch.governance.retention_class"],
 ] as const;
 
 export const STANDARD_RESOURCE_PREFIXES = [

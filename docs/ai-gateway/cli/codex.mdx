@@ -6,7 +6,19 @@ sidebarTitle: Codex CLI
 
 The Codex CLI speaks the OpenAI Chat Completions and Responses APIs. Both are available from the LangWatch AI Gateway and Codex will work with either — set the two env vars and go.
 
-## Setup
+## Quick path — `langwatch codex` wrapper (recommended for personal IDE keys)
+
+If you've authenticated via `langwatch login --device` ([Personal IDE keys](/ai-gateway/governance/personal-keys)), the simplest invocation is the wrapper. It exec's Codex with the right env vars already pointing at your gateway:
+
+```bash
+langwatch codex "explain this repo"
+```
+
+All Codex flags / subcommands pass through unchanged — `langwatch codex` is byte-for-byte equivalent to bare `codex`, just with `OPENAI_BASE_URL` and `OPENAI_API_KEY` already set.
+
+## Manual setup — service VK / shared workstation
+
+If you have a **service-virtual-key** for non-personal traffic, or you want every plain `codex` invocation to route through the gateway without the wrapper:
 
 ```bash
 export OPENAI_BASE_URL="https://gateway.langwatch.ai/v1"

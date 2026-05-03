@@ -1,0 +1,65 @@
+---
+title: Per-origin retention
+description: Each IngestionSource picks a retention class — `thirty_days` (default, operational), `one_year` (compliance baseline), or `seven_years` (regulated industry). ClickHouse TTL policy honours the class, system-derived from the origin attribute. Same storage, different lifetimes.
+sidebarTitle: Retention
+---
+
+LangWatch governance data lives in the same `recorded_spans` + `log_records` tables as every other trace your platform stores. What differs is **retention** — how long the data sticks around before it ages out. Every governance IngestionSource picks one of three retention classes; the trace pipeline writes the class as a denormalised column on each row, and ClickHouse TTL deletes per class.
+
+## The three classes
+
+| `IngestionSource.retentionClass` | Window | Use case |
+|---|---|---|
+| `thirty_days` (default) | 30 days | Day-to-day debugging, dashboards, SOC 2 / ISO 27001 baseline |
+| `one_year` | 1 year | SOC 2 audit window, GDPR right-to-be-forgotten window, EU AI Act general-purpose tier logging |
+| `seven_years` | 7 years | HIPAA-most-uses, financial audit windows, long-form regulated-industry retention |
+
+The `retentionClass` is set at the IngestionSource and stored on the Postgres `IngestionSource` row. It is **system-derived per source**, never user-supplied at OTLP ingest. Customer admins pick the class once at composer time + the receiver stamps `langwatch.governance.retention_class = <class>` on every span / log_record produced by that source.
+
+## Org plan ceiling
+
+The composer offers all three classes in the dropdown today; backend service-layer enforcement gates the upper tiers behind enterprise plans:
+
+- **Free / open-source self-host**: `thirty_days` only
+- **Team plan**: `thirty_days`, `one_year`
+- **Enterprise plan**: all three (`thirty_days`, `one_year`, `seven_years`)
+
+If a non-Enterprise admin attempts to mint an IngestionSource with `seven_years`, the API responds with a 403 + a clear "upgrade your plan to enable long-form retention" message. The CLI surfaces the same message with an upsell URL.
+
+## How the TTL works (under the hood)
+
+The trace pipeline's map projections (`spanStorage.mapProjection.ts`, `logRecordStorage.mapProjection.ts`) read `langwatch.governance.retention_class` from each span / log_record's attributes and denormalise it into a `RetentionClass LowCardinality(String) DEFAULT ''` column on `stored_spans` + `stored_log_records`. ClickHouse TTL policy applies per-class:
+
+```sql
+TTL StartTime + INTERVAL 30 DAY DELETE WHERE RetentionClass = 'thirty_days',
+    StartTime + INTERVAL 1 YEAR DELETE WHERE RetentionClass = 'one_year',
+    StartTime + INTERVAL 7 YEAR DELETE WHERE RetentionClass = 'seven_years'
+```
+
+Application-origin spans (no `langwatch.governance.retention_class` attribute) keep current default retention behaviour — `RetentionClass = ''` doesn't match any of the per-class TTL clauses, so application traces are unaffected.
+
+### SaaS / cold-storage installs
+
+For installs with `CLICKHOUSE_COLD_STORAGE_ENABLED=true` (LangWatch SaaS, dedicated dataplanes), the `ttlReconciler` extends the per-class DELETE TTL with a cold-storage MOVE TTL into a single combined `MODIFY TTL` clause. Per-class retention enforcement works identically across both install modes (self-hosted no-cold + SaaS with cold).
+
+## What this means for compliance
+
+For an SOC 2 / GDPR / HIPAA auditor asking about retention:
+
+- **The retention class on each IngestionSource is system-derived, not user-supplied per event** — meaning a malicious user cannot arbitrarily extend retention beyond their org's plan ceiling
+- **Deletion is enforced by the storage layer** (ClickHouse TTL), not by an application worker that could be skipped
+- **The `event_log` foundation provides non-repudiation** even after derived rows age out — see [Compliance architecture](/ai-gateway/governance/compliance-architecture) for the full mechanism set
+- **Application traces are unaffected** by governance retention classes — the policies are explicit per-row, not per-table
+
+## Changing a source's retention class
+
+A source admin can change `retentionClass` via the composer's edit flow. The change applies prospectively — new spans land with the new class; existing rows retain their original class until aged out. There is no retroactive re-class operation; that would risk silently shortening compliance evidence retention.
+
+If you need to extend retention on existing rows (e.g. an EU AI Act audit comes in mid-stream and you want the prior 6 months at `one_year` instead of `thirty_days`), contact your account rep — the operation requires manual data plane intervention.
+
+## Cross-references
+
+- [Compliance architecture](/ai-gateway/governance/compliance-architecture) — how the unified substrate underwrites SOC 2 / ISO 27001 / EU AI Act / GDPR / HIPAA-most-uses
+- [OCSF / SIEM export](/ai-gateway/governance/ocsf-export) — pulling governance events into your SIEM for additional retention or cross-correlation
+- [Ingestion sources](/ai-gateway/governance/ingestion-sources) — composer flow + per-platform setup
+- [ADR-018: governance unified observability substrate](https://github.com/langwatch/langwatch/blob/main/dev/docs/adr/018-governance-unified-observability-substrate.md) — the architecture decision record

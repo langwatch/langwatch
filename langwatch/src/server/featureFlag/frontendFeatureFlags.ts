@@ -54,6 +54,13 @@ export const FRONTEND_FEATURE_FLAGS = [
   "release_ui_dark_mode_enabled",
   "release_ui_negate_filters_enabled",
   "release_ui_ai_gateway_menu_enabled",
+  // Governance preview — gates the personal-keys / admin oversight /
+  // RoutingPolicy / IngestionSource UI surfaces on this long-lived
+  // branch. Default off until rchaves flips it for an org. Distinct
+  // from `release_ui_ai_gateway_menu_enabled` because the existing
+  // gateway product ships unblocked while governance keeps cooking.
+  // Force-enable in dev: `FEATURE_FLAG_FORCE_ENABLE=release_ui_ai_governance_enabled`.
+  "release_ui_ai_governance_enabled",
   "release_ui_traces_v2_enabled",
 ] as const;
 

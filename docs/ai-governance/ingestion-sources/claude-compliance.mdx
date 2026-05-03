@@ -1,0 +1,44 @@
+---
+title: Anthropic Claude Enterprise Compliance
+description: Setup contract only — workspace API key captured; the compliance API poller is pending.
+sidebarTitle: Anthropic Compliance
+---
+
+<Info>**Pairs with:** [AI Gateway → Anthropic provider](/ai-gateway/providers/anthropic). Direct Anthropic API traffic flows through the gateway data plane; Anthropic Enterprise Compliance API exports are a separate bulk feed routed through this ingestion source.</Info>
+
+`claude_compliance` polls Anthropic's compliance API with a workspace API key. Today the source can be created and the workspace API key is persisted server-side, but the cron worker that calls Anthropic hasn't shipped — events do not flow yet.
+
+This page documents the configuration contract so admins can pre-stage workspace keys; the matching adapter is on the [roadmap](/ai-governance/ingestion-sources/index#adapter-roadmap).
+
+## Currently implemented
+
+- **CRUD:** the source can be created via the admin composer at `/settings/governance/ingestion-sources` and via `api.ingestionSources.create`. It will appear in `langwatch ingest list` with status `awaiting_first_event`.
+- **Receiver:** none. There is no `/api/ingest/claude-compliance/:id` endpoint and the OTLP / webhook receivers reject `claude_compliance` sources with `400 wrong_endpoint`.
+- **Poller:** none.
+- **Normaliser:** none.
+- **Status flip:** the source will stay `awaiting_first_event` indefinitely until the poller ships.
+
+## What the admin configures upstream
+
+The composer collects:
+
+| Field | Required | Stored | Used by |
+|---|---|---|---|
+| Workspace API key | yes | `IngestionSource.payloadConfig.workspaceApiKey` (hashed server-side) | (future poller) |
+| Polling cadence (seconds) | no | `payloadConfig.pollEverySec` (default 300) | (future poller) |
+
+In Anthropic's admin console: **Compliance → Workspace API Keys → Generate**, paste the value into the LangWatch composer.
+
+There is no LangWatch-side URL to paste back into Anthropic — the future poller calls Anthropic's compliance API outbound from your LangWatch deployment using the workspace key above.
+
+## What event shape we accept today
+
+None — no events flow until the poller ships.
+
+## What is still envelope-only / follow-up work
+
+- **Compliance API poller worker.** A cron job that authenticates with the workspace API key, calls Anthropic's compliance feed (`/v1/compliance/...`), and walks the response for new events since the last watermark.
+- **Compliance event → governance event mapping.** Anthropic's compliance feed has its own JSON schema (organisation ID, workspace ID, model, message metadata, content classification). Mapping into Actor / Action / Target is pending and will live in a `claude-compliance.ts` normaliser.
+- **Watermark + dedup.** The poller will track the last seen event timestamp / cursor in `IngestionSource.payloadConfig.watermark` to avoid replays.
+
+When the poller ships, this page is updated with the real event shape, the CLI verification flow, and the per-source detail behaviour.

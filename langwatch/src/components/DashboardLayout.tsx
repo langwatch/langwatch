@@ -11,9 +11,8 @@ import {
   useBreakpointValue,
   VStack,
 } from "@chakra-ui/react";
-import type { Organization, Project, Team } from "@prisma/client";
-import { OrganizationUserRole } from "@prisma/client";
-import { Activity, ChevronDown, ChevronRight, Info, KeyRound, Plus } from "lucide-react";
+import { OrganizationUserRole, type Organization, type Project, type Team } from "@prisma/client";
+import { Activity, Building2, ChevronDown, ChevronRight, Info, KeyRound, Plus } from "lucide-react";
 import numeral from "numeral";
 import React, { useState } from "react";
 import { ErrorBoundary } from "react-error-boundary";
@@ -24,6 +23,7 @@ import { ImpersonationBanner } from "../../ee/admin/ImpersonationBanner";
 import { ImpersonationSwitchBackMenuItem } from "../../ee/admin/ImpersonationSwitchBackMenuItem";
 import { CommandBarTrigger } from "../features/command-bar";
 import { useDrawer } from "../hooks/useDrawer";
+import { useFeatureFlag } from "../hooks/useFeatureFlag";
 import { useLiteMemberGuard } from "../hooks/useLiteMemberGuard";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import { usePlanManagementUrl } from "../hooks/usePlanManagementUrl";
@@ -42,8 +42,11 @@ import { FullLogo } from "./icons/FullLogo";
 import { LogoIcon } from "./icons/LogoIcon";
 import { LoadingScreen } from "./LoadingScreen";
 import { MainMenu, MENU_WIDTH_COMPACT, MENU_WIDTH_EXPANDED } from "./MainMenu";
-import { SavedViewsBar } from "./messages/SavedViewsBar";
+import { PersonalSidebar } from "./PersonalSidebar";
 import { ProjectAvatar } from "./ProjectAvatar";
+import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
+import { useWorkspaceData } from "./useWorkspaceData";
+import { SavedViewsBar } from "./messages/SavedViewsBar";
 import { SdkRadarBanner } from "./SdkRadarBanner";
 import { UpgradeModal } from "./UpgradeModal";
 import { Link } from "./ui/link";
@@ -51,7 +54,12 @@ import { Menu } from "./ui/menu";
 import { PageErrorFallback } from "./ui/PageErrorFallback";
 
 const Breadcrumbs = ({ currentRoute }: { currentRoute: Route | undefined }) => {
-  const { project } = useOrganizationTeamProject();
+  // No redirects from the breadcrumb path — it only reads `project` for the
+  // dashboard link. The owning DashboardLayout call handles bouncing.
+  const { project } = useOrganizationTeamProject({
+    redirectToOnboarding: false,
+    redirectToProjectOnboarding: false,
+  });
 
   if (!currentRoute) return null;
 
@@ -83,6 +91,19 @@ const Breadcrumbs = ({ currentRoute }: { currentRoute: Route | undefined }) => {
     </HStack>
   );
 };
+
+/**
+ * Header chip rendered on personal-scope routes (`/me`, `/me/settings`).
+ * Replaces the legacy `<ProjectSelector>` so the user sees ONE workspace
+ * chip — the unified `WorkspaceSwitcher` with Personal + Teams + Projects
+ * groups — not two competing context indicators.
+ *
+ * Spec: specs/ai-gateway/governance/persona-aware-chrome.feature
+ */
+const PersonalScopeHeaderSwitcher = React.memo(function PersonalScopeHeaderSwitcher() {
+  const data = useWorkspaceData();
+  return <WorkspaceSwitcher {...data} current={{ kind: "personal" }} />;
+});
 
 export const ProjectSelector = React.memo(function ProjectSelector({
   organizations,
@@ -283,12 +304,31 @@ export const AddProjectButton = ({
 export type DashboardLayoutProps = {
   publicPage?: boolean;
   compactMenu?: boolean;
+  /**
+   * Set on personal-scope routes (`/me`, `/me/settings`) where the page
+   * intentionally has no project context. Disables the OTP hook's
+   * "no project → bounce to /onboarding or /<defaultProjectSlug>"
+   * redirect, which would otherwise hijack the route on first paint.
+   */
+  personalScope?: boolean;
+  /**
+   * Set on org-scope routes (`/governance`) where the page is scoped to
+   * an organization, not a project. Same effect as `personalScope` on
+   * project-redirect gating, but in the header replaces the
+   * `<ProjectSelector>` with a flat org-name indicator (admins crossing
+   * /governance ↔ /:project/* should never see the project picker on
+   * the governance side, since governance is org-scoped, not
+   * project-scoped — see governance-home-routing.feature).
+   */
+  orgScope?: boolean;
 } & StackProps;
 
 export const DashboardLayout = ({
   children,
   publicPage = false,
   compactMenu: compactMenuProp = false,
+  personalScope = false,
+  orgScope = false,
   ...props
 }: DashboardLayoutProps) => {
   // fallback: "lg" tells Chakra to assume large screen during SSR/initial render,
@@ -300,8 +340,12 @@ export const DashboardLayout = ({
 
   const { data: session } = useRequiredSession({ required: !publicPage });
 
+  const bypassProjectGating = personalScope || orgScope;
   const { isLoading, organization, organizations, team, project, organizationRole } =
-    useOrganizationTeamProject();
+    useOrganizationTeamProject({
+      redirectToOnboarding: !bypassProjectGating,
+      redirectToProjectOnboarding: !bypassProjectGating,
+    });
   const { isLiteMember } = useLiteMemberGuard();
   const usage = api.limits.getUsage.useQuery(
     { organizationId: organization?.id ?? "" },
@@ -317,6 +361,13 @@ export const DashboardLayout = ({
     {},
     { enabled: !!session },
   );
+  // The "My Workspace" entry in the user-avatar dropdown is part of the
+  // governance preview surface, distinct from the existing AI Gateway
+  // menu (which keeps shipping unblocked under release_ui_ai_gateway_menu_enabled).
+  const { enabled: governancePreviewEnabled } = useFeatureFlag(
+    "release_ui_ai_governance_enabled",
+    { projectId: project?.id, enabled: !!project },
+  );
 
   usePostHogIdentify({
     session: session ?? null,
@@ -329,14 +380,20 @@ export const DashboardLayout = ({
   }
 
   const isOpsRoute = router.pathname.startsWith("/ops");
+  const isPersonalScopeRoute = personalScope || router.pathname.startsWith("/me");
+  const isOrgScopeRoute = orgScope || router.pathname === "/governance";
 
   if (
     !publicPage &&
     (!session ||
       isLoading ||
-      !organization ||
-      !organizations ||
-      (!isOpsRoute && (!team || !project)))
+      // Persona-1 (org-less CLI/IDE devs) are a first-class persona on
+      // /me — they legitimately have no organization. Don't trap them
+      // in LoadingScreen on personal-scope routes. Other route classes
+      // (project chrome, ops, governance/orgScope) still require an
+      // organization context.
+      (!isPersonalScopeRoute && (!organization || !organizations)) ||
+      (!isOpsRoute && !isPersonalScopeRoute && !isOrgScopeRoute && (!team || !project)))
   ) {
     return <LoadingScreen />;
   }
@@ -447,6 +504,39 @@ export const DashboardLayout = ({
                 </Text>
               </HStack>
             </HStack>
+          ) : isOrgScopeRoute && organization ? (
+            <HStack gap={3} alignItems="center" paddingLeft={2}>
+              <HStack
+                gap={1.5}
+                paddingX={2.5}
+                height="28px"
+                borderRadius="md"
+                bg="bg.emphasized"
+              >
+                <Building2 size={14} />
+                <Text fontSize="sm" fontWeight="medium">
+                  {organization.name}
+                </Text>
+              </HStack>
+              <HStack
+                gap={1.5}
+                paddingX={2.5}
+                height="28px"
+                borderRadius="md"
+                bg="purple.500/8"
+                border="1px solid"
+                borderColor="purple.500/15"
+              >
+                <Info size={12} color="var(--chakra-colors-purple-400)" />
+                <Text fontSize="xs" color="purple.400">
+                  Organization-scoped — not tied to a project
+                </Text>
+              </HStack>
+            </HStack>
+          ) : isPersonalScopeRoute && organizations ? (
+            <HStack gap={0} alignItems="center" paddingLeft={2}>
+              <PersonalScopeHeaderSwitcher />
+            </HStack>
           ) : organizations && project ? (
             <HStack gap={0} alignItems="center">
               <ProjectSelector
@@ -541,6 +631,11 @@ export const DashboardLayout = ({
                   <Menu.ItemGroup
                     title={`${session.user.name} (${session.user.email})`}
                   >
+                    {governancePreviewEnabled && (
+                      <Menu.Item value="my-workspace" asChild>
+                        <Link href="/me">My Workspace</Link>
+                      </Menu.Item>
+                    )}
                     {!isLiteMember && (
                       <Menu.Item value="api-keys" asChild>
                         <Link href="/settings/api-keys">
@@ -569,7 +664,11 @@ export const DashboardLayout = ({
         gap={0}
         minHeight="calc(100vh - 56px)"
       >
-        <MainMenu isCompact={compactMenu} />
+        {isPersonalScopeRoute ? (
+          <PersonalSidebar isCompact={compactMenu} />
+        ) : (
+          <MainMenu isCompact={compactMenu} />
+        )}
 
         <Box
           width="full"

@@ -71,6 +71,23 @@ export const Resources = {
   GATEWAY_LOGS: "gatewayLogs",
   GATEWAY_USAGE: "gatewayUsage",
   GATEWAY_CACHE_RULES: "gatewayCacheRules",
+  // AI Governance resources — see specs/ai-gateway/governance/. These are
+  // org-level (not project/team-level), so they live in
+  // ORGANIZATION_ROLE_PERMISSIONS rather than the team role bags. Custom
+  // roles can grant any subset via the existing CustomRolePermissions JSON
+  // column without requiring a Prisma enum change.
+  GOVERNANCE: "governance",
+  INGESTION_SOURCES: "ingestionSources",
+  ANOMALY_RULES: "anomalyRules",
+  COMPLIANCE_EXPORT: "complianceExport",
+  ACTIVITY_MONITOR: "activityMonitor",
+  // AI Tools Portal (Phase 7) — the customizable per-org card grid on
+  // /me. Two permissions:
+  //   - aiTools:view → ALL org roles. Portal must work for every member
+  //     so they can discover what's available + click through to setup.
+  //   - aiTools:manage → org ADMIN only. Catalog editor surface at
+  //     /settings/governance/tool-catalog (CRUD + reorder + enable).
+  AI_TOOLS: "aiTools",
 } as const;
 
 export type Resource = (typeof Resources)[keyof typeof Resources];
@@ -294,9 +311,38 @@ const ORGANIZATION_ROLE_PERMISSIONS: Record<
     "organization:view",
     "organization:manage",
     "organization:delete",
+    // AI Governance — org-level permissions for the governance offering
+    // (anomaly rules, ingestion sources, OCSF SIEM export, activity
+    // monitor, top-level Govern section). Default-attached to ADMIN so
+    // admins can bootstrap their first IngestionSource without a
+    // chicken-and-egg gate. MEMBER + EXTERNAL get nothing by default;
+    // custom roles via CustomRolePermissions JSON column are the
+    // production-shape delegation surface (e.g. a "security_analyst"
+    // custom role granting governance:view + activityMonitor:view +
+    // anomalyRules:view).
+    "governance:view",
+    "governance:manage",
+    "ingestionSources:view",
+    "ingestionSources:create",
+    "ingestionSources:update",
+    "ingestionSources:delete",
+    "ingestionSources:manage",
+    "anomalyRules:view",
+    "anomalyRules:create",
+    "anomalyRules:update",
+    "anomalyRules:delete",
+    "anomalyRules:manage",
+    "complianceExport:view",
+    "activityMonitor:view",
+    // AI Tools Portal — admin owns the catalog. View is implicit via
+    // the org-wide grant below (admins also see the user-facing portal).
+    "aiTools:view",
+    "aiTools:manage",
   ],
-  [OrganizationUserRole.MEMBER]: ["organization:view"],
-  [OrganizationUserRole.EXTERNAL]: ["organization:view"], // Limited view for Lite Member users
+  // MEMBER + EXTERNAL get aiTools:view so the /me portal renders for
+  // every org member. Catalog management stays admin-only.
+  [OrganizationUserRole.MEMBER]: ["organization:view", "aiTools:view"],
+  [OrganizationUserRole.EXTERNAL]: ["organization:view", "aiTools:view"],
 };
 
 /**

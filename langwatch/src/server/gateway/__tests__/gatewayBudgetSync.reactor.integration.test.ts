@@ -44,7 +44,10 @@ const USER_ID = `usr-${suffix}`;
 const VK_ID = `vk_${suffix}`;
 const BUDGET_ID = `bdg-${suffix}`;
 
-function buildFoldState(attrs: Record<string, string>): TraceSummaryData {
+function buildFoldState(
+  attrs: Record<string, string>,
+  overrides: { totalCost?: number } = {},
+): TraceSummaryData {
   const now = Date.now();
   return {
     traceId: `trace-${suffix}`,
@@ -60,7 +63,7 @@ function buildFoldState(attrs: Record<string, string>): TraceSummaryData {
     containsOKStatus: true,
     errorMessage: null,
     models: ["gpt-5-mini"],
-    totalCost: 0.0125,
+    totalCost: overrides.totalCost ?? 0.0125,
     tokensEstimated: false,
     totalPromptTokenCount: 300,
     totalCompletionTokenCount: 150,
@@ -292,5 +295,206 @@ describe("gatewayBudgetSync reactor — real PG + real CH", () => {
     // from the triple-fire plus 0.0125 from prior test = 0.0500.
     const spent = Number.parseFloat(projectScope!.spentUsd);
     expect(spent).toBeCloseTo(0.025, 3);
+  }, 60_000);
+
+  // ==========================================================================
+  // Phase 5 reactor backpressure scenarios — measure-and-pin current
+  // behaviour under load. Pure characterization; no new mechanism shipped
+  // here (timeouts, retries, bounded queues are post-merge follow-ups).
+  // ==========================================================================
+
+  it("burst: 100 distinct traces folded in parallel — all spend reflects in /budget/check", async () => {
+    const chRepo = new GatewayBudgetClickHouseRepository(async () => {
+      const { getTestClickHouseClient } = await import(
+        "~/server/event-sourcing/__tests__/integration/testContainers"
+      );
+      const client = getTestClickHouseClient();
+      if (!client) throw new Error("Test CH client not initialised");
+      return client;
+    });
+    const reactor = createGatewayBudgetSyncReactor({
+      prisma,
+      budgetRepository: new GatewayBudgetRepository(prisma),
+      budgetCHRepository: chRepo,
+    });
+
+    // Capture pre-burst baseline so we measure the delta this test
+    // contributed (prior tests may have left spend in CH).
+    const service = GatewayBudgetService.create(prisma, chRepo);
+    const baseline = await service.check({
+      organizationId: ORG_ID,
+      teamId: TEAM_ID,
+      projectId: PROJECT_ID,
+      virtualKeyId: VK_ID,
+      principalUserId: USER_ID,
+      projectedCostUsd: 0,
+    });
+    const baselineProj = baseline.scopes.find(
+      (s) => s.scope === "project" && s.scopeId === PROJECT_ID,
+    );
+    const baselineSpent = Number.parseFloat(baselineProj?.spentUsd ?? "0");
+
+    // 100 distinct traces, each 0.0001 cost (so total 0.01 — well
+    // under the 1.00 budget even with prior-test accumulation).
+    const N = 100;
+    const PER_TRACE_COST = 0.0001;
+    const start = Date.now();
+    await Promise.all(
+      Array.from({ length: N }, (_, i) =>
+        reactor.handle(
+          buildEvent(),
+          ctx(
+            buildFoldState(
+              {
+                "langwatch.virtual_key_id": VK_ID,
+                "langwatch.gateway_request_id": `req-${suffix}-burst-${i}`,
+              },
+              { totalCost: PER_TRACE_COST },
+            ),
+          ),
+        ),
+      ),
+    );
+    const elapsedMs = Date.now() - start;
+    // eslint-disable-next-line no-console
+    console.log(
+      `[reactor-backpressure] burst N=${N} distinct traces in ${elapsedMs}ms (${(elapsedMs / N).toFixed(1)}ms/trace avg)`,
+    );
+
+    const after = await service.check({
+      organizationId: ORG_ID,
+      teamId: TEAM_ID,
+      projectId: PROJECT_ID,
+      virtualKeyId: VK_ID,
+      principalUserId: USER_ID,
+      projectedCostUsd: 0,
+    });
+    const afterProj = after.scopes.find(
+      (s) => s.scope === "project" && s.scopeId === PROJECT_ID,
+    );
+    const afterSpent = Number.parseFloat(afterProj!.spentUsd);
+    const delta = afterSpent - baselineSpent;
+
+    // 100 × 0.0001 = 0.01 expected. Accept tiny floating-point drift
+    // from CH Decimal(18, 10) round-trip.
+    expect(delta).toBeCloseTo(N * PER_TRACE_COST, 4);
+  }, 60_000);
+
+  it("CH error swallow: insertDebit throws — reactor returns cleanly, pipeline stays alive", async () => {
+    // Stub the CH repo to always throw. Mirrors a CH outage / network
+    // partition / rejected write. The reactor's contract is
+    // best-effort: errors get logged + captured but never propagate
+    // up to the trace-processing pipeline (otherwise a CH outage
+    // would crash the entire trace-fold).
+    const failingChRepo = {
+      insertDebit: async () => {
+        throw new Error("simulated ClickHouse insert failure");
+      },
+    } as unknown as GatewayBudgetClickHouseRepository;
+
+    const reactor = createGatewayBudgetSyncReactor({
+      prisma,
+      budgetRepository: new GatewayBudgetRepository(prisma),
+      budgetCHRepository: failingChRepo,
+    });
+
+    // The handle() call must NOT throw — pipeline isolation invariant.
+    await expect(
+      reactor.handle(
+        buildEvent(),
+        ctx(
+          buildFoldState(
+            {
+              "langwatch.virtual_key_id": VK_ID,
+              "langwatch.gateway_request_id": `req-${suffix}-ch-error`,
+            },
+            { totalCost: 0.0001 },
+          ),
+        ),
+      ),
+    ).resolves.toBeUndefined();
+  }, 30_000);
+
+  it("same-trace replay: SEQUENTIAL same-gateway_request_id calls dedup via insertDebit probe — only one effective debit", async () => {
+    // App-side dedup at insertDebit (probe SELECT before INSERT,
+    // budget.clickhouse.repository.ts:124) collapses sequential
+    // replays of the same gateway_request_id. The existing
+    // "fires the reactor idempotently" test above already proves
+    // 3 sequential fires = 1 effective row; this scenario extends
+    // to 50 sequential fires to characterise the dedup limit and
+    // pin the contract under heavier replay pressure (e.g. a job
+    // worker that retries the same trace 50 times after a
+    // pipeline restart).
+    //
+    // Note on PARALLEL same-id fires: the probe-then-insert is
+    // not race-free under TRUE parallelism — N concurrent
+    // invocations may all probe an empty ledger before any
+    // insert lands, then all insert. That is mitigated in
+    // production by the reactor's `makeJobId` TTL (5 min) which
+    // sequentialises same-trace replay at the BullMQ layer
+    // before the reactor runs. The probe-race characterisation
+    // is captured as a follow-up perf row; this slice
+    // intentionally does NOT assert against the parallel case.
+    const chRepo = new GatewayBudgetClickHouseRepository(async () => {
+      const { getTestClickHouseClient } = await import(
+        "~/server/event-sourcing/__tests__/integration/testContainers"
+      );
+      const client = getTestClickHouseClient();
+      if (!client) throw new Error("Test CH client not initialised");
+      return client;
+    });
+    const reactor = createGatewayBudgetSyncReactor({
+      prisma,
+      budgetRepository: new GatewayBudgetRepository(prisma),
+      budgetCHRepository: chRepo,
+    });
+
+    const service = GatewayBudgetService.create(prisma, chRepo);
+    const baseline = await service.check({
+      organizationId: ORG_ID,
+      teamId: TEAM_ID,
+      projectId: PROJECT_ID,
+      virtualKeyId: VK_ID,
+      principalUserId: USER_ID,
+      projectedCostUsd: 0,
+    });
+    const baselineSpent = Number.parseFloat(
+      baseline.scopes.find(
+        (s) => s.scope === "project" && s.scopeId === PROJECT_ID,
+      )?.spentUsd ?? "0",
+    );
+
+    const reqId = `req-${suffix}-replay-burst`;
+    const fold = buildFoldState(
+      {
+        "langwatch.virtual_key_id": VK_ID,
+        "langwatch.gateway_request_id": reqId,
+      },
+      { totalCost: 0.0001 },
+    );
+    const N = 50;
+    for (let i = 0; i < N; i++) {
+      await reactor.handle(buildEvent(), ctx(fold));
+    }
+
+    const after = await service.check({
+      organizationId: ORG_ID,
+      teamId: TEAM_ID,
+      projectId: PROJECT_ID,
+      virtualKeyId: VK_ID,
+      principalUserId: USER_ID,
+      projectedCostUsd: 0,
+    });
+    const afterSpent = Number.parseFloat(
+      after.scopes.find(
+        (s) => s.scope === "project" && s.scopeId === PROJECT_ID,
+      )!.spentUsd,
+    );
+    const delta = afterSpent - baselineSpent;
+
+    // 50 SEQUENTIAL invocations of the SAME gateway_request_id → only
+    // 0.0001 counts (not 50 × 0.0001). If app-side probe dedup
+    // failed we'd see delta ≈ 0.005 instead of ≈ 0.0001.
+    expect(delta).toBeCloseTo(0.0001, 4);
   }, 60_000);
 });

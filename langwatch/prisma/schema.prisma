@@ -2,17 +2,17 @@
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
 generator client {
-    provider = "prisma-client-js"
+  provider = "prisma-client-js"
 }
 
 datasource db {
-    provider     = "postgresql"
-    // NOTE: When using mysql or sqlserver, uncomment the @db.Text annotations in model Account below
-    // Further reading:
-    // https://next-auth.js.org/adapters/prisma#create-the-prisma-schema
-    // https://www.prisma.io/docs/reference/api-reference/prisma-schema-reference#string
-    url          = env("DATABASE_URL")
-    relationMode = "prisma"
+  provider     = "postgresql"
+  // NOTE: When using mysql or sqlserver, uncomment the @db.Text annotations in model Account below
+  // Further reading:
+  // https://next-auth.js.org/adapters/prisma#create-the-prisma-schema
+  // https://www.prisma.io/docs/reference/api-reference/prisma-schema-reference#string
+  url          = env("DATABASE_URL")
+  relationMode = "prisma"
 }
 
 // BetterAuth-compatible Account. Column names preserved; BetterAuth's field
@@ -20,678 +20,724 @@ datasource db {
 // these columns. `password` is new — credential passwords moved here from
 // `User.password` in the better_auth_cutover migration.
 model Account {
-    id                String   @id @default(nanoid())
-    userId            String
-    type              String   @default("oauth")
-    provider          String
-    providerAccountId String
-    refresh_token     String?  @db.Text
-    access_token      String?  @db.Text
-    expires_at        DateTime?
-    ext_expires_in    Int?
-    token_type        String?
-    scope             String?
-    id_token          String?  @db.Text
-    session_state     String?
-    password          String?  @db.Text
-    user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-    createdAt         DateTime @default(now())
-    updatedAt         DateTime @default(now()) @updatedAt
+  id                String    @id @default(nanoid())
+  userId            String
+  type              String    @default("oauth")
+  provider          String
+  providerAccountId String
+  refresh_token     String?   @db.Text
+  access_token      String?   @db.Text
+  expires_at        DateTime?
+  ext_expires_in    Int?
+  token_type        String?
+  scope             String?
+  id_token          String?   @db.Text
+  session_state     String?
+  password          String?   @db.Text
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @default(now()) @updatedAt
 
-    @@unique([provider, providerAccountId])
-    @@index([userId])
+  @@unique([provider, providerAccountId])
+  @@index([userId])
 }
 
 model Session {
-    id            String   @id @default(nanoid())
-    sessionToken  String   @unique
-    userId        String
-    expires       DateTime
-    user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-    impersonating Json?
-    ipAddress     String?
-    userAgent     String?  @db.Text
-    createdAt     DateTime @default(now())
-    updatedAt     DateTime @default(now()) @updatedAt
+  id            String   @id @default(nanoid())
+  sessionToken  String   @unique
+  userId        String
+  expires       DateTime
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  impersonating Json?
+  ipAddress     String?
+  userAgent     String?  @db.Text
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @default(now()) @updatedAt
 
-    @@index([userId])
+  @@index([userId])
 }
 
 model User {
-    id                      String                   @id @default(nanoid())
-    name                    String?
-    email                   String?                  @unique
-    emailVerified           Boolean                  @default(false)
-    image                   String?                  @db.Text
-    pendingSsoSetup         Boolean                  @default(false)
-    accounts                Account[]
-    sessions                Session[]
-    teamMemberships         TeamUser[]
-    orgMemberships          OrganizationUser[]
-    createdAt               DateTime                 @default(now())
-    updatedAt               DateTime                 @default(now()) @updatedAt
-    lastLoginAt             DateTime?
-    deactivatedAt           DateTime?
-    Annotation              Annotation[]
-    publicShares            PublicShare[]
-    Workflow                Workflow[]
-    WorkflowVersion         WorkflowVersion[]
-    annotationQueues        AnnotationQueueMembers[]
-    assignedQueueItems      AnnotationQueueItem[]    @relation("AssignedTo")
-    createdQueueItems       AnnotationQueueItem[]    @relation("CreatedBy")
-    llmPromptConfigVersions LlmPromptConfigVersion[]
-    scenarios               Scenario[]
-    inviteRequests          OrganizationInvite[]
-    secretsCreated          ProjectSecret[]          @relation("secretCreatedBy")
-    secretsUpdated          ProjectSecret[]          @relation("secretUpdatedBy")
-    savedViews              SavedView[]
-    versionTagsCreated      PromptTagAssignment[]  @relation("versionTagCreatedBy")
-    versionTagsUpdated      PromptTagAssignment[]  @relation("versionTagUpdatedBy")
-    promptTagsCreated       PromptTag[]            @relation("promptTagCreatedBy")
-    promptTagsUpdated       PromptTag[]            @relation("promptTagUpdatedBy")
-    groupMemberships        GroupMembership[]
-    roleBindings            RoleBinding[]
-    personalAccessTokens    PersonalAccessToken[]
-    virtualKeysCreated      VirtualKey[]           @relation("VirtualKeyCreatedBy")
-    virtualKeysRevoked      VirtualKey[]           @relation("VirtualKeyRevokedBy")
-    gatewayBudgetsCreated   GatewayBudget[]        @relation("GatewayBudgetCreatedBy")
-    principalVirtualKeys    VirtualKey[]           @relation("VirtualKeyPrincipalUser")
-    principalGatewayBudgets GatewayBudget[]        @relation("PrincipalScopedGatewayBudgets")
+  id                      String                   @id @default(nanoid())
+  name                    String?
+  email                   String?                  @unique
+  emailVerified           Boolean                  @default(false)
+  image                   String?                  @db.Text
+  pendingSsoSetup         Boolean                  @default(false)
+  accounts                Account[]
+  sessions                Session[]
+  teamMemberships         TeamUser[]
+  orgMemberships          OrganizationUser[]
+  createdAt               DateTime                 @default(now())
+  updatedAt               DateTime                 @default(now()) @updatedAt
+  lastLoginAt             DateTime?
+  deactivatedAt           DateTime?
+  Annotation              Annotation[]
+  publicShares            PublicShare[]
+  Workflow                Workflow[]
+  WorkflowVersion         WorkflowVersion[]
+  annotationQueues        AnnotationQueueMembers[]
+  assignedQueueItems      AnnotationQueueItem[]    @relation("AssignedTo")
+  createdQueueItems       AnnotationQueueItem[]    @relation("CreatedBy")
+  llmPromptConfigVersions LlmPromptConfigVersion[]
+  scenarios               Scenario[]
+  inviteRequests          OrganizationInvite[]
+  secretsCreated          ProjectSecret[]          @relation("secretCreatedBy")
+  secretsUpdated          ProjectSecret[]          @relation("secretUpdatedBy")
+  savedViews              SavedView[]
+  versionTagsCreated      PromptTagAssignment[]    @relation("versionTagCreatedBy")
+  versionTagsUpdated      PromptTagAssignment[]    @relation("versionTagUpdatedBy")
+  promptTagsCreated       PromptTag[]              @relation("promptTagCreatedBy")
+  promptTagsUpdated       PromptTag[]              @relation("promptTagUpdatedBy")
+  groupMemberships        GroupMembership[]
+  roleBindings            RoleBinding[]
+  personalAccessTokens    PersonalAccessToken[]
+  virtualKeysCreated      VirtualKey[]             @relation("VirtualKeyCreatedBy")
+  virtualKeysRevoked      VirtualKey[]             @relation("VirtualKeyRevokedBy")
+  gatewayBudgetsCreated   GatewayBudget[]          @relation("GatewayBudgetCreatedBy")
+  principalVirtualKeys    VirtualKey[]             @relation("VirtualKeyPrincipalUser")
+  principalGatewayBudgets GatewayBudget[]          @relation("PrincipalScopedGatewayBudgets")
+  personalTeams           Team[]                   @relation("PersonalTeamOwner")
+  personalProjects        Project[]                @relation("PersonalProjectOwner")
+  routingPoliciesCreated  RoutingPolicy[]          @relation("RoutingPolicyCreatedBy")
+  routingPoliciesUpdated  RoutingPolicy[]          @relation("RoutingPolicyUpdatedBy")
+  ingestionSourcesCreated IngestionSource[]        @relation("IngestionSourceCreatedBy")
+  anomalyRulesCreated     AnomalyRule[]            @relation("AnomalyRuleCreatedBy")
 }
 
 model VerificationToken {
-    id         String   @id @default(nanoid())
-    identifier String
-    token      String   @unique
-    expires    DateTime
-    createdAt  DateTime @default(now())
-    updatedAt  DateTime @default(now()) @updatedAt
+  id         String   @id @default(nanoid())
+  identifier String
+  token      String   @unique
+  expires    DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @default(now()) @updatedAt
 
-    @@unique([identifier, token])
+  @@unique([identifier, token])
 }
 
 enum TeamUserRole {
-    ADMIN
-    MEMBER
-    VIEWER
-    CUSTOM
+  ADMIN
+  MEMBER
+  VIEWER
+  CUSTOM
 }
 
 // Scoped RBAC — scope levels for RoleBinding
 enum RoleBindingScopeType {
-    ORGANIZATION
-    TEAM
-    PROJECT
+  ORGANIZATION
+  TEAM
+  PROJECT
 }
 
 enum OrganizationUserRole {
-    ADMIN
-    MEMBER
-    EXTERNAL
+  ADMIN
+  MEMBER
+  EXTERNAL
 }
 
 model TeamUser {
-    userId         String
-    teamId         String
-    role           TeamUserRole
-    assignedRoleId String?
-    assignedRole   CustomRole?  @relation(fields: [assignedRoleId], references: [id])
-    user           User         @relation(fields: [userId], references: [id])
-    team           Team         @relation(fields: [teamId], references: [id])
-    createdAt      DateTime     @default(now())
-    updatedAt      DateTime     @default(now()) @updatedAt
+  userId         String
+  teamId         String
+  role           TeamUserRole
+  assignedRoleId String?
+  assignedRole   CustomRole?  @relation(fields: [assignedRoleId], references: [id])
+  user           User         @relation(fields: [userId], references: [id])
+  team           Team         @relation(fields: [teamId], references: [id])
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @default(now()) @updatedAt
 
-    @@id([userId, teamId])
-    @@index([teamId])
-    @@index([userId])
-    @@index([assignedRoleId])
+  @@id([userId, teamId])
+  @@index([teamId])
+  @@index([userId])
+  @@index([assignedRoleId])
 }
 
 model OrganizationUser {
-    userId         String
-    organizationId String
-    role           OrganizationUserRole
-    user           User                 @relation(fields: [userId], references: [id])
-    organization   Organization         @relation(fields: [organizationId], references: [id])
-    createdAt      DateTime             @default(now())
-    updatedAt      DateTime             @default(now()) @updatedAt
+  userId         String
+  organizationId String
+  role           OrganizationUserRole
+  user           User                 @relation(fields: [userId], references: [id])
+  organization   Organization         @relation(fields: [organizationId], references: [id])
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @default(now()) @updatedAt
 
-    @@id([userId, organizationId])
-    @@index([organizationId])
-    @@index([userId])
+  @@id([userId, organizationId])
+  @@index([organizationId])
+  @@index([userId])
 }
 
 model Team {
-    id              String          @id @default(nanoid())
-    name            String
-    slug            String          @unique
-    members         TeamUser[]
-    organizationId  String
-    organization    Organization    @relation(fields: [organizationId], references: [id])
-    projects        Project[]
-    createdAt       DateTime        @default(now())
-    updatedAt       DateTime        @default(now()) @updatedAt
-    archivedAt      DateTime?
-    gatewayBudgets  GatewayBudget[] @relation("TeamScopedGatewayBudgets")
-    @@index([organizationId])
+  id             String          @id @default(nanoid())
+  name           String
+  slug           String          @unique
+  members        TeamUser[]
+  organizationId String
+  organization   Organization    @relation(fields: [organizationId], references: [id])
+  projects       Project[]
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @default(now()) @updatedAt
+  archivedAt     DateTime?
+  gatewayBudgets GatewayBudget[] @relation("TeamScopedGatewayBudgets")
+
+  // Personal workspace per (org, user). Created on user's first
+  // visit to an org. UI hides isPersonal=true teams from team
+  // pickers; they surface under "My Workspace" instead.
+  isPersonal  Boolean @default(false)
+  ownerUserId String? @db.VarChar(255)
+  ownerUser   User?   @relation("PersonalTeamOwner", fields: [ownerUserId], references: [id])
+
+  ingestionSources IngestionSource[]
+
+  @@index([organizationId])
+  @@index([isPersonal])
 }
 
 model Organization {
-    id                     String               @id @default(nanoid())
-    name                   String
-    phoneNumber            String?
-    slug                   String               @unique
-    members                OrganizationUser[]
-    teams                  Team[]
-    createdAt              DateTime             @default(now())
-    updatedAt              DateTime             @default(now()) @updatedAt
-    OrganizationInvite     OrganizationInvite[]
-    usageSpendingMaxLimit  Int?
-    signupData             Json?
-    signedDPA              Boolean              @default(false)
-    elasticsearchNodeUrl   String?
-    elasticsearchApiKey    String?
-    useCustomElasticsearch Boolean              @default(false)
-    s3Endpoint             String?
-    s3AccessKeyId          String?
-    s3SecretAccessKey      String?
-    s3Bucket               String?
-    useCustomS3            Boolean              @default(false)
-    sentPlanLimitAlert     DateTime?
-    ssoDomain              String?              @unique
-    ssoProvider            String?
-    presenceEnabled        Boolean              @default(true)
+  id                     String               @id @default(nanoid())
+  name                   String
+  phoneNumber            String?
+  slug                   String               @unique
+  members                OrganizationUser[]
+  teams                  Team[]
+  createdAt              DateTime             @default(now())
+  updatedAt              DateTime             @default(now()) @updatedAt
+  OrganizationInvite     OrganizationInvite[]
+  usageSpendingMaxLimit  Int?
+  signupData             Json?
+  signedDPA              Boolean              @default(false)
+  elasticsearchNodeUrl   String?
+  elasticsearchApiKey    String?
+  useCustomElasticsearch Boolean              @default(false)
+  s3Endpoint             String?
+  s3AccessKeyId          String?
+  s3SecretAccessKey      String?
+  s3Bucket               String?
+  useCustomS3            Boolean              @default(false)
+  sentPlanLimitAlert     DateTime?
+  ssoDomain              String?              @unique
+  ssoProvider            String?
+  presenceEnabled        Boolean              @default(true)
 
-    promoCode     String?
-    stripeCustomerId String?      @unique
-    currency      Currency         @default(EUR)
-    pricingModel  PricingModel     @default(TIERED)
-    features      OrganizationFeature[]
-    CustomRoles   CustomRole[]
-    notifications Notification[]
-    subscriptions Subscription[]
-    scimTokens    ScimToken[]
-    promptTags    PromptTag[]
-    groups        Group[]
-    roleBindings           RoleBinding[]
-    personalAccessTokens   PersonalAccessToken[]
-    // License enforcement fields (COSS-0226)
-    license                String?              @db.Text
-    licenseExpiresAt       DateTime?
-    licenseLastValidatedAt DateTime?
-    gatewayBudgets         GatewayBudget[]      @relation("OrgScopedGatewayBudgets")
-    gatewayChangeEvents    GatewayChangeEvent[]
+  promoCode              String?
+  stripeCustomerId       String?               @unique
+  currency               Currency              @default(EUR)
+  pricingModel           PricingModel          @default(TIERED)
+  features               OrganizationFeature[]
+  CustomRoles            CustomRole[]
+  notifications          Notification[]
+  subscriptions          Subscription[]
+  scimTokens             ScimToken[]
+  promptTags             PromptTag[]
+  groups                 Group[]
+  roleBindings           RoleBinding[]
+  personalAccessTokens   PersonalAccessToken[]
+  // License enforcement fields (COSS-0226)
+  license                String?               @db.Text
+  licenseExpiresAt       DateTime?
+  licenseLastValidatedAt DateTime?
+  gatewayBudgets         GatewayBudget[]       @relation("OrgScopedGatewayBudgets")
+  gatewayChangeEvents    GatewayChangeEvent[]
+  routingPolicies        RoutingPolicy[]
+  ingestionSources       IngestionSource[]
+  anomalyRules           AnomalyRule[]
+  anomalyAlerts          AnomalyAlert[]
+  aiToolEntries          AiToolEntry[]
 
-    @@index([ssoProvider])
+  @@index([ssoProvider])
 }
 
 model ScimToken {
-    id             String       @id @default(nanoid())
-    organizationId String
-    organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-    hashedToken    String
-    description    String?
-    createdAt      DateTime     @default(now())
-    lastUsedAt     DateTime?
+  id             String       @id @default(nanoid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  hashedToken    String
+  description    String?
+  createdAt      DateTime     @default(now())
+  lastUsedAt     DateTime?
 
-    @@index([organizationId])
-    @@index([hashedToken])
+  @@index([organizationId])
+  @@index([hashedToken])
 }
 
-
 enum PlanTypes {
-    FREE
-    PRO
-    GROWTH
-    GROWTH_SEAT_EUR_MONTHLY
-    GROWTH_SEAT_EUR_ANNUAL
-    GROWTH_SEAT_USD_MONTHLY
-    GROWTH_SEAT_USD_ANNUAL
-    ENTERPRISE
-    LAUNCH
-    ACCELERATE
-    LAUNCH_ANNUAL
-    ACCELERATE_ANNUAL
+  FREE
+  PRO
+  GROWTH
+  GROWTH_SEAT_EUR_MONTHLY
+  GROWTH_SEAT_EUR_ANNUAL
+  GROWTH_SEAT_USD_MONTHLY
+  GROWTH_SEAT_USD_ANNUAL
+  ENTERPRISE
+  LAUNCH
+  ACCELERATE
+  LAUNCH_ANNUAL
+  ACCELERATE_ANNUAL
 }
 
 enum PricingModel {
-    TIERED
-    SEAT_EVENT
+  TIERED
+  SEAT_EVENT
 }
 
 enum SubscriptionStatus {
-    PENDING
-    FAILED
-    ACTIVE
-    CANCELLED
+  PENDING
+  FAILED
+  ACTIVE
+  CANCELLED
 }
 
 enum Currency {
-    USD
-    EUR
+  USD
+  EUR
 }
 
 enum PIIRedactionLevel {
-    STRICT
-    ESSENTIAL
-    DISABLED
+  STRICT
+  ESSENTIAL
+  DISABLED
 }
 
 enum ProjectSensitiveDataVisibilityLevel {
-    REDACTED_TO_ALL
-    VISIBLE_TO_ADMIN
-    VISIBLE_TO_ALL
+  REDACTED_TO_ALL
+  VISIBLE_TO_ADMIN
+  VISIBLE_TO_ALL
 }
 
 model Project {
-    id                       String                              @id @default(nanoid())
-    name                     String
-    slug                     String                              @unique
-    apiKey                   String                              @unique
-    teamId                   String
-    team                     Team                                @relation(fields: [teamId], references: [id])
-    language                 String
-    framework                String
-    firstMessage             Boolean                             @default(false)
-    integrated               Boolean                             @default(false)
-    createdAt                DateTime                            @default(now())
-    updatedAt                DateTime                            @default(now()) @updatedAt
-    userLinkTemplate         String?
-    checks                   Monitor[]
-    costs                    Cost[]
-    topics                   Topic[]
-    datasets                 Dataset[]
-    datasetRecords           DatasetRecord[]
-    customGraphs             CustomGraph[]
-    dashboards               Dashboard[]
-    batchEvaluations         BatchEvaluation[]
-    piiRedactionLevel        PIIRedactionLevel                   @default(ESSENTIAL)
-    capturedInputVisibility  ProjectSensitiveDataVisibilityLevel @default(VISIBLE_TO_ALL)
-    capturedOutputVisibility ProjectSensitiveDataVisibilityLevel @default(VISIBLE_TO_ALL)
-    traceSharingEnabled      Boolean                             @default(true)
-    presenceEnabled          Boolean                             @default(true)
-    triggers                 Trigger[]
-    experiments              Experiment[]
-    annotations              Annotation[]
-    modelProviders           ModelProvider[]
-    projectSecrets           ProjectSecret[]
-    defaultModel             String?
-    topicClusteringModel     String?
-    embeddingsModel          String?
-    TriggerSent              TriggerSent[]
-    annotationScores         AnnotationScore[]
-    publicShares             PublicShare[]
-    workflows                Workflow[]
-    WorkflowVersion          WorkflowVersion[]
-    AnnotationQueue          AnnotationQueue[]
-    AnnotationQueueItem      AnnotationQueueItem[]
-    s3Endpoint               String?
-    s3AccessKeyId            String?
-    s3SecretAccessKey        String?
-    s3Bucket                 String?
-    llmPromptConfigs         LlmPromptConfig[]
-    analytics                Analytics[]
-    archivedAt               DateTime?
-    notifications            Notification[]
-    agents                   Agent[]
-    evaluators               Evaluator[]
-    scenarios                Scenario[]
-    suiteConfigurations      SimulationSuite[]
-    savedViews               SavedView[]
-    virtualKeys              VirtualKey[]
-    gatewayProviderCreds     GatewayProviderCredential[]
-    gatewayBudgets           GatewayBudget[]                     @relation("ProjectScopedGatewayBudgets")
-    gatewayChangeEvents      GatewayChangeEvent[]
+  id                       String                              @id @default(nanoid())
+  name                     String
+  slug                     String                              @unique
+  apiKey                   String                              @unique
+  teamId                   String
+  team                     Team                                @relation(fields: [teamId], references: [id])
+  language                 String
+  framework                String
+  /// Project kind:
+  ///   - "application": user-facing workspace where developers send their
+  ///     own app traces. The default for everything created via the
+  ///     onboarding/quickstart flow.
+  ///   - "internal_governance": hidden per-org routing/tenancy artifact
+  ///     for IngestionSource ingest data. Auto-created lazily on the
+  ///     first IngestionSource mint via ensureHiddenGovernanceProject().
+  ///     MUST be filtered out of every user-visible Project surface
+  ///     (project picker, /api/v1/projects, billing exports, RBAC
+  ///     pickers, etc.) — the regression-test invariant in
+  ///     specs/ai-gateway/governance/ui-contract.feature codifies this.
+  /// Stored as a free-form string (matching IngestionSource.sourceType
+  /// pattern) so future routing kinds can ship without schema migrations.
+  kind                     String                              @default("application")
+  firstMessage             Boolean                             @default(false)
+  integrated               Boolean                             @default(false)
+  createdAt                DateTime                            @default(now())
+  updatedAt                DateTime                            @default(now()) @updatedAt
+  userLinkTemplate         String?
+  checks                   Monitor[]
+  costs                    Cost[]
+  topics                   Topic[]
+  datasets                 Dataset[]
+  datasetRecords           DatasetRecord[]
+  customGraphs             CustomGraph[]
+  dashboards               Dashboard[]
+  batchEvaluations         BatchEvaluation[]
+  piiRedactionLevel        PIIRedactionLevel                   @default(ESSENTIAL)
+  capturedInputVisibility  ProjectSensitiveDataVisibilityLevel @default(VISIBLE_TO_ALL)
+  capturedOutputVisibility ProjectSensitiveDataVisibilityLevel @default(VISIBLE_TO_ALL)
+  traceSharingEnabled      Boolean                             @default(true)
+  presenceEnabled          Boolean                             @default(true)
+  triggers                 Trigger[]
+  experiments              Experiment[]
+  annotations              Annotation[]
+  modelProviders           ModelProvider[]
+  projectSecrets           ProjectSecret[]
+  defaultModel             String?
+  topicClusteringModel     String?
+  embeddingsModel          String?
+  TriggerSent              TriggerSent[]
+  annotationScores         AnnotationScore[]
+  publicShares             PublicShare[]
+  workflows                Workflow[]
+  WorkflowVersion          WorkflowVersion[]
+  AnnotationQueue          AnnotationQueue[]
+  AnnotationQueueItem      AnnotationQueueItem[]
+  s3Endpoint               String?
+  s3AccessKeyId            String?
+  s3SecretAccessKey        String?
+  s3Bucket                 String?
+  llmPromptConfigs         LlmPromptConfig[]
+  analytics                Analytics[]
+  archivedAt               DateTime?
+  notifications            Notification[]
+  agents                   Agent[]
+  evaluators               Evaluator[]
+  scenarios                Scenario[]
+  suiteConfigurations      SimulationSuite[]
+  savedViews               SavedView[]
+  virtualKeys              VirtualKey[]
+  gatewayProviderCreds     GatewayProviderCredential[]
+  gatewayBudgets           GatewayBudget[]                     @relation("ProjectScopedGatewayBudgets")
+  gatewayChangeEvents      GatewayChangeEvent[]
 
-    @@index([teamId])
+  // Denormalised mirror of parent Team's personal flag for fast
+  // lookup at trace ingest time without a Team join. Always equals
+  // the parent Team.isPersonal value; PersonalWorkspaceService
+  // sets both atomically.
+  isPersonal  Boolean @default(false)
+  ownerUserId String? @db.VarChar(255)
+  ownerUser   User?   @relation("PersonalProjectOwner", fields: [ownerUserId], references: [id])
+
+  @@index([teamId])
+  @@index([isPersonal])
+  @@index([ownerUserId])
+  @@index([teamId, kind])
 }
 
 enum INVITE_STATUS {
-    PENDING
-    ACCEPTED
-    WAITING_APPROVAL
-    PAYMENT_PENDING
+  PENDING
+  ACCEPTED
+  WAITING_APPROVAL
+  PAYMENT_PENDING
 }
 
 model OrganizationInvite {
-    id              String               @id @default(nanoid())
-    email           String
-    inviteCode      String               @unique
-    expiration      DateTime?
-    status          INVITE_STATUS        @default(PENDING)
-    organizationId  String
-    organization    Organization         @relation(fields: [organizationId], references: [id])
-    teamIds         String
-    teamAssignments Json? // Array of {teamId: string, role: TeamUserRole, customRoleId?: string}
-    role            OrganizationUserRole
-    requestedBy     String?
-    requestedByUser User?                @relation(fields: [requestedBy], references: [id])
-    subscriptionId  String?
-    createdAt       DateTime             @default(now())
-    updatedAt       DateTime             @default(now()) @updatedAt
+  id              String               @id @default(nanoid())
+  email           String
+  inviteCode      String               @unique
+  expiration      DateTime?
+  status          INVITE_STATUS        @default(PENDING)
+  organizationId  String
+  organization    Organization         @relation(fields: [organizationId], references: [id])
+  teamIds         String
+  teamAssignments Json? // Array of {teamId: string, role: TeamUserRole, customRoleId?: string}
+  role            OrganizationUserRole
+  requestedBy     String?
+  requestedByUser User?                @relation(fields: [requestedBy], references: [id])
+  subscriptionId  String?
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @default(now()) @updatedAt
 
-    @@index([organizationId])
-    @@index([requestedBy])
+  @@index([organizationId])
+  @@index([requestedBy])
 }
 
 enum EvaluationExecutionMode {
-    ON_MESSAGE
-    AS_GUARDRAIL
-    MANUALLY
+  ON_MESSAGE
+  AS_GUARDRAIL
+  MANUALLY
 }
 
 model Monitor {
-    id                String                  @id @default(nanoid())
-    projectId         String
-    project           Project                 @relation(fields: [projectId], references: [id])
-    experimentId      String?                 @unique
-    experiment        Experiment?             @relation(fields: [experimentId], references: [id], onDelete: Restrict, onUpdate: Restrict)
-    evaluatorId       String? // Reference to saved Evaluator (new monitors)
-    evaluator         Evaluator?              @relation(fields: [evaluatorId], references: [id])
-    checkType         String
-    name              String
-    slug              String
-    executionMode     EvaluationExecutionMode @default(ON_MESSAGE)
-    enabled           Boolean                 @default(true)
-    preconditions     Json
-    parameters        Json // Keep for backward compatibility, new monitors may have empty
-    mappings          Json?
-    sample            Float                   @default(1.0)
-    level             String                  @default("trace") // "trace" or "thread" - evaluation level
-    threadIdleTimeout Int? // Seconds to wait after last message before evaluating thread. null = disabled (evaluate on every message)
-    createdAt         DateTime                @default(now())
-    updatedAt         DateTime                @default(now()) @updatedAt
+  id                String                  @id @default(nanoid())
+  projectId         String
+  project           Project                 @relation(fields: [projectId], references: [id])
+  experimentId      String?                 @unique
+  experiment        Experiment?             @relation(fields: [experimentId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  evaluatorId       String? // Reference to saved Evaluator (new monitors)
+  evaluator         Evaluator?              @relation(fields: [evaluatorId], references: [id])
+  checkType         String
+  name              String
+  slug              String
+  executionMode     EvaluationExecutionMode @default(ON_MESSAGE)
+  enabled           Boolean                 @default(true)
+  preconditions     Json
+  parameters        Json // Keep for backward compatibility, new monitors may have empty
+  mappings          Json?
+  sample            Float                   @default(1.0)
+  level             String                  @default("trace") // "trace" or "thread" - evaluation level
+  threadIdleTimeout Int? // Seconds to wait after last message before evaluating thread. null = disabled (evaluate on every message)
+  createdAt         DateTime                @default(now())
+  updatedAt         DateTime                @default(now()) @updatedAt
 
-    @@unique([projectId, slug])
-    @@index([projectId])
-    @@index([evaluatorId])
+  @@unique([projectId, slug])
+  @@index([projectId])
+  @@index([evaluatorId])
 }
 
 enum CostType {
-    TRACE_CHECK
-    GUARDRAIL
-    CLUSTERING
-    BATCH_EVALUATION
+  TRACE_CHECK
+  GUARDRAIL
+  CLUSTERING
+  BATCH_EVALUATION
 }
 
 enum CostReferenceType {
-    CHECK
-    TRACE
-    PROJECT
-    BATCH
+  CHECK
+  TRACE
+  PROJECT
+  BATCH
 }
 
 model Cost {
-    id            String            @id @default(nanoid())
-    projectId     String
-    project       Project           @relation(fields: [projectId], references: [id])
-    costType      CostType
-    costName      String?
-    referenceType CostReferenceType
-    referenceId   String
-    amount        Float
-    currency      String
-    createdAt     DateTime          @default(now())
-    updatedAt     DateTime          @default(now()) @updatedAt
-    extraInfo     Json?
+  id            String            @id @default(nanoid())
+  projectId     String
+  project       Project           @relation(fields: [projectId], references: [id])
+  costType      CostType
+  costName      String?
+  referenceType CostReferenceType
+  referenceId   String
+  amount        Float
+  currency      String
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @default(now()) @updatedAt
+  extraInfo     Json?
 
-    @@index([referenceType, referenceId])
-    @@index([costType])
-    @@index([projectId])
-    @@index([projectId, createdAt])
+  @@index([referenceType, referenceId])
+  @@index([costType])
+  @@index([projectId])
+  @@index([projectId, createdAt])
 }
 
 model Topic {
-    id        String  @id @default(nanoid())
-    projectId String
-    project   Project @relation(fields: [projectId], references: [id])
-    name      String
-    parentId  String?
-    parent    Topic?  @relation("Subtopics", fields: [parentId], references: [id], onDelete: Restrict, onUpdate: Restrict)
-    subtopics Topic[] @relation("Subtopics")
+  id        String  @id @default(nanoid())
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id])
+  name      String
+  parentId  String?
+  parent    Topic?  @relation("Subtopics", fields: [parentId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  subtopics Topic[] @relation("Subtopics")
 
-    embeddings_model       String
-    centroid               Json
-    p95Distance            Float
-    automaticallyGenerated Boolean @default(true)
+  embeddings_model       String
+  centroid               Json
+  p95Distance            Float
+  automaticallyGenerated Boolean @default(true)
 
-    createdAt DateTime @default(now())
-    updatedAt DateTime @default(now()) @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
 
-    @@index([parentId])
-    @@index([projectId])
+  @@index([parentId])
+  @@index([projectId])
 }
 
 model Dataset {
-    id               String            @id @default(nanoid())
-    projectId        String
-    project          Project           @relation(fields: [projectId], references: [id])
-    name             String
-    slug             String
-    columnTypes      Json
-    createdAt        DateTime          @default(now())
-    updatedAt        DateTime          @default(now()) @updatedAt
-    archivedAt       DateTime?
-    datasetRecords   DatasetRecord[]
-    batchEvaluations BatchEvaluation[]
-    mapping          Json?
-    useS3            Boolean           @default(false)
-    s3RecordCount    Int?
+  id               String            @id @default(nanoid())
+  projectId        String
+  project          Project           @relation(fields: [projectId], references: [id])
+  name             String
+  slug             String
+  columnTypes      Json
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @default(now()) @updatedAt
+  archivedAt       DateTime?
+  datasetRecords   DatasetRecord[]
+  batchEvaluations BatchEvaluation[]
+  mapping          Json?
+  useS3            Boolean           @default(false)
+  s3RecordCount    Int?
 
-    @@unique([projectId, slug])
+  @@unique([projectId, slug])
 }
 
 model DatasetRecord {
-    id        String   @id @default(nanoid())
-    datasetId String
-    dataset   Dataset  @relation(fields: [datasetId], references: [id])
-    projectId String
-    project   Project  @relation(fields: [projectId], references: [id])
-    entry     Json
-    createdAt DateTime @default(now())
-    updatedAt DateTime @default(now()) @updatedAt
+  id        String   @id @default(nanoid())
+  datasetId String
+  dataset   Dataset  @relation(fields: [datasetId], references: [id])
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id])
+  entry     Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
 
-    @@index([datasetId])
-    @@index([projectId])
-    @@index([createdAt])
+  @@index([datasetId])
+  @@index([projectId])
+  @@index([createdAt])
 }
 
 model Dashboard {
-    id        String        @id @default(nanoid())
-    projectId String
-    project   Project       @relation(fields: [projectId], references: [id])
-    name      String
-    order     Int           @default(0)
-    createdAt DateTime      @default(now())
-    updatedAt DateTime      @default(now()) @updatedAt
-    graphs    CustomGraph[]
+  id        String        @id @default(nanoid())
+  projectId String
+  project   Project       @relation(fields: [projectId], references: [id])
+  name      String
+  order     Int           @default(0)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @default(now()) @updatedAt
+  graphs    CustomGraph[]
 
-    @@index([projectId])
-    @@index([projectId, order])
-    @@map("Dashboard")
+  @@index([projectId])
+  @@index([projectId, order])
+  @@map("Dashboard")
 }
 
 model SavedView {
-    id        String   @id @default(nanoid())
-    projectId String
-    project   Project  @relation(fields: [projectId], references: [id])
-    userId    String?
-    user      User?    @relation(fields: [userId], references: [id])
-    name      String
-    filters   Json     @default("{}")
-    query     String?
-    period    Json?
-    order     Int      @default(0)
-    createdAt DateTime @default(now())
-    updatedAt DateTime @default(now()) @updatedAt
+  id        String   @id @default(nanoid())
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id])
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id])
+  name      String
+  filters   Json     @default("{}")
+  query     String?
+  period    Json?
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
 
-    @@index([projectId])
-    @@index([projectId, order])
-    @@index([userId])
+  @@index([projectId])
+  @@index([projectId, order])
+  @@index([userId])
 }
 
 model CustomGraph {
-    id        String   @id @default(nanoid())
-    projectId String
-    project   Project  @relation(fields: [projectId], references: [id])
-    name      String
-    graph     Json
-    filters   Json?
-    createdAt DateTime @default(now())
-    updatedAt DateTime @default(now()) @updatedAt
+  id        String   @id @default(nanoid())
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id])
+  name      String
+  graph     Json
+  filters   Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
 
-    // Report page relationship
-    dashboardId String?
-    dashboard   Dashboard? @relation(fields: [dashboardId], references: [id], onDelete: Cascade)
+  // Report page relationship
+  dashboardId String?
+  dashboard   Dashboard? @relation(fields: [dashboardId], references: [id], onDelete: Cascade)
 
-    // Grid positioning (2-column grid)
-    gridColumn  Int           @default(0)
-    gridRow     Int           @default(0)
-    colSpan     Int           @default(1)
-    rowSpan     Int           @default(1)
-    trigger     Trigger?
-    TriggerSent TriggerSent[]
+  // Grid positioning (2-column grid)
+  gridColumn  Int           @default(0)
+  gridRow     Int           @default(0)
+  colSpan     Int           @default(1)
+  rowSpan     Int           @default(1)
+  trigger     Trigger?
+  TriggerSent TriggerSent[]
 
-    @@index([projectId])
-    @@index([dashboardId])
+  @@index([projectId])
+  @@index([dashboardId])
 }
 
 model BatchEvaluation {
-    id           String     @id @default(nanoid())
-    experimentId String
-    experiment   Experiment @relation(fields: [experimentId], references: [id])
-    projectId    String
-    project      Project    @relation(fields: [projectId], references: [id])
-    data         Json       @default("{}")
-    status       String
-    score        Float
-    label        String?
-    passed       Boolean
-    details      String
-    cost         Float
-    datasetSlug  String
-    datasetId    String
-    dataset      Dataset    @relation(fields: [datasetId], references: [id])
-    evaluation   String
-    createdAt    DateTime   @default(now())
-    updatedAt    DateTime   @default(now()) @updatedAt
+  id           String     @id @default(nanoid())
+  experimentId String
+  experiment   Experiment @relation(fields: [experimentId], references: [id])
+  projectId    String
+  project      Project    @relation(fields: [projectId], references: [id])
+  data         Json       @default("{}")
+  status       String
+  score        Float
+  label        String?
+  passed       Boolean
+  details      String
+  cost         Float
+  datasetSlug  String
+  datasetId    String
+  dataset      Dataset    @relation(fields: [datasetId], references: [id])
+  evaluation   String
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @default(now()) @updatedAt
 
-    @@unique([id])
-    @@index([projectId])
-    @@index([datasetId])
-    @@index([experimentId])
+  @@unique([id])
+  @@index([projectId])
+  @@index([datasetId])
+  @@index([experimentId])
 }
 
 enum TriggerAction {
-    SEND_EMAIL
-    ADD_TO_DATASET
-    ADD_TO_ANNOTATION_QUEUE
-    SEND_SLACK_MESSAGE
+  SEND_EMAIL
+  ADD_TO_DATASET
+  ADD_TO_ANNOTATION_QUEUE
+  SEND_SLACK_MESSAGE
 }
 
 enum AlertType {
-    CRITICAL
-    WARNING
-    INFO
+  CRITICAL
+  WARNING
+  INFO
 }
 
 model Trigger {
-    id            String        @id @default(nanoid())
-    name          String
-    projectId     String
-    project       Project       @relation(fields: [projectId], references: [id])
-    action        TriggerAction
-    actionParams  Json
-    filters       Json
-    lastRunAt     Float         @default(0)
-    createdAt     DateTime      @default(now())
-    updatedAt     DateTime      @default(now()) @updatedAt
-    active        Boolean       @default(true)
-    message       String?
-    deleted       Boolean       @default(false)
-    alertType     AlertType?
-    TriggerSent   TriggerSent[]
-    customGraphId String?       @unique
-    customGraph   CustomGraph?  @relation(fields: [customGraphId], references: [id], onDelete: Cascade)
+  id            String        @id @default(nanoid())
+  name          String
+  projectId     String
+  project       Project       @relation(fields: [projectId], references: [id])
+  action        TriggerAction
+  actionParams  Json
+  filters       Json
+  lastRunAt     Float         @default(0)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @default(now()) @updatedAt
+  active        Boolean       @default(true)
+  message       String?
+  deleted       Boolean       @default(false)
+  alertType     AlertType?
+  TriggerSent   TriggerSent[]
+  customGraphId String?       @unique
+  customGraph   CustomGraph?  @relation(fields: [customGraphId], references: [id], onDelete: Cascade)
 
-    @@index([projectId])
+  @@index([projectId])
 }
 
 enum ExperimentType {
-    DSPY
-    BATCH_EVALUATION
-    BATCH_EVALUATION_V2
-    EVALUATIONS_V3
+  DSPY
+  BATCH_EVALUATION
+  BATCH_EVALUATION_V2
+  EVALUATIONS_V3
 }
 
 model Experiment {
-    id               String            @id @default(nanoid())
-    name             String?
-    type             ExperimentType
-    slug             String
-    projectId        String
-    project          Project           @relation(fields: [projectId], references: [id])
-    workflowId       String?
-    workflow         Workflow?         @relation(fields: [workflowId], references: [id])
-    createdAt        DateTime          @default(now())
-    updatedAt        DateTime          @default(now()) @updatedAt
-    batchEvaluations BatchEvaluation[]
-    workbenchState   Json?
-    monitor          Monitor?
+  id               String            @id @default(nanoid())
+  name             String?
+  type             ExperimentType
+  slug             String
+  projectId        String
+  project          Project           @relation(fields: [projectId], references: [id])
+  workflowId       String?
+  workflow         Workflow?         @relation(fields: [workflowId], references: [id])
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @default(now()) @updatedAt
+  batchEvaluations BatchEvaluation[]
+  workbenchState   Json?
+  monitor          Monitor?
 
-    @@unique([projectId, slug])
-    @@index([projectId])
-    @@index([workflowId])
+  @@unique([projectId, slug])
+  @@index([projectId])
+  @@index([workflowId])
 }
 
 model Annotation {
-    id             String   @id @default(nanoid())
-    projectId      String
-    project        Project  @relation(fields: [projectId], references: [id])
-    traceId        String
-    comment        String?
-    isThumbsUp     Boolean?
-    userId         String?
-    user           User?    @relation(fields: [userId], references: [id])
-    createdAt      DateTime @default(now())
-    updatedAt      DateTime @default(now()) @updatedAt
-    email          String?
-    scoreOptions   Json?
-    expectedOutput String?
+  id             String   @id @default(nanoid())
+  projectId      String
+  project        Project  @relation(fields: [projectId], references: [id])
+  traceId        String
+  comment        String?
+  isThumbsUp     Boolean?
+  userId         String?
+  user           User?    @relation(fields: [userId], references: [id])
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @default(now()) @updatedAt
+  email          String?
+  scoreOptions   Json?
+  expectedOutput String?
 
-    @@index([projectId])
-    @@index([traceId])
-    @@index([userId])
-    @@index([projectId, traceId])
+  @@index([projectId])
+  @@index([traceId])
+  @@index([userId])
+  @@index([projectId, traceId])
 }
 
 model ModelProvider {
-    id                     String                      @id @default(nanoid())
-    // Legacy pointer. Always the project the row was originally
-    // created under (or a sibling project in the same org/team for
-    // org/team-scoped credentials). Kept so existing per-project
-    // lookups keep compiling; access is granted via ModelProviderScope.
-    projectId              String
-    project                Project                     @relation(fields: [projectId], references: [id])
-    // Human-readable name (iter 109): one "OpenAI" by default, auto-
-    // suffixed as "OpenAI 2" / "OpenAI 3" when duplicates coexist
-    // under the same organization. Model selectors use this to group
-    // options when multiple instances of the same provider are in
-    // scope for a project.
-    name                   String
-    provider               String
-    enabled                Boolean
-    customKeys             Json?
-    extraHeaders           Json?
-    customModels           Json?
-    customEmbeddingsModels Json?
-    deploymentMapping      Json?
-    createdAt              DateTime                    @default(now())
-    updatedAt              DateTime                    @default(now()) @updatedAt
-    scopes                 ModelProviderScope[]
-    gatewayCredentials     GatewayProviderCredential[]
+  id                     String                      @id @default(nanoid())
+  // Legacy pointer. Always the project the row was originally
+  // created under (or a sibling project in the same org/team for
+  // org/team-scoped credentials). Kept so existing per-project
+  // lookups keep compiling; access is granted via ModelProviderScope.
+  projectId              String
+  project                Project                     @relation(fields: [projectId], references: [id])
+  // Human-readable name (iter 109): one "OpenAI" by default, auto-
+  // suffixed as "OpenAI 2" / "OpenAI 3" when duplicates coexist
+  // under the same organization. Model selectors use this to group
+  // options when multiple instances of the same provider are in
+  // scope for a project.
+  name                   String
+  provider               String
+  enabled                Boolean
+  customKeys             Json?
+  extraHeaders           Json?
+  customModels           Json?
+  customEmbeddingsModels Json?
+  deploymentMapping      Json?
+  createdAt              DateTime                    @default(now())
+  updatedAt              DateTime                    @default(now()) @updatedAt
+  scopes                 ModelProviderScope[]
+  gatewayCredentials     GatewayProviderCredential[]
 
-    @@index([projectId])
+  @@index([projectId])
 }
 
 // Principal-style N-scope access (iter 109, ADR-016 follow-up): a
@@ -702,254 +748,254 @@ model ModelProvider {
 // permission on that entity (organization:manage, team:manage,
 // project:manage). Reads filter by the caller's membership set.
 model ModelProviderScope {
-    id              String   @id @default(nanoid())
-    modelProviderId String
-    modelProvider   ModelProvider @relation(fields: [modelProviderId], references: [id], onDelete: Cascade)
-    scopeType       String
-    scopeId         String
-    createdAt       DateTime @default(now())
+  id              String        @id @default(nanoid())
+  modelProviderId String
+  modelProvider   ModelProvider @relation(fields: [modelProviderId], references: [id], onDelete: Cascade)
+  scopeType       String
+  scopeId         String
+  createdAt       DateTime      @default(now())
 
-    @@unique([modelProviderId, scopeType, scopeId])
-    @@index([scopeType, scopeId])
-    @@index([modelProviderId])
+  @@unique([modelProviderId, scopeType, scopeId])
+  @@index([scopeType, scopeId])
+  @@index([modelProviderId])
 }
 
 model ProjectSecret {
-    id             String   @id @default(nanoid())
-    projectId      String
-    project        Project  @relation(fields: [projectId], references: [id])
-    name           String
-    encryptedValue String
-    createdById    String
-    createdBy      User     @relation("secretCreatedBy", fields: [createdById], references: [id])
-    updatedById    String
-    updatedBy      User     @relation("secretUpdatedBy", fields: [updatedById], references: [id])
-    createdAt      DateTime @default(now())
-    updatedAt      DateTime @default(now()) @updatedAt
+  id             String   @id @default(nanoid())
+  projectId      String
+  project        Project  @relation(fields: [projectId], references: [id])
+  name           String
+  encryptedValue String
+  createdById    String
+  createdBy      User     @relation("secretCreatedBy", fields: [createdById], references: [id])
+  updatedById    String
+  updatedBy      User     @relation("secretUpdatedBy", fields: [updatedById], references: [id])
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @default(now()) @updatedAt
 
-    @@unique([projectId, name])
-    @@index([projectId])
+  @@unique([projectId, name])
+  @@index([projectId])
 }
 
 model TriggerSent {
-    id            String       @id @default(nanoid())
-    triggerId     String
-    traceId       String? // Set for trace-based triggers, null for custom graph alerts
-    customGraphId String? // Set for custom graph alerts, null for trace-based triggers
-    customGraph   CustomGraph? @relation(fields: [customGraphId], references: [id], onDelete: Cascade)
-    projectId     String
-    project       Project      @relation(fields: [projectId], references: [id])
-    trigger       Trigger      @relation(fields: [triggerId], references: [id])
-    resolvedAt    DateTime? // For custom graph alerts: null = still firing, set = resolved
-    createdAt     DateTime     @default(now())
-    updatedAt     DateTime     @default(now()) @updatedAt
+  id            String       @id @default(nanoid())
+  triggerId     String
+  traceId       String? // Set for trace-based triggers, null for custom graph alerts
+  customGraphId String? // Set for custom graph alerts, null for trace-based triggers
+  customGraph   CustomGraph? @relation(fields: [customGraphId], references: [id], onDelete: Cascade)
+  projectId     String
+  project       Project      @relation(fields: [projectId], references: [id])
+  trigger       Trigger      @relation(fields: [triggerId], references: [id])
+  resolvedAt    DateTime? // For custom graph alerts: null = still firing, set = resolved
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @default(now()) @updatedAt
 
-    @@unique([triggerId, traceId])
-    @@index([triggerId])
-    @@index([projectId])
-    @@index([customGraphId])
-    @@index([resolvedAt])
+  @@unique([triggerId, traceId])
+  @@index([triggerId])
+  @@index([projectId])
+  @@index([customGraphId])
+  @@index([resolvedAt])
 }
 
 enum AnnotationScoreDataType {
-    CATEGORICAL
-    BOOLEAN
-    LIKERT
-    OPTION
-    CHECKBOX
+  CATEGORICAL
+  BOOLEAN
+  LIKERT
+  OPTION
+  CHECKBOX
 }
 
 model AnnotationScore {
-    id                    String                   @id @default(nanoid())
-    name                  String
-    projectId             String
-    project               Project                  @relation(fields: [projectId], references: [id])
-    createdAt             DateTime                 @default(now())
-    updatedAt             DateTime                 @default(now()) @updatedAt
-    deletedAt             DateTime?
-    description           String?
-    active                Boolean                  @default(true)
-    dataType              AnnotationScoreDataType?
-    options               Json?
-    defaultValue          Json?
-    global                Boolean                  @default(false)
-    AnnotationQueueScores AnnotationQueueScores[]
+  id                    String                   @id @default(nanoid())
+  name                  String
+  projectId             String
+  project               Project                  @relation(fields: [projectId], references: [id])
+  createdAt             DateTime                 @default(now())
+  updatedAt             DateTime                 @default(now()) @updatedAt
+  deletedAt             DateTime?
+  description           String?
+  active                Boolean                  @default(true)
+  dataType              AnnotationScoreDataType?
+  options               Json?
+  defaultValue          Json?
+  global                Boolean                  @default(false)
+  AnnotationQueueScores AnnotationQueueScores[]
 
-    @@index([projectId])
+  @@index([projectId])
 }
 
 enum PublicShareResourceTypes {
-    TRACE
-    THREAD
+  TRACE
+  THREAD
 }
 
 model AnnotationQueue {
-    id                    String                   @id @default(nanoid())
-    name                  String
-    slug                  String
-    projectId             String
-    description           String?
-    project               Project                  @relation(fields: [projectId], references: [id])
-    members               AnnotationQueueMembers[]
-    createdAt             DateTime                 @default(now())
-    updatedAt             DateTime                 @default(now()) @updatedAt
-    AnnotationQueueScores AnnotationQueueScores[]
-    AnnotationQueueItems  AnnotationQueueItem[]
+  id                    String                   @id @default(nanoid())
+  name                  String
+  slug                  String
+  projectId             String
+  description           String?
+  project               Project                  @relation(fields: [projectId], references: [id])
+  members               AnnotationQueueMembers[]
+  createdAt             DateTime                 @default(now())
+  updatedAt             DateTime                 @default(now()) @updatedAt
+  AnnotationQueueScores AnnotationQueueScores[]
+  AnnotationQueueItems  AnnotationQueueItem[]
 
-    @@unique([projectId, slug])
-    @@index([projectId])
+  @@unique([projectId, slug])
+  @@index([projectId])
 }
 
 model AnnotationQueueMembers {
-    annotationQueueId String
-    userId            String
-    user              User            @relation(fields: [userId], references: [id])
-    annotationQueue   AnnotationQueue @relation(fields: [annotationQueueId], references: [id])
+  annotationQueueId String
+  userId            String
+  user              User            @relation(fields: [userId], references: [id])
+  annotationQueue   AnnotationQueue @relation(fields: [annotationQueueId], references: [id])
 
-    @@id([annotationQueueId, userId])
-    @@index([annotationQueueId])
-    @@index([userId])
+  @@id([annotationQueueId, userId])
+  @@index([annotationQueueId])
+  @@index([userId])
 }
 
 model AnnotationQueueScores {
-    annotationQueueId String
-    annotationScoreId String
-    annotationScore   AnnotationScore @relation(fields: [annotationScoreId], references: [id])
-    annotationQueue   AnnotationQueue @relation(fields: [annotationQueueId], references: [id])
+  annotationQueueId String
+  annotationScoreId String
+  annotationScore   AnnotationScore @relation(fields: [annotationScoreId], references: [id])
+  annotationQueue   AnnotationQueue @relation(fields: [annotationQueueId], references: [id])
 
-    @@id([annotationQueueId, annotationScoreId])
-    @@index([annotationQueueId])
-    @@index([annotationScoreId])
+  @@id([annotationQueueId, annotationScoreId])
+  @@index([annotationQueueId])
+  @@index([annotationScoreId])
 }
 
 model AnnotationQueueItem {
-    id                String           @id @default(nanoid())
-    annotationQueueId String?
-    annotationQueue   AnnotationQueue? @relation(fields: [annotationQueueId], references: [id])
-    userId            String?
-    user              User?            @relation("AssignedTo", fields: [userId], references: [id])
-    createdAt         DateTime         @default(now())
-    updatedAt         DateTime         @default(now()) @updatedAt
-    createdByUserId   String?
-    createdByUser     User?            @relation("CreatedBy", fields: [createdByUserId], references: [id])
-    traceId           String
-    projectId         String
-    doneAt            DateTime?
-    project           Project          @relation(fields: [projectId], references: [id])
+  id                String           @id @default(nanoid())
+  annotationQueueId String?
+  annotationQueue   AnnotationQueue? @relation(fields: [annotationQueueId], references: [id])
+  userId            String?
+  user              User?            @relation("AssignedTo", fields: [userId], references: [id])
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @default(now()) @updatedAt
+  createdByUserId   String?
+  createdByUser     User?            @relation("CreatedBy", fields: [createdByUserId], references: [id])
+  traceId           String
+  projectId         String
+  doneAt            DateTime?
+  project           Project          @relation(fields: [projectId], references: [id])
 
-    @@unique([traceId, userId, projectId])
-    @@unique([traceId, annotationQueueId, projectId])
-    @@index([annotationQueueId])
-    @@index([userId])
-    @@index([projectId])
-    @@index([projectId, doneAt])
-    @@index([projectId, userId, doneAt])
-    @@index([annotationQueueId, doneAt])
+  @@unique([traceId, userId, projectId])
+  @@unique([traceId, annotationQueueId, projectId])
+  @@index([annotationQueueId])
+  @@index([userId])
+  @@index([projectId])
+  @@index([projectId, doneAt])
+  @@index([projectId, userId, doneAt])
+  @@index([annotationQueueId, doneAt])
 }
 
 model PublicShare {
-    id           String                   @id @default(nanoid())
-    resourceType PublicShareResourceTypes
-    resourceId   String
-    projectId    String
-    project      Project                  @relation(fields: [projectId], references: [id])
-    userId       String?
-    user         User?                    @relation(fields: [userId], references: [id])
+  id           String                   @id @default(nanoid())
+  resourceType PublicShareResourceTypes
+  resourceId   String
+  projectId    String
+  project      Project                  @relation(fields: [projectId], references: [id])
+  userId       String?
+  user         User?                    @relation(fields: [userId], references: [id])
 
-    createdAt DateTime @default(now())
-    updatedAt DateTime @default(now()) @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
 
-    @@unique([projectId, resourceType, resourceId])
-    @@index([userId])
+  @@unique([projectId, resourceType, resourceId])
+  @@index([userId])
 }
 
 model CustomLLMModelCost {
-    id                 String   @id @default(nanoid())
-    projectId          String
-    model              String
-    regex              String
-    inputCostPerToken  Float?
-    outputCostPerToken Float?
-    createdAt          DateTime @default(now())
-    updatedAt          DateTime @default(now()) @updatedAt
+  id                 String   @id @default(nanoid())
+  projectId          String
+  model              String
+  regex              String
+  inputCostPerToken  Float?
+  outputCostPerToken Float?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @default(now()) @updatedAt
 
-    @@index([projectId])
+  @@index([projectId])
 }
 
 model Workflow {
-    id                   String            @id @default(nanoid())
-    projectId            String
-    project              Project           @relation(fields: [projectId], references: [id])
-    name                 String
-    icon                 String
-    description          String
-    createdAt            DateTime          @default(now())
-    updatedAt            DateTime          @default(now()) @updatedAt
-    latestVersionId      String?
-    latestVersion        WorkflowVersion?  @relation("LatestVersion", fields: [latestVersionId], references: [id], onDelete: Restrict, onUpdate: Restrict)
-    currentVersionId     String?
-    currentVersion       WorkflowVersion?  @relation("CurrentVersion", fields: [currentVersionId], references: [id], onDelete: Restrict, onUpdate: Restrict)
-    versions             WorkflowVersion[] @relation("Versions")
-    publishedId          String?
-    publishedById        String?
-    publishedBy          User?             @relation(fields: [publishedById], references: [id])
-    archivedAt           DateTime?
-    experiments          Experiment[]
-    isEvaluator          Boolean           @default(false)
-    isComponent          Boolean           @default(false)
-    copiedFromWorkflowId String?
-    copiedFrom           Workflow?         @relation("WorkflowCopies", fields: [copiedFromWorkflowId], references: [id], onDelete: Restrict, onUpdate: Restrict)
-    copiedWorkflows      Workflow[]        @relation("WorkflowCopies")
-    agents               Agent[]
-    evaluators           Evaluator[]
+  id                   String            @id @default(nanoid())
+  projectId            String
+  project              Project           @relation(fields: [projectId], references: [id])
+  name                 String
+  icon                 String
+  description          String
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @default(now()) @updatedAt
+  latestVersionId      String?
+  latestVersion        WorkflowVersion?  @relation("LatestVersion", fields: [latestVersionId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  currentVersionId     String?
+  currentVersion       WorkflowVersion?  @relation("CurrentVersion", fields: [currentVersionId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  versions             WorkflowVersion[] @relation("Versions")
+  publishedId          String?
+  publishedById        String?
+  publishedBy          User?             @relation(fields: [publishedById], references: [id])
+  archivedAt           DateTime?
+  experiments          Experiment[]
+  isEvaluator          Boolean           @default(false)
+  isComponent          Boolean           @default(false)
+  copiedFromWorkflowId String?
+  copiedFrom           Workflow?         @relation("WorkflowCopies", fields: [copiedFromWorkflowId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  copiedWorkflows      Workflow[]        @relation("WorkflowCopies")
+  agents               Agent[]
+  evaluators           Evaluator[]
 
-    @@index([projectId])
-    @@index([publishedById])
-    @@index([latestVersionId])
-    @@index([currentVersionId])
-    @@index([copiedFromWorkflowId])
+  @@index([projectId])
+  @@index([publishedById])
+  @@index([latestVersionId])
+  @@index([currentVersionId])
+  @@index([copiedFromWorkflowId])
 }
 
 model WorkflowVersion {
-    id                       String            @id @default(nanoid())
-    version                  String
-    commitMessage            String
-    authorId                 String
-    author                   User              @relation(fields: [authorId], references: [id])
-    projectId                String
-    project                  Project           @relation(fields: [projectId], references: [id])
-    workflowId               String
-    workflow                 Workflow          @relation("Versions", fields: [workflowId], references: [id])
-    parentId                 String?
-    parent                   WorkflowVersion?  @relation("WorkflowVersionHistory", fields: [parentId], references: [id], onDelete: Restrict, onUpdate: Restrict)
-    children                 WorkflowVersion[] @relation("WorkflowVersionHistory")
-    autoSaved                Boolean           @default(false)
-    createdAt                DateTime          @default(now())
-    updatedAt                DateTime          @default(now()) @updatedAt
-    dsl                      Json
-    WorkflowAsLatestVersion  Workflow[]        @relation("LatestVersion")
-    WorkflowAsCurrentVersion Workflow[]        @relation("CurrentVersion")
+  id                       String            @id @default(nanoid())
+  version                  String
+  commitMessage            String
+  authorId                 String
+  author                   User              @relation(fields: [authorId], references: [id])
+  projectId                String
+  project                  Project           @relation(fields: [projectId], references: [id])
+  workflowId               String
+  workflow                 Workflow          @relation("Versions", fields: [workflowId], references: [id])
+  parentId                 String?
+  parent                   WorkflowVersion?  @relation("WorkflowVersionHistory", fields: [parentId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  children                 WorkflowVersion[] @relation("WorkflowVersionHistory")
+  autoSaved                Boolean           @default(false)
+  createdAt                DateTime          @default(now())
+  updatedAt                DateTime          @default(now()) @updatedAt
+  dsl                      Json
+  WorkflowAsLatestVersion  Workflow[]        @relation("LatestVersion")
+  WorkflowAsCurrentVersion Workflow[]        @relation("CurrentVersion")
 
-    @@unique([workflowId, version])
-    @@index([workflowId])
-    @@index([projectId])
-    @@index([parentId])
-    @@index([authorId])
-    @@index([createdAt])
+  @@unique([workflowId, version])
+  @@index([workflowId])
+  @@index([projectId])
+  @@index([parentId])
+  @@index([authorId])
+  @@index([createdAt])
 }
 
 model OrganizationFeature {
-    id             String       @id @default(nanoid())
-    feature        String
-    organizationId String
-    organization   Organization @relation(fields: [organizationId], references: [id])
-    createdAt      DateTime     @default(now())
-    updatedAt      DateTime     @default(now()) @updatedAt
-    trialEndDate   DateTime?
+  id             String       @id @default(nanoid())
+  feature        String
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @default(now()) @updatedAt
+  trialEndDate   DateTime?
 
-    @@unique([feature, organizationId])
-    @@index([feature])
-    @@index([organizationId])
+  @@unique([feature, organizationId])
+  @@index([feature])
+  @@index([organizationId])
 }
 
 // AuditLog is the unified governance ledger. Both gateway-driven mutations
@@ -966,453 +1012,452 @@ model OrganizationFeature {
 // The /settings/audit-log page renders both via a `source` field computed
 // from the presence of `targetKind` (gateway = purple badge, platform = grey).
 model AuditLog {
-    id             String   @id @default(cuid())
-    createdAt      DateTime @default(now())
-    userId         String?
-    projectId      String?
-    organizationId String?
-    action         String
-    args           Json?
-    error          String?
-    ipAddress      String?
-    userAgent      String?
-    metadata       Json?
+  id             String   @id @default(cuid())
+  createdAt      DateTime @default(now())
+  userId         String?
+  projectId      String?
+  organizationId String?
+  action         String
+  args           Json?
+  error          String?
+  ipAddress      String?
+  userAgent      String?
+  metadata       Json?
 
-    // Gateway-shape governance fields (see model docstring above).
-    targetKind     String?
-    targetId       String?
-    before         Json?
-    after          Json?
+  // Gateway-shape governance fields (see model docstring above).
+  targetKind String?
+  targetId   String?
+  before     Json?
+  after      Json?
 
-    @@index([createdAt])
-    @@index([userId])
-    @@index([projectId])
-    @@index([action])
-    @@index([ipAddress])
-    @@index([organizationId, createdAt])
-    @@index([targetKind, targetId])
+  @@index([createdAt])
+  @@index([userId])
+  @@index([projectId])
+  @@index([action])
+  @@index([ipAddress])
+  @@index([organizationId, createdAt])
+  @@index([targetKind, targetId])
 }
 
 enum PromptScope {
-    ORGANIZATION
-    PROJECT
+  ORGANIZATION
+  PROJECT
 }
 
 model LlmPromptConfig {
-    id             String      @id @default(nanoid())
-    handle         String? // Globally unique identifier in format team/sample-prompt
-    name           String
-    projectId      String
-    project        Project     @relation(fields: [projectId], references: [id])
-    createdAt      DateTime    @default(now())
-    updatedAt      DateTime    @default(now()) @updatedAt
-    deletedAt      DateTime?
-    organizationId String
-    scope          PromptScope @default(PROJECT)
+  id             String      @id @default(nanoid())
+  handle         String? // Globally unique identifier in format team/sample-prompt
+  name           String
+  projectId      String
+  project        Project     @relation(fields: [projectId], references: [id])
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @default(now()) @updatedAt
+  deletedAt      DateTime?
+  organizationId String
+  scope          PromptScope @default(PROJECT)
 
-    // Copy tracking
-    copiedFromPromptId String?
-    copiedFrom         LlmPromptConfig?  @relation("PromptCopies", fields: [copiedFromPromptId], references: [id], onDelete: Restrict, onUpdate: Restrict)
-    copiedPrompts      LlmPromptConfig[] @relation("PromptCopies")
+  // Copy tracking
+  copiedFromPromptId String?
+  copiedFrom         LlmPromptConfig?  @relation("PromptCopies", fields: [copiedFromPromptId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  copiedPrompts      LlmPromptConfig[] @relation("PromptCopies")
 
-    // Relation to all versions - latest is determined by query
-    versions LlmPromptConfigVersion[] @relation("Versions")
+  // Relation to all versions - latest is determined by query
+  versions LlmPromptConfigVersion[] @relation("Versions")
 
-    // Relation to labels (e.g., "production", "staging")
-    versionTags PromptTagAssignment[] @relation("VersionTags")
+  // Relation to labels (e.g., "production", "staging")
+  versionTags PromptTagAssignment[] @relation("VersionTags")
 
-    @@unique([handle], map: "LlmPromptConfig_handle_key")
-    @@index([projectId])
-    @@index([organizationId], map: "LlmPromptConfig_organizationId_idx")
-    @@index([copiedFromPromptId])
+  @@unique([handle], map: "LlmPromptConfig_handle_key")
+  @@index([projectId])
+  @@index([organizationId], map: "LlmPromptConfig_organizationId_idx")
+  @@index([copiedFromPromptId])
 }
 
 model LlmPromptConfigVersion {
-    id            String          @id @default(nanoid())
-    version       Int // The version number of the config
-    commitMessage String? // Optional: Describe changes in this version
-    authorId      String? // Optional: User who created this version
-    author        User?           @relation(fields: [authorId], references: [id])
-    configId      String // Foreign key to the parent LlmPromptConfig
-    config        LlmPromptConfig @relation("Versions", fields: [configId], references: [id], onDelete: Cascade) // Cascade delete versions if parent is deleted
+  id            String          @id @default(nanoid())
+  version       Int // The version number of the config
+  commitMessage String? // Optional: Describe changes in this version
+  authorId      String? // Optional: User who created this version
+  author        User?           @relation(fields: [authorId], references: [id])
+  configId      String // Foreign key to the parent LlmPromptConfig
+  config        LlmPromptConfig @relation("Versions", fields: [configId], references: [id], onDelete: Cascade) // Cascade delete versions if parent is deleted
 
-    // Version specific data
-    configData    Json   @map("config") // The actual config JSON for this version
-    schemaVersion String // Schema version for this specific configData
+  // Version specific data
+  configData    Json   @map("config") // The actual config JSON for this version
+  schemaVersion String // Schema version for this specific configData
 
-    createdAt DateTime @default(now()) // Used to determine the latest version
+  createdAt DateTime @default(now()) // Used to determine the latest version
 
-    // Required for multi-tenancy
-    projectId String
+  // Required for multi-tenancy
+  projectId String
 
-    // Tags pointing to this version
-    versionTags PromptTagAssignment[]
+  // Tags pointing to this version
+  versionTags PromptTagAssignment[]
 
-    @@unique([configId, version]) // Each version number must be unique per config
-    @@index([configId])
-    @@index([authorId])
-    @@index([createdAt]) // Index important for finding the latest efficiently
+  @@unique([configId, version]) // Each version number must be unique per config
+  @@index([configId])
+  @@index([authorId])
+  @@index([createdAt]) // Index important for finding the latest efficiently
 }
 
 model PromptTagAssignment {
-    id          String   @id @default(nanoid())
-    configId    String
-    config      LlmPromptConfig        @relation("VersionTags", fields: [configId], references: [id], onDelete: Cascade)
-    versionId   String
-    version     LlmPromptConfigVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
-    tagId       String
-    promptTag   PromptTag @relation(fields: [tagId], references: [id], onDelete: Cascade)
-    projectId   String
-    createdAt   DateTime @default(now())
-    updatedAt   DateTime @default(now()) @updatedAt
-    createdById String?
-    createdBy   User?    @relation("versionTagCreatedBy", fields: [createdById], references: [id])
-    updatedById String?
-    updatedBy   User?    @relation("versionTagUpdatedBy", fields: [updatedById], references: [id])
+  id          String                 @id @default(nanoid())
+  configId    String
+  config      LlmPromptConfig        @relation("VersionTags", fields: [configId], references: [id], onDelete: Cascade)
+  versionId   String
+  version     LlmPromptConfigVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
+  tagId       String
+  promptTag   PromptTag              @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  projectId   String
+  createdAt   DateTime               @default(now())
+  updatedAt   DateTime               @default(now()) @updatedAt
+  createdById String?
+  createdBy   User?                  @relation("versionTagCreatedBy", fields: [createdById], references: [id])
+  updatedById String?
+  updatedBy   User?                  @relation("versionTagUpdatedBy", fields: [updatedById], references: [id])
 
-    @@unique([configId, tagId])
-    @@index([configId])
-    @@index([versionId])
-    @@index([projectId])
-    @@index([tagId])
+  @@unique([configId, tagId])
+  @@index([configId])
+  @@index([versionId])
+  @@index([projectId])
+  @@index([tagId])
 }
 
 model PromptTag {
-    id             String       @id @default(nanoid())
-    organizationId String
-    organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-    name           String
-    assignments    PromptTagAssignment[]
-    createdAt      DateTime     @default(now())
-    updatedAt      DateTime     @default(now()) @updatedAt
-    createdById    String?
-    createdBy      User?        @relation("promptTagCreatedBy", fields: [createdById], references: [id])
-    updatedById    String?
-    updatedBy      User?        @relation("promptTagUpdatedBy", fields: [updatedById], references: [id])
+  id             String                @id @default(nanoid())
+  organizationId String
+  organization   Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String
+  assignments    PromptTagAssignment[]
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @default(now()) @updatedAt
+  createdById    String?
+  createdBy      User?                 @relation("promptTagCreatedBy", fields: [createdById], references: [id])
+  updatedById    String?
+  updatedBy      User?                 @relation("promptTagUpdatedBy", fields: [updatedById], references: [id])
 
-    @@unique([organizationId, name])
-    @@index([organizationId])
+  @@unique([organizationId, name])
+  @@index([organizationId])
 }
 
 model Analytics {
-    id           String   @id @default(nanoid())
-    projectId    String
-    project      Project  @relation(fields: [projectId], references: [id])
-    key          String
-    value        Json? // For complex/metadata
-    numericValue Float? // For metrics that need aggregation
-    stringValue  String? // For categorical data
-    boolValue    Boolean? // For true/false metrics
-    createdAt    DateTime @default(now())
+  id           String   @id @default(nanoid())
+  projectId    String
+  project      Project  @relation(fields: [projectId], references: [id])
+  key          String
+  value        Json? // For complex/metadata
+  numericValue Float? // For metrics that need aggregation
+  stringValue  String? // For categorical data
+  boolValue    Boolean? // For true/false metrics
+  createdAt    DateTime @default(now())
 
-    @@index([createdAt, key, projectId, numericValue])
-    @@index([projectId])
+  @@index([createdAt, key, projectId, numericValue])
+  @@index([projectId])
 }
 
 model CustomRole {
-    id             String       @id @default(nanoid())
-    organizationId String
-    organization   Organization @relation(fields: [organizationId], references: [id])
-    name           String
-    description    String?
-    permissions    Json // Array of Permission strings
-    createdAt      DateTime     @default(now())
-    updatedAt      DateTime     @default(now()) @updatedAt
-    assignedUsers      TeamUser[]
-    roleBindings       RoleBinding[]
+  id             String        @id @default(nanoid())
+  organizationId String
+  organization   Organization  @relation(fields: [organizationId], references: [id])
+  name           String
+  description    String?
+  permissions    Json // Array of Permission strings
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @default(now()) @updatedAt
+  assignedUsers  TeamUser[]
+  roleBindings   RoleBinding[]
 
-    @@unique([organizationId, name])
-    @@index([organizationId])
+  @@unique([organizationId, name])
+  @@index([organizationId])
 }
 
 model Notification {
-    id String @id @default(nanoid())
+  id String @id @default(nanoid())
 
-    // Optional context - notifications can be at user, organization, or project level
-    organizationId String?
-    organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-    projectId      String?
-    project        Project?      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  // Optional context - notifications can be at user, organization, or project level
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  projectId      String?
+  project        Project?      @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
-    // Flexible metadata to store notification-specific data
-    // For usage limit: { currentUsage: number, limit: number, percentage: number, threshold: number }
-    metadata Json
+  // Flexible metadata to store notification-specific data
+  // For usage limit: { currentUsage: number, limit: number, percentage: number, threshold: number }
+  metadata Json
 
-    // Timestamps
-    createdAt DateTime @default(now())
-    updatedAt DateTime @default(now()) @updatedAt
-    sentAt    DateTime // When email was actually sent
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+  sentAt    DateTime // When email was actually sent
 
-    @@index([organizationId])
-    @@index([projectId])
-    @@index([createdAt])
-    @@index([sentAt])
+  @@index([organizationId])
+  @@index([projectId])
+  @@index([createdAt])
+  @@index([sentAt])
 }
 
 model Agent {
-    id                 String    @id @default(nanoid())
-    projectId          String
-    project            Project   @relation(fields: [projectId], references: [id])
-    name               String
-    type               String // "signature" | "code" | "workflow"
-    config             Json // Node configuration (model, prompt, code, etc.)
-    workflowId         String? // For "workflow" type - top level for joins
-    workflow           Workflow? @relation(fields: [workflowId], references: [id])
-    copiedFromAgentId  String?
-    copiedFrom         Agent?    @relation("AgentCopies", fields: [copiedFromAgentId], references: [id], onDelete: Restrict, onUpdate: Restrict)
-    copiedAgents       Agent[]   @relation("AgentCopies")
-    archivedAt         DateTime?
-    createdAt          DateTime  @default(now())
-    updatedAt          DateTime  @default(now()) @updatedAt
+  id                String    @id @default(nanoid())
+  projectId         String
+  project           Project   @relation(fields: [projectId], references: [id])
+  name              String
+  type              String // "signature" | "code" | "workflow"
+  config            Json // Node configuration (model, prompt, code, etc.)
+  workflowId        String? // For "workflow" type - top level for joins
+  workflow          Workflow? @relation(fields: [workflowId], references: [id])
+  copiedFromAgentId String?
+  copiedFrom        Agent?    @relation("AgentCopies", fields: [copiedFromAgentId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  copiedAgents      Agent[]   @relation("AgentCopies")
+  archivedAt        DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @default(now()) @updatedAt
 
-    @@index([projectId])
-    @@index([workflowId])
-    @@index([copiedFromAgentId])
+  @@index([projectId])
+  @@index([workflowId])
+  @@index([copiedFromAgentId])
 }
 
 model Evaluator {
-    id                    String     @id @default(nanoid())
-    projectId             String
-    project               Project    @relation(fields: [projectId], references: [id])
-    name                  String
-    slug                  String? // Human-readable identifier for guardrails API
-    type                  String // "evaluator" (built-in) | "workflow" (custom)
-    config                Json // Settings for built-in, or empty for workflow
-    workflowId            String? // For "workflow" type - top level for joins
-    workflow              Workflow?  @relation(fields: [workflowId], references: [id])
-    copiedFromEvaluatorId String?
-    copiedFrom            Evaluator? @relation("EvaluatorCopies", fields: [copiedFromEvaluatorId], references: [id], onDelete: Restrict, onUpdate: Restrict)
-    copiedEvaluators      Evaluator[] @relation("EvaluatorCopies")
-    monitors              Monitor[] // Monitors using this evaluator
-    archivedAt            DateTime?
-    createdAt             DateTime   @default(now())
-    updatedAt             DateTime   @default(now()) @updatedAt
+  id                    String      @id @default(nanoid())
+  projectId             String
+  project               Project     @relation(fields: [projectId], references: [id])
+  name                  String
+  slug                  String? // Human-readable identifier for guardrails API
+  type                  String // "evaluator" (built-in) | "workflow" (custom)
+  config                Json // Settings for built-in, or empty for workflow
+  workflowId            String? // For "workflow" type - top level for joins
+  workflow              Workflow?   @relation(fields: [workflowId], references: [id])
+  copiedFromEvaluatorId String?
+  copiedFrom            Evaluator?  @relation("EvaluatorCopies", fields: [copiedFromEvaluatorId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  copiedEvaluators      Evaluator[] @relation("EvaluatorCopies")
+  monitors              Monitor[] // Monitors using this evaluator
+  archivedAt            DateTime?
+  createdAt             DateTime    @default(now())
+  updatedAt             DateTime    @default(now()) @updatedAt
 
-    @@unique([projectId, slug])
-    @@index([projectId])
-    @@index([workflowId])
-    @@index([copiedFromEvaluatorId])
+  @@unique([projectId, slug])
+  @@index([projectId])
+  @@index([workflowId])
+  @@index([copiedFromEvaluatorId])
 }
 
 model Scenario {
-    id              String    @id @default(nanoid())
-    projectId       String
-    project         Project   @relation(fields: [projectId], references: [id])
-    name            String
-    situation       String
-    criteria        String[]
-    labels          String[]
-    lastUpdatedById String?
-    lastUpdatedBy   User?     @relation(fields: [lastUpdatedById], references: [id])
-    archivedAt      DateTime?
-    createdAt       DateTime  @default(now())
-    updatedAt       DateTime  @default(now()) @updatedAt
+  id              String    @id @default(nanoid())
+  projectId       String
+  project         Project   @relation(fields: [projectId], references: [id])
+  name            String
+  situation       String
+  criteria        String[]
+  labels          String[]
+  lastUpdatedById String?
+  lastUpdatedBy   User?     @relation(fields: [lastUpdatedById], references: [id])
+  archivedAt      DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @default(now()) @updatedAt
 
-    @@index([projectId])
+  @@index([projectId])
 }
 
 model SimulationSuite {
-    id          String    @id @default(nanoid())
-    projectId   String
-    project     Project   @relation(fields: [projectId], references: [id])
-    name        String
-    slug        String
-    description String?
-    scenarioIds String[]
-    targets     Json      // Array of { type: "prompt" | "http", referenceId: string }
-    repeatCount Int       @default(1)
-    labels      String[]
-    archivedAt  DateTime?
-    createdAt   DateTime  @default(now())
-    updatedAt   DateTime  @default(now()) @updatedAt
+  id          String    @id @default(nanoid())
+  projectId   String
+  project     Project   @relation(fields: [projectId], references: [id])
+  name        String
+  slug        String
+  description String?
+  scenarioIds String[]
+  targets     Json // Array of { type: "prompt" | "http", referenceId: string }
+  repeatCount Int       @default(1)
+  labels      String[]
+  archivedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @default(now()) @updatedAt
 
-    @@index([projectId])
-    @@unique([projectId, slug])
+  @@unique([projectId, slug])
+  @@index([projectId])
 }
 
 model ProjectDailySdkUsage {
-    id                 String   @id
-    projectId          String
-    date               String   // UTC date "YYYY-MM-DD"
-    sdkName            String   @default("")
-    sdkVersion         String   @default("")
-    sdkLanguage        String   @default("")
-    count              Int      @default(0)
-    lastEventTimestamp BigInt?  // Unix ms from event.timestamp
-    updatedAt          DateTime @default(now()) @updatedAt
+  id                 String   @id
+  projectId          String
+  date               String // UTC date "YYYY-MM-DD"
+  sdkName            String   @default("")
+  sdkVersion         String   @default("")
+  sdkLanguage        String   @default("")
+  count              Int      @default(0)
+  lastEventTimestamp BigInt? // Unix ms from event.timestamp
+  updatedAt          DateTime @default(now()) @updatedAt
 
-    @@unique([projectId, date, sdkName, sdkVersion, sdkLanguage])
-    @@index([projectId, date])
+  @@unique([projectId, date, sdkName, sdkVersion, sdkLanguage])
+  @@index([projectId, date])
 }
 
 model Subscription {
-    id                    String             @id @default(nanoid())
-    organizationId        String
-    plan                  PlanTypes
-    stripeSubscriptionId  String?            @unique
-    status                SubscriptionStatus
-    startDate             DateTime?
-    endDate               DateTime?
-    lastPaymentFailedDate DateTime?
-    createdAt             DateTime           @default(now())
-    updatedAt             DateTime           @default(now()) @updatedAt
-    maxMembers            Int?
-    maxProjects           Int?
-    maxMessagesPerMonth   Int?
-    maxWorkflows          Int?
-    maxRetentionDays      Int?
-    maxMembersLite        Int?
-    maxTeams              Int?
-    maxPrompts            Int?
-    maxEvaluators         Int?
-    maxScenarios          Int?
-    maxAgents             Int?
-    maxExperiments        Int?
-    maxOnlineEvaluations  Int?
-    maxDatasets           Int?
-    maxDashboards         Int?
-    maxCustomGraphs       Int?
-    maxAutomations        Int?
+  id                    String             @id @default(nanoid())
+  organizationId        String
+  plan                  PlanTypes
+  stripeSubscriptionId  String?            @unique
+  status                SubscriptionStatus
+  startDate             DateTime?
+  endDate               DateTime?
+  lastPaymentFailedDate DateTime?
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @default(now()) @updatedAt
+  maxMembers            Int?
+  maxProjects           Int?
+  maxMessagesPerMonth   Int?
+  maxWorkflows          Int?
+  maxRetentionDays      Int?
+  maxMembersLite        Int?
+  maxTeams              Int?
+  maxPrompts            Int?
+  maxEvaluators         Int?
+  maxScenarios          Int?
+  maxAgents             Int?
+  maxExperiments        Int?
+  maxOnlineEvaluations  Int?
+  maxDatasets           Int?
+  maxDashboards         Int?
+  maxCustomGraphs       Int?
+  maxAutomations        Int?
 
-    organization Organization @relation(fields: [organizationId], references: [id])
-    invoices     Invoice[]
+  organization Organization @relation(fields: [organizationId], references: [id])
+  invoices     Invoice[]
 
-    @@index([organizationId])
+  @@index([organizationId])
 }
 
 model Invoice {
-    id             String   @id @default(nanoid())
-    subscriptionId String
-    totalAmount    Float
-    currency       String
-    dueDate        DateTime
-    paid           Boolean  @default(false)
-    createdAt      DateTime @default(now())
-    updatedAt      DateTime @default(now()) @updatedAt
+  id             String   @id @default(nanoid())
+  subscriptionId String
+  totalAmount    Float
+  currency       String
+  dueDate        DateTime
+  paid           Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @default(now()) @updatedAt
 
-    subscription Subscription  @relation(fields: [subscriptionId], references: [id])
-    lineItems    InvoiceItem[]
+  subscription Subscription  @relation(fields: [subscriptionId], references: [id])
+  lineItems    InvoiceItem[]
 
-    @@index([subscriptionId])
+  @@index([subscriptionId])
 }
 
 model InvoiceItem {
-    id          String   @id @default(nanoid())
-    invoiceId   String
-    description String
-    amount      Float
-    createdAt   DateTime @default(now())
-    updatedAt   DateTime @default(now()) @updatedAt
+  id          String   @id @default(nanoid())
+  invoiceId   String
+  description String
+  amount      Float
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
 
-    invoice Invoice @relation(fields: [invoiceId], references: [id])
+  invoice Invoice @relation(fields: [invoiceId], references: [id])
 
-    @@index([invoiceId])
+  @@index([invoiceId])
 }
-
 
 // ============================================================================
 // Scoped RBAC — Groups, GroupMembership, RoleBinding
 // ============================================================================
 
 model Group {
-    id             String            @id @default(nanoid())
-    organizationId String
-    organization   Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-    name           String
-    slug           String
-    // SCIM provenance — null for manually created groups
-    externalId     String?           // IdP-side group ID (SCIM externalId)
-    scimSource     String?           // e.g. "azure-ad", "okta"
-    members        GroupMembership[]
-    roleBindings   RoleBinding[]     @relation("GroupBindings")
-    createdAt      DateTime          @default(now())
-    updatedAt      DateTime          @default(now()) @updatedAt
+  id             String            @id @default(nanoid())
+  organizationId String
+  organization   Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String
+  slug           String
+  // SCIM provenance — null for manually created groups
+  externalId     String? // IdP-side group ID (SCIM externalId)
+  scimSource     String? // e.g. "azure-ad", "okta"
+  members        GroupMembership[]
+  roleBindings   RoleBinding[]     @relation("GroupBindings")
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @default(now()) @updatedAt
 
-    @@unique([organizationId, slug])
-    @@unique([organizationId, externalId])
-    @@index([organizationId])
+  @@unique([organizationId, slug])
+  @@unique([organizationId, externalId])
+  @@index([organizationId])
 }
 
 model GroupMembership {
-    userId    String
-    groupId   String
-    user      User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-    group     Group  @relation(fields: [groupId], references: [id], onDelete: Cascade)
-    createdAt DateTime @default(now())
+  userId    String
+  groupId   String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  group     Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
 
-    @@id([userId, groupId])
-    @@index([userId])
-    @@index([groupId])
+  @@id([userId, groupId])
+  @@index([userId])
+  @@index([groupId])
 }
 
 model RoleBinding {
-    id             String               @id @default(nanoid())
-    organizationId String
-    organization   Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  id             String       @id @default(nanoid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
-    // Principal — exactly one must be set
-    userId         String?
-    user           User?                @relation(fields: [userId], references: [id], onDelete: Cascade)
-    groupId        String?
-    group          Group?               @relation("GroupBindings", fields: [groupId], references: [id], onDelete: Cascade)
-    patId          String?
-    pat            PersonalAccessToken? @relation(fields: [patId], references: [id], onDelete: Restrict)
+  // Principal — exactly one must be set
+  userId  String?
+  user    User?                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  groupId String?
+  group   Group?               @relation("GroupBindings", fields: [groupId], references: [id], onDelete: Cascade)
+  patId   String?
+  pat     PersonalAccessToken? @relation(fields: [patId], references: [id], onDelete: Restrict)
 
-    // Role — built-in named role or custom
-    role           TeamUserRole
-    customRoleId   String?
-    customRole     CustomRole?          @relation(fields: [customRoleId], references: [id])
+  // Role — built-in named role or custom
+  role         TeamUserRole
+  customRoleId String?
+  customRole   CustomRole?  @relation(fields: [customRoleId], references: [id])
 
-    // Scope — scopeType + scopeId identify the resource
-    scopeType      RoleBindingScopeType
-    scopeId        String               // orgId, teamId, or projectId depending on scopeType
+  // Scope — scopeType + scopeId identify the resource
+  scopeType RoleBindingScopeType
+  scopeId   String // orgId, teamId, or projectId depending on scopeType
 
-    createdAt      DateTime             @default(now())
-    updatedAt      DateTime             @default(now()) @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
 
-    // Uniqueness is enforced by six partial unique indexes defined in migrations:
-    //   • user + group (built-in and custom) — 20260410120000_fix_role_binding_unique_custom_role
-    //   • pat (built-in and custom) — 20260414222341_add_personal_access_tokens
-    // Prisma does not support partial indexes natively, so there is no @@unique here.
-    @@index([organizationId])
-    @@index([userId])
-    @@index([groupId])
-    @@index([patId])
-    @@index([scopeType, scopeId])
+  // Uniqueness is enforced by six partial unique indexes defined in migrations:
+  //   • user + group (built-in and custom) — 20260410120000_fix_role_binding_unique_custom_role
+  //   • pat (built-in and custom) — 20260414222341_add_personal_access_tokens
+  // Prisma does not support partial indexes natively, so there is no @@unique here.
+  @@index([organizationId])
+  @@index([userId])
+  @@index([groupId])
+  @@index([patId])
+  @@index([scopeType, scopeId])
 }
 
 model PersonalAccessToken {
-    id             String        @id @default(nanoid())
-    name           String
-    description    String?
-    lookupId       String        @unique
-    hashedSecret   String
-    userId         String
-    user           User          @relation(fields: [userId], references: [id], onDelete: Restrict)
-    organizationId String
-    organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-    roleBindings   RoleBinding[]
-    expiresAt      DateTime?
-    lastUsedAt     DateTime?
-    revokedAt      DateTime?
-    createdAt      DateTime      @default(now())
-    updatedAt      DateTime      @default(now()) @updatedAt
+  id             String        @id @default(nanoid())
+  name           String
+  description    String?
+  lookupId       String        @unique
+  hashedSecret   String
+  userId         String
+  user           User          @relation(fields: [userId], references: [id], onDelete: Restrict)
+  organizationId String
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  roleBindings   RoleBinding[]
+  expiresAt      DateTime?
+  lastUsedAt     DateTime?
+  revokedAt      DateTime?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @default(now()) @updatedAt
 
-    @@index([userId])
-    @@index([organizationId])
-    @@index([lookupId])
+  @@index([userId])
+  @@index([organizationId])
+  @@index([lookupId])
 }
 
 model BillingMeterCheckpoint {
-    id                   String   @id @default(cuid())
-    organizationId       String
-    billingMonth         String   // "2026-02"
-    lastReportedTotal    Int      @default(0)
-    pendingReportedTotal Int?     // non-null = in-flight Stripe call
-    consecutiveFailures  Int      @default(0)
-    updatedAt            DateTime @updatedAt
+  id                   String   @id @default(cuid())
+  organizationId       String
+  billingMonth         String // "2026-02"
+  lastReportedTotal    Int      @default(0)
+  pendingReportedTotal Int? // non-null = in-flight Stripe call
+  consecutiveFailures  Int      @default(0)
+  updatedAt            DateTime @updatedAt
 
-    @@unique([organizationId, billingMonth])
+  @@unique([organizationId, billingMonth])
 }
 
 // ============================================================================
@@ -1438,13 +1483,13 @@ model BillingMeterCheckpoint {
 // ============================================================================
 
 enum VirtualKeyEnvironment {
-    LIVE
-    TEST
+  LIVE
+  TEST
 }
 
 enum VirtualKeyStatus {
-    ACTIVE
-    REVOKED
+  ACTIVE
+  REVOKED
 }
 
 // Rotation policy for gateway provider credentials.
@@ -1456,57 +1501,57 @@ enum VirtualKeyStatus {
 // would mislead operators into thinking they're configuring a feature
 // that silently does nothing. See iter 56 dogfood feedback.
 enum GatewayProviderRotationPolicy {
-    MANUAL
+  MANUAL
 }
 
 enum GatewayProviderHealthStatus {
-    UNKNOWN
-    HEALTHY
-    DEGRADED
-    CIRCUIT_OPEN
+  UNKNOWN
+  HEALTHY
+  DEGRADED
+  CIRCUIT_OPEN
 }
 
 enum GatewayBudgetScopeType {
-    ORGANIZATION
-    TEAM
-    PROJECT
-    VIRTUAL_KEY
-    PRINCIPAL
+  ORGANIZATION
+  TEAM
+  PROJECT
+  VIRTUAL_KEY
+  PRINCIPAL
 }
 
 enum GatewayBudgetWindow {
-    MINUTE
-    HOUR
-    DAY
-    WEEK
-    MONTH
-    TOTAL
+  MINUTE
+  HOUR
+  DAY
+  WEEK
+  MONTH
+  TOTAL
 }
 
 enum GatewayBudgetBreachAction {
-    BLOCK
-    WARN
+  BLOCK
+  WARN
 }
 
 enum GatewayBudgetLedgerStatus {
-    SUCCESS
-    PROVIDER_ERROR
-    BLOCKED_BY_GUARDRAIL
-    CANCELLED
+  SUCCESS
+  PROVIDER_ERROR
+  BLOCKED_BY_GUARDRAIL
+  CANCELLED
 }
 
 enum GatewayChangeEventKind {
-    VK_CREATED
-    VK_CONFIG_UPDATED
-    VK_REVOKED
-    VK_ROTATED
-    BUDGET_CREATED
-    BUDGET_UPDATED
-    BUDGET_DELETED
-    PROVIDER_BINDING_UPDATED
-    CACHE_RULE_CREATED
-    CACHE_RULE_UPDATED
-    CACHE_RULE_DELETED
+  VK_CREATED
+  VK_CONFIG_UPDATED
+  VK_REVOKED
+  VK_ROTATED
+  BUDGET_CREATED
+  BUDGET_UPDATED
+  BUDGET_DELETED
+  PROVIDER_BINDING_UPDATED
+  CACHE_RULE_CREATED
+  CACHE_RULE_UPDATED
+  CACHE_RULE_DELETED
 }
 
 // Gateway audit action codes — kept as a TypeScript const union in
@@ -1518,233 +1563,578 @@ enum GatewayChangeEventKind {
 // 20260425000000_consolidate_gateway_audit_into_audit_log.
 
 enum GatewayCacheRuleMode {
-    RESPECT
-    FORCE
-    DISABLE
+  RESPECT
+  FORCE
+  DISABLE
 }
 
 model VirtualKey {
-    id                       String                         @id @default(nanoid())
-    projectId                String
-    project                  Project                        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  id        String  @id @default(nanoid())
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
-    name                     String
-    description              String?
-    environment              VirtualKeyEnvironment          @default(LIVE)
-    status                   VirtualKeyStatus               @default(ACTIVE)
+  name        String
+  description String?
+  environment VirtualKeyEnvironment @default(LIVE)
+  status      VirtualKeyStatus      @default(ACTIVE)
 
-    // Credential material. Full secret format:
-    //   lw_vk_{live|test}_<26-char-crockford-ulid>  (40 chars total)
-    // Only the hashed form and a short display prefix (first 18 chars) are
-    // kept after creation. The full secret is shown exactly once.
-    hashedSecret             String                         // argon2id(secret + server pepper)
-    displayPrefix            String                         // e.g. "lw_vk_live_01HZX9"
+  // Credential material. Full secret format:
+  //   lw_vk_{live|test}_<26-char-crockford-ulid>  (40 chars total)
+  // Only the hashed form and a short display prefix (first 18 chars) are
+  // kept after creation. The full secret is shown exactly once.
+  hashedSecret  String // argon2id(secret + server pepper)
+  displayPrefix String // e.g. "lw_vk_live_01HZX9"
 
-    // Principal to attribute traces to when this VK is used. Optional because
-    // a VK can be owned by a project without binding to a specific human.
-    principalUserId          String?
-    principalUser            User?                          @relation("VirtualKeyPrincipalUser", fields: [principalUserId], references: [id])
+  // Principal to attribute traces to when this VK is used. Optional because
+  // a VK can be owned by a project without binding to a specific human.
+  principalUserId String?
+  principalUser   User?   @relation("VirtualKeyPrincipalUser", fields: [principalUserId], references: [id])
 
-    // Config blob. Mirrors the shape of `GET /internal/gateway/config/:vk_id`.
-    // Stored as a single JSON blob so the control-plane can version it and
-    // return it to the gateway without reassembling from many tables. Fields:
-    //   model_aliases, models_allowed, cache, guardrails, policy_rules,
-    //   rate_limits, fallback (non-chain scalars). The chain itself is
-    //   materialised in VirtualKeyProviderCredential for FK integrity.
-    config                   Json                           @default("{}")
+  // Config blob. Mirrors the shape of `GET /internal/gateway/config/:vk_id`.
+  // Stored as a single JSON blob so the control-plane can version it and
+  // return it to the gateway without reassembling from many tables. Fields:
+  //   model_aliases, models_allowed, cache, guardrails, policy_rules,
+  //   rate_limits, fallback (non-chain scalars). The chain itself is
+  //   materialised in VirtualKeyProviderCredential for FK integrity.
+  config Json @default("{}")
 
-    // Revision — every mutation bumps this; gateway uses it to skip config
-    // fetches that would be no-ops.
-    revision                 BigInt                         @default(0)
+  // Revision — every mutation bumps this; gateway uses it to skip config
+  // fetches that would be no-ops.
+  revision BigInt @default(0)
 
-    // Rotation bookkeeping. When rotated in place, the previous secret stays
-    // valid for 24h via `previousHashedSecret` + `previousSecretValidUntil`.
-    previousHashedSecret     String?
-    previousSecretValidUntil DateTime?
+  // Rotation bookkeeping. When rotated in place, the previous secret stays
+  // valid for 24h via `previousHashedSecret` + `previousSecretValidUntil`.
+  previousHashedSecret     String?
+  previousSecretValidUntil DateTime?
 
-    revokedAt                DateTime?
-    revokedById              String?
-    revokedBy                User?                          @relation("VirtualKeyRevokedBy", fields: [revokedById], references: [id])
+  revokedAt   DateTime?
+  revokedById String?
+  revokedBy   User?     @relation("VirtualKeyRevokedBy", fields: [revokedById], references: [id])
 
-    createdAt                DateTime                       @default(now())
-    updatedAt                DateTime                       @default(now()) @updatedAt
-    createdById              String
-    createdBy                User                           @relation("VirtualKeyCreatedBy", fields: [createdById], references: [id])
-    lastUsedAt               DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @default(now()) @updatedAt
+  createdById String
+  createdBy   User      @relation("VirtualKeyCreatedBy", fields: [createdById], references: [id])
+  lastUsedAt  DateTime?
 
-    providerCredentials      VirtualKeyProviderCredential[]
-    budgets                  GatewayBudget[]                @relation("VirtualKeyScopedGatewayBudgets")
-    ledgerEntries            GatewayBudgetLedger[]
+  providerCredentials VirtualKeyProviderCredential[]
+  budgets             GatewayBudget[]                @relation("VirtualKeyScopedGatewayBudgets")
+  ledgerEntries       GatewayBudgetLedger[]
 
-    @@unique([projectId, name])
-    @@unique([hashedSecret])
-    @@index([projectId])
-    @@index([displayPrefix])
-    @@index([status])
-    @@index([principalUserId])
-    @@index([revision])
+  // Optional RoutingPolicy reference. When set, gateway pulls
+  // provider chain + model allowlist from the policy instead of
+  // the embedded VirtualKeyProviderCredential rows. Used by
+  // personal keys and any centrally-governed VK.
+  routingPolicyId String?
+  routingPolicy   RoutingPolicy? @relation(fields: [routingPolicyId], references: [id], onDelete: SetNull)
+
+  @@unique([projectId, name])
+  @@unique([hashedSecret])
+  @@index([projectId])
+  @@index([displayPrefix])
+  @@index([status])
+  @@index([principalUserId])
+  @@index([revision])
+  @@index([routingPolicyId])
+}
+
+// ---------------------------------------------------------------------------
+// RoutingPolicy — admin-defined routing template referenced by VirtualKey.
+//
+// A policy answers two gateway questions in one place:
+//   1. Which provider credentials are eligible for a given request?
+//   2. In what order / by what strategy do we pick among eligible providers?
+//
+// Decoupling these from the VK itself lets the admin publish (e.g.)
+// `developer-default` once and have every personal VK in the org inherit
+// the same routing semantics — no per-key configuration needed.
+//
+// Scoping mirrors GatewayBudget: an org-scoped policy applies to any VK
+// in the org; a team-scoped policy applies to VKs whose project lives in
+// that team; a project-scoped policy applies only to VKs in that project.
+// `isDefault=true` (one per scope tier) makes the policy auto-apply when
+// `virtualKey.issuePersonal` is called without an explicit policyId.
+// ---------------------------------------------------------------------------
+model RoutingPolicy {
+  id             String       @id @default(nanoid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  scope   String // 'organization' | 'team' | 'project'
+  scopeId String
+
+  name        String
+  description String?
+
+  // Ordered list of GatewayProviderCredential.id values. JSON for
+  // shape flexibility; gateway materialises into provider chain at
+  // request time.
+  providerCredentialIds Json @default("[]")
+
+  // Optional model allowlist (JSON array of glob patterns).
+  // null/empty = "all models the eligible providers can serve".
+  modelAllowlist Json?
+
+  // Routing strategy applied across the model-eligible subset.
+  //   'priority'    — try providerCredentialIds in order (default)
+  //   'cost'        — pick lowest unit cost first
+  //   'latency'     — pick fastest healthy provider
+  //   'round_robin' — distribute evenly
+  strategy String @default("priority")
+
+  isDefault Boolean @default(false)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
+  createdById String?
+  createdBy   User?    @relation("RoutingPolicyCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedById String?
+  updatedBy   User?    @relation("RoutingPolicyUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+
+  virtualKeys VirtualKey[]
+
+  @@unique([organizationId, scope, scopeId, name])
+  @@index([organizationId])
+  @@index([scope, scopeId])
+}
+
+/// Per-platform fleet configuration that connects a closed SaaS
+/// product's audit / OTel / S3 stream to LangWatch's Activity
+/// Monitor (cf. specs/ai-gateway/governance/activity-monitor.feature
+/// + ingestion-sources.feature, docs/ai-gateway/governance/architecture.md).
+///
+/// One IngestionSource = one upstream fleet (e.g. "Miro Cowork",
+/// "Acme Workato production"). The runtime ingests events on whatever
+/// cadence the source supports — push for OTel/webhook/S3 (Tier C/D),
+/// pull for poll-based admin APIs (Tier C). Per-source-type adapters
+/// normalise platform-specific shapes into OCSF + AOS before they
+/// land in trace_summaries with SourceType + SourceId tags.
+model IngestionSource {
+  id             String       @id @default(nanoid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  /// Optional team-scope. null = org-wide.
+  teamId String?
+  team   Team?   @relation(fields: [teamId], references: [id], onDelete: SetNull)
+
+  /// 'otel_generic' | 'claude_cowork' | 'workato' | 'copilot_studio' |
+  /// 'openai_compliance' | 'claude_compliance' | 's3_custom' (extensible).
+  /// String not enum so adapters can be added without migrations — the
+  /// supported set lives in code (activity-monitor adapter registry).
+  sourceType String
+
+  /// Human-friendly label for the admin UI. Unique per-org so two
+  /// "Cowork" sources can coexist with different names.
+  name        String
+  description String?
+
+  /// HMAC bearer token the upstream operator pastes into the platform
+  /// (or LangWatch sends in pull mode). Stored encrypted at rest via
+  /// the same pepper-derived KEK as VirtualKey secrets. Auto-generated
+  /// on create, rotatable via the admin UI with a 24h grace window.
+  ingestSecretHash String
+
+  /// Per-source-type configuration. Shape is platform-specific:
+  ///   - otel_generic: { allowedSourceTypeLabel?: string }
+  ///   - claude_cowork: { workspaceId: string }
+  ///   - workato: { sharedSecretLastFour: string }
+  ///   - copilot_studio: { tenantId, clientId, clientSecretHash, pollEverySec }
+  ///   - openai_compliance: { bucket, prefix, roleArn, pollEverySec }
+  ///   - claude_compliance: { workspaceApiKeyHash, pollEverySec }
+  ///   - s3_custom: { bucket, prefix, roleArn, parserDsl, pollEverySec }
+  parserConfig Json @default("{}")
+
+  /// For pull-based sources, persisted between polls so the next poll
+  /// resumes where the last left off (timestamp / cursor / file marker).
+  pollerCursor Json?
+
+  /// Status flag. 'active' (default), 'disabled' (admin paused), or
+  /// 'awaiting_first_event' (created but never received).
+  status String @default("awaiting_first_event")
+
+  /// Per-origin retention class applied to every span/log emitted by
+  /// this source's events when they land in the unified observability
+  /// store (recorded_spans / log_records). Drives the CH TTL policy.
+  /// Values:
+  ///   - "thirty_days": operational debugging window (default)
+  ///   - "one_year":    compliance baseline (SOC2 / ISO 27001 / EU AI Act)
+  ///   - "seven_years": long-form audit (regulated industry)
+  /// Org plan ceiling enforced at the composer / API layer.
+  /// Stored as string for extensibility — the canonical set lives in
+  /// code (governance retention policy registry).
+  /// Spec: specs/ai-gateway/governance/retention.feature
+  retentionClass String @default("thirty_days")
+
+  /// Last event timestamp observed (any direction). Surfaces in the
+  /// admin UI as "last event 2 minutes ago".
+  lastEventAt DateTime?
+
+  archivedAt DateTime?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
+  createdById String?
+  createdBy   User?    @relation("IngestionSourceCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+  @@index([teamId])
+  @@index([sourceType])
+}
+
+/// Admin-defined anomaly detection rule. Evaluated server-side at
+/// ingest time (Option C — not in this slice yet) against
+/// gateway_activity_events. When triggered, an alert is dispatched
+/// to the destinations configured on the rule (Slack / SIEM / webhook
+/// / PagerDuty / email).
+///
+/// This is a configuration entity — the actual rule evaluation +
+/// alert state lives in a future ClickHouse table
+/// (gateway_anomaly_alerts) and a server-side worker. Spec:
+/// specs/ai-gateway/governance/anomaly-rules.feature
+/// (Alexis lane B C-UI; mocked-v0 today, real persistence is THIS slice).
+model AnomalyRule {
+  id             String       @id @default(nanoid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  /// 'organization' | 'team' | 'project' | 'source_type' | 'source'.
+  /// String not enum so new scopes ship without migrations.
+  scope   String
+  /// Org id / team id / project id / source-type string / source id
+  /// — narrows what the rule applies to.
+  scopeId String
+
+  name        String
+  description String?
+
+  /// 'critical' | 'warning' | 'info'. Drives default destination
+  /// routing (e.g. critical → PagerDuty, warning → Slack only).
+  severity String
+
+  /// Extensible rule taxonomy: 'spend_spike' | 'rate_limit' |
+  /// 'tool_mismatch' | 'after_hours' | 'unusual_model' | 'pii_leak'
+  /// | 'custom'. New types ship without migrations — evaluator
+  /// picks a per-type implementation from a code registry.
+  ruleType String
+
+  /// Per-rule-type threshold shape. Examples:
+  ///   spend_spike: { windowSec, ratioVsBaseline, minBaselineUsd }
+  ///   rate_limit: { windowSec, requestsThreshold }
+  ///   after_hours: { startHour, endHour, timezone, requestsThreshold }
+  thresholdConfig Json @default("{}")
+
+  /// Alert routing per destination. Shape:
+  ///   { slack?: { channelId }, siem?: { endpointUrl, authHeader },
+  ///     webhook?: { url, authHeader }, pagerduty?: { routingKey },
+  ///     email?: { to: string[] } }
+  /// Empty map = use org defaults (when defaults exist; today no-op).
+  destinationConfig Json @default("{}")
+
+  /// 'active' (default — evaluator picks it up) | 'disabled' (admin
+  /// paused; rule rows kept for audit). 'archived' uses archivedAt
+  /// timestamp instead so we can filter `archivedAt IS NULL` cheaply.
+  status String @default("active")
+
+  archivedAt DateTime?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
+  createdById String?
+  createdBy   User?    @relation("AnomalyRuleCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+  @@index([scope, scopeId])
+  @@index([ruleType])
+  @@index([status])
+
+  alerts AnomalyAlert[]
+}
+
+/// Persisted anomaly detection. Inserted by the anomaly-detection
+/// reactor (event-sourcing pipeline; modeled on PR #3351's
+/// alertTrigger pattern) when a rule's threshold trips while
+/// processing a freshly-arrived ActivityEventReceived event.
+/// Read by api.activityMonitor.recentAnomalies for the admin dashboard.
+///
+/// Dedup: (ruleId, triggerWindowStart) — re-evaluating the same
+/// window updates the existing row rather than creating a duplicate.
+/// Acknowledgement / resolution are admin actions on the row.
+///
+/// Spec: specs/ai-gateway/governance/anomaly-detection.feature
+model AnomalyAlert {
+  id             String       @id @default(nanoid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  ruleId         String
+  rule           AnomalyRule  @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+
+  /// Denormalised from rule for fast WHERE filtering on the
+  /// dashboard query (no join needed for the common path).
+  severity String
+  ruleName String
+  ruleType String
+
+  /// Window the trigger refers to (UTC).
+  triggerWindowStart DateTime
+  triggerWindowEnd   DateTime
+
+  /// Numeric trigger context. Per-rule-type detail in `detail` JSONB.
+  triggerSpendUsd   Decimal? @db.Decimal(18, 6)
+  triggerEventCount Int?
+
+  /// Per-rule-type extra context: {topActors: [...], baseline: ...,
+  /// observed: ..., timezone: ..., etc}.
+  detail Json @default("{}")
+
+  /// 'open' | 'acknowledged' | 'resolved'.
+  state String @default("open")
+
+  /// Per-destination dispatch outcome:
+  ///   { webhook: { lastAttemptIso, lastError?, attemptCount, statusCode? },
+  ///     slack: ..., pagerduty: ..., siem: ..., email: ... }
+  destinationStatus Json @default("{}")
+
+  detectedAt     DateTime  @default(now())
+  acknowledgedAt DateTime?
+  resolvedAt     DateTime?
+
+  @@unique([ruleId, triggerWindowStart])
+  @@index([organizationId, detectedAt])
+  @@index([ruleId])
+  @@index([state])
+}
+
+/// Org-scoped catalog of AI tools surfaced on the personal home portal
+/// (/me) and managed by org admins at /settings/governance/tool-catalog.
+///
+/// Three first-class tile types via `type` discriminator:
+///   - "coding_assistant" — click expands to setup helper (e.g. `langwatch claude`)
+///   - "model_provider"   — click expands to inline personal-VK creation
+///   - "external_tool"    — click expands to admin-attached markdown + external link
+///
+/// Scoping: organization-default entries can be OVERRIDDEN at the team
+/// tier (same `slug` + `scope=team` + matching `scopeId`) so admins can
+/// hide or re-skin a globally-listed tool for a specific team. The
+/// user-facing `list` endpoint resolves this hierarchy at read time.
+///
+/// `config` is a discriminated JSON union per `type`:
+///   coding_assistant: { setupCommand, setupDocsUrl, helperText? }
+///   model_provider:   { providerKey, suggestedRoutingPolicyId?, defaultLabel?, projectSuggestionText? }
+///   external_tool:    { descriptionMarkdown, linkUrl, ctaLabel? }
+///
+/// Spec: specs/ai-governance/personal-portal/tool-catalog-*.feature
+model AiToolEntry {
+  id             String       @id @default(nanoid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  /// "organization" | "team". String not enum so new scopes ship
+  /// without migrations.
+  scope   String
+  /// organizationId or teamId, narrowing what scope this entry applies
+  /// to. Always equals organizationId when scope=organization.
+  scopeId String
+
+  /// "coding_assistant" | "model_provider" | "external_tool".
+  /// Discriminator drives the per-tile UX shape and validates
+  /// the `config` JSON column at the app layer.
+  type String
+
+  displayName String
+
+  /// Stable slug for icon lookup + team-overrides-org resolution
+  /// (a team-scoped entry with the same slug as an org-scoped one
+  /// hides the org default for users in that team).
+  slug    String
+  iconKey String?
+
+  /// Admin-curated sort within the user-facing portal grid.
+  order Int @default(0)
+
+  /// When false the entry is hidden from the user-facing list but
+  /// remains in the admin list (so admins can re-enable without
+  /// losing per-entry config). Disabled is "soft-hide", archived is
+  /// "soft-delete" (preserves audit trail + scope binding history).
+  enabled Boolean @default(true)
+
+  /// Per-type config JSON. Validated via zod discriminated union
+  /// at the service layer (see AiToolEntryService).
+  config Json @default("{}")
+
+  archivedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @default(now()) @updatedAt
+  createdById String?
+  updatedById String?
+
+  @@index([organizationId, scope, scopeId])
+  @@index([organizationId, enabled, archivedAt])
+  @@index([organizationId, type])
 }
 
 model GatewayProviderCredential {
-    id                     String                          @id @default(nanoid())
-    projectId              String
-    project                Project                         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  id        String  @id @default(nanoid())
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
-    modelProviderId        String
-    modelProvider          ModelProvider                   @relation(fields: [modelProviderId], references: [id], onDelete: Cascade)
+  modelProviderId String
+  modelProvider   ModelProvider @relation(fields: [modelProviderId], references: [id], onDelete: Cascade)
 
-    // A project can register the same ModelProvider under multiple slots
-    // (e.g. "primary", "secondary" for the same vendor with different
-    // deployments or quota tiers). Unique per (project, provider, slot).
-    slot                   String                          @default("primary")
+  // A project can register the same ModelProvider under multiple slots
+  // (e.g. "primary", "secondary" for the same vendor with different
+  // deployments or quota tiers). Unique per (project, provider, slot).
+  slot String @default("primary")
 
-    // Gateway-only settings — do NOT leak to litellm/legacy path.
-    rateLimitRpm           Int?
-    rateLimitTpm           Int?
-    rateLimitRpd           Int?
-    rotationPolicy         GatewayProviderRotationPolicy   @default(MANUAL)
-    extraHeaders           Json?                           // appended by gateway only
-    fallbackPriorityGlobal Int?                            // used when a VK has no explicit chain
+  // Gateway-only settings — do NOT leak to litellm/legacy path.
+  rateLimitRpm           Int?
+  rateLimitTpm           Int?
+  rateLimitRpd           Int?
+  rotationPolicy         GatewayProviderRotationPolicy @default(MANUAL)
+  extraHeaders           Json? // appended by gateway only
+  fallbackPriorityGlobal Int? // used when a VK has no explicit chain
 
-    // Provider-specific routing hints (e.g. bedrock region, azure deployment
-    // override) that the gateway applies on top of ModelProvider defaults.
-    providerConfig         Json?
+  // Provider-specific routing hints (e.g. bedrock region, azure deployment
+  // override) that the gateway applies on top of ModelProvider defaults.
+  providerConfig Json?
 
-    // Health / circuit breaker state written by the gateway.
-    healthStatus           GatewayProviderHealthStatus     @default(UNKNOWN)
-    circuitOpenedAt        DateTime?
-    lastHealthCheckAt      DateTime?
+  // Health / circuit breaker state written by the gateway.
+  healthStatus      GatewayProviderHealthStatus @default(UNKNOWN)
+  circuitOpenedAt   DateTime?
+  lastHealthCheckAt DateTime?
 
-    disabledAt             DateTime?
-    createdAt              DateTime                        @default(now())
-    updatedAt              DateTime                        @default(now()) @updatedAt
+  disabledAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @default(now()) @updatedAt
 
-    virtualKeyBindings     VirtualKeyProviderCredential[]
-    ledgerEntries          GatewayBudgetLedger[]
+  virtualKeyBindings VirtualKeyProviderCredential[]
+  ledgerEntries      GatewayBudgetLedger[]
 
-    @@unique([projectId, modelProviderId, slot])
-    @@index([projectId])
-    @@index([modelProviderId])
-    @@index([healthStatus])
+  @@unique([projectId, modelProviderId, slot])
+  @@index([projectId])
+  @@index([modelProviderId])
+  @@index([healthStatus])
 }
 
 model VirtualKeyProviderCredential {
-    virtualKeyId         String
-    providerCredentialId String
-    // Position in the VK's fallback chain. Lower = higher priority.
-    priority             Int
-    // Optional per-binding overrides that apply only when this VK routes via
-    // this credential (e.g. alternate extra headers, alternate model alias set).
-    overrides            Json?
-    createdAt            DateTime                  @default(now())
+  virtualKeyId         String
+  providerCredentialId String
+  // Position in the VK's fallback chain. Lower = higher priority.
+  priority             Int
+  // Optional per-binding overrides that apply only when this VK routes via
+  // this credential (e.g. alternate extra headers, alternate model alias set).
+  overrides            Json?
+  createdAt            DateTime @default(now())
 
-    virtualKey           VirtualKey                @relation(fields: [virtualKeyId], references: [id], onDelete: Cascade)
-    providerCredential   GatewayProviderCredential @relation(fields: [providerCredentialId], references: [id], onDelete: Cascade)
+  virtualKey         VirtualKey                @relation(fields: [virtualKeyId], references: [id], onDelete: Cascade)
+  providerCredential GatewayProviderCredential @relation(fields: [providerCredentialId], references: [id], onDelete: Cascade)
 
-    @@id([virtualKeyId, providerCredentialId])
-    @@unique([virtualKeyId, priority])
-    @@index([providerCredentialId])
+  @@id([virtualKeyId, providerCredentialId])
+  @@unique([virtualKeyId, priority])
+  @@index([providerCredentialId])
 }
 
 model GatewayBudget {
-    id                     String                    @id @default(nanoid())
-    organizationId         String
-    // Scope is identified by (scopeType, scopeId). The typed relations below
-    // exist for RI when a matching target row is deleted; scopeId is the
-    // canonical discriminator the query layer uses.
-    scopeType              GatewayBudgetScopeType
-    scopeId                String
+  id             String                 @id @default(nanoid())
+  organizationId String
+  // Scope is identified by (scopeType, scopeId). The typed relations below
+  // exist for RI when a matching target row is deleted; scopeId is the
+  // canonical discriminator the query layer uses.
+  scopeType      GatewayBudgetScopeType
+  scopeId        String
 
-    // Typed FKs — exactly one matches scopeType. The mismatched ones are NULL.
-    organizationScopedId   String?
-    organizationScoped     Organization?             @relation("OrgScopedGatewayBudgets", fields: [organizationScopedId], references: [id], onDelete: Cascade)
+  // Typed FKs — exactly one matches scopeType. The mismatched ones are NULL.
+  organizationScopedId String?
+  organizationScoped   Organization? @relation("OrgScopedGatewayBudgets", fields: [organizationScopedId], references: [id], onDelete: Cascade)
 
-    teamScopedId           String?
-    teamScoped             Team?                     @relation("TeamScopedGatewayBudgets", fields: [teamScopedId], references: [id], onDelete: Cascade)
+  teamScopedId String?
+  teamScoped   Team?   @relation("TeamScopedGatewayBudgets", fields: [teamScopedId], references: [id], onDelete: Cascade)
 
-    projectScopedId        String?
-    projectScoped          Project?                  @relation("ProjectScopedGatewayBudgets", fields: [projectScopedId], references: [id], onDelete: Cascade)
+  projectScopedId String?
+  projectScoped   Project? @relation("ProjectScopedGatewayBudgets", fields: [projectScopedId], references: [id], onDelete: Cascade)
 
-    virtualKeyScopedId     String?
-    virtualKeyScoped       VirtualKey?               @relation("VirtualKeyScopedGatewayBudgets", fields: [virtualKeyScopedId], references: [id], onDelete: Cascade)
+  virtualKeyScopedId String?
+  virtualKeyScoped   VirtualKey? @relation("VirtualKeyScopedGatewayBudgets", fields: [virtualKeyScopedId], references: [id], onDelete: Cascade)
 
-    principalUserId        String?
-    principalUser          User?                     @relation("PrincipalScopedGatewayBudgets", fields: [principalUserId], references: [id], onDelete: Cascade)
+  principalUserId String?
+  principalUser   User?   @relation("PrincipalScopedGatewayBudgets", fields: [principalUserId], references: [id], onDelete: Cascade)
 
-    name                   String
-    description            String?
-    window                 GatewayBudgetWindow
-    limitUsd               Decimal                   @db.Decimal(18, 6)
-    onBreach               GatewayBudgetBreachAction @default(BLOCK)
-    timezone               String?                   // org-level default if null
+  name        String
+  description String?
+  window      GatewayBudgetWindow
+  limitUsd    Decimal                   @db.Decimal(18, 6)
+  onBreach    GatewayBudgetBreachAction @default(BLOCK)
+  timezone    String? // org-level default if null
 
-    // Mutated by the ledger, read by the gateway as part of the config payload.
-    spentUsd               Decimal                   @default(0) @db.Decimal(18, 6)
-    currentPeriodStartedAt DateTime                  @default(now())
-    resetsAt               DateTime
-    lastResetAt            DateTime?
+  // Mutated by the ledger, read by the gateway as part of the config payload.
+  spentUsd               Decimal   @default(0) @db.Decimal(18, 6)
+  currentPeriodStartedAt DateTime  @default(now())
+  resetsAt               DateTime
+  lastResetAt            DateTime?
 
-    archivedAt             DateTime?
+  archivedAt DateTime?
 
-    createdAt              DateTime                  @default(now())
-    updatedAt              DateTime                  @default(now()) @updatedAt
-    createdById            String
-    createdBy              User                      @relation("GatewayBudgetCreatedBy", fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
+  createdById String
+  createdBy   User     @relation("GatewayBudgetCreatedBy", fields: [createdById], references: [id])
 
-    ledgerEntries          GatewayBudgetLedger[]
+  ledgerEntries GatewayBudgetLedger[]
 
-    @@index([organizationId])
-    @@index([scopeType, scopeId])
-    @@index([resetsAt])
+  @@index([organizationId])
+  @@index([scopeType, scopeId])
+  @@index([resetsAt])
 }
 
 model GatewayBudgetLedger {
-    id                   String                     @id @default(nanoid())
-    budgetId             String
-    budget               GatewayBudget              @relation(fields: [budgetId], references: [id], onDelete: Cascade)
+  id       String        @id @default(nanoid())
+  budgetId String
+  budget   GatewayBudget @relation(fields: [budgetId], references: [id], onDelete: Cascade)
 
-    virtualKeyId         String
-    virtualKey           VirtualKey                 @relation(fields: [virtualKeyId], references: [id], onDelete: Cascade)
-    providerCredentialId String?
-    providerCredential   GatewayProviderCredential? @relation(fields: [providerCredentialId], references: [id])
+  virtualKeyId         String
+  virtualKey           VirtualKey                 @relation(fields: [virtualKeyId], references: [id], onDelete: Cascade)
+  providerCredentialId String?
+  providerCredential   GatewayProviderCredential? @relation(fields: [providerCredentialId], references: [id])
 
-    // Idempotency key — ULID produced by the gateway per request. Dedup for 24h.
-    gatewayRequestId     String
-    amountUsd            Decimal                    @db.Decimal(18, 6)
-    tokensInput          Int                        @default(0)
-    tokensOutput         Int                        @default(0)
-    tokensCacheRead      Int                        @default(0)
-    tokensCacheWrite     Int                        @default(0)
-    model                String
-    providerSlot         String?
-    durationMs           Int?
-    status               GatewayBudgetLedgerStatus  @default(SUCCESS)
-    occurredAt           DateTime                   @default(now())
+  // Idempotency key — ULID produced by the gateway per request. Dedup for 24h.
+  gatewayRequestId String
+  amountUsd        Decimal                   @db.Decimal(18, 6)
+  tokensInput      Int                       @default(0)
+  tokensOutput     Int                       @default(0)
+  tokensCacheRead  Int                       @default(0)
+  tokensCacheWrite Int                       @default(0)
+  model            String
+  providerSlot     String?
+  durationMs       Int?
+  status           GatewayBudgetLedgerStatus @default(SUCCESS)
+  occurredAt       DateTime                  @default(now())
 
-    @@unique([budgetId, gatewayRequestId])
-    @@index([virtualKeyId])
-    @@index([gatewayRequestId])
-    @@index([occurredAt])
+  @@unique([budgetId, gatewayRequestId])
+  @@index([virtualKeyId])
+  @@index([gatewayRequestId])
+  @@index([occurredAt])
 }
 
 model GatewayChangeEvent {
-    // Monotonically-increasing revision the gateway long-polls on.
-    revision             BigInt                 @id @default(autoincrement())
-    organizationId       String
-    organization         Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-    kind                 GatewayChangeEventKind
-    virtualKeyId         String?
-    budgetId             String?
-    providerCredentialId String?
-    projectId            String?
-    project              Project?               @relation(fields: [projectId], references: [id], onDelete: SetNull)
-    payload              Json?
-    createdAt            DateTime               @default(now())
+  // Monotonically-increasing revision the gateway long-polls on.
+  revision             BigInt                 @id @default(autoincrement())
+  organizationId       String
+  organization         Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  kind                 GatewayChangeEventKind
+  virtualKeyId         String?
+  budgetId             String?
+  providerCredentialId String?
+  projectId            String?
+  project              Project?               @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  payload              Json?
+  createdAt            DateTime               @default(now())
 
-    @@index([organizationId, revision])
-    @@index([projectId, revision])
-    @@index([virtualKeyId])
-    @@index([budgetId])
+  @@index([organizationId, revision])
+  @@index([projectId, revision])
+  @@index([virtualKeyId])
+  @@index([budgetId])
 }
 
 // model GatewayAuditLog removed — gateway services now write to the
@@ -1758,45 +2148,45 @@ model GatewayChangeEvent {
 // See specs/ai-gateway/cache-control-rules.feature for the contract and
 // docs/ai-gateway/cache-control.mdx for the rules-engine narrative.
 model GatewayCacheRule {
-    id             String               @id @default(nanoid())
-    // organizationId is the multitenancy boundary; no FK is enforced at the
-    // DB level (org-scoped table, distribution-friendly). The service layer
-    // guards orphan-org refs at write time.
-    organizationId String
+  id             String @id @default(nanoid())
+  // organizationId is the multitenancy boundary; no FK is enforced at the
+  // DB level (org-scoped table, distribution-friendly). The service layer
+  // guards orphan-org refs at write time.
+  organizationId String
 
-    name           String
-    description    String?
-    priority       Int                  @default(100)
-    enabled        Boolean              @default(true)
+  name        String
+  description String?
+  priority    Int     @default(100)
+  enabled     Boolean @default(true)
 
-    // Matchers are ANDed. Null / empty means "no constraint on this field".
-    // Shape (validated in the service layer, JSON on the wire):
-    //   {
-    //     vk_id?: string,
-    //     vk_tags?: string[],
-    //     vk_prefix?: string,
-    //     principal_id?: string,
-    //     model?: string,
-    //     request_metadata?: Record<string, string>
-    //   }
-    matchers       Json
+  // Matchers are ANDed. Null / empty means "no constraint on this field".
+  // Shape (validated in the service layer, JSON on the wire):
+  //   {
+  //     vk_id?: string,
+  //     vk_tags?: string[],
+  //     vk_prefix?: string,
+  //     principal_id?: string,
+  //     model?: string,
+  //     request_metadata?: Record<string, string>
+  //   }
+  matchers Json
 
-    // Action applied when the rule matches.
-    //   { mode: "respect"|"force"|"disable", ttl?: number, salt?: string }
-    // `mode` is also captured in `modeEnum` so we can index by it; the
-    // JSON column keeps the full action for forward compatibility with
-    // ttl / salt etc.
-    action         Json
-    modeEnum       GatewayCacheRuleMode
+  // Action applied when the rule matches.
+  //   { mode: "respect"|"force"|"disable", ttl?: number, salt?: string }
+  // `mode` is also captured in `modeEnum` so we can index by it; the
+  // JSON column keeps the full action for forward compatibility with
+  // ttl / salt etc.
+  action   Json
+  modeEnum GatewayCacheRuleMode
 
-    archivedAt     DateTime?
+  archivedAt DateTime?
 
-    createdAt      DateTime             @default(now())
-    updatedAt      DateTime             @default(now()) @updatedAt
-    // createdById is a user reference; no FK enforced (distribution policy).
-    // The service layer enforces "rule is created by an active user".
-    createdById    String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
+  // createdById is a user reference; no FK enforced (distribution policy).
+  // The service layer enforces "rule is created by an active user".
+  createdById String
 
-    @@index([organizationId, archivedAt, priority])
-    @@index([organizationId, enabled, priority])
+  @@index([organizationId, archivedAt, priority])
+  @@index([organizationId, enabled, priority])
 }

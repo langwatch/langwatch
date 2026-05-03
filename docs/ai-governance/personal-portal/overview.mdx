@@ -1,0 +1,102 @@
+---
+title: AI Tools Portal — overview
+description: A customizable card-grid home at /me where every developer in your organization can see the AI tools available to them — coding assistants, model providers for virtual-key creation, and admin-curated external tools — published and scoped by your IT admins.
+sidebarTitle: Overview
+---
+
+The **AI Tools Portal** is the company-wide AI starting point. When an
+engineer signs in via `langwatch login` (without a tool subcommand) or
+opens the LangWatch dashboard, they land on `/me` and see a card grid of
+every AI tool their organization has published for them: the coding
+assistants they can install, the model providers they can mint virtual
+keys for, and the external AI tools (Copilot Studio, internal chat agents,
+Workato, etc.) the company has approved with admin-authored guidance.
+
+![Portal grid populated — admin home with all three tile classes](/images/ai-governance/portal/portal-hero-populated.png)
+
+<Info>**Pairs with:** [Personal IDE keys](/ai-gateway/governance/personal-keys) (the device-flow login the coding-assistant tiles trigger) and [Routing Policies](/ai-gateway/governance/routing-policies) (the org-wide policy a model-provider tile binds new virtual keys to).</Info>
+
+## Why this exists
+
+Enterprises rolling out AI tooling end up with the same fragmented
+experience: every team finds its own way to install Claude Code, every
+developer hunts for the right place to mint a Bedrock key, every
+"approved external AI tool" lives in a different wiki page. The portal
+collapses all of that into a single curated grid that the admin owns and
+every employee sees.
+
+## The three tile classes
+
+The portal is intentionally minimal: three kinds of cards, picked by what
+the user has to do next.
+
+<CardGroup cols={3}>
+  <Card title="Coding assistants" icon="terminal">
+    Claude Code, Copilot, Cursor, Codex, Gemini CLI. Click to expand the
+    setup walkthrough — usually a single `langwatch <tool>` command that
+    triggers SSO + virtual-key provisioning + the underlying CLI.
+  </Card>
+  <Card title="Model providers" icon="key">
+    OpenAI, Anthropic, Bedrock, Gemini, Azure, Vertex. Click to expand
+    inline virtual-key creation — name the key, generate, copy the
+    secret. Includes a "building an app? create a project" hint that
+    routes shared-app keys to project scope instead.
+  </Card>
+  <Card title="External tools" icon="link">
+    Copilot Studio, Workato, internal chat agents. Click to expand
+    admin-authored markdown describing what the tool is for, who's
+    approved to use it, and a link to the company wiki or vendor portal.
+  </Card>
+</CardGroup>
+
+## How scoping works
+
+Tiles are stored as `AiToolCatalogEntry` rows. Each row has:
+
+- A **scope** — `"organization"` (visible to everyone in the org) or
+  `"team"` (visible only to members of that team).
+- A **type discriminator** — `coding_assistant` | `model_provider` |
+  `external_tool` — which decides the click-to-expand UX.
+- A type-specific **`config` JSON** — setup command + docs URL for
+  coding assistants, provider key + suggested routing policy for model
+  providers, markdown body + external link for external tools.
+
+When a team-scoped entry has the same `slug` as an org-scoped entry, the
+team entry overrides for users in that team. This is how admins say
+"engineering gets Cursor, everyone else gets the default Copilot."
+
+## Empty state
+
+A fresh organization has an empty catalog. The first admin to visit
+`/settings/governance/tool-catalog` sees a starter-pack import CTA
+([Admin catalog](/ai-governance/personal-portal/admin-catalog#starter-pack)).
+End users on `/me` see a "your IT team is still setting things up"
+message until the admin publishes the catalog.
+
+![Portal empty state — end-user view before admin publishes the catalog](/images/ai-governance/portal/portal-empty.png)
+
+## Permissions
+
+Two new RBAC permissions gate the portal surfaces:
+
+- `aiTools:view` — granted to ADMIN, MEMBER, and EXTERNAL by default.
+  Required to see the grid at `/me` and call the public tile list.
+  This is intentionally broad: the portal is the company's curated AI
+  starting point and must work for everyone.
+- `aiTools:manage` — granted to ADMIN by default. Required to access
+  `/settings/governance/tool-catalog` and to run any catalog
+  mutation. Delegable to non-ADMIN roles via the `CustomRolePermissions`
+  JSON column.
+
+## Where to next
+
+- **End user:** [Tile interactions](/ai-governance/personal-portal/end-user)
+  walks through each tile-class expand UX.
+- **Admin:** [Admin catalog](/ai-governance/personal-portal/admin-catalog)
+  walks through the catalog editor at
+  `/settings/governance/tool-catalog`, including starter-pack import,
+  scope binding, and per-tile editing.
+- **Developer integrating with the catalog API:** the underlying tRPC
+  router is `aiToolsCatalogRouter` (see source — not yet stable for
+  external integration; this page will be expanded once the router
+  contract locks for v1 GA).

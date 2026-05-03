@@ -120,6 +120,50 @@ describe("guardProjectId — exempt org-scoped gateway models", () => {
     });
   });
 
+  describe("findFirst on RoutingPolicy with org-scoped filter", () => {
+    // Regression: /api/auth/cli/exchange → approveDeviceCode →
+    // PersonalVirtualKeyService.ensureDefault → RoutingPolicyService.
+    // resolveDefaultForUser threw "requires projectId" inside the
+    // device-flow approval handler, blocking every CLI dogfood. Caught
+    // by @ai_gateway_andre during e2e dogfood on :5660.
+    it("does NOT throw (org-scoped; (organizationId, scope, scopeId) is the natural key)", async () => {
+      await expect(
+        runGuard({
+          model: "RoutingPolicy",
+          action: "findFirst",
+          args: {
+            where: {
+              organizationId: "org_01",
+              scope: "team",
+              scopeId: "team_01",
+              isDefault: true,
+            },
+          },
+        }),
+      ).resolves.toBe("ok");
+    });
+  });
+
+  describe("create on RoutingPolicy without projectId in data", () => {
+    it("does NOT throw (org-scoped; admin-defined templates carry organizationId+scope)", async () => {
+      await expect(
+        runGuard({
+          model: "RoutingPolicy",
+          action: "create",
+          args: {
+            data: {
+              organizationId: "org_01",
+              scope: "organization",
+              scopeId: "org_01",
+              name: "developer-default",
+              providerCredentialIds: [],
+            },
+          },
+        }),
+      ).resolves.toBe("ok");
+    });
+  });
+
   describe("create on GatewayCacheRule without projectId in data", () => {
     it("does NOT throw — cache rules carry organizationId, never projectId", async () => {
       await expect(

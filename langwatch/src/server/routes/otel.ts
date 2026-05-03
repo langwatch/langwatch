@@ -7,20 +7,20 @@
  * - POST /api/otel/v1/metrics
  */
 import { SpanKind, SpanStatusCode } from "@opentelemetry/api";
-import type {
-  IExportLogsServiceRequest,
-  IExportMetricsServiceRequest,
-  IExportTraceServiceRequest,
-} from "@opentelemetry/otlp-transformer";
+import type { IExportTraceServiceRequest } from "@opentelemetry/otlp-transformer";
 import * as root from "@opentelemetry/otlp-transformer/build/src/generated/root";
 import { getLangWatchTracer } from "langwatch";
-import { brotliDecompress, gunzip, inflate } from "node:zlib";
-import { promisify } from "node:util";
 import { Hono } from "hono";
 import { loggerMiddleware } from "~/app/api/middleware/logger";
 import { tracerMiddleware } from "~/app/api/middleware/tracer";
 import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
+import {
+  parseOtlpLogs,
+  parseOtlpMetrics,
+  parseOtlpTraces,
+  readOtlpBody,
+} from "~/server/otel/parseOtlpBody";
 import { TokenResolver } from "~/server/pat/token-resolver";
 import {
   collectAuthDiagnostics,
@@ -32,47 +32,8 @@ import { decodeBase64OpenTelemetryId } from "~/server/tracer/utils";
 import { createLogger } from "~/utils/logger/server";
 import { captureException } from "~/utils/posthogErrorCapture";
 
-const gunzipAsync = promisify(gunzip);
-const inflateAsync = promisify(inflate);
-const brotliDecompressAsync = promisify(brotliDecompress);
-
-function toArrayBuffer(buf: Buffer): ArrayBuffer {
-  return new Uint8Array(buf).buffer as ArrayBuffer;
-}
-
-/**
- * Reads the request body, decompressing based on Content-Encoding.
- * Supports gzip (OTEL standard), deflate, and brotli.
- */
-async function readBody(req: Request): Promise<ArrayBuffer> {
-  const raw = await req.arrayBuffer();
-  const encoding = req.headers.get("content-encoding");
-
-  if (!encoding || encoding === "identity") {
-    return raw;
-  }
-
-  if (encoding === "gzip") {
-    return toArrayBuffer(await gunzipAsync(Buffer.from(raw)));
-  }
-
-  if (encoding === "deflate") {
-    return toArrayBuffer(await inflateAsync(Buffer.from(raw)));
-  }
-
-  if (encoding === "br") {
-    return toArrayBuffer(await brotliDecompressAsync(Buffer.from(raw)));
-  }
-
-  throw new Error(`Unsupported Content-Encoding: ${encoding}`);
-}
-
 const traceRequestType = (root as any).opentelemetry.proto.collector.trace.v1
   .ExportTraceServiceRequest;
-const logRequestType = (root as any).opentelemetry.proto.collector.logs.v1
-  .ExportLogsServiceRequest;
-const metricsRequestType = (root as any).opentelemetry.proto.collector.metrics
-  .v1.ExportMetricsServiceRequest;
 
 const loggerTraces = createLogger("langwatch:otel:v1:traces");
 const loggerLogs = createLogger("langwatch:otel:v1:logs");
@@ -316,23 +277,8 @@ app.post("/traces", async (c) => {
       const { project, resolved } = authResult;
       span.setAttribute("langwatch.project.id", project.id);
 
+      const body = await readOtlpBody(c.req.raw);
       const contentType = c.req.header("content-type");
-
-      let body: ArrayBuffer;
-      try {
-        body = await readBody(c.req.raw);
-      } catch (error) {
-        loggerTraces.warn(
-          {
-            projectId: project.id,
-            contentEncoding: c.req.header("content-encoding") ?? null,
-            error: error instanceof Error ? error.message : String(error),
-          },
-          "OTel /traces: failed to read request body",
-        );
-        span.setStatus({ code: SpanStatusCode.ERROR, message: "Body read failed" });
-        return c.json({ error: "Unable to read body" }, 400);
-      }
 
       // Best-effort. If the body can't be peeked (malformed, unsupported
       // shape, etc.), customerTraceIds stays empty — the projectId is still
@@ -371,48 +317,28 @@ app.post("/traces", async (c) => {
         });
       }
 
-      let traceRequest: IExportTraceServiceRequest;
-      try {
-        if (contentType === "application/json") {
-          traceRequest = JSON.parse(Buffer.from(body).toString("utf-8"));
-        } else {
-          traceRequest = traceRequestType.decode(new Uint8Array(body));
-        }
-      } catch (error) {
-        try {
-          const json = JSON.parse(Buffer.from(body).toString("utf-8"));
-          traceRequest = traceRequestType.decode(
-            new Uint8Array(traceRequestType.encode(json).finish()),
-          );
-          if (
-            !traceRequest.resourceSpans ||
-            traceRequest.resourceSpans.length === 0
-          ) {
-            throw new Error("Spans are empty, likely an invalid format");
-          }
-        } catch (jsonError) {
-          loggerTraces.error(
-            {
-              error: jsonError,
-              projectId: project.id,
-              customerTraceIds,
-              traceRequest: Buffer.from(body).toString("base64"),
-            },
-            "error parsing traces",
-          );
-          captureException(error, {
-            extra: {
-              projectId: project.id,
-              customerTraceIds,
-              traceRequest: Buffer.from(body).toString("base64"),
-              jsonError,
-            },
-          });
-
-          span.setStatus({ code: SpanStatusCode.ERROR, message: "Failed to parse traces" });
-          return c.json({ error: "Failed to parse traces" }, { status: 400 });
-        }
+      const parsed = parseOtlpTraces(body, contentType);
+      if (!parsed.ok) {
+        loggerTraces.error(
+          {
+            error: parsed.error,
+            projectId: project.id,
+            customerTraceIds,
+            traceRequest: Buffer.from(body).toString("base64"),
+          },
+          "error parsing traces",
+        );
+        captureException(new Error(parsed.error), {
+          extra: {
+            projectId: project.id,
+            customerTraceIds,
+            traceRequest: Buffer.from(body).toString("base64"),
+          },
+        });
+        span.setStatus({ code: SpanStatusCode.ERROR, message: "Failed to parse traces" });
+        return c.json({ error: "Failed to parse traces" }, { status: 400 });
       }
+      const traceRequest = parsed.request;
 
       // Body successfully parsed — mark PAT as used
       if (resolved.type === "pat") {
@@ -468,63 +394,28 @@ app.post("/logs", async (c) => {
         );
       }
 
-      const contentType = c.req.header("content-type");
-
-      let body: ArrayBuffer;
-      try {
-        body = await readBody(c.req.raw);
-      } catch (error) {
-        loggerLogs.warn(
+      const body = await readOtlpBody(c.req.raw);
+      const parsed = parseOtlpLogs(body, c.req.header("content-type"));
+      if (!parsed.ok) {
+        span.setStatus({ code: SpanStatusCode.ERROR, message: "Failed to parse logs" });
+        span.recordException(new Error(parsed.error));
+        loggerLogs.error(
           {
+            error: parsed.error,
             projectId: project.id,
-            contentEncoding: c.req.header("content-encoding") ?? null,
-            error: error instanceof Error ? error.message : String(error),
+            logRequest: Buffer.from(body).toString("base64"),
           },
-          "OTel /logs: failed to read request body",
+          "error parsing logs",
         );
-        span.setStatus({ code: SpanStatusCode.ERROR, message: "Body read failed" });
-        return c.json({ error: "Unable to read body" }, 400);
+        captureException(new Error(parsed.error), {
+          extra: {
+            projectId: project.id,
+            logRequest: Buffer.from(body).toString("base64"),
+          },
+        });
+        return c.json({ error: "Failed to parse logs" }, { status: 400 });
       }
-
-      let logRequest: IExportLogsServiceRequest;
-      try {
-        if (contentType === "application/json") {
-          logRequest = JSON.parse(Buffer.from(body).toString("utf-8"));
-        } else {
-          logRequest = logRequestType.decode(new Uint8Array(body));
-        }
-      } catch (error) {
-        try {
-          const json = JSON.parse(Buffer.from(body).toString("utf-8"));
-          logRequest = logRequestType.decode(
-            new Uint8Array(logRequestType.encode(json).finish()),
-          );
-        } catch (jsonError) {
-          span.setStatus({ code: SpanStatusCode.ERROR, message: "Failed to parse logs" });
-          span.recordException(
-            jsonError instanceof Error ? jsonError : new Error(String(jsonError)),
-          );
-
-          loggerLogs.error(
-            {
-              error: jsonError,
-              projectId: project.id,
-              logRequest: Buffer.from(body).toString("base64"),
-            },
-            "error parsing logs",
-          );
-
-          captureException(error, {
-            extra: {
-              projectId: project.id,
-              logRequest: Buffer.from(body).toString("base64"),
-              jsonError,
-            },
-          });
-
-          return c.json({ error: "Failed to parse logs" }, { status: 400 });
-        }
-      }
+      const logRequest = parsed.request;
 
       // Body successfully parsed — mark PAT as used
       if (resolved.type === "pat") {
@@ -573,63 +464,28 @@ app.post("/metrics", async (c) => {
         );
       }
 
-      const contentType = c.req.header("content-type");
-
-      let body: ArrayBuffer;
-      try {
-        body = await readBody(c.req.raw);
-      } catch (error) {
-        loggerMetrics.warn(
+      const body = await readOtlpBody(c.req.raw);
+      const parsed = parseOtlpMetrics(body, c.req.header("content-type"));
+      if (!parsed.ok) {
+        span.setStatus({ code: SpanStatusCode.ERROR, message: "Failed to parse metrics" });
+        span.recordException(new Error(parsed.error));
+        loggerMetrics.error(
           {
+            error: parsed.error,
             projectId: project.id,
-            contentEncoding: c.req.header("content-encoding") ?? null,
-            error: error instanceof Error ? error.message : String(error),
+            metricsRequest: Buffer.from(body).toString("base64"),
           },
-          "OTel /metrics: failed to read request body",
+          "error parsing metrics",
         );
-        span.setStatus({ code: SpanStatusCode.ERROR, message: "Body read failed" });
-        return c.json({ error: "Unable to read body" }, 400);
+        captureException(new Error(parsed.error), {
+          extra: {
+            projectId: project.id,
+            metricsRequest: Buffer.from(body).toString("base64"),
+          },
+        });
+        return c.json({ error: "Failed to parse metrics" }, { status: 400 });
       }
-
-      let metricsRequest: IExportMetricsServiceRequest;
-      try {
-        if (contentType === "application/json") {
-          metricsRequest = JSON.parse(Buffer.from(body).toString("utf-8"));
-        } else {
-          metricsRequest = metricsRequestType.decode(new Uint8Array(body));
-        }
-      } catch (error) {
-        try {
-          const json = JSON.parse(Buffer.from(body).toString("utf-8"));
-          metricsRequest = metricsRequestType.decode(
-            new Uint8Array(metricsRequestType.encode(json).finish()),
-          );
-        } catch (jsonError) {
-          span.setStatus({ code: SpanStatusCode.ERROR, message: "Failed to parse metrics" });
-          span.recordException(
-            jsonError instanceof Error ? jsonError : new Error(String(jsonError)),
-          );
-
-          loggerMetrics.error(
-            {
-              error: jsonError,
-              projectId: project.id,
-              metricsRequest: Buffer.from(body).toString("base64"),
-            },
-            "error parsing metrics",
-          );
-
-          captureException(error, {
-            extra: {
-              projectId: project.id,
-              metricsRequest: Buffer.from(body).toString("base64"),
-              jsonError,
-            },
-          });
-
-          return c.json({ error: "Failed to parse metrics" }, { status: 400 });
-        }
-      }
+      const metricsRequest = parsed.request;
 
       // Body successfully parsed — mark PAT as used
       if (resolved.type === "pat") {

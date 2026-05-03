@@ -1,0 +1,243 @@
+---
+title: Governance CLI debug helpers
+description: Inspect IngestionSources, tail recent OCSF events, and read the org governance setup state from the terminal.
+sidebarTitle: CLI debug
+---
+
+<Info>**Pairs with:** [AI Gateway → CLI Integrations](/ai-gateway/cli/overview). The `langwatch` CLI is shared between Gateway and Governance — `login`/`logout-device` are gateway-side, `ingest` and `governance status` subcommands are governance-side, both behind the same device-flow OAuth.</Info>
+
+A small set of read-only commands for SREs, governance admins, and on-call engineers to answer "is data flowing?" without opening the web UI. They reuse the same backend the [admin oversight dashboard](/ai-governance/control-plane) and the [per-source detail page](/ai-gateway/governance/admin-setup#ingestion-sources) already render — so what you see in the terminal and what you see in the browser are guaranteed identical (byte-for-byte on `--json`).
+
+## When to use
+
+- **"Did my OTLP push actually land?"** — `langwatch ingest tail <sourceId>` and watch events stream as you fire from the upstream platform.
+- **"Why isn't the source flipping to Active?"** — `langwatch ingest health <sourceId>` shows 24h / 7d / 30d counts plus the timestamp of the last successful event.
+- **"Has anyone in this org started using governance yet?"** — `langwatch governance status` mirrors the OR-of-flags that drives the MainMenu Govern entry promotion in the web app.
+- **"I need machine output for a runbook step / SIEM script"** — every command accepts `--json` and is contract-stable against the equivalent tRPC procedure.
+
+These commands are **not** for end-user developers — they don't proxy completions, debit budgets, or mutate state. For coding-CLI integration, see [Coding CLI Integrations](/ai-gateway/cli/overview).
+
+## Prerequisites
+
+```bash
+# Enable the governance preview surface (off by default)
+export LANGWATCH_GOVERNANCE_PREVIEW=1
+
+# Authenticate via device-flow OAuth — opens your browser to /cli/auth
+langwatch login --device
+```
+
+The same `~/.langwatch/config.json` the rest of the governance CLI uses persists the Bearer access token. Token TTL is 1h with a long-lived refresh token; the CLI rotates transparently. `langwatch logout-device` server-revokes both.
+
+If `LANGWATCH_GOVERNANCE_PREVIEW` is unset the `ingest` and `governance` subcommands aren't even registered — `langwatch --help` won't list them. This matches the web app's PostHog gate (`release_ui_ai_governance_enabled`) so the preview ships cleanly behind a single fence on each surface.
+
+## `langwatch governance status`
+
+The org-level setup-state OR-of-flags. Mirrors `api.governance.setupState` exactly — same boolean shape that promotes the MainMenu **Govern** entry from hidden → visible once any 3 of 5 are true.
+
+```text
+$ langwatch governance status
+Governance setup state
+  · Personal VKs
+  · Routing policies
+  ✓ Ingestion sources
+  ✓ Anomaly rules
+  ✓ Recent activity (30d)
+
+Governance active: yes
+```
+
+A `✓` is a flag the org already qualifies for; a `·` is one it does not. The bottom line (`Governance active: yes/no`) is the OR of the five — `yes` if any of them are on, `no` otherwise.
+
+`--json` for machine output (exact contract match with the tRPC procedure):
+
+```text
+$ langwatch governance status --json
+{
+  "setup": {
+    "hasPersonalVKs": false,
+    "hasRoutingPolicies": false,
+    "hasIngestionSources": true,
+    "hasAnomalyRules": true,
+    "hasRecentActivity": true,
+    "governanceActive": true
+  }
+}
+```
+
+Pipe to `jq` for runbook predicates: `langwatch governance status --json | jq -r '.setup.governanceActive'`.
+
+## `langwatch ingest list`
+
+The org's IngestionSources, active by default. Pass `--all` to include archived rows.
+
+```text
+$ langwatch ingest list
+NAME                        TYPE          STATUS  LAST EVENT
+Dogfood OTel · alexis lane  otel_generic  active  46m ago
+```
+
+Status colouring:
+
+- **active** (green) — events received in the last 30d.
+- **awaiting_first_event** (yellow) — secret minted, source created, no events yet.
+- **archived** (grey) — soft-deleted, hidden by default.
+
+`--json` returns the full row shape used by `api.ingestionSources.list`:
+
+```text
+$ langwatch ingest list --json
+[
+  {
+    "id": "JxQztBgN90QeX12-afJ0C",
+    "name": "Dogfood OTel · alexis lane",
+    "sourceType": "otel_generic",
+    "description": null,
+    "status": "active",
+    "lastEventAt": "2026-04-27T07:11:19.105Z",
+    "createdAt": "2026-04-27T06:25:27.884Z",
+    "archivedAt": null
+  }
+]
+```
+
+The `id` is the same one you pass to `ingest health` and `ingest tail`.
+
+## `langwatch ingest health <sourceId>`
+
+A one-shot snapshot: events received in the last 24h / 7d / 30d, plus the timestamp of the most recent successful event. Wraps `api.activityMonitor.sourceHealthMetrics`, the same query the per-source detail page's metric strip uses.
+
+```text
+$ langwatch ingest health JxQztBgN90QeX12-afJ0C
+Dogfood OTel · alexis lane  (JxQztBgN90QeX12-afJ0C)
+Status:        active
+Events (24h):  1
+Events (7d):   1
+Events (30d):  1
+Last event:    47m ago
+```
+
+`--json`:
+
+```text
+$ langwatch ingest health JxQztBgN90QeX12-afJ0C --json
+{
+  "source": {
+    "id": "JxQztBgN90QeX12-afJ0C",
+    "name": "Dogfood OTel · alexis lane",
+    "status": "active"
+  },
+  "health": {
+    "events24h": 1,
+    "events7d": 1,
+    "events30d": 1,
+    "lastSuccessIso": "2026-04-27T07:11:18.963Z"
+  }
+}
+```
+
+Useful for a Datadog / Grafana check: pipe `events24h` through `jq` and alert when it drops to zero on a source you expect traffic from.
+
+## `langwatch ingest tail <sourceId>`
+
+Stream the most recent OCSF-normalised events for a source. Wraps `api.activityMonitor.eventsForSource`, the same query the per-source detail page renders — so the CLI tail and the web event list show identical data.
+
+```text
+$ langwatch ingest tail JxQztBgN90QeX12-afJ0C --limit 5
+2026-04-27T07:11:18.963Z  api.call  chat_completion → claude-3-5-sonnet
+```
+
+Format per row: `<eventTimestamp>  <eventType>  <action> → <target>  $cost  <input>/<output> tok`. `cost` and tokens render only when present (gated on the cost-enrichment + token-count attributes the OTel normaliser picks up — `gen_ai.usage.cost_usd` / `gen_ai.usage.input_tokens` / `gen_ai.usage.output_tokens`).
+
+### `--follow`
+
+Polls every 3s for new events newest-first, deduplicating by `eventId` so re-replays don't double-print:
+
+```bash
+langwatch ingest tail JxQztBgN90QeX12-afJ0C --follow
+```
+
+`Ctrl-C` exits cleanly. The follow loop is robust to transient errors — control-plane 5xx prints a yellow `warn` and retries on the next tick rather than killing the stream.
+
+### `--json`
+
+Each event prints as a single JSON line (NDJSON) so you can pipe to `jq` or save to a file:
+
+```bash
+langwatch ingest tail $SRC --follow --json | jq 'select(.action == "chat_completion") | {ts: .eventTimestampIso, model: .target}'
+```
+
+The shape is the canonical `ActivityEventDetailRow` — same fields the per-source detail page consumes. Field names are kebab-friendly (`eventTimestampIso`, `tokensInput`, `tokensOutput`, `costUsd`).
+
+### Empty state
+
+If a source exists but no events have landed yet (status `awaiting_first_event`), `tail` prints a hint pointing at the upstream-platform setup rather than an empty list:
+
+```text
+$ langwatch ingest tail brand-new-source-id
+No events for this source yet. Once your upstream platform starts
+sending OTel/audit logs to /api/ingest/* with the source's bearer
+secret, events will land here.
+```
+
+## Error paths
+
+These commands respect the same auth contract every other governance REST adapter uses; the CLI surfaces the underlying tRPC errors with human-readable wording:
+
+```text
+# No ~/.langwatch/config.json or no access_token persisted
+$ langwatch governance status
+Not logged in — run `langwatch login --device` first
+
+# Source ID doesn't exist (or belongs to a different org)
+$ langwatch ingest health does-not-exist
+Error: IngestionSource not found
+
+# Access token expired or revoked server-side
+$ langwatch ingest list
+Error: Session expired — re-run `langwatch login --device`
+```
+
+The 401-on-expired-session path also clears the cached token, so the next invocation lands on the "not logged in" branch and the user sees a clear next step. All three error paths are asserted in `specs/ai-gateway/governance/cli-ingest-debug.feature` (12 scenarios).
+
+## Error catalog
+
+The `langwatch login` flow itself can fail before the device-flow handshake completes if the org isn't configured for CLI sign-in. Each entry below names the error code returned by `/api/auth/cli/personal-virtual-keys/approve`, the human-readable hint shown to the developer, and the admin remediation.
+
+### `409 no_default_routing_policy`
+
+Returned when the org has **no default routing policy** published. The CLI cannot bind the new Personal Virtual Key to a policy without a default, so it refuses to create the VK rather than creating an orphan.
+
+```text
+$ langwatch login --device
+… opening https://app.langwatch.ai/cli/auth?code=ABCD-EFGH …
+Error: HTTP 409 — no_default_routing_policy
+       Your organization has no default routing policy published.
+       Ask your admin to publish one at Settings → Routing Policies
+       (/settings/routing-policies), then re-run `langwatch login`.
+```
+
+**Admin remediation:**
+
+1. Sign in to the LangWatch web app as an org admin.
+2. Navigate to **Settings → Routing Policies** (`/settings/routing-policies`).
+3. Create at least one routing policy and toggle it to **Default**.
+4. Ask the developer to re-run `langwatch login --device`.
+
+The CLI does not fall back to a non-default policy; selection is explicit. See the [admin prerequisites callout in the AI Governance overview](/ai-governance/overview#admin-prerequisites) for the rest of the org-bootstrap checklist.
+
+The 409 contract is asserted in `specs/ai-gateway/governance/personal-keys.feature` (sign-in scenarios).
+
+## How it fits
+
+Three surfaces, one backend:
+
+| Surface | Audience | Contract |
+|---------|----------|----------|
+| Web `/governance` admin oversight | Governance admin in a browser | tRPC: `api.governance.setupState`, `api.activityMonitor.*`, `api.ingestionSources.*` |
+| Web `/settings/governance/ingestion-sources/:id` detail | Per-source SRE | tRPC: `api.activityMonitor.eventsForSource`, `api.activityMonitor.sourceHealthMetrics` |
+| **CLI `governance status` / `ingest list/health/tail`** | **Terminal-first SRE / on-call** | **REST: `GET /api/auth/cli/governance/*` — Bearer adapter that imports the same service classes the tRPC procedures use, byte-for-byte matching IO** |
+
+The REST endpoints are flag-gated implicitly: the CLI never registers the subcommands without `LANGWATCH_GOVERNANCE_PREVIEW=1`, and the endpoints reuse the existing `validateAccessToken()` Bearer helper that's been in production since the device-flow CLI shipped, so opening this surface doesn't introduce a new auth path.
+
+For the bigger picture — five-tier integration ladder, persona-based routing, the daily-use vs admin-authoring split — see [the control plane overview](/ai-governance/control-plane).

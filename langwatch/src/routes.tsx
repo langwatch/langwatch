@@ -183,6 +183,60 @@ const routes: RouteObject[] = [
     path: "/settings/usage",
     ...page(() => import("./pages/settings/usage")),
   },
+  {
+    path: "/settings/routing-policies",
+    ...page(() => import("./pages/settings/routing-policies")),
+  },
+  {
+    // Top-level governance home (admin oversight dashboard).
+    // Sub-routes for admin authoring (ingestion-sources, anomaly-rules,
+    // routing-policies) stay under /settings/* per the daily-use vs
+    // admin-authoring distinction.
+    path: "/governance",
+    ...page(() => import("./pages/settings/governance")),
+  },
+  {
+    // Back-compat alias for the original path. Any existing bookmarks
+    // / docs referencing /settings/governance still land on the same
+    // dashboard. Removed in a future cleanup once nothing links here.
+    path: "/settings/governance",
+    ...page(() => import("./pages/settings/governance")),
+  },
+  {
+    path: "/settings/governance/ingestion-sources",
+    ...page(() => import("./pages/settings/governance/ingestion-sources")),
+  },
+  {
+    path: "/settings/governance/ingestion-sources/:id",
+    ...page(() =>
+      import("./pages/settings/governance/ingestion-source-detail"),
+    ),
+  },
+  {
+    path: "/settings/governance/anomaly-rules",
+    ...page(() => import("./pages/settings/governance/anomaly-rules")),
+  },
+  {
+    path: "/settings/governance/tool-catalog",
+    ...page(() => import("./pages/settings/governance/tool-catalog")),
+  },
+
+  // Personal-scope governance routes (must precede the /:project catch-all
+  // so "me" doesn't get treated as a project slug)
+  {
+    path: "/me",
+    ...page(() => import("./pages/me/index")),
+  },
+  {
+    path: "/me/settings",
+    ...page(() => import("./pages/me/settings")),
+  },
+
+  // CLI device-flow approval (RFC 8628 user-facing screen)
+  {
+    path: "/cli/auth",
+    ...page(() => import("./pages/cli/auth")),
+  },
 
   // Project routes
   {

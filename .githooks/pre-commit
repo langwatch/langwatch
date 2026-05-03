@@ -1,17 +1,46 @@
 #!/bin/bash
 set -euo pipefail
 # Auto-regenerate derived docs files when their sources change.
+#
+# Multi-agent worktrees share an index. The regenerators below take seconds —
+# during that window peer agents in the same worktree can mutate the index and
+# silently drop files from the in-flight commit. Snapshot the staged set
+# before regeneration so we can detect that race and abort loudly instead of
+# committing a partial set that the author has to chase down later.
+
+staged_before=$(git diff --cached --name-only | sort)
 
 # Check if any staged files match skill sources
-if git diff --cached --name-only | grep -qE '^skills/.*\.md$|^skills/_shared/'; then
+if echo "$staged_before" | grep -qE '^skills/.*\.md$|^skills/_shared/'; then
   echo "pre-commit: Regenerating prompts-data.jsx from skill sources..."
   bash docs/scripts/sync-prompts.sh
   git add docs/snippets/prompts-data.jsx
 fi
 
 # Check if any staged files are under docs/ — always regenerate llms.txt (generation is fast)
-if git diff --cached --name-only | grep -qE '^docs/'; then
+if echo "$staged_before" | grep -qE '^docs/'; then
   echo "pre-commit: Regenerating llms.txt..."
-  (cd docs && node llms.txt.cjs)
+  # Suppress per-file "Processing: ..." stdout noise (errors still surface via
+  # stderr) so the index-race ABORT block below remains visible without
+  # scrolling past hundreds of regenerator lines.
+  (cd docs && node llms.txt.cjs > /dev/null)
   git add docs/llms.txt docs/llms-full.txt
+fi
+
+# Detect peer-agent index races: anything in $staged_before must still be
+# staged. Hook-written paths (prompts-data.jsx, llms.txt, llms-full.txt) are
+# additions on top, so we only fail if an originally-staged path disappeared.
+staged_after=$(git diff --cached --name-only | sort)
+dropped=$(comm -23 <(echo "$staged_before") <(echo "$staged_after") || true)
+if [ -n "$dropped" ]; then
+  echo "" >&2
+  echo "pre-commit: ABORTING — files staged at hook entry are no longer staged:" >&2
+  echo "$dropped" | sed 's/^/  - /' >&2
+  echo "" >&2
+  echo "This is almost always a shared-worktree index race (peer agent ran" >&2
+  echo "git add/reset/checkout while this hook was regenerating docs)." >&2
+  echo "Re-stage the dropped files and retry the commit:" >&2
+  echo "  git add $(echo "$dropped" | tr '\n' ' ')" >&2
+  echo "  git commit ..." >&2
+  exit 1
 fi

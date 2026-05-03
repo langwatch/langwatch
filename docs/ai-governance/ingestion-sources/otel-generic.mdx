@@ -1,0 +1,174 @@
+---
+title: Generic OTel
+description: OTLP/HTTP push — the production-ready governance ingest path. Spans land in the unified trace store with origin metadata stamped at the receiver edge.
+sidebarTitle: Generic OTel
+---
+
+<Info>**Pairs with:** [LangWatch OpenTelemetry guide](/integration/opentelemetry/guide). Same wire shape; this page uses the governance ingest endpoint instead of a project-scoped one, so events get `langwatch.origin.kind = "ingestion_source"` instead of `app`.</Info>
+
+`otel_generic` is the production-ready governance ingest path. Anything that speaks OTLP/HTTP — your own agents, third-party SDKs, tracing libraries — points at the source's URL with the source's bearer secret and events flow end-to-end into the [governance dashboard](/ai-governance/control-plane), the per-source detail page, and the [`langwatch ingest tail`](/ai-governance/cli-debug) CLI.
+
+<Note>**Not sending your own app's traces here.** This endpoint is for *third-party* OTel feeds your org wants in the governance audit trail. For your own application's LLM traces, use [`/api/otel/v1/traces`](/integration/quick-start) with your project API key — see [Choosing the right OTel endpoint](/observability/trace-vs-activity-ingestion) for the full comparison.</Note>
+
+## Currently implemented
+
+- **Receiver:** `POST /api/ingest/otel/:sourceId` (also accepts `claude_cowork` sources, see [Anthropic Cowork](/ai-gateway/governance/ingestion-sources/claude-cowork)).
+- **Auth:** `Authorization: Bearer lw_is_<secret>`.
+- **Body:** OTLP/HTTP JSON envelope (`resource_spans` / `scope_spans` / `spans`). `snake_case` and `camelCase` both accepted.
+- **OTLP shape:** Spans (parent-child + duration). Lands in `recorded_spans`.
+- **Pipeline:** Receiver lazy-ensures the hidden Governance Project, stamps `langwatch.origin.*` + `langwatch.governance.retention_class` on every span, hands off to the existing trace pipeline (same `traces.collection.handleOtlpTraceRequest` that powers `/api/otel/v1/traces`). No parallel write path.
+- **Status flip:** receiver calls `recordEventReceived(sourceId)` after any successful 202; source flips from `awaiting_first_event` → `active`.
+
+## What the admin configures upstream
+
+After clicking Create on the composer, the one-time-reveal modal exposes:
+
+| Field | Value |
+|---|---|
+| OTLP URL | `https://<your-langwatch>/api/ingest/otel/<sourceId>` |
+| Bearer secret | `lw_is_<base64url>` (shown once, never returned by the list endpoints) |
+
+The composer also persists one optional config field:
+
+- `allowedSourceTypeLabel` — when set, only events whose `LangWatchSourceType` resource attribute matches this label are accepted. Leave blank to accept any.
+
+In the upstream platform's OTLP exporter config:
+
+```yaml
+# OpenTelemetry Collector example
+exporters:
+  otlphttp/langwatch:
+    endpoint: https://<your-langwatch>/api/ingest/otel/<sourceId>
+    headers:
+      Authorization: Bearer lw_is_<secret>
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      exporters: [otlphttp/langwatch]
+```
+
+```python
+# Python OpenTelemetry SDK example
+from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+
+exporter = OTLPSpanExporter(
+    endpoint="https://<your-langwatch>/api/ingest/otel/<sourceId>",
+    headers={"Authorization": "Bearer lw_is_<secret>"},
+)
+```
+
+## Event shape we accept today
+
+OTLP spans land in `recorded_spans` with `langwatch.origin.kind = "ingestion_source"` stamped at the receiver edge. The governance fold projection (`governance_kpis` + `governance_ocsf_events`) extracts the canonical KPI + OCSF dimensions from these attribute precedences. Span resource attributes are merged with span-level attributes (span-level wins on collision):
+
+| Governance dimension | OTLP attribute precedence |
+|---|---|
+| Actor (OCSF / KPI user) | `langwatch.user.id` ▸ `user.email` ▸ `user.id` ▸ `enduser.id` |
+| Action (OCSF) | `gen_ai.operation.name` ▸ `span.name` |
+| Target (OCSF / KPI model) | `gen_ai.request.model` ▸ `gen_ai.response.model` ▸ `llm.model` ▸ `model` ▸ `tool.name` |
+| Cost USD (KPI spend) | `gen_ai.usage.cost_usd` ▸ `gen_ai.usage.cost` ▸ `llm.cost.usd` ▸ `langwatch.cost.usd` |
+| Input tokens | `gen_ai.usage.input_tokens` ▸ `gen_ai.usage.prompt_tokens` ▸ `llm.token_count.prompt` ▸ `input_tokens` |
+| Output tokens | `gen_ai.usage.output_tokens` ▸ `gen_ai.usage.completion_tokens` ▸ `llm.token_count.completion` ▸ `output_tokens` |
+| Event time | `span.startTimeUnixNano` (parsed as nanoseconds) ▸ ingest time |
+
+If a field doesn't resolve from the precedence list, the fold projection stores an empty string / 0 — the span is still persisted and queryable in the trace viewer.
+
+## What is still envelope-only / follow-up work
+
+- **gRPC.** Only OTLP/HTTP JSON + protobuf is implemented (gzip / deflate / brotli accepted via the shared parser). OTLP/gRPC is not yet wired. Use the JSON or protobuf HTTP exporter on the upstream side.
+- **Span events / span links.** Not extracted into separate fold dimensions in this slice; the parent span's data is surfaced. Span events appear in the trace viewer's drill-down.
+
+## Verify with CLI + web
+
+After wiring the upstream exporter:
+
+```bash
+# Wait until the source flips to active
+langwatch ingest list
+
+# Watch new spans land in real time
+langwatch ingest tail <sourceId> --follow
+
+# Confirm 24h / 7d / 30d totals
+langwatch ingest health <sourceId>
+```
+
+The web equivalent is `/settings/governance/ingestion-sources/<sourceId>` — same data, same poll cadence semantics.
+
+A successful smoke test produces output like:
+
+```text
+$ langwatch ingest tail JxQztBgN90QeX12-afJ0C --limit 1
+2026-04-27T07:11:18.963Z  api.call  chat_completion → claude-3-5-sonnet
+```
+
+If `eventType` shows `agent.action` instead of `api.call` / `tool.invocation`, the upstream span isn't carrying the attributes the heuristic looks for — the source still works, but you'll get less filtering precision in the admin dashboard. The fix is on the upstream side: emit `gen_ai.request.model` and (if applicable) `tool.name`.
+
+## Test it now — copy-paste curl
+
+The five attributes that make the canonical first-event flow useful (and that the secret-reveal modal's auto-generated curl pre-fills):
+
+| Attribute | Maps to | Why include it |
+|---|---|---|
+| `gen_ai.request.model` | `target` | Source detail page shows a model name instead of an empty cell |
+| `user.email` | `actor` | "Spend by user" KPI groups by actor; `agent.action` on its own attributes to "(unattributed)" |
+| `gen_ai.usage.cost_usd` | `costUsd` | Drives the Spend KPI on `/governance` and the per-source health strip |
+| `gen_ai.usage.input_tokens` | `tokensInput` | Tokens KPI |
+| `gen_ai.usage.output_tokens` | `tokensOutput` | Tokens KPI |
+
+A complete OTLP/HTTP JSON body that hits the full normaliser and produces one row in `langwatch ingest tail` / the per-source detail page. Substitute `<otlpUrl>` and `<secret>` from the one-time-reveal modal:
+
+```bash
+curl -X POST '<otlpUrl>' \
+  -H 'Authorization: Bearer <secret>' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "resource_spans": [{
+      "resource": {
+        "attributes": [
+          {"key": "service.name", "value": {"stringValue": "smoke-test"}}
+        ]
+      },
+      "scope_spans": [{
+        "spans": [{
+          "spanId": "0123456789abcdef",
+          "traceId": "0123456789abcdef0123456789abcdef",
+          "name": "chat.completion",
+          "startTimeUnixNano": "'$(date +%s)'000000000",
+          "attributes": [
+            {"key": "gen_ai.request.model", "value": {"stringValue": "claude-3-5-sonnet"}},
+            {"key": "user.email", "value": {"stringValue": "you@your.org"}},
+            {"key": "gen_ai.usage.cost_usd", "value": {"doubleValue": 0.01}},
+            {"key": "gen_ai.usage.input_tokens", "value": {"intValue": 100}},
+            {"key": "gen_ai.usage.output_tokens", "value": {"intValue": 250}}
+          ]
+        }]
+      }]
+    }]
+  }'
+```
+
+Expected response:
+
+```json
+HTTP/1.1 202 Accepted
+Content-Type: application/json
+{"accepted":true,"bytes":<n>,"events":1}
+```
+
+`events:1` confirms the body parsed and the row landed. `events:0` with `bytes>0` means the body was accepted but no spans were extracted — common causes:
+- `resource_spans` / `resourceSpans` not present at the top level (wrong nesting)
+- `spans` array empty within a `scope_spans` entry
+- Body is not OTLP-shaped JSON (e.g. you posted a Workato-style envelope to the OTLP endpoint).
+
+After the curl succeeds, verify with:
+
+```bash
+langwatch ingest tail <sourceId> --limit 1
+# → 2026-04-27T...  api.call  chat.completion → claude-3-5-sonnet  $0.0100  100/250 tok
+```
+
+### OTLP attribute value keys are camelCase
+
+The OTLP/HTTP JSON spec uses camelCase for attribute value field names — `stringValue` / `intValue` / `doubleValue` / `boolValue`. Snake_case (`string_value` / `int_value`) is **not** accepted by the normaliser today. If you're hand-authoring OTLP bodies for tests, match the casing exactly or you'll see `events:0` despite a 202.
