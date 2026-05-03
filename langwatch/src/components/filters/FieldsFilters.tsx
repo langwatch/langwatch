@@ -721,10 +721,7 @@ function ListSelection({
 
 					const isHighlighted = virtualItem.index === highlightedIndex;
 
-					const onChange_ = (e: any) => {
-						e.preventDefault();
-						e.stopPropagation();
-
+					const onChange_ = () => {
 						if (currentValues.includes(field.toString())) {
 							onChange(
 								currentValues.filter((v) => v.toString() !== field.toString()),
@@ -760,7 +757,7 @@ function ListSelection({
 									gap={2}
 									size="sm"
 									checked={currentValues.includes(field.toString())}
-									onChange={onChange_}
+									onCheckedChange={onChange_}
 								>
 									<VStack width="full" align="start" gap={0}>
 										{details && (
@@ -818,7 +815,7 @@ function ListSelection({
 							gap={2}
 							size="sm"
 							checked={currentValues.includes(customValueQuery)}
-							onChange={handleCustomValueSelect}
+							onCheckedChange={handleCustomValueSelect}
 						>
 							<OverflownTextWithTooltip
 								fontSize="sm"

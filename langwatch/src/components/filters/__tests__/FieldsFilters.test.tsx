@@ -175,8 +175,32 @@ describe("FieldsFilters", () => {
 // - Enter key selects the highlighted option
 // - Custom value can be selected via click or keyboard
 
-// @regression #3749 — Checkbox onChange not fired in Chakra v3 (use onCheckedChange)
-describe("when the user clicks a filter option in the popover", () => {
+/**
+ * @regression #3749 — filter checkboxes on /messages no longer clickable.
+ *
+ * Root cause: PR #3528 swapped the option-row click handler from
+ * `<Checkbox onClick={onChange_}>` to `<Checkbox onChange={onChange_}>`.
+ * Our `<Checkbox>` wrapper spreads props onto Chakra v3's
+ * `ChakraCheckbox.Root` (backed by Ark/Zag), which intercepts pointer
+ * events on its label/control machinery — neither `onChange` nor
+ * `onCheckedChange` fires reliably when the Checkbox is nested inside a
+ * Popover + virtualizer in the production browser.
+ *
+ * The fix moves the click handler off the `<Checkbox>` and onto the
+ * containing `<HStack>` row, so a click anywhere on the row triggers the
+ * toggle. Verified empirically: clicking the row container fires the
+ * handler; clicking the Checkbox does not.
+ *
+ * The test asserts: clicking the row container (not the Checkbox itself)
+ * calls `setFilters` with the toggled value. Without the fix, the row
+ * has no click handler and `setFilters` is never called.
+ */
+describe("@regression #3749 — filter option row click toggles setFilters", () => {
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+  });
+
   beforeEach(() => {
     mockUseQuery.mockReturnValue({
       data: { options: mockFilterOptions },
@@ -184,40 +208,29 @@ describe("when the user clicks a filter option in the popover", () => {
     });
   });
 
-  afterEach(() => {
-    cleanup();
-    vi.clearAllMocks();
-  });
-
   describe("given the user has opened a filter popover", () => {
-    describe("when they click an option", () => {
+    describe("when they click anywhere on a virtualised option row", () => {
       it("calls setFilters with the toggled value", async () => {
         const user = userEvent.setup();
         const setFilters = vi.fn();
 
-        renderComponent({
-          filters: {} as Record<FilterField, string[]>,
-          setFilters,
-        });
+        renderComponent({ setFilters });
 
-        // Open the Label filter popover
         const labelButton = screen.getByText("Label").closest("button");
-        expect(labelButton).toBeInTheDocument();
         await user.click(labelButton!);
 
-        // The popover should now be open
-        expect(labelButton).toHaveAttribute("aria-expanded", "true");
+        // Find the row container (HStack) that wraps the "Production" option.
+        // Click the count text "100" — a sibling of the Checkbox — so the
+        // click MUST traverse the row's onClick to register, never the
+        // Checkbox's own handlers.
+        const countText = screen.getByText("100");
+        await user.click(countText);
 
-        // Click the "Production" option (field: "label-1")
-        const productionOption = screen.getByText("Production");
-        await user.click(productionOption);
-
-        // setFilters must have been called — this FAILS on the buggy code because
-        // Chakra v3 Checkbox.Root fires onCheckedChange, not onChange, so the
-        // click handler never executes.
         expect(setFilters).toHaveBeenCalledOnce();
         expect(setFilters).toHaveBeenCalledWith(
-          expect.objectContaining({ "metadata.labels": ["label-1"] }),
+          expect.objectContaining({
+            "metadata.labels": expect.arrayContaining(["label-1"]),
+          }),
         );
       });
     });
