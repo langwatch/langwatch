@@ -654,6 +654,14 @@
             ]
           },
           {
+            "group": "Personal Portal",
+            "pages": [
+              "ai-governance/personal-portal/overview",
+              "ai-governance/personal-portal/end-user",
+              "ai-governance/personal-portal/admin-catalog"
+            ]
+          },
+          {
             "group": "Sources",
             "pages": [
               "ai-governance/ingestion-sources/index",
