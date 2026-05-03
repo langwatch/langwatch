@@ -94,7 +94,7 @@ examples = [
     "openai>=1.68.2,<2.8.0", # 2.8+ calls model_dump(by_alias=None) which pydantic-core rejects
     "pydantic>=1,<2.10.2", # v2.10.2 is broken for chainlit
     "pytest>=7.4.2,<8.0.0",
-    "python-dotenv==1.2.1",
+    "python-dotenv==1.2.2",
     "streamlit>=1.37.1,<2.0.0",
     "uvicorn>=0.38.0,<0.41.0",
     "json-repair>=0.42.0",
@@ -113,5 +113,5 @@ examples = [
 tests = [
     "factory-boy>=3.3.3",
     "pytest-asyncio>=0.21.2",
-    "python-dotenv==1.2.1"
+    "python-dotenv==1.2.2"
 ]
