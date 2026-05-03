@@ -35,6 +35,14 @@ describe("envForTool", () => {
     expect(env.GEMINI_API_KEY).toBe("lw_vk_test_x");
   });
 
+  it("opencode → both Anthropic + OpenAI pairs (multi-provider)", () => {
+    const env = envForTool(cfg, "opencode").vars;
+    expect(env.OPENAI_BASE_URL).toBe("http://gw.example.com/api/v1/openai");
+    expect(env.OPENAI_API_KEY).toBe("lw_vk_test_x");
+    expect(env.ANTHROPIC_BASE_URL).toBe("http://gw.example.com/api/v1/anthropic");
+    expect(env.ANTHROPIC_AUTH_TOKEN).toBe("lw_vk_test_x");
+  });
+
   it("unknown tool → empty env", () => {
     const env = envForTool(cfg, "nonsense").vars;
     expect(env).toEqual({});

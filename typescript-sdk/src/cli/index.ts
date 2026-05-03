@@ -281,6 +281,21 @@ program
   });
 
 program
+  .command("opencode")
+  .description("Run `opencode` routed through the LangWatch gateway (multi-provider; injects both Anthropic and OpenAI env vars).")
+  .allowUnknownOption(true)
+  .helpOption(false)
+  .action(async (_opts, cmd: { args?: string[] }) => {
+    try {
+      const { wrapOpencode } = await import("./commands/wrap.js");
+      await wrapOpencode(cmd.args ?? []);
+    } catch (error) {
+      console.error(`Error: ${formatApiErrorMessage({ error })}`);
+      process.exit(1);
+    }
+  });
+
+program
   .command("logout-device")
   .description("Server-revoke the device-flow refresh token AND clear the local ~/.langwatch/config.json. Idempotent.")
   .action(async () => {

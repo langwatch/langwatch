@@ -64,6 +64,19 @@ export function envForTool(cfg: GovernanceConfig, tool: string): ToolEnv {
           GEMINI_API_KEY: auth,
         },
       };
+    case "opencode":
+      // opencode is multi-provider — it reads the standard
+      // OPENAI_*/ANTHROPIC_* env vars depending on which model the
+      // user selected at the prompt. Mirror cursor's both-pairs
+      // injection so any provider the user hops to lands at our gw.
+      return {
+        vars: {
+          OPENAI_BASE_URL: `${gw}/api/v1/openai`,
+          OPENAI_API_KEY: auth,
+          ANTHROPIC_BASE_URL: `${gw}/api/v1/anthropic`,
+          ANTHROPIC_AUTH_TOKEN: auth,
+        },
+      };
     default:
       return { vars: {} };
   }

@@ -21,3 +21,7 @@ export const wrapCursor = async (args: string[]): Promise<void> => {
 export const wrapGemini = async (args: string[]): Promise<void> => {
   await runWrapped("gemini", args);
 };
+
+export const wrapOpencode = async (args: string[]): Promise<void> => {
+  await runWrapped("opencode", args);
+};
