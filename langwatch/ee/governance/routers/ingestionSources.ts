@@ -131,6 +131,11 @@ export const ingestionSourcesRouter = createTRPCRouter({
         description: z.string().nullable().optional(),
         parserConfig: z.record(z.string(), z.unknown()).optional(),
         retentionClass: retentionClassSchema.optional(),
+        pullConfig: z
+          .record(z.string(), z.unknown())
+          .nullable()
+          .optional(),
+        pullSchedule: z.string().min(1).max(64).nullable().optional(),
       }),
     )
     .use(checkOrganizationPermission("ingestionSources:manage"))
@@ -144,6 +149,8 @@ export const ingestionSourcesRouter = createTRPCRouter({
         name: input.name,
         description: input.description ?? null,
         parserConfig: input.parserConfig,
+        pullConfig: input.pullConfig,
+        pullSchedule: input.pullSchedule,
         retentionClass: input.retentionClass as
           | (typeof SUPPORTED_RETENTION_CLASSES)[number]
           | undefined,

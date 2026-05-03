@@ -19,7 +19,8 @@
  */
 import { createHash, randomBytes } from "crypto";
 
-import type { IngestionSource, Prisma, PrismaClient } from "@prisma/client";
+import { Prisma } from "@prisma/client";
+import type { IngestionSource, PrismaClient } from "@prisma/client";
 
 import { env } from "~/env.mjs";
 import {
@@ -73,6 +74,16 @@ export interface CreateIngestionSourceInput {
   description?: string | null;
   parserConfig?: Record<string, unknown>;
   retentionClass?: RetentionClass;
+  /**
+   * Phase 10: opaque adapter config persisted on IngestionSource.pullConfig.
+   * Worker resolves `pullConfig.adapter` through the pullerAdapterRegistry
+   * and dispatches `runOnce`. For reference adapters (copilot_studio etc.)
+   * the URL/auth/mapping are locked and the admin-supplied portion is just
+   * the adapter id + credentials reference.
+   */
+  pullConfig?: Record<string, unknown> | null;
+  /** Cron schedule for the BullMQ puller worker. Null = use adapter default. */
+  pullSchedule?: string | null;
   actorUserId: string;
 }
 
@@ -212,6 +223,13 @@ export class IngestionSourceService {
         description: input.description ?? null,
         ingestSecretHash,
         parserConfig: (input.parserConfig ?? {}) as Prisma.InputJsonValue,
+        pullConfig:
+          input.pullConfig === undefined
+            ? undefined
+            : input.pullConfig === null
+              ? Prisma.JsonNull
+              : (input.pullConfig as Prisma.InputJsonValue),
+        pullSchedule: input.pullSchedule ?? null,
         retentionClass,
         status: "awaiting_first_event",
         createdById: input.actorUserId,

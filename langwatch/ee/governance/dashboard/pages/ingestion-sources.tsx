@@ -172,7 +172,40 @@ interface ComposerState {
   description: string;
   parserConfig: Record<string, string>;
   retentionClass: RetentionClass;
+  /**
+   * Phase 10: optional cron override for puller-mode sources. When the
+   * source-type maps to a registered PullerAdapter, the composer
+   * auto-fills this with the adapter's locked default schedule (15min
+   * for copilot_studio); admins can edit before save. Ignored for
+   * push/webhook source types.
+   */
+  pullSchedule: string;
 }
+
+/**
+ * Maps user-facing pull-mode source-types onto the PullerAdapter id
+ * registered server-side (`pullerAdapterRegistry.ids()`). Hardcoded
+ * curated list per @ai_gateway_sergey_2's directive — keeps the UI
+ * free of a round-trip enumeration call. Entries land in lockstep
+ * with the reference adapters Sergey ships in `services/pullers/`.
+ */
+const PULL_ADAPTER_FOR_SOURCE: Partial<Record<SourceType, string>> = {
+  copilot_studio: "copilot_studio",
+  openai_compliance: "openai_compliance",
+  claude_compliance: "claude_compliance",
+};
+
+/**
+ * Default cron schedule per puller adapter — mirrors the locked
+ * `*_PULL_CONFIG.schedule` from the reference impl. Keeps the UI in
+ * sync without a server round-trip; if the locked default ever
+ * diverges, update both ends.
+ */
+const PULL_SCHEDULE_DEFAULTS: Record<string, string> = {
+  copilot_studio: "*/15 * * * *",
+  openai_compliance: "*/15 * * * *",
+  claude_compliance: "*/15 * * * *",
+};
 
 const blankComposer = (): ComposerState => ({
   sourceType: "otel_generic",
@@ -180,6 +213,7 @@ const blankComposer = (): ComposerState => ({
   description: "",
   parserConfig: {},
   retentionClass: "thirty_days",
+  pullSchedule: "",
 });
 
 function fmtRelative(date: Date | string | null): string {
@@ -281,6 +315,7 @@ function IngestionSourcesPage() {
 
   const onSubmit = () => {
     if (!composer.name.trim()) return;
+    const pullAdapter = PULL_ADAPTER_FOR_SOURCE[composer.sourceType];
     createMutation.mutate({
       organizationId: orgId,
       sourceType: composer.sourceType,
@@ -288,6 +323,12 @@ function IngestionSourcesPage() {
       description: composer.description.trim() || null,
       parserConfig: buildParserConfig(composer),
       retentionClass: composer.retentionClass,
+      pullConfig: pullAdapter ? { adapter: pullAdapter } : null,
+      pullSchedule: pullAdapter
+        ? composer.pullSchedule.trim() ||
+          PULL_SCHEDULE_DEFAULTS[pullAdapter] ||
+          null
+        : null,
     });
   };
 
@@ -641,6 +682,12 @@ function SourceComposerDrawer({
           onChange={(parserConfig) => setComposer({ ...composer, parserConfig })}
         />
 
+        <PullScheduleField
+          sourceType={composer.sourceType}
+          value={composer.pullSchedule}
+          onChange={(pullSchedule) => setComposer({ ...composer, pullSchedule })}
+        />
+
         <VStack align="stretch" gap={1}>
           <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
             Retention class
@@ -884,6 +931,40 @@ function ParserConfigFields({
           )}
         </VStack>
       ))}
+    </VStack>
+  );
+}
+
+function PullScheduleField({
+  sourceType,
+  value,
+  onChange,
+}: {
+  sourceType: SourceType;
+  value: string;
+  onChange: (next: string) => void;
+}) {
+  const adapter = PULL_ADAPTER_FOR_SOURCE[sourceType];
+  if (!adapter) return null;
+  const defaultSchedule = PULL_SCHEDULE_DEFAULTS[adapter] ?? "";
+  return (
+    <VStack align="stretch" gap={1}>
+      <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
+        Polling schedule
+      </Text>
+      <Input
+        size="sm"
+        backgroundColor="white"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={defaultSchedule}
+        fontFamily="mono"
+      />
+      <Text fontSize="xs" color="fg.muted">
+        Standard 5-field cron. Leave blank to use the adapter default
+        (<code>{defaultSchedule}</code>). The puller worker honors this on
+        the next BullMQ tick after save.
+      </Text>
     </VStack>
   );
 }
