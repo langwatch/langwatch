@@ -284,6 +284,18 @@ export const DrawerHeader = memo(function DrawerHeader({
       ) {
         continue;
       }
+      // The rich `Scenario run` chip (built from `useScenarioChipData`
+      // in `TraceHeaderChips`) already surfaces the scenario run id with
+      // status + criteria + click-to-open behaviour. The plain hoisted
+      // pin would render the bare run id next to it, producing two pills
+      // for the same concept — so we skip the hoisted version whenever a
+      // scenario run is attached to the trace.
+      if (
+        def.key === "scenario.run_id" &&
+        (trace.scenarioRunId ?? trace.attributes["scenario.run_id"])
+      ) {
+        continue;
+      }
       if (userKeys.has(`attribute:${def.key}`)) continue;
       const resolved = def.resolve
         ? def.resolve(trace)

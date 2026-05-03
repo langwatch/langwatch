@@ -24,6 +24,14 @@ export function AccordionShell({
   );
 }
 
+/**
+ * Approximate rendered height of one accordion trigger row (uppercase 2xs
+ * label + paddingY=2 + 1px top border). Used to compute the sticky-top
+ * offset so triggers stack instead of overlapping. If we restyle the
+ * trigger size, bump this in step.
+ */
+const STICKY_TRIGGER_HEIGHT_PX = 32;
+
 export function Section({
   value,
   title,
@@ -31,6 +39,7 @@ export function Section({
   empty,
   children,
   isFirst,
+  stackIndex,
   open,
 }: {
   value: string;
@@ -44,6 +53,13 @@ export function Section({
   empty?: boolean;
   children: ReactNode;
   isFirst?: boolean;
+  /**
+   * Position of this section in its accordion (0-based). Drives the sticky
+   * top offset so this section's trigger pins below all earlier sections'
+   * triggers as the user scrolls. Pass the iteration index. Falls back to 0
+   * when omitted, which collapses the stack into a single sticky line.
+   */
+  stackIndex?: number;
   /**
    * When provided, defers mounting `children` until the section has been
    * opened at least once. After first open, children stay mounted so toggling
@@ -68,7 +84,10 @@ export function Section({
         width="100%"
         paddingX={4}
         paddingY={2}
-        bg="transparent"
+        // Solid bg under sticky so content scrolling underneath is
+        // occluded — without it the title would overlap the content
+        // beneath when pinned. `bg.surface` matches the drawer body.
+        bg="bg.surface"
         color="fg.muted"
         borderTopWidth={isFirst ? "0" : "1px"}
         borderColor="border.muted"
@@ -76,6 +95,16 @@ export function Section({
         _hover={{ bg: "bg.softHover", color: "fg" }}
         _open={{ bg: "bg.softHover", color: "fg" }}
         cursor="pointer"
+        // Sticky stack: each trigger pins at a `top` offset that equals
+        // its position in the accordion times the trigger height, so as
+        // the user scrolls down the open section's body, every earlier
+        // trigger comes to rest above it (Notion-style). Inside-Item
+        // sticky scopes the stickiness to the Item's height — fine here
+        // because the Items are direct children of the same scroll
+        // container and their triggers occupy full width.
+        position="sticky"
+        top={`${(stackIndex ?? 0) * STICKY_TRIGGER_HEIGHT_PX}px`}
+        zIndex={1}
       >
         <HStack flex={1} gap={2}>
           <Text

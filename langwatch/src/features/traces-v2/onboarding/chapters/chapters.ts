@@ -72,6 +72,7 @@ export const STAGE_TO_CHAPTER: Record<StageId, ChapterId> = {
   facetsReveal: "slice",
   arrivalPrep: "arrivals",
   auroraArrival: "arrivals",
+  auroraLanding: "arrivals",
   postArrival: "arrivals",
   drawerOverview: "drawer",
   outro: "outro",

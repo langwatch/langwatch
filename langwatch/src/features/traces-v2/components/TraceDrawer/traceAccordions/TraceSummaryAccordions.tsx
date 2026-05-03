@@ -109,24 +109,29 @@ export function TraceSummaryAccordions({
                 title="Input and Output"
                 empty={!hasIO}
                 isFirst={isFirst}
+                stackIndex={idx}
                 open={isOpen}
               >
                 {hasIO ? (
                   <VStack align="stretch" gap={2}>
-                    {trace.input && (
+                    {trace.input ? (
                       <IOViewer
                         label="Input"
                         content={trace.input}
                         traceId={trace.traceId}
                       />
+                    ) : (
+                      <MissingIORow label="Input" mode="input" />
                     )}
-                    {trace.output && (
+                    {trace.output ? (
                       <IOViewer
                         label="Output"
                         content={trace.output}
                         mode="output"
                         traceId={trace.traceId}
                       />
+                    ) : (
+                      <MissingIORow label="Output" mode="output" />
                     )}
                   </VStack>
                 ) : (
@@ -147,6 +152,7 @@ export function TraceSummaryAccordions({
                 count={attrCount}
                 empty={!hasAttributes && !resources.isLoading}
                 isFirst={isFirst}
+                stackIndex={idx}
                 open={isOpen}
               >
                 {hasAttributes ? (
@@ -174,6 +180,7 @@ export function TraceSummaryAccordions({
                 value="scope"
                 title="Instrumentation Scope"
                 isFirst={isFirst}
+                stackIndex={idx}
                 open={isOpen}
               >
                 <ScopeBlock scope={resources.scope} />
@@ -187,6 +194,7 @@ export function TraceSummaryAccordions({
                 value="exceptions"
                 title="Exceptions"
                 isFirst={isFirst}
+                stackIndex={idx}
                 open={isOpen}
               >
                 <HStack
@@ -231,6 +239,7 @@ export function TraceSummaryAccordions({
                   pendingCount === 0
                 }
                 isFirst={isFirst}
+                stackIndex={idx}
                 open={isOpen}
               >
                 {evalsLoading ? (
@@ -261,6 +270,7 @@ export function TraceSummaryAccordions({
               count={traceEvents.length > 0 ? traceEvents.length : undefined}
               empty={traceEvents.length === 0}
               isFirst={isFirst}
+                stackIndex={idx}
               open={isOpen}
             >
               {traceEvents.length > 0 ? (
@@ -299,5 +309,40 @@ export function TraceSummaryAccordions({
         })}
       </AccordionShell>
     </Box>
+  );
+}
+
+/**
+ * Single dim row used in place of an IOViewer when the trace has the
+ * other side captured but this one is missing. Lets the user see at a
+ * glance that "this trace had an input but no output" rather than us
+ * silently hiding the OUTPUT label and leaving them to infer the gap.
+ *
+ * Kept structurally similar to the IOViewer header (uppercase 2xs label
+ * on the left) so the two read as siblings — same hierarchy, just with
+ * the body replaced by a muted placeholder.
+ */
+function MissingIORow({
+  label,
+  mode,
+}: {
+  label: string;
+  mode: "input" | "output";
+}): React.JSX.Element {
+  return (
+    <HStack gap={2} paddingY={1}>
+      <Text
+        textStyle="2xs"
+        fontWeight="bold"
+        color="fg.muted"
+        letterSpacing="wide"
+        textTransform="uppercase"
+      >
+        {label}
+      </Text>
+      <Text textStyle="xs" color="fg.subtle" fontStyle="italic">
+        — no {mode} recorded
+      </Text>
+    </HStack>
   );
 }

@@ -79,7 +79,7 @@ export function buildScenarioChipDef(d: ScenarioChipData): ChipDef {
 
   return {
     id: `scenario:${d.scenarioRunId}`,
-    label: "Scenario",
+    label: "Scenario run",
     value: hasResults
       ? `${displayName} · ${metCount}/${totalCount}`
       : displayName,

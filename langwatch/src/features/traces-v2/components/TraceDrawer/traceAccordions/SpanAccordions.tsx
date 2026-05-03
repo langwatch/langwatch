@@ -124,6 +124,7 @@ export function SpanAccordions({
                   title="Input and Output"
                   empty={!detailQuery.isLoading && !hasIO}
                   isFirst={isFirst}
+                stackIndex={idx}
                   open={isOpen}
                 >
                   {detailQuery.isLoading ? (
@@ -158,6 +159,7 @@ export function SpanAccordions({
                   value="prompt"
                   title="Prompt"
                   isFirst={isFirst}
+                stackIndex={idx}
                   open={isOpen}
                 >
                   {detail && <PromptAccordion span={detail} />}
@@ -181,6 +183,7 @@ export function SpanAccordions({
                     !detailQuery.isLoading
                   }
                   isFirst={isFirst}
+                stackIndex={idx}
                   open={isOpen}
                 >
                   {hasAttributes ? (
@@ -212,6 +215,7 @@ export function SpanAccordions({
                   value="scope"
                   title="Instrumentation Scope"
                   isFirst={isFirst}
+                stackIndex={idx}
                   open={isOpen}
                 >
                   <ScopeBlock scope={spanScope} />
@@ -225,6 +229,7 @@ export function SpanAccordions({
                   value="exceptions"
                   title="Exceptions"
                   isFirst={isFirst}
+                stackIndex={idx}
                   open={isOpen}
                 >
                   {detail?.error ? (
@@ -289,6 +294,7 @@ export function SpanAccordions({
                 count={hasEvents ? detail!.events.length : undefined}
                 empty={!detailQuery.isLoading && !hasEvents}
                 isFirst={isFirst}
+                stackIndex={idx}
                 open={isOpen}
               >
                 {hasEvents ? (
