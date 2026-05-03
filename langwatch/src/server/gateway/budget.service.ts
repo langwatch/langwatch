@@ -353,6 +353,31 @@ export class GatewayBudgetService {
   }
 
   async create(input: CreateBudgetInput): Promise<GatewayBudget> {
+    // Cross-org guard for PRINCIPAL budgets: the named user must be a
+    // member of the budget's organization. Without this check an admin
+    // in org A could create a PRINCIPAL budget for any userId — the FK
+    // to User would still pass, but the budget would never match the
+    // user's traffic (PRINCIPAL spans only their org's VKs), so the
+    // budget would be a silent no-op. Reject up-front with a helpful
+    // BAD_REQUEST instead. Spec:
+    // specs/ai-gateway/budgets-principal-cascade.feature.
+    if (input.scope.kind === "PRINCIPAL") {
+      const membership = await this.prisma.organizationUser.findFirst({
+        where: {
+          organizationId: input.organizationId,
+          userId: input.scope.principalUserId,
+        },
+        select: { userId: true },
+      });
+      if (!membership) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message:
+            "principalUserId is not a member of this organization — PRINCIPAL budgets must scope a user inside the budget's org.",
+        });
+      }
+    }
+
     const resetsAt = nextResetAt(input.window);
     const scopeCols = scopeToColumns(input.scope);
     const projectId = resolveProjectFromScope(input.scope);

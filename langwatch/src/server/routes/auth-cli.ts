@@ -165,6 +165,18 @@ function accessTokenKey(accessToken: string): string {
 }
 
 /**
+ * Per-user index of CLI token Redis keys, used by
+ * `cliTokenRevocation.service.ts` to revoke every token a deactivated
+ * user holds. Members are FULL Redis keys (e.g. "lwcli:access:lw_at_AAA")
+ * so the revoker can DEL them per-key and stay cluster-safe. The set's
+ * own TTL is bumped to the refresh-token lifetime on every mint/rotate
+ * so it self-evicts after the longest-lived member would have expired.
+ */
+function userTokensIndexKey(userId: string): string {
+  return `lwcli:user:${userId}:tokens`;
+}
+
+/**
  * Resolve a Bearer access_token to its (user_id, organization_id) record.
  * Returns null on missing / expired / malformed. Used by every authenticated
  * CLI endpoint (currently /budget/status; future ones use the same helper).
@@ -439,6 +451,15 @@ app.post("/exchange", async (c: Context) => {
       )
       .exec();
 
+    // Per-user token index — single-key ops, cluster-safe. Used by
+    // CliTokenRevocationService.revokeForUser on deactivation.
+    const indexKey = userTokensIndexKey(user.id);
+    await redis
+      .pipeline()
+      .sadd(indexKey, accessTokenKey(accessToken), refreshTokenKey(refreshToken))
+      .pexpire(indexKey, REFRESH_TOKEN_TTL_SECONDS * 1000)
+      .exec();
+
     // Single-use device_code: delete after successful exchange.
     // Per-key dels — Redis cluster CROSSSLOT-rejects multi-key ops
     // when keys differ in hash slot.
@@ -561,6 +582,18 @@ app.post("/refresh", async (c: Context) => {
       REFRESH_TOKEN_TTL_SECONDS,
     )
     .del(refreshTokenKey(refresh_token))
+    .exec();
+
+  // Refresh the per-user index so revokeForUser sees the rotated pair.
+  // The old refresh-token key was DELed in the multi above; leaving it
+  // in the index is harmless (DEL on a missing key is a 0-return no-op).
+  // The old access-token key TTLs out on its own; same harmlessness.
+  // Single-key ops, cluster-safe.
+  const indexKey = userTokensIndexKey(record.user_id);
+  await redis
+    .pipeline()
+    .sadd(indexKey, accessTokenKey(newAccessToken), refreshTokenKey(newRefreshToken))
+    .pexpire(indexKey, REFRESH_TOKEN_TTL_SECONDS * 1000)
     .exec();
 
   return c.json(
