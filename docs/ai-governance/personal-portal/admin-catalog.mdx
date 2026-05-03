@@ -9,6 +9,8 @@ The AI Tools Portal is curated by org admins from
 (`/settings/governance/tool-catalog`). Anything you publish here lands on
 every matching user's `/me` portal grid.
 
+![Admin catalog editor — section-grouped list of published tiles](/images/ai-governance/portal/admin-catalog-overview.png)
+
 <Info>**Pairs with:** [Portal overview](/ai-governance/personal-portal/overview) for the user-side tile grid, and [End-user tile interactions](/ai-governance/personal-portal/end-user) for what each tile expands into.</Info>
 
 <Note>**Permission required**: `aiTools:manage` (granted to ADMIN by default; delegable via the `CustomRolePermissions` JSON column).</Note>
@@ -33,6 +35,8 @@ manually if your org's allowed-AI list is narrower.
 
 Click **+ Add tile** to open the upsert drawer. The drawer is shaped by
 the **type** picker:
+
+![Add tile drawer — type-discriminated form per tile class](/images/ai-governance/portal/admin-add-tile-drawer.png)
 
 ### Coding assistant
 
@@ -84,6 +88,8 @@ get `rel="noopener noreferrer"`).
 Each tile is scoped either **org-wide** (visible to every user in the
 org) or **team-scoped** (visible only to that team's members). Team
 scoping uses the existing org-team multi-select picker.
+
+![Scope picker — whole-org or specific-team selection](/images/ai-governance/portal/admin-scope-picker.png)
 
 When a team-scoped tile shares its `slug` with an org-scoped tile, the
 team entry **overrides** the org entry for users in that team. This is
