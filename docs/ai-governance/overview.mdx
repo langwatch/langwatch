@@ -27,6 +27,17 @@ LangWatch is open-core. Some governance surfaces work for every self-hosted depl
 
 In the LangWatch UI, Enterprise-only surfaces show an **"Available on Enterprise plans"** card with an upgrade CTA when the org isn't on an Enterprise plan; the same surfaces gray out source-type dropdowns to `otel_generic` and retention to `thirty_days` for non-enterprise users.
 
+### Per-file license headers
+
+The repository tree is split 1:1 by license, so the directory a file lives in is its license:
+
+| Path | License | Header (first line of every source file) |
+|---|---|---|
+| Anything outside `langwatch/ee/` | Apache 2.0 | `// SPDX-License-Identifier: Apache-2.0` |
+| Anything inside `langwatch/ee/` | Enterprise (LangWatch EE) | `// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise` |
+
+The header is a single SPDX line — no block comment, no preamble, no copyright assignment. Tooling (REUSE, GitHub linguist) reads SPDX identifiers natively, and contributors moving a file across the boundary only need to flip one line. The Enterprise identifier is a `LicenseRef-*` because LangWatch EE is not a registered SPDX license; the canonical text lives at the repo root in `LICENSE-EE` (follow-up PR — root LICENSE/LICENSE-EE files are intentionally out-of-scope for this PR).
+
 ## Two personas
 
 LangWatch governance is shaped around two people who never need the same screen:
