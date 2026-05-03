@@ -33,6 +33,14 @@
  * concurrency doesn't break tenant isolation under load — Sergey's
  * "50 orgs × 100 concurrent first-mints" gap, scaled down for CI runtime).
  *
+ * Higher-fan-out cross-org regression added in Phase 5: 50 orgs × 5
+ * concurrent first-mints per org = 250 in-flight requests across 50
+ * tenants. Each org's 5 concurrent POSTs race
+ * `ensureHiddenGovernanceProject`, hitting the P2002-catch + re-fetch
+ * path 4 times per org (200 P2002 catches across the suite). Pins the
+ * slug-uniqueness invariant under heavy contention without burning CI
+ * minutes the way 50×100=5000 would.
+ *
  * Out of scope (deferred to `*.stress.test.ts` running against real
  * dev server — see `vitest.stress.config.ts`):
  *   - Sustained throughput cliff (1k spans/sec for 60s)
@@ -425,6 +433,115 @@ describe("ingestionRoutes — volume regression", () => {
       // handleTraceSpy was called once per org (one POST each)
       expect(handleTraceSpy).toHaveBeenCalledTimes(ORGS);
     });
+  });
+
+  describe("given 50 orgs × 5 concurrent first-mints per org (high-fan-out cross-org)", () => {
+    /**
+     * Higher-fan-out cross-org scenario per the orchestrator's
+     * "50 orgs × 100 first-mints" gap, scaled to a CI-sustainable
+     * 50 × 5 = 250 in-flight requests. The 1-mint-per-org case
+     * above proves cross-org isolation; this case adds intra-org
+     * concurrency on top — within each org, 5 simultaneous POSTs
+     * race to ensureHiddenGovernanceProject, so 4 of 5 hit the
+     * P2002-catch + re-fetch path per org (200 P2002 catches
+     * across the whole suite).
+     *
+     * Pins:
+     *   - Every POST returns 202 across all 250 requests
+     *   - Each org has EXACTLY ONE hidden Gov Project — slug
+     *     uniqueness holds under heavy contention
+     *   - handleOtlpTraceRequest invoked exactly 250 times — no
+     *     dedup or batching at the receiver layer
+     *   - No Gov Project bleeds across org boundaries (every org's
+     *     project belongs to a team within that org)
+     *   - p99 latency stays under a loose 15s budget — flags a
+     *     catastrophic regression of the lazy-ensure path under
+     *     contention, not a tight SLO
+     */
+    it("preserves slug-uniqueness + tenant isolation across 250 concurrent first-mints", async () => {
+      handleTraceSpy.mockClear();
+      const ORGS = 50;
+      const CONCURRENT_PER_ORG = 5;
+      const TOTAL = ORGS * CONCURRENT_PER_ORG;
+
+      // Seed all orgs sequentially first — seedOrgWithIngestionSource
+      // creates rows that the receiver reads, so they must exist
+      // before any POST fires.
+      const seeds = await Promise.all(
+        Array.from({ length: ORGS }, (_, i) =>
+          seedOrgWithIngestionSource(`${NS}-fanout-${i}-${nanoid(4)}`),
+        ),
+      );
+      seeds.forEach((s) => crossOrgSeeds.push(s));
+
+      // Fan out: for each org, schedule CONCURRENT_PER_ORG POSTs in
+      // parallel. The outer flatMap + Promise.all means all 250 are
+      // in-flight together (subject to vitest fileParallelism + node
+      // event-loop scheduling).
+      const all = seeds.flatMap((s) =>
+        Array.from({ length: CONCURRENT_PER_ORG }, () =>
+          postOnce(s.ingestionSourceId, s.ingestSecret),
+        ),
+      );
+      const start = Date.now();
+      const results = await Promise.all(all);
+      const elapsedMs = Date.now() - start;
+
+      expect(results.length).toBe(TOTAL);
+      expect(results.every((r) => r.status === 202)).toBe(true);
+
+      const latencies = results.map((r) => r.latencyMs).sort((a, b) => a - b);
+      const p99 = percentile(latencies, 0.99);
+      // eslint-disable-next-line no-console
+      console.log(
+        `[volume] fan-out ${ORGS} orgs × ${CONCURRENT_PER_ORG} concurrent = ${TOTAL} reqs in ${elapsedMs}ms → p99=${p99}ms`,
+      );
+
+      // Slug-uniqueness invariant under contention: each org has
+      // EXACTLY ONE hidden Gov Project, regardless of how many of
+      // its 5 concurrent first-mints raced through ensure().
+      const govProjectCounts = await Promise.all(
+        seeds.map((s) =>
+          prisma.project.count({
+            where: {
+              kind: PROJECT_KIND.INTERNAL_GOVERNANCE,
+              team: { organizationId: s.organizationId },
+            },
+          }),
+        ),
+      );
+      const violations = govProjectCounts
+        .map((c, i) => ({ orgIndex: i, count: c }))
+        .filter((v) => v.count !== 1);
+      expect(violations).toEqual([]);
+
+      // Cross-org isolation: no Gov Project for org A is visible
+      // through org B's team scope. Sample a handful to keep the
+      // assertion bounded; the per-org count check above already
+      // proves the invariant holds.
+      for (let i = 0; i < Math.min(5, ORGS); i++) {
+        const probe = await prisma.project.findFirst({
+          where: {
+            kind: PROJECT_KIND.INTERNAL_GOVERNANCE,
+            team: {
+              organizationId: { not: seeds[i]!.organizationId },
+              members: { some: { userId: seeds[i]!.userId } },
+            },
+          },
+        });
+        expect(probe).toBeNull();
+      }
+
+      // Receiver does not dedup or batch at the HTTP layer.
+      expect(handleTraceSpy).toHaveBeenCalledTimes(TOTAL);
+
+      // Loose latency budget. With 250 in-flight requests racing
+      // ensureHiddenGovernanceProject (which does 3 PG roundtrips
+      // before the create attempt), worst-case tail is dominated
+      // by PG connection pool + per-org row-lock contention. 15s
+      // p99 catches a 3x regression while tolerating CI noise.
+      expect(p99).toBeLessThan(15_000);
+    }, 60_000);
   });
 
   describe("given a sustained ~1k spans/sec rate against a single source", () => {
