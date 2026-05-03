@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+
 /**
  * OpenAI Enterprise Compliance reference puller — built on top of
  * the S3PollingPullerAdapter with the bucket-shape locked to

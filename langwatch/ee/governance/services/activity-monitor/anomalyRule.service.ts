@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+
 /**
  * AnomalyRuleService — admin CRUD for anomaly detection rules.
  *

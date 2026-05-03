@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+
 /**
  * tRPC router for the AI Tools Portal catalog (Phase 7).
  *

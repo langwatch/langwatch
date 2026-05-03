@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+
 /**
  * tRPC router for the Activity Monitor read-side queries that power
  * the /governance admin dashboard. Replaces Alexis's MOCK_* fixtures

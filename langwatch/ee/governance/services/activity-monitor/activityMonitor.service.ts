@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+
 /**
  * ActivityMonitorService — read-side queries powering the /governance
  * admin dashboard.

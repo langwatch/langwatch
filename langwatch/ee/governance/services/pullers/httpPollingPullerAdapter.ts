@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+
 /**
  * HttpPollingPullerAdapter — universal HTTP-polling adapter for
  * paginated REST audit-log APIs. Mirrors Airbyte's HTTP-source

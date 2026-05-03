@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+
 /**
  * GovernanceContentStripService — receiver-side gen_ai content stripping
  * ("no-spy mode"). Drops prompt + completion + system-instruction

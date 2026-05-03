@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+
 /**
  * tRPC router for cross-cutting governance read-side queries that
  * don't fit neatly under the more focused governance routers

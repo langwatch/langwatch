@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+
 /**
  * CliSessionInventoryService — read + revoke per-user CLI device-flow
  * sessions. Mirrors the macOS "Logged-in Devices" pattern: every active

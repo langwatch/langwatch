@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+
 /**
  * Microsoft Copilot Studio reference puller — built on top of the
  * generic HttpPollingPullerAdapter with the URL + auth shape locked

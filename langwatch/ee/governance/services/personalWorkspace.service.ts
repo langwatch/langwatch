@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+
 /**
  * PersonalWorkspaceService — owns the lifecycle of a user's "Personal
  * Workspace" inside an organization.

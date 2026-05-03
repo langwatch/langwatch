@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+
 /**
  * AnomalyAlertDispatcher — C3 alert dispatch fan-out.
  *

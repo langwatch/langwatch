@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+
 /**
  * PersonalUsageService — read-only ClickHouse rollups powering the
  * /me dashboard.

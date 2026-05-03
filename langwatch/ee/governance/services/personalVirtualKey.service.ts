@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+
 /**
  * PersonalVirtualKeyService — owns personal-VK issuance + lifecycle.
  *

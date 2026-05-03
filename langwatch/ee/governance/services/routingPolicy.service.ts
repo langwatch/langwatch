@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+
 /**
  * RoutingPolicyService — admin-defined routing templates that VirtualKeys
  * reference instead of embedding their own fallback chain.

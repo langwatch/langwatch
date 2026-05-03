@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+
 /**
  * GovernanceOcsfExportService — read-side cursor-paginated SIEM
  * forwarding pull. Returns OCSF v1.1 / OWASP AOS rows from

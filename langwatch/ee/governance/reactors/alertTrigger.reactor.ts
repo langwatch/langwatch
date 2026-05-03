@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import {
   buildPreconditionTraceDataFromFoldState,

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+
 /**
  * Per-rule-type Zod schemas for `AnomalyRule.thresholdConfig`. Mirrors
  * the per-tile-type config validation pattern from the Phase 7 aiTools

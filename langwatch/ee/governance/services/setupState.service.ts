@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+
 /**
  * GovernanceSetupStateService — read-only signals that tell the UI
  * whether an org has any governance state at all.

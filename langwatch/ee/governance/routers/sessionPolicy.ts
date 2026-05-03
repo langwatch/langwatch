@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+
 /**
  * Org-scoped governance policy — admin-tunable knobs flipped from
  * `/settings/governance`:

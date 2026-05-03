@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+
 /**
  * CliBootstrapService — shared logic for the Storyboard Screen 4
  * login-completion ceremony. Returns inherited providers + monthly

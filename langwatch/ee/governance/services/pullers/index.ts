@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+
 /**
  * PullerAdapter registry bootstrap. Importing this module wires the
  * built-in adapters into the singleton registry — the BullMQ worker

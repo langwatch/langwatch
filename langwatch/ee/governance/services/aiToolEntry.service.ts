@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+
 /**
  * AiToolEntryService — owns the AI Tools Portal catalog (Phase 7).
  *

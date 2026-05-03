@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+
 /**
  * tRPC router for /me/sessions — Phase 8 Sessions/Devices dashboard.
  *

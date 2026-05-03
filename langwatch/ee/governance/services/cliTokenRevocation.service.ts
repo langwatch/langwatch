@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+
 import type { Cluster, Redis } from "ioredis";
 
 import { connection as defaultRedisConnection } from "~/server/redis";

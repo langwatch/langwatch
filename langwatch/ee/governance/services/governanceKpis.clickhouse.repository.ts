@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+
 /**
  * GovernanceKpisClickHouseRepository — write side of the
  * `governance_kpis` fold projection. Each call inserts ONE row keyed

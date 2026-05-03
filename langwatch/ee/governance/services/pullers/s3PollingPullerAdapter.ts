@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+
 /**
  * S3PollingPullerAdapter — universal S3-polling adapter for SaaS
  * platforms that drop audit logs as files in a customer-owned bucket

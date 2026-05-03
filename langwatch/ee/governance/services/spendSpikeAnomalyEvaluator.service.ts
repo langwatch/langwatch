@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+
 /**
  * SpendSpikeAnomalyEvaluator — evaluates spend_spike AnomalyRules
  * against the governance_kpis fold (3b) and creates AnomalyAlert

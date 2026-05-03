@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+
 /**
  * PullerAdapter — universal contract for pull-mode IngestionSources.
  *

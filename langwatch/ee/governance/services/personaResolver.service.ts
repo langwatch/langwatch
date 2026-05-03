@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+
 /**
  * PersonaResolverService — picks the right home destination for a user
  * landing on `/`.

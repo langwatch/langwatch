@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+
 /**
  * Zod schema for `AnomalyRule.destinationConfig` — the C3 alert
  * dispatch payload that fans out fired AnomalyAlerts to external

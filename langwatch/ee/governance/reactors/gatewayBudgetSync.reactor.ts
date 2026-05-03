@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+
 import type {
   GatewayBudgetLedgerStatus,
   PrismaClient,

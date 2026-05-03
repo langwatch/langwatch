@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+
 /**
  * IngestionSourceService — admin CRUD for the per-platform fleet
  * configuration that powers the Activity Monitor pillar (cf.

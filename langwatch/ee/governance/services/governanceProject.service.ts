@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+
 /**
  * Hidden Governance Project — internal routing/tenancy artifact.
  *

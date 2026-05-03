@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+
 /**
  * Anthropic (Claude) Compliance reference puller — built on top of
  * the HttpPollingPullerAdapter with the URL + auth shape locked to
