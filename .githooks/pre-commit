@@ -20,7 +20,10 @@ fi
 # Check if any staged files are under docs/ — always regenerate llms.txt (generation is fast)
 if echo "$staged_before" | grep -qE '^docs/'; then
   echo "pre-commit: Regenerating llms.txt..."
-  (cd docs && node llms.txt.cjs)
+  # Suppress per-file "Processing: ..." stdout noise (errors still surface via
+  # stderr) so the index-race ABORT block below remains visible without
+  # scrolling past hundreds of regenerator lines.
+  (cd docs && node llms.txt.cjs > /dev/null)
   git add docs/llms.txt docs/llms-full.txt
 fi
 
