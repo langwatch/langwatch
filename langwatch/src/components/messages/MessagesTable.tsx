@@ -1104,30 +1104,35 @@ export function MessagesTable({
                   ...selectedHeaderColumns,
                 }).map(([columnKey, column]) => {
                   if (columnKey === "checked") return null;
+                  const toggleColumn = () => {
+                    setSelectedHeaderColumns({
+                      ...selectedHeaderColumns,
+                      [columnKey]: {
+                        enabled: !selectedHeaderColumns[columnKey]?.enabled,
+                        name: column.name,
+                      },
+                    });
+                    setLocalStorageHeaderColumns({
+                      ...selectedHeaderColumns,
+                      [columnKey]: {
+                        enabled: !selectedHeaderColumns[columnKey]?.enabled,
+                        name: column.name,
+                      },
+                    });
+                  };
                   return (
-                    <Checkbox
+                    <HStack
                       key={columnKey}
-                      checked={selectedHeaderColumns[columnKey]?.enabled}
-                      onChange={() => {
-                        setSelectedHeaderColumns({
-                          ...selectedHeaderColumns,
-                          [columnKey]: {
-                            enabled: !selectedHeaderColumns[columnKey]?.enabled,
-                            name: column.name,
-                          },
-                        });
-
-                        setLocalStorageHeaderColumns({
-                          ...selectedHeaderColumns,
-                          [columnKey]: {
-                            enabled: !selectedHeaderColumns[columnKey]?.enabled,
-                            name: column.name,
-                          },
-                        });
-                      }}
+                      width="full"
+                      cursor="pointer"
+                      onClick={toggleColumn}
                     >
-                      {column.name}
-                    </Checkbox>
+                      <Checkbox
+                        checked={selectedHeaderColumns[columnKey]?.enabled}
+                      >
+                        {column.name}
+                      </Checkbox>
+                    </HStack>
                   );
                 })}
               </VStack>
