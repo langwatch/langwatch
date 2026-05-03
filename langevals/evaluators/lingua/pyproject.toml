@@ -1,6 +1,6 @@
 [project]
 name = "langevals-lingua"
-version = "2.2.0"
+version = "2.3.0"
 description = "LangEvals lingua evaluator for language detection."
 authors = [
     {name = "Rogerio Chaves", email = "rogerio@langwatch.ai"},

@@ -1,6 +1,6 @@
 [project]
 name = "langevals-ragas"
-version = "2.2.0"
+version = "2.3.0"
 description = "LangEvals Ragas evaluator"
 authors = [
     {name = "Rogerio Chaves", email = "rogerio@langwatch.ai"},
