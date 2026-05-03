@@ -290,7 +290,7 @@ jobs:
 
       - name: Configure AWS credentials
         if: ${{ !inputs.dry_run }}
-        uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502 # v4
+        uses: aws-actions/configure-aws-credentials@ec61189d14ec14c8efccab744f656cffd0e33f37 # v4
         with:
           aws-region: ${{ env.AWS_REGION }}
           aws-access-key-id: ${{ secrets.EMBEDS_AWS_ACCESS_KEY_ID }}
