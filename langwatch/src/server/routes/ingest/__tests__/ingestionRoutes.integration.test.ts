@@ -519,6 +519,38 @@ describe("/api/ingest/* — end-to-end HTTP receiver contract", () => {
   });
 
   describe("POST /api/ingest/webhook/:sourceId — flat-event sources", () => {
+    describe("auth contract", () => {
+      it("rejects missing Authorization header with 401", async () => {
+        const res = await ingestApp.request(
+          `/api/ingest/webhook/${workatoSeed!.ingestionSourceId}`,
+          {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ event: "test" }),
+          },
+        );
+        expect(res.status).toBe(401);
+      });
+
+      it("rejects when Bearer's source.id does not match :sourceId path param (cross-org tenant isolation) with 401", async () => {
+        // Use orgA's bearer (workatoSeed) against orgB's source path
+        // (crossOrgSeed lives in a different organization) — proves the
+        // webhook receiver enforces the same isolation invariant as /otel/.
+        const res = await ingestApp.request(
+          `/api/ingest/webhook/${crossOrgSeed!.ingestionSourceId}`,
+          {
+            method: "POST",
+            headers: {
+              "content-type": "application/json",
+              authorization: `Bearer ${workatoSeed!.ingestSecret}`,
+            },
+            body: JSON.stringify({ event: "test" }),
+          },
+        );
+        expect(res.status).toBe(401);
+      });
+    });
+
     describe("source-type routing", () => {
       it("rejects span-shaped (claude_cowork) source on /webhook/ with 400 wrong_endpoint", async () => {
         const res = await ingestApp.request(
