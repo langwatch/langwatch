@@ -636,4 +636,179 @@ describe("SimulationClickHouseRepository (integration)", () => {
       });
     });
   });
+
+  describe("getRunIdsForSet()", () => {
+    describe("when runs exist in two scenario sets", () => {
+      it("returns only run ids matching the scenarioSetId", async () => {
+        const setA = `set-a-${nanoid()}`;
+        const setB = `set-b-${nanoid()}`;
+
+        const setAIds: string[] = [];
+        for (let i = 0; i < 3; i++) {
+          const id = `run-seta-${nanoid()}`;
+          setAIds.push(id);
+          await insertRow(ch, makeInsertRow({ ScenarioRunId: id, ScenarioSetId: setA }));
+        }
+        for (let i = 0; i < 3; i++) {
+          await insertRow(ch, makeInsertRow({ ScenarioRunId: `run-setb-${nanoid()}`, ScenarioSetId: setB }));
+        }
+
+        const result = await repo.getRunIdsForSet({ projectId: tenantId, scenarioSetId: setA });
+
+        expect(result.runIds.length).toBe(3);
+        expect(result.reachedCap).toBe(false);
+        for (const id of result.runIds) {
+          expect(setAIds).toContain(id);
+        }
+      });
+    });
+
+    describe("when scenarioSetId is \"default\"", () => {
+      it("returns rows with both ScenarioSetId = \"default\" and ScenarioSetId = \"\"", async () => {
+        // Use a unique tenant to prevent default/empty rows from other tests leaking in
+        const isolatedTenantId = `test-default-coalesce-${nanoid()}`;
+
+        const defaultIds: string[] = [];
+        const emptyIds: string[] = [];
+        const setAIds: string[] = [];
+
+        for (let i = 0; i < 2; i++) {
+          const id = `run-default-${nanoid()}`;
+          defaultIds.push(id);
+          await insertRow(ch, makeInsertRow({ TenantId: isolatedTenantId, ScenarioRunId: id, ScenarioSetId: "default" }));
+        }
+        for (let i = 0; i < 2; i++) {
+          const id = `run-empty-${nanoid()}`;
+          emptyIds.push(id);
+          await insertRow(ch, makeInsertRow({ TenantId: isolatedTenantId, ScenarioRunId: id, ScenarioSetId: "" }));
+        }
+        for (let i = 0; i < 2; i++) {
+          const id = `run-seta-${nanoid()}`;
+          setAIds.push(id);
+          await insertRow(ch, makeInsertRow({ TenantId: isolatedTenantId, ScenarioRunId: id, ScenarioSetId: `set-a-${nanoid()}` }));
+        }
+
+        const result = await repo.getRunIdsForSet({ projectId: isolatedTenantId, scenarioSetId: "default" });
+
+        expect(result.runIds.length).toBe(4);
+        expect(result.reachedCap).toBe(false);
+        const expectedIds = [...defaultIds, ...emptyIds];
+        for (const id of result.runIds) {
+          expect(expectedIds).toContain(id);
+        }
+        for (const id of setAIds) {
+          expect(result.runIds).not.toContain(id);
+        }
+      });
+    });
+
+    describe("when scenarioSetId is unknown", () => {
+      it("returns empty result with reachedCap false", async () => {
+        const ghostSet = `ghost-set-${nanoid()}`;
+
+        const result = await repo.getRunIdsForSet({ projectId: tenantId, scenarioSetId: ghostSet });
+
+        expect(result.runIds.length).toBe(0);
+        expect(result.reachedCap).toBe(false);
+      });
+    });
+
+    describe("when archived rows exist", () => {
+      it("excludes archived rows", async () => {
+        const setId = `set-archive-${nanoid()}`;
+        const activeIds: string[] = [];
+
+        for (let i = 0; i < 2; i++) {
+          const id = `run-active-${nanoid()}`;
+          activeIds.push(id);
+          await insertRow(ch, makeInsertRow({ ScenarioRunId: id, ScenarioSetId: setId, ArchivedAt: null }));
+        }
+        for (let i = 0; i < 2; i++) {
+          await insertRow(ch, makeInsertRow({
+            ScenarioRunId: `run-archived-${nanoid()}`,
+            ScenarioSetId: setId,
+            ArchivedAt: new Date(now),
+          }));
+        }
+
+        const result = await repo.getRunIdsForSet({ projectId: tenantId, scenarioSetId: setId });
+
+        expect(result.runIds.length).toBe(2);
+        for (const id of result.runIds) {
+          expect(activeIds).toContain(id);
+        }
+      });
+    });
+
+    describe("when a stale non-archived row coexists with a newer archived row for the same run", () => {
+      // Regression for the ReplacingMergeTree(UpdatedAt) dedup gap: without
+      // dedup, an older `ArchivedAt IS NULL` version would match the filter
+      // even after the latest version archived the run, re-dispatching
+      // deletions for already-archived runs.
+      it("treats the run as archived and does not return its id", async () => {
+        const setId = `set-dedup-${nanoid()}`;
+        const archivedRunId = `run-archived-stale-${nanoid()}`;
+        const sharedBatchId = `batch-${nanoid()}`;
+
+        // Older version: ArchivedAt IS NULL, lower UpdatedAt.
+        await insertRow(ch, makeInsertRow({
+          ScenarioRunId: archivedRunId,
+          ScenarioSetId: setId,
+          BatchRunId: sharedBatchId,
+          UpdatedAt: new Date(now - 10_000),
+          ArchivedAt: null,
+        }));
+        // Newer version (same dedup key): ArchivedAt set, higher UpdatedAt.
+        await insertRow(ch, makeInsertRow({
+          ScenarioRunId: archivedRunId,
+          ScenarioSetId: setId,
+          BatchRunId: sharedBatchId,
+          UpdatedAt: new Date(now),
+          ArchivedAt: new Date(now),
+        }));
+
+        // A second, currently-active run in the same set acts as a positive
+        // control — confirms the query is otherwise wired up correctly.
+        const activeRunId = `run-active-${nanoid()}`;
+        await insertRow(ch, makeInsertRow({
+          ScenarioRunId: activeRunId,
+          ScenarioSetId: setId,
+          ArchivedAt: null,
+        }));
+
+        const result = await repo.getRunIdsForSet({ projectId: tenantId, scenarioSetId: setId });
+
+        expect(result.runIds).toContain(activeRunId);
+        expect(result.runIds).not.toContain(archivedRunId);
+      });
+    });
+
+    describe("when rows exist in another project", () => {
+      it("does not return cross-project run ids", async () => {
+        const sharedSetName = `set-cross-${nanoid()}`;
+        const crossTenantId = `cross-project-${nanoid()}`;
+
+        const callerIds: string[] = [];
+        for (let i = 0; i < 2; i++) {
+          const id = `run-caller-${nanoid()}`;
+          callerIds.push(id);
+          await insertRow(ch, makeInsertRow({ ScenarioRunId: id, ScenarioSetId: sharedSetName }));
+        }
+        for (let i = 0; i < 2; i++) {
+          await insertRow(ch, makeInsertRow({
+            TenantId: crossTenantId,
+            ScenarioRunId: `run-other-${nanoid()}`,
+            ScenarioSetId: sharedSetName,
+          }));
+        }
+
+        const result = await repo.getRunIdsForSet({ projectId: tenantId, scenarioSetId: sharedSetName });
+
+        expect(result.runIds.length).toBe(2);
+        for (const id of result.runIds) {
+          expect(callerIds).toContain(id);
+        }
+      });
+    });
+  });
 });
