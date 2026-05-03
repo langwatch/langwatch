@@ -175,7 +175,7 @@
     "geoip-country": "^5.0.202605012358",
     "handlebars": "^4.7.9",
     "hono": "^4.12.15",
-    "hono-openapi": "^0.4.8",
+    "hono-openapi": "^1.3.0",
     "immer": "^10.2.0",
     "import-in-the-middle": "1.14.2",
     "ioredis": "^5.10.1",
