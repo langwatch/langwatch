@@ -20,12 +20,14 @@ import { useState } from "react";
 
 import { api } from "~/utils/api";
 
+import { TileIcon } from "./TileIcon";
 import type { ModelProviderConfig } from "./types";
 
 interface Props {
   displayName: string;
   config: ModelProviderConfig;
   organizationId: string;
+  iconKey?: string | null;
 }
 
 interface IssuedKey {
@@ -38,6 +40,7 @@ export function ModelProviderTile({
   displayName,
   config,
   organizationId,
+  iconKey,
 }: Props) {
   const [expanded, setExpanded] = useState(false);
   const [label, setLabel] = useState(config.defaultLabel ?? "");
@@ -99,6 +102,10 @@ export function ModelProviderTile({
         onClick={() => setExpanded(!expanded)}
         gap={3}
       >
+        <TileIcon
+          iconKey={iconKey ?? config.providerKey}
+          type="model_provider"
+        />
         <VStack align="start" gap={0} flex={1}>
           <Text fontSize="sm" fontWeight="semibold">
             {displayName}

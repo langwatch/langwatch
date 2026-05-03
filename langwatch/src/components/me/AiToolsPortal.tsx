@@ -2,6 +2,7 @@ import {
   Box,
   Heading,
   SimpleGrid,
+  Skeleton,
   Text,
   VStack,
 } from "@chakra-ui/react";
@@ -63,6 +64,23 @@ export function AiToolsPortal() {
 
   const totalEnabled = entries.filter((e) => e.enabled).length;
 
+  if (listQuery.isLoading) {
+    return (
+      <VStack align="stretch" gap={6} width="full">
+        {SECTION_ORDER.map((type) => (
+          <VStack key={type} align="stretch" gap={3}>
+            <Skeleton height="14px" width="180px" />
+            <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} gap={3}>
+              {Array.from({ length: 3 }).map((_, idx) => (
+                <Skeleton key={idx} height="60px" borderRadius="md" />
+              ))}
+            </SimpleGrid>
+          </VStack>
+        ))}
+      </VStack>
+    );
+  }
+
   if (totalEnabled === 0) {
     return (
       <Box
@@ -122,6 +140,7 @@ function RenderTile({
         <CodingAssistantTile
           displayName={entry.displayName}
           config={entry.config as CodingAssistantConfig}
+          iconKey={entry.iconKey}
         />
       );
     case "model_provider":
@@ -130,6 +149,7 @@ function RenderTile({
           displayName={entry.displayName}
           config={entry.config as ModelProviderConfig}
           organizationId={orgId}
+          iconKey={entry.iconKey}
         />
       );
     case "external_tool":
@@ -137,6 +157,7 @@ function RenderTile({
         <ExternalToolTile
           displayName={entry.displayName}
           config={entry.config as ExternalToolConfig}
+          iconKey={entry.iconKey}
         />
       );
   }

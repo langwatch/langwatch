@@ -10,14 +10,16 @@ import { useState } from "react";
 
 import { Markdown } from "~/components/Markdown";
 
+import { TileIcon } from "./TileIcon";
 import type { ExternalToolConfig } from "./types";
 
 interface Props {
   displayName: string;
   config: ExternalToolConfig;
+  iconKey?: string | null;
 }
 
-export function ExternalToolTile({ displayName, config }: Props) {
+export function ExternalToolTile({ displayName, config, iconKey }: Props) {
   const [expanded, setExpanded] = useState(false);
 
   return (
@@ -33,6 +35,7 @@ export function ExternalToolTile({ displayName, config }: Props) {
         onClick={() => setExpanded(!expanded)}
         gap={3}
       >
+        <TileIcon iconKey={iconKey} type="external_tool" />
         <VStack align="start" gap={0} flex={1}>
           <Text fontSize="sm" fontWeight="semibold">
             {displayName}

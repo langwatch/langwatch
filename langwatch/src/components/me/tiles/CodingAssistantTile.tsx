@@ -10,14 +10,16 @@ import {
 import { Check, ChevronDown, ChevronRight, Copy } from "lucide-react";
 import { useState } from "react";
 
+import { TileIcon } from "./TileIcon";
 import type { CodingAssistantConfig } from "./types";
 
 interface Props {
   displayName: string;
   config: CodingAssistantConfig;
+  iconKey?: string | null;
 }
 
-export function CodingAssistantTile({ displayName, config }: Props) {
+export function CodingAssistantTile({ displayName, config, iconKey }: Props) {
   const [expanded, setExpanded] = useState(false);
   const [copied, setCopied] = useState(false);
 
@@ -40,6 +42,7 @@ export function CodingAssistantTile({ displayName, config }: Props) {
         onClick={() => setExpanded(!expanded)}
         gap={3}
       >
+        <TileIcon iconKey={iconKey} type="coding_assistant" />
         <VStack align="start" gap={0} flex={1}>
           <Text fontSize="sm" fontWeight="semibold">
             {displayName}
