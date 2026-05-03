@@ -6,29 +6,10 @@ import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-// Mock tRPC
-const mockUseQuery = vi.fn();
-vi.mock("../../../utils/api", () => ({
-  api: {
-    analytics: {
-      dataForFilter: {
-        useQuery: () => mockUseQuery(),
-      },
-    },
-  },
-}));
-
-// Mock useFilterParams
-const mockUseFilterParams = vi.fn(() => ({
-  filterParams: {},
-  queryOpts: { enabled: true },
-  nonEmptyFilters: {},
-  setFilters: vi.fn(),
-}));
-vi.mock("../../../hooks/useFilterParams", () => ({
-  useFilterParams: () => mockUseFilterParams(),
-}));
-
+// Mock @tanstack/react-virtual so virtualizer items render in jsdom.
+// jsdom returns zero for all layout measurements, which means useVirtualizer
+// produces no virtual items. We replace it with a stub that returns every
+// item directly so popover content is reachable from tests.
 vi.mock("@tanstack/react-virtual", () => ({
   useVirtualizer: ({ count }: { count: number }) => ({
     getVirtualItems: () =>
@@ -42,6 +23,28 @@ vi.mock("@tanstack/react-virtual", () => ({
       })),
     getTotalSize: () => count * 36,
     measureElement: () => undefined,
+  }),
+}));
+
+// Mock tRPC
+const mockUseQuery = vi.fn();
+vi.mock("../../../utils/api", () => ({
+  api: {
+    analytics: {
+      dataForFilter: {
+        useQuery: () => mockUseQuery(),
+      },
+    },
+  },
+}));
+
+// Mock useFilterParams
+vi.mock("../../../hooks/useFilterParams", () => ({
+  useFilterParams: () => ({
+    filterParams: {},
+    queryOpts: { enabled: true },
+    nonEmptyFilters: {},
+    setFilters: vi.fn(),
   }),
 }));
 
@@ -118,7 +121,6 @@ describe("FieldsFilters", () => {
         >,
       });
 
-      // The button should show "Production" instead of "Any"
       const labelButton = screen.getByText("Label").closest("button");
       expect(labelButton).toHaveTextContent("Production");
     });
@@ -131,7 +133,6 @@ describe("FieldsFilters", () => {
         >,
       });
 
-      // Should show "2" badge for two selected values
       expect(screen.getByText("2")).toBeInTheDocument();
     });
   });
@@ -157,82 +158,45 @@ describe("FieldsFilters", () => {
       expect(labelButton).toBeInTheDocument();
       await user.click(labelButton!);
 
-      // Check that popover is now open via aria-expanded
       expect(labelButton).toHaveAttribute("aria-expanded", "true");
     });
   });
 
-});
+  /**
+   * @regression #3749 — filter checkboxes on /messages no longer clickable.
+   *
+   * PR #3528 moved the option-row click handler from `<HStack onClick=...>`
+   * to `<Checkbox onChange=...>`. Inside the Popover + virtualizer, neither
+   * `onChange` nor `onCheckedChange` on the Chakra v3 Checkbox fires
+   * reliably — verified empirically: clicking the row container fires;
+   * clicking the Checkbox itself does not.
+   *
+   * Fix: put the click handler back on the `<HStack>` row container.
+   * The test asserts a click on a non-Checkbox sibling element (the count
+   * text) toggles the filter — only the row's onClick can deliver that.
+   */
+  describe("when the user clicks an option row outside the Checkbox", () => {
+    it("toggles the filter value", async () => {
+      const user = userEvent.setup();
+      const setFilters = vi.fn();
 
-// Note: Due to Chakra UI Popover rendering via Portal, deep integration tests
-// for popover content (options, custom values, keyboard selection) are better
-// tested via E2E tests. The component logic (highlighting, selection, custom
-// values) works correctly in the browser but doesn't render properly in jsdom.
-//
-// The following features have been implemented and can be verified manually:
-// - Custom value option appears when typing non-matching text
-// - Keyboard navigation (ArrowUp/Down) highlights options
-// - Enter key selects the highlighted option
-// - Custom value can be selected via click or keyboard
+      renderComponent({ setFilters });
 
-/**
- * @regression #3749 — filter checkboxes on /messages no longer clickable.
- *
- * Root cause: PR #3528 swapped the option-row click handler from
- * `<Checkbox onClick={onChange_}>` to `<Checkbox onChange={onChange_}>`.
- * Our `<Checkbox>` wrapper spreads props onto Chakra v3's
- * `ChakraCheckbox.Root` (backed by Ark/Zag), which intercepts pointer
- * events on its label/control machinery — neither `onChange` nor
- * `onCheckedChange` fires reliably when the Checkbox is nested inside a
- * Popover + virtualizer in the production browser.
- *
- * The fix moves the click handler off the `<Checkbox>` and onto the
- * containing `<HStack>` row, so a click anywhere on the row triggers the
- * toggle. Verified empirically: clicking the row container fires the
- * handler; clicking the Checkbox does not.
- *
- * The test asserts: clicking the row container (not the Checkbox itself)
- * calls `setFilters` with the toggled value. Without the fix, the row
- * has no click handler and `setFilters` is never called.
- */
-describe("@regression #3749 — filter option row click toggles setFilters", () => {
-  afterEach(() => {
-    cleanup();
-    vi.clearAllMocks();
-  });
+      const labelButton = screen.getByText("Label").closest("button");
+      await user.click(labelButton!);
 
-  beforeEach(() => {
-    mockUseQuery.mockReturnValue({
-      data: { options: mockFilterOptions },
-      isLoading: false,
-    });
-  });
+      // The count text "100" is a sibling of the Checkbox in the HStack.
+      // Clicking it can ONLY reach the toggle handler if the handler is
+      // on the row container, not on the Checkbox.
+      const countText = screen.getByText("100");
+      await user.click(countText);
 
-  describe("given the user has opened a filter popover", () => {
-    describe("when they click anywhere on a virtualised option row", () => {
-      it("calls setFilters with the toggled value", async () => {
-        const user = userEvent.setup();
-        const setFilters = vi.fn();
-
-        renderComponent({ setFilters });
-
-        const labelButton = screen.getByText("Label").closest("button");
-        await user.click(labelButton!);
-
-        // Find the row container (HStack) that wraps the "Production" option.
-        // Click the count text "100" — a sibling of the Checkbox — so the
-        // click MUST traverse the row's onClick to register, never the
-        // Checkbox's own handlers.
-        const countText = screen.getByText("100");
-        await user.click(countText);
-
-        expect(setFilters).toHaveBeenCalledOnce();
-        expect(setFilters).toHaveBeenCalledWith(
-          expect.objectContaining({
-            "metadata.labels": expect.arrayContaining(["label-1"]),
-          }),
-        );
-      });
+      expect(setFilters).toHaveBeenCalledOnce();
+      expect(setFilters).toHaveBeenCalledWith(
+        expect.objectContaining({
+          "metadata.labels": expect.arrayContaining(["label-1"]),
+        }),
+      );
     });
   });
 });
