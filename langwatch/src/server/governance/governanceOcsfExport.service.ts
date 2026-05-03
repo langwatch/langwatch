@@ -30,6 +30,14 @@ import { PROJECT_KIND } from "./governanceProject.service";
 
 export interface GovernanceOcsfExportRow {
   eventId: string;
+  /**
+   * Forward-compat marker stamped by
+   * `governanceOcsfEvents.clickhouse.repository.ts:OCSF_SCHEMA_VERSION`
+   * at write time. Pre-this-column rows materialize as "1.1.0" via
+   * the CH DEFAULT (migration 00028). SIEM consumers can filter or
+   * version-gate downstream parsing on this value.
+   */
+  ocsfSchemaVersion: string;
   traceId: string;
   sourceId: string;
   sourceType: string;
@@ -56,6 +64,7 @@ export interface GovernanceOcsfExportPage {
 
 interface CHRow {
   EventId: string;
+  OcsfSchemaVersion: string;
   TraceId: string;
   SourceId: string;
   SourceType: string;
@@ -100,6 +109,7 @@ export class GovernanceOcsfExportService {
       query: `
         SELECT
           EventId,
+          OcsfSchemaVersion,
           TraceId,
           SourceId,
           SourceType,
@@ -140,6 +150,7 @@ export class GovernanceOcsfExportService {
     const rows = (await result.json()) as CHRow[];
     const events: GovernanceOcsfExportRow[] = rows.map((r) => ({
       eventId: r.EventId,
+      ocsfSchemaVersion: r.OcsfSchemaVersion,
       traceId: r.TraceId,
       sourceId: r.SourceId,
       sourceType: r.SourceType,

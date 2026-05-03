@@ -64,6 +64,17 @@ export type OcsfActivity = (typeof OCSF_ACTIVITY)[keyof typeof OCSF_ACTIVITY];
 const OCSF_CLASS_API_ACTIVITY = 6003;
 const OCSF_CATEGORY_APPLICATION_ACTIVITY = 6;
 
+/**
+ * Single source of truth for the OCSF schema version stamped on every
+ * row written to governance_ocsf_events. SIEM consumers filter on this
+ * to opt into / out of new OCSF revisions. Bump in lockstep with the
+ * `RawOcsfJson` payload shape; downstream OCSF v1.2 work would update
+ * this constant + (optionally) emit a new ClassUid.
+ *
+ * Migration: 00028_add_ocsf_schema_version.sql
+ */
+export const OCSF_SCHEMA_VERSION = "1.1.0" as const;
+
 export interface GovernanceOcsfEventInput {
   tenantId: string;
   eventId: string;
@@ -98,6 +109,7 @@ export class GovernanceOcsfEventsClickHouseRepository {
         values: [
           {
             TenantId: row.tenantId,
+            OcsfSchemaVersion: OCSF_SCHEMA_VERSION,
             EventId: row.eventId,
             TraceId: row.traceId,
             SourceId: row.sourceId,
