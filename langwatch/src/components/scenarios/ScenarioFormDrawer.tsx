@@ -270,7 +270,14 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
 
       try {
         await form.handleSubmit(async (data) => {
-          const savedScenario = await handleSave(data);
+          // skipTransition: don't open the edit-mode drawer mid-save — we're
+          // navigating away to /simulations next, so the create→edit URL push
+          // would race with our redirect (lw#3586 F11). The whole `await` is
+          // also why the redirect itself MUST be the only router.push that
+          // fires after — `onClose()` does its own router.push inside
+          // closeDrawer, and back-to-back router.push calls get coalesced
+          // (the cleanup push wins, the redirect gets dropped silently).
+          const savedScenario = await handleSave(data, { skipTransition: true });
           if (!savedScenario) return;
 
           // Persist the target selection for this scenario
@@ -282,8 +289,10 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
           // Fire the run — no callbacks, simulations page picks up via SSE
           void runScenario({ scenarioId: savedScenario.id, target, batchRunId });
 
-          // Close drawer and navigate to simulations page
-          onClose();
+          // Navigate to simulations — drawer closes implicitly via route change.
+          // Intentionally NOT calling onClose() here: closeDrawer() does its
+          // own router.push to strip drawer.* params, which would race with
+          // this redirect and silently win (lw#3586 F11).
           void router.push(`/${project.slug}/simulations?pendingBatch=${batchRunId}`);
         })();
       } catch (error) {
@@ -296,7 +305,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
         });
       }
     },
-    [handleSave, project?.id, project?.slug, persistTarget, runScenario, formInstance, onClose, router, utils, openDrawer],
+    [handleSave, project?.id, project?.slug, persistTarget, runScenario, formInstance, router, utils, openDrawer],
   );
   const handleSaveWithoutRunning = useCallback(async () => {
     const form = formInstance;
