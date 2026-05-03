@@ -204,6 +204,15 @@ model Organization {
   updatedAt              DateTime             @default(now()) @updatedAt
   OrganizationInvite     OrganizationInvite[]
   usageSpendingMaxLimit  Int?
+  /// Phase 8 — admin-configurable max lifetime for CLI device-flow
+  /// sessions, in days. 0 = unbounded (default, mirrors GitHub CLI /
+  /// gh-style flows). Companies that need finite session lifetime
+  /// (eg. SOC 2 / ISO 27001 customers with mandated session
+  /// expiration) can set a positive value. The /api/auth/cli/refresh
+  /// endpoint rejects refresh attempts where now - issued_at exceeds
+  /// this value, regardless of the underlying refresh-token TTL.
+  /// Spec: specs/ai-governance/sessions/session-ttl.feature.
+  maxSessionDurationDays Int                  @default(0)
   signupData             Json?
   signedDPA              Boolean              @default(false)
   elasticsearchNodeUrl   String?

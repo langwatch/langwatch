@@ -106,11 +106,35 @@ interface DeviceCodeRecord {
   };
 }
 
+/**
+ * Phase 8 — device metadata captured at /exchange time so users can
+ * see "Bob's MacBook Pro" entries in the /me/sessions inventory and
+ * revoke them per-device. All fields optional to stay
+ * backwards-compatible with older CLI versions that don't send
+ * client_info; rendered as "Unknown device" in the UI when missing.
+ *
+ * Spec: specs/ai-governance/sessions/sessions-inventory.feature
+ */
+interface ClientInfo {
+  /** Human label, defaults to platform + hostname. e.g. "Macbook Pro". */
+  device_label?: string;
+  /** os.hostname() output. */
+  hostname?: string;
+  /** os.userInfo().username so we can disambiguate two devs on same Mac. */
+  uname?: string;
+  /** "darwin" / "linux" / "win32" — process.platform. */
+  platform?: string;
+  /** First-issued timestamp; preserved across rotations of this session. */
+  session_started_at?: number;
+}
+
 interface RefreshTokenRecord {
   user_id: string;
   organization_id: string;
   issued_at: number;
   expires_at: number;
+  /** Phase 8 — present when the CLI sent client_info on /exchange. */
+  client_info?: ClientInfo;
 }
 
 interface AccessTokenRecord {
@@ -118,6 +142,9 @@ interface AccessTokenRecord {
   organization_id: string;
   issued_at: number;
   expires_at: number;
+  /** Phase 8 — mirror of refresh-token client_info; useful for the
+   * /me/sessions UI which reads access tokens directly. */
+  client_info?: ClientInfo;
 }
 
 // ---------------------------------------------------------------------------
@@ -291,8 +318,25 @@ app.post("/device-code", async (c: Context) => {
 // ---------------------------------------------------------------------------
 // POST /api/auth/cli/exchange
 // ---------------------------------------------------------------------------
+const clientInfoSchema = z
+  .object({
+    device_label: z.string().max(128).optional(),
+    hostname: z.string().max(255).optional(),
+    uname: z.string().max(64).optional(),
+    platform: z.string().max(32).optional(),
+  })
+  .optional();
+
 const exchangeRequestSchema = z.object({
   device_code: z.string().min(1),
+  /**
+   * Phase 8 — optional device fingerprint. CLI clients SHOULD send
+   * `{ hostname: os.hostname(), uname: os.userInfo().username,
+   *    platform: process.platform, device_label: <user-set> }`.
+   * Older CLI builds that don't send it get rendered as
+   * "Unknown device" in /me/sessions; new builds get a friendly label.
+   */
+  client_info: clientInfoSchema,
 });
 
 app.post("/exchange", async (c: Context) => {
@@ -427,17 +471,26 @@ app.post("/exchange", async (c: Context) => {
     const accessToken = generateAccessToken();
     const refreshToken = generateRefreshToken();
     const now = Date.now();
+    // Phase 8 — stamp client device info so /me/sessions can show
+    // "Bob's MacBook Pro" entries. session_started_at is preserved
+    // through future /refresh rotations so the dashboard can show
+    // "logged in 5 days ago" rather than the rotation timestamp.
+    const clientInfoStamped: ClientInfo | undefined = parsed.data.client_info
+      ? { ...parsed.data.client_info, session_started_at: now }
+      : undefined;
     const accessRecord: AccessTokenRecord = {
       user_id: user.id,
       organization_id: organization.id,
       issued_at: now,
       expires_at: now + ACCESS_TOKEN_TTL_SECONDS * 1000,
+      client_info: clientInfoStamped,
     };
     const refreshRecord: RefreshTokenRecord = {
       user_id: user.id,
       organization_id: organization.id,
       issued_at: now,
       expires_at: now + REFRESH_TOKEN_TTL_SECONDS * 1000,
+      client_info: clientInfoStamped,
     };
     await redis
       .multi()
@@ -553,22 +606,66 @@ app.post("/refresh", async (c: Context) => {
     );
   }
 
+  // Phase 8 — enforce admin-configured max session duration. The
+  // session-start anchor is `client_info.session_started_at` (set at
+  // /exchange and preserved across rotations); fall back to
+  // record.issued_at for sessions started before client_info was
+  // captured. When maxSessionDurationDays > 0 and the session is
+  // older, reject the refresh — the user must re-run `langwatch login`.
+  const sessionAnchorMs =
+    record.client_info?.session_started_at ?? record.issued_at;
+  const org = await prisma.organization.findUnique({
+    where: { id: record.organization_id },
+    select: { maxSessionDurationDays: true },
+  });
+  const maxDurationDays = org?.maxSessionDurationDays ?? 0;
+  if (maxDurationDays > 0) {
+    const sessionAgeMs = Date.now() - sessionAnchorMs;
+    const maxDurationMs = maxDurationDays * 24 * 60 * 60 * 1000;
+    if (sessionAgeMs > maxDurationMs) {
+      // Reject + invalidate the old refresh token to prevent further
+      // rotation attempts. The CLI gets 401 → wipes local state.
+      await redis.del(refreshTokenKey(refresh_token));
+      logger.info(
+        {
+          userId: record.user_id,
+          organizationId: record.organization_id,
+          sessionAgeDays: Math.round(sessionAgeMs / 86_400_000),
+          maxDurationDays,
+        },
+        "rejecting refresh: session exceeded org max-duration policy",
+      );
+      return c.json(
+        {
+          error: "invalid_grant",
+          error_description: `Session exceeded organization max-duration policy of ${maxDurationDays} days. Please run \`langwatch login\` to start a new session.`,
+        },
+        401,
+      );
+    }
+  }
+
   // Rotate: mint new pair, invalidate old. (Sliding-window rotation —
   // standard OAuth pattern, helps detect stolen tokens.)
   const newAccessToken = generateAccessToken();
   const newRefreshToken = generateRefreshToken();
   const now = Date.now();
+  // Preserve session_started_at across rotations so /me/sessions can
+  // accurately show "logged in N days ago" even after many refreshes.
+  const carriedClientInfo = record.client_info;
   const newAccessRecord: AccessTokenRecord = {
     user_id: record.user_id,
     organization_id: record.organization_id,
     issued_at: now,
     expires_at: now + ACCESS_TOKEN_TTL_SECONDS * 1000,
+    client_info: carriedClientInfo,
   };
   const newRefreshRecord: RefreshTokenRecord = {
     user_id: record.user_id,
     organization_id: record.organization_id,
     issued_at: now,
     expires_at: now + REFRESH_TOKEN_TTL_SECONDS * 1000,
+    client_info: carriedClientInfo,
   };
 
   await redis
