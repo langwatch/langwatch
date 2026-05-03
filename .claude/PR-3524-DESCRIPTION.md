@@ -1325,17 +1325,23 @@ model AiToolCatalogEntry {
 | P7-spec-provider | `specs/ai-governance/personal-portal/model-provider-tile.feature` — inline VK creation flow + project-suggestion line + name-validation + duplicate-name handling | 🅑 | |
 | P7-spec-external | `specs/ai-governance/personal-portal/external-tool-tile.feature` — markdown render boundaries (no JS, no img-src exfil) + external-link safety (rel=noopener) | 🅑 | |
 | P7-spec-admin | `specs/ai-governance/personal-portal/admin-catalog-editor.feature` — admin upsert / reorder / scope-bind / archive / starter-pack import | 🅑 | |
-| P7-ui-shell | `/me` portal grid page + tab refactor (Tools default tab when generic `langwatch login` lands) + empty-state | 🅑 | ✓ |
-| P7-ui-coding | `CodingAssistantCard` + expanded setup-helper panel with copy buttons | 🅑 | |
-| P7-ui-provider | `ModelProviderCard` + inline VK-creation form + project-suggestion line | 🅑 | ✓ |
-| P7-ui-external | `ExternalToolCard` + sanitized markdown render + external link with `rel=noopener noreferrer` | 🅑 | |
-| P7-ui-admin | `/settings/governance/tool-catalog` admin editor — list view + reorder + upsert drawer (3 type-specific shapes) + archive + starter-pack-import CTA | 🅑 | ✓ |
+| P7-B1 ✅ | Portal shell + section grouping + empty state — `components/me/AiToolsPortal.tsx` (3-section grid, section-empty hides, totally-empty shows CLI-fallback callout) | 🅑 (`16e3af8fe`) | ✓ |
+| P7-B2 ✅ | `components/me/tiles/CodingAssistantTile.tsx` — click-expand → command + copy + walkthrough text | 🅑 (`16e3af8fe`) | |
+| P7-B3 ✅ | `components/me/tiles/ModelProviderTile.tsx` — click-expand → label-only VK form → success state w/ masked secret + reveal/copy + base URL + 💡 project-suggestion hint (mocked VK; B9 swaps to real `personalVirtualKeys.issuePersonal`) | 🅑 (`16e3af8fe`) | ✓ |
+| P7-B4 ✅ | `components/me/tiles/ExternalToolTile.tsx` — click-expand → markdown body + external-link CTA + `tiles/{types,mockCatalog}.ts` mirroring Sergey's contract 1:1 | 🅑 (`16e3af8fe`) | |
+| P7-B5 ✅ | `pages/me/index.tsx` — portal hero ABOVE existing usage dashboard (single URL, no ferry) | 🅑 (`16e3af8fe`) | ✓ |
+| P7-B6 ✅ (list + route) | Admin route + list view: `pages/settings/governance/tool-catalog.tsx` (FF-gated, UI-preview banner) + `components/settings/governance/ToolCatalogEditor.tsx` (section-grouped list, drag handles, `+Add tile` per-section, scope badge). B7 drawer pending. | 🅑 (`16e3af8fe`) | ✓ |
+| P7-B7 | Admin add/edit drawer — type-discriminator picker + scope picker (org / team multi-select) + per-type fields (coding: command + docsUrl; provider: providerKey + suggestedRoutingPolicyId + projectSuggestionText; external: descriptionMarkdown + linkUrl + ctaLabel) + sort-order input | 🅑 | |
+| P7-B8 | Drag-to-reorder wired to backend (within-section only) | 🅑 | |
+| P7-B9 | Wire UI to Sergey's `aiToolsCatalogRouter` — replace mock tiles → `api.aiTools.list`; admin → `api.aiTools.adminList` + mutations; ModelProviderTile generate → `api.personalVirtualKeys.issuePersonal` w/ `config.suggestedRoutingPolicyId` | 🅑 | ✓ |
 | P7-starter-pack | Starter-pack JSON seed (Claude Code + Copilot + Cursor + Codex coding-assistants; OpenAI + Anthropic + Bedrock + Gemini providers; Copilot Studio + Workato externals) — admin-imports on first visit if catalog empty | 🅢 | |
-| P7-dogfood | Live-data dogfood + screenshots — portal grid populated, 3 expanded states, admin editor list + upsert drawer, empty-state, starter-pack import success | 🅑 | ✓ |
+| P7-B10 (dogfood) | Live-data dogfood — 5 paths × 9 PNGs to `docs/images/ai-governance/portal/`: `portal-hero-populated`, `portal-empty`, `tile-claude-expanded`, `tile-anthropic-form`, `tile-anthropic-issued`, `tile-copilot-studio`, `admin-catalog-overview`, `admin-add-tile-drawer`, `admin-scope-picker` | 🅑 | ✓ |
+| P7-B11 | Empty / error polish (rate-limit messages, network-failure retries, no-permission states) | 🅑 | |
+| P7-B12 | Lane-B docs page contributions if any new copy beyond what shipped in `3d8a5d3c8` | 🅑 | |
 | P7-docs ✅ (scaffold) | `docs/ai-governance/personal-portal/{overview,admin-catalog,end-user}.mdx` shipped (3 pages, 393 LOC) + `docs.json` Personal Portal group inserted between "Get Started" and "Sources" inside AI Governance anchor (`3d8a5d3c8`). Cross-links live: `personal-keys` (device-flow trigger), `routing-policies` (policy chain), `cli-debug` (error catalog). Screenshots from P7-dogfood will fold into all 3 pages once Alexis ships those. | 🅐 (`3d8a5d3c8`) | ✓ |
 | P7-fold | 🅐 Andre folds each batch into PR body + re-PATCHes (this row stays open until P7-dogfood lands) | 🅐 | |
 
-Critical path: **P7-arch → P7-schema → P7-router (+ P7-vk-reuse, P7-rbac, P7-int-test) → P7-ui-shell → P7-ui-provider → P7-ui-admin → P7-dogfood**.
+Critical path: **P7-arch → P7-schema → P7-router (+ P7-vk-reuse, P7-rbac, P7-int-test) → P7-B1/B5 (portal shell + me/index embed) → P7-B3 (ModelProviderTile) → P7-B6 (admin route + list) → P7-B9 (wire-up) → P7-B10 (dogfood)**. Lane-B already past the UI-shell critical-path checkpoint as of `16e3af8fe`.
 
 #### BDD spec file list (8 files, 3 lane-S backend / 5 lane-B UX)
 
