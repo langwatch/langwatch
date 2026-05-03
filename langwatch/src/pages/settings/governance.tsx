@@ -1,13 +1,16 @@
 import {
   Badge,
   Box,
+  Button,
   Heading,
   HStack,
+  Input,
   SimpleGrid,
   Spacer,
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { useEffect, useState } from "react";
 import {
   CheckCircle2,
   Circle,
@@ -23,6 +26,7 @@ import { LoadingScreen } from "~/components/LoadingScreen";
 import { NotFoundScene } from "~/components/NotFoundScene";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { Link } from "~/components/ui/link";
+import { toaster } from "~/components/ui/toaster";
 import { useFeatureFlag } from "~/hooks/useFeatureFlag";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api, type RouterOutputs } from "~/utils/api";
@@ -275,6 +279,8 @@ function GovernanceOverviewPage() {
           )}
         </SectionCard>
 
+        <SessionPolicySection organizationId={orgId} />
+
         <SectionCard
           title="By user"
           subline="Spend and activity per LangWatch member, last 30 days."
@@ -294,6 +300,99 @@ function GovernanceOverviewPage() {
         </SectionCard>
       </VStack>
     </GovernanceLayout>
+  );
+}
+
+function SessionPolicySection({ organizationId }: { organizationId: string }) {
+  const policyQuery = api.sessionPolicy.get.useQuery(
+    { organizationId },
+    { enabled: !!organizationId, refetchOnWindowFocus: false },
+  );
+  const utils = api.useUtils();
+  const setMutation = api.sessionPolicy.setMaxDuration.useMutation({
+    onSuccess: () => {
+      void utils.sessionPolicy.get.invalidate({ organizationId });
+      toaster.create({ title: "Session policy saved", type: "success" });
+    },
+    onError: (err) => {
+      toaster.create({
+        title: "Failed to save",
+        description: err.message,
+        type: "error",
+      });
+    },
+  });
+
+  const persisted = policyQuery.data?.maxSessionDurationDays ?? 0;
+  const [value, setValue] = useState<string>("0");
+
+  useEffect(() => {
+    if (policyQuery.data) setValue(String(persisted));
+  }, [persisted, policyQuery.data]);
+
+  const parsed = Number(value);
+  const isInvalid =
+    !Number.isInteger(parsed) || parsed < 0 || parsed > 365;
+  const isDirty = !isInvalid && parsed !== persisted;
+  const onSave = () => {
+    if (isInvalid || !organizationId) return;
+    setMutation.mutate({ organizationId, maxSessionDurationDays: parsed });
+  };
+  const onReset = () => setValue(String(persisted));
+
+  return (
+    <SectionCard
+      title="CLI session policy"
+      subline="Maximum lifetime of a CLI/device session before re-login is required. Applies to every member's `langwatch login` session."
+    >
+      <VStack align="stretch" gap={3}>
+        <HStack gap={3} align="end">
+          <VStack align="start" gap={1}>
+            <Text fontSize="xs" color="fg.muted">
+              Days (0 = unbounded)
+            </Text>
+            <Input
+              type="number"
+              min={0}
+              max={365}
+              step={1}
+              value={value}
+              onChange={(e) => setValue(e.target.value)}
+              width="120px"
+              size="sm"
+              borderColor={isInvalid ? "red.300" : undefined}
+            />
+          </VStack>
+          <Button
+            size="sm"
+            onClick={onSave}
+            loading={setMutation.isPending}
+            disabled={!isDirty || isInvalid}
+          >
+            Save
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={onReset}
+            disabled={!isDirty || setMutation.isPending}
+          >
+            Reset
+          </Button>
+        </HStack>
+        <Text fontSize="xs" color="fg.muted">
+          Suggested presets: <code>7</code> (high-security) ·{" "}
+          <code>30</code> (standard) · <code>0</code> (open-source / small
+          teams). Values higher than the natural refresh-token life (~30d) cap
+          at the refresh-token expiry.
+        </Text>
+        {isInvalid && (
+          <Text fontSize="xs" color="red.600">
+            Enter an integer between 0 and 365.
+          </Text>
+        )}
+      </VStack>
+    </SectionCard>
   );
 }
 

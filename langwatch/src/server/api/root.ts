@@ -66,6 +66,7 @@ import { anomalyRulesRouter } from "@ee/governance/routers/anomalyRules";
 import { aiToolsRouter } from "@ee/governance/routers/aiTools";
 import { governanceRouter } from "@ee/governance/routers/governance";
 import { personalSessionsRouter } from "@ee/governance/routers/personalSessions";
+import { sessionPolicyRouter } from "@ee/governance/routers/sessionPolicy";
 import { workflowRouter } from "./routers/workflows";
 import { opsRouter } from "./routers/ops";
 
@@ -133,6 +134,7 @@ const coreRouters = {
   aiTools: aiToolsRouter,
   governance: governanceRouter,
   personalSessions: personalSessionsRouter,
+  sessionPolicy: sessionPolicyRouter,
   gatewayProviders: gatewayProvidersRouter,
   gatewayBudgets: gatewayBudgetsRouter,
   gatewayCacheRules: gatewayCacheRulesRouter,
