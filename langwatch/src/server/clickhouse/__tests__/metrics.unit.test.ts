@@ -416,6 +416,16 @@ describe("ClickHouse metrics", () => {
       } as unknown as ClickHouseClient;
     };
 
+    const countCallsMatching = (
+      calls: unknown[][],
+      argIndex: number,
+      needle: string,
+    ) =>
+      calls.filter((args) => {
+        const arg = args[argIndex];
+        return typeof arg === "string" && arg.includes(needle);
+      }).length;
+
     it("emits exactly one warn for repeated failures until recovery", async () => {
       const client = buildMockClient(() => true);
 
@@ -423,12 +433,11 @@ describe("ClickHouse metrics", () => {
       await metrics.collectStorageStats(client);
       await metrics.collectStorageStats(client);
 
-      // First failure warns; subsequent failures fall through to debug.
-      const backupWarnCount = loggerMocks.warn.mock.calls.filter(
-        ([, msg]: [unknown, unknown]) =>
-          typeof msg === "string" && msg.includes("system.backups"),
-      ).length;
-      expect(backupWarnCount).toBe(1);
+      // logger.warn signature is (obj, msg). First failure warns;
+      // subsequent failures fall through to debug.
+      expect(
+        countCallsMatching(loggerMocks.warn.mock.calls, 1, "system.backups"),
+      ).toBe(1);
     });
 
     it("warns again on a fresh failure after recovering", async () => {
@@ -442,17 +451,14 @@ describe("ClickHouse metrics", () => {
       shouldFail = true;
       await metrics.collectStorageStats(client); // fail → warn (#2)
 
-      const backupWarnCount = loggerMocks.warn.mock.calls.filter(
-        ([, msg]: [unknown, unknown]) =>
-          typeof msg === "string" && msg.includes("system.backups"),
-      ).length;
-      expect(backupWarnCount).toBe(2);
-
-      const recoveryInfoCount = loggerMocks.info.mock.calls.filter(
-        ([msg]: [unknown]) =>
-          typeof msg === "string" && msg.includes("recovered"),
-      ).length;
-      expect(recoveryInfoCount).toBe(1);
+      expect(
+        countCallsMatching(loggerMocks.warn.mock.calls, 1, "system.backups"),
+      ).toBe(2);
+      // logger.info("ClickHouse backup stats collection recovered ...")
+      // is called with the message as the first arg.
+      expect(
+        countCallsMatching(loggerMocks.info.mock.calls, 0, "recovered"),
+      ).toBe(1);
     });
   });
 });
