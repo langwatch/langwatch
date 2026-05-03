@@ -81,10 +81,10 @@ importers:
         version: 3.1030.0
       '@bull-board/api':
         specifier: ^6.21.3
-        version: 6.21.3(@bull-board/ui@6.21.3)
+        version: 6.21.3(@bull-board/ui@7.0.0)
       '@bull-board/hono':
-        specifier: ^6.21.3
-        version: 6.21.3(hono@4.12.16)
+        specifier: ^7.0.0
+        version: 7.0.0(hono@4.12.16)
       '@chakra-ui/react':
         specifier: ^3.34.0
         version: 3.34.0(@emotion/react@11.14.0(@types/react@19.2.14)(react@19.2.5))(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
@@ -2047,13 +2047,18 @@ packages:
     peerDependencies:
       '@bull-board/ui': 6.21.3
 
-  '@bull-board/hono@6.21.3':
-    resolution: {integrity: sha512-J0/HbVPBshkYxxurIk3ShLcsqxPHTItf00tF2Qy2NVB7ixO2Ex1sMwbIER6RciKxYpC3y0xrQHEZZl2cFNvpUg==}
+  '@bull-board/api@7.0.0':
+    resolution: {integrity: sha512-ISNspLHVmUWUSq/eLw+wd1FuBBUnqpLbYP2xUNmehpfKhS+NoZWMbBvqjUYVeE/HLfUkRcR1edzMKpl5n9zlSw==}
+    peerDependencies:
+      '@bull-board/ui': 7.0.0
+
+  '@bull-board/hono@7.0.0':
+    resolution: {integrity: sha512-olpxmQX06Bf0XEgbH5z2a800woXmB4uiLGM1noMdORBg3GvdImevw/nfxV9XxAPBN4dcnQ99VVAEqOvwrMObvQ==}
     peerDependencies:
       hono: ^4
 
-  '@bull-board/ui@6.21.3':
-    resolution: {integrity: sha512-s/PLBJab8cnoQAGVqjQb0v4oGe0KgB4aQ5G5g93doxzXB/D+wkXNL9P9+zLWLldBJXE57jL4CR99ttDCIiyNHw==}
+  '@bull-board/ui@7.0.0':
+    resolution: {integrity: sha512-AnKeklpDn0iMFgu4ukDU6uTNmw4oudl07G4k2Fh95SknKDrXSiWRV0N1TGUawMqyfG1Yi5P/W/8d7raBq/Uw6w==}
 
   '@cfworker/json-schema@4.1.1':
     resolution: {integrity: sha512-gAmrUZSGtKc3AiBL71iNWxDsyUC5uMaKKGdvzYsBoTW/xi42JQHl7eKV2OYzCUqvc+D2RCcf7EXY2iCyFIk6og==}
@@ -7809,8 +7814,8 @@ packages:
   base64-js@1.5.1:
     resolution: {integrity: sha512-AKpaYlHn8t4SVbOHCy+b5+KKgvR4vrsD8vbvrbiQJps7fKDTkjkDry6ji0rUJjC0kzbNePLwzxq8iypo41qeWA==}
 
-  baseline-browser-mapping@2.10.25:
-    resolution: {integrity: sha512-QO/VHsXCQdnzADMfmkeOPvHdIAkoB7i0/rGjINPJEetLx75hNttVWGQ/jycHUDP9zZ9rupbm60WRxcwViB0MiA==}
+  baseline-browser-mapping@2.10.27:
+    resolution: {integrity: sha512-zEs/ufmZoUd7WftKpKyXaT6RFxpQ5Qm9xytKRHvJfxFV9DFJkZph9RvJ1LcOUi0Z1ZVijMte65JbILeV+8QQEA==}
     engines: {node: '>=6.0.0'}
     hasBin: true
 
@@ -15876,21 +15881,26 @@ snapshots:
 
   '@bufbuild/protobuf@2.12.0': {}
 
-  '@bull-board/api@6.21.3(@bull-board/ui@6.21.3)':
+  '@bull-board/api@6.21.3(@bull-board/ui@7.0.0)':
     dependencies:
-      '@bull-board/ui': 6.21.3
+      '@bull-board/ui': 7.0.0
       redis-info: 3.1.0
 
-  '@bull-board/hono@6.21.3(hono@4.12.16)':
+  '@bull-board/api@7.0.0(@bull-board/ui@7.0.0)':
     dependencies:
-      '@bull-board/api': 6.21.3(@bull-board/ui@6.21.3)
-      '@bull-board/ui': 6.21.3
+      '@bull-board/ui': 7.0.0
+      redis-info: 3.1.0
+
+  '@bull-board/hono@7.0.0(hono@4.12.16)':
+    dependencies:
+      '@bull-board/api': 7.0.0(@bull-board/ui@7.0.0)
+      '@bull-board/ui': 7.0.0
       ejs: 5.0.2
       hono: 4.12.16
 
-  '@bull-board/ui@6.21.3':
+  '@bull-board/ui@7.0.0':
     dependencies:
-      '@bull-board/api': 6.21.3(@bull-board/ui@6.21.3)
+      '@bull-board/api': 7.0.0(@bull-board/ui@7.0.0)
 
   '@cfworker/json-schema@4.1.1': {}
 
@@ -23554,7 +23564,7 @@ snapshots:
 
   base64-js@1.5.1: {}
 
-  baseline-browser-mapping@2.10.25: {}
+  baseline-browser-mapping@2.10.27: {}
 
   bcrypt-pbkdf@1.0.2:
     dependencies:
@@ -23679,7 +23689,7 @@ snapshots:
 
   browserslist@4.28.2:
     dependencies:
-      baseline-browser-mapping: 2.10.25
+      baseline-browser-mapping: 2.10.27
       caniuse-lite: 1.0.30001791
       electron-to-chromium: 1.5.349
       node-releases: 2.0.38
