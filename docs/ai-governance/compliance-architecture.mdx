@@ -6,6 +6,8 @@ sidebarTitle: Compliance architecture
 
 <Info>**Pairs with:** [AI Gateway → Audit](/ai-gateway/audit). The gateway emits the spans; governance reactors fold them into OCSF-mapped events for SIEM export.</Info>
 
+<Note>**Available on Enterprise plans.** The OCSF/SIEM export, multi-class retention, and tamper-evidence (post-GA follow-up) covered on this page require an Enterprise license. The Apache 2.0 floor still gives you a single trace store with `thirty_days` retention and append-only event_log; the compliance underwriting documented below is the Enterprise extension. See [Open-core licensing](/ai-governance/overview#open-core-licensing) for the full Apache 2.0 / Enterprise split.</Note>
+
 LangWatch AI Gateway governance is built on a **unified observability substrate** — every audit event, OTel span, webhook delivery, and S3 replay row lands in the same trace store that powers the rest of the platform. That single store is what underwrites the compliance posture below: one source of truth, one append-only event log, one set of retention controls, one set of access controls.
 
 This page maps each compliance framework you might need to which mechanisms in LangWatch underwrite it, and names what's deferred (and why).
