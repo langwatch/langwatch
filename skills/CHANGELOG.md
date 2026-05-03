@@ -1,5 +1,29 @@
 # Changelog
 
+## [0.5.0](https://github.com/langwatch/langwatch/compare/skills@v0.4.1...skills@v0.5.0) (2026-05-03)
+
+
+### Features
+
+* **ai-gateway:** ship v1 GA — virtual keys, budgets, guardrails, Go data plane ([#3327](https://github.com/langwatch/langwatch/issues/3327)) ([bd6ce5b](https://github.com/langwatch/langwatch/commit/bd6ce5b09492d31471ce2120401dd97751348821))
+
+
+### Bug Fixes
+
+* **ci:** make docs-ci green — pnpm version pin + skills workspace + Node 24 .cjs rename ([#3549](https://github.com/langwatch/langwatch/issues/3549)) ([2d3160f](https://github.com/langwatch/langwatch/commit/2d3160f4546491fbc7c15ea5e38dd06e57845960))
+* **deps:** bump protobufjs to clear CVE-2026-41242 across JS workspaces ([#3612](https://github.com/langwatch/langwatch/issues/3612)) ([f2f2c37](https://github.com/langwatch/langwatch/commit/f2f2c37a4dc2011e7463752e952172b6225c2b6d))
+* **release:** path-routed Release-As shadows for 6 polluted components ([#3627](https://github.com/langwatch/langwatch/issues/3627)) ([b39d59e](https://github.com/langwatch/langwatch/commit/b39d59e87ed6d87224d580271175650c1d4159a7))
+* **release:** scope Release-As to langwatch, restore other components ([#3618](https://github.com/langwatch/langwatch/issues/3618)) ([e259e79](https://github.com/langwatch/langwatch/commit/e259e796b50e4d060e5c7f42cad1927f1da8a83d))
+* **skills:** publish datasets skill to langwatch/skills repo ([#3553](https://github.com/langwatch/langwatch/issues/3553)) ([0e99311](https://github.com/langwatch/langwatch/commit/0e993111e613d0d125ed5000c445b64d1895a302))
+
+
+### Miscellaneous
+
+* release as 3.2.1 ([ca9d7a9](https://github.com/langwatch/langwatch/commit/ca9d7a9231a7b3d9d8cf9a28a48fa494b1daeb4b))
+* release as 3.2.1 (override release-please from 3.3.0) ([#3615](https://github.com/langwatch/langwatch/issues/3615)) ([ca9d7a9](https://github.com/langwatch/langwatch/commit/ca9d7a9231a7b3d9d8cf9a28a48fa494b1daeb4b))
+* scope Release-As to langwatch, restore other components ([e259e79](https://github.com/langwatch/langwatch/commit/e259e796b50e4d060e5c7f42cad1927f1da8a83d))
+* **skills:** single-footer shadow Release-As 0.5.0 ([475f598](https://github.com/langwatch/langwatch/commit/475f598fcd0a2b9175ae021335a56568a6995894))
+
 ## [0.4.1](https://github.com/langwatch/langwatch/compare/skills@v0.4.0...skills@v0.4.1) (2026-04-24)
 
 
