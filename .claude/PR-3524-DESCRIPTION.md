@@ -1109,6 +1109,282 @@ The Jane at Acme 8-screen storyboard from `gateway.md` is the **trial-wedge demo
 | ⏳ | 🌐 | CodeRabbit / reviewer pass on `feat/governance-platform` PR before merge |
 | ⏳ | 🌐 | Squash + merge `feat/governance-platform` to main; tag release |
 
+### Phase 7 — AI Tools Portal on /me (NEW per rchaves directive 2026-05-03)
+
+> **Concept (rchaves quote, condensed)**: "/me dashboard becomes the customizable portal for AI tools for the whole company." Card-grid landing surface for users after `langwatch login` (without subcommand) or generic dashboard entry. Three tile classes: coding assistants → click expands to setup helper; model providers → click expands to inline VK creation; external tools → admin-attached markdown description + external link. Admin catalog editor at `/settings/governance/tool-catalog` defines org-wide + team-scoped tile list. Default empty + starter-pack import CTA in empty state.
+>
+> **Lane split (locked by master_orchestrator)**: 🅐 architecture spine + ASCII wireframes + Gantt + BDD file list + PR narrative fold; 🅑 portal UI + admin catalog editor + click-to-expand flows + dogfood/screenshots; 🅢 backend schema/API/RBAC + integration tests + inline VK reuse.
+
+#### Architecture spine (Lane-S surface map — Sergey, kanban 2026-05-03)
+
+**1 new Prisma model** (org-scoped, exempt from projectId middleware) — no migrations to existing models, no derivation from `Provider` / `ExternalTool`:
+
+```prisma
+model AiToolCatalogEntry {
+  id              String   @id @default(nanoid())
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  scope           String   // "organization" | "team"
+  scopeId         String   // organizationId or teamId
+  type            String   // "coding_assistant" | "model_provider" | "external_tool"
+  displayName     String
+  slug            String   // icon lookup key (e.g. "claude-code", "openai")
+  iconKey         String?  // overrides slug-derived icon
+  order           Int      @default(0)
+  enabled         Boolean  @default(true)
+  config          Json     // discriminated union per-type
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  archivedAt      DateTime?
+  createdById     String?
+  updatedById     String?
+
+  @@index([organizationId, scope, scopeId])
+  @@index([organizationId, enabled, archivedAt])
+}
+```
+
+`config` JSON shape (TS discriminated union, app-layer validated):
+- `coding_assistant`: `{ setupCommand, setupDocsUrl, helperText? }`
+- `model_provider`: `{ providerKey, suggestedRoutingPolicyId?, defaultLabel?, projectSuggestionText? }`
+- `external_tool`: `{ descriptionMarkdown, linkUrl, ctaLabel? }`
+
+**RBAC catalog additions** (2 lines + 1 rbac.test.ts case):
+- `AI_TOOLS: "aiTools"` new Resource
+- `aiTools:view` → ADMIN + MEMBER + EXTERNAL (portal must work for everyone)
+- `aiTools:manage` → ADMIN only
+
+**1 new tRPC router** `aiToolsCatalogRouter`:
+- `list({ organizationId, scope?, scopeId? })` — gates on `aiTools:view`, enabled + non-archived only, team entries override org entries by slug
+- `adminList({ organizationId })` — gates on `aiTools:manage`, includes disabled + archived
+- `create / update / archive / setEnabled / reorder` — admin mutations gated on `aiTools:manage`
+
+**Reuse map** (almost zero new backend code beyond the catalog itself):
+
+| Tile click | Backend |
+|---|---|
+| Coding-assistant → expand setup | NONE (docs-only, uses existing `langwatch login` device-flow) |
+| Model-provider → inline VK creation | **REUSES** `personalVirtualKeys.issuePersonal` — pass `routingPolicyId` from `config.suggestedRoutingPolicyId` |
+| External-tool → open link | NONE (markdown render via existing sanitizer + `linkUrl` href) |
+
+**Open-question resolutions (master_orchestrator, 2026-05-03)**:
+- Default catalog: **empty at org creation** + starter-pack import CTA in empty state.
+- External-tool markdown: **reuse existing renderer/HTML sanitizer**; do not invent a new one.
+- Multi-tenancy: org-scoped → add `AiToolCatalogEntry` to `EXEMPT_MODELS` in prisma middleware (org-scoped, no projectId).
+
+#### ASCII wireframes (Lane-A spine — Alexis owns finished mockups in dogfood)
+
+**Portal grid view** (`/me` — default tab when generic `langwatch login` lands here):
+
+```
+┌─ Workspace: Acme Corp ─────────────────────────────────────────────┐
+│  [Tools]  Activity   Usage   Settings                                │
+├─────────────────────────────────────────────────────────────────────┤
+│  Available AI tools                                                  │
+│                                                                      │
+│  Coding assistants                                                   │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐            │
+│  │ ▣ Claude │  │ ▣ Copilot│  │ ▣ Cursor │  │ ▣ Codex  │            │
+│  │   Code   │  │          │  │          │  │          │            │
+│  │ set up > │  │ set up > │  │ set up > │  │ set up > │            │
+│  └──────────┘  └──────────┘  └──────────┘  └──────────┘            │
+│                                                                      │
+│  Model providers                                                     │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐            │
+│  │ ▣ OpenAI │  │ ▣ Anthrop│  │ ▣ Bedrock│  │ ▣ Gemini │            │
+│  │          │  │   ic     │  │          │  │          │            │
+│  │create key│  │create key│  │create key│  │create key│            │
+│  └──────────┘  └──────────┘  └──────────┘  └──────────┘            │
+│                                                                      │
+│  External tools                                                      │
+│  ┌──────────────┐  ┌──────────────┐                                 │
+│  │ ▣ Copilot    │  │ ▣ Workato    │                                 │
+│  │   Studio     │  │              │                                 │
+│  │ Open guide > │  │ Open guide > │                                 │
+│  └──────────────┘  └──────────────┘                                 │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+**Empty-state (no tiles configured)** — admin sees a starter-pack CTA; non-admin sees a "talk to your admin" message:
+
+```
+┌─ Available AI tools ────────────────────────────────────────────────┐
+│  No AI tools configured yet.                                         │
+│                                                                      │
+│  [admin]  Your IT team hasn't published a tool catalog yet.          │
+│           [Import starter pack ▸]   [Open admin catalog ▸]           │
+│                                                                      │
+│  [user]   Your IT team is still setting things up. Reach out to      │
+│           {orgAdminEmail} once tools are ready.                      │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+**Coding-assistant expanded state** (click on Claude Code tile):
+
+```
+┌─ ▣ Claude Code ─────────────────────────── [×] collapse ────────────┐
+│  Run this in your terminal:                                         │
+│   $ langwatch claude                                          [📋]   │
+│                                                                      │
+│  This will:                                                          │
+│   1. Open a browser tab to sign you in via your company SSO         │
+│   2. Provision a personal virtual key bound to your identity        │
+│   3. exec `claude` with the right env vars pre-injected             │
+│                                                                      │
+│  Always-on: paste this in your ~/.zshrc                             │
+│   $ eval "$(langwatch init-shell zsh)"                        [📋]   │
+│                                                                      │
+│  Docs → /ai-governance/personal-keys                                │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+**Model-provider expanded state** (click on OpenAI tile):
+
+```
+┌─ ▣ OpenAI ───────────────────────────────── [×] collapse ───────────┐
+│  Create a virtual key for your apps                                 │
+│                                                                      │
+│   Name your key: [my-rag-app                                  ]      │
+│   [ Generate ]                                                       │
+│                                                                      │
+│  Building an application for the team? Consider creating a          │
+│  shared project instead. → /settings/projects                       │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+**External-tool expanded state** (click on Copilot Studio tile):
+
+```
+┌─ ▣ Copilot Studio ───────────────────────── [×] collapse ───────────┐
+│  Microsoft Copilot Studio is approved for org-wide use.             │
+│  See the internal wiki for setup instructions:                      │
+│   → wiki.acme.corp/ai/copilot-studio                                │
+│                                                                      │
+│  ## Approved use cases                                              │
+│  - Customer support automation                                      │
+│  - Internal knowledge agents                                        │
+│  Contact: ai-platform@acme.corp                                     │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+**Admin catalog editor** (`/settings/governance/tool-catalog`):
+
+```
+┌─ Tool catalog ─────────────────────────────── [+ Add tile ▸] ──────┐
+│  Coding assistants                                                   │
+│  ⋮⋮  ▣ Claude Code        org-wide              [edit] [archive]    │
+│  ⋮⋮  ▣ Copilot            team:engineering      [edit] [archive]    │
+│  ⋮⋮  ▣ Cursor             org-wide              [edit] [archive]    │
+│                                                                      │
+│  Model providers                                                     │
+│  ⋮⋮  ▣ OpenAI             org-wide              [edit] [archive]    │
+│  ⋮⋮  ▣ Anthropic          org-wide              [edit] [archive]    │
+│                                                                      │
+│  External tools                                                      │
+│  ⋮⋮  ▣ Copilot Studio     org-wide              [edit] [archive]    │
+│  ⋮⋮  ▣ Workato            team:integrations     [edit] [archive]    │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+**Admin upsert drawer** (external-tool example):
+
+```
+┌─ Edit tile: Copilot Studio ──────────────── [Cancel]  [Save] ──────┐
+│  Display name: [Copilot Studio                             ]         │
+│  Icon:         [▣ copilot-studio  ▼]                                 │
+│  Scope:        ( ) org-wide   (•) team: [integrations ▼]             │
+│  Type:         [external_tool      ▼]                                │
+│                                                                      │
+│  External link: [https://wiki.acme.corp/ai/copilot-studio  ]         │
+│  Description (markdown):                                             │
+│  ┌────────────────────────────────────────────────────────┐         │
+│  │ Microsoft Copilot Studio is approved for org-wide use. │         │
+│  │ ## Approved use cases                                  │         │
+│  │ - Customer support automation                          │         │
+│  └────────────────────────────────────────────────────────┘         │
+│  Sort order: [3]                                                     │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+#### Phase 7 atomic-task Gantt — AI Tools Portal
+
+| Step | Description | Owner | Critical path |
+|---|---|---|---|
+| P7-arch | Architecture spine + ASCII wireframes + Gantt + BDD file list + PR narrative fold (THIS COMMIT) | 🅐 | ✓ |
+| P7-schema | `AiToolCatalogEntry` Prisma model + migration + EXEMPT_MODELS entry | 🅢 | ✓ |
+| P7-rbac | `aiTools:view` + `aiTools:manage` resource catalog entries + ADMIN/MEMBER/EXTERNAL default grants + 1 rbac.test.ts case | 🅢 | ✓ |
+| P7-router | `aiToolsCatalogRouter` tRPC (`list` + `adminList` + `create` / `update` / `archive` / `setEnabled` / `reorder`) | 🅢 | ✓ |
+| P7-vk-reuse | Inline VK creation tile API — thin wrapper around `personalVirtualKeys.issuePersonal` consuming `config.suggestedRoutingPolicyId` from catalog entry | 🅢 | ✓ |
+| P7-md-render | Wire external-tool description markdown render via existing renderer + sanitizer (no new sanitizer) | 🅢 | |
+| P7-int-test | `governance.toolCatalog.integration.test.ts` — RBAC + scoping + cross-org isolation + VK-bridge call shape | 🅢 | ✓ |
+| P7-spec-rbac | `specs/ai-governance/personal-portal/tool-catalog-rbac.feature` — admin manages, member lists, external-only assigned | 🅢 | |
+| P7-spec-scope | `specs/ai-governance/personal-portal/tool-catalog-scoping.feature` — team-scope-overrides-org-by-slug; disabled hidden from list / visible in adminList | 🅢 | |
+| P7-spec-vkbridge | `specs/ai-governance/personal-portal/tool-catalog-vk-bridge.feature` — model-provider tile click → `issuePersonal` with `suggestedRoutingPolicyId` | 🅢 | |
+| P7-spec-portal | `specs/ai-governance/personal-portal/portal-grid.feature` — generic-login landing → portal grid; tile-grid scoping invariants user-side | 🅑 | |
+| P7-spec-coding | `specs/ai-governance/personal-portal/coding-assistant-tile.feature` — click-to-expand, copy-command UX, link-to-docs | 🅑 | |
+| P7-spec-provider | `specs/ai-governance/personal-portal/model-provider-tile.feature` — inline VK creation flow + project-suggestion line + name-validation + duplicate-name handling | 🅑 | |
+| P7-spec-external | `specs/ai-governance/personal-portal/external-tool-tile.feature` — markdown render boundaries (no JS, no img-src exfil) + external-link safety (rel=noopener) | 🅑 | |
+| P7-spec-admin | `specs/ai-governance/personal-portal/admin-catalog-editor.feature` — admin upsert / reorder / scope-bind / archive / starter-pack import | 🅑 | |
+| P7-ui-shell | `/me` portal grid page + tab refactor (Tools default tab when generic `langwatch login` lands) + empty-state | 🅑 | ✓ |
+| P7-ui-coding | `CodingAssistantCard` + expanded setup-helper panel with copy buttons | 🅑 | |
+| P7-ui-provider | `ModelProviderCard` + inline VK-creation form + project-suggestion line | 🅑 | ✓ |
+| P7-ui-external | `ExternalToolCard` + sanitized markdown render + external link with `rel=noopener noreferrer` | 🅑 | |
+| P7-ui-admin | `/settings/governance/tool-catalog` admin editor — list view + reorder + upsert drawer (3 type-specific shapes) + archive + starter-pack-import CTA | 🅑 | ✓ |
+| P7-starter-pack | Starter-pack JSON seed (Claude Code + Copilot + Cursor + Codex coding-assistants; OpenAI + Anthropic + Bedrock + Gemini providers; Copilot Studio + Workato externals) — admin-imports on first visit if catalog empty | 🅢 | |
+| P7-dogfood | Live-data dogfood + screenshots — portal grid populated, 3 expanded states, admin editor list + upsert drawer, empty-state, starter-pack import success | 🅑 | ✓ |
+| P7-docs | `docs/ai-governance/personal-portal/{overview,admin-catalog,end-user}.mdx` (3 pages) + screenshots from P7-dogfood + cross-links from `personal-keys` and `admin-setup` | 🅐 | |
+| P7-fold | 🅐 Andre folds each batch into PR body + re-PATCHes (this row stays open until P7-dogfood lands) | 🅐 | |
+
+Critical path: **P7-arch → P7-schema → P7-router (+ P7-vk-reuse, P7-rbac, P7-int-test) → P7-ui-shell → P7-ui-provider → P7-ui-admin → P7-dogfood**.
+
+#### BDD spec file list (8 files, 3 lane-S backend / 5 lane-B UX)
+
+```
+specs/ai-governance/personal-portal/
+├── tool-catalog-rbac.feature           🅢  RBAC invariants
+├── tool-catalog-scoping.feature        🅢  org/team scope resolution
+├── tool-catalog-vk-bridge.feature      🅢  model-provider tile → issuePersonal
+├── portal-grid.feature                 🅑  generic-login landing + tile-grid
+├── coding-assistant-tile.feature       🅑  click-to-expand setup helper
+├── model-provider-tile.feature         🅑  inline VK creation
+├── external-tool-tile.feature          🅑  markdown + external-link safety
+└── admin-catalog-editor.feature        🅑  admin upsert/reorder/archive/import
+```
+
+Total: 8 feature files. Lane-S writes the 3 backend invariants (RBAC, scoping, VK-bridge); Lane-B writes the 5 UX flows. Lane-A (me) folds each batch into PR narrative as it ships.
+
+#### Implementation split for dogfood + screenshots (Lane-B owns)
+
+After P7-ui-shell + P7-ui-provider + P7-ui-admin land, capture:
+1. **Portal grid populated** — admin home with 4 coding-assistants + 4 providers + 2 externals
+2. **Empty state** — fresh-org admin view with "Import starter pack" CTA
+3. **Coding-assistant expanded** — Claude Code tile expanded, copy buttons highlighted
+4. **Model-provider expanded** — OpenAI tile expanded, key just generated, success toast visible
+5. **External-tool expanded** — Copilot Studio tile expanded, markdown rendered, external link visible
+6. **Admin catalog list** — `/settings/governance/tool-catalog` populated
+7. **Admin upsert drawer** — external-tool drawer mid-edit
+8. **Starter-pack import** — admin-side import-confirm modal + success toast + grid populated post-import
+
+All shots commit to `dev/dogfood-screenshots/phase-7-portal/` and embed inline via raw GitHub URLs in PR doc + the 3 new docs pages.
+
+---
+
+### Pending-phase status snapshot (rchaves directive 2026-05-03)
+
+Quick state of the still-pending Phase 1B.5 / 2C / 2D / 4 / 5 work, surfaced for parallel-track triage so Phase 7 doesn't stall them. Owner emojis match the Gantt rows above.
+
+| Phase | Open items (count) | Blocking critical path? | Parallel-OK with Phase 7? |
+|---|---|---|---|
+| **Phase 1B.5** | 5 ⏳ (1.5b-ii Screen 2 single-input email-only `/signin-cli`, 1.5b-iii Screen 4 ceremony page, 1.5b-iv Screen 6 polish, 1.5b-v Screen 7 polish, 1.5b-vi Screen 8 BudgetExceededBanner web-side enrichment, 1.5a-marketing draft) — all 🅑 except marketing 🅐 | No | ✓ — Lane-B can rotate between portal UI work + Screen polish |
+| **Phase 2C** | 2 ⏳ in-PR scope (C3 dispatch — Slack/PagerDuty/SIEM/email; structured threshold-config schema per rule type) — both 🅢; 5 📋 backlog (Live rule types + revocation automations) | No | ✓ — Lane-S can rotate between portal backend + 2C dispatch |
+| **Phase 2D** | 5 ⏳ (3 puller workers — copilot_studio / openai_compliance / claude_compliance; 2 webhook adapters — workato job-array unwrap, s3_custom DSL) — all 🅢 | No | ✓ — pure Lane-S backend, fully parallel with portal |
+| **Phase 4** | License relocation (4a-1/2/3 + 4c-2/3/4) **deferred to follow-up PR per Vote H** (already locked); 4b UI gating + 4b-4/5 service 403 + 4b-6 CLI 402 + 4b-7 docs callout still in-PR scope — 7 ⏳ across 🅑 + 🅢 + 🅐 | Yes (in-PR scope blocks GA) | ✓ — independent file surface; portal lives in `langwatch/src/` (Apache 2.0); 4b license-gates are surface-level wrappers |
+| **Phase 5** | 12 ⏳ — 8 🅢 (volume regression, cross-org concurrency, reactor backpressure, CH retention TTL atomicity, receiver auth rate limit, OCSF schema versioning) + 2 🅑 (browser-QA enterprise gating, cross-org HTTP isolation smoke) + 1 🅐 (self-hosted compliance docs) + 3 🌐 (E2E smoke in CI, CodeRabbit pass, squash+merge+release) | Yes (gates merge) | ✓ — most are independent test/doc work |
+
+**Net call**: Phase 7 launches without stalling 1B.5 / 2C / 2D / 4 / 5. Lane-B can interleave Phase 7 portal UI with the 5 remaining 1B.5 polish items; Lane-S has plenty of room across 2C / 2D + Phase 7 backend; Lane-A keeps folding + drives docs + handles 4b-6/7 + 5-self-hosted-compliance-docs in parallel.
+
+---
+
 ### Phase 3 — Tamper-evidence + SIEM push (post-GA, named follow-ups)
 
 | | Owner | Task |
