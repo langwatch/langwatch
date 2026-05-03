@@ -1332,7 +1332,7 @@ model AiToolCatalogEntry {
 | P7-ui-admin | `/settings/governance/tool-catalog` admin editor — list view + reorder + upsert drawer (3 type-specific shapes) + archive + starter-pack-import CTA | 🅑 | ✓ |
 | P7-starter-pack | Starter-pack JSON seed (Claude Code + Copilot + Cursor + Codex coding-assistants; OpenAI + Anthropic + Bedrock + Gemini providers; Copilot Studio + Workato externals) — admin-imports on first visit if catalog empty | 🅢 | |
 | P7-dogfood | Live-data dogfood + screenshots — portal grid populated, 3 expanded states, admin editor list + upsert drawer, empty-state, starter-pack import success | 🅑 | ✓ |
-| P7-docs | `docs/ai-governance/personal-portal/{overview,admin-catalog,end-user}.mdx` (3 pages) + screenshots from P7-dogfood + cross-links from `personal-keys` and `admin-setup` | 🅐 | |
+| P7-docs ✅ (scaffold) | `docs/ai-governance/personal-portal/{overview,admin-catalog,end-user}.mdx` shipped (3 pages, 393 LOC) + `docs.json` Personal Portal group inserted between "Get Started" and "Sources" inside AI Governance anchor (`3d8a5d3c8`). Cross-links live: `personal-keys` (device-flow trigger), `routing-policies` (policy chain), `cli-debug` (error catalog). Screenshots from P7-dogfood will fold into all 3 pages once Alexis ships those. | 🅐 (`3d8a5d3c8`) | ✓ |
 | P7-fold | 🅐 Andre folds each batch into PR body + re-PATCHes (this row stays open until P7-dogfood lands) | 🅐 | |
 
 Critical path: **P7-arch → P7-schema → P7-router (+ P7-vk-reuse, P7-rbac, P7-int-test) → P7-ui-shell → P7-ui-provider → P7-ui-admin → P7-dogfood**.
