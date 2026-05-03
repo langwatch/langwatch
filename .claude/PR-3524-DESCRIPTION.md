@@ -1104,7 +1104,7 @@ The Jane at Acme 8-screen storyboard from `gateway.md` is the **trial-wedge demo
 | ⏳ | 🅢 | CH retention TTL atomicity test: span without retention attr (bug) defaults to 30d → wrong tier for `seven_years` source. Need TTL-mismatch alarm |
 | ⏳ | 🅢 | Receiver auth rate limiting (per-source Redis-token-bucket RPS limit) |
 | ⏳ | 🅢 | OCSF schema versioning column on the fold for graceful v1.1 → v1.2 upgrade |
-| ⏳ | 🅑 | Browser-QA pass on enterprise-gating: every governance surface verified to gray-out for non-enterprise plan |
+| ✅ | 🅑 | **Browser-QA pass on enterprise-gating** — `abf12247c`. 5 screenshots at `docs/images/ai-governance/enterprise-gating/`: 2× non-enterprise-upsell shots (anomaly-rules + ingestion-sources, real FREE-tier render — dev defaults to FREE so no override needed) + 2× enterprise-content shots (no upsell flash) + 1× non-enterprise tool-catalog-ungated (proof of intentional Apache-2.0 floor). **Bug fix rode along**: `ingestion-source-detail.tsx` had a `if (!source) return Spinner` short-circuit that bypassed the `EnterpriseLockedSurface` wrap — non-enterprise users hit a spinner forever; the spinner branch now also wraps in `EnterpriseLockedSurface`. *Deferred follow-up*: ingestion-source-detail page-level non-enterprise shot waits on Sergey's 4b-4/5 service-layer 403 + an IngestionSource seeded on the dogfood org. |
 | ⏳ | 🅐 | Self-hosted compliance docs (`docs/self-hosting/compliance.mdx`) — what works in self-hosted Apache 2.0 vs requires Enterprise license |
 | ⏳ | 🅑 | Cross-org isolation smoke at HTTP receiver layer (orgA bearer can't read orgB sources) |
 | ⏳ | 🌐 | End-to-end customer dogfood smoke test (mint org → mint source → POST OTel → trace viewer + dashboard light up + Layer-1 non-leak) — automated in CI |
