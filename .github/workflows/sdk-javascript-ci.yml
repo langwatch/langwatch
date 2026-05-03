@@ -150,7 +150,7 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@eae0cfeb286e66ffb5155f1a79b90583a127a68b # v2
+        uses: pnpm/action-setup@8912a9102ac27614460f54aedde9e1e7f9aec20d # v2
         with:
           version: 10.24.0
 
