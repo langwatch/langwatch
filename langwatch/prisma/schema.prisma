@@ -1770,6 +1770,18 @@ model IngestionSource {
   /// resumes where the last left off (timestamp / cursor / file marker).
   pollerCursor Json?
 
+  /// Phase 10 — number of consecutive errors observed by the puller
+  /// worker. Reset to 0 on a successful run. Drives admin-UI banners
+  /// ("Microsoft authentication failed — re-authorize") + back-off
+  /// scheduling when the source has been broken for a while.
+  /// Spec: specs/ai-governance/puller-framework/puller-adapter-contract.feature
+  errorCount Int @default(0)
+
+  /// Phase 10 — cron schedule for pull-mode sources. Validated by the
+  /// adapter's pullConfig schema; mirrored here for fast worker
+  /// dispatch. Null for push-mode sources.
+  pullSchedule String?
+
   /// Status flag. 'active' (default), 'disabled' (admin paused), or
   /// 'awaiting_first_event' (created but never received).
   status String @default("awaiting_first_event")

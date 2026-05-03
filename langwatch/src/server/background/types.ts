@@ -110,3 +110,10 @@ export type AnomalyDetectionJob = {
   timestamp: number;
 };
 
+export type IngestionPullerJob = {
+  /** IngestionSource id this run targets. */
+  ingestionSourceId: string;
+  /** Wall-clock dispatch time (ms since epoch). */
+  scheduledAt: number;
+};
+

@@ -50,3 +50,15 @@ export const ANOMALY_DETECTION_QUEUE = {
   JOB: "anomaly_detection",
 } as const;
 
+/**
+ * Pull-mode ingestion source poller — drives the PullerAdapter
+ * framework. Each IngestionSource with `pullSchedule` set has a
+ * BullMQ repeat job that fires `runOnce` and persists the resulting
+ * cursor + events. Spec:
+ * specs/ai-governance/puller-framework/puller-adapter-contract.feature.
+ */
+export const PULLER_QUEUE = {
+  NAME: makeQueueName("ingestion_puller"),
+  JOB: "ingestion_puller",
+} as const;
+
