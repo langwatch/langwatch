@@ -2,6 +2,7 @@ import type { PrismaClient } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { captureException } from "~/utils/posthogErrorCapture";
+import { stripNullBytes } from "../../datasets/sanitize";
 import { newDatasetEntriesSchema } from "../../datasets/types";
 import { prisma } from "../../db";
 import { StorageService } from "../../storage";
@@ -274,6 +275,12 @@ const updateDatasetRecord = async ({
   useS3: boolean;
   prisma: PrismaClient;
 }) => {
+  // Strip Postgres-incompatible U+0000 null bytes from any user-supplied
+  // strings before persisting (Postgres error 22P05). Applied for both
+  // S3 and Postgres paths so the stored entry is consistent regardless
+  // of storage backend.
+  const sanitisedRecord = stripNullBytes(updatedRecord);
+
   if (useS3) {
     const { records } = await storageService.getObject(projectId, datasetId);
 
@@ -284,7 +291,7 @@ const updateDatasetRecord = async ({
       // Create a new record
       const newRecord = {
         id: recordId,
-        entry: updatedRecord,
+        entry: sanitisedRecord,
         datasetId,
         projectId,
         createdAt: new Date().toISOString(),
@@ -295,7 +302,7 @@ const updateDatasetRecord = async ({
       // Update the record
       records[recordIndex] = {
         ...records[recordIndex],
-        entry: updatedRecord,
+        entry: sanitisedRecord,
         updatedAt: new Date().toISOString(),
       };
     }
@@ -322,14 +329,14 @@ const updateDatasetRecord = async ({
       await prisma.datasetRecord.update({
         where: { id: recordId, projectId },
         data: {
-          entry: updatedRecord,
+          entry: sanitisedRecord as any,
         },
       });
     } else {
       await prisma.datasetRecord.create({
         data: {
           id: recordId,
-          entry: updatedRecord,
+          entry: sanitisedRecord as any,
           datasetId,
           projectId,
         },

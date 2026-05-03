@@ -17,6 +17,7 @@ import {
   MalformedColumnTypesError,
 } from "./errors";
 import { ExperimentRepository } from "./experiment.repository";
+import { stripNullBytes } from "./sanitize";
 import type {
   DatasetColumns,
   DatasetRecordEntry,
@@ -229,6 +230,12 @@ export class DatasetService {
   /**
    * Creates a new dataset with generated slug and optional records.
    *
+   * Atomicity: dataset row creation and record insertion are wrapped in a
+   * single Prisma transaction. If record insertion fails (e.g. Postgres
+   * rejects a record with a U+0000 null byte before sanitisation reached it),
+   * the dataset row is rolled back so the user is not left with an orphaned
+   * empty dataset that blocks retries with a "name already exists" error.
+   *
    * @throws {DatasetConflictError} if slug already exists
    */
   private async createNewDataset(params: {
@@ -254,24 +261,30 @@ export class DatasetService {
       projectId,
     });
 
-    const dataset = await this.repository.create({
-      id: `dataset_${nanoid()}`,
-      slug,
-      name,
-      projectId,
-      columnTypes,
-      useS3: canUseS3,
+    return await this.prisma.$transaction(async (tx) => {
+      const dataset = await this.repository.create(
+        {
+          id: `dataset_${nanoid()}`,
+          slug,
+          name,
+          projectId,
+          columnTypes,
+          useS3: canUseS3,
+        },
+        { tx },
+      );
+
+      if (datasetRecords) {
+        await createManyDatasetRecords({
+          datasetId: dataset.id,
+          projectId,
+          datasetRecords,
+          tx,
+        });
+      }
+
+      return dataset;
     });
-
-    if (datasetRecords) {
-      await createManyDatasetRecords({
-        datasetId: dataset.id,
-        projectId,
-        datasetRecords,
-      });
-    }
-
-    return dataset;
   }
 
   /**
@@ -556,6 +569,8 @@ export class DatasetService {
       projectId: params.projectId,
     });
 
+    const sanitisedEntry = stripNullBytes(params.entry) as Prisma.InputJsonValue;
+
     const existing = await this.recordRepository.findOne({
       id: params.recordId,
       datasetId: dataset.id,
@@ -567,7 +582,7 @@ export class DatasetService {
         id: params.recordId,
         datasetId: dataset.id,
         projectId: params.projectId,
-        entry: params.entry,
+        entry: sanitisedEntry,
       });
       return { record: updated, created: false };
     }
@@ -576,7 +591,7 @@ export class DatasetService {
       id: params.recordId,
       datasetId: dataset.id,
       projectId: params.projectId,
-      entry: params.entry,
+      entry: sanitisedEntry,
     });
     return { record: created, created: true };
   }
@@ -632,7 +647,9 @@ export class DatasetService {
       }
     }
 
-    // Build records with missing columns filled as null and generated IDs
+    // Build records with missing columns filled as null and generated IDs.
+    // stripNullBytes guards Postgres jsonb against U+0000 in user-supplied
+    // string values (Postgres error 22P05).
     const records = params.entries.map((entry) => {
       const fullEntry: Record<string, unknown> = {};
       for (const col of datasetColumns) {
@@ -640,7 +657,7 @@ export class DatasetService {
       }
       return {
         id: generate(KSUID_RESOURCES.DATASET_RECORD).toString(),
-        entry: fullEntry as Prisma.InputJsonValue,
+        entry: stripNullBytes(fullEntry) as Prisma.InputJsonValue,
       };
     });
 
