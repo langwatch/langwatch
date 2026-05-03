@@ -96,6 +96,22 @@ async function getJSON<T>(
       "Session expired — run `langwatch login --device` again",
     );
   }
+  if (res.status === 402) {
+    const body = (await res.json().catch(() => ({}))) as {
+      error_description?: string;
+      upgrade_url?: string;
+    };
+    const description =
+      body.error_description ?? "This feature requires an Enterprise plan";
+    const upgrade = body.upgrade_url
+      ? `\n\n  Upgrade your organization at:\n    ${body.upgrade_url}`
+      : "";
+    throw new GovernanceCliError(
+      402,
+      "payment_required",
+      `${description}${upgrade}`,
+    );
+  }
   if (res.status === 404) {
     const body = (await res.json().catch(() => ({}))) as {
       error_description?: string;

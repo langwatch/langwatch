@@ -48,6 +48,10 @@ import { ActivityMonitorService } from "~/server/governance/activity-monitor/act
 import { GovernanceSetupStateService } from "~/server/governance/setupState.service";
 import { CliBootstrapService } from "~/server/governance/cliBootstrap.service";
 import {
+  assertEnterprisePlan,
+  ENTERPRISE_FEATURE_ERRORS,
+} from "~/server/api/enterprise";
+import {
   getClickHouseClientForProject,
   isClickHouseEnabled,
 } from "~/server/clickhouse/clickhouseClient";
@@ -787,7 +791,38 @@ app.get("/bootstrap", async (c: Context) => {
 //
 // Authoring (create / rotate / archive) intentionally stays
 // browser-only until the setup flow is stable; CLI only reads.
+//
+// License gate: governance ingestion + activity-monitor surfaces are
+// Enterprise-only. Non-enterprise orgs receive a 402 Payment Required
+// envelope (RFC 7231 §6.5.2) with the upgrade URL inline so the CLI can
+// render an actionable upsell without a follow-up call. Mirrors the
+// tRPC `requireEnterprisePlan` middleware shape from
+// `langwatch/src/server/api/enterprise.ts` but speaks REST 402 instead
+// of TRPCError FORBIDDEN.
 // ---------------------------------------------------------------------------
+
+async function ensureEnterpriseOr402(
+  c: Context,
+  organizationId: string,
+  errorMessage: string,
+): Promise<Response | null> {
+  try {
+    await assertEnterprisePlan({ organizationId, errorMessage });
+    return null;
+  } catch {
+    const upgradeUrl = `${
+      env.NEXTAUTH_URL ?? env.BASE_HOST ?? "http://localhost:5560"
+    }/settings/subscription`;
+    return c.json(
+      {
+        error: "payment_required",
+        error_description: errorMessage,
+        upgrade_url: upgradeUrl,
+      },
+      402,
+    );
+  }
+}
 
 app.get("/governance/ingest/sources", async (c: Context) => {
   const tokenRecord = await validateAccessToken(c.req.header("Authorization"));
@@ -801,6 +836,12 @@ app.get("/governance/ingest/sources", async (c: Context) => {
       401,
     );
   }
+  const gate = await ensureEnterpriseOr402(
+    c,
+    tokenRecord.organization_id,
+    ENTERPRISE_FEATURE_ERRORS.INGESTION_SOURCES,
+  );
+  if (gate) return gate;
   const includeArchived = c.req.query("include_archived") === "1";
   const service = new IngestionSourceService(prisma);
   const sources = await service.list(tokenRecord.organization_id);
@@ -833,6 +874,12 @@ app.get("/governance/ingest/sources/:id/events", async (c: Context) => {
       401,
     );
   }
+  const gate = await ensureEnterpriseOr402(
+    c,
+    tokenRecord.organization_id,
+    ENTERPRISE_FEATURE_ERRORS.ACTIVITY_MONITOR,
+  );
+  if (gate) return gate;
   const sourceId = c.req.param("id");
   if (!sourceId) {
     return c.json(
@@ -881,6 +928,12 @@ app.get("/governance/ingest/sources/:id/health", async (c: Context) => {
       401,
     );
   }
+  const gate = await ensureEnterpriseOr402(
+    c,
+    tokenRecord.organization_id,
+    ENTERPRISE_FEATURE_ERRORS.INGESTION_SOURCES,
+  );
+  if (gate) return gate;
   const sourceId = c.req.param("id");
   if (!sourceId) {
     return c.json(
@@ -922,6 +975,12 @@ app.get("/governance/status", async (c: Context) => {
       401,
     );
   }
+  const gate = await ensureEnterpriseOr402(
+    c,
+    tokenRecord.organization_id,
+    ENTERPRISE_FEATURE_ERRORS.INGESTION_SOURCES,
+  );
+  if (gate) return gate;
   const setupService = GovernanceSetupStateService.create(prisma);
   const setup = await setupService.resolve(tokenRecord.organization_id);
   return c.json({ setup });

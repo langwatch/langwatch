@@ -27,8 +27,21 @@ import {
   startTestContainers,
   stopTestContainers,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
+import { FREE_PLAN } from "../../../../ee/licensing/constants";
+import type { PlanInfo } from "../../../../ee/licensing/planInfo";
+import { PlanProviderService } from "~/server/app-layer/subscription/plan-provider";
+import { globalForApp, resetApp } from "~/server/app-layer/app";
+import { createTestApp } from "~/server/app-layer/presets";
 
 import { app } from "../auth-cli";
+
+// Phase 4b-6 added a 402 license gate on every /api/auth/cli/governance/*
+// route. This test pins read-and-tenancy behavior, not license behavior, so
+// override the plan provider to ENTERPRISE for the existing org. 402-on-FREE
+// is covered by its own subdescribe at the end of the file using a separate
+// org with a plan-provider override that returns FREE for that org's id only.
+const enterprisePlan: PlanInfo = { ...FREE_PLAN, type: "ENTERPRISE" };
+const freePlan: PlanInfo = FREE_PLAN;
 
 const suffix = nanoid(8);
 
@@ -55,9 +68,25 @@ async function callGovernance(path: string, authHeader: string | null) {
   });
 }
 
+// Org C carries a FREE plan for the 402-license-gate subdescribe.
+const ORG_C = `org-cli-gov-c-${suffix}`;
+const USER_C = `usr-cli-gov-c-${suffix}`;
+const TOKEN_C = `lw_at_${"c".repeat(43)}-${suffix}`;
+const SOURCE_C_ID = `src-cli-gov-c-${suffix}`;
+
 describe("GET /api/auth/cli/governance/*", () => {
   beforeAll(async () => {
     await startTestContainers();
+
+    // Override plan provider so org A + B get ENTERPRISE (existing tests
+    // pin RBAC + tenancy, not license) and org C gets FREE (402 subdescribe).
+    resetApp();
+    globalForApp.__langwatch_app = createTestApp({
+      planProvider: PlanProviderService.create({
+        getActivePlan: async ({ organizationId }) =>
+          organizationId === ORG_C ? freePlan : enterprisePlan,
+      }),
+    });
 
     await prisma.organization.create({
       data: { id: ORG_A, name: `Gov Org A ${suffix}`, slug: `gov-a-${suffix}` },
@@ -79,11 +108,24 @@ describe("GET /api/auth/cli/governance/*", () => {
         name: "Gov Tester B",
       },
     });
+    await prisma.organization.create({
+      data: { id: ORG_C, name: `Gov Org C ${suffix}`, slug: `gov-c-${suffix}` },
+    });
+    await prisma.user.create({
+      data: {
+        id: USER_C,
+        email: `gov-c-${suffix}@example.com`,
+        name: "Gov Tester C",
+      },
+    });
     await prisma.organizationUser.create({
       data: { organizationId: ORG_A, userId: USER_A, role: "ADMIN" },
     });
     await prisma.organizationUser.create({
       data: { organizationId: ORG_B, userId: USER_B, role: "ADMIN" },
+    });
+    await prisma.organizationUser.create({
+      data: { organizationId: ORG_C, userId: USER_C, role: "ADMIN" },
     });
 
     // One IngestionSource per org. The hashed secret + status are
@@ -111,6 +153,17 @@ describe("GET /api/auth/cli/governance/*", () => {
         lastEventAt: new Date(),
       },
     });
+    await prisma.ingestionSource.create({
+      data: {
+        id: SOURCE_C_ID,
+        organizationId: ORG_C,
+        sourceType: "otel_generic",
+        name: `Source C ${suffix}`,
+        ingestSecretHash: `hash-${suffix}-c`,
+        status: "active",
+        lastEventAt: new Date(),
+      },
+    });
 
     if (!redisConnection) {
       throw new Error("Redis connection unavailable in test env");
@@ -131,25 +184,28 @@ describe("GET /api/auth/cli/governance/*", () => {
     };
     await planToken(TOKEN_A, USER_A, ORG_A);
     await planToken(TOKEN_B, USER_B, ORG_B);
+    await planToken(TOKEN_C, USER_C, ORG_C);
   }, 60_000);
 
   afterAll(async () => {
     if (redisConnection) {
       await redisConnection.del(`lwcli:access:${TOKEN_A}`);
       await redisConnection.del(`lwcli:access:${TOKEN_B}`);
+      await redisConnection.del(`lwcli:access:${TOKEN_C}`);
     }
     await prisma.ingestionSource.deleteMany({
-      where: { id: { in: [SOURCE_A_ID, SOURCE_B_ID] } },
+      where: { id: { in: [SOURCE_A_ID, SOURCE_B_ID, SOURCE_C_ID] } },
     });
     await prisma.organizationUser.deleteMany({
-      where: { organizationId: { in: [ORG_A, ORG_B] } },
+      where: { organizationId: { in: [ORG_A, ORG_B, ORG_C] } },
     });
     await prisma.user.deleteMany({
-      where: { id: { in: [USER_A, USER_B] } },
+      where: { id: { in: [USER_A, USER_B, USER_C] } },
     });
     await prisma.organization.deleteMany({
-      where: { id: { in: [ORG_A, ORG_B] } },
+      where: { id: { in: [ORG_A, ORG_B, ORG_C] } },
     });
+    resetApp();
     await stopTestContainers();
   }, 60_000);
 
@@ -336,6 +392,30 @@ describe("GET /api/auth/cli/governance/*", () => {
         expect(typeof body.health.events7d).toBe("number");
         expect(typeof body.health.events30d).toBe("number");
         // lastSuccessIso is `string | null` — both acceptable.
+      });
+    });
+  });
+
+  describe("license gate — 402 Payment Required for non-enterprise (4b-6)", () => {
+    const endpoints = [
+      "/status",
+      "/ingest/sources",
+      `/ingest/sources/${SOURCE_C_ID}/events`,
+      `/ingest/sources/${SOURCE_C_ID}/health`,
+    ];
+
+    describe("when called with a valid Bearer for an org on FREE plan", () => {
+      it.each(endpoints)("returns 402 with payment_required envelope on %s", async (path) => {
+        const res = await callGovernance(path, `Bearer ${TOKEN_C}`);
+        expect(res.status).toBe(402);
+        const body = (await res.json()) as {
+          error: string;
+          error_description: string;
+          upgrade_url: string;
+        };
+        expect(body.error).toBe("payment_required");
+        expect(body.error_description).toMatch(/Enterprise/i);
+        expect(body.upgrade_url).toMatch(/\/settings\/subscription$/);
       });
     });
   });
