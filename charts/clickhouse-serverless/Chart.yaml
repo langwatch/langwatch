@@ -1,9 +1,11 @@
 apiVersion: v2
 name: clickhouse-serverless
-description: ClickHouse with auto-tuning from CPU/RAM, tiered storage, and optional replication via embedded Keeper
+description: >-
+  ClickHouse with auto-tuning from CPU/RAM, tiered storage, and optional
+  replication via embedded Keeper
 type: application
-appVersion: "25.10.2.65"
-version: 0.2.0
+appVersion: 25.10.2.65
+version: 0.3.0
 home: https://github.com/langwatch/langwatch
 sources:
   - https://github.com/langwatch/langwatch/tree/main/clickhouse-serverless
