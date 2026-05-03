@@ -1310,21 +1310,21 @@ model AiToolCatalogEntry {
 
 | Step | Description | Owner | Critical path |
 |---|---|---|---|
-| P7-arch | Architecture spine + ASCII wireframes + Gantt + BDD file list + PR narrative fold (THIS COMMIT) | 🅐 | ✓ |
-| P7-schema | `AiToolCatalogEntry` Prisma model + migration + EXEMPT_MODELS entry | 🅢 | ✓ |
-| P7-rbac | `aiTools:view` + `aiTools:manage` resource catalog entries + ADMIN/MEMBER/EXTERNAL default grants + 1 rbac.test.ts case | 🅢 | ✓ |
-| P7-router | `aiToolsCatalogRouter` tRPC (`list` + `adminList` + `create` / `update` / `archive` / `setEnabled` / `reorder`) | 🅢 | ✓ |
-| P7-vk-reuse | Inline VK creation tile API — thin wrapper around `personalVirtualKeys.issuePersonal` consuming `config.suggestedRoutingPolicyId` from catalog entry | 🅢 | ✓ |
+| P7-arch ✅ | Architecture spine + ASCII wireframes + Gantt + BDD file list + PR narrative fold (`5e63887ef`) | 🅐 (`5e63887ef`) | ✓ |
+| P7-schema ✅ | `AiToolEntry` Prisma model (org-scoped) + migration `20260503000000_add_ai_tool_entry` (3 indexes) + `EXEMPT_MODELS` entry in `dbMultiTenancyProtection.ts` | 🅢 (`6c1be0cda`) | ✓ |
+| P7-rbac ✅ | `AI_TOOLS = "aiTools"` resource added to `rbac.ts`. `aiTools:view` granted to ADMIN + MEMBER + EXTERNAL (portal works for everyone). `aiTools:manage` granted to ADMIN only. `permissionsConfig.ts` `orderedResources` adds `AI_TOOLS` for custom-role builder UI. | 🅢 (`6c1be0cda`) | ✓ |
+| P7-router ✅ | `aiToolsRouter` (new tRPC, 7 procedures) + `AiToolEntryService` with team-overrides-org-by-slug resolution + zod-discriminated-union per-type `config` validation + `listForUser` / `listForAdmin` / CRUD / `reorder`. Matches Alexis's B1-B6 scaffold contract 1:1. | 🅢 (`6c1be0cda`) | ✓ |
+| P7-vk-reuse ✅ | No new endpoint — model-provider tile click reuses existing `personalVirtualKeys.issuePersonal` with `config.suggestedRoutingPolicyId` passed through. Confirmed wire-ready in `vk-bridge` spec. | 🅢 (`6c1be0cda`) | ✓ |
 | P7-md-render | Wire external-tool description markdown render via existing renderer + sanitizer (no new sanitizer) | 🅢 | |
 | P7-int-test | `governance.toolCatalog.integration.test.ts` — RBAC + scoping + cross-org isolation + VK-bridge call shape | 🅢 | ✓ |
-| P7-spec-rbac | `specs/ai-governance/personal-portal/tool-catalog-rbac.feature` — admin manages, member lists, external-only assigned | 🅢 | |
-| P7-spec-scope | `specs/ai-governance/personal-portal/tool-catalog-scoping.feature` — team-scope-overrides-org-by-slug; disabled hidden from list / visible in adminList | 🅢 | |
-| P7-spec-vkbridge | `specs/ai-governance/personal-portal/tool-catalog-vk-bridge.feature` — model-provider tile click → `issuePersonal` with `suggestedRoutingPolicyId` | 🅢 | |
-| P7-spec-portal | `specs/ai-governance/personal-portal/portal-grid.feature` — generic-login landing → portal grid; tile-grid scoping invariants user-side | 🅑 | |
-| P7-spec-coding | `specs/ai-governance/personal-portal/coding-assistant-tile.feature` — click-to-expand, copy-command UX, link-to-docs | 🅑 | |
-| P7-spec-provider | `specs/ai-governance/personal-portal/model-provider-tile.feature` — inline VK creation flow + project-suggestion line + name-validation + duplicate-name handling | 🅑 | |
-| P7-spec-external | `specs/ai-governance/personal-portal/external-tool-tile.feature` — markdown render boundaries (no JS, no img-src exfil) + external-link safety (rel=noopener) | 🅑 | |
-| P7-spec-admin | `specs/ai-governance/personal-portal/admin-catalog-editor.feature` — admin upsert / reorder / scope-bind / archive / starter-pack import | 🅑 | |
+| P7-spec-rbac ✅ | `specs/ai-governance/personal-portal/tool-catalog-rbac.feature` — admin manages, member lists, external-only assigned | 🅢 (`6c1be0cda`) | |
+| P7-spec-scope ✅ | `specs/ai-governance/personal-portal/tool-catalog-scoping.feature` — team-scope-overrides-org-by-slug; disabled hidden from list / visible in adminList | 🅢 (`6c1be0cda`) | |
+| P7-spec-vkbridge ✅ | `specs/ai-governance/personal-portal/tool-catalog-vk-bridge.feature` — model-provider tile click → `issuePersonal` with `suggestedRoutingPolicyId`, includes regression scenario for the cross-org policy guard from `17047a301` | 🅢 (`6c1be0cda`) | |
+| P7-spec-portal ✅ | `portal-grid.feature` (73 LOC, 6 scenarios) — /me layout, section ordering, empty states, team-overrides-org by slug, disabled-entry hiding, FF gate | 🅑 (`b846c7b20`) | |
+| P7-spec-coding ✅ | `coding-assistant-tile.feature` (63 LOC, 6 scenarios) — click-to-expand, copy-to-clipboard with bare-command (no leading `$`), optional setupDocsUrl link, no backend mutation on expand | 🅑 (`b846c7b20`) | |
+| P7-spec-provider ✅ | `model-provider-tile.feature` (93 LOC, 8 scenarios) — inline VK form, label validation, `issuePersonal` mutation contract (passes `config.suggestedRoutingPolicyId`), reveal/copy secret toggles, **409 `no_default_routing_policy` inline error path** (ties `49f81be4f` 409 fix into portal UX), "Issue another" reset | 🅑 (`b846c7b20`) | |
+| P7-spec-external ✅ | `external-tool-tile.feature` (76 LOC, 6 scenarios) — admin markdown render via existing sanitizer, sanitization strips script tags, CTA button `target=_blank rel=noopener`, no backend | 🅑 (`b846c7b20`) | |
+| P7-spec-admin ✅ | `admin-catalog-editor.feature` (134 LOC, 11 scenarios) — `aiTools:manage` gate, 3 sections always visible (incl. empty-state callouts), per-row drag/scope-badge/edit/disable shape, drawer field map per type discriminator, save-fires-create vs edit-fires-update, reorder mutation contract, setEnabled round-trip, UI-preview banner while router unwired | 🅑 (`b846c7b20`) | |
 | P7-B1 ✅ | Portal shell + section grouping + empty state — `components/me/AiToolsPortal.tsx` (3-section grid, section-empty hides, totally-empty shows CLI-fallback callout) | 🅑 (`16e3af8fe`) | ✓ |
 | P7-B2 ✅ | `components/me/tiles/CodingAssistantTile.tsx` — click-expand → command + copy + walkthrough text | 🅑 (`16e3af8fe`) | |
 | P7-B3 ✅ | `components/me/tiles/ModelProviderTile.tsx` — click-expand → label-only VK form → success state w/ masked secret + reveal/copy + base URL + 💡 project-suggestion hint (mocked VK; B9 swaps to real `personalVirtualKeys.issuePersonal`) | 🅑 (`16e3af8fe`) | ✓ |
@@ -1333,7 +1333,7 @@ model AiToolCatalogEntry {
 | P7-B6 ✅ (list + route) | Admin route + list view: `pages/settings/governance/tool-catalog.tsx` (FF-gated, UI-preview banner) + `components/settings/governance/ToolCatalogEditor.tsx` (section-grouped list, drag handles, `+Add tile` per-section, scope badge). B7 drawer pending. | 🅑 (`16e3af8fe`) | ✓ |
 | P7-B7 | Admin add/edit drawer — type-discriminator picker + scope picker (org / team multi-select) + per-type fields (coding: command + docsUrl; provider: providerKey + suggestedRoutingPolicyId + projectSuggestionText; external: descriptionMarkdown + linkUrl + ctaLabel) + sort-order input | 🅑 | |
 | P7-B8 | Drag-to-reorder wired to backend (within-section only) | 🅑 | |
-| P7-B9 | Wire UI to Sergey's `aiToolsCatalogRouter` — replace mock tiles → `api.aiTools.list`; admin → `api.aiTools.adminList` + mutations; ModelProviderTile generate → `api.personalVirtualKeys.issuePersonal` w/ `config.suggestedRoutingPolicyId` | 🅑 | ✓ |
+| P7-B9 (unblocked) | Wire UI to Sergey's `aiToolsRouter` (`6c1be0cda`) — replace mock tiles → `api.aiTools.list`; admin → `api.aiTools.adminList` + mutations; ModelProviderTile generate → `api.personalVirtualKeys.issuePersonal` w/ `config.suggestedRoutingPolicyId`. Schema fields + types match scaffold 1:1 — single-commit migration. | 🅑 | ✓ |
 | P7-starter-pack | Starter-pack JSON seed (Claude Code + Copilot + Cursor + Codex coding-assistants; OpenAI + Anthropic + Bedrock + Gemini providers; Copilot Studio + Workato externals) — admin-imports on first visit if catalog empty | 🅢 | |
 | P7-B10 (dogfood) | Live-data dogfood — 5 paths × 9 PNGs to `docs/images/ai-governance/portal/`: `portal-hero-populated`, `portal-empty`, `tile-claude-expanded`, `tile-anthropic-form`, `tile-anthropic-issued`, `tile-copilot-studio`, `admin-catalog-overview`, `admin-add-tile-drawer`, `admin-scope-picker` | 🅑 | ✓ |
 | P7-B11 | Empty / error polish (rate-limit messages, network-failure retries, no-permission states) | 🅑 | |
