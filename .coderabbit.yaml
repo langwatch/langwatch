@@ -1,0 +1,29 @@
+# https://docs.coderabbit.ai/getting-started/configure-coderabbit
+# Schema: https://coderabbit.ai/integrations/coderabbit-overview/schema.v2.json
+language: en
+early_access: false
+
+reviews:
+  profile: chill
+  request_changes_workflow: false
+  high_level_summary: true
+  poem: false
+  review_status: true
+  collapse_walkthrough: false
+  auto_review:
+    enabled: true
+    drafts: false
+
+  # Block obviously-broken paths from sneaking into the repo.
+  # See PR #3752: a literal "${HOME/workspace/orchard-codex/contracts}"
+  # directory leaked through #3476 because the default review didn't flag it.
+  path_filters:
+    - "!**/${*"   # any path segment starting with a literal "${"
+
+  path_instructions:
+    - path: "**/*"
+      instructions: |
+        FAIL the review (request changes) if any added or renamed file path
+        contains an unexpanded shell variable like "${HOME...", "${VAR...",
+        or any segment starting with "${". These are bugs from broken
+        env-var expansion, never intentional content.
