@@ -1,5 +1,4 @@
 import {
-  Box,
   Heading,
   HStack,
   Spacer,
@@ -18,16 +17,15 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { AiToolEntry } from "~/components/me/tiles/types";
 
 /**
- * Admin AI Tool Catalog editor — Phase 7 B6 scaffold.
+ * Admin AI Tool Catalog editor — Phase 7 B6+B9 wired surface.
  *
- * UI shell against mock data. Will wire to Sergey's
- * `api.aiTools.adminList` + `api.aiTools.create/update/setEnabled/reorder`
- * mutations in B9.
- *
- * Drawer for add/edit + drag-to-reorder land in B7+B8.
+ * Reads + setEnabled wired to Sergey's `aiToolsCatalogRouter`
+ * (commit `6c1be0cda`). Add/edit drawer (B7) + drag-reorder (B8) ship
+ * in follow-up commits — clicking +Add tile or Edit currently opens
+ * a placeholder until those land.
  */
 export default function ToolCatalogPage() {
-  const { project } = useOrganizationTeamProject({
+  const { project, organization } = useOrganizationTeamProject({
     redirectToOnboarding: false,
     redirectToProjectOnboarding: false,
   });
@@ -46,7 +44,7 @@ export default function ToolCatalogPage() {
   if (ffLoading) {
     return <LoadingScreen />;
   }
-  if (!governancePreviewEnabled) {
+  if (!governancePreviewEnabled || !organization) {
     return <NotFoundScene />;
   }
 
@@ -66,27 +64,10 @@ export default function ToolCatalogPage() {
           <Spacer />
         </HStack>
 
-        <Box
-          padding={3}
-          borderWidth="1px"
-          borderColor="orange.300"
-          borderRadius="sm"
-          backgroundColor="orange.50"
-        >
-          <Text fontSize="xs" color="orange.700">
-            <strong>UI preview only.</strong> Backend persistence (Sergey's
-            <code> aiToolsCatalogRouter</code>) ships in a follow-up commit.
-            This page renders mock data; actions are no-ops until B9.
-          </Text>
-        </Box>
-
         <ToolCatalogEditor
+          organizationId={organization.id}
           onAddTile={(type) => setDrawerOpen({ mode: "create", type })}
           onEditTile={(entry) => setDrawerOpen({ mode: "edit", entry })}
-          onToggleEnabled={(entry) => {
-            // TODO(B9): wire to api.aiTools.setEnabled mutation
-            console.log("toggle enabled", entry.id);
-          }}
         />
       </VStack>
     </SettingsLayout>

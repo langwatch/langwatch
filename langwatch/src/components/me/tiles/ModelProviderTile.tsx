@@ -18,11 +18,14 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 
+import { api } from "~/utils/api";
+
 import type { ModelProviderConfig } from "./types";
 
 interface Props {
   displayName: string;
   config: ModelProviderConfig;
+  organizationId: string;
 }
 
 interface IssuedKey {
@@ -31,29 +34,43 @@ interface IssuedKey {
   baseUrl: string;
 }
 
-export function ModelProviderTile({ displayName, config }: Props) {
+export function ModelProviderTile({
+  displayName,
+  config,
+  organizationId,
+}: Props) {
   const [expanded, setExpanded] = useState(false);
   const [label, setLabel] = useState(config.defaultLabel ?? "");
-  const [issuing, setIssuing] = useState(false);
   const [issued, setIssued] = useState<IssuedKey | null>(null);
   const [secretRevealed, setSecretRevealed] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const issueMutation = api.personalVirtualKeys.issuePersonal.useMutation({
+    onSuccess: (result) => {
+      setIssued({
+        label: result.label,
+        secret: result.secret,
+        baseUrl: result.baseUrl,
+      });
+      setErrorMessage(null);
+    },
+    onError: (err) => {
+      setErrorMessage(err.message);
+    },
+  });
 
   const onIssue = () => {
-    if (!label.trim()) return;
-    setIssuing(true);
-    // TODO(B9): replace mock with `api.personalVirtualKeys.issuePersonal`
-    // mutation, passing { providerKey: config.providerKey,
-    // routingPolicyId: config.suggestedRoutingPolicyId, label }.
-    setTimeout(() => {
-      setIssued({
-        label: label.trim(),
-        secret: `lw_vk_live_${Math.random().toString(36).slice(2, 12)}_MOCK`,
-        baseUrl: "https://gateway.langwatch.ai/v1",
-      });
-      setIssuing(false);
-    }, 300);
+    if (!label.trim() || !organizationId) return;
+    setErrorMessage(null);
+    issueMutation.mutate({
+      organizationId,
+      label: label.trim(),
+      routingPolicyId: config.suggestedRoutingPolicyId,
+    });
   };
+
+  const issuing = issueMutation.isPending;
 
   const onCopySecret = () => {
     if (!issued) return;
@@ -66,6 +83,7 @@ export function ModelProviderTile({ displayName, config }: Props) {
     setIssued(null);
     setLabel(config.defaultLabel ?? "");
     setSecretRevealed(false);
+    setErrorMessage(null);
   };
 
   return (
@@ -125,6 +143,19 @@ export function ModelProviderTile({ displayName, config }: Props) {
               Cancel
             </Button>
           </HStack>
+          {errorMessage && (
+            <Box
+              padding={2}
+              borderWidth="1px"
+              borderColor="red.300"
+              borderRadius="sm"
+              backgroundColor="red.50"
+            >
+              <Text fontSize="xs" color="red.700">
+                {errorMessage}
+              </Text>
+            </Box>
+          )}
           {config.projectSuggestionText && (
             <Box
               borderTopWidth="1px"

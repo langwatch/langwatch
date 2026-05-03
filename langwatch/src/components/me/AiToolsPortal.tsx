@@ -7,9 +7,11 @@ import {
 } from "@chakra-ui/react";
 import { useMemo } from "react";
 
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { api } from "~/utils/api";
+
 import { CodingAssistantTile } from "./tiles/CodingAssistantTile";
 import { ExternalToolTile } from "./tiles/ExternalToolTile";
-import { MOCK_TOOL_CATALOG } from "./tiles/mockCatalog";
 import { ModelProviderTile } from "./tiles/ModelProviderTile";
 import type {
   AiToolEntry,
@@ -31,11 +33,17 @@ const SECTION_ORDER: AiToolEntry["type"][] = [
 ];
 
 export function AiToolsPortal() {
-  // TODO(B9): replace MOCK_TOOL_CATALOG with
-  // `api.aiTools.list({ organizationId }).useQuery(...)` once Sergey's
-  // `aiToolsCatalogRouter` ships. The shape of `entries` matches the
-  // backend response 1:1 — only the source swaps.
-  const entries = MOCK_TOOL_CATALOG;
+  const { organization } = useOrganizationTeamProject({
+    redirectToOnboarding: false,
+  });
+  const orgId = organization?.id ?? "";
+
+  const listQuery = api.aiTools.list.useQuery(
+    { organizationId: orgId },
+    { enabled: !!orgId, refetchOnWindowFocus: false },
+  );
+
+  const entries = (listQuery.data ?? []) as unknown as AiToolEntry[];
 
   const grouped = useMemo(() => {
     const byType: Record<AiToolEntry["type"], AiToolEntry[]> = {
@@ -91,7 +99,7 @@ export function AiToolsPortal() {
             </Heading>
             <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} gap={3}>
               {items.map((entry) => (
-                <RenderTile key={entry.id} entry={entry} />
+                <RenderTile key={entry.id} entry={entry} orgId={orgId} />
               ))}
             </SimpleGrid>
           </VStack>
@@ -101,7 +109,13 @@ export function AiToolsPortal() {
   );
 }
 
-function RenderTile({ entry }: { entry: AiToolEntry }) {
+function RenderTile({
+  entry,
+  orgId,
+}: {
+  entry: AiToolEntry;
+  orgId: string;
+}) {
   switch (entry.type) {
     case "coding_assistant":
       return (
@@ -115,6 +129,7 @@ function RenderTile({ entry }: { entry: AiToolEntry }) {
         <ModelProviderTile
           displayName={entry.displayName}
           config={entry.config as ModelProviderConfig}
+          organizationId={orgId}
         />
       );
     case "external_tool":

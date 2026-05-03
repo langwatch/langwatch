@@ -4,13 +4,15 @@ import {
   Button,
   Heading,
   HStack,
+  Spinner,
   Text,
   VStack,
 } from "@chakra-ui/react";
 import { GripVertical, Plus } from "lucide-react";
 
-import { MOCK_TOOL_CATALOG } from "~/components/me/tiles/mockCatalog";
 import type { AiToolEntry } from "~/components/me/tiles/types";
+import { toaster } from "~/components/ui/toaster";
+import { api } from "~/utils/api";
 
 const SECTION_LABELS: Record<AiToolEntry["type"], string> = {
   coding_assistant: "Coding assistants",
@@ -25,20 +27,49 @@ const SECTION_ORDER: AiToolEntry["type"][] = [
 ];
 
 interface Props {
+  organizationId: string;
   onAddTile: (type: AiToolEntry["type"]) => void;
   onEditTile: (entry: AiToolEntry) => void;
-  onToggleEnabled: (entry: AiToolEntry) => void;
 }
 
 export function ToolCatalogEditor({
+  organizationId,
   onAddTile,
   onEditTile,
-  onToggleEnabled,
 }: Props) {
-  // TODO(B9): replace MOCK_TOOL_CATALOG with
-  // `api.aiTools.adminList({ organizationId }).useQuery(...)` once Sergey's
-  // `aiToolsCatalogRouter` ships. adminList includes disabled+archived.
-  const entries = MOCK_TOOL_CATALOG;
+  const utils = api.useUtils();
+
+  const adminListQuery = api.aiTools.adminList.useQuery(
+    { organizationId },
+    { enabled: !!organizationId, refetchOnWindowFocus: false },
+  );
+
+  const setEnabledMutation = api.aiTools.setEnabled.useMutation({
+    onSuccess: () => {
+      void utils.aiTools.adminList.invalidate({ organizationId });
+      void utils.aiTools.list.invalidate({ organizationId });
+    },
+    onError: (err) => {
+      toaster.create({
+        title: "Failed to update tile",
+        description: err.message,
+        type: "error",
+      });
+    },
+  });
+
+  if (adminListQuery.isLoading) {
+    return (
+      <HStack padding={6} justifyContent="center">
+        <Spinner size="sm" />
+        <Text fontSize="sm" color="fg.muted">
+          Loading catalog…
+        </Text>
+      </HStack>
+    );
+  }
+
+  const entries = (adminListQuery.data ?? []) as unknown as AiToolEntry[];
 
   const grouped: Record<AiToolEntry["type"], AiToolEntry[]> = {
     coding_assistant: [],
@@ -90,7 +121,17 @@ export function ToolCatalogEditor({
                     key={entry.id}
                     entry={entry}
                     onEdit={() => onEditTile(entry)}
-                    onToggleEnabled={() => onToggleEnabled(entry)}
+                    onToggleEnabled={() =>
+                      setEnabledMutation.mutate({
+                        organizationId,
+                        id: entry.id,
+                        enabled: !entry.enabled,
+                      })
+                    }
+                    isPending={
+                      setEnabledMutation.isPending &&
+                      setEnabledMutation.variables?.id === entry.id
+                    }
                   />
                 ))}
               </VStack>
@@ -106,10 +147,12 @@ function CatalogRow({
   entry,
   onEdit,
   onToggleEnabled,
+  isPending,
 }: {
   entry: AiToolEntry;
   onEdit: () => void;
   onToggleEnabled: () => void;
+  isPending: boolean;
 }) {
   const scopeLabel =
     entry.scope === "organization"
@@ -137,7 +180,12 @@ function CatalogRow({
       <Button size="xs" variant="ghost" onClick={onEdit}>
         Edit
       </Button>
-      <Button size="xs" variant="ghost" onClick={onToggleEnabled}>
+      <Button
+        size="xs"
+        variant="ghost"
+        onClick={onToggleEnabled}
+        disabled={isPending}
+      >
         {entry.enabled ? "Disable" : "Enable"}
       </Button>
     </HStack>
