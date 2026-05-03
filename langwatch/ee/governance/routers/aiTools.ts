@@ -25,10 +25,10 @@ import {
   AiToolEntryService,
   SUPPORTED_SCOPES,
   SUPPORTED_TILE_TYPES,
-} from "~/server/governance/aiToolEntry.service";
+} from "@ee/governance/services/aiToolEntry.service";
 
-import { checkOrganizationPermission } from "../rbac";
-import { createTRPCRouter, protectedProcedure } from "../trpc";
+import { checkOrganizationPermission } from "~/server/api/rbac";
+import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 
 const scopeSchema = z.enum(SUPPORTED_SCOPES as readonly [string, ...string[]]);
 const typeSchema = z.enum(

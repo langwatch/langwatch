@@ -25,8 +25,8 @@ import { RoleBindingScopeType, TeamUserRole } from "@prisma/client";
 
 import { prisma } from "~/server/db";
 import { encrypt } from "~/utils/encryption";
-import { PersonalWorkspaceService } from "~/server/governance/personalWorkspace.service";
-import { PersonalVirtualKeyService } from "~/server/governance/personalVirtualKey.service";
+import { PersonalWorkspaceService } from "@ee/governance/services/personalWorkspace.service";
+import { PersonalVirtualKeyService } from "@ee/governance/services/personalVirtualKey.service";
 
 interface Args {
   email: string;

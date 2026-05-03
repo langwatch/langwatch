@@ -47,7 +47,7 @@ import { FREE_PLAN } from "../../../../../ee/licensing/constants";
 import type { PlanInfo } from "../../../../../ee/licensing/planInfo";
 
 import { prisma } from "~/server/db";
-import { IngestionSourceService } from "~/server/governance/activity-monitor/ingestionSource.service";
+import { IngestionSourceService } from "@ee/governance/services/activity-monitor/ingestionSource.service";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
 import { PlanProviderService } from "~/server/app-layer/subscription/plan-provider";

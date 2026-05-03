@@ -22,14 +22,14 @@ import {
   IngestionSourceService,
   SUPPORTED_RETENTION_CLASSES,
   SUPPORTED_SOURCE_TYPES,
-} from "~/server/governance/activity-monitor/ingestionSource.service";
+} from "@ee/governance/services/activity-monitor/ingestionSource.service";
 
 import {
   ENTERPRISE_FEATURE_ERRORS,
   requireEnterprisePlan,
-} from "../enterprise";
-import { checkOrganizationPermission } from "../rbac";
-import { createTRPCRouter, protectedProcedure } from "../trpc";
+} from "~/server/api/enterprise";
+import { checkOrganizationPermission } from "~/server/api/rbac";
+import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 
 const enterpriseGate = requireEnterprisePlan(
   ENTERPRISE_FEATURE_ERRORS.INGESTION_SOURCES,

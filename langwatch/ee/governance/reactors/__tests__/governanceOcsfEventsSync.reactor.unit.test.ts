@@ -36,9 +36,9 @@ import {
   type GovernanceOcsfEventsClickHouseRepository,
   OCSF_ACTIVITY,
   OCSF_SEVERITY,
-} from "~/server/governance/governanceOcsfEvents.clickhouse.repository";
-import type { ReactorContext } from "../../../../reactors/reactor.types";
-import type { TraceProcessingEvent } from "../../schemas/events";
+} from "@ee/governance/services/governanceOcsfEvents.clickhouse.repository";
+import type { ReactorContext } from "~/server/event-sourcing/reactors/reactor.types";
+import type { TraceProcessingEvent } from "~/server/event-sourcing/pipelines/trace-processing/schemas/events";
 import {
   createGovernanceOcsfEventsSyncReactor,
   type GovernanceOcsfEventsSyncReactorDeps,

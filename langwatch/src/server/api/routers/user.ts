@@ -11,17 +11,17 @@ import { revokeOtherSessionsForUser } from "~/server/better-auth/revokeSessions"
 import { rateLimit } from "~/server/rateLimit";
 import { getClientIp } from "~/utils/getClientIp";
 import { isAdmin as checkIsAdmin } from "../../../../ee/admin/isAdmin";
-import { PersonalWorkspaceService } from "~/server/governance/personalWorkspace.service";
-import { PersonalVirtualKeyService } from "~/server/governance/personalVirtualKey.service";
-import { RoutingPolicyService } from "~/server/governance/routingPolicy.service";
-import { PersonalUsageService } from "~/server/governance/personalUsage.service";
+import { PersonalWorkspaceService } from "@ee/governance/services/personalWorkspace.service";
+import { PersonalVirtualKeyService } from "@ee/governance/services/personalVirtualKey.service";
+import { RoutingPolicyService } from "@ee/governance/services/routingPolicy.service";
+import { PersonalUsageService } from "@ee/governance/services/personalUsage.service";
 import { GatewayBudgetService } from "~/server/gateway/budget.service";
 import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
 import {
   getClickHouseClientForProject,
   isClickHouseEnabled,
 } from "~/server/clickhouse/clickhouseClient";
-import { CliBootstrapService } from "~/server/governance/cliBootstrap.service";
+import { CliBootstrapService } from "@ee/governance/services/cliBootstrap.service";
 import {
   Auth0ApiError,
   changeAuth0Password,

@@ -24,9 +24,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
-import type { GovernanceKpisClickHouseRepository } from "~/server/governance/governanceKpis.clickhouse.repository";
-import type { ReactorContext } from "../../../../reactors/reactor.types";
-import type { TraceProcessingEvent } from "../../schemas/events";
+import type { GovernanceKpisClickHouseRepository } from "@ee/governance/services/governanceKpis.clickhouse.repository";
+import type { ReactorContext } from "~/server/event-sourcing/reactors/reactor.types";
+import type { TraceProcessingEvent } from "~/server/event-sourcing/pipelines/trace-processing/schemas/events";
 import {
   createGovernanceKpisSyncReactor,
   type GovernanceKpisSyncReactorDeps,

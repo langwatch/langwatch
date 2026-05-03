@@ -26,7 +26,7 @@ import { type ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { prisma } from "../../db";
+import { prisma } from "~/server/db";
 import { getTestClickHouseClient } from "~/server/event-sourcing/__tests__/integration/testContainers";
 
 import {

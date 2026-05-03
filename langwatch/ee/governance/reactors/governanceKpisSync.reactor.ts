@@ -1,15 +1,15 @@
 import {
   GovernanceKpisClickHouseRepository,
   type GovernanceKpiContribution,
-} from "~/server/governance/governanceKpis.clickhouse.repository";
+} from "@ee/governance/services/governanceKpis.clickhouse.repository";
 import { createLogger } from "~/utils/logger/server";
 import { captureException } from "~/utils/posthogErrorCapture";
 import type {
   ReactorContext,
   ReactorDefinition,
-} from "../../../reactors/reactor.types";
-import type { TraceSummaryData } from "../projections/traceSummary.foldProjection";
-import type { TraceProcessingEvent } from "../schemas/events";
+} from "~/server/event-sourcing/reactors/reactor.types";
+import type { TraceSummaryData } from "~/server/event-sourcing/pipelines/trace-processing/projections/traceSummary.foldProjection";
+import type { TraceProcessingEvent } from "~/server/event-sourcing/pipelines/trace-processing/schemas/events";
 
 const logger = createLogger(
   "langwatch:trace-processing:governance-kpis-sync-reactor",

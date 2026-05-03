@@ -32,7 +32,7 @@ import {
   startTestContainers,
   stopTestContainers,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
-import { createGatewayBudgetSyncReactor } from "~/server/event-sourcing/pipelines/trace-processing/reactors/gatewayBudgetSync.reactor";
+import { createGatewayBudgetSyncReactor } from "@ee/governance/reactors/gatewayBudgetSync.reactor";
 import type { ReactorContext } from "~/server/event-sourcing/reactors/reactor.types";
 import type { TraceProcessingEvent } from "~/server/event-sourcing/pipelines/trace-processing/schemas/events";
 

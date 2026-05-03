@@ -3,7 +3,7 @@ import { BullMQOtel } from "bullmq-otel";
 
 import { withJobContext } from "../../context/asyncContext";
 import { prisma } from "../../db";
-import { SpendSpikeAnomalyEvaluator } from "~/server/governance/spendSpikeAnomalyEvaluator.service";
+import { SpendSpikeAnomalyEvaluator } from "@ee/governance/services/spendSpikeAnomalyEvaluator.service";
 import { createLogger } from "../../../utils/logger/server";
 import {
   captureException,

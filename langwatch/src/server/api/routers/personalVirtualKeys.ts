@@ -15,8 +15,8 @@ import {
   PersonalVirtualKeyService,
   PersonalVirtualKeyNotFoundError,
   NoDefaultRoutingPolicyError,
-} from "~/server/governance/personalVirtualKey.service";
-import { PersonalWorkspaceService } from "~/server/governance/personalWorkspace.service";
+} from "@ee/governance/services/personalVirtualKey.service";
+import { PersonalWorkspaceService } from "@ee/governance/services/personalWorkspace.service";
 
 import { checkOrganizationPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";

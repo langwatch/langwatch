@@ -30,17 +30,17 @@ import {
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { FREE_PLAN } from "../../../../../ee/licensing/constants";
-import type { PlanInfo } from "../../../../../ee/licensing/planInfo";
+import { FREE_PLAN } from "@ee/licensing/constants";
+import type { PlanInfo } from "@ee/licensing/planInfo";
 
-import { prisma } from "../../../db";
-import { IngestionSourceService } from "../../../governance/activity-monitor/ingestionSource.service";
+import { prisma } from "~/server/db";
+import { IngestionSourceService } from "@ee/governance/services/activity-monitor/ingestionSource.service";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
 import { PlanProviderService } from "~/server/app-layer/subscription/plan-provider";
 
-import { appRouter } from "../../root";
-import { createInnerTRPCContext } from "../../trpc";
+import { appRouter } from "~/server/api/root";
+import { createInnerTRPCContext } from "~/server/api/trpc";
 
 const ns = `lic-gate-${nanoid(8)}`;
 

@@ -15,23 +15,23 @@
  */
 import { z } from "zod";
 
-import { GovernanceSetupStateService } from "~/server/governance/setupState.service";
+import { GovernanceSetupStateService } from "@ee/governance/services/setupState.service";
 import {
   resolvePersonaHomeSafe,
   type PersonaResolution,
-} from "~/server/governance/personaResolver.service";
+} from "@ee/governance/services/personaResolver.service";
 import { UsageStatsService } from "~/server/license-enforcement/usage-stats.service";
-import { GovernanceOcsfExportService } from "~/server/governance/governanceOcsfExport.service";
+import { GovernanceOcsfExportService } from "@ee/governance/services/governanceOcsfExport.service";
 
 import {
   ENTERPRISE_FEATURE_ERRORS,
   requireEnterprisePlan,
-} from "../enterprise";
+} from "~/server/api/enterprise";
 import {
   checkOrganizationPermission,
   hasOrganizationPermission,
-} from "../rbac";
-import { createTRPCRouter, protectedProcedure } from "../trpc";
+} from "~/server/api/rbac";
+import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 
 export const governanceRouter = createTRPCRouter({
   /**

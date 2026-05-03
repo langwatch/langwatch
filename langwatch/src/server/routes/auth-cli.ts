@@ -39,14 +39,14 @@ import {
   PersonalVirtualKeyService,
   NoDefaultRoutingPolicyError,
   PersonalVirtualKeyAlreadyExistsError,
-} from "~/server/governance/personalVirtualKey.service";
-import { PersonalWorkspaceService } from "~/server/governance/personalWorkspace.service";
+} from "@ee/governance/services/personalVirtualKey.service";
+import { PersonalWorkspaceService } from "@ee/governance/services/personalWorkspace.service";
 import { GatewayBudgetService } from "~/server/gateway/budget.service";
 import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
-import { IngestionSourceService } from "~/server/governance/activity-monitor/ingestionSource.service";
-import { ActivityMonitorService } from "~/server/governance/activity-monitor/activityMonitor.service";
-import { GovernanceSetupStateService } from "~/server/governance/setupState.service";
-import { CliBootstrapService } from "~/server/governance/cliBootstrap.service";
+import { IngestionSourceService } from "@ee/governance/services/activity-monitor/ingestionSource.service";
+import { ActivityMonitorService } from "@ee/governance/services/activity-monitor/activityMonitor.service";
+import { GovernanceSetupStateService } from "@ee/governance/services/setupState.service";
+import { CliBootstrapService } from "@ee/governance/services/cliBootstrap.service";
 import {
   assertEnterprisePlan,
   ENTERPRISE_FEATURE_ERRORS,

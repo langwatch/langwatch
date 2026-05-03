@@ -41,8 +41,8 @@ import type { IngestionSource } from "@prisma/client";
 
 import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
-import { IngestionSourceService } from "~/server/governance/activity-monitor/ingestionSource.service";
-import { ensureHiddenGovernanceProject } from "~/server/governance/governanceProject.service";
+import { IngestionSourceService } from "@ee/governance/services/activity-monitor/ingestionSource.service";
+import { ensureHiddenGovernanceProject } from "@ee/governance/services/governanceProject.service";
 import {
   parseOtlpTraces,
   readOtlpBody,

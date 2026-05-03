@@ -26,7 +26,7 @@ import {
   assertEnterprisePlan,
   ENTERPRISE_FEATURE_ERRORS,
 } from "~/server/api/enterprise";
-import { ensureHiddenGovernanceProject } from "~/server/governance/governanceProject.service";
+import { ensureHiddenGovernanceProject } from "@ee/governance/services/governanceProject.service";
 
 export type SourceType =
   | "otel_generic"

@@ -6,13 +6,13 @@ import {
 } from "~/server/filters/triggerFilter.matcher";
 import { createLogger } from "~/utils/logger/server";
 import { captureException } from "~/utils/posthogErrorCapture";
-import type { ReactorDefinition } from "../../../reactors/reactor.types";
+import type { ReactorDefinition } from "~/server/event-sourcing/reactors/reactor.types";
 import {
   dispatchTriggerAction,
   type TriggerActionDispatchDeps,
-} from "../../shared/triggerActionDispatch";
-import type { TraceProcessingEvent } from "../schemas/events";
-import { defineOriginGuardedTraceReactor } from "./_originGuardedReactor";
+} from "~/server/event-sourcing/pipelines/shared/triggerActionDispatch";
+import type { TraceProcessingEvent } from "~/server/event-sourcing/pipelines/trace-processing/schemas/events";
+import { defineOriginGuardedTraceReactor } from "~/server/event-sourcing/pipelines/trace-processing/reactors/_originGuardedReactor";
 
 const logger = createLogger("langwatch:trace-processing:alert-trigger-reactor");
 

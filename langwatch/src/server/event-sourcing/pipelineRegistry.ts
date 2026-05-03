@@ -52,15 +52,15 @@ import { createExperimentMetricsSyncReactor } from "./pipelines/trace-processing
 import {
   createGatewayBudgetSyncReactor,
   type GatewayBudgetSyncReactorDeps,
-} from "./pipelines/trace-processing/reactors/gatewayBudgetSync.reactor";
+} from "@ee/governance/reactors/gatewayBudgetSync.reactor";
 import {
   createGovernanceKpisSyncReactor,
   type GovernanceKpisSyncReactorDeps,
-} from "./pipelines/trace-processing/reactors/governanceKpisSync.reactor";
+} from "@ee/governance/reactors/governanceKpisSync.reactor";
 import {
   createGovernanceOcsfEventsSyncReactor,
   type GovernanceOcsfEventsSyncReactorDeps,
-} from "./pipelines/trace-processing/reactors/governanceOcsfEventsSync.reactor";
+} from "@ee/governance/reactors/governanceOcsfEventsSync.reactor";
 import type { ComputeExperimentRunMetricsCommandData } from "./pipelines/experiment-run-processing/schemas/commands";
 
 import { createElasticsearchBatchEvaluationRepository } from "../evaluations-v3/repositories/elasticsearchBatchEvaluation.repository";
@@ -92,7 +92,7 @@ import { createOrUpdateQueueItems } from "~/server/api/routers/annotation";
 import { createManyDatasetRecords } from "~/server/api/routers/datasetRecord.utils";
 import { getProtectionsForProject } from "~/server/api/utils";
 import { TraceService } from "~/server/traces/trace.service";
-import { createAlertTriggerReactor } from "./pipelines/trace-processing/reactors/alertTrigger.reactor";
+import { createAlertTriggerReactor } from "@ee/governance/reactors/alertTrigger.reactor";
 import { createEvaluationTriggerReactor } from "./pipelines/trace-processing/reactors/evaluationTrigger.reactor";
 import {
   createOriginGateReactor,

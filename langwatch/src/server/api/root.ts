@@ -60,11 +60,11 @@ import { gatewayProvidersRouter } from "./routers/gatewayProviders";
 import { virtualKeysRouter } from "./routers/virtualKeys";
 import { personalVirtualKeysRouter } from "./routers/personalVirtualKeys";
 import { routingPoliciesRouter } from "./routers/routingPolicies";
-import { ingestionSourcesRouter } from "./routers/ingestionSources";
-import { activityMonitorRouter } from "./routers/activityMonitor";
-import { anomalyRulesRouter } from "./routers/anomalyRules";
-import { aiToolsRouter } from "./routers/aiTools";
-import { governanceRouter } from "./routers/governance";
+import { ingestionSourcesRouter } from "@ee/governance/routers/ingestionSources";
+import { activityMonitorRouter } from "@ee/governance/routers/activityMonitor";
+import { anomalyRulesRouter } from "@ee/governance/routers/anomalyRules";
+import { aiToolsRouter } from "@ee/governance/routers/aiTools";
+import { governanceRouter } from "@ee/governance/routers/governance";
 import { workflowRouter } from "./routers/workflows";
 import { opsRouter } from "./routers/ops";
 

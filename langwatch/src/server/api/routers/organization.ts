@@ -45,7 +45,7 @@ import { skipPermissionCheck } from "../rbac";
 import { checkOrganizationPermission, checkTeamPermission } from "../rbac";
 import { signUpDataSchema } from "~/server/schemas/sign-up-data.schema";
 import { LITE_MEMBER_VIEWER_ONLY_ERROR } from "~/server/app-layer/organizations/compute-effective-team-role-updates";
-import { PersonalWorkspaceService } from "~/server/governance/personalWorkspace.service";
+import { PersonalWorkspaceService } from "@ee/governance/services/personalWorkspace.service";
 import type { FullyLoadedOrganization } from "~/server/app-layer/organizations/repositories/organization.repository";
 import { PrismaRoleBindingRepository } from "~/server/app-layer/role-bindings/repositories/role-binding.prisma.repository";
 import { enrichTeamWithRoleBindings } from "~/server/app-layer/organizations/organization.service";

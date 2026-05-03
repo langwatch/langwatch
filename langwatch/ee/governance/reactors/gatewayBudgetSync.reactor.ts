@@ -12,9 +12,9 @@ import type {
 } from "~/server/gateway/budget.repository";
 import { createLogger } from "~/utils/logger/server";
 import { captureException } from "~/utils/posthogErrorCapture";
-import type { ReactorContext, ReactorDefinition } from "../../../reactors/reactor.types";
-import type { TraceSummaryData } from "../projections/traceSummary.foldProjection";
-import type { TraceProcessingEvent } from "../schemas/events";
+import type { ReactorContext, ReactorDefinition } from "~/server/event-sourcing/reactors/reactor.types";
+import type { TraceSummaryData } from "~/server/event-sourcing/pipelines/trace-processing/projections/traceSummary.foldProjection";
+import type { TraceProcessingEvent } from "~/server/event-sourcing/pipelines/trace-processing/schemas/events";
 
 const logger = createLogger(
   "langwatch:trace-processing:gateway-budget-sync-reactor",

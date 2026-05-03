@@ -50,8 +50,8 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { nanoid } from "nanoid";
 
 import { prisma } from "~/server/db";
-import { IngestionSourceService } from "~/server/governance/activity-monitor/ingestionSource.service";
-import { PROJECT_KIND } from "~/server/governance/governanceProject.service";
+import { IngestionSourceService } from "@ee/governance/services/activity-monitor/ingestionSource.service";
+import { PROJECT_KIND } from "@ee/governance/services/governanceProject.service";
 
 import { app as ingestApp } from "../ingestionRoutes";
 

@@ -14,8 +14,8 @@ import { InMemoryPresenceRepository } from "./presence/repositories/presence.mem
 import { createClickHouseClientFromConfig } from "./clients/clickhouse.factory";
 import { GatewayBudgetRepository } from "~/server/gateway/budget.repository";
 import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
-import { GovernanceKpisClickHouseRepository } from "~/server/governance/governanceKpis.clickhouse.repository";
-import { GovernanceOcsfEventsClickHouseRepository } from "~/server/governance/governanceOcsfEvents.clickhouse.repository";
+import { GovernanceKpisClickHouseRepository } from "@ee/governance/services/governanceKpis.clickhouse.repository";
+import { GovernanceOcsfEventsClickHouseRepository } from "@ee/governance/services/governanceOcsfEvents.clickhouse.repository";
 import { NullLangevalsClient } from "./clients/langevals/langevals.client";
 import { LangEvalsHttpClient } from "./clients/langevals/langevals.http.client";
 import { createRedisConnectionFromConfig } from "./clients/redis.factory";

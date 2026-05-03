@@ -14,14 +14,14 @@
  */
 import { z } from "zod";
 
-import { ActivityMonitorService } from "~/server/governance/activity-monitor/activityMonitor.service";
+import { ActivityMonitorService } from "@ee/governance/services/activity-monitor/activityMonitor.service";
 
 import {
   ENTERPRISE_FEATURE_ERRORS,
   requireEnterprisePlan,
-} from "../enterprise";
-import { checkOrganizationPermission } from "../rbac";
-import { createTRPCRouter, protectedProcedure } from "../trpc";
+} from "~/server/api/enterprise";
+import { checkOrganizationPermission } from "~/server/api/rbac";
+import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 
 const enterpriseGate = requireEnterprisePlan(
   ENTERPRISE_FEATURE_ERRORS.ACTIVITY_MONITOR,

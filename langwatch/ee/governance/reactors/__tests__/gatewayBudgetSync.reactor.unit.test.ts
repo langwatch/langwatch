@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { GatewayBudget } from "@prisma/client";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
-import type { ReactorContext } from "../../../../reactors/reactor.types";
-import type { TraceProcessingEvent } from "../../schemas/events";
+import type { ReactorContext } from "~/server/event-sourcing/reactors/reactor.types";
+import type { TraceProcessingEvent } from "~/server/event-sourcing/pipelines/trace-processing/schemas/events";
 import {
   createGatewayBudgetSyncReactor,
   type GatewayBudgetSyncReactorDeps,

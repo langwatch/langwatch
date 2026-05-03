@@ -21,14 +21,14 @@ import {
   AnomalyRuleService,
   SUPPORTED_SCOPES,
   SUPPORTED_SEVERITIES,
-} from "~/server/governance/activity-monitor/anomalyRule.service";
+} from "@ee/governance/services/activity-monitor/anomalyRule.service";
 
 import {
   ENTERPRISE_FEATURE_ERRORS,
   requireEnterprisePlan,
-} from "../enterprise";
-import { checkOrganizationPermission } from "../rbac";
-import { createTRPCRouter, protectedProcedure } from "../trpc";
+} from "~/server/api/enterprise";
+import { checkOrganizationPermission } from "~/server/api/rbac";
+import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 
 const enterpriseGate = requireEnterprisePlan(
   ENTERPRISE_FEATURE_ERRORS.ANOMALY_RULES,

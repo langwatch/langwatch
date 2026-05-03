@@ -29,7 +29,7 @@ import { Prisma } from "@prisma/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { prisma } from "../../db";
+import { prisma } from "~/server/db";
 
 import {
   AnomalyAlertDispatcherService,

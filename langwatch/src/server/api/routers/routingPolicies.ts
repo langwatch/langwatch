@@ -8,7 +8,7 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
-import { RoutingPolicyService } from "~/server/governance/routingPolicy.service";
+import { RoutingPolicyService } from "@ee/governance/services/routingPolicy.service";
 
 import { checkOrganizationPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
