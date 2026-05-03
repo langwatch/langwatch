@@ -64,6 +64,11 @@ export const Resources = {
   VIRTUAL_KEYS: "virtualKeys",
   GATEWAY_BUDGETS: "gatewayBudgets",
   GATEWAY_PROVIDERS: "gatewayProviders",
+  // RoutingPolicies are Enterprise-tier gateway primitives (provider
+  // chain + fallback + per-model rules). Granular permission lets
+  // custom roles delegate routing-policy mgmt without granting
+  // organization:manage. Mirrors gatewayProviders:* shape.
+  ROUTING_POLICIES: "routingPolicies",
   GATEWAY_GUARDRAILS: "gatewayGuardrails",
   // Deprecated (kept for backwards-compat): pre-consolidation perm that
   // gated /[project]/gateway/audit. The page is gone; auditLog:view is
@@ -165,6 +170,8 @@ const TEAM_ROLE_PERMISSIONS: Record<TeamUserRole, Permission[]> = {
     "gatewayProviders:view",
     "gatewayProviders:update",
     "gatewayProviders:manage",
+    "routingPolicies:view",
+    "routingPolicies:manage",
     "gatewayGuardrails:view",
     "gatewayGuardrails:attach",
     "gatewayGuardrails:detach",
@@ -225,6 +232,7 @@ const TEAM_ROLE_PERMISSIONS: Record<TeamUserRole, Permission[]> = {
     "virtualKeys:rotate",
     "gatewayBudgets:view",
     "gatewayProviders:view",
+    "routingPolicies:view",
     "gatewayGuardrails:view",
     "gatewayLogs:view",
     "auditLog:view",
@@ -258,6 +266,7 @@ const TEAM_ROLE_PERMISSIONS: Record<TeamUserRole, Permission[]> = {
     "virtualKeys:view",
     "gatewayBudgets:view",
     "gatewayProviders:view",
+    "routingPolicies:view",
     "gatewayGuardrails:view",
     "gatewayLogs:view",
     "auditLog:view",
@@ -292,6 +301,7 @@ const TEAM_ROLE_PERMISSIONS: Record<TeamUserRole, Permission[]> = {
     "virtualKeys:view",
     "gatewayBudgets:view",
     "gatewayProviders:view",
+    "routingPolicies:view",
     "gatewayGuardrails:view",
     "gatewayLogs:view",
     "auditLog:view",
