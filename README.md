@@ -12,6 +12,7 @@
 <a href="https://twitter.com/intent/follow?screen_name=langwatchai" target="_blank">
    <img src="https://img.shields.io/twitter/follow/langwatchai?logo=X&color=%20%23f5f5f5"
       alt="follow on X"></a>
+<img src="https://img.shields.io/badge/license-Apache%202.0%20%2B%20Enterprise-blue" alt="Open-core: Apache 2.0 floor + Enterprise extension">
 </p>
 
 <video src="https://github.com/user-attachments/assets/ff49882d-4e9d-4b7c-819b-be690fba9387" autoplay loop muted playsinline width="100%" style="display: block; aspect-ratio: 16 / 9;"></video>
@@ -159,9 +160,18 @@ Contributions are what make the open-source community such an amazing place to l
 
 Please read our [Contribution Guidelines](https://github.com/langwatch/langwatch/blob/main/CONTRIBUTING.md) for details on our code of conduct, and the process for submitting pull requests.
 
-## ✍️ License
+## ✍️ License — open-core split
 
-Please read our [LICENSE.md](/LICENSE.md) file.
+LangWatch is **open-core**. The repo ships under two licenses, mapped 1:1 to the directory split:
+
+| Tier | Where it lives | License | What it covers |
+|---|---|---|---|
+| **Apache 2.0 floor** | `langwatch/src/`, `services/aigateway/`, `python-sdk/`, `typescript-sdk/`, `langwatch_nlp/`, `langwatch_server/`, `charts/gateway/`, `docs/` | Apache 2.0 | The platform, AI Gateway data plane, Personal IDE keys + CLI device-flow login, AI Tools Portal at `/me`, routing policies, single ingestion source (`otel_generic`) at 30-day retention, RBAC catalog with the 5 default roles, PII redaction, integration SDKs |
+| **Enterprise extension** | `langwatch/ee/` (governance services / routers / reactors under `langwatch/ee/governance/`) | Enterprise | Multi-source governance ingestion (Workato / S3 / Copilot Studio / OpenAI + Anthropic compliance APIs), anomaly rules + dispatch, OCSF/SIEM export, multi-class retention (`one_year` / `seven_years`), custom roles via `CustomRolePermissions`, SCIM provisioning, post-GA tamper-evidence |
+
+The split is enforced at three layers — see [Open-core licensing](https://docs.langwatch.ai/ai-governance/overview#open-core-licensing) for the layered enforcement (UI gating + tRPC middleware + service-layer defense-in-depth + CLI 402 envelope) and [Self-hosting compliance](https://docs.langwatch.ai/self-hosting/compliance) for what each tier underwrites against SOC 2 / ISO 27001 / GDPR / HIPAA / EU AI Act.
+
+License files at the repo root: [`LICENSE`](/LICENSE) (Apache 2.0, applies to the floor) and [`LICENSE-EE`](/LICENSE-EE) (Enterprise terms, applies to `langwatch/ee/`). The legacy [`LICENSE.md`](/LICENSE.md) is preserved for backwards compatibility while consumers transition.
 
 ## 👮‍♀️ Security + Compliance
 
