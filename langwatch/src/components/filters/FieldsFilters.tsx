@@ -750,6 +750,7 @@ function ListSelection({
 								borderRadius="md"
 								paddingX={2}
 								onMouseMove={() => handleMouseMove(virtualItem.index)}
+								onClick={onChange_}
 							>
 								<Checkbox
 									width="full"
@@ -757,7 +758,6 @@ function ListSelection({
 									gap={2}
 									size="sm"
 									checked={currentValues.includes(field.toString())}
-									onCheckedChange={onChange_}
 								>
 									<VStack width="full" align="start" gap={0}>
 										{details && (
@@ -808,6 +808,7 @@ function ListSelection({
 						borderRadius="md"
 						paddingX={2}
 						onMouseMove={() => handleMouseMove(customValueIndex)}
+						onClick={handleCustomValueSelect}
 					>
 						<Checkbox
 							width="full"
@@ -815,7 +816,6 @@ function ListSelection({
 							gap={2}
 							size="sm"
 							checked={currentValues.includes(customValueQuery)}
-							onCheckedChange={handleCustomValueSelect}
 						>
 							<OverflownTextWithTooltip
 								fontSize="sm"
