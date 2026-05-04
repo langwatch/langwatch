@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 describe("better-auth config", () => {
   describe("when imported", () => {
+    /** @scenario BetterAuth is the live handler */
     it("exports an auth instance without throwing", async () => {
       const module = await import("../index");
       expect(module.auth).toBeDefined();
@@ -44,6 +45,22 @@ describe("better-auth config", () => {
     });
 
     /** @scenario Credentials-only on-prem mode */
+    /** @scenario The BetterAuth admin plugin is intentionally omitted */
+    it("does not register the BetterAuth admin plugin", async () => {
+      const { auth } = await import("../index");
+      const options = (auth as any).options;
+      const pluginIds = (options?.plugins ?? []).map(
+        (p: { id?: string }) => p?.id,
+      );
+      expect(pluginIds).not.toContain("admin");
+      // Only genericOAuth (or empty) is acceptable — impersonation is handled
+      // via the legacy Session.impersonating JSON column, not via the
+      // admin() plugin.
+      for (const id of pluginIds) {
+        expect(id).toBe("generic-oauth");
+      }
+    });
+
     it("gates emailAndPassword.enabled on NEXTAUTH_PROVIDER=email", async () => {
       // Regression for iter-20 bug 16: BetterAuth's email/password routes
       // (`/sign-up/email`, `/sign-in/email`) were unconditionally enabled,

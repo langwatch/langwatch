@@ -62,6 +62,7 @@ const makePrismaMock = (overrides: PrismaMockOverrides = {}): PrismaClient => {
 
 describe("beforeUserCreate", () => {
   describe("when the user is deactivated", () => {
+    /** @scenario Deactivated user is blocked */
     it("blocks the creation by returning false", async () => {
       const prisma = makePrismaMock();
       const result = await beforeUserCreate({
@@ -475,6 +476,7 @@ describe("afterAccountCreate", () => {
   });
 
   describe("when the user's email domain matches an org with the correct SSO provider", () => {
+    /** @scenario Existing user with correct SSO provider auto-links */
     it("clears pendingSsoSetup and removes stale OAuth accounts", async () => {
       const deleteMany = vi.fn().mockResolvedValue(undefined);
       const update = vi.fn().mockResolvedValue(undefined);
