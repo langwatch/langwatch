@@ -17,6 +17,22 @@ import {
 } from "../http-template-engine";
 import { injectTraceContextHeaders } from "../trace-context-headers";
 import type { HttpAgentData } from "../types";
+import { createChildProcessLogger } from "../child-logger";
+import type { Logger } from "~/utils/logger/server";
+
+/**
+ * Truncate a response body for log inclusion. Long bodies are useless in
+ * CloudWatch and explode log volume; the prefix is enough to spot the
+ * upstream's failure mode.
+ */
+const RESPONSE_BODY_PREVIEW_CHARS = 512;
+
+function previewResponseBody(body: string): string {
+  if (body.length <= RESPONSE_BODY_PREVIEW_CHARS) {
+    return body;
+  }
+  return `${body.slice(0, RESPONSE_BODY_PREVIEW_CHARS)}…`;
+}
 
 /**
  * Serialized HTTP agent adapter that uses pre-fetched configuration.
@@ -26,12 +42,15 @@ export class SerializedHttpAgentAdapter extends AgentAdapter {
   role = AgentRole.AGENT;
 
   private readonly config: HttpAgentData;
+  private readonly logger: Logger;
   private capturedTraceId: string | undefined;
 
-  constructor(config: HttpAgentData) {
+  constructor(config: HttpAgentData, logger?: Logger) {
     super();
     this.name = "SerializedHttpAgentAdapter";
     this.config = config;
+    this.logger =
+      logger ?? createChildProcessLogger("langwatch:scenarios:http-adapter");
   }
 
   /** Returns the trace ID captured during the most recent HTTP request. */
@@ -81,15 +100,57 @@ export class SerializedHttpAgentAdapter extends AgentAdapter {
     body: string,
   ): Promise<unknown> {
     const method = this.config.method.toUpperCase();
-    const response = await ssrfSafeFetch(url, {
-      method,
-      headers,
-      body: method !== "GET" ? body : undefined,
-    });
+    const startedAt = Date.now();
+    let response: Response;
+    try {
+      response = await ssrfSafeFetch(url, {
+        method,
+        headers,
+        body: method !== "GET" ? body : undefined,
+      });
+    } catch (error) {
+      const errorClass =
+        error instanceof Error ? error.constructor.name : typeof error;
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.error(
+        {
+          url,
+          method,
+          errorClass,
+          message,
+          durationMs: Date.now() - startedAt,
+        },
+        "http call failed",
+      );
+      throw error;
+    }
+
+    const durationMs = Date.now() - startedAt;
 
     if (!response.ok) {
+      const responseBody = await response.text().catch(() => "");
+      this.logger.warn(
+        {
+          url,
+          method,
+          statusCode: response.status,
+          durationMs,
+          responseBodyPreview: previewResponseBody(responseBody),
+        },
+        "http call failed",
+      );
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
+
+    this.logger.info(
+      {
+        url,
+        method,
+        statusCode: response.status,
+        durationMs,
+      },
+      "http call ok",
+    );
 
     const contentType = response.headers.get("content-type");
     if (contentType?.includes("application/json")) {
