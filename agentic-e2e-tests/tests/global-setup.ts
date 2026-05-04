@@ -59,7 +59,6 @@ function validateEnvironment(): void {
   const appEnvVars = [
     "DATABASE_URL",
     "REDIS_URL",
-    "ELASTICSEARCH_NODE_URL",
     "NEXTAUTH_SECRET",
   ];
 

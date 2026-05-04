@@ -83,7 +83,6 @@ jobs:
       NEXTAUTH_SECRET: "nextauth-secret-for-ci-testing"
       NEXTAUTH_URL: "http://localhost:3000"
       API_TOKEN_JWT_SECRET: "api-jwt-secret-for-ci-testing"
-      ELASTICSEARCH_NODE_URL: "http://localhost:9200"
       REDIS_URL: "redis://localhost:6379"
       BUILD_TIME: "true"
 
@@ -147,7 +146,6 @@ jobs:
       NEXTAUTH_SECRET: "nextauth-secret-for-ci-testing"
       NEXTAUTH_URL: "http://localhost:3000"
       API_TOKEN_JWT_SECRET: "api-jwt-secret-for-ci-testing"
-      ELASTICSEARCH_NODE_URL: "http://localhost:9200"
       CLICKHOUSE_URL: "http://default:ci_password@localhost:8123/test_langwatch"
       CI_REDIS_URL: "redis://localhost:6379"
       CI_CLICKHOUSE_URL: "http://default:ci_password@localhost:8123/test_langwatch"

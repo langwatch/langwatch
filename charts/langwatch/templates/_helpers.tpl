@@ -293,8 +293,6 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 
 - name: SKIP_ENV_VALIDATION
   value: {{ .Values.app.features.skipEnvValidation | default false | quote }}
-- name: SKIP_ELASTIC_MIGRATE
-  value: "true"
 - name: DISABLE_PII_REDACTION
   value: {{ .Values.app.features.disablePiiRedaction | default false | quote }}
 
