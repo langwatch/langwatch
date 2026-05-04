@@ -6,8 +6,7 @@ Feature: PullerAdapter framework contract
   So that pull-mode ingestion is universal: the BullMQ worker + the admin UI
   + the CH ingest path are the same regardless of source-type
 
-  Inspired by Singer Tap / Airbyte CDK / Apache Camel / Kafka Connect — pull
-  side. Spec maps to Phase 10 backend (Sergey: P10-adapter-iface).
+  Inspired by Singer Tap / Airbyte CDK / Apache Camel / Kafka Connect — pull side.
 
   Background:
     Given the LangWatch governance ingest pipeline accepts events under the unified `/governance/ingest/*` substrate

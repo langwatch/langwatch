@@ -6,8 +6,6 @@ Feature: `langwatch opencode` wrapper end-to-end
   wrappers, with whichever provider OpenCode is configured against (typically
   Anthropic)
 
-  Spec maps to Phase 11 (Sergey: P11-per-wrapper).
-
   Background:
     Given the LangWatch control plane + stub Anthropic provider are running
     And alice has a default routing policy + active CLI session

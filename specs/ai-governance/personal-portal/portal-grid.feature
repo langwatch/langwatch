@@ -6,7 +6,6 @@ Feature: AI Tools Portal — Grid layout on /me
   So that I can pick the next tool to set up without hunting through
   documentation or asking my admin
 
-  Per Phase 7 architecture (rchaves directive 2026-05-03):
     /me is the AI Tools Home. Portal grid hero on top, existing usage
     dashboard below. Single landing surface; no ferry between two URLs.
     The portal is the customizable company portal — admins curate the

@@ -6,9 +6,6 @@ Feature: Microsoft Copilot Studio reference puller (built on HttpPollingPullerAd
   So that admins enable "Copilot Studio" with one click in the UI + the
   framework handles polling / pagination / event-mapping
 
-  Demonstrates the framework end-to-end. Spec maps to Phase 10 backend
-  (Sergey: P10-reference-impl).
-
   Background:
     Given the puller framework + HttpPollingPullerAdapter + S3PollingPullerAdapter are in place
 

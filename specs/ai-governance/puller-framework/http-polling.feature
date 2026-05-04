@@ -7,7 +7,6 @@ Feature: HttpPollingPullerAdapter (universal HTTP-polling adapter)
   So that I don't have to write custom adapter code per platform
 
   Mirrors Airbyte's HTTP-source connector + Singer Tap's REST extractor.
-  Spec maps to Phase 10 backend (Sergey: P10-http-adapter).
 
   Background:
     Given an IngestionSource of type `pull` with adapter `http_polling`

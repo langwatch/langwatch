@@ -5,7 +5,6 @@ Feature: AI Tools Portal — Admin catalog editor at /settings/governance/tool-c
   So that I can publish, retire, scope, and order the tile set without
   database access
 
-  Per Phase 7 architecture (rchaves directive 2026-05-03):
     The admin editor is the only authoring surface — no API for tile
     creation outside of /settings/governance/tool-catalog. Reuses Chakra
     Drawer pattern from existing IngestionSource/AnomalyRule editors.

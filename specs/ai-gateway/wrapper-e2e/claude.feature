@@ -6,9 +6,6 @@ Feature: `langwatch claude` wrapper end-to-end
   while I get the same Claude Code experience I'd have running it
   directly
 
-  Spec maps to Phase 11 (Sergey: P11-harness, P11-per-wrapper, P11-ci).
-  Reuses the `services/aigateway/` Bifrost test patterns.
-
   Background:
     Given the LangWatch control plane is running on a test port
     And a stub Bifrost-compatible Anthropic provider is wired into the gateway test harness

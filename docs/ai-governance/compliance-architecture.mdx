@@ -113,7 +113,7 @@ LangWatch's RBAC layer (`langwatch/src/server/api/rbac.ts`) is the single source
 
 **Custom-role delegation surface** is the production-shape mechanism for finer-grained access. Example: an org wanting a "security_analyst" role gets it via a custom role granting `governance:view` + `activityMonitor:view` + `anomalyRules:view` — read-only governance access for the security team without admin-level org management capability. Configurable through the existing Roles UI.
 
-**Chrome visibility gates**: `hasPermission('governance:view') && release_ui_ai_governance_enabled` for the Govern sidebar section; `hasPermission('virtualKeys:view') && release_ui_ai_gateway_menu_enabled` for the AI Gateway sidebar section. The feature flags are operator rollout knobs; the permissions are the audience predicate. Two flags preserve pilot flexibility — Gateway and Governance can roll out independently per @rchaves directive 2026-04-29.
+**Chrome visibility gates**: `hasPermission('governance:view') && release_ui_ai_governance_enabled` for the Govern sidebar section; `hasPermission('virtualKeys:view') && release_ui_ai_gateway_menu_enabled` for the AI Gateway sidebar section. The feature flags are operator rollout knobs; the permissions are the audience predicate. Two flags preserve pilot flexibility so Gateway and Governance can roll out independently.
 
 **tRPC + REST enforcement**: every governance procedure currently checks `organization:manage` (broad). Granularization to the new dedicated permissions (`governance:manage`, `ingestionSources:manage`, etc.) is a deferred follow-up — existing checks still work; the catalog addition unblocks the gate-side migration.
 

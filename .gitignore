@@ -110,3 +110,8 @@ preprocessed_configs/
 status
 uuid
 .claude/worktrees/
+
+# Agent scratch — transient PR-description drafts staged for `gh api PATCH`
+# of the GitHub PR body; never the source of truth (PR body on GitHub is).
+.claude/PR-*-DESCRIPTION.md
+.claude/PR-DESCRIPTION.md

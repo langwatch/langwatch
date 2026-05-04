@@ -5,8 +5,6 @@ Feature: `langwatch codex` wrapper end-to-end
   So that all the same governance properties hold as for `langwatch claude`,
   with OpenAI as the provider instead of Anthropic
 
-  Spec maps to Phase 11 (Sergey: P11-per-wrapper).
-
   Background:
     Given the LangWatch control plane is running on a test port
     And a stub Bifrost-compatible OpenAI provider is wired into the gateway

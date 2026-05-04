@@ -5,8 +5,7 @@ Feature: `langwatch cursor` wrapper end-to-end
   So that Cursor sessions get the same governance + per-user attribution
   as Claude Code / Codex
 
-  Cursor speaks both Anthropic-shaped + custom request shapes; the wrapper
-  needs to handle both. Spec maps to Phase 11 (Sergey: P11-per-wrapper).
+  Cursor speaks both Anthropic-shaped + custom request shapes; the wrapper needs to handle both.
 
   Background:
     Given the LangWatch control plane + stub Anthropic provider are running

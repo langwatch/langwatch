@@ -16,9 +16,6 @@ Feature: Gateway no-spy mode (governanceLogContentMode)
   store"). The CH-stored span attributes are what employees can be searched
   against.
 
-  Spec maps to Phase 9 backend (Sergey: P9-schema, P9-strip-service,
-  P9-pipeline-wire, P9-int-test) + UI (Alexis: P9-ui) + docs (Andre: P9-docs).
-
   Background:
     Given organization "acme" exists with `governanceLogContentMode = "full"` (default)
     And alice is an org ADMIN of "acme"

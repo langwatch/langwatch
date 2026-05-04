@@ -4,7 +4,6 @@ Feature: AI Tools Portal — Model-provider tile inline VK creation
   and see the show-once secret + base URL inline
   So that I can wire up my own integration without leaving the portal
 
-  Per Phase 7 architecture (rchaves directive 2026-05-03):
     The model-provider tile reuses `personalVirtualKeys.issuePersonal`
     as the backend mutation, passing the catalog entry's
     `config.suggestedRoutingPolicyId` so the issued VK is bound to the

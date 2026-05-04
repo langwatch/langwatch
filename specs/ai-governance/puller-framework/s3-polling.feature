@@ -10,8 +10,6 @@ Feature: S3PollingPullerAdapter (universal S3-polling adapter)
   Cursor = lexicographic-max key seen so far. Resume-from-cursor = list
   keys lexicographically AFTER the cursor.
 
-  Spec maps to Phase 10 backend (Sergey: P10-s3-adapter).
-
   Background:
     Given an IngestionSource of type `pull` with adapter `s3_polling`
 

@@ -4,8 +4,6 @@ Feature: `langwatch gemini` wrapper end-to-end
   So that Gemini sessions get the same governance treatment as the other
   wrappers, with Google as the provider
 
-  Spec maps to Phase 11 (Sergey: P11-per-wrapper).
-
   Background:
     Given the LangWatch control plane + stub Google Gemini provider are running
     And alice has a default routing policy resolving to the stub Gemini provider

@@ -7,7 +7,6 @@ Feature: AI Tools Portal — External-tool tile markdown render
   (e.g. Copilot Studio, Workato, an internal wiki) without leaving the
   LangWatch surface
 
-  Per Phase 7 architecture (rchaves directive 2026-05-03):
     The external-tool tile is markdown + link only — no backend mutation,
     no inline form. Markdown is rendered through the existing sanitizer
     at `~/components/Markdown` so admin input cannot inject script tags.

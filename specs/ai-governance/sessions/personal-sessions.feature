@@ -9,10 +9,6 @@ Feature: Personal CLI sessions / devices inventory
   Apple ID "Trusted devices" pattern: per-session metadata captured at
   device-flow exchange + a single API the user controls.
 
-  Spec maps to Phase 8 backend (Sergey: P8-schema, P8-exchange, P8-list-api,
-  P8-int-test) + UI (Alexis: P8-ui-sessions, P8-dogfood) + docs (Andre:
-  P8-docs).
-
   Background:
     Given alice exists as an organization user of "acme"
     And alice has an active CLI device-flow access token + refresh token

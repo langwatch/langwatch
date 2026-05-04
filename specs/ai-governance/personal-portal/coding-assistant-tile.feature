@@ -4,7 +4,6 @@ Feature: AI Tools Portal — Coding-assistant tile click-to-expand
   to run, with copy support and a walkthrough of what happens next
   So that I can paste-and-run instead of hunting through SDK docs
 
-  Per Phase 7 architecture (rchaves directive 2026-05-03):
     The coding-assistant tile click reveals the existing `langwatch <tool>`
     flow — no new backend. The tile's `config.setupCommand` and optional
     `helperText`+`setupDocsUrl` are the only stored fields.

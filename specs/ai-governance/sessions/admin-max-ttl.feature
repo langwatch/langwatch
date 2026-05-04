@@ -9,9 +9,6 @@ Feature: Admin-controlled max session lifetime (max-TTL)
   rejects expired sessions with a clear `error: "session_expired"` so the
   CLI can prompt re-login.
 
-  Spec maps to Phase 8 backend (Sergey: P8-schema, P8-refresh-ttl) + UI
-  (Alexis: P8-ui-admin-ttl).
-
   Background:
     Given organization "acme" exists
     And alice is an org ADMIN of "acme"

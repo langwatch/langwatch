@@ -7,7 +7,6 @@ Feature: CLI wrapper login → token → env injection → routing
   but every prompt is observable + governed without any per-invocation auth.
 
   Inspired by `gh auth login` / `aws-vault exec` — wrap don't replace.
-  Spec maps to Phase 11 (Sergey: P11-wrapper-e2e).
 
   Background:
     Given the user has run `langwatch login --device` and a `GovernanceConfig` with
