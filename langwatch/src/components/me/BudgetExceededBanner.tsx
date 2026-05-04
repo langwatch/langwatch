@@ -2,6 +2,7 @@ import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import { AlertTriangle, ExternalLink, TrendingUp } from "lucide-react";
 import React from "react";
 
+import { formatBudgetUsd } from "../gateway/formatBudgetUsd";
 import { Link } from "../ui/link";
 
 /**
@@ -61,13 +62,11 @@ const SCOPE_LABEL: Record<string, string> = {
   organization: "organization",
 };
 
-const USD_FORMATTER = new Intl.NumberFormat("en-US", {
-  style: "currency",
-  currency: "USD",
-});
-
+// Defer to the shared gateway formatter so sub-cent gpt-5-mini-class
+// spend renders with micro-precision instead of getting truncated to
+// $0.00 by Intl.NumberFormat's 2-decimal default.
 function fmtUsd(n: number): string {
-  return USD_FORMATTER.format(n);
+  return formatBudgetUsd(n);
 }
 
 export function BudgetExceededBanner({

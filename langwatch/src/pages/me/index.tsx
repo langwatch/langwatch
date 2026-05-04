@@ -12,6 +12,7 @@ import Head from "~/utils/compat/next-head";
 
 import { LoadingScreen } from "~/components/LoadingScreen";
 import { NotFoundScene } from "~/components/NotFoundScene";
+import { formatBudgetUsd } from "~/components/gateway/formatBudgetUsd";
 import { AiToolsPortal } from "~/components/me/AiToolsPortal";
 import { BudgetExceededBanner } from "~/components/me/BudgetExceededBanner";
 import MyLayout from "~/components/me/MyLayout";
@@ -19,8 +20,10 @@ import { usePersonalContext } from "~/components/me/usePersonalContext";
 import { useFeatureFlag } from "~/hooks/useFeatureFlag";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 
-const fmtUsd = (amount: number) =>
-  amount === 0 ? "$0.00" : numeral(amount).format("$0,0.00");
+// /me/usage frequently surfaces sub-cent gpt-5-mini-class spend; defer
+// to the shared gateway formatter so $0.000165 doesn't render as $0.00.
+// See iter L: docs/governance bug-class fix.
+const fmtUsd = (amount: number) => formatBudgetUsd(amount);
 
 const fmtPctDelta = (pct: number | null) =>
   pct === null
