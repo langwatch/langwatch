@@ -4,6 +4,11 @@ Feature: Create workflow agent via new workflow
   I want to create a new workflow with a blank template
   So that I can build my agent logic from scratch
 
+  # All scenarios in this file describe a UI flow that crosses the agent
+  # type selector → New Workflow modal → workflow studio redirect. They
+  # need a Next.js page-level integration harness or a Playwright E2E to
+  # exercise end-to-end. Aspirational pending that harness.
+
   Background:
     Given I am logged in to a project
 
