@@ -110,7 +110,7 @@ Feature: SSRF blocking via BLOCK_LOCAL_HTTP_CALLS toggle (TS + Python parity)
         | TS     |
         | Python |
 
-    @unit @unimplemented
+    @unit
     Scenario Outline: <impl> allowlist works in production NODE_ENV
       Given NODE_ENV is "production"
       And BLOCK_LOCAL_HTTP_CALLS is "true"
@@ -177,7 +177,7 @@ Feature: SSRF blocking via BLOCK_LOCAL_HTTP_CALLS toggle (TS + Python parity)
     self-signed-cert behavior, but it no longer gates private-IP blocking.
     Operators must set BLOCK_LOCAL_HTTP_CALLS explicitly.
 
-    @unit @unimplemented
+    @unit
     Scenario: TS validator ignores IS_SAAS for SSRF blocking
       Given IS_SAAS is "true"
       And BLOCK_LOCAL_HTTP_CALLS is unset
@@ -185,7 +185,7 @@ Feature: SSRF blocking via BLOCK_LOCAL_HTTP_CALLS toggle (TS + Python parity)
       Then the validation passes
       And no SSRF block error is raised
 
-    @unit @unimplemented
+    @unit
     Scenario: TS validator with explicit BLOCK_LOCAL_HTTP_CALLS overrides any IS_SAAS state
       Given IS_SAAS is "false"
       And BLOCK_LOCAL_HTTP_CALLS is "true"

@@ -207,6 +207,58 @@ describe("createSSRFValidator()", () => {
       );
     });
   });
+
+  describe("env-var independence (validator reads only its config)", () => {
+    /** @scenario <impl> allowlist works in production NODE_ENV */
+    it("allowlist behaves identically with NODE_ENV=production", async () => {
+      vi.stubEnv("NODE_ENV", "production");
+      try {
+        const validate = createSSRFValidator({
+          blockLocal: true,
+          allowedHosts: ["10.0.5.3"],
+        });
+
+        const result = await validate("http://10.0.5.3/api");
+        expect(result.type).toBe("allowlisted");
+        expect(result.hostname).toBe("10.0.5.3");
+      } finally {
+        vi.unstubAllEnvs();
+      }
+    });
+
+    /** @scenario TS validator ignores IS_SAAS for SSRF blocking */
+    it("blockLocal=false stays permissive even when IS_SAAS=true", async () => {
+      vi.stubEnv("IS_SAAS", "true");
+      try {
+        const validate = createSSRFValidator({
+          blockLocal: false,
+          allowedHosts: [],
+        });
+
+        const result = await validate("http://10.0.5.3/");
+        expect(result.type).toBe("resolved");
+      } finally {
+        vi.unstubAllEnvs();
+      }
+    });
+
+    /** @scenario TS validator with explicit BLOCK_LOCAL_HTTP_CALLS overrides any IS_SAAS state */
+    it("blockLocal=true blocks private IPs even when IS_SAAS=false", async () => {
+      vi.stubEnv("IS_SAAS", "false");
+      try {
+        const validate = createSSRFValidator({
+          blockLocal: true,
+          allowedHosts: [],
+        });
+
+        await expect(validate("http://10.0.5.3/")).rejects.toThrow(
+          "private or localhost IP addresses",
+        );
+      } finally {
+        vi.unstubAllEnvs();
+      }
+    });
+  });
 });
 
 describe("createSSRFSafeFetchConfig()", () => {
