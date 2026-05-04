@@ -68,6 +68,7 @@ describe("licensePurchaseHandler", () => {
 
   describe("handleLicensePurchase()", () => {
     describe("when checkout session has valid buyer details", () => {
+      /** @scenario Use business name as organization name in license */
       it("generates a GROWTH license with the correct seat count", async () => {
         const session = createMockCheckoutSession();
 

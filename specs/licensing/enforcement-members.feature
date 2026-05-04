@@ -1,5 +1,27 @@
 @wip @integration
 Feature: Member Limit Enforcement with License
+
+  # Eight role-classification scenarios are bound below to
+  # member-classification.unit.test.ts. The remaining @unimplemented
+  # scenarios fall in three groups:
+  #   1. License-based invite-flow scenarios (under/at/over limit, bulk
+  #      invite, expired/invalid-license FREE-tier fallback, pending
+  #      invite aggregation, lite-vs-full member counting) — exercised
+  #      partially by license-limit-guard.unit.test.ts
+  #      (assertMemberTypeLimitNotExceeded) and member.repository tests,
+  #      but the end-to-end "invite a user via tRPC, FORBIDDEN" path
+  #      requires an integration fixture that mounts the team-router
+  #      against a license-bearing org. No such harness yet.
+  #   2. UI click-then-modal scenarios (Add members button always
+  #      clickable, shows upgrade modal at limit, opens form when
+  #      allowed, disabled-tooltip for non-admin) — require a
+  #      page-level component test against the members page.
+  #   3. Role-update enforcement (Lite→Full upgrade allowed/blocked,
+  #      custom-role mutation that crosses lite/full boundary) — needs
+  #      a tRPC organization.updateMemberRole integration test that
+  #      asserts the limit guard fires; partial coverage in
+  #      license-limit-guard.unit.test.ts but no end-to-end binding.
+  # All aspirational pending those test harnesses.
   As a LangWatch self-hosted deployment with a license
   I want the member invite limit to be enforced
   So that organizations respect their licensed seat count
@@ -126,14 +148,12 @@ Feature: Member Limit Enforcement with License
     Then the request fails with FORBIDDEN
     And the error message contains "Over the limit of lite members allowed"
 
-  @unimplemented
   Scenario: ADMIN role users count as Full Member
     Given the organization has 2 Full Members with role ADMIN
     And the organization has a license with maxMembers 2
     When I invite user "new@example.com" as ADMIN to the organization
     Then the request fails with FORBIDDEN
 
-  @unimplemented
   Scenario: MEMBER role users count as Full Member
     Given the organization has 2 Full Members with role MEMBER
     And the organization has a license with maxMembers 2
@@ -144,7 +164,6 @@ Feature: Member Limit Enforcement with License
   # Custom Role Classification
   # ============================================================================
 
-  @unimplemented
   Scenario: Custom role with only view permissions counts as Lite Member
     Given a custom role "Viewer" exists with permissions:
       | project:view    |
@@ -156,7 +175,6 @@ Feature: Member Limit Enforcement with License
     When I invite user "new@example.com" with custom role "Viewer" to the organization
     Then the invite is created successfully
 
-  @unimplemented
   Scenario: Custom role with manage permission counts as Full Member
     Given a custom role "Manager" exists with permissions:
       | project:view    |
@@ -166,7 +184,6 @@ Feature: Member Limit Enforcement with License
     When I invite user "new@example.com" with custom role "Manager" to the organization
     Then the request fails with FORBIDDEN
 
-  @unimplemented
   Scenario: Custom role with create permission counts as Full Member
     Given a custom role "Creator" exists with permissions:
       | project:view    |
@@ -176,7 +193,6 @@ Feature: Member Limit Enforcement with License
     When I invite user "new@example.com" with custom role "Creator" to the organization
     Then the request fails with FORBIDDEN
 
-  @unimplemented
   Scenario: Custom role with update permission counts as Full Member
     Given a custom role "Editor" exists with permissions:
       | project:view    |
@@ -186,7 +202,6 @@ Feature: Member Limit Enforcement with License
     When I invite user "new@example.com" with custom role "Editor" to the organization
     Then the request fails with FORBIDDEN
 
-  @unimplemented
   Scenario: Custom role with delete permission counts as Full Member
     Given a custom role "Deleter" exists with permissions:
       | project:view    |
@@ -196,7 +211,6 @@ Feature: Member Limit Enforcement with License
     When I invite user "new@example.com" with custom role "Deleter" to the organization
     Then the request fails with FORBIDDEN
 
-  @unimplemented
   Scenario: Custom role with share permission counts as Full Member
     Given a custom role "Sharer" exists with permissions:
       | traces:view     |

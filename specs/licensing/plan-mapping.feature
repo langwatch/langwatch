@@ -58,6 +58,12 @@ Feature: License to PlanInfo Mapping
   # Constants: UNLIMITED_PLAN
   # ============================================================================
 
+  # KEPT @unimplemented: requires a structural assertion test for the
+  # UNLIMITED_PLAN constant exported from ee/licensing/constants.ts. The
+  # constant is currently used as a fixture in plan-router/onboarding tests
+  # but its full shape is not asserted anywhere. Cheap to add: a
+  # constants.unit.test.ts case that imports UNLIMITED_PLAN and checks
+  # every field against the literals listed below.
   @unimplemented
   Scenario: UNLIMITED_PLAN has correct structure for backward compatibility
     When I access the UNLIMITED_PLAN constant
@@ -76,6 +82,9 @@ Feature: License to PlanInfo Mapping
   # Constants: FREE_PLAN
   # ============================================================================
 
+  # KEPT @unimplemented: same gap as UNLIMITED_PLAN above. FREE_PLAN's full
+  # shape is not asserted directly — only piecemeal usage in licenseHandler
+  # integration tests. Add a constants.unit.test.ts case to bind this.
   @unimplemented
   Scenario: FREE_PLAN has correct limits for expired/invalid licenses
     When I access the FREE_PLAN constant

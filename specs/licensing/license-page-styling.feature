@@ -1,4 +1,13 @@
 Feature: License Settings Page Styling
+
+  # All scenarios in this file describe design-system-compliance details
+  # of the License settings page (button colorPalette, drawer
+  # header/body/footer pattern, dropzone styling, badge styling, semantic
+  # colors, skeleton, warning/error boxes). They all require a page-level
+  # component test or Playwright E2E against the rendered License page.
+  # No license-page component fixture exists yet — all aspirational pending
+  # that harness.
+
   As a user
   I want the license settings page to match the platform design language
   So that I have a consistent user experience across the application

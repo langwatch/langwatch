@@ -176,6 +176,7 @@ describe("LicenseEnforcementService", () => {
   });
 
   describe("enforceLimit", () => {
+    /** @scenario Allows workflow creation when under limit */
     it("does not throw when limit is not exceeded", async () => {
       vi.mocked(mockRepository.getWorkflowCount).mockResolvedValue(2);
 
@@ -184,6 +185,7 @@ describe("LicenseEnforcementService", () => {
       ).resolves.toBeUndefined();
     });
 
+    /** @scenario Blocks workflow creation when at limit */
     it("throws LimitExceededError when limit is reached", async () => {
       vi.mocked(mockRepository.getWorkflowCount).mockResolvedValue(3);
 

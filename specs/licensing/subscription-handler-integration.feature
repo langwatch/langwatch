@@ -12,7 +12,6 @@ Feature: PlanProvider License Integration
   # License-Based Plan Resolution
   # ============================================================================
 
-  @unimplemented
   Scenario: Limits to 1 member when no license
     Given the organization has no license
     When I call planProvider.getActivePlan

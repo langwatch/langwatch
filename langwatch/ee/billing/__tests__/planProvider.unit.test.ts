@@ -134,7 +134,7 @@ describe("createSaaSPlanProvider", () => {
     });
 
     describe("when active subscription exists", () => {
-      /** @scenario 'Valid subscription returns its own plan regardless of pricing model' */
+      /** @scenario Only non-null overrides replace plan defaults */
       it("returns plan limits with custom overrides", async () => {
         const subscription = {
           plan: PlanTypes.LAUNCH,

@@ -1,4 +1,13 @@
 Feature: License Generation
+
+  # All scenarios in this file describe admin-side UI flows on the license
+  # generation drawer (form validation, plan-template auto-population,
+  # download filename, "Generate Another" reset). The underlying
+  # generateLicenseKey function is unit-tested in
+  # ee/licensing/__tests__/licenseGenerationService.unit.test.ts but the
+  # drawer UI itself has no component-level test fixture yet — all
+  # aspirational pending that harness.
+
   As an administrator
   I want to generate licenses for organizations
   So that I can provide valid license keys for self-hosted deployments

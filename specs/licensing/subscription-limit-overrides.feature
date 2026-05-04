@@ -1,5 +1,16 @@
 @unit
 Feature: Subscription Limit Overrides
+
+  # The "Only non-null overrides replace plan defaults" scenario is
+  # bound below. The remaining @unimplemented scenarios (per-field
+  # project/message overrides, multiple-overrides-applied-together,
+  # cancellation clears overrides) are exercised at the unit level by
+  # the it.each block in
+  # ee/billing/__tests__/planProvider.unit.test.ts (NUMERIC_OVERRIDE_FIELDS
+  # parameterization), but parameterized it.each tests cannot bind via
+  # @scenario JSDoc. Aspirational pending dedicated prose tests OR a
+  # parity-script enhancement that traverses it.each parameter sets.
+
   As a LangWatch Cloud operator
   I want per-subscription overrides to take precedence over plan defaults
   So that I can customize limits for individual organizations without creating new plans
@@ -35,7 +46,6 @@ Feature: Subscription Limit Overrides
   # Null Overrides Fall Back to Plan Defaults
   # ============================================================================
 
-  @unimplemented
   Scenario: Only non-null overrides replace plan defaults
     Given the subscription overrides member capacity to 20
     And all other override fields are null
