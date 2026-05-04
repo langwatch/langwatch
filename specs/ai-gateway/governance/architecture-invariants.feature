@@ -211,12 +211,53 @@ Feature: AI Gateway Governance — Architecture Invariants
     Given the /governance dashboard renders summary cards
       (spend this month, active users, anomaly counts)
     When the dashboard's tRPC procedures execute
-      (api.activityMonitor.summary / spendByUser / etc.)
+      (api.activityMonitor.summary / spendByUser / spendByTeam / etc.)
     Then they read from the governance_kpis fold projection
       (org_id, source_id, time_bucket → spend/tokens/event_count)
     And NOT from raw recorded_spans / log_records (full partition
       scans would be expensive at scale)
     And NOT from the deleted gateway_activity_events table
+
+  @bdd @architecture @folds @rbac
+  Scenario: Per-team spend rollup honors org tenancy
+    Given an admin in org "acme" with 3 teams (Backend / Frontend / Data)
+      and one IngestionSource per team
+    And the past 30 days have spend distributed across all 3 teams
+    When the admin calls api.activityMonitor.spendByTeam
+      with their organizationId and windowDays = 30
+    Then the response contains exactly 3 rows
+    And each row carries { teamId, teamName, spendUsd, requestCount,
+      deltaPctVsPriorWindow } at minimum (additional metadata fields
+      like lastActivityIso + sourceCount are permitted by the contract
+      and consumed by the UI for caption/tooltip rendering)
+    And NO row references a team outside the admin's organization
+      (cross-org tenancy is enforced via WHERE TenantId = govProjectId
+      so a cross-org leak is structurally impossible)
+    And the deltaPctVsPriorWindow column compares the requested window
+      against the immediately-preceding equal-length window (e.g. 30d
+      vs the prior 30d) so the dashboard surfaces real movement, not
+      cumulative totals
+    And rows with zero spend AND zero requests in BOTH windows are
+      filtered out (no zero-zero noise rows)
+    And the same procedure called by a MEMBER (no organization:view
+      on this org) returns UNAUTHORIZED
+    And the same procedure called by an ADMIN of a DIFFERENT org with
+      acme's organizationId returns UNAUTHORIZED (existence-discovery
+      denied)
+
+  @bdd @architecture @folds
+  Scenario: Sources without a teamId aggregate under an "Org-wide" bucket
+    Given an admin in org "acme" with 2 teams + 1 IngestionSource
+      that has no teamId attached (org-scoped only)
+    And all 3 sources have spend in the past 30 days
+    When the admin calls api.activityMonitor.spendByTeam
+      with their organizationId and windowDays = 30
+    Then the response contains exactly 3 rows
+    And the row covering the team-less source carries
+      teamName = "Org-wide" (or equivalent platform constant)
+    And its spendUsd + requestCount + deltaPctVsPriorWindow are
+      computed from the team-less source's data only (NOT from
+      sources that DO have a teamId)
 
   @bdd @architecture @folds
   Scenario: Anomaly reactor reads from the governance fold, not raw spans

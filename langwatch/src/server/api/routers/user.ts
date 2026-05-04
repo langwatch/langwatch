@@ -26,6 +26,10 @@ import {
   Auth0ApiError,
   changeAuth0Password,
 } from "~/server/auth0/passwordService";
+import { sendBudgetIncreaseRequestEmail } from "~/server/mailer/budgetIncreaseRequestEmail";
+import { createLogger } from "~/utils/logger/server";
+
+const logger = createLogger("langwatch:user-router");
 
 export const userRouter = createTRPCRouter({
   /**
@@ -698,6 +702,74 @@ export const userRouter = createTRPCRouter({
         userId: ctx.session.user.id,
         organizationId: input.organizationId,
       });
+    }),
+
+  /**
+   * Submit a budget-increase request to the org admin. Triggered from the
+   * `/me/budget/request` page (linked from the gateway's 402
+   * `request_increase_url` and from the `langwatch request-increase`
+   * CLI command). Resolves the org's first ADMIN by email and sends them
+   * an HTML email with the user, scope, limit, spent, and optional
+   * free-form message.
+   */
+  requestBudgetIncrease: protectedProcedure
+    .input(
+      z.object({
+        organizationId: z.string(),
+        scope: z.string(),
+        scopeId: z.string(),
+        limitUsd: z.string(),
+        spentUsd: z.string(),
+        period: z.string().optional(),
+        message: z.string().max(2000).optional(),
+      }),
+    )
+    .use(checkOrganizationPermission("organization:view"))
+    .mutation(async ({ ctx, input }) => {
+      const adminEmail = await resolveOrgAdminEmail({
+        prisma: ctx.prisma,
+        organizationId: input.organizationId,
+      });
+      if (!adminEmail) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: "no_admin_found",
+        });
+      }
+      const [organization, requester] = await Promise.all([
+        ctx.prisma.organization.findUnique({
+          where: { id: input.organizationId },
+          select: { name: true },
+        }),
+        ctx.prisma.user.findUnique({
+          where: { id: ctx.session.user.id },
+          select: { email: true, name: true },
+        }),
+      ]);
+      try {
+        await sendBudgetIncreaseRequestEmail({
+          to: adminEmail,
+          requesterEmail: requester?.email ?? ctx.session.user.email ?? "",
+          requesterName: requester?.name ?? undefined,
+          organizationName: organization?.name ?? "",
+          scope: input.scope,
+          scopeId: input.scopeId,
+          limitUsd: input.limitUsd,
+          spentUsd: input.spentUsd,
+          period: input.period,
+          message: input.message,
+        });
+      } catch (err) {
+        logger.error(
+          { err, organizationId: input.organizationId },
+          "failed to send budget increase request email",
+        );
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "email_send_failed",
+        });
+      }
+      return { ok: true as const, sentTo: adminEmail };
     }),
 });
 
