@@ -125,13 +125,13 @@ export class PersonalUsageService {
     const result = await client.query({
       query: `
         SELECT
-          toDate(OccurredAt) AS Day,
-          sum(SpentUsd)      AS SpentUsd,
-          count()            AS Requests
+          toDate(LatestOccurredAt) AS Day,
+          sum(SpentUsd)            AS SpentUsd,
+          count()                  AS Requests
         FROM (
           SELECT
             TraceId,
-            argMax(OccurredAt, UpdatedAt) AS OccurredAt,
+            argMax(OccurredAt, UpdatedAt) AS LatestOccurredAt,
             argMax(TotalCost, UpdatedAt)  AS SpentUsd
           FROM trace_summaries
           WHERE TenantId = {tenantId:String}
@@ -252,19 +252,30 @@ export class PersonalUsageService {
     const client = await getClickHouseClientForProject(input.personalProjectId);
     if (!client) return [];
 
+    // Inner alias must be `LatestOccurredAt` (not `OccurredAt`) so it
+    // doesn't shadow the table column in WHERE — even inside a subquery,
+    // ClickHouse's parser flags `argMax(OccurredAt, UpdatedAt) AS
+    // OccurredAt` colliding with `WHERE OccurredAt >= ...` as
+    // ILLEGAL_AGGREGATION (code 184: "Aggregate function ... is found in
+    // WHERE in query"). Outer SELECT re-projects to `OccurredAt` so the
+    // wire shape stays stable. Caught live during the 2026-05-04 dogfood
+    // pass while loading /me/usage as persona-3.
     const result = await client.query({
       query: `
-        SELECT
-          TraceId,
-          argMax(OccurredAt, UpdatedAt) AS OccurredAt,
-          argMax(Models, UpdatedAt)     AS Models,
-          argMax(TotalCost, UpdatedAt)  AS SpentUsd,
-          argMax(ComputedInput, UpdatedAt) AS Preview
-        FROM trace_summaries
-        WHERE TenantId = {tenantId:String}
-          AND OccurredAt >= {fromMs:DateTime64(3, 'UTC')}
-          AND OccurredAt <  {toMs:DateTime64(3, 'UTC')}
-        GROUP BY TraceId
+        SELECT TraceId, LatestOccurredAt AS OccurredAt, Models, SpentUsd, Preview
+        FROM (
+          SELECT
+            TraceId,
+            argMax(OccurredAt, UpdatedAt) AS LatestOccurredAt,
+            argMax(Models, UpdatedAt)     AS Models,
+            argMax(TotalCost, UpdatedAt)  AS SpentUsd,
+            argMax(ComputedInput, UpdatedAt) AS Preview
+          FROM trace_summaries
+          WHERE TenantId = {tenantId:String}
+            AND OccurredAt >= {fromMs:DateTime64(3, 'UTC')}
+            AND OccurredAt <  {toMs:DateTime64(3, 'UTC')}
+          GROUP BY TraceId
+        )
         ORDER BY OccurredAt DESC
         LIMIT {lim:UInt32}
         SETTINGS ${formatSettings(ANALYTICS_CLICKHOUSE_SETTINGS)}
