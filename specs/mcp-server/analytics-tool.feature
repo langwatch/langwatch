@@ -4,6 +4,13 @@ Feature: MCP Analytics Tool
   I want to query analytics metrics via the MCP server
   So that I can analyze production performance of AI agents
 
+  # All scenarios in this file describe the get_analytics MCP tool. The
+  # underlying analytics router is exercised in the LangWatch app
+  # integration tests; the MCP-side wrapper has lighter integration
+  # coverage in `mcp-server/src/__tests__/all-tools.integration.test.ts`
+  # (analytics endpoints aren't included there yet). Cheap to add when
+  # someone touches the analytics tool wrapper.
+
   Background:
     Given the MCP server is configured with a valid API key
     And the LangWatch project has trace data

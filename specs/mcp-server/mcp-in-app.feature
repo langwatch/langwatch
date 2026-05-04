@@ -9,6 +9,12 @@ Feature: MCP HTTP Server In-App Integration (Phase 1)
   # Phase 2 (follow-up): OAuth Authorization Code + PKCE for Claude Desktop,
   # /authorize/mcp consent page, and SSE transport with graceful drain.
 
+  # All @unimplemented scenarios in this file describe the in-app MCP
+  # transport mount and OAuth flows. Need an integration test against
+  # the langwatch app's MCP route handler — the standalone mcp-server
+  # tests cover the tool-call surface, not the in-app HTTP transport.
+  # Tracked here.
+
   # --- Route Mounting ---
 
   @integration @unimplemented
