@@ -70,7 +70,7 @@ async function startFakeGateway(): Promise<{ server: http.Server; url: string }>
       recordedGwRequests.push({
         path: req.url ?? "",
         method: req.method ?? "",
-        authorization: (req.headers.authorization as string) ?? "",
+        authorization: req.headers.authorization ?? "",
         body,
       });
       res.writeHead(200, { "content-type": "application/json" });
