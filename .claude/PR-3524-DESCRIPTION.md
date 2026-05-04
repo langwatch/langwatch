@@ -7,40 +7,32 @@
 
 ---
 
-## Current status (iter29 — 2026-05-01)
+## Current status (iter34+ — 2026-05-04)
 
-> **Backend GA gate: FULLY GREEN.** All 6 lane-S slices closed (3a/3b/3c/3d/3e/3f) with backend GA verified at unit + integration depth (16 anomaly tests + 56/56 RBAC tests + per-slice integration suites).
+> **Scope**: this PR is the LangWatch AI Governance Platform — a unified org-level control plane (workspaces, sessions, no-spy mode, pull-mode framework, anomaly detection, ingestion sources, OCSF/SIEM export) layered on the AI Gateway data plane, plus the persona-aware chrome that makes both surfaces coexist for end-users / members / admins.
 >
-> **Customer-facing docs flip: COMPLETE** end-to-end against ADR-018 unified-substrate framing. 4 waves shipped:
-> - Wave 1 (`1e34cd9ef`): `trace-vs-activity-ingestion.mdx` reframed
-> - Wave 2 (`f13c33e20`): NEW `compliance-architecture.mdx` + `retention.mdx` + `ocsf-export.mdx`
-> - Wave 3 (`5bca796f2`): 8 ingestion-source pages reframed end-to-end
-> - Wave 4 (`0b4f4d90e`): `personal-keys.mdx` storyboard refresh
+> **In-PR phase landing status** (every row reflects a shipped commit):
 >
-> **Persona-aware experience: SHIPPED.** Initial 1.5b-viii claim ("persona-aware home") was scoped too narrowly to the URL redirect; iter29 dogfood review surfaced the chrome was unchanged from LLMOps defaults (`/me` rendered with two stacked selectors + irrelevant LLMOps sidebar). Cross-lane fix landed end-to-end:
-> - `a935d707e` chrome refactor — new `PersonalSidebar`; `DashboardLayout` swaps to WorkspaceSwitcher + PersonalSidebar on personal scope; `MyLayout` shrinks; `MainMenu` drops chicken-and-egg `hasIngestionSources` predicate
-> - `b311d1ca5` BDD spec FF correction (two-flag shape locked per @rchaves directive)
-> - `385c95e89` AI Governance permissions catalog (5 new Resources × actions added to `rbac.ts`; ADMIN gets full set; MEMBER + EXTERNAL get none; custom-role JSON column = the production-shape delegation surface)
-> - `043726430` chrome gate consumes `governance:view` permission instead of broad `organization:manage`
+> | Phase | What landed | Key SHAs | Remaining (in-PR) |
+> |---|---|---|---|
+> | **Phase 4 — Open-core split** | Lane-B `git mv` of governance UI → `ee/governance/dashboard/`; Lane-S backend → `ee/governance/`; tRPC permission granularization (`routingPolicies:view/manage`); per-file SPDX `LicenseRef-LangWatch-Enterprise` headers (3 dashboard + 41 backend = 44 production EE files); README open-core split table; `@ee/*` alias parity across `tsconfig.*.json` + `vite.config.ts` + every `vitest.config.ts` | `73c39d443` `515b4f4c0` `40c7a4bbc` `05e837dc2` `a8aa293fb` `abbb0cb6c` `b6fef411b` | Only follow-up-PR scope: literal root `LICENSE` / `LICENSE-EE` files |
+> | **Phase 7 — Personal AI Tools Portal** | `/me` portal + AiToolCatalogEntry (org-scoped) + 3 tile classes (coding-assistant / model-provider / external-tool) + admin catalog editor at `/settings/governance/tool-catalog` + persona-aware chrome (`PersonalSidebar`, `DashboardLayout` swap, MainMenu predicate cleanup); enterprise-gating UX (upsell card / FREE-tier defaults); 9 portal PNGs + 5 enterprise-gating PNGs landed | `25dea5fdd` `abf12247c` `33a8cf6d0` `a935d707e` `043726430` | Trace-fold reactor smoke evidence (queued; Docker recovered, Sergey running) |
+> | **Phase 8 — Sessions / Devices** | Backend (`CliSession` model + `personalSessions.{list,revoke,revokeAll}` tRPC + `Organization.maxSessionDurationDays`) + UI (`/me/sessions` device-card grid w/ revoke + revoke-all) + admin max-TTL section in `/settings/governance/index.tsx` + 12 BDD scenarios (sessions + admin-TTL); `cliSessionInventoryService` groups rotated tokens by `session_started_at` so UI sees one card per logical session | `82ae4b666` `1e7360a8f` `890f5e5d5` `bd4875f56` | P8 dogfood capture (queued; Docker recovered) |
+> | **Phase 9 — Gateway no-spy mode** | Backend (`Organization.governanceLogContentMode` enum `full`/`strip_io`/`strip_all` + `governanceContentStrip.service.ts` w/ 30s TTL fail-CLOSED resolver wired in `spanStorage.store.ts` AppendStore + `sessionPolicy.{get,setContentMode}` router extension) + UI (`<ContentModeSection />` 3-card picker w/ forward-looking copy) + 7 BDD scenarios; 14 unit tests; integration test in CI | `6433e3e14` `d6f2f5178` `bd4875f56` | P9 dogfood capture + PG+CH integration test trace_id (queued) |
+> | **Phase 10 — Pull-mode connector framework** | `PullerAdapter` universal contract (Singer Tap / Airbyte CDK pattern) + `HttpPollingPullerAdapter` (JSON-path + template substitution + 4xx-fail/5xx-retry, SSRF-safe) + `S3PollingPullerAdapter` (NDJSON/CSV/JSON-array, lex-max cursor, 50MB/file safety cap) + 3 reference impls (Copilot Studio + OpenAI Compliance + Anthropic Compliance, all locked-shape) + BullMQ worker + direct-to-OCSF event-sink wiring (idempotent via `EventId = <sourceType>:<source_event_id>` + `ReplacingMergeTree`) + 6-scenario worker-dispatch test + UI composer (3-of-5 surfaced — locked refs only) + 26 BDD scenarios. **Adapter id space = 5**. **Phase 10 unit suite: 33 passing.** | `3fdf6626b` `5c084ceca` `17dafb79e` `38ccf82f0` `4cd210b33` `0c9c0f166` `bd4875f56` | P10 dogfood capture + testContainers integration swap (queued) |
+> | **Phase 11 — CLI wrapper e2e in CI** | Pure-Node e2e harness at `typescript-sdk/__tests__/e2e/cli/governance-wrapper.e2e.test.ts` (fake control-plane Express + fake gateway Express + mocked tool binaries on PATH); 16 scenarios across 5 wrapped tools (claude/codex/cursor/gemini/opencode — cursor + gemini included for free since assertion shape was line-for-line identical); `pool: "forks"` singleFork + async `spawn()` to dodge the in-process-HTTP deadlock; PATH scrub + `process.execPath` to dodge real-binary leakage. **3-second runtime, no Docker, no live LLM.** Wired into `test:governance-e2e` script. | `d7c59436d` | P11-ui-handoff Playwright pass on `/cli/auth` (queued) |
 >
-> **Persona-3 regression-safety invariant locked**: LLMOps majority (~90% of users today, no AI gateway) sees ZERO chrome change. DashboardLayout untouched for project_only persona. Verified via BDD spec.
+> **Persona-3 regression-safety invariant locked**: LLMOps majority (~90% of users today, no AI gateway) sees ZERO chrome change. `DashboardLayout` untouched for `project_only` persona. Codified as the FIRST scenario in `persona-aware-chrome.feature`.
 >
-> **Rollout sequence (per @rchaves directive)**: two-phase FF rollout. Phase 1 → flip `release_ui_ai_gateway_menu_enabled` ON → Gateway menu + personal-key flow visible. Phase 2 (later) → flip `release_ui_ai_governance_enabled` ON → Governance dashboard + ingestion-sources + anomaly-rules + OCSF export visible. Two flags, not one — preserves pilot flexibility (gateway-only vs governance-only customer rollouts).
+> **Rollout sequence (per @rchaves directive)**: two-phase FF rollout. Phase 1 → `release_ui_ai_gateway_menu_enabled` ON → Gateway menu + personal-key flow visible. Phase 2 → `release_ui_ai_governance_enabled` ON → Governance dashboard + ingestion-sources + anomaly-rules + OCSF export visible. Two flags, not one — preserves pilot flexibility (gateway-only vs governance-only customer rollouts).
 >
-> **Open vote resolution (per @rchaves 2026-05-02)**:
-> - **Vote D** — Personal-key SSO provisioning: **(a) Apache 2.0 / works for everyone**. Can restrict later via plan-cap follow-up (tracked separately as #3686).
-> - **Vote F** — BSL→Apache 2.0 license-flip timing: **(b) follow-up PR**. But this PR's design + docs + UX pretend Apache 2.0 floor is already in place (free-tier framing, demo-loop wedge copy, etc.).
-> - **Vote G** — Phase 1B.5 sequencing: **(a) parallel** — keep going as already running.
-> - **Vote H** — License relocation Phase 4 in this PR vs follow-up: **SPLIT** (3-lane consensus + locked earlier). This PR ships behavior; follow-up PR ships file relocation.
-> - **Vote I** — Persona-home rollout shape: **(a) feature-flag-gated** — `release_ui_ai_governance_enabled` defaults OFF on merge. Safer rollout; pilot per org via PostHog.
+> **In-PR work remaining** (no critical-path code; all dogfood + smoke evidence):
+> - 3-reactor smoke trace evidence (`gatewayBudgetSync` / `governanceKpisSync` / `governanceOcsfEventsSync`) — Docker recovered; Sergey running end-to-end
+> - Dogfood captures for Phases 7/8/9/10/11 — Lane-B running Playwright pass against the live stack, landing under `docs/images/ai-governance/persona-x-flow/<persona>/<flow>/<screen>.png`
+> - Phase 9 PG+CH integration test trace_id + Phase 10 testContainers integration swap
+> - Final §Smoke evidence rows + §Screenshots grid fill once captures land
 >
-> **CI status @ `75f8e46d0`: FULLY GREEN.** All 15 workflows complete: codeql, sdk-go, langevals, mcp-js, clickhouse-serverless, langwatch-nlp, docs, go-ci, go-services, es-migration, sdk-js, langwatch-app (lint/typecheck/build/4× test-unit/4× test-integration/feature-parity/ci-self-test), e2e-ci, sdk-python, langwatch-chart. CodeRabbit status context = SUCCESS. Only `Auto-approve for validated Low-Risk or Firefighting Check` job is FAILURE — expected for a feature PR (the auto-approve evaluator only passes for trivial / firefighting changes), not a merge blocker.
->
-> **iter32 live-fire — END-TO-END CONFIRMED.** The dogfood loop now runs from scratch in one command and produces real spend in the trace store. Sergey's `1544b834f` closed the last gateway-side blocker (`GatewayConfigMaterialiser.loadProviderChain` now resolves the policy-side `providerCredentialIds` for personal VKs minted via RoutingPolicy, not just direct VK→credential bindings). Alexis verified end-to-end: fresh seeded P4 admin → `seed-personas --mint-vk` → 3 `gpt-4o-mini` completions through the local Go gateway → spans land in `langwatch.stored_spans` with `langwatch.virtual_key_id` + `gen_ai.usage.{input,output}_tokens` populated; `/governance` chrome loads with GOVERN sidebar visible; `/me/usage` chrome correct.
->
-> **One open product question, captured as follow-up (not in this PR per @master_orchestrator)**: `/me/usage` shows zero spend until an admin attaches a Budget — the spend column is driven by `gateway_budget_ledger_events` fold, which only writes when a Budget applies. Lane-S recommendation (Sergey, iter32): separate the usage-display query from the Budget-limit machinery so `/me/usage` aggregates spans directly scoped by `principal_user_id` regardless of Budget binding ("Budget is the LIMIT machinery; usage display is independent"). Captured as a post-merge follow-up; not pulled into this PR. Documented in `admin-setup.mdx` Budget caveat note for the dogfood walkthrough.
->
-> **In-PR fixes tracker (iter32-iter34): A–I, all closed in this PR.** Detail moved to its own §"In-PR fixes tracker (iter32-iter34)" below — A/D/E/G/I dogfood-derived UX fixes (lanes A/B), B/F backend RBAC (lane-S), C architectural review, H CodeRabbit review-driven critical/major/nitpick wave 1 (lane-S, 3 commits). Browser-verified end-to-end. No deferred dogfood bugs from the chrome walks.
+> **Why this is not "feature complete" yet** (per @rchaves 2026-05-04): every phase needs proven end-to-end dogfood evidence — real Playwright captures + real CH rows + real trace_ids — folded into the PR doc before merge. Backend tests ✅ and UI ✅ alone do not prove the customer journey; the smoke + dogfood layer does. Pivoting all lanes back to that loop.
 
 ---
 
@@ -56,7 +48,7 @@ This PR is large (215+ commits, multi-week, 3-lane). If you have **30 minutes**,
 6. **The persona-aware experience (5 min)** — `specs/ai-gateway/governance/persona-aware-chrome.feature` (BDD contract) + `langwatch/src/components/DashboardLayout.tsx` (the layout swap). Persona-3 (LLMOps majority, ~90% of users) regression-safety invariant is FIRST in the spec file by design.
 7. **The dogfood loop (2 min)** — `docs/ai-gateway/governance/admin-setup.mdx#try-it-locally-dogfood-loop` walks the full sign-up → seed-personas → fire-completion → /me/usage flow against your local stack. Reproducible by you, not just the team.
 
-If you have **5 minutes**, skip to step 7 (dogfood loop) and skim the screenshots in §"UI flows + screenshots" below.
+If you have **5 minutes**, skip to step 7 (dogfood loop) and the §Screenshots grid (persona × flow) below.
 
 **What to push back on, if anything:** the `ee/` license-relocation Phase 4 is *deferred to a follow-up PR* per @rchaves vote H — the behavior ships here, the file moves ship next. If you want it done in-PR, flag it and we'll reopen the vote.
 
@@ -713,11 +705,14 @@ Critical path: D1 → D2 → D5 → D8. **Phase 6 status: D1–D8 ✅ — 100% c
 
 ---
 
-## §Screenshots — centralized taxonomy (persona × flow) — REORG IN FLIGHT
+## §Screenshots — centralized persona × flow grid
 
-> **Per rchaves directive 2026-05-03**: replacing scattered screenshot embedding (currently spread across iter32-iter33 + Phase 7 portal + enterprise-gating + persona-aware-chrome + per-page UI sections) with **ONE centralized index, organized by persona × flow**. ASCII wireframes are placeholders only — the real product must be fully developed end-to-end + dogfooded with real screenshots.
+> **Single canonical visual evidence surface** (per rchaves reset 2026-05-04). The PR doc body holds zero inline `![…](…)` image references — every screenshot referenced anywhere in this PR description lives in the grid below, and every flow narrative cross-links to a grid cell by coordinate.
 >
-> **Status**: Asset-library capture in flight (Lane-B). Index reorg lands in a Lane-A doc-pass after the asset library is complete (no point reorganising while assets are still arriving). The grid below shows the target taxonomy + which cells are populated vs missing.
+> **Reorg state**:
+> - **Pass 1 ✅** (`1eb0a0acb` 2026-05-04): all scattered inline embeds throughout the PR doc body deleted; engineering narrative preserved as prose-only with grid-cell cross-links.
+> - **Pass 2 ⏳**: Lane-B running Playwright dogfood pass against the live stack (Docker recovered); new captures landing under canonical `docs/images/ai-governance/persona-x-flow/<persona>/<flow>/<screen>.png`. Grid cells flip from TBD → populated as captures land.
+> - **Pass 3 ⏳**: Lane-A converts ASCII wireframes (Phase 7 §Architecture spine + per-phase ASCII boxes) to "design-time placeholders" with cross-links to the corresponding populated grid cells. Holds until pass 2 is complete so cross-links resolve to real cells, not TBDs.
 
 | Persona ↓ / Flow → | Onboarding | `/me` portal | Sessions | Coding-assistant tile | Model-provider tile | External-tool tile | Admin catalog | Anomaly rules | Ingestion sources | Routing policies | Compliance posture | Privacy mode | Empty state | Error state |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
