@@ -29,13 +29,6 @@ const enterpriseGate = requireEnterprisePlan(
   ENTERPRISE_FEATURE_ERRORS.ACTIVITY_MONITOR,
 );
 
-function extractSourceLabel(detail: unknown): string {
-  const d = (detail as Record<string, unknown>) ?? {};
-  if (typeof d.sourceLabel === "string") return d.sourceLabel;
-  if (typeof d.source === "string") return d.source;
-  return "";
-}
-
 export const activityMonitorRouter = createTRPCRouter({
   /**
    * Summary cards: total spend in window, delta vs previous window,
@@ -119,10 +112,10 @@ export const activityMonitorRouter = createTRPCRouter({
     }),
 
   /**
-   * Recent anomaly alerts produced by the anomaly-detection reactor
-   * (C2). Reads AnomalyAlert rows from PG, sorted by detectedAt DESC.
-   * Returns [] when no rules have fired or when ClickHouse is
-   * disabled (the reactor short-circuits without CH access).
+   * Recent anomaly alerts produced by the anomaly-detection reactor.
+   * Service-routed read of `prisma.anomalyAlert` keyed by org, sorted
+   * by detectedAt DESC. Returns [] when no rules have fired or when
+   * ClickHouse is disabled (the reactor short-circuits without CH).
    */
   recentAnomalies: protectedProcedure
     .input(
@@ -134,32 +127,11 @@ export const activityMonitorRouter = createTRPCRouter({
     .use(checkOrganizationPermission("activityMonitor:view"))
     .use(enterpriseGate)
     .query(async ({ ctx, input }) => {
-      const rows = await ctx.prisma.anomalyAlert.findMany({
-        where: { organizationId: input.organizationId },
-        orderBy: { detectedAt: "desc" },
-        take: input.limit,
+      const service = ActivityMonitorService.create(ctx.prisma);
+      return await service.recentAnomalies({
+        organizationId: input.organizationId,
+        limit: input.limit,
       });
-      return rows.map((row) => ({
-        id: row.id,
-        ruleId: row.ruleId,
-        ruleName: row.ruleName,
-        ruleType: row.ruleType,
-        severity: row.severity as "critical" | "warning" | "info",
-        triggerWindowStartIso: row.triggerWindowStart.toISOString(),
-        triggerWindowEndIso: row.triggerWindowEnd.toISOString(),
-        triggerSpendUsd: row.triggerSpendUsd
-          ? Number(row.triggerSpendUsd.toString())
-          : null,
-        triggerEventCount: row.triggerEventCount,
-        detectedAtIso: row.detectedAt.toISOString(),
-        state: row.state,
-        currentState: row.state as "open" | "acknowledged" | "resolved",
-        detail: row.detail as Record<string, unknown>,
-        // Back-compat aliases for the existing /governance dashboard
-        // (renderer was sketched against the iter-10 mock shape).
-        rule: row.ruleName,
-        sourceLabel: extractSourceLabel(row.detail),
-      }));
     }),
 
   /**

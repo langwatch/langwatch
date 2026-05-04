@@ -93,6 +93,26 @@ export interface ActivityEventDetailRow {
   rawPayload: string;
 }
 
+export interface RecentAnomalyRow {
+  id: string;
+  ruleId: string;
+  ruleName: string;
+  ruleType: string;
+  severity: "critical" | "warning" | "info";
+  triggerWindowStartIso: string;
+  triggerWindowEndIso: string;
+  triggerSpendUsd: number | null;
+  triggerEventCount: number | null;
+  detectedAtIso: string;
+  state: string;
+  currentState: "open" | "acknowledged" | "resolved";
+  detail: Record<string, unknown>;
+  /** Back-compat alias — same as `ruleName`, used by the iter-10 dashboard renderer. */
+  rule: string;
+  /** Best-effort source label pulled from `detail` for the dashboard row. */
+  sourceLabel: string;
+}
+
 export interface SourceHealthMetrics {
   events24h: number;
   events7d: number;
@@ -117,6 +137,13 @@ const ORIGIN_KIND_VALUE = "ingestion_source";
 function pctChange(current: number, previous: number): number {
   if (previous === 0) return current === 0 ? 0 : 100;
   return ((current - previous) / previous) * 100;
+}
+
+function extractSourceLabel(detail: unknown): string {
+  const d = (detail as Record<string, unknown>) ?? {};
+  if (typeof d.sourceLabel === "string") return d.sourceLabel;
+  if (typeof d.source === "string") return d.source;
+  return "";
 }
 
 export class ActivityMonitorService {
@@ -485,6 +512,45 @@ export class ActivityMonitorService {
             : null,
         sourceCount: t.sourceCount,
       }));
+  }
+
+  /**
+   * Recent anomaly alerts produced by the anomaly-detection reactor.
+   * Read-only snapshot of `prisma.anomalyAlert` rows for the org,
+   * sorted by detectedAt DESC. Returns `[]` for orgs with no alerts
+   * — callers render the empty-state in the dashboard.
+   */
+  async recentAnomalies(input: {
+    organizationId: string;
+    limit?: number;
+  }): Promise<RecentAnomalyRow[]> {
+    const limit = input.limit ?? 50;
+    const rows = await this.prisma.anomalyAlert.findMany({
+      where: { organizationId: input.organizationId },
+      orderBy: { detectedAt: "desc" },
+      take: limit,
+    });
+    return rows.map((row) => ({
+      id: row.id,
+      ruleId: row.ruleId,
+      ruleName: row.ruleName,
+      ruleType: row.ruleType,
+      severity: row.severity as "critical" | "warning" | "info",
+      triggerWindowStartIso: row.triggerWindowStart.toISOString(),
+      triggerWindowEndIso: row.triggerWindowEnd.toISOString(),
+      triggerSpendUsd: row.triggerSpendUsd
+        ? Number(row.triggerSpendUsd.toString())
+        : null,
+      triggerEventCount: row.triggerEventCount,
+      detectedAtIso: row.detectedAt.toISOString(),
+      state: row.state,
+      currentState: row.state as "open" | "acknowledged" | "resolved",
+      detail: row.detail as Record<string, unknown>,
+      // Back-compat aliases for the existing /governance dashboard
+      // (renderer was sketched against the iter-10 mock shape).
+      rule: row.ruleName,
+      sourceLabel: extractSourceLabel(row.detail),
+    }));
   }
 
   async ingestionSourcesHealth(input: {
