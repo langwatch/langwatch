@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { generateEvaluatorSlug, isValidEvaluatorSlug } from "../evaluatorSlug";
 
 describe("generateEvaluatorSlug", () => {
+  /** @scenario Generate slug from evaluator name on creation */
   it("should generate slug from simple name with format name-XXXXX", () => {
     const slug = generateEvaluatorSlug("My Custom Evaluator");
     expect(slug).toMatch(/^my-custom-evaluator-[a-z0-9]{5}$/);
@@ -56,12 +57,14 @@ describe("generateEvaluatorSlug", () => {
     );
   });
 
+  /** @scenario Handle empty or whitespace-only names */
   it("should throw error for whitespace-only name", () => {
     expect(() => generateEvaluatorSlug("   ")).toThrow(
       "Evaluator name cannot be empty",
     );
   });
 
+  /** @scenario Handle very long names */
   it("should truncate very long names", () => {
     const longName = "A".repeat(100);
     const slug = generateEvaluatorSlug(longName);
@@ -94,6 +97,7 @@ describe("generateEvaluatorSlug", () => {
     expect(parts[parts.length - 1]).toHaveLength(5);
   });
 
+  /** @scenario Slug uniqueness within project */
   it("should generate unique slugs for same name", () => {
     const slug1 = generateEvaluatorSlug("Same Name");
     const slug2 = generateEvaluatorSlug("Same Name");

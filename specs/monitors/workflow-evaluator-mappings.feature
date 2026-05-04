@@ -13,6 +13,23 @@ Feature: Workflow evaluator mappings in Online Evaluation
       | score  | float|
     And I have a workflow evaluator "My Scorer" linked to workflow "Custom Scorer"
 
+  # All 9 @unimplemented scenarios remain unbound — per AUDIT_MANIFEST.md mostly
+  # KEEP-need-test-added against EvaluatorMappingsSection + OnlineEvaluationDrawer:
+  # - "Workflow evaluator shows mapping fields from workflow entry node" (KEEP via
+  #   getWorkflowEntryOutputs in evaluator.service.ts:145).
+  # - "Workflow evaluator without entry outputs shows no mappings needed" (KEEP at
+  #   EvaluatorEditorContent.tsx:146).
+  # - "Workflow with only optional-like fields allows saving" (KEEP — auto-map exists).
+  # - "Workflow evaluator mappings persist after configuration" (KEEP via drawer:970-979).
+  # - "Editing existing monitor preserves workflow mappings" (KEEP via EvaluatorEditorDrawer:451).
+  # - "Switching from built-in to workflow evaluator refreshes mappings" (KEEP).
+  # - "Switching from workflow to built-in evaluator uses builtin fields" (KEEP).
+  # - "Workflow evaluator at thread level uses thread sources": DUPLICATE per manifest of
+  #   monitor-trace-mappings "Thread level traces mapping" + pending-mappings "Thread level
+  #   always opens editor" — thread-source branching is generic, not workflow-specific.
+  # - "Switching levels clears and re-infers mappings" (KEEP via OnlineEvaluationDrawer.tsx:863-884).
+  # All implementations exist; integration tests pending in PR #3458.
+
   # ============================================================================
   # Workflow evaluator field detection
   # ============================================================================

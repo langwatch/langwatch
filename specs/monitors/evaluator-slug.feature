@@ -4,17 +4,28 @@ Feature: Evaluator Slug Generation
   I want evaluators to have human-readable slugs
   So that guardrails can reference them by slug instead of ID
 
+  # 4 of 8 scenarios bound to evaluatorSlug.unit.test.ts (Generate slug from
+  # name, Slug uniqueness, Handle very long names, Handle empty/whitespace).
+  # Remaining 4 @unimplemented scenarios:
+  # - "Same name allowed in different projects": DELETE per manifest
+  #   (evaluatorSlug.ts is project-agnostic — no project-scoped slug logic).
+  # - "Handle special characters in name": UPDATE per manifest (slugify strict
+  #   drops dots, output is "llm-judge-v20-beta-XXXXX" not "llm-judge-v2-0-beta").
+  # - "Handle unicode characters in name": UPDATE per manifest (scenario name
+  #   contains no unicode; needs rewrite with real unicode example).
+  # - "Retry on unique constraint violation": DELETE per manifest (no retry
+  #   logic exists; uniqueness relies solely on nanoid entropy).
+  # Aspirational pending DELETE/UPDATE rewrites tracked in PR #3458.
+
   Background:
     Given the system supports evaluator creation with slug generation
 
-  @unimplemented
   Scenario: Generate slug from evaluator name on creation
     Given a new evaluator with name "My Custom Evaluator"
     When the evaluator is created
     Then the slug should match pattern "my-custom-evaluator-XXXXX"
     And the slug suffix should be 5 characters from nanoid
 
-  @unimplemented
   Scenario: Slug uniqueness within project
     Given an evaluator with name "Exact Match" exists in project "proj1"
     When creating another evaluator with name "Exact Match" in the same project
@@ -41,14 +52,12 @@ Feature: Evaluator Slug Generation
     Then unicode should be transliterated or removed
     And the slug should be valid
 
-  @unimplemented
   Scenario: Handle very long names
     Given a new evaluator with name that is 200 characters long
     When the evaluator is created
     Then the slug should be truncated to a reasonable length
     And the nanoid suffix should still be present
 
-  @unimplemented
   Scenario: Handle empty or whitespace-only names
     Given a new evaluator with name "   "
     When the evaluator is created

@@ -4,6 +4,32 @@ Feature: Monitor Trace Mappings
   I want to map evaluator fields to trace attributes
   So that the evaluator receives the correct data from traces
 
+  # All 11 @unimplemented scenarios remain unbound — per AUDIT_MANIFEST.md
+  # mix of DUPLICATE and KEEP classifications:
+  # - "Standard fields auto-inference": DUPLICATE of pending-mappings-validation
+  #   "All fields auto-mapped - can save immediately".
+  # - "Contexts field auto-inference": KEEP per manifest (only spec covering
+  #   contexts auto-map; no peer covers it).
+  # - "Expected output infers from metadata": KEEP per manifest (DEFAULT_MAPPINGS
+  #   expected_output → metadata.expected_output; no peer asserts it).
+  # - "Custom field cannot be auto-inferred": DUPLICATE of pending-mappings-validation
+  #   "Some fields cannot be auto-mapped - editor opens".
+  # - "Nested metadata field selection": DUPLICATE of nested-trace-mapping-ui
+  #   "Select field with one level of nesting (metadata)".
+  # - "Nested span field selection": DUPLICATE of nested-trace-mapping-ui
+  #   "Select field with two levels of nesting (spans)".
+  # - "Thread level traces mapping": DUPLICATE of nested-trace-mapping-ui
+  #   "Thread level traces mapping with multi-select".
+  # - "Thread level always requires manual mapping": DUPLICATE of pending-mappings-validation
+  #   "Thread level always opens editor".
+  # - "Mapping to evaluations results": KEEP per manifest (only spec covering
+  #   evaluations source + subkeys at tracesMapping.ts L292-336).
+  # - "Mapping to annotations": KEEP per manifest (only spec covering annotations
+  #   source keys at tracesMapping.ts L338-350).
+  # - "Empty trace source": KEEP per manifest (auto-inference fallback when
+  #   contexts source is empty → pending; no peer asserts source-availability gating).
+  # Aspirational pending KEEP test additions tracked in PR #3458.
+
   Background:
     Given I am configuring an online evaluation
     And trace level is selected

@@ -389,6 +389,8 @@ describe("THREAD_MAPPINGS", () => {
 });
 
 describe("formatSpansDigest", () => {
+  /** @scenario Formatted trace produces a span hierarchy digest */
+  /** @scenario Formatted trace includes inputs and outputs */
   it("produces a string digest from spans", async () => {
     const spans = [
       {
@@ -438,6 +440,7 @@ describe("formatSpansDigest", () => {
     expect(result).toBe("No spans recorded.");
   });
 
+  /** @scenario Formatted trace includes errors */
   it("includes error information in the digest", async () => {
     const spans = [
       {
@@ -465,6 +468,7 @@ describe("formatSpansDigest", () => {
     expect(result).toContain("ERROR");
   });
 
+  /** @scenario Thread-level formatted traces joins multiple traces */
   it("joins multiple trace digests with separator for thread use", async () => {
     const trace1Spans = [
       {
@@ -509,6 +513,7 @@ describe("formatSpansDigest", () => {
 });
 
 describe("getTraceAvailableSources", () => {
+  /** @scenario Trace-level formatted trace source is available */
   it("includes formatted_trace with label 'Full Trace (AI-Readable)'", () => {
     const sources = getTraceAvailableSources([], []);
     const traceSource = sources[0]!;
