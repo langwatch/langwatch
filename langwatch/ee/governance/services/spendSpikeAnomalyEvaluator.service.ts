@@ -393,7 +393,7 @@ export class SpendSpikeAnomalyEvaluator {
     // the alert's detail.dispatch but never propagate up — the
     // evaluator stays log-only-equivalent on permanent webhook
     // failures.
-    let dispatchTag = "log_only";
+    let dispatchTag: string;
     let dispatchOutcomes: Prisma.InputJsonValue = [];
     try {
       const dispatchResult = await this.dispatcher.dispatchAlert({ rule, alert });
