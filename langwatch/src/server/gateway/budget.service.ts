@@ -164,10 +164,11 @@ export class GatewayBudgetService {
   }
 
   async list(organizationId: string): Promise<GatewayBudget[]> {
-    return this.prisma.gatewayBudget.findMany({
+    const budgets = await this.prisma.gatewayBudget.findMany({
       where: { organizationId, archivedAt: null },
       orderBy: [{ scopeType: "asc" }, { createdAt: "desc" }],
     });
+    return await this.applyClickHouseSpend(budgets, organizationId);
   }
 
   async listForProject(projectId: string): Promise<GatewayBudget[]> {
@@ -176,7 +177,7 @@ export class GatewayBudgetService {
       include: { team: true },
     });
     if (!project) return [];
-    return this.prisma.gatewayBudget.findMany({
+    const budgets = await this.prisma.gatewayBudget.findMany({
       where: {
         organizationId: project.team.organizationId,
         archivedAt: null,
@@ -188,12 +189,56 @@ export class GatewayBudgetService {
       },
       orderBy: [{ scopeType: "asc" }, { createdAt: "desc" }],
     });
+    return await this.applyClickHouseSpend(budgets, project.team.organizationId);
+  }
+
+  /**
+   * Decorate budgets with their current-period CH ledger spend, so the
+   * /gateway/budgets list view shows real spend instead of the legacy
+   * (now stale, post-iter72) `GatewayBudget.spentUsd` PG column. Falls
+   * back to the PG column for deploys without CH wired (mirrors the
+   * fallback in `check()`).
+   *
+   * The CH ledger is keyed by TenantId = the project where the trace
+   * landed. ORG/TEAM/PRINCIPAL-scoped budgets accumulate rows across
+   * MULTIPLE projects, so we sum across every project in the org via
+   * `getSpendForBudgetsAcrossTenants`.
+   *
+   * Caught live during the 2026-05-04 dogfood pass (§In-PR fixes M):
+   * sergey-p3-member's PRINCIPAL budget showed $0.00 in the list
+   * despite the CH ledger having 5 real ledger rows totaling
+   * $0.000165.
+   */
+  private async applyClickHouseSpend(
+    budgets: GatewayBudget[],
+    organizationId: string,
+  ): Promise<GatewayBudget[]> {
+    if (!this.chRepo || budgets.length === 0) return budgets;
+    const projects = await this.prisma.project.findMany({
+      where: { team: { organizationId }, archivedAt: null },
+      select: { id: true },
+    });
+    if (projects.length === 0) return budgets;
+    const tenantIds = projects.map((p) => p.id);
+    const spends = await this.chRepo.getSpendForBudgetsAcrossTenants(
+      tenantIds,
+      budgets,
+    );
+    const spendByBudget = new Map(spends.map((s) => [s.budgetId, s.spentUsd]));
+    return budgets.map((b) => {
+      const ch = spendByBudget.get(b.id);
+      if (ch === undefined) return b;
+      return { ...b, spentUsd: new Prisma.Decimal(ch) };
+    });
   }
 
   async get(id: string, organizationId: string): Promise<GatewayBudget | null> {
-    return this.prisma.gatewayBudget.findFirst({
+    const budget = await this.prisma.gatewayBudget.findFirst({
       where: { id, organizationId },
     });
+    if (!budget) return null;
+    const [decorated] = await this.applyClickHouseSpend([budget], organizationId);
+    return decorated ?? budget;
   }
 
   /**
