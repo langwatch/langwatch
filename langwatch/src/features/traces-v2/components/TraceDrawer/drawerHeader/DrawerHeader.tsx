@@ -717,16 +717,14 @@ export const DrawerHeader = memo(function DrawerHeader({
           row separated by thin vertical dividers. The right end slot anchors
           the trace ID + relative timestamp. Collapsing what used to be three
           separate rows keeps the header dense without losing categorisation.
-          `minHeight` reserves space for two pill rows so the strip's height
-          stays stable when the user navigates between traces with different
-          chip counts — without this lock, the body content visibly hops
-          every time you press ←/→ in a conversation. */}
+          The strip wraps naturally — height tracks content rather than
+          locking to two rows, so traces with a single row of pills don't
+          carry a permanent ~28px empty band underneath. */}
       <HStack
         gap={1.5}
         flexWrap="wrap"
         align="center"
         alignContent="flex-start"
-        minHeight="56px"
       >
         {/* Section 1: Performance metrics */}
         <MetricPill label="Duration" value={formatDuration(trace.durationMs)} />
