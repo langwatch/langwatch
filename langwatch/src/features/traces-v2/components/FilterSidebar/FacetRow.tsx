@@ -1,6 +1,8 @@
 import { Badge, Box, HStack, Text } from "@chakra-ui/react";
 import { memo, useCallback } from "react";
+import { analyzeOrGroups } from "~/server/app-layer/traces/query-language/queries";
 import { useFacetHoverStore } from "../../stores/facetHoverStore";
+import { useFilterStore } from "../../stores/filterStore";
 import { RowButton } from "./RowButton";
 import type { FacetItem, FacetValueState } from "./types";
 import { formatCount, paletteFromColor } from "./utils";
@@ -94,16 +96,28 @@ export const FacetRow = memo(function FacetRow({
   const orPalette = orGroupId ? orGroupColor(orGroupId) : null;
 
   const setHoveredFacet = useFacetHoverStore((s) => s.setHoveredFacet);
+  const setHoveredGroup = useFacetHoverStore((s) => s.setHoveredGroup);
   const clearHover = useFacetHoverStore((s) => s.clearHover);
-  // Single-facet broadcast — highlights ONLY this row's matching
-  // chip in the search bar (or vice versa). The whole-OR-group
-  // glow stays reserved for hovering the connector line itself,
-  // which is the explicit "show me everything in this group"
-  // affordance.
+  // Hovering a row that belongs to an OR group lights up every other
+  // member of that group too — the user explicitly asked for this so
+  // they can see "what else is OR'd with this." For non-OR rows we
+  // fall back to a 1:1 highlight (this row ↔ the matching search-bar
+  // chip). The connector line keeps its quiet behaviour: hover it
+  // for the tooltip without pulling member highlights along.
   const handleMouseEnter = useCallback(() => {
     if (!field) return;
-    setHoveredFacet({ field, value: item.value });
-  }, [field, item.value, setHoveredFacet]);
+    const ast = useFilterStore.getState().ast;
+    const orAnalysis = analyzeOrGroups(ast);
+    const groupId = orAnalysis.fieldToGroupId.get(field);
+    const group = groupId
+      ? orAnalysis.groups.find((g) => g.id === groupId)
+      : null;
+    if (group) {
+      setHoveredGroup(group);
+    } else {
+      setHoveredFacet({ field, value: item.value });
+    }
+  }, [field, item.value, setHoveredFacet, setHoveredGroup]);
   const handleMouseLeave = useCallback(() => clearHover(), [clearHover]);
 
   return (

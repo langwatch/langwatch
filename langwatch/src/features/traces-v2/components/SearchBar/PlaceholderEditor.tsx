@@ -174,6 +174,10 @@ export const PlaceholderEditor: React.FC<PlaceholderEditorProps> = ({
                   className="filter-token-delete"
                   aria-label="Remove this filter"
                   tabIndex={-1}
+                  // Mirror the chip's data-attrs so the X button picks
+                  // up the chip-highlight CSS as part of the same pill.
+                  data-filter-chip-field={token.field}
+                  data-filter-chip-value={token.value ?? undefined}
                   onMouseDown={(event) => {
                     // mousedown beats onFocus + onActivate so the editor
                     // doesn't mount mid-click. Stops the placeholder's

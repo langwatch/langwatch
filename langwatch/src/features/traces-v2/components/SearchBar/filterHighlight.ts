@@ -408,6 +408,13 @@ function createDeleteWidget(token: TokenRef): HTMLElement {
   btn.dataset.field = token.field;
   btn.dataset.kind = token.kind;
   if (token.value !== null) btn.dataset.value = token.value;
+  // Mirror the chip's data-attrs onto the X button so the
+  // chip-highlight CSS picks it up as part of the same chip — without
+  // these, hovering the chip would tint just the field:value half and
+  // leave the right-half X button in its original colour, breaking
+  // the visual that the two halves form one pill.
+  btn.dataset.filterChipField = token.field;
+  if (token.value !== null) btn.dataset.filterChipValue = token.value;
 
   // Crisp SVG X — the "×" text glyph rendered chunky and uneven at this size.
   const svg = document.createElementNS(SVG_NS, "svg");

@@ -183,27 +183,27 @@ export interface OrGroupAnalysis {
 }
 
 /**
- * Walk the AST and produce a structured map of every cross-facet OR
- * group. A group is any `LogicalExpression` (op = OR) whose Tag
- * descendants come from more than one distinct field. Nested OR
- * subtrees are flattened into the same group — the visual treatment
- * doesn't distinguish `(a OR b OR c)` from `((a OR b) OR c)`.
+ * Walk the AST and produce a structured map of every OR group. A
+ * group is any `LogicalExpression` (op = OR) with two or more Tag
+ * descendants — *including* same-field ORs like
+ * `(status:error OR status:warning)`, which the sidebar can already
+ * render as multiple selected values within one section but for
+ * which the user still wants the connector line as visual
+ * confirmation that those values are linked. Nested OR subtrees are
+ * flattened into the same group — the visual treatment doesn't
+ * distinguish `(a OR b OR c)` from `((a OR b) OR c)`.
  */
 export function analyzeOrGroups(ast: LiqeQuery): OrGroupAnalysis {
   const groups: OrGroup[] = [];
   const fieldToGroupId = new Map<string, string>();
 
-  // Recurse looking for OR LogicalExpression nodes. When we find one,
-  // collect the union of fields under it (flattening nested ORs); if
-  // the count > 1, record the group and skip descending further into
-  // that subtree (we'd just re-find the same fields).
   const visit = (node: LiqeQuery): void => {
     if (node.type === "LogicalExpression") {
       if (node.operator.operator === "OR") {
         const members = collectOrMembers(node);
-        const fields = new Set(members.map((m) => m.field));
-        if (fields.size > 1) {
+        if (members.length > 1) {
           const id = `or-${node.location.start}-${node.location.end}`;
+          const fields = new Set(members.map((m) => m.field));
           groups.push({
             id,
             fields,
