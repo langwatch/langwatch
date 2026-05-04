@@ -3,6 +3,14 @@ Feature: Suite run validation for organization-scoped prompts
   I want suites to correctly resolve prompt targets across projects
   So that I can run suites referencing prompts from any project in my organization
 
+  # @unit scenarios need a SuiteService test that hits the
+  # validateTargetExists path with org-scope prompts in another project
+  # — `suite.service.unit.test.ts` covers ScenarioReference / TargetReference
+  # validation but the prompt-org-scope branch isn't asserted yet.
+  # @integration scenarios need a SuiteFormDrawer / edit-drawer
+  # component test for the deleted-prompt warning UI. Both bindings are
+  # cheap to add when someone touches those code paths.
+
   Background:
     Given I am logged into project "my-project" in organization "my-org"
 

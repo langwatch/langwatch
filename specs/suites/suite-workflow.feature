@@ -5,6 +5,14 @@ Feature: Suite Workflow — Create, Run, See Results
 
   See mockups.md for UI reference.
 
+  # All scenarios in this file describe the multi-step Suites page UI flow
+  # (create-suite drawer → scenarios picker → targets picker → run trigger →
+  # results page). Need a Next.js page-level integration harness or
+  # Playwright E2E to drive end-to-end. The underlying suite REST API,
+  # repository, and service paths are already exercised by
+  # `suites-api.integration.test.ts`, `suite.repository.unit.test.ts`,
+  # `suite.service.unit.test.ts`.
+
   Background:
     Given I am logged into project "my-project"
 
