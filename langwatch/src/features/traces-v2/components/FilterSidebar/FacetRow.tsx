@@ -1,8 +1,6 @@
 import { Badge, Box, HStack, Text } from "@chakra-ui/react";
 import { memo, useCallback } from "react";
-import { analyzeOrGroups } from "~/server/app-layer/traces/query-language/queries";
 import { useFacetHoverStore } from "../../stores/facetHoverStore";
-import { useFilterStore } from "../../stores/filterStore";
 import { RowButton } from "./RowButton";
 import type { FacetItem, FacetValueState } from "./types";
 import { formatCount, paletteFromColor } from "./utils";
@@ -96,26 +94,16 @@ export const FacetRow = memo(function FacetRow({
   const orPalette = orGroupId ? orGroupColor(orGroupId) : null;
 
   const setHoveredFacet = useFacetHoverStore((s) => s.setHoveredFacet);
-  const setHoveredGroup = useFacetHoverStore((s) => s.setHoveredGroup);
   const clearHover = useFacetHoverStore((s) => s.clearHover);
+  // Single-facet broadcast — highlights ONLY this row's matching
+  // chip in the search bar (or vice versa). The whole-OR-group
+  // glow stays reserved for hovering the connector line itself,
+  // which is the explicit "show me everything in this group"
+  // affordance.
   const handleMouseEnter = useCallback(() => {
     if (!field) return;
-    // If this field is part of an OR group, broadcast the whole group
-    // so the highlighter lights up every member (in the sidebar AND
-    // the search bar). Otherwise fall back to the single facet so the
-    // matching chip in the search bar still pulses.
-    const ast = useFilterStore.getState().ast;
-    const orAnalysis = analyzeOrGroups(ast);
-    const groupId = orAnalysis.fieldToGroupId.get(field);
-    const group = groupId
-      ? orAnalysis.groups.find((g) => g.id === groupId)
-      : null;
-    if (group) {
-      setHoveredGroup(group);
-    } else {
-      setHoveredFacet({ field, value: item.value });
-    }
-  }, [field, item.value, setHoveredFacet, setHoveredGroup]);
+    setHoveredFacet({ field, value: item.value });
+  }, [field, item.value, setHoveredFacet]);
   const handleMouseLeave = useCallback(() => clearHover(), [clearHover]);
 
   return (

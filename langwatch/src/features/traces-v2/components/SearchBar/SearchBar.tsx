@@ -8,7 +8,6 @@ import { useModelProvidersSettings } from "~/hooks/useModelProvidersSettings";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { SEARCH_FIELDS } from "~/server/app-layer/traces/query-language/metadata";
 import { useTraceFacets } from "../../hooks/useTraceFacets";
-import { analyzeOrGroups } from "~/server/app-layer/traces/query-language/queries";
 import { useFacetHoverStore } from "../../stores/facetHoverStore";
 import { useFilterStore } from "../../stores/filterStore";
 import { AskAiButton } from "../ai/AskAiButton";
@@ -131,21 +130,10 @@ export const SearchBar: React.FC = () => {
       const field = target.dataset.filterChipField ?? "";
       const value = target.dataset.filterChipValue ?? "";
       if (!field || !value) return;
-      // Look up whether this chip belongs to an OR group; if it does,
-      // broadcast the whole group so the highlighter lights up every
-      // member, not just the hovered one. Uses the latest AST so the
-      // group lookup stays in sync with concurrent edits.
-      const ast = useFilterStore.getState().ast;
-      const orAnalysis = analyzeOrGroups(ast);
-      const groupId = orAnalysis.fieldToGroupId.get(field);
-      const group = groupId
-        ? orAnalysis.groups.find((g) => g.id === groupId)
-        : null;
-      if (group) {
-        useFacetHoverStore.getState().setHoveredGroup(group);
-      } else {
-        useFacetHoverStore.getState().setHoveredFacet({ field, value });
-      }
+      // Single-facet broadcast — chip ↔ row 1:1 highlight. The
+      // whole-OR-group glow stays reserved for hovering the
+      // connector line itself, so casual chip hovers stay quiet.
+      useFacetHoverStore.getState().setHoveredFacet({ field, value });
     };
     const leave = (e: Event) => {
       const related = (e as MouseEvent).relatedTarget as HTMLElement | null;

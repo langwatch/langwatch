@@ -5,7 +5,7 @@ import type { OrGroup } from "~/server/app-layer/traces/query-language/queries";
 import { useFacetHoverStore } from "../../stores/facetHoverStore";
 
 const LANE_WIDTH = 14;
-const LINE_THICKNESS = 1.5;
+const LINE_THICKNESS = 2;
 const HIT_AREA_WIDTH = 10;
 
 /**
@@ -185,7 +185,7 @@ export const OrConnectorOverlay: React.FC<OrConnectorOverlayProps> = ({
                   height={`${heightPx}px`}
                   bg={lineColor}
                   borderRadius="full"
-                  opacity={isHovered ? 1 : 0.55}
+                  opacity={isHovered ? 1 : 0.95}
                   transition="opacity 100ms ease, width 100ms ease"
                 />
               </Box>
