@@ -8,15 +8,15 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@clickhouse/client": "1.18.2",
+    "@clickhouse/client": "1.18.3",
     "@elastic/elasticsearch": "^8.17.0",
     "@opentelemetry/otlp-transformer-next": "npm:@opentelemetry/otlp-transformer@0.208.0",
-    "dotenv": "^16.4.0"
+    "dotenv": "^16.6.1"
   },
   "devDependencies": {
     "@types/node": "^20.11.0",
     "tsconfig-paths": "^4.2.0",
-    "tsx": "^4.7.0",
-    "typescript": "^5.3.3"
+    "tsx": "^4.21.0",
+    "typescript": "^6.0.3"
   }
 }
