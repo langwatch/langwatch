@@ -8,13 +8,15 @@ Feature: Remove redundant SUITES label from sidebar
   # Removing it reduces visual clutter while preserving the sidebar's hierarchy
   # (search box, action buttons, and suite cards remain unchanged).
 
-  @integration @unimplemented
+  # Parity status: 2 of 2 scenarios bound to existing tests.
+
+  @integration
   Scenario: Sidebar does not display a redundant SUITES label
     Given the suite sidebar contains suites
     When I view the suites sidebar in expanded mode
     Then there is no "SUITES" section header above the suite list
 
-  @integration @unimplemented
+  @integration
   Scenario: Sidebar still shows suite names and action buttons after label removal
     Given the suite sidebar contains suites
     When I view the suites sidebar in expanded mode

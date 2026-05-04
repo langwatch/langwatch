@@ -107,6 +107,7 @@ describe("<SuiteSidebar/> External Sets", () => {
       );
     });
 
+    /** @scenario "External set batch entry displays the set name" */
     it("displays external set names", () => {
       render(
         <SuiteSidebar

@@ -183,6 +183,8 @@ describe("<RunHistoryPanel/> (all-runs view)", () => {
       return render(<RunHistoryPanel period={defaultPeriod} />, { wrapper: Wrapper });
     }
 
+    /** @scenario "Pre-suite scenario runs appear in All Runs" */
+    /** @scenario "Suite-created runs still appear in All Runs" */
     it("renders All Runs title", () => {
       renderWithRuns();
       expect(screen.getByText("All Runs")).toBeInTheDocument();
@@ -314,6 +316,8 @@ describe("<RunHistoryPanel/> (all-runs view)", () => {
     }
 
     describe("when the panel renders", () => {
+      /** @scenario "All Runs page displays group-by selector with correct options and default" */
+      /** @scenario "None grouping on All Runs preserves batch run layout" */
       it("renders the group-by selector with None selected by default", () => {
         setupWithRuns();
         render(<RunHistoryPanel period={defaultPeriod} />, { wrapper: Wrapper });
@@ -336,6 +340,7 @@ describe("<RunHistoryPanel/> (all-runs view)", () => {
     });
 
     describe("when group-by is changed to Scenario", () => {
+      /** @scenario "User groups All Runs results by scenario" */
       it("renders group row headers instead of batch run rows", async () => {
         setupWithRuns();
         render(<RunHistoryPanel period={defaultPeriod} />, { wrapper: Wrapper });
@@ -356,6 +361,8 @@ describe("<RunHistoryPanel/> (all-runs view)", () => {
         );
       });
 
+      /** @scenario "All run types appear together" */
+      /** @scenario "Grouped results include runs from all suites" */
       it("includes runs from multiple suites in grouped results", async () => {
         const runsFromTwoSuites = [
           {
