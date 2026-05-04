@@ -1,12 +1,10 @@
 /**
  * Currency formatter for gateway-budget amounts.
  *
- * Per-request costs in modern small-model workloads (gpt-5-mini,
- * haiku-4) routinely fall in the $0.0001–$0.001 range. Truncating
- * to 2 decimals ("$0.00") makes it impossible to tell whether spend
- * is genuinely zero or just sub-cent — discovered during dogfood
- * when 5 real openai/gpt-5-mini completions totaling $0.000165
- * displayed as $0.00 / $1.00 (0%) on the budget list page.
+ * Per-request costs in modern small-model workloads routinely fall
+ * in the $0.0001–$0.001 range. Truncating to 2 decimals ("$0.00")
+ * makes it impossible to tell whether spend is genuinely zero or
+ * just sub-cent.
  *
  * Formatting strategy:
  *   - n === 0          → "$0.00"          (no spend)

@@ -20,9 +20,8 @@ import { usePersonalContext } from "~/components/me/usePersonalContext";
 import { useFeatureFlag } from "~/hooks/useFeatureFlag";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 
-// /me/usage frequently surfaces sub-cent gpt-5-mini-class spend; defer
-// to the shared gateway formatter so $0.000165 doesn't render as $0.00.
-// See iter L: docs/governance bug-class fix.
+// /me/usage frequently surfaces sub-cent spend; defer to the shared
+// gateway formatter so values like $0.000165 don't render as $0.00.
 const fmtUsd = (amount: number) => formatBudgetUsd(amount);
 
 const fmtPctDelta = (pct: number | null) =>
