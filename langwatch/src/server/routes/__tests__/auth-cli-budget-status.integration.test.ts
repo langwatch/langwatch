@@ -135,6 +135,15 @@ describe("GET /api/auth/cli/budget/status", () => {
   });
 
   describe("when the Bearer token is unknown to Redis", () => {
+    /*
+     * Post-revocation state == token is absent from Redis (proven by
+     * cliTokenRevocation.service.integration.test.ts "deletes both
+     * token keys and the per-user index"). This test exercises the
+     * same "Bearer token absent from Redis → 401" code path that fires
+     * after userService.deactivate calls cliTokenRevocation.revokeForUser.
+     * Spec: specs/ai-gateway/cli-token-revoke-on-deactivation.feature:72.
+     */
+    /** @scenario After deactivation, /budget/status returns 401 for the revoked access_token */
     it("returns 401 — unknown / expired tokens are rejected", async () => {
       const res = await callBudgetStatus(
         `Bearer lw_at_${"u".repeat(43)}-unknown-${suffix}`,

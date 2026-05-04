@@ -73,6 +73,16 @@ describe("CliTokenRevocationService.revokeForUser", () => {
       await redis.pexpire(indexKey, 30 * 86400 * 1000);
     });
 
+    /*
+     * Proves the precondition for the e2e behavior: revokeForUser DELs
+     * the refresh_token key from Redis. /api/auth/cli/refresh returns
+     * 401 invalid_grant when redis.get(refreshTokenKey(token)) yields
+     * null (auth-cli.ts:586-595) — so a revoked refresh_token cannot
+     * mint a new access pair. Composition of this test + the route's
+     * structural 401-on-missing branch covers the e2e scenario.
+     * Spec: specs/ai-gateway/cli-token-revoke-on-deactivation.feature:79.
+     */
+    /** @scenario After deactivation, /refresh returns 401 for the revoked refresh_token */
     it("deletes both token keys and the per-user index", async () => {
       const service = CliTokenRevocationService.create(redisConnection);
       const result = await service.revokeForUser({ userId });
