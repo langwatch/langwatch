@@ -23,12 +23,15 @@ const sourceFindUnique = vi.fn();
 const sourceUpdate = vi.fn();
 const ocsfInsert = vi.fn();
 const fetchStub = vi.fn();
+const ensureGovProject = vi.fn();
 
 beforeEach(() => {
   sourceFindUnique.mockReset();
   sourceUpdate.mockReset();
   ocsfInsert.mockReset();
   fetchStub.mockReset();
+  ensureGovProject.mockReset();
+  ensureGovProject.mockResolvedValue({ id: "gov-proj-1" });
 
   vi.doMock("~/server/db", () => ({
     prisma: {
@@ -39,7 +42,7 @@ beforeEach(() => {
     },
   }));
   vi.doMock("~/server/clickhouse/clickhouseClient", () => ({
-    getClickHouseClientForOrganization: async () => ({}),
+    getClickHouseClientForProject: async () => ({}),
   }));
   vi.doMock("../../governanceOcsfEvents.clickhouse.repository", () => ({
     GovernanceOcsfEventsClickHouseRepository: class {
@@ -49,6 +52,9 @@ beforeEach(() => {
     },
     OCSF_ACTIVITY: { CREATE: 1, READ: 2, UPDATE: 3, DELETE: 4, INVOKE: 6 },
     OCSF_SEVERITY: { INFO: 1, LOW: 3, MEDIUM: 4, HIGH: 5, CRITICAL: 6 },
+  }));
+  vi.doMock("../../governanceProject.service", () => ({
+    ensureHiddenGovernanceProject: ensureGovProject,
   }));
   vi.doMock("~/utils/ssrfProtection", () => ({
     ssrfSafeFetch: fetchStub,
@@ -134,7 +140,10 @@ describe("pullerWorker dispatch end-to-end (mocked storage edges)", () => {
       expect(ocsfInsert).toHaveBeenCalledTimes(2);
       const firstRow = ocsfInsert.mock.calls[0]![0];
       expect(firstRow).toMatchObject({
-        tenantId: "org-1",
+        // TenantId is the org's hidden internal_governance Project ID,
+        // resolved by the worker — same key as the trace-fold reactor +
+        // OCSF export service. Org id is NOT used.
+        tenantId: "gov-proj-1",
         eventId: "http_polling:evt-1",
         traceId: "pull:http_polling:evt-1",
         sourceId,
@@ -143,6 +152,10 @@ describe("pullerWorker dispatch end-to-end (mocked storage edges)", () => {
         actionName: "completion",
         targetName: "gpt-5-mini",
       });
+      expect(ensureGovProject).toHaveBeenCalledWith(
+        expect.anything(),
+        "org-1",
+      );
       // Cursor advanced + status promoted to active + lastEventAt stamped
       expect(sourceUpdate).toHaveBeenCalledTimes(1);
       const updateCall = sourceUpdate.mock.calls[0]![0];

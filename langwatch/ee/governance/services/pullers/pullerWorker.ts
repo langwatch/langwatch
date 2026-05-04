@@ -31,7 +31,7 @@ import { BullMQOtel } from "bullmq-otel";
 
 import { env } from "~/env.mjs";
 import type { IngestionPullerJob } from "~/server/background/types";
-import { getClickHouseClientForOrganization } from "~/server/clickhouse/clickhouseClient";
+import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
 import { withJobContext } from "~/server/context/asyncContext";
 import { prisma } from "~/server/db";
 import { connection } from "~/server/redis";
@@ -48,6 +48,7 @@ import {
   OCSF_SEVERITY,
   type GovernanceOcsfEventInput,
 } from "../governanceOcsfEvents.clickhouse.repository";
+import { ensureHiddenGovernanceProject } from "../governanceProject.service";
 
 import {
   pullerAdapterRegistry,
@@ -173,9 +174,29 @@ export async function runIngestionPullerJob(
   // direct-to-CH (rather than synthesizing a fake trace) is the right
   // shape for pull-mode: each audit-log entry is a single event, not
   // a multi-span trace.
+  //
+  // TenantId convention: every governance write path (the trace fold
+  // reactor, the OCSF export service) keys on the org's hidden
+  // internal_governance Project ID. Pull events MUST follow the same
+  // convention or they're invisible to SIEM export reads. Resolve
+  // (and lazy-mint) that project once per job; the `governance_ocsf_events`
+  // CH client is also acquired per-project so per-org private CH
+  // clusters route correctly.
   if (result.events.length > 0) {
+    const govProject = await ensureHiddenGovernanceProject(
+      prisma,
+      source.organizationId,
+    );
     const ocsfRepo = new GovernanceOcsfEventsClickHouseRepository(
-      getClickHouseClientForOrganization,
+      async (tenantId) => {
+        const client = await getClickHouseClientForProject(tenantId);
+        if (!client) {
+          throw new Error(
+            `ClickHouse not available for tenant ${tenantId}`,
+          );
+        }
+        return client;
+      },
     );
     let inserted = 0;
     for (const evt of result.events) {
@@ -183,7 +204,7 @@ export async function runIngestionPullerJob(
         await ocsfRepo.insertEvent(
           mapToOcsfRow({
             event: evt,
-            organizationId: source.organizationId,
+            tenantId: govProject.id,
             ingestionSourceId: source.id,
             sourceType: source.sourceType,
           }),
@@ -251,15 +272,19 @@ export async function runIngestionPullerJob(
  *
  * EventId is `${sourceType}:${source_event_id}` to keep the (TenantId,
  * EventId) key unique across multiple sources of the same type.
+ *
+ * `tenantId` MUST be the hidden internal_governance Project ID for the
+ * org — same key the trace-fold reactor and OCSF export service use.
+ * Resolved by the worker before this is called.
  */
 function mapToOcsfRow({
   event,
-  organizationId,
+  tenantId,
   ingestionSourceId,
   sourceType,
 }: {
   event: NormalizedPullEvent;
-  organizationId: string;
+  tenantId: string;
   ingestionSourceId: string;
   sourceType: string;
 }): GovernanceOcsfEventInput {
@@ -298,7 +323,7 @@ function mapToOcsfRow({
     },
   });
   return {
-    tenantId: organizationId,
+    tenantId,
     eventId,
     // Pull events are atomic — synthesize a stable trace id from the
     // event id so SIEM-side pivot ("show me this trace") still works.

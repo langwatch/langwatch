@@ -49,12 +49,12 @@ describe("PullerWorker — OCSF mapping (semantic contract)", () => {
   describe("when reproducing the worker's mapping shape inline", () => {
     function mapToOcsfRowSemantic({
       event,
-      organizationId,
+      tenantId,
       ingestionSourceId,
       sourceType,
     }: {
       event: NormalizedPullEvent;
-      organizationId: string;
+      tenantId: string;
       ingestionSourceId: string;
       sourceType: string;
     }) {
@@ -64,7 +64,7 @@ describe("PullerWorker — OCSF mapping (semantic contract)", () => {
         : new Date();
       const eventId = `${sourceType}:${event.source_event_id}`;
       return {
-        tenantId: organizationId,
+        tenantId,
         eventId,
         traceId: `pull:${eventId}`,
         sourceId: ingestionSourceId,
@@ -79,7 +79,7 @@ describe("PullerWorker — OCSF mapping (semantic contract)", () => {
     it("composes eventId as `<sourceType>:<source_event_id>`", () => {
       const row = mapToOcsfRowSemantic({
         event: baseEvent,
-        organizationId: "org-1",
+        tenantId: "gov-proj-1",
         ingestionSourceId: "src-1",
         sourceType: "copilot_studio",
       });
@@ -87,20 +87,23 @@ describe("PullerWorker — OCSF mapping (semantic contract)", () => {
       expect(row.traceId).toBe("pull:copilot_studio:evt-123");
     });
 
-    it("uses organizationId as tenantId (org-scoped, not project-scoped)", () => {
+    it("uses the org's hidden internal_governance Project ID as tenantId", () => {
+      // Same key the trace-fold reactor + OCSF export service use, so
+      // pull events surface alongside trace-derived events on the SIEM
+      // export path.
       const row = mapToOcsfRowSemantic({
         event: baseEvent,
-        organizationId: "org-acme-42",
+        tenantId: "gov-proj-acme-42",
         ingestionSourceId: "src-1",
         sourceType: "copilot_studio",
       });
-      expect(row.tenantId).toBe("org-acme-42");
+      expect(row.tenantId).toBe("gov-proj-acme-42");
     });
 
     it("falls back to current time when event_timestamp is unparseable", () => {
       const row = mapToOcsfRowSemantic({
         event: { ...baseEvent, event_timestamp: "not-a-date" },
-        organizationId: "org-1",
+        tenantId: "gov-proj-1",
         ingestionSourceId: "src-1",
         sourceType: "x",
       });
@@ -111,7 +114,7 @@ describe("PullerWorker — OCSF mapping (semantic contract)", () => {
     it("propagates actor/action/target to the OCSF fields without transformation", () => {
       const row = mapToOcsfRowSemantic({
         event: baseEvent,
-        organizationId: "org-1",
+        tenantId: "gov-proj-1",
         ingestionSourceId: "src-1",
         sourceType: "x",
       });
