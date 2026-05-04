@@ -55,6 +55,14 @@ Feature: Trace Name Filter and Group-By
 
   # ---------------------------------------------------------------------------
   # Filter: trace name appears as a filter dimension
+  #
+  # The remaining `@unimplemented` scenarios in this file describe analytics
+  # filter / group-by behavior on TraceName that needs an integration harness
+  # against a seeded ClickHouse — the existing `filter-evaluation-queries`
+  # integration test pattern would extend cleanly to cover these. The
+  # `@unit` filter-translator and group-by-resolver scenarios at the bottom
+  # similarly need a dedicated unit test for TraceName mapping (no test file
+  # currently references the TraceName translator path).
   # ---------------------------------------------------------------------------
 
   @integration @unimplemented
