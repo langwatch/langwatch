@@ -183,6 +183,7 @@ describe("<ScenarioFormDrawerFromUrl/>", () => {
   });
 
   describe("when the drawer is open and user types in an input field", () => {
+    /** @scenario "User types in a nested drawer opened from the suite editor" */
     it("receives keyboard input in the name field", async () => {
       const user = userEvent.setup();
       render(<ScenarioFormDrawerFromUrl />, { wrapper: Wrapper });

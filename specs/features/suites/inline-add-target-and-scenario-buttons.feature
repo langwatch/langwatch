@@ -10,6 +10,19 @@ Feature: Inline Add Target and Add Scenario buttons
   # Important constraint: nested drawers must be managed via state (children),
   # not via navigation, to avoid nested drawer routing issues (#1962).
 
+  # Parity status: 0 of 8 scenarios bound to existing tests.
+  # Remaining @unimplemented scenarios (#3458):
+  #   8 NO_TEST: shipped behavior, no integration test yet
+  # NO_TEST gaps:
+  #   - "Adding a target via the inline button"
+  #   - "Adding a scenario via the inline button"
+  #   - "Add Target button replaces bottom sidebar buttons"
+  #   - "Add Target button uses an icon"
+  #   - "Add Scenario button is inline with the scenario search"
+  #   - "Add Target drawer opens as a child drawer, not via navigation"
+  #   - "Add Scenario drawer opens as a child drawer, not via navigation"
+  #   - "Add Target drawer reuses the existing target drawer component"
+
   Background:
     Given I am on a suite detail page with targets and scenarios configured
 

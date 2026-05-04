@@ -28,6 +28,7 @@ describe("usePeriodSelector()", () => {
   });
 
   describe("when no time range has been selected", () => {
+    /** @scenario "Default time range is applied on initial load" */
     it("defaults to a 30-day range", () => {
       const { result } = renderHook(() => usePeriodSelector(30));
 
@@ -123,6 +124,7 @@ describe("usePeriodSelector()", () => {
   });
 
   describe("when query params have inverted date range", () => {
+    /** @scenario "Selected date range limits displayed run data" */
     it("returns startDate <= endDate", () => {
       mockQuery = {
         startDate: "2025-03-20T00:00:00Z",

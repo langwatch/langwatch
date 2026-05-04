@@ -62,6 +62,7 @@ describe("<RunRow/> borderless styling", () => {
   });
 
   describe("when rendered", () => {
+    /** @scenario "Run rows in All Runs panel span the full available width" */
     it("renders header as a direct child without wrapper Box", () => {
       render(
         <RunRow
