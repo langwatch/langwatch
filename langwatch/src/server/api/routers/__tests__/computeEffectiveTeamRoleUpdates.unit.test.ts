@@ -85,6 +85,8 @@ describe("computeEffectiveTeamRoleUpdates()", () => {
 
   describe("when no requested updates are present", () => {
     describe("when new org role is EXTERNAL", () => {
+      /** @scenario All team assignments respect Lite Member restrictions */
+      /** @scenario Switching org role updates all team assignments */
       it("auto-corrects all non-VIEWER memberships to VIEWER", () => {
         const result = computeEffectiveTeamRoleUpdates({
           requestedTeamRoleUpdates: [],

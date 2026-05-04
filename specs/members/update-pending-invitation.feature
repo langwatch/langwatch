@@ -3,6 +3,24 @@ Feature: Invitation Approval Workflow
   I want to request invitations for new users
   So that admins can approve them and new collaborators can join
 
+  # The end-to-end invitation flows are partially bound to existing
+  # JSDOM render tests:
+  #   * `InvitesTable.integration.test.tsx` — Pending Approval / Invited
+  #     badges + admin-only approve/reject buttons.
+  #   * `members-invitation-approval.integration.test.tsx` —
+  #     WaitingApprovalActions visibility (admin sees buttons, non-
+  #     admin does not).
+  #
+  # The full backend integration suite
+  # (`organization.invites.integration.test.ts`) covers the rest —
+  # `createInviteRequest` validation, expiration/email semantics,
+  # admin approval transitions, license-limit enforcement — but is
+  # currently `describe.skip()` pending an app-layer init regression
+  # fix (#3240). The Playwright e2e specs under
+  # `agentic-e2e-tests/tests/members/*.spec.ts` are also `test.fixme()`
+  # for CI-flakiness reasons (#1811). Until those suites unfreeze,
+  # the remaining `@unimplemented` scenarios stay justified.
+
   # ============================================================================
   # E2E: Happy Paths - Full User Workflows
   # ============================================================================
