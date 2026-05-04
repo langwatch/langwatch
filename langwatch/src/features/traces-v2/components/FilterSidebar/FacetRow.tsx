@@ -14,11 +14,31 @@ function parseTypedLabel(label: string): { typeTag?: string; text: string } {
 
 const MIN_VISIBLE_FILL_PCT = 4;
 
+// Mirror of SidebarSection's hash → palette so OR-group rings here use
+// the same colour as their section header. Six well-spaced pastel hues.
+const OR_GROUP_PALETTE = [
+  "purple",
+  "teal",
+  "pink",
+  "yellow",
+  "cyan",
+  "green",
+] as const;
+
+function orGroupColor(id: string): (typeof OR_GROUP_PALETTE)[number] {
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) | 0;
+  return OR_GROUP_PALETTE[
+    Math.abs(h) % OR_GROUP_PALETTE.length
+  ] as (typeof OR_GROUP_PALETTE)[number];
+}
+
 export const FacetRow = memo(function FacetRow({
   item,
   state,
   maxCount,
   onToggle,
+  orGroupId,
 }: {
   item: FacetItem;
   state: FacetValueState;
@@ -30,6 +50,9 @@ export const FacetRow = memo(function FacetRow({
    * dropping into the search bar to type the operator themselves.
    */
   onToggle: (value: string, options?: { modifierKey?: boolean }) => void;
+  /** Set when this specific value is a member of an OR group — paints
+   * the row with a coloured outline matching the section's OR pill. */
+  orGroupId?: string;
 }) {
   const { typeTag, text } = parseTypedLabel(item.label);
 
@@ -58,6 +81,11 @@ export const FacetRow = memo(function FacetRow({
 
   const subtleBg = `${palette}.subtle`;
   const solidBar = `${palette}.solid`;
+  // OR group ring: when this row's value is a member of an OR group,
+  // paint a coloured outline matching the section's OR pill so users
+  // can match values to their group at a glance, even across distant
+  // sections in the sidebar.
+  const orPalette = orGroupId ? orGroupColor(orGroupId) : null;
 
   return (
     <RowButton
@@ -75,8 +103,11 @@ export const FacetRow = memo(function FacetRow({
       borderRadius="sm"
       overflow="hidden"
       background={isActive ? subtleBg : "transparent"}
-      borderWidth={0}
+      borderWidth={orPalette ? "1px" : 0}
+      borderStyle="solid"
+      borderColor={orPalette ? `${orPalette}.muted` : "transparent"}
       data-state={state}
+      data-or-group={orGroupId}
       onClick={(e) =>
         onToggle(item.value, {
           modifierKey: e.shiftKey || e.ctrlKey || e.metaKey,

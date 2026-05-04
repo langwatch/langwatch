@@ -39,6 +39,12 @@ interface SidebarSectionProps {
    * than independently AND-toggleable.
    */
   orGroupId?: string;
+  /**
+   * Other field names in the same OR group. Surfaced in the OR pill
+   * as "OR · model · service" so users know exactly which sections
+   * are linked without scanning the rail for matching colours.
+   */
+  orPeers?: readonly string[];
   children: React.ReactNode;
 }
 
@@ -78,9 +84,15 @@ export const SidebarSection: React.FC<SidebarSectionProps> = ({
   dragHandleProps,
   onShiftToggle,
   orGroupId,
+  orPeers,
   children,
 }) => {
   const orPalette = orGroupId ? orGroupColor(orGroupId) : undefined;
+  const peerLabel =
+    orPeers && orPeers.length > 0
+      ? orPeers.slice(0, 3).join(" · ") +
+        (orPeers.length > 3 ? ` +${orPeers.length - 3}` : "")
+      : null;
   const [internalOpen, setInternalOpen] = useState(false);
   const isControlled = open !== undefined;
   const effectiveOpen = isControlled ? open : internalOpen;
@@ -229,17 +241,34 @@ export const SidebarSection: React.FC<SidebarSectionProps> = ({
                     as="span"
                     display="inline-flex"
                     alignItems="center"
+                    gap="3px"
                     bg={`${orPalette}.subtle`}
                     color={`${orPalette}.fg`}
-                    paddingX="4px"
+                    borderWidth="1px"
+                    borderColor={`${orPalette}.muted`}
+                    paddingX="6px"
                     paddingY="0"
-                    borderRadius="3px"
+                    borderRadius="4px"
                     fontSize="2xs"
-                    fontWeight="600"
+                    fontWeight="700"
                     letterSpacing="0.04em"
-                    title="This facet is OR-linked with other facets in the query"
+                    title={
+                      peerLabel
+                        ? `OR-linked with: ${peerLabel}`
+                        : "This facet is OR-linked"
+                    }
                   >
                     OR
+                    {peerLabel && (
+                      <Box
+                        as="span"
+                        fontWeight="500"
+                        textTransform="lowercase"
+                        opacity={0.85}
+                      >
+                        · {peerLabel}
+                      </Box>
+                    )}
                   </Box>
                 )}
                 {activeIndicator}

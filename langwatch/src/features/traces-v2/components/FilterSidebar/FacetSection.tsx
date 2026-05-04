@@ -28,6 +28,8 @@ interface FacetSectionProps {
   noneRow?: { active: boolean; onToggle: () => void };
   onShiftToggle?: (nextOpen: boolean) => void;
   orGroupId?: string;
+  orPeers?: readonly string[];
+  orMemberValues?: ReadonlySet<string>;
 }
 
 export const FacetSection: React.FC<FacetSectionProps> = ({
@@ -41,6 +43,8 @@ export const FacetSection: React.FC<FacetSectionProps> = ({
   noneRow,
   onShiftToggle,
   orGroupId,
+  orPeers,
+  orMemberValues,
 }) => {
   const lensOverride = useFacetLensStore((s) => s.lens.sectionOpen[field]);
   const setSectionOpen = useFacetLensStore((s) => s.setSectionOpen);
@@ -95,6 +99,7 @@ export const FacetSection: React.FC<FacetSectionProps> = ({
       dragHandleProps={dragHandleProps}
       onShiftToggle={onShiftToggle}
       orGroupId={orGroupId}
+      orPeers={orPeers}
       valueCount={items.length}
       hasActive={activeCount > 0}
       activeIndicator={
@@ -124,6 +129,9 @@ export const FacetSection: React.FC<FacetSectionProps> = ({
             state={getValueState(item.value)}
             maxCount={maxCount}
             onToggle={handleToggle}
+            orGroupId={
+              orMemberValues?.has(item.value) ? orGroupId : undefined
+            }
           />
         ))}
 

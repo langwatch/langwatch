@@ -8,7 +8,6 @@ import {
   PopoverRoot,
   PopoverTrigger,
 } from "~/components/ui/popover";
-import { Tooltip } from "~/components/ui/tooltip";
 
 // Local Kbd defined first so the module-level `TIPS` array can reference
 // it. `<Kbd>` in JSX captures the identifier at evaluation time, and
@@ -88,19 +87,25 @@ const TIPS: Tip[] = [
 export const SearchTipsPopover: React.FC = () => {
   return (
     <PopoverRoot positioning={{ placement: "bottom-end" }}>
-      <Tooltip content="Search shortcuts" openDelay={200}>
-        <PopoverTrigger asChild>
-          <IconButton
-            aria-label="Show search shortcuts"
-            size="2xs"
-            variant="ghost"
-            color="fg.subtle"
-            _hover={{ color: "yellow.fg", bg: "yellow.subtle" }}
-          >
-            <Lightbulb size={13} />
-          </IconButton>
-        </PopoverTrigger>
-      </Tooltip>
+      {/*
+       * Don't wrap PopoverTrigger in Tooltip — the Tooltip's portal
+       * intercepted the ref the Popover needs for placement, so the
+       * popover positioning fell back to the document origin (top-left).
+       * The IconButton's `title` is enough for hover discoverability;
+       * `aria-label` covers accessibility.
+       */}
+      <PopoverTrigger asChild>
+        <IconButton
+          aria-label="Show search shortcuts"
+          title="Search shortcuts"
+          size="2xs"
+          variant="ghost"
+          color="fg.subtle"
+          _hover={{ color: "yellow.fg", bg: "yellow.subtle" }}
+        >
+          <Lightbulb size={13} />
+        </IconButton>
+      </PopoverTrigger>
       <PopoverContent maxWidth="320px">
         <PopoverArrow />
         <PopoverBody>

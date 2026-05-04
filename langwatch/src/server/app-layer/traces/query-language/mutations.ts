@@ -38,6 +38,39 @@ export function toggleFacetInQuery(
 }
 
 /**
+ * Append a new `field:value` Tag into the OR group at the given liqe
+ * location. The group's coordinates come from
+ * `analyzeOrGroups(...).groups[].{start,end}` — that's the inner
+ * LogicalExpression's range (not including surrounding parens), so
+ * splicing ` OR field:value` after the group's end keeps any
+ * wrapping parens intact and OR's left-associativity does the rest:
+ * `(a OR b) AND c` → `(a OR b OR x) AND c`.
+ *
+ * Used by the sidebar's smart-toggle: clicking a new value in a
+ * facet that's part of an OR group adds it to the same group rather
+ * than AND-combining at the top level.
+ */
+export function addToOrGroupAtLocation(
+  currentQuery: string,
+  groupStart: number,
+  groupEnd: number,
+  fieldName: string,
+  value: string,
+): string {
+  if (!currentQuery.trim()) return currentQuery;
+  const trimmed = currentQuery.trimStart();
+  const leadingWs = currentQuery.length - trimmed.length;
+  const absEnd = leadingWs + groupEnd;
+  if (absEnd <= leadingWs + groupStart) return currentQuery;
+  const newClause = `${fieldName}:${escapeValue(value)}`;
+  return (
+    currentQuery.slice(0, absEnd) +
+    ` OR ${newClause}` +
+    currentQuery.slice(absEnd)
+  );
+}
+
+/**
  * Replace the value of the Tag at the given liqe location with
  * `newValue`, preserving the field name and any leading NOT. Drives the
  * click-a-token-to-edit-value popover in the search bar — given the

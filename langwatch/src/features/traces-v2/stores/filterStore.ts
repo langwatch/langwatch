@@ -4,6 +4,7 @@ import {
   removeFacetValueFromQuery,
   removeFieldFromQuery,
   setRangeInQuery,
+  addToOrGroupAtLocation,
   setFacetValueAtLocation,
   swapOperatorAtLocation,
   toggleFacetInQuery,
@@ -78,11 +79,18 @@ interface FilterState {
    * Three-stage facet toggle: neutral → include → exclude → neutral.
    * Pass `combinator: "OR"` (typically from a Shift/Ctrl-click in the
    * sidebar) to glue the new clause via OR rather than the default AND.
+   * Pass `orGroupLocation` to splice the new value into an existing OR
+   * group rather than appending a fresh OR — so clicking a value in an
+   * OR-grouped facet extends the same group instead of opening a new
+   * cross-facet OR scope.
    */
   toggleFacet: (
     field: string,
     value: string,
-    options?: { combinator?: "AND" | "OR" },
+    options?: {
+      combinator?: "AND" | "OR";
+      orGroupLocation?: { start: number; end: number };
+    },
   ) => void;
   /** Swap the AND/OR keyword at a given liqe text location. Used by the
    * search-bar token cycle handler. */
@@ -236,17 +244,35 @@ export const useFilterStore = create<FilterState>((set, get) => ({
     }),
 
   toggleFacet: (field, value, options) =>
-    set((s) =>
-      applyMutation(s, (q) =>
+    set((s) => {
+      const state = getFacetValueState(s.ast, field, value);
+      // OR-group splice path: when the field is currently part of an
+      // OR group AND we're adding a new value (not removing one), put
+      // it into the same group via `addToOrGroupAtLocation` instead of
+      // the generic toggleFacet which would AND-combine at the top.
+      // Removal still goes through removeFacetValueFromQuery which
+      // walks the whole AST.
+      if (state === "neutral" && options?.orGroupLocation) {
+        return applyMutation(s, (q) =>
+          addToOrGroupAtLocation(
+            q,
+            options.orGroupLocation!.start,
+            options.orGroupLocation!.end,
+            field,
+            value,
+          ),
+        );
+      }
+      return applyMutation(s, (q) =>
         toggleFacetInQuery(
           q,
           field,
           value,
-          getFacetValueState(s.ast, field, value),
+          state,
           options?.combinator ?? "AND",
         ),
-      ),
-    ),
+      );
+    }),
 
   swapOperator: (start, end) =>
     set((s) =>

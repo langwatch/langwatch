@@ -2,6 +2,7 @@ import { useCallback, useMemo } from "react";
 import {
   analyzeOrGroups,
   buildFacetStateLookup,
+  getFacetValues,
 } from "~/server/app-layer/traces/query-language/queries";
 import { useTraceFacets } from "../../../hooks/useTraceFacets";
 import {
@@ -38,20 +39,37 @@ export function useFilterSidebarData() {
   const setRange = useFilterStore((s) => s.setRange);
   const removeRange = useFilterStore((s) => s.removeRange);
 
+  // Cross-facet OR analysis. Sections whose field shows up in
+  // `fieldToGroupId` are part of an OR group; the colour is derived
+  // from the group id so multiple distinct OR groups visually
+  // distinguish themselves on the rail.
+  const orAnalysisRaw = useMemo(() => analyzeOrGroups(ast), [ast]);
+
   // Translate the sidebar's `modifierKey` modifier (raised when the user
   // holds Shift / Ctrl / Cmd while clicking a facet row) into the
-  // store's `combinator` option. Keeps the modifier semantics ("alt
-  // click = OR") in one place rather than baking it into every caller.
+  // store's `combinator` option. Also auto-detect when the toggled
+  // field already participates in an OR group: a fresh value goes into
+  // *that* group via `orGroupLocation` instead of opening a new
+  // top-level OR scope. The user holds modifier only when they want to
+  // start a new OR scope across unrelated facets.
   const toggleFacet = useCallback(
     (
       field: string,
       value: string,
       options?: { modifierKey?: boolean },
-    ) =>
+    ) => {
+      const groupId = orAnalysisRaw.fieldToGroupId.get(field);
+      const group = groupId
+        ? orAnalysisRaw.groups.find((g) => g.id === groupId)
+        : undefined;
       storeToggleFacet(field, value, {
         combinator: options?.modifierKey ? "OR" : "AND",
-      }),
-    [storeToggleFacet],
+        orGroupLocation: group
+          ? { start: group.start, end: group.end }
+          : undefined,
+      });
+    },
+    [storeToggleFacet, orAnalysisRaw],
   );
 
   const { data: descriptors, isLoading: facetsLoading } = useTraceFacets();
@@ -138,10 +156,32 @@ export function useFilterSidebarData() {
   const facetItems = useMemo(() => {
     const map = new Map<string, FacetItem[]>();
     for (const cat of categoricals) {
-      map.set(cat.key, buildFacetItems(cat, isSynthetic));
+      const baseItems = buildFacetItems(cat, isSynthetic);
+      // Surface values that the user typed in the search bar but that
+      // discover didn't return (rare value, custom label, paste from
+      // another query). Without this, an active filter like
+      // `status:custom` shows up as `1` in the section's badge but the
+      // matching row is invisible — users can't see what's selected
+      // and can't click to remove. Synthesised AST-only rows render
+      // with no count so they don't lie about hit counts.
+      const known = new Set(baseItems.map((i) => i.value));
+      const { include, exclude } = getFacetValues(ast, cat.key);
+      const extras: FacetItem[] = [];
+      for (const value of [...include, ...exclude]) {
+        if (known.has(value)) continue;
+        known.add(value);
+        extras.push({
+          value,
+          label: value,
+          count: 0,
+          dimmed: true,
+          synthetic: true,
+        });
+      }
+      map.set(cat.key, [...baseItems, ...extras]);
     }
     return map;
-  }, [categoricals, isSynthetic]);
+  }, [categoricals, isSynthetic, ast]);
 
   const getValueStates = useMemo(() => {
     const map = new Map<string, (value: string) => FacetValueState>();
@@ -173,12 +213,6 @@ export function useFilterSidebarData() {
     [orderedKeys, lensGroupOrder],
   );
 
-  // Cross-facet OR analysis. Sections whose field shows up in
-  // `fieldToGroupId` are part of an OR group; the colour is derived
-  // from the group id so multiple distinct OR groups visually
-  // distinguish themselves on the rail.
-  const orAnalysis = useMemo(() => analyzeOrGroups(ast), [ast]);
-
   return {
     ast,
     categoricals,
@@ -193,7 +227,7 @@ export function useFilterSidebarData() {
     descriptors,
     orderedKeys,
     orderedGroups,
-    orAnalysis,
+    orAnalysis: orAnalysisRaw,
     sectionByKey,
     toggleFacet,
     setRange,

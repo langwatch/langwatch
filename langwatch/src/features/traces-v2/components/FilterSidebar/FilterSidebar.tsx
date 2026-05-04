@@ -161,6 +161,24 @@ export const FilterSidebar: React.FC = () => {
             removeRange={removeRange}
             onShiftToggle={handleShiftToggle}
             orGroupId={orAnalysis.fieldToGroupId.get(key)}
+            orPeers={(() => {
+              const id = orAnalysis.fieldToGroupId.get(key);
+              if (!id) return undefined;
+              const group = orAnalysis.groups.find((g) => g.id === id);
+              if (!group) return undefined;
+              return [...group.fields].filter((f) => f !== key);
+            })()}
+            orMemberValues={(() => {
+              const id = orAnalysis.fieldToGroupId.get(key);
+              if (!id) return undefined;
+              const group = orAnalysis.groups.find((g) => g.id === id);
+              if (!group) return undefined;
+              return new Set(
+                group.members
+                  .filter((m) => m.field === key)
+                  .map((m) => m.value),
+              );
+            })()}
           />
         </IsolatedErrorBoundary>
       );

@@ -28,6 +28,13 @@ interface SectionRendererProps {
   /** Set when this section's field belongs to a cross-facet OR group;
    * threaded into the section so it can render its "linked" badge. */
   orGroupId?: string;
+  /** Other field names in the same OR group — shown in the badge as
+   * "OR · model" so users see exactly which sections are linked. */
+  orPeers?: readonly string[];
+  /** Set of values from THIS field that are members of the OR group;
+   * those rows get a coloured ring so the user can see which specific
+   * values participate. */
+  orMemberValues?: ReadonlySet<string>;
   setRange: (field: string, from: string, to: string) => void;
   removeRange: (field: string) => void;
   onShiftToggle: (nextOpen: boolean) => void;
@@ -43,6 +50,8 @@ export const SectionRenderer: React.FC<SectionRendererProps> = ({
   removeRange,
   onShiftToggle,
   orGroupId,
+  orPeers,
+  orMemberValues,
 }) => {
   const icon = getFacetIcon({ key: section.key, group: section.group });
 
@@ -67,6 +76,8 @@ export const SectionRenderer: React.FC<SectionRendererProps> = ({
         onShiftToggle={onShiftToggle}
         noneRow={noneRow}
         orGroupId={orGroupId}
+        orPeers={orPeers}
+        orMemberValues={orMemberValues}
       />
     );
   }
@@ -87,6 +98,7 @@ export const SectionRenderer: React.FC<SectionRendererProps> = ({
         onClear={() => removeRange(section.key)}
         onShiftToggle={onShiftToggle}
         orGroupId={orGroupId}
+        orPeers={orPeers}
       />
     );
   }
