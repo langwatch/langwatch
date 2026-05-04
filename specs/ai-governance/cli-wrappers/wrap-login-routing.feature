@@ -29,12 +29,42 @@ Feature: CLI wrapper login → token → env injection → routing
     And the config file is readable by the wrapper on next invocation
     And `isLoggedIn(cfg)` returns true
 
-  Scenario: Wrap fails fast when not logged in
+  Scenario: Auto-trigger device-flow login when not logged in (interactive shell)
     Given the user has NOT logged in (no config file or empty config)
+    And `process.stdin.isTTY` is true (interactive shell)
+    When the user runs `langwatch claude`
+    Then the wrapper detects the missing config
+    And the wrapper invokes the device-flow login inline
+      (same flow as `langwatch login --device`)
+    And after the user completes the device-flow approval the wrapper proceeds to:
+      1. reload the freshly-persisted GovernanceConfig
+      2. run the budget pre-check
+      3. spawn the wrapped tool with normal env injection
+
+  Scenario: Wrap fails fast when not logged in and stdin is not a TTY
+    Given the user has NOT logged in (no config file or empty config)
+    And `process.stdin.isTTY` is false (CI/scripted shell)
+    And `LANGWATCH_AUTO_LOGIN` is not set to `1`
     When the user runs `langwatch claude`
     Then the wrapper exits with code 1
     And stderr contains "Not logged in — run `langwatch login --device` first"
     And no child process is spawned
+
+  Scenario: Forced auto-login overrides TTY check (LANGWATCH_AUTO_LOGIN=1)
+    Given the user has NOT logged in
+    And `process.stdin.isTTY` is false
+    And `LANGWATCH_AUTO_LOGIN=1` is exported in the environment
+    When the user runs `langwatch claude`
+    Then the wrapper invokes the device-flow login inline
+    And after the device-flow completes the wrapper proceeds normally
+
+  Scenario: Wrapper forwards every CLI argument verbatim to the wrapped tool
+    Given the user is logged in
+    When the user runs `langwatch claude --dangerously-skip-permissions --print "say hi"`
+    Then the spawned `claude` child process receives argv
+      `['--dangerously-skip-permissions', '--print', 'say hi']` exactly
+    And no argument is dropped, reordered, or quoted-merged by the wrapper
+    And no `langwatch` flags leak into the child's argv
 
   # ─────────────────────────────────────────────────────────────────────
   # Env injection — per-tool standard provider env vars

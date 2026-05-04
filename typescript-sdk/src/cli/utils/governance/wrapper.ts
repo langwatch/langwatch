@@ -18,6 +18,7 @@ import { spawn } from "node:child_process";
 import type { GovernanceConfig } from "./config";
 import { loadConfig, saveConfig, isLoggedIn } from "./config";
 import { checkBudget, renderBudgetExceeded } from "./budget";
+import { runDeviceFlowLogin } from "./login-flow";
 
 export interface ToolEnv {
   /** Env-var name → value pairs to inject into the child process. */
@@ -83,16 +84,50 @@ export function envForTool(cfg: GovernanceConfig, tool: string): ToolEnv {
 }
 
 /**
+ * When the wrapper is invoked without a usable config, decide whether to
+ * auto-trigger the device-flow login inline or to fail fast. The device
+ * flow needs a TTY (the user has to copy a code or click a browser link),
+ * so default ON only when stdin is a TTY. CI/scripted callers can opt in
+ * explicitly via `LANGWATCH_AUTO_LOGIN=1`, or opt out via
+ * `LANGWATCH_AUTO_LOGIN=0` even on an interactive shell.
+ */
+function shouldAutoLogin(): boolean {
+  const flag = process.env.LANGWATCH_AUTO_LOGIN;
+  if (flag === "1" || flag === "true") return true;
+  if (flag === "0" || flag === "false") return false;
+  return Boolean(process.stdin.isTTY);
+}
+
+/**
  * Run the named tool routed through the gateway. Inherits stdio so
  * the user gets the same interactive UX they'd have invoking the
  * tool directly. Exits the parent process with the child's exit
  * code (or 2 if the budget pre-check fired).
  */
 export async function runWrapped(tool: string, args: string[]): Promise<never> {
-  const cfg = loadConfig();
+  let cfg = loadConfig();
   if (!isLoggedIn(cfg)) {
-    process.stderr.write("Not logged in — run `langwatch login --device` first\n");
-    process.exit(1);
+    if (!shouldAutoLogin()) {
+      process.stderr.write(
+        "Not logged in — run `langwatch login --device` first\n",
+      );
+      process.exit(1);
+    }
+    process.stderr.write(
+      "Not logged in — starting device-flow login...\n",
+    );
+    try {
+      cfg = await runDeviceFlowLogin({ cfg });
+    } catch (err) {
+      process.stderr.write(
+        `login failed: ${(err as Error).message ?? "unknown error"}\n`,
+      );
+      process.exit(1);
+    }
+    if (!isLoggedIn(cfg)) {
+      process.stderr.write("login did not complete — exiting\n");
+      process.exit(1);
+    }
   }
 
   // Budget pre-check — render Screen-8 box + exit 2 BEFORE exec.

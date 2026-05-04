@@ -82,6 +82,12 @@ async function startFakeGateway(): Promise<{ server: http.Server; url: string }>
   return { server, url: `http://127.0.0.1:${port}` };
 }
 
+// Fake device-flow state — the auto-login path drives /api/auth/cli/device-code
+// then poll/exchange. Tests can flip this off (deviceFlowEnabled=false) to
+// simulate a control-plane that doesn't support the endpoint.
+let deviceFlowEnabled = true;
+let recordedDeviceCodeRequests = 0;
+
 async function startFakeControlPlane(): Promise<{
   server: http.Server;
   url: string;
@@ -92,6 +98,58 @@ async function startFakeControlPlane(): Promise<{
         "content-type": "application/json",
       });
       res.end(JSON.stringify(cpBudgetResponse.body));
+      return;
+    }
+    if (req.url === "/api/auth/cli/device-code" && req.method === "POST") {
+      recordedDeviceCodeRequests += 1;
+      if (!deviceFlowEnabled) {
+        res.writeHead(404, { "content-type": "application/json" });
+        res.end(JSON.stringify({ error: "not_supported" }));
+        return;
+      }
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(
+        JSON.stringify({
+          device_code: "test-device-code",
+          user_code: "TEST-CODE",
+          verification_uri: `${cpUrl}/auth/cli/verify`,
+          verification_uri_complete: `${cpUrl}/auth/cli/verify?user_code=TEST-CODE`,
+          expires_in: 300,
+          interval: 1,
+        }),
+      );
+      return;
+    }
+    if (req.url === "/api/auth/cli/exchange" && req.method === "POST") {
+      // Resolve the auto-login flow on first poll — no need to delay.
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(
+        JSON.stringify({
+          access_token: TEST_ACCESS_TOKEN,
+          refresh_token: "lw_rt_auto_login",
+          expires_in: 3600,
+          user: {
+            id: "user_auto_login",
+            email: "auto-login@acme.test",
+            name: "Auto Login",
+          },
+          organization: {
+            id: "org_auto_login",
+            slug: "acme",
+            name: "ACME",
+          },
+          default_personal_vk: {
+            id: "vk_auto_login",
+            secret: TEST_VK,
+            prefix: "lw_vk_t",
+          },
+        }),
+      );
+      return;
+    }
+    if (req.url === "/api/auth/cli/bootstrap" && req.method === "GET") {
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({ providers: [], budget: {} }));
       return;
     }
     res.writeHead(404, { "content-type": "application/json" });
@@ -139,6 +197,16 @@ function writeToolStub(name: string, mode: string): void {
   } else if (mode.startsWith("exit-code:")) {
     const code = mode.slice("exit-code:".length);
     body += `exit ${code}\n`;
+  } else if (mode === "echo-argv") {
+    // One arg per line so we can split on newlines and assert exact
+    // count + ordering. Exits 0.
+    body +=
+      'idx=0\n' +
+      'for arg in "$@"; do\n' +
+      '  printf "ARG[%d]=%s\\n" "$idx" "$arg"\n' +
+      '  idx=$((idx + 1))\n' +
+      'done\n' +
+      'printf "ARGC=%d\\n" "$#"\n';
   } else {
     throw new Error(`unknown stub mode: ${mode}`);
   }
@@ -157,6 +225,8 @@ function clearToolStubs(): void {
 interface RunOpts {
   /** Whether to include toolStubsDir on PATH (off → simulates "binary not installed"). */
   includeToolStubs?: boolean;
+  /** Optional extra env-vars to inject (e.g. LANGWATCH_AUTO_LOGIN=1). */
+  extraEnv?: Record<string, string>;
 }
 
 interface RunResult {
@@ -216,6 +286,16 @@ function runCli(args: string[], opts: RunOpts = {}): Promise<RunResult> {
   env.LANGWATCH_GOVERNANCE_PREVIEW = "1";
   env.LANGWATCH_ENDPOINT = cpUrl;
   env.LANGWATCH_GATEWAY_URL = gwUrl;
+  // Default OFF so the existing scenarios still get the
+  // "Not logged in — exit 1" path under the test harness's non-TTY stdin.
+  // Individual tests opt in via opts.extraEnv to verify the auto-login path.
+  env.LANGWATCH_AUTO_LOGIN = "0";
+  // Always suppress the OS browser open() side-effect from the device-flow
+  // login so tests don't pop a real browser tab on the dev machine.
+  env.LANGWATCH_BROWSER = "none";
+  if (opts.extraEnv) {
+    for (const [k, v] of Object.entries(opts.extraEnv)) env[k] = v;
+  }
   // Detach stdin from the vitest worker — passing "ignore" means the
   // child gets /dev/null on fd 0, which prevents any inherited stdio
   // from blocking exit. stdout/stderr are pipes so we can capture
@@ -310,6 +390,8 @@ afterAll(async () => {
 beforeEach(() => {
   recordedGwRequests = [];
   cpBudgetResponse = { status: 200, body: { ok: true } };
+  deviceFlowEnabled = true;
+  recordedDeviceCodeRequests = 0;
   if (fs.existsSync(toolStubsDir)) clearToolStubs();
   if (fs.existsSync(configPath)) fs.unlinkSync(configPath);
 });
@@ -336,7 +418,7 @@ function envFromStub(stdout: string): Record<string, string> {
 // ─────────────────────────────────────────────────────────────────
 describe("governance CLI wrappers — e2e", () => {
   describe("login state gating", () => {
-    describe("when not logged in", () => {
+    describe("when not logged in and auto-login is disabled (non-TTY default)", () => {
       it("exits 1 with `Not logged in` on `langwatch claude` and never spawns the tool", async () => {
         writeLoggedOutConfig();
         writeToolStub("claude", "echo-env");
@@ -347,6 +429,27 @@ describe("governance CLI wrappers — e2e", () => {
         expect(combined).toMatch(/langwatch login --device/);
         // tool stub never wrote any env-line to stdout
         expect(res.stdout ?? "").not.toMatch(/^ANTHROPIC_BASE_URL=/m);
+      });
+    });
+
+    describe("when not logged in and auto-login is forced via env", () => {
+      it("runs the device-flow login inline, persists the config, then spawns the wrapped tool", async () => {
+        writeLoggedOutConfig();
+        writeToolStub("claude", "echo-env");
+        const res = await runCli(["claude"], {
+          extraEnv: { LANGWATCH_AUTO_LOGIN: "1" },
+        });
+        expect(res.status).toBe(0);
+        expect(recordedDeviceCodeRequests).toBeGreaterThanOrEqual(1);
+        const env = envFromStub(res.stdout ?? "");
+        expect(env.ANTHROPIC_BASE_URL).toBe(`${gwUrl}/api/v1/anthropic`);
+        expect(env.ANTHROPIC_AUTH_TOKEN).toBe(TEST_VK);
+        // Config got persisted by the auto-login path
+        const cfg = readConfig();
+        expect(cfg.access_token).toBe(TEST_ACCESS_TOKEN);
+        expect((cfg.default_personal_vk as { secret?: string })?.secret).toBe(
+          TEST_VK,
+        );
       });
     });
   });
@@ -539,6 +642,82 @@ describe("governance CLI wrappers — e2e", () => {
         expect(combined).toMatch(/install it first/);
       });
     });
+  });
+
+  describe("arg forwarding — wrapper passes every CLI arg verbatim to the tool", () => {
+    function parseArgv(stdout: string): { argc: number; argv: string[] } {
+      const argv: string[] = [];
+      let argc = 0;
+      for (const line of stdout.split("\n")) {
+        const argMatch = line.match(/^ARG\[(\d+)\]=(.*)$/);
+        if (argMatch) {
+          argv[Number(argMatch[1])] = argMatch[2] ?? "";
+          continue;
+        }
+        const argcMatch = line.match(/^ARGC=(\d+)$/);
+        if (argcMatch) argc = Number(argcMatch[1]);
+      }
+      return { argc, argv };
+    }
+
+    describe("when the user runs `langwatch claude` with no extra args", () => {
+      it("spawns claude with zero argv (plain invocation works)", async () => {
+        writeLoggedInConfig();
+        writeToolStub("claude", "echo-argv");
+        const res = await runCli(["claude"]);
+        expect(res.status).toBe(0);
+        const parsed = parseArgv(res.stdout ?? "");
+        expect(parsed.argc).toBe(0);
+        expect(parsed.argv).toEqual([]);
+      });
+    });
+
+    describe("when the user runs `langwatch claude --dangerously-skip-permissions`", () => {
+      it("forwards the flag verbatim to the claude child process", async () => {
+        writeLoggedInConfig();
+        writeToolStub("claude", "echo-argv");
+        const res = await runCli(["claude", "--dangerously-skip-permissions"]);
+        expect(res.status).toBe(0);
+        const parsed = parseArgv(res.stdout ?? "");
+        expect(parsed.argc).toBe(1);
+        expect(parsed.argv).toEqual(["--dangerously-skip-permissions"]);
+      });
+    });
+
+    describe("when the user runs `langwatch claude` with mixed flags + a quoted prompt", () => {
+      it("preserves the count, ordering, and value of every arg (including the quoted one)", async () => {
+        writeLoggedInConfig();
+        writeToolStub("claude", "echo-argv");
+        const res = await runCli([
+          "claude",
+          "--dangerously-skip-permissions",
+          "--print",
+          "say hi from the wrapper",
+        ]);
+        expect(res.status).toBe(0);
+        const parsed = parseArgv(res.stdout ?? "");
+        expect(parsed.argc).toBe(3);
+        expect(parsed.argv).toEqual([
+          "--dangerously-skip-permissions",
+          "--print",
+          "say hi from the wrapper",
+        ]);
+      });
+    });
+
+    describe.each(["codex", "cursor", "gemini", "opencode"])(
+      "when the user runs `langwatch %s` with extra args",
+      (tool) => {
+        it("forwards every arg verbatim to the wrapped tool's child process", async () => {
+          writeLoggedInConfig();
+          writeToolStub(tool, "echo-argv");
+          const res = await runCli([tool, "--foo", "bar baz"]);
+          expect(res.status).toBe(0);
+          const parsed = parseArgv(res.stdout ?? "");
+          expect(parsed.argv).toEqual(["--foo", "bar baz"]);
+        });
+      },
+    );
   });
 
   describe("exit-code propagation", () => {
