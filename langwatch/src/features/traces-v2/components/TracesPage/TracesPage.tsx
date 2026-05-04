@@ -18,7 +18,9 @@ import {
   SELECT_ALL_MATCHING_CAP,
   useSelectionStore,
 } from "../../stores/selectionStore";
+import { useFilterStore } from "../../stores/filterStore";
 import { useUIStore } from "../../stores/uiStore";
+import { analyzeOrGroups } from "~/server/app-layer/traces/query-language/queries";
 import { DensityProvider } from "../DensityProvider";
 import { FilterSidebar } from "../FilterSidebar/FilterSidebar";
 import { FindBar } from "../FindBar";
@@ -38,8 +40,11 @@ import {
 } from "./useKeyboardShortcuts";
 import { useTracesPageTitle } from "./usePageTitle";
 
-const SIDEBAR_WIDTH_EXPANDED = "220px";
-const SIDEBAR_WIDTH_COLLAPSED = "40px";
+const SIDEBAR_WIDTH_EXPANDED = 220;
+const SIDEBAR_WIDTH_COLLAPSED = 40;
+/** Width per OR-group connector lane added to the right of the
+ * sidebar. Must match `OrConnectorOverlay`'s LANE_WIDTH. */
+const OR_GROUP_LANE_WIDTH = 16;
 
 const DIMMED_PROPS = {
   opacity: 0.45,
@@ -181,6 +186,14 @@ const FilterAside: React.FC<{
   dimmed?: boolean;
 }> = React.memo(({ dimmed = false }) => {
   const collapsed = useUIStore((s) => s.sidebarCollapsed);
+  // Grow the aside by one lane per active OR group so the connector
+  // overlay has room to draw without squeezing the facet rows. When
+  // the AST has no cross-facet OR the width is identical to before.
+  const orGroupCount = useFilterStore(
+    (s) => analyzeOrGroups(s.ast).groups.length,
+  );
+
+  const expandedWidth = SIDEBAR_WIDTH_EXPANDED + orGroupCount * OR_GROUP_LANE_WIDTH;
 
   return (
     <Box
@@ -195,7 +208,7 @@ const FilterAside: React.FC<{
       // ~1700px, which the parent then clipped — facets past the
       // viewport were invisible *and* unscrollable.
       height="full"
-      width={collapsed ? SIDEBAR_WIDTH_COLLAPSED : SIDEBAR_WIDTH_EXPANDED}
+      width={`${collapsed ? SIDEBAR_WIDTH_COLLAPSED : expandedWidth}px`}
       transition="width 0.15s ease"
       borderRightWidth="1px"
       borderColor="border"

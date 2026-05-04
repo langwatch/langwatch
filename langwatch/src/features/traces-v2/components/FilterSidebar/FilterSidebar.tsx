@@ -1,4 +1,5 @@
 import {
+  Box,
   Button,
   HStack,
   Separator,
@@ -23,7 +24,7 @@ import {
 } from "@dnd-kit/sortable";
 import { PanelLeftClose } from "lucide-react";
 import type React from "react";
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useRef } from "react";
 import { Kbd } from "~/components/ops/shared/Kbd";
 import { IsolatedErrorBoundary } from "~/components/ui/IsolatedErrorBoundary";
 import {
@@ -40,6 +41,10 @@ import { CollapsedSidebarSkeleton } from "./CollapsedSidebarSkeleton";
 import { getFacetGroupId } from "./constants";
 import { FacetGroupHeader } from "./FacetGroupHeader";
 import { FilterSidebarSkeleton } from "./FilterSidebarSkeleton";
+import {
+  ConnectorLaneWidth as CONNECTOR_LANE_WIDTH,
+  OrConnectorOverlay,
+} from "./OrConnectorOverlay";
 import { useFilterSidebarData } from "./hooks/useFilterSidebarData";
 import { SectionRenderer } from "./SectionRenderer";
 
@@ -79,6 +84,10 @@ export const FilterSidebar: React.FC = () => {
     () => orderedGroups.map((g) => groupSortableId(g.id)),
     [orderedGroups],
   );
+
+  // Ref to the inner scroll container so OrConnectorOverlay can read
+  // FacetRow positions and re-measure on scroll/resize.
+  const scrollAreaRef = useRef<HTMLDivElement | null>(null);
 
   // A group is "modified" when at least one of its sections has an active
   // filter in the working AST. We walk every known SEARCH_FIELD (not just
@@ -218,14 +227,33 @@ export const FilterSidebar: React.FC = () => {
   }
 
   return (
-    <VStack height="full" gap={0} align="stretch" overflow="hidden" as="aside">
-      <VStack
-        flex={1}
-        gap={0}
-        align="stretch"
-        overflowY="auto"
-        overflowX="hidden"
-        paddingTop={1}
+    <VStack
+      height="full"
+      gap={0}
+      align="stretch"
+      overflow="hidden"
+      as="aside"
+      position="relative"
+    >
+      <OrConnectorOverlay
+        groups={orAnalysis.groups}
+        containerRef={scrollAreaRef}
+      />
+      <div
+        ref={scrollAreaRef}
+        style={{
+          flex: 1,
+          display: "flex",
+          flexDirection: "column",
+          overflowY: "auto",
+          overflowX: "hidden",
+          paddingTop: 4,
+          // Reserve right-side gutter for OR connector lanes — one lane
+          // per OR group, sized to match `OrConnectorOverlay`'s internal
+          // LANE_WIDTH. With no OR groups the gutter collapses to zero
+          // and the rail looks identical to before this feature.
+          paddingRight: `${orAnalysis.groups.length * CONNECTOR_LANE_WIDTH}px`,
+        }}
       >
         {showSkeleton ? (
           <FilterSidebarSkeleton />
@@ -257,7 +285,7 @@ export const FilterSidebar: React.FC = () => {
             </SortableContext>
           </DndContext>
         )}
-      </VStack>
+      </div>
 
       <Separator />
       <HStack paddingX={3} paddingY={1.5}>
