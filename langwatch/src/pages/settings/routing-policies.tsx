@@ -2,9 +2,11 @@ import {
   Badge,
   Box,
   Button,
+  Field,
   Heading,
   HStack,
   Input,
+  NativeSelect,
   Spacer,
   Spinner,
   Text,
@@ -23,6 +25,7 @@ import { LoadingScreen } from "~/components/LoadingScreen";
 import { NotFoundScene } from "~/components/NotFoundScene";
 import SettingsLayout from "~/components/SettingsLayout";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
+import { Drawer } from "~/components/ui/drawer";
 import { toaster } from "~/components/ui/toaster";
 import { useFeatureFlag } from "~/hooks/useFeatureFlag";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -290,73 +293,59 @@ function RoutingPoliciesPage() {
             </HStack>
 
             <VStack align="stretch" gap={2}>
-              {grouped[scope].length === 0 &&
-                !(editingId === "new" && composer?.scope === scope) && (
-                  <Text fontSize="sm" color="fg.muted">
-                    No policies defined at this scope.
-                  </Text>
-                )}
-              {grouped[scope].map((p) =>
-                editingId === p.id ? (
-                  <PolicyComposer
-                    key={p.id}
-                    composer={composer!}
-                    setComposer={setComposer}
-                    isPending={updateMutation.isPending}
-                    onSubmit={onSubmit}
-                    onCancel={() => {
-                      setEditingId(null);
-                      setComposer(null);
-                    }}
-                    submitLabel="Save changes"
-                    lockedScope
-                  />
-                ) : (
-                  <PolicyRow
-                    key={p.id}
-                    policy={p}
-                    onEdit={() => startEdit(p)}
-                    onSetDefault={() =>
-                      setDefaultMutation.mutate({
-                        organizationId: orgId,
-                        id: p.id,
-                      })
-                    }
-                    onDelete={() =>
-                      deleteMutation.mutate({
-                        organizationId: orgId,
-                        id: p.id,
-                      })
-                    }
-                    isPendingSetDefault={
-                      setDefaultMutation.isPending &&
-                      setDefaultMutation.variables?.id === p.id
-                    }
-                    isPendingDelete={
-                      deleteMutation.isPending &&
-                      deleteMutation.variables?.id === p.id
-                    }
-                  />
-                ),
+              {grouped[scope].length === 0 && (
+                <Text fontSize="sm" color="fg.muted">
+                  No policies defined at this scope.
+                </Text>
               )}
-
-              {editingId === "new" && composer?.scope === scope && (
-                <PolicyComposer
-                  composer={composer}
-                  setComposer={setComposer}
-                  isPending={createMutation.isPending}
-                  onSubmit={onSubmit}
-                  onCancel={() => {
-                    setEditingId(null);
-                    setComposer(null);
-                  }}
-                  submitLabel="Create policy"
+              {grouped[scope].map((p) => (
+                <PolicyRow
+                  key={p.id}
+                  policy={p}
+                  onEdit={() => startEdit(p)}
+                  onSetDefault={() =>
+                    setDefaultMutation.mutate({
+                      organizationId: orgId,
+                      id: p.id,
+                    })
+                  }
+                  onDelete={() =>
+                    deleteMutation.mutate({
+                      organizationId: orgId,
+                      id: p.id,
+                    })
+                  }
+                  isPendingSetDefault={
+                    setDefaultMutation.isPending &&
+                    setDefaultMutation.variables?.id === p.id
+                  }
+                  isPendingDelete={
+                    deleteMutation.isPending &&
+                    deleteMutation.variables?.id === p.id
+                  }
                 />
-              )}
+              ))}
             </VStack>
           </Box>
         ))}
       </VStack>
+
+      <RoutingPolicyDrawer
+        open={composer !== null}
+        composer={composer}
+        setComposer={setComposer}
+        mode={editingId === "new" ? "create" : "edit"}
+        isPending={
+          editingId === "new"
+            ? createMutation.isPending
+            : updateMutation.isPending
+        }
+        onSubmit={onSubmit}
+        onCancel={() => {
+          setEditingId(null);
+          setComposer(null);
+        }}
+      />
     </SettingsLayout>
   );
 }
@@ -443,210 +432,214 @@ function PolicyRow({
   );
 }
 
-function PolicyComposer({
+type ComposerState = {
+  scope: Scope;
+  scopeId: string;
+  name: string;
+  description: string;
+  strategy: Strategy;
+  providerCredentialIds: string;
+  modelAllowlist: string;
+  isDefault: boolean;
+};
+
+const SCOPE_LABEL: Record<Scope, string> = {
+  organization: "Organization",
+  team: "Team",
+  project: "Project",
+};
+
+function RoutingPolicyDrawer({
+  open,
   composer,
   setComposer,
+  mode,
   isPending,
   onSubmit,
   onCancel,
-  submitLabel,
-  lockedScope,
 }: {
-  composer: {
-    scope: Scope;
-    scopeId: string;
-    name: string;
-    description: string;
-    strategy: Strategy;
-    providerCredentialIds: string;
-    modelAllowlist: string;
-    isDefault: boolean;
-  };
-  setComposer: (
-    next: {
-      scope: Scope;
-      scopeId: string;
-      name: string;
-      description: string;
-      strategy: Strategy;
-      providerCredentialIds: string;
-      modelAllowlist: string;
-      isDefault: boolean;
-    } | null,
-  ) => void;
+  open: boolean;
+  composer: ComposerState | null;
+  setComposer: (next: ComposerState | null) => void;
+  mode: "create" | "edit";
   isPending: boolean;
   onSubmit: () => void;
   onCancel: () => void;
-  submitLabel: string;
-  lockedScope?: boolean;
 }) {
+  const submitDisabled =
+    !composer ||
+    !composer.name.trim() ||
+    !composer.scopeId.trim() ||
+    isPending;
+
   return (
-    <Box
-      borderWidth="1px"
-      borderColor="blue.300"
-      borderRadius="sm"
-      padding={3}
-      backgroundColor="blue.50"
+    <Drawer.Root
+      open={open}
+      onOpenChange={({ open: next }) => {
+        if (!next) onCancel();
+      }}
+      placement="end"
+      size="md"
     >
-      <VStack align="stretch" gap={3}>
-        <HStack gap={3}>
-          <VStack align="stretch" gap={1} flex={1}>
-            <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
-              Name
-            </Text>
-            <Input
-              size="sm"
-              backgroundColor="white"
-              value={composer.name}
-              onChange={(e) =>
-                setComposer({ ...composer, name: e.target.value })
-              }
-              placeholder="e.g. developer-default"
-            />
-          </VStack>
-          <VStack align="stretch" gap={1} flex={1}>
-            <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
-              Strategy
-            </Text>
-            <select
-              value={composer.strategy}
-              onChange={(e) =>
-                setComposer({
-                  ...composer,
-                  strategy: e.target.value as Strategy,
-                })
-              }
-              style={{
-                padding: "8px",
-                border: "1px solid var(--chakra-colors-border-muted)",
-                borderRadius: "var(--chakra-radii-sm)",
-                background: "white",
-                fontSize: "14px",
-              }}
-            >
-              {STRATEGY_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
-          </VStack>
-          {!lockedScope && composer.scope !== "organization" && (
-            <VStack align="stretch" gap={1} flex={1}>
-              <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
-                {composer.scope === "team" ? "Team ID" : "Project ID"}
-              </Text>
-              <Input
-                size="sm"
-                backgroundColor="white"
-                value={composer.scopeId}
-                onChange={(e) =>
-                  setComposer({ ...composer, scopeId: e.target.value })
+      <Drawer.Content>
+        <Drawer.Header>
+          <Drawer.Title>
+            {mode === "create" ? "New routing policy" : "Edit routing policy"}
+          </Drawer.Title>
+          <Drawer.CloseTrigger />
+        </Drawer.Header>
+        <Drawer.Body>
+          {composer && (
+            <VStack align="stretch" gap={4}>
+              <Field.Root>
+                <Field.Label>Scope</Field.Label>
+                <Text fontSize="sm" color="fg.muted">
+                  {SCOPE_LABEL[composer.scope]}
+                  {composer.scope !== "organization" && " — locked to this scope"}
+                </Text>
+              </Field.Root>
+
+              <Field.Root required>
+                <Field.Label>Name</Field.Label>
+                <Input
+                  value={composer.name}
+                  onChange={(e) =>
+                    setComposer({ ...composer, name: e.target.value })
+                  }
+                  placeholder="e.g. developer-default"
+                  autoFocus
+                />
+              </Field.Root>
+
+              <Field.Root required>
+                <Field.Label>Strategy</Field.Label>
+                <NativeSelect.Root size="sm">
+                  <NativeSelect.Field
+                    value={composer.strategy}
+                    onChange={(e) =>
+                      setComposer({
+                        ...composer,
+                        strategy: e.target.value as Strategy,
+                      })
+                    }
+                  >
+                    {STRATEGY_OPTIONS.map((o) => (
+                      <option key={o.value} value={o.value}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </NativeSelect.Field>
+                </NativeSelect.Root>
+              </Field.Root>
+
+              {composer.scope !== "organization" && mode === "create" && (
+                <Field.Root required>
+                  <Field.Label>
+                    {composer.scope === "team" ? "Team ID" : "Project ID"}
+                  </Field.Label>
+                  <Input
+                    value={composer.scopeId}
+                    onChange={(e) =>
+                      setComposer({ ...composer, scopeId: e.target.value })
+                    }
+                    placeholder={
+                      composer.scope === "team" ? "team_..." : "project_..."
+                    }
+                  />
+                </Field.Root>
+              )}
+
+              <Field.Root>
+                <Field.Label>Description</Field.Label>
+                <Textarea
+                  rows={2}
+                  value={composer.description}
+                  onChange={(e) =>
+                    setComposer({ ...composer, description: e.target.value })
+                  }
+                  placeholder="What this policy is for"
+                />
+              </Field.Root>
+
+              <Field.Root required>
+                <Field.Label>
+                  Provider credential IDs (comma-separated, ordered)
+                </Field.Label>
+                <Input
+                  value={composer.providerCredentialIds}
+                  onChange={(e) =>
+                    setComposer({
+                      ...composer,
+                      providerCredentialIds: e.target.value,
+                    })
+                  }
+                  placeholder="mp_anthropic, mp_openai, mp_gemini"
+                />
+                <Field.HelperText>
+                  Drag-to-reorder picker comes in a follow-up.
+                </Field.HelperText>
+              </Field.Root>
+
+              <Field.Root>
+                <Field.Label>
+                  Model allowlist (comma-separated globs; empty = no restriction)
+                </Field.Label>
+                <Input
+                  value={composer.modelAllowlist}
+                  onChange={(e) =>
+                    setComposer({ ...composer, modelAllowlist: e.target.value })
+                  }
+                  placeholder="claude-*, gpt-5-mini, gemini-2.5-*"
+                />
+              </Field.Root>
+
+              <HStack
+                cursor="pointer"
+                onClick={() =>
+                  setComposer({ ...composer, isDefault: !composer.isDefault })
                 }
-                placeholder={
-                  composer.scope === "team"
-                    ? "team_..."
-                    : "project_..."
-                }
-              />
+                gap={2}
+              >
+                <Box
+                  width="16px"
+                  height="16px"
+                  borderRadius="sm"
+                  borderWidth="1px"
+                  borderColor={
+                    composer.isDefault ? "blue.500" : "border.emphasis"
+                  }
+                  backgroundColor={
+                    composer.isDefault ? "blue.500" : "transparent"
+                  }
+                  color="white"
+                  fontSize="10px"
+                  display="flex"
+                  alignItems="center"
+                  justifyContent="center"
+                >
+                  {composer.isDefault && "✓"}
+                </Box>
+                <Text fontSize="sm">Set as default for this scope</Text>
+              </HStack>
             </VStack>
           )}
-        </HStack>
-
-        <VStack align="stretch" gap={1}>
-          <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
-            Description
-          </Text>
-          <Textarea
-            size="sm"
-            backgroundColor="white"
-            rows={2}
-            value={composer.description}
-            onChange={(e) =>
-              setComposer({ ...composer, description: e.target.value })
-            }
-            placeholder="What this policy is for"
-          />
-        </VStack>
-
-        <VStack align="stretch" gap={1}>
-          <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
-            Provider credential IDs (comma-separated, ordered)
-          </Text>
-          <Input
-            size="sm"
-            backgroundColor="white"
-            value={composer.providerCredentialIds}
-            onChange={(e) =>
-              setComposer({
-                ...composer,
-                providerCredentialIds: e.target.value,
-              })
-            }
-            placeholder="mp_anthropic, mp_openai, mp_gemini"
-          />
-          <Text fontSize="xs" color="fg.muted">
-            (v0 — drag-to-reorder picker comes in a follow-up iteration)
-          </Text>
-        </VStack>
-
-        <VStack align="stretch" gap={1}>
-          <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
-            Model allowlist (comma-separated globs; empty = no restriction)
-          </Text>
-          <Input
-            size="sm"
-            backgroundColor="white"
-            value={composer.modelAllowlist}
-            onChange={(e) =>
-              setComposer({ ...composer, modelAllowlist: e.target.value })
-            }
-            placeholder="claude-*, gpt-5-mini, gemini-2.5-*"
-          />
-        </VStack>
-
-        <HStack gap={3}>
-          <HStack
-            cursor="pointer"
-            onClick={() =>
-              setComposer({ ...composer, isDefault: !composer.isDefault })
-            }
-            gap={2}
-          >
-            <Box
-              width="16px"
-              height="16px"
-              borderRadius="sm"
-              borderWidth="1px"
-              borderColor={composer.isDefault ? "blue.500" : "border.emphasis"}
-              backgroundColor={
-                composer.isDefault ? "blue.500" : "transparent"
-              }
-              color="white"
-              fontSize="10px"
-              display="flex"
-              alignItems="center"
-              justifyContent="center"
+        </Drawer.Body>
+        <Drawer.Footer>
+          <HStack gap={2} width="full" justifyContent="flex-end">
+            <Button variant="ghost" onClick={onCancel} disabled={isPending}>
+              Cancel
+            </Button>
+            <Button
+              onClick={onSubmit}
+              loading={isPending}
+              disabled={submitDisabled}
             >
-              {composer.isDefault && "✓"}
-            </Box>
-            <Text fontSize="sm">Set as default for this scope</Text>
+              {mode === "create" ? "Create policy" : "Save changes"}
+            </Button>
           </HStack>
-          <Spacer />
-          <Button size="sm" variant="ghost" onClick={onCancel}>
-            Cancel
-          </Button>
-          <Button
-            size="sm"
-            onClick={onSubmit}
-            loading={isPending}
-            disabled={!composer.name.trim() || !composer.scopeId.trim()}
-          >
-            {submitLabel}
-          </Button>
-        </HStack>
-      </VStack>
-    </Box>
+        </Drawer.Footer>
+      </Drawer.Content>
+    </Drawer.Root>
   );
 }
 

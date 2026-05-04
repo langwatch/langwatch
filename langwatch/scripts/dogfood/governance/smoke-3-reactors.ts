@@ -36,12 +36,12 @@ import { randomBytes } from "crypto";
 import { createClient } from "@clickhouse/client";
 import { TeamUserRole } from "@prisma/client";
 
-import { prisma } from "../../src/server/db";
+import { prisma } from "../../../src/server/db";
 import {
   hashVirtualKeySecret,
   mintVirtualKeySecret,
-} from "../../src/server/gateway/virtualKey.crypto";
-import { defaultVirtualKeyConfig } from "../../src/server/gateway/virtualKey.config";
+} from "../../../src/server/gateway/virtualKey.crypto";
+import { defaultVirtualKeyConfig } from "../../../src/server/gateway/virtualKey.config";
 
 const APP_BASE_URL = process.env.LANGWATCH_BASE_URL ?? "http://localhost:5560";
 const CLICKHOUSE_URL = process.env.CLICKHOUSE_URL ?? "http://default:langwatch@localhost:8123/langwatch";
