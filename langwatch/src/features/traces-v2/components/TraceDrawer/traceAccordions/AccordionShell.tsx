@@ -2,6 +2,10 @@ import { Accordion, Badge, Box, HStack, Text } from "@chakra-ui/react";
 import { type ReactNode, useRef } from "react";
 import { PresenceSection } from "~/features/presence/components/PresenceSection";
 import { SectionPresenceDot } from "~/features/presence/components/SectionPresenceDot";
+import {
+  getDrawerDensityTokens,
+  useDensityStore,
+} from "../../../stores/densityStore";
 import { useSectionPresenceStore } from "./sectionPresence";
 
 export function AccordionShell({
@@ -73,6 +77,8 @@ export function Section({
   const hasOpenedRef = useRef(open ?? true);
   if (open) hasOpenedRef.current = true;
   const renderChildren = open === undefined || hasOpenedRef.current;
+  const density = useDensityStore((s) => s.density);
+  const tokens = getDrawerDensityTokens(density);
   return (
     <Accordion.Item
       value={value}
@@ -83,7 +89,7 @@ export function Section({
       <Accordion.ItemTrigger
         width="100%"
         paddingX={4}
-        paddingY={2}
+        paddingY={tokens.sectionTriggerY}
         // Solid bg under sticky so content scrolling underneath is
         // occluded — without it the title would overlap the content
         // beneath when pinned. `bg.surface` matches the drawer body.
@@ -139,7 +145,11 @@ export function Section({
       <Accordion.ItemContent>
         {trackPresence ? (
           <PresenceSection id={value}>
-            <Box paddingX={4} paddingY={2} paddingBottom={3}>
+            <Box
+              paddingX={4}
+              paddingY={tokens.sectionContentY}
+              paddingBottom={tokens.sectionContentY + 1}
+            >
               {renderChildren ? children : null}
             </Box>
           </PresenceSection>

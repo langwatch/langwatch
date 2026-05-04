@@ -1,13 +1,28 @@
 import { Box, HStack, Icon, Text } from "@chakra-ui/react";
 import { ChevronDown, ChevronRight, Settings2 } from "lucide-react";
 import type React from "react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { formatPreview } from "../../../utils/previewFormatter";
 
 const SYSTEM_PROMPT_LONG_THRESHOLD = 280;
 
 export const SystemPromptBanner: React.FC<{ text: string }> = ({ text }) => {
   const [expanded, setExpanded] = useState(false);
-  const isLong = text.length > SYSTEM_PROMPT_LONG_THRESHOLD;
+  // Run system-prompt text through the shared formatter so JSON envelopes
+  // (`{"text": "…"}`), Anthropic typed blocks, and stray markdown noise
+  // get unwrapped before display. Newlines stay intact (`pre-wrap` below
+  // wants real `\n`s for line breaks); we just kill the literal fences and
+  // image markdown that would otherwise survive into the banner.
+  const formatted = useMemo(
+    () =>
+      formatPreview(text, {
+        maxChars: 100_000,
+        newlines: "preserve",
+        stripMarkdownNoise: true,
+      }).text,
+    [text],
+  );
+  const isLong = formatted.length > SYSTEM_PROMPT_LONG_THRESHOLD;
   return (
     <Box
       borderRadius="lg"
@@ -58,7 +73,7 @@ export const SystemPromptBanner: React.FC<{ text: string }> = ({ text }) => {
           lineHeight="1.6"
           lineClamp={isLong && !expanded ? 3 : undefined}
         >
-          {text}
+          {formatted}
         </Text>
       </Box>
     </Box>

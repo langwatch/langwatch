@@ -63,7 +63,11 @@ import {
 import { ThreadProgressIndicator } from "./ThreadProgressIndicator";
 import { TooltipRow } from "./TooltipRow";
 import { TraceOverflowMenu } from "./TraceOverflowMenu";
-import { readNumberAttribute, resolveAttributeValue } from "./utils";
+import {
+  formatPinValue,
+  readNumberAttribute,
+  resolveAttributeValue,
+} from "./utils";
 
 interface DrawerHeaderProps {
   trace: TraceHeader;
@@ -300,7 +304,7 @@ export const DrawerHeader = memo(function DrawerHeader({
       const resolved = def.resolve
         ? def.resolve(trace)
         : trace.attributes[def.key];
-      const value = resolved ?? null;
+      const value = formatPinValue(def.key, resolved ?? null);
       if (!value) continue;
       const filterField = FILTERABLE_PIN_FIELDS[def.key];
       const navigate = buildNavigate(def.key, value);
@@ -324,7 +328,7 @@ export const DrawerHeader = memo(function DrawerHeader({
         p.source === "resource"
           ? resources.resourceAttributes
           : trace.attributes;
-      const value = resolveAttributeValue(valueSource, p.key);
+      const value = formatPinValue(p.key, resolveAttributeValue(valueSource, p.key));
       const filterField = FILTERABLE_PIN_FIELDS[p.key];
       const navigate = value ? buildNavigate(p.key, value) : undefined;
       out.push({
@@ -411,6 +415,31 @@ export const DrawerHeader = memo(function DrawerHeader({
   const { refresh: handleRefresh, isRefreshing } = useTraceRefresh(
     trace.traceId,
   );
+
+  // Title fallback chain: explicit traceName attribute → root span name (the
+  // server populates `trace.name` from it) → trace ID prefix as a last
+  // resort. The fallback is rendered muted so the reader can tell at a
+  // glance that no semantic name was set rather than reading the ID hex
+  // as if it were the title. We detect the ID-fallback case by comparing
+  // against a prefix of the trace ID — server-side projection drops the
+  // span name into `trace.name` for unnamed traces, but for traces with
+  // no spans at all the same field falls through to the trace ID itself.
+  const { titleText, titleIsFallback } = useMemo(() => {
+    const explicit = trace.traceName?.trim();
+    if (explicit) return { titleText: explicit, titleIsFallback: false };
+    const spanName = trace.name?.trim();
+    if (
+      spanName &&
+      spanName !== trace.traceId &&
+      !trace.traceId.startsWith(spanName)
+    ) {
+      return { titleText: spanName, titleIsFallback: false };
+    }
+    return {
+      titleText: trace.traceId.slice(0, 12),
+      titleIsFallback: true,
+    };
+  }, [trace.traceName, trace.name, trace.traceId]);
 
   const chipDefs = useTraceHeaderChipDefs(trace, {
     onSelectSpan: selectSpan,
@@ -528,8 +557,9 @@ export const DrawerHeader = memo(function DrawerHeader({
             fontFamily="mono"
             letterSpacing="-0.005em"
             minWidth={0}
+            color={titleIsFallback ? "fg.muted" : undefined}
           >
-            {trace.traceName || trace.name}
+            {titleText}
           </Text>
           <HStack gap={1} flexShrink={0}>
             <Circle size="8px" bg={statusColor} flexShrink={0} />
@@ -805,23 +835,26 @@ export const DrawerHeader = memo(function DrawerHeader({
         {chipsOverflow}
       </HStack>
 
-      {/* Row 4: Dedicated pinned-context strip — auto-pins (identity / run /
-          tag) inline with intra-category dividers, custom pins capped at 3
-          inline with the rest in a "+N pinned" overflow popover. Lives on
-          its own row so the categorisation stays scannable. The slot is
-          always reserved (even when empty) so navigating to a trace with
-          no pins doesn't collapse the header by 28px and shift the body
-          tabs underneath. */}
-      <HStack
-        gap={1.5}
-        flexWrap="wrap"
-        align="center"
-        alignContent="flex-start"
-        minHeight="28px"
-      >
-        {pinResult.inline}
-        {pinResult.overflow}
-      </HStack>
+      {/* Pin strip — auto-pins (identity / run / tag) inline with intra-
+          category dividers, custom pins capped at 3 inline with the rest in
+          a "+N pinned" overflow popover. The row only renders when there's
+          actually something to show; ~35% of traces have no auto-pins (LLM
+          completions without a conversation thread, error traces, etc.) and
+          the previous always-reserved 28px slot read as dead chrome. The
+          height jump on next/previous-trace nav between trace-with-pins and
+          trace-without is small enough (~28px) that it's cheaper than the
+          permanent waste. */}
+      {(pinResult.inline.length > 0 || pinResult.overflow != null) && (
+        <HStack
+          gap={1.5}
+          flexWrap="wrap"
+          align="center"
+          alignContent="flex-start"
+        >
+          {pinResult.inline}
+          {pinResult.overflow}
+        </HStack>
+      )}
 
       {/* Row 5: Inline mode tabs — Trace / Conversation. Trace ID + relative
           timestamp tuck into the right corner of the same row, so they
