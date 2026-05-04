@@ -22,18 +22,21 @@ describe("normalizeDocsUrl()", () => {
       );
     });
 
+    /** @scenario docs with a relative path appends .md and resolves under /docs */
     it("appends .md to a relative path without extension", () => {
       expect(normalizeDocsUrl("integration/python/guide", "langwatch")).toBe(
         "https://langwatch.ai/docs/integration/python/guide.md",
       );
     });
 
+    /** @scenario docs is forgiving about leading slashes */
     it("strips a leading slash and prefixes the docs base", () => {
       expect(normalizeDocsUrl("/integration/python/guide", "langwatch")).toBe(
         "https://langwatch.ai/docs/integration/python/guide.md",
       );
     });
 
+    /** @scenario docs is forgiving about a redundant docs/ prefix */
     it("does not duplicate the docs/ prefix when included", () => {
       expect(normalizeDocsUrl("docs/integration/python/guide", "langwatch")).toBe(
         "https://langwatch.ai/docs/integration/python/guide.md",
@@ -43,6 +46,7 @@ describe("normalizeDocsUrl()", () => {
       );
     });
 
+    /** @scenario docs accepts a full URL ending in .md unchanged */
     it("preserves an absolute URL unchanged when it ends in .md", () => {
       expect(
         normalizeDocsUrl(
@@ -52,6 +56,7 @@ describe("normalizeDocsUrl()", () => {
       ).toBe("https://langwatch.ai/docs/integration/python/guide.md");
     });
 
+    /** @scenario docs accepts a full URL without an extension and appends .md */
     it("appends .md to an absolute URL without an extension", () => {
       expect(
         normalizeDocsUrl(
@@ -61,12 +66,14 @@ describe("normalizeDocsUrl()", () => {
       ).toBe("https://langwatch.ai/docs/integration/python/guide.md");
     });
 
+    /** @scenario docs preserves an absolute URL ending in .txt (e.g. llms.txt) */
     it("preserves an absolute URL ending in .txt (e.g., llms.txt)", () => {
       expect(
         normalizeDocsUrl("https://langwatch.ai/docs/llms.txt", "langwatch"),
       ).toBe("https://langwatch.ai/docs/llms.txt");
     });
 
+    /** @scenario docs strips wrapping quotes that agents sometimes paste */
     it("strips wrapping quotes from input", () => {
       expect(normalizeDocsUrl('"integration/python/guide"', "langwatch")).toBe(
         "https://langwatch.ai/docs/integration/python/guide.md",
@@ -96,12 +103,14 @@ describe("normalizeDocsUrl()", () => {
       );
     });
 
+    /** @scenario scenario-docs with a relative path resolves under /scenario */
     it("appends .md to a relative scenario path", () => {
       expect(normalizeDocsUrl("advanced/red-teaming", "scenario")).toBe(
         "https://langwatch.ai/scenario/advanced/red-teaming.md",
       );
     });
 
+    /** @scenario scenario-docs is forgiving about a redundant scenario/ prefix */
     it("does not duplicate the scenario/ prefix when included", () => {
       expect(
         normalizeDocsUrl("scenario/advanced/red-teaming", "scenario"),
@@ -140,6 +149,7 @@ describe("docsCommand()", () => {
     fetchSpy.mockRestore();
   });
 
+  /** @scenario docs with no argument fetches the LangWatch llms.txt index */
   it("fetches the langwatch index when called with no url", async () => {
     await docsCommand();
     expect(fetchSpy).toHaveBeenCalledWith(
@@ -157,6 +167,7 @@ describe("docsCommand()", () => {
     );
   });
 
+  /** @scenario scenario-docs with no argument fetches the Scenario llms.txt index */
   it("fetches the scenario index when scenarioDocsCommand is called with no url", async () => {
     await scenarioDocsCommand();
     expect(fetchSpy).toHaveBeenCalledWith(

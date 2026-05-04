@@ -68,6 +68,8 @@ describe("Experiment.printSummary", () => {
   }
 
   describe("when all evaluations passed", () => {
+    /** @scenario printSummary prints a CI-friendly summary after run completes */
+    /** @scenario printSummary does not exit when all evaluations passed */
     it("prints the run id, 100% pass rate, and does not exit", () => {
       const exp = buildExperimentFixture({
         evaluations: [
@@ -88,6 +90,7 @@ describe("Experiment.printSummary", () => {
   });
 
   describe("when at least one evaluation failed and exitOnFailure defaults to true", () => {
+    /** @scenario printSummary exits with code 1 when any evaluation failed and exitOnFailure is true */
     it("prints the failure count and calls process.exit(1)", () => {
       const exp = buildExperimentFixture({
         evaluations: [
@@ -104,6 +107,7 @@ describe("Experiment.printSummary", () => {
   });
 
   describe("when exitOnFailure is explicitly false", () => {
+    /** @scenario printSummary does not exit when exitOnFailure is false even with failures */
     it("prints the failure count but does not exit", () => {
       const exp = buildExperimentFixture({
         evaluations: [
