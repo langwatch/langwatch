@@ -88,6 +88,8 @@ curl POST :5563/v1/chat/completions
 - Real PRINCIPAL-scope budget resolution via `applicableForRequest` — was a suspected failure point during the morning smoke-pivot debug arc, now confirmed working end-to-end.
 
 Full evidence record (curl outputs, CH `SELECT *` results, gateway logs, persona-seed payload) at `dev/docs/dogfood/governance-live-fire-evidence-2026-05-04.md`.
+
+**Capstone visual proof** (`1bf591263` 2026-05-04): `admin/budgets/06-microcent-end-to-end.png` renders the seeded persona-3 Personal Budget as **$0.000165 / $1.00 · 0% · block · in 30 days** in the live UI — the canonical "loop closed" shot proving K (seed-personas auto-budget-create `d579b3776`) + L (frontend micro-cent formatter `49d4d2bc6`) + M (gatewayBudgets list/get CH spend merge `ffb9c1aa2`) + N (personalUsage CH alias-collision fix `90a3b2002`) all wire together: mint VK → fire real openai/gpt-5-mini completion → see live ledger spend rendered with micro-cent precision. Closed in ~30 min from @rchaves's 2026-05-04 dogfood-pivot directive to fully-working capture.
 >
 > **Review-thread closures** (2026-05-04):
 > - **Backend lane** (Sergey): all 6 review threads resolved. 5 of 6 were stale — already fixed by prior commits and verified against current code (`abd5fe5c6` personalUsage CH nested-aggs ×2 critical / `49f81be4f` personalVirtualKey 409 + personalWorkspace P2002 race / `0bf5781c4` organization captureException). Only 1 real new fix in `1d71faccd` for spendSpike CodeQL dead-store (`let dispatchTag = "log_only"` → `let dispatchTag: string;`).
@@ -840,6 +842,7 @@ The persona × flow grid above is governance-centric. Gateway-flow captures (Vir
 | Budget detail | ✅ `admin/budgets/02-detail.png` |
 | Budget detail (live data, pre-fix) | ✅ `admin/budgets/03-live-data.png` (surfaced row L formatter + row M projection bugs — sergey-p3-member personal budget @ live spend showing $0.00 / $1.00 / 0%) |
 | Budget detail (live data, post-formatter) | ✅ `admin/budgets/04-live-data-microcent-fix.png` (post-`49d4d2bc6` formatter ship; still $0.00 because list query hits row M backend projection bug — captured as evidence the formatter renders correctly when `spentUsd === 0`) |
+| **Budget detail — loop closed end-to-end** | ✅ `admin/budgets/06-microcent-end-to-end.png` (post-`ffb9c1aa2` M fix; renders **$0.000165 / $1.00 · 0% · block · in 30 days** for the seeded persona-3 Personal Budget; **canonical visual proof that L + M + N + K all wire together**: mint VK → fire completion → see live ledger spend with micro-cent precision) |
 | Providers list | ✅ `admin/providers/01-list.png` |
 | Gateway usage | ✅ `admin/usage/01-gateway-usage.png` |
 | Gateway usage (live data) | ✅ `admin/usage/02-live-data.png` (same project as budget; **surfaces row M empty-despite-ledger-rows bug**) |
