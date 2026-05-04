@@ -51,6 +51,8 @@ import { monitoredQueues } from "./queues";
 import { startUsageStatsWorker } from "./workers/usageStatsWorker";
 import { startAnomalyDetectionWorker } from "./workers/anomalyDetectionWorker";
 import { scheduleAnomalyDetection } from "./queues/anomalyDetectionQueue";
+import { startIngestionPullerWorker } from "@ee/governance/services/pullers/pullerWorker";
+import { scheduleIngestionPullers } from "./queues/ingestionPullerQueue";
 
 const logger = createLogger("langwatch:workers");
 
@@ -169,6 +171,8 @@ export const start = async (
     const usageStatsWorker = startUsageStatsWorker();
     const anomalyDetectionWorker = startAnomalyDetectionWorker();
     void scheduleAnomalyDetection();
+    const ingestionPullerWorker = startIngestionPullerWorker();
+    void scheduleIngestionPullers();
     const metricsServer = startMetricsServer();
 
     // Register all closeables for graceful shutdown
@@ -178,6 +182,9 @@ export const start = async (
     registerCloseable("trackEvents", trackEventsWorker);
     registerCloseable("usageStats", usageStatsWorker);
     registerCloseable("anomalyDetection", anomalyDetectionWorker);
+    if (ingestionPullerWorker) {
+      registerCloseable("ingestionPuller", ingestionPullerWorker);
+    }
     registerCloseable("scenario", scenarioProcessor);
     registerCloseable("metricsServer", {
       close: () =>
