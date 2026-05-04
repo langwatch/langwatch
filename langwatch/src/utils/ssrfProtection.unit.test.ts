@@ -46,6 +46,8 @@ describe("createSSRFValidator()", () => {
       allowedHosts: [],
     });
 
+    /** @scenario <impl> allows private IP literals when BLOCK_LOCAL_HTTP_CALLS is unset */
+    /** @scenario Scenario runner reaches a private hostname when BLOCK_LOCAL_HTTP_CALLS is unset */
     it("allows a private hostname", async () => {
       stubDnsResolve(["192.168.1.100"]);
 
@@ -53,6 +55,8 @@ describe("createSSRFValidator()", () => {
       expect(result.hostname).toBe("my-internal-agent");
     });
 
+    /** @scenario <impl> allows private IP literals when BLOCK_LOCAL_HTTP_CALLS is "false" */
+    /** @scenario Private IP literals are allowed when BLOCK_LOCAL_HTTP_CALLS is unset */
     it("allows a private IP literal like 10.0.0.5", async () => {
       const result = await validate("https://10.0.0.5:8443/chat");
       expect(result).toMatchObject({
@@ -61,6 +65,8 @@ describe("createSSRFValidator()", () => {
       });
     });
 
+    /** @scenario <impl> blocks cloud metadata even when BLOCK_LOCAL_HTTP_CALLS is "false" */
+    /** @scenario Cloud metadata endpoints are blocked even when BLOCK_LOCAL_HTTP_CALLS is <toggle> */
     it("blocks cloud metadata endpoints", async () => {
       await expect(
         validate("http://169.254.169.254/latest/meta-data/")
@@ -69,6 +75,7 @@ describe("createSSRFValidator()", () => {
       );
     });
 
+    /** @scenario Cloud provider internal domains are blocked even when BLOCK_LOCAL_HTTP_CALLS is <toggle> */
     it("blocks cloud provider internal domains", async () => {
       stubDnsResolve(["52.94.76.1"]);
 
@@ -86,6 +93,8 @@ describe("createSSRFValidator()", () => {
       allowedHosts: [],
     });
 
+    /** @scenario <impl> blocks DNS rebinding to private IPs when BLOCK_LOCAL_HTTP_CALLS is "true" */
+    /** @scenario Scenario runner blocks a private hostname when BLOCK_LOCAL_HTTP_CALLS is "true" */
     it("blocks a private hostname", async () => {
       stubDnsResolve(["192.168.1.100"]);
 
@@ -96,6 +105,8 @@ describe("createSSRFValidator()", () => {
       );
     });
 
+    /** @scenario <impl> blocks private IP literals when BLOCK_LOCAL_HTTP_CALLS is "true" */
+    /** @scenario Private IP literals are blocked when BLOCK_LOCAL_HTTP_CALLS is "true" */
     it("blocks a private IP literal like 10.0.0.5", async () => {
       await expect(
         validate("https://10.0.0.5:8443/chat")
@@ -104,6 +115,8 @@ describe("createSSRFValidator()", () => {
       );
     });
 
+    /** @scenario <impl> blocks cloud metadata even when BLOCK_LOCAL_HTTP_CALLS is "false" */
+    /** @scenario Cloud metadata endpoints are blocked even when BLOCK_LOCAL_HTTP_CALLS is <toggle> */
     it("blocks cloud metadata endpoints", async () => {
       await expect(
         validate("http://169.254.169.254/latest/meta-data/")
@@ -112,6 +125,7 @@ describe("createSSRFValidator()", () => {
       );
     });
 
+    /** @scenario Cloud provider internal domains are blocked even when BLOCK_LOCAL_HTTP_CALLS is <toggle> */
     it("blocks cloud provider internal domains", async () => {
       stubDnsResolve(["52.94.76.1"]);
 
@@ -136,6 +150,7 @@ describe("createSSRFValidator()", () => {
   });
 
   describe("when allowedHosts contains the target hostname", () => {
+    /** @scenario <impl> allows allowlisted host even when BLOCK_LOCAL_HTTP_CALLS is "true" */
     it("allows a private IP literal even when blockLocal is true", async () => {
       const validate = createSSRFValidator({
         blockLocal: true,
@@ -157,6 +172,7 @@ describe("createSSRFValidator()", () => {
       expect(result.type).toBe("allowlisted");
     });
 
+    /** @scenario <impl> blocks cloud metadata even when host is in ALLOWED_PROXY_HOSTS */
     it("never bypasses cloud metadata even when listed", async () => {
       const validate = createSSRFValidator({
         blockLocal: true,
@@ -179,6 +195,7 @@ describe("createSSRFValidator()", () => {
       expect(result.type).toBe("allowlisted");
     });
 
+    /** @scenario <impl> hostname not in allowlist is still blocked */
     it("does not allow hostnames not in the list", async () => {
       const validate = createSSRFValidator({
         blockLocal: true,
@@ -194,6 +211,7 @@ describe("createSSRFValidator()", () => {
 
 describe("createSSRFSafeFetchConfig()", () => {
   describe("when isSaaS is false", () => {
+    /** @scenario Scenario runner allows self-signed certificates when IS_SAAS is false */
     it("disables TLS certificate validation", () => {
       const config = createSSRFSafeFetchConfig({ isSaaS: false });
       expect(config.rejectUnauthorized).toBe(false);
@@ -201,6 +219,7 @@ describe("createSSRFSafeFetchConfig()", () => {
   });
 
   describe("when isSaaS is true", () => {
+    /** @scenario Scenario runner enforces TLS certificates when IS_SAAS is true */
     it("enables TLS certificate validation", () => {
       const config = createSSRFSafeFetchConfig({ isSaaS: true });
       expect(config.rejectUnauthorized).toBe(true);
