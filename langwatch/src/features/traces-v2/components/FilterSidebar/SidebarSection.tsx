@@ -45,6 +45,14 @@ interface SidebarSectionProps {
    * are linked without scanning the rail for matching colours.
    */
   orPeers?: readonly string[];
+  /**
+   * Content rendered between the header and the collapsible — always
+   * visible, even when the section is collapsed. Used by FacetSection
+   * to keep active values (and OR-group members) visible at all
+   * times so the connector line and at-a-glance read of "what's
+   * filtered" never depend on the section being expanded.
+   */
+  pinnedContent?: React.ReactNode;
   children: React.ReactNode;
 }
 
@@ -85,6 +93,7 @@ export const SidebarSection: React.FC<SidebarSectionProps> = ({
   onShiftToggle,
   orGroupId,
   orPeers,
+  pinnedContent,
   children,
 }) => {
   const orPalette = orGroupId ? orGroupColor(orGroupId) : undefined;
@@ -285,8 +294,12 @@ export const SidebarSection: React.FC<SidebarSectionProps> = ({
           </Collapsible.Trigger>
         </HStack>
 
+        {pinnedContent && (
+          <Box marginTop={1}>{pinnedContent}</Box>
+        )}
+
         <Collapsible.Content>
-          <Box marginTop={1}>{children}</Box>
+          <Box marginTop={pinnedContent ? 0 : 1}>{children}</Box>
         </Collapsible.Content>
       </VStack>
     </Collapsible.Root>

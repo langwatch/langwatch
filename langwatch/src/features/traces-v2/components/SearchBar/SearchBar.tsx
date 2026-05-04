@@ -2,12 +2,14 @@ import { Box, Flex, Icon } from "@chakra-ui/react";
 import { Search } from "lucide-react";
 import { AnimatePresence } from "motion/react";
 import type React from "react";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Kbd } from "~/components/ops/shared/Kbd";
 import { useModelProvidersSettings } from "~/hooks/useModelProvidersSettings";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { SEARCH_FIELDS } from "~/server/app-layer/traces/query-language/metadata";
 import { useTraceFacets } from "../../hooks/useTraceFacets";
+import { analyzeOrGroups } from "~/server/app-layer/traces/query-language/queries";
+import { useFacetHoverStore } from "../../stores/facetHoverStore";
 import { useFilterStore } from "../../stores/filterStore";
 import { AskAiButton } from "../ai/AskAiButton";
 import { ActiveSearchEditor } from "./ActiveSearchEditor";
@@ -112,6 +114,54 @@ export const SearchBar: React.FC = () => {
 
   const placeholderRef = useRef<HTMLDivElement>(null);
   const floatRect = useFloatRect(placeholderRef, aiMode);
+
+  // Delegate chip hover events on the search bar so both the cold-load
+  // PlaceholderEditor and the live ProseMirror editor's
+  // decoration-injected chips broadcast hover into the global
+  // `facetHoverStore`. The sidebar listens to that store and
+  // cross-highlights the matching row + any OR-group peers.
+  useEffect(() => {
+    const root = placeholderRef.current;
+    if (!root) return;
+    const enter = (e: Event) => {
+      const target = (e.target as HTMLElement | null)?.closest(
+        "[data-filter-chip-field][data-filter-chip-value]",
+      ) as HTMLElement | null;
+      if (!target) return;
+      const field = target.dataset.filterChipField ?? "";
+      const value = target.dataset.filterChipValue ?? "";
+      if (!field || !value) return;
+      // Look up whether this chip belongs to an OR group; if it does,
+      // broadcast the whole group so the highlighter lights up every
+      // member, not just the hovered one. Uses the latest AST so the
+      // group lookup stays in sync with concurrent edits.
+      const ast = useFilterStore.getState().ast;
+      const orAnalysis = analyzeOrGroups(ast);
+      const groupId = orAnalysis.fieldToGroupId.get(field);
+      const group = groupId
+        ? orAnalysis.groups.find((g) => g.id === groupId)
+        : null;
+      if (group) {
+        useFacetHoverStore.getState().setHoveredGroup(group);
+      } else {
+        useFacetHoverStore.getState().setHoveredFacet({ field, value });
+      }
+    };
+    const leave = (e: Event) => {
+      const related = (e as MouseEvent).relatedTarget as HTMLElement | null;
+      // Don't clear if we're moving between two chips — the next chip's
+      // mouseenter will overwrite and we'd otherwise flicker the
+      // highlight off-then-on.
+      if (related?.closest("[data-filter-chip-field]")) return;
+      useFacetHoverStore.getState().clearHover();
+    };
+    root.addEventListener("mouseover", enter, true);
+    root.addEventListener("mouseout", leave, true);
+    return () => {
+      root.removeEventListener("mouseover", enter, true);
+      root.removeEventListener("mouseout", leave, true);
+    };
+  }, []);
 
   // ⌘I / Ctrl+I anywhere on the page enters AI mode. Gated through the
   // same provider-primer popover the button uses — pressing the shortcut

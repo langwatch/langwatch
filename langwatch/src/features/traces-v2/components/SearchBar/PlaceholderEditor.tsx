@@ -243,6 +243,8 @@ export const PlaceholderEditor: React.FC<PlaceholderEditorProps> = ({
                   className={seg.className}
                   data-filter-chip-start={tok.start}
                   data-filter-chip-end={tok.end}
+                  data-filter-chip-field={tok.field}
+                  data-filter-chip-value={tok.value}
                   style={{ cursor: "pointer" }}
                   title="Click to change value"
                   onMouseDown={(event) => {

@@ -69,16 +69,39 @@ export const FacetSection: React.FC<FacetSectionProps> = ({
     [items, searchQuery],
   );
 
-  const isHighCardinality = items.length >= MAX_VISIBLE_FACETS;
+  // Active rows = currently-filtered values + OR-group members. We
+  // pin them above the collapsible content so they stay visible even
+  // when the section is collapsed — the connector line keeps its
+  // anchors and the user can see / remove what's filtered without
+  // expanding the whole list.
+  const activeItems = useMemo(
+    () =>
+      filtered.filter(
+        (item) =>
+          getValueState(item.value) !== "neutral" ||
+          orMemberValues?.has(item.value),
+      ),
+    [filtered, getValueState, orMemberValues],
+  );
+  const activeValueSet = useMemo(
+    () => new Set(activeItems.map((i) => i.value)),
+    [activeItems],
+  );
+  const restItems = useMemo(
+    () => filtered.filter((item) => !activeValueSet.has(item.value)),
+    [filtered, activeValueSet],
+  );
+
+  const isHighCardinality = restItems.length >= MAX_VISIBLE_FACETS;
   const facetWindow = useMemo(
     () =>
       computeWindow({
-        filtered,
+        filtered: restItems,
         isHighCardinality,
         showMore,
         searchActive: searchQuery.length > 0,
       }),
-    [filtered, isHighCardinality, showMore, searchQuery],
+    [restItems, isHighCardinality, showMore, searchQuery],
   );
 
   const maxCount = useMemo(
@@ -102,6 +125,25 @@ export const FacetSection: React.FC<FacetSectionProps> = ({
       orPeers={orPeers}
       valueCount={items.length}
       hasActive={activeCount > 0}
+      pinnedContent={
+        activeItems.length > 0 ? (
+          <VStack gap={0.5} align="stretch">
+            {activeItems.map((item) => (
+              <FacetRow
+                key={item.value}
+                item={item}
+                state={getValueState(item.value)}
+                maxCount={maxCount}
+                onToggle={handleToggle}
+                orGroupId={
+                  orMemberValues?.has(item.value) ? orGroupId : undefined
+                }
+                field={field}
+              />
+            ))}
+          </VStack>
+        ) : undefined
+      }
       activeIndicator={
         activeCount > 0 ? (
           <Badge
@@ -132,6 +174,7 @@ export const FacetSection: React.FC<FacetSectionProps> = ({
             orGroupId={
               orMemberValues?.has(item.value) ? orGroupId : undefined
             }
+            field={field}
           />
         ))}
 

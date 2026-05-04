@@ -2,15 +2,15 @@ import { Box } from "@chakra-ui/react";
 import type React from "react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { OrGroup } from "~/server/app-layer/traces/query-language/queries";
+import { useFacetHoverStore } from "../../stores/facetHoverStore";
 
-const LANE_WIDTH = 16;
-const TICK_WIDTH = 12;
-const LINE_THICKNESS = 3;
+const LANE_WIDTH = 14;
+const LINE_THICKNESS = 1.5;
+const HIT_AREA_WIDTH = 10;
 
 /**
  * Six well-spaced pastel hues — must match the palette in
- * `SidebarSection` and `FacetRow` so a group's pill, row outline, and
- * connector line all share one colour.
+ * `SidebarSection` so a group's pill and connector line share a colour.
  */
 const OR_GROUP_PALETTE = [
   "purple",
@@ -47,48 +47,43 @@ interface LineGeometry {
   groupId: string;
   palette: (typeof OR_GROUP_PALETTE)[number];
   laneIndex: number;
-  topPct: number;
-  bottomPct: number;
-  ticks: number[]; // centerY in container px
+  topY: number;
+  bottomY: number;
 }
 
 /**
- * SVG overlay that paints vertical connector lines linking the rows of
- * each cross-facet OR group. Lines live in their own per-group lane on
- * the right gutter of the sidebar; the gutter's width is reserved by
- * `FilterAside`'s width calc (one lane per active OR group). Each line
- * runs from the first to the last visible member row of its group with
- * a horizontal tick at every member — the result reads as a literal
- * bracket joining the rows that are linked by OR.
+ * Vertical connector lines linking the rows of each cross-facet OR
+ * group. Lines live in their own per-group lane on the right gutter
+ * of the sidebar.
  *
- * Reads row positions via `[data-or-group]` data-attrs every layout
- * pass (and on resize/scroll) so the lines stay aligned through facet
- * collapse / expand and sidebar scrolling.
+ * Hover the line, a sidebar row, or a search-bar chip → all three
+ * surfaces light up via a single style-block driven by
+ * `facetHoverStore`. That gives bidirectional cross-highlighting:
+ * hover a chip and the matching row glows; hover a row in an OR
+ * group and every other group member (chips and rows) lights up too.
  */
 export const OrConnectorOverlay: React.FC<OrConnectorOverlayProps> = ({
   groups,
   containerRef,
 }) => {
-  const overlayRef = useRef<HTMLDivElement | null>(null);
-  const [size, setSize] = useState<{ width: number; height: number } | null>(
+  const [lines, setLines] = useState<LineGeometry[]>([]);
+  const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number } | null>(
     null,
   );
-  const [lines, setLines] = useState<LineGeometry[]>([]);
+
+  const hoveredGroup = useFacetHoverStore((s) => s.hoveredGroup);
+  const hoveredFacet = useFacetHoverStore((s) => s.hoveredFacet);
+  const setHoveredGroup = useFacetHoverStore((s) => s.setHoveredGroup);
+  const clearHover = useFacetHoverStore((s) => s.clearHover);
 
   // Stable lane assignment: sort groups by id so the lane index for a
-  // given group doesn't shuffle between renders, which would re-paint
-  // the rows in a different colour.
+  // given group doesn't shuffle between renders.
   const sortedGroups = [...groups].sort((a, b) => a.id.localeCompare(b.id));
 
   const recompute = (): void => {
     const container = containerRef.current;
-    const overlay = overlayRef.current;
-    if (!container || !overlay) return;
+    if (!container) return;
     const containerRect = container.getBoundingClientRect();
-    setSize({
-      width: sortedGroups.length * LANE_WIDTH,
-      height: containerRect.height,
-    });
     const next: LineGeometry[] = [];
     sortedGroups.forEach((group, laneIndex) => {
       const rows = Array.from(
@@ -104,16 +99,13 @@ export const OrConnectorOverlay: React.FC<OrConnectorOverlayProps> = ({
         groupId: group.id,
         palette,
         laneIndex,
-        topPct: Math.min(...centers),
-        bottomPct: Math.max(...centers),
-        ticks: centers,
+        topY: Math.min(...centers),
+        bottomY: Math.max(...centers),
       });
     });
     setLines(next);
   };
 
-  // Re-measure whenever the layout could shift: on mount, on group
-  // changes, on container resize, on container scroll.
   useLayoutEffect(() => {
     recompute();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -132,54 +124,181 @@ export const OrConnectorOverlay: React.FC<OrConnectorOverlayProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [containerRef, groups]);
 
-  if (sortedGroups.length === 0) return null;
+  if (sortedGroups.length === 0 && !hoveredFacet) return null;
 
   return (
+    <>
+      {/* Style block lives at the document level via the same overlay so
+          highlights apply to both sidebar rows AND search-bar chips
+          regardless of where they're mounted. */}
+      <HoverHighlightStyle
+        group={hoveredGroup ?? null}
+        facet={hoveredGroup ? null : hoveredFacet}
+      />
+
+      {sortedGroups.length > 0 && (
+        <Box
+          position="absolute"
+          top={0}
+          right={0}
+          bottom={0}
+          width={`${sortedGroups.length * LANE_WIDTH}px`}
+          pointerEvents="none"
+          zIndex={2}
+        >
+          {lines.map((line) => {
+            const cx = line.laneIndex * LANE_WIDTH + LANE_WIDTH / 2;
+            const lineColor = `var(--chakra-colors-${line.palette}-solid)`;
+            const isHovered = hoveredGroup?.id === line.groupId;
+            const heightPx = Math.max(line.bottomY - line.topY, 1);
+            const group = groups.find((g) => g.id === line.groupId);
+            return (
+              <Box key={line.groupId} position="absolute" inset={0}>
+                {/* Hit area — invisible but wider so the user doesn't
+                    have to mouse onto a 1.5px line. */}
+                <Box
+                  position="absolute"
+                  left={`${cx - HIT_AREA_WIDTH / 2}px`}
+                  top={`${line.topY - 4}px`}
+                  width={`${HIT_AREA_WIDTH}px`}
+                  height={`${heightPx + 8}px`}
+                  cursor="help"
+                  pointerEvents="auto"
+                  onMouseEnter={(e) => {
+                    if (group) setHoveredGroup(group);
+                    setTooltipPos({ x: e.clientX, y: e.clientY });
+                  }}
+                  onMouseMove={(e) =>
+                    setTooltipPos({ x: e.clientX, y: e.clientY })
+                  }
+                  onMouseLeave={() => {
+                    clearHover();
+                    setTooltipPos(null);
+                  }}
+                />
+                {/* The visible line itself — thin and straight. */}
+                <Box
+                  position="absolute"
+                  left={`${cx - LINE_THICKNESS / 2}px`}
+                  top={`${line.topY}px`}
+                  width={`${isHovered ? LINE_THICKNESS + 1 : LINE_THICKNESS}px`}
+                  height={`${heightPx}px`}
+                  bg={lineColor}
+                  borderRadius="full"
+                  opacity={isHovered ? 1 : 0.55}
+                  transition="opacity 100ms ease, width 100ms ease"
+                />
+              </Box>
+            );
+          })}
+        </Box>
+      )}
+
+      {hoveredGroup && tooltipPos && (
+        <ConnectorTooltip group={hoveredGroup} pos={tooltipPos} />
+      )}
+    </>
+  );
+};
+
+const HoverHighlightStyle: React.FC<{
+  group: OrGroup | null;
+  facet: { field: string; value: string } | null;
+}> = ({ group, facet }) => {
+  if (!group && !facet) return null;
+  const palette = group ? orGroupColor(group.id) : "blue";
+  const escape = (s: string) => s.replace(/"/g, '\\"');
+  const memberSelectors: string[] = [];
+  if (group) {
+    for (const m of group.members) {
+      // Match both the search-bar chip span (data-filter-chip-*) and
+      // the sidebar row (data-facet-field + data-facet-value). One
+      // style block lights up everything that participates.
+      memberSelectors.push(
+        `[data-filter-chip-field="${escape(m.field)}"][data-filter-chip-value="${escape(m.value)}"]`,
+        `[data-facet-field="${escape(m.field)}"][data-facet-value="${escape(m.value)}"]`,
+      );
+    }
+  } else if (facet) {
+    memberSelectors.push(
+      `[data-filter-chip-field="${escape(facet.field)}"][data-filter-chip-value="${escape(facet.value)}"]`,
+      `[data-facet-field="${escape(facet.field)}"][data-facet-value="${escape(facet.value)}"]`,
+    );
+  }
+  if (memberSelectors.length === 0) return null;
+  // Background-fill highlight rather than outline. Outlines were
+  // getting clipped by parent overflow:hidden (TipTap renders chips
+  // inside a contained scroll area) and even when visible they read
+  // as a debug ring rather than a confident highlight. The fill ties
+  // the chip + sidebar row visually to the OR group's pill colour:
+  // same `subtle` background, same `fg` text colour, same `muted`
+  // border. `border-radius: inherit` lets the highlight take on
+  // whatever shape the chip already has, so it never spills outside
+  // a rounded chip into the surrounding text.
+  return (
+    <style>{`
+      ${memberSelectors.join(",\n      ")} {
+        background-color: var(--chakra-colors-${palette}-subtle) !important;
+        color: var(--chakra-colors-${palette}-fg) !important;
+        border-color: var(--chakra-colors-${palette}-muted) !important;
+        transition: background-color 100ms ease, color 100ms ease;
+      }
+    `}</style>
+  );
+};
+
+const ConnectorTooltip: React.FC<{
+  group: OrGroup;
+  pos: { x: number; y: number };
+}> = ({ group, pos }) => {
+  const palette = orGroupColor(group.id);
+  // Anchor to the left of the line so the tooltip body sits over the
+  // sidebar (where there's space) rather than off the right edge.
+  const top = Math.min(window.innerHeight - 80, pos.y + 12);
+  const left = Math.max(8, pos.x - 240);
+  return (
     <Box
-      ref={overlayRef}
-      position="absolute"
-      top={0}
-      right={0}
-      width={`${sortedGroups.length * LANE_WIDTH}px`}
-      bottom={0}
+      position="fixed"
+      top={`${top}px`}
+      left={`${left}px`}
+      maxWidth="240px"
+      bg="bg.panel"
+      borderWidth="1px"
+      borderColor={`${palette}.muted`}
+      borderRadius="md"
+      paddingX={2.5}
+      paddingY={1.5}
+      boxShadow="md"
       pointerEvents="none"
-      zIndex={2}
+      zIndex={2100}
     >
-      {lines.map((line) => {
-        const cx = line.laneIndex * LANE_WIDTH + LANE_WIDTH / 2;
-        const lineColor = `var(--chakra-colors-${line.palette}-solid)`;
-        return (
-          <Box key={line.groupId} position="absolute" inset={0}>
-            {/* Vertical spine */}
-            <Box
-              position="absolute"
-              left={`${cx - LINE_THICKNESS / 2}px`}
-              top={`${line.topPct}px`}
-              width={`${LINE_THICKNESS}px`}
-              height={`${line.bottomPct - line.topPct}px`}
-              bg={lineColor}
-              borderRadius="full"
-              opacity={0.85}
-            />
-            {/* One tick per member row — a short horizontal mark
-                pointing left toward the row, so the link is explicit
-                rather than just "rows happen to share a colour." */}
-            {line.ticks.map((y, i) => (
-              <Box
-                key={i}
-                position="absolute"
-                left={`${cx - TICK_WIDTH}px`}
-                top={`${y - LINE_THICKNESS / 2}px`}
-                width={`${TICK_WIDTH}px`}
-                height={`${LINE_THICKNESS}px`}
-                bg={lineColor}
-                borderRadius="full"
-                opacity={0.85}
-              />
-            ))}
+      <Box
+        fontSize="2xs"
+        color="fg.muted"
+        fontWeight="600"
+        letterSpacing="0.04em"
+        textTransform="uppercase"
+        mb={1}
+      >
+        Linked by OR
+      </Box>
+      <Box fontSize="xs" fontFamily="mono" lineHeight="1.5">
+        {group.members.map((m, i) => (
+          <Box key={i}>
+            {m.negated && (
+              <Box as="span" color={`${palette}.fg`} fontWeight="600">
+                NOT&nbsp;
+              </Box>
+            )}
+            <Box as="span" color="fg.muted">
+              {m.field}:
+            </Box>
+            <Box as="span" color="fg" fontWeight="500">
+              {m.value}
+            </Box>
           </Box>
-        );
-      })}
+        ))}
+      </Box>
     </Box>
   );
 };

@@ -164,6 +164,11 @@ export function useFilterSidebarData() {
       // matching row is invisible — users can't see what's selected
       // and can't click to remove. Synthesised AST-only rows render
       // with no count so they don't lie about hit counts.
+      //
+      // Pin AST extras to the TOP of the list so they always stay
+      // above the show-more cut — otherwise an actively-filtered value
+      // can hide below the fold the moment a section has more than ten
+      // discovered values.
       const known = new Set(baseItems.map((i) => i.value));
       const { include, exclude } = getFacetValues(ast, cat.key);
       const extras: FacetItem[] = [];
@@ -178,7 +183,7 @@ export function useFilterSidebarData() {
           synthetic: true,
         });
       }
-      map.set(cat.key, [...baseItems, ...extras]);
+      map.set(cat.key, [...extras, ...baseItems]);
     }
     return map;
   }, [categoricals, isSynthetic, ast]);

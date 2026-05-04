@@ -1,5 +1,8 @@
 import { Badge, Box, HStack, Text } from "@chakra-ui/react";
-import { memo } from "react";
+import { memo, useCallback } from "react";
+import { analyzeOrGroups } from "~/server/app-layer/traces/query-language/queries";
+import { useFacetHoverStore } from "../../stores/facetHoverStore";
+import { useFilterStore } from "../../stores/filterStore";
 import { RowButton } from "./RowButton";
 import type { FacetItem, FacetValueState } from "./types";
 import { formatCount, paletteFromColor } from "./utils";
@@ -39,6 +42,7 @@ export const FacetRow = memo(function FacetRow({
   maxCount,
   onToggle,
   orGroupId,
+  field,
 }: {
   item: FacetItem;
   state: FacetValueState;
@@ -53,6 +57,10 @@ export const FacetRow = memo(function FacetRow({
   /** Set when this specific value is a member of an OR group — paints
    * the row with a coloured outline matching the section's OR pill. */
   orGroupId?: string;
+  /** Field name (e.g. "status", "model") — used to broadcast hover so
+   * the matching search-bar chip can highlight even when the row isn't
+   * part of an OR group. */
+  field?: string;
 }) {
   const { typeTag, text } = parseTypedLabel(item.label);
 
@@ -87,6 +95,29 @@ export const FacetRow = memo(function FacetRow({
   // sections in the sidebar.
   const orPalette = orGroupId ? orGroupColor(orGroupId) : null;
 
+  const setHoveredFacet = useFacetHoverStore((s) => s.setHoveredFacet);
+  const setHoveredGroup = useFacetHoverStore((s) => s.setHoveredGroup);
+  const clearHover = useFacetHoverStore((s) => s.clearHover);
+  const handleMouseEnter = useCallback(() => {
+    if (!field) return;
+    // If this field is part of an OR group, broadcast the whole group
+    // so the highlighter lights up every member (in the sidebar AND
+    // the search bar). Otherwise fall back to the single facet so the
+    // matching chip in the search bar still pulses.
+    const ast = useFilterStore.getState().ast;
+    const orAnalysis = analyzeOrGroups(ast);
+    const groupId = orAnalysis.fieldToGroupId.get(field);
+    const group = groupId
+      ? orAnalysis.groups.find((g) => g.id === groupId)
+      : null;
+    if (group) {
+      setHoveredGroup(group);
+    } else {
+      setHoveredFacet({ field, value: item.value });
+    }
+  }, [field, item.value, setHoveredFacet, setHoveredGroup]);
+  const handleMouseLeave = useCallback(() => clearHover(), [clearHover]);
+
   return (
     <RowButton
       type="button"
@@ -103,11 +134,13 @@ export const FacetRow = memo(function FacetRow({
       borderRadius="sm"
       overflow="hidden"
       background={isActive ? subtleBg : "transparent"}
-      borderWidth={orPalette ? "1px" : 0}
-      borderStyle="solid"
-      borderColor={orPalette ? `${orPalette}.muted` : "transparent"}
+      borderWidth={0}
       data-state={state}
       data-or-group={orGroupId}
+      data-facet-field={field}
+      data-facet-value={item.value}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
       onClick={(e) =>
         onToggle(item.value, {
           modifierKey: e.shiftKey || e.ctrlKey || e.metaKey,
