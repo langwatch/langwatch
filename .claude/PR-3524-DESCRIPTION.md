@@ -60,13 +60,20 @@ Canonical end-to-end evidence that the trace-processing pipeline correctly fans 
 
 **Reproducibility**: re-run via `pnpm tsx langwatch/scripts/dogfood/smoke-3-reactors.ts` after a fresh `make dev` + `make service svc=aigateway`. The script seeds a smoke project + ingestion source, fires both a gateway trace + ingestion-source trace, polls the three CH tables by `TenantId = projectId`, and emits the JSON summary above.
 >
-> **In-PR work remaining beyond the blockers above** (dogfood + smoke evidence):
-> - 3-reactor smoke trace evidence (`gatewayBudgetSync` / `governanceKpisSync` / `governanceOcsfEventsSync`) — gated on blocker #1 above; once registration fix lands, fire a real gateway trace + capture trace_id + CH evidence rows
-> - Dogfood captures for Phases 7/8/9/10/11 — Lane-B running Playwright pass against the live stack, landing under `docs/images/ai-governance/persona-x-flow/<persona>/<flow>/<screen>.png`
-> - Phase 9 PG+CH integration test trace_id + Phase 10 testContainers integration swap (Sergey landing as direct PG+CH tests; counts as coverage but NOT pipeline-smoke proof per orchestrator 2026-05-04)
-> - Final §Smoke evidence rows + §Screenshots grid fill once captures land
+> **Review-thread closures** (2026-05-04):
+> - **Backend lane** (Sergey): all 6 review threads resolved. 5 of 6 were stale — already fixed by prior commits and verified against current code (`abd5fe5c6` personalUsage CH nested-aggs ×2 critical / `49f81be4f` personalVirtualKey 409 + personalWorkspace P2002 race / `0bf5781c4` organization captureException). Only 1 real new fix in `1d71faccd` for spendSpike CodeQL dead-store (`let dispatchTag = "log_only"` → `let dispatchTag: string;`).
+> - **UI lane** (Alexis): notification-toggles thread closed in `59aef6bcc` — entire `<SectionCard title="Notifications">` block dropped (no Prisma model, no router, no endpoint backed it; per @rchaves "no mocks in UI" rule, honest empty state = section gone, NOT disable+apology copy). 2 files / 1 insertion / 86 deletions, type-clean. Browser-verified at `/me/settings`: page renders Profile + Personal API Keys + Budget cards only.
 >
-> **Why this is not "feature complete" yet** (per @rchaves 2026-05-04): every phase needs proven end-to-end dogfood evidence — real Playwright captures + real CH rows + real trace_ids — folded into the PR doc before merge. Backend tests ✅ and UI ✅ alone do not prove the customer journey; the smoke + dogfood layer does. Pivoting all lanes back to that loop.
+> **Branch state — MERGEABLE ✅** (post-`2dc1fc0d4` 2026-05-04, Sergey):
+> - GitHub `mergeable=CONFLICTING` → **`MERGEABLE`** ✅; merge state `BLOCKED` only on branch-protection-reviews + pending CodeQL Analyze.
+> - Strategy: switched from rebase to merge after `git rebase origin/main` hit conflicts on commit 1/398 (`schema.prisma` + `project.factory.ts` modified repeatedly across 398 commits — per-commit replay would conflict on the same files dozens of times). This branch already uses merge for main-integration (cf. `f5d371f79` 'iter29 rebase pivot').
+> - Three-way merge auto-resolved cleanly with **zero manual conflicts**. Three overlap files: `.gitignore` (main added MCP env-var leak defense lines, no overlap); `MainMenu.tsx` (main renamed beta tooltip 'Traces v2' → 'Trace Explorer', no overlap); `gatewayBudgetSync.reactor.{integration,unit}.test.ts` (main-wide PascalCase normalization `lastEventOccurredAt` → `LastEventOccurredAt`; auto-merge picked main's name, verified consistent across all 7 other reactor unit tests + foldProjection definition).
+> - Push: fast-forward from `59aef6bcc` → `2dc1fc0d4` (no force needed). Review-fix commits all preserved + visible in `git log`.
+>
+> **CI status** (as of `2dc1fc0d4` 2026-05-04):
+> - **CodeQL Analyze**: ⏳ pending (orchestrator monitoring) — last remaining gate before branch-protection clears.
+> - **CodeRabbit `evaluate`**: failed with HTTP 406 `PullRequest.diff too_large` — GitHub's 300-file diff cap. **Automation limit, NOT a product/code failure** — CodeRabbit cannot fetch the full diff for a PR exceeding the cap; reviewers should not read this red as a real CI failure.
+> - **Branch-protection-reviews**: ⏳ pending rchaves's final review.
 >
 > **Side-effects observed during dogfood** (transparency notes, not blockers):
 > - **ClickHouse schema drift caught + fixed**: `trace_summaries.RootSpanType` + `ContainsAi` columns missing in dev-stack despite goose marking migration 0020 applied. Manual `ALTER TABLE` patched it locally; full `DROP DATABASE` + re-run via newly-installed goose binary in app container resolved cleanly. Pre-existing dev-stack inconsistency, **not introduced by this PR**.
