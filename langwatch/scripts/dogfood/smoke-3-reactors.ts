@@ -246,21 +246,25 @@ interface ReactorEvidence {
   landed: boolean;
 }
 
-async function pollClickHouse(orgId: string): Promise<ReactorEvidence[]> {
+async function pollClickHouse(projectId: string): Promise<ReactorEvidence[]> {
+  // CH `TenantId` column is the trace-processing tenant id, which is the
+  // PROJECT id (not the organization id). Earlier smoke runs polled by
+  // org id and consistently returned 0 rows even though reactors had
+  // written; that was the smoke-script bug, not a pipeline bug.
   const ch = createClient({ url: CLICKHOUSE_URL, database: "langwatch" });
   const deadline = Date.now() + POLL_TIMEOUT_MS;
   const tables = [
     {
       name: "gateway_budget_ledger_events",
-      query: `SELECT * FROM gateway_budget_ledger_events WHERE TenantId = '${orgId}' LIMIT 1`,
+      query: `SELECT * FROM gateway_budget_ledger_events WHERE TenantId = '${projectId}' LIMIT 1`,
     },
     {
       name: "governance_kpis",
-      query: `SELECT * FROM governance_kpis WHERE TenantId = '${orgId}' LIMIT 1`,
+      query: `SELECT * FROM governance_kpis WHERE TenantId = '${projectId}' LIMIT 1`,
     },
     {
       name: "governance_ocsf_events",
-      query: `SELECT * FROM governance_ocsf_events WHERE TenantId = '${orgId}' LIMIT 1`,
+      query: `SELECT * FROM governance_ocsf_events WHERE TenantId = '${projectId}' LIMIT 1`,
     },
   ];
   while (Date.now() < deadline) {
@@ -397,7 +401,7 @@ async function main() {
   console.log(
     `[smoke] polling ClickHouse for reactor evidence (timeout ${POLL_TIMEOUT_MS / 1000}s)…`,
   );
-  const evidence = await pollClickHouse(seeded.org.id);
+  const evidence = await pollClickHouse(seeded.project.id);
   console.log("\n");
   const summary = {
     seeded: {
