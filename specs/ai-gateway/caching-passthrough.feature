@@ -1,4 +1,10 @@
 Feature: Caching passthrough (Anthropic cache_control + gateway semantic cache)
+
+  # All scenarios in this file describe gateway data-plane behaviour
+  # (cache_control passthrough across provider APIs) implemented in the
+  # Go service. Out of scope for the TS parity check — verified via
+  # Go integration tests against provider SDKs.
+
   The gateway must never silently break upstream provider caching. Anthropic
   prompt caching pays for itself in 90% input-cost savings on cache hits;
   our gateway is in the hot path of every call, so any stripping / reordering

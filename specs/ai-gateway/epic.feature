@@ -1,4 +1,14 @@
 Feature: LangWatch AI Gateway — Cross-cutting epic
+
+  # All scenarios in this file are end-to-end cross-cutting flows
+  # that compose multiple subsystems (gateway data plane + control
+  # plane + tracing + billing). They require running the gateway
+  # service end-to-end and verifying a real request lifecycle. Each
+  # individual subsystem has its own scenarios (virtual-keys.feature,
+  # budgets.feature, fallback.feature, etc.); the epic file is the
+  # integration-level overlay. Aspirational pending a cross-stack
+  # e2e test harness.
+
   As a LangWatch customer (enterprise or self-hosted)
   I want a single API endpoint that governs every LLM call my org makes
   So that cost, compliance, observability, and reliability are enforced uniformly

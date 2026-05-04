@@ -1,4 +1,13 @@
 Feature: langwatch CLI — virtual-keys subcommands
+
+  # All scenarios in this file describe a `langwatch virtual-keys`
+  # subcommand surface that is not yet implemented in
+  # typescript-sdk/src/cli/commands/. The CLI test harness exists for
+  # other subcommands (push/pull/tag/sync) under
+  # typescript-sdk/__tests__/e2e/cli/ — once the virtual-keys CLI ships,
+  # each scenario is a one-line bind to the corresponding e2e test.
+  # All aspirational pending the CLI implementation.
+
   As a LangWatch user with an API token
   I want to manage AI Gateway virtual keys from the terminal
   So that I can script VK provisioning, rotation, and revocation without the UI

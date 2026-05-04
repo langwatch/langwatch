@@ -1,4 +1,11 @@
 Feature: Semantic caching — fuzzy-match prompts to cached responses
+
+  # All scenarios in this file describe the gateway's semantic-cache
+  # backend (embedding similarity match, Redis storage, TTL handling,
+  # collision avoidance). Implemented in the Go gateway service plus
+  # an external Redis dependency — out of scope for the TS parity
+  # check. v1.1 feature; not yet shipped.
+
   As an enterprise customer running high-volume chat traffic
   I want the gateway to recognize semantically-similar prompts and serve
   cached responses without re-hitting the upstream provider

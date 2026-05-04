@@ -1,4 +1,11 @@
 Feature: Provider fallback chain
+
+  # All scenarios in this file describe the gateway data-plane fallback
+  # engine (5xx/timeout/429/network triggers, circuit breakers, mid-
+  # stream fallback). Implemented in Go (services/aigateway/), out of
+  # scope for the TS parity check — verified via Go unit + integration
+  # tests in services/aigateway/.
+
   When a primary provider fails for a reason that indicates "try again
   elsewhere" (5xx, timeout, 429, network), the gateway walks the VK's
   fallback chain. Client-fault errors (400/401/403/404) are returned as-is

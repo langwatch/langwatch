@@ -1,4 +1,13 @@
 Feature: AI Gateway — Coding CLI integrations
+
+  # All scenarios in this file describe how third-party CLIs (Claude
+  # Code, Codex, opencode, Cursor, Aider) interact with the LangWatch
+  # AI Gateway. They require running the gateway service plus the
+  # third-party CLI under test — neither integration exists in the
+  # TypeScript test harness. The data-plane scenarios (streaming,
+  # cache, budget hard-cap, VK revocation) are also Go-side. All
+  # aspirational pending an end-to-end CLI integration harness.
+
   As a LangWatch customer rolling out governed AI usage to engineering teams
   I want every coding CLI (Claude Code, Codex, opencode, Cursor, Aider) to work
   against the LangWatch AI Gateway with no custom client code
