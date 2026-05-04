@@ -59,6 +59,35 @@ Canonical end-to-end evidence that the trace-processing pipeline correctly fans 
 | `governance_ocsf_events` | `ClassUid=6003` (API Activity), `CategoryUid=6`, `ActivityId=6`, `TypeUid=600306`, OCSF v1.1.0 envelope, `RawOcsfJson` populated with full OCSF spec shape |
 
 **Reproducibility**: re-run via `pnpm tsx langwatch/scripts/dogfood/smoke-3-reactors.ts` after a fresh `make dev` + `make service svc=aigateway`. The script seeds a smoke project + ingestion source, fires both a gateway trace + ingestion-source trace, polls the three CH tables by `TenantId = projectId`, and emits the JSON summary above.
+
+#### §Live-fire dogfood evidence — real openai/gpt-5-mini through the gateway (`eb91c075f` 2026-05-04)
+
+Distinct from the Phase-7 synthetic-OTLP smoke above. The smoke proves reactor-handler logic against pre-stamped synthetic spans; this run proves the **full chain end-to-end** with real LLM completions:
+
+```
+curl POST :5563/v1/chat/completions
+ → Bifrost → OpenAI (real chatcmpl-* + req_*)
+ → gateway OTel stamp (langwatch.virtual_key_id + langwatch.gateway_request_id)
+ → trace_summaries fold (TotalCost from real cost catalog)
+ → gatewayBudgetSync reactor (PRINCIPAL-scope applicableForRequest)
+ → gateway_budget_ledger_events INSERT (BudgetId+GatewayRequestId tuple, matching trace cost)
+```
+
+**Run identifiers**:
+- VK: `vk_XDc7r6c5-VM-slajDpMk3g` / `lw_vk_live_01KQSRG0J9Y04DSBVQGJ4Y7Z51`
+- Org: `kfdwbfXJpF0IrP_zkKiF_` (persona p4 admin: `alexis-dogfood@acme.invalid`)
+- Budget: `budget_dogfood_sergey_live` ($1/MONTH PRINCIPAL-scope)
+
+**Evidence**:
+- 5 real `trace_summaries` rows totaling $0.000195 across persona-p4's personal project
+- 2 real `gateway_budget_ledger_events` rows on the PRINCIPAL-scope budget, BudgetId+GatewayRequestId tuple matching trace cost
+
+**What this proves beyond Phase-7 synthetic smoke**:
+- The gateway actually **stamps** the `langwatch.virtual_key_id` + `langwatch.gateway_request_id` OTel attributes the reactor reads (via `services/aigateway/internal/otel/attrs.go`) — Phase-7 smoke fed pre-stamped synthetic spans, this run produces them from a real chat completion.
+- Real cost-catalog enrichment at trace-time (post-iter72 PG-debit cutover) — the `TotalCost` on `trace_summaries` was computed from the live cost catalog, not a fixture.
+- Real PRINCIPAL-scope budget resolution via `applicableForRequest` — was a suspected failure point during the morning smoke-pivot debug arc, now confirmed working end-to-end.
+
+Full evidence record (curl outputs, CH `SELECT *` results, gateway logs, persona-seed payload) at `dev/docs/dogfood/governance-live-fire-evidence-2026-05-04.md`.
 >
 > **Review-thread closures** (2026-05-04):
 > - **Backend lane** (Sergey): all 6 review threads resolved. 5 of 6 were stale — already fixed by prior commits and verified against current code (`abd5fe5c6` personalUsage CH nested-aggs ×2 critical / `49f81be4f` personalVirtualKey 409 + personalWorkspace P2002 race / `0bf5781c4` organization captureException). Only 1 real new fix in `1d71faccd` for spendSpike CodeQL dead-store (`let dispatchTag = "log_only"` → `let dispatchTag: string;`).
