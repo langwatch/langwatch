@@ -318,6 +318,18 @@ export function createEnvConfig() {
     !process.env.SKIP_ENV_VALIDATION &&
     !process.env.BUILD_TIME
   ) {
+    if (
+      (process.env.IS_SAAS === "1" ||
+        process.env.IS_SAAS?.toLowerCase() === "true") &&
+      !(
+        process.env.BLOCK_LOCAL_HTTP_CALLS === "1" ||
+        process.env.BLOCK_LOCAL_HTTP_CALLS?.toLowerCase() === "true"
+      )
+    ) {
+      throw new Error(
+        "IS_SAAS=true requires BLOCK_LOCAL_HTTP_CALLS=true to keep SSRF protections enabled",
+      );
+    }
     assertGatewaySecretsAllOrNone(process.env);
   }
 
