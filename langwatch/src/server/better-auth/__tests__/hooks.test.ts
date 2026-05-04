@@ -565,6 +565,7 @@ describe("afterAccountCreate", () => {
 
 describe("beforeSessionCreate", () => {
   describe("when the user is deactivated", () => {
+    /** @scenario Deactivated user is blocked from signing in */
     it("blocks the session", async () => {
       const prisma = makePrismaMock({
         user: {
@@ -583,6 +584,7 @@ describe("beforeSessionCreate", () => {
   });
 
   describe("when the user is active", () => {
+    /** @scenario Active user is not blocked from signing in */
     it("allows the session", async () => {
       const prisma = makePrismaMock({
         user: {
