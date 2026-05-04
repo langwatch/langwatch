@@ -101,7 +101,7 @@ export class SerializedHttpAgentAdapter extends AgentAdapter {
   ): Promise<unknown> {
     const method = this.config.method.toUpperCase();
     const startedAt = Date.now();
-    let response: Response;
+    let response: Awaited<ReturnType<typeof ssrfSafeFetch>>;
     try {
       response = await ssrfSafeFetch(url, {
         method,
