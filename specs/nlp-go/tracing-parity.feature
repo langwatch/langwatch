@@ -3,6 +3,12 @@ Feature: Tracing parity with Python langwatch_nlp — Studio shows the same dept
 
   Reference: the Python target shape uses optional_langwatch_trace(name="execute_component", type="component") wrapping each component dispatch, plus dspy auto-instrumentation for the per-implementation child span (e.g. `Code.forward`, `Code.__call__`). See langwatch_nlp/langwatch_nlp/studio/execute/execute_component.py and python-sdk/src/langwatch/attributes.py for the reserved attribute names.
 
+  # All scenarios are @unimplemented because services/nlpgo/ does not yet exist.
+  # The TS feature-parity checker only scans TS test roots, so Go-side OTel span
+  # parity scenarios cannot be bound via @scenario JSDoc. Span recorder fixtures
+  # and assertions will live as Go integration tests under services/nlpgo/.
+  # Aspirational pending nlpgo stand-up + tracing instrumentation.
+
   Background:
     Given nlpgo is configured to export OTel spans to a span recorder
     And a langwatch.input attribute is JSON-encoded per python-sdk attributes.py

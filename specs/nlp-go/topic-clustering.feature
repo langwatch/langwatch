@@ -10,6 +10,13 @@ Feature: Topic clustering migrates to langevals when the Go-engine flag is on
   # long-term lives. The Go-engine feature flag decides which host serves a
   # project's job — the algorithm and request shape stay byte-identical.
 
+  # All @unimplemented scenarios describe TS routing in
+  # langwatch/src/server/topicClustering/topicClustering.ts (host selection by
+  # flag, env-var fallback, engine attribution log). Existing tests in
+  # topicClustering.unit.test.ts + .integration.test.ts cover ClickHouse query
+  # behavior, not the FF routing path. Aspirational pending dedicated routing
+  # tests + the langevals service contract landing.
+
   Background:
     Given the langevals service is reachable at ${LANGEVALS_ENDPOINT}
     And the langwatch_nlp service is reachable at ${TOPIC_CLUSTERING_SERVICE}

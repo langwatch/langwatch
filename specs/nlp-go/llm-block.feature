@@ -11,6 +11,13 @@ Feature: LLM block — Studio signature node executes via the Go AI Gateway
   # from the workflow's `litellm_params`. There is no second HTTP hop and no HMAC.
   # See _shared/contract.md §4 (no application-layer auth) and §8 (library, not HTTP).
 
+  # All scenarios are @unimplemented because services/nlpgo/ does not yet exist.
+  # The TS feature-parity checker only scans TS test roots, so Go-side signature
+  # node scenarios cannot be bound via @scenario JSDoc. Python-side parity:
+  # langwatch_nlp/langwatch_nlp/studio/execute/signature_node.py + dspy adapters.
+  # Go-side test coverage will live under services/nlpgo/. Aspirational pending
+  # nlpgo service stand-up.
+
   Background:
     Given the nlpgo service is running on port 5562 with NLPGO_BYPASS unset
     And nlpgo imports the AI Gateway dispatcher in-process (no second HTTP hop)

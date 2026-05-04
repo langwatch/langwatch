@@ -8,6 +8,13 @@ Feature: Code block — execute user Python with isolated subprocess and structu
 
   See _shared/contract.md §7.
 
+  # All scenarios are @unimplemented because the Go service `nlpgo` does not yet
+  # exist (services/nlpgo/ is unborn). The TS feature-parity checker only scans
+  # TS test roots, so Go-side scenarios cannot be bound via @scenario JSDoc.
+  # Existing Python-side parity reference: langwatch_nlp/langwatch_nlp/studio/
+  # execute/code_node.py and langwatch_nlp/tests/studio/. Aspirational pending
+  # nlpgo service stand-up.
+
   Background:
     Given nlpgo is listening on :5562
     And a Python 3.12+ interpreter is available on PATH inside the container
