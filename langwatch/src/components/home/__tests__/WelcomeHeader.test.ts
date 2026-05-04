@@ -8,10 +8,12 @@ import {
 describe("WelcomeHeader", () => {
   describe("getGreetingName", () => {
     describe("when user has a full name", () => {
+      /** @scenario Displays greeting with user's first name */
       it("extracts first name from 'John Doe'", () => {
         expect(getGreetingName("John Doe")).toBe("John");
       });
 
+      /** @scenario Extracts first name from full name */
       it("extracts first name from multiple-word name 'Jane Maria Smith'", () => {
         expect(getGreetingName("Jane Maria Smith")).toBe("Jane");
       });
@@ -22,6 +24,7 @@ describe("WelcomeHeader", () => {
     });
 
     describe("when name is an email address", () => {
+      /** @scenario Displays friendly fallback when name is just email */
       it("returns null for 'johndoe@example.com'", () => {
         expect(getGreetingName("johndoe@example.com")).toBeNull();
       });
@@ -32,6 +35,7 @@ describe("WelcomeHeader", () => {
     });
 
     describe("when name is not available", () => {
+      /** @scenario Displays friendly fallback when name unavailable */
       it("returns null for null", () => {
         expect(getGreetingName(null)).toBeNull();
       });

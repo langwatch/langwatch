@@ -4,6 +4,14 @@ Feature: Recent Items UI
   I want to see my recently accessed items on the home page
   So that I can quickly navigate back to what I was working on
 
+  # The grouping/filtering helper (`groupItemsByType`) is bound to its
+  # unit test in `RecentItemsSection.test.ts`. The remaining scenarios
+  # describe full RecentItemsSection rendering (loading skeleton, empty
+  # state, click navigation, tab switching, error retry). Need a JSDOM
+  # render of the section component with a mocked tRPC query — there's
+  # a partial fixture in `RecentItemsSection.test.ts` but the render-
+  # path scenarios aren't covered yet.
+
   Background:
     Given I am on the home page
 
@@ -62,7 +70,6 @@ Feature: Recent Items UI
     When I view the "Recents" tab
     Then items should be ordered by most recent first
 
-  @unimplemented
   Scenario: By type tab groups items by entity type
     Given the recent items API returns mixed type items
     When I click the "By type" tab

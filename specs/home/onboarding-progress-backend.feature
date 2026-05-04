@@ -4,6 +4,12 @@ Feature: Onboarding Progress Backend
   I want to know my onboarding progress
   So that I can complete the setup of my project
 
+  # All scenarios in this file describe the `home.getOnboardingStatus`
+  # tRPC procedure (per-step completion checks against the entity
+  # tables). Need a tRPC router integration test — none exists for the
+  # home router yet. Cheap to add: each step is a single Prisma count
+  # query backed by an existing model.
+
   Background:
     Given I am authenticated as user "user-123"
     And I have access to project "project-456"
