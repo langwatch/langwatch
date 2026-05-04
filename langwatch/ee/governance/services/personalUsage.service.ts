@@ -258,8 +258,7 @@ export class PersonalUsageService {
     // OccurredAt` colliding with `WHERE OccurredAt >= ...` as
     // ILLEGAL_AGGREGATION (code 184: "Aggregate function ... is found in
     // WHERE in query"). Outer SELECT re-projects to `OccurredAt` so the
-    // wire shape stays stable. Caught live during the 2026-05-04 dogfood
-    // pass while loading /me/usage as persona-3.
+    // wire shape stays stable.
     const result = await client.query({
       query: `
         SELECT TraceId, LatestOccurredAt AS OccurredAt, Models, SpentUsd, Preview

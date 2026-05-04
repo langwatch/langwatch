@@ -1,7 +1,7 @@
 // @vitest-environment node
 
 /**
- * Phase 11 — CLI wrapper e2e suite.
+ * CLI wrapper e2e suite.
  *
  * Pure-Node harness — no Docker, no live LLM, no langwatch-server.
  * Spins up a fake control-plane + fake gateway in-process, drops
@@ -334,7 +334,7 @@ function envFromStub(stdout: string): Record<string, string> {
 // ─────────────────────────────────────────────────────────────────
 // Tests
 // ─────────────────────────────────────────────────────────────────
-describe("governance CLI wrappers — Phase 11 e2e", () => {
+describe("governance CLI wrappers — e2e", () => {
   describe("login state gating", () => {
     describe("when not logged in", () => {
       it("exits 1 with `Not logged in` on `langwatch claude` and never spawns the tool", async () => {

@@ -195,7 +195,7 @@ export class GatewayBudgetService {
   /**
    * Decorate budgets with their current-period CH ledger spend, so the
    * /gateway/budgets list view shows real spend instead of the legacy
-   * (now stale, post-iter72) `GatewayBudget.spentUsd` PG column. Falls
+   * (now stale post-cutover) `GatewayBudget.spentUsd` PG column. Falls
    * back to the PG column for deploys without CH wired (mirrors the
    * fallback in `check()`).
    *
@@ -203,11 +203,6 @@ export class GatewayBudgetService {
    * landed. ORG/TEAM/PRINCIPAL-scoped budgets accumulate rows across
    * MULTIPLE projects, so we sum across every project in the org via
    * `getSpendForBudgetsAcrossTenants`.
-   *
-   * Caught live during the 2026-05-04 dogfood pass (§In-PR fixes M):
-   * sergey-p3-member's PRINCIPAL budget showed $0.00 in the list
-   * despite the CH ledger having 5 real ledger rows totaling
-   * $0.000165.
    */
   private async applyClickHouseSpend(
     budgets: GatewayBudget[],

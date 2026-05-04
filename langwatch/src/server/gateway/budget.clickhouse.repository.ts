@@ -282,9 +282,9 @@ export class GatewayBudgetClickHouseRepository {
    * project the trace landed in, not the budget's scope).
    *
    * Without this, list() reads `GatewayBudget.spentUsd` from PG which
-   * is the legacy iter72 column that's no longer updated — every
+   * is the legacy column that's no longer updated post-cutover — every
    * budget in the list view shows $0.00 / 0% even when CH has real
-   * ledger rows. Caught live during the 2026-05-04 dogfood pass.
+   * ledger rows.
    */
   async getSpendForBudgetsAcrossTenants(
     tenantIds: string[],
