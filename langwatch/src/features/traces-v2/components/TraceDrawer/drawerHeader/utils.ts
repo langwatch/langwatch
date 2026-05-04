@@ -22,18 +22,13 @@ export function readNumberAttribute(
  *    a pill pollutes the strip; we unwrap to a `·`-separated list so the
  *    user sees the labels themselves.
  */
-export function formatPinValue(
-  key: string,
-  value: unknown,
-): string | null;
-export function formatPinValue(value: unknown): string | null;
-export function formatPinValue(
-  arg1: unknown,
-  arg2?: unknown,
-): string | null {
-  // Two-arg form: (key, value). One-arg form: (value).
-  const key = arguments.length === 2 ? (arg1 as string) : null;
-  const value = arguments.length === 2 ? arg2 : arg1;
+export function formatPinValue({
+  key,
+  value,
+}: {
+  value: unknown;
+  key?: string;
+}): string | null {
   if (value === undefined || value === null || value === "") return null;
 
   // Key-aware formatting goes first so it can return without falling
@@ -88,7 +83,10 @@ export function resolveAttributeValue(
   key: string,
 ): string | null {
   if (key in source) {
-    return formatPinValue(key, (source as Record<string, unknown>)[key]);
+    return formatPinValue({
+      key,
+      value: (source as Record<string, unknown>)[key],
+    });
   }
   // Dot-path traversal as a fallback for nested objects.
   const parts = key.split(".");
@@ -97,5 +95,5 @@ export function resolveAttributeValue(
     if (current == null || typeof current !== "object") return null;
     current = (current as Record<string, unknown>)[part];
   }
-  return formatPinValue(key, current);
+  return formatPinValue({ key, value: current });
 }

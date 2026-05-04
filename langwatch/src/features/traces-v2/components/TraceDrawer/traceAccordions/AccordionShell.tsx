@@ -29,14 +29,6 @@ export function AccordionShell({
 }
 
 /**
- * Approximate rendered height of one accordion trigger row (uppercase 2xs
- * label + paddingY=2 + 1px top border). Used to compute the sticky-top
- * offset so triggers stack instead of overlapping. If we restyle the
- * trigger size, bump this in step.
- */
-const STICKY_TRIGGER_HEIGHT_PX = 32;
-
-/**
  * Height of the `SpanTabBar` (Summary / LLM-Optimized / pinned span tabs)
  * that sits sticky at `top: 0` of the drawer body. Accordion triggers
  * have to pin *below* it or they end up hidden behind the tab strip
@@ -118,7 +110,7 @@ export function Section({
         // because the Items are direct children of the same scroll
         // container and their triggers occupy full width.
         position="sticky"
-        top={`${SPAN_TAB_BAR_HEIGHT_PX + (stackIndex ?? 0) * STICKY_TRIGGER_HEIGHT_PX}px`}
+        top={`${SPAN_TAB_BAR_HEIGHT_PX + (stackIndex ?? 0) * tokens.triggerHeightPx}px`}
         zIndex={1}
       >
         <HStack flex={1} gap={2}>

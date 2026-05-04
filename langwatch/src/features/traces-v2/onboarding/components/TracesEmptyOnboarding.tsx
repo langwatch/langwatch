@@ -591,12 +591,11 @@ export function TracesEmptyOnboarding(): React.ReactElement {
                 give the user a way out of "I missed that beat" without
                 forcing them to restart the whole tour. Hidden on the
                 density spotlight (its cards already double as advance
-                affordances) and the outro (the OutroPanel owns its own
-                CTAs there). The bullet separators are only rendered
-                when an item is shown so we don't get adjacent dots. */}
-            {!stageDef.showDensitySpotlight &&
-              stage !== "outro" &&
-              !isReturningWelcome && (
+                affordances). The outer gate already excludes the outro
+                chapter (the OutroPanel owns its own CTAs there). The
+                bullet separators are only rendered when an item is
+                shown so we don't get adjacent dots. */}
+            {!stageDef.showDensitySpotlight && !isReturningWelcome && (
               <>
                 {canGoBack && (
                   <>

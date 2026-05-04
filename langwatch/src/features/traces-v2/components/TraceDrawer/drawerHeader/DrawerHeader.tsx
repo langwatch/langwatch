@@ -304,7 +304,7 @@ export const DrawerHeader = memo(function DrawerHeader({
       const resolved = def.resolve
         ? def.resolve(trace)
         : trace.attributes[def.key];
-      const value = formatPinValue(def.key, resolved ?? null);
+      const value = formatPinValue({ key: def.key, value: resolved ?? null });
       if (!value) continue;
       const filterField = FILTERABLE_PIN_FIELDS[def.key];
       const navigate = buildNavigate(def.key, value);
@@ -328,7 +328,10 @@ export const DrawerHeader = memo(function DrawerHeader({
         p.source === "resource"
           ? resources.resourceAttributes
           : trace.attributes;
-      const value = formatPinValue(p.key, resolveAttributeValue(valueSource, p.key));
+      const value = formatPinValue({
+        key: p.key,
+        value: resolveAttributeValue(valueSource, p.key),
+      });
       const filterField = FILTERABLE_PIN_FIELDS[p.key];
       const navigate = value ? buildNavigate(p.key, value) : undefined;
       out.push({
