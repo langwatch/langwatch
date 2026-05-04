@@ -31,7 +31,37 @@ interface SidebarSectionProps {
    * is moving toward.
    */
   onShiftToggle?: (nextOpen: boolean) => void;
+  /**
+   * Set when this section's facet participates in a cross-facet OR
+   * group. Renders an "OR · linked" pill in the header and a coloured
+   * left-border on the section background so users can tell at a
+   * glance that this row's value is OR-bound to other sections rather
+   * than independently AND-toggleable.
+   */
+  orGroupId?: string;
   children: React.ReactNode;
+}
+
+/**
+ * Six well-spaced pastel hues. Index by a hash of the group id so a
+ * stable colour follows a given OR group across renders, and multiple
+ * concurrent OR groups stay visually distinct.
+ */
+const OR_GROUP_PALETTE = [
+  "purple",
+  "teal",
+  "pink",
+  "yellow",
+  "cyan",
+  "green",
+] as const;
+
+function orGroupColor(id: string): (typeof OR_GROUP_PALETTE)[number] {
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) | 0;
+  return OR_GROUP_PALETTE[
+    Math.abs(h) % OR_GROUP_PALETTE.length
+  ] as (typeof OR_GROUP_PALETTE)[number];
 }
 
 const DRAG_HANDLE_HIT_AREA = "16px";
@@ -47,8 +77,10 @@ export const SidebarSection: React.FC<SidebarSectionProps> = ({
   hasActive = false,
   dragHandleProps,
   onShiftToggle,
+  orGroupId,
   children,
 }) => {
+  const orPalette = orGroupId ? orGroupColor(orGroupId) : undefined;
   const [internalOpen, setInternalOpen] = useState(false);
   const isControlled = open !== undefined;
   const effectiveOpen = isControlled ? open : internalOpen;
@@ -89,6 +121,27 @@ export const SidebarSection: React.FC<SidebarSectionProps> = ({
         gap={1}
         role="group"
         data-group
+        // When this section participates in a cross-facet OR group,
+        // anchor a 3px coloured rail on the left edge so the section
+        // visually links to its peers in the same group. Painting it
+        // as a pseudo-rail (insetInlineStart border) instead of a real
+        // border keeps the section's hit-rect unchanged.
+        position="relative"
+        _before={
+          orPalette
+            ? {
+                content: '""',
+                position: "absolute",
+                top: "6px",
+                bottom: "6px",
+                left: 0,
+                width: "3px",
+                borderRadius: "0 2px 2px 0",
+                bg: `${orPalette}.solid`,
+                opacity: 0.85,
+              }
+            : undefined
+        }
       >
         <HStack gap={1} width="full" align="center">
           {dragHandleProps && (
@@ -171,6 +224,24 @@ export const SidebarSection: React.FC<SidebarSectionProps> = ({
                       {valueCount}
                     </Text>
                   )}
+                {orPalette && (
+                  <Box
+                    as="span"
+                    display="inline-flex"
+                    alignItems="center"
+                    bg={`${orPalette}.subtle`}
+                    color={`${orPalette}.fg`}
+                    paddingX="4px"
+                    paddingY="0"
+                    borderRadius="3px"
+                    fontSize="2xs"
+                    fontWeight="600"
+                    letterSpacing="0.04em"
+                    title="This facet is OR-linked with other facets in the query"
+                  >
+                    OR
+                  </Box>
+                )}
                 {activeIndicator}
               </HStack>
               <Icon

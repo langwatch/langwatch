@@ -72,6 +72,7 @@ export const FilterSidebar: React.FC = () => {
     removeRange,
     setGroupOrder,
     setAllSectionsOpen,
+    orAnalysis,
   } = useFilterSidebarData();
 
   const groupSortableIds = useMemo(
@@ -159,6 +160,7 @@ export const FilterSidebar: React.FC = () => {
             setRange={setRange}
             removeRange={removeRange}
             onShiftToggle={handleShiftToggle}
+            orGroupId={orAnalysis.fieldToGroupId.get(key)}
           />
         </IsolatedErrorBoundary>
       );
@@ -172,6 +174,7 @@ export const FilterSidebar: React.FC = () => {
       setRange,
       removeRange,
       handleShiftToggle,
+      orAnalysis,
     ],
   );
 

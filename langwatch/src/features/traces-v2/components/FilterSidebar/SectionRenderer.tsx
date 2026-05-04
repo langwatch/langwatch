@@ -25,6 +25,9 @@ interface SectionRendererProps {
     value: string,
     options?: { modifierKey?: boolean },
   ) => void;
+  /** Set when this section's field belongs to a cross-facet OR group;
+   * threaded into the section so it can render its "linked" badge. */
+  orGroupId?: string;
   setRange: (field: string, from: string, to: string) => void;
   removeRange: (field: string) => void;
   onShiftToggle: (nextOpen: boolean) => void;
@@ -39,6 +42,7 @@ export const SectionRenderer: React.FC<SectionRendererProps> = ({
   setRange,
   removeRange,
   onShiftToggle,
+  orGroupId,
 }) => {
   const icon = getFacetIcon({ key: section.key, group: section.group });
 
@@ -62,6 +66,7 @@ export const SectionRenderer: React.FC<SectionRendererProps> = ({
         onToggle={toggleFacet}
         onShiftToggle={onShiftToggle}
         noneRow={noneRow}
+        orGroupId={orGroupId}
       />
     );
   }
@@ -81,6 +86,7 @@ export const SectionRenderer: React.FC<SectionRendererProps> = ({
         onChange={(from, to) => setRange(section.key, String(from), String(to))}
         onClear={() => removeRange(section.key)}
         onShiftToggle={onShiftToggle}
+        orGroupId={orGroupId}
       />
     );
   }

@@ -27,6 +27,7 @@ interface FacetSectionProps {
   /** When set, renders a "(none)" row pinned at the bottom that toggles a `none:`/`has:` filter. */
   noneRow?: { active: boolean; onToggle: () => void };
   onShiftToggle?: (nextOpen: boolean) => void;
+  orGroupId?: string;
 }
 
 export const FacetSection: React.FC<FacetSectionProps> = ({
@@ -39,6 +40,7 @@ export const FacetSection: React.FC<FacetSectionProps> = ({
   dragHandleProps,
   noneRow,
   onShiftToggle,
+  orGroupId,
 }) => {
   const lensOverride = useFacetLensStore((s) => s.lens.sectionOpen[field]);
   const setSectionOpen = useFacetLensStore((s) => s.setSectionOpen);
@@ -92,6 +94,7 @@ export const FacetSection: React.FC<FacetSectionProps> = ({
       onOpenChange={(next) => setSectionOpen(field, next)}
       dragHandleProps={dragHandleProps}
       onShiftToggle={onShiftToggle}
+      orGroupId={orGroupId}
       valueCount={items.length}
       hasActive={activeCount > 0}
       activeIndicator={

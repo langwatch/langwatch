@@ -7,7 +7,6 @@ import { Kbd } from "~/components/ops/shared/Kbd";
 import { useModelProvidersSettings } from "~/hooks/useModelProvidersSettings";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { SEARCH_FIELDS } from "~/server/app-layer/traces/query-language/metadata";
-import { hasCrossFacetOR } from "~/server/app-layer/traces/query-language/queries";
 import { useTraceFacets } from "../../hooks/useTraceFacets";
 import { useFilterStore } from "../../stores/filterStore";
 import { AskAiButton } from "../ai/AskAiButton";
@@ -65,20 +64,14 @@ export const SearchBar: React.FC = () => {
   const applyQueryText = useFilterStore((s) => s.applyQueryText);
   const clearAll = useFilterStore((s) => s.clearAll);
   const lastAiTranslation = useFilterStore((s) => s.lastAiTranslation);
-  const showCrossFacetWarning = useFilterStore((s) => hasCrossFacetOR(s.ast));
 
-  // Errors win over warnings — a query that doesn't parse already produces
-  // confusing facet behaviour, so the cross-facet OR warning is moot until
-  // the parse fixes itself.
+  // Cross-facet OR no longer triggers a warning chip: the sidebar now
+  // marks OR-grouped facets with a coloured "OR" pill + rail (see
+  // SidebarSection.orGroupId), so the situation reads honestly without
+  // a banner. Parse errors still win.
   const status: SearchBarStatus = parseError
     ? { kind: "error", message: parseError }
-    : showCrossFacetWarning
-      ? {
-          kind: "warning",
-          message:
-            "Query uses cross-facet OR — the sidebar may not fully reflect what you've searched for.",
-        }
-      : { kind: "ok" };
+    : { kind: "ok" };
 
   // Gate Ask AI on having at least one model provider configured. The
   // AI mode submits requests against the user's own keys; with none

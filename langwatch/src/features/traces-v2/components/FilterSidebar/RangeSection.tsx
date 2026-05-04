@@ -33,6 +33,7 @@ interface RangeSectionProps {
   onClear: () => void;
   dragHandleProps?: React.HTMLAttributes<HTMLDivElement>;
   onShiftToggle?: (nextOpen: boolean) => void;
+  orGroupId?: string;
 }
 
 export const RangeSection: React.FC<RangeSectionProps> = ({
@@ -48,6 +49,7 @@ export const RangeSection: React.FC<RangeSectionProps> = ({
   onClear,
   dragHandleProps,
   onShiftToggle,
+  orGroupId,
 }) => {
   const lensOverride = useFacetLensStore((s) => s.lens.sectionOpen[field]);
   const setSectionOpen = useFacetLensStore((s) => s.setSectionOpen);
@@ -122,6 +124,7 @@ export const RangeSection: React.FC<RangeSectionProps> = ({
       onOpenChange={(next) => setSectionOpen(field, next)}
       dragHandleProps={dragHandleProps}
       onShiftToggle={onShiftToggle}
+      orGroupId={orGroupId}
       hasActive={isActive}
       activeIndicator={
         summary ? (

@@ -1,5 +1,8 @@
 import { useCallback, useMemo } from "react";
-import { buildFacetStateLookup } from "~/server/app-layer/traces/query-language/queries";
+import {
+  analyzeOrGroups,
+  buildFacetStateLookup,
+} from "~/server/app-layer/traces/query-language/queries";
 import { useTraceFacets } from "../../../hooks/useTraceFacets";
 import {
   applyLensOrder,
@@ -170,6 +173,12 @@ export function useFilterSidebarData() {
     [orderedKeys, lensGroupOrder],
   );
 
+  // Cross-facet OR analysis. Sections whose field shows up in
+  // `fieldToGroupId` are part of an OR group; the colour is derived
+  // from the group id so multiple distinct OR groups visually
+  // distinguish themselves on the rail.
+  const orAnalysis = useMemo(() => analyzeOrGroups(ast), [ast]);
+
   return {
     ast,
     categoricals,
@@ -184,6 +193,7 @@ export function useFilterSidebarData() {
     descriptors,
     orderedKeys,
     orderedGroups,
+    orAnalysis,
     sectionByKey,
     toggleFacet,
     setRange,
