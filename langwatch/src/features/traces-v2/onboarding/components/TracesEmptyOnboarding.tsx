@@ -310,7 +310,13 @@ export function TracesEmptyOnboarding(): React.ReactElement {
         // slack on narrower viewports (the Flex container's
         // paddingRight = viewport - drawerLeft caps the visible
         // canvas, so this maxWidth only kicks in when there's space).
-        maxWidth={stageDef.heroLayout === "left" ? "460px" : "640px"}
+        maxWidth={
+          stageDef.heroLayout === "left"
+            ? "460px"
+            : stageDef.heroLayout === "topBanner"
+              ? "820px"
+              : "640px"
+        }
         paddingX={{ base: 4, md: 8 }}
       >
         {/* Hero motion key is the heading text (or a hidden-stage
@@ -563,7 +569,12 @@ export function TracesEmptyOnboarding(): React.ReactElement {
             stage (densityIntro). The Continue button stays quiet
             until the user actually picks a density — once they
             have, it wakes up to solid orange so pressing it next
-            reads as obvious. */}
+            reads as obvious. Suppressed on outro: the OutroPanel
+            top banner owns its own primary + dismiss controls, and
+            stacking another row of "Skip for now / Integration
+            overview" alongside the banner would re-introduce the
+            duplicate-CTA problem the banner is here to fix. */}
+        {stage !== "outro" && (
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -580,12 +591,11 @@ export function TracesEmptyOnboarding(): React.ReactElement {
                 give the user a way out of "I missed that beat" without
                 forcing them to restart the whole tour. Hidden on the
                 density spotlight (its cards already double as advance
-                affordances) and the outro (the OutroPanel owns its own
-                CTAs there). The bullet separators are only rendered
-                when an item is shown so we don't get adjacent dots. */}
-            {!stageDef.showDensitySpotlight &&
-              stage !== "outro" &&
-              !isReturningWelcome && (
+                affordances). The outer gate already excludes the outro
+                chapter (the OutroPanel owns its own CTAs there). The
+                bullet separators are only rendered when an item is
+                shown so we don't get adjacent dots. */}
+            {!stageDef.showDensitySpotlight && !isReturningWelcome && (
               <>
                 {canGoBack && (
                   <>
@@ -666,17 +676,19 @@ export function TracesEmptyOnboarding(): React.ReactElement {
                 outro footer feel cluttered. */}
           </HStack>
         </motion.div>
+        )}
 
         {/* Chapter progress strip — sits at the bottom of the hero
             stack, beneath the docs / skip secondary controls, so it
             reads as a quiet "where am I in this" indicator rather
             than competing with the primary CTA. Hidden on `settle`
-            (no narrative beat has landed yet) so it doesn't appear
-            before the journey is acknowledged. The strip itself is
-            non-clickable — chapter jumping is offered separately
-            via `ReturningUserHub` for users who've already done the
-            tour once. */}
-        {stage !== "settle" && (
+            (no narrative beat has landed yet) and on `outro` (the
+            top banner is the entire chrome — adding a strip below it
+            re-introduces the stacked-card feel the banner is here to
+            replace). The strip itself is non-clickable — chapter
+            jumping is offered separately via `ReturningUserHub` for
+            users who've already done the tour once. */}
+        {stage !== "settle" && stage !== "outro" && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}

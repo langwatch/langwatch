@@ -3,7 +3,8 @@ import { ArrowDown, ArrowUp, Bot, User, Wrench } from "lucide-react";
 import type React from "react";
 import { useDensityTokens } from "../../hooks/useDensityTokens";
 import { useDensityStore } from "../../stores/densityStore";
-import { type ParsedIO, tryParseChat } from "./chatContent";
+import { formatPreview } from "../../utils/previewFormatter";
+import { tryParseChat } from "./chatContent";
 
 const VERTICAL_BAR = "\u2506";
 const COMFORTABLE_LABEL_WIDTH = "60px";
@@ -21,20 +22,41 @@ export const IOPreview: React.FC<IOPreviewProps> = ({ input, output }) => {
   return <CompactIOPreview input={input} output={output} />;
 };
 
+/**
+ * Build the row data once per cell. `formatPreview` runs the unified
+ * unwrap/strip/glyph pipeline; `tryParseChat` is still consulted for the
+ * isChat/isTool flags that drive the role icon. Both are cheap (each does
+ * one JSON.parse attempt on the same input).
+ */
+function buildRow(raw: string | null): {
+  text: string;
+  isChat: boolean;
+  isTool: boolean;
+} {
+  if (raw === null) return { text: "", isChat: false, isTool: false };
+  const parsed = tryParseChat(raw);
+  const formatted = formatPreview(raw, { maxChars: 80 });
+  return {
+    text: formatted.text,
+    isChat: parsed.isChat,
+    isTool: parsed.isTool,
+  };
+}
+
 const CompactIOPreview: React.FC<IOPreviewProps> = ({ input, output }) => {
   const tokens = useDensityTokens();
   return (
     <VStack align="start" gap={0.5} fontFamily="mono">
       {input !== null && (
         <CompactRow
-          parsed={tryParseChat(input)}
+          row={buildRow(input)}
           fontSize={tokens.ioFontSize}
           direction="input"
         />
       )}
       {output !== null && (
         <CompactRow
-          parsed={tryParseChat(output)}
+          row={buildRow(output)}
           fontSize={tokens.ioFontSize}
           direction="output"
         />
@@ -44,13 +66,13 @@ const CompactIOPreview: React.FC<IOPreviewProps> = ({ input, output }) => {
 };
 
 interface CompactRowProps {
-  parsed: ParsedIO;
+  row: { text: string; isChat: boolean; isTool: boolean };
   fontSize: string;
   direction: "input" | "output";
 }
 
 const CompactRow: React.FC<CompactRowProps> = ({
-  parsed,
+  row,
   fontSize,
   direction,
 }) => {
@@ -67,7 +89,7 @@ const CompactRow: React.FC<CompactRowProps> = ({
         <Icon boxSize="10px" color={accent}>
           {isInput ? <ArrowUp /> : <ArrowDown />}
         </Icon>
-        <RoleIcon parsed={parsed} color={accent} direction={direction} />
+        <RoleIcon row={row} color={accent} direction={direction} />
       </Flex>
       <Text
         fontSize={fontSize}
@@ -78,32 +100,32 @@ const CompactRow: React.FC<CompactRowProps> = ({
         flex={1}
         minWidth={0}
       >
-        {parsed.text}
+        {row.text}
       </Text>
     </HStack>
   );
 };
 
 const RoleIcon: React.FC<{
-  parsed: ParsedIO;
+  row: { isChat: boolean; isTool: boolean };
   color: string;
   direction: "input" | "output";
-}> = ({ parsed, color, direction }) => {
+}> = ({ row, color, direction }) => {
   if (direction === "input") {
-    return parsed.isChat ? (
+    return row.isChat ? (
       <Icon boxSize="10px" color={color}>
         <User />
       </Icon>
     ) : null;
   }
-  if (parsed.isTool) {
+  if (row.isTool) {
     return (
       <Icon boxSize="10px" color={color}>
         <Wrench />
       </Icon>
     );
   }
-  if (parsed.isChat) {
+  if (row.isChat) {
     return (
       <Icon boxSize="10px" color={color}>
         <Bot />
@@ -120,7 +142,7 @@ const ComfortableIOPreview: React.FC<IOPreviewProps> = ({ input, output }) => (
         label="Input"
         labelColor="blue.fg"
         textColor="fg.muted"
-        text={tryParseChat(input).text}
+        text={formatPreview(input, { maxChars: 200 }).text}
       />
     )}
     {output !== null && (
@@ -128,7 +150,7 @@ const ComfortableIOPreview: React.FC<IOPreviewProps> = ({ input, output }) => (
         label="Output"
         labelColor="green.fg"
         textColor="fg"
-        text={tryParseChat(output).text}
+        text={formatPreview(output, { maxChars: 200 }).text}
       />
     )}
   </VStack>

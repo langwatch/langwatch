@@ -28,8 +28,11 @@ interface Curtain {
  * Curtains are packed tighter than their radii so they overlap, and
  * mix-blend-mode "screen" (below) brightens those overlaps additively —
  * making the row read as one continuous wash instead of discrete blobs.
- * Long mismatched durations with negative delays keep them out of phase
- * so there's no perceptible resync beat.
+ * Mismatched durations with negative delays keep them out of phase so
+ * there's no perceptible resync beat. Cycle times sit in the 4–7s range
+ * so the ribbon reads as something happening *now*, not as a slow
+ * background loop. Delays are scaled in proportion so each curtain
+ * still enters its cycle at a different phase.
  */
 const CURTAINS: Curtain[] = [
   {
@@ -37,16 +40,16 @@ const CURTAINS: Curtain[] = [
     rx: 170,
     ry: 270,
     color: "#7dd3fc",
-    durationMs: 11500,
-    delayMs: -2200,
+    durationMs: 5750,
+    delayMs: -1100,
   },
   {
     cx: 160,
     rx: 160,
     ry: 290,
     color: "#3b82f6",
-    durationMs: 9000,
-    delayMs: -5500,
+    durationMs: 4500,
+    delayMs: -2750,
     reverse: true,
   },
   {
@@ -54,16 +57,16 @@ const CURTAINS: Curtain[] = [
     rx: 175,
     ry: 260,
     color: "#22d3ee",
-    durationMs: 13000,
-    delayMs: -1500,
+    durationMs: 6500,
+    delayMs: -750,
   },
   {
     cx: 380,
     rx: 165,
     ry: 295,
     color: "#60a5fa",
-    durationMs: 8500,
-    delayMs: -7000,
+    durationMs: 4250,
+    delayMs: -3500,
     reverse: true,
   },
   {
@@ -71,16 +74,16 @@ const CURTAINS: Curtain[] = [
     rx: 175,
     ry: 270,
     color: "#6366f1",
-    durationMs: 12000,
-    delayMs: -3500,
+    durationMs: 6000,
+    delayMs: -1750,
   },
   {
     cx: 600,
     rx: 160,
     ry: 285,
     color: "#38bdf8",
-    durationMs: 10000,
-    delayMs: -8500,
+    durationMs: 5000,
+    delayMs: -4250,
     reverse: true,
   },
   {
@@ -88,16 +91,16 @@ const CURTAINS: Curtain[] = [
     rx: 170,
     ry: 265,
     color: "#818cf8",
-    durationMs: 11500,
-    delayMs: -2800,
+    durationMs: 5750,
+    delayMs: -1400,
   },
   {
     cx: 820,
     rx: 165,
     ry: 290,
     color: "#0ea5e9",
-    durationMs: 9500,
-    delayMs: -6200,
+    durationMs: 4750,
+    delayMs: -3100,
     reverse: true,
   },
   {
@@ -105,8 +108,8 @@ const CURTAINS: Curtain[] = [
     rx: 175,
     ry: 275,
     color: "#a5b4fc",
-    durationMs: 13500,
-    delayMs: -4400,
+    durationMs: 6750,
+    delayMs: -2200,
   },
 ];
 

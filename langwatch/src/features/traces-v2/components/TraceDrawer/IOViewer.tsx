@@ -1,5 +1,12 @@
 import { Box, Button, HStack, Icon, Text } from "@chakra-ui/react";
-import { forwardRef, memo, useMemo, useState } from "react";
+import {
+  forwardRef,
+  memo,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   LuCheck,
   LuChevronDown,
@@ -275,6 +282,38 @@ export const IOViewer = memo(function IOViewer({
   // assistant card sits flush at the root of the section.
   const flushChatCard = format === "pretty" && isChat && mode === "output";
 
+  // Track whether the preview box's content actually exceeds its visible
+  // height. The "Click to interact" scrim only makes sense when there's
+  // hidden content to reveal — otherwise it's noise on a one-line input.
+  // ResizeObserver catches both initial layout and any reflow (format
+  // toggle, density change, font load, etc.). The fallback `scroll` listener
+  // covers the case where content height changes without the element
+  // resizing (rare, but cheap to add).
+  const previewBoxRef = useRef<HTMLDivElement>(null);
+  const [hasOverflow, setHasOverflow] = useState(false);
+  useEffect(() => {
+    const el = previewBoxRef.current;
+    if (!el) {
+      setHasOverflow(false);
+      return;
+    }
+    const measure = () => {
+      setHasOverflow(el.scrollHeight - el.clientHeight > 1);
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [
+    displayContent,
+    format,
+    isVirtualizingChat,
+    engaged,
+    expanded,
+    chatLayout,
+    markdownSubmode,
+  ]);
+
   return (
     <Box>
       <HStack marginBottom={1} gap={2}>
@@ -384,6 +423,7 @@ export const IOViewer = memo(function IOViewer({
         <>
           <Box ref={engagedRef} position="relative">
             <Box
+              ref={previewBoxRef}
               bg={flushChatCard ? "transparent" : "bg.subtle"}
               borderRadius={flushChatCard ? "0" : "md"}
               borderWidth={flushChatCard ? "0" : "1px"}
@@ -395,7 +435,9 @@ export const IOViewer = memo(function IOViewer({
                     ? 0
                     : 3
               }
-              opacity={!isVirtualizingChat && !engaged ? 0.6 : 1}
+              opacity={
+                !isVirtualizingChat && !engaged && hasOverflow ? 0.6 : 1
+              }
               transition="opacity 120ms ease-out"
               maxHeight={
                 isVirtualizingChat
@@ -430,7 +472,7 @@ export const IOViewer = memo(function IOViewer({
                 mode={mode}
               />
             </Box>
-            {!isVirtualizingChat && !engaged && (
+            {!isVirtualizingChat && !engaged && hasOverflow && (
               <IOViewerEngageScrim
                 flushChatCard={flushChatCard}
                 onEngage={() => setEngaged(true)}
