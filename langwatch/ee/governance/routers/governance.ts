@@ -80,7 +80,7 @@ export const governanceRouter = createTRPCRouter({
       const setupService = GovernanceSetupStateService.create(ctx.prisma);
       const usageService = UsageStatsService.create(ctx.prisma);
 
-      const [setupState, firstProject, isEnterprise, hasManage] =
+      const [setupState, firstProject, isEnterprise, hasManage, userPin] =
         await Promise.all([
           // hasApplicationTraces is part of setupState as of 9d2688c84.
           setupService.resolve(input.organizationId),
@@ -104,13 +104,14 @@ export const governanceRouter = createTRPCRouter({
             input.organizationId,
             "organization:manage",
           ),
+          ctx.prisma.user.findUnique({
+            where: { id: userId },
+            select: { lastHomePath: true },
+          }),
         ]);
 
       return resolvePersonaHomeSafe({
-        // User pin override deferred to follow-up PR (requires
-        // User.lastHomePath migration). Always null for now — persona
-        // detection drives the destination.
-        userLastHomePath: null,
+        userLastHomePath: userPin?.lastHomePath ?? null,
         setupState: {
           hasPersonalVKs: setupState.hasPersonalVKs,
           hasIngestionSources: setupState.hasIngestionSources,

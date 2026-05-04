@@ -72,6 +72,10 @@ model User {
   updatedAt               DateTime                 @default(now()) @updatedAt
   lastLoginAt             DateTime?
   deactivatedAt           DateTime?
+  // User-level pin for the persona-resolver redirect target. NULL = use
+  // auto-detection. When set, wins over auto-detected persona destination.
+  // Spec: specs/ai-gateway/governance/persona-home-content.feature
+  lastHomePath            String?
   Annotation              Annotation[]
   publicShares            PublicShare[]
   Workflow                Workflow[]

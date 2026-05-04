@@ -66,7 +66,7 @@ Feature: Persona-aware home CONTENT — what each persona sees on landing
   # ---------------------------------------------------------------------------
 
   @bdd @ui @persona-content @persona-2 @gap
-  Scenario: Mixed-persona home additionally renders projects + recent project activity
+  Scenario: Mixed-persona home additionally renders the user's projects card
     Given a user resolves to persona "mixed"
     And the user is a member of at least one project (ProjectMember row)
     When the user lands on "/me"
@@ -74,31 +74,45 @@ Feature: Persona-aware home CONTENT — what each persona sees on landing
       | section              | required                              |
       | Welcome eyebrow      | "Welcome back, <name>"                |
       | AiToolsPortal        | tile grid                             |
-      | Personal usage card  | $spent / reqs / top-model             |
       | Your projects card   | last-touched project list (max 5)    |
-      | Recent project actv. | cross-project trace summaries (10)   |
+      | Personal usage card  | $spent / reqs / top-model             |
       | Spending over time   | 14d daily-bucket chart                |
       | Recent activity      | last 10 wrapper calls                 |
-    And each "Your projects" row renders { name, last activity, traces this week }
+    And each "Your projects" row renders { project name, team subtitle, chevron }
     And clicking a row routes to "/[projectSlug]/messages"
+    And the per-row last-activity timestamp is NOT shown until a project-level
+      activity-time field exists (today projects sort by updatedAt as a coarse
+      proxy; rendering it would mislead since updatedAt fires on any project
+      edit, not just trace activity)
 
   @bdd @ui @persona-content @persona-2
-  Scenario: Mixed-persona "Recent project activity" pulls from the user's projects only
+  Scenario: Mixed-persona "Your projects" card lists only the user's own projects
     Given a user is a member of projects "alex-prod" and "alex-stg"
     And the user is NOT a member of project "isolated-team-prod"
     When the user lands on "/me" as persona "mixed"
-    Then "Recent project activity" lists rows ONLY from "alex-prod" and "alex-stg"
+    Then "Your projects" lists rows ONLY for "alex-prod" and "alex-stg"
     And NO row references "isolated-team-prod"
 
-  @bdd @ui @persona-content @persona-2 @fallback
-  Scenario: Mixed persona with stale project memberships falls back gracefully
-    Given a user resolves to persona "mixed"
-    And ALL the user's projects have zero application traces
+  @bdd @ui @persona-content @persona-2 @hidden-projects
+  Scenario: Mixed persona "Your projects" excludes hidden internal_governance projects
+    Given a user is a member of an org with both application projects
+      and at least one hidden internal_governance project
+      (auto-created lazily on first IngestionSource mint)
     When the user lands on "/me"
-    Then "Your projects" renders the project list with "no recent activity"
-    And "Recent project activity" renders an EmptyState
-      "No project activity in the last 14 days"
-    And the AiToolsPortal + personal-usage block still render normally
+    Then "Your projects" lists ONLY application-kind projects
+    And NO row references the hidden governance project
+      (regression-invariant — same hidden-project filter as every other
+      user-facing project picker)
+
+  @bdd @ui @persona-content @persona-2 @follow-up
+  Scenario: Mixed persona cross-project Recent activity panel — DEFERRED
+    Given the user has multiple projects with recent traces
+    When the user lands on "/me"
+    Then a "Recent project activity" panel SHOULD eventually render
+      cross-project trace summaries (max 10) sorted by occurredAt DESC
+    But this scenario is deferred to a follow-up PR — the cross-project
+      user-scoped trace query is a new fold shape; the v1 ship covers
+      "Your projects" with last-touched only
 
   # ---------------------------------------------------------------------------
   # Persona 3 — project_only — REGRESSION INVARIANT — DO NOT TOUCH

@@ -21,6 +21,7 @@ import Head from "~/utils/compat/next-head";
 import { LoadingScreen } from "~/components/LoadingScreen";
 import { NotFoundScene } from "~/components/NotFoundScene";
 import MyLayout from "~/components/me/MyLayout";
+import { HomePagePicker } from "~/components/me/HomePagePicker";
 import {
   type PersonalApiKeyRow,
   usePersonalContext,
@@ -274,6 +275,15 @@ export default function MySettingsPage() {
             </VStack>
           )}
         </SectionCard>
+
+        {ctx.organizationId ? (
+          <SectionCard
+            title="Default landing page"
+            description="Where to land when you open LangWatch. Auto uses your detected persona."
+          >
+            <HomePagePicker organizationId={ctx.organizationId} />
+          </SectionCard>
+        ) : null}
 
         <SectionCard title="Budget">
           {ctx.summary.budgetUsd === null ? (

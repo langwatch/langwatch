@@ -771,6 +771,130 @@ export const userRouter = createTRPCRouter({
       }
       return { ok: true as const, sentTo: adminEmail };
     }),
+
+  /**
+   * Persona-2 enrichment: list the user's projects (across all teams in
+   * the org) for the "Your projects" card on /me. Each row carries the
+   * minimum the card needs to render — { id, slug, name, lastEventAt }.
+   * Sorted by lastEventAt DESC so the most-touched project surfaces
+   * first; null lastEventAt sinks to the bottom.
+   *
+   * Spec: specs/ai-gateway/governance/persona-home-content.feature
+   */
+  userProjects: protectedProcedure
+    .input(
+      z.object({
+        organizationId: z.string(),
+        limit: z.number().int().min(1).max(20).optional(),
+      }),
+    )
+    .use(checkOrganizationPermission("organization:view"))
+    .query(async ({ ctx, input }) => {
+      const userId = ctx.session.user.id;
+      // The Project model has no per-trace lastEventAt — that lives on
+      // IngestionSource (governance) and on raw recorded_spans (CH).
+      // Until a project-level activity field is wired, sort by
+      // updatedAt as a coarse "last touched" proxy. Honest UX in the
+      // card itself: don't show a precise time, just "Open project →".
+      const projects = await ctx.prisma.project.findMany({
+        where: {
+          team: {
+            organizationId: input.organizationId,
+            members: { some: { userId } },
+          },
+          archivedAt: null,
+          // Hide the per-org hidden internal_governance project from
+          // user-facing surfaces. Same invariant as every other project
+          // picker in the app.
+          kind: "application",
+        },
+        orderBy: { updatedAt: "desc" },
+        take: input.limit ?? 5,
+        select: {
+          id: true,
+          slug: true,
+          name: true,
+          team: { select: { id: true, name: true } },
+        },
+      });
+      return projects.map((p) => ({
+        id: p.id,
+        slug: p.slug,
+        name: p.name,
+        teamName: p.team.name,
+      }));
+    }),
+
+  /**
+   * Persist (or clear) the user's pinned home destination. NULL clears
+   * the pin and reverts to auto-detection. The picker UI (on
+   * /me/settings) calls this when the user picks a destination from the
+   * dropdown.
+   *
+   * Spec: specs/ai-gateway/governance/persona-home-content.feature
+   *       (User pin > org pin > auto-detection priority)
+   */
+  setLastHomePath: protectedProcedure
+    .input(
+      z.object({
+        path: z
+          .string()
+          .min(1)
+          .max(1024)
+          .regex(/^\//, "must start with /")
+          .nullable(),
+      }),
+    )
+    .use(skipPermissionCheck)
+    .mutation(async ({ ctx, input }) => {
+      await ctx.prisma.user.update({
+        where: { id: ctx.session.user.id },
+        data: { lastHomePath: input.path },
+      });
+      return { ok: true as const };
+    }),
+
+  /**
+   * Snapshot of the user's home-page picker state for /me/settings:
+   * the currently-pinned path (if any) + the auto-detected default
+   * destination + the flags that drive which dropdown options to show.
+   *
+   * Powers the "Default landing page" picker. Single round-trip so the
+   * UI doesn't have to compose multiple queries.
+   */
+  homePagePickerState: protectedProcedure
+    .input(z.object({ organizationId: z.string() }))
+    .use(checkOrganizationPermission("organization:view"))
+    .query(async ({ ctx, input }) => {
+      const userId = ctx.session.user.id;
+      const [user, firstProject] = await Promise.all([
+        ctx.prisma.user.findUnique({
+          where: { id: userId },
+          select: { lastHomePath: true },
+        }),
+        ctx.prisma.project.findFirst({
+          where: {
+            team: {
+              organizationId: input.organizationId,
+              members: { some: { userId } },
+            },
+            archivedAt: null,
+          },
+          orderBy: { createdAt: "asc" },
+          select: { slug: true },
+        }),
+      ]);
+      return {
+        lastHomePath: user?.lastHomePath ?? null,
+        firstProjectSlug: firstProject?.slug ?? null,
+        // The governance-home option is shown for any user who could
+        // possibly land there via auto-detection — gate on the resolver's
+        // own conjunctive check instead of duplicating the logic here.
+        // The picker UI calls api.governance.resolveHome to learn the
+        // auto-detected destination + isOverride flag and uses that to
+        // decide which options to surface.
+      };
+    }),
 });
 
 // ---------------------------------------------------------------------------
