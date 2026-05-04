@@ -830,23 +830,60 @@ Critical path: D1 → D2 → D5 → D8. **Phase 6 status: D1–D8 ✅ — 100% c
 
 ### Gateway-flow captures (Persona-4 admin)
 
-The persona × flow grid above is governance-centric. Gateway-flow captures (Virtual Keys / Budgets / Providers / Usage / Audit log) live here as a sibling block — same persona-x-flow root, separate sub-table since the columns don't map cleanly to governance flows:
+The persona × flow grid above is governance-centric. Gateway-flow captures (Virtual Keys / Budgets / Providers / Usage / Audit log) render below as inline screenshots — same `persona-x-flow/admin/...` root, separate gallery since the surfaces don't map cleanly to governance flow columns. Each image links back to the raw file on the branch.
 
-| Gateway surface | Capture |
-|---|---|
-| Virtual Keys list | ✅ `admin/virtual-keys/01-list.png` |
-| Virtual Key detail | ✅ `admin/virtual-keys/02-detail.png` |
-| Virtual Key create drawer | ✅ `admin/virtual-keys/03-create-drawer.png` (provider fallback chain + inline validation) |
-| Virtual Key edit drawer | ✅ `admin/virtual-keys/04-edit-drawer.png` (populated edit fields + provider chain reorder UI) |
-| Budgets list | ✅ `admin/budgets/01-list.png` |
-| Budget detail | ✅ `admin/budgets/02-detail.png` |
-| Budget detail (live data, pre-fix) | ✅ `admin/budgets/03-live-data.png` (surfaced row L formatter + row M projection bugs — sergey-p3-member personal budget @ live spend showing $0.00 / $1.00 / 0%) |
-| Budget detail (live data, post-formatter) | ✅ `admin/budgets/04-live-data-microcent-fix.png` (post-`49d4d2bc6` formatter ship; still $0.00 because list query hits row M backend projection bug — captured as evidence the formatter renders correctly when `spentUsd === 0`) |
-| **Budget detail — loop closed end-to-end** | ✅ `admin/budgets/06-microcent-end-to-end.png` (post-`ffb9c1aa2` M fix; renders **$0.000165 / $1.00 · 0% · block · in 30 days** for the seeded persona-3 Personal Budget; **canonical visual proof that L + M + N + K all wire together**: mint VK → fire completion → see live ledger spend with micro-cent precision) |
-| Providers list | ✅ `admin/providers/01-list.png` |
-| Gateway usage | ✅ `admin/usage/01-gateway-usage.png` |
-| Gateway usage (live data) | ✅ `admin/usage/02-live-data.png` (same project as budget; **surfaces row M empty-despite-ledger-rows bug**) |
-| Audit log | ✅ `admin/audit-log/01-list.png` |
+#### Virtual Keys
+
+![Virtual Keys list](https://github.com/langwatch/langwatch/raw/feat/governance-platform/docs/images/ai-governance/persona-x-flow/admin/virtual-keys/01-list.png)
+*Virtual Keys list — `admin/virtual-keys/01-list.png`*
+
+![Virtual Key detail](https://github.com/langwatch/langwatch/raw/feat/governance-platform/docs/images/ai-governance/persona-x-flow/admin/virtual-keys/02-detail.png)
+*Virtual Key detail — `admin/virtual-keys/02-detail.png`*
+
+![Virtual Key create drawer](https://github.com/langwatch/langwatch/raw/feat/governance-platform/docs/images/ai-governance/persona-x-flow/admin/virtual-keys/03-create-drawer.png)
+*Create drawer with provider fallback chain + inline `Missing: name, at least one provider` validation — `admin/virtual-keys/03-create-drawer.png`*
+
+![Virtual Key edit drawer](https://github.com/langwatch/langwatch/raw/feat/governance-platform/docs/images/ai-governance/persona-x-flow/admin/virtual-keys/04-edit-drawer.png)
+*Edit drawer (populated fields + provider chain reorder UI) — `admin/virtual-keys/04-edit-drawer.png`*
+
+#### Budgets
+
+![Budgets list](https://github.com/langwatch/langwatch/raw/feat/governance-platform/docs/images/ai-governance/persona-x-flow/admin/budgets/01-list.png)
+*Budgets list — `admin/budgets/01-list.png`*
+
+![Budget detail](https://github.com/langwatch/langwatch/raw/feat/governance-platform/docs/images/ai-governance/persona-x-flow/admin/budgets/02-detail.png)
+*Budget detail — `admin/budgets/02-detail.png`*
+
+![Budget detail (live data, loop closed)](https://github.com/langwatch/langwatch/raw/feat/governance-platform/docs/images/ai-governance/persona-x-flow/admin/budgets/06-microcent-end-to-end.png)
+**Capstone — loop closed end-to-end:** sergey-p3-member personal budget rendering **$0.000165 / $1.00 · 0% · block · in 30 days** post-fix. Canonical visual proof that K (seed-personas auto-budget) + L (frontend formatter) + M (CH spend merge) + N (personalUsage CH alias) all wire together — mint VK → fire real openai/gpt-5-mini → see live ledger spend with micro-cent precision. — `admin/budgets/06-microcent-end-to-end.png`
+
+<details><summary>Live-data debug history (pre/post each fix)</summary>
+
+![Live data pre-fix](https://github.com/langwatch/langwatch/raw/feat/governance-platform/docs/images/ai-governance/persona-x-flow/admin/budgets/03-live-data.png)
+*Pre-fix — surfaced row L formatter + row M projection bugs (showing $0.00 / $1.00 / 0% despite real ledger rows) — `admin/budgets/03-live-data.png`*
+
+![Live data post-formatter](https://github.com/langwatch/langwatch/raw/feat/governance-platform/docs/images/ai-governance/persona-x-flow/admin/budgets/04-live-data-microcent-fix.png)
+*Post-`49d4d2bc6` formatter; still $0.00 because list query hit row M backend projection bug — evidence the formatter renders correctly when `spentUsd === 0` — `admin/budgets/04-live-data-microcent-fix.png`*
+
+</details>
+
+#### Providers
+
+![Providers list](https://github.com/langwatch/langwatch/raw/feat/governance-platform/docs/images/ai-governance/persona-x-flow/admin/providers/01-list.png)
+*Providers list — `admin/providers/01-list.png`*
+
+#### Gateway usage
+
+![Gateway usage](https://github.com/langwatch/langwatch/raw/feat/governance-platform/docs/images/ai-governance/persona-x-flow/admin/usage/01-gateway-usage.png)
+*Gateway usage — `admin/usage/01-gateway-usage.png`*
+
+![Gateway usage live data](https://github.com/langwatch/langwatch/raw/feat/governance-platform/docs/images/ai-governance/persona-x-flow/admin/usage/02-live-data.png)
+*Live data on the same project as the row 06 budget capture — `admin/usage/02-live-data.png`*
+
+#### Audit log
+
+![Audit log](https://github.com/langwatch/langwatch/raw/feat/governance-platform/docs/images/ai-governance/persona-x-flow/admin/audit-log/01-list.png)
+*Audit log — `admin/audit-log/01-list.png`*
 
 **Asset libraries** — all NEW captures land under the centralized persona × flow scheme `docs/images/ai-governance/persona-x-flow/<persona>/<flow>/<screen>.png` (Lane-B 2026-05-04 reset). Existing libraries below are preserved as historical evidence + will be migrated cell-by-cell as the new captures land:
 - `docs/images/ai-governance/persona-x-flow/{dev,admin,finance}/{portal,sessions,admin-policy,ingestion,gateway-usage,cli-handoff}/*.png` — **canonical destination** for the post-2026-05-04 reorg pass
