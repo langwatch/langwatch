@@ -137,6 +137,7 @@ describe("customerIoSimulationSync reactor", () => {
   });
 
   describe("makeJobId", () => {
+    /** @scenario 'Simulation sync reactor uses project-scoped job ID for debouncing' */
     it("returns cio-sim-sync-{tenantId}", () => {
       const deps = createDeps();
       const reactor = createCustomerIoSimulationSyncReactor(deps);
@@ -153,6 +154,8 @@ describe("customerIoSimulationSync reactor", () => {
 
   describe("given an organization with no prior simulation runs across any project", () => {
     describe("when the first simulation is processed", () => {
+      /** @scenario 'First simulation run identifies user with has_simulations true' */
+      /** @scenario 'First simulation fires immediately without debouncing' */
       it("identifies user with has_simulations true and org-wide simulation_count 1", async () => {
         const deps = createDeps({
           simulationCountFn: vi.fn().mockResolvedValue(1),
@@ -174,6 +177,7 @@ describe("customerIoSimulationSync reactor", () => {
         });
       });
 
+      /** @scenario 'First simulation run fires first_simulation_ran event' */
       it("tracks first_simulation_ran event with project_id", async () => {
         const deps = createDeps({
           simulationCountFn: vi.fn().mockResolvedValue(1),
@@ -198,6 +202,7 @@ describe("customerIoSimulationSync reactor", () => {
 
   describe("given an organization that already has simulation runs", () => {
     describe("when a new simulation is processed", () => {
+      /** @scenario 'Subsequent simulation runs update org-wide count and timestamp with debouncing' */
       it("identifies user with updated org-wide simulation_count and last_simulation_at", async () => {
         const deps = createDeps({
           simulationCountFn: vi.fn().mockResolvedValue(6),
@@ -277,6 +282,7 @@ describe("customerIoSimulationSync reactor", () => {
   });
 
   describe("given the simulation is not in a finished state", () => {
+    /** @scenario 'Simulation tracking is independent of scenario template creation' */
     it("does not call nurturing methods for started events", async () => {
       const deps = createDeps();
       const reactor = createCustomerIoSimulationSyncReactor(deps);

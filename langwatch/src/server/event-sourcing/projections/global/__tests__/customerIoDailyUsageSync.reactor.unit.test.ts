@@ -125,6 +125,7 @@ describe("customerIoDailyUsageSync reactor", () => {
 
   describe("given the projectDailySdkUsage fold has completed for a project", () => {
     describe("when the daily usage sync reactor runs", () => {
+      /** @scenario 'Daily usage fold pushes aggregated metrics to Customer.io' */
       it("identifies user with trace_count as cumulative total", async () => {
         const deps = createDeps();
         const reactor = createCustomerIoDailyUsageSyncReactor(deps);
@@ -155,6 +156,7 @@ describe("customerIoDailyUsageSync reactor", () => {
         });
       });
 
+      /** @scenario 'Daily usage sync sends cumulative totals not reset counters' */
       it("includes trace_count_updated_at as ISO 8601 timestamp", async () => {
         const deps = createDeps();
         const reactor = createCustomerIoDailyUsageSyncReactor(deps);

@@ -38,6 +38,7 @@ const createMockDb = ({
 };
 
 describe("getFreePlanLimits", () => {
+  /** @scenario 'All pricing models get 50,000 events on the free tier' */
   it("returns 50,000 messages per month", () => {
     const plan = getFreePlanLimits();
     expect(plan.maxMessagesPerMonth).toBe(50_000);
@@ -90,6 +91,7 @@ describe("createSaaSPlanProvider", () => {
       });
 
       describe("when organization has SEAT_EVENT pricing model", () => {
+        /** @scenario 'SEAT_EVENT organization on FREE plan gets 50,000 events per month' */
         it("returns FREE with 50,000 messages per month", async () => {
           const db = createMockDb({
             orgFindUniqueResult: { pricingModel: "SEAT_EVENT" },
@@ -103,6 +105,7 @@ describe("createSaaSPlanProvider", () => {
       });
 
       describe("when organization has TIERED pricing model", () => {
+        /** @scenario 'TIERED organization on FREE plan gets 50,000 events per month' */
         it("returns FREE with 50,000 messages per month", async () => {
           const db = createMockDb({
             orgFindUniqueResult: { pricingModel: "TIERED" },
@@ -116,6 +119,7 @@ describe("createSaaSPlanProvider", () => {
       });
 
       describe("when organization is not found", () => {
+        /** @scenario 'Organization not found gets 50,000 events per month' */
         it("returns FREE with 50,000 messages per month", async () => {
           const db = createMockDb({
             orgFindUniqueResult: null,
@@ -130,6 +134,7 @@ describe("createSaaSPlanProvider", () => {
     });
 
     describe("when active subscription exists", () => {
+      /** @scenario 'Valid subscription returns its own plan regardless of pricing model' */
       it("returns plan limits with custom overrides", async () => {
         const subscription = {
           plan: PlanTypes.LAUNCH,
@@ -285,6 +290,7 @@ describe("createSaaSPlanProvider", () => {
         expect(plan.type).toBe(PlanTypes.FREE);
       });
 
+      /** @scenario 'Custom subscription limits override the base free allowance' */
       it("applies overrides over free defaults", async () => {
         const subscription = {
           plan: "NONEXISTENT_PLAN",

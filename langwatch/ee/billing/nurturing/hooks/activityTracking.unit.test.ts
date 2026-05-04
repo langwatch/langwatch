@@ -45,6 +45,7 @@ describe("Activity tracking hook", () => {
     });
 
     describe("when the auth session callback fires", () => {
+      /** @scenario 'User login pushes last_active_at to Customer.io' */
       it("identifies user with last_active_at set to the current time", () => {
         const now = new Date("2026-03-15T12:00:00.000Z");
         vi.setSystemTime(now);
@@ -61,6 +62,7 @@ describe("Activity tracking hook", () => {
     });
 
     describe("when a user refreshes their session multiple times within one hour", () => {
+      /** @scenario 'Activity tracking is debounced to avoid excessive API calls' */
       it("makes at most one Customer.io identify call per hour", () => {
         vi.useFakeTimers();
         vi.setSystemTime(new Date("2026-03-15T12:00:00.000Z"));
@@ -148,6 +150,7 @@ describe("Activity tracking hook", () => {
     });
 
     describe("when Customer.io API is unavailable", () => {
+      /** @scenario 'Activity tracking failure does not break the login flow' */
       it("does not throw (fire-and-forget)", async () => {
         const { captureException } = await import(
           "../../../../src/utils/posthogErrorCapture"
