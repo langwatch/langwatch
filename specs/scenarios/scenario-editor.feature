@@ -6,6 +6,11 @@ Feature: Scenario Editor
   Background:
     Given I am logged into project "my-project"
 
+  # Per AUDIT_MANIFEST.md: 10 scenarios → 7 DUPLICATE (already bound elsewhere)
+  # + 3 KEEP. The 3 KEEP scenarios remain @unimplemented pending integration
+  # test coverage for list-page navigation, form-field schema audit, and
+  # criteria empty-input validation — tracked in PR #3458.
+
   # ============================================================================
   # Create Scenario
   # ============================================================================

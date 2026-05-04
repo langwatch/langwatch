@@ -3,6 +3,14 @@ Feature: Scenario Failure Handler
   I want to see meaningful error messages when scenario jobs fail
   So that I can diagnose issues instead of seeing generic timeout messages
 
+  # Per AUDIT_MANIFEST.md: 18 scenarios → 5 DUPLICATE (already bound elsewhere
+  # against scenario-processor-failure-handler.unit.test.ts +
+  # pollForScenarioRun.unit.test.ts) + 2 DELETE (synthetic ID generation no
+  # longer applies; idempotency moved downstream) + 5 UPDATE (handler emits
+  # only finishRun unconditionally; scenarioRunId now pre-assigned; 15min
+  # timeout not 5min) + 6 KEEP. The 11 remaining @unimplemented scenarios
+  # need rewrites or new tests in PR #3458.
+
   # ============================================================================
   # ScenarioFailureHandler Service - Unit Tests
   # ============================================================================
@@ -38,7 +46,7 @@ Feature: Scenario Failure Handler
     And the RUN_FINISHED uses the existing scenarioRunId from RUN_STARTED
     And no new RUN_STARTED event is emitted
 
-  @unit @unimplemented
+  @unit
   Scenario: Include job metadata in failure events
     Given a scenario job failed with:
       | projectId  | proj_123     |
@@ -60,13 +68,13 @@ Feature: Scenario Failure Handler
   # The processor's completed handler should call the failure handler
   # when result.success is false.
 
-  @integration @unimplemented
+  @integration
   Scenario: Worker does not call failure handler on success
     Given a scenario job completes with result.success = true
     When the worker's completed event fires
     Then ScenarioFailureHandler is not invoked
 
-  @integration @unimplemented
+  @integration
   Scenario: Failure handler errors do not crash worker
     Given a scenario job completes with result.success = false
     And ScenarioFailureHandler throws an error

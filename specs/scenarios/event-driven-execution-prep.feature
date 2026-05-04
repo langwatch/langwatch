@@ -3,6 +3,13 @@ Feature: Event-driven scenario execution
   I need scenario runs to be fully event-driven
   So that queueing, execution, and cancellation use a single event-sourcing architecture
 
+  # Per AUDIT_MANIFEST.md: 11 scenarios → 7 DUPLICATE (already bound via
+  # @scenario JSDoc against cancellation-eligibility.unit.test.ts,
+  # simulation-runner.router.unit.test.ts, execution-pool.unit.test.ts) +
+  # 4 KEEP. The 4 KEEP scenarios remain @unimplemented pending integration test
+  # coverage for suite-level queueRun fan-out, execution reactor on queued/cancelled,
+  # and 6-pod GroupQueue distribution — tracked in PR #3458.
+
   Background:
     Given the event-sourcing pipeline is active
 
