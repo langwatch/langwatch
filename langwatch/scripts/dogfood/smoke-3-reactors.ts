@@ -300,6 +300,90 @@ async function pollClickHouse(orgId: string): Promise<ReactorEvidence[]> {
   return out;
 }
 
+async function postSyntheticIngestionSourceTrace(seeded: SeededState): Promise<string> {
+  // Build an OTLP/JSON payload for an ingestion-source-shaped trace.
+  // governanceKpisSync + governanceOcsfEventsSync gate on
+  // langwatch.origin.kind=ingestion_source + langwatch.ingestion_source.id.
+  // Without these markers they early-return — so the GATEWAY trace
+  // shape doesn't fire those two reactors. We need a SECOND synthetic
+  // trace shaped like a Phase 10 puller event.
+  const traceId = hexId(16);
+  const spanId = hexId(8);
+  const startTimeMs = Date.now() - 800;
+  const endTimeMs = Date.now();
+  const startTimeUnixNano = String(BigInt(startTimeMs) * 1_000_000n);
+  const endTimeUnixNano = String(BigInt(endTimeMs) * 1_000_000n);
+  const ingestionSourceId = `ingsrc_smoke_${hexId(4)}`;
+
+  const payload = {
+    resourceSpans: [
+      {
+        resource: {
+          attributes: [
+            attrStr("service.name", "smoke-puller"),
+            attrStr("langwatch.organization_id", seeded.org.id),
+            attrStr("langwatch.project_id", seeded.project.id),
+          ],
+        },
+        scopeSpans: [
+          {
+            scope: { name: "langwatch.governance.ingest" },
+            spans: [
+              {
+                traceId,
+                spanId,
+                name: "ingestion.source.event",
+                kind: 1, // INTERNAL
+                startTimeUnixNano,
+                endTimeUnixNano,
+                attributes: [
+                  // Governance ingestion-source markers required by the
+                  // governanceKpisSync + governanceOcsfEventsSync reactors
+                  attrStr("langwatch.origin.kind", "ingestion_source"),
+                  attrStr("langwatch.ingestion_source.id", ingestionSourceId),
+                  attrStr(
+                    "langwatch.ingestion_source.organization_id",
+                    seeded.org.id,
+                  ),
+                  attrStr(
+                    "langwatch.ingestion_source.source_type",
+                    "http_polling",
+                  ),
+                  attrStr("langwatch.governance.retention_class", "audit"),
+                  attrStr("gen_ai.system", "openai"),
+                  attrStr("gen_ai.request.model", "gpt-4o-mini"),
+                  attrInt("gen_ai.usage.input_tokens", 25),
+                  attrInt("gen_ai.usage.output_tokens", 8),
+                  attrDouble("langwatch.cost_usd", 0.000095),
+                ],
+                status: { code: 1 },
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  };
+
+  const url = `${APP_BASE_URL}/api/otel/v1/traces`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Auth-Token": seeded.project.apiKey,
+    },
+    body: JSON.stringify(payload),
+  });
+  const text = await res.text();
+  if (!res.ok) {
+    throw new Error(`OTLP returned ${res.status}: ${text.slice(0, 600)}`);
+  }
+  console.log(
+    `[smoke] OTLP accepted ingestion-source trace ${traceId} (status ${res.status})`,
+  );
+  return traceId;
+}
+
 async function main() {
   console.log("[smoke] seeding fresh org/project/user/VK + budget…");
   const seeded = await seed();
@@ -308,6 +392,8 @@ async function main() {
   );
   console.log(`[smoke] posting synthetic OTLP gateway trace to /api/otel/v1/traces…`);
   const traceId = await postSyntheticOtlpTrace(seeded);
+  console.log(`[smoke] posting synthetic OTLP ingestion-source trace…`);
+  const ingestionTraceId = await postSyntheticIngestionSourceTrace(seeded);
   console.log(
     `[smoke] polling ClickHouse for reactor evidence (timeout ${POLL_TIMEOUT_MS / 1000}s)…`,
   );
@@ -319,7 +405,10 @@ async function main() {
       projectId: seeded.project.id,
       vkId: seeded.vk.id,
     },
-    fired: { traceId },
+    fired: {
+      gatewayTraceId: traceId,
+      ingestionSourceTraceId: ingestionTraceId,
+    },
     reactors: evidence.map((e) => ({
       table: e.table,
       landed: e.landed,
