@@ -98,12 +98,12 @@ export const FacetRow = memo(function FacetRow({
   const setHoveredFacet = useFacetHoverStore((s) => s.setHoveredFacet);
   const setHoveredGroup = useFacetHoverStore((s) => s.setHoveredGroup);
   const clearHover = useFacetHoverStore((s) => s.clearHover);
-  // Hovering a row that belongs to an OR group lights up every other
-  // member of that group too — the user explicitly asked for this so
-  // they can see "what else is OR'd with this." For non-OR rows we
-  // fall back to a 1:1 highlight (this row ↔ the matching search-bar
-  // chip). The connector line keeps its quiet behaviour: hover it
-  // for the tooltip without pulling member highlights along.
+  // Hovering a row that's actually a member of an OR group lights up
+  // every other member too. Just being in a *field* that participates
+  // in some OR group isn't enough — `origin:simulation` hovered
+  // shouldn't drag `origin:evaluation` and `origin:application`
+  // along just because they happen to share the field. So check
+  // membership at the (field, value) level, not the field level.
   const handleMouseEnter = useCallback(() => {
     if (!field) return;
     const ast = useFilterStore.getState().ast;
@@ -112,7 +112,11 @@ export const FacetRow = memo(function FacetRow({
     const group = groupId
       ? orAnalysis.groups.find((g) => g.id === groupId)
       : null;
-    if (group) {
+    const isMember =
+      group?.members.some(
+        (m) => m.field === field && m.value === item.value,
+      ) ?? false;
+    if (group && isMember) {
       setHoveredGroup(group);
     } else {
       setHoveredFacet({ field, value: item.value });

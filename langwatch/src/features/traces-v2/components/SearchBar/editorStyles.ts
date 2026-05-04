@@ -84,7 +84,7 @@ export const editorStyles: SystemStyleObject = {
   "& .filter-keyword-clickable": {
     cursor: "pointer",
     borderRadius: "2px",
-    paddingX: "2px",
+    marginX: "2px",
     transition: "background 80ms ease, color 80ms ease",
   },
   "& .filter-keyword-clickable:hover": {
@@ -107,10 +107,10 @@ export const editorStyles: SystemStyleObject = {
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
-    width: "18px",
+    width: "20px",
     height: "23px",
     paddingLeft: "2px",
-    paddingRight: 0,
+    paddingRight: "2px",
     background: "blue.subtle",
     borderTop: "1px solid",
     borderBottom: "1px solid",

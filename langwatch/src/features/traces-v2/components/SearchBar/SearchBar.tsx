@@ -131,16 +131,21 @@ export const SearchBar: React.FC = () => {
       const field = target.dataset.filterChipField ?? "";
       const value = target.dataset.filterChipValue ?? "";
       if (!field || !value) return;
-      // If this chip is part of an OR group, broadcast the group so
-      // every other member (chip + sidebar row) lights up too.
-      // Otherwise 1:1 with the matching sidebar row.
+      // Only broadcast the whole OR group when this exact (field,
+      // value) is one of its members. Sharing a field with a group
+      // member doesn't count — `origin:simulation` should not drag
+      // `origin:evaluation` and `origin:application` along just
+      // because they happen to be grouped under the same field.
       const ast = useFilterStore.getState().ast;
       const orAnalysis = analyzeOrGroups(ast);
       const groupId = orAnalysis.fieldToGroupId.get(field);
       const group = groupId
         ? orAnalysis.groups.find((g) => g.id === groupId)
         : null;
-      if (group) {
+      const isMember =
+        group?.members.some((m) => m.field === field && m.value === value) ??
+        false;
+      if (group && isMember) {
         useFacetHoverStore.getState().setHoveredGroup(group);
       } else {
         useFacetHoverStore.getState().setHoveredFacet({ field, value });
