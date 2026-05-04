@@ -727,15 +727,15 @@ Critical path: D1 → D2 → D5 → D8. **Phase 6 status: D1–D8 ✅ — 100% c
 | **Persona-4** (governance ADMIN) | TBD | ✅ `portal-hero-populated` | TBD (Phase 8 admin TTL) | ✅ `admin-add-tile-drawer` | ✅ `admin-scope-picker` | ✅ `admin-catalog-overview` | ✅ `admin-catalog-overview` | ✅ `non-enterprise-anomaly-rules` + `enterprise-anomaly-rules` | ✅ `non-enterprise-ingestion-sources` + `enterprise-ingestion-sources` | TBD | TBD | TBD (Phase 9) | ✅ `non-enterprise-tool-catalog-ungated` | TBD |
 | **Persona-5** (non-enterprise org viewing gated surfaces) | n/a | ✅ `portal-hero-populated` (works for everyone) | n/a | n/a | n/a | n/a | n/a (admin-only) | ✅ `non-enterprise-anomaly-rules` (upsell) | ✅ `non-enterprise-ingestion-sources` (upsell) | ✅ tool-catalog Apache-2.0 floor | TBD | TBD | n/a | n/a |
 
-**Asset libraries (current paths)**:
-- `docs/images/ai-governance/portal/` — 9 PNGs from Phase 7 B10 dogfood
-- `docs/images/ai-governance/enterprise-gating/` — 5 PNGs from Phase 5 browser-QA pass
-- `docs/images/ai-governance/personas/` — persona-aware-chrome shots
-- `docs/images/ai-governance/gateway-flows/` — 4 PNGs from Alexis's `c548ab57f` capture batch (VK list / budgets / providers / cache rules) replacing the prior img402 7-day-CDN shots
-- `docs/images/ai-governance/admin/`, `drawers/`, `flows/`, `cli/`, `architecture/` — Phase 7 D5b deferred (most empty until Lane-B captures land)
-- `docs/images/ai-governance/sessions/` — Phase 8 capture target (4 PNGs planned)
-- `docs/images/ai-governance/no-spy-mode/` — Phase 9 capture target (3 PNGs planned)
-- `docs/images/ai-governance/puller-framework/` — Phase 10 capture target (4 PNGs planned)
+**Asset libraries** — all NEW captures land under the centralized persona × flow scheme `docs/images/ai-governance/persona-x-flow/<persona>/<flow>/<screen>.png` (Lane-B 2026-05-04 reset). Existing libraries below are preserved as historical evidence + will be migrated cell-by-cell as the new captures land:
+- `docs/images/ai-governance/persona-x-flow/{dev,admin,finance}/{portal,sessions,admin-policy,ingestion,gateway-usage,cli-handoff}/*.png` — **canonical destination** for the post-2026-05-04 reorg pass
+- `docs/images/ai-governance/portal/` — 9 PNGs from Phase 7 B10 dogfood (will migrate to `persona-x-flow/dev/portal/`)
+- `docs/images/ai-governance/enterprise-gating/` — 5 PNGs from Phase 5 browser-QA pass (will migrate to `persona-x-flow/admin/admin-policy/`)
+- `docs/images/ai-governance/personas/` — persona-aware-chrome shots (will migrate)
+- `docs/images/ai-governance/gateway-flows/` — 4 PNGs from Alexis's `c548ab57f` capture batch (will migrate to `persona-x-flow/admin/gateway-usage/`)
+- `docs/images/ai-governance/sessions/` — Phase 8 capture target (4 PNGs planned; will land directly under `persona-x-flow/dev/sessions/`)
+- `docs/images/ai-governance/no-spy-mode/` — Phase 9 capture target (3 PNGs planned; will land directly under `persona-x-flow/admin/admin-policy/`)
+- `docs/images/ai-governance/puller-framework/` — Phase 10 capture target (4 PNGs planned; will land directly under `persona-x-flow/admin/ingestion/`)
 
 **Known route gaps** (surfaced during Alexis's `c548ab57f` gateway capture pass; tracked here as ground-truth for the reorg):
 - **`/gateway/audit` — REMOVED (intentional)**. Sergey's earlier consolidation work merged the gateway-scoped audit log into the platform-wide `/settings/audit-log`. PR-doc captions referencing "gateway audit log viewer" are STALE — replace with `/settings/audit-log` cross-links during the reorg pass. (Confirmed Sergey channel post 2026-05-03.)
@@ -754,126 +754,46 @@ Critical path: D1 → D2 → D5 → D8. **Phase 6 status: D1–D8 ✅ — 100% c
 
 ---
 
-## UI flows + screenshots (LEGACY scattered placement — pending reorg into §Screenshots above)
+## UI flows + spec ↔ screenshot mapping
 
-> Captured by Alexis during the iter22 governance dogfood pass against the
-> running dev server. All post-`33a8cf6d0` (full receiver rewire shipped).
+> **All screenshots live in §Screenshots above** — single canonical persona × flow grid. This section preserves the engineering narrative + the spec-↔-screenshot mapping table that ties each captured frame back to the BDD scenario it proves. Image references throughout this section are deliberately **prose-only** and cross-link into the grid by cell coordinate (persona / flow); no inline `![…]()` embeds in the body of the PR description outside the central grid, per @rchaves's "screenshots all spread out" reset 2026-05-04.
 
-### The unified-substrate dogfood path
+### Flow narratives (engineering claims, screenshot evidence in the central grid)
 
-The customer journey, captured frame-by-frame against the running dev
-server post-`33a8cf6d0` (full receiver rewire shipped):
+The customer journey post-`33a8cf6d0` (full receiver rewire) was captured frame-by-frame during the iter22-iter33 dogfood passes. Each flow below maps a spec scenario to a grid cell:
 
-1. **`/governance` admin overview** — chrome + 3 KPI cards (SPEND 30D / ACTIVE USERS 30D / OPEN ANOMALIES 1) + 6 ingestion sources + 1 anomaly firing in Recent anomalies (live-data dogfood post-3a, post-Sergey ActivityMonitorService rewire). Org-scoped surface; the top-nav shows the "Organization-scoped — not tied to a project" indicator (iter 19 work) confirming the page is not gated on the active project context. **Updated (iter27): replaces the earlier iter22 $0/0 synthetic shot — KPI strip + Recent anomalies now flow from real `recorded_spans` + `log_records` + `governance_kpis` data.**
-   ![Governance dashboard with live data](https://i.img402.dev/j0m3np49vm.png)
+- **`/governance` admin overview** (org-scoped, NOT project-gated; iter27 update replaces iter22 $0/0 synthetic shot — KPI strip + Recent anomalies now flow from real `recorded_spans` + `log_records` + `governance_kpis` data) → grid cell **Persona-4 / Compliance posture**.
+- **`/settings/governance/ingestion-sources` list** (fleet management; per-source last-event timestamps, status, Rotate-secret affordance with 24h grace window) → grid cell **Persona-4 / Ingestion sources**.
+- **Add ingestion source composer drawer** (right-edge Drawer per universal create/edit pattern, `746951769`; retention-class dropdown with three options gated by org plan ceiling — Operational/Compliance/Long-form audit; **NO Project field** — hidden Governance Project is internal routing only, per `master_orchestrator` + `rchaves` directive 2026-04-27) → grid cell **Persona-4 / Ingestion sources** (composer state).
+- **WorkspaceSwitcher pre-helper** (baseline: no IngestionSource exists, no hidden Governance Project minted — helper is lazy, feature-flag activation alone does not create one) → grid cell **Persona-4 / Empty state**.
+- **SecretModal post-create** (one-time bearer reveal + curl example; "OTLP **ingestion** endpoint" framing — not "audit-event endpoint" — locked by `7cf097a22` revert; "different auth, **same trace store**" copy is the unified-substrate framing) → grid cell **Persona-4 / Ingestion sources** (post-create state).
+- **WorkspaceSwitcher post-helper** — `ensureHiddenGovernanceProject` minted a real `Project.kind = "internal_governance"` row through Sergey's lazy-ensure helper (`94426716e`); WorkspaceSwitcher dropdown is unchanged. Layer-1 filter at `PrismaOrganizationRepository.getAllForUser` hides the routing artifact from every user-visible Project surface — proven end-to-end through real DB state, not synthetic test data. **This is the hidden-Governance-Project non-leak invariant operating in live UI.** → grid cell **Persona-4 / Compliance posture** (post-bootstrap state).
+- **Anomaly rules list** (`/settings/governance/anomaly-rules`; Critical/Warning/Info severity sections; cross-linked from governance overview when rule fires) → grid cell **Persona-4 / Anomaly rules**.
+- **AnomalyRule composer drawer** (`size=lg`; Name + Severity + Description + Rule type + Scope + Threshold JSON; v1 ships `spend_spike` + log-only dispatch; `rate_limit` / `after_hours` / Slack / PagerDuty / webhook / email destinations explicitly **preview** in composer copy — config persists, evaluation/dispatch is follow-up; honest framing per @rchaves "no mocks in UI" directive) → grid cell **Persona-4 / Anomaly rules** (composer state).
+- **Persona-aware chrome** — iter29 cross-lane fix (`a935d707e` + `b311d1ca5` + `385c95e89` + `043726430`) wired the chrome (sidebar + selectors) to match the persona-aware home routing claim from 1.5b-viii (`e40ee0045`). Persona-1 (`/me`): one chip header + PersonalSidebar (My Usage + Settings only) + NO ProjectSelector + NO redundant in-page chip. Persona-4 (admin home): full LLMOps sidebar + Govern (Preview) + Gateway (Beta) sections both visible. Persona-4 (`/governance`): org chip + "Organization-scoped" banner + Govern active + setup checklist visible **without any IngestionSource yet** (chicken-and-egg gate fix VALIDATED). → grid cells **Persona-1 / `/me` portal**, **Persona-4 / Onboarding**, **Persona-4 / Compliance posture**.
+- **iter32-iter33 chrome walks** (19 PNGs at `dev/dogfood-screenshots/iter32-iter33/`) closed papercuts E (`.env.example` two-flag default), F (`9e373c284` router-layer RBAC enforcement) + `d311c2f70` seed-gap follow-up, G (`c991006c3` + `071a416f8` 4-layer race close on persona-1 `/me` home redirect). → grid cells **Persona-1 / `/me` portal**, **Persona-3 / Error state**, **Persona-4 / Onboarding**.
 
-2. **`/settings/governance/ingestion-sources` list** — fleet management
-   for the per-platform feeds. "+ Add source" CTA opens the composer.
-   Active sources show last-event timestamps, status, and a Rotate
-   secret affordance (24h grace window — old secret stays valid while
-   the new one rolls out upstream).
-   ![Ingestion sources list](https://i.img402.dev/sfmg6nsxbd.png)
+### Spec ↔ screenshot mapping (consolidated)
 
-3. **Add ingestion source composer** — opens as a right-edge Drawer
-   per the platform's universal create/edit pattern (commit
-   `746951769` — refactored from inline panel to Drawer per
-   rchaves's directive 2026-04-27). Source-type dropdown, display
-   name, description, and the **retention class dropdown** with three
-   options gated by org plan ceiling — Operational (30 days,
-   SOC 2 / ISO 27001 baseline) / Compliance (1 year, EU AI Act /
-   GDPR / HIPAA-most-uses) / Long-form audit (7 years, regulated
-   industry). **Crucially, NO Project field** — the hidden
-   Governance Project is internal routing only, never
-   user-configurable. Per `master_orchestrator` + `rchaves` directive
-   2026-04-27.
-   ![Ingestion source composer drawer](https://i.img402.dev/o7cplffzne.png)
+Single canonical mapping — every screenshot in the §Screenshots grid traces back to a BDD scenario here. The list is the audit trail; the grid above is the visual evidence:
 
-4. **WorkspaceSwitcher BEFORE the helper fires** — only the
-   user-visible "tes" application project appears under the "test"
-   organization. Baseline state: no IngestionSource exists, no hidden
-   Governance Project minted yet (the helper is lazy — feature-flag
-   activation alone does not create one).
-   ![Workspace switcher pre-helper](https://i.img402.dev/urj4u15h3y.png)
-
-5. **SecretModal post-create** — one-time bearer reveal + copy-paste
-   curl example. Notice the section heading reads "OTLP **ingestion**
-   endpoint" (not "audit-event endpoint") and the caption explains
-   "Spans push into the LangWatch trace store with this source's
-   origin tag... If you are sending agent traces from your own
-   LangWatch SDK, use `/api/otel/v1/traces` with your project API
-   key — different auth, **same trace store**."
-   This is the unified-substrate framing locked by the branch
-   correction (commit `7cf097a22`) — explicitly NOT the
-   parallel-audit-events framing the original direction implied.
-   ![Secret modal post-create](https://i.img402.dev/2favdzd7k4.png)
-
-6. **WorkspaceSwitcher AFTER `ensureHiddenGovernanceProject` fires** —
-   the create-source flow just minted a real `Project.kind =
-   "internal_governance"` row through Sergey's lazy-ensure helper. The
-   dropdown is unchanged: still ONLY "tes" appears. The Layer-1
-   filter at `PrismaOrganizationRepository.getAllForUser` (commit
-   `94426716e`) hides the routing artifact from every user-visible
-   Project surface — proven end-to-end through real DB state, not
-   synthetic test data. **This is the hidden-Governance-Project
-   non-leak invariant operating in live UI.**
-   ![Workspace switcher post-helper](https://i.img402.dev/nmrpej53qr.png)
-
-7. **Anomaly rules list** — `/settings/governance/anomaly-rules`.
-   Critical / Warning / Info severity sections; one active rule each.
-   Cross-link from the governance overview when the rule fires.
-   ![Anomaly rules list](https://i.img402.dev/x7qg8aqgfq.png)
-
-8. **AnomalyRule composer** — opens as a larger right-edge Drawer
-   (size=lg, fits the JSON threshold editor + Alert destinations
-   callout cleanly). Name + Severity + Description + Rule type +
-   Scope + Threshold JSON. v1 ships `spend_spike` rule type +
-   log-only dispatch; `rate_limit` / `after_hours` / Slack / PagerDuty
-   / webhook / email destinations are explicitly **preview** in the
-   composer copy (config persists, evaluation/dispatch in follow-up).
-   Honest framing — no mocked-v0 surfaces per @rchaves "no mocks in
-   UI" directive.
-   ![Anomaly composer drawer](https://i.img402.dev/3sionqxgev.png)
-
-### Screenshot cross-references — what each shot proves
-
-| Shot | Proves | Spec scenario |
+| Grid cell | Proves | Spec scenario |
 |---|---|---|
-| 1. /governance dashboard | Org-scoped admin surface renders chrome + KPI strip + IngestionSources panel against live PG | `ui-contract.feature` "single governance surface" |
-| 2. Ingestion sources list | Fleet management surface + per-source action affordances | `ingestion-sources.feature` list + rotation |
-| 3. Composer | Retention-class dropdown with canonical enum values; NO project picker (Governance Project is internal routing only) | `ui-contract.feature` "composer offers retention class" + "no project picker" |
-| 4. WorkspaceSwitcher pre-helper | Baseline state — no Gov Project exists | `architecture-invariants.feature` lazy-ensure semantics |
-| 5. Secret modal post-create | Unified-substrate copy ("OTLP ingestion endpoint" + "different auth, same trace store"), not parallel-audit-events framing | `ui-contract.feature` SecretModal copy + commit `7cf097a22` revert |
-| 6. WorkspaceSwitcher post-helper | Hidden Governance Project never leaks into user-visible Project surfaces, **proven against real DB state** | `architecture-invariants.feature` "hidden Gov Project never appears in user-visible Project surfaces" + Layer-1 filter at `getAllForUser` |
-| 7. Anomaly rules list | AnomalyRule + AnomalyAlert read paths render against real PG state | `architecture-invariants.feature` AnomalyRule lifecycle |
-| 8. Anomaly composer | Composer offers retention-class + scope + threshold; Preview-rule-type framing matches spec contract | `ui-contract.feature` composer scenarios |
-
-### Persona-aware chrome dogfood (iter29 — post `a935d707e` + `043726430`)
-
-The persona-aware home routing claim from 1.5b-viii (`e40ee0045`) was scoped only to the URL redirect — the chrome (sidebar + selectors) remained LLMOps-default. iter29 dogfood under @rchaves review surfaced the gap: a personal-only user landing at `/me` saw two stacked selectors + an irrelevant LLMOps sidebar + "My Usage" buried as a sub-page.
-
-Cross-lane fix shipped in 4 commits (`a935d707e` + `b311d1ca5` + `385c95e89` + `043726430`); 3 live-data screenshots prove the chrome works end-to-end. Hosted via img402.dev (7-day free tier; same pattern as iter22 shots above):
-
-| Shot | Proves | Image |
-|---|---|---|
-| 9. /me with PersonalSidebar | Persona-1 chrome — ONE chip in header (`My Workspace ▼`), PersonalSidebar with "My Usage" + "Settings" only, NO ProjectSelector, NO redundant in-page chip, NO 'MY WORKSPACE' eyebrow header (literal gateway.md Screen 6 layout) | ![persona-1 /me chrome](https://i.img402.dev/jhzp1bqwql.png) |
-| 10. Admin home with Govern + Gateway | Persona-4 chrome — admin lands on project context with full LLMOps sidebar + Govern (Preview) + Gateway (Beta) sections both visible (admin role + 2 FFs on) | ![persona-4 admin home](https://i.img402.dev/vtjtf3wj7o.png) |
-| 11. /governance with org-scope chrome | Persona-4 governance home — org chip ("Acme P4") + "Organization-scoped" banner + Govern active in sidebar + setup checklist (define routing policy / connect ingestion source / anomaly rules) visible to admin **without any IngestionSource yet** — chicken-and-egg gate fix VALIDATED | ![persona-4 /governance](https://i.img402.dev/rtulyk7esy.png) |
-
-The AI Gateway product-surface screenshot (originally planned as #12) is already covered by iter22 shots #1–#10 above (VK list / drawer / detail / usage / audit / providers / cache rules / budgets) — a single chrome shot of that surface would be redundant. The chrome rework's ship-claim rests on the 3 shots above.
+| Persona-4 / Compliance posture | Org-scoped admin surface renders chrome + KPI strip + IngestionSources panel against live PG | `ui-contract.feature` "single governance surface" |
+| Persona-4 / Ingestion sources (list) | Fleet management surface + per-source action affordances + Rotate secret 24h grace | `ingestion-sources.feature` list + rotation |
+| Persona-4 / Ingestion sources (composer) | Retention-class dropdown with canonical enum values; NO project picker (Governance Project is internal routing only) | `ui-contract.feature` "composer offers retention class" + "no project picker" |
+| Persona-4 / Empty state | Baseline — no Gov Project exists; helper is lazy | `architecture-invariants.feature` lazy-ensure semantics |
+| Persona-4 / Ingestion sources (post-create) | Unified-substrate copy ("OTLP ingestion endpoint" + "different auth, same trace store"), not parallel-audit-events framing | `ui-contract.feature` SecretModal copy + commit `7cf097a22` revert |
+| Persona-4 / Compliance posture (post-bootstrap) | Hidden Governance Project never leaks into user-visible Project surfaces, **proven against real DB state** | `architecture-invariants.feature` "hidden Gov Project never appears in user-visible Project surfaces" + Layer-1 filter at `getAllForUser` |
+| Persona-4 / Anomaly rules (list) | AnomalyRule + AnomalyAlert read paths render against real PG state | `architecture-invariants.feature` AnomalyRule lifecycle |
+| Persona-4 / Anomaly rules (composer) | Composer offers retention-class + scope + threshold; Preview-rule-type framing matches spec contract | `ui-contract.feature` composer scenarios |
+| Persona-1 / `/me` portal | Persona-1 chrome — ONE chip in header, PersonalSidebar (My Usage + Settings only), NO ProjectSelector, NO redundant in-page chip | `persona-aware-chrome.feature` Persona-1 chrome scenarios |
+| Persona-4 / Onboarding | Admin lands on project context with full LLMOps sidebar + Govern (Preview) + Gateway (Beta) both visible (admin role + 2 FFs on) | `persona-aware-chrome.feature` Persona-4 chrome scenarios |
+| Persona-3 / Error state | MEMBER hitting `/governance` directly — "Access Restricted" page guard fires; sidebar correctly hides Govern entry; tRPC also returns 401 (defense-in-depth) | RBAC test + `persona-aware-chrome.feature` |
 
 **Regression-safety invariant locked**: Persona-3 (LLMOps majority — ~90% of users today, no AI gateway) sees ZERO chrome change. `DashboardLayout` is untouched for `project_only` persona. Codified in `persona-aware-chrome.feature` as the FIRST scenario in the file.
 
-### iter32-iter33 dogfood screenshots
-
-iter32-iter33 chrome walks under the persona seed harness produced 19 PNGs covering admin happy-path, MEMBER access-restricted (RBAC defense-in-depth proof), and persona-1 home-redirect fix. Committed to `dev/dogfood-screenshots/iter32-iter33/` (raw GitHub URLs survive branch state). Three highlights embedded; full set browsable at the dir.
-
-| Shot | Proves | Image |
-|---|---|---|
-| 12. Admin /governance after FF toggle | Fresh ORG ADMIN with both flags on — Govern + Gateway visible in sidebar, governance home renders with setup checklist + ingestion-sources empty state. Closes papercut **E** (`.env.example` two-flag default). | ![admin /governance](https://raw.githubusercontent.com/langwatch/langwatch/feat/governance-platform/dev/dogfood-screenshots/iter32-iter33/iter32-governance-after-ff.png) |
-| 13. Persona-1 /me final | Org-less CLI/IDE dev lands at `/me` with full chrome (My Workspace switcher, PersonalSidebar, stat cards, "Run langwatch claude" onboarding hint) — proves papercut **G** fix end-to-end (`c991006c3` + `071a416f8` 4-layer race close). | ![persona-1 /me](https://raw.githubusercontent.com/langwatch/langwatch/feat/governance-platform/dev/dogfood-screenshots/iter32-iter33/iter33-p1-me-final2.png) |
-| 14. MEMBER /governance after RBAC fix | Fresh ORG MEMBER hitting `/governance` directly — "Access Restricted" page guard fires; sidebar correctly hides Govern entry. Underlying tRPC also returns 401 (defense-in-depth). Closes papercut **F** (`9e373c284` router-layer enforcement) + the `d311c2f70` seed-gap follow-up. | ![member /governance](https://raw.githubusercontent.com/langwatch/langwatch/feat/governance-platform/dev/dogfood-screenshots/iter32-iter33/iter33-p3-governance-after-rbac.png) |
-
-The remaining 16 shots cover: anomaly-rules composer, settings/governance/ingestion-sources before/after FF, settings/routing-policies before/after the RBAC fix (papercut **D**), persona-1 me-direct + me-after-fix transitions, persona-3 (MEMBER) ingestion-sources/routing-policies direct-load attempts. Browse at `dev/dogfood-screenshots/iter32-iter33/`.
+> **Note on URL hosts**: earlier drafts of this section embedded image URLs directly via `i.img402.dev` (7-day free CDN; URLs from iter22-iter29 captures are now expired) and `raw.githubusercontent.com/.../dev/dogfood-screenshots/iter32-iter33/...` (these survive branch state). All inline embeds removed in the 2026-05-04 reorg pass; the canonical visual evidence now lives ONLY in §Screenshots above, with new captures landing under `docs/images/ai-governance/persona-x-flow/<persona>/<flow>/<screen>.png` per Lane-B's centralized capture path scheme.
 
 ---
 
@@ -1621,25 +1541,17 @@ A senior engineer (Jane) at a fictional enterprise customer (Acme) joins the com
 
 These supersede the iter22 shots that were limited by the pre-3a `$0/0` empty-state. Captured against `pnpm dev :5570` post-Sergey 3a (`fd118131c`) + 1.5b-viii persona resolver (`e40ee0045`).
 
-**Screen 6 — `/me` personal dashboard** (Storyboard layout match: STRONG)
-3-card top strip (`SPENT THIS MONTH $0.00` / `REQUESTS THIS MONTH 0` / `MOST-USED MODEL —`) + Spending over time chart placeholder + By tool placeholder + Recent activity ("Run `langwatch claude` to get started" empty-state) + WorkspaceSwitcher dropdown header. Refreshed iter33 capture (post-persona-aware-chrome rework — single-chip header, PersonalSidebar, no LLMOps double-menu):
-![/me personal dashboard (iter33)](https://raw.githubusercontent.com/langwatch/langwatch/feat/governance-platform/dev/dogfood-screenshots/iter32-iter33/iter33-p1-me-final2.png)
+**Screen 6 — `/me` personal dashboard** (Storyboard layout match: STRONG; refreshed iter33 capture post-persona-aware-chrome rework — single-chip header, PersonalSidebar, no LLMOps double-menu): 3-card top strip (`SPENT THIS MONTH $0.00` / `REQUESTS THIS MONTH 0` / `MOST-USED MODEL —`) + Spending over time chart placeholder + By tool placeholder + Recent activity ("Run `langwatch claude` to get started" empty-state) + WorkspaceSwitcher dropdown header. → grid cell **Persona-1 / `/me` portal**.
 
-**Screen 7 — `/me/settings`** (Storyboard layout match: STRONG)
-Profile section with `Managed by test IT` subtitle on email row + Personal API Keys section ("No personal keys yet") + Notifications panel (3 checkboxes for 80% / weekly summary / per-request threshold) + Budget section ("No personal budget set by your admin"). The "managed by your company" chrome is already in place — the storyboard's helper text rendering matches the design. Refreshed iter32 capture (post-persona-aware-chrome rework — single-chip header + PersonalSidebar; supersedes the iter27 shot which still rendered the old LLMOps double-menu):
-![/me/settings personal-key surface (iter32)](https://raw.githubusercontent.com/langwatch/langwatch/feat/governance-platform/dev/dogfood-screenshots/iter32-iter33/iter32-me-settings.png)
+**Screen 7 — `/me/settings`** (Storyboard layout match: STRONG; refreshed iter32 capture post-persona-aware-chrome rework — single-chip header + PersonalSidebar; supersedes the iter27 shot which still rendered the old LLMOps double-menu): Profile section with `Managed by test IT` subtitle on email row + Personal API Keys section ("No personal keys yet") + Notifications panel (3 checkboxes for 80% / weekly summary / per-request threshold) + Budget section ("No personal budget set by your admin"). The "managed by your company" chrome is already in place. → grid cell **Persona-1 / `/me` portal** (settings sub-state).
 
-**Screen 1 — `/cli/auth?user_code=...` browser handshake**
-"Authorize the LangWatch CLI" + monospace user code + "Confirm this matches the code in your terminal" + Approve / Deny. The browser side of `langwatch login --device`.
-![/cli/auth browser handshake](https://i.img402.dev/qgiw81w31i.png)
+**Screen 1 — `/cli/auth?user_code=...` browser handshake**: "Authorize the LangWatch CLI" + monospace user code + "Confirm this matches the code in your terminal" + Approve / Deny. The browser side of `langwatch login --device`. → grid cell **Persona-1 / Onboarding** (CLI handoff).
 
-**Screen 4 — `/cli/auth` web-side success ceremony (the apache2-floor demo wedge proof)**
-"Authorize the LangWatch CLI" header + green-tick "You're signed in!" message + "LangWatch CLI is now authorized for **<org>** using the `default` personal key. You can close this tab and return to your terminal." That's Jane's first "I'm in" moment captured live. Issued personal Virtual Key carries the org-default `RoutingPolicy`.
-![/cli/auth web-side success ceremony](https://i.img402.dev/e0emfvpzoy.png)
+**Screen 4 — `/cli/auth` web-side success ceremony** (the apache2-floor demo wedge proof): "Authorize the LangWatch CLI" header + green-tick "You're signed in!" message + "LangWatch CLI is now authorized for **<org>** using the `default` personal key. You can close this tab and return to your terminal." Jane's first "I'm in" moment captured live; issued personal VK carries the org-default `RoutingPolicy`. → grid cell **Persona-1 / Onboarding** (CLI handoff success).
 
-**Negative-case — approval-failed when org has no provider configured (caught + fixed inline)**
-The dogfood pass surfaced a real UX bug: when an admin tries to approve the device-flow before they've configured a ModelProvider, the page returned a generic "Failed to issue key" with no action. **Inline fix shipped in `915d8def3`** updates the message to "Your admin needs to configure a model provider first. Ask them to add one at Settings → Model Providers." This screenshot is the BEFORE state — captured during dogfood, fixed in the same PR.
-![/cli/auth approval-failed BEFORE 915d8def3](https://i.img402.dev/7tgpvbkzmb.png)
+**Negative-case — approval-failed when org has no provider configured** (caught + fixed inline): the dogfood pass surfaced a real UX bug — when an admin tries to approve the device-flow before configuring a ModelProvider, the page returned a generic "Failed to issue key" with no action. **Inline fix shipped in `915d8def3`** updates the message to "Your admin needs to configure a model provider first. Ask them to add one at Settings → Model Providers." → grid cell **Persona-4 / Error state** (capture targets BEFORE-state for the regression-pin).
+
+> **Visual evidence**: all five frames live in §Screenshots above; iter32-iter33 captures from `dev/dogfood-screenshots/iter32-iter33/` (iter33-p1-me-final2.png, iter32-me-settings.png — survive branch state); iter27 CLI-handshake captures were on `i.img402.dev` 7-day CDN and have expired — re-capture queued under `docs/images/ai-governance/persona-x-flow/dev/cli-handoff/` per Lane-B's centralized scheme.
 
 **iter28 discoveries** (Alexis post-screenshot pass):
 
