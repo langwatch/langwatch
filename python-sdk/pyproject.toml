@@ -92,7 +92,7 @@ examples = [
     "opentelemetry-instrumentation-fastapi>=0.53b1",
     "langgraph>=1.0.0,<2.0.0",
     "openai>=1.68.2,<2.8.0", # 2.8+ calls model_dump(by_alias=None) which pydantic-core rejects
-    "pydantic>=1,<2.10.2", # v2.10.2 is broken for chainlit
+    "pydantic>=2.11.0", # v2.10.2 was broken for chainlit, >=2.11 is fine; mcp>=1.23 needs this
     "pytest>=7.4.2,<8.0.0",
     "python-dotenv==1.2.1",
     "streamlit>=1.37.1,<2.0.0",
