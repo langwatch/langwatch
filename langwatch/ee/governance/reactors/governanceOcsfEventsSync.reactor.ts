@@ -29,16 +29,21 @@ const logger = createLogger(
  */
 export const GOVERNANCE_OCSF_EVENTS_SYNC_DEBOUNCE_TTL_MS = 5 * 60_000;
 
-const ATTR_ORIGIN_KIND = "langwatch.origin.kind";
-const ATTR_INGESTION_SOURCE_ID = "langwatch.ingestion_source.id";
-const ATTR_INGESTION_SOURCE_TYPE = "langwatch.ingestion_source.source_type";
-const ATTR_USER_ID = "langwatch.user_id";
+import {
+  GOVERNANCE_ATTR,
+  GOVERNANCE_ORIGIN_KIND_VALUE,
+} from "../services/governanceAttributeKeys";
+
+const ATTR_ORIGIN_KIND = GOVERNANCE_ATTR.ORIGIN_KIND;
+const ATTR_INGESTION_SOURCE_ID = GOVERNANCE_ATTR.INGESTION_SOURCE_ID;
+const ATTR_INGESTION_SOURCE_TYPE = GOVERNANCE_ATTR.INGESTION_SOURCE_TYPE;
+const ATTR_USER_ID = GOVERNANCE_ATTR.USER_ID;
 const ATTR_USER_EMAIL = "user.email";
 const ATTR_ENDUSER_ID = "enduser.id";
 const ATTR_GEN_AI_REQUEST_MODEL = "gen_ai.request.model";
 const ATTR_TOOL_NAME = "tool.name";
-const ATTR_ANOMALY_ALERT_ID = "langwatch.governance.anomaly_alert_id";
-const ORIGIN_KIND_VALUE = "ingestion_source";
+const ATTR_ANOMALY_ALERT_ID = GOVERNANCE_ATTR.ANOMALY_ALERT_ID;
+const ORIGIN_KIND_VALUE = GOVERNANCE_ORIGIN_KIND_VALUE;
 
 export interface GovernanceOcsfEventsSyncReactorDeps {
   governanceOcsfEventsRepository: GovernanceOcsfEventsClickHouseRepository;

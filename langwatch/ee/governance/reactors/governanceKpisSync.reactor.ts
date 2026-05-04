@@ -4,6 +4,10 @@ import {
   GovernanceKpisClickHouseRepository,
   type GovernanceKpiContribution,
 } from "@ee/governance/services/governanceKpis.clickhouse.repository";
+import {
+  GOVERNANCE_ATTR,
+  GOVERNANCE_ORIGIN_KIND_VALUE,
+} from "@ee/governance/services/governanceAttributeKeys";
 import { createLogger } from "~/utils/logger/server";
 import { captureException } from "~/utils/posthogErrorCapture";
 import type {
@@ -27,10 +31,10 @@ const logger = createLogger(
  */
 export const GOVERNANCE_KPIS_SYNC_DEBOUNCE_TTL_MS = 5 * 60_000;
 
-const ATTR_ORIGIN_KIND = "langwatch.origin.kind";
-const ATTR_INGESTION_SOURCE_ID = "langwatch.ingestion_source.id";
-const ATTR_INGESTION_SOURCE_TYPE = "langwatch.ingestion_source.source_type";
-const ORIGIN_KIND_VALUE = "ingestion_source";
+const ATTR_ORIGIN_KIND = GOVERNANCE_ATTR.ORIGIN_KIND;
+const ATTR_INGESTION_SOURCE_ID = GOVERNANCE_ATTR.INGESTION_SOURCE_ID;
+const ATTR_INGESTION_SOURCE_TYPE = GOVERNANCE_ATTR.INGESTION_SOURCE_TYPE;
+const ORIGIN_KIND_VALUE = GOVERNANCE_ORIGIN_KIND_VALUE;
 
 export interface GovernanceKpisSyncReactorDeps {
   governanceKpisRepository: GovernanceKpisClickHouseRepository;

@@ -32,6 +32,10 @@ import type { PrismaClient } from "@prisma/client";
 
 import { getClickHouseClientForOrganization } from "~/server/clickhouse/clickhouseClient";
 import { PROJECT_KIND } from "../governanceProject.service";
+import {
+  GOVERNANCE_ATTR,
+  GOVERNANCE_ORIGIN_KIND_VALUE,
+} from "../governanceAttributeKeys";
 
 export interface SummaryResult {
   spentThisWindowUsd: number;
@@ -129,10 +133,10 @@ const EMPTY_SUMMARY: SummaryResult = {
   anomalyBreakdown: { critical: 0, warning: 0, info: 0 },
 };
 
-const ATTR_ORIGIN_KIND = "langwatch.origin.kind";
-const ATTR_INGESTION_SOURCE_ID = "langwatch.ingestion_source.id";
-const ATTR_USER_ID = "langwatch.user_id";
-const ORIGIN_KIND_VALUE = "ingestion_source";
+const ATTR_ORIGIN_KIND = GOVERNANCE_ATTR.ORIGIN_KIND;
+const ATTR_INGESTION_SOURCE_ID = GOVERNANCE_ATTR.INGESTION_SOURCE_ID;
+const ATTR_USER_ID = GOVERNANCE_ATTR.USER_ID;
+const ORIGIN_KIND_VALUE = GOVERNANCE_ORIGIN_KIND_VALUE;
 
 function pctChange(current: number, previous: number): number {
   if (previous === 0) return current === 0 ? 0 : 100;
@@ -696,7 +700,7 @@ export class ActivityMonitorService {
         originKey: ATTR_ORIGIN_KIND,
         originValue: ORIGIN_KIND_VALUE,
         sourceKey: ATTR_INGESTION_SOURCE_ID,
-        sourceTypeKey: "langwatch.ingestion_source.source_type",
+        sourceTypeKey: GOVERNANCE_ATTR.INGESTION_SOURCE_TYPE,
         userKey: ATTR_USER_ID,
         sourceId: input.sourceId,
         limit,
