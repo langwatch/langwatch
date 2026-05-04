@@ -38,7 +38,8 @@ export type SourceType =
   | "copilot_studio"
   | "openai_compliance"
   | "claude_compliance"
-  | "s3_custom";
+  | "s3_custom"
+  | "http_custom";
 
 export const SUPPORTED_SOURCE_TYPES: readonly SourceType[] = [
   "otel_generic",
@@ -48,6 +49,7 @@ export const SUPPORTED_SOURCE_TYPES: readonly SourceType[] = [
   "openai_compliance",
   "claude_compliance",
   "s3_custom",
+  "http_custom",
 ] as const;
 
 /** Canonical retention bucket values. Free-form string in the DB column

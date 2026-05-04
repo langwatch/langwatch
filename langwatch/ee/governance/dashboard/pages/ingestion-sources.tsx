@@ -65,7 +65,8 @@ type SourceType =
   | "copilot_studio"
   | "openai_compliance"
   | "claude_compliance"
-  | "s3_custom";
+  | "s3_custom"
+  | "http_custom";
 
 const SOURCE_TYPE_OPTIONS: Array<{
   value: SourceType;
@@ -121,6 +122,13 @@ const SOURCE_TYPE_OPTIONS: Array<{
     mode: "s3",
     blurb:
       "For homegrown agent systems writing audit logs to S3. Provide a parser DSL describing how each line maps to OCSF ActivityEvent fields.",
+  },
+  {
+    value: "http_custom",
+    label: "Custom HTTP audit-log API",
+    mode: "pull",
+    blurb:
+      "Bring-your-own paginated REST audit-log API. Declare URL + auth + cursor + JSON-path field mappings; the universal HTTP-polling adapter handles paging + retries + OCSF fold.",
   },
 ];
 
@@ -195,6 +203,7 @@ const PULL_ADAPTER_FOR_SOURCE: Partial<Record<SourceType, string>> = {
   copilot_studio: "copilot_studio",
   openai_compliance: "openai_compliance",
   claude_compliance: "claude_compliance",
+  http_custom: "http_polling",
 };
 
 /**
@@ -207,6 +216,7 @@ const PULL_SCHEDULE_DEFAULTS: Record<string, string> = {
   copilot_studio: "*/15 * * * *",
   openai_compliance: "*/15 * * * *",
   claude_compliance: "*/15 * * * *",
+  http_polling: "*/15 * * * *",
 };
 
 const blankComposer = (): ComposerState => ({
@@ -318,6 +328,27 @@ function IngestionSourcesPage() {
   const onSubmit = () => {
     if (!composer.name.trim()) return;
     const pullAdapter = PULL_ADAPTER_FOR_SOURCE[composer.sourceType];
+    // For BYO `http_custom` we send the FULL HttpPollingConfig shape so the
+    // generic adapter can run unmodified. The locked-shape reference pullers
+    // (copilot_studio / openai_compliance / claude_compliance) only need the
+    // adapter id — their validateConfig override returns the frozen config.
+    const pullConfig =
+      composer.sourceType === "http_custom"
+        ? buildHttpCustomPullConfig(composer)
+        : pullAdapter
+          ? { adapter: pullAdapter }
+          : null;
+    if (composer.sourceType === "http_custom" && !pullConfig) {
+      // buildHttpCustomPullConfig returns null when required fields are
+      // empty — keep the drawer open so the user can fix the form.
+      toaster.create({
+        title: "Missing required HTTP source fields",
+        description:
+          "URL, auth header value, token, events JSONPath, cursor JSONPath, and event mapping are all required.",
+        type: "error",
+      });
+      return;
+    }
     createMutation.mutate({
       organizationId: orgId,
       sourceType: composer.sourceType,
@@ -325,7 +356,7 @@ function IngestionSourcesPage() {
       description: composer.description.trim() || null,
       parserConfig: buildParserConfig(composer),
       retentionClass: composer.retentionClass,
-      pullConfig: pullAdapter ? { adapter: pullAdapter } : null,
+      pullConfig,
       pullSchedule: pullAdapter
         ? composer.pullSchedule.trim() ||
           PULL_SCHEDULE_DEFAULTS[pullAdapter] ||
@@ -883,7 +914,128 @@ const PARSER_FIELDS: Record<SourceType, FieldDef[]> = {
       placeholder: "60",
     },
   ],
+  http_custom: [
+    {
+      key: "url",
+      label: "Audit-log endpoint URL",
+      placeholder: "https://api.acme.com/v1/audit-log",
+      hint: "Paginated REST endpoint that returns a JSON page of events plus a next-cursor.",
+      required: true,
+    },
+    {
+      key: "authHeaderName",
+      label: "Auth header name",
+      placeholder: "Authorization",
+      hint: "Standard bearer flow: leave as Authorization. For x-api-key style auth, paste the header name.",
+      required: true,
+    },
+    {
+      key: "authHeaderValue",
+      label: "Auth header value (template)",
+      placeholder: "Bearer ${{credentials.token}}",
+      hint: "Use ${{credentials.token}} where the secret should be substituted at request time. The token itself is captured in the next field.",
+      required: true,
+    },
+    {
+      key: "credentialsToken",
+      label: "Bearer token / API key",
+      placeholder: "(value pasted from the upstream admin console)",
+      hint: "Persisted server-side; only the value is held in IngestionSource.pullConfig.credentials. Substituted into the header template at request time.",
+      required: true,
+    },
+    {
+      key: "eventsJsonPath",
+      label: "Events array JSONPath",
+      placeholder: "$.data",
+      hint: "JSONPath into the response body to extract the events array (e.g. $.data, $.events, $.value).",
+      required: true,
+    },
+    {
+      key: "cursorJsonPath",
+      label: "Next-cursor JSONPath",
+      placeholder: "$.next_cursor",
+      hint: "JSONPath to the pagination cursor in the response. Set to a path that yields null/missing when drained.",
+      required: true,
+    },
+    {
+      key: "cursorQueryParam",
+      label: "Cursor query parameter name",
+      placeholder: "cursor",
+      hint: "Query-param name the upstream API expects on subsequent pages. Defaults to 'cursor'. Common alternatives: next_token, pageToken, $skiptoken.",
+    },
+    {
+      key: "eventMappingDsl",
+      label: "Event mapping (key=jsonpath per line)",
+      placeholder:
+        "source_event_id=$.id\nevent_timestamp=$.created_at\nactor=$.user.email\naction=$.event_type\ntarget=$.target.name",
+      hint: "Required keys: source_event_id, event_timestamp, actor, action, target. Optional: cost_usd, tokens_input, tokens_output. Each line maps an OCSF field to a JSONPath into one event.",
+      required: true,
+    },
+  ],
 };
+
+/**
+ * Build the full `HttpPollingConfig`-shaped pullConfig for the
+ * `http_custom` BYO source-type. Maps the form's parser-config fields
+ * (auth header / token / JSONPaths / mapping DSL) onto the structured
+ * shape that `HttpPollingPullerAdapter.validateConfig` expects.
+ *
+ * Returns null when required fields are missing — the caller should
+ * keep the form open + surface the missing-field state via the existing
+ * required-field markers rather than fire a dispatch that the worker
+ * would reject at validateConfig time.
+ */
+function buildHttpCustomPullConfig(
+  c: ComposerState,
+): Record<string, unknown> | null {
+  const p = c.parserConfig;
+  const url = (p.url ?? "").trim();
+  const headerName = (p.authHeaderName ?? "Authorization").trim();
+  const headerValue = (p.authHeaderValue ?? "").trim();
+  const token = (p.credentialsToken ?? "").trim();
+  const eventsPath = (p.eventsJsonPath ?? "").trim();
+  const cursorPath = (p.cursorJsonPath ?? "").trim();
+  const cursorParam = (p.cursorQueryParam ?? "").trim() || "cursor";
+  const mappingDsl = (p.eventMappingDsl ?? "").trim();
+  if (
+    !url ||
+    !headerValue ||
+    !token ||
+    !eventsPath ||
+    !cursorPath ||
+    !mappingDsl
+  ) {
+    return null;
+  }
+  const eventMapping: Record<string, string> = {};
+  for (const line of mappingDsl.split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) continue;
+    const eq = trimmed.indexOf("=");
+    if (eq <= 0) continue;
+    const k = trimmed.slice(0, eq).trim();
+    const v = trimmed.slice(eq + 1).trim();
+    if (!k || !v) continue;
+    eventMapping[k] = v;
+  }
+  return {
+    adapter: "http_polling",
+    url,
+    method: "GET",
+    headers: { [headerName]: headerValue },
+    authMode: "header_template",
+    cursorJsonPath: cursorPath,
+    cursorQueryParam: cursorParam,
+    eventsJsonPath: eventsPath,
+    schedule:
+      c.pullSchedule.trim() || PULL_SCHEDULE_DEFAULTS.http_polling || "*/15 * * * *",
+    eventMapping,
+    // Per HttpPollingPullerAdapter contract: caller-supplied secrets land
+    // on `pullConfig.credentials.*` and the adapter substitutes them into
+    // the header template via the `${{credentials.<key>}}` syntax.
+    credentials: { token },
+  };
+}
 
 function ParserConfigFields({
   sourceType,
@@ -907,7 +1059,7 @@ function ParserConfigFields({
             {f.label}
             {f.required && <Text as="span" color="red.500" marginLeft={1}>*</Text>}
           </Text>
-          {f.key === "parserDsl" ? (
+          {f.key === "parserDsl" || f.key === "eventMappingDsl" ? (
             <Textarea
               size="sm"
               backgroundColor="white"
@@ -921,6 +1073,13 @@ function ParserConfigFields({
             <Input
               size="sm"
               backgroundColor="white"
+              type={
+                f.key === "credentialsToken" ||
+                f.key === "clientSecret" ||
+                f.key === "workspaceApiKey"
+                  ? "password"
+                  : "text"
+              }
               value={values[f.key] ?? ""}
               onChange={(e) => onChange({ ...values, [f.key]: e.target.value })}
               placeholder={f.placeholder}
