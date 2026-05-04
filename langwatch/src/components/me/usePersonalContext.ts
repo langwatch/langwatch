@@ -65,11 +65,6 @@ export type PersonalContext = {
   spendByTool: Array<{ tool: string; usd: number }>;
   recentActivity: PersonalRecentActivityRow[];
   apiKeys: PersonalApiKeyRow[];
-  notificationPrefs: {
-    budgetThreshold80: boolean;
-    weeklySummary: boolean;
-    perRequestOverOneDollar: boolean;
-  };
 };
 
 /**
@@ -194,10 +189,5 @@ export function usePersonalContext(): PersonalContext {
         costUsd: row.spentUsd,
       })) ?? [],
     apiKeys,
-    notificationPrefs: {
-      budgetThreshold80: true,
-      weeklySummary: true,
-      perRequestOverOneDollar: false,
-    },
   };
 }

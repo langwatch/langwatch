@@ -62,7 +62,6 @@ export default function MySettingsPage() {
       projectId: project?.id,
     });
   const ctx = usePersonalContext();
-  const [prefs, setPrefs] = useState(ctx.notificationPrefs);
   const [newKeyLabel, setNewKeyLabel] = useState("");
   const [showAddForm, setShowAddForm] = useState(false);
   const [revealedSecret, setRevealedSecret] = useState<{
@@ -153,8 +152,7 @@ export default function MySettingsPage() {
               Settings
             </Heading>
             <Text color="fg.muted" fontSize="sm">
-              Manage your personal API keys, notifications, and view your
-              admin-managed budget
+              Manage your personal API keys and view your admin-managed budget
             </Text>
           </VStack>
           <Spacer />
@@ -275,37 +273,6 @@ export default function MySettingsPage() {
               ))}
             </VStack>
           )}
-        </SectionCard>
-
-        <SectionCard title="Notifications">
-          <VStack align="stretch" gap={2}>
-            <Text fontSize="xs" color="fg.muted">
-              Notification preferences are not yet persisted — UI preview only.
-              Coming in a follow-up release.
-            </Text>
-            <CheckboxRow
-              label="Alert me when I hit 80% of my monthly budget"
-              checked={prefs.budgetThreshold80}
-              onChange={(v) =>
-                setPrefs({ ...prefs, budgetThreshold80: v })
-              }
-              disabled
-            />
-            <CheckboxRow
-              label="Weekly usage summary"
-              checked={prefs.weeklySummary}
-              onChange={(v) => setPrefs({ ...prefs, weeklySummary: v })}
-              disabled
-            />
-            <CheckboxRow
-              label="Each request over $1.00"
-              checked={prefs.perRequestOverOneDollar}
-              onChange={(v) =>
-                setPrefs({ ...prefs, perRequestOverOneDollar: v })
-              }
-              disabled
-            />
-          </VStack>
         </SectionCard>
 
         <SectionCard title="Budget">
@@ -559,47 +526,5 @@ function RevealedSecretBanner({
         </Text>
       </VStack>
     </Box>
-  );
-}
-
-function CheckboxRow({
-  label,
-  checked,
-  onChange,
-  disabled = false,
-}: {
-  label: string;
-  checked: boolean;
-  onChange: (v: boolean) => void;
-  disabled?: boolean;
-}) {
-  return (
-    <HStack
-      paddingY={1}
-      cursor={disabled ? "not-allowed" : "pointer"}
-      onClick={() => {
-        if (disabled) return;
-        onChange(!checked);
-      }}
-      gap={3}
-      opacity={disabled ? 0.5 : 1}
-    >
-      <Box
-        width="16px"
-        height="16px"
-        borderRadius="sm"
-        borderWidth="1px"
-        borderColor={checked ? "blue.500" : "border.emphasis"}
-        backgroundColor={checked ? "blue.500" : "transparent"}
-        display="flex"
-        alignItems="center"
-        justifyContent="center"
-        color="white"
-        fontSize="10px"
-      >
-        {checked && "✓"}
-      </Box>
-      <Text fontSize="sm">{label}</Text>
-    </HStack>
   );
 }
