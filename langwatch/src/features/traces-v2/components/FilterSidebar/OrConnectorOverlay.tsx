@@ -70,11 +70,15 @@ export const OrConnectorOverlay: React.FC<OrConnectorOverlayProps> = ({
   const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number } | null>(
     null,
   );
+  // Local: which line the cursor is currently over. Used only for the
+  // tooltip + the line's own thicken-on-hover affordance — does NOT
+  // touch `facetHoverStore`, so member chips/rows stay quiet when
+  // someone runs the cursor over the connector itself. The store gets
+  // bumped only by direct chip/row hovers.
+  const [hoveredLineId, setHoveredLineId] = useState<string | null>(null);
 
   const hoveredGroup = useFacetHoverStore((s) => s.hoveredGroup);
   const hoveredFacet = useFacetHoverStore((s) => s.hoveredFacet);
-  const setHoveredGroup = useFacetHoverStore((s) => s.setHoveredGroup);
-  const clearHover = useFacetHoverStore((s) => s.clearHover);
 
   // Stable lane assignment: sort groups by id so the lane index for a
   // given group doesn't shuffle between renders.
@@ -149,13 +153,12 @@ export const OrConnectorOverlay: React.FC<OrConnectorOverlayProps> = ({
           {lines.map((line) => {
             const cx = line.laneIndex * LANE_WIDTH + LANE_WIDTH / 2;
             const lineColor = `var(--chakra-colors-${line.palette}-solid)`;
-            const isHovered = hoveredGroup?.id === line.groupId;
+            const isHovered = hoveredLineId === line.groupId;
             const heightPx = Math.max(line.bottomY - line.topY, 1);
-            const group = groups.find((g) => g.id === line.groupId);
             return (
               <Box key={line.groupId} position="absolute" inset={0}>
                 {/* Hit area — invisible but wider so the user doesn't
-                    have to mouse onto a 1.5px line. */}
+                    have to mouse onto a 2px line. */}
                 <Box
                   position="absolute"
                   left={`${cx - HIT_AREA_WIDTH / 2}px`}
@@ -165,14 +168,14 @@ export const OrConnectorOverlay: React.FC<OrConnectorOverlayProps> = ({
                   cursor="help"
                   pointerEvents="auto"
                   onMouseEnter={(e) => {
-                    if (group) setHoveredGroup(group);
+                    setHoveredLineId(line.groupId);
                     setTooltipPos({ x: e.clientX, y: e.clientY });
                   }}
                   onMouseMove={(e) =>
                     setTooltipPos({ x: e.clientX, y: e.clientY })
                   }
                   onMouseLeave={() => {
-                    clearHover();
+                    setHoveredLineId(null);
                     setTooltipPos(null);
                   }}
                 />
@@ -194,9 +197,12 @@ export const OrConnectorOverlay: React.FC<OrConnectorOverlayProps> = ({
         </Box>
       )}
 
-      {hoveredGroup && tooltipPos && (
-        <ConnectorTooltip group={hoveredGroup} pos={tooltipPos} />
-      )}
+      {hoveredLineId && tooltipPos && (() => {
+        const tipGroup = groups.find((g) => g.id === hoveredLineId);
+        return tipGroup ? (
+          <ConnectorTooltip group={tipGroup} pos={tooltipPos} />
+        ) : null;
+      })()}
     </>
   );
 };
