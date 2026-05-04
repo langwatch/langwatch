@@ -10,11 +10,31 @@ import { safeJsonParseOrStringFallback } from "./utils/safe-json-parse-or-string
 
 type RawMessage = ScenarioMessageSnapshotEvent["messages"][number];
 
-type DisplayItem =
+export type DisplayItem =
   | { kind: "text"; id: string; role: string; content: string; traceId?: string }
   | { kind: "image"; id: string; src: string; traceId?: string }
+  | {
+      kind: "audio";
+      id: string;
+      role: string;
+      src: string;
+      missing: boolean;
+      traceId?: string;
+    }
   | { kind: "tool_call"; id: string; name: string; arguments: unknown; traceId?: string }
   | { kind: "tool_result"; id: string; result: unknown; traceId?: string };
+
+/**
+ * Audio data shorter than this is treated as missing — Scenario sometimes
+ * truncates payloads when caps trigger, and a 1-byte WAV is a broken player
+ * waiting to happen. Tuned by eye; if it ever rejects a real short clip we
+ * can lower it.
+ */
+const MIN_AUDIO_BASE64_CHARS = 100;
+
+function buildAudioDataUrl(data: string, format: string | undefined): string {
+  return `data:audio/${format ?? "wav"};base64,${data}`;
+}
 
 interface ScenarioMessageRendererProps {
   messages: ScenarioMessageSnapshotEvent["messages"];
@@ -108,6 +128,37 @@ export function ScenarioMessageRenderer({
               </VStack>
             );
 
+          case "audio":
+            return (
+              <VStack
+                key={item.id}
+                align={item.role === "assistant" ? "flex-start" : "flex-end"}
+                gap={1}
+              >
+                {item.missing ? (
+                  <Box
+                    border="1px solid"
+                    borderColor="border"
+                    borderRadius="lg"
+                    paddingX={3}
+                    paddingY={2}
+                    fontSize="xs"
+                    color="fg.muted"
+                  >
+                    (audio data missing)
+                  </Box>
+                ) : (
+                  <Box maxW="320px">
+                    {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+                    <audio controls src={item.src} style={{ width: "100%" }} />
+                  </Box>
+                )}
+                {!smallerView && item.traceId && item.role === "assistant" && (
+                  <TraceMessage traceId={item.traceId} />
+                )}
+              </VStack>
+            );
+
           case "tool_call":
             return (
               <VStack key={item.id} align="flex-start" gap={2}>
@@ -175,7 +226,12 @@ export function ScenarioMessageRenderer({
 // Flatten raw scenario messages + streaming into DisplayItems
 // ---------------------------------------------------------------------------
 
-function flattenMessages(
+/**
+ * Convert raw scenario messages (and any in-flight streaming buffers) into
+ * the flat list of `DisplayItem`s the renderer iterates over. Exported for
+ * unit testing — the renderer's render path is pure once this returns.
+ */
+export function flattenMessages(
   messages: ScenarioMessageSnapshotEvent["messages"],
   streamingMessages?: StreamingMessage[],
 ): DisplayItem[] {
@@ -253,6 +309,22 @@ function flattenMixed(content: any[], msg: RawMessage): DisplayItem[] {
       items.push({ kind: "image", id: `${msg.id}-img${i}`, src: item.image_url.url, traceId: msg.trace_id });
     } else if (typeof item === "object" && item.image) {
       items.push({ kind: "image", id: `${msg.id}-img${i}`, src: item.image, traceId: msg.trace_id });
+    } else if (
+      typeof item === "object" &&
+      (item.type === "input_audio" || item.type === "audio")
+    ) {
+      const payload =
+        (item.input_audio as { data?: string; format?: string } | undefined) ??
+        (item.audio as { data?: string; format?: string } | undefined);
+      const data = payload?.data ?? "";
+      items.push({
+        kind: "audio",
+        id: `${msg.id}-aud${i}`,
+        role: msg.role ?? "user",
+        src: buildAudioDataUrl(data, payload?.format),
+        missing: data.length < MIN_AUDIO_BASE64_CHARS,
+        traceId: msg.trace_id,
+      });
     } else if (item.type === "tool_use" || item.type === "tool_call") {
       items.push({ kind: "tool_call", id: `${msg.id}-tu${i}`, name: item.name ?? item.toolName ?? "tool", arguments: item.arguments ?? item.input ?? item.args, traceId: msg.trace_id });
     } else if (item.type === "tool_result") {
