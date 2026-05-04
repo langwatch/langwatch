@@ -144,6 +144,7 @@ describe("ActivityMonitorService — read-side queries against unified trace sto
   let ch: ClickHouseClient;
   let primaryOrg: Organization;
   let primaryGovProject: Project;
+  let primaryTeamId: string;
   let primarySourceId: string;
   let secondarySourceId: string;
   let crossOrg: Organization;
@@ -163,13 +164,14 @@ describe("ActivityMonitorService — read-side queries against unified trace sto
         slug: `primary-org-${namespace}`,
       },
     });
-    await prisma.team.create({
+    const primaryTeam = await prisma.team.create({
       data: {
         name: `Primary Team ${namespace}`,
         slug: `primary-team-${namespace}`,
         organizationId: primaryOrg.id,
       },
     });
+    primaryTeamId = primaryTeam.id;
     crossOrg = await prisma.organization.create({
       data: {
         name: `Cross Org ${namespace}`,
@@ -301,6 +303,8 @@ describe("ActivityMonitorService — read-side queries against unified trace sto
         {
           id: primarySourceId,
           organizationId: primaryOrg.id,
+          // Team-scoped — exercises the spendByTeam team-rollup path.
+          teamId: primaryTeamId,
           name: "Primary OTel source",
           sourceType: "otel_generic",
           status: "active",
@@ -311,6 +315,7 @@ describe("ActivityMonitorService — read-side queries against unified trace sto
         {
           id: secondarySourceId,
           organizationId: primaryOrg.id,
+          // Null teamId — exercises the spendByTeam "Org-wide" bucket.
           name: "Secondary Cowork source",
           sourceType: "claude_cowork",
           status: "active",
@@ -425,6 +430,74 @@ describe("ActivityMonitorService — read-side queries against unified trace sto
       expect(bob?.spendUsd).toBeCloseTo(1.5, 2);
       expect(alice?.spendUsd).toBeCloseTo(0.5, 2);
       expect(rows[0]?.actor).toBe("bob@example.com");
+    });
+  });
+
+  describe("when querying spendByTeam()", () => {
+    it("rolls up spend by IngestionSource.teamId with an Org-wide bucket for null-teamId sources", async () => {
+      const service = ActivityMonitorService.create(prisma);
+      // 14d window includes Carol's 14d-old trace under secondarySourceId
+      // (teamId=null → Org-wide bucket).
+      const rows = await service.spendByTeam({
+        organizationId: primaryOrg.id,
+        windowDays: 14,
+      });
+      expect(rows.length).toBeGreaterThanOrEqual(2);
+
+      const primary = rows.find((r) => r.teamId === primaryTeamId);
+      const orgWide = rows.find((r) => r.teamId === null);
+
+      // Primary team source: alice $0.50 + bob $1.50 = $2.00, 2 requests.
+      expect(primary).toBeDefined();
+      expect(primary?.spendUsd).toBeCloseTo(2.0, 2);
+      expect(primary?.requestCount).toBe(2);
+      expect(primary?.sourceCount).toBe(1);
+      expect(primary?.lastActivityIso).not.toBeNull();
+      // No spend in the prior window → 100 (matches summary's pctChange semantic).
+      expect(primary?.deltaPctVsPriorWindow).toBe(100);
+
+      // Org-wide (null-teamId) source: carol's 14d-old $0.25 trace.
+      expect(orgWide).toBeDefined();
+      expect(orgWide?.teamName).toBe("Org-wide");
+      expect(orgWide?.spendUsd).toBeCloseTo(0.25, 2);
+      expect(orgWide?.requestCount).toBe(1);
+      expect(orgWide?.sourceCount).toBe(1);
+
+      // Sort: primary ($2.00) before orgWide ($0.25) since spend desc.
+      const primaryIdx = rows.findIndex((r) => r.teamId === primaryTeamId);
+      const orgWideIdx = rows.findIndex((r) => r.teamId === null);
+      expect(primaryIdx).toBeLessThan(orgWideIdx);
+    });
+
+    it("excludes cross-org governance traces (TenantId isolation)", async () => {
+      const service = ActivityMonitorService.create(prisma);
+      const rows = await service.spendByTeam({
+        organizationId: primaryOrg.id,
+        windowDays: 30,
+      });
+      // Cross-org trace had spend=$50; if any leaked, primary's largest row
+      // would be far above $2 + $0.25.
+      const totalReturned = rows.reduce((sum, r) => sum + r.spendUsd, 0);
+      expect(totalReturned).toBeLessThan(10);
+      // Cross-org Team is a Team but its id should never surface here.
+      const allTeamIds = rows.map((r) => r.teamId).filter(Boolean);
+      expect(allTeamIds).toEqual([primaryTeamId]);
+    });
+
+    it("returns [] when org has no hidden Governance Project (no IngestionSource ever minted)", async () => {
+      const orgNoGov = await prisma.organization.create({
+        data: {
+          name: `No-gov Org ${nanoid(6)}`,
+          slug: `no-gov-${nanoid(6)}`,
+        },
+      });
+      const service = ActivityMonitorService.create(prisma);
+      const rows = await service.spendByTeam({
+        organizationId: orgNoGov.id,
+        windowDays: 30,
+      });
+      expect(rows).toEqual([]);
+      await prisma.organization.delete({ where: { id: orgNoGov.id } });
     });
   });
 
