@@ -220,6 +220,50 @@ async function main() {
     process.stderr.write(
       `[seed-personas] minted personal VK id=${issued.id} routingPolicy=${issued.routingPolicyId ?? "none"}\n`,
     );
+
+    // Personal $1/month BLOCK budget so a live-fire loop (fire-completion
+    // or `langwatch claude`) actually populates gateway_budget_ledger_events
+    // out-of-box. Without this, traces ingest cleanly but the trace-fold
+    // reactor finds zero applicable budgets and skips the ledger insert
+    // (Sergey live-fire dogfood, 2026-05-04 — see
+    // dev/docs/dogfood/governance-live-fire-evidence-2026-05-04.md).
+    // Idempotent per (org, principal) — finds existing or creates.
+    const existingBudget = await prisma.gatewayBudget.findFirst({
+      where: {
+        organizationId: org.id,
+        scopeType: "PRINCIPAL",
+        scopeId: user.id,
+        archivedAt: null,
+      },
+      select: { id: true },
+    });
+    if (!existingBudget) {
+      const budget = await prisma.gatewayBudget.create({
+        data: {
+          organizationId: org.id,
+          scopeType: "PRINCIPAL",
+          scopeId: user.id,
+          principalUserId: user.id,
+          createdById: user.id,
+          name: `Personal Budget — ${args.email}`,
+          description: "Auto-seeded by seed-personas.ts --mint-vk",
+          window: "MONTH",
+          limitUsd: "1.000000",
+          onBreach: "BLOCK",
+          timezone: "UTC",
+          currentPeriodStartedAt: new Date(),
+          resetsAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        },
+        select: { id: true },
+      });
+      process.stderr.write(
+        `[seed-personas] seeded personal budget id=${budget.id} ($1/MONTH BLOCK)\n`,
+      );
+    } else {
+      process.stderr.write(
+        `[seed-personas] reusing existing personal budget id=${existingBudget.id}\n`,
+      );
+    }
   }
 
   process.stdout.write(
