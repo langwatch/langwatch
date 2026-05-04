@@ -128,6 +128,8 @@ describe("TraceDetails tabs", () => {
   });
 
   describe("when user is a lite member", () => {
+    /** @scenario Lite member opens trace details drawer from the messages page */
+    /** @scenario Lite member does not see "Trace Details" or "Sequence" tabs */
     it("hides Trace Details and Sequence tabs but shows Thread, Evaluations, User Events", () => {
       const tabs = renderTabs({ isLiteMember: true });
 

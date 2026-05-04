@@ -8,6 +8,20 @@ Feature: Lite member access restrictions
   They can see everything a regular viewer sees but cannot create/edit
   certain resources or debug individual traces.
 
+  # Several scenarios in this file are bound to existing JSDOM
+  # render tests under `langwatch/src/{tests,components}/...`:
+  #   * TraceDetails-liteMember.integration.test.tsx
+  #   * MessageHoverActions-liteMember.integration.test.tsx
+  #   * datasets.lite-member.integration.test.tsx
+  #   * evaluations.lite-member.integration.test.tsx
+  #   * annotation-scores.lite-member.integration.test.tsx
+  #   * LLMModelCostDrawer.lite-member.integration.test.tsx
+  #
+  # Most remaining scenarios are page-level navigation / sidebar
+  # visibility / cross-page restriction-modal flows that need a
+  # broader app-level render fixture or Playwright suite. They stay
+  # `@unimplemented` until that infrastructure exists.
+
   Background:
     Given an organization "acme" with a project "chatbot"
     And a lite member "sarah" in organization "acme"

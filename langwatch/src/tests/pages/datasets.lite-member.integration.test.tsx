@@ -250,6 +250,7 @@ describe("Datasets page permission visibility", () => {
       mockIsLiteMemberRef.current = true;
     });
 
+    /** @scenario Lite member clicks create on prompts or datasets and sees restriction modal */
     it("hides edit and delete menu items", () => {
       renderPage();
 
