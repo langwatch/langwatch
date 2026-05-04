@@ -3,6 +3,11 @@ Feature: Python SDK async-native experiment parallelism
   I want a first-class async execution mode for experiment.loop / experiment.submit
   So that singletons (gRPC channels, Firestore, ADK runners, connection pools) keep working and every item gets an isolated trace
 
+  # All `@unimplemented` scenarios in this file describe Python SDK
+  # behaviour. The check-feature-parity script only scans `*.test.ts
+  # /tsx`, so pytest cases cannot bind via JSDoc today. Cheap
+  # structural fix: extend the scanner to read pytest docstring tags.
+
   Background:
     Given a LangWatch client initialized with a valid API key
     And an experiment instance created via langwatch.experiment(slug="<slug>")
