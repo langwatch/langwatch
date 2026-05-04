@@ -24,6 +24,10 @@ import {
 } from "./SearchBarIndicators";
 import { SearchTipsPopover } from "./SearchTipsPopover";
 import { SyntaxHelpDrawerHost } from "./SyntaxHelpDrawer";
+import {
+  TokenValuePicker,
+  type TokenValuePickerAnchor,
+} from "./TokenValuePicker";
 import type { ValueResolver } from "./useFilterEditor";
 import { useFloatRect } from "./useFloatRect";
 import { useGlobalAiShortcut } from "./useGlobalAiShortcut";
@@ -92,6 +96,12 @@ export const SearchBar: React.FC = () => {
   const [editorMounted, setEditorMounted] = useState(false);
   const [editorHasContent, setEditorHasContent] = useState(false);
   const [aiMode, setAiMode] = useState(false);
+  // Anchor info for the click-a-chip-to-edit-value popover. Lifted to
+  // SearchBar so the popover can portal into document.body and share
+  // the same instance whether the click came from PlaceholderEditor or
+  // the live ProseMirror editor.
+  const [tokenAnchor, setTokenAnchor] =
+    useState<TokenValuePickerAnchor | null>(null);
 
   const requestEditor = useCallback(() => setEditorMounted(true), []);
 
@@ -211,12 +221,14 @@ export const SearchBar: React.FC = () => {
                 autoFocus
                 onHasContentChange={setEditorHasContent}
                 valueResolver={valueResolver}
+                onTokenClick={setTokenAnchor}
               />
             ) : (
               <PlaceholderEditor
                 queryText={queryText}
                 onActivate={requestEditor}
                 onApplyQueryText={applyQueryText}
+                onTokenClick={setTokenAnchor}
               />
             )}
           </Box>
@@ -228,6 +240,10 @@ export const SearchBar: React.FC = () => {
           ) : (
             <Kbd>{"/"}</Kbd>
           )}
+          <TokenValuePicker
+            anchor={tokenAnchor}
+            onClose={() => setTokenAnchor(null)}
+          />
         </Flex>
       )}
     </Box>

@@ -154,6 +154,18 @@ interface UseFilterEditorParams {
    * Return `null` to fall back to the static `FIELD_VALUES` enum.
    */
   valueResolver?: ValueResolver;
+  /**
+   * Fired when the user clicks an existing categorical chip in the
+   * search bar. Caller decides whether to render a value-picker
+   * popover; if undefined, chip clicks behave like normal text clicks
+   * (cursor placement).
+   */
+  onTokenClick?: (payload: {
+    rect: DOMRect;
+    field: string;
+    currentValue: string;
+    location: { start: number; end: number };
+  }) => void;
 }
 
 interface FilterEditorApi {
@@ -174,6 +186,7 @@ export function useFilterEditor({
   applyQueryText,
   onHasContentChange,
   valueResolver,
+  onTokenClick,
 }: UseFilterEditorParams): FilterEditorApi {
   const [suggestion, setSuggestion] =
     useState<SuggestionUIState>(CLOSED_SUGGESTION);
@@ -457,6 +470,37 @@ export function useFilterEditor({
       if (editor.isDestroyed) return;
       const target = event.target as HTMLElement | null;
 
+      // Chip click → open the value-picker popover. Chip spans carry
+      // field/value/location data attrs from filterHighlight's
+      // decoration pass; the parent receives the click rect to anchor
+      // the popover. Skip when no callback is wired so chip clicks
+      // still place the cursor as before.
+      const chipEl = target?.closest("[data-filter-chip-start]") as
+        | HTMLElement
+        | null;
+      if (chipEl && onTokenClick) {
+        event.preventDefault();
+        event.stopPropagation();
+        const start = Number(chipEl.dataset.filterChipStart);
+        const end = Number(chipEl.dataset.filterChipEnd);
+        const field = chipEl.dataset.filterChipField ?? "";
+        const value = chipEl.dataset.filterChipValue ?? "";
+        if (
+          Number.isFinite(start) &&
+          Number.isFinite(end) &&
+          field &&
+          value
+        ) {
+          onTokenClick({
+            rect: chipEl.getBoundingClientRect(),
+            field,
+            currentValue: value,
+            location: { start, end },
+          });
+        }
+        return;
+      }
+
       // AND/OR operator click → cycle the keyword in place. The inline
       // span carries the liqe-text coordinates as data attributes (set
       // by `filterHighlight`'s decoration pass) so we can flip without
@@ -510,7 +554,7 @@ export function useFilterEditor({
     };
     dom.addEventListener("mousedown", handler);
     return () => dom.removeEventListener("mousedown", handler);
-  }, [editor, applyQueryTextRef]);
+  }, [editor, applyQueryTextRef, onTokenClick]);
 
   // Sync external query changes back into the editor. Only runs while the
   // editor is NOT focused — while focused, the editor is the source of

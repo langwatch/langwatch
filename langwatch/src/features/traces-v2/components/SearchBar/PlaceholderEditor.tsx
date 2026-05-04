@@ -21,6 +21,12 @@ type DecoratedSegment =
        * the live ProseMirror editor exposes.
        */
       opLoc?: { start: number; end: number };
+      /**
+       * For categorical chip segments, the parsed token info — the
+       * placeholder uses this to fire a value-picker popover when the
+       * chip is clicked.
+       */
+      token?: TokenRef;
     }
   | { kind: "delete"; token: TokenRef };
 
@@ -62,13 +68,18 @@ function buildSegments(text: string): DecoratedSegment[] {
   for (const slot of slots) {
     if (slot.from < cursor) continue; // overlap (rare); skip
     pushTextChunk(cursor, slot.from);
+    const token = tokenAtEnd.get(slot.to);
     out.push({
       kind: "text",
       text: text.slice(slot.from, slot.to),
       className: slot.className,
       opLoc: slot.opLoc,
+      // Only chip slots get a token — operator slots have opLoc, attribute
+      // chips have neither. The presence of `token` on a text segment is
+      // what tells the click handler "this is a value chip; open the
+      // picker with this field/value/location".
+      token: token && token.value !== null ? token : undefined,
     });
-    const token = tokenAtEnd.get(slot.to);
     if (token) {
       out.push({ kind: "delete", token });
     }
@@ -78,10 +89,23 @@ function buildSegments(text: string): DecoratedSegment[] {
   return out;
 }
 
+export interface TokenClickPayload {
+  /** Bounding rect of the clicked chip — used to anchor a popover. */
+  rect: DOMRect;
+  field: string;
+  currentValue: string;
+  /** Liqe-text-coordinate range of the Tag. */
+  location: { start: number; end: number };
+}
+
 interface PlaceholderEditorProps {
   queryText: string;
   onActivate: () => void;
   onApplyQueryText: (text: string) => void;
+  /** Fired when a categorical chip is clicked. The parent opens the
+   * value-picker popover; if absent, clicks fall through to the
+   * activation behaviour. */
+  onTokenClick?: (payload: TokenClickPayload) => void;
 }
 
 /**
@@ -94,6 +118,7 @@ export const PlaceholderEditor: React.FC<PlaceholderEditorProps> = ({
   queryText,
   onActivate,
   onApplyQueryText,
+  onTokenClick,
 }) => {
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
@@ -201,6 +226,37 @@ export const PlaceholderEditor: React.FC<PlaceholderEditorProps> = ({
                       end,
                     );
                     if (next !== queryText) onApplyQueryText(next);
+                  }}
+                >
+                  {seg.text}
+                </span>
+              );
+            }
+            // Categorical chip → clickable value-picker affordance.
+            // Open the picker on mousedown so the placeholder doesn't
+            // simultaneously activate the heavier ProseMirror editor.
+            if (seg.token && onTokenClick && seg.token.value !== null) {
+              const tok = seg.token;
+              return (
+                <span
+                  key={i}
+                  className={seg.className}
+                  data-filter-chip-start={tok.start}
+                  data-filter-chip-end={tok.end}
+                  style={{ cursor: "pointer" }}
+                  title="Click to change value"
+                  onMouseDown={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    const rect = (
+                      event.currentTarget as HTMLElement
+                    ).getBoundingClientRect();
+                    onTokenClick({
+                      rect,
+                      field: tok.field,
+                      currentValue: tok.value!,
+                      location: { start: tok.start, end: tok.end },
+                    });
                   }}
                 >
                   {seg.text}

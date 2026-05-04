@@ -4,6 +4,7 @@ import {
   removeFacetValueFromQuery,
   removeFieldFromQuery,
   setRangeInQuery,
+  setFacetValueAtLocation,
   swapOperatorAtLocation,
   toggleFacetInQuery,
 } from "~/server/app-layer/traces/query-language/mutations";
@@ -86,6 +87,10 @@ interface FilterState {
   /** Swap the AND/OR keyword at a given liqe text location. Used by the
    * search-bar token cycle handler. */
   swapOperator: (start: number, end: number) => void;
+
+  /** Replace the value of the Tag at the given liqe location. Used by
+   * the click-a-token-to-edit-value popover in the search bar. */
+  setFacetValueAt: (start: number, end: number, newValue: string) => void;
   /** Remove a specific facet value (force to neutral) */
   removeFacet: (field: string, value: string) => void;
   /** Remove all values for a field */
@@ -246,6 +251,13 @@ export const useFilterStore = create<FilterState>((set, get) => ({
   swapOperator: (start, end) =>
     set((s) =>
       applyMutation(s, (q) => swapOperatorAtLocation(q, start, end)),
+    ),
+
+  setFacetValueAt: (start, end, newValue) =>
+    set((s) =>
+      applyMutation(s, (q) =>
+        setFacetValueAtLocation(q, start, end, newValue),
+      ),
     ),
 
   removeFacet: (field, value) =>

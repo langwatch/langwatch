@@ -7,7 +7,7 @@
 
 import type { FacetState } from "./metadata";
 import { isEmptyAST, parse, serialize } from "./parse";
-import { filterAST } from "./walk";
+import { filterAST, walkAST } from "./walk";
 
 /**
  * Toggle a facet value through three states: neutral → include → exclude → neutral.
@@ -35,6 +35,50 @@ export function toggleFacetInQuery(
     return appendClause(cleaned, `NOT ${fieldName}:${escapeValue(value)}`);
   }
   return cleaned;
+}
+
+/**
+ * Replace the value of the Tag at the given liqe location with
+ * `newValue`, preserving the field name and any leading NOT. Drives the
+ * click-a-token-to-edit-value popover in the search bar — given the
+ * Tag's [start, end] coordinates and a candidate replacement, swap the
+ * value in place without touching the rest of the query.
+ *
+ * Returns the original query if the location doesn't resolve to a Tag
+ * with a literal expression (e.g. range tokens, structural mismatch).
+ */
+export function setFacetValueAtLocation(
+  currentQuery: string,
+  start: number,
+  end: number,
+  newValue: string,
+): string {
+  if (!currentQuery.trim()) return currentQuery;
+  try {
+    const ast = parse(currentQuery);
+    let fieldName: string | null = null;
+    walkAST(ast, (node) => {
+      if (node.type !== "Tag") return;
+      if (node.location.start !== start || node.location.end !== end) return;
+      if (node.field.type === "ImplicitField") return;
+      if (node.expression.type !== "LiteralExpression") return;
+      fieldName = (node.field as { name: string }).name;
+    });
+    if (fieldName === null) return currentQuery;
+    // Tag.location covers only `field:value` — any wrapping `NOT ` /
+    // `-` lives in the surrounding text outside [start, end), so we
+    // splice just the field:value form and leave the negation intact.
+    const trimmed = currentQuery.trimStart();
+    const leadingWs = currentQuery.length - trimmed.length;
+    const replacement = `${fieldName}:${escapeValue(newValue)}`;
+    return (
+      currentQuery.slice(0, leadingWs + start) +
+      replacement +
+      currentQuery.slice(leadingWs + end)
+    );
+  } catch {
+    return currentQuery;
+  }
 }
 
 /**

@@ -63,6 +63,18 @@ export interface DecorationSlot {
    * `swapOperatorAtLocation`. Other slots leave this undefined.
    */
   opLoc?: { start: number; end: number };
+  /**
+   * Optional field+value+location reference for click-to-edit on the
+   * value chip. Set on Tag slots; the editor's mousedown handler reads
+   * `data-filter-chip-start` etc. off the inline span to open the
+   * value picker popover.
+   */
+  chipToken?: {
+    start: number;
+    end: number;
+    field: string;
+    value: string;
+  };
 }
 
 /**
@@ -240,6 +252,20 @@ function walkAst(
         from: start,
         to: end,
         className: tagClassName({ fieldName, negated }),
+        // Carry the parsed token coords through to the inline
+        // decoration so the editor's mousedown delegate can open the
+        // value picker without re-walking the AST. Only categorical
+        // (literal-value) chips qualify — range chips have no
+        // single-value picker.
+        chipToken:
+          value !== null
+            ? {
+                start: tag.location.start,
+                end: tag.location.end,
+                field: fieldName,
+                value,
+              }
+            : undefined,
       });
       return;
     }
@@ -422,6 +448,12 @@ function computeDecorations(
         attrs["data-filter-op-start"] = String(slot.opLoc.start);
         attrs["data-filter-op-end"] = String(slot.opLoc.end);
         attrs["title"] = "Click to switch AND ↔ OR";
+      }
+      if (slot.chipToken) {
+        attrs["data-filter-chip-start"] = String(slot.chipToken.start);
+        attrs["data-filter-chip-end"] = String(slot.chipToken.end);
+        attrs["data-filter-chip-field"] = slot.chipToken.field;
+        attrs["data-filter-chip-value"] = slot.chipToken.value;
       }
       decorations.push(Decoration.inline(slot.from, slot.to, attrs));
     }
