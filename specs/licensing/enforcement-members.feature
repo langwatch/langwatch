@@ -277,7 +277,6 @@ Feature: Member Limit Enforcement with License
   # Role Update Limit Checks
   # ============================================================================
 
-  @unimplemented
   Scenario: Blocks upgrade from Lite Member to full member when at member limit
     Given the organization has 3 Full Members
     And the organization has 1 Lite Member user "lite@example.com"
@@ -286,7 +285,6 @@ Feature: Member Limit Enforcement with License
     Then the request fails with FORBIDDEN
     And the error message contains "member limit reached"
 
-  @unimplemented
   Scenario: Allows upgrade from Lite Member to full member when under limit
     Given the organization has 2 Full Members
     And the organization has 1 Lite Member user "lite@example.com"
