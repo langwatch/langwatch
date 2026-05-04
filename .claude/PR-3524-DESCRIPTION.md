@@ -278,27 +278,46 @@ codify this.
 
 ---
 
-## BDD specs — the executable contract (9 files / ~1,580 LOC)
+## BDD specs — the executable contract (52 files / ~6,067 LOC across 3 spec roots)
 
-Spec-first, code-follows. The full architecture lock is captured as testable
-scenarios before the code lands. All committed to `specs/ai-gateway/governance/`:
+Spec-first, code-follows. Every architectural lock is captured as testable scenarios before the code lands. Specs live in three roots:
+
+- `specs/ai-gateway/governance/` — 30 files. The original architecture-invariants pillar (Phase 7 lock + cross-lane contracts).
+- `specs/ai-governance/` — 17 files across 5 sub-dirs (`cli-wrappers/`, `no-spy-mode/`, `personal-portal/`, `puller-framework/`, `sessions/`). Phase 8/9/10/11 surfaces.
+- `specs/ai-gateway/wrapper-e2e/` — 5 files (one per wrapped tool: claude/codex/cursor/gemini/opencode). Phase 11 behavioral pins.
+
+### Phase 7 substrate specs (`specs/ai-gateway/governance/`, 30 files)
+
+The architecture-spine specs from the original 3-lane build. Highlights:
 
 | Spec file | Lane | Coverage |
 |---|---|---|
-| `architecture-invariants.feature` | Lane B (Alexis) | Cross-cutting: unified substrate, OTLP-shape per source, hidden Gov Project, origin/governance namespaces, fold derivation, tamper-evidence deferred |
-| `ui-contract.feature` | Lane B (Alexis) | UI: single events feed, shape-aware drill-down, hidden Gov Project filter discipline at every Project consumer, retention dropdown, no project picker on the composer |
-| `compliance-baseline.feature` | Lane A (Andre) | SOC 2 Type II / ISO 27001 / EU AI Act / GDPR / HIPAA-most-uses coverage; tamper-evidence deferred contract |
-| `siem-export.feature` | Lane A (Andre) | OCSF v1.1 read API contract; 6 SIEM platforms named as cron-pull targets; thin-layer push only if it stays derived |
-| `receiver-shapes.feature` | Lane S (Sergey) | Per-source OTLP shape (spans for span-shaped, logs for flat feeds); shared hardened parser; receiver as thin wrapper |
-| `folds.feature` | Lane S (Sergey) | governance_kpis + governance_ocsf_events fold derivation; anomaly reactor reads fold not raw spans; fold rebuild from event_log |
-| `retention.feature` | Lane S (Sergey) | Per-IngestionSource retention class (30d / 1y / 7y); CH TTL enforcement; org plan ceiling |
-| `event-log-durability.feature` | Lane S (Sergey) | Append-only event_log foundation for non-repudiation; folds rebuildable; tamper-evidence deferred |
-| `persona-aware-chrome.feature` (197 LOC, NEW iter29) | Lane B (Alexis) | Persona-aware chrome contract — sidebar + header per 4 personas; persona-3 regression-invariant FIRST in file; gateway.md Screen 6 layout; chicken-and-egg fix codified; FF-off split scenarios for two-flag pilot flexibility; single-chip-in-header invariant prevents iter29 dogfood-bug recurrence |
+| `architecture-invariants.feature` | 🅑 | Cross-cutting: unified substrate, OTLP-shape per source, hidden Gov Project, origin/governance namespaces, fold derivation, tamper-evidence deferred |
+| `ui-contract.feature` | 🅑 | UI: single events feed, shape-aware drill-down, hidden Gov Project filter discipline at every Project consumer, retention dropdown, no project picker on the composer |
+| `compliance-baseline.feature` | 🅐 | SOC 2 Type II / ISO 27001 / EU AI Act / GDPR / HIPAA-most-uses coverage; tamper-evidence deferred contract |
+| `siem-export.feature` | 🅐 | OCSF v1.1 read API contract; 6 SIEM platforms named as cron-pull targets; thin-layer push only if it stays derived |
+| `receiver-shapes.feature` | 🅢 | Per-source OTLP shape (spans for span-shaped, logs for flat feeds); shared hardened parser; receiver as thin wrapper |
+| `folds.feature` | 🅢 | `governance_kpis` + `governance_ocsf_events` fold derivation; anomaly reactor reads fold not raw spans; fold rebuild from event_log |
+| `retention.feature` | 🅢 | Per-IngestionSource retention class (30d / 1y / 7y); CH TTL enforcement; org plan ceiling |
+| `event-log-durability.feature` | 🅢 | Append-only event_log foundation for non-repudiation; folds rebuildable; tamper-evidence deferred |
+| `persona-aware-chrome.feature` | 🅑 | Persona-aware chrome contract — sidebar + header per 4 personas; persona-3 regression-invariant FIRST in file; chicken-and-egg fix codified; FF-off split scenarios for two-flag pilot flexibility |
+| + 21 more | mixed | RBAC + ingestion-source variants (workato / s3-custom / openai-compliance / claude-compliance / copilot-studio / otel-generic) + anomaly-rules + routing-policies + audit-event API + cli-integrations + budgets + cli-token-revoke + Personal IDE keys (5 sub-files) + composer-drawer + tool-catalog + observability + governance-project invariants |
 
-Cross-references: each spec cites siblings rather than duplicating scenarios.
-Andre's `compliance-baseline.feature` references my `retention.feature` +
-`event-log-durability.feature` as canonical sources for the mechanics; Alexis's
-`architecture-invariants.feature` references all four lane-S specs.
+### Phase 8/9/10 surface specs (`specs/ai-governance/`, 17 files)
+
+| Sub-dir | Files | Coverage |
+|---|---|---|
+| `sessions/` | `personal-sessions.feature` + `admin-max-ttl.feature` | 12 scenarios — `/exchange` device-fingerprint capture; list returns enriched metadata for current user only (cross-user isolation); revoke/revokeAll behavior; missing client_info graceful fallback; admin max-TTL enforcement (default unbounded → set → too-old sessions expire on next /refresh) |
+| `no-spy-mode/` | `no-spy-mode.feature` | 7 scenarios — three-mode storage behavior (`full` / `strip_io` / `strip_all`); cross-org isolation; non-gateway-origin spans untouched; forward-looking-only mode flips; ADMIN-only permission gate |
+| `puller-framework/` | `puller-adapter-contract.feature` + `http-polling.feature` + `s3-polling.feature` + `copilot-studio-reference.feature` | 26 scenarios — framework contract (interface shape + cursor-based pagination + restart-safety + bad-config rejection); http_polling (config validation + multi-page pulls + header template substitution + 5xx retry + 4xx fail-fast); s3_polling (config validation + drain + lex-cursor key resume + parser switching + malformed-file-skipped + credential rotation); copilot_studio reference (one-click admin enable + locked reference config + future-puller pattern) |
+| `personal-portal/` | several | Persona-1 portal, tile classes, end-user/admin walkthroughs |
+| `cli-wrappers/` | `wrap-login-routing.feature` (Sergey's concrete pin, `d7c59436d`) | 14 scenarios — login config write + env injection + budget pre-flight exit code 2 per tool. **Sister to** `specs/ai-gateway/wrapper-e2e/{claude,codex,cursor,gemini,opencode}.feature` (broader behavioral specs, 27 scenarios). |
+
+### Phase 11 wrapper-e2e specs (`specs/ai-gateway/wrapper-e2e/`, 5 files)
+
+5 feature files (one per wrapped tool) with 27 scenarios total — per-wrapper env-var injection, gateway routing + bearer = personal VK, trace attribution, budget-exhaustion graceful 429, exit-code passthrough. The Phase 11 e2e harness at `typescript-sdk/__tests__/e2e/cli/governance-wrapper.e2e.test.ts` (16/16 passing in 3s) enforces these behaviorally with `wrap-login-routing.feature` as the concrete test-shape pin.
+
+Cross-references: each spec cites siblings rather than duplicating scenarios. The Phase 7 `architecture-invariants.feature` is the canonical source for substrate invariants; Phase 8/9/10/11 specs reference it for fold semantics + RBAC + retention.
 
 ---
 
