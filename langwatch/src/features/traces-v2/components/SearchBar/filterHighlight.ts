@@ -477,15 +477,7 @@ function computeDecorations(
           : pos + token.end;
       decorations.push(
         Decoration.widget(widgetPos, () => createDeleteWidget(token), {
-          // `side: -1` puts the X widget *to the left of* the cursor
-          // when the cursor is at this position. So a click anywhere
-          // in the chip's pill area lands the cursor logically at the
-          // chip's end, but visually renders the cursor on the right
-          // of the X — i.e. outside the pill, ready to type the next
-          // clause. With `side: 1` (the previous setting) the cursor
-          // rendered *between* the value text and the X, which read
-          // as "you're editing inside this chip."
-          side: -1,
+          side: 1,
           ignoreSelection: true,
           // Without an explicit key, ProseMirror's DecorationSet diff
           // compared widget specs by render-function reference equality.

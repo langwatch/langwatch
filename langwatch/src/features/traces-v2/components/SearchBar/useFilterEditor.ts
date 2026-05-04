@@ -365,6 +365,27 @@ export function useFilterEditor({
     },
     editorProps: {
       attributes: { spellcheck: "false" },
+      // Suppress PM's default cursor placement when the user clicks on a
+      // chip pill or its X widget. PM otherwise drops the caret into the
+      // text node *inside* the chip (between "value" and the widget), so
+      // typing the next clause read as if it were extending the chip's
+      // value (`status:errorx`). Returning `true` here keeps PM out of
+      // the click — the addEventListener-based handler below still runs
+      // and opens the value picker / deletes the chip.
+      handleDOMEvents: {
+        mousedown: (_view, event) => {
+          const target = event.target as HTMLElement | null;
+          if (!target) return false;
+          if (
+            target.closest("[data-filter-chip-start]") ||
+            target.closest("[data-filter-delete]") ||
+            target.closest("[data-filter-op-start]")
+          ) {
+            return true;
+          }
+          return false;
+        },
+      },
       handleKeyDown: (view, event) => {
         const text = view.state.doc.textContent;
         const cursorPos = view.state.selection.from - PARAGRAPH_OFFSET;
