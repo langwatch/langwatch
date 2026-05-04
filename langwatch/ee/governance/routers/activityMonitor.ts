@@ -81,6 +81,30 @@ export const activityMonitorRouter = createTRPCRouter({
     }),
 
   /**
+   * Per-team spend rollup. Aggregates ingestion-source events by the
+   * source's `teamId` (with an "Org-wide" bucket for null-teamId
+   * sources). Pairs with `spendByUser` for the admin bird's-eye home.
+   */
+  spendByTeam: protectedProcedure
+    .input(
+      z.object({
+        organizationId: z.string(),
+        windowDays: z.number().int().min(1).max(365).default(30),
+        limit: z.number().int().min(1).max(500).default(50),
+      }),
+    )
+    .use(checkOrganizationPermission("activityMonitor:view"))
+    .use(enterpriseGate)
+    .query(async ({ ctx, input }) => {
+      const service = ActivityMonitorService.create(ctx.prisma);
+      return await service.spendByTeam({
+        organizationId: input.organizationId,
+        windowDays: input.windowDays,
+        limit: input.limit,
+      });
+    }),
+
+  /**
    * Per-source health metrics for the dashboard's source strip.
    */
   ingestionSourcesHealth: protectedProcedure

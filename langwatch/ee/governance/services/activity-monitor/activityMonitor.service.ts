@@ -51,6 +51,25 @@ export interface SpendByUserRow {
   mostUsedTarget: string | null;
 }
 
+export interface SpendByTeamRow {
+  /** Team.id, or null for sources that aren't team-scoped (org-wide). */
+  teamId: string | null;
+  /** Team.name, or "Org-wide" for non-team-scoped sources. */
+  teamName: string;
+  spendUsd: number;
+  requestCount: number;
+  /**
+   * Spend change vs the previous equal-length window (e.g. last 30
+   * days vs the 30 days before that). 0 when previous window had no
+   * spend AND current is also empty; 100 when previous was zero and
+   * current is non-zero (matches `summary.windowOverPreviousPct`).
+   */
+  deltaPctVsPriorWindow: number;
+  lastActivityIso: string | null;
+  /** Number of distinct ingestion sources rolled up under this team. */
+  sourceCount: number;
+}
+
 export interface IngestionSourceHealthRow {
   id: string;
   name: string;
@@ -308,6 +327,164 @@ export class ActivityMonitorService {
       trendVsPreviousPct: 0,
       mostUsedTarget: r.mostUsedTarget && r.mostUsedTarget !== "" ? r.mostUsedTarget : null,
     }));
+  }
+
+  /**
+   * Per-team spend rollup for the admin governance home — the
+   * organization-wide bird's-eye view that complements `spendByUser`
+   * (top spenders) with the team breakdown.
+   *
+   * Implementation: each `IngestionSource` row carries an optional
+   * `teamId` (PG schema), and every span/log_record persisted from
+   * that source carries the source id in
+   * `Attributes['langwatch.ingestion_source.id']`. We aggregate spend
+   * + request count per source in ClickHouse, then roll those rows up
+   * by team via a PG join. Sources with `teamId = null` aggregate
+   * under the "Org-wide" bucket so org-wide ingestion (e.g., a
+   * tenant-spanning compliance feed) still surfaces in the dashboard.
+   *
+   * RBAC: caller is responsible for the org-membership check (the
+   * existing `requireEnterprisePlan` + `checkOrganizationPermission`
+   * middleware on the tRPC procedure handle that). Service-side
+   * defense-in-depth: every CH query filters by `TenantId =
+   * govProjectId`, where `govProjectId` is the caller's hidden
+   * Governance Project — cross-org leak is structurally impossible.
+   */
+  async spendByTeam(input: {
+    organizationId: string;
+    windowDays: number;
+    limit?: number;
+  }): Promise<SpendByTeamRow[]> {
+    const govProjectId = await this.resolveGovProjectId(input.organizationId);
+    if (!govProjectId) return [];
+
+    const ch = await this.getClickhouse(input.organizationId);
+    if (!ch) return [];
+
+    const now = Date.now();
+    const windowMs = input.windowDays * 24 * 60 * 60 * 1000;
+    const limit = input.limit ?? 50;
+
+    const previousWindowStart = now - 2 * windowMs;
+    const result = await ch.query({
+      query: `
+        SELECT
+          sourceId,
+          toString(sumIf(spendUsd, occurredAt >= fromUnixTimestamp64Milli({thisStart:UInt64}))) AS thisSpendStr,
+          toString(sumIf(spendUsd, occurredAt < fromUnixTimestamp64Milli({thisStart:UInt64}))) AS prevSpendStr,
+          toString(countIf(occurredAt >= fromUnixTimestamp64Milli({thisStart:UInt64}))) AS thisRequests,
+          toString(toUnixTimestamp64Milli(maxIf(occurredAt, occurredAt >= fromUnixTimestamp64Milli({thisStart:UInt64})))) AS lastActivityMs
+        FROM (
+          SELECT
+            ts.Attributes[{sourceKey:String}] AS sourceId,
+            coalesce(ts.TotalCost, 0) AS spendUsd,
+            ts.OccurredAt AS occurredAt
+          FROM trace_summaries ts
+          WHERE ts.TenantId = {tenantId:String}
+            AND ts.OccurredAt >= fromUnixTimestamp64Milli({prevStart:UInt64})
+            AND ts.Attributes[{originKey:String}] = {originValue:String}
+            AND ts.Attributes[{sourceKey:String}] != ''
+            AND (ts.TenantId, ts.TraceId, ts.UpdatedAt) IN (
+              SELECT TenantId, TraceId, max(UpdatedAt)
+              FROM trace_summaries
+              WHERE TenantId = {tenantId:String}
+                AND OccurredAt >= fromUnixTimestamp64Milli({prevStart:UInt64})
+              GROUP BY TenantId, TraceId
+            )
+        )
+        GROUP BY sourceId
+      `,
+      query_params: {
+        tenantId: govProjectId,
+        thisStart: now - windowMs,
+        prevStart: previousWindowStart,
+        originKey: ATTR_ORIGIN_KIND,
+        originValue: ORIGIN_KIND_VALUE,
+        sourceKey: ATTR_INGESTION_SOURCE_ID,
+      },
+      format: "JSONEachRow",
+    });
+
+    const sourceRows = (await result.json()) as Array<{
+      sourceId: string;
+      thisSpendStr: string;
+      prevSpendStr: string;
+      thisRequests: string;
+      lastActivityMs: string;
+    }>;
+    if (sourceRows.length === 0) return [];
+
+    const sourceIds = sourceRows.map((r) => r.sourceId).filter((id) => id !== "");
+    const sources = await this.prisma.ingestionSource.findMany({
+      where: { id: { in: sourceIds }, organizationId: input.organizationId },
+      select: {
+        id: true,
+        teamId: true,
+        team: { select: { id: true, name: true } },
+      },
+    });
+    const teamBySource = new Map(
+      sources.map((s) => [s.id, s.team] as const),
+    );
+
+    const ORG_WIDE_KEY = "__org_wide__";
+    const byTeam = new Map<
+      string,
+      {
+        teamId: string | null;
+        teamName: string;
+        thisSpend: number;
+        prevSpend: number;
+        requestCount: number;
+        lastActivityMs: number;
+        sourceCount: number;
+      }
+    >();
+    for (const row of sourceRows) {
+      const team = teamBySource.get(row.sourceId) ?? null;
+      const key = team ? team.id : ORG_WIDE_KEY;
+      const teamId = team?.id ?? null;
+      const teamName = team?.name ?? "Org-wide";
+      const thisSpend = Number(row.thisSpendStr);
+      const prevSpend = Number(row.prevSpendStr);
+      const requestCount = Number(row.thisRequests);
+      const lastActivityMs = Number(row.lastActivityMs);
+      const existing = byTeam.get(key);
+      if (existing) {
+        existing.thisSpend += thisSpend;
+        existing.prevSpend += prevSpend;
+        existing.requestCount += requestCount;
+        existing.sourceCount += 1;
+        existing.lastActivityMs = Math.max(existing.lastActivityMs, lastActivityMs);
+      } else {
+        byTeam.set(key, {
+          teamId,
+          teamName,
+          thisSpend,
+          prevSpend,
+          requestCount,
+          lastActivityMs,
+          sourceCount: 1,
+        });
+      }
+    }
+
+    return [...byTeam.values()]
+      .filter((t) => t.thisSpend > 0 || t.requestCount > 0)
+      .sort((a, b) => b.thisSpend - a.thisSpend)
+      .slice(0, limit)
+      .map((t) => ({
+        teamId: t.teamId,
+        teamName: t.teamName,
+        spendUsd: t.thisSpend,
+        requestCount: t.requestCount,
+        deltaPctVsPriorWindow: pctChange(t.thisSpend, t.prevSpend),
+        lastActivityIso:
+          t.lastActivityMs > 0
+            ? new Date(t.lastActivityMs).toISOString()
+            : null,
+        sourceCount: t.sourceCount,
+      }));
   }
 
   async ingestionSourcesHealth(input: {
