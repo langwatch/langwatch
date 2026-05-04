@@ -70,16 +70,16 @@ Canonical end-to-end evidence that the trace-processing pipeline correctly fans 
 > - Three-way merge auto-resolved cleanly with **zero manual conflicts**. Three overlap files: `.gitignore` (main added MCP env-var leak defense lines, no overlap); `MainMenu.tsx` (main renamed beta tooltip 'Traces v2' → 'Trace Explorer', no overlap); `gatewayBudgetSync.reactor.{integration,unit}.test.ts` (main-wide PascalCase normalization `lastEventOccurredAt` → `LastEventOccurredAt`; auto-merge picked main's name, verified consistent across all 7 other reactor unit tests + foldProjection definition).
 > - Push: fast-forward from `59aef6bcc` → `2dc1fc0d4` (no force needed). Review-fix commits all preserved + visible in `git log`.
 >
-> **CI status** (as of `e55bbcb79` 2026-05-04 — orchestrator-corrected post-rebase snapshot):
-> - **`docs-ci`**: ❌ `check_links` failed; `docs-complete` failed.
-> - **`sdk-javascript-ci`**: ❌ `ci` + `e2e` failed; `sdk-javascript-complete` failed.
-> - **`es-migration-e2e`**: ❌ `Seed ES → Run Migration → Validate CH` failed; `es-migration-e2e-complete` failed.
-> - **`langwatch-app-ci`**: ❌ `feature-parity` failed.
-> - **CodeRabbit `evaluate`**: ❌ failed with HTTP 406 `PullRequest.diff too_large` — GitHub's 300-file diff cap. **Automation limit, NOT a product/code failure** — CodeRabbit cannot fetch the full diff for a PR exceeding the cap; reviewers should not read this red as a real CI failure.
-> - **CodeQL Analyze**: 🟡 JS/TS in progress; Go/Python ✅ passed.
+> **CI status** (as of `30a84d243` 2026-05-04 — fresh CI wave running on the post-fix HEAD):
+> - **`docs-ci check_links`**: 🟡 fix shipped (`2c9cf46b1`). Mintlify CLI in fresh CI runner prompts before producing output (welcome/version dialog), exits nonzero from inside `$()` under `set -eo pipefail`, kills the step before broken-links report runs. Fix: pipe `continue\n` + `|| true` + drive pass/fail from output strings.
+> - **`sdk-javascript-ci`**: 🟡 fix shipped (`18b257331`). Phase 11 governance-wrapper e2e files: dropped `as string` cast on `req.headers.authorization` (`@typescript-eslint/consistent-type-assertions`); added `vitest.governance-e2e.config.mts` to `tsconfig.eslint.json` include (eliminates `parserOptions.project` parse error). Local: `pnpm lint` → 0 errors.
+> - **`es-migration-e2e`**: 🟡 fix shipped (`ab4e3efbd`). CH migration version 22 collision (main shipped `00022_mix_trace_summary_and_eval_runs_col_casing.sql`; PR-side had `00022_add_trace_source_type.sql`). Renumbered PR-side to `00029_add_trace_source_type.sql` (next free after `00028_add_ocsf_schema_version`). Migration is purely additive (`ADD COLUMN/INDEX IF NOT EXISTS`), no ordering deps on 23-28.
+> - **`langwatch-app-ci feature-parity`**: 🟡 fix shipped (`30a84d243`). 2 unbound scenarios in `specs/ai-gateway/cli-token-revoke-on-deactivation.feature` (lines 72 + 79). Bound to `auth-cli-budget-status.integration.test.ts` (`returns 401 — unknown / expired tokens are rejected`) + `cliTokenRevocation.service.integration.test.ts` (`deletes both token keys and the per-user index`) via `/** @scenario ... */` JSDoc annotations. Scanner gotcha captured (proximity scanner stops at first non-comment / non-whitespace char — multi-line explanation must be in a separate `/* */` block ABOVE the single-line `/** @scenario */` JSDoc). Local: `pnpm tsx scripts/check-feature-parity.ts` → 2/2 bound ✅.
+> - **CodeRabbit `evaluate`**: ❌ unchanged (HTTP 406 `PullRequest.diff too_large`, GitHub's 300-file diff cap). **Automation limit, NOT a product/code failure** — CodeRabbit cannot fetch the full diff for a PR exceeding the cap; reviewers should not read this red as a real CI failure.
+> - **CodeQL Analyze**: 🟡 JS/TS still in progress on the fresh CI wave; Go/Python ✅ passed on the prior run.
 > - **Branch-protection-reviews**: ⏳ pending rchaves's final review.
 >
-> Orchestrator pulling logs to route concrete root causes for the 4 failing CI groups (`docs-ci` / `sdk-javascript-ci` / `es-migration-e2e` / `langwatch-app-ci feature-parity`). Each failure will be triaged + assigned to a lane; fixes fold into this section as SHAs land.
+> 🟡 entries flip to ✅ as the fresh CI wave (running on `30a84d243`) confirms each fix-SHA lands the failing job green. Orchestrator monitoring; will route any new failure that surfaces.
 >
 > **Side-effects observed during dogfood** (transparency notes, not blockers):
 > - **ClickHouse schema drift caught + fixed**: `trace_summaries.RootSpanType` + `ContainsAi` columns missing in dev-stack despite goose marking migration 0020 applied. Manual `ALTER TABLE` patched it locally; full `DROP DATABASE` + re-run via newly-installed goose binary in app container resolved cleanly. Pre-existing dev-stack inconsistency, **not introduced by this PR**.
