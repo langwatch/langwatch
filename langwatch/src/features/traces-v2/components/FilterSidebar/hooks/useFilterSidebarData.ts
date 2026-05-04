@@ -31,9 +31,25 @@ import { facetLabel, sortBySectionOrder } from "../utils";
 
 export function useFilterSidebarData() {
   const ast = useFilterStore((s) => s.ast);
-  const toggleFacet = useFilterStore((s) => s.toggleFacet);
+  const storeToggleFacet = useFilterStore((s) => s.toggleFacet);
   const setRange = useFilterStore((s) => s.setRange);
   const removeRange = useFilterStore((s) => s.removeRange);
+
+  // Translate the sidebar's `modifierKey` modifier (raised when the user
+  // holds Shift / Ctrl / Cmd while clicking a facet row) into the
+  // store's `combinator` option. Keeps the modifier semantics ("alt
+  // click = OR") in one place rather than baking it into every caller.
+  const toggleFacet = useCallback(
+    (
+      field: string,
+      value: string,
+      options?: { modifierKey?: boolean },
+    ) =>
+      storeToggleFacet(field, value, {
+        combinator: options?.modifierKey ? "OR" : "AND",
+      }),
+    [storeToggleFacet],
+  );
 
   const { data: descriptors, isLoading: facetsLoading } = useTraceFacets();
 

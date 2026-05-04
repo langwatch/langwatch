@@ -18,7 +18,11 @@ interface FacetSectionProps {
   field: string;
   items: FacetItem[];
   getValueState: (value: string) => FacetValueState;
-  onToggle: (field: string, value: string) => void;
+  onToggle: (
+    field: string,
+    value: string,
+    options?: { modifierKey?: boolean },
+  ) => void;
   dragHandleProps?: React.HTMLAttributes<HTMLDivElement>;
   /** When set, renders a "(none)" row pinned at the bottom that toggles a `none:`/`has:` filter. */
   noneRow?: { active: boolean; onToggle: () => void };
@@ -42,7 +46,8 @@ export const FacetSection: React.FC<FacetSectionProps> = ({
   const [searchQuery, setSearchQuery] = useState("");
 
   const handleToggle = useCallback(
-    (value: string) => onToggle(field, value),
+    (value: string, options?: { modifierKey?: boolean }) =>
+      onToggle(field, value, options),
     [onToggle, field],
   );
 

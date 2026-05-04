@@ -1,13 +1,27 @@
 import { Box } from "@chakra-ui/react";
 import type React from "react";
 import { useEffect, useMemo } from "react";
-import { removeNodeAtLocation } from "~/server/app-layer/traces/query-language/mutations";
+import {
+  removeNodeAtLocation,
+  swapOperatorAtLocation,
+} from "~/server/app-layer/traces/query-language/mutations";
 import { buildDecorationPlan, type TokenRef } from "./filterHighlight";
 
 const PLACEHOLDER_TEXT = "Search filters, free text, or Ask AI…";
 
 type DecoratedSegment =
-  | { kind: "text"; text: string; className?: string }
+  | {
+      kind: "text";
+      text: string;
+      className?: string;
+      /**
+       * Liqe-text-coordinate range for AND/OR operator segments. Set
+       * when the slot wraps a BooleanOperator so the placeholder's
+       * click handler can flip the keyword in place — same affordance
+       * the live ProseMirror editor exposes.
+       */
+      opLoc?: { start: number; end: number };
+    }
   | { kind: "delete"; token: TokenRef };
 
 /**
@@ -52,6 +66,7 @@ function buildSegments(text: string): DecoratedSegment[] {
       kind: "text",
       text: text.slice(slot.from, slot.to),
       className: slot.className,
+      opLoc: slot.opLoc,
     });
     const token = tokenAtEnd.get(slot.to);
     if (token) {
@@ -163,6 +178,33 @@ export const PlaceholderEditor: React.FC<PlaceholderEditorProps> = ({
                     <line x1="8" y1="2" x2="2" y2="8" />
                   </svg>
                 </button>
+              );
+            }
+            if (seg.opLoc) {
+              const { start, end } = seg.opLoc;
+              return (
+                <span
+                  key={i}
+                  className={seg.className}
+                  data-filter-op-start={start}
+                  data-filter-op-end={end}
+                  title="Click to switch AND ↔ OR"
+                  onMouseDown={(event) => {
+                    // Beat onActivate / onFocus so a click on AND/OR
+                    // doesn't simultaneously kick the placeholder into
+                    // mounting the heavier ProseMirror editor.
+                    event.preventDefault();
+                    event.stopPropagation();
+                    const next = swapOperatorAtLocation(
+                      queryText,
+                      start,
+                      end,
+                    );
+                    if (next !== queryText) onApplyQueryText(next);
+                  }}
+                >
+                  {seg.text}
+                </span>
               );
             }
             return seg.className ? (

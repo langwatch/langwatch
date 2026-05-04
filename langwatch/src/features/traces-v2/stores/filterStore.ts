@@ -4,6 +4,7 @@ import {
   removeFacetValueFromQuery,
   removeFieldFromQuery,
   setRangeInQuery,
+  swapOperatorAtLocation,
   toggleFacetInQuery,
 } from "~/server/app-layer/traces/query-language/mutations";
 import {
@@ -72,8 +73,19 @@ interface FilterState {
    */
   setFilterFromLens: (text: string) => void;
 
-  /** Three-stage facet toggle: neutral → include → exclude → neutral */
-  toggleFacet: (field: string, value: string) => void;
+  /**
+   * Three-stage facet toggle: neutral → include → exclude → neutral.
+   * Pass `combinator: "OR"` (typically from a Shift/Ctrl-click in the
+   * sidebar) to glue the new clause via OR rather than the default AND.
+   */
+  toggleFacet: (
+    field: string,
+    value: string,
+    options?: { combinator?: "AND" | "OR" },
+  ) => void;
+  /** Swap the AND/OR keyword at a given liqe text location. Used by the
+   * search-bar token cycle handler. */
+  swapOperator: (start: number, end: number) => void;
   /** Remove a specific facet value (force to neutral) */
   removeFacet: (field: string, value: string) => void;
   /** Remove all values for a field */
@@ -218,7 +230,7 @@ export const useFilterStore = create<FilterState>((set, get) => ({
       return { ...result, page: 1 };
     }),
 
-  toggleFacet: (field, value) =>
+  toggleFacet: (field, value, options) =>
     set((s) =>
       applyMutation(s, (q) =>
         toggleFacetInQuery(
@@ -226,8 +238,14 @@ export const useFilterStore = create<FilterState>((set, get) => ({
           field,
           value,
           getFacetValueState(s.ast, field, value),
+          options?.combinator ?? "AND",
         ),
       ),
+    ),
+
+  swapOperator: (start, end) =>
+    set((s) =>
+      applyMutation(s, (q) => swapOperatorAtLocation(q, start, end)),
     ),
 
   removeFacet: (field, value) =>

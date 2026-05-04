@@ -22,6 +22,7 @@ import {
   statusBackgroundColor,
   statusBorderColor,
 } from "./SearchBarIndicators";
+import { SearchTipsPopover } from "./SearchTipsPopover";
 import { SyntaxHelpDrawerHost } from "./SyntaxHelpDrawer";
 import type { ValueResolver } from "./useFilterEditor";
 import { useFloatRect } from "./useFloatRect";
@@ -221,6 +222,7 @@ export const SearchBar: React.FC = () => {
           </Box>
 
           <StatusBadge status={status} />
+          <SearchTipsPopover />
           {hasContent ? (
             <ClearButton onClear={handleClear} />
           ) : (

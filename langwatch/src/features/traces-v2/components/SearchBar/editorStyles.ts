@@ -78,6 +78,21 @@ export const editorStyles: SystemStyleObject = {
   "& .filter-keyword-not": {
     color: "red.fg",
   },
+  // AND/OR keyword tokens are clickable in place — clicking cycles the
+  // operator. Show a subtle underline + pointer so users discover the
+  // affordance without a tooltip-only hint.
+  "& .filter-keyword-clickable": {
+    cursor: "pointer",
+    borderRadius: "2px",
+    paddingX: "2px",
+    transition: "background 80ms ease, color 80ms ease",
+  },
+  "& .filter-keyword-clickable:hover": {
+    background: "bg.muted",
+    textDecoration: "underline",
+    textDecorationStyle: "dotted",
+    textUnderlineOffset: "3px",
+  },
   "& .filter-paren": {
     color: "fg.subtle",
     fontWeight: "semibold",

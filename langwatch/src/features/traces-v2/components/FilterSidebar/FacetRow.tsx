@@ -23,7 +23,13 @@ export const FacetRow = memo(function FacetRow({
   item: FacetItem;
   state: FacetValueState;
   maxCount: number;
-  onToggle: (value: string) => void;
+  /**
+   * `modifierKey` is `true` when the user held Shift or Ctrl/Cmd while
+   * clicking. The store reads this as "combine with OR" instead of the
+   * default AND, so users can build alternative-set queries without
+   * dropping into the search bar to type the operator themselves.
+   */
+  onToggle: (value: string, options?: { modifierKey?: boolean }) => void;
 }) {
   const { typeTag, text } = parseTypedLabel(item.label);
 
@@ -71,7 +77,11 @@ export const FacetRow = memo(function FacetRow({
       background={isActive ? subtleBg : "transparent"}
       borderWidth={0}
       data-state={state}
-      onClick={() => onToggle(item.value)}
+      onClick={(e) =>
+        onToggle(item.value, {
+          modifierKey: e.shiftKey || e.ctrlKey || e.metaKey,
+        })
+      }
       transition="background 120ms ease, border-color 120ms ease"
       _hover={{
         background: isActive ? subtleBg : "bg.muted",

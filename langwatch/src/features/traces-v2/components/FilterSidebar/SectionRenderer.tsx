@@ -20,7 +20,11 @@ interface SectionRendererProps {
   ast: LiqeQuery;
   facetItemsByKey: Map<string, FacetItem[]>;
   valueStateGetters: Map<string, (value: string) => FacetValueState>;
-  toggleFacet: (field: string, value: string) => void;
+  toggleFacet: (
+    field: string,
+    value: string,
+    options?: { modifierKey?: boolean },
+  ) => void;
   setRange: (field: string, from: string, to: string) => void;
   removeRange: (field: string) => void;
   onShiftToggle: (nextOpen: boolean) => void;

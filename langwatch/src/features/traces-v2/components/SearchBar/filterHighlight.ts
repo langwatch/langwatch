@@ -55,6 +55,14 @@ export interface DecorationSlot {
   from: number;
   to: number;
   className: string;
+  /**
+   * Optional liqe-text-coordinate range for click-to-cycle on the
+   * AND/OR keyword. Set when the slot wraps a BooleanOperator; the
+   * editor's mousedown handler reads `data-filter-op-start` /
+   * `data-filter-op-end` off the inline span to invoke
+   * `swapOperatorAtLocation`. Other slots leave this undefined.
+   */
+  opLoc?: { start: number; end: number };
 }
 
 /**
@@ -255,7 +263,11 @@ function walkAst(
         plan.slots.push({
           from: baseOffset + op.location.start,
           to: baseOffset + op.location.end,
-          className: `filter-keyword filter-keyword-${op.operator.toLowerCase()}`,
+          className: `filter-keyword filter-keyword-${op.operator.toLowerCase()} filter-keyword-clickable`,
+          // Carry the liqe-text coordinates through to the inline
+          // decoration so the editor's click delegate can call
+          // `swapOperatorAtLocation` without re-walking the AST.
+          opLoc: { start: op.location.start, end: op.location.end },
         });
       }
       walkAst(logic.right, negated, baseOffset, plan);
@@ -405,9 +417,13 @@ function computeDecorations(
     if (!node.isText || !node.text) return;
     const plan = buildDecorationPlan(node.text, pos);
     for (const slot of plan.slots) {
-      decorations.push(
-        Decoration.inline(slot.from, slot.to, { class: slot.className }),
-      );
+      const attrs: Record<string, string> = { class: slot.className };
+      if (slot.opLoc) {
+        attrs["data-filter-op-start"] = String(slot.opLoc.start);
+        attrs["data-filter-op-end"] = String(slot.opLoc.end);
+        attrs["title"] = "Click to switch AND ↔ OR";
+      }
+      decorations.push(Decoration.inline(slot.from, slot.to, attrs));
     }
     for (const token of plan.tokens) {
       // AST tokens carry liqe's trimmed-text coords, so we translate by

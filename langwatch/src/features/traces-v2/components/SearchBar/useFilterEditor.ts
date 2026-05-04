@@ -5,7 +5,10 @@ import Placeholder from "@tiptap/extension-placeholder";
 import { Text as TiptapText } from "@tiptap/extension-text";
 import { type Editor, useEditor } from "@tiptap/react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { removeNodeAtLocation } from "~/server/app-layer/traces/query-language/mutations";
+import {
+  removeNodeAtLocation,
+  swapOperatorAtLocation,
+} from "~/server/app-layer/traces/query-language/mutations";
 import { AutoUppercaseOperators } from "./autoUppercaseOperators";
 import {
   applyAcceptToEditor,
@@ -453,6 +456,31 @@ export function useFilterEditor({
       // destroyed view crashes ProseMirror.
       if (editor.isDestroyed) return;
       const target = event.target as HTMLElement | null;
+
+      // AND/OR operator click → cycle the keyword in place. The inline
+      // span carries the liqe-text coordinates as data attributes (set
+      // by `filterHighlight`'s decoration pass) so we can flip without
+      // re-parsing the AST here.
+      const opEl = target?.closest("[data-filter-op-start]") as
+        | HTMLElement
+        | null;
+      if (opEl) {
+        event.preventDefault();
+        event.stopPropagation();
+        const start = Number(opEl.dataset.filterOpStart);
+        const end = Number(opEl.dataset.filterOpEnd);
+        if (!Number.isFinite(start) || !Number.isFinite(end)) return;
+        const current = editor.getText();
+        const next = swapOperatorAtLocation(current, start, end);
+        if (next === current) return;
+        isProgrammaticRef.current = true;
+        editor.commands.setContent(buildDocument(next));
+        isProgrammaticRef.current = false;
+        lastCommittedTextRef.current = next;
+        applyQueryTextRef.current(next);
+        return;
+      }
+
       const btn = target?.closest("[data-filter-delete]") as HTMLElement | null;
       if (!btn) return;
       event.preventDefault();
