@@ -4,6 +4,27 @@ Feature: Batch Evaluation Results Visualization
   I want to see a clear visualization of my evaluation runs
   So that I can understand how my targets performed across the dataset
 
+  # Many scenarios in this file are bound below to existing JSDOM
+  # render tests under
+  # `langwatch/src/components/batch-evaluation-results/__tests__/`:
+  #   * BatchEvaluationResultsTable.test.tsx — table rendering +
+  #     loading skeleton + empty state + dataset/target columns.
+  #   * BatchTargetCell.test.tsx — output display + cost/duration,
+  #     error state, truncation, evaluator chips (pass/fail/error).
+  #   * BatchSummaryFooter.test.tsx — run summary + cost.
+  #   * BatchRunsSidebar.integration.test.tsx — list of runs.
+  #   * isRunFinished.test.ts — running / stopped indicator.
+  #   * csvExport.test.ts — CSV export + special characters.
+  #
+  # Remaining scenarios that stay `@unimplemented` describe page-
+  # level integration flows (image rendering in cells, evaluator
+  # chip hover tooltip, "View Trace" link conditional render,
+  # Studio panel "Open full experiment" button, comparison-mode
+  # toggles, V2-vs-V3 page wiring) that need either a top-level
+  # render fixture for the experiment page or a Playwright suite.
+  # See specs/batch-evaluation-results/AUDIT_MANIFEST.md for the
+  # full classification.
+
   Background:
     Given I am on the experiment results page
     And an evaluation run has completed

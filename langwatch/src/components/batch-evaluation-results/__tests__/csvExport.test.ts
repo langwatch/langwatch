@@ -38,6 +38,9 @@ const createTargetOutput = (
 
 describe("csvExport", () => {
   describe("buildCsvHeaders", () => {
+    /** @scenario Export results to CSV */
+    /** @scenario CSV contains all columns */
+    /** @scenario CSV handles special characters */
     it("returns index header for empty data", () => {
       const data = createMinimalData();
       const headers = buildCsvHeaders(data);

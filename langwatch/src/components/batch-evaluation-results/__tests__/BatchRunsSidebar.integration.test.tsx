@@ -65,6 +65,8 @@ describe("BatchRunsSidebar", () => {
       createRun({ runId: "run-new", createdAt: 3_000_000 }),
     ];
 
+    /** @scenario Display list of evaluation runs */
+    /** @scenario Select a different run */
     it("displays runs newest-first", () => {
       render(
         <Wrapper>
