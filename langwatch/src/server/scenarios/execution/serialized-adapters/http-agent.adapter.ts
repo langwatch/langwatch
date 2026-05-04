@@ -128,7 +128,10 @@ export class SerializedHttpAgentAdapter extends AgentAdapter {
     const durationMs = Date.now() - startedAt;
 
     if (!response.ok) {
-      const responseBody = await response.text().catch(() => "");
+      const responseBody =
+        typeof response.text === "function"
+          ? await response.text().catch(() => "")
+          : "";
       this.logger.warn(
         {
           url,
