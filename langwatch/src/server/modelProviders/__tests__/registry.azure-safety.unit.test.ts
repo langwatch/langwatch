@@ -18,6 +18,7 @@ describe("Feature: azure_safety model provider registry entry", () => {
     describe("when accessing the azure_safety entry", () => {
       const entry = modelProviders.azure_safety;
 
+      /** @scenario Azure Safety appears in the Add Model Provider list */
       it("exposes the azure_safety provider", () => {
         expect(entry).toBeDefined();
       });
@@ -26,6 +27,7 @@ describe("Feature: azure_safety model provider registry entry", () => {
         expect(entry.name).toBe("Azure Safety");
       });
 
+      /** @scenario Azure Safety form only shows credentials and extra headers */
       it("marks the provider as type safety", () => {
         expect(entry.type).toBe("safety");
       });
@@ -62,6 +64,7 @@ describe("Feature: azure_safety model provider registry entry", () => {
     });
 
     describe("when the endpoint is not a URL", () => {
+      /** @scenario Azure Safety validates endpoint is a URL */
       it("fails validation", () => {
         const result = schema.safeParse({
           AZURE_CONTENT_SAFETY_ENDPOINT: "not-a-url",
@@ -82,6 +85,7 @@ describe("Feature: azure_safety model provider registry entry", () => {
     });
 
     describe("when the subscription key is empty string", () => {
+      /** @scenario Azure Safety validates subscription key is non-empty */
       it("fails validation", () => {
         const result = schema.safeParse({
           AZURE_CONTENT_SAFETY_ENDPOINT:

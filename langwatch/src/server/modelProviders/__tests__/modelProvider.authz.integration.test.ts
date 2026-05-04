@@ -272,6 +272,7 @@ describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
       });
 
       describe("when the caller is only a team admin (not org admin)", () => {
+        /** @scenario Service rejects assigning an MP to an org the user is not a member of */
         it("rejects with FORBIDDEN and does not persist", async () => {
           const before = await prisma.modelProvider.count({
             where: { projectId: projectAId, provider: "anthropic" },
@@ -344,6 +345,7 @@ describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
       });
 
       describe("when the caller is team admin for a DIFFERENT team", () => {
+        /** @scenario Service rejects assigning an MP to a team the user cannot manage */
         it("rejects with FORBIDDEN", async () => {
           await expect(
             service().updateModelProvider(
@@ -367,6 +369,7 @@ describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
 
     describe("given a multi-scope write (ORG + TEAM)", () => {
       describe("when the caller can manage ONLY the team (not the org)", () => {
+        /** @scenario Service rejects updating scopes to add a team the user cannot manage */
         it("rejects the entire mutation with no partial persistence", async () => {
           const before = await prisma.modelProvider.count({
             where: { projectId: projectAId, provider: "deepseek" },
@@ -483,6 +486,7 @@ describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
 
     describe("given an ORG-scoped MP that the caller cannot see", () => {
       describe("when an unrelated user calls getById", () => {
+        /** @scenario getById rejects reading an MP outside the user's scope */
         it("surfaces NOT_FOUND to prevent id enumeration across tenants", async () => {
           const mp = await service().updateModelProvider(
             {
@@ -559,6 +563,7 @@ describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
       });
 
       describe("when a team-admin from a different team tries to delete", () => {
+        /** @scenario Deletion requires manage permission on EVERY current scope of the MP */
         it("rejects with FORBIDDEN", async () => {
           const mp = await service().updateModelProvider(
             {

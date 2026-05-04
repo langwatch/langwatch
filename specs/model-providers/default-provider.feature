@@ -3,6 +3,13 @@ Feature: Default Provider Settings
   I want to set a provider as the default for LangWatch features
   So that operations use my preferred provider automatically
 
+  # All scenarios describe the "Default Model" section of the model provider
+  # drawer (toggle + three model selectors). Need a JSDOM render of
+  # `DefaultModelSelectors` + integration test against project settings update.
+  # The behind-the-scenes resolution (which provider gets used when defaultModel
+  # is null) is already covered by `utils.unit.test.ts` (`getVercelAIModel`).
+  # Aspirational pending the default-model UI harness.
+
   Background:
     Given I am logged in
     And I have access to a project
