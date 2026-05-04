@@ -51,9 +51,10 @@ export function useWorkspaceData(): Pick<
             kind: "project" as const,
             projectId: project.id,
             projectSlug: project.slug,
+            teamId: team.id,
             href: `/${project.slug}`,
             label: project.name,
-            subtitle: "Project I work on",
+            subtitle: team.name,
           })),
         ),
       )

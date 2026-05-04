@@ -33,6 +33,13 @@ export type WorkspaceSwitcherEntry =
       kind: "project";
       projectId: string;
       projectSlug: string;
+      /**
+       * Parent-team id. Drives the nested-under-team grouping in the
+       * dropdown so the visible hierarchy matches the data model
+       * (Project ⊂ Team ⊂ Org). Projects whose `teamId` doesn't match
+       * any provided team fall back into a flat "Projects" group.
+       */
+      teamId: string;
       href: string;
       label: string;
       subtitle: string;
@@ -97,10 +104,17 @@ function currentLabel(
 }
 
 /**
- * Top-left workspace context switcher. Three groups, in order:
+ * Top-left workspace context switcher. Mirrors the Project ⊂ Team ⊂ Org
+ * hierarchy of the data model:
+ *
  *   1. My Workspace (always present, always first)
- *   2. Teams (the user's team memberships, alpha-sorted)
- *   3. Projects (the user's project access, alpha-sorted)
+ *   2. Each team (alpha-sorted), with its projects nested directly underneath
+ *   3. Orphan projects whose teamId doesn't match any provided team
+ *      (fallback flat "Projects" group — should be empty in practice)
+ *
+ * Project rows render the colored ProjectAvatar bubble (same component
+ * the legacy ProjectSelector used) so projects stay visually identifiable
+ * by their team-color.
  *
  * Consumes data via props so it can mount in any layout (DashboardLayout,
  * MyLayout, future SettingsLayout) without coupling to a specific data hook.
@@ -132,6 +146,22 @@ export const WorkspaceSwitcher = React.memo(function WorkspaceSwitcher({
     triggerKind === "project" ? triggerLabel : null;
 
   const hasMore = teams.length > 0 || projects.length > 0;
+
+  // Group projects under their parent team for the nested-hierarchy render.
+  // Anything whose teamId doesn't match a known team falls into the orphan
+  // bucket (rare; happens only if projects+teams arrays drift).
+  const projectsByTeam = new Map<string, typeof projects>();
+  const orphanProjects: typeof projects = [];
+  const knownTeamIds = new Set(teams.map((t) => t.teamId));
+  for (const project of projects) {
+    if (knownTeamIds.has(project.teamId)) {
+      const bucket = projectsByTeam.get(project.teamId) ?? [];
+      bucket.push(project);
+      projectsByTeam.set(project.teamId, bucket);
+    } else {
+      orphanProjects.push(project);
+    }
+  }
 
   return (
     <Menu.Root open={open} onOpenChange={({ open }) => setOpen(open)}>
@@ -179,24 +209,43 @@ export const WorkspaceSwitcher = React.memo(function WorkspaceSwitcher({
               </Group>
 
               {teams.length > 0 && (
-                <Group title="Teams">
-                  {teams.map((team) => (
-                    <SwitcherItem
-                      key={team.teamId}
-                      entry={team}
-                      active={entryIsCurrent(team, current)}
-                      onSelect={() => {
-                        setOpen(false);
-                        void router.push(team.href);
-                      }}
-                    />
-                  ))}
+                <Group title="Teams & projects">
+                  {teams.map((team) => {
+                    const teamProjects = projectsByTeam.get(team.teamId) ?? [];
+                    return (
+                      <Box key={team.teamId}>
+                        <SwitcherItem
+                          entry={team}
+                          active={entryIsCurrent(team, current)}
+                          onSelect={() => {
+                            setOpen(false);
+                            void router.push(team.href);
+                          }}
+                        />
+                        {teamProjects.length > 0 && (
+                          <VStack gap={0} align="stretch" paddingLeft={5}>
+                            {teamProjects.map((project) => (
+                              <SwitcherItem
+                                key={project.projectId}
+                                entry={project}
+                                active={entryIsCurrent(project, current)}
+                                onSelect={() => {
+                                  setOpen(false);
+                                  void router.push(project.href);
+                                }}
+                              />
+                            ))}
+                          </VStack>
+                        )}
+                      </Box>
+                    );
+                  })}
                 </Group>
               )}
 
-              {projects.length > 0 && (
+              {orphanProjects.length > 0 && (
                 <Group title="Projects">
-                  {projects.map((project) => (
+                  {orphanProjects.map((project) => (
                     <SwitcherItem
                       key={project.projectId}
                       entry={project}
@@ -288,7 +337,11 @@ function SwitcherItem({
       >
         <HStack gap={3} width="full" alignItems="start" paddingY={1}>
           <Box paddingTop="2px">
-            <Icon size={14} />
+            {entry.kind === "project" ? (
+              <ProjectAvatar name={entry.label} />
+            ) : (
+              <Icon size={14} />
+            )}
           </Box>
           <VStack gap={0} alignItems="start" flex={1} minWidth={0}>
             <HStack gap={2} width="full">

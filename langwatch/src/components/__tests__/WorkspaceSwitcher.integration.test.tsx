@@ -56,9 +56,10 @@ const projectFoo = {
   kind: "project" as const,
   projectId: "project_foo",
   projectSlug: "project-foo",
+  teamId: "team_a",
   href: "/project-foo",
   label: "Foo Project",
-  subtitle: "Project I work on",
+  subtitle: "Acme Engineering",
 };
 
 describe("WorkspaceSwitcher", () => {
