@@ -47,6 +47,8 @@ const teamA = {
   kind: "team" as const,
   teamId: "team_a",
   teamSlug: "team-a",
+  orgId: "org_acme",
+  orgName: "Acme",
   href: "/settings/teams/team-a",
   label: "Acme Engineering",
   subtitle: "Team I'm part of",
@@ -57,6 +59,8 @@ const projectFoo = {
   projectId: "project_foo",
   projectSlug: "project-foo",
   teamId: "team_a",
+  orgId: "org_acme",
+  orgName: "Acme",
   href: "/project-foo",
   label: "Foo Project",
   subtitle: "Acme Engineering",
@@ -296,6 +300,84 @@ describe("WorkspaceSwitcher", () => {
 
       // Trigger shows the team label (override won), not "My Workspace"
       expect(screen.getByText("Acme Engineering")).toBeInTheDocument();
+    });
+  });
+
+  // -------------------------------------------------------------------
+  // Multi-org disambiguation: a user belonging to two orgs that each
+  // have a "Default Team" should see them grouped under their org name,
+  // not as visually-identical adjacent rows.
+  // Spec: specs/ai-gateway/governance/workspace-switcher.feature
+  //       (scenarios under "Multi-org disambiguation")
+  // -------------------------------------------------------------------
+
+  describe("when a user belongs to multiple orgs", () => {
+    const teamAcmeDefault = {
+      kind: "team" as const,
+      teamId: "team_acme_default",
+      teamSlug: "acme-default",
+      orgId: "org_acme",
+      orgName: "Acme",
+      href: "/settings/teams/acme-default",
+      label: "Default Team",
+      subtitle: "Team I'm part of",
+    };
+    const teamGlobexDefault = {
+      kind: "team" as const,
+      teamId: "team_globex_default",
+      teamSlug: "globex-default",
+      orgId: "org_globex",
+      orgName: "Globex",
+      href: "/settings/teams/globex-default",
+      label: "Default Team",
+      subtitle: "Team I'm part of",
+    };
+
+    it("groups teams under their org name as section headers", () => {
+      renderSwitcher({
+        personal,
+        teams: [teamAcmeDefault, teamGlobexDefault],
+        projects: [],
+        current: { kind: "personal" },
+      });
+
+      // Trigger to open
+      screen.getByRole("button", { name: /switch workspace/i }).click();
+
+      // Both org names render as section headers, disambiguating the
+      // identical "Default Team" rows that would otherwise look duplicated.
+      expect(screen.getByText("Acme")).toBeInTheDocument();
+      expect(screen.getByText("Globex")).toBeInTheDocument();
+    });
+
+    it("does NOT render the generic 'Teams & projects' header in multi-org mode", () => {
+      renderSwitcher({
+        personal,
+        teams: [teamAcmeDefault, teamGlobexDefault],
+        projects: [],
+        current: { kind: "personal" },
+      });
+
+      screen.getByRole("button", { name: /switch workspace/i }).click();
+
+      // The generic header is only used in single-org mode; with multiple
+      // orgs each org name is its own header.
+      expect(screen.queryByText("Teams & projects")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("when a user belongs to a single org", () => {
+    it("uses the generic 'Teams & projects' header (org name is redundant)", () => {
+      renderSwitcher({
+        personal,
+        teams: [teamA],
+        projects: [projectFoo],
+        current: { kind: "personal" },
+      });
+
+      screen.getByRole("button", { name: /switch workspace/i }).click();
+
+      expect(screen.getByText("Teams & projects")).toBeInTheDocument();
     });
   });
 });

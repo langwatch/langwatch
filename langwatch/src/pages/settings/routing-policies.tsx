@@ -14,10 +14,13 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import {
+  ArrowDown,
+  ArrowUp,
   Pencil,
   Plus,
   Star,
   Trash2,
+  X,
 } from "lucide-react";
 import { useMemo, useState } from "react";
 
@@ -88,8 +91,8 @@ function RoutingPoliciesPage() {
     name: string;
     description: string;
     strategy: Strategy;
-    providerCredentialIds: string;
-    modelAllowlist: string;
+    providerCredentialIds: string[];
+    modelAllowlist: string[];
     isDefault: boolean;
   } | null>(null);
 
@@ -174,8 +177,8 @@ function RoutingPoliciesPage() {
       name: "",
       description: "",
       strategy: "priority",
-      providerCredentialIds: "",
-      modelAllowlist: "",
+      providerCredentialIds: [],
+      modelAllowlist: [],
       isDefault: false,
     });
   };
@@ -189,25 +192,17 @@ function RoutingPoliciesPage() {
       description: p.description ?? "",
       strategy: p.strategy as Strategy,
       providerCredentialIds: Array.isArray(p.providerCredentialIds)
-        ? (p.providerCredentialIds as string[]).join(", ")
-        : "",
+        ? (p.providerCredentialIds as string[])
+        : [],
       modelAllowlist: Array.isArray(p.modelAllowlist)
-        ? (p.modelAllowlist as string[]).join(", ")
-        : "",
+        ? (p.modelAllowlist as string[])
+        : [],
       isDefault: p.isDefault,
     });
   };
 
   const onSubmit = () => {
     if (!composer) return;
-    const providerIds = composer.providerCredentialIds
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean);
-    const allowlist = composer.modelAllowlist
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean);
 
     if (editingId === "new") {
       createMutation.mutate({
@@ -216,8 +211,9 @@ function RoutingPoliciesPage() {
         scopeId: composer.scopeId,
         name: composer.name,
         description: composer.description || null,
-        providerCredentialIds: providerIds,
-        modelAllowlist: allowlist.length > 0 ? allowlist : null,
+        providerCredentialIds: composer.providerCredentialIds,
+        modelAllowlist:
+          composer.modelAllowlist.length > 0 ? composer.modelAllowlist : null,
         strategy: composer.strategy,
         isDefault: composer.isDefault,
       });
@@ -227,8 +223,9 @@ function RoutingPoliciesPage() {
         id: editingId,
         name: composer.name,
         description: composer.description || null,
-        providerCredentialIds: providerIds,
-        modelAllowlist: allowlist.length > 0 ? allowlist : null,
+        providerCredentialIds: composer.providerCredentialIds,
+        modelAllowlist:
+          composer.modelAllowlist.length > 0 ? composer.modelAllowlist : null,
         strategy: composer.strategy,
       });
     }
@@ -438,10 +435,149 @@ type ComposerState = {
   name: string;
   description: string;
   strategy: Strategy;
-  providerCredentialIds: string;
-  modelAllowlist: string;
+  providerCredentialIds: string[];
+  modelAllowlist: string[];
   isDefault: boolean;
 };
+
+/**
+ * Inline chip-list editor for ordered string lists. Used for routing-policy
+ * provider IDs (where order = fallback priority) and model allow-list globs
+ * (where order is decorative but must round-trip).
+ *
+ * Replaces the prior comma-separated freetext to make order explicit and
+ * removal one-click. Type-Enter (or comma / paste) appends a chip, ✕ removes,
+ * up/down arrows reorder.
+ */
+function ChipListEditor({
+  values,
+  onChange,
+  placeholder,
+  ordered,
+  inputAriaLabel,
+}: {
+  values: string[];
+  onChange: (next: string[]) => void;
+  placeholder: string;
+  ordered: boolean;
+  inputAriaLabel: string;
+}) {
+  const [draft, setDraft] = useState("");
+
+  const commitDraft = () => {
+    const tokens = draft
+      .split(",")
+      .map((t) => t.trim())
+      .filter((t) => t.length > 0 && !values.includes(t));
+    if (tokens.length === 0) {
+      setDraft("");
+      return;
+    }
+    onChange([...values, ...tokens]);
+    setDraft("");
+  };
+
+  const removeAt = (i: number) =>
+    onChange(values.filter((_, idx) => idx !== i));
+
+  const swap = (a: number, b: number) => {
+    if (a < 0 || b < 0 || a >= values.length || b >= values.length) return;
+    const next = values.slice();
+    const tmp = next[a]!;
+    next[a] = next[b]!;
+    next[b] = tmp;
+    onChange(next);
+  };
+
+  const moveUp = (i: number) => swap(i, i - 1);
+  const moveDown = (i: number) => swap(i, i + 1);
+
+  return (
+    <VStack align="stretch" gap={2}>
+      {values.length > 0 && (
+        <VStack align="stretch" gap={1}>
+          {values.map((value, i) => (
+            <HStack
+              key={`${value}-${i}`}
+              borderWidth="1px"
+              borderColor="border.muted"
+              borderRadius="sm"
+              paddingX={2}
+              paddingY={1}
+              gap={2}
+              backgroundColor="bg.subtle"
+            >
+              {ordered && (
+                <Text fontSize="xs" color="fg.muted" minWidth="20px">
+                  {i + 1}.
+                </Text>
+              )}
+              <Text fontSize="sm" flex={1} fontFamily="mono">
+                {value}
+              </Text>
+              {ordered && (
+                <>
+                  <Button
+                    size="xs"
+                    variant="ghost"
+                    onClick={() => moveUp(i)}
+                    disabled={i === 0}
+                    aria-label="Move up"
+                  >
+                    <ArrowUp size={12} />
+                  </Button>
+                  <Button
+                    size="xs"
+                    variant="ghost"
+                    onClick={() => moveDown(i)}
+                    disabled={i === values.length - 1}
+                    aria-label="Move down"
+                  >
+                    <ArrowDown size={12} />
+                  </Button>
+                </>
+              )}
+              <Button
+                size="xs"
+                variant="ghost"
+                onClick={() => removeAt(i)}
+                aria-label="Remove"
+              >
+                <X size={12} />
+              </Button>
+            </HStack>
+          ))}
+        </VStack>
+      )}
+      <HStack gap={2}>
+        <Input
+          aria-label={inputAriaLabel}
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === ",") {
+              e.preventDefault();
+              commitDraft();
+            }
+          }}
+          onBlur={() => {
+            if (draft.trim().length > 0) commitDraft();
+          }}
+          placeholder={placeholder}
+          size="sm"
+        />
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={commitDraft}
+          disabled={draft.trim().length === 0}
+        >
+          <Plus size={12} /> Add
+        </Button>
+      </HStack>
+    </VStack>
+  );
+}
 
 const SCOPE_LABEL: Record<Scope, string> = {
   organization: "Organization",
@@ -562,35 +698,35 @@ function RoutingPolicyDrawer({
               </Field.Root>
 
               <Field.Root required>
-                <Field.Label>
-                  Provider credential IDs (comma-separated, ordered)
-                </Field.Label>
-                <Input
-                  value={composer.providerCredentialIds}
-                  onChange={(e) =>
-                    setComposer({
-                      ...composer,
-                      providerCredentialIds: e.target.value,
-                    })
+                <Field.Label>Provider credentials (ordered)</Field.Label>
+                <ChipListEditor
+                  values={composer.providerCredentialIds}
+                  onChange={(next) =>
+                    setComposer({ ...composer, providerCredentialIds: next })
                   }
-                  placeholder="mp_anthropic, mp_openai, mp_gemini"
+                  placeholder="mp_anthropic"
+                  ordered
+                  inputAriaLabel="Add provider credential ID"
                 />
                 <Field.HelperText>
-                  Drag-to-reorder picker comes in a follow-up.
+                  First match wins. Use ↑/↓ to set fallback priority.
                 </Field.HelperText>
               </Field.Root>
 
               <Field.Root>
-                <Field.Label>
-                  Model allowlist (comma-separated globs; empty = no restriction)
-                </Field.Label>
-                <Input
-                  value={composer.modelAllowlist}
-                  onChange={(e) =>
-                    setComposer({ ...composer, modelAllowlist: e.target.value })
+                <Field.Label>Model allowlist (globs)</Field.Label>
+                <ChipListEditor
+                  values={composer.modelAllowlist}
+                  onChange={(next) =>
+                    setComposer({ ...composer, modelAllowlist: next })
                   }
-                  placeholder="claude-*, gpt-5-mini, gemini-2.5-*"
+                  placeholder="claude-*"
+                  ordered={false}
+                  inputAriaLabel="Add model allowlist glob"
                 />
+                <Field.HelperText>
+                  Empty = no restriction. Globs match against the requested model name.
+                </Field.HelperText>
               </Field.Root>
 
               <HStack

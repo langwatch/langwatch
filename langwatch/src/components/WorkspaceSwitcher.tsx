@@ -25,6 +25,8 @@ export type WorkspaceSwitcherEntry =
       kind: "team";
       teamId: string;
       teamSlug: string;
+      orgId: string;
+      orgName: string;
       href: string;
       label: string;
       subtitle: string;
@@ -40,6 +42,8 @@ export type WorkspaceSwitcherEntry =
        * any provided team fall back into a flat "Projects" group.
        */
       teamId: string;
+      orgId: string;
+      orgName: string;
       href: string;
       label: string;
       subtitle: string;
@@ -163,6 +167,28 @@ export const WorkspaceSwitcher = React.memo(function WorkspaceSwitcher({
     }
   }
 
+  // Group teams by org so multi-org users see clear org boundaries instead
+  // of flattened lists of same-named teams from different orgs (Acme P3
+  // dogfood reproduces this). Single-org users keep the original
+  // "Teams & projects" header.
+  const teamsByOrg = new Map<
+    string,
+    { orgName: string; teams: typeof teams }
+  >();
+  for (const team of teams) {
+    const bucket =
+      teamsByOrg.get(team.orgId) ??
+      { orgName: team.orgName, teams: [] as typeof teams };
+    bucket.teams.push(team);
+    teamsByOrg.set(team.orgId, bucket);
+  }
+  const orgs = Array.from(teamsByOrg.entries()).map(([orgId, value]) => ({
+    orgId,
+    orgName: value.orgName,
+    teams: value.teams,
+  }));
+  const multipleOrgs = orgs.length > 1;
+
   return (
     <Menu.Root open={open} onOpenChange={({ open }) => setOpen(open)}>
       <Menu.Trigger asChild>
@@ -208,9 +234,12 @@ export const WorkspaceSwitcher = React.memo(function WorkspaceSwitcher({
                 />
               </Group>
 
-              {teams.length > 0 && (
-                <Group title="Teams & projects">
-                  {teams.map((team) => {
+              {orgs.map((org) => (
+                <Group
+                  key={org.orgId}
+                  title={multipleOrgs ? org.orgName : "Teams & projects"}
+                >
+                  {org.teams.map((team) => {
                     const teamProjects = projectsByTeam.get(team.teamId) ?? [];
                     return (
                       <Box key={team.teamId}>
@@ -241,7 +270,7 @@ export const WorkspaceSwitcher = React.memo(function WorkspaceSwitcher({
                     );
                   })}
                 </Group>
-              )}
+              ))}
 
               {orphanProjects.length > 0 && (
                 <Group title="Projects">
