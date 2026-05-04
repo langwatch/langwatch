@@ -234,6 +234,8 @@ describe("<SuiteFormDrawer/>", () => {
   });
 
   describe("given the drawer is open in create mode", () => {
+    /** @scenario 'Form drawer title reads "New Run Plan" for creation' */
+    /** @scenario 'Form placeholder uses "Run Plan" terminology' */
     it("displays the 'New Run Plan' title", () => {
       render(<SuiteFormDrawer />, { wrapper: Wrapper });
 
@@ -386,6 +388,7 @@ describe("<SuiteFormDrawer/>", () => {
         expect(descInput.value).toBe("Runs every deploy");
       });
 
+      /** @scenario 'Form drawer title reads "Edit Run Plan" for editing' */
       it("displays the Edit Run Plan title", () => {
         mocks.mockGetByIdData = makeSuiteConfig();
 

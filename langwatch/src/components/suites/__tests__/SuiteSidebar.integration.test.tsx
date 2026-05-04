@@ -60,6 +60,7 @@ describe("<SuiteSidebar/>", () => {
   });
 
   describe("given no suites exist", () => {
+    /** @scenario "Empty state when no run plans exist" */
     it("displays empty state message", () => {
       render(<SuiteSidebar {...defaultProps} suites={[]} />, {
         wrapper: Wrapper,
@@ -204,6 +205,7 @@ describe("<SuiteSidebar/>", () => {
     });
 
     describe("when search matches no suites", () => {
+      /** @scenario "Empty state when search has no matches" */
       it("displays no matching suites message", async () => {
         const user = userEvent.setup();
 
