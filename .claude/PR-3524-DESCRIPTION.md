@@ -789,7 +789,7 @@ Critical path: D1 → D2 → D5 → D8. **Phase 6 status: D1–D8 ✅ — 100% c
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 | **Persona-1** (org-less developer) | ✅ `dev/cli-handoff/{01-device-flow-landing,02-device-flow-approval}.png` | ✅ `portal-hero-populated` | n/a | ✅ `tile-claude-expanded` | ✅ `tile-anthropic-{form,issued}` | ✅ `tile-copilot-studio` | n/a | n/a | n/a | n/a | n/a | n/a | ✅ `portal-empty` | TBD |
 | **Persona-2** (LLMOps majority — chrome unchanged) | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a |
-| **Persona-3** (member of governed org) | TBD | ✅ `dev/portal/01-tiles.png` + `dev/me-home/01-fullpage.png` | ✅ `dev/sessions/{01-empty,02-populated,03-revoke-confirm}.png` | ✅ `tile-claude-expanded` | ✅ `tile-anthropic-{form,issued}` | ✅ `tile-copilot-studio` | n/a (admin gated) | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
+| **Persona-3** (member of governed org) | TBD | ✅ `dev/portal/01-tiles.png` + `dev/me-home/{01-fullpage,02-workspace-switcher,03-avatar-dropdown}.png` | ✅ `dev/sessions/{01-empty,02-populated,03-revoke-confirm}.png` | ✅ `tile-claude-expanded` | ✅ `tile-anthropic-{form,issued}` | ✅ `tile-copilot-studio` | n/a (admin gated) | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
 | **Persona-4** (governance ADMIN) | ✅ `admin/setup-checklist/01-overview.png` | ✅ `portal-hero-populated` | ✅ `admin/sessions-policy/01-policy-section.png` | ✅ `admin-add-tile-drawer` | ✅ `admin-scope-picker` | ✅ `admin-catalog-overview` | ✅ `admin-catalog-overview` | ✅ `admin/anomaly-rules/{01-rules-list,02-new-rule-drawer}.png` | ✅ `admin/ingestion/{01-list-empty,02-composer-puller-copilot-studio,03-composer-puller-schedule}.png` + legacy `enterprise-ingestion-sources` | ✅ `admin/routing-policies/01-list.png` | ✅ `admin/governance/01-overview-toplevel.png` | ✅ `admin/no-spy/01-mode-picker.png` | ✅ `non-enterprise-tool-catalog-ungated` | TBD |
 | **Persona-5** (non-enterprise org viewing gated surfaces) | n/a | ✅ `portal-hero-populated` (works for everyone) | n/a | n/a | n/a | n/a | n/a (admin-only) | ✅ `non-enterprise-anomaly-rules` (upsell) | ✅ `admin/ingestion/00-license-gate-non-enterprise.png` (current; supersedes legacy `non-enterprise-ingestion-sources`) | ✅ tool-catalog Apache-2.0 floor | TBD | TBD | n/a | n/a |
 
@@ -801,6 +801,7 @@ The persona × flow grid above is governance-centric. Gateway-flow captures (Vir
 |---|---|
 | Virtual Keys list | ✅ `admin/virtual-keys/01-list.png` |
 | Virtual Key detail | ✅ `admin/virtual-keys/02-detail.png` |
+| Virtual Key create drawer | ✅ `admin/virtual-keys/03-create-drawer.png` (provider fallback chain + inline validation) |
 | Budgets list | ✅ `admin/budgets/01-list.png` |
 | Budget detail | ✅ `admin/budgets/02-detail.png` |
 | Providers list | ✅ `admin/providers/01-list.png` |
