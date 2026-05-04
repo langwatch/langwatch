@@ -70,10 +70,16 @@ Canonical end-to-end evidence that the trace-processing pipeline correctly fans 
 > - Three-way merge auto-resolved cleanly with **zero manual conflicts**. Three overlap files: `.gitignore` (main added MCP env-var leak defense lines, no overlap); `MainMenu.tsx` (main renamed beta tooltip 'Traces v2' → 'Trace Explorer', no overlap); `gatewayBudgetSync.reactor.{integration,unit}.test.ts` (main-wide PascalCase normalization `lastEventOccurredAt` → `LastEventOccurredAt`; auto-merge picked main's name, verified consistent across all 7 other reactor unit tests + foldProjection definition).
 > - Push: fast-forward from `59aef6bcc` → `2dc1fc0d4` (no force needed). Review-fix commits all preserved + visible in `git log`.
 >
-> **CI status** (as of `2dc1fc0d4` 2026-05-04):
-> - **CodeQL Analyze**: ⏳ pending (orchestrator monitoring) — last remaining gate before branch-protection clears.
-> - **CodeRabbit `evaluate`**: failed with HTTP 406 `PullRequest.diff too_large` — GitHub's 300-file diff cap. **Automation limit, NOT a product/code failure** — CodeRabbit cannot fetch the full diff for a PR exceeding the cap; reviewers should not read this red as a real CI failure.
+> **CI status** (as of `e55bbcb79` 2026-05-04 — orchestrator-corrected post-rebase snapshot):
+> - **`docs-ci`**: ❌ `check_links` failed; `docs-complete` failed.
+> - **`sdk-javascript-ci`**: ❌ `ci` + `e2e` failed; `sdk-javascript-complete` failed.
+> - **`es-migration-e2e`**: ❌ `Seed ES → Run Migration → Validate CH` failed; `es-migration-e2e-complete` failed.
+> - **`langwatch-app-ci`**: ❌ `feature-parity` failed.
+> - **CodeRabbit `evaluate`**: ❌ failed with HTTP 406 `PullRequest.diff too_large` — GitHub's 300-file diff cap. **Automation limit, NOT a product/code failure** — CodeRabbit cannot fetch the full diff for a PR exceeding the cap; reviewers should not read this red as a real CI failure.
+> - **CodeQL Analyze**: 🟡 JS/TS in progress; Go/Python ✅ passed.
 > - **Branch-protection-reviews**: ⏳ pending rchaves's final review.
+>
+> Orchestrator pulling logs to route concrete root causes for the 4 failing CI groups (`docs-ci` / `sdk-javascript-ci` / `es-migration-e2e` / `langwatch-app-ci feature-parity`). Each failure will be triaged + assigned to a lane; fixes fold into this section as SHAs land.
 >
 > **Side-effects observed during dogfood** (transparency notes, not blockers):
 > - **ClickHouse schema drift caught + fixed**: `trace_summaries.RootSpanType` + `ContainsAi` columns missing in dev-stack despite goose marking migration 0020 applied. Manual `ALTER TABLE` patched it locally; full `DROP DATABASE` + re-run via newly-installed goose binary in app container resolved cleanly. Pre-existing dev-stack inconsistency, **not introduced by this PR**.
