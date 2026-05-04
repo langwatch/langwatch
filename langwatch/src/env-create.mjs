@@ -94,6 +94,7 @@ export function createEnvConfig() {
       EMAIL_DEFAULT_FROM: z.string().optional(),
       S3_KEY_SALT: z.string().optional(),
       IS_SAAS: z.boolean().optional(),
+      LANGWATCH_DEV_FORCE_ENTERPRISE: z.boolean().optional(),
       SHOW_OPS_IN_MAIN_SIDEBAR: z.string().optional(),
       USE_S3_STORAGE: z.boolean().optional(),
       S3_ENDPOINT: z.string().optional(),
@@ -234,6 +235,9 @@ export function createEnvConfig() {
       IS_SAAS:
         process.env.IS_SAAS === "1" ||
         process.env.IS_SAAS?.toLowerCase() === "true",
+      LANGWATCH_DEV_FORCE_ENTERPRISE:
+        process.env.LANGWATCH_DEV_FORCE_ENTERPRISE === "1" ||
+        process.env.LANGWATCH_DEV_FORCE_ENTERPRISE?.toLowerCase() === "true",
       SHOW_OPS_IN_MAIN_SIDEBAR: process.env.SHOW_OPS_IN_MAIN_SIDEBAR,
       USE_S3_STORAGE:
         process.env.USE_S3_STORAGE === "1" ||
