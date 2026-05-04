@@ -1,4 +1,5 @@
 import { Avatar, Box, type AvatarRootProps } from "@chakra-ui/react";
+import { useState } from "react";
 import { Tooltip } from "~/components/ui/tooltip";
 import type { PresenceSession } from "~/server/app-layer/presence/types";
 import {
@@ -20,6 +21,11 @@ export function PresenceAvatar({
 }: PresenceAvatarProps) {
   const displayName = presenceDisplayName(session);
   const color = presenceSessionColor(session);
+  // Auth0 / OAuth profile images can 404 or be blocked by CORS; without an
+  // explicit error handler Chakra's Avatar.Image falls back to the browser's
+  // broken-image glyph instead of the initials fallback.
+  const [imageBroken, setImageBroken] = useState(false);
+  const showImage = !!session.user.image && !imageBroken;
 
   const avatar = (
     <Avatar.Root
@@ -30,7 +36,12 @@ export function PresenceAvatar({
       borderColor="bg.surface"
       {...rootProps}
     >
-      {session.user.image ? <Avatar.Image src={session.user.image} /> : null}
+      {showImage ? (
+        <Avatar.Image
+          src={session.user.image!}
+          onError={() => setImageBroken(true)}
+        />
+      ) : null}
       <Avatar.Fallback name={displayName} />
     </Avatar.Root>
   );

@@ -265,6 +265,10 @@ const ResultsPane: React.FC = React.memo(() => {
           right={4}
           width="320px"
           pointerEvents="none"
+          // Sit above the table's row hover overlays (IOPreview, etc.) so the
+          // progress toast doesn't get painted under in-row text while a long
+          // export is running.
+          zIndex="overlay"
         >
           <Box pointerEvents="auto">
             <ExportProgress

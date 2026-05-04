@@ -59,6 +59,7 @@ export const SearchBar: React.FC = () => {
   const parseError = useFilterStore((s) => s.parseError);
   const applyQueryText = useFilterStore((s) => s.applyQueryText);
   const clearAll = useFilterStore((s) => s.clearAll);
+  const lastAiTranslation = useFilterStore((s) => s.lastAiTranslation);
   const showCrossFacetWarning = useFilterStore((s) => hasCrossFacetOR(s.ast));
 
   // Errors win over warnings — a query that doesn't parse already produces
@@ -162,6 +163,19 @@ export const SearchBar: React.FC = () => {
             key="ai-bar"
             rect={floatRect}
             onClose={() => setAiMode(false)}
+            // If the URL query is still exactly what the last AI run
+            // produced (same project, no facet/free-text edits since),
+            // re-show the natural-language prompt — the user likely
+            // wants to refine *what they asked*, not edit the generated
+            // syntax. Otherwise fall back to the current query so a
+            // mid-typed expression isn't wiped on AI-mode entry.
+            initialPrompt={
+              lastAiTranslation &&
+              lastAiTranslation.projectId === project?.id &&
+              lastAiTranslation.query === queryText
+                ? lastAiTranslation.prompt
+                : queryText
+            }
           />
         )}
       </AnimatePresence>

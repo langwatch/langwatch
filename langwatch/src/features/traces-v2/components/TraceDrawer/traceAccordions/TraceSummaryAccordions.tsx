@@ -7,6 +7,7 @@ import type {
 } from "~/server/api/routers/tracesV2.schemas";
 import { useTraceEvaluations } from "../../../hooks/useTraceEvaluations";
 import { useTraceResources } from "../../../hooks/useTraceResources";
+import { useTraceUserEvents } from "../../../hooks/useTraceUserEvents";
 import { AttributeTable } from "../AttributeTable";
 import { EvalsList } from "../evalCards";
 import { IOViewer } from "../IOViewer";
@@ -27,7 +28,16 @@ export function TraceSummaryAccordions({
 }) {
   const hasIO = !!(trace.input || trace.output);
   const traceAttributes = trace.attributes ?? {};
-  const traceEvents = trace.events ?? [];
+  // Span-level OTel events come on the header; user-events (track API)
+  // arrive via a separate query — merge once both are loaded so the
+  // Events accordion shows everything attached to the trace, regardless
+  // of source.
+  const spanEvents = trace.events ?? [];
+  const { data: userEvents = [] } = useTraceUserEvents(trace.traceId);
+  const traceEvents = useMemo(
+    () => [...spanEvents, ...userEvents],
+    [spanEvents, userEvents],
+  );
   const resources = useTraceResources(trace.traceId);
   const hasResourceAttributes =
     Object.keys(resources.resourceAttributes).length > 0;
@@ -288,7 +298,7 @@ export function TraceSummaryAccordions({
                         )}
                         ms
                       </Text>
-                      {onSelectSpan && (
+                      {onSelectSpan && evt.spanId && (
                         <Button
                           size="xs"
                           variant="ghost"

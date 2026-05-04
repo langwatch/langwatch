@@ -56,13 +56,33 @@ export function useFilterSidebarData() {
     [facetStateLookup],
   );
 
+  // While the discover request is in flight (no descriptors back yet),
+  // synthesise categorical sections from FACET_DEFAULTS so the sidebar
+  // renders immediately with the well-known facets (origin, status,
+  // spanType, …) instead of a blank skeleton. Rows are flagged
+  // `synthetic` so FacetRow hides the missing count + value bar; the
+  // affordance is fully clickable so a user can apply a filter before
+  // discover completes. Once real descriptors arrive `partitionDescriptors`
+  // takes over and the synthetic rows merge into the real data.
+  const effectiveDescriptors = useMemo(() => {
+    if (!facetsLoading || (descriptors && descriptors.length > 0)) {
+      return { items: descriptors ?? [], synthetic: false };
+    }
+    return { items: synthesizeDefaultDescriptors(), synthetic: true };
+  }, [descriptors, facetsLoading]);
+
   const {
     categoricals,
     ranges,
     traceAttributeKeys,
     spanAttributeKeys,
     eventAttributeKeys,
-  } = useMemo(() => partitionDescriptors(descriptors), [descriptors]);
+  } = useMemo(
+    () => partitionDescriptors(effectiveDescriptors.items),
+    [effectiveDescriptors.items],
+  );
+
+  const isSynthetic = effectiveDescriptors.synthetic;
 
   const attributeSections = useMemo<AttributesSectionData[]>(() => {
     const sections: AttributesSectionData[] = [];
@@ -99,10 +119,10 @@ export function useFilterSidebarData() {
   const facetItems = useMemo(() => {
     const map = new Map<string, FacetItem[]>();
     for (const cat of categoricals) {
-      map.set(cat.key, buildFacetItems(cat));
+      map.set(cat.key, buildFacetItems(cat, isSynthetic));
     }
     return map;
-  }, [categoricals]);
+  }, [categoricals, isSynthetic]);
 
   const getValueStates = useMemo(() => {
     const map = new Map<string, (value: string) => FacetValueState>();
@@ -267,7 +287,32 @@ function partitionDescriptors(
   };
 }
 
-function buildFacetItems(cat: CategoricalSection): FacetItem[] {
+/**
+ * Build a synthetic descriptor list from FACET_DEFAULTS — used to render
+ * the sidebar before discover responds, so users see the well-known
+ * facets immediately instead of a blank skeleton. Each value carries
+ * count=0; `partitionDescriptors` keeps these because their key matches
+ * a FACET_DEFAULTS entry.
+ */
+type Descriptors = NonNullable<ReturnType<typeof useTraceFacets>["data"]>;
+function synthesizeDefaultDescriptors(): Descriptors {
+  const out: Descriptors[number][] = [];
+  for (const [key, values] of Object.entries(FACET_DEFAULTS)) {
+    out.push({
+      kind: "categorical",
+      key,
+      label: key,
+      group: undefined,
+      topValues: values.map((value) => ({ value, count: 0 })),
+    } as Descriptors[number]);
+  }
+  return out;
+}
+
+function buildFacetItems(
+  cat: CategoricalSection,
+  synthetic: boolean,
+): FacetItem[] {
   const curatedColors = FACET_COLORS[cat.key];
   const dimmed = !VIBRANT_FIELDS.has(cat.key);
   const counts = new Map(cat.topValues.map((v) => [v.value, v.count]));
@@ -287,6 +332,7 @@ function buildFacetItems(cat: CategoricalSection): FacetItem[] {
     count: counts.get(value) ?? 0,
     dotColor: dotColorFor(value),
     dimmed,
+    synthetic,
   }));
 }
 

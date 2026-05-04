@@ -171,25 +171,35 @@ export async function generateTraceAction(
 
   let lastError = "Unknown error";
   let lastQuery = "";
+  let providerErrored = false;
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     let parsedAction: z.infer<typeof aiActionSchema>;
     try {
       const { object } = await generateObject({
         model,
+        // `mode: "json"` forces response_format=json_object across providers
+        // (incl. LiteLLM proxies). OpenAI's API rejects this mode unless the
+        // word "json" appears in the messages — the system prompt already
+        // includes "JSON output rules" below to satisfy that constraint.
+        mode: "json",
+        schemaName: "TraceAction",
+        schemaDescription:
+          "Either an apply_query (filter the current view) or a create_lens (create a saved view) action with a trace query language string.",
+        schema: aiActionSchema,
         system:
           attempt === 1
             ? systemPrompt
             : `${systemPrompt}\n\nThe previous attempt produced query "${lastQuery}" which failed to parse: ${lastError}\nReturn a valid query this time.`,
-        schema: aiActionSchema,
         prompt: input.prompt,
         maxRetries: 1,
       });
       parsedAction = object;
     } catch (e) {
+      providerErrored = true;
       lastError = e instanceof Error ? e.message : "Unknown generation error.";
-      logger.info(
-        { projectId: input.projectId, attempt, lastError },
-        "AI action generation failed, retrying",
+      logger.error(
+        { projectId: input.projectId, attempt, lastError, err: e },
+        "AI action generation failed",
       );
       continue;
     }
@@ -213,11 +223,21 @@ export async function generateTraceAction(
     );
   }
 
-  return { ok: false, error: lastError };
+  // Don't leak provider/SDK errors to the UI — those carry stack-y messages
+  // like "litellm.BadRequestError: OpenAIException - …" that aren't actionable
+  // for the user. Distinguish "model errored" from "model returned an
+  // unparseable query" so the message can be tailored without losing context.
+  return {
+    ok: false,
+    error: providerErrored
+      ? "AI couldn't generate a query right now. Try again, or rephrase."
+      : "AI's reply didn't match the trace query syntax. Try rephrasing.",
+  };
 }
 
 function buildActionSystemPrompt(fieldsBlock: string): string {
-  return `You translate natural-language descriptions into a trace-view action.
+  return `You translate natural-language descriptions into a trace-view action,
+and reply as a JSON object matching the TraceAction schema.
 
 There are two action kinds you can return:
 
@@ -239,9 +259,10 @@ ${QUERY_SYNTAX_DOC}
 
 ${fieldsBlock}
 
-## Output rules
+## JSON output rules
 
-- Use uppercase AND, OR, NOT.
+- The response must be a JSON object matching the TraceAction schema.
+- Use uppercase AND, OR, NOT inside the query string.
 - Only use fields listed above.
 - For value-side OR, group with parens, e.g. status:(error OR warning).
 - For wildcards, use *.

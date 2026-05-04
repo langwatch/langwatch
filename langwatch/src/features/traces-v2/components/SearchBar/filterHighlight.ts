@@ -38,8 +38,18 @@ const OPERATOR_SHAPED_WORD_REGEX = /\b([A-Z]{2,5})\b/g;
 // Tolerant fallback for queries that don't yet parse (mid-typing, unmatched
 // quotes, trailing operator). Decorates anything shaped like `field:value`
 // so users still get visual feedback while editing.
+//
+// Value alternatives (in match-precedence order):
+//   - "..."             quoted literal
+//   - [...]             bracketed range, e.g. duration:[100 TO 1000]
+//   - (>=|<=|>|<)NUM    comparison range, e.g. duration:>1000 / cost:<=5
+//   - ...               bare token (catch-all for everything else)
+//
+// The comparison-range alternative was missing originally — without it,
+// typing `duration:>1000` left the token unhighlighted, so users saw the
+// numeric facet "stop working" mid-edit.
 const FILTER_TOKEN_REGEX =
-  /(?<prefix>NOT\s+|-)?(?<field>[a-zA-Z][a-zA-Z0-9_.]*):(?:"[^"]*"|\[[^\]]*\]|[^\s()]+)/g;
+  /(?<prefix>NOT\s+|-)?(?<field>[a-zA-Z][a-zA-Z0-9_.]*):(?:"[^"]*"|\[[^\]]*\]|(?:>=|<=|>|<)[^\s()]+|[^\s()]+)/g;
 
 export interface DecorationSlot {
   from: number;

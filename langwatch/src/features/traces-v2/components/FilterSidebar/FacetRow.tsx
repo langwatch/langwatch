@@ -27,8 +27,11 @@ export const FacetRow = memo(function FacetRow({
 }) {
   const { typeTag, text } = parseTypedLabel(item.label);
 
+  // Synthetic rows have no real count yet — render with zero fill so they
+  // don't look like "0 matches" while we're still waiting on the real
+  // descriptors. Once real data lands the row gets a count + bar.
   const fillPct =
-    maxCount > 0
+    !item.synthetic && maxCount > 0
       ? Math.max(
           (item.count / maxCount) * 100,
           item.count > 0 ? MIN_VISIBLE_FILL_PCT : 0,
@@ -141,16 +144,18 @@ export const FacetRow = memo(function FacetRow({
         >
           {text}
         </Text>
-        <Text
-          textStyle="xs"
-          color="fg.subtle"
-          fontFamily="mono"
-          mr={2}
-          fontWeight={isActive ? "600" : "400"}
-          flexShrink={0}
-        >
-          {formatCount(item.count)}
-        </Text>
+        {!item.synthetic && (
+          <Text
+            textStyle="xs"
+            color="fg.subtle"
+            fontFamily="mono"
+            mr={2}
+            fontWeight={isActive ? "600" : "400"}
+            flexShrink={0}
+          >
+            {formatCount(item.count)}
+          </Text>
+        )}
       </HStack>
     </RowButton>
   );

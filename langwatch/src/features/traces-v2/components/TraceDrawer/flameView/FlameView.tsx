@@ -1045,8 +1045,12 @@ export const FlameView = memo(function FlameView({
         )}
       </Box>
 
-      {/* Minimap (always-on while there's a duration) */}
-      {fullDur > 0 && (
+      {/* Minimap — only surfaced once the user has zoomed in. At full
+          extent it's a duplicate of what they're already looking at and
+          eats vertical space; hiding it by default reclaims that space
+          for the flame itself. The Reset-zoom action snaps the viewport
+          back to full range, which hides this band again. */}
+      {fullDur > 0 && isZoomed && (
         <Minimap
           allNodes={tree.all}
           maxDepth={tree.maxDepth}

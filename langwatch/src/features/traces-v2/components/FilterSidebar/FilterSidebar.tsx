@@ -175,15 +175,16 @@ export const FilterSidebar: React.FC = () => {
     ],
   );
 
-  const showSkeleton = facetsLoading && descriptors.length === 0;
+  // The hook now synthesises FACET_DEFAULTS rows while discover is in
+  // flight, so `descriptors.length === 0 && facetsLoading` no longer
+  // happens — `categoricals` is always populated. We keep `showSkeleton`
+  // wired through but it'll only fire in genuinely degenerate states
+  // (empty FACET_DEFAULTS, etc.) so as not to silently regress to a
+  // blank rail if the synthesis is ever short-circuited.
+  const showSkeleton =
+    facetsLoading && descriptors.length === 0 && categoricals.length === 0;
 
   if (collapsed) {
-    // Mirror the expanded-sidebar skeleton policy on the collapsed
-    // rail: until the first facet payload lands the rail used to
-    // render as an empty 40px column, which read as a layout glitch
-    // rather than "filters are loading." Showing circular icon
-    // placeholders matches the live rail's silhouette so the swap
-    // when data arrives feels like a fade-in, not a pop-in.
     if (showSkeleton) return <CollapsedSidebarSkeleton />;
     return (
       <CollapsedSidebar

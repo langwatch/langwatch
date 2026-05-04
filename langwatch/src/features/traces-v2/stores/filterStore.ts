@@ -42,6 +42,25 @@ interface FilterState {
   /** Debounced version of timeRange to drive network requests */
   debouncedTimeRange: TimeRange;
 
+  /**
+   * The most recent successful Ask AI translation: the natural-language
+   * prompt the user typed and the query the model produced. Read by the
+   * search bar so re-entering AI mode after an AI translation re-shows
+   * the user's original prompt rather than the generated query (which
+   * would be the URL state). Cleared the moment any other code path
+   * mutates the query — facet toggle, free-text edit, lens switch — so
+   * we never re-show a stale prompt against an unrelated query.
+   *
+   * `projectId` scoping protects against showing one project's prompt
+   * after the user switches workspaces (the store is module-level and
+   * persists across project changes).
+   */
+  lastAiTranslation: {
+    projectId: string;
+    prompt: string;
+    query: string;
+  } | null;
+
   /** Apply a query string from the search bar (parses → AST) */
   applyQueryText: (text: string) => void;
   /** Set query text and AST together */
@@ -73,6 +92,15 @@ interface FilterState {
   clearAll: () => void;
   /** Update the debounced values (usually called by a global timer/effect) */
   commitDebounced: () => void;
+
+  /** Record the last AI prompt + result so the next AI mode entry can
+   * surface the original natural-language prompt instead of the produced
+   * query string. */
+  recordAiTranslation: (translation: {
+    projectId: string;
+    prompt: string;
+    query: string;
+  }) => void;
 }
 
 const EMPTY_AST: LiqeQuery = {
@@ -141,6 +169,9 @@ export const useFilterStore = create<FilterState>((set, get) => ({
   pageSize: 50,
   debouncedQueryText: "",
   debouncedTimeRange: INITIAL_TIME_RANGE,
+  lastAiTranslation: null,
+
+  recordAiTranslation: (translation) => set({ lastAiTranslation: translation }),
 
   applyQueryText: (text) =>
     set((state) => {
