@@ -262,9 +262,9 @@ function BudgetDetailPage() {
                       </EmptyState.Indicator>
                       <EmptyState.Title>No debits yet</EmptyState.Title>
                       <EmptyState.Description>
-                        Debits land here once the gateway writes the outbox
-                        ledger after a completed request against a VK in this
-                        scope.
+                        Debits land here once the trace-fold reactor projects a
+                        completed request against a VK in this scope onto the
+                        ClickHouse budget ledger.
                       </EmptyState.Description>
                     </EmptyState.Content>
                   </EmptyState.Root>
@@ -318,8 +318,8 @@ function BudgetDetailPage() {
                   </Table.Root>
                 )}
                 <Text fontSize="xs" color="fg.muted" mt={1}>
-                  Most recent 20 debits. Full history lives on the outbox
-                  ledger — query via Usage for aggregates.
+                  Most recent 20 debits. Full history lives on the ClickHouse
+                  budget ledger — query via Usage for aggregates.
                 </Text>
               </Section>
             </VStack>

@@ -162,9 +162,10 @@ function GatewayUsagePage() {
                 </EmptyState.Indicator>
                 <EmptyState.Title>No usage in this window</EmptyState.Title>
                 <EmptyState.Description>
-                  Spend shows up here once the gateway debits budgets after a
-                  completed request. Try sending a few requests against a
-                  virtual key, then come back in a couple of minutes.
+                  Spend shows up here once the trace-fold reactor has projected
+                  the first completed request onto the budget ledger. Try
+                  sending a few requests against a virtual key, then come back
+                  in a couple of minutes.
                 </EmptyState.Description>
               </EmptyState.Content>
             </EmptyState.Root>
