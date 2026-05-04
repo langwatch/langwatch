@@ -253,21 +253,31 @@ const HoverHighlightStyle: React.FC<{
   );
 };
 
+const TOOLTIP_WIDTH = 240;
 const ConnectorTooltip: React.FC<{
   group: OrGroup;
   pos: { x: number; y: number };
 }> = ({ group, pos }) => {
   const palette = orGroupColor(group.id);
-  // Anchor to the left of the line so the tooltip body sits over the
-  // sidebar (where there's space) rather than off the right edge.
-  const top = Math.min(window.innerHeight - 80, pos.y + 12);
-  const left = Math.max(8, pos.x - 240);
+  // Anchor just to the right of the cursor — the connector line lives
+  // on the sidebar's right edge so there's always space in the
+  // adjacent results pane. Clamp against the viewport edges so a
+  // bottom-near-edge hover doesn't push the body offscreen.
+  const top = Math.min(
+    window.innerHeight - 80,
+    Math.max(8, pos.y + 8),
+  );
+  const left = Math.min(
+    window.innerWidth - TOOLTIP_WIDTH - 8,
+    pos.x + 12,
+  );
   return (
     <Box
       position="fixed"
       top={`${top}px`}
       left={`${left}px`}
-      maxWidth="240px"
+      width={`${TOOLTIP_WIDTH}px`}
+      maxWidth={`${TOOLTIP_WIDTH}px`}
       bg="bg.panel"
       borderWidth="1px"
       borderColor={`${palette}.muted`}
