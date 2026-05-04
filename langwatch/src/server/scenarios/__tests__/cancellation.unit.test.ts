@@ -126,7 +126,6 @@ describe("ScenarioCancellationService", () => {
         result = await service.cancelJob(defaultJobParams);
       });
 
-      /** @scenario "Fold projection sets CancellationRequestedAt without changing Status" */
       it("dispatches cancel_requested event", () => {
         expect(mockDispatchCancelRequested).toHaveBeenCalledWith(
           expect.objectContaining({
@@ -136,7 +135,6 @@ describe("ScenarioCancellationService", () => {
         );
       });
 
-      /** @scenario "Cancel request is idempotent" */
       it("does not dispatch finished (worker handles it after killing child)", () => {
         expect(mockDispatchFinishRun).not.toHaveBeenCalled();
       });

@@ -3,9 +3,9 @@ Feature: Unified run table merging queued jobs and completed runs
   I want queued, running, and completed scenarios to appear in the same run table
   So that I can track execution progress without a separate pending banner
 
-  # Parity status: 5 of 12 scenarios bound to existing tests.
+  # Parity status: 4 of 12 scenarios bound to existing tests.
   # Remaining @unimplemented scenarios (#3458):
-  #   7 NO_TEST: shipped behavior, no integration test yet
+  #   8 NO_TEST: shipped behavior, no integration test yet
   # NO_TEST gaps:
   #   - "Queued jobs appear in the run table immediately after suite run"
   #   - "Row status progresses from queued to running to completed"

@@ -3,12 +3,14 @@ Feature: Cancel queued and running suite jobs
   I want to cancel queued or in-progress suite jobs
   So that I can stop work I no longer need without waiting for it to finish
 
-  # Parity status: 12 of 14 scenarios bound to existing tests.
+  # Parity status: 10 of 14 scenarios bound to existing tests.
   # Remaining scenarios (#3458):
-  #   2 NO_TEST: shipped behavior, no integration test yet
+  #   4 NO_TEST: shipped behavior, no integration test yet
   # NO_TEST gaps:
   #   - "Cancellation reaches a worker on a different pod"
   #   - "Batch cancel across multiple workers terminates all active runs"
+  #   - "Fold projection sets CancellationRequestedAt without changing Status"
+  #   - "Cancel request is idempotent"
 
   Background:
     Cancellation is implemented via event-sourcing. When the user requests
@@ -27,14 +29,14 @@ Feature: Cancel queued and running suite jobs
     Then a "lw.simulation_run.cancel_requested" event is stored in the event log
     And the event contains the scenarioRunId
 
-  @unit
+  @unit @unimplemented
   Scenario: Fold projection sets CancellationRequestedAt without changing Status
     Given a simulation run has Status "IN_PROGRESS"
     When a cancel_requested event is applied to the fold projection
     Then the state has CancellationRequestedAt set to the event timestamp
     And the Status remains "IN_PROGRESS"
 
-  @unit
+  @unit @unimplemented
   Scenario: Cancel request is idempotent
     Given a simulation run already has CancellationRequestedAt set
     When a second cancel_requested event is applied

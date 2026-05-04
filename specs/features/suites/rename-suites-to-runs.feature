@@ -3,9 +3,9 @@ Feature: Rename Suites to Run Plans and Simulation Runs to Run History in UI
   I want the UI to use "Run Plans" instead of "Suites" and "Run History" instead of "Runs"
   So that the terminology is clearer and avoids naming collisions
 
-  # Parity status: 8 of 16 scenarios bound to existing tests.
+  # Parity status: 9 of 20 scenarios bound to existing tests.
   # Remaining @unimplemented scenarios (#3458):
-  #   8 NO_TEST: shipped behavior, no integration test yet
+  #   11 NO_TEST: shipped behavior, no integration test yet
   # NO_TEST gaps:
   #   - "Sidebar displays \"Run Plans\" instead of \"Suites\""
   #   - "Sidebar displays \"Run History\" instead of \"Runs\""
