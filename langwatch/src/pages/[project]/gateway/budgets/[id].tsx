@@ -21,6 +21,7 @@ import { DashboardLayout } from "~/components/DashboardLayout";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { BudgetEditDrawer } from "~/components/gateway/BudgetEditDrawer";
 import { ConfirmDialog } from "~/components/gateway/ConfirmDialog";
+import { formatBudgetUsd } from "~/components/gateway/formatBudgetUsd";
 import { GatewayLayout } from "~/components/gateway/GatewayLayout";
 import { Link } from "~/components/ui/link";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
@@ -154,9 +155,9 @@ function BudgetDetailPage() {
                 <VStack align="stretch" gap={2}>
                   <HStack>
                     <Text fontWeight="medium" fontSize="2xl">
-                      ${spent.toFixed(2)}
+                      {formatBudgetUsd(spent)}
                     </Text>
-                    <Text color="fg.muted">/ ${limit.toFixed(2)}</Text>
+                    <Text color="fg.muted">/ {formatBudgetUsd(limit)}</Text>
                     <Spacer />
                     <Badge
                       colorPalette={
@@ -452,11 +453,11 @@ function StatusBadge({
   return <Badge colorPalette={palette}>{status.toLowerCase()}</Badge>;
 }
 
-// Human-readable dollar amount for a single ledger debit. The stored
-// value is a fixed-precision Decimal with 6 decimal places; most per-
-// request costs fall in the $0.0001–$1 range, where 6 decimals is
-// noisier than useful in a list. Keep full precision under a cent,
-// drop to 4 above.
+// Per-row ledger debit formatter. Same precision tiers as
+// formatBudgetUsd but with one extra digit at $1+ (.0001 vs .00) so
+// per-request line items surface micro-cents even when summed totals
+// would round. Reuses the shared trim-trailing-zeros logic for a
+// consistent look across the budget surfaces.
 function formatAmount(raw: string | number): string {
   const n = typeof raw === "number" ? raw : Number(raw);
   if (!Number.isFinite(n)) return "—";

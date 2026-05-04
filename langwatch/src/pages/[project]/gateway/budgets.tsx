@@ -21,6 +21,7 @@ import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { BudgetCreateDrawer } from "~/components/gateway/BudgetCreateDrawer";
 import { BudgetEditDrawer } from "~/components/gateway/BudgetEditDrawer";
 import { ConfirmDialog } from "~/components/gateway/ConfirmDialog";
+import { formatBudgetUsd } from "~/components/gateway/formatBudgetUsd";
 import { GatewayErrorPanel } from "~/components/gateway/GatewayErrorPanel";
 import { GatewayLayout } from "~/components/gateway/GatewayLayout";
 import { Link } from "~/components/ui/link";
@@ -213,9 +214,9 @@ function BudgetsPage() {
                         <VStack align="stretch" gap={1}>
                           <HStack fontSize="xs">
                             <Text fontWeight="medium">
-                              ${spent.toFixed(2)}
+                              {formatBudgetUsd(spent)}
                             </Text>
-                            <Text color="fg.muted">/ ${limit.toFixed(2)}</Text>
+                            <Text color="fg.muted">/ {formatBudgetUsd(limit)}</Text>
                             <Spacer />
                             <Badge
                               variant="outline"
