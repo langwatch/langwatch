@@ -46,6 +46,7 @@ import { api, type RouterOutputs } from "~/utils/api";
 type Source = RouterOutputs["ingestionSources"]["list"][number];
 type SourceHealth = RouterOutputs["activityMonitor"]["ingestionSourcesHealth"][number];
 type SpendByUser = RouterOutputs["activityMonitor"]["spendByUser"][number];
+type SpendByTeam = RouterOutputs["activityMonitor"]["spendByTeam"][number];
 
 const fmtUsd = (n: number) =>
   n === 0 ? "$0.00" : numeral(n).format("$0,0.00");
@@ -92,6 +93,10 @@ function GovernanceOverviewPage() {
     { organizationId: orgId, windowDays: 30, limit: 50 },
     { enabled: !!orgId, refetchOnWindowFocus: false },
   );
+  const teamsQuery = api.activityMonitor.spendByTeam.useQuery(
+    { organizationId: orgId, windowDays: 30, limit: 50 },
+    { enabled: !!orgId, refetchOnWindowFocus: false },
+  );
   const healthQuery = api.activityMonitor.ingestionSourcesHealth.useQuery(
     { organizationId: orgId },
     { enabled: !!orgId, refetchOnWindowFocus: false },
@@ -112,6 +117,7 @@ function GovernanceOverviewPage() {
   const policies = policiesQuery.data ?? [];
   const summary = summaryQuery.data;
   const users = usersQuery.data ?? [];
+  const teams = teamsQuery.data ?? [];
   const sourceHealth = healthQuery.data ?? [];
   const anomalies = anomaliesQuery.data ?? [];
 
@@ -282,6 +288,24 @@ function GovernanceOverviewPage() {
         <SessionPolicySection organizationId={orgId} />
 
         <ContentModeSection organizationId={orgId} />
+
+        <SectionCard
+          title="By team"
+          subline="Spend and activity rolled up per team, last 30 days. Sources without a team land under 'Org-wide'."
+        >
+          {teams.length === 0 ? (
+            <Text color="fg.muted" fontSize="sm">
+              No team activity this window.
+            </Text>
+          ) : (
+            <VStack align="stretch" gap={0}>
+              <TeamRowHeader />
+              {teams.map((t) => (
+                <TeamRow key={t.teamId ?? "org-wide"} team={t} />
+              ))}
+            </VStack>
+          )}
+        </SectionCard>
 
         <SectionCard
           title="By user"
@@ -762,6 +786,71 @@ function UserRowHeader() {
       <Box flex={2}>Last active</Box>
       <Box flex={2}>Trend</Box>
       <Box flex={2}>Most-used</Box>
+    </HStack>
+  );
+}
+
+function TeamRowHeader() {
+  return (
+    <HStack
+      paddingY={2}
+      paddingX={3}
+      borderBottomWidth="1px"
+      borderColor="border.muted"
+      fontSize="xs"
+      fontWeight="semibold"
+      color="fg.muted"
+      textTransform="uppercase"
+      letterSpacing="wider"
+    >
+      <Box flex={3}>Team</Box>
+      <Box flex={2}>Spend</Box>
+      <Box flex={2}>Requests</Box>
+      <Box flex={2}>Last active</Box>
+      <Box flex={2}>Trend</Box>
+      <Box flex={2}>Sources</Box>
+    </HStack>
+  );
+}
+
+function TeamRow({ team }: { team: SpendByTeam }) {
+  const trendArrow =
+    team.deltaPctVsPriorWindow > 0
+      ? "↑"
+      : team.deltaPctVsPriorWindow < 0
+        ? "↓"
+        : "·";
+  const trendColor =
+    team.deltaPctVsPriorWindow > 25
+      ? "orange.500"
+      : team.deltaPctVsPriorWindow < -25
+        ? "blue.500"
+        : "fg.muted";
+  const isOrgWide = !team.teamId;
+  return (
+    <HStack
+      paddingY={2}
+      paddingX={3}
+      borderBottomWidth="1px"
+      borderColor="border.muted"
+      fontSize="sm"
+    >
+      <Box flex={3}>
+        <Text fontWeight="medium" color={isOrgWide ? "fg.muted" : "fg"}>
+          {team.teamName}
+        </Text>
+      </Box>
+      <Box flex={2}>{fmtUsd(team.spendUsd)}</Box>
+      <Box flex={2}>{numeral(team.requestCount).format("0,0")}</Box>
+      <Box flex={2} color="fg.muted">
+        {fmtRelative(team.lastActivityIso)}
+      </Box>
+      <Box flex={2} color={trendColor}>
+        {trendArrow} {Math.abs(team.deltaPctVsPriorWindow)}%
+      </Box>
+      <Box flex={2} color="fg.muted">
+        {team.sourceCount} {team.sourceCount === 1 ? "source" : "sources"}
+      </Box>
     </HStack>
   );
 }
