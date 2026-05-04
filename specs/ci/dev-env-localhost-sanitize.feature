@@ -33,19 +33,19 @@ Feature: Dev launchers strip stale localhost-pinned NEXTAUTH_URL / BASE_HOST
 
   @unit
   Scenario: sanitize leaves https boxd-proxy NEXTAUTH_URL untouched
-    Given NEXTAUTH_URL=https://langwatch-fork.boxd.sh
+    Given APP_PORT=5562 and NEXTAUTH_URL=https://langwatch-fork.boxd.sh
     When sanitize_localhost_dev_env runs
     Then NEXTAUTH_URL is unchanged
 
   @unit
   Scenario: sanitize leaves a 127.0.0.1 NEXTAUTH_URL untouched
-    Given NEXTAUTH_URL=http://127.0.0.1:5560
+    Given APP_PORT=5562 and NEXTAUTH_URL=http://127.0.0.1:5560
     When sanitize_localhost_dev_env runs
     Then NEXTAUTH_URL is unchanged
 
   @unit
   Scenario: sanitize leaves a non-localhost http override untouched
-    Given NEXTAUTH_URL=http://abc123.ngrok.io
+    Given APP_PORT=5562 and NEXTAUTH_URL=http://abc123.ngrok.io
     When sanitize_localhost_dev_env runs
     Then NEXTAUTH_URL is unchanged
 
