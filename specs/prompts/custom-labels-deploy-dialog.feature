@@ -3,6 +3,17 @@ Feature: Custom labels in Deploy dialog
   I want to add custom tags (beyond production/staging) in the Deploy dialog
   So that I can manage environment-specific prompt versions for my team's workflow
 
+  # All 8 remaining @unimplemented scenarios are KEEP/UPDATE per AUDIT_MANIFEST.md:
+  # DeployPromptDialog rendering (built-in/custom rows, delete buttons, empty state,
+  # add/remove flows, duplicate-name rejection) is fully covered by
+  # DeployPromptDialog.integration.test.tsx. Validation (lowercase, no-digits,
+  # protected-tag rejection) is covered by prompt-tag.service.unit.test.ts.
+  # Remaining scenarios assert deeper integration: cascade-to-assignments on delete,
+  # reassignment overwrite, custom-vs-built-in fetch resolution, undefined-tag rejection,
+  # and getTagsForConfig mixed listing. Aspirational pending KEEP-class integration
+  # tests + UPDATE wording fixes around "production"/"staging" as built-ins (only
+  # "latest" is in PROTECTED_TAGS now). Tracked in PR #3458.
+
   Background:
     Given I am logged into project "my-project"
     And a prompt "pizza-prompt" with versions v1, v2, v3
