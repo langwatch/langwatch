@@ -293,7 +293,7 @@ describe("matchesEvaluationFilters", () => {
       errorDetails: null,
       createdAt: Date.now(),
       updatedAt: Date.now(),
-      lastEventOccurredAt: Date.now(),
+      LastEventOccurredAt: Date.now(),
       archivedAt: null,
       scheduledAt: null,
       startedAt: null,
@@ -643,7 +643,7 @@ describe("buildPreconditionTraceDataFromFoldState", () => {
       occurredAt: Date.now(),
       createdAt: Date.now(),
       updatedAt: Date.now(),
-      lastEventOccurredAt: Date.now(),
+      LastEventOccurredAt: Date.now(),
     } as TraceSummaryData;
 
     const result = buildPreconditionTraceDataFromFoldState(foldState);
@@ -699,7 +699,7 @@ describe("buildPreconditionTraceDataFromFoldState", () => {
       occurredAt: Date.now(),
       createdAt: Date.now(),
       updatedAt: Date.now(),
-      lastEventOccurredAt: Date.now(),
+      LastEventOccurredAt: Date.now(),
     } as TraceSummaryData;
 
     const result = buildPreconditionTraceDataFromFoldState(foldState);
@@ -756,7 +756,7 @@ describe("buildPreconditionTraceDataFromFoldState", () => {
       occurredAt: Date.now(),
       createdAt: Date.now(),
       updatedAt: Date.now(),
-      lastEventOccurredAt: Date.now(),
+      LastEventOccurredAt: Date.now(),
     } as TraceSummaryData;
 
     const result = buildPreconditionTraceDataFromFoldState(foldState);
@@ -811,7 +811,7 @@ describe("buildPreconditionTraceDataFromFoldState", () => {
       occurredAt: Date.now(),
       createdAt: Date.now(),
       updatedAt: Date.now(),
-      lastEventOccurredAt: Date.now(),
+      LastEventOccurredAt: Date.now(),
     } as TraceSummaryData;
 
     const result = buildPreconditionTraceDataFromFoldState(foldState);
@@ -868,7 +868,7 @@ describe("buildPreconditionTraceDataFromFoldState", () => {
       occurredAt: Date.now(),
       createdAt: Date.now(),
       updatedAt: Date.now(),
-      lastEventOccurredAt: Date.now(),
+      LastEventOccurredAt: Date.now(),
     } as TraceSummaryData;
 
     const result = buildPreconditionTraceDataFromFoldState(foldState);
@@ -942,7 +942,7 @@ describe("buildPreconditionTraceDataFromFoldState", () => {
       occurredAt: Date.now(),
       createdAt: Date.now(),
       updatedAt: Date.now(),
-      lastEventOccurredAt: Date.now(),
+      LastEventOccurredAt: Date.now(),
     } as TraceSummaryData;
 
     const result = buildPreconditionTraceDataFromFoldState(foldState);

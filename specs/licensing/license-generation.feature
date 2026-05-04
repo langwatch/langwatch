@@ -44,31 +44,6 @@ Feature: License Generation
       | planType         | Plan type is required            |
 
   @integration @unimplemented
-  Scenario: Display validation error for invalid email format
-    Given I navigate to the license generation section
-    When I fill in the email "invalid-email"
-    And I click "Generate License"
-    Then I see a validation error "Invalid email format" for the email field
-
-  @integration @unimplemented
-  Scenario: Display validation error for past expiration date
-    Given I navigate to the license generation section
-    When I fill in all required fields
-    And I set the expiration date to "2020-01-01"
-    And I click "Generate License"
-    Then I see a validation error "Expiration date must be in the future"
-
-  @integration @unimplemented
-  Scenario: Display validation error for negative plan limits
-    Given I navigate to the license generation section
-    When I fill in the organization name "Test Org"
-    And I fill in the email "test@test.com"
-    And I select the plan type "PRO"
-    And I set maxMembers to "-5"
-    And I click "Generate License"
-    Then I see a validation error "Plan limits must be positive numbers"
-
-  @integration @unimplemented
   Scenario: Generate license with preset plan template
     Given I navigate to the license generation section
     And I fill in the organization name "Enterprise Corp"
@@ -113,12 +88,6 @@ Feature: License Generation
     And the filename uses the .langwatch-license extension
 
   @integration @unimplemented
-  Scenario: License file contains valid license key content
-    Given I have successfully generated a license
-    Then the downloaded file contains a valid base64-encoded license key
-    And the file content can be used to activate a license
-
-  @integration @unimplemented
   Scenario: Generate another license after successful generation
     Given I have successfully generated a license
     When I click "Generate Another"
@@ -126,36 +95,4 @@ Feature: License Generation
     And I can enter new license details
 
   # API-level validation
-  @unit @unimplemented
-  Scenario: Validate license data schema
-    Given valid license input data
-    When the schema validation runs
-    Then all required fields are validated:
-      | Field            | Type   | Required |
-      | organizationName | string | yes      |
-      | email            | string | yes      |
-      | expiresAt        | date   | yes      |
-      | plan.type        | string | yes      |
-      | plan.name        | string | yes      |
-      | plan.maxMembers  | number | yes      |
-      | plan.maxProjects | number | yes      |
 
-  @unit @unimplemented
-  Scenario: Generate unique license ID
-    Given I generate two licenses with the same input
-    When I compare the license IDs
-    Then each license has a unique licenseId
-
-  @unit @unimplemented
-  Scenario: Sign license with RSA-SHA256
-    Given valid license data
-    When the license is signed
-    Then the signature is a valid RSA-SHA256 signature
-    And the signed license can be verified with the public key
-
-  @unit @unimplemented
-  Scenario: Encode signed license as base64
-    Given a signed license
-    When the license is encoded
-    Then the output is a valid base64 string
-    And decoding produces valid JSON with data and signature fields

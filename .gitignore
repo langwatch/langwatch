@@ -4,6 +4,12 @@
 traceDir
 node_modules
 
+# Defense against MCP env-var leaks: external tooling can mkdir a literal
+# directory like "${HOME/...}" relative to cwd when bash-style env defaults
+# aren't expanded. Never let those slip into the repo again.
+${HOME*
+${VAR*
+
 llm-model-costs.json
 quickwit-*
 

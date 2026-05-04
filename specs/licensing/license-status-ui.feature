@@ -96,14 +96,6 @@ Feature: License Status UI Component
   # ============================================================================
 
   @unimplemented
-  Scenario: Shows loading state during upload
-    Given the organization has no license
-    And I enter a license key in the textarea
-    When I click "Activate License"
-    Then the button shows a loading spinner
-    And the button is disabled
-
-  @unimplemented
   Scenario: Shows success toast on successful activation
     Given the organization has no license
     And I enter a valid license key

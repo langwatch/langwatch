@@ -21,30 +21,7 @@ Feature: LiteLLM Model ID Translation
 
   # Unit Tests: Translation Function
 
-  @unit @unimplemented
-  Scenario: Translates Anthropic Claude Opus 4.5 model ID
-    Given a model ID "anthropic/claude-opus-4.5"
-    When calling translateModelIdForLitellm
-    Then the result should be "anthropic/claude-opus-4-5"
-
-  @unit @unimplemented
-  Scenario: Translates Anthropic Claude Sonnet 4.5 model ID
-    Given a model ID "anthropic/claude-sonnet-4.5"
-    When calling translateModelIdForLitellm
-    Then the result should be "anthropic/claude-sonnet-4-5"
-
-  @unit @unimplemented
-  Scenario: Translates Anthropic Claude 3.5 Haiku model ID with alias expansion
-    Given a model ID "anthropic/claude-3.5-haiku"
-    When calling translateModelIdForLitellm
-    Then the result should be "anthropic/claude-3-5-haiku-20241022"
     # LiteLLM requires the full dated version for Claude 3.5 Haiku
-
-  @unit @unimplemented
-  Scenario: Translates Anthropic Claude 3.7 Sonnet model ID
-    Given a model ID "anthropic/claude-3.7-sonnet"
-    When calling translateModelIdForLitellm
-    Then the result should be "anthropic/claude-3-7-sonnet"
 
   @unit @unimplemented
   Scenario: Translates Anthropic Claude 3.5 Sonnet model ID
@@ -52,56 +29,20 @@ Feature: LiteLLM Model ID Translation
     When calling translateModelIdForLitellm
     Then the result should be "anthropic/claude-3-5-sonnet"
 
-  @unit @unimplemented
-  Scenario: Preserves OpenAI model IDs unchanged
-    Given a model ID "openai/gpt-5"
-    When calling translateModelIdForLitellm
-    Then the result should be "openai/gpt-5"
-
-  @unit @unimplemented
-  Scenario: Preserves Gemini model IDs unchanged
-    Given a model ID "gemini/gemini-2.5-pro"
-    When calling translateModelIdForLitellm
-    Then the result should be "gemini/gemini-2.5-pro"
     # Gemini uses dashes natively, no conversion needed
 
-  @unit @unimplemented
-  Scenario: Preserves Anthropic models without dots unchanged
-    Given a model ID "anthropic/claude-3-opus"
-    When calling translateModelIdForLitellm
-    Then the result should be "anthropic/claude-3-opus"
     # Models already using dashes pass through unchanged
 
-  @unit @unimplemented
-  Scenario: Handles model ID with multiple dots
-    Given a model ID "anthropic/claude-opus-4.5.1"
-    When calling translateModelIdForLitellm
-    Then the result should be "anthropic/claude-opus-4-5-1"
     # All dots in version numbers are converted
 
-  @unit @unimplemented
-  Scenario: Preserves custom provider prefix
-    Given a model ID "custom/claude-opus-4.5"
-    When calling translateModelIdForLitellm
-    Then the result should be "custom/claude-opus-4-5"
     # Translation applies regardless of prefix
 
   # Unit Tests: Model Alias Mapping
   # Some models require alias expansion to their full dated versions
   # Example: "anthropic/claude-sonnet-4" → "anthropic/claude-sonnet-4-20250514"
 
-  @unit @unimplemented
-  Scenario: Translates claude-sonnet-4 alias to full dated version
-    Given a model ID "anthropic/claude-sonnet-4"
-    When calling translateModelIdForLitellm
-    Then the result should be "anthropic/claude-sonnet-4-20250514"
     # LiteLLM requires the full dated version for Claude 4 models
 
-  @unit @unimplemented
-  Scenario: Translates claude-opus-4 alias to full dated version
-    Given a model ID "anthropic/claude-opus-4"
-    When calling translateModelIdForLitellm
-    Then the result should be "anthropic/claude-opus-4-20250514"
     # LiteLLM requires the full dated version for Claude 4 models
 
   # Unit Tests: Boundary Integration

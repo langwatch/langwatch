@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Badge,
   Box,
@@ -17,11 +17,15 @@ import type { GroupInfo } from "~/server/app-layer/ops/types";
 import { toaster } from "~/components/ui/toaster";
 import { ConfirmDialog } from "~/components/ops/shared/ConfirmDialog";
 import { formatTimeAgo } from "~/components/ops/shared/formatters";
+import { VirtualizedTableRows } from "~/components/ops/shared/VirtualizedTableRows";
 import { useOpsPermission } from "~/hooks/useOpsPermission";
 import { api } from "~/utils/api";
 import { isOverdue, matchesStatusFilter } from "./pipelineUtils";
 import { GroupDetailDialog } from "./GroupDetailDialog";
 import type { StatusFilter } from "./types";
+
+const GROUPS_VIEWPORT_HEIGHT = 480;
+const GROUPS_ROW_HEIGHT = 36;
 
 export function GroupsCard({ queueNames }: { queueNames: string[] }) {
   const { hasAccess } = useOpsPermission();
@@ -29,6 +33,7 @@ export function GroupsCard({ queueNames }: { queueNames: string[] }) {
 
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [search, setSearch] = useState("");
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   // Use the first queue name for the groups query (most setups have a single queue)
   const primaryQueue = queueNames[0];
@@ -69,6 +74,14 @@ export function GroupsCard({ queueNames }: { queueNames: string[] }) {
     }
     return { all: allGroups.length, ok, blocked, stale, active };
   }, [allGroups]);
+
+  // Filter changes shrink the visible row count without re-mounting the
+  // scroll container, so the virtualizer's total height drops while
+  // scrollTop holds its old value — leaving blank space below the rows
+  // until the user scrolls. Snap back to the top on every filter change.
+  useEffect(() => {
+    if (scrollContainerRef.current) scrollContainerRef.current.scrollTop = 0;
+  }, [statusFilter, search]);
 
   const isLoading = !!primaryQueue && groupsQuery.isLoading;
 
@@ -134,88 +147,96 @@ export function GroupsCard({ queueNames }: { queueNames: string[] }) {
               <Text textStyle="xs" color="fg.muted">No groups match current filters.</Text>
             </Box>
           ) : (
-            <>
-              <Table.ScrollArea>
-                <Table.Root size="sm" variant="line" css={{ "& tr:last-child td": { borderBottom: "none" } }}>
-                  <Table.Header>
-                    <Table.Row>
-                      <Table.ColumnHeader>Group ID</Table.ColumnHeader>
-                      <Table.ColumnHeader width="140px">Pipeline</Table.ColumnHeader>
-                      <Table.ColumnHeader textAlign="end" width="50px">Pend.</Table.ColumnHeader>
-                      <Table.ColumnHeader textAlign="end" width="45px">Retry</Table.ColumnHeader>
-                      <Table.ColumnHeader width="75px">Oldest</Table.ColumnHeader>
-                      <Table.ColumnHeader width="65px">Status</Table.ColumnHeader>
-                      {hasAccess && <Table.ColumnHeader width="100px">Actions</Table.ColumnHeader>}
-                    </Table.Row>
-                  </Table.Header>
-                  <Table.Body>
-                    {filteredGroups.slice(0, 100).map((group) => {
+            <Box
+              ref={scrollContainerRef}
+              maxHeight={`${GROUPS_VIEWPORT_HEIGHT}px`}
+              overflowY="auto"
+            >
+              <Table.Root size="sm" variant="line" css={{ "& tr:last-child td": { borderBottom: "none" } }}>
+                <Table.Header position="sticky" top={0} zIndex={1} bg="bg">
+                  <Table.Row>
+                    <Table.ColumnHeader>Group ID</Table.ColumnHeader>
+                    <Table.ColumnHeader width="140px">Pipeline</Table.ColumnHeader>
+                    <Table.ColumnHeader textAlign="end" width="50px">Pend.</Table.ColumnHeader>
+                    <Table.ColumnHeader textAlign="end" width="45px">Retry</Table.ColumnHeader>
+                    <Table.ColumnHeader width="75px">Oldest</Table.ColumnHeader>
+                    <Table.ColumnHeader width="65px">Status</Table.ColumnHeader>
+                    {hasAccess && <Table.ColumnHeader width="100px">Actions</Table.ColumnHeader>}
+                  </Table.Row>
+                </Table.Header>
+                <Table.Body>
+                  <VirtualizedTableRows
+                    count={filteredGroups.length}
+                    rowHeight={GROUPS_ROW_HEIGHT}
+                    columnCount={hasAccess ? 7 : 6}
+                    scrollContainerRef={scrollContainerRef}
+                    getItemKey={(i) => {
+                      const g = filteredGroups[i]!;
+                      return `${g.queueName}:${g.groupId}`;
+                    }}
+                    renderRow={(i) => {
+                      const group = filteredGroups[i]!;
                       const overdue = !group.isBlocked && isOverdue(group.oldestJobMs);
                       return (
-                      <Table.Row
-                        key={`${group.queueName}:${group.groupId}`}
-                        cursor="pointer"
-                        _hover={{ bg: "bg.subtle" }}
-                        onClick={() => setSelectedGroup({ queueName: group.queueName, groupId: group.groupId })}
-                      >
-                        <Table.Cell>
-                          <Text textStyle="xs" fontFamily="mono" truncate title={group.groupId}>{group.groupId}</Text>
-                        </Table.Cell>
-                        <Table.Cell>
-                          <Text textStyle="xs" color="fg.muted" truncate>{group.pipelineName ?? "\u2014"}</Text>
-                        </Table.Cell>
-                        <Table.Cell textAlign="end">
-                          <Text textStyle="xs" fontFamily="mono">{group.pendingJobs}</Text>
-                        </Table.Cell>
-                        <Table.Cell textAlign="end">
-                          {(group.retryCount ?? 0) > 0 ? (
-                            <Text textStyle="xs" fontFamily="mono" color="orange.500">{group.retryCount}</Text>
-                          ) : (
-                            <Text textStyle="xs" fontFamily="mono" color="fg.muted">{"\u2014"}</Text>
-                          )}
-                        </Table.Cell>
-                        <Table.Cell>
-                          <Text textStyle="xs" color={overdue ? "orange.500" : "fg.muted"} fontWeight={overdue ? "medium" : undefined}>
-                            {formatTimeAgo(group.oldestJobMs)}{overdue ? " ⚠" : ""}
-                          </Text>
-                        </Table.Cell>
-                        <Table.Cell>
-                          {group.isStaleBlock ? (
-                            <Badge size="xs" colorPalette="orange" variant="subtle">Stale</Badge>
-                          ) : group.isBlocked ? (
-                            <Badge size="xs" colorPalette="red" variant="subtle">Blocked</Badge>
-                          ) : group.hasActiveJob ? (
-                            <Badge size="xs" colorPalette="green" variant="subtle">Active</Badge>
-                          ) : (
-                            <Badge size="xs" colorPalette="gray" variant="subtle">OK</Badge>
-                          )}
-                        </Table.Cell>
-                        {hasAccess && (
-                          <Table.Cell onClick={(e) => e.stopPropagation()}>
-                            <HStack gap={1}>
-                              {group.isBlocked && (
-                                <Button variant="outline" size="2xs" colorPalette="green" onClick={() => unblockMutation.mutate({ queueName: group.queueName, groupId: group.groupId })} loading={unblockMutation.isPending}>
-                                  Retry
-                                </Button>
-                              )}
-                              <Button variant="outline" size="2xs" colorPalette="red" onClick={() => setDrainTarget({ queueName: group.queueName, groupId: group.groupId })}>
-                                Drain
-                              </Button>
-                            </HStack>
+                        <Table.Row
+                          key={`${group.queueName}:${group.groupId}`}
+                          cursor="pointer"
+                          _hover={{ bg: "bg.subtle" }}
+                          onClick={() => setSelectedGroup({ queueName: group.queueName, groupId: group.groupId })}
+                        >
+                          <Table.Cell>
+                            <Text textStyle="xs" fontFamily="mono" truncate title={group.groupId}>{group.groupId}</Text>
                           </Table.Cell>
-                        )}
-                      </Table.Row>
+                          <Table.Cell>
+                            <Text textStyle="xs" color="fg.muted" truncate>{group.pipelineName ?? "—"}</Text>
+                          </Table.Cell>
+                          <Table.Cell textAlign="end">
+                            <Text textStyle="xs" fontFamily="mono">{group.pendingJobs}</Text>
+                          </Table.Cell>
+                          <Table.Cell textAlign="end">
+                            {(group.retryCount ?? 0) > 0 ? (
+                              <Text textStyle="xs" fontFamily="mono" color="orange.500">{group.retryCount}</Text>
+                            ) : (
+                              <Text textStyle="xs" fontFamily="mono" color="fg.muted">{"—"}</Text>
+                            )}
+                          </Table.Cell>
+                          <Table.Cell>
+                            <Text textStyle="xs" color={overdue ? "orange.500" : "fg.muted"} fontWeight={overdue ? "medium" : undefined}>
+                              {formatTimeAgo(group.oldestJobMs)}{overdue ? " ⚠" : ""}
+                            </Text>
+                          </Table.Cell>
+                          <Table.Cell>
+                            {group.isStaleBlock ? (
+                              <Badge size="xs" colorPalette="orange" variant="subtle">Stale</Badge>
+                            ) : group.isBlocked ? (
+                              <Badge size="xs" colorPalette="red" variant="subtle">Blocked</Badge>
+                            ) : group.hasActiveJob ? (
+                              <Badge size="xs" colorPalette="green" variant="subtle">Active</Badge>
+                            ) : (
+                              <Badge size="xs" colorPalette="gray" variant="subtle">OK</Badge>
+                            )}
+                          </Table.Cell>
+                          {hasAccess && (
+                            <Table.Cell onClick={(e) => e.stopPropagation()}>
+                              <HStack gap={1}>
+                                {group.isBlocked && (
+                                  <Button variant="outline" size="2xs" colorPalette="green" onClick={() => unblockMutation.mutate({ queueName: group.queueName, groupId: group.groupId })} loading={unblockMutation.isPending}>
+                                    Retry
+                                  </Button>
+                                )}
+                                <Button variant="outline" size="2xs" colorPalette="red" onClick={() => setDrainTarget({ queueName: group.queueName, groupId: group.groupId })}>
+                                  Drain
+                                </Button>
+                              </HStack>
+                            </Table.Cell>
+                          )}
+                        </Table.Row>
                       );
-                    })}
-                  </Table.Body>
-                </Table.Root>
-              </Table.ScrollArea>
-              {filteredGroups.length > 100 && (
-                <Box padding={3} borderTop="1px solid" borderTopColor="border">
-                  <Text textStyle="xs" color="fg.muted" textAlign="center">Showing 100 of {filteredGroups.length}</Text>
-                </Box>
-              )}
-            </>
+                    }}
+                  />
+                </Table.Body>
+              </Table.Root>
+            </Box>
           )}
         </Card.Body>
       </Card.Root>

@@ -1,4 +1,3 @@
-import mermaid from "mermaid";
 import {
   type Dispatch,
   type RefObject,
@@ -7,6 +6,13 @@ import {
   useState,
 } from "react";
 import { EASTER_EGG_IMAGE_URL } from "./useKonamiEasterEgg";
+
+// Mermaid is loaded via a true `await import()` inside the effect so it
+// stays in its own chunk. A top-level `import mermaid from "mermaid"`
+// collapses mermaid into whatever chunk the parent module ends up in,
+// which in turn rewires mermaid's internal dynamic diagram loaders and
+// breaks its `__name` helper at top-level evaluation. Keeping the import
+// dynamic preserves the chunk boundary mermaid expects.
 
 const MINIMAP_W = 200;
 const MINIMAP_H = 72;
@@ -79,6 +85,8 @@ export function useMermaidRenderer({
 
     void (async () => {
       try {
+        const mermaid = (await import("mermaid")).default;
+        if (cancelled) return;
         mermaid.initialize({
           startOnLoad: false,
           theme: colorMode === "dark" ? "dark" : "default",

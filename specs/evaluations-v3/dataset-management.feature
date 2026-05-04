@@ -33,29 +33,8 @@ Feature: Dataset management in evaluations workbench
     And the "Other Dataset" tab has no dropdown arrow
 
   # ============================================================================
-  # Switching datasets
-  # ============================================================================
-
-  @unimplemented
-  Scenario: Switch datasets by clicking inactive tab
-    Given I have datasets "Test Data" and "Production Samples" in the workbench
-    And "Test Data" is the active dataset
-    When I click on the "Production Samples" tab
-    Then "Production Samples" becomes the active dataset
-    And the table displays columns from "Production Samples"
-    And the table displays data from "Production Samples"
-
-  # ============================================================================
   # Add dataset menu
   # ============================================================================
-
-  @unimplemented
-  Scenario: Add dataset menu shows options in correct order
-    When I click the "+" button in the dataset header
-    Then I see "Select existing dataset" option first
-    And I see "Upload CSV" option second
-    And I see "Create new" option third
-
   @unimplemented
   Scenario: Select existing dataset opens drawer
     When I click the "+" button in the dataset header
@@ -63,13 +42,6 @@ Feature: Dataset management in evaluations workbench
     Then a drawer opens with title "Choose Dataset"
     And I see a search input to filter datasets
     And I see a list of datasets with entry count, column count, and last edit date
-
-  @unimplemented
-  Scenario: Search datasets in drawer
-    Given the "Choose Dataset" drawer is open
-    And there are datasets "thread_test2", "Draft Evaluation (245)" in the project
-    When I type "thread" in the search input
-    Then only "thread_test2" is shown in the list
 
   @unimplemented
   Scenario: Add existing dataset to workbench
@@ -88,44 +60,14 @@ Feature: Dataset management in evaluations workbench
     And after uploading, the dataset is saved to the database
     And the saved dataset is added to the workbench
 
-  @unimplemented
-  Scenario: Create new dataset copies first dataset columns
-    Given "Test Data" has columns "input", "expected_output", "context"
-    When I click the "+" button in the dataset header
-    And I select "Create new" from the dropdown
-    Then a new "Dataset 2" tab appears
-    And the new dataset has columns "input", "expected_output", "context"
-    And the new dataset becomes active
-
   # ============================================================================
   # Active dataset dropdown menu
   # ============================================================================
-
-  @unimplemented
-  Scenario: Active tab dropdown shows save option for inline
-    Given "Test Data" is an inline dataset and is active
-    When I click on the active "Test Data" tab dropdown
-    Then I see "Save as dataset" option
-    And I do NOT see "Switch to dataset" option
-
-  @unimplemented
-  Scenario: Active tab dropdown shows remove when multiple datasets
-    Given I have datasets "Test Data" and "Other Dataset" in the workbench
-    And "Test Data" is the active dataset
-    When I click on the active "Test Data" tab dropdown
-    Then I see "Remove from workbench" option
-
   @unimplemented
   Scenario: Active tab dropdown hides remove for single dataset
     Given I only have "Test Data" in the workbench
     When I click on the active "Test Data" tab dropdown
     Then I do NOT see "Remove from workbench" option
-
-  @unimplemented
-  Scenario: Saved dataset dropdown has no save option
-    Given "Production Samples" is a saved dataset and is active
-    When I click on the active "Production Samples" tab dropdown
-    Then I do NOT see "Save as dataset" option
 
   # ============================================================================
   # Save as dataset
@@ -146,20 +88,6 @@ Feature: Dataset management in evaluations workbench
     When the save completes successfully
     Then the "Test Data" tab is replaced with a reference to the saved dataset
     And the tab shows a blue database icon indicating saved type
-
-  # ============================================================================
-  # Remove dataset
-  # ============================================================================
-
-  @unimplemented
-  Scenario: Remove dataset from workbench
-    Given I have datasets "Test Data" and "Production Samples" in the workbench
-    And "Production Samples" is active
-    When I click on the active "Production Samples" tab dropdown
-    And I select "Remove from workbench"
-    Then "Production Samples" is removed from the tabs
-    And "Test Data" becomes the active dataset
-    And mappings pointing to "Production Samples" are cleaned up
 
   # ============================================================================
   # Edit dataset

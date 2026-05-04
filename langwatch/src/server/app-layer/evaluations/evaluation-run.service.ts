@@ -1,5 +1,8 @@
 import { EvaluationNotFoundError } from "./errors";
-import type { EvaluationRunRepository } from "./repositories/evaluation-run.repository";
+import type {
+  EvaluationRunRepository,
+  GetByEvaluationIdParams,
+} from "./repositories/evaluation-run.repository";
 import type { EvalSummary, EvaluationRunData } from "./types";
 
 export class EvaluationRunService {
@@ -10,11 +13,10 @@ export class EvaluationRunService {
   }
 
   async getByEvaluationId(
-    tenantId: string,
-    evaluationId: string,
+    params: GetByEvaluationIdParams,
   ): Promise<EvaluationRunData> {
-    const result = await this.repository.getByEvaluationId(tenantId, evaluationId);
-    if (!result) throw new EvaluationNotFoundError(evaluationId);
+    const result = await this.repository.getByEvaluationId(params);
+    if (!result) throw new EvaluationNotFoundError(params.evaluationId);
     return result;
   }
 

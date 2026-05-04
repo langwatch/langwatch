@@ -10,28 +10,9 @@ Feature: Event-driven scenario execution
   # 1. QUEUED status lifecycle
   # ============================================================================
 
-  @unit @unimplemented
-  Scenario: QUEUED runs can be cancelled
-    Given a scenario run is in QUEUED status
-    When the system checks whether the run is cancellable
-    Then the run is eligible for cancellation
-
-  @unit @unimplemented
-  Scenario: Terminal statuses remain non-cancellable
-    Given a scenario run is in SUCCESS status
-    When the system checks whether the run is cancellable
-    Then the run is not eligible for cancellation
-
   # ============================================================================
   # 2. Ad-hoc and suite runs dispatch queueRun command
   # ============================================================================
-
-  @integration @unimplemented
-  Scenario: Ad-hoc run dispatches queueRun command
-    Given a user triggers an ad-hoc scenario run from the UI
-    When the simulation runner processes the request
-    Then a queueRun command is dispatched with the scenario metadata
-    And the QUEUED state is written to ClickHouse
 
   @integration @unimplemented
   Scenario: Suite run dispatches queueRun for each scenario
@@ -60,27 +41,6 @@ Feature: Event-driven scenario execution
   # 4. Execution pool manages concurrency
   # ============================================================================
 
-  @unit @unimplemented
-  Scenario: Pool starts child process when capacity is available
-    Given the execution pool has concurrency 3
-    And 2 scenarios are currently running
-    When a new job is submitted to the pool
-    Then the pool spawns a child process immediately
-
-  @unit @unimplemented
-  Scenario: Pool buffers jobs when at capacity
-    Given the execution pool has concurrency 3
-    And 3 scenarios are currently running
-    When a new job is submitted to the pool
-    Then the job is added to the pending queue
-    And no child process is spawned yet
-
-  @unit @unimplemented
-  Scenario: Pool dequeues pending jobs when a slot opens
-    Given the execution pool is at capacity with 1 pending job
-    When a running child process exits
-    Then the pending job is dequeued and spawned immediately
-
   # ============================================================================
   # 5. Distribution across worker pods
   # ============================================================================
@@ -92,9 +52,3 @@ Feature: Event-driven scenario execution
     Then queued events are distributed across the 6 workers
     And each worker's execution reactor fires for its assigned scenarios
 
-  @integration @unimplemented
-  Scenario: Each worker respects its local concurrency limit
-    Given a worker pod has concurrency 3
-    And 10 queued events are assigned to this worker
-    Then at most 3 child processes run concurrently
-    And the remaining 7 are buffered in the pending queue

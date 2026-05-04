@@ -74,7 +74,7 @@ function makeTraceSummary(overrides: Partial<TraceSummaryData> = {}): TraceSumma
     scenarioRoleLatencies: { Agent: 4000 },
     scenarioRoleSpans: {},
     spanCosts: {},
-    lastEventOccurredAt: 0,
+    LastEventOccurredAt: 0,
     occurredAt: 1000,
     createdAt: 1000,
     updatedAt: 2000,

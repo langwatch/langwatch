@@ -8,13 +8,6 @@ Feature: License to PlanInfo Mapping
   # Basic Mapping
   # ============================================================================
 
-  @unimplemented
-  Scenario: Maps license plan data to PlanInfo structure
-    Given a license with plan type "PRO" and name "Pro"
-    When I map the license to PlanInfo
-    Then the PlanInfo type is "PRO"
-    And the PlanInfo name is "Pro"
-
   Scenario: Maps all numeric limits correctly
     Given a license with:
       | maxMembers          | 5      |

@@ -80,22 +80,6 @@ Feature: Default Provider Settings
     And a tooltip explains this is the only enabled provider
 
   @integration @unimplemented
-  Scenario: Show "Default Model" badge when default model belongs to provider
-    Given I have "openai" provider enabled
-    And the project's default model is "openai/gpt-4o"
-    When I navigate to the Model Providers settings page
-    Then I see the "openai" provider in the list
-    And the "openai" provider row shows a "Default Model" badge
-
-  @integration @unimplemented
-  Scenario: Hide "Default Model" badge when default model does not belong to provider
-    Given I have "openai" provider enabled
-    And the project's default model is "anthropic/claude-sonnet-4"
-    When I navigate to the Model Providers settings page
-    Then I see the "openai" provider in the list
-    And the "openai" provider row does not show a "Default Model" badge
-
-  @integration @unimplemented
   Scenario: Include custom models in model selector options
     Given I have "openai" provider configured with custom model "gpt-5-custom"
     When I open the model provider configuration drawer for "openai"

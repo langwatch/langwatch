@@ -1,7 +1,7 @@
 import { useVirtualizer, type Virtualizer } from "@tanstack/react-virtual";
 import { useCallback } from "react";
 import { useDensityStore } from "../../stores/densityStore";
-import { useTraceTableScrollRef } from "./scrollContext";
+import { useTraceTableScrollElement } from "./scrollContext";
 
 /** Px estimate per row before measureElement runs. */
 const ESTIMATE_PER_DENSITY: Record<"compact" | "comfortable", number> = {
@@ -26,18 +26,23 @@ interface VirtualizerResult {
 /**
  * Shared virtualizer for the trace lens bodies. Each "item" is one row's
  * outer <tbody>; spacers are emitted by the lens body.
+ *
+ * Subscribes to the scroll-element store rather than reading a RefObject so
+ * the virtualizer re-renders when the element attaches; otherwise the first
+ * `getScrollElement()` call returns `null` and the virtualizer never
+ * recovers, leaving the table body empty on initial load.
  */
 export function useTraceTableVirtualizer({
   count,
   addonCount,
 }: VirtualizerArgs): VirtualizerResult {
-  const scrollRef = useTraceTableScrollRef();
+  const scrollEl = useTraceTableScrollElement();
   const density = useDensityStore((s) => s.density);
 
   const baseEstimate =
     ESTIMATE_PER_DENSITY[density] + addonCount * ESTIMATE_PER_ADDON;
 
-  const getScrollElement = useCallback(() => scrollRef.current, [scrollRef]);
+  const getScrollElement = useCallback(() => scrollEl, [scrollEl]);
   const estimateSize = useCallback(() => baseEstimate, [baseEstimate]);
 
   const virtualizer = useVirtualizer<HTMLElement, HTMLTableSectionElement>({

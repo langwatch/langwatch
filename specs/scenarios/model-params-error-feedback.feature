@@ -27,14 +27,6 @@ Feature: Model params preparation error feedback
     And the error message includes the provider name "azure"
 
   @unit @unimplemented
-  Scenario: Reject model when provider exists but is not enabled
-    Given a model string "azure/gpt-4" with valid format
-    And the project has provider "azure" but it is disabled
-    When model params preparation runs
-    Then it returns failure with reason "provider_not_enabled"
-    And the error message includes the provider name "azure"
-
-  @unit @unimplemented
   Scenario: Reject when resolved params are missing API key
     Given a model string "openai/gpt-4" with valid format
     And the provider "openai" is enabled
@@ -72,14 +64,6 @@ Feature: Model params preparation error feedback
   # ============================================================================
   # prefetchScenarioData must forward the reason code and actionable message
   # from the modelParamsProvider instead of a generic error.
-
-  @unit @unimplemented
-  Scenario: Prefetcher forwards reason code from model params failure
-    Given modelParamsProvider returns failure with reason "provider_not_enabled"
-    And the failure message is "Provider 'azure' is not enabled for this project"
-    When prefetchScenarioData is called
-    Then the result includes reason "provider_not_enabled"
-    And the error message is "Provider 'azure' is not enabled for this project"
 
   @unit @unimplemented
   Scenario: Prefetcher logs model params failure with reason

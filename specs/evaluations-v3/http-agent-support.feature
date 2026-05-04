@@ -11,19 +11,6 @@ Feature: HTTP Agent Support in Evaluations V3
     And I have a dataset with columns "input, expected_output"
 
   # ============================================================================
-  # UI - Agent List Drawer (HTTP icon/label missing)
-  # ============================================================================
-
-  @integration @unimplemented
-  Scenario: HTTP agent displays with correct icon and label in agent list
-    Given I have an HTTP agent "My API Agent" saved in the project
-    When I click "Add Target"
-    And I select "Agent"
-    Then I see "My API Agent" in the agent list
-    And it displays with a Globe icon
-    And it displays "HTTP" as the type label
-
-  # ============================================================================
   # UI - Target Editor Routing (currently routes to code editor)
   # ============================================================================
 
@@ -44,31 +31,6 @@ Feature: HTTP Agent Support in Evaluations V3
     And I configure and save the HTTP agent
     Then the HTTP agent is added as a target
     And if I click edit, the HTTP agent editor opens (not code editor)
-
-  # ============================================================================
-  # UI - HTTP Agent Mappings
-  # ============================================================================
-
-  @integration @unimplemented
-  Scenario: HTTP agent target shows input mapping section
-    Given I have an HTTP agent with inputs "thread_id, input"
-    When I add it as a target
-    And I open the target mappings
-    Then I see "thread_id" and "input" as mappable inputs
-    And I can map each input to a dataset column or literal value
-
-  @integration @unimplemented
-  Scenario: HTTP agent mappings auto-infer from dataset columns
-    Given I have dataset columns "input, expected_output, thread_id"
-    When I add an HTTP agent with input "thread_id"
-    Then the input "thread_id" is automatically mapped to dataset column "thread_id"
-
-  @integration @unimplemented
-  Scenario: Missing HTTP agent mappings show alert on target chip
-    Given I have an HTTP agent target with required input "messages"
-    And "messages" is not mapped to any source
-    Then the target header shows a pulsing alert indicator
-    And clicking the alert opens the mappings drawer
 
   # ============================================================================
   # DSL Generation - HTTP Node Creation
@@ -113,55 +75,6 @@ Feature: HTTP Agent Support in Evaluations V3
     Then the HTTP node is recognized (no "unknown node type" error)
 
   @integration @unimplemented
-  Scenario: HTTP node makes request with configured method and URL
-    Given an HTTP node with:
-      | url    | https://api.example.com/v1/chat |
-      | method | POST                            |
-    When execute_flow runs the HTTP node
-    Then an HTTP POST request is made to "https://api.example.com/v1/chat"
-
-  @integration @unimplemented
-  Scenario: HTTP node interpolates inputs into body template
-    Given an HTTP node with:
-      | bodyTemplate | {"thread_id": "{{thread_id}}", "message": "{{input}}"} |
-    And inputs:
-      | thread_id | abc-123       |
-      | input     | Hello, world! |
-    When execute_flow runs the HTTP node
-    Then the request body is {"thread_id": "abc-123", "message": "Hello, world!"}
-
-  @integration @unimplemented
-  Scenario: HTTP node extracts output using JSONPath
-    Given an HTTP node with outputPath "$.choices[0].message.content"
-    And the HTTP endpoint returns:
-      """json
-      {
-        "choices": [
-          {"message": {"content": "Hello! How can I help you?"}}
-        ]
-      }
-      """
-    When execute_flow runs the HTTP node
-    Then the node output is "Hello! How can I help you?"
-
-  @integration @unimplemented
-  Scenario: HTTP node applies bearer token authentication
-    Given an HTTP node with:
-      | auth.type  | bearer        |
-      | auth.token | sk-test-12345 |
-    When execute_flow runs the HTTP node
-    Then the request includes header "Authorization: Bearer sk-test-12345"
-
-  @integration @unimplemented
-  Scenario: HTTP node applies API key authentication
-    Given an HTTP node with:
-      | auth.type   | api_key      |
-      | auth.header | X-API-Key    |
-      | auth.value  | my-secret-key|
-    When execute_flow runs the HTTP node
-    Then the request includes header "X-API-Key: my-secret-key"
-
-  @integration @unimplemented
   Scenario: HTTP node applies custom headers
     Given an HTTP node with headers:
       | key           | value            |
@@ -173,21 +86,6 @@ Feature: HTTP Agent Support in Evaluations V3
   # ============================================================================
   # Error Handling
   # ============================================================================
-
-  @integration @unimplemented
-  Scenario: HTTP node returns error for connection failure
-    Given an HTTP node targeting "https://nonexistent.invalid"
-    When execute_flow runs the HTTP node
-    Then the node result contains an error
-    And the error indicates connection/network failure
-
-  @integration @unimplemented
-  Scenario: HTTP node returns error for non-2xx response
-    Given an HTTP endpoint that returns 401 Unauthorized
-    When execute_flow runs the HTTP node
-    Then the node result contains an error
-    And the error includes status code 401
-
   @integration @unimplemented
   Scenario: HTTP node returns error when JSONPath finds no match
     Given an HTTP node with outputPath "$.nonexistent.path"

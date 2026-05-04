@@ -5,9 +5,11 @@ import { RICH_ARRIVAL_TRACE_ID } from "../data/samplePreviewTraces";
  * Global `<style>` tag for the rich-arrival row's tour highlight —
  * the soft blue halo + outer ring that pulses around the highlighted
  * row. Active across the arrival → drawer chapters
- * (`auroraArrival`, `postArrival`, `drawerOverview`) so the row
+ * (`auroraLanding`, `postArrival`, `drawerOverview`) so the row
  * "comes out glowing" the moment it lands and stays visibly tagged
- * while the drawer is open.
+ * while the drawer is open. Note: ribbon-only `auroraArrival` is
+ * intentionally excluded — the row hasn't arrived yet during that
+ * beat, so there's nothing to glow.
  *
  * Why a global stylesheet (not a Chakra `css` prop on a wrapper):
  * the table renders inside the always-on `ResultsPane` chrome, and
@@ -18,16 +20,21 @@ import { RICH_ARRIVAL_TRACE_ID } from "../data/samplePreviewTraces";
  * (`OnboardingHost` only renders this when active) keeps the rule
  * out of stylesheet for users who aren't onboarding.
  *
- * Scoped to `> tr:first-child > td` so only the main row gets the
- * outer ring — the optional IOPreview addon row inside the same
- * `<tbody>` would otherwise pick up its own ring and the trace
- * would read as two stacked highlighted cells.
+ * The trace's `<tbody>` may contain one or two `<tr>` elements:
+ *  - Compact density: a single main row.
+ *  - Comfortable density: a main row + an IOPreview addon row.
+ *
+ * The outline is drawn so the two rows read as one block: top stroke on
+ * the first row, bottom stroke on the last row, side strokes that wrap
+ * the whole tbody. In compact density `:first-child === :last-child` so
+ * both rules apply to the same row and it gets all four strokes
+ * naturally — no special-casing needed.
  *
  * Uses `html.dark` for the dark-mode override (Chakra v3's
  * class-based color mode), matching `DrawerGlow`.
  */
 const ACTIVE_STAGES = [
-  "auroraArrival",
+  "auroraLanding",
   "postArrival",
   "drawerOverview",
 ] as const;
@@ -46,12 +53,21 @@ export const RichRowGlow: React.FC = () => {
       return `${dark}body[data-traces-tour-stage="${stage}"] ${tbody}${hover}${suffix}`;
     }).join(", ");
 
-  // Outer ring on the main row only. Top + bottom strokes on every
-  // td; first/last td add the matching side stroke. The result reads
-  // as one outlined block rather than four side-by-side boxes.
-  const ROW = " > tr:first-child > td";
-  const ROW_FIRST = " > tr:first-child > td:first-child";
-  const ROW_LAST = " > tr:first-child > td:last-child";
+  // Outer ring split across the tbody's row(s):
+  //   - top stroke on every td of the first row
+  //   - bottom stroke on every td of the last row (same row in compact)
+  //   - left/right side strokes spanning ALL rows' first/last td
+  //
+  // In compact density there's only one row, so :first-child and
+  // :last-child collapse to the same row and the four strokes assemble
+  // into a single outline. In comfortable density the main row carries
+  // the top + sides, the IOPreview row carries the bottom + sides, and
+  // the seam between them is intentionally unstroked so the highlight
+  // reads as one block rather than two stacked boxes.
+  const ROW_FIRST = " > tr:first-child > td";
+  const ROW_LAST = " > tr:last-child > td";
+  const SIDE_FIRST = " > tr > td:first-child";
+  const SIDE_LAST = " > tr > td:last-child";
 
   return (
     <style>{`
@@ -97,38 +113,96 @@ export const RichRowGlow: React.FC = () => {
         --rich-bg-hover: rgba(125, 211, 252, 0.2);
         animation: tracesV2RichRowGlowDark 2.2s ease-in-out infinite;
       }
-      ${each(ROW)} {
+      ${each(" > tr > td")} {
         background-color: var(--rich-bg);
-        box-shadow:
-          inset 0 1px 0 0 var(--rich-ring),
-          inset 0 -1px 0 0 var(--rich-ring);
         transition: background-color 200ms ease, box-shadow 200ms ease;
       }
       ${each(ROW_FIRST)} {
+        box-shadow: inset 0 1px 0 0 var(--rich-ring);
+      }
+      ${each(ROW_LAST)} {
+        box-shadow: inset 0 -1px 0 0 var(--rich-ring);
+      }
+      ${each(SIDE_FIRST)} {
+        box-shadow: inset 1px 0 0 0 var(--rich-ring);
+      }
+      ${each(SIDE_LAST)} {
+        box-shadow: inset -1px 0 0 0 var(--rich-ring);
+      }
+      ${each(" > tr:first-child > td:first-child")} {
+        box-shadow:
+          inset 0 1px 0 0 var(--rich-ring),
+          inset 1px 0 0 0 var(--rich-ring);
+      }
+      ${each(" > tr:first-child > td:last-child")} {
+        box-shadow:
+          inset 0 1px 0 0 var(--rich-ring),
+          inset -1px 0 0 0 var(--rich-ring);
+      }
+      ${each(" > tr:last-child > td:first-child")} {
+        box-shadow:
+          inset 0 -1px 0 0 var(--rich-ring),
+          inset 1px 0 0 0 var(--rich-ring);
+      }
+      ${each(" > tr:last-child > td:last-child")} {
+        box-shadow:
+          inset 0 -1px 0 0 var(--rich-ring),
+          inset -1px 0 0 0 var(--rich-ring);
+      }
+      ${each(" > tr:first-child:last-child > td:first-child")} {
         box-shadow:
           inset 0 1px 0 0 var(--rich-ring),
           inset 0 -1px 0 0 var(--rich-ring),
           inset 1px 0 0 0 var(--rich-ring);
       }
-      ${each(ROW_LAST)} {
+      ${each(" > tr:first-child:last-child > td:last-child")} {
         box-shadow:
           inset 0 1px 0 0 var(--rich-ring),
           inset 0 -1px 0 0 var(--rich-ring),
           inset -1px 0 0 0 var(--rich-ring);
       }
-      ${each(ROW, { hover: true })} {
+      ${each(" > tr > td", { hover: true })} {
         background-color: var(--rich-bg-hover);
-        box-shadow:
-          inset 0 1px 0 0 var(--rich-ring-hover),
-          inset 0 -1px 0 0 var(--rich-ring-hover);
       }
       ${each(ROW_FIRST, { hover: true })} {
+        box-shadow: inset 0 1px 0 0 var(--rich-ring-hover);
+      }
+      ${each(ROW_LAST, { hover: true })} {
+        box-shadow: inset 0 -1px 0 0 var(--rich-ring-hover);
+      }
+      ${each(SIDE_FIRST, { hover: true })} {
+        box-shadow: inset 1px 0 0 0 var(--rich-ring-hover);
+      }
+      ${each(SIDE_LAST, { hover: true })} {
+        box-shadow: inset -1px 0 0 0 var(--rich-ring-hover);
+      }
+      ${each(" > tr:first-child > td:first-child", { hover: true })} {
+        box-shadow:
+          inset 0 1px 0 0 var(--rich-ring-hover),
+          inset 1px 0 0 0 var(--rich-ring-hover);
+      }
+      ${each(" > tr:first-child > td:last-child", { hover: true })} {
+        box-shadow:
+          inset 0 1px 0 0 var(--rich-ring-hover),
+          inset -1px 0 0 0 var(--rich-ring-hover);
+      }
+      ${each(" > tr:last-child > td:first-child", { hover: true })} {
+        box-shadow:
+          inset 0 -1px 0 0 var(--rich-ring-hover),
+          inset 1px 0 0 0 var(--rich-ring-hover);
+      }
+      ${each(" > tr:last-child > td:last-child", { hover: true })} {
+        box-shadow:
+          inset 0 -1px 0 0 var(--rich-ring-hover),
+          inset -1px 0 0 0 var(--rich-ring-hover);
+      }
+      ${each(" > tr:first-child:last-child > td:first-child", { hover: true })} {
         box-shadow:
           inset 0 1px 0 0 var(--rich-ring-hover),
           inset 0 -1px 0 0 var(--rich-ring-hover),
           inset 1px 0 0 0 var(--rich-ring-hover);
       }
-      ${each(ROW_LAST, { hover: true })} {
+      ${each(" > tr:first-child:last-child > td:last-child", { hover: true })} {
         box-shadow:
           inset 0 1px 0 0 var(--rich-ring-hover),
           inset 0 -1px 0 0 var(--rich-ring-hover),

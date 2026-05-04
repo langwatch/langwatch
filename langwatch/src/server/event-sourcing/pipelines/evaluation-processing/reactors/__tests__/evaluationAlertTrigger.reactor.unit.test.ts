@@ -55,7 +55,7 @@ function createEvalFoldState(
     errorDetails: null,
     createdAt: Date.now(),
     updatedAt: Date.now(),
-    lastEventOccurredAt: Date.now(),
+    LastEventOccurredAt: Date.now(),
     archivedAt: null,
     scheduledAt: null,
     startedAt: null,
@@ -99,7 +99,7 @@ function createTraceSummary(
     occurredAt: Date.now(),
     createdAt: Date.now(),
     updatedAt: Date.now(),
-    lastEventOccurredAt: Date.now(),
+    LastEventOccurredAt: Date.now(),
     ...overrides,
   } as TraceSummaryData;
 }

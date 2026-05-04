@@ -55,24 +55,6 @@ Feature: License Lifecycle End-to-End
   # Invalid License Handling
   # ============================================================================
 
-  @unimplemented
-  Scenario: Attempting to upload invalid license
-    Given I am on the license settings page
-    And the organization has no license
-    When I paste "invalid-license-key-garbage" into the textarea
-    And I click "Activate License"
-    Then I see an error toast "Invalid license format"
-    And I still see "No license installed"
-
-  @unimplemented
-  Scenario: Attempting to upload expired license
-    Given I am on the license settings page
-    And I have an expired PRO license
-    When I paste the expired license key
-    And I click "Activate License"
-    Then I see an error toast "License expired"
-    And I still see "No license installed"
-
   # ============================================================================
   # License Expiration Behavior
   # ============================================================================
@@ -108,10 +90,3 @@ Feature: License Lifecycle End-to-End
   # Settings Page Navigation
   # ============================================================================
 
-  @wip @unimplemented
-  Scenario: License menu item appears in settings
-    Given I am on any settings page
-    Then I see "License" in the settings menu
-    When I click on "License"
-    Then I am navigated to "/settings/license"
-    And the page title includes "License"

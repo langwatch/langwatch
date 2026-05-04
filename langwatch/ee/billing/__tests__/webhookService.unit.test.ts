@@ -425,6 +425,7 @@ describe("webhookService", () => {
     });
 
     describe("when subscription is already CANCELLED in DB and Stripe subscription is canceled", () => {
+      /** @scenario $0 invoice on cancellation does not reactivate a cancelled subscription */
       it("does not reactivate a cancelled subscription", async () => {
         mockStripeInstance.subscriptions.retrieve.mockResolvedValue({
           id: "sub_stripe_1",
@@ -451,6 +452,7 @@ describe("webhookService", () => {
     });
 
     describe("when subscription is ACTIVE in DB but Stripe subscription is canceled", () => {
+      /** @scenario $0 invoice on cancellation does not reactivate a cancelling subscription */
       it("does not reactivate when Stripe status is canceled", async () => {
         mockStripeInstance.subscriptions.retrieve.mockResolvedValue({
           id: "sub_stripe_1",

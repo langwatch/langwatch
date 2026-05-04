@@ -56,15 +56,6 @@ Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators, Scenarios, 
   # Workflows: Database Query Compatibility
   # ============================================================================
 
-  @integration @unimplemented
-  Scenario: Workflow count query bypasses multi-tenancy protection
-    Given the organization has a license with maxWorkflows 5
-    And the organization has 2 workflows in project "proj-A"
-    And the organization has 1 workflow in project "proj-B"
-    When the license enforcement service counts workflows for the organization
-    Then the count returns 3
-    And no "requires a 'projectId'" error is thrown
-
   # ============================================================================
   # Prompts: Backend Enforcement
   # ============================================================================
@@ -172,13 +163,6 @@ Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators, Scenarios, 
     When I create a team in the organization
     Then the request fails with FORBIDDEN
     And the error message contains "maximum number of teams"
-
-  @integration @unimplemented
-  Scenario: Blocks team creation when over limit
-    Given the organization has a license with maxTeams 2
-    And the organization has 3 teams
-    When I create a team in the organization
-    Then the request fails with FORBIDDEN
 
   # ============================================================================
   # UI: Click-then-Modal Pattern (All Resources)
@@ -355,66 +339,9 @@ Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators, Scenarios, 
   # useLicenseEnforcement Hook Behavior
   # ============================================================================
 
-  @unit @unimplemented
-  Scenario: Hook returns isAllowed true when under limit
-    Given the organization has a license with maxWorkflows 5
-    And the organization has 3 workflows
-    When useLicenseEnforcement hook checks "workflows" limit
-    Then isAllowed returns true
-    And checkAndProceed executes the callback
-
-  @unit @unimplemented
-  Scenario: Hook returns isAllowed false when at limit
-    Given the organization has a license with maxWorkflows 3
-    And the organization has 3 workflows
-    When useLicenseEnforcement hook checks "workflows" limit
-    Then isAllowed returns false
-    And checkAndProceed does not execute the callback
-    And checkAndProceed triggers the upgrade modal
-
-  @unit @unimplemented
-  Scenario: Hook handles loading state optimistically
-    Given the license check query is still loading
-    When checkAndProceed is called
-    Then the callback is executed immediately
-    And no modal is shown
-
   # ============================================================================
   # UI: Form Error Handling (Backend FORBIDDEN Response)
   # ============================================================================
-
-  @unit @unimplemented
-  Scenario: Workflow form shows upgrade modal on FORBIDDEN error
-    Given the organization has a license with maxWorkflows 3
-    And the organization reached the limit after the form was opened
-    When I submit the new workflow form
-    And the server returns FORBIDDEN with limitType "workflows"
-    Then an upgrade modal is displayed
-    And the modal shows the current and max limit from the error
-    And no generic "Failed to create workflow" toast is shown
-
-  @unit @unimplemented
-  Scenario: Prompt creation shows upgrade modal on FORBIDDEN error
-    Given the organization has a license with maxPrompts 3
-    And the organization reached the limit after the action started
-    When the prompt creation request returns FORBIDDEN with limitType "prompts"
-    Then an upgrade modal is displayed
-    And the modal shows the current and max limit from the error
-
-  @unit @unimplemented
-  Scenario: Evaluator creation shows upgrade modal on FORBIDDEN error
-    Given the organization has a license with maxEvaluators 3
-    And the organization reached the limit after the action started
-    When the evaluator creation request returns FORBIDDEN with limitType "evaluators"
-    Then an upgrade modal is displayed
-    And the modal shows the current and max limit from the error
-
-  @unit @unimplemented
-  Scenario: Form handles non-limit FORBIDDEN errors normally
-    Given the server returns FORBIDDEN for permission denied
-    When I submit the new workflow form
-    Then an appropriate error toast is shown
-    And no upgrade modal is displayed
 
   # ============================================================================
   # Invalid/Expired License Falls to FREE Tier

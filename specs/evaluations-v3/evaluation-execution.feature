@@ -134,22 +134,6 @@ Feature: Evaluation execution - UI
   # ==========================================================================
   # Partial Execution UI
   # ==========================================================================
-
-  @unimplemented
-  Scenario: Run button on target header executes only that target
-    Given targets "my-prompt" and "other-prompt" are configured
-    When I click the run button on "my-prompt" target header
-    Then only "my-prompt" cells show loading skeletons
-    And "other-prompt" cells remain unchanged
-
-  @unimplemented
-  Scenario: Run button on row executes only that row
-    When I hover over row 0
-    Then a small play button appears on the row
-    When I click the row play button
-    Then only row 0 shows loading skeletons across all targets
-    And rows 1 and 2 remain unchanged
-
   @unimplemented
   Scenario: Run button on cell executes only that cell
     Given targets "my-prompt" and "other-prompt" are configured

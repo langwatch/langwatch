@@ -12,21 +12,6 @@ Feature: Prompt selection drawer
   # ============================================================================
 
   @unimplemented
-  Scenario: PromptListDrawer shows list of prompts
-    Given prompts "my-assistant", "code-reviewer", and "translator" exist
-    When the PromptListDrawer opens
-    Then I see all three prompts listed
-    And I see a "+ New Prompt" button at the top
-
-  @unimplemented
-  Scenario: PromptListDrawer empty state
-    Given no prompts exist in the project
-    When the PromptListDrawer opens
-    Then I see "No prompts yet" message
-    And I see a "Create your first prompt" call to action
-    And I see a "+ New Prompt" button
-
-  @unimplemented
   Scenario: Each prompt shows relevant info
     Given prompt "my-assistant" exists with model "openai/gpt-4o"
     When the PromptListDrawer opens
@@ -99,13 +84,6 @@ Feature: Prompt selection drawer
   # ============================================================================
   # Create new prompt flow
   # ============================================================================
-
-  @unimplemented
-  Scenario: New Prompt button opens editor drawer
-    Given the PromptListDrawer is open
-    When I click "+ New Prompt"
-    Then the PromptEditorDrawer opens
-    And the PromptListDrawer remains in the drawer stack
 
   @unimplemented
   Scenario: Create new prompt and select it
@@ -228,29 +206,6 @@ Feature: Prompt selection drawer
   # ============================================================================
 
   @unimplemented
-  Scenario: Search prompts by name
-    Given prompts "assistant", "reviewer", and "translator" exist
-    When I type "assist" in the search field
-    Then only "assistant" is shown in the list
-
-  @unimplemented
-  Scenario: Search shows no results message when no matches
-    Given prompts "assistant" and "reviewer" exist
-    When I type "nonexistent" in the search field
-    Then I see "No prompts match" message
-    And I see a "Clear search" button
-
-  @future @unimplemented
-  Scenario: Filter prompts by model
-    Given prompts exist with different models
-    When I filter by model "openai/gpt-4o"
-    Then only prompts using that model are shown
-
-  # ============================================================================
-  # PromptEditorDrawer - Header structure (matches prompt playground)
-  # ============================================================================
-
-  @unimplemented
   Scenario: PromptEditorDrawer header displays model selector
     When the PromptEditorDrawer opens for "my-assistant"
     Then I see a header bar above the messages section
@@ -270,25 +225,6 @@ Feature: Prompt selection drawer
     Then the header contains a Save/Saved button on the right
     And the button shows "Saved" when no changes exist
     And the button shows "Save" when changes exist
-
-  @unimplemented
-  Scenario: No version history button in create mode
-    When the PromptEditorDrawer opens in create mode
-    Then no version history button is shown
-    And the Save button is enabled once name is provided
-
-  # ============================================================================
-  # Close without save behavior (for evaluations context)
-  # ============================================================================
-
-  @unimplemented
-  Scenario: Close without save in evaluations context preserves local changes
-    Given the PromptEditorDrawer is open from evaluations-v3
-    And I have made modifications to the prompt
-    When I close the drawer without saving
-    Then no confirmation dialog appears
-    And the modifications are stored locally in the runner config
-    And I can run evaluations with the modified prompt
 
   @unimplemented
   Scenario: Close without save in standalone context warns user

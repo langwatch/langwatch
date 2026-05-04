@@ -100,6 +100,7 @@ describe("DatasetSelection", () => {
   });
 
   describe("when clicking the New dataset button", () => {
+    /** @scenario New dataset button opens the dataset creation form directly */
     it("opens addOrEditDataset drawer directly without forcing file upload", async () => {
       const user = userEvent.setup();
 
@@ -122,6 +123,7 @@ describe("DatasetSelection", () => {
       );
     });
 
+    /** @scenario Creating a dataset sets it as the active dataset */
     it("calls setIsEditing with the created dataset when onSuccess fires", async () => {
       const user = userEvent.setup();
 
@@ -145,6 +147,7 @@ describe("DatasetSelection", () => {
   });
 
   describe("when a dataset already exists on the node", () => {
+    /** @scenario New dataset button works when a dataset already exists */
     it("opens addOrEditDataset drawer, not uploadCSV", async () => {
       const user = userEvent.setup();
       const propsWithDataset = {

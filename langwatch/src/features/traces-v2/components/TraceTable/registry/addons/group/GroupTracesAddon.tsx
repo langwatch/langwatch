@@ -10,7 +10,7 @@ import {
   formatRelativeTime,
   formatTokens,
 } from "../../../../../utils/formatters";
-import { truncateText } from "../../../chatContent";
+import { formatPreview } from "../../../../../utils/previewFormatter";
 import { MonoCell } from "../../../MonoCell";
 import { ROW_STYLES, rowVariantFor, StatusDot } from "../../../StatusRow";
 import { Td, Tr } from "../../../TablePrimitives";
@@ -60,7 +60,7 @@ const GroupedTraceRow: React.FC<GroupedTraceRowProps> = ({
   const style = ROW_STYLES[variant];
   const turnBg = isSelected ? style.bg : "fg/2";
   const inputPreview = trace.input
-    ? truncateText({ text: trace.input, limit: INPUT_PREVIEW_LIMIT })
+    ? formatPreview(trace.input, { maxChars: INPUT_PREVIEW_LIMIT }).text
     : null;
 
   return (

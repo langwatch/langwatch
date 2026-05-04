@@ -6,17 +6,6 @@ Feature: Unified Reasoning UI Component
   Background:
     Given I am on a page with the LLM Config popover
 
-  # Single Reasoning Dropdown Display
-  @integration @unimplemented
-  Scenario: Shows single Reasoning dropdown for OpenAI reasoning model
-    Given the selected model "openai/gpt-5" has reasoningConfig with allowedValues ["low", "medium", "high"]
-    When I open the LLM Config popover
-    Then I should see a "Reasoning" dropdown
-    And the dropdown should have options ["low", "medium", "high"]
-    And I should NOT see "Reasoning Effort" dropdown
-    And I should NOT see "Thinking Level" dropdown
-    And I should NOT see "Effort" dropdown
-
   @integration @unimplemented
   Scenario: Shows single Reasoning dropdown for Gemini reasoning model
     Given the selected model "gemini/gemini-3-flash" has reasoningConfig with allowedValues ["low", "high"]
@@ -37,14 +26,6 @@ Feature: Unified Reasoning UI Component
     When I open the LLM Config popover
     Then I should see a "Reasoning" dropdown
     And the dropdown should have options ["none", "low", "medium", "high", "xhigh"]
-
-  # No Reasoning Dropdown for Non-Reasoning Models
-  @integration @unimplemented
-  Scenario: Does not show Reasoning dropdown for non-reasoning models
-    Given the selected model "openai/gpt-4.1" has no reasoningConfig
-    When I open the LLM Config popover
-    Then I should NOT see a "Reasoning" dropdown
-    And I should see "Temperature" parameter
 
   # Value Selection
   @integration @unimplemented
@@ -97,11 +78,3 @@ Feature: Unified Reasoning UI Component
     When I open the LLM Config popover
     Then the Reasoning parameter should appear before Verbosity
     And the Reasoning parameter should appear before Temperature
-
-  # Accessibility
-  @integration @unimplemented
-  Scenario: Reasoning dropdown is keyboard accessible
-    Given I have opened the LLM Config popover for a reasoning model
-    When I focus on the Reasoning dropdown
-    Then I should be able to navigate options with keyboard
-    And I should be able to select an option with Enter key

@@ -25,6 +25,7 @@ import {
 import { useTraceDrawerNavigation } from "../../hooks/useTraceDrawerNavigation";
 import { useDrawerStore } from "../../stores/drawerStore";
 import { STATUS_COLORS } from "../../utils/formatters";
+import { formatPreview } from "../../utils/previewFormatter";
 import { TraceIdPeek } from "../TraceIdPeek";
 import { useDisplayRoleVisuals } from "./scenarioRoles";
 
@@ -73,96 +74,41 @@ const SLIDE_VARIANTS: Variants = {
 // the bookshelf direction cue.
 const SLIDE_TRANSITION = { duration: 0.16, ease: "easeOut" as const };
 
-function truncate(s: string): string {
-  const flat = s.replace(/\s+/g, " ").trim();
-  return flat.length <= MAX_PREVIEW
-    ? flat
-    : `${flat.slice(0, MAX_PREVIEW - 1)}…`;
-}
-
 /**
- * Pull a readable snippet out of an input/output payload. If the payload is
- * a JSON chat array, walk the messages and extract the text from the side
- * we actually care about (last user prose for "input", last assistant text
- * for "output"). Strips Anthropic-style typed-block JSON and tool_use
- * wrappers so the context strip doesn't look like a stringified blob.
+ * Pull a readable snippet out of an input/output payload using the unified
+ * `formatPreview` pipeline (JSON unwrap, fence/image strip, newline glyph,
+ * cap). The `prefer` argument is a soft hint — when the payload is a chat
+ * array, we walk it for the preferred role first and fall back to
+ * `formatPreview` (which always returns the most-recent message of any
+ * role) if there's no role match. For non-array payloads `formatPreview`
+ * does all the work, so the strip's behaviour stays consistent across the
+ * column / table / drawer surfaces.
  */
 function extractReadableSnippet(
   raw: string | null | undefined,
   prefer: "user" | "assistant",
 ): string {
   if (!raw) return "";
-  // Try to parse as JSON. If chat-shaped, walk it.
-  let parsed: unknown = null;
   const trimmed = raw.trim();
-  if (
-    (trimmed.startsWith("[") && trimmed.endsWith("]")) ||
-    (trimmed.startsWith("{") && trimmed.endsWith("}"))
-  ) {
+  if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
     try {
-      parsed = JSON.parse(trimmed);
+      const parsed = JSON.parse(trimmed) as unknown;
+      if (Array.isArray(parsed)) {
+        for (let i = parsed.length - 1; i >= 0; i--) {
+          const msg = parsed[i] as Record<string, unknown> | null;
+          if (msg && msg.role === prefer) {
+            const single = formatPreview(JSON.stringify([msg]), {
+              maxChars: MAX_PREVIEW,
+            });
+            if (single.text.trim()) return single.text;
+          }
+        }
+      }
     } catch {
-      // not JSON, fall through to raw
+      /* fall through to formatPreview on raw input */
     }
   }
-
-  const extractMessageText = (msg: unknown): string => {
-    if (!msg || typeof msg !== "object") return "";
-    const obj = msg as Record<string, unknown>;
-    const content = obj.content;
-    if (typeof content === "string") {
-      // Could itself be JSON of a typed block — strip that down.
-      const t = content.trim();
-      if (t.startsWith('{"type":"text"')) {
-        try {
-          const inner = JSON.parse(t) as { text?: string };
-          if (typeof inner.text === "string") return inner.text;
-        } catch {
-          /* ignore */
-        }
-      }
-      // Skip pure JSON typed-blocks that aren't text
-      if (t.startsWith('{"type":"') && !t.startsWith('{"type":"text"'))
-        return "";
-      return content;
-    }
-    if (Array.isArray(content)) {
-      const texts: string[] = [];
-      for (const part of content) {
-        if (typeof part === "string") {
-          texts.push(part);
-        } else if (
-          part &&
-          typeof part === "object" &&
-          (part as { type?: unknown }).type === "text" &&
-          typeof (part as { text?: unknown }).text === "string"
-        ) {
-          texts.push((part as { text: string }).text);
-        }
-      }
-      return texts.join(" ");
-    }
-    return "";
-  };
-
-  if (Array.isArray(parsed)) {
-    const targetRole = prefer;
-    // Walk backwards for the latest matching role.
-    for (let i = parsed.length - 1; i >= 0; i--) {
-      const msg = parsed[i] as Record<string, unknown> | null;
-      if (msg && msg.role === targetRole) {
-        const text = extractMessageText(msg);
-        if (text.trim()) return truncate(text);
-      }
-    }
-    // Fallback: any message with text content.
-    for (let i = parsed.length - 1; i >= 0; i--) {
-      const text = extractMessageText(parsed[i]);
-      if (text.trim()) return truncate(text);
-    }
-  }
-
-  return truncate(raw);
+  return formatPreview(raw, { maxChars: MAX_PREVIEW }).text;
 }
 
 /**

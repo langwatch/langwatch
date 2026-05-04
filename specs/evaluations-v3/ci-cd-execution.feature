@@ -161,48 +161,6 @@ Feature: CI/CD Execution of Platform Evaluations
       | summary | object |
 
   # ==========================================================================
-  # Summary Format
-  # ==========================================================================
-
-  @unimplemented
-  Scenario: Summary contains target statistics
-    When execution completes
-    Then the summary contains per-target stats:
-      | field       | description              |
-      | targetId    | target identifier        |
-      | name        | target display name      |
-      | passed      | count of passed evals    |
-      | failed      | count of failed evals    |
-      | avgLatency  | average duration in ms   |
-      | totalCost   | total cost in USD        |
-
-  @unimplemented
-  Scenario: Summary contains evaluator statistics
-    When execution completes
-    Then the summary contains per-evaluator stats:
-      | field      | description             |
-      | evaluator  | evaluator identifier    |
-      | name       | evaluator display name  |
-      | passed     | count of passed results |
-      | failed     | count of failed results |
-      | passRate   | percentage passed       |
-      | avgScore   | average score if scored |
-
-  @unimplemented
-  Scenario: Summary contains overall statistics
-    When execution completes
-    Then the summary contains:
-      | field          | description               |
-      | runId          | unique run identifier     |
-      | status         | completed/failed/stopped  |
-      | totalPassed    | total passed evaluations  |
-      | totalFailed    | total failed evaluations  |
-      | passRate       | overall pass percentage   |
-      | duration       | total execution time ms   |
-      | totalCost      | total cost in USD         |
-      | runUrl         | URL to view in LangWatch  |
-
-  # ==========================================================================
   # Error Handling
   # ==========================================================================
 

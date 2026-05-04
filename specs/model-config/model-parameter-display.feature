@@ -7,33 +7,6 @@ Feature: Model Parameter Display
     Given I am on a page with the LLM Config popover
     And model providers are loaded for my project
 
-  # Dynamic Parameter Display
-  @integration @unimplemented
-  Scenario: Shows temperature for traditional models
-    Given the selected model "openai/gpt-4.1" supports parameters:
-      | temperature       |
-      | top_p             |
-      | max_tokens        |
-      | frequency_penalty |
-      | presence_penalty  |
-    When I open the LLM Config popover
-    Then I should see the Temperature parameter as a slider
-    And the slider should have min 0 and max 2
-
-  @integration @unimplemented
-  Scenario: Shows reasoning effort for reasoning models
-    Given the selected model "openai/gpt-5" supports parameters:
-      | reasoning_effort |
-      | verbosity        |
-      | max_tokens       |
-    When I open the LLM Config popover
-    Then I should see the Reasoning Effort parameter as a dropdown
-    And the dropdown should have options:
-      | minimal |
-      | low     |
-      | medium  |
-      | high    |
-
   @integration @unimplemented
   Scenario: Shows verbosity for GPT-5 models
     Given the selected model "openai/gpt-5" supports parameters:
@@ -46,35 +19,6 @@ Feature: Model Parameter Display
       | low    |
       | medium |
       | high   |
-
-  @integration @unimplemented
-  Scenario: Does not show temperature for reasoning-only models
-    Given the selected model "openai/gpt-5" supports parameters:
-      | reasoning_effort |
-      | verbosity        |
-      | max_tokens       |
-    When I open the LLM Config popover
-    Then I should not see the Temperature parameter
-
-  @integration @unimplemented
-  Scenario: Shows top_p for models that support it
-    Given the selected model "anthropic/claude-3.5-sonnet" supports parameters:
-      | temperature |
-      | top_p       |
-      | max_tokens  |
-    When I open the LLM Config popover
-    Then I should see the Top P parameter as a slider
-    And the slider should have min 0 and max 1
-
-  @integration @unimplemented
-  Scenario: Shows penalty parameters when supported
-    Given the selected model "openai/gpt-4.1" supports parameters:
-      | temperature       |
-      | frequency_penalty |
-      | presence_penalty  |
-    When I open the LLM Config popover
-    Then I should see the Frequency Penalty parameter
-    And I should see the Presence Penalty parameter
 
   # Max Tokens Slider
   @integration @unimplemented

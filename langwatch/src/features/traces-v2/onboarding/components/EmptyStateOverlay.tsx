@@ -44,14 +44,20 @@ export const EmptyStateOverlay = () => {
           surrounding chrome as-is for ~1.4s, so the page reads as a
           real product they're looking at — not a marketing
           sequence. Mesh + hero band fade in only when the welcome
-          typewriter starts. */}
-      {stage !== "settle" && <OnboardingMeshBackground />}
+          typewriter starts. The outro chapter also drops the mesh
+          so the live table reads as the user's space, with only the
+          thin top banner left as onboarding chrome. */}
+      {stage !== "settle" && heroLayout !== "topBanner" && (
+        <OnboardingMeshBackground />
+      )}
       {/* Hero band — full-width horizontal fade. Sticks regardless
           of where the hero is anchored, because once the user is
           past the table-centric beats (drawer open, sidebar open)
           the band fades into being a soft atmospheric wash. Fades
           in over the settle → welcome transition so the page
-          calmly slides into onboarding rather than slamming in. */}
+          calmly slides into onboarding rather than slamming in.
+          Suppressed for the topBanner layout so the live table is
+          fully visible behind the wrap-up strip. */}
       <Flex
         position="absolute"
         inset={0}
@@ -59,7 +65,9 @@ export const EmptyStateOverlay = () => {
         justify="center"
         zIndex={1}
         pointerEvents="none"
-        opacity={stage === "settle" ? 0 : 1}
+        opacity={
+          stage === "settle" || heroLayout === "topBanner" ? 0 : 1
+        }
         transition="opacity 0.7s ease-out"
       >
         <Box
@@ -137,6 +145,13 @@ function layoutFlexProps(layout: HeroLayout, drawerLeftX: number | null) {
       align: "flex-end" as const,
       justify: "center" as const,
       paddingBottom: { base: 8, md: 12 },
+    };
+  }
+  if (layout === "topBanner") {
+    return {
+      align: "flex-start" as const,
+      justify: "center" as const,
+      paddingTop: { base: 2, md: 3 },
     };
   }
   return { align: "center" as const, justify: "center" as const };

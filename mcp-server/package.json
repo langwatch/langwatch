@@ -42,7 +42,7 @@
   },
   "devDependencies": {
     "@ai-sdk/anthropic": "^3.0.44",
-    "@anthropic-ai/claude-code": "^2.1.72",
+    "@anthropic-ai/claude-code": "^2.1.119",
     "@eslint/js": "^10.0.1",
     "@langwatch/scenario": "^0.4.6",
     "@types/debug": "^4.1.12",

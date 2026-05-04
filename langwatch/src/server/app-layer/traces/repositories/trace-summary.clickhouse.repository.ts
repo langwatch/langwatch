@@ -324,7 +324,7 @@ export class TraceSummaryClickHouseRepository
       occurredAt: record.OccurredAt,
       createdAt: record.CreatedAt,
       updatedAt: record.UpdatedAt,
-      lastEventOccurredAt: Number(record.LastEventOccurredAt ?? 0),
+      LastEventOccurredAt: Number(record.LastEventOccurredAt ?? 0),
     };
   }
 
@@ -343,8 +343,8 @@ export class TraceSummaryClickHouseRepository
       OccurredAt: new Date(data.occurredAt),
       CreatedAt: new Date(data.createdAt),
       UpdatedAt: new Date(data.updatedAt),
-      LastEventOccurredAt: data.lastEventOccurredAt
-        ? new Date(data.lastEventOccurredAt)
+      LastEventOccurredAt: data.LastEventOccurredAt
+        ? new Date(data.LastEventOccurredAt)
         : new Date(0),
       ComputedIOSchemaVersion: data.computedIOSchemaVersion,
       ComputedInput: data.computedInput,

@@ -178,29 +178,54 @@ export class SimulationRunStateRepositoryClickHouse<
 
     try {
       const client = await this.resolveClient(context.tenantId);
+      // IN-tuple dedup over the ReplacingMergeTree (see
+      // dev/docs/best_practices/clickhouse-queries.md). Inner SELECT scans
+      // only (TenantId, ScenarioRunId, UpdatedAt); outer SELECT pulls the
+      // heavy columns (Messages.*, TraceMetricsJson, RoleCosts, etc.) for
+      // the single matching row. Outer references UpdatedAt via table alias
+      // because the column is also projected as `toUnixTimestamp64Milli(...)
+      // AS UpdatedAt` — without the alias the IN-tuple comparison resolves
+      // to the projected UInt64 instead of the raw DateTime64.
       const result = await client.query({
         query: `
           SELECT
-            ProjectionId, TenantId, ScenarioRunId, ScenarioId, BatchRunId, ScenarioSetId,
-            Version, Status, Name, Description, Metadata,
-            \`Messages.Id\`, \`Messages.Role\`, \`Messages.Content\`,
-            \`Messages.TraceId\`, \`Messages.Rest\`,
-            TraceIds,
-            Verdict, Reasoning, MetCriteria, UnmetCriteria, Error,
-            toString(DurationMs) AS DurationMs,
-            TotalCost, RoleCosts, RoleLatencies, TraceMetricsJson,
-            toUnixTimestamp64Milli(StartedAt) AS StartedAt,
-            if(QueuedAt IS NOT NULL, toUnixTimestamp64Milli(QueuedAt), NULL) AS QueuedAt,
-            toUnixTimestamp64Milli(CreatedAt) AS CreatedAt,
-            toUnixTimestamp64Milli(UpdatedAt) AS UpdatedAt,
-            toUnixTimestamp64Milli(FinishedAt) AS FinishedAt,
-            toUnixTimestamp64Milli(ArchivedAt) AS ArchivedAt,
-            if(CancellationRequestedAt IS NOT NULL, toUnixTimestamp64Milli(CancellationRequestedAt), NULL) AS CancellationRequestedAt,
-            toUnixTimestamp64Milli(LastSnapshotOccurredAt) AS LastSnapshotOccurredAt,
-            toUnixTimestamp64Milli(LastEventOccurredAt) AS LastEventOccurredAt
-          FROM ${TABLE_NAME}
-          WHERE TenantId = {tenantId:String} AND ScenarioRunId = {scenarioRunId:String}
-          ORDER BY UpdatedAt DESC
+            t.ProjectionId AS ProjectionId, t.TenantId AS TenantId,
+            t.ScenarioRunId AS ScenarioRunId, t.ScenarioId AS ScenarioId,
+            t.BatchRunId AS BatchRunId, t.ScenarioSetId AS ScenarioSetId,
+            t.Version AS Version, t.Status AS Status, t.Name AS Name,
+            t.Description AS Description, t.Metadata AS Metadata,
+            t.\`Messages.Id\` AS \`Messages.Id\`,
+            t.\`Messages.Role\` AS \`Messages.Role\`,
+            t.\`Messages.Content\` AS \`Messages.Content\`,
+            t.\`Messages.TraceId\` AS \`Messages.TraceId\`,
+            t.\`Messages.Rest\` AS \`Messages.Rest\`,
+            t.TraceIds AS TraceIds,
+            t.Verdict AS Verdict, t.Reasoning AS Reasoning,
+            t.MetCriteria AS MetCriteria, t.UnmetCriteria AS UnmetCriteria,
+            t.Error AS Error,
+            toString(t.DurationMs) AS DurationMs,
+            t.TotalCost AS TotalCost, t.RoleCosts AS RoleCosts,
+            t.RoleLatencies AS RoleLatencies,
+            t.TraceMetricsJson AS TraceMetricsJson,
+            toUnixTimestamp64Milli(t.StartedAt) AS StartedAt,
+            if(t.QueuedAt IS NOT NULL, toUnixTimestamp64Milli(t.QueuedAt), NULL) AS QueuedAt,
+            toUnixTimestamp64Milli(t.CreatedAt) AS CreatedAt,
+            toUnixTimestamp64Milli(t.UpdatedAt) AS UpdatedAt,
+            toUnixTimestamp64Milli(t.FinishedAt) AS FinishedAt,
+            toUnixTimestamp64Milli(t.ArchivedAt) AS ArchivedAt,
+            if(t.CancellationRequestedAt IS NOT NULL, toUnixTimestamp64Milli(t.CancellationRequestedAt), NULL) AS CancellationRequestedAt,
+            toUnixTimestamp64Milli(t.LastSnapshotOccurredAt) AS LastSnapshotOccurredAt,
+            toUnixTimestamp64Milli(t.LastEventOccurredAt) AS LastEventOccurredAt
+          FROM ${TABLE_NAME} AS t
+          WHERE t.TenantId = {tenantId:String}
+            AND t.ScenarioRunId = {scenarioRunId:String}
+            AND (t.TenantId, t.ScenarioRunId, t.UpdatedAt) IN (
+              SELECT TenantId, ScenarioRunId, max(UpdatedAt)
+              FROM ${TABLE_NAME}
+              WHERE TenantId = {tenantId:String}
+                AND ScenarioRunId = {scenarioRunId:String}
+              GROUP BY TenantId, ScenarioRunId
+            )
           LIMIT 1
         `,
         query_params: { tenantId: context.tenantId, scenarioRunId },

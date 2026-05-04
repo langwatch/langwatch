@@ -1,8 +1,11 @@
+import { on } from "node:events";
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { checkOpsPermission } from "~/server/api/rbac";
 import { getApp } from "~/server/app-layer/app";
+import { DASHBOARD_EVENT } from "~/server/app-layer/ops/metrics-collector";
+import type { DashboardData } from "~/server/app-layer/ops/types";
 import { getProjectionMetadata, getReactorMetadata } from "~/server/event-sourcing/pipelineRegistry";
 
 const opsViewPermission = checkOpsPermission("ops:view");
@@ -48,6 +51,24 @@ export const opsRouter = createTRPCRouter({
         return { blockedCount: 0, dlqCount: 0 };
       }
       return ops.metricsCollector.getBadgeCounts();
+    }),
+
+  dashboardStream: protectedProcedure
+    .use(opsViewPermission)
+    .subscription(async function* (opts) {
+      const collector = getApp().ops?.metricsCollector;
+      if (!collector) return;
+
+      // Yield the current snapshot immediately so the client doesn't have
+      // to wait for the next broadcast tick before rendering.
+      yield collector.getDashboardData();
+
+      for await (const [data] of on(collector.getEmitter(), DASHBOARD_EVENT, {
+        // @ts-expect-error - signal is not typed
+        signal: opts.signal,
+      })) {
+        yield data as DashboardData;
+      }
     }),
 
   listQueues: protectedProcedure

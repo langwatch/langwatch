@@ -41,14 +41,6 @@ Feature: License Settings Page Styling
     And each resource shows current usage vs limit
 
   # Visual consistency with platform patterns - full system verification
-  @e2e @unimplemented
-  Scenario: License generator drawer follows platform drawer styling
-    When I click the "New License" button
-    Then the license generator drawer opens
-    And the drawer has the same frosted glass background as other platform drawers
-    And the drawer has rounded corners matching other drawers
-    And the drawer header and footer styling matches EvaluatorEditorDrawer
-    And the primary action button uses colorPalette "blue"
 
   @e2e @unimplemented
   Scenario: License activation form follows platform form patterns
@@ -170,53 +162,6 @@ Feature: License Settings Page Styling
     And the warning text uses appropriate status color
 
   # License activation error messages - user-friendly
-  @e2e @unimplemented
-  Scenario: Show user-friendly error when activating invalid license
-    Given no license is installed
-    When I paste an invalid license key
-    And I click "Activate License"
-    Then I see an error toast with title "Failed to activate license"
-    And the error message is "The license key is invalid or has been tampered with. Please check the key and try again."
-
-  @e2e @unimplemented
-  Scenario: Show user-friendly error when activating expired license
-    Given no license is installed
-    When I paste an expired license key
-    And I click "Activate License"
-    Then I see an error toast with title "Failed to activate license"
-    And the error message is "This license has expired. Please contact support to renew your license."
-
-  @integration @unimplemented
-  Scenario: License validation errors are user-friendly
-    Given the license validation returns an error
-    Then the error messages map as follows:
-      | Technical Error     | User-Friendly Message                                                              |
-      | Invalid license format   | The license key is invalid or has been tampered with. Please check the key and try again. |
-      | Invalid signature   | The license key is invalid or has been tampered with. Please check the key and try again. |
-      | License expired     | This license has expired. Please contact support to renew your license.            |
-
-  # Unit tests for style constants
-  @unit @unimplemented
-  Scenario: Components export consistent style constants
-    Given the license component files
-    Then border radius values are "lg" for cards and "md" for inner elements
-    And padding values follow the 6/4/3/2 scale pattern
-    And color tokens use semantic naming (fg.muted, bg.subtle)
-
-  @unit @unimplemented
-  Scenario: Button props use colorPalette over colorScheme
-    Given button component props
-    When buttons need color variants
-    Then colorPalette prop is used instead of colorScheme
-    And this applies to all license-related buttons
-
-  @unit @unimplemented
-  Scenario: LicenseGeneratorDrawer uses correct Drawer configuration props
-    Given the LicenseGeneratorDrawer component
-    Then the Drawer.Root has size "lg"
-    And the Drawer.Root has closeOnInteractOutside true
-    And the Drawer.Root has modal false
-    And the component does not render Drawer.Backdrop
 
   @unit @unimplemented
   Scenario: LicenseGeneratorForm uses correct layout structure

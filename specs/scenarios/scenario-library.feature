@@ -21,17 +21,6 @@ Feature: Scenario Library
   # ============================================================================
 
   @e2e @unimplemented
-  Scenario: View scenarios in list
-    Given scenarios exist in the project:
-      | name          | labels              |
-      | Refund Flow   | ["support"]         |
-      | Billing Check | ["billing", "edge"] |
-    When I am on the scenarios list page
-    Then I see a list with both scenarios
-    And each row shows the scenario name
-    And each row shows the labels
-
-  @e2e @unimplemented
   Scenario: Click scenario row to edit
     Given scenario "Refund Flow" exists
     When I click on "Refund Flow" in the list
@@ -48,8 +37,3 @@ Feature: Scenario Library
   # Filtering
   # ============================================================================
 
-  @e2e @unimplemented
-  Scenario: Filter scenarios by label
-    Given scenarios exist with various labels
-    When I select label "support" in the filter
-    Then I only see scenarios with the "support" label

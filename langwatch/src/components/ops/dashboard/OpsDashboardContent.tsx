@@ -121,8 +121,8 @@ export function OpsDashboardContent({ data }: { data: DashboardData }) {
                 </Table.Row>
               </Table.Header>
               <Table.Body>
-                {data.topErrors.slice(0, 5).map((err, i) => (
-                  <Table.Row key={i}>
+                {data.topErrors.slice(0, 5).map((err) => (
+                  <Table.Row key={`${err.queueName}::${err.normalizedMessage}`}>
                     <Table.Cell>
                       <Text color="red.500" fontWeight="medium">
                         {err.count}

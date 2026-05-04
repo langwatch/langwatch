@@ -9,38 +9,12 @@ Feature: Billing Meter Dispatch
   # ============================================================================
 
   @integration @unimplemented
-  Scenario: Reports delta to Stripe when org has billable events
-    Given I am in SaaS mode
-    And an organization with a Stripe customer ID and active subscription
-    And the organization has 150 billable events across all projects this month
-    And the checkpoint shows 100 events previously reported
-    When the usage reporting job runs for the organization
-    Then it reports a delta of 50 events to Stripe
-    And the checkpoint is updated to 150
-
-  @integration @unimplemented
   Scenario: Aggregates events across all projects in the organization
     Given I am in SaaS mode
     And an organization with 3 projects
     And project A has 50 billable events, project B has 30, and project C has 20
     When the usage reporting job runs for the organization
     Then the total billable count is 100
-
-  @integration @unimplemented
-  Scenario: Self-re-triggers when delta is positive
-    Given I am in SaaS mode
-    And an organization with billable events exceeding the checkpoint
-    When the usage reporting job runs and reports a positive delta
-    Then it enqueues a delayed follow-up job for the organization
-
-  @integration @unimplemented
-  Scenario: Creates checkpoint on first run for a new organization
-    Given I am in SaaS mode
-    And an organization with no existing checkpoint
-    And the organization has 50 billable events this month
-    When the usage reporting job runs for the organization
-    Then it reports a delta of 50 events to Stripe
-    And a new checkpoint is created at 50
 
   # ============================================================================
   # Usage Reporting Worker — Skip Conditions
@@ -53,28 +27,6 @@ Feature: Billing Meter Dispatch
     Then no usage is reported to Stripe
 
   @integration @unimplemented
-  Scenario: Skips when organization has no Stripe customer ID
-    Given I am in SaaS mode
-    And an organization without a Stripe customer ID
-    When the usage reporting job runs for the organization
-    Then no usage is reported to Stripe
-
-  @integration @unimplemented
-  Scenario: Skips when organization has no active subscription
-    Given I am in SaaS mode
-    And an organization with a Stripe customer ID but no active subscription
-    When the usage reporting job runs for the organization
-    Then no usage is reported to Stripe
-
-  @integration @unimplemented
-  Scenario: Skips when delta is zero
-    Given I am in SaaS mode
-    And an organization with 100 billable events this month
-    And the checkpoint shows 100 events previously reported
-    When the usage reporting job runs for the organization
-    Then no usage is reported to Stripe
-
-  @integration @unimplemented
   Scenario: Skips when organization has no projects
     Given I am in SaaS mode
     And an organization with no projects
@@ -84,16 +36,6 @@ Feature: Billing Meter Dispatch
   # ============================================================================
   # Usage Reporting Worker — Crash Recovery (Two-Phase Checkpoint)
   # ============================================================================
-
-  @integration @unimplemented
-  Scenario: Recovers from crash using pending checkpoint
-    Given I am in SaaS mode
-    And a checkpoint with a pending value of 200 from a previous crash
-    And the checkpoint shows 100 events previously reported
-    When the usage reporting job runs for the organization
-    Then it reports a delta of 100 events to Stripe using the pending value
-    And the idempotency key is deterministic based on the checkpoint values
-    And the checkpoint is updated to 200 with pending cleared
 
   @integration @unimplemented
   Scenario: Catches up after crash recovery when count has grown
@@ -111,49 +53,9 @@ Feature: Billing Meter Dispatch
     When the usage reporting job runs for the organization
     Then the error is re-thrown for the worker to retry
 
-  @integration @unimplemented
-  Scenario: Handles permanent Stripe rejection without updating checkpoint
-    Given I am in SaaS mode
-    And the Stripe reporting service returns a permanent rejection
-    When the usage reporting job runs for the organization
-    Then the checkpoint is not updated
-    And the error is captured for alerting
-
   # ============================================================================
   # Billing Dispatch Reactor — Post-Fold Side Effect
   # ============================================================================
-
-  @integration @unimplemented
-  Scenario: Dispatch fires after fold succeeds
-    Given a project belonging to an organization
-    When a billable event fold completes successfully
-    Then the reactor enqueues a usage reporting job for the organization
-
-  @integration @unimplemented
-  Scenario: Dispatch does not fire if fold fails
-    Given a project belonging to an organization
-    When the billable event fold fails
-    Then no usage reporting job is enqueued
-
-  @integration @unimplemented
-  Scenario: Resolves organization from cache on subsequent events
-    Given a project whose organization was previously resolved
-    When another billable event fold completes for the same project
-    Then the organization is resolved from cache without a DB query
-
-  @integration @unimplemented
-  Scenario: Skips orphan projects gracefully
-    Given a project that does not belong to any organization
-    When the billing dispatch reactor fires
-    Then no job is enqueued
-    And a warning is logged
-
-  @integration @unimplemented
-  Scenario: Skips silently when queue is unavailable
-    Given the job queue is not available
-    When the billing dispatch reactor fires
-    Then no job is enqueued
-    And no error is thrown
 
   @integration @unimplemented
   Scenario: Deduplicates concurrent events for the same organization

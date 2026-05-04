@@ -24,7 +24,7 @@ interface ClickHouseSummaryRow extends TraceSummaryFieldsBase {
   AttrConversationId: string;
   AttrUserId: string;
   AttrOrigin: string;
-  lastEventOccurredAt: number;
+  LastEventOccurredAt: number;
   TotalCount: number;
 }
 
@@ -165,7 +165,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
           ScenarioRoleLatencies,
           ScenarioRoleSpans,
           SpanCosts,
-          toUnixTimestamp64Milli(lastEventOccurredAt) AS lastEventOccurredAt,
+          toUnixTimestamp64Milli(LastEventOccurredAt) AS LastEventOccurredAt,
           TotalCount
         FROM (
           SELECT
@@ -215,7 +215,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
             ScenarioRoleLatencies,
             ScenarioRoleSpans,
             SpanCosts,
-            lastEventOccurredAt,
+            LastEventOccurredAt,
             count() OVER () AS TotalCount
           FROM ${TABLE_NAME}
           WHERE ${whereClause}
@@ -842,7 +842,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
       occurredAt: Number(row.OccurredAt),
       createdAt: Number(row.CreatedAt),
       updatedAt: Number(row.UpdatedAt),
-      lastEventOccurredAt: Number(row.lastEventOccurredAt ?? 0),
+      LastEventOccurredAt: Number(row.LastEventOccurredAt ?? 0),
     };
   }
 }

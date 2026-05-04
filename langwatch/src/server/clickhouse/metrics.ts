@@ -127,35 +127,58 @@ export async function executeWithMetrics<T>(
 // Backup Status Metrics
 // ============================================================================
 
-register.removeSingleMetric("clickhouse_backup_last_success_timestamp_seconds");
-const clickhouseBackupLastSuccessTimestamp = new Gauge({
-  name: "clickhouse_backup_last_success_timestamp_seconds",
-  help: "Timestamp of the last successful ClickHouse backup (Unix seconds)",
-});
+// Lazy-registered: gauges only materialize after the first successful update,
+// so non-worker pods (which never call collectStorageStats) don't pollute
+// /metrics with default-zero series. Combined with `noDataState: Alerting`,
+// a missing gauge becomes a real signal that no worker is reporting.
+let clickhouseBackupLastSuccessTimestamp: Gauge<string> | null = null;
+let clickhouseBackupLastSizeBytes: Gauge<string> | null = null;
+let clickhouseBackupStatusTotal: Gauge<"status"> | null = null;
 
-export const setClickHouseBackupLastSuccessTimestamp = (ts: number) =>
+export const setClickHouseBackupLastSuccessTimestamp = (ts: number) => {
+  if (!clickhouseBackupLastSuccessTimestamp) {
+    register.removeSingleMetric(
+      "clickhouse_backup_last_success_timestamp_seconds",
+    );
+    clickhouseBackupLastSuccessTimestamp = new Gauge({
+      name: "clickhouse_backup_last_success_timestamp_seconds",
+      help: "Timestamp of the last successful ClickHouse backup (Unix seconds)",
+    });
+  }
   clickhouseBackupLastSuccessTimestamp.set(ts);
+};
 
-register.removeSingleMetric("clickhouse_backup_last_size_bytes");
-const clickhouseBackupLastSizeBytes = new Gauge({
-  name: "clickhouse_backup_last_size_bytes",
-  help: "Size of the last successful ClickHouse backup in bytes",
-});
-
-export const setClickHouseBackupLastSizeBytes = (bytes: number) =>
+export const setClickHouseBackupLastSizeBytes = (bytes: number) => {
+  if (!clickhouseBackupLastSizeBytes) {
+    register.removeSingleMetric("clickhouse_backup_last_size_bytes");
+    clickhouseBackupLastSizeBytes = new Gauge({
+      name: "clickhouse_backup_last_size_bytes",
+      help: "Size of the last successful ClickHouse backup in bytes",
+    });
+  }
   clickhouseBackupLastSizeBytes.set(bytes);
+};
 
-register.removeSingleMetric("clickhouse_backup_status_total");
-const clickhouseBackupStatusTotal = new Gauge({
-  name: "clickhouse_backup_status_total",
-  help: "Count of ClickHouse backups by status",
-  labelNames: ["status"] as const,
-});
+const ensureBackupStatusTotal = (): Gauge<"status"> => {
+  if (!clickhouseBackupStatusTotal) {
+    register.removeSingleMetric("clickhouse_backup_status_total");
+    clickhouseBackupStatusTotal = new Gauge({
+      name: "clickhouse_backup_status_total",
+      help: "Count of ClickHouse backups by status",
+      labelNames: ["status"] as const,
+    });
+  }
+  return clickhouseBackupStatusTotal;
+};
 
 export const setClickHouseBackupStatusCount = (
   status: string,
   count: number,
-) => clickhouseBackupStatusTotal.labels(status).set(count);
+) => ensureBackupStatusTotal().labels(status).set(count);
+
+// Edge-triggered: collectStorageStats runs every 15s, so we'd otherwise
+// produce 5,760 identical warns/day if system.backups is unavailable.
+let backupStatsCollectionFailing = false;
 
 // ============================================================================
 // Disk Storage Metrics
@@ -267,7 +290,7 @@ export async function collectStorageStats(
 
       const backupRows = await backupResult.json<BackupStats>();
 
-      clickhouseBackupStatusTotal.reset();
+      ensureBackupStatusTotal().reset();
       for (const row of backupRows.data) {
         setClickHouseBackupStatusCount(row.status, parseInt(row.cnt, 10));
 
@@ -282,12 +305,26 @@ export async function collectStorageStats(
           }
         }
       }
+
+      if (backupStatsCollectionFailing) {
+        logger.info(
+          "ClickHouse backup stats collection recovered from previous failure",
+        );
+        backupStatsCollectionFailing = false;
+      }
     } catch (backupError) {
-      // system.backups may not exist on all ClickHouse versions
-      logger.debug(
-        { error: backupError },
-        "Failed to collect ClickHouse backup stats (system.backups may not exist)",
-      );
+      if (!backupStatsCollectionFailing) {
+        logger.warn(
+          { error: backupError },
+          "Failed to collect ClickHouse backup stats from system.backups (further failures suppressed until recovery)",
+        );
+        backupStatsCollectionFailing = true;
+      } else {
+        logger.debug(
+          { error: backupError },
+          "Failed to collect ClickHouse backup stats from system.backups",
+        );
+      }
     }
 
     // Collect per-disk storage metrics

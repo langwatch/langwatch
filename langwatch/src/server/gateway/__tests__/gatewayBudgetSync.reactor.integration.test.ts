@@ -89,7 +89,7 @@ function buildFoldState(
     occurredAt: now,
     createdAt: now,
     updatedAt: now,
-    lastEventOccurredAt: now,
+    LastEventOccurredAt: now,
   };
 }
 

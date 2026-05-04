@@ -15,20 +15,6 @@ Feature: Evaluator as evaluation target
   # ============================================================================
   # Target type selection
   # ============================================================================
-
-  @unimplemented
-  Scenario: Evaluator appears as third option in type selector
-    When I click the "+ Add" button
-    Then the TargetTypeSelectorDrawer opens
-    And I see three options: "Prompt", "Agent", and "Evaluator"
-
-  @unimplemented
-  Scenario: Select Evaluator type opens evaluator list
-    Given the TargetTypeSelectorDrawer is open
-    When I select "Evaluator"
-    Then the EvaluatorListDrawer opens
-    And I can select from existing evaluators
-
   @unimplemented
   Scenario: Evaluator card shows correct styling
     When I click the "+ Add" button
@@ -108,13 +94,6 @@ Feature: Evaluator as evaluation target
   # ============================================================================
   # Target header and UI
   # ============================================================================
-
-  @unimplemented
-  Scenario: Evaluator target header shows evaluator icon
-    Given an evaluator target "Sentiment Check" is configured
-    Then the target header shows a checkmark icon
-    And the icon has green color styling
-
   @unimplemented
   Scenario: Evaluator target header shows popover on click
     Given an evaluator target "Sentiment Check" is configured
@@ -130,13 +109,6 @@ Feature: Evaluator as evaluation target
     And I click "Edit Evaluator" in the popover
     Then the EvaluatorEditorDrawer opens
     And I can view the evaluator settings
-
-  @unimplemented
-  Scenario: Remove evaluator target from workbench
-    Given an evaluator target "Sentiment Check" is configured
-    When I click on the target header "Sentiment Check"
-    And I click "Remove from Workbench" in the popover
-    Then the target column is removed from the table
 
   # ============================================================================
   # Execution
@@ -158,12 +130,6 @@ Feature: Evaluator as evaluation target
     And I see passed status (checkmark or X)
     And I see the score value
     And I see the label if present
-
-  @unimplemented
-  Scenario: Evaluator target error displays in cell
-    Given an evaluator target failed with "Invalid input format"
-    Then the cell shows an error state
-    And I can see the error message
 
   # ============================================================================
   # Meta-evaluation (evaluators on evaluator targets)

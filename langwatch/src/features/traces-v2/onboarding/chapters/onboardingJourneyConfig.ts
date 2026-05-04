@@ -8,8 +8,8 @@
  *
  * Stage flow:
  *
- *   welcome1     →  welcome2     →  densityIntro  →  auroraArrival  →  postArrival  →  complete
- *   (auto 3.5s)     (auto 4.5s)     (manual CTA)     (auto 4s)         (row click)
+ *   welcome1  →  welcome2  →  densityIntro  →  auroraArrival  →  auroraLanding  →  postArrival  →  complete
+ *   (auto)       (auto)       (manual CTA)     (ribbon only)     (rows arrive)     (row click)
  *
  * `holdMs + next` ⇒ auto-advance after the delay.
  * `cta + next`    ⇒ render an inline CTA button that advances on click.
@@ -25,6 +25,7 @@ export type StageId =
   | "facetsReveal"
   | "arrivalPrep"
   | "auroraArrival"
+  | "auroraLanding"
   | "postArrival"
   | "drawerOverview"
   | "outro"
@@ -37,8 +38,12 @@ export type StageId =
  *                     the trace drawer is open on the right.
  *  - `bottomCentre` — bottom-anchored, centred horizontally, used
  *                     while the facet sidebar takes the left rail.
+ *  - `topBanner`    — top-anchored thin banner. The hero band fades
+ *                     out so the live table reads as the user's
+ *                     space, with the banner sitting above it as a
+ *                     "wrap-up" strip rather than an overlay.
  */
-export type HeroLayout = "centre" | "left" | "bottomCentre";
+export type HeroLayout = "centre" | "left" | "bottomCentre" | "topBanner";
 
 export interface StageDef {
   id: StageId;
@@ -219,14 +224,31 @@ export const ONBOARDING_JOURNEY: StageDef[] = [
     // we don't get a re-fade flicker. Hero text dims during the
     // aurora so the user's eye is pulled UP to the ribbon, then
     // fades back when we advance.
+    //
+    // Ribbon-only beat: the aurora flares first, *without* the new
+    // arrivals in the table below it. If the rows land at the same
+    // moment the ribbon plays, the eye doesn't get a chance to read
+    // "aurora → then traces" — it reads "ribbon and items appear at
+    // once," which loses the cause-and-effect of the metaphor. The
+    // landing happens in the next stage.
     heading: "Watch out for the aurora...\nNew traces tend to follow it.",
-    // 5800ms — gives the aurora long enough to read as a *moment*
-    // rather than a flash. The drift cycles are 8–13s so we still
-    // won't see a full one, but stretching past the previous 4.8s
-    // means the user has time to register the ribbon, see the rows
-    // land underneath it, and feel that something arrived. This is
-    // the journey's marquee visual; it earns the extra second.
-    holdMs: 5800,
+    holdMs: 1800,
+    next: "auroraLanding",
+    showAurora: true,
+    showArrivals: false,
+    showIntegrateCta: false,
+    dimHero: true,
+  },
+  {
+    id: "auroraLanding",
+    // Second beat of the marquee moment: ribbon stays visible while
+    // the new arrivals slide in underneath it, so the user reads
+    // "the aurora is what brought these in." Total time on the
+    // ribbon (auroraArrival + auroraLanding) lands ~5.8s, matching
+    // what the previous single stage held. Heading still carries
+    // through so we don't re-fade the hero text mid-moment.
+    heading: "Watch out for the aurora...\nNew traces tend to follow it.",
+    holdMs: 4000,
     next: "postArrival",
     showAurora: true,
     showArrivals: true,
@@ -269,15 +291,17 @@ export const ONBOARDING_JOURNEY: StageDef[] = [
   },
   {
     id: "outro",
-    // Terminal chapter — renders as the OutroPanel (highlight cards
-    // + integrate / done CTAs) instead of a typewriter hero. The
-    // panel absorbs the role the standalone "What's-new" dialog
-    // used to play, so all the post-tour content (multiplayer,
-    // shortcuts, integrate) lives in one place at the end of the
-    // journey rather than as a separate dialog the user has to
-    // re-open.
+    // Terminal chapter — renders as a thin top banner instead of a
+    // centred hero overlay. The journey already taught the user the
+    // basics; the outro is now a "tour done, here's the CTA" strip
+    // that pins to the top of the table area so the live data is
+    // visible underneath without overlap. `showIntegrateCta: false`
+    // suppresses the standalone "Integrate my code" button that
+    // would otherwise stack a duplicate primary CTA next to the
+    // banner's own "Send your own traces" button.
     showArrivals: true,
-    heroLayout: "centre",
+    heroLayout: "topBanner",
+    showIntegrateCta: false,
   },
   {
     id: "complete",

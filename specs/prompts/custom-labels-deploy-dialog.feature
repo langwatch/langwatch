@@ -16,35 +16,9 @@ Feature: Custom labels in Deploy dialog
     Then "latest", "production", and "staging" are included
     And they are marked as built-in
 
-  @integration @unimplemented
-  Scenario: Creating a custom tag definition
-    When I create a tag "canary" for the organization
-    Then a PromptTag record exists with name "canary"
-    And "canary" appears in the list of available tags
-
-  @unit @unimplemented
-  Scenario: Rejects tag names starting with a number
-    When I try to create a tag named "123numeric"
-    Then the operation fails with a validation error
-
-  @unit @unimplemented
-  Scenario: Rejects uppercase tag names
-    When I try to create a tag named "UPPERCASE"
-    Then the operation fails with a validation error
-
-  @unit @unimplemented
-  Scenario: Accepts a valid lowercase tag name
-    When I create a tag named "canary"
-    Then the operation succeeds
-
   @unit @unimplemented
   Scenario: Custom tags cannot shadow built-in tags
     When I try to create a tag named "production"
-    Then the operation fails because it conflicts with a built-in tag
-
-  @unit @unimplemented
-  Scenario: Custom tags cannot shadow the "latest" pseudo-tag
-    When I try to create a tag named "latest"
     Then the operation fails because it conflicts with a built-in tag
 
   @integration @unimplemented
@@ -89,59 +63,3 @@ Feature: Custom labels in Deploy dialog
     Then I see "production" pointing to v1 and "canary" pointing to v2
 
   # --- UI: Deploy dialog shows tags ---
-
-  @integration @unimplemented
-  Scenario: Deploy dialog renders built-in and custom tag rows
-    Given "production" is assigned to v1
-    And "canary" is a custom tag assigned to v2
-    When I open the Deploy dialog for "pizza-prompt"
-    Then I see rows for "latest", "production", "staging", and "canary"
-    And each non-latest row has a version selector
-
-  @integration @unimplemented
-  Scenario: Only "latest" has no delete button
-    When I open the Deploy dialog for "pizza-prompt"
-    Then the "latest" row has no delete button
-    And the "production" row has a delete button
-    And the "staging" row has a delete button
-
-  @integration @unimplemented
-  Scenario: Deploy dialog shows empty state when no custom tags exist
-    When I open the Deploy dialog for "pizza-prompt"
-    Then I see rows for "latest", "production", and "staging" only
-    And the "+ Add tag" button is visible
-
-  # --- UI: Adding a custom tag ---
-
-  @integration @unimplemented
-  Scenario: Deploy dialog adds a custom tag row when user confirms input
-    When I open the Deploy dialog for "pizza-prompt"
-    And I click "+ Add tag"
-    And I type "canary" and confirm
-    Then "canary" appears as a new row in the dialog with no version assigned
-
-  @integration @unimplemented
-  Scenario: Deploy dialog rejects duplicate custom tag name
-    Given "canary" is a custom tag for the organization
-    When I open the Deploy dialog for "pizza-prompt"
-    And I click "+ Add tag"
-    And I type "canary" and confirm
-    Then the dialog shows an error that "canary" already exists
-
-  # --- UI: Deleting a custom tag ---
-
-  @integration @unimplemented
-  Scenario: Deploy dialog removes custom tag row after delete confirmation
-    Given "canary" is a custom tag assigned to v2
-    When I open the Deploy dialog for "pizza-prompt"
-    And I click the delete button on "canary"
-    Then a confirmation dialog warns that SDK callers may be affected
-    When I confirm the deletion
-    Then "canary" is removed from the dialog
-
-  @integration @unimplemented
-  Scenario: Custom tag delete button is visible only for non-latest tags
-    Given "canary" is a custom tag assigned to v2
-    When I open the Deploy dialog for "pizza-prompt"
-    Then the "canary" row has a delete button
-    And the "latest" row has no delete button

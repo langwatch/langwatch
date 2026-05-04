@@ -17,7 +17,7 @@ export const projectRoutes = {
   },
   traces_v2: {
     path: "/[project]/traces",
-    title: "Traces Evolved",
+    title: "Trace Explorer",
   },
   evaluations: {
     path: "/[project]/evaluations",
