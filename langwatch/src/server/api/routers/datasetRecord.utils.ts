@@ -221,13 +221,16 @@ export const getFullDataset = async ({
     });
 
     if (
+      entrySelection === "first" ||
       entrySelection === "random" ||
       entrySelection === "last" ||
       typeof entrySelection === "number"
     ) {
       let skip = 0;
 
-      if (entrySelection === "last") {
+      if (entrySelection === "first") {
+        skip = 0;
+      } else if (entrySelection === "last") {
         skip = Math.max(count - 1, 0);
       } else if (entrySelection === "random") {
         skip = Math.floor(Math.random() * count);
