@@ -1070,14 +1070,23 @@ export const checkPermissionOrPubliclyShared =
 // OPS PERMISSION
 // ============================================================================
 
-export type OpsScope = { kind: "platform" };
+/**
+ * Discriminated scope every authenticated user has — `none` means "no ops
+ * access" (the honest answer for a non-ops user), `platform` means "full
+ * platform-wide access". Modeled this way so `getScope` can be a status
+ * probe that returns data instead of throwing FORBIDDEN on every page
+ * load (lw#3584).
+ */
+export type OpsScope = { kind: "none" } | { kind: "platform" };
 
 /**
- * Resolve the ops scope for a user. Returns null if the user has no ops access.
- * Shared between tRPC middleware and SSE endpoint.
+ * Resolve the ops scope for a user. Always returns a typed scope value;
+ * non-ops users get `{ kind: "none" }` instead of null. Shared between
+ * tRPC middleware (which still rejects non-ops callers via
+ * `checkOpsPermission`) and the SSE endpoint.
  *
- * Only users listed in ADMIN_EMAILS have ops access. All ops data is
- * platform-wide so no org-scoped tier exists.
+ * Only users listed in ADMIN_EMAILS get the `platform` scope. All ops
+ * data is platform-wide so no org-scoped tier exists.
  */
 export function resolveOpsScope({
   userEmail,
@@ -1086,20 +1095,21 @@ export function resolveOpsScope({
   userEmail: string | null | undefined;
   permission: Permission;
   prisma: unknown;
-}): OpsScope | null {
+}): OpsScope {
   if (isAdmin({ email: userEmail })) {
     return { kind: "platform" };
   }
 
-  return null;
+  return { kind: "none" };
 }
 
 export const checkOpsPermission =
-  (permission: Permission) =>
+  (permission: Permission, options: { throwOnDeny?: boolean } = {}) =>
   async ({
     ctx,
     next,
   }: PermissionMiddlewareParams<unknown>) => {
+    const { throwOnDeny = true } = options;
     const user = ctx.session?.user;
     if (!user) {
       throw new TRPCError({ code: "UNAUTHORIZED" });
@@ -1112,7 +1122,12 @@ export const checkOpsPermission =
       prisma: ctx.prisma,
     });
 
-    if (!opsScope) {
+    // For mutating endpoints, `kind: "none"` is a hard FORBIDDEN. For status
+    // probes that want to *report* "no access" without throwing (lw#3584
+    // — see ops.getScope), pass `{ throwOnDeny: false }` so the middleware
+    // populates `ctx.opsScope = { kind: "none" }` and the procedure handler
+    // can branch on it.
+    if (opsScope.kind === "none" && throwOnDeny) {
       throw new TRPCError({
         code: "FORBIDDEN",
         message: "You do not have permission to access ops resources",
