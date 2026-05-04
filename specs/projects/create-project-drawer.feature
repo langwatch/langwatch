@@ -4,6 +4,16 @@ Feature: Create Project Drawer
   I want to create new projects via a drawer interface
   So that I can add projects without leaving my current page
 
+  # The CreateProjectDrawer page-render flows (entry-point clicks
+  # from settings/team/dropdown, drawer chrome, close mechanisms,
+  # team-selector behaviour, loading-state UI) have no JSDOM
+  # render fixture exercising them today. Validation logic +
+  # multi-org organizationId-prop pathing are bound below to the
+  # underlying unit / integration tests
+  # (`ProjectForm.unit.test.ts`, `CreateProjectDrawer.test.tsx`,
+  # `project.create.planLimit.integration.test.ts`). Cheap follow-
+  # up: write a JSDOM render test for the drawer + entry points.
+
   Background:
     Given I am logged in as an authenticated user
     And I have permission to create projects
