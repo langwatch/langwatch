@@ -39,7 +39,6 @@ Feature: Project Creation Flow
     And the project is created under "Analytics Team"
     And I see a success toast notification
 
-  @unimplemented
   Scenario: Project creation calls correct API endpoint
     Given the CreateProjectDrawer is open with valid data
     When I submit the form
