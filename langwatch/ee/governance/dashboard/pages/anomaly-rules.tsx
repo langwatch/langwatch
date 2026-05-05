@@ -99,6 +99,29 @@ function summariseThresholdConfig(
   ruleType: string,
   raw: string,
 ): { kind: "ok" | "unsupported"; english: string } | { kind: "error"; message: string } {
+  // Order matters: non-spend_spike rule types are persisted as
+  // preview-mode (Sergey 5f416d410 — server accepts any
+  // thresholdConfig shape for non-detector-wired types). So check
+  // ruleType FIRST. Empty `{}` on rate_limit / after_hours /
+  // model_drift / error_rate is a valid save — surface it as
+  // "Won't fire" rather than the spend_spike-shape "Empty config"
+  // error.
+  if (ruleType !== "spend_spike") {
+    if (raw.trim() !== "" && raw.trim() !== "{}") {
+      try {
+        JSON.parse(raw);
+      } catch (err) {
+        return {
+          kind: "error",
+          message: `Invalid JSON: ${err instanceof Error ? err.message : "parse failed"}`,
+        };
+      }
+    }
+    return {
+      kind: "unsupported",
+      english: `\`${ruleType}\` is in preview — the rule will save but no detector runs against it yet. \`spend_spike\` is the only type evaluated today; the others (\`rate_limit\`, \`after_hours\`, \`model_drift\`, \`error_rate\`) ship as detectors land.`,
+    };
+  }
   if (raw.trim() === "" || raw.trim() === "{}") {
     return {
       kind: "error",
@@ -113,12 +136,6 @@ function summariseThresholdConfig(
     return {
       kind: "error",
       message: `Invalid JSON: ${err instanceof Error ? err.message : "parse failed"}`,
-    };
-  }
-  if (ruleType !== "spend_spike") {
-    return {
-      kind: "unsupported",
-      english: `\`${ruleType}\` rule type is not yet wired to a detector. The rule will save but won't fire alerts. \`spend_spike\` is the only type evaluated today.`,
     };
   }
   const windowSec = parsed.windowSec;
