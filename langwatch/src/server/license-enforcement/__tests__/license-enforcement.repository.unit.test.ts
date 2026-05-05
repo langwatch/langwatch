@@ -173,7 +173,8 @@ describe("LicenseEnforcementRepository", () => {
   });
 
   describe("getProjectCount", () => {
-    it("queries projects with organization filter", async () => {
+    /** @scenario Counts projects across all teams */
+    it("queries projects with organization filter that traverses every team", async () => {
       mockPrisma.project.count.mockResolvedValue(4);
 
       const result = await repository.getProjectCount(organizationId);

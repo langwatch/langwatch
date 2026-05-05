@@ -71,7 +71,6 @@ Feature: Project Limit Enforcement with License
     When I create a project named "New Project"
     Then the project is created successfully
 
-  @unimplemented
   Scenario: Counts projects across all teams
     Given the organization has a license with maxProjects 3
     And team "team-456" has 2 projects
