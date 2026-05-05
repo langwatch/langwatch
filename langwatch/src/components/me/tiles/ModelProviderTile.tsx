@@ -18,10 +18,38 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 
+import { Link } from "~/components/ui/link";
 import { api } from "~/utils/api";
 
 import { TileIcon } from "./TileIcon";
 import type { ModelProviderConfig } from "./types";
+
+/**
+ * Personal-VK label rules (mirrors `personalVirtualKeysRouter.issuePersonal`
+ * Zod regex `/^[a-z0-9][a-z0-9_\-]*$/`): lowercase alphanumeric with dashes
+ * or underscores, no spaces, must start with alnum. Admins fill the
+ * catalog `defaultLabel` freeform — sanitise on the user side so spaces
+ * become dashes ("Anthropic key" → "anthropic-key") instead of failing
+ * the user's first issue attempt with a regex error.
+ */
+function sanitizeDefaultLabel(raw: string | undefined): string {
+  if (!raw) return "";
+  return raw
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "-")
+    .replace(/[^a-z0-9_-]/g, "")
+    .replace(/^[^a-z0-9]+/, "");
+}
+
+const VOWEL_SOUNDS = ["a", "e", "i", "o", "u"];
+function articleFor(word: string): "a" | "an" {
+  const first = word.trim().charAt(0).toLowerCase();
+  return VOWEL_SOUNDS.includes(first) ? "an" : "a";
+}
+
+const NO_DEFAULT_POLICY_HINT =
+  "no default routing policy"; // matches `NoDefaultRoutingPolicyError.message` (lowercased compare)
 
 interface Props {
   displayName: string;
@@ -68,7 +96,7 @@ export function ModelProviderTile({
   iconKey,
 }: Props) {
   const [expanded, setExpanded] = useState(false);
-  const [label, setLabel] = useState(config.defaultLabel ?? "");
+  const [label, setLabel] = useState(sanitizeDefaultLabel(config.defaultLabel));
   const [issued, setIssued] = useState<IssuedKey | null>(null);
   const [secretRevealed, setSecretRevealed] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -109,7 +137,7 @@ export function ModelProviderTile({
 
   const onReset = () => {
     setIssued(null);
-    setLabel(config.defaultLabel ?? "");
+    setLabel(sanitizeDefaultLabel(config.defaultLabel));
     setSecretRevealed(false);
     setErrorMessage(null);
   };
@@ -145,7 +173,7 @@ export function ModelProviderTile({
       {expanded && !issued && (
         <VStack align="stretch" gap={3} marginTop={4}>
           <Text fontSize="sm" fontWeight="medium">
-            Issue a {displayName} virtual key
+            Issue {articleFor(displayName)} {displayName} virtual key
           </Text>
           {config.projectSuggestionText && (
             <Box
@@ -199,6 +227,21 @@ export function ModelProviderTile({
               <Text fontSize="xs" color="red.700">
                 {errorMessage}
               </Text>
+              {errorMessage.toLowerCase().includes(NO_DEFAULT_POLICY_HINT) && (
+                <Text fontSize="xs" color="red.700" marginTop={1}>
+                  <Link
+                    href="/settings/routing-policies"
+                    color="red.700"
+                    fontWeight="medium"
+                  >
+                    Configure routing policy →
+                  </Link>{" "}
+                  <Text as="span" color="fg.muted">
+                    (admin only — non-admins should ask their organization
+                    admin to publish a default)
+                  </Text>
+                </Text>
+              )}
             </Box>
           )}
         </VStack>
