@@ -71,6 +71,52 @@ Feature: Bird's-eye governance dashboard v2 — graphs, Top-N framing, click-thr
     And the cell does NOT render "↑ 100%" or any percentage
     And the cell does NOT render in the warning (orange) color
 
+  @bdd @ui @birds-eye-v2 @phase-a @bug-fix @regression
+  Scenario: KPI summary card mutes its trend when prior window is zero
+    Given the org has > 0 spend in the current window
+    And the org has zero spend in the prior window
+    When the KPI summary card renders at the top of /settings/governance
+    Then its trend label renders muted "—" / "no prior data"
+    And the trend label does NOT render a percentage value
+    And the trend label does NOT render an absurd percentage like
+      "↑ 889058% vs previous" (regression — the v1 KPI summary
+      bypassed Phase A's hasPriorBaseline mute path; caught during
+      B-2 recapture; fixed by 3f0f9a3ee)
+    And the same hasPriorBaseline guard is applied identically to
+      every trend-displaying surface on the page (KPI summary card +
+      SpendByTeam table + SpendByUser table + future v2 cards)
+
+  @bdd @ui @birds-eye-v2 @phase-a @bug-fix @regression
+  Scenario: TeamRow caps absurd trend percentages
+    Given a SpendByTeam row's computed trend would render at e.g.
+      "↑ 253806%" (e.g. prior=$0.000001 vs current=$2.50)
+    When the row renders
+    Then the trend cell does NOT render a 6-digit percentage
+    And the trend cell either caps the displayed value (e.g. ">999%")
+      or falls back to the muted "—" treatment per the
+      hasPriorBaseline rule
+    And the cell does NOT render in the warning (orange) color when
+      the underlying baseline is effectively zero (regression caught
+      in B-2 recapture; fixed by 3f0f9a3ee)
+
+  @bdd @ch @birds-eye-v2 @phase-a @bug-fix @regression
+  Scenario: spendOverTime CH bucket math operates on DateTime64 directly
+    Given trace_summaries.OccurredAt is typed DateTime64(3, 'UTC')
+    When the spendOverTime CH query bucketizes by day
+    Then the query passes OccurredAt directly to toStartOfDay
+      (matching the working pattern at activityMonitor.service spendByUser
+      where toUnixTimestamp64Milli(max(occurredAt)) consumes the column
+      directly)
+    And the query does NOT divide by 1000 and re-wrap in toDateTime64
+      (which would treat ms-precision ticks as seconds and double-shift
+      every bucket out of window, causing bucket-key lookups to miss
+      every row and points: [] to render despite live data — regression
+      caught in B-2 recapture; fixed by 4f776a56e)
+    And the dense-bucket integration test asserts at least one bucket
+      contains populated points against the seeded fixture (anti-
+      regression — a structurally-correct response with zero points
+      anywhere must fail the test)
+
   @bdd @ui @birds-eye-v2 @phase-a @bug-fix
   Scenario: Trend cell only colors orange when actually anomalous
     Given a SpendByTeam row with current=$100 and prior=$80 (delta +25%)
