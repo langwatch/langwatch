@@ -18,6 +18,7 @@ import {
   RoutingPolicyHasNoProvidersError,
 } from "@ee/governance/services/personalVirtualKey.service";
 import { PersonalWorkspaceService } from "@ee/governance/services/personalWorkspace.service";
+import { env } from "~/env.mjs";
 
 import { checkOrganizationPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
@@ -56,7 +57,9 @@ export const personalVirtualKeysRouter = createTRPCRouter({
         userId: ctx.session.user.id,
         organizationId: input.organizationId,
       });
-      const service = PersonalVirtualKeyService.create(ctx.prisma);
+      const service = PersonalVirtualKeyService.create(ctx.prisma, {
+        gatewayBaseUrl: env.LW_GATEWAY_BASE_URL,
+      });
       const keys = await service.list({
         userId: ctx.session.user.id,
         organizationId: input.organizationId,
@@ -122,7 +125,9 @@ export const personalVirtualKeysRouter = createTRPCRouter({
         });
       }
 
-      const service = PersonalVirtualKeyService.create(ctx.prisma);
+      const service = PersonalVirtualKeyService.create(ctx.prisma, {
+        gatewayBaseUrl: env.LW_GATEWAY_BASE_URL,
+      });
       let issued;
       try {
         issued = await service.issue({
@@ -183,7 +188,9 @@ export const personalVirtualKeysRouter = createTRPCRouter({
         organizationId: input.organizationId,
       });
 
-      const service = PersonalVirtualKeyService.create(ctx.prisma);
+      const service = PersonalVirtualKeyService.create(ctx.prisma, {
+        gatewayBaseUrl: env.LW_GATEWAY_BASE_URL,
+      });
       try {
         await service.revoke({
           userId: ctx.session.user.id,

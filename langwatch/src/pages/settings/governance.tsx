@@ -19,8 +19,6 @@ import {
   CircleX,
 } from "lucide-react";
 import numeral from "numeral";
-import Head from "~/utils/compat/next-head";
-
 import GovernanceLayout from "~/components/governance/GovernanceLayout";
 import { SpendByTeamBar } from "~/components/governance/SpendByTeamBar";
 import {
@@ -123,18 +121,8 @@ function GovernanceOverviewPage() {
     { enabled: !!orgId, refetchOnWindowFocus: false },
   );
 
-  const head = (
-    <Head>
-      <title>Governance · LangWatch</title>
-    </Head>
-  );
-
-  if (ffLoading) {
-    return <>{head}<LoadingScreen /></>;
-  }
-  if (!governancePreviewEnabled) {
-    return <>{head}<NotFoundScene /></>;
-  }
+  if (ffLoading) return <LoadingScreen />;
+  if (!governancePreviewEnabled) return <NotFoundScene />;
 
   const sources = sourcesQuery.data ?? [];
   const policies = policiesQuery.data ?? [];
@@ -153,9 +141,7 @@ function GovernanceOverviewPage() {
       summary.openAnomalyCount > 0);
 
   return (
-    <GovernanceLayout>
-      {head}
-
+    <GovernanceLayout pageTitle="Governance · LangWatch">
       <VStack align="stretch" gap={6} width="full" maxW="container.xl">
         <HStack alignItems="end">
           <VStack align="start" gap={1}>

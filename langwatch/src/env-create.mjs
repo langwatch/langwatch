@@ -61,6 +61,12 @@ export function createEnvConfig() {
       // HS256 secret used by control-plane to sign the short-lived JWT that the
       // gateway verifies on every request (contract §4.1). 32+ chars.
       LW_GATEWAY_JWT_SECRET: z.string().min(32).optional(),
+      // Public-facing base URL the AI Gateway is reachable at. Surfaced
+      // to /me VK reveal cards + the CLI as `baseUrl`. Falls back to
+      // https://gateway.langwatch.com on production builds with no
+      // override; self-hosted dev sets it to http://localhost:5560 (or
+      // whatever the gateway-internal proxy port is).
+      LW_GATEWAY_BASE_URL: z.string().url().optional(),
       // Argon2id pepper mixed into virtual-key hashing. Rotating this
       // invalidates all existing VKs — treat as append-only / key-management.
       LW_VIRTUAL_KEY_PEPPER: z.string().min(32).optional(),
@@ -194,6 +200,7 @@ export function createEnvConfig() {
       NEXTAUTH_URL: process.env.NEXTAUTH_URL,
       LW_GATEWAY_INTERNAL_SECRET: process.env.LW_GATEWAY_INTERNAL_SECRET,
       LW_GATEWAY_JWT_SECRET: process.env.LW_GATEWAY_JWT_SECRET,
+      LW_GATEWAY_BASE_URL: process.env.LW_GATEWAY_BASE_URL,
       LW_VIRTUAL_KEY_PEPPER: process.env.LW_VIRTUAL_KEY_PEPPER,
       AUTH0_CLIENT_ID: process.env.AUTH0_CLIENT_ID,
       AUTH0_CLIENT_SECRET: process.env.AUTH0_CLIENT_SECRET,

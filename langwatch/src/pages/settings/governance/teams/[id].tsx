@@ -8,7 +8,6 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import numeral from "numeral";
-import Head from "~/utils/compat/next-head";
 import { useRouter } from "~/utils/compat/next-router";
 
 import GovernanceLayout from "~/components/governance/GovernanceLayout";
@@ -66,23 +65,16 @@ function GovernanceTeamDetailPage() {
     { enabled: !!orgId, refetchOnWindowFocus: false },
   );
 
-  const team = (teamsQuery.data ?? []).find((t) => t.teamId === teamId);
-  const head = (
-    <Head>
-      <title>
-        {team
-          ? `${team.teamName} · Governance · LangWatch`
-          : "Team · Governance · LangWatch"}
-      </title>
-    </Head>
-  );
+  if (ffLoading) return <LoadingScreen />;
+  if (!enabled) return <NotFoundScene />;
 
-  if (ffLoading) return <>{head}<LoadingScreen /></>;
-  if (!enabled) return <>{head}<NotFoundScene /></>;
+  const team = (teamsQuery.data ?? []).find((t) => t.teamId === teamId);
+  const pageTitle = team
+    ? `${team.teamName} · Governance · LangWatch`
+    : "Team · Governance · LangWatch";
 
   return (
-    <GovernanceLayout>
-      {head}
+    <GovernanceLayout pageTitle={pageTitle}>
       <VStack align="stretch" gap={4} width="full" maxW="container.xl">
         <VStack align="start" gap={1}>
           <Text fontSize="xs" color="fg.muted">

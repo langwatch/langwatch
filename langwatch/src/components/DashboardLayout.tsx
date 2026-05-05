@@ -321,6 +321,17 @@ export type DashboardLayoutProps = {
    * project-scoped — see governance-home-routing.feature).
    */
   orgScope?: boolean;
+  /**
+   * Override the default `LangWatch - {project.name}` tab title.
+   * When set, the layout's <Head> emits this string verbatim.
+   * Set on org-scope routes (governance overview, view-all listings,
+   * detail pages) where the project-based default would otherwise read
+   * "LangWatch - Personal Workspace" because the user has no active
+   * project. Surfaced as Ariana QA finding G12 — child <Head> writers
+   * lost the layout-effect race against the parent layout's <Head>,
+   * so the only correct fix is to push the title down through props.
+   */
+  pageTitle?: string;
 } & StackProps;
 
 export const DashboardLayout = ({
@@ -329,6 +340,7 @@ export const DashboardLayout = ({
   compactMenu: compactMenuProp = false,
   personalScope = false,
   orgScope = false,
+  pageTitle,
   ...props
 }: DashboardLayoutProps) => {
   // fallback: "lg" tells Chakra to assume large screen during SSR/initial render,
@@ -424,10 +436,14 @@ export const DashboardLayout = ({
     >
       <Head>
         <title>
-          LangWatch{project ? ` - ${project.name}` : ""}
-          {currentRoute && currentRoute.title !== "Home"
-            ? ` - ${currentRoute?.title}`
-            : ""}
+          {pageTitle ?? (
+            <>
+              LangWatch{project ? ` - ${project.name}` : ""}
+              {currentRoute && currentRoute.title !== "Home"
+                ? ` - ${currentRoute?.title}`
+                : ""}
+            </>
+          )}
         </title>
       </Head>
 

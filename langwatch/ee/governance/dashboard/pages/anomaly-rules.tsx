@@ -15,7 +15,6 @@ import {
 } from "@chakra-ui/react";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
-import Head from "~/utils/compat/next-head";
 
 import GovernanceLayout from "~/components/governance/GovernanceLayout";
 import { LoadingScreen } from "~/components/LoadingScreen";
@@ -249,24 +248,17 @@ function AnomalyRulesPage() {
     }
   };
 
-  const head = (
-    <Head>
-      <title>Anomaly Rules · Governance · LangWatch</title>
-    </Head>
-  );
-
   if (ffLoading) {
-    return <>{head}<LoadingScreen /></>;
+    return <LoadingScreen />;
   }
   if (!governancePreviewEnabled) {
-    return <>{head}<NotFoundScene /></>;
+    return <NotFoundScene />;
   }
 
   const isPending = createMutation.isPending || updateMutation.isPending;
 
   return (
-    <GovernanceLayout>
-      {head}
+    <GovernanceLayout pageTitle="Anomaly Rules · Governance · LangWatch">
       <EnterpriseLockedSurface
         featureName="Anomaly Rules"
         description="Anomaly Rules let your governance team define thresholds that page on-call when ingestion drifts. Available on Enterprise plans."

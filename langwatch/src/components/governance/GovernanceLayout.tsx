@@ -32,9 +32,12 @@ import { MenuLink } from "../MenuLink";
  * Spec: specs/ai-gateway/governance/governance-home-routing.feature
  *       (the "future top-level layout" scenario, now current state)
  */
-export default function GovernanceLayout({ children }: PropsWithChildren) {
+export default function GovernanceLayout({
+  children,
+  pageTitle,
+}: PropsWithChildren<{ pageTitle?: string }>) {
   return (
-    <DashboardLayout orgScope>
+    <DashboardLayout orgScope pageTitle={pageTitle}>
       <Box width="full" paddingY={4} paddingX={4}>
         <Container maxW="container.xl" paddingX={0}>
           <HStack alignItems="start" gap={6} width="full">

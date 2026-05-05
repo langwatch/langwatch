@@ -25,7 +25,6 @@ import {
 } from "lucide-react";
 import numeral from "numeral";
 import { useState } from "react";
-import Head from "~/utils/compat/next-head";
 
 import { EnterpriseLockedSurface } from "~/components/enterprise/EnterpriseLockedSurface";
 import GovernanceLayout from "~/components/governance/GovernanceLayout";
@@ -154,37 +153,29 @@ function IngestionSourceDetailPage() {
       }),
   });
 
-  const source = sourceQuery.data;
-  const head = (
-    <Head>
-      <title>
-        {source?.name
-          ? `${source.name} · Ingestion Source · LangWatch`
-          : "Ingestion Source · LangWatch"}
-      </title>
-    </Head>
-  );
-
   if (ffLoading) {
-    return <>{head}<LoadingScreen /></>;
+    return <LoadingScreen />;
   }
   if (!governancePreviewEnabled) {
-    return <>{head}<NotFoundScene /></>;
+    return <NotFoundScene />;
   }
   if (!sourceId) {
-    return <>{head}<NotFoundScene /></>;
+    return <NotFoundScene />;
   }
   if (sourceQuery.isError) {
-    return <>{head}<NotFoundScene /></>;
+    return <NotFoundScene />;
   }
 
+  const source = sourceQuery.data;
   const health = healthQuery.data;
   const events = eventsQuery.data ?? [];
+  const pageTitle = source?.name
+    ? `${source.name} · Ingestion Source · LangWatch`
+    : "Ingestion Source · LangWatch";
 
   if (!source) {
     return (
-      <GovernanceLayout>
-        {head}
+      <GovernanceLayout pageTitle={pageTitle}>
         <EnterpriseLockedSurface
           featureName="Ingestion Source detail"
           description="Source-level health metrics and event drill-downs are part of the Enterprise plan."
@@ -200,8 +191,7 @@ function IngestionSourceDetailPage() {
   const StatusIcon = status.icon;
 
   return (
-    <GovernanceLayout>
-      {head}
+    <GovernanceLayout pageTitle={pageTitle}>
       <EnterpriseLockedSurface
         featureName="Ingestion Source detail"
         description="Source-level health metrics and event drill-downs are part of the Enterprise plan."

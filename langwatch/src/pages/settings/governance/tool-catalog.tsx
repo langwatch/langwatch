@@ -7,9 +7,9 @@ import {
 } from "@chakra-ui/react";
 import { useState } from "react";
 
+import GovernanceLayout from "~/components/governance/GovernanceLayout";
 import { LoadingScreen } from "~/components/LoadingScreen";
 import { NotFoundScene } from "~/components/NotFoundScene";
-import SettingsLayout from "~/components/SettingsLayout";
 import { AiToolEntryDrawer } from "~/components/settings/governance/AiToolEntryDrawer";
 import { ToolCatalogEditor } from "~/components/settings/governance/ToolCatalogEditor";
 import { useFeatureFlag } from "~/hooks/useFeatureFlag";
@@ -49,7 +49,7 @@ export default function ToolCatalogPage() {
   }
 
   return (
-    <SettingsLayout>
+    <GovernanceLayout pageTitle="Tool Catalog · Governance · LangWatch">
       <VStack align="stretch" gap={6} width="full">
         <HStack alignItems="end">
           <VStack align="start" gap={0}>
@@ -76,6 +76,6 @@ export default function ToolCatalogPage() {
         state={drawerState}
         onClose={() => setDrawerState(null)}
       />
-    </SettingsLayout>
+    </GovernanceLayout>
   );
 }

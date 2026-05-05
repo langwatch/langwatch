@@ -7,7 +7,6 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import numeral from "numeral";
-import Head from "~/utils/compat/next-head";
 import { useRouter } from "~/utils/compat/next-router";
 
 import GovernanceLayout from "~/components/governance/GovernanceLayout";
@@ -136,25 +135,13 @@ function GovernanceTeamsListPage() {
     { enabled: !!orgId, refetchOnWindowFocus: false },
   );
 
-  // Render <Head> unconditionally so the tab title reflects the route
-  // even during FF / org-context resolution. Otherwise the title flashes
-  // the parent route's "LangWatch - Personal Workspace" until ffLoading
-  // clears (Ariana QA finding G12 — useLayoutEffect on the Head shim
-  // fixed the post-mount tick but not the pre-mount loading window).
-  const head = (
-    <Head>
-      <title>Teams · Governance · LangWatch</title>
-    </Head>
-  );
-
-  if (ffLoading) return <>{head}<LoadingScreen /></>;
-  if (!enabled) return <>{head}<NotFoundScene /></>;
+  if (ffLoading) return <LoadingScreen />;
+  if (!enabled) return <NotFoundScene />;
 
   const teams = teamsQuery.data ?? [];
 
   return (
-    <GovernanceLayout>
-      {head}
+    <GovernanceLayout pageTitle="Teams · Governance · LangWatch">
       <VStack align="stretch" gap={4} width="full" maxW="container.xl">
         <HStack alignItems="end">
           <VStack align="start" gap={1}>

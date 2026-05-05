@@ -36,6 +36,31 @@ interface IssuedKey {
   baseUrl: string;
 }
 
+/**
+ * tRPC's Zod input-validation errors arrive on the client as the raw
+ * JSON-stringified ZodError array (e.g. `[{"validation":"regex",...,
+ * "message":"Label must be lowercase..."}]`). End users shouldn't see
+ * that shape — extract the human-readable `message` field(s). Falls
+ * back to the raw string on shapes we don't recognise so we never lose
+ * information. Surfaced as Ariana QA finding G31.
+ */
+function humanizeZodMessage(raw: string): string {
+  const trimmed = raw.trim();
+  if (!trimmed.startsWith("[") && !trimmed.startsWith("{")) return raw;
+  try {
+    const parsed = JSON.parse(trimmed);
+    const issues = Array.isArray(parsed) ? parsed : [parsed];
+    const messages = issues
+      .map((i: { message?: unknown }) =>
+        typeof i?.message === "string" ? i.message : null,
+      )
+      .filter((m): m is string => !!m);
+    return messages.length ? messages.join(". ") : raw;
+  } catch {
+    return raw;
+  }
+}
+
 export function ModelProviderTile({
   displayName,
   config,
@@ -59,7 +84,7 @@ export function ModelProviderTile({
       setErrorMessage(null);
     },
     onError: (err) => {
-      setErrorMessage(err.message);
+      setErrorMessage(humanizeZodMessage(err.message));
     },
   });
 
@@ -122,6 +147,19 @@ export function ModelProviderTile({
           <Text fontSize="sm" fontWeight="medium">
             Issue a {displayName} virtual key
           </Text>
+          {config.projectSuggestionText && (
+            <Box
+              padding={3}
+              borderWidth="1px"
+              borderColor="border.muted"
+              borderRadius="sm"
+              backgroundColor="bg.subtle"
+            >
+              <Text fontSize="xs" color="fg.muted">
+                💡 {config.projectSuggestionText}
+              </Text>
+            </Box>
+          )}
           <VStack align="stretch" gap={1}>
             <Text fontSize="xs" color="fg.muted">
               Label
@@ -160,17 +198,6 @@ export function ModelProviderTile({
             >
               <Text fontSize="xs" color="red.700">
                 {errorMessage}
-              </Text>
-            </Box>
-          )}
-          {config.projectSuggestionText && (
-            <Box
-              borderTopWidth="1px"
-              borderColor="border.muted"
-              paddingTop={3}
-            >
-              <Text fontSize="xs" color="fg.muted">
-                💡 {config.projectSuggestionText}
               </Text>
             </Box>
           )}
