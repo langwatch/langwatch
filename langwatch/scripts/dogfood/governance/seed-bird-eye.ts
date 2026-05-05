@@ -21,13 +21,19 @@
  * SpendByTeam rollup actually has a per-team breakdown), and an
  * optional AnomalyAlert seed so "Recent anomalies" isn't empty.
  *
- * Time distribution: rows span `2 * --days` with a recent-heavy power
- * curve (~65% in the dashboard window, ~35% in the prior window). The
- * prior-window mass is what makes `windowOverPreviousPct` /
- * `deltaPctVsPriorWindow` produce realistic single-digit-to-double-digit
- * deltas instead of `+100%-from-zero` artifacts on every team/user row.
- * `--days N` keeps the dashboard window unchanged; the seed quietly
- * fills 2*N days underneath.
+ * Time distribution: rows span `2 * --days`, but each team gets a
+ * distinct power-curve skew so the spend-over-time chart shows real
+ * variance instead of every team sharing the same +86% shape:
+ *
+ *   - Customer Support — moderate growth (~+86% recent vs prior)
+ *   - Engineering      — flat (~0% — already-saturated team)
+ *   - Marketing        — explosive (~+200% — newly onboarded)
+ *   - Org-wide         — declining (~−67% — usage winding down)
+ *
+ * The prior-window mass is what makes `windowOverPreviousPct` /
+ * `deltaPctVsPriorWindow` produce realistic deltas instead of
+ * `+100%-from-zero` artifacts. `--days N` keeps the dashboard window
+ * unchanged; the seed quietly fills 2*N days underneath.
  *
  * Usage (from langwatch/ workspace, app container running):
  *   docker exec wise-mixing-zebra-app-1 sh -c \
@@ -126,20 +132,40 @@ function hex(n: number): string {
   return randomBytes(n).toString("hex");
 }
 
-function pickDaysAgo(maxDays: number): number {
-  // Distribute over 2 * maxDays with a recent-heavy power curve. The
-  // dashboard window is `maxDays` (the most-recent maxDays), so events
-  // landing in [maxDays, 2*maxDays) form the prior-window baseline that
+function pickDaysAgo(maxDays: number, recentSkew: number): number {
+  // Distribute over 2 * maxDays with a power-curve skew. The dashboard
+  // window is `maxDays` (the most-recent maxDays), so events landing in
+  // [maxDays, 2*maxDays) form the prior-window baseline that
   // `windowOverPreviousPct` / `deltaPctVsPriorWindow` compare against.
-  // Without this the prior bucket is empty and every trend renders +100%.
   //
-  // Power 1.6 over [0, 1) → integrating t^1.6 gives ~65% mass in the
-  // recent half, ~35% in the prior half → a realistic +86% delta on
-  // average, with per-team variance from the existing source-skew. Top
-  // of the list still feels fresh because the curve front-loads recent.
+  // `recentSkew` controls the recent-vs-prior split:
+  //   - 1.0 → uniform across the full range (~50% recent, flat trend, ~0%)
+  //   - 1.6 → 65% recent / 35% prior (~+86% delta — moderately growing)
+  //   - 2.4 → 75% recent / 25% prior (~+200% delta — explosive growth)
+  //   - 0.5 → 25% recent / 75% prior (~−67% delta — declining usage)
+  //
+  // Per-source skew (see SOURCE_TIME_SKEWS) gives each department a
+  // distinct visual story on the spend-over-time chart instead of every
+  // team sharing the same uniform +86% shape.
   const r = Math.random();
-  return Math.floor(2 * maxDays * Math.pow(r, 1.6));
+  return Math.floor(2 * maxDays * Math.pow(r, recentSkew));
 }
+
+/**
+ * Per-source recent-skew exponent for `pickDaysAgo`. Index aligns with
+ * the source list emitted by `ensureSourcesAcrossTeams`:
+ *   [0] Customer Support — moderate growth (~+86% delta)
+ *   [1] Engineering      — flat (~0% delta — already-saturated team)
+ *   [2] Marketing        — explosive (~+200% — newly onboarded team)
+ *   [3] Org-wide         — declining (~−67% — usage winding down /
+ *                          legacy ingestion source)
+ *
+ * The 4-distinct-story shape makes the bird's-eye spend-over-time chart
+ * visibly differentiated (one growing fast, one flat, one explosive,
+ * one declining) instead of every series sharing the same growth curve.
+ * Falls back to 1.6 (moderate growth) for any out-of-range index.
+ */
+const SOURCE_TIME_SKEWS = [1.6, 1.0, 2.4, 0.5];
 
 /**
  * Find-or-create the named Team row this seed needs to roll up under.
@@ -316,7 +342,17 @@ async function seedTraceSummaries({
       promptTokens * model.costPerInputToken +
       completionTokens * model.costPerOutputToken;
     const durationMs = rand(400, 6000);
-    const daysAgo = pickDaysAgo(args.days);
+    // Skew distribution: source 0 (Customer Support) dominates so the
+    // rollup has a clear winner and a long tail. Persona skew matches.
+    const sourceIdx =
+      Math.random() < 0.5 ? 0 : 1 + (Math.random() < 0.66 ? 0 : Math.random() < 0.5 ? 1 : 2);
+    const source = sources[Math.min(sourceIdx, sources.length - 1)]!;
+    // Per-source time skew so each team has a distinct trend shape —
+    // see SOURCE_TIME_SKEWS for the per-index rationale.
+    const recentSkew =
+      SOURCE_TIME_SKEWS[Math.min(sourceIdx, SOURCE_TIME_SKEWS.length - 1)] ??
+      1.6;
+    const daysAgo = pickDaysAgo(args.days, recentSkew);
     const now = new Date();
     const occurredAt = new Date(now);
     occurredAt.setUTCDate(now.getUTCDate() - daysAgo);
@@ -329,11 +365,6 @@ async function seedTraceSummaries({
       occurredAt.setTime(now.getTime() - 1000);
     }
     const occurredAtMs = occurredAt.getTime();
-    // Skew distribution: source 0 (Customer Support) dominates so the
-    // rollup has a clear winner and a long tail. Persona skew matches.
-    const sourceIdx =
-      Math.random() < 0.5 ? 0 : 1 + (Math.random() < 0.66 ? 0 : Math.random() < 0.5 ? 1 : 2);
-    const source = sources[Math.min(sourceIdx, sources.length - 1)]!;
     const persona = PERSONAS[rand(0, PERSONAS.length)] ?? PERSONAS[0]!;
 
     totalCostUsd += costUsd;
