@@ -159,13 +159,17 @@ Send your team this snippet:
 ```text
 Welcome to LangWatch! To use AI tools at <YourCompany>:
 
-1. Install: curl -sSL https://get.langwatch.com | sh
+1. Install: npm install -g langwatch     (or run via npx -y langwatch ...)
 2. Sign in: langwatch login
 3. Use it:  langwatch claude  (or codex / cursor / gemini)
 
 Dashboard: https://app.langwatch.ai/me
 Questions: <#langwatch slack channel>
 ```
+
+The CLI ships as an npm package (the only canonical install path); see
+`docs/integration/install.mdx` for full prerequisites and self-hosted
+endpoint configuration.
 
 That's it. The first time each user runs `langwatch login`, the
 backend auto-provisions their personal team + project, mints a
