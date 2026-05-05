@@ -20,6 +20,7 @@ import { eventMapping } from "../../../../elastic/mappings/scenario-events";
 describe("extensible scenario metadata", () => {
   describe("scenarioRunStartedSchema", () => {
     describe("when metadata has extra fields", () => {
+      /** @scenario Event parsing preserves additional metadata fields */
       it("preserves additional metadata fields", () => {
         const event = {
           type: ScenarioEventType.RUN_STARTED,
@@ -44,6 +45,7 @@ describe("extensible scenario metadata", () => {
     });
 
     describe("when metadata has only name and description", () => {
+      /** @scenario Event schema validates known fields and preserves custom metadata */
       it("validates successfully", () => {
         const event = {
           type: ScenarioEventType.RUN_STARTED,
@@ -91,6 +93,7 @@ describe("extensible scenario metadata", () => {
     });
 
     describe("when langwatch namespace is missing required fields", () => {
+      /** @scenario Langwatch namespace rejects incomplete platform metadata */
       it("rejects the event", () => {
         const event = {
           type: ScenarioEventType.RUN_STARTED,
@@ -133,6 +136,7 @@ describe("extensible scenario metadata", () => {
     });
 
     describe("when langwatch namespace is omitted", () => {
+      /** @scenario Langwatch namespace is optional on metadata */
       it("validates successfully", () => {
         const event = {
           type: ScenarioEventType.RUN_STARTED,
@@ -153,6 +157,7 @@ describe("extensible scenario metadata", () => {
 
   describe("scenarioEventSchema (discriminated union)", () => {
     describe("when parsing RUN_STARTED with extra metadata", () => {
+      /** @scenario Event parsing preserves additional metadata fields */
       it("preserves extra metadata fields through the discriminated union", () => {
         const event = {
           type: ScenarioEventType.RUN_STARTED,
@@ -258,6 +263,7 @@ describe("extensible scenario metadata", () => {
 
   describe("Elasticsearch transforms", () => {
     describe("when event has custom metadata keys in camelCase", () => {
+      /** @scenario Storage transform preserves metadata key casing */
       it("preserves metadata keys in their original casing", () => {
         const event: Record<string, unknown> = {
           type: ScenarioEventType.RUN_STARTED,
@@ -281,6 +287,7 @@ describe("extensible scenario metadata", () => {
     });
 
     describe("when event is transformed to Elasticsearch format and back", () => {
+      /** @scenario Elasticsearch round-trip preserves metadata integrity */
       it("preserves original metadata keys and values", () => {
         const event: Record<string, unknown> = {
           type: ScenarioEventType.RUN_STARTED,
@@ -314,6 +321,7 @@ describe("extensible scenario metadata", () => {
 
   describe("Elasticsearch mapping", () => {
     describe("metadata.langwatch", () => {
+      /** @scenario Elasticsearch mapping includes langwatch namespace fields */
       it("is mapped as an object with dynamic keyword support", () => {
         const properties = eventMapping.properties as Record<string, unknown>;
         const metadataMapping = properties.metadata as {
@@ -335,6 +343,7 @@ describe("extensible scenario metadata", () => {
     });
 
     describe("user-level metadata fields", () => {
+      /** @scenario User metadata fields are not explicitly mapped in Elasticsearch */
       it("are not explicitly mapped outside langwatch namespace", () => {
         const properties = eventMapping.properties as Record<string, unknown>;
         const metadataMapping = properties.metadata as {

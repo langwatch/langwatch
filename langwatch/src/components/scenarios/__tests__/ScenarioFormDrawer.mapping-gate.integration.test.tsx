@@ -279,6 +279,7 @@ describe("<ScenarioFormDrawer /> mapping gate", () => {
       });
     });
 
+    /** @scenario Opens mapping drawer when running a scenario with an unmapped workflow agent */
     it("opens the AgentWorkflowEditorDrawer instead of starting the run", async () => {
       const user = userEvent.setup();
       renderWithTarget({ type: "workflow", id: "workflow-agent-1" });
@@ -332,6 +333,7 @@ describe("<ScenarioFormDrawer /> mapping gate", () => {
       });
     });
 
+    /** @scenario Opens mapping drawer when workflow agent has no input-field mapping */
     it("opens the AgentWorkflowEditorDrawer instead of starting the run", async () => {
       const user = userEvent.setup();
       renderWithTarget({ type: "workflow", id: "workflow-agent-2" });

@@ -14,6 +14,7 @@ import { validateWorkflowAgentMappings } from "../validate-workflow-mappings";
 
 describe("validateWorkflowAgentMappings", () => {
   describe("when the workflow has multiple inputs and no mappings are configured", () => {
+    /** @scenario Returns actionable error for multi-input workflow agent without mappings */
     it("throws a BAD_REQUEST TRPCError with an actionable message", () => {
       expect(() =>
         validateWorkflowAgentMappings({
@@ -99,6 +100,7 @@ describe("validateWorkflowAgentMappings", () => {
   });
 
   describe("when the workflow has exactly one input and no mappings are configured", () => {
+    /** @scenario Allows single-input workflow agent to run without explicit mappings */
     it("does not throw (legacy single-input fallback handles it)", () => {
       expect(() =>
         validateWorkflowAgentMappings({
