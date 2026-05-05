@@ -1,7 +1,7 @@
 import { Box, HStack, Heading, Spacer, Text, VStack } from "@chakra-ui/react";
 import numeral from "numeral";
 
-import { getChartColorForName } from "~/utils/governanceChartColors";
+import { getHexColorForString } from "~/utils/rotatingColors";
 
 /**
  * Single horizontal stacked bar — each segment proportional to that
@@ -48,7 +48,7 @@ export function SpendByTeamBar({
       >
         {teams.map((t) => {
           const pct = (t.spendUsd / total) * 100;
-          const color = getChartColorForName(t.teamName);
+          const color = getHexColorForString(t.teamName);
           return (
             <Box
               key={t.teamId ?? t.teamName}
@@ -66,7 +66,7 @@ export function SpendByTeamBar({
       <HStack wrap="wrap" gap={3} fontSize="xs">
         {teams.map((t) => {
           const pct = (t.spendUsd / total) * 100;
-          const color = getChartColorForName(t.teamName);
+          const color = getHexColorForString(t.teamName);
           return (
             <HStack key={t.teamId ?? t.teamName} gap={1.5}>
               <Box

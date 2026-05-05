@@ -36,7 +36,7 @@ import { toaster } from "~/components/ui/toaster";
 import { useFeatureFlag } from "~/hooks/useFeatureFlag";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api, type RouterOutputs } from "~/utils/api";
-import { getChartColorForName } from "~/utils/governanceChartColors";
+import { getHexColorForString } from "~/utils/rotatingColors";
 
 /**
  * Org-admin overview of AI governance state — spend, users, anomalies,
@@ -989,14 +989,16 @@ function TrendCell({
 
 function TeamRow({ team }: { team: SpendByTeam }) {
   const isOrgWide = !team.teamId;
-  const dotColor = isOrgWide ? "#94a3b8" : getChartColorForName(team.teamName);
-  return (
+  const dotColor = isOrgWide ? "#94a3b8" : getHexColorForString(team.teamName);
+  const inner = (
     <HStack
       paddingY={2}
       paddingX={3}
       borderBottomWidth="1px"
       borderColor="border.muted"
       fontSize="sm"
+      _hover={isOrgWide ? undefined : { backgroundColor: "bg.subtle" }}
+      cursor={isOrgWide ? "default" : "pointer"}
     >
       <Box flex={3}>
         <HStack gap={2}>
@@ -1026,17 +1028,32 @@ function TeamRow({ team }: { team: SpendByTeam }) {
       </Box>
     </HStack>
   );
+  if (isOrgWide) return inner;
+  return (
+    <Link
+      href={`/settings/governance/teams/${team.teamId}`}
+      _hover={{ textDecoration: "none" }}
+    >
+      {inner}
+    </Link>
+  );
 }
 
 function UserRow({ user }: { user: SpendByUser }) {
-  const dotColor = getChartColorForName(user.actor);
+  const dotColor = getHexColorForString(user.actor);
   return (
+    <Link
+      href={`/settings/governance/users/${encodeURIComponent(user.actor)}`}
+      _hover={{ textDecoration: "none" }}
+    >
     <HStack
       paddingY={2}
       paddingX={3}
       borderBottomWidth="1px"
       borderColor="border.muted"
       fontSize="sm"
+      _hover={{ backgroundColor: "bg.subtle" }}
+      cursor="pointer"
     >
       <Box flex={3}>
         <HStack gap={2}>
@@ -1063,6 +1080,7 @@ function UserRow({ user }: { user: SpendByUser }) {
         {user.mostUsedTarget}
       </Box>
     </HStack>
+    </Link>
   );
 }
 

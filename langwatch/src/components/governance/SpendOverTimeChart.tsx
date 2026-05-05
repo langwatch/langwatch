@@ -12,7 +12,7 @@ import {
   YAxis,
 } from "recharts";
 
-import { getChartColorForName } from "~/utils/governanceChartColors";
+import { getHexColorForString } from "~/utils/rotatingColors";
 
 /**
  * Wire shape returned by `api.activityMonitor.spendOverTime` — see
@@ -39,7 +39,7 @@ const GROUP_LABEL: Record<GroupBy, string> = {
  * Stacked-area chart showing daily spend bucketed by group (team /
  * user / model). Answers the admin's "how is AI usage trending across
  * the org" question at a glance. Each series carries a stable hash-
- * derived color (see `getChartColorForName`) so the same team paints
+ * derived color (see `getHexColorForString`) so the same team paints
  * the same hue across every governance surface.
  *
  * Empty state is honest: when `buckets` is empty (no events in
@@ -115,7 +115,7 @@ export function SpendOverTimeChart({
             <AreaChart data={rows} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
               <defs>
                 {seriesKeys.map((s) => {
-                  const color = getChartColorForName(s.label);
+                  const color = getHexColorForString(s.label);
                   return (
                     <linearGradient
                       key={s.key}
@@ -161,7 +161,7 @@ export function SpendOverTimeChart({
                 }
               />
               {seriesKeys.map((s) => {
-                const color = getChartColorForName(s.label);
+                const color = getHexColorForString(s.label);
                 return (
                   <Area
                     key={s.key}
