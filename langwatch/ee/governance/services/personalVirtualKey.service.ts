@@ -221,7 +221,14 @@ export class PersonalVirtualKeyService {
       projectId: personalProjectId,
       organizationId,
       name: label,
-      description: `Personal key for ${label}`,
+      // Brief, non-redundant description rendered alongside the
+       // already-visible label in the /me/settings list (which prints
+       // `{description} · Last used …`). Earlier `Personal key for
+       // ${label}` just echoed the label back at the user — Ariana
+       // logged the duplication during option-C dogfood. The label
+       // itself is the primary identifier; description holds the
+       // category context.
+      description: "Personal virtual key",
       environment: "live",
       principalUserId: userId,
       actorUserId: userId,

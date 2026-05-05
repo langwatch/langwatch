@@ -135,7 +135,13 @@ export function usePersonalContext(): PersonalContext {
       deviceHint: row.description ?? "Personal device",
       os: "Unknown",
       lastUsedAt: row.lastUsedAt ? row.lastUsedAt.toISOString() : null,
-      createdAt: row.createdAt.toISOString().slice(0, 10),
+      // `fmtRelative` reads back this field via `Date.now() -
+      // new Date(iso).getTime()` and renders "N min/h/d ago". Sending
+      // a date-only `YYYY-MM-DD` made the JS Date parse as midnight
+      // UTC, so a key minted 3min ago rendered as "Created 18h ago"
+      // (Ariana QA option-C dogfood — visible regression on a
+      // freshly-minted key).
+      createdAt: row.createdAt.toISOString(),
     }));
   }, [personalKeysQuery.data]);
 
