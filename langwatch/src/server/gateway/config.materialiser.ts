@@ -244,10 +244,21 @@ export class GatewayConfigMaterialiser {
     // guard is satisfied without adding GatewayProviderCredential to
     // EXEMPT_MODELS. The VK we were handed was already tenancy-checked
     // upstream, so we narrow the projectId to vk.projectId explicitly.
+    //
+    // Fail-closed filter on disabled state: skip rows whose binding has
+    // been soft-disabled (`disabledAt != null`) or whose underlying
+    // ModelProvider has been turned off (`modelProvider.enabled = false`).
+    // The cascade in `disableAllForModelProvider` covers the binding
+    // side; checking `modelProvider.enabled` here is the defense in
+    // depth for any window where the cascade hasn't run yet (it's
+    // logged-not-fatal at the router layer). A request that lands while
+    // the chain is empty fails closed at the gateway dispatcher.
     const rows = await this.prisma.gatewayProviderCredential.findMany({
       where: {
         projectId: vk.projectId,
         id: { in: vk.providerCredentials.map((p) => p.providerCredentialId) },
+        disabledAt: null,
+        modelProvider: { enabled: true },
       },
       include: { modelProvider: true },
     });
@@ -289,10 +300,17 @@ export class GatewayConfigMaterialiser {
     const projectIds = orgProjects.map((p) => p.id);
     if (projectIds.length === 0) return [];
 
+    // Fail-closed filter — same contract as the embedded-chain branch:
+    // a soft-disabled binding (cascade marker) or a disabled MP must
+    // not appear in the materialised chain. The Go gateway treats an
+    // empty chain as "no route", so the request fails closed instead
+    // of being dispatched to a credential that's been pulled.
     const rows = await this.prisma.gatewayProviderCredential.findMany({
       where: {
         projectId: { in: projectIds },
         id: { in: credIds },
+        disabledAt: null,
+        modelProvider: { enabled: true },
       },
       include: { modelProvider: true },
     });

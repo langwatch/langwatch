@@ -437,6 +437,112 @@ describe("GatewayConfigMaterialiser", () => {
       });
     });
 
+    describe("when a binding is disabled or its ModelProvider is turned off (fail-closed)", () => {
+      it("filters disabled binding rows out of the embedded VK chain", async () => {
+        // VK declares pc_disabled in its chain, but the cascade
+        // (disableAllForModelProvider) flipped its disabledAt. The
+        // materialiser must pass the disabledAt-null + MP.enabled-true
+        // filter so the disabled row is dropped — empty chain → Go
+        // gateway fails closed instead of routing through a pulled
+        // credential.
+        let capturedWhere: unknown = null;
+        const prisma = mockPrisma({
+          project: {
+            findUnique: async () => ({
+              id: "project_01",
+              teamId: "team_01",
+              name: "p",
+              slug: "p",
+              team: { id: "team_01", name: "t", organizationId: "org_01" },
+            }),
+          } as any,
+          gatewayProviderCredential: {
+            findMany: async ({ where }: any) => {
+              capturedWhere = where;
+              return [];
+            },
+          } as any,
+          gatewayBudget: { findMany: async () => [] } as any,
+          gatewayCacheRule: { findMany: async () => [] } as any,
+        });
+        const sut = new GatewayConfigMaterialiser(prisma);
+
+        const bundle = await sut.materialise(
+          stubVk({
+            providerCredentials: [
+              { providerCredentialId: "pc_disabled", priority: 0 } as any,
+            ],
+          }),
+        );
+
+        expect(bundle.providers).toEqual([]);
+        expect(bundle.fallback.chain).toEqual([]);
+        expect(capturedWhere).toMatchObject({
+          disabledAt: null,
+          modelProvider: { enabled: true },
+        });
+      });
+
+      it("filters disabled bindings out of policy-driven chain too", async () => {
+        // Org admin disables an MP that an admin-published policy
+        // points at; the cascade flips the dependent binding row's
+        // disabledAt. The policy still references the (now disabled)
+        // pc_id, but the materialiser must drop it from the chain a
+        // personal VK consumes — fail-closed at the gateway.
+        let capturedWhere: unknown = null;
+        const prisma = mockPrisma({
+          project: {
+            findUnique: async () => ({
+              id: "personal_proj_01",
+              teamId: "personal_team_01",
+              name: "Personal",
+              slug: "personal",
+              team: {
+                id: "personal_team_01",
+                name: "Personal",
+                organizationId: "org_01",
+              },
+            }),
+            findMany: async () => [
+              { id: "personal_proj_01" },
+              { id: "admin_proj_01" },
+            ],
+          } as any,
+          routingPolicy: {
+            findUnique: async () => ({
+              id: "rp_default",
+              organizationId: "org_01",
+              providerCredentialIds: ["pc_disabled_admin"],
+            }),
+          } as any,
+          gatewayProviderCredential: {
+            findMany: async ({ where }: any) => {
+              capturedWhere = where;
+              return [];
+            },
+          } as any,
+          gatewayBudget: { findMany: async () => [] } as any,
+          gatewayCacheRule: { findMany: async () => [] } as any,
+        });
+        const sut = new GatewayConfigMaterialiser(prisma);
+
+        const bundle = await sut.materialise(
+          stubVk({
+            projectId: "personal_proj_01",
+            providerCredentials: [],
+            routingPolicyId: "rp_default",
+          }),
+        );
+
+        expect(bundle.providers).toEqual([]);
+        expect(bundle.fallback.chain).toEqual([]);
+        expect(capturedWhere).toMatchObject({
+          disabledAt: null,
+          modelProvider: { enabled: true },
+        });
+      });
+    });
+
     describe("when the project is missing", () => {
       it("throws a descriptive error", async () => {
         const prisma = mockPrisma({
