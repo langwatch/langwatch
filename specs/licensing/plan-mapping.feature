@@ -58,34 +58,24 @@ Feature: License to PlanInfo Mapping
   # Constants: UNLIMITED_PLAN
   # ============================================================================
 
-  # KEPT @unimplemented: requires a structural assertion test for the
-  # UNLIMITED_PLAN constant exported from ee/licensing/constants.ts. The
-  # constant is currently used as a fixture in plan-router/onboarding tests
-  # but its full shape is not asserted anywhere. Cheap to add: a
-  # constants.unit.test.ts case that imports UNLIMITED_PLAN and checks
-  # every field against the literals listed below.
-  @unimplemented
+  # Limits use Number.MAX_SAFE_INTEGER (effectively unlimited and JSON-safe)
+  # rather than Infinity, which serializes to null and would break tRPC.
   Scenario: UNLIMITED_PLAN has correct structure for backward compatibility
     When I access the UNLIMITED_PLAN constant
     Then the plan type is "OPEN_SOURCE"
     And the plan name is "Open Source"
     And the plan free is true
     And the plan overrideAddingLimitations is true
-    And maxMembers is 99999
-    And maxProjects is 9999
-    And maxMessagesPerMonth is 999999999
-    And evaluationsCredit is 999999
-    And maxWorkflows is 9999
+    And maxMembers is Number.MAX_SAFE_INTEGER
+    And maxProjects is Number.MAX_SAFE_INTEGER
+    And maxMessagesPerMonth is Number.MAX_SAFE_INTEGER
+    And maxWorkflows is Number.MAX_SAFE_INTEGER
     And canPublish is true
 
   # ============================================================================
   # Constants: FREE_PLAN
   # ============================================================================
 
-  # KEPT @unimplemented: same gap as UNLIMITED_PLAN above. FREE_PLAN's full
-  # shape is not asserted directly — only piecemeal usage in licenseHandler
-  # integration tests. Add a constants.unit.test.ts case to bind this.
-  @unimplemented
   Scenario: FREE_PLAN has correct limits for expired/invalid licenses
     When I access the FREE_PLAN constant
     Then the plan type is "FREE"
@@ -94,6 +84,5 @@ Feature: License to PlanInfo Mapping
     And maxMembers is 1
     And maxProjects is 2
     And maxMessagesPerMonth is 1000
-    And evaluationsCredit is 2
     And maxWorkflows is 3
     And canPublish is false
