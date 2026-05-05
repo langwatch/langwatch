@@ -883,6 +883,7 @@ describe("Feature: Dataset REST API", () => {
     });
 
     describe("when the dataset does not exist", () => {
+      /** @scenario Batch create records returns 404 for non-existent dataset */
       it("returns 404 Not Found", async () => {
         const res = await helpers.api.post(
           "/api/dataset/ghost/records",
@@ -900,6 +901,7 @@ describe("Feature: Dataset REST API", () => {
         ]);
       });
 
+      /** @scenario Batch create records requires entries in body */
       it("returns 422 Unprocessable Entity for empty body", async () => {
         const res = await helpers.api.post(
           "/api/dataset/my-dataset/records",
@@ -907,6 +909,30 @@ describe("Feature: Dataset REST API", () => {
         );
 
         expect(res.status).toBe(422);
+      });
+    });
+
+    describe("when entries exceed the maximum batch size", () => {
+      beforeEach(async () => {
+        await createDatasetWithColumns("my-dataset", [
+          { name: "input", type: "string" },
+        ]);
+      });
+
+      /** @scenario Batch create records enforces maximum batch size */
+      it("returns 422 Unprocessable Entity when entries exceeds 1000", async () => {
+        const tooMany = Array.from({ length: 1001 }, (_, i) => ({
+          input: `value-${i}`,
+        }));
+        const res = await helpers.api.post(
+          "/api/dataset/my-dataset/records",
+          { entries: tooMany },
+        );
+
+        expect(res.status).toBe(422);
+        const body = await res.json();
+        const errorText = JSON.stringify(body).toLowerCase();
+        expect(errorText).toMatch(/too many|maximum|1000|limit|batch/);
       });
     });
 
