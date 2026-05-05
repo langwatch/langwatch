@@ -38,30 +38,30 @@ export function envForTool(cfg: GovernanceConfig, tool: string): ToolEnv {
     case "claude":
       return {
         vars: {
-          ANTHROPIC_BASE_URL: `${gw}/api/v1/anthropic`,
+          ANTHROPIC_BASE_URL: gw,
           ANTHROPIC_AUTH_TOKEN: auth,
         },
       };
     case "codex":
       return {
         vars: {
-          OPENAI_BASE_URL: `${gw}/api/v1/openai`,
+          OPENAI_BASE_URL: gw,
           OPENAI_API_KEY: auth,
         },
       };
     case "cursor":
       return {
         vars: {
-          OPENAI_BASE_URL: `${gw}/api/v1/openai`,
+          OPENAI_BASE_URL: gw,
           OPENAI_API_KEY: auth,
-          ANTHROPIC_BASE_URL: `${gw}/api/v1/anthropic`,
+          ANTHROPIC_BASE_URL: gw,
           ANTHROPIC_AUTH_TOKEN: auth,
         },
       };
     case "gemini":
       return {
         vars: {
-          GOOGLE_GENAI_API_BASE: `${gw}/api/v1/gemini`,
+          GOOGLE_GENAI_API_BASE: gw,
           GEMINI_API_KEY: auth,
         },
       };
@@ -72,9 +72,9 @@ export function envForTool(cfg: GovernanceConfig, tool: string): ToolEnv {
       // injection so any provider the user hops to lands at our gw.
       return {
         vars: {
-          OPENAI_BASE_URL: `${gw}/api/v1/openai`,
+          OPENAI_BASE_URL: gw,
           OPENAI_API_KEY: auth,
-          ANTHROPIC_BASE_URL: `${gw}/api/v1/anthropic`,
+          ANTHROPIC_BASE_URL: gw,
           ANTHROPIC_AUTH_TOKEN: auth,
         },
       };

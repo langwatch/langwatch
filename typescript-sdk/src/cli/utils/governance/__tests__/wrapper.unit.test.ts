@@ -11,13 +11,13 @@ const cfg: GovernanceConfig = {
 describe("envForTool", () => {
   it("claude → ANTHROPIC_BASE_URL + ANTHROPIC_AUTH_TOKEN", () => {
     const env = envForTool(cfg, "claude").vars;
-    expect(env.ANTHROPIC_BASE_URL).toBe("http://gw.example.com/api/v1/anthropic");
+    expect(env.ANTHROPIC_BASE_URL).toBe("http://gw.example.com");
     expect(env.ANTHROPIC_AUTH_TOKEN).toBe("lw_vk_test_x");
   });
 
   it("codex → OPENAI_BASE_URL + OPENAI_API_KEY", () => {
     const env = envForTool(cfg, "codex").vars;
-    expect(env.OPENAI_BASE_URL).toBe("http://gw.example.com/api/v1/openai");
+    expect(env.OPENAI_BASE_URL).toBe("http://gw.example.com");
     expect(env.OPENAI_API_KEY).toBe("lw_vk_test_x");
   });
 
@@ -31,15 +31,15 @@ describe("envForTool", () => {
 
   it("gemini → GOOGLE_GENAI_API_BASE + GEMINI_API_KEY", () => {
     const env = envForTool(cfg, "gemini").vars;
-    expect(env.GOOGLE_GENAI_API_BASE).toBe("http://gw.example.com/api/v1/gemini");
+    expect(env.GOOGLE_GENAI_API_BASE).toBe("http://gw.example.com");
     expect(env.GEMINI_API_KEY).toBe("lw_vk_test_x");
   });
 
   it("opencode → both Anthropic + OpenAI pairs (multi-provider)", () => {
     const env = envForTool(cfg, "opencode").vars;
-    expect(env.OPENAI_BASE_URL).toBe("http://gw.example.com/api/v1/openai");
+    expect(env.OPENAI_BASE_URL).toBe("http://gw.example.com");
     expect(env.OPENAI_API_KEY).toBe("lw_vk_test_x");
-    expect(env.ANTHROPIC_BASE_URL).toBe("http://gw.example.com/api/v1/anthropic");
+    expect(env.ANTHROPIC_BASE_URL).toBe("http://gw.example.com");
     expect(env.ANTHROPIC_AUTH_TOKEN).toBe("lw_vk_test_x");
   });
 
@@ -57,6 +57,6 @@ describe("envForTool", () => {
   it("strips trailing slash from gateway_url", () => {
     const trailing: GovernanceConfig = { ...cfg, gateway_url: "http://gw.example.com/" };
     const env = envForTool(trailing, "claude").vars;
-    expect(env.ANTHROPIC_BASE_URL).toBe("http://gw.example.com/api/v1/anthropic");
+    expect(env.ANTHROPIC_BASE_URL).toBe("http://gw.example.com");
   });
 });
