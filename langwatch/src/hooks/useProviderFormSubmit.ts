@@ -159,6 +159,42 @@ export function useProviderFormSubmit({
         }
       }
 
+      // Block save when "use as default provider" is enabled but the
+      // selected default model belongs to a different provider — otherwise
+      // updateProjectDefaultModels would silently persist a contradiction
+      // (this provider becomes the default while the model still points
+      // elsewhere). See #3785.
+      if (useAsDefaultProvider) {
+        const prefix = `${provider.provider}/`;
+        const mismatched: string[] = [];
+        if (projectDefaultModel && !projectDefaultModel.startsWith(prefix)) {
+          mismatched.push("Default model");
+        }
+        if (
+          projectTopicClusteringModel &&
+          !projectTopicClusteringModel.startsWith(prefix)
+        ) {
+          mismatched.push("Topic clustering model");
+        }
+        if (mismatched.length > 0) {
+          toaster.create({
+            title: "Cannot save: pick a model from this provider",
+            description: `${mismatched.join(" and ")} ${
+              mismatched.length === 1 ? "belongs" : "belong"
+            } to a different provider. Pick a ${
+              provider.provider
+            } model${
+              provider.provider === "azure" ? " (or add a custom deployment)" : ""
+            } before saving.`,
+            type: "error",
+            duration: 5000,
+            meta: { closable: true },
+          });
+          setIsSaving(false);
+          return;
+        }
+      }
+
       // Determine what customKeys to send
       let customKeysToSend: Record<string, unknown> | undefined;
       const userEnteredNewKey = hasUserEnteredNewApiKey(customKeys);
