@@ -30,6 +30,26 @@ const baseAzureProvider = {
   deploymentMapping: null,
 };
 
+const baseAnthropicProvider = {
+  provider: "anthropic" as const,
+  enabled: true,
+  customKeys: {
+    ANTHROPIC_API_KEY: "sk-ant-test",
+  },
+  extraHeaders: null,
+  deploymentMapping: null,
+};
+
+const baseOpenAIProvider = {
+  provider: "openai" as const,
+  enabled: true,
+  customKeys: {
+    OPENAI_API_KEY: "sk-openai-test",
+  },
+  extraHeaders: null,
+  deploymentMapping: null,
+};
+
 describe("prepareLitellmParams", () => {
   describe("when the caller passes the new canonical mp-id wire format", () => {
     it("normalises params.model to provider-prefixed form using the resolved MP", async () => {
@@ -58,17 +78,12 @@ describe("prepareLitellmParams", () => {
     });
   });
 
-  describe("when the model is an Anthropic Claude version with dots", () => {
-    /** @scenario "prepareLitellmParams translates Anthropic model ID" */
-    it("translates anthropic/claude-opus-4.5 to anthropic/claude-opus-4-5 in params.model", async () => {
-      const baseAnthropicProvider = {
-        provider: "anthropic" as const,
-        enabled: true,
-        customKeys: { ANTHROPIC_API_KEY: "sk-ant-test" },
-        extraHeaders: null,
-        deploymentMapping: null,
-      };
-
+  describe("when provider is anthropic", () => {
+    /** @scenario prepareLitellmParams translates Anthropic model ID */
+    it("translates dotted Anthropic model IDs to LiteLLM-compatible dashed form", async () => {
+      // llmModels.json uses "anthropic/claude-opus-4.5" (dot notation).
+      // LiteLLM expects "anthropic/claude-opus-4-5" (dash notation).
+      // prepareLitellmParams must translate at the boundary.
       const params = await prepareLitellmParams({
         model: "anthropic/claude-opus-4.5",
         modelProvider: baseAnthropicProvider,
@@ -79,17 +94,11 @@ describe("prepareLitellmParams", () => {
     });
   });
 
-  describe("when the model is an OpenAI model", () => {
-    /** @scenario "prepareLitellmParams preserves OpenAI model ID" */
-    it("preserves openai/gpt-5 unchanged in params.model", async () => {
-      const baseOpenAIProvider = {
-        provider: "openai" as const,
-        enabled: true,
-        customKeys: { OPENAI_API_KEY: "sk-openai-test" },
-        extraHeaders: null,
-        deploymentMapping: null,
-      };
-
+  describe("when provider is openai", () => {
+    /** @scenario prepareLitellmParams preserves OpenAI model ID */
+    it("preserves OpenAI model IDs unchanged", async () => {
+      // Only Anthropic and custom providers need dot-to-dash translation.
+      // OpenAI model IDs already use the format LiteLLM expects.
       const params = await prepareLitellmParams({
         model: "openai/gpt-5",
         modelProvider: baseOpenAIProvider,
