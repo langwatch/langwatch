@@ -35,6 +35,18 @@ import { useRouter } from "~/utils/compat/next-router";
 import { useSession } from "~/utils/auth-client";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 
+/**
+ * Credential the CLI is requesting.
+ *  - `device_session`: user-scoped CLI session token written to
+ *    `~/.langwatch/config.json`. Used by `langwatch claude/codex/etc`,
+ *    `whoami`, governance commands. Today's only mode.
+ *  - `project_api_key`: project-scoped SDK API key written to `.env`.
+ *    Used by `langwatch sync`, `langwatch eval`, `langwatch prompt`,
+ *    and the SDK auto-instrumentation. Replaces the legacy paste-back
+ *    flow with the same no-paste UX as device sessions.
+ */
+type CredentialType = "device_session" | "project_api_key";
+
 type LookupState =
   | { kind: "loading" }
   | {
@@ -42,6 +54,7 @@ type LookupState =
       userCode: string;
       status: string;
       expiresAt: number;
+      credentialType: CredentialType;
     }
   | { kind: "error"; message: string }
   | { kind: "expired" };
@@ -53,6 +66,8 @@ type ActionState =
       kind: "success";
       vkLabel: string;
       organizationName: string;
+      credentialType: CredentialType;
+      projectName?: string;
     }
   | { kind: "error"; message: string }
   | { kind: "denied" };
@@ -78,6 +93,9 @@ export default function CliAuthPage() {
   const [lookup, setLookup] = useState<LookupState>({ kind: "loading" });
   const [action, setAction] = useState<ActionState>({ kind: "idle" });
   const [selectedOrgId, setSelectedOrgId] = useState<string | null>(null);
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(
+    null,
+  );
 
   // Auto-pick the first org if there's only one. The chooser is only
   // necessary when the user is in 2+.
@@ -86,6 +104,42 @@ export default function CliAuthPage() {
       setSelectedOrgId(organizations[0]!.id);
     }
   }, [organizations, selectedOrgId]);
+
+  // Projects scoped to the selected org, flattened across teams. Drives
+  // the project picker that only renders for `project_api_key` mode.
+  // Excludes the hidden `internal_governance` project — it's a system
+  // tenancy boundary, never a target for SDK keys.
+  const projectsForOrg = useMemo(() => {
+    if (!selectedOrgId || !organizations) return [] as Array<{
+      id: string;
+      name: string;
+      slug: string;
+      teamName: string;
+    }>;
+    const org = organizations.find((o) => o.id === selectedOrgId);
+    if (!org) return [];
+    return (org.teams ?? []).flatMap((team) =>
+      (team.projects ?? [])
+        .filter((p) => p.slug !== "internal_governance")
+        .map((p) => ({
+          id: p.id,
+          name: p.name,
+          slug: p.slug,
+          teamName: team.name,
+        })),
+    );
+  }, [organizations, selectedOrgId]);
+
+  // Auto-pick the only project, if there is exactly one. Reset when org
+  // changes so the picker is fresh per-org.
+  useEffect(() => {
+    setSelectedProjectId(null);
+  }, [selectedOrgId]);
+  useEffect(() => {
+    if (projectsForOrg.length === 1 && !selectedProjectId) {
+      setSelectedProjectId(projectsForOrg[0]!.id);
+    }
+  }, [projectsForOrg, selectedProjectId]);
 
   // Redirect to sign-in if unauthenticated, preserving the user_code in
   // the callback URL so the user lands back here after SSO.
@@ -132,12 +186,22 @@ export default function CliAuthPage() {
           user_code: string;
           status: string;
           expires_at: number;
+          credential_type?: CredentialType;
         };
+        // Defensive: backend may not yet emit `credential_type` on older
+        // deployments. Default to `device_session` so the existing UX
+        // path keeps working until the discriminator ships server-side.
+        const credentialType: CredentialType =
+          data.credential_type === "project_api_key" ||
+          data.credential_type === "device_session"
+            ? data.credential_type
+            : "device_session";
         setLookup({
           kind: "ready",
           userCode: data.user_code,
           status: data.status,
           expiresAt: data.expires_at,
+          credentialType,
         });
       } catch (err) {
         if (cancelled) return;
@@ -152,8 +216,13 @@ export default function CliAuthPage() {
     };
   }, [session, userCode]);
 
+  const credentialType: CredentialType =
+    lookup.kind === "ready" ? lookup.credentialType : "device_session";
+  const requiresProject = credentialType === "project_api_key";
+
   const handleApprove = async () => {
     if (!selectedOrgId || !userCode) return;
+    if (requiresProject && !selectedProjectId) return;
     setAction({ kind: "submitting" });
     try {
       const r = await fetch("/api/auth/cli/approve", {
@@ -162,6 +231,9 @@ export default function CliAuthPage() {
         body: JSON.stringify({
           user_code: userCode,
           organization_id: selectedOrgId,
+          ...(requiresProject && selectedProjectId
+            ? { project_id: selectedProjectId }
+            : {}),
         }),
       });
       const data = (await r.json().catch(() => ({}))) as {
@@ -179,10 +251,15 @@ export default function CliAuthPage() {
       const orgName =
         organizations?.find((o) => o.id === selectedOrgId)?.name ??
         "your organization";
+      const projectName = requiresProject
+        ? projectsForOrg.find((p) => p.id === selectedProjectId)?.name
+        : undefined;
       setAction({
         kind: "success",
         vkLabel: data.personal_vk_label ?? "default",
         organizationName: orgName,
+        credentialType,
+        projectName,
       });
     } catch (err) {
       setAction({
@@ -228,7 +305,9 @@ export default function CliAuthPage() {
           <Card.Header>
             <HStack width="full" align="center">
               <Heading as="h1" size="md">
-                Authorize the LangWatch CLI
+                {requiresProject
+                  ? "Generate an SDK key for the LangWatch CLI"
+                  : "Authorize the LangWatch CLI"}
               </Heading>
             </HStack>
           </Card.Header>
@@ -279,6 +358,11 @@ export default function CliAuthPage() {
 
               {lookup.kind === "ready" && action.kind !== "success" && action.kind !== "denied" && (
                 <>
+                  <Text fontSize="sm" color="gray.600">
+                    {requiresProject
+                      ? "The CLI is requesting a project SDK API key. Pick the project to mint a key for; the key will flow back to your terminal automatically — no copy-paste."
+                      : "The CLI is requesting a device session. Approving signs in this device for AI-tool wrappers (Claude, Codex, etc.) and governance commands."}
+                  </Text>
                   <Box
                     bg="gray.50"
                     borderRadius="md"
@@ -316,6 +400,49 @@ export default function CliAuthPage() {
                     </Box>
                   )}
 
+                  {requiresProject && (
+                    <Box>
+                      <Text fontWeight="medium" mb={2}>
+                        Project
+                      </Text>
+                      {projectsForOrg.length === 0 ? (
+                        <Alert.Root status="warning">
+                          <Alert.Indicator />
+                          <Alert.Content>
+                            <Alert.Title>No projects yet</Alert.Title>
+                            <Alert.Description>
+                              Create a project in this organization first, then
+                              re-run <code>langwatch login</code> in your
+                              terminal.
+                            </Alert.Description>
+                          </Alert.Content>
+                        </Alert.Root>
+                      ) : (
+                        <VStack align="stretch" gap={2}>
+                          {projectsForOrg.map((p) => (
+                            <Button
+                              key={p.id}
+                              variant={
+                                selectedProjectId === p.id ? "solid" : "outline"
+                              }
+                              onClick={() => setSelectedProjectId(p.id)}
+                              justifyContent="flex-start"
+                              height="auto"
+                              paddingY={3}
+                            >
+                              <VStack align="start" gap={0} width="full">
+                                <Text fontWeight="semibold">{p.name}</Text>
+                                <Text fontSize="xs" opacity={0.7}>
+                                  {p.teamName}
+                                </Text>
+                              </VStack>
+                            </Button>
+                          ))}
+                        </VStack>
+                      )}
+                    </Box>
+                  )}
+
                   {action.kind === "error" && (
                     <Alert.Root status="error">
                       <Alert.Indicator />
@@ -332,9 +459,12 @@ export default function CliAuthPage() {
                       flex={1}
                       onClick={handleApprove}
                       loading={action.kind === "submitting"}
-                      disabled={!selectedOrgId}
+                      disabled={
+                        !selectedOrgId ||
+                        (requiresProject && !selectedProjectId)
+                      }
                     >
-                      Approve
+                      {requiresProject ? "Generate API key" : "Approve"}
                     </Button>
                     <Button
                       variant="outline"
@@ -351,13 +481,30 @@ export default function CliAuthPage() {
                 <Alert.Root status="success">
                   <Alert.Indicator />
                   <Alert.Content>
-                    <Alert.Title>You're signed in!</Alert.Title>
-                    <Alert.Description>
-                      LangWatch CLI is now authorized for{" "}
-                      <strong>{action.organizationName}</strong> using the{" "}
-                      <code>{action.vkLabel}</code> personal key. You can close
-                      this tab and return to your terminal.
-                    </Alert.Description>
+                    {action.credentialType === "project_api_key" ? (
+                      <>
+                        <Alert.Title>API key generated!</Alert.Title>
+                        <Alert.Description>
+                          A fresh project API key has been minted for{" "}
+                          <strong>
+                            {action.projectName ?? "your project"}
+                          </strong>{" "}
+                          ({action.organizationName}). The key flowed back to
+                          your terminal automatically — your{" "}
+                          <code>.env</code> is updated. You can close this tab.
+                        </Alert.Description>
+                      </>
+                    ) : (
+                      <>
+                        <Alert.Title>You&apos;re signed in!</Alert.Title>
+                        <Alert.Description>
+                          LangWatch CLI is now authorized for{" "}
+                          <strong>{action.organizationName}</strong> using the{" "}
+                          <code>{action.vkLabel}</code> personal key. You can
+                          close this tab and return to your terminal.
+                        </Alert.Description>
+                      </>
+                    )}
                   </Alert.Content>
                 </Alert.Root>
               )}
