@@ -2,6 +2,7 @@ import type { PrismaClient, Project } from "@prisma/client";
 import type { Session } from "~/server/auth";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
+import { env } from "~/env.mjs";
 import { KEY_CHECK, MASKED_KEY_PLACEHOLDER } from "../../utils/constants";
 import type { CustomModelsInput } from "./customModel.schema";
 import { toLegacyCompatibleCustomModels } from "./customModel.schema";
@@ -380,7 +381,21 @@ export class ModelProviderService {
       Object.entries(modelProviders)
         .filter(([_, modelProvider]) => modelProvider.enabledSince)
         .map(([providerKey, modelProvider]) => {
+          // Auto-enable from host env vars only when running in SaaS mode.
+          // In SaaS, the platform's `ANTHROPIC_API_KEY` (etc.) is the
+          // shared platform key that every org tenant inherits — that's
+          // the intended product behavior. In self-hosted, the host
+          // `.env` keys belong to whoever installed the deployment and
+          // should NOT silently leak into every fresh org as "already
+          // configured" (G79: Ariana's fresh-org Anthropic edit drawer
+          // pre-populated the API-key field with masked dots, making the
+          // admin think their org had a key when they didn't).
+          //
+          // Self-hosted operators who DO want global env-key sharing can
+          // still set `IS_SAAS=true` explicitly; the default is the
+          // safer multi-tenant isolation.
           const enabled =
+            env.IS_SAAS === true &&
             modelProvider.enabledSince! < project.createdAt &&
             !!process.env[modelProvider.apiKey] &&
             (providerKey !== "vertex_ai" || !!process.env.VERTEXAI_PROJECT);
