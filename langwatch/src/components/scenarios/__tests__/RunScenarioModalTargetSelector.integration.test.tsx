@@ -132,6 +132,7 @@ describe("RunScenarioModal with TargetSelector", () => {
   });
 
   describe("when selecting an agent from the dropdown", () => {
+    /** @scenario Selecting an agent preserves its type */
     it("keeps the modal open and shows the selected agent", async () => {
       renderModal();
       await openDropdown();

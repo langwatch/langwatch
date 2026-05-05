@@ -41,6 +41,7 @@ function hasHashTag(queueName: string): boolean {
 
 describe("BullMQ Redis Cluster Compatibility", () => {
   describe("when using makeQueueName", () => {
+    /** @scenario Every queue name produced by the system contains a hash tag */
     it("wraps a name in hash tags", () => {
       expect(makeQueueName("collector")).toBe("{collector}");
     });
@@ -57,6 +58,7 @@ describe("BullMQ Redis Cluster Compatibility", () => {
   });
 
   describe("when checking background worker queue constants", () => {
+    /** @scenario Background worker queues operate on Redis Cluster */
     it.each([
       ["COLLECTOR_QUEUE", COLLECTOR_QUEUE.NAME],
       ["EVALUATIONS_QUEUE", EVALUATIONS_QUEUE.NAME],
@@ -111,6 +113,7 @@ describe("Redis Cluster CROSSSLOT Behavior", () => {
     // To stop: docker rm -f $(docker ps -q --filter "label=org.testcontainers=true")
   });
 
+  /** @scenario Adding a job to a queue without a hash tag fails on Redis Cluster */
   it("fails with CROSSSLOT when queue name has no hash tag", async () => {
     const connection = createClusterConnection();
     const queue = new Queue("test-no-hash-tag", {
@@ -128,6 +131,7 @@ describe("Redis Cluster CROSSSLOT Behavior", () => {
   });
 
   // Skipped: requires testcontainers Redis cluster setup. Enable when testcontainers are available in CI.
+  /** @scenario Adding and processing a job succeeds when the queue name has a hash tag */
   it.skip("succeeds when queue name has a hash tag", async () => {
     const queueConnection = createClusterConnection();
     const workerConnection = createClusterConnection();

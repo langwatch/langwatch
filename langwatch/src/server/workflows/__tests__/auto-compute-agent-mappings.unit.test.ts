@@ -86,6 +86,7 @@ function buildPrismaMock({
 
 describe("autoComputeAgentMappings", () => {
   describe("when a workflow agent has no scenarioMappings and conventional inputs", () => {
+    /** @scenario Auto-computes mappings when workflow with conventional inputs is saved */
     it("maps query to scenario input field", async () => {
       const dsl = buildDSL({ inputs: ["query", "history"], output: "response" });
       const { prisma, updatedConfigs } = buildPrismaMock({
@@ -208,6 +209,7 @@ describe("autoComputeAgentMappings", () => {
   });
 
   describe("when the workflow still has blank-template placeholder fields", () => {
+    /** @scenario Skips auto-compute when workflow still has blank-template placeholder fields */
     it("skips auto-compute and leaves scenarioMappings empty", async () => {
       // Blank template: entry outputs "question", end inputs "output"
       const dsl = buildDSL({ inputs: ["question"], output: "output" });
@@ -227,6 +229,7 @@ describe("autoComputeAgentMappings", () => {
   });
 
   describe("when existing scenarioMappings reference stale fields", () => {
+    /** @scenario Re-computes mappings when existing mappings reference stale fields */
     it("re-computes mappings against the current workflow inputs", async () => {
       // Workflow now has "prompt" — but agent still maps "old_query"
       const dsl = buildDSL({ inputs: ["prompt"], output: "response" });
@@ -450,6 +453,7 @@ describe("autoComputeAgentMappings", () => {
   });
 
   describe("when Prisma throws an error", () => {
+    /** @scenario Auto-compute does not block the workflow save on failure */
     it("does not propagate the error (non-blocking)", async () => {
       const dsl = buildDSL({ inputs: ["query"], output: "response" });
       const prisma = {

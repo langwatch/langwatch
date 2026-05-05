@@ -3,6 +3,19 @@ Feature: Unified run table merging queued jobs and completed runs
   I want queued, running, and completed scenarios to appear in the same run table
   So that I can track execution progress without a separate pending banner
 
+  # Parity status: 4 of 12 scenarios bound to existing tests.
+  # Remaining @unimplemented scenarios (#3458):
+  #   8 NO_TEST: shipped behavior, no integration test yet
+  # NO_TEST gaps:
+  #   - "Queued jobs appear in the run table immediately after suite run"
+  #   - "Row status progresses from queued to running to completed"
+  #   - "Pass rate reflects total vs completed vs pending counts"
+  #   - "All Runs view includes queued jobs across suites"
+  #   - "Scheduled suite run stores scenario metadata needed for display"
+  #   - "ScenarioJobRepository normalizes waiting jobs into row format"
+  #   - "Queued rows render with a pending visual treatment"
+  #   - "Maps BullMQ job state to scenario run status" (Scenario Outline)
+
   Background:
     Given a project with a suite containing scenarios and targets
 
@@ -33,7 +46,7 @@ Feature: Unified run table merging queued jobs and completed runs
     And pending jobs are reflected in the count
 
   # Service layer: merge and deduplicate from both data sources
-  @integration @unimplemented
+  @integration
   Scenario: Service merges BullMQ jobs and ES scenario events into a unified list
     Given BullMQ has waiting and active jobs for a batch run
     And ES has completed scenario events for the same batch run
@@ -42,7 +55,7 @@ Feature: Unified run table merging queued jobs and completed runs
     And no duplicate rows exist for the same scenario run
 
   # Deduplication: ES wins when both sources have data for the same scenario+target+batch
-  @integration @unimplemented
+  @integration
   Scenario: ES data takes precedence over BullMQ job data
     Given a job exists in BullMQ as active for a scenario and target
     And an ES event exists for the same scenario, target, and batch run
@@ -50,7 +63,7 @@ Feature: Unified run table merging queued jobs and completed runs
     Then only the ES-sourced row is returned for that scenario execution
 
   # Edge case: no queued jobs returns only ES data
-  @integration @unimplemented
+  @integration
   Scenario: Returns only ES data when no jobs are queued
     Given BullMQ has no waiting or active jobs for the suite
     And ES has completed scenario events
@@ -58,7 +71,7 @@ Feature: Unified run table merging queued jobs and completed runs
     Then only ES-sourced rows are returned
 
   # Edge case: no ES data returns only queued job rows
-  @integration @unimplemented
+  @integration
   Scenario: Returns only queued rows when no ES events exist yet
     Given BullMQ has waiting jobs for a batch run
     And ES has no scenario events for that batch run
@@ -101,7 +114,7 @@ Feature: Unified run table merging queued jobs and completed runs
       | active       | running    |
 
   # Service layer: deduplication logic
-  @unit @unimplemented
+  @unit
   Scenario: Deduplication removes BullMQ entries that have matching ES entries
     Given a list of job rows and a list of ES rows
     And some entries share the same scenario, target, and batch run
@@ -116,11 +129,3 @@ Feature: Unified run table merging queued jobs and completed runs
     When the table renders
     Then queued rows display a spinner or skeleton indicator
     And queued rows do not show a pass/fail badge
-
-  # Frontend: QueueStatusBanner is no longer needed
-  @integration @unimplemented
-  Scenario: No separate pending banner is displayed
-    Given a suite run is in progress with queued jobs
-    When I view the suite detail page
-    Then no separate pending jobs banner is visible
-    And all pending jobs are visible as rows in the run table

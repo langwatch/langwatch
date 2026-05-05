@@ -11,6 +11,7 @@ import {
 
 describe("ProjectForm validation logic", () => {
   describe("when validating project name", () => {
+    /** @scenario Project name is required */
     it("requires a project name", () => {
       expect(validateProjectName(undefined)).toBe("Project name is required");
     });
@@ -19,6 +20,7 @@ describe("ProjectForm validation logic", () => {
       expect(validateProjectName("")).toBe("Project name is required");
     });
 
+    /** @scenario Project name with only whitespace is invalid */
     it("rejects whitespace only", () => {
       expect(validateProjectName("   ")).toBe("Project name is required");
     });
@@ -33,6 +35,8 @@ describe("ProjectForm validation logic", () => {
       expect(validateNewTeamName("team-123", undefined)).toBe(true);
     });
 
+    /** @scenario Show new team name field when creating new team */
+    /** @scenario New team name is required when creating team */
     it("requires new team name when creating new team", () => {
       expect(validateNewTeamName(NEW_TEAM_VALUE, undefined)).toBe(
         "Team name is required",

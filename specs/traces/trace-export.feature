@@ -4,6 +4,12 @@ Feature: Trace export with depth options
   I want to export traces with configurable depth (summary or full with spans)
   So that I can use trace data for debugging, data analysis, and BI workflows
 
+  # All scenarios describe the export-modal UI flow on the Messages page
+  # (summary vs full export, CSV/JSON, async progress). Need a JSDOM
+  # render of the export modal + integration test against the export
+  # endpoint. The CSV/JSON serializers are already covered by their
+  # own unit tests in `langwatch/src/server/export/__tests__/`.
+
   Background:
     Given I am on the Messages page in table view
     And my project has traces with spans, evaluations, and metadata

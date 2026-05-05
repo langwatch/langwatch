@@ -6,6 +6,7 @@ import { projectRoutes } from "../routes";
 
 describe("projectRoutes", () => {
   describe("when the suites route configuration is read", () => {
+    /** @scenario 'Route title is "Run Plans"' */
     it("has title 'Run Plans'", () => {
       expect(projectRoutes.suites.title).toBe("Run Plans");
     });

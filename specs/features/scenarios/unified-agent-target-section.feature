@@ -3,6 +3,13 @@ Feature: Unified agent target section in scenario menus
   I want a single "Agent" section listing all agent types together
   So that I don't have to scan separate sections for HTTP vs Code agents
 
+  # Parity status: 1 of 4 scenarios bound to existing tests.
+  # The remaining 3 @unimplemented scenarios describe shipped behavior
+  # that does not yet have an integration test (#3458):
+  #   - "SaveAndRunMenu shows agents in a single section"
+  #   - "TargetSelector shows agents in a single section"
+  #   - "Search filters across all agent types"
+
   Background:
     Given a project with HTTP agents and Code agents configured
     And published prompts exist
@@ -29,7 +36,7 @@ Feature: Unified agent target section in scenario menus
     And I search for "My"
     Then both "My HTTP Bot" and "My Code Bot" appear in the agents section
 
-  @integration @unimplemented
+  @integration
   Scenario: Selecting an agent preserves its type
     When I select an HTTP agent from the unified agents section
     Then the target value has type "http" and the correct agent id

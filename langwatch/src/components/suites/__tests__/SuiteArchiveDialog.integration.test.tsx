@@ -33,6 +33,7 @@ describe("<SuiteArchiveDialog/>", () => {
   });
 
   describe("given the dialog is open", () => {
+    /** @scenario 'Archive confirmation dialog uses "run plan"' */
     it("displays 'Archive run plan?' as the title", () => {
       render(<SuiteArchiveDialog {...defaultProps} />, { wrapper: Wrapper });
 

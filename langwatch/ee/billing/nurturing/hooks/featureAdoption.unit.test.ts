@@ -44,6 +44,7 @@ describe("Feature adoption hooks", () => {
 
   describe("fireTeamMemberInvitedNurturing()", () => {
     describe("when an invite is sent", () => {
+      /** @scenario 'Team member invite updates member count and fires event' */
       it("identifies user with updated team_member_count", () => {
         fireTeamMemberInvitedNurturing({
           userId: "user-1",
@@ -88,6 +89,7 @@ describe("Feature adoption hooks", () => {
     });
 
     describe("when Customer.io API is unavailable", () => {
+      /** @scenario 'Feature adoption hook failure does not break the originating action' */
       it("does not throw (fire-and-forget)", async () => {
         const { captureException } = await import(
           "../../../../src/utils/posthogErrorCapture"
@@ -113,6 +115,7 @@ describe("Feature adoption hooks", () => {
 
   describe("fireWorkflowCreatedNurturing()", () => {
     describe("when the workflow is saved", () => {
+      /** @scenario 'Workflow creation updates workflow count and fires event' */
       it("identifies user with updated workflow_count", () => {
         fireWorkflowCreatedNurturing({
           userId: "user-1",
@@ -186,6 +189,7 @@ describe("Feature adoption hooks", () => {
 
   describe("fireScenarioCreatedNurturing()", () => {
     describe("when the scenario is saved", () => {
+      /** @scenario 'Scenario creation updates scenario count and fires event' */
       it("identifies user with updated scenario_count", () => {
         fireScenarioCreatedNurturing({
           userId: "user-1",
@@ -259,6 +263,7 @@ describe("Feature adoption hooks", () => {
 
   describe("fireExperimentRanNurturing()", () => {
     describe("when the experiment completes", () => {
+      /** @scenario 'Experiment run fires event' */
       it("tracks experiment_ran event with experiment_id and project_id", () => {
         fireExperimentRanNurturing({
           userId: "user-1",

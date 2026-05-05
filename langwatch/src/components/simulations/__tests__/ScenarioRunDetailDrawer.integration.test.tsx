@@ -32,6 +32,7 @@ describe("ScenarioRunDetailDrawer", () => {
 
   describe("ScenarioRunHeader in drawer context", () => {
     describe("given a failed run", () => {
+      /** @scenario Drawer header shows run identity and status */
       it("displays the scenario name and status icon", () => {
         render(
           <ScenarioRunHeader
@@ -96,6 +97,7 @@ describe("ScenarioRunDetailDrawer", () => {
 
   describe("SimulationConsole in drawer context", () => {
     describe("given a completed run with results", () => {
+      /** @scenario Criteria section shows pass/fail summary */
       it("displays the test report with criteria", () => {
         render(
           <SimulationConsole

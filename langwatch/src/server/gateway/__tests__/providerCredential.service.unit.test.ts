@@ -148,6 +148,7 @@ describe("GatewayProviderCredentialService.create", () => {
       expect(data.rotationPolicy).toBe("MANUAL");
     });
 
+    /** @scenario Provider binding mutation writes targetKind=provider_binding */
     it("emits a PROVIDER_BINDING_UPDATED change-event + gateway.provider_binding.created audit entry", async () => {
       const { prisma, changeEventCreate, auditCreate } = mockPrisma({
         modelProvider: stubModelProvider(),

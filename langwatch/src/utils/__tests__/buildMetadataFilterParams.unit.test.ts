@@ -3,6 +3,7 @@ import { buildMetadataFilterParams } from "../buildMetadataFilterParams";
 
 describe("buildMetadataFilterParams", () => {
   describe("when key is trace_id", () => {
+    /** @scenario trace_id uses query search syntax */
     it("returns query param with trace_id search syntax", () => {
       const result = buildMetadataFilterParams("trace_id", "abc123", "abc123");
 
@@ -11,6 +12,7 @@ describe("buildMetadataFilterParams", () => {
   });
 
   describe("when key is a reserved metadata key", () => {
+    /** @scenario Reserved metadata keys map to URL params */
     it("returns the mapped urlKey param for user_id", () => {
       const result = buildMetadataFilterParams(
         "user_id",
@@ -61,6 +63,7 @@ describe("buildMetadataFilterParams", () => {
     });
 
     describe("when originalValue is an array", () => {
+      /** @scenario Array metadata values pass all elements for OR filtering */
       it("passes all array elements for OR filtering", () => {
         const result = buildMetadataFilterParams("labels", "a, b, c", [
           "a",
@@ -86,6 +89,7 @@ describe("buildMetadataFilterParams", () => {
   });
 
   describe("when key is a custom metadata key", () => {
+    /** @scenario Custom metadata keys use metadata prefix */
     it("returns metadata_key and metadata.{key} params", () => {
       const result = buildMetadataFilterParams(
         "environment",
@@ -100,6 +104,7 @@ describe("buildMetadataFilterParams", () => {
     });
 
     describe("when key contains dots", () => {
+      /** @scenario Dots in custom keys are replaced with middle dots */
       it("replaces dots with middle dots in key", () => {
         const result = buildMetadataFilterParams(
           "app.version",

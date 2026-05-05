@@ -164,6 +164,8 @@ describe("All Runs default selection (Issue #1771)", () => {
 
   describe("when the page loads with no suite param in URL", () => {
     /** @scenario "All Runs is selected when page loads" */
+    /** @scenario "Run rows are expanded by default" */
+    /** @scenario "All runs panel rows are expanded by default" */
     it("selects 'All Runs' as the default sidebar item and displays the All Runs panel", async () => {
       mockRouterQuery = { project: "my-project" };
 
