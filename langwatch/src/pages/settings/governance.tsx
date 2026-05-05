@@ -184,7 +184,7 @@ function GovernanceOverviewPage() {
                 href="/settings/routing-policies"
                 ctaLabel={
                   hasPolicies
-                    ? `${policies.length} policy${policies.length === 1 ? "" : "ies"} configured`
+                    ? `${policies.length} ${policies.length === 1 ? "policy" : "policies"} configured`
                     : "Add a routing policy"
                 }
               />
@@ -205,7 +205,6 @@ function GovernanceOverviewPage() {
                 description="Set thresholds that page on-call when activity drifts."
                 href="/settings/governance/anomaly-rules"
                 ctaLabel="Anomaly rules"
-                upcoming
               />
             </VStack>
             <Box marginTop={5}>
