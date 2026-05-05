@@ -32,8 +32,12 @@ const suffix = nanoid(8);
 const ORG_ID = `org-g86-${suffix}`;
 const TEAM_ID = `team-g86-${suffix}`;
 const PROJECT_ID = `proj-g86-${suffix}`;
+// G116 — second project in the same team/org used to verify that an
+// org-scoped MP minted under PROJECT_ID is bindable from PROJECT_B_ID.
+const PROJECT_B_ID = `proj-g86b-${suffix}`;
 const USER_ID = `usr-g86-${suffix}`;
 const MP_ID = `mp-g86-${suffix}`;
+const MP_ORG_ID = `mp-g86-org-${suffix}`;
 
 describe("G86 diagnostic — getAllForOrg sees project-scoped binds", () => {
   const service = GatewayProviderCredentialService.create(prisma);
@@ -79,9 +83,27 @@ describe("G86 diagnostic — getAllForOrg sees project-scoped binds", () => {
         framework: "openai",
       },
     });
+    // G116 — second project under the same team so the org-scoped-MP
+    // bind path has a "different project, same org" caller to bind
+    // from. Mirrors Ariana's repro: an org-scoped credential created
+    // under one project is bindable from any sibling project.
+    await prisma.project.create({
+      data: {
+        id: PROJECT_B_ID,
+        name: `G86 Project B ${suffix}`,
+        slug: `g86-projb-${suffix}`,
+        apiKey: `key-b-${suffix}`,
+        teamId: TEAM_ID,
+        language: "typescript",
+        framework: "openai",
+      },
+    });
     // ModelProvider must exist + be enabled before a credential can
-    // bind to it (matches the service.create guard in
-    // providerCredential.service.ts).
+    // bind to it. Iter 109 made access depend on `ModelProviderScope`
+    // rows (the legacy `projectId` pointer no longer grants access on
+    // its own) — mirror that contract in the seed by writing an
+    // explicit PROJECT scope row, the same default the production
+    // ModelProviderRepository writes.
     await prisma.modelProvider.create({
       data: {
         id: MP_ID,
@@ -89,19 +111,38 @@ describe("G86 diagnostic — getAllForOrg sees project-scoped binds", () => {
         name: "Anthropic",
         provider: "anthropic",
         enabled: true,
+        scopes: {
+          create: { scopeType: "PROJECT", scopeId: PROJECT_ID },
+        },
+      },
+    });
+    // Org-scoped MP: legacy `projectId` points at PROJECT_ID, but the
+    // grant comes via an ORGANIZATION-scoped ModelProviderScope row
+    // which makes it visible from every project in ORG_ID — including
+    // PROJECT_B_ID. Used by the G116 test below.
+    await prisma.modelProvider.create({
+      data: {
+        id: MP_ORG_ID,
+        projectId: PROJECT_ID,
+        name: "Anthropic Org",
+        provider: "anthropic",
+        enabled: true,
+        scopes: {
+          create: { scopeType: "ORGANIZATION", scopeId: ORG_ID },
+        },
       },
     });
   });
 
   afterAll(async () => {
     await prisma.gatewayProviderCredential
-      .deleteMany({ where: { projectId: PROJECT_ID } })
+      .deleteMany({ where: { projectId: { in: [PROJECT_ID, PROJECT_B_ID] } } })
       .catch(() => undefined);
     await prisma.modelProvider
       .deleteMany({ where: { projectId: PROJECT_ID } })
       .catch(() => undefined);
     await prisma.project
-      .deleteMany({ where: { id: PROJECT_ID } })
+      .deleteMany({ where: { id: { in: [PROJECT_ID, PROJECT_B_ID] } } })
       .catch(() => undefined);
     await prisma.team
       .deleteMany({ where: { organizationId: ORG_ID } })
@@ -235,6 +276,87 @@ describe("G86 diagnostic — getAllForOrg sees project-scoped binds", () => {
         actorUserId: USER_ID,
       }),
     ).rejects.toMatchObject({ code: "CONFLICT" });
+  });
+
+  it("create binds an org-scoped MP from a sibling project (G116)", async () => {
+    // Ariana's repro: MP_ORG_ID is owned by PROJECT_ID via legacy
+    // pointer, granted to ORG_ID via ModelProviderScope. The bind
+    // drawer's dropdown (scope-aware via findAllAccessibleForProject)
+    // surfaces it on PROJECT_B_ID's gateway-providers admin. Pre-G116
+    // the create endpoint did `findFirst({ id, projectId })` and 404'd
+    // it. Contract under the scope-ladder lookup: PROJECT_B_ID can
+    // bind it because ORG_ID is a shared scope.
+    const bound = await service.create({
+      projectId: PROJECT_B_ID,
+      organizationId: ORG_ID,
+      modelProviderId: MP_ORG_ID,
+      slot: "primary",
+      actorUserId: USER_ID,
+    });
+    expect(bound.id).toBeTruthy();
+    expect(bound.projectId).toBe(PROJECT_B_ID);
+    expect(bound.modelProviderId).toBe(MP_ORG_ID);
+
+    // Org-scoped pickers (routing-policy drawer) must see this bind
+    // even though it's nested under PROJECT_B_ID — getAllForOrg sweeps
+    // every project in the org.
+    const orgRows = await service.getAllForOrg(ORG_ID);
+    expect(orgRows.find((r) => r.id === bound.id)).toBeDefined();
+
+    // Negative half of the contract: an MP with no scope-row coverage
+    // for the caller's project/team/org must remain inaccessible.
+    // Build a dedicated org+project pair to prove the boundary holds.
+    const otherSuffix = nanoid(6);
+    const otherOrgId = `org-g116-other-${otherSuffix}`;
+    const otherTeamId = `team-g116-other-${otherSuffix}`;
+    const otherProjectId = `proj-g116-other-${otherSuffix}`;
+    await prisma.organization.create({
+      data: {
+        id: otherOrgId,
+        name: `G116 Other ${otherSuffix}`,
+        slug: `g116-other-${otherSuffix}`,
+      },
+    });
+    await prisma.team.create({
+      data: {
+        id: otherTeamId,
+        name: `G116 Team ${otherSuffix}`,
+        slug: `g116-team-${otherSuffix}`,
+        organizationId: otherOrgId,
+      },
+    });
+    await prisma.project.create({
+      data: {
+        id: otherProjectId,
+        name: `G116 Other Proj ${otherSuffix}`,
+        slug: `g116-other-proj-${otherSuffix}`,
+        apiKey: `key-other-${otherSuffix}`,
+        teamId: otherTeamId,
+        language: "typescript",
+        framework: "openai",
+      },
+    });
+    try {
+      await expect(
+        service.create({
+          projectId: otherProjectId,
+          organizationId: otherOrgId,
+          modelProviderId: MP_ORG_ID,
+          slot: "primary",
+          actorUserId: USER_ID,
+        }),
+      ).rejects.toMatchObject({ code: "NOT_FOUND" });
+    } finally {
+      await prisma.project
+        .delete({ where: { id: otherProjectId } })
+        .catch(() => undefined);
+      await prisma.team
+        .delete({ where: { id: otherTeamId } })
+        .catch(() => undefined);
+      await prisma.organization
+        .delete({ where: { id: otherOrgId } })
+        .catch(() => undefined);
+    }
   });
 
   it("getAllForOrg returns empty array for an org with no credentials", async () => {
