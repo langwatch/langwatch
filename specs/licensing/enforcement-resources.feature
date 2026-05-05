@@ -92,7 +92,7 @@ Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators, Scenarios, 
     When I create a prompt in project "proj-789"
     Then the prompt is created successfully
 
-  @integration @unimplemented
+  @integration
   Scenario: Blocks prompt creation when at limit
     Given the organization has a license with maxPrompts 3
     And the organization has 3 prompts across all projects
@@ -181,7 +181,7 @@ Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators, Scenarios, 
     When I create a team in the organization
     Then the team is created successfully
 
-  @integration @unimplemented
+  @integration
   Scenario: Blocks team creation when at limit
     Given the organization has a license with maxTeams 3
     And the organization has 3 teams
