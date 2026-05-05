@@ -35,6 +35,8 @@ overrides:
   # Security: Next.js DoS with Server Components (#872)
   # next is an unused optional peer dep of better-auth (this is a Vite app)
   "next@>=13.0.0 <15.5.15": "15.5.15"
+  # Security: axios prototype pollution gadgets, header injection, loopback bypass (#982/#984/#987/#988)
+  "axios@>=1.0.0 <1.16.0": "1.16.0"
 
 packageExtensions:
   bullmq-otel:
