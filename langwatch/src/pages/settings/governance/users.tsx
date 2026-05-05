@@ -127,16 +127,20 @@ function GovernanceUsersListPage() {
     { enabled: !!orgId, refetchOnWindowFocus: false },
   );
 
-  if (ffLoading) return <LoadingScreen />;
-  if (!enabled) return <NotFoundScene />;
+  const head = (
+    <Head>
+      <title>Users · Governance · LangWatch</title>
+    </Head>
+  );
+
+  if (ffLoading) return <>{head}<LoadingScreen /></>;
+  if (!enabled) return <>{head}<NotFoundScene /></>;
 
   const users = usersQuery.data ?? [];
 
   return (
     <GovernanceLayout>
-      <Head>
-        <title>Users · Governance · LangWatch</title>
-      </Head>
+      {head}
       <VStack align="stretch" gap={4} width="full" maxW="container.xl">
         <HStack alignItems="end">
           <VStack align="start" gap={1}>

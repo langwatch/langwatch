@@ -151,7 +151,7 @@ export default function SettingsLayout({
               <MenuLink href="/settings/scim">SCIM Provisioning</MenuLink>
             )}
             {isEnterprise && !isLiteMember && (
-              <MenuLink href="/settings/access-audit">Access Audit</MenuLink>
+              <MenuLink href="/settings/access-audit">Role Bindings</MenuLink>
             )}
             {isEnterprise && !isLiteMember && hasPermission("auditLog:view") && (
               <MenuLink href="/settings/audit-log">Audit Log</MenuLink>

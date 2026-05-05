@@ -60,20 +60,23 @@ function GovernanceUserDetailPage() {
     { enabled: !!orgId, refetchOnWindowFocus: false },
   );
 
-  if (ffLoading) return <LoadingScreen />;
-  if (!enabled) return <NotFoundScene />;
-
   const user = (usersQuery.data ?? []).find((u) => u.actor === actor);
+  const head = (
+    <Head>
+      <title>
+        {user
+          ? `${user.actor} · Governance · LangWatch`
+          : "User · Governance · LangWatch"}
+      </title>
+    </Head>
+  );
+
+  if (ffLoading) return <>{head}<LoadingScreen /></>;
+  if (!enabled) return <>{head}<NotFoundScene /></>;
 
   return (
     <GovernanceLayout>
-      <Head>
-        <title>
-          {user
-            ? `${user.actor} · Governance · LangWatch`
-            : "User · Governance"}
-        </title>
-      </Head>
+      {head}
       <VStack align="stretch" gap={4} width="full" maxW="container.xl">
         <VStack align="start" gap={1}>
           <Text fontSize="xs" color="fg.muted">

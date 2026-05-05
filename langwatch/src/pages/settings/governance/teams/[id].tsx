@@ -66,18 +66,23 @@ function GovernanceTeamDetailPage() {
     { enabled: !!orgId, refetchOnWindowFocus: false },
   );
 
-  if (ffLoading) return <LoadingScreen />;
-  if (!enabled) return <NotFoundScene />;
-
   const team = (teamsQuery.data ?? []).find((t) => t.teamId === teamId);
+  const head = (
+    <Head>
+      <title>
+        {team
+          ? `${team.teamName} · Governance · LangWatch`
+          : "Team · Governance · LangWatch"}
+      </title>
+    </Head>
+  );
+
+  if (ffLoading) return <>{head}<LoadingScreen /></>;
+  if (!enabled) return <>{head}<NotFoundScene /></>;
 
   return (
     <GovernanceLayout>
-      <Head>
-        <title>
-          {team ? `${team.teamName} · Governance · LangWatch` : "Team · Governance"}
-        </title>
-      </Head>
+      {head}
       <VStack align="stretch" gap={4} width="full" maxW="container.xl">
         <VStack align="start" gap={1}>
           <Text fontSize="xs" color="fg.muted">

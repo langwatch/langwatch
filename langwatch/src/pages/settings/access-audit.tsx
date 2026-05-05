@@ -220,7 +220,7 @@ function AccessAuditPage() {
     <SettingsLayout>
       <VStack align="start" gap={6} width="full">
         <VStack align="start" gap={1} width="full">
-          <Heading as="h2">Access Audit</Heading>
+          <Heading as="h2">Role Bindings</Heading>
           <Text color="fg.muted" fontSize="sm">
             All role bindings in this organization.
           </Text>

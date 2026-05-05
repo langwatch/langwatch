@@ -136,16 +136,25 @@ function GovernanceTeamsListPage() {
     { enabled: !!orgId, refetchOnWindowFocus: false },
   );
 
-  if (ffLoading) return <LoadingScreen />;
-  if (!enabled) return <NotFoundScene />;
+  // Render <Head> unconditionally so the tab title reflects the route
+  // even during FF / org-context resolution. Otherwise the title flashes
+  // the parent route's "LangWatch - Personal Workspace" until ffLoading
+  // clears (Ariana QA finding G12 — useLayoutEffect on the Head shim
+  // fixed the post-mount tick but not the pre-mount loading window).
+  const head = (
+    <Head>
+      <title>Teams · Governance · LangWatch</title>
+    </Head>
+  );
+
+  if (ffLoading) return <>{head}<LoadingScreen /></>;
+  if (!enabled) return <>{head}<NotFoundScene /></>;
 
   const teams = teamsQuery.data ?? [];
 
   return (
     <GovernanceLayout>
-      <Head>
-        <title>Teams · Governance · LangWatch</title>
-      </Head>
+      {head}
       <VStack align="stretch" gap={4} width="full" maxW="container.xl">
         <HStack alignItems="end">
           <VStack align="start" gap={1}>

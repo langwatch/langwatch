@@ -25,6 +25,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { useMemo, useState } from "react";
+import Head from "~/utils/compat/next-head";
 
 import { EnterpriseLockedSurface } from "~/components/enterprise/EnterpriseLockedSurface";
 import GovernanceLayout from "~/components/governance/GovernanceLayout";
@@ -379,15 +380,22 @@ function IngestionSourcesPage() {
     return out;
   }, [sourcesQuery.data]);
 
+  const head = (
+    <Head>
+      <title>Ingestion Sources · Governance · LangWatch</title>
+    </Head>
+  );
+
   if (ffLoading) {
-    return <LoadingScreen />;
+    return <>{head}<LoadingScreen /></>;
   }
   if (!governancePreviewEnabled) {
-    return <NotFoundScene />;
+    return <>{head}<NotFoundScene /></>;
   }
 
   return (
     <GovernanceLayout>
+      {head}
       <EnterpriseLockedSurface
         featureName="Ingestion Sources"
         description="Custom ingestion sources beyond the OTel generic endpoint require an Enterprise plan. Existing OTel ingestion remains available on every plan."

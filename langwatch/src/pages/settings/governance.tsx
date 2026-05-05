@@ -123,11 +123,17 @@ function GovernanceOverviewPage() {
     { enabled: !!orgId, refetchOnWindowFocus: false },
   );
 
+  const head = (
+    <Head>
+      <title>Governance · LangWatch</title>
+    </Head>
+  );
+
   if (ffLoading) {
-    return <LoadingScreen />;
+    return <>{head}<LoadingScreen /></>;
   }
   if (!governancePreviewEnabled) {
-    return <NotFoundScene />;
+    return <>{head}<NotFoundScene /></>;
   }
 
   const sources = sourcesQuery.data ?? [];
@@ -148,9 +154,7 @@ function GovernanceOverviewPage() {
 
   return (
     <GovernanceLayout>
-      <Head>
-        <title>Governance · LangWatch</title>
-      </Head>
+      {head}
 
       <VStack align="stretch" gap={6} width="full" maxW="container.xl">
         <HStack alignItems="end">
