@@ -367,25 +367,25 @@ Feature: Saved Views on Traces List
     Then I receive all views for that project
     And they are ordered by the "order" field ascending
 
-  @integration @unimplemented
+  @integration
   Scenario: create adds a new view at the end
     When I call savedViews.create with name, filters, and projectId
     Then a new view is created in the database
     And its order is after all existing views
 
-  @integration @unimplemented
+  @integration
   Scenario: delete removes a view
     Given a saved view exists with id "view-1"
     When I call savedViews.delete with id "view-1" and projectId
     Then the view is removed from the database
 
-  @integration @unimplemented
+  @integration
   Scenario: rename updates the view name
     Given a saved view exists with name "Old Name"
     When I call savedViews.rename with the new name "New Name"
     Then the view name is updated in the database
 
-  @integration @unimplemented
+  @integration
   Scenario: reorder updates the order of all views
     Given views exist in order ["view-a", "view-b", "view-c"]
     When I call savedViews.reorder with ["view-c", "view-a", "view-b"]
