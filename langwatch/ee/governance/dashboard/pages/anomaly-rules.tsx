@@ -13,7 +13,7 @@ import {
   Textarea,
   VStack,
 } from "@chakra-ui/react";
-import { Pencil, Plus, Trash2 } from "lucide-react";
+import { Info, Pencil, Plus, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import GovernanceLayout from "~/components/governance/GovernanceLayout";
@@ -80,6 +80,74 @@ const SPEND_SPIKE_THRESHOLD_TEMPLATE = JSON.stringify(
   null,
   2,
 );
+
+/**
+ * Plain-English summary of a threshold config — rendered live below
+ * the JSON Textarea so admins see what their rule will actually
+ * evaluate before they save (rchaves QA: "a preview would be great").
+ *
+ * Returns:
+ *   - { kind: "ok", english } when the JSON parses + the rule type is
+ *     known + every required field is present + has the right shape
+ *   - { kind: "error", message } when JSON is invalid or required
+ *     fields are missing/wrong type
+ *   - { kind: "unsupported", english } when the rule type is in the
+ *     UI suggestions but not yet wired to a detector — admin gets a
+ *     clear "this won't fire" signal at compose time
+ */
+function summariseThresholdConfig(
+  ruleType: string,
+  raw: string,
+): { kind: "ok" | "unsupported"; english: string } | { kind: "error"; message: string } {
+  if (raw.trim() === "" || raw.trim() === "{}") {
+    return {
+      kind: "error",
+      message:
+        "Empty config — fill in the rule-type-specific fields below or click the rule type to load the template.",
+    };
+  }
+  let parsed: Record<string, unknown>;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (err) {
+    return {
+      kind: "error",
+      message: `Invalid JSON: ${err instanceof Error ? err.message : "parse failed"}`,
+    };
+  }
+  if (ruleType !== "spend_spike") {
+    return {
+      kind: "unsupported",
+      english: `\`${ruleType}\` rule type is not yet wired to a detector. The rule will save but won't fire alerts. \`spend_spike\` is the only type evaluated today.`,
+    };
+  }
+  const windowSec = parsed.windowSec;
+  const ratio = parsed.ratioVsBaseline;
+  const minBaseline = parsed.minBaselineUsd;
+  const baselineOffset = parsed.baselineOffsetSec;
+  if (
+    typeof windowSec !== "number" ||
+    typeof ratio !== "number" ||
+    typeof minBaseline !== "number" ||
+    typeof baselineOffset !== "number"
+  ) {
+    return {
+      kind: "error",
+      message:
+        "spend_spike requires numeric `windowSec`, `ratioVsBaseline`, `minBaselineUsd`, and `baselineOffsetSec`.",
+    };
+  }
+  const fmtDuration = (sec: number): string => {
+    if (sec >= 86400) return `${Math.round((sec / 86400) * 10) / 10} day${sec === 86400 ? "" : "s"}`;
+    if (sec >= 3600) return `${Math.round((sec / 3600) * 10) / 10} hour${sec === 3600 ? "" : "s"}`;
+    if (sec >= 60) return `${Math.round((sec / 60) * 10) / 10} minute${sec === 60 ? "" : "s"}`;
+    return `${sec} second${sec === 1 ? "" : "s"}`;
+  };
+  return {
+    kind: "ok",
+    english: `Fires when spend in the last ${fmtDuration(windowSec)} is at least ${ratio}× the spend in the equivalent ${fmtDuration(windowSec)} window from ${fmtDuration(baselineOffset)} ago, AND that baseline is at least $${minBaseline}. Otherwise the baseline is too noisy and the rule stays quiet.`,
+  };
+}
 
 interface ComposerState {
   id?: string;
@@ -685,9 +753,24 @@ function RuleComposer({
         </HStack>
 
         <VStack align="stretch" gap={1}>
-          <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
-            Threshold config (rule-type-specific JSON)
-          </Text>
+          <HStack gap={2} alignItems="center">
+            <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
+              Threshold config (rule-type-specific JSON)
+            </Text>
+            <Spacer />
+            <Link
+              href="https://docs.langwatch.ai/ai-governance/anomaly-rules#threshold-config"
+              isExternal
+              color="orange.600"
+              fontSize="xs"
+              fontWeight="medium"
+            >
+              <HStack gap={1} alignItems="center">
+                <Info size={12} />
+                <Text as="span">Schema reference</Text>
+              </HStack>
+            </Link>
+          </HStack>
           <Textarea
             size="sm"
             backgroundColor="white"
@@ -698,6 +781,10 @@ function RuleComposer({
               setComposer({ ...composer, thresholdConfig: e.target.value })
             }
             placeholder="{}"
+          />
+          <ThresholdPreview
+            ruleType={composer.ruleType}
+            raw={composer.thresholdConfig}
           />
         </VStack>
 
@@ -760,6 +847,41 @@ const selectStyle = {
   background: "white",
   fontSize: "14px",
 };
+
+function ThresholdPreview({
+  ruleType,
+  raw,
+}: {
+  ruleType: string;
+  raw: string;
+}) {
+  const summary = summariseThresholdConfig(ruleType, raw);
+  const palette =
+    summary.kind === "ok"
+      ? { bg: "blue.50", border: "blue.300", fg: "blue.900", label: "Preview" }
+      : summary.kind === "unsupported"
+        ? { bg: "orange.50", border: "orange.300", fg: "orange.900", label: "Won't fire" }
+        : { bg: "red.50", border: "red.300", fg: "red.900", label: "Invalid" };
+  return (
+    <Box
+      borderWidth="1px"
+      borderColor={palette.border}
+      backgroundColor={palette.bg}
+      padding={2}
+      borderRadius="sm"
+      marginTop={1}
+    >
+      <HStack alignItems="start" gap={2}>
+        <Badge colorPalette={palette.label === "Won't fire" ? "orange" : palette.label === "Invalid" ? "red" : "blue"} size="xs" variant="subtle">
+          {palette.label}
+        </Badge>
+        <Text fontSize="xs" color={palette.fg} flex={1}>
+          {summary.kind === "error" ? summary.message : summary.english}
+        </Text>
+      </HStack>
+    </Box>
+  );
+}
 
 export default withPermissionGuard("organization:manage", { bypassOnboardingRedirect: true })(
   AnomalyRulesPage,
