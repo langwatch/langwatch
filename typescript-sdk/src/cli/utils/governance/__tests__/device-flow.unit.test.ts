@@ -130,6 +130,37 @@ describe("exchange", () => {
     await expect(exchange({ baseUrl: url, fetchImpl }, "DC"))
       .rejects.toMatchObject({ name: "DeviceFlowError", kind: "other" });
   });
+
+  it("attaches client_info (hostname, uname, platform) to the exchange POST body", async () => {
+    // Drives the /me/sessions device-label fix (Ariana QA): without
+    // client_info on /exchange, every CLI session falls back to
+    // "Unknown device" in the inventory, blocking selective revoke
+    // for multi-device users.
+    const body = {
+      access_token: "at",
+      refresh_token: "rt",
+      expires_in: 3600,
+      user: { id: "u_1", email: "j@miro.com", name: "Jane" },
+      organization: { id: "o_1", slug: "miro", name: "Miro" },
+    };
+    const fetchImpl = vi.fn().mockResolvedValue(jsonResponse(200, body));
+    await exchange({ baseUrl: url, fetchImpl }, "DC");
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    const init = fetchImpl.mock.calls[0]?.[1] as RequestInit | undefined;
+    const sent = JSON.parse(String(init?.body ?? "{}")) as {
+      device_code: string;
+      client_info?: {
+        hostname?: string;
+        uname?: string;
+        platform?: string;
+      };
+    };
+    expect(sent.device_code).toBe("DC");
+    expect(sent.client_info).toBeDefined();
+    expect(sent.client_info?.platform).toBe(process.platform);
+    expect(typeof sent.client_info?.hostname).toBe("string");
+    expect(typeof sent.client_info?.uname).toBe("string");
+  });
 });
 
 describe("pollUntilDone", () => {

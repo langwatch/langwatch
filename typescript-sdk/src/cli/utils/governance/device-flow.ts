@@ -8,6 +8,7 @@
  * CLI's HTTP style.
  */
 
+import * as os from "node:os";
 import { setTimeout as wait } from "node:timers/promises";
 
 export interface DeviceCode {
@@ -133,6 +134,37 @@ export async function startDeviceCode(
 }
 
 /**
+ * Device fingerprint stamped onto the CLI session at /exchange time.
+ * The control plane persists it on the access + refresh token records
+ * so /me/sessions can render "Mac (rchaves.local)" instead of
+ * "Unknown device" — multi-device users need this to revoke
+ * individual sessions without nuking every device they're logged in
+ * on (Ariana QA finding). See
+ * `langwatch/src/server/routes/auth-cli.ts#clientInfoSchema` for the
+ * server contract.
+ */
+function collectClientInfo(): {
+  hostname: string;
+  uname: string;
+  platform: string;
+} {
+  let hostname = "";
+  let uname = "";
+  try {
+    hostname = os.hostname();
+  } catch {
+    // os.hostname() can throw on locked-down sandboxes; carry empty.
+  }
+  try {
+    uname = os.userInfo().username;
+  } catch {
+    // os.userInfo() throws when the uid has no /etc/passwd entry
+    // (some Docker images, CI sandboxes); carry empty.
+  }
+  return { hostname, uname, platform: process.platform };
+}
+
+/**
  * `POST /api/auth/cli/exchange` — single poll. Returns the access+refresh
  * token bundle on success (200), or throws DeviceFlowError with a
  * categorised `kind` so the caller can decide whether to keep polling
@@ -142,7 +174,10 @@ export async function exchange(
   opts: DeviceFlowOptions,
   deviceCode: string,
 ): Promise<ExchangeResult> {
-  const res = await rawPost(opts, "/api/auth/cli/exchange", { device_code: deviceCode });
+  const res = await rawPost(opts, "/api/auth/cli/exchange", {
+    device_code: deviceCode,
+    client_info: collectClientInfo(),
+  });
   switch (res.status) {
     case 200: {
       const body = (await res.json()) as
