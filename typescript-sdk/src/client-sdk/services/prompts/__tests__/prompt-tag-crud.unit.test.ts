@@ -33,6 +33,7 @@ describe("Tag CRUD", () => {
 
     describe("listTags()", () => {
       describe("when listing tags succeeds", () => {
+        /** @scenario List tags calls GET /api/prompts/tags */
         it("calls GET /api/prompts/tags", async () => {
           mockGet.mockResolvedValue({
             data: [
@@ -48,6 +49,7 @@ describe("Tag CRUD", () => {
           expect(mockGet).toHaveBeenCalledWith("/api/prompts/tags");
         });
 
+        /** @scenario List tags returns built-in and custom tags */
         it("returns the list of tags", async () => {
           const expectedTags = [
             { id: "ptag_prod", name: "production", createdAt: "2026-01-01T00:00:00.000Z" },
@@ -76,6 +78,7 @@ describe("Tag CRUD", () => {
 
     describe("createTag()", () => {
       describe("when creating a tag succeeds", () => {
+        /** @scenario Create custom tag via SDK */
         it("calls POST /api/prompts/tags with the tag name", async () => {
           mockPost.mockResolvedValue({
             data: { id: "ptag_abc", name: "canary", createdAt: "2026-01-01T00:00:00.000Z" },
@@ -114,6 +117,7 @@ describe("Tag CRUD", () => {
 
     describe("deleteTag()", () => {
       describe("when deleting a tag succeeds", () => {
+        /** @scenario Delete custom tag via SDK */
         it("calls DELETE /api/prompts/tags/:tag", async () => {
           mockDelete.mockResolvedValue({ data: undefined, error: undefined });
 
