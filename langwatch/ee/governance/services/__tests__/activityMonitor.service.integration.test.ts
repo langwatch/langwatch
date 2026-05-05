@@ -436,11 +436,16 @@ describe("ActivityMonitorService — read-side queries against unified trace sto
   describe("when querying spendByTeam()", () => {
     it("rolls up spend by IngestionSource.teamId with an Org-wide bucket for null-teamId sources", async () => {
       const service = ActivityMonitorService.create(prisma);
-      // 14d window includes Carol's 14d-old trace under secondarySourceId
-      // (teamId=null → Org-wide bucket).
+      // windowDays=15 (not 14) to comfortably include Carol's row at
+      // `now - 14 * day` regardless of test-execution latency between
+      // fixture insert and query — at exactly windowDays=14 the row
+      // is right on the boundary and small clock drift (insert
+      // wall-clock vs query wall-clock) flipped it from the current
+      // window into the prior window, dropping the Org-wide row from
+      // the result entirely.
       const rows = await service.spendByTeam({
         organizationId: primaryOrg.id,
-        windowDays: 14,
+        windowDays: 15,
       });
       expect(rows.length).toBeGreaterThanOrEqual(2);
 
@@ -498,6 +503,158 @@ describe("ActivityMonitorService — read-side queries against unified trace sto
       });
       expect(rows).toEqual([]);
       await prisma.organization.delete({ where: { id: orgNoGov.id } });
+    });
+  });
+
+  describe("when querying spendByUser() with pagination + sort args (v2 spec line 157)", () => {
+    it("limit + offset paginate the same ordering — sortBy='spend' desc returns bob ($1.50) on page 0, alice ($0.50) on page 1", async () => {
+      const service = ActivityMonitorService.create(prisma);
+      const page0 = await service.spendByUser({
+        organizationId: primaryOrg.id,
+        windowDays: 30,
+        limit: 1,
+        offset: 0,
+        sortBy: "spend",
+        sortDir: "desc",
+      });
+      const page1 = await service.spendByUser({
+        organizationId: primaryOrg.id,
+        windowDays: 30,
+        limit: 1,
+        offset: 1,
+        sortBy: "spend",
+        sortDir: "desc",
+      });
+      expect(page0).toHaveLength(1);
+      expect(page0[0]!.actor).toBe("bob@example.com");
+      expect(page1).toHaveLength(1);
+      expect(page1[0]!.actor).toBe("alice@example.com");
+    });
+
+    it("sortDir='asc' inverts the ordering — carol ($0.25) is the smallest spender so she comes first", async () => {
+      const service = ActivityMonitorService.create(prisma);
+      const rows = await service.spendByUser({
+        organizationId: primaryOrg.id,
+        windowDays: 30,
+        limit: 50,
+        sortBy: "spend",
+        sortDir: "asc",
+      });
+      const actors = rows.map((r) => r.actor);
+      expect(actors[0]).toBe("carol@example.com");
+      expect(actors[actors.length - 1]).toBe("bob@example.com");
+    });
+
+    it("sortBy='lastActivity' desc puts the recently-active users before carol's 14d-old row", async () => {
+      const service = ActivityMonitorService.create(prisma);
+      const rows = await service.spendByUser({
+        organizationId: primaryOrg.id,
+        windowDays: 30,
+        limit: 50,
+        sortBy: "lastActivity",
+        sortDir: "desc",
+      });
+      const carolIdx = rows.findIndex((r) => r.actor === "carol@example.com");
+      const aliceIdx = rows.findIndex((r) => r.actor === "alice@example.com");
+      const bobIdx = rows.findIndex((r) => r.actor === "bob@example.com");
+      // carol is 14d ago; alice + bob are 12h ago — carol must be last.
+      expect(carolIdx).toBeGreaterThan(aliceIdx);
+      expect(carolIdx).toBeGreaterThan(bobIdx);
+    });
+
+    it("legacy callers (no pagination/sort args) still get the v1 default — top-N by spend desc", async () => {
+      const service = ActivityMonitorService.create(prisma);
+      const rows = await service.spendByUser({
+        organizationId: primaryOrg.id,
+        windowDays: 30,
+      });
+      // Default ordering = spend desc — bob ($1.50) ahead of alice ($0.50)
+      // ahead of carol ($0.25). Same shape as the v1 contract.
+      const bobIdx = rows.findIndex((r) => r.actor === "bob@example.com");
+      const aliceIdx = rows.findIndex((r) => r.actor === "alice@example.com");
+      const carolIdx = rows.findIndex((r) => r.actor === "carol@example.com");
+      expect(bobIdx).toBeLessThan(aliceIdx);
+      expect(aliceIdx).toBeLessThan(carolIdx);
+    });
+  });
+
+  describe("when querying spendByTeam() with pagination + sort args (v2 spec line 157)", () => {
+    it("limit caps the page; offset paginates — limit=1 offset=0 gets primary team, offset=1 gets Org-wide", async () => {
+      const service = ActivityMonitorService.create(prisma);
+      const page0 = await service.spendByTeam({
+        organizationId: primaryOrg.id,
+        windowDays: 30,
+        limit: 1,
+        offset: 0,
+        sortBy: "spend",
+        sortDir: "desc",
+      });
+      const page1 = await service.spendByTeam({
+        organizationId: primaryOrg.id,
+        windowDays: 30,
+        limit: 1,
+        offset: 1,
+        sortBy: "spend",
+        sortDir: "desc",
+      });
+      expect(page0).toHaveLength(1);
+      expect(page0[0]!.teamId).toBe(primaryTeamId);
+      expect(page1).toHaveLength(1);
+      expect(page1[0]!.teamId).toBeNull(); // Org-wide bucket
+    });
+
+    it("sortDir='asc' inverts the ordering — Org-wide ($0.25) before primary team ($2.00)", async () => {
+      const service = ActivityMonitorService.create(prisma);
+      const rows = await service.spendByTeam({
+        organizationId: primaryOrg.id,
+        windowDays: 30,
+        limit: 10,
+        sortBy: "spend",
+        sortDir: "asc",
+      });
+      expect(rows[0]!.teamId).toBeNull();
+      expect(rows[rows.length - 1]!.teamId).toBe(primaryTeamId);
+    });
+
+    it("sortBy='lastActivity' desc puts the team with the recent activity first", async () => {
+      const service = ActivityMonitorService.create(prisma);
+      const rows = await service.spendByTeam({
+        organizationId: primaryOrg.id,
+        windowDays: 30,
+        limit: 10,
+        sortBy: "lastActivity",
+        sortDir: "desc",
+      });
+      // Primary team's last activity is 12h ago; Org-wide's is 14d ago.
+      const primaryIdx = rows.findIndex((r) => r.teamId === primaryTeamId);
+      const orgWideIdx = rows.findIndex((r) => r.teamId === null);
+      expect(primaryIdx).toBeLessThan(orgWideIdx);
+    });
+
+    it("sortBy='requests' desc orders by raw request count, not spend", async () => {
+      const service = ActivityMonitorService.create(prisma);
+      const rows = await service.spendByTeam({
+        organizationId: primaryOrg.id,
+        windowDays: 30,
+        limit: 10,
+        sortBy: "requests",
+        sortDir: "desc",
+      });
+      // Primary team has 2 requests (alice + bob), Org-wide has 1 (carol).
+      expect(rows[0]!.teamId).toBe(primaryTeamId);
+      expect(rows[0]!.requestCount).toBe(2);
+    });
+
+    it("legacy callers (no pagination/sort args) still get the v1 default — top-N by spend desc", async () => {
+      const service = ActivityMonitorService.create(prisma);
+      const rows = await service.spendByTeam({
+        organizationId: primaryOrg.id,
+        windowDays: 30,
+      });
+      // Default ordering = spend desc — primary ($2.00) before Org-wide ($0.25).
+      const primaryIdx = rows.findIndex((r) => r.teamId === primaryTeamId);
+      const orgWideIdx = rows.findIndex((r) => r.teamId === null);
+      expect(primaryIdx).toBeLessThan(orgWideIdx);
     });
   });
 
