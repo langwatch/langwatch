@@ -55,7 +55,12 @@ const fmtUsd = (n: number) =>
 const fmtRelative = (date: Date | string | null): string => {
   if (!date) return "—";
   const d = typeof date === "string" ? new Date(date) : date;
+  if (Number.isNaN(d.getTime())) return "—";
   const diffMs = Date.now() - d.getTime();
+  // Future-dated sources (clock skew between LangWatch and the
+  // reporting source, or seed scripts that drift past `now`) would
+  // otherwise render as "-63236s ago". Clamp to "just now" instead.
+  if (diffMs < 0) return "just now";
   const sec = Math.floor(diffMs / 1000);
   if (sec < 60) return `${sec}s ago`;
   const min = Math.floor(sec / 60);
@@ -257,8 +262,19 @@ function GovernanceOverviewPage() {
          */}
 
         <SectionCard
-          title="By team"
-          subline="Spend and activity rolled up per team, last 30 days. Sources without a team land under 'Org-wide'."
+          title="Top teams by spend"
+          subline="Top 5 teams ranked by spend (last 30 days). Sources without a team land under 'Org-wide'."
+          actions={
+            teams.length > 0 ? (
+              <Link
+                href="/settings/governance/teams"
+                color="orange.600"
+                fontSize="sm"
+              >
+                View all teams →
+              </Link>
+            ) : null
+          }
         >
           {teams.length === 0 ? (
             <Text color="fg.muted" fontSize="sm">
@@ -267,7 +283,7 @@ function GovernanceOverviewPage() {
           ) : (
             <VStack align="stretch" gap={0}>
               <TeamRowHeader />
-              {teams.map((t) => (
+              {teams.slice(0, 5).map((t) => (
                 <TeamRow key={t.teamId ?? "org-wide"} team={t} />
               ))}
             </VStack>
@@ -275,8 +291,19 @@ function GovernanceOverviewPage() {
         </SectionCard>
 
         <SectionCard
-          title="By user"
-          subline="Spend and activity per LangWatch member, last 30 days."
+          title="Top users by spend"
+          subline="Top 5 LangWatch members ranked by spend (last 30 days)."
+          actions={
+            users.length > 0 ? (
+              <Link
+                href="/settings/governance/users"
+                color="orange.600"
+                fontSize="sm"
+              >
+                View all users →
+              </Link>
+            ) : null
+          }
         >
           {users.length === 0 ? (
             <Text color="fg.muted" fontSize="sm">
@@ -285,7 +312,7 @@ function GovernanceOverviewPage() {
           ) : (
             <VStack align="stretch" gap={0}>
               <UserRowHeader />
-              {users.map((u) => (
+              {users.slice(0, 5).map((u) => (
                 <UserRow key={u.actor} user={u} />
               ))}
             </VStack>
@@ -638,11 +665,13 @@ function SummaryCard({
 function SectionCard({
   title,
   subline,
+  actions,
   children,
   ...rest
 }: {
   title: string;
   subline?: string;
+  actions?: React.ReactNode;
   children: React.ReactNode;
   [key: string]: unknown;
 }) {
@@ -654,16 +683,19 @@ function SectionCard({
       padding={5}
       {...rest}
     >
-      <VStack align="start" gap={1} marginBottom={3}>
-        <Heading as="h3" size="sm">
-          {title}
-        </Heading>
-        {subline && (
-          <Text fontSize="sm" color="fg.muted">
-            {subline}
-          </Text>
-        )}
-      </VStack>
+      <HStack align="start" justify="space-between" marginBottom={3} gap={4}>
+        <VStack align="start" gap={1} flex={1}>
+          <Heading as="h3" size="sm">
+            {title}
+          </Heading>
+          {subline && (
+            <Text fontSize="sm" color="fg.muted">
+              {subline}
+            </Text>
+          )}
+        </VStack>
+        {actions && <Box flexShrink={0}>{actions}</Box>}
+      </HStack>
       {children}
     </Box>
   );
@@ -829,19 +861,40 @@ function TeamRowHeader() {
   );
 }
 
+/**
+ * Trend cell rendering — three states:
+ *   1. No prior baseline (first window of activity, or seed without
+ *      prior-window distribution): render '—' muted. Avoids the
+ *      misleading +100% on every brand-new team / fresh customer.
+ *   2. |delta| > 25%: orange (anomalous spike) or blue (sharp drop).
+ *      Threshold matches `summary.windowOverPreviousPct` palette.
+ *   3. otherwise: gray neutral with arrow + %.
+ */
+function TrendCell({
+  pct,
+  hasBaseline,
+}: {
+  pct: number;
+  hasBaseline: boolean;
+}) {
+  if (!hasBaseline) {
+    return (
+      <Box flex={2} color="fg.muted">
+        —
+      </Box>
+    );
+  }
+  const arrow = pct > 0 ? "↑" : pct < 0 ? "↓" : "·";
+  const color =
+    pct > 25 ? "orange.500" : pct < -25 ? "blue.500" : "fg.muted";
+  return (
+    <Box flex={2} color={color}>
+      {arrow} {Math.abs(pct)}%
+    </Box>
+  );
+}
+
 function TeamRow({ team }: { team: SpendByTeam }) {
-  const trendArrow =
-    team.deltaPctVsPriorWindow > 0
-      ? "↑"
-      : team.deltaPctVsPriorWindow < 0
-        ? "↓"
-        : "·";
-  const trendColor =
-    team.deltaPctVsPriorWindow > 25
-      ? "orange.500"
-      : team.deltaPctVsPriorWindow < -25
-        ? "blue.500"
-        : "fg.muted";
   const isOrgWide = !team.teamId;
   return (
     <HStack
@@ -861,9 +914,10 @@ function TeamRow({ team }: { team: SpendByTeam }) {
       <Box flex={2} color="fg.muted">
         {fmtRelative(team.lastActivityIso)}
       </Box>
-      <Box flex={2} color={trendColor}>
-        {trendArrow} {Math.abs(team.deltaPctVsPriorWindow)}%
-      </Box>
+      <TrendCell
+        pct={team.deltaPctVsPriorWindow}
+        hasBaseline={team.hasPriorBaseline}
+      />
       <Box flex={2} color="fg.muted">
         {team.sourceCount} {team.sourceCount === 1 ? "source" : "sources"}
       </Box>
@@ -872,18 +926,6 @@ function TeamRow({ team }: { team: SpendByTeam }) {
 }
 
 function UserRow({ user }: { user: SpendByUser }) {
-  const trendArrow =
-    user.trendVsPreviousPct > 0
-      ? "↑"
-      : user.trendVsPreviousPct < 0
-        ? "↓"
-        : "·";
-  const trendColor =
-    user.trendVsPreviousPct > 25
-      ? "orange.500"
-      : user.trendVsPreviousPct < -25
-        ? "blue.500"
-        : "fg.muted";
   return (
     <HStack
       paddingY={2}
@@ -900,9 +942,10 @@ function UserRow({ user }: { user: SpendByUser }) {
       <Box flex={2} color="fg.muted">
         {fmtRelative(user.lastActivityIso)}
       </Box>
-      <Box flex={2} color={trendColor}>
-        {trendArrow} {Math.abs(user.trendVsPreviousPct)}%
-      </Box>
+      <TrendCell
+        pct={user.trendVsPreviousPct}
+        hasBaseline={user.hasPriorBaseline}
+      />
       <Box flex={2} color="fg.muted">
         {user.mostUsedTarget}
       </Box>

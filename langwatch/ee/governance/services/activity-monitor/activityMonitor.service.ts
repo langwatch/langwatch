@@ -52,6 +52,14 @@ export interface SpendByUserRow {
   requests: number;
   lastActivityIso: string;
   trendVsPreviousPct: number;
+  /**
+   * False when the previous-window spend was zero (no baseline data).
+   * UI mutes the trend cell rather than rendering a misleading
+   * percentage on first-window users. Currently always `false` until
+   * the per-user prior-window CTE lands (paired with `trendVsPreviousPct`,
+   * which still hard-zeros today).
+   */
+  hasPriorBaseline: boolean;
   mostUsedTarget: string | null;
 }
 
@@ -67,8 +75,17 @@ export interface SpendByTeamRow {
    * days vs the 30 days before that). 0 when previous window had no
    * spend AND current is also empty; 100 when previous was zero and
    * current is non-zero (matches `summary.windowOverPreviousPct`).
+   * UI should consult `hasPriorBaseline` before rendering this as a
+   * percentage — `100` is overloaded (real doubling vs zero-baseline
+   * artifact).
    */
   deltaPctVsPriorWindow: number;
+  /**
+   * False when the previous-window spend was zero (no baseline data
+   * to compare against). UI mutes the trend cell to '—' rather than
+   * showing a misleading +100% on every brand-new team.
+   */
+  hasPriorBaseline: boolean;
   lastActivityIso: string | null;
   /** Number of distinct ingestion sources rolled up under this team. */
   sourceCount: number;
@@ -356,6 +373,7 @@ export class ActivityMonitorService {
       lastActivityIso: new Date(Number(r.lastActivityMs)).toISOString(),
       // Trend-vs-previous needs a windowed CTE comparison; deferred to 3b.
       trendVsPreviousPct: 0,
+      hasPriorBaseline: false,
       mostUsedTarget: r.mostUsedTarget && r.mostUsedTarget !== "" ? r.mostUsedTarget : null,
     }));
   }
@@ -510,6 +528,7 @@ export class ActivityMonitorService {
         spendUsd: t.thisSpend,
         requestCount: t.requestCount,
         deltaPctVsPriorWindow: pctChange(t.thisSpend, t.prevSpend),
+        hasPriorBaseline: t.prevSpend > 0,
         lastActivityIso:
           t.lastActivityMs > 0
             ? new Date(t.lastActivityMs).toISOString()
