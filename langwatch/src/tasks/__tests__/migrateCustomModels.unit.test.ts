@@ -50,6 +50,7 @@ describe("migrateCustomModelsRow()", () => {
   };
 
   describe("when all custom models match registry entries", () => {
+    /** @scenario "Migration drops custom models that match registry entries" */
     it("returns empty arrays", () => {
       const row = buildRow({
         provider: "openai",
