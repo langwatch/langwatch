@@ -90,7 +90,7 @@ Feature: Explicit application origin for race condition prevention
 
   # --- Evaluation trigger reactor guards ---
 
-  @unit @unimplemented
+  @unit
   Scenario: Evaluation trigger skips traces with empty origin and no SDK info
     Given an online evaluation monitor is enabled for the project
     And a trace arrives where the fold state has no langwatch.origin
@@ -99,14 +99,14 @@ Feature: Explicit application origin for race condition prevention
     Then no evaluation commands are dispatched for this trace
     And a deferred check is scheduled for 5 minutes later
 
-  @unit @unimplemented
+  @unit
   Scenario: Evaluation trigger runs on traces with explicit application origin
     Given an online evaluation monitor is enabled for the project
     And a trace arrives where the fold state has langwatch.origin = "application"
     When the evaluation trigger reactor fires at normal debounce
     Then evaluation commands are dispatched for matching monitors
 
-  @unit @unimplemented
+  @unit
   Scenario: Evaluation trigger dispatches for any known origin (preconditions filter)
     Given an online evaluation monitor is enabled for the project
     And a trace arrives where the fold state has langwatch.origin = "evaluation"
