@@ -39,6 +39,7 @@ import {
   PersonalVirtualKeyService,
   NoDefaultRoutingPolicyError,
   PersonalVirtualKeyAlreadyExistsError,
+  RoutingPolicyHasNoProvidersError,
 } from "@ee/governance/services/personalVirtualKey.service";
 import { PersonalWorkspaceService } from "@ee/governance/services/personalWorkspace.service";
 import { GatewayBudgetService } from "~/server/gateway/budget.service";
@@ -1420,6 +1421,21 @@ app.post("/approve", async (c: Context) => {
           message: err.message,
         },
         409,
+      );
+    }
+    if (err instanceof RoutingPolicyHasNoProvidersError) {
+      // G34 — the resolved policy exists but has zero providers
+      // configured. 422 (UNPROCESSABLE) per the validate-before-mint
+      // contract: well-formed request, but the org's state doesn't
+      // support processing it yet. The CLI surfaces this as "ask your
+      // admin to add providers in Routing Policies before issuing
+      // keys" — same actionable hint the /me portal renders.
+      return c.json(
+        {
+          error: "routing_policy_has_no_providers",
+          message: err.message,
+        },
+        422,
       );
     }
     if (err instanceof PersonalVirtualKeyAlreadyExistsError) {

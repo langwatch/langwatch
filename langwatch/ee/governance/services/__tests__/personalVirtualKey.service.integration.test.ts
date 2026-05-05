@@ -35,6 +35,7 @@ import {
   PersonalVirtualKeyAlreadyExistsError,
   PersonalVirtualKeyNotFoundError,
   PersonalVirtualKeyService,
+  RoutingPolicyHasNoProvidersError,
 } from "../personalVirtualKey.service";
 import { PersonalWorkspaceService } from "../personalWorkspace.service";
 
@@ -254,6 +255,122 @@ describe("PersonalVirtualKeyService", () => {
       expect(issued.virtualKey.projectId).toBe(workspace!.project.id);
       expect(issued.secret).toBeDefined();
       expect(issued.virtualKey.principalUserId).toBe(USER_ID);
+    });
+
+    it("rejects with RoutingPolicyHasNoProvidersError when the resolved policy has zero providers (G34)", async () => {
+      // Set up an empty default policy in a fresh org so the assertion
+      // doesn't trample the main suite's seeded default policy.
+      const emptyOrgId = `org-pvk-empty-${nanoid(6)}`;
+      const emptyUserId = `usr-pvk-empty-${nanoid(6)}`;
+      const emptyPolicyId = `rp-pvk-empty-${nanoid(6)}`;
+      await prisma.organization.create({
+        data: {
+          id: emptyOrgId,
+          name: `PVK Empty ${suffix}`,
+          slug: `pvk-empty-${suffix}-${nanoid(6)}`,
+        },
+      });
+      await prisma.user.create({
+        data: {
+          id: emptyUserId,
+          email: `pvk-empty-${nanoid(6)}@example.com`,
+          name: "Empty",
+        },
+      });
+      await prisma.organizationUser.create({
+        data: {
+          organizationId: emptyOrgId,
+          userId: emptyUserId,
+          role: "MEMBER",
+        },
+      });
+      await prisma.routingPolicy.create({
+        data: {
+          id: emptyPolicyId,
+          organizationId: emptyOrgId,
+          scope: "organization",
+          scopeId: emptyOrgId,
+          name: "Org default (empty)",
+          providerCredentialIds: [], // ← the G34 trigger
+          strategy: "priority",
+          isDefault: true,
+          createdById: emptyUserId,
+          updatedById: emptyUserId,
+        },
+      });
+
+      // Trigger: portal/CLI mints a personal VK with default-policy
+      // resolution → policy exists but providerCredentialIds is [].
+      // Expected: typed RoutingPolicyHasNoProvidersError so the route
+      // / tRPC handler maps to 422 with actionable admin hint instead
+      // of issuing a VK that 504s on first gateway call.
+      try {
+        // ensureDefault calls issue() internally → exercises the same
+        // guard path the CLI device-flow + /me portal both hit.
+        await service.ensureDefault({
+          userId: emptyUserId,
+          organizationId: emptyOrgId,
+          displayName: "Empty",
+          displayEmail: "empty@example.com",
+        });
+        throw new Error(
+          "Expected RoutingPolicyHasNoProvidersError but issue() succeeded",
+        );
+      } catch (err) {
+        expect(err).toBeInstanceOf(RoutingPolicyHasNoProvidersError);
+        const typed = err as RoutingPolicyHasNoProvidersError;
+        expect(typed.routingPolicyId).toBe(emptyPolicyId);
+        expect(typed.routingPolicyName).toBe("Org default (empty)");
+        expect(typed.message).toContain("no providers configured");
+        expect(typed.message).toContain("Settings → Routing Policies");
+      }
+
+      // No personal VK should have been created (validate-before-mint
+      // contract — mirror of the no_default_routing_policy invariant
+      // at lines 177-188 of the service).
+      const personalProjects = await prisma.project.findMany({
+        where: {
+          isPersonal: true,
+          ownerUserId: emptyUserId,
+        },
+        select: { id: true },
+      });
+      const personalProjectIds = personalProjects.map((p) => p.id);
+      const stragglerVks =
+        personalProjectIds.length === 0
+          ? []
+          : await prisma.virtualKey.findMany({
+              where: {
+                projectId: { in: personalProjectIds },
+                principalUserId: emptyUserId,
+              },
+            });
+      expect(stragglerVks).toHaveLength(0);
+
+      // Cleanup. Order matters: the validate-before-mint guard does
+      // NOT block PersonalWorkspaceService.ensure() — it runs first
+      // and provisions the personal Team + TeamUser binding before
+      // service.issue() throws. So we have to drop TeamUser rows
+      // before deleting the Teams they reference.
+      await prisma.routingPolicy.deleteMany({
+        where: { organizationId: emptyOrgId },
+      });
+      if (personalProjectIds.length > 0) {
+        await prisma.project.deleteMany({
+          where: { id: { in: personalProjectIds } },
+        });
+      }
+      await prisma.teamUser.deleteMany({
+        where: { team: { organizationId: emptyOrgId } },
+      });
+      await prisma.team.deleteMany({
+        where: { organizationId: emptyOrgId },
+      });
+      await prisma.organizationUser.deleteMany({
+        where: { organizationId: emptyOrgId },
+      });
+      await prisma.user.deleteMany({ where: { id: emptyUserId } });
+      await prisma.organization.delete({ where: { id: emptyOrgId } });
     });
   });
 

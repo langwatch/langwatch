@@ -187,6 +187,18 @@ export class PersonalVirtualKeyService {
       throw new NoDefaultRoutingPolicyError(organizationId);
     }
 
+    // G34 (Ariana QA dogfood): the resolved policy exists but has zero
+    // provider credentials configured. Minting here would succeed at
+    // /me's "Issue VK" step, then fail later with a gateway 504
+    // (`provider_timeout: provider is required`) the first time the
+    // user calls the gateway — green-success-then-mystery-failure UX.
+    // Validate at issue time so /me surfaces the actionable
+    // "ask your admin to add providers" guidance instead of after a
+    // copy-pasted curl.
+    if (policy && extractProviderCredentialIds(policy).length === 0) {
+      throw new RoutingPolicyHasNoProvidersError(policy.id, policy.name);
+    }
+
     // Personal VKs delegate provider-chain resolution to the routing
     // policy at request time — no embedded VirtualKeyProviderCredential
     // rows. VirtualKeyService.create accepts an empty
@@ -388,4 +400,44 @@ export class NoDefaultRoutingPolicyError extends Error {
     );
     this.name = "NoDefaultRoutingPolicyError";
   }
+}
+
+/**
+ * Thrown by `issue()` when the resolved routing policy exists but has
+ * zero provider credentials configured. Without providers, any
+ * subsequent gateway call against the minted VK would 504 with
+ * `provider_timeout`. Routes / tRPC handlers should translate this to
+ * HTTP 409 with `{ error: "routing_policy_has_no_providers" }` so /me
+ * (or the CLI) surfaces the "ask your admin to add providers"
+ * guidance at mint time, not after a copy-pasted curl mysteriously
+ * fails.
+ *
+ * Caught by Ariana QA dogfood (G34).
+ */
+export class RoutingPolicyHasNoProvidersError extends Error {
+  constructor(
+    public readonly routingPolicyId: string,
+    public readonly routingPolicyName: string,
+  ) {
+    super(
+      `Routing policy "${routingPolicyName}" has no providers configured. Ask your organization admin to add at least one provider in Settings → Routing Policies before issuing keys.`,
+    );
+    this.name = "RoutingPolicyHasNoProvidersError";
+  }
+}
+
+/**
+ * Read the `providerCredentialIds: Json` column off a RoutingPolicy
+ * row as a `string[]`. The column is typed as `Json` in Prisma but is
+ * always an array of credential ids in practice (default `"[]"`,
+ * service-layer always writes an array). Returns `[]` for any
+ * non-array shape (extra defensiveness in case migrations / manual
+ * writes ever produce an unexpected encoding).
+ */
+function extractProviderCredentialIds(policy: {
+  providerCredentialIds: unknown;
+}): string[] {
+  const raw = policy.providerCredentialIds;
+  if (!Array.isArray(raw)) return [];
+  return raw.filter((x): x is string => typeof x === "string");
 }
