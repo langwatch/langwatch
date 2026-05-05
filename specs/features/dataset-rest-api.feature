@@ -3,13 +3,8 @@ Feature: Dataset REST API
   I want full CRUD access to datasets and records via REST endpoints
   So that I can programmatically manage datasets without the UI
 
-  # 35 of 38 scenarios are now bound to integration tests in
+  # All 38 scenarios are now bound to integration tests in
   # langwatch/src/app/api/dataset/__tests__/dataset-rest-api.integration.test.ts.
-  # The 3 remaining @unimplemented scenarios are gaps in test coverage:
-  #   - "Batch create records returns 404 for non-existent dataset"
-  #   - "Batch create records requires entries in body"
-  #   - "Batch create records enforces maximum batch size"
-  # These edge cases are not yet exercised by integration tests; tracked under #3458.
 
   Background:
     Given a project with a valid API key in the X-Auth-Token header
@@ -196,18 +191,18 @@ Feature: Dataset REST API
     Then the records are created successfully
     And the missing column "output" defaults to null
 
-  @integration @unimplemented
+  @integration
   Scenario: Batch create records returns 404 for non-existent dataset
     When I call POST /api/dataset/ghost/records with entries [{"input": "hello"}]
     Then the request fails with 404 Not Found
 
-  @integration @unimplemented
+  @integration
   Scenario: Batch create records requires entries in body
     Given a dataset "my-dataset" exists
     When I call POST /api/dataset/my-dataset/records with an empty body
     Then the request fails with 422 Unprocessable Entity
 
-  @integration @unimplemented
+  @integration
   Scenario: Batch create records enforces maximum batch size
     Given a dataset "my-dataset" with columns [input]
     When I call POST /api/dataset/my-dataset/records with more than 1000 entries
