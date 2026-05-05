@@ -7,6 +7,7 @@ import {
   type EvaluationTriggerReactorDeps,
 } from "../evaluationTrigger.reactor";
 import { DEFERRED_CHECK_DELAY_MS } from "../originGate.reactor";
+import { SYNTHETIC_SPAN_NAMES } from "~/server/tracer/constants";
 
 function createFoldState(
   overrides: Partial<TraceSummaryData> = {},
@@ -193,6 +194,74 @@ describe("evaluationTrigger reactor", () => {
       await reactor.handle(createEvent(), createContext(state));
 
       expect(deps.evaluation).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when inbound event is a synthetic span (langwatch.track_event)", () => {
+    // Regression test for Bug 2 of issue #3875: the reactor must short-circuit
+    // BEFORE querying monitors when the inbound span name is in SYNTHETIC_SPAN_NAMES.
+    // Without this filter, thumbs-up/down feedback spans re-trigger ON_MESSAGE
+    // monitors and the presidio evaluator crashes on null computedInput/Output.
+    it("does NOT invoke monitor service", async () => {
+      const deps = createDeps();
+      const reactor = createEvaluationTriggerReactor(deps);
+      // Origin gate must pass so that only the synthetic-span check rejects.
+      const state = createFoldState({
+        attributes: { "langwatch.origin": "application" },
+      });
+      const syntheticSpanName = [...SYNTHETIC_SPAN_NAMES][0]!;
+      const event = createEvent({ data: { span: { name: syntheticSpanName } } });
+
+      await reactor.handle(event, createContext(state));
+
+      // Filter must happen BEFORE the DB lookup.
+      expect(deps.monitors.getEnabledOnMessageMonitors).not.toHaveBeenCalled();
+    });
+
+    it("does NOT dispatch evaluation commands", async () => {
+      const deps = createDeps();
+      const reactor = createEvaluationTriggerReactor(deps);
+      const state = createFoldState({
+        attributes: { "langwatch.origin": "application" },
+      });
+      const syntheticSpanName = [...SYNTHETIC_SPAN_NAMES][0]!;
+      const event = createEvent({ data: { span: { name: syntheticSpanName } } });
+
+      await reactor.handle(event, createContext(state));
+
+      expect(deps.evaluation).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when inbound event is a normal (non-synthetic) span", () => {
+    it("dispatches evaluation commands", async () => {
+      const deps = createDeps();
+      const reactor = createEvaluationTriggerReactor(deps);
+      const state = createFoldState({
+        attributes: { "langwatch.origin": "application" },
+      });
+      const event = createEvent({ data: { span: { name: "openai.chat" } } });
+
+      await reactor.handle(event, createContext(state));
+
+      expect(deps.monitors.getEnabledOnMessageMonitors).toHaveBeenCalledWith("tenant-1");
+      expect(deps.evaluation).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("when inbound event has no span data field", () => {
+    // Events without a span (e.g. non-span event types) must NOT be short-circuited
+    // by the synthetic-span filter — only an explicit name match should reject.
+    it("dispatches evaluation commands", async () => {
+      const deps = createDeps();
+      const reactor = createEvaluationTriggerReactor(deps);
+      const state = createFoldState({
+        attributes: { "langwatch.origin": "application" },
+      });
+
+      await reactor.handle(createEvent(), createContext(state));
+
+      expect(deps.evaluation).toHaveBeenCalledTimes(1);
     });
   });
 });
