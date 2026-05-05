@@ -34,6 +34,7 @@ describe("tagCreateCommand", () => {
   });
 
   describe("when given a valid tag name", () => {
+    /** @scenario "Create a custom tag" */
     it("calls createTag with the name", async () => {
       mockCreateTag.mockResolvedValue({ name: "canary", createdAt: new Date().toISOString() });
 
@@ -52,6 +53,7 @@ describe("tagCreateCommand", () => {
   });
 
   describe("when given an invalid tag name", () => {
+    /** @scenario "Create tag with invalid name exits 1 without calling API" */
     it("does not call createTag", async () => {
       await expect(tagCreateCommand("INVALID_NAME!")).rejects.toThrow(ProcessExitError);
 
@@ -72,6 +74,7 @@ describe("tagCreateCommand", () => {
   });
 
   describe("when the API returns a duplicate error", () => {
+    /** @scenario "Create duplicate tag surfaces API error" */
     it("propagates the error", async () => {
       mockCreateTag.mockRejectedValue(new Error("Tag already exists"));
 

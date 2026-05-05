@@ -34,6 +34,7 @@ describe("tagRenameCommand", () => {
   });
 
   describe("when given valid old and new names", () => {
+    /** @scenario "Rename a tag" */
     it("calls renameTag with old and new names", async () => {
       mockRenameTag.mockResolvedValue(undefined);
 
@@ -52,6 +53,7 @@ describe("tagRenameCommand", () => {
   });
 
   describe("when given an invalid new name", () => {
+    /** @scenario "Rename tag with invalid new name exits 1" */
     it("does not call renameTag", async () => {
       await expect(tagRenameCommand("canary", "INVALID!")).rejects.toThrow(ProcessExitError);
 
