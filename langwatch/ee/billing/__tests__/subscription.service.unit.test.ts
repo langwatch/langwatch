@@ -17,6 +17,7 @@ import { EESubscriptionService, RECENT_INVOICES_LIMIT } from "../services/subscr
 import { InvalidPlanError, OrganizationNotFoundError, SeatBillingUnavailableError } from "../errors";
 import type { SeatEventSubscriptionFns } from "../services/seatEventSubscription";
 import type { SubscriptionRepository } from "../../../src/server/app-layer/subscription/subscription.repository";
+import type { SubscriptionService } from "../../../src/server/app-layer/subscription/subscription.service";
 import type { OrganizationRepository } from "../../../src/server/app-layer/organizations/repositories/organization.repository";
 
 const createMockStripe = () => ({
@@ -138,6 +139,26 @@ describe("EESubscriptionService", () => {
   let itemCalculator: ReturnType<typeof createMockItemCalculator>;
   let organizationRepository: ReturnType<typeof createMockOrganizationRepository>;
   let service: EESubscriptionService;
+
+  describe("interface conformance", () => {
+    /** @scenario "New class implements the same interface as old factory" */
+    it("implements the SubscriptionService app-layer interface", () => {
+      const localService = new EESubscriptionService({
+        prisma: createMockDb() as unknown as PrismaClient,
+        repository: createMockRepository() as unknown as SubscriptionRepository,
+        stripe: createMockStripe() as unknown as Stripe,
+        itemCalculator: createMockItemCalculator(),
+        organizationRepository: createMockOrganizationRepository() as unknown as OrganizationRepository,
+      });
+      const asInterface: SubscriptionService = localService;
+
+      expect(typeof asInterface.updateSubscriptionItems).toBe("function");
+      expect(typeof asInterface.createOrUpdateSubscription).toBe("function");
+      expect(typeof asInterface.createBillingPortalSession).toBe("function");
+      expect(typeof asInterface.getLastNonCancelledSubscription).toBe("function");
+      expect(typeof asInterface.notifyProspective).toBe("function");
+    });
+  });
 
   beforeEach(() => {
     vi.clearAllMocks();

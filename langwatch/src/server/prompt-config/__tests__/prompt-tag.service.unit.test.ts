@@ -7,7 +7,10 @@ import {
   PromptTagValidationError,
   validateTagName,
 } from "../prompt-tag.service";
-import { PromptTagRepository } from "../repositories/prompt-tag.repository";
+import {
+  PROTECTED_TAGS,
+  PromptTagRepository,
+} from "../repositories/prompt-tag.repository";
 import type { PromptTag } from "@prisma/client";
 
 function makeTag(overrides: Partial<PromptTag> = {}): PromptTag {
@@ -40,7 +43,7 @@ function makeRepo(overrides: Partial<PromptTagRepository> = {}): PromptTagReposi
 
 describe("validateTagName()", () => {
   describe("when name is valid", () => {
-    /** @scenario Accepts valid non-numeric tag during creation */
+    /** @scenario "Validation accepts well-formed custom tag names" */
     it("does not throw for a lowercase slug", () => {
       expect(() => validateTagName("canary")).not.toThrow();
     });
@@ -48,16 +51,27 @@ describe("validateTagName()", () => {
     it("does not throw for names with hyphens and underscores", () => {
       expect(() => validateTagName("ab-test_v2")).not.toThrow();
     });
+
+    /** @scenario 'Validation accepts "production" as a tag name' */
+    it("does not throw for the seeded 'production' tag name", () => {
+      expect(() => validateTagName("production")).not.toThrow();
+    });
+
+    /** @scenario 'Validation accepts "staging" as a tag name' */
+    it("does not throw for the seeded 'staging' tag name", () => {
+      expect(() => validateTagName("staging")).not.toThrow();
+    });
   });
 
   describe("when name is empty", () => {
+    /** @scenario "Validation rejects empty tag names" */
     it("throws PromptTagValidationError", () => {
       expect(() => validateTagName("")).toThrow(PromptTagValidationError);
     });
   });
 
   describe("when name is purely numeric", () => {
-    /** @scenario Rejects zero as a tag name during creation */
+    /** @scenario "Validation rejects purely numeric tag names" */
     it("throws PromptTagValidationError mentioning numeric", () => {
       expect(() => validateTagName("42")).toThrow(
         expect.objectContaining({ name: "PromptTagValidationError", message: expect.stringMatching(/numeric/i) }),
@@ -66,6 +80,7 @@ describe("validateTagName()", () => {
   });
 
   describe("when name contains invalid characters", () => {
+    /** @scenario "Validation rejects uppercase tag names" */
     it("throws for uppercase names", () => {
       expect(() => validateTagName("CANARY")).toThrow(PromptTagValidationError);
     });
@@ -76,10 +91,18 @@ describe("validateTagName()", () => {
   });
 
   describe("when name is a protected tag", () => {
+    /** @scenario 'Validation rejects creating a tag named "latest"' */
     it("throws PromptTagValidationError mentioning protected for 'latest'", () => {
       expect(() => validateTagName("latest")).toThrow(
         expect.objectContaining({ name: "PromptTagValidationError", message: expect.stringMatching(/protected/i) }),
       );
+    });
+  });
+
+  describe("when inspecting PROTECTED_TAGS", () => {
+    /** @scenario 'Only "latest" is a protected tag' */
+    it("contains only 'latest'", () => {
+      expect([...PROTECTED_TAGS]).toEqual(["latest"]);
     });
   });
 });

@@ -3,14 +3,11 @@ Feature: Enterprise-only feature guards
   I want to restrict RBAC custom roles and Audit Logs to Enterprise plans
   So that these premium features are only available to paying Enterprise customers
 
-  # Parity status: 23 of 27 scenarios bound to existing tests.
-  # The remaining are tracked under #3458:
-  #   - 4 NO_TEST: behavior shipped + correct, no integration test yet exists
-  # NO_TEST gaps:
-  #   - "Non-enterprise org can list custom roles"
-  #   - "Non-enterprise org can view a custom role"
+  # Parity status: 25 of 27 scenarios bound to existing tests.
+  # 2 remain @unimplemented (#3458):
   #   - "Invite with foreign custom role ID is rejected"
   #   - "Invite with valid custom role ID succeeds"
+  # Both require full org+invite+RBAC integration harness, deferred.
 
   Background:
     Given an organization exists
@@ -166,14 +163,14 @@ Feature: Enterprise-only feature guards
 
   # --- Read-only endpoints remain accessible ---
 
-  @unit @unimplemented
+  @unit
   Scenario: Non-enterprise org can list custom roles
     Given the organization plan is not ENTERPRISE
     And custom roles exist from when the org was on Enterprise
     When a user calls role.getAll
     Then the roles are returned successfully
 
-  @unit @unimplemented
+  @unit
   Scenario: Non-enterprise org can view a custom role
     Given the organization plan is not ENTERPRISE
     And a custom role exists from when the org was on Enterprise

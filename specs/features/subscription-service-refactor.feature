@@ -9,7 +9,7 @@ Feature: Subscription service refactor
   # — implementation diverged from the spec wording (no co-existence with old
   # factory; the new class IS the service). Tracked under #3458.
 
-  @unit @unimplemented
+  @unit
   Scenario: New class implements the same interface as old factory
     Given the SubscriptionService interface in app-layer
     When EESubscriptionService.create() is called with identical dependencies
