@@ -1,5 +1,7 @@
+import { PlanTypes, PLAN_LIMITS } from "../../../../ee/licensing/planInfo";
 import type { PlanInfo } from "../../../../ee/licensing/planInfo";
 import { isAdmin } from "../../../../ee/billing/planProvider";
+import { env } from "~/env.mjs";
 import type { PlanProvider, PlanProviderUser } from "./plan-provider";
 
 /**
@@ -36,7 +38,28 @@ export function createCompositePlanProvider({
         selectedPlan = { ...licensePlan, planSource: "license" };
       }
 
-      // 3. Recompute overrideAddingLimitations from user context (not plan source)
+      // 3. Self-hosted dev bypass — when LANGWATCH_DEV_FORCE_ENTERPRISE=true,
+      // surface ENTERPRISE limits everywhere (including the license-
+      // enforcement guard at member/team/project create time). Previously
+      // this bypass only patched the UI display in usage-stats.service.ts,
+      // so server-side enforcement still rejected with 'reached the
+      // limit of 1 team members' on dogfood installs (Ariana's option-C
+      // sweep blocker — couldn't test team-scoped tile overrides,
+      // multi-user budgets, RBAC delegation, anomaly scope:USER).
+      // No effect on SaaS deploys or NODE_ENV=test.
+      const devForceEnterprise =
+        env.NODE_ENV !== "test" &&
+        !env.IS_SAAS &&
+        env.LANGWATCH_DEV_FORCE_ENTERPRISE === true;
+      if (devForceEnterprise) {
+        selectedPlan = {
+          ...PLAN_LIMITS[PlanTypes.ENTERPRISE],
+          planSource: selectedPlan.planSource,
+          overrideAddingLimitations: selectedPlan.overrideAddingLimitations,
+        };
+      }
+
+      // 4. Recompute overrideAddingLimitations from user context (not plan source)
       return {
         ...selectedPlan,
         overrideAddingLimitations: computeOverrideAddingLimitations(user),
