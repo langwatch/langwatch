@@ -4,6 +4,21 @@ Feature: Scenario tests for skills quality assurance
   We want every skill to have scenario tests proving it works
   So that we can compound improvements with confidence and catch regressions
 
+  # All `@unimplemented` scenarios in this file describe live Claude
+  # Code-driven scenario tests under `skills/_tests/*.scenario.test.ts`
+  # (e.g. `tracing.scenario.test.ts`, `evaluations.scenario.test.ts`,
+  # `level-up.scenario.test.ts`, `analytics.scenario.test.ts`,
+  # `prompts*.scenario.test.ts`, `scenarios.scenario.test.ts`). The
+  # tests exist and are skipped in CI (`it.skipIf(isCI)`) — they
+  # spawn an actual Claude Code agent against a fixture codebase.
+  #
+  # The `check-feature-parity` script's DEFAULT_TEST_ROOTS does not
+  # include `skills/_tests/`, so JSDoc `@scenario` annotations in
+  # those files would not currently bind. Expanding the test roots
+  # is the right structural fix for this domain — tracked outside
+  # this PR. Until then, scenarios stay `@unimplemented` (with this
+  # justifying note) rather than being orphaned.
+
   Background:
     Given scenario tests live in skills/_tests/
     And fixture codebases live in skills/_tests/fixtures/
