@@ -164,6 +164,7 @@ describe("useSimulationUpdateListener()", () => {
   });
 
   describe("when no SSE event has fired recently", () => {
+    /** @scenario "First SSE event triggers immediate refetch" */
     it("fires refetch immediately without debounce delay", () => {
       renderHook(() =>
         useSimulationUpdateListener({
@@ -183,6 +184,7 @@ describe("useSimulationUpdateListener()", () => {
   });
 
   describe("when rapid SSE events fire within the debounce window", () => {
+    /** @scenario "Rapid SSE events are coalesced into a single refetch" */
     it("coalesces them into one additional refetch", () => {
       renderHook(() =>
         useSimulationUpdateListener({
