@@ -213,6 +213,7 @@ describe("orchestrator", () => {
   });
 
   describe("generateCells with evaluator-all-rows scope", () => {
+      /** @scenario "Running evaluator on all rows creates one execution per row with target output" */
       it("creates one cell per row that has a pre-computed target output", () => {
         const state = createTestState(1, 2);
         const datasetRows = createTestDataset(4);
@@ -239,6 +240,7 @@ describe("orchestrator", () => {
         expect(cells.map((c) => c.rowIndex)).toEqual([0, 1, 3]);
       });
 
+      /** @scenario "Running evaluator on all rows creates one execution per row with target output" */
       it("skips target execution for each cell", () => {
         const state = createTestState(1, 1);
         const datasetRows = createTestDataset(2);
