@@ -19,6 +19,7 @@ describe("applySpanToSummary() langwatch.origin hoisting", () => {
   });
 
   describe("when root span has langwatch.origin", () => {
+    /** @scenario "Origin is hoisted from root span to trace summary" */
     it("hoists origin to trace summary attributes", () => {
       const span = createTestSpan({
         parentSpanId: null, // root span
@@ -34,6 +35,7 @@ describe("applySpanToSummary() langwatch.origin hoisting", () => {
   });
 
   describe("when child span has langwatch.origin and root span does not", () => {
+    /** @scenario "Root span without origin preserves child span origin" */
     it("preserves child span origin value", () => {
       // Child span arrives first with origin
       const childSpan = createTestSpan({
@@ -61,6 +63,7 @@ describe("applySpanToSummary() langwatch.origin hoisting", () => {
   });
 
   describe("when root span overrides child span origin", () => {
+    /** @scenario "Root span overrides child span origin when it has an opinion" */
     it("uses root span origin value", () => {
       // Child span arrives first with origin
       const childSpan = createTestSpan({
@@ -90,6 +93,7 @@ describe("applySpanToSummary() langwatch.origin hoisting", () => {
   });
 
   describe("when no span sets langwatch.origin", () => {
+    /** @scenario "Traces without any origin attribute remain unset" */
     it("does not set langwatch.origin in summary attributes", () => {
       const span = createTestSpan({
         parentSpanId: null,
@@ -103,6 +107,7 @@ describe("applySpanToSummary() langwatch.origin hoisting", () => {
   });
 
   describe("when black-box scenario trace propagates origin through traceparent", () => {
+    /** @scenario "Black-box scenario trace propagates origin through traceparent" */
     it("preserves root span origin through child spans", () => {
       // Root span with simulation origin
       const rootSpan = createTestSpan({
@@ -130,6 +135,7 @@ describe("applySpanToSummary() langwatch.origin hoisting", () => {
   });
 
   describe("when span has metadata.platform = 'optimization_studio'", () => {
+    /** @scenario Projection strips metadata.platform "optimization_studio" on new traces */
     it("strips metadata.platform from hoisting", () => {
       const span = createTestSpan({
         spanAttributes: {
@@ -146,6 +152,7 @@ describe("applySpanToSummary() langwatch.origin hoisting", () => {
   });
 
   describe("when span has metadata.platform = 'my-custom-platform'", () => {
+    /** @scenario "Projection preserves user-set metadata.platform values" */
     it("preserves user-set metadata.platform", () => {
       const span = createTestSpan({
         spanAttributes: {
@@ -160,6 +167,7 @@ describe("applySpanToSummary() langwatch.origin hoisting", () => {
   });
 
   describe("when span has metadata.labels containing 'scenario-runner'", () => {
+    /** @scenario Projection strips metadata.labels "scenario-runner" on new traces */
     it("strips scenario-runner from labels", () => {
       const span = createTestSpan({
         spanAttributes: {
@@ -195,6 +203,7 @@ describe("applySpanToSummary() langwatch.origin hoisting", () => {
   });
 
   describe("when span has metadata.environment = 'production'", () => {
+    /** @scenario "Projection preserves generic metadata keys like environment" */
     it("preserves generic metadata keys", () => {
       const span = createTestSpan({
         spanAttributes: {
@@ -211,6 +220,7 @@ describe("applySpanToSummary() langwatch.origin hoisting", () => {
   });
 
   describe("when span has instrumentationScope.name = 'langwatch-evaluation'", () => {
+    /** @scenario Infer origin from instrumentationScope.name "langwatch-evaluation" */
     it("infers langwatch.origin = 'evaluation'", () => {
       const span = createTestSpan({
         instrumentationScope: { name: "langwatch-evaluation", version: null },
@@ -224,6 +234,7 @@ describe("applySpanToSummary() langwatch.origin hoisting", () => {
   });
 
   describe("when span has instrumentationScope.name = '@langwatch/scenario'", () => {
+    /** @scenario Infer origin from instrumentationScope.name "@langwatch/scenario" */
     it("infers langwatch.origin = 'simulation'", () => {
       const span = createTestSpan({
         instrumentationScope: { name: "@langwatch/scenario", version: null },
@@ -237,6 +248,7 @@ describe("applySpanToSummary() langwatch.origin hoisting", () => {
   });
 
   describe("when span has metadata.platform = 'optimization_studio' without langwatch.origin", () => {
+    /** @scenario Infer origin from metadata.platform "optimization_studio" */
     it("infers langwatch.origin = 'workflow'", () => {
       const span = createTestSpan({
         spanAttributes: {
@@ -251,6 +263,7 @@ describe("applySpanToSummary() langwatch.origin hoisting", () => {
   });
 
   describe("when span has metadata.labels containing 'scenario-runner' without langwatch.origin", () => {
+    /** @scenario Infer origin from metadata.labels containing "scenario-runner" */
     it("infers langwatch.origin = 'simulation'", () => {
       const span = createTestSpan({
         spanAttributes: {
@@ -265,6 +278,7 @@ describe("applySpanToSummary() langwatch.origin hoisting", () => {
   });
 
   describe("when span has resource attribute scenario.labels without langwatch.origin", () => {
+    /** @scenario "Infer origin from resource attribute scenario.labels" */
     it("infers langwatch.origin = 'simulation'", () => {
       const span = createTestSpan({
         resourceAttributes: {
@@ -280,6 +294,7 @@ describe("applySpanToSummary() langwatch.origin hoisting", () => {
   });
 
   describe("when span has evaluation.run_id without langwatch.origin", () => {
+    /** @scenario "Infer origin from span attribute evaluation.run_id" */
     it("infers langwatch.origin = 'evaluation'", () => {
       const span = createTestSpan({
         spanAttributes: {
@@ -294,6 +309,7 @@ describe("applySpanToSummary() langwatch.origin hoisting", () => {
   });
 
   describe("when explicit langwatch.origin is set alongside legacy markers", () => {
+    /** @scenario "Explicit langwatch.origin takes precedence over all inferred signals" */
     it("uses explicit origin over all inferred signals", () => {
       const span = createTestSpan({
         instrumentationScope: { name: "langwatch-evaluation", version: null },
