@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { useMemo, useState } from "react";
 
+import { ConfirmDialog } from "~/components/gateway/ConfirmDialog";
 import GovernanceLayout from "~/components/governance/GovernanceLayout";
 import { LoadingScreen } from "~/components/LoadingScreen";
 import { NotFoundScene } from "~/components/NotFoundScene";
@@ -97,6 +98,7 @@ function RoutingPoliciesPage() {
   );
 
   const [editingId, setEditingId] = useState<string | "new" | null>(null);
+  const [policyToDelete, setPolicyToDelete] = useState<Policy | null>(null);
   const [composer, setComposer] = useState<{
     scope: Scope;
     scopeId: string;
@@ -170,6 +172,7 @@ function RoutingPoliciesPage() {
   const deleteMutation = api.routingPolicy.delete.useMutation({
     onSuccess: () => {
       void refetch();
+      setPolicyToDelete(null);
       toaster.create({ title: "Routing policy deleted", type: "success" });
     },
     onError: (e) =>
@@ -397,12 +400,7 @@ function RoutingPoliciesPage() {
                       id: p.id,
                     })
                   }
-                  onDelete={() =>
-                    deleteMutation.mutate({
-                      organizationId: orgId,
-                      id: p.id,
-                    })
-                  }
+                  onDelete={() => setPolicyToDelete(p)}
                   isPendingSetDefault={
                     setDefaultMutation.isPending &&
                     setDefaultMutation.variables?.id === p.id
@@ -440,6 +438,32 @@ function RoutingPoliciesPage() {
           setDrawerError(null);
           setEditingId(null);
           setComposer(null);
+        }}
+      />
+      <ConfirmDialog
+        open={!!policyToDelete}
+        onOpenChange={(open) => {
+          if (!open) setPolicyToDelete(null);
+        }}
+        title={
+          policyToDelete?.isDefault
+            ? `Delete default policy "${policyToDelete?.name}"?`
+            : `Delete routing policy "${policyToDelete?.name ?? ""}"?`
+        }
+        message={
+          policyToDelete?.isDefault
+            ? "This is the default policy at this scope. Personal-key issue paths and 'langwatch login' will return 409 no_default_routing_policy until another default is published. Virtual keys that resolved through this policy will fail closed at the next request."
+            : "Virtual keys that explicitly reference this policy will lose the reference and fail closed at the next request. Re-publish or pick another policy on the affected VKs to restore routing."
+        }
+        confirmLabel="Delete policy"
+        tone="danger"
+        loading={deleteMutation.isPending}
+        onConfirm={() => {
+          if (!policyToDelete) return;
+          deleteMutation.mutate({
+            organizationId: orgId,
+            id: policyToDelete.id,
+          });
         }}
       />
     </GovernanceLayout>
@@ -964,6 +988,7 @@ function RoutingPolicyDrawer({
     !composer ||
     !composer.name.trim() ||
     !composer.scopeId.trim() ||
+    composer.providerCredentialIds.length === 0 ||
     isPending;
 
   return (
