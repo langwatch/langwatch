@@ -92,9 +92,22 @@ prevents drift.
 - Tests should pin both paths whenever a new bypass lands. The composite's
   unit suite (28 tests) covers the SaaS path; the non-SaaS path needs its
   own unit asserting the dogfood case.
+- **Bypasses guarded by `NODE_ENV !== "test"` need a regression test that
+  explicitly exercises the bypass branch under a non-test env.** The guard
+  is necessary (integration tests assert real plan resolution, not an
+  ENTERPRISE override) but it also means the bypass body is dark to the
+  default unit suite. Surfaced concretely by `efc6edd02`: a typo'd import
+  path (`PlanTypes` from `ee/licensing/planInfo` instead of
+  `ee/billing/planTypes`) compiled green, type-checked green, passed 28/28
+  unit tests, and broke `/settings/*` with TRPC 500s the moment a dogfood
+  install loaded the bypass branch. Going forward: any change to a
+  `NODE_ENV !== "test"`-gated branch should ship with a test that
+  monkey-patches `env.NODE_ENV` to a non-test value (or imports the
+  bypass through a thin seam) so the body actually executes under CI.
 
 ## References
 
+- `efc6edd02` fix(license): correct PLAN_LIMITS / PlanTypes import paths — unblock /settings/* 500s (regression repair: typo'd import that landed in `0cc690381` + `7714a0356` was masked by the test guard)
 - `7714a0356` fix(license): apply LANGWATCH_DEV_FORCE_ENTERPRISE on the non-SaaS plan-provider path too
 - `0cc690381` fix(license): apply LANGWATCH_DEV_FORCE_ENTERPRISE at the composite layer so member-cap enforcement honors it
 - `src/server/app-layer/presets.ts:266-304` — both plan-resolution branches
