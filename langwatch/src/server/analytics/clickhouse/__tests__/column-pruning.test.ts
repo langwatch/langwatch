@@ -237,6 +237,7 @@ describe("column-pruning", () => {
     });
 
     describe("when requesting performance.tokens_per_second", () => {
+      /** @scenario "Tokens per second metric resolves duration from stored spans" */
       it("includes DurationMs in the stored_spans subquery", () => {
         const result = buildTimeseriesQuery({
           ...baseInput,
