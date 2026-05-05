@@ -23,6 +23,21 @@ import { env } from "~/env.mjs";
 import { checkOrganizationPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
+/**
+ * Service options for VK lifecycle calls. Forwards the gateway-URL
+ * env signal so the service can pick the right default for the
+ * deployment shape: explicit `LW_GATEWAY_BASE_URL` always wins,
+ * otherwise SaaS gets `gateway.langwatch.com` and self-hosted falls
+ * back to `http://localhost:5563` (the Docker port the AI gateway
+ * binds to). Without this, fresh self-hosted installs displayed the
+ * production gateway URL on the VK reveal card and the user's curl
+ * routed to the wrong place (Ariana QA option-C dogfood finding).
+ */
+const gatewayUrlOptions = () => ({
+  gatewayBaseUrl: env.LW_GATEWAY_BASE_URL,
+  isSaas: env.IS_SAAS,
+});
+
 async function assertOrgMembership({
   prisma,
   userId,
@@ -58,7 +73,7 @@ export const personalVirtualKeysRouter = createTRPCRouter({
         organizationId: input.organizationId,
       });
       const service = PersonalVirtualKeyService.create(ctx.prisma, {
-        gatewayBaseUrl: env.LW_GATEWAY_BASE_URL,
+        ...gatewayUrlOptions(),
       });
       const keys = await service.list({
         userId: ctx.session.user.id,
@@ -126,7 +141,7 @@ export const personalVirtualKeysRouter = createTRPCRouter({
       }
 
       const service = PersonalVirtualKeyService.create(ctx.prisma, {
-        gatewayBaseUrl: env.LW_GATEWAY_BASE_URL,
+        ...gatewayUrlOptions(),
       });
       let issued;
       try {
@@ -189,7 +204,7 @@ export const personalVirtualKeysRouter = createTRPCRouter({
       });
 
       const service = PersonalVirtualKeyService.create(ctx.prisma, {
-        gatewayBaseUrl: env.LW_GATEWAY_BASE_URL,
+        ...gatewayUrlOptions(),
       });
       try {
         await service.revoke({
