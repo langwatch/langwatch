@@ -240,6 +240,61 @@ Feature: Dataset File Upload REST API
     When reserved columns are renamed
     Then both names remain unchanged
 
+  # ── Null-byte sanitisation (Postgres 22P05 protection) ────────
+  # Postgres text/jsonb cannot store the U+0000 null byte. User-supplied
+  # files (PDFs copy-pasted into JSONL, broken CSV exports) regularly
+  # contain stray null bytes; the upload pipeline must scrub them silently
+  # so the customer never sees a Postgres error.
+
+  @integration
+  Scenario: Create + upload accepts a JSONL file containing a null byte in a string field
+    When I POST /api/dataset/upload with name "With Nulls" and a .jsonl file where one record's "reference" field contains a literal U+0000 null byte
+    Then the response status is 201
+    And the dataset is created with all uploaded records
+    And the offending record's "reference" value has the null byte stripped
+
+  @integration
+  Scenario: Upload to existing dataset accepts a CSV containing null bytes
+    Given a dataset "feedback" exists with columns [{"name": "input", "type": "string"}]
+    When I POST /api/dataset/feedback/upload with a CSV file where one row contains a literal U+0000 null byte in the "input" column
+    Then the response status is 200
+    And the dataset gains the new record with the null byte stripped from "input"
+
+  @integration
+  Scenario: Batch create records via REST sanitises null bytes
+    Given a dataset "feedback" exists with columns [{"name": "input", "type": "string"}]
+    When I call POST /api/dataset/feedback/records with entries [{"input": "hello\u0000world"}]
+    Then the records are created
+    And the stored entry's "input" value is "helloworld"
+
+  @integration
+  Scenario: Update record via REST sanitises null bytes
+    Given a dataset "feedback" has a record "rec-1" with entry {"input": "old"}
+    When I call PATCH /api/dataset/feedback/records/rec-1 with entry {"input": "new\u0000value"}
+    Then the response status is 200
+    And the stored entry's "input" value is "newvalue"
+
+  # ── Atomic dataset creation ───────────────────────────────────
+  # If record insertion fails after the parent dataset row is created,
+  # the dataset row must be rolled back. Otherwise the user gets a
+  # half-baked empty dataset and a misleading "name already exists"
+  # error on retry.
+
+  @integration
+  Scenario: Create + upload rolls back the dataset row when record insertion fails
+    Given the database is configured to reject the records insert (e.g. simulated transient error)
+    When I POST /api/dataset/upload with name "Atomic Test" and a valid CSV file
+    Then the request fails with 5xx
+    And no dataset row with slug "atomic-test" exists in the database
+
+  @integration
+  Scenario: Retrying after a failed create + upload reuses the same name
+    Given a previous POST /api/dataset/upload with name "Retry Me" failed during record insertion
+    And the dataset row was rolled back
+    When I POST /api/dataset/upload with name "Retry Me" and a valid CSV file
+    Then the request succeeds with 201
+    And the dataset is created with all records
+
   # ── Authentication ─────────────────────────────────────────────
 
   @integration
