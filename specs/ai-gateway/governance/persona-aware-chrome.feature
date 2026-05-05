@@ -146,6 +146,39 @@ Feature: AI Gateway Governance — Persona-aware chrome (sidebar + header)
     And the chrome on /governance renders the org-scope header (org name banner, NOT ProjectSelector)
     And the sidebar shows Home + Observe + Evaluate + Library + Govern + Gateway
 
+  @bdd @ui @persona-chrome @persona-4 @regression
+  Scenario: Govern sub-nav stays put across every governance sub-route
+    Given user is Persona 4 (governance admin) with both FFs on
+    And the user is on "/governance" with the Govern sub-nav visible in
+        the left rail (Overview / Ingestion Sources / Anomaly Rules /
+        Routing Policies)
+    When the user clicks any of these sub-nav links and lands on:
+      | route                                              |
+      | /settings/governance/ingestion-sources             |
+      | /settings/governance/ingestion-sources/<id>        |
+      | /settings/governance/anomaly-rules                 |
+      | /settings/governance/teams                         |
+      | /settings/governance/teams/<id>                    |
+      | /settings/governance/users                         |
+      | /settings/governance/users/<id>                    |
+      | /settings/routing-policies                         |
+    Then the destination page renders inside `<GovernanceLayout>` —
+        the Govern sub-nav is still visible in the left rail with the
+        active item highlighted
+    And the chrome stays in org-scope mode (org-name banner, not
+        ProjectSelector)
+    And the project switcher in the top bar does NOT flip the user's
+        selected project to "Personal Workspace" (governance is
+        org-scoped — entering a sub-page must not rebind a project)
+    And the outer left sidebar does NOT collapse to icons-only
+    And the user can return to the Overview via the sub-nav itself
+        without needing a fallback "Back to governance" link in the
+        page body (regression caught by Ariana QA G17 against
+        `ee/governance/dashboard/pages/{ingestion-sources,
+        ingestion-source-detail, anomaly-rules}.tsx` rendering under
+        the legacy `<SettingsLayout>` instead of `<GovernanceLayout>`;
+        fixed by `a8f2342c8`)
+
   @bdd @ui @persona-chrome @persona-4 @ff-off-regression
   Scenario: Govern section vanishes when its feature flag flips off (independent of Gateway)
     Given user is Persona 4 with both sections visible
