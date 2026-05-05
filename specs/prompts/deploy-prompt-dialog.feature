@@ -18,13 +18,13 @@ Feature: Deploy Prompt Dialog
     And the description reads "Use tags to get specific prompt version via SDK. Prompt tagged as Production is returned by default."
     And I see the prompt slug "pizza-prompt" with a copy button
 
-  @integration @unimplemented
+  @unit
   Scenario: Fetch all labels for a prompt config
     Given "pizza-prompt" has production=v2 and staging=v3
     When I call getLabelsForConfig with configId for "pizza-prompt"
     Then I receive two label records: production pointing to v2, staging pointing to v3
 
-  @unit @unimplemented
+  @unit
   Scenario: getLabelsForConfig returns empty when no labels assigned
     Given "pizza-prompt" has no labels assigned
     When I call getLabelsForConfig with configId for "pizza-prompt"
