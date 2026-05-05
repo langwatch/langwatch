@@ -154,6 +154,7 @@ describe("createSaaSPlanProvider", () => {
       });
 
       describe("when valid subscription exists for SEAT_EVENT org", () => {
+        /** @scenario Valid subscription returns its own plan regardless of pricing model */
         it("does not query the organization table", async () => {
           const subscription = {
             plan: PlanTypes.LAUNCH,
