@@ -148,6 +148,7 @@ describe("customerIoTraceSync reactor", () => {
   });
 
   describe("makeJobId", () => {
+    /** @scenario 'Trace sync reactor uses project-scoped job ID for debouncing' */
     it("returns cio-trace-sync-{projectId}", () => {
       const deps = createDeps();
       const reactor = createCustomerIoTraceSyncReactor(deps);
@@ -164,6 +165,8 @@ describe("customerIoTraceSync reactor", () => {
 
   describe("given a project that has never received a trace", () => {
     describe("when the first trace is processed", () => {
+      /** @scenario 'First trace identifies user with trace milestones' */
+      /** @scenario 'First trace fires immediately without debouncing' */
       it("identifies user with has_traces true, sdk metadata, and trace timestamp", async () => {
         const deps = createDeps();
         const reactor = createCustomerIoTraceSyncReactor(deps);
@@ -189,6 +192,7 @@ describe("customerIoTraceSync reactor", () => {
         });
       });
 
+      /** @scenario 'First trace fires first_trace_integrated event' */
       it("tracks first_trace_integrated event", async () => {
         const deps = createDeps();
         const reactor = createCustomerIoTraceSyncReactor(deps);
@@ -216,6 +220,7 @@ describe("customerIoTraceSync reactor", () => {
 
   describe("given a project that already has traces", () => {
     describe("when a new trace is processed", () => {
+      /** @scenario 'Subsequent traces update count and timestamp with debouncing' */
       it("identifies user with last_trace_at", async () => {
         const deps = createDeps({
           projects: createMockProjectService({
@@ -316,6 +321,7 @@ describe("customerIoTraceSync reactor", () => {
   });
 
   describe("when the first trace is detected via firstMessage flag", () => {
+    /** @scenario 'Trace sync does not duplicate first-trace detection logic' */
     it("calls resolveOrgAdmin on the project service", async () => {
       const deps = createDeps();
       const reactor = createCustomerIoTraceSyncReactor(deps);

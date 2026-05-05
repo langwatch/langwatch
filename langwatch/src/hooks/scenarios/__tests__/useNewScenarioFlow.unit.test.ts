@@ -27,6 +27,7 @@ describe("useNewScenarioFlow()", () => {
   });
 
   describe("when no scenarios exist and welcome not yet seen", () => {
+    /** @scenario 'Show welcome screen on first scenario creation' */
     it("shows inline welcome", () => {
       const { result } = renderHook(() =>
         useNewScenarioFlow({ scenarioCount: 0, isLoading: false })
@@ -48,6 +49,7 @@ describe("useNewScenarioFlow()", () => {
       expect(result.current.showCreateModal).toBe(false);
     });
 
+    /** @scenario 'Proceed from welcome screen to scenario creation' */
     it("opens create modal after proceeding from welcome", () => {
       const { result } = renderHook(() =>
         useNewScenarioFlow({ scenarioCount: 0, isLoading: false })
@@ -122,6 +124,7 @@ describe("useNewScenarioFlow()", () => {
   });
 
   describe("when scenarios exist", () => {
+    /** @scenario 'Skip welcome screen when scenarios already exist' */
     it("opens create modal directly on handleNewScenario", () => {
       const { result } = renderHook(() =>
         useNewScenarioFlow({ scenarioCount: 3, isLoading: false })

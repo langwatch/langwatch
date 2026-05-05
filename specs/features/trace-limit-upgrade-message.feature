@@ -7,6 +7,15 @@ Feature: Usage limit 429 message includes upgrade instructions
   # Free tier counts "events", paid TIERED counts "traces".
   # The message must reflect the actual usage unit being counted.
 
+  # 0 of 4 scenarios are bound — all are UPDATE-class per AUDIT_MANIFEST.
+  # Production message formatting diverges from scenario assertions
+  # (e.g., "Free limit of 50000 events" vs "Free plan limit of"). Scenarios need
+  # rewriting to match actual strings in limit-message.ts (tracked under #3458):
+  #   - "Free-tier org on SaaS told to upgrade with correct unit"
+  #   - "Free-tier org on self-hosted told to buy a license"
+  #   - "Paid TIERED org on SaaS told to upgrade with traces unit"
+  #   - "Paid TIERED org on self-hosted told to buy a license"
+
   @unimplemented
   Scenario: Free-tier org on SaaS told to upgrade with correct unit
     Given a free-tier organization that has exceeded 50000 events

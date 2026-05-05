@@ -145,6 +145,7 @@ describe("afterPromptCreated()", () => {
   });
 
   describe("when created via REST API (no userId)", () => {
+    /** @scenario 'Prompt creation tracked regardless of whether created via platform UI or API' */
     it("resolves userId via resolveOrgAdmin", async () => {
       const prisma = createMockPrisma({ promptCount: 1 });
       mockProjects.resolveOrgAdmin.mockResolvedValueOnce({

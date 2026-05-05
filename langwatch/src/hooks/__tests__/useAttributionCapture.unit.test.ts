@@ -30,6 +30,7 @@ describe("useAttributionCapture()", () => {
         setUrl("?ref=website");
       });
 
+      /** @scenario 'Attribution hook captures ref param in sessionStorage on first touch' */
       it("captures ref into lw_attrib.leadSource", () => {
         renderHook(() => useAttributionCapture());
 
@@ -46,6 +47,7 @@ describe("useAttributionCapture()", () => {
         );
       });
 
+      /** @scenario 'Attribution hook captures full utm tuple when present in URL' */
       it("captures utm_source into lw_attrib.utmSource", () => {
         renderHook(() => useAttributionCapture());
         expect(window.sessionStorage.getItem("lw_attrib.utmSource")).toBe(
@@ -87,6 +89,7 @@ describe("useAttributionCapture()", () => {
         setReferrer("https://www.langwatch.ai/");
       });
 
+      /** @scenario 'Attribution hook captures document.referrer when present' */
       it("captures referrer into lw_attrib.referrer", () => {
         renderHook(() => useAttributionCapture());
 
@@ -139,6 +142,7 @@ describe("useAttributionCapture()", () => {
       setUrl("?ref=later");
     });
 
+    /** @scenario 'Attribution hook does not overwrite existing first-touch values' */
     it("does not overwrite the first-touch value", () => {
       renderHook(() => useAttributionCapture());
 
