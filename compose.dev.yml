@@ -38,6 +38,8 @@ x-common-env: &common-env
   CLICKHOUSE_URL: http://default:langwatch@clickhouse:8123/langwatch
   LANGWATCH_NLP_SERVICE: http://langwatch_nlp:5561
   LANGEVALS_ENDPOINT: http://langevals:5562
+  # Prod-like dev: IS_SAAS=true (from langwatch/.env) requires SSRF blocking.
+  BLOCK_LOCAL_HTTP_CALLS: "true"
 
 services:
   # =============================================================================
