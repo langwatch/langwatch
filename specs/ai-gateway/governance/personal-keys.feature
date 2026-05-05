@@ -62,6 +62,31 @@ Feature: AI Gateway Governance — Personal virtual keys
     And the response body contains `{ "error": "no_default_routing_policy", "message": "Your organization admin must publish a default routing policy before personal keys can be issued." }`
     And no personal VK is created
 
+  @bdd @personal-keys @issuance @policy-resolution @regression
+  Scenario: When the default RoutingPolicy has zero providers, personal-key issuance fails with a clear error (validate-before-mint)
+    Given organization "acme" HAS a default RoutingPolicy
+    But that policy has zero ProviderCredentials in its `providerCredentialIds` chain
+    When user "jane@acme.com" tries to login via the CLI device-flow
+    Then the device-exchange response status is 422
+    And the response body contains `{ "error": "routing_policy_has_no_providers", "message": "Your organization admin must bind at least one provider to the default routing policy before personal keys can be issued." }`
+    And no personal VK is created
+    # Regression-invariant: pre-637c4e137, the empty-policy mint succeeded
+    # but every gateway call returned 504 provider_timeout (Ariana QA G34
+    # caught the green-success-then-504 mismatch). Now validate-before-mint
+    # symmetric with the no_default_routing_policy invariant above. Same
+    # contract surfaces from `api.personalVirtualKeys.issuePersonal` (tRPC
+    # UNPROCESSABLE_CONTENT → HTTP 422) and `POST /api/auth/cli/exchange`
+    # (HTTP 422 + JSON error body) — no green-success on either path.
+
+  @bdd @personal-keys @issuance @policy-resolution
+  Scenario: Empty-policy invariant applies symmetrically to /me portal mint and CLI device-flow mint
+    Given the same empty-default-policy state above
+    When EITHER the /me portal calls `api.personalVirtualKeys.issuePersonal`
+    OR the CLI device-flow exchange runs
+    Then both surfaces return HTTP 422 with `routing_policy_has_no_providers`
+    And both surfaces include the same actionable admin hint message
+    And neither surface creates a personal VK
+
   # ---------------------------------------------------------------------------
   # Listing
   # ---------------------------------------------------------------------------
