@@ -40,6 +40,8 @@ Validation responsibility is split:
 
 A submit handler that detects an invalid cross-field state **must `return` before any mutation fires** and **must surface why** through a toast or inline error. Silent no-ops are forbidden — they are the failure mode that produced #3785.
 
+**Inputs are a separate category from action buttons.** A disabled *input* (a select with no options to pick, a date field outside its allowed range) is fine and often clearer than an enabled-but-empty one. The "no `disabled={!isValid}`" rule applies to **submit/action buttons**, where the user is choosing whether to commit. An input whose underlying domain is empty isn't hiding a constraint — there's nothing to choose. Pair the disabled input with a hint that explains *why* and *what to do* (see #3785: empty `chatOptions` → disabled `ProviderModelSelector` + "Add one in the Custom Models section above").
+
 ## Rationale
 
 ### Why not `disabled={!isValid}`

@@ -40,11 +40,13 @@ export const ProviderModelSelector = React.memo(function ProviderModelSelector({
   options,
   onChange,
   size = "full",
+  disabled = false,
 }: {
   model: string;
   options: string[];
   onChange: (model: string) => void;
   size?: "sm" | "md" | "full";
+  disabled?: boolean;
 }) {
   const [modelSearch, setModelSearch] = useState("");
 
@@ -168,6 +170,7 @@ export const ProviderModelSelector = React.memo(function ProviderModelSelector({
         setHighlightedValue(details.highlightedValue);
       }}
       size={size === "full" ? undefined : size}
+      disabled={disabled}
     >
       <Select.Trigger
         className="fix-hidden-inputs"

@@ -194,6 +194,12 @@ export const DefaultProviderSection = ({
           LangWatch features.
         </Text>
       )}
+      {state.useAsDefaultProvider && chatOptions.length === 0 && (
+        <Text fontSize="xs" color="fg.muted">
+          No {providerName} models available. Add one in the Custom Models
+          section above to enable this.
+        </Text>
+      )}
 
       {/* Default Models Selection - Only visible when toggle is enabled */}
       {state.useAsDefaultProvider && (
@@ -207,23 +213,18 @@ export const DefaultProviderSection = ({
               model={state.projectDefaultModel ?? ""}
               options={chatOptions}
               onChange={(model) => actions.setProjectDefaultModel(model)}
+              disabled={chatOptions.length === 0}
             />
-            {chatOptions.length === 0 ? (
-              <Text fontSize="xs" color="fg.muted" marginTop={1}>
-                No {providerName} models available. Add one in the Custom
-                Models section above to enable this.
-              </Text>
-            ) : (
+            {chatOptions.length > 0 &&
               state.projectDefaultModel &&
               !state.projectDefaultModel.startsWith(
                 `${provider.provider}/`,
               ) && (
                 <Text fontSize="xs" color="orange.600" marginTop={1}>
-                  Persisted default belongs to a different provider — pick a
-                  model from {providerName} to switch.
+                  Persisted default belongs to a different provider — pick a{" "}
+                  {providerName} model to switch.
                 </Text>
-              )
-            )}
+              )}
           </Field.Root>
 
           <Field.Root width="full">
@@ -237,23 +238,18 @@ export const DefaultProviderSection = ({
               onChange={(model) =>
                 actions.setProjectTopicClusteringModel(model)
               }
+              disabled={chatOptions.length === 0}
             />
-            {chatOptions.length === 0 ? (
-              <Text fontSize="xs" color="fg.muted" marginTop={1}>
-                No {providerName} models available. Add one in the Custom
-                Models section above to enable this.
-              </Text>
-            ) : (
+            {chatOptions.length > 0 &&
               state.projectTopicClusteringModel &&
               !state.projectTopicClusteringModel.startsWith(
                 `${provider.provider}/`,
               ) && (
                 <Text fontSize="xs" color="orange.600" marginTop={1}>
-                  Persisted default belongs to a different provider — pick a
-                  model from {providerName} to switch.
+                  Persisted default belongs to a different provider — pick a{" "}
+                  {providerName} model to switch.
                 </Text>
-              )
-            )}
+              )}
           </Field.Root>
 
           <Field.Root width="full">
