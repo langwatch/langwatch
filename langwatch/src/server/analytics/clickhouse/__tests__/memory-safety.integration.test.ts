@@ -415,6 +415,7 @@ describe("memory-safety integration", () => {
       expect(sql).not.toContain("SpanAttributes");
     });
 
+    /** @scenario "Analytics queries complete within a tight memory budget" */
     it("completes total_cost query within 50MB on wide-attribute data", async () => {
       resetParamCounter();
       const { sql, params } = buildTimeseriesQuery({
@@ -535,6 +536,7 @@ describe("memory-safety integration", () => {
   });
 
   describe("when verifying query result correctness on seeded data", () => {
+    /** @scenario "Analytics query results are correct on seeded data" */
     it("returns expected trace_count for cardinality of metadata.trace_id", async () => {
       // Use "full" timeScale to get a single aggregation across all time
       resetParamCounter();

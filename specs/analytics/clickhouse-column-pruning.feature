@@ -76,7 +76,7 @@ Feature: ClickHouse Analytics Column Pruning
     When an analytics timeseries query is built for "trace_count" over a date range
     Then the generated SQL is syntactically valid
 
-  @unit @unimplemented
+  @unit
   Scenario: Pruned query resolves all column references from pruned sources
     When an analytics timeseries query is built for "trace_count" over a date range
     Then every column alias referenced in SELECT, GROUP BY, and ORDER BY is available from the pruned sources
@@ -91,13 +91,13 @@ Feature: ClickHouse Analytics Column Pruning
   # ClickHouse memory safety net
   # ---------------------------------------------------------------------------
 
-  @integration @unimplemented
+  @unit
   Scenario: Analytics queries include a memory spill-to-disk safety setting
     When any analytics query is executed against ClickHouse
     Then the query is sent with a max_bytes_before_external_group_by setting
     So that large GROUP BY operations spill to disk instead of exceeding memory
 
-  @integration @unimplemented
+  @unit
   Scenario: Memory safety setting does not override explicit per-query settings
     When a query is executed with an explicit clickhouse_settings override
     Then the override takes precedence over the default memory safety setting
