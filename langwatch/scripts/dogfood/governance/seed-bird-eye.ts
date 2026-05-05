@@ -119,6 +119,44 @@ function pickDaysAgo(maxDays: number): number {
   return Math.floor(maxDays * Math.pow(r, 1.6));
 }
 
+/**
+ * Find-or-create the named Team row this seed needs to roll up under.
+ * Slug is deterministic per (org, team-name) so re-runs are idempotent
+ * and won't collide with other orgs' seed runs.
+ *
+ * Important: the bird's-eye `SpendByTeam` query rolls up by
+ * `IngestionSource.teamId → Team.name`, so the Team ROW must exist for
+ * the team-name to render in the dashboard. Re-using whatever existing
+ * teams the org already had ("Default Team", "P3 Member Dogfood's
+ * Workspace", etc.) makes the capture look monolithic — the whole point
+ * of this seed is to demonstrate the cross-team rollup.
+ */
+async function ensureSeedTeam({
+  organizationId,
+  orgSlugSuffix,
+  name,
+  shortKey,
+}: {
+  organizationId: string;
+  orgSlugSuffix: string;
+  name: string;
+  shortKey: string;
+}): Promise<{ id: string; name: string }> {
+  const slug = `birdseye-${shortKey}-${orgSlugSuffix}`;
+  const existing = await prisma.team.findUnique({ where: { slug } });
+  if (existing) {
+    return { id: existing.id, name: existing.name };
+  }
+  const created = await prisma.team.create({
+    data: {
+      name,
+      slug,
+      organizationId,
+    },
+  });
+  return { id: created.id, name: created.name };
+}
+
 async function ensureSourcesAcrossTeams({
   organizationId,
   govProjectId,
@@ -126,27 +164,44 @@ async function ensureSourcesAcrossTeams({
   organizationId: string;
   govProjectId: string;
 }): Promise<{ id: string; teamId: string | null; teamName: string }[]> {
-  const teams = await prisma.team.findMany({
-    where: { organizationId },
-    orderBy: { createdAt: "asc" },
-    take: 3,
-  });
-  if (teams.length === 0) {
-    throw new Error(
-      `Org ${organizationId} has no teams. Create at least one team before seeding bird's-eye.`,
-    );
+  // Deterministic slug suffix per org so re-running the seed picks up
+  // the same Team rows + IngestionSource rows without duplicating.
+  // Last 8 chars of the org id keeps slugs short while staying unique
+  // in practice (nanoid is 21 chars; the tail is high-entropy).
+  const orgSlugSuffix = organizationId.slice(-8).toLowerCase();
+
+  const teamSpecs = [
+    { name: "Customer Support", shortKey: "customer-support" },
+    { name: "Engineering", shortKey: "engineering" },
+    { name: "Marketing", shortKey: "marketing" },
+  ];
+  const teams: { id: string; name: string }[] = [];
+  for (const spec of teamSpecs) {
+    const team = await ensureSeedTeam({
+      organizationId,
+      orgSlugSuffix,
+      name: spec.name,
+      shortKey: spec.shortKey,
+    });
+    teams.push(team);
   }
 
-  const labels = ["Customer Support", "Engineering", "Marketing"];
   const sources: { id: string; teamId: string | null; teamName: string }[] = [];
-  for (let i = 0; i < Math.min(3, labels.length); i++) {
-    const team = teams[i % teams.length]!;
-    const name = `Bird's-eye ${labels[i]} (seed)`;
+  for (const team of teams) {
+    const sourceName = `Bird's-eye ${team.name} (seed)`;
     const existing = await prisma.ingestionSource.findFirst({
-      where: { organizationId, name },
+      where: { organizationId, name: sourceName },
     });
     if (existing) {
-      sources.push({ id: existing.id, teamId: existing.teamId, teamName: team.name });
+      // Re-bind to the seed team in case a prior buggy run created the
+      // source against a different team — idempotent + self-healing.
+      if (existing.teamId !== team.id) {
+        await prisma.ingestionSource.update({
+          where: { id: existing.id },
+          data: { teamId: team.id },
+        });
+      }
+      sources.push({ id: existing.id, teamId: team.id, teamName: team.name });
       continue;
     }
     const created = await prisma.ingestionSource.create({
@@ -154,15 +209,16 @@ async function ensureSourcesAcrossTeams({
         organizationId,
         teamId: team.id,
         sourceType: "otel_generic",
-        name,
+        name: sourceName,
         ingestSecretHash: hex(20),
         status: "active",
         lastEventAt: new Date(),
         retentionClass: "thirty_days",
       },
     });
-    sources.push({ id: created.id, teamId: created.teamId, teamName: team.name });
+    sources.push({ id: created.id, teamId: team.id, teamName: team.name });
   }
+
   // Plus one team-less ("Org-wide") source so the "Org-wide" bucket
   // renders in the team rollup — covers the contract path the
   // SpendByTeamSection renderer special-cases.
@@ -185,6 +241,14 @@ async function ensureSourcesAcrossTeams({
     });
     sources.push({ id: created.id, teamId: null, teamName: "Org-wide" });
   } else {
+    // Self-heal team-bind for the org-wide source too — earlier runs
+    // may have left a non-null teamId here.
+    if (orgWide.teamId !== null) {
+      await prisma.ingestionSource.update({
+        where: { id: orgWide.id },
+        data: { teamId: null },
+      });
+    }
     sources.push({ id: orgWide.id, teamId: null, teamName: "Org-wide" });
   }
 
