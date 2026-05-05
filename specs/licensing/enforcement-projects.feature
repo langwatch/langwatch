@@ -22,14 +22,12 @@ Feature: Project Limit Enforcement with License
   # License-Based Project Limits
   # ============================================================================
 
-  @unimplemented
   Scenario: Allows project creation when under limit
     Given the organization has a license with maxProjects 5
     And the organization has 3 projects
     When I create a project named "New Project"
     Then the project is created successfully
 
-  @unimplemented
   Scenario: Blocks project creation when over limit
     Given the organization has a license with maxProjects 2
     And the organization has 3 projects
