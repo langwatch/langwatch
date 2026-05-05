@@ -13,6 +13,7 @@ import { RedisPresenceRepository } from "./presence/repositories/presence.redis.
 import { InMemoryPresenceRepository } from "./presence/repositories/presence.memory.repository";
 import { createClickHouseClientFromConfig } from "./clients/clickhouse.factory";
 import { GatewayBudgetRepository } from "~/server/gateway/budget.repository";
+import { PlanTypes, PLAN_LIMITS } from "../../../ee/licensing/planInfo";
 import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
 import { GovernanceKpisClickHouseRepository } from "@ee/governance/services/governanceKpis.clickhouse.repository";
 import { GovernanceOcsfEventsClickHouseRepository } from "@ee/governance/services/governanceOcsfEvents.clickhouse.repository";
@@ -279,6 +280,26 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     : PlanProviderService.create({
         getActivePlan: async ({ organizationId }) => {
           const plan = await getLicenseHandler().getActivePlan(organizationId);
+          // Self-hosted dev bypass — same intent as the composite branch
+          // above, but the non-SaaS path doesn't go through the composite
+          // provider, so the bypass has to land here too. Without this,
+          // every multi-user surface in governance (member invites,
+          // team-scoped tile overrides, per-principal budgets, anomaly
+          // scope:USER) hits the FREE plan member-cap on dogfood
+          // installs (Ariana's option-C blocker — `0cc690381` shipped
+          // the composite-side fix and discovered the non-SaaS path
+          // needs the same patch).
+          const devForceEnterprise =
+            env.NODE_ENV !== "test" &&
+            !env.IS_SAAS &&
+            env.LANGWATCH_DEV_FORCE_ENTERPRISE === true;
+          if (devForceEnterprise) {
+            return {
+              ...PLAN_LIMITS[PlanTypes.ENTERPRISE],
+              planSource: plan.free ? ("free" as const) : ("license" as const),
+              overrideAddingLimitations: false,
+            };
+          }
           return { ...plan, planSource: plan.free ? "free" as const : "license" as const };
         },
       });
