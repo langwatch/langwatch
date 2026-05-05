@@ -4,9 +4,10 @@ import "time"
 
 // Bundle is the resolved virtual-key configuration used for the request lifecycle.
 type Bundle struct {
-	VirtualKeyID string
-	ProjectID    string
-	TeamID       string
+	VirtualKeyID   string
+	ProjectID      string
+	TeamID         string
+	OrganizationID string
 
 	// Credentials is the ordered fallback chain of provider credentials.
 	Credentials []Credential
