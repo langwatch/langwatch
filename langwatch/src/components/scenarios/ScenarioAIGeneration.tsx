@@ -417,7 +417,13 @@ function DefaultModelErrorBanner({ children }: { children: React.ReactNode }) {
       </Alert.Indicator>
       <Alert.Content gap={2}>
         <Alert.Description>{children}</Alert.Description>
-        <Button colorPalette="blue" asChild size="sm" alignSelf="flex-start">
+        <Button
+          colorPalette="blue"
+          color="white"
+          asChild
+          size="sm"
+          alignSelf="flex-start"
+        >
           <a
             data-testid="scenario-ai-configure-default-model-button"
             href="/settings/model-providers"
