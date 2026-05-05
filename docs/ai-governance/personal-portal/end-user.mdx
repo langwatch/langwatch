@@ -105,6 +105,15 @@ same key works against whichever provider chain the admin has wired up
 for your org (OpenAI primary, Azure fallback, etc.). You don't pick a
 provider; the policy does.
 
+### If your key returns `provider_timeout` / 504 on first use
+
+Your virtual key was provisioned successfully, but the routing policy
+it's bound to has zero providers configured — the gateway has nothing
+to forward to. Ask your admin to bind at least one provider in
+`/settings/governance/routing-policies` (the org-default policy must
+have a `providers` chain or every call returns 504). Once a provider is
+bound, your existing key works immediately — you don't need to reissue.
+
 ### When to create a project instead
 
 If you're building a team-shared application — a customer-facing chat,

@@ -131,6 +131,17 @@ Two policies to create on day one:
 Policies cascade: a `TEAM`-scoped policy with `isDefault=true`
 overrides the `ORG`-scoped default for members of that team.
 
+<Note>
+**Smoke-test before you publish the portal**: the org-default routing
+policy MUST have at least one provider in its chain before personal
+keys can serve traffic. If you publish `/me` to teammates with an
+empty `developer-default` policy, every issued VK provisions
+successfully but the first call returns `504 provider_timeout` (the
+gateway has nothing to forward to). After §2 (Connect providers) +
+this section, mint a test key against your own user, fire one
+completion, and confirm a 200 before announcing the portal.
+</Note>
+
 ## 4. Set per-user budgets
 
 In **AI Gateway → Budgets**:
