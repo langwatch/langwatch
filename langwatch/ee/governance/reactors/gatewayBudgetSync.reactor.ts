@@ -111,15 +111,28 @@ export function createGatewayBudgetSyncReactor(
         // dashboards refresh on minute-scale, no need to thrash the
         // row on every request.
         const now = new Date();
-        if (
+        const shouldTouch =
           !vk.lastUsedAt ||
-          now.getTime() - vk.lastUsedAt.getTime() > 60 * 1000
-        ) {
+          now.getTime() - vk.lastUsedAt.getTime() > 60 * 1000;
+        logger.info(
+          {
+            projectId,
+            virtualKeyId,
+            previousLastUsedAt: vk.lastUsedAt,
+            shouldTouch,
+          },
+          "EC6 lastUsedAt touch decision",
+        );
+        if (shouldTouch) {
           try {
             await deps.prisma.virtualKey.update({
               where: { id: vk.id },
               data: { lastUsedAt: now },
             });
+            logger.info(
+              { projectId, virtualKeyId, touchedAt: now.toISOString() },
+              "EC6 lastUsedAt touched",
+            );
           } catch (touchErr) {
             // Best-effort: a row update failure here doesn't poison
             // the budget fold below, and the /budget/check hook is
