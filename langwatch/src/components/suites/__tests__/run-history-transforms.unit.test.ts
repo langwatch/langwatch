@@ -919,6 +919,7 @@ describe("computeSuiteRunSummaries()", () => {
 
 describe("getScenarioDisplayNames()", () => {
   describe("when given scenario runs with duplicate names", () => {
+    /** @scenario "Extracts unique sorted scenario names from batch run data" */
     it("returns unique sorted names", () => {
       const scenarioRuns = [
         makeScenarioRunData({ name: "Login Flow", scenarioRunId: "r1" }),
@@ -932,6 +933,7 @@ describe("getScenarioDisplayNames()", () => {
   });
 
   describe("when a scenario run has null name", () => {
+    /** @scenario "Falls back to scenario ID when name is null or undefined" */
     it("falls back to scenarioId", () => {
       const scenarioRuns = [
         makeScenarioRunData({
