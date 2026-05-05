@@ -30,6 +30,7 @@ import GovernanceLayout from "~/components/governance/GovernanceLayout";
 import { LoadingScreen } from "~/components/LoadingScreen";
 import { NotFoundScene } from "~/components/NotFoundScene";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
+import { Checkbox } from "~/components/ui/checkbox";
 import { Drawer } from "~/components/ui/drawer";
 import { Link } from "~/components/ui/link";
 import { toaster } from "~/components/ui/toaster";
@@ -1112,34 +1113,17 @@ function RoutingPolicyDrawer({
                 </Field.HelperText>
               </Field.Root>
 
-              <HStack
-                cursor="pointer"
-                onClick={() =>
-                  setComposer({ ...composer, isDefault: !composer.isDefault })
+              <Checkbox
+                checked={composer.isDefault}
+                onChange={(e) =>
+                  setComposer({
+                    ...composer,
+                    isDefault: e.target.checked,
+                  })
                 }
-                gap={2}
               >
-                <Box
-                  width="16px"
-                  height="16px"
-                  borderRadius="sm"
-                  borderWidth="1px"
-                  borderColor={
-                    composer.isDefault ? "blue.500" : "border.emphasis"
-                  }
-                  backgroundColor={
-                    composer.isDefault ? "blue.500" : "transparent"
-                  }
-                  color="white"
-                  fontSize="10px"
-                  display="flex"
-                  alignItems="center"
-                  justifyContent="center"
-                >
-                  {composer.isDefault && "✓"}
-                </Box>
                 <Text fontSize="sm">Set as default for this scope</Text>
-              </HStack>
+              </Checkbox>
             </VStack>
           )}
         </Drawer.Body>
