@@ -538,6 +538,32 @@ describe("Feature: Dataset TypeScript SDK", () => {
       });
     });
 
+    describe("when explicit pagination params are given", () => {
+      let capturedUrl: URL | null = null;
+
+      beforeEach(() => {
+        capturedUrl = null;
+        server.use(
+          http.get(`${TEST_ENDPOINT}/api/dataset/:slugOrId/records`, ({ request }) => {
+            capturedUrl = new URL(request.url);
+            return HttpResponse.json({
+              data: [],
+              pagination: { page: 2, limit: 20, total: 0, totalPages: 0 },
+            });
+          }),
+        );
+      });
+
+      /** @scenario "List records with explicit pagination" */
+      it("forwards page and limit as query parameters", async () => {
+        await langwatch.datasets.listRecords("my-data", { page: 2, limit: 20 });
+
+        expect(capturedUrl).not.toBeNull();
+        expect(capturedUrl!.searchParams.get("page")).toBe("2");
+        expect(capturedUrl!.searchParams.get("limit")).toBe("20");
+      });
+    });
+
     describe("when the API responds with 404", () => {
       beforeEach(() => {
         server.use(

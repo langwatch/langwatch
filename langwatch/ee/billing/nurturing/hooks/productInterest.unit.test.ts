@@ -36,6 +36,7 @@ vi.mock("../../../../src/server/app-layer/app", () => ({
 
 describe("mapProductSelectionToIntegrationMethod()", () => {
   describe("when given a valid product selection", () => {
+    /** @scenario 'Integration-method selection maps to canonical trait value' */
     it("maps 'via-claude-code' to 'coding_agent'", () => {
       expect(mapProductSelectionToIntegrationMethod("via-claude-code")).toBe("coding_agent");
     });

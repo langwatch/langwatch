@@ -3,7 +3,7 @@ Feature: Customer.io nurturing integration
   I want LangWatch to push user traits and events to Customer.io in real-time
   So that customer nurturing workflows trigger automatically as users progress through the platform
 
-  # 87 of 93 scenarios are bound to existing tests in:
+  # All scenarios bound to existing tests in:
   #   langwatch/ee/billing/nurturing/nurturing.service.unit.test.ts
   #   langwatch/ee/billing/nurturing/nurturing.service.wiring.unit.test.ts
   #   langwatch/ee/billing/nurturing/hooks/signupIdentification.unit.test.ts
@@ -17,17 +17,13 @@ Feature: Customer.io nurturing integration
   #   langwatch/src/server/event-sourcing/pipelines/evaluation-processing/reactors/__tests__/customerIoEvaluationSync.reactor.unit.test.ts
   #   langwatch/src/server/event-sourcing/projections/global/__tests__/customerIoDailyUsageSync.reactor.unit.test.ts
   #   langwatch/src/server/event-sourcing/pipelines/simulation-processing/reactors/__tests__/customerIoSimulationSync.reactor.unit.test.ts
-  # The remaining 6 @unimplemented scenarios are UPDATE-class per AUDIT_MANIFEST
-  # — implementation diverged from the spec wording — and need the scenarios
-  # rewritten before binding (tracked under #3458):
-  #   - "Null service resolves all methods without making HTTP requests"
-  #   - "Service is a no-op when CUSTOMER_IO_API_KEY is absent"
-  #   - "Region defaults to US when CUSTOMER_IO_REGION is not set"
-  #   - "Test app uses null NurturingService"
-  #   - "Evaluation sync reactor uses project-scoped job ID for debouncing"
-  #   - "Product selection fires a separate identify call after flavour is picked"
-  #   - "Product interest is updated independently of signup flow"
-  #   - "Flavour selection maps to correct product_interest trait value"
+  # Six scenarios were rewritten to match shipped implementation (was UPDATE-class):
+  #   - "Null service resolves..." dropped (impl uses `undefined`, not null pattern)
+  #   - "Region defaults to US" → "Region defaults to EU" (matches impl)
+  #   - "Test app uses null NurturingService" → "Test app passes no NurturingService"
+  #   - "Evaluation sync uses project-scoped job ID" → "...project-and-evaluation-scoped job ID"
+  #   - "Pick your flavour" / product_interest scenarios → "Integration-method selection"
+  #     (the actual onboarding flow & trait names)
 
   All scheduling, sequencing, and email delivery is owned by Customer.io.
   LangWatch reactors and hooks fire-and-forget data to Customer.io via the
@@ -85,12 +81,10 @@ Feature: Customer.io nurturing integration
     Then the method resolves without throwing
     And the error is logged and captured for observability
 
-  @unit @unimplemented
-  Scenario: Null service resolves all methods without making HTTP requests
-    Given a NurturingService created via createNull
-    When identifyUser is called
-    Then no HTTP request is made
-    And the method resolves without throwing
+  # Implementation diverges from "null service" pattern: when no API key
+  # is configured, getApp().nurturing is undefined rather than a null
+  # NurturingService. This is enforced via the wiring tests below.
+  # See "Service is undefined when CUSTOMER_IO_API_KEY is absent".
 
   # ---------------------------------------------------------------------------
   # R9: Environment configuration and graceful degradation
@@ -102,22 +96,22 @@ Feature: Customer.io nurturing integration
     When the app is initialized
     Then getApp().nurturing is an active NurturingService instance
 
-  @integration @unimplemented
-  Scenario: Service is a no-op when CUSTOMER_IO_API_KEY is absent
+  @unit
+  Scenario: Service is undefined when CUSTOMER_IO_API_KEY is absent
     Given the app config has no customerIoApiKey
-    When the app is initialized
-    Then getApp().nurturing is a null NurturingService that silently no-ops
+    When NurturingService.create is conditionally called
+    Then nurturing is undefined
 
-  @integration @unimplemented
-  Scenario: Region defaults to US when CUSTOMER_IO_REGION is not set
-    Given the app config has no customerIoRegion
-    When the app is initialized
-    Then the NurturingService uses the US regional endpoint
+  @unit
+  Scenario: Region defaults to EU when CUSTOMER_IO_REGION is not set
+    Given a NurturingService created with no customerIoRegion
+    When identifyUser is called
+    Then the request is sent to the EU regional endpoint
 
-  @integration @unimplemented
-  Scenario: Test app uses null NurturingService
+  @unit
+  Scenario: Test app passes no NurturingService
     Given createTestApp is called
-    Then getApp().nurturing is a null NurturingService that silently no-ops
+    Then nurturing is undefined
 
   # ---------------------------------------------------------------------------
   # R2: Signup identification — onboarding hook
@@ -245,11 +239,11 @@ Feature: Customer.io nurturing integration
     When a new evaluation is processed with score 0.85 and passed true
     Then the update is debounced per project
 
-  @unit @unimplemented
-  Scenario: Evaluation sync reactor uses project-scoped job ID for debouncing
+  @unit
+  Scenario: Evaluation sync reactor uses project-and-evaluation-scoped job ID for debouncing
     Given the customerIoEvaluationSync reactor
-    When makeJobId is called for a project
-    Then the returned ID is "cio-eval-sync-{projectId}"
+    When makeJobId is called for an evaluation event
+    Then the returned ID is "cio-eval-sync-{projectId}-{evaluationId}"
 
   # ---------------------------------------------------------------------------
   # R5: Daily usage sync reactor — customerIoDailyUsageSync
@@ -357,33 +351,24 @@ Feature: Customer.io nurturing integration
   # that calls getApp().nurturing.identifyUser().
   # ---------------------------------------------------------------------------
 
-  @integration @unimplemented
-  Scenario: Product selection fires a separate identify call after flavour is picked
-    Given a user has completed organization setup
-    And the user reaches the "Pick your flavour" onboarding screen
-    When the user selects "Observability"
-    Then a separate identifyUser call is made to Customer.io with product_interest "observability"
-    And this call is independent of the initial signup identification
+  # The "Pick your flavour" wording was a planning-stage label. The shipped
+  # onboarding asks "How do you want to integrate?" and the trait sent is
+  # `integration_method`, not `product_interest`. The mapping is enforced by
+  # mapProductSelectionToIntegrationMethod() (see ee/billing/nurturing/hooks/
+  # productInterest.unit.test.ts).
 
-  @integration @unimplemented
-  Scenario: Product interest is updated independently of signup flow
-    Given a user completed onboarding without selecting a product interest
-    When the user later selects a product interest from the flavour screen
-    Then the user is identified in Customer.io with the selected product_interest
-    And no other signup traits are re-sent
-
-  @unit @unimplemented
-  Scenario Outline: Flavour selection maps to correct product_interest trait value
-    Given a user reaches the "Pick your flavour" onboarding screen
+  @unit
+  Scenario Outline: Integration-method selection maps to canonical trait value
+    Given a user reaches the integration-method onboarding screen
     When the user selects "<selection>"
-    Then the product_interest trait sent to Customer.io is "<trait_value>"
+    Then the integration_method trait sent to Customer.io is "<trait_value>"
 
     Examples:
-      | selection          | trait_value        |
-      | Observability      | observability      |
-      | Evaluations        | evaluations        |
-      | Prompt Management  | prompt_management  |
-      | Agent Simulations  | agent_simulations  |
+      | selection            | trait_value    |
+      | via-claude-code      | coding_agent   |
+      | via-platform         | platform       |
+      | via-claude-desktop   | mcp            |
+      | manually             | manual_sdk     |
 
   @integration
   Scenario: Product interest identify call is fire-and-forget
