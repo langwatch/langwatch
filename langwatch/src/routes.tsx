@@ -220,6 +220,33 @@ const routes: RouteObject[] = [
     path: "/settings/governance/tool-catalog",
     ...page(() => import("./pages/settings/governance/tool-catalog")),
   },
+  {
+    // View-all teams listing — bird's-eye `View all teams →` lands here.
+    // 500-row paginated list with sort chips for spend / requests /
+    // last-activity. Per-row click-through routes to the team detail
+    // page below.
+    path: "/settings/governance/teams",
+    ...page(() => import("./pages/settings/governance/teams")),
+  },
+  {
+    // Per-team detail — single-row scoped view of `spendByTeam` filtered
+    // to the URL-encoded team id, four-stat KPI grid + breadcrumb back
+    // to the listing. Detail-data depth (per-day trend, per-user
+    // breakdown, model mix) defers to a follow-up.
+    path: "/settings/governance/teams/:id",
+    ...page(() => import("./pages/settings/governance/teams/[id]")),
+  },
+  {
+    // View-all users listing — bird's-eye `View all users →` lands here.
+    path: "/settings/governance/users",
+    ...page(() => import("./pages/settings/governance/users")),
+  },
+  {
+    // Per-user detail — single-row scoped view keyed off the
+    // URL-encoded actor id (email / sub claim).
+    path: "/settings/governance/users/:id",
+    ...page(() => import("./pages/settings/governance/users/[id]")),
+  },
 
   // Personal-scope governance routes (must precede the /:project catch-all
   // so "me" doesn't get treated as a project slug)
