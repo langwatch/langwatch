@@ -208,7 +208,13 @@ export const DefaultProviderSection = ({
               options={chatOptions}
               onChange={(model) => actions.setProjectDefaultModel(model)}
             />
-            {state.projectDefaultModel &&
+            {chatOptions.length === 0 ? (
+              <Text fontSize="xs" color="fg.muted" marginTop={1}>
+                No {providerName} models available. Add a custom model below to
+                enable this.
+              </Text>
+            ) : (
+              state.projectDefaultModel &&
               !state.projectDefaultModel.startsWith(
                 `${provider.provider}/`,
               ) && (
@@ -216,7 +222,8 @@ export const DefaultProviderSection = ({
                   Persisted default belongs to a different provider — pick a{" "}
                   {providerName} model to switch.
                 </Text>
-              )}
+              )
+            )}
           </Field.Root>
 
           <Field.Root width="full">
@@ -231,7 +238,13 @@ export const DefaultProviderSection = ({
                 actions.setProjectTopicClusteringModel(model)
               }
             />
-            {state.projectTopicClusteringModel &&
+            {chatOptions.length === 0 ? (
+              <Text fontSize="xs" color="fg.muted" marginTop={1}>
+                No {providerName} models available. Add a custom model below to
+                enable this.
+              </Text>
+            ) : (
+              state.projectTopicClusteringModel &&
               !state.projectTopicClusteringModel.startsWith(
                 `${provider.provider}/`,
               ) && (
@@ -239,7 +252,8 @@ export const DefaultProviderSection = ({
                   Persisted default belongs to a different provider — pick a{" "}
                   {providerName} model to switch.
                 </Text>
-              )}
+              )
+            )}
           </Field.Root>
 
           <Field.Root width="full">
