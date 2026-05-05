@@ -169,6 +169,40 @@ describe("<DefaultProviderSection/>", () => {
       });
     });
 
+    describe("when projectTopicClusteringModel belongs to a different provider (openai/gpt-4o-mini)", () => {
+      it("renders the orange mismatch warning under the Topic Clustering Model field", () => {
+        const state = buildState({
+          useAsDefaultProvider: true,
+          customModels: [
+            { modelId: "my-azure-deployment", displayName: "My Azure Deployment", mode: "chat" },
+          ],
+          projectDefaultModel: "azure/gpt-5-mini",
+          projectTopicClusteringModel: "openai/gpt-4o-mini",
+        });
+        const actions = buildActions();
+
+        render(
+          <Wrapper>
+            <DefaultProviderSection
+              state={state}
+              actions={actions}
+              provider={azureProvider}
+              enabledProvidersCount={2}
+              project={{ defaultModel: "azure/gpt-5-mini" }}
+              providers={{ azure: azureProvider }}
+            />
+          </Wrapper>,
+        );
+
+        // Both Default Model and Topic Clustering use the same warning text;
+        // here only topic clustering should mismatch, so exactly one warning.
+        const warnings = screen.getAllByText(
+          /Persisted default belongs to a different provider/i,
+        );
+        expect(warnings).toHaveLength(1);
+      });
+    });
+
     describe("when projectDefaultModel matches the azure prefix (azure/gpt-5-mini)", () => {
       it("does not render the mismatch warning", () => {
         const state = buildState({

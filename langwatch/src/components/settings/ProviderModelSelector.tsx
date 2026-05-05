@@ -207,6 +207,12 @@ export const ProviderModelSelector = React.memo(function ProviderModelSelector({
                 onChange={(e) => setModelSearch(e.target.value)}
                 border="none"
                 _focus={{ boxShadow: "none" }}
+                _focusVisible={{
+                  outline: "2px solid",
+                  outlineColor: "colorPalette.focusRing",
+                  outlineOffset: "1px",
+                  borderRadius: "sm",
+                }}
                 paddingX={2}
               />
             </InputGroup>
