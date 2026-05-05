@@ -23,6 +23,7 @@
  */
 import type { PrismaClient } from "@prisma/client";
 
+import { env } from "~/env.mjs";
 import {
   getClickHouseClientForProject,
   isClickHouseEnabled,
@@ -48,6 +49,23 @@ export interface CliBootstrapResult {
     monthlyUsedUsd: number;
     period: string;
   };
+  /**
+   * Authoritative gateway base URL for the CLI to use as `cfg.gateway_url`.
+   * Resolution: explicit `LW_GATEWAY_BASE_URL` wins, else SaaS pickes
+   * `https://gateway.langwatch.com`, else self-hosted defaults to
+   * `http://localhost:5563`. Mirrors the same helper used by the
+   * personal-VK reveal card so /me and CLI surfaces report the same
+   * URL — Ariana caught the CLI bootstrap displaying production while
+   * the dashboard showed localhost.
+   */
+  gatewayUrl: string;
+}
+
+function resolveGatewayUrl(): string {
+  if (env.LW_GATEWAY_BASE_URL) return env.LW_GATEWAY_BASE_URL;
+  return env.IS_SAAS
+    ? "https://gateway.langwatch.com"
+    : "http://localhost:5563";
 }
 
 const SCOPE_RANK: Record<string, number> = {
@@ -86,7 +104,7 @@ export class CliBootstrapService {
       projectId: workspace.project.id,
     });
 
-    return { providers, budget };
+    return { providers, budget, gatewayUrl: resolveGatewayUrl() };
   }
 
   private async resolveProviders(
@@ -187,5 +205,6 @@ function emptyBootstrap(): CliBootstrapResult {
       monthlyUsedUsd: 0,
       period: "MONTHLY",
     },
+    gatewayUrl: resolveGatewayUrl(),
   };
 }

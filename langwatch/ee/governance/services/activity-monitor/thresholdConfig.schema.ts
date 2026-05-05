@@ -22,8 +22,36 @@
  */
 import { z } from "zod";
 
+/**
+ * Rule types with a wired detector / evaluator. Only these run on the
+ * anomaly reactor today; others save in "preview" mode (admin can
+ * persist the row, but no detection fires until the corresponding
+ * evaluator ships).
+ */
 export const SUPPORTED_RULE_TYPES = ["spend_spike"] as const;
 export type SupportedRuleType = (typeof SUPPORTED_RULE_TYPES)[number];
+
+/**
+ * Rule types the admin UI lets you compose. Including a type here
+ * promises only "save will succeed" — the actual detection only fires
+ * for `SUPPORTED_RULE_TYPES`. Keeping this list small + explicit
+ * forces the contract to be deliberate rather than letting any
+ * arbitrary string land in the `ruleType` column.
+ *
+ * Adding a detector flow:
+ *   1. Implement the evaluator service (mirror SpendSpikeAnomalyEvaluator)
+ *   2. Wire it into the anomaly reactor's switchboard
+ *   3. Add the type to SUPPORTED_RULE_TYPES above
+ *   4. Add a Zod schema branch in `validateThresholdConfig`
+ */
+export const ALLOWED_RULE_TYPES = [
+  "spend_spike",
+  "rate_limit",
+  "after_hours",
+  "model_drift",
+  "error_rate",
+] as const;
+export type AllowedRuleType = (typeof ALLOWED_RULE_TYPES)[number];
 
 export const spendSpikeThresholdConfigSchema = z.object({
   windowSec: z
@@ -54,11 +82,21 @@ export function validateThresholdConfig({
 }: {
   ruleType: string;
   config: unknown;
-}): SpendSpikeThresholdConfigParsed {
-  if (!SUPPORTED_RULE_TYPES.includes(ruleType as SupportedRuleType)) {
+}): SpendSpikeThresholdConfigParsed | null {
+  // Reject genuinely unknown types — saves the admin from a typo
+  // landing as a forever-dead rule.
+  if (!ALLOWED_RULE_TYPES.includes(ruleType as AllowedRuleType)) {
     throw new Error(
-      `Unsupported ruleType "${ruleType}". Supported: ${SUPPORTED_RULE_TYPES.join(", ")}.`,
+      `Unsupported ruleType "${ruleType}". Allowed: ${ALLOWED_RULE_TYPES.join(", ")}.`,
     );
+  }
+  // Allowed but not yet detected — preview mode. Admin can save the
+  // rule, the UI's ThresholdPreview surfaces "Won't fire" honestly,
+  // and when the detector ships the rule starts firing without an
+  // edit. No config validation since we have no schema to validate
+  // against until the detector lands.
+  if (!SUPPORTED_RULE_TYPES.includes(ruleType as SupportedRuleType)) {
+    return null;
   }
   // Discriminator dispatch — single ruleType today, ready for more.
   switch (ruleType as SupportedRuleType) {

@@ -93,6 +93,19 @@ export async function runUnifiedLoginFlow(
       saveConfig(cfg);
 
       const bootstrap = await fetchBootstrapSafely(cfg);
+
+      // Pick up the server's authoritative gateway URL. Without this,
+      // self-hosted CLI users would see the SaaS default
+      // (https://gateway.langwatch.com) on whoami / login output even
+      // though the actual gateway is on localhost:5563. The server's
+      // `gatewayUrl` reflects `LW_GATEWAY_BASE_URL` or the IS_SAAS-
+      // aware fallback. Backwards-compatible: older servers (without
+      // this field) leave the local default in place.
+      if (bootstrap?.gatewayUrl) {
+        cfg.gateway_url = bootstrap.gatewayUrl;
+        saveConfig(cfg);
+      }
+
       console.log();
       const ceremonyLines = formatLoginCeremony({
         email: cfg.user?.email ?? result.user.email,

@@ -204,6 +204,14 @@ export interface CliBootstrapBudget {
 export interface CliBootstrapResponse {
   providers: CliBootstrapProvider[];
   budget: CliBootstrapBudget;
+  /**
+   * Server-authoritative gateway base URL. Sourced from the backend's
+   * `LW_GATEWAY_BASE_URL` (or its self-hosted/SaaS-aware fallback).
+   * Older self-hosted servers without this field fall back to the
+   * CLI's local config default — so undefined is the legacy shape, not
+   * an error.
+   */
+  gatewayUrl?: string;
 }
 
 /**
