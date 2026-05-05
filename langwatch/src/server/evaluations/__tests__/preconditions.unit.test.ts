@@ -52,6 +52,19 @@ describe("evaluatePreconditions()", () => {
       },
     ];
 
+    describe("when a trace arrives with origin = 'application'", () => {
+      /** @scenario "Precondition matcher matches explicit application origin" */
+      it("passes the precondition", () => {
+        const traceData = makeTraceData({ origin: "application" });
+        expect(
+          evaluatePreconditions({
+            traceData,
+            preconditions,
+          }),
+        ).toBe(true);
+      });
+    });
+
     describe("when a trace arrives with no origin attribute", () => {
       /** @scenario Origin "is" application treats missing origin as application (legacy default) */
       it("passes the precondition", () => {

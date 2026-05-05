@@ -144,7 +144,7 @@ Feature: Explicit application origin for race condition prevention
   # precondition-matchers.ts:223 intentionally defaults empty/undefined origin to
   # "application" (preconditions.unit.test.ts:55-65 documents the OPPOSITE assertion).
 
-  @unit @unimplemented
+  @unit
   Scenario: Precondition matcher matches explicit application origin
     Given a precondition: traces.origin is "application"
     And a trace with langwatch.origin = "application" in the fold state
