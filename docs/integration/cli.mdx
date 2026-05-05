@@ -25,52 +25,88 @@ enterprise-network notes, see the [full install guide](/integration/install).
 
 ## Authenticate
 
-Sign in once and the CLI saves your API key to `.env` in the current directory:
+`langwatch login` is interactive by default — it asks where (cloud vs self-hosted) and how (AI tools vs project SDK), opens your browser to approve, and the credential flows back to the CLI automatically. **No copy-paste of keys**:
 
 ```bash
 langwatch login
 ```
 
-This opens [app.langwatch.ai/authorize](https://app.langwatch.ai/authorize) in your browser, where you copy a key and paste it back. For CI/CD or headless setups, pass the key non-interactively:
+You'll see two questions:
 
-```bash
-langwatch login --api-key sk-lw-...
-```
+1. **Where do you want to log in?** — LangWatch Cloud (`app.langwatch.ai`) or a self-hosted instance (custom URL).
+2. **How do you want to use it?** — three options:
+   - **AI tools / agentic flows** — `claude`, `codex`, `cursor`, `gemini`, `opencode`. Mints an OAuth-style device session in `~/.langwatch/config.json` (user-scoped) so `langwatch claude` etc. wrap any tool through your gateway.
+   - **Project / SDK API key** — for `langwatch sync`, `langwatch eval`, and SDK auto-instrumentation. Mints a fresh project API key into `$CWD/.env` (project-scoped).
+   - **Both** — runs both flows in sequence.
+
+The browser shows an "Approve" or "Generate API key" button (depending on the chosen mode); after you click, the credential is delivered back to the CLI over the same RFC 8628 device-code poll. **You never copy-paste a key.**
+
+### Storage discipline (where credentials land)
+
+| Scope | Path | What lives there |
+|---|---|---|
+| Project | `$CWD/.env` | `LANGWATCH_API_KEY` — used by SDK consumers + `langwatch sync` / `eval` / `prompt` |
+| User-global | `~/.langwatch/config.json` (mode `0600`) | Device session (`access_token` + `refresh_token`), control-plane URL, gateway URL, default org — used by `langwatch claude/codex/cursor/gemini/opencode`, `langwatch whoami`, `langwatch request-increase` |
+
+The two stores serve different audiences and never leak into each other. Logging out of one (`langwatch logout-device` clears `~/.langwatch/config.json`) doesn't touch the other.
 
 ### Self-hosted
 
-If you run a self-hosted LangWatch, point the CLI at your deployment:
+The CLI picks up your self-hosted endpoint from any of these (highest priority first):
+
+| Priority | Source | Use case |
+|---|---|---|
+| 1 | `--endpoint <url>` flag on `langwatch login` | one-shot login at a different host |
+| 2 | `LANGWATCH_ENDPOINT` env var | CI / scripts |
+| 3 | `~/.langwatch/config.json:control_plane_url` | persisted from prior login (daily driver) |
+| 4 | `https://app.langwatch.ai` | built-in cloud default |
+
+The simplest path for self-hosted users is the interactive prompt — pick "Self-hosted instance", enter your URL, and the CLI saves it for future invocations:
 
 ```bash
-export LANGWATCH_ENDPOINT=https://langwatch.mycompany.com
 langwatch login
+# → Where do you want to log in?  ▸ Self-hosted instance
+# → URL: https://langwatch.acme.internal
 ```
 
-The `authorize` flow, docs fetcher, and every API call will automatically use that endpoint. Add `LANGWATCH_ENDPOINT` to your `.env` so it persists across sessions, or to your shell profile (`~/.zshrc`, `~/.bashrc`) so it's available globally.
-
-For one-off commands against a different endpoint without exporting:
+Or, equivalently, one-shot with the flag:
 
 ```bash
-LANGWATCH_ENDPOINT=https://langwatch.mycompany.com langwatch trace search
+langwatch login --endpoint https://langwatch.acme.internal
 ```
 
-The dashboard's "Install CLI" empty-state cards (`/me`, `/me/sessions`,
-governance setup checklist) auto-detect the deployment URL and render
-copy-paste commands with the endpoint pre-filled — handy for onboarding
-your team without each member needing to remember the URL.
+To inspect or change persisted settings without re-logging in:
+
+```bash
+langwatch config list                                          # show resolved values + sources
+langwatch config get endpoint
+langwatch config set endpoint https://langwatch.acme.internal  # writes ~/.langwatch/config.json
+```
+
+### Non-interactive escape hatches (for CI / agents)
+
+When you're driving the CLI from automation and already have a credential, skip the prompts:
+
+| Flag | Use case | Where it lands |
+|---|---|---|
+| `langwatch login --device` | AI tools mode, skip Q1/Q2 prompts | `~/.langwatch/config.json` |
+| `langwatch login --api-key <KEY>` | CI pipeline that has `LANGWATCH_API_KEY` injected from secrets | `$CWD/.env` |
+| `langwatch login --token <TOKEN>` | Agent harness with a pre-minted device session token (issued via dashboard "Personal Access Tokens") | `~/.langwatch/config.json` |
+| `langwatch login --endpoint <URL>` | combine with any of the above to pin a self-hosted instance | persisted to config |
+
+The interactive `langwatch login` always shows these flags in a banner above the prompts, so a fake-TTY agent (`Claude Code`, certain Gemini CLI sandboxes) can detect the prompt and re-invoke with the right flag instead of getting stuck.
+
+When stdin is not a TTY (genuine CI), `langwatch login` with no flags errors out with the same flag list — explicit > implicit, no surprise API-key fall-throughs.
 
 ### Letting an agent do it
 
-If you're driving the CLI from a coding assistant, just ask the agent to set it up. When the API key is missing, the CLI prints a message pointing at the `/authorize` URL so the agent can walk the user through it:
+A coding assistant driving `langwatch` will see the always-on banner naming `--device` / `--api-key` / `--token` / `--endpoint` whenever the interactive prompt fires. If the assistant's harness reports as a TTY but can't actually answer prompts, the banner gives it everything it needs to re-invoke:
 
-```
-Error: LANGWATCH_API_KEY not found.
-Get your API key from:
-  https://app.langwatch.ai/authorize
-Then either run:
-  langwatch login --api-key <your-key>
-Or add it to your .env file:
-  echo 'LANGWATCH_API_KEY=<your-key>' >> .env
+```bash
+langwatch login --device                # AI tools mode (recommended for assistants)
+langwatch login --api-key sk-lw-...     # if a project key was injected from secrets
+langwatch login --token lwc_...         # if a device session token was pre-minted
+langwatch login --endpoint https://...  # combine with any of the above for self-hosted
 ```
 
 ## Fetch documentation

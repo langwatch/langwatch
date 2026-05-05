@@ -37,14 +37,61 @@ export interface ExchangePersonalVK {
   prefix?: string;
 }
 
-export interface ExchangeResult {
+export interface ExchangeProject {
+  id: string;
+  slug: string;
+  name: string;
+}
+
+/**
+ * The CLI device-code flow can mint two distinct credential types:
+ *   - "device_session" — the user-scoped OAuth-style access+refresh
+ *     token pair used by `langwatch claude/codex/...` wrappers.
+ *   - "project_api_key" — the project-scoped SDK key
+ *     (`Project.apiKey`) returned verbatim, used by SDK consumers
+ *     and `langwatch sync/eval/prompt/...` commands.
+ *
+ * Caller selects via `startDeviceCode({ credentialType })`. Server
+ * stamps the choice on the device-code record + flips the response
+ * shape on /exchange. Same browser approval ceremony for both — only
+ * the persist target differs (`~/.langwatch/config.json` vs `.env`).
+ */
+export type CredentialType = "device_session" | "project_api_key";
+
+export interface ExchangeDeviceSessionResult {
+  kind: "device_session";
   access_token: string;
   refresh_token: string;
   expires_in: number;
   user: ExchangeUser;
   organization: ExchangeOrganization;
   default_personal_vk?: ExchangePersonalVK;
+  endpoint?: string;
 }
+
+export interface ExchangeApiKeyResult {
+  kind: "api_key";
+  api_key: string;
+  project: ExchangeProject;
+  user: ExchangeUser;
+  organization: ExchangeOrganization;
+  endpoint?: string;
+}
+
+export type ExchangeResult =
+  | ExchangeDeviceSessionResult
+  | ExchangeApiKeyResult;
+
+/**
+ * Back-compat alias for the device-session shape. Pre-`f9fcc3927` server
+ * builds returned the unkinded shape verbatim; the runtime normaliser
+ * below maps that to `{ kind: 'device_session', ... }` so callers can
+ * always assume the discriminated form.
+ */
+export type LegacyExchangeResult = Omit<
+  ExchangeDeviceSessionResult,
+  "kind"
+> & { kind?: "device_session" };
 
 export interface RefreshResult {
   access_token: string;
@@ -68,9 +115,19 @@ export interface DeviceFlowOptions {
 
 /**
  * `POST /api/auth/cli/device-code` — mint a device-code + user-code pair.
+ *
+ * Optional `credentialType` selects what `/exchange` will return on
+ * approval: a user-scoped device session (default) or a project-scoped
+ * API key. Older servers ignore the field and stay on the device-session
+ * shape — back-compat is the server's responsibility.
  */
-export async function startDeviceCode(opts: DeviceFlowOptions): Promise<DeviceCode> {
-  const dc = await postJSON<DeviceCode>(opts, "/api/auth/cli/device-code", {});
+export async function startDeviceCode(
+  opts: DeviceFlowOptions,
+  init: { credentialType?: CredentialType } = {},
+): Promise<DeviceCode> {
+  const body: Record<string, unknown> = {};
+  if (init.credentialType) body.credential_type = init.credentialType;
+  const dc = await postJSON<DeviceCode>(opts, "/api/auth/cli/device-code", body);
   if (!dc.interval || dc.interval <= 0) dc.interval = 5;
   return dc;
 }
@@ -87,8 +144,17 @@ export async function exchange(
 ): Promise<ExchangeResult> {
   const res = await rawPost(opts, "/api/auth/cli/exchange", { device_code: deviceCode });
   switch (res.status) {
-    case 200:
-      return (await res.json()) as ExchangeResult;
+    case 200: {
+      const body = (await res.json()) as
+        | ExchangeResult
+        | LegacyExchangeResult;
+      // Pre-f9fcc3927 servers returned the device-session shape without
+      // a `kind` field. Normalise so callers can always discriminate.
+      if (!("kind" in body) || !body.kind) {
+        return { kind: "device_session", ...(body as LegacyExchangeResult) };
+      }
+      return body as ExchangeResult;
+    }
     case 428:
       throw new DeviceFlowError("pending", "authorization pending");
     case 410:

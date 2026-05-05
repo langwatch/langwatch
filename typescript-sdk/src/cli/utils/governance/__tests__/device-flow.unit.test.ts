@@ -71,8 +71,45 @@ describe("exchange", () => {
     };
     const fetchImpl = vi.fn().mockResolvedValue(jsonResponse(200, body));
     const r = await exchange({ baseUrl: url, fetchImpl }, "DC");
+    // Pre-f9fcc3927 server response shape (no `kind` field) is normalised
+    // to a discriminated `device_session` result by the runtime.
+    expect(r.kind).toBe("device_session");
+    if (r.kind !== "device_session") throw new Error("unreachable");
     expect(r.access_token).toBe("at");
     expect(r.user.email).toBe("j@miro.com");
+  });
+
+  it("normalises legacy un-kinded device-session responses", async () => {
+    // Pre-f9fcc3927 servers returned the bare device-session payload
+    // without a `kind` discriminator. exchange() must add it so callers
+    // can always switch on the union without runtime surprises.
+    const body = {
+      access_token: "at",
+      refresh_token: "rt",
+      expires_in: 3600,
+      user: { id: "u", email: "j@x", name: "J" },
+      organization: { id: "o", slug: "x", name: "X" },
+    };
+    const fetchImpl = vi.fn().mockResolvedValue(jsonResponse(200, body));
+    const r = await exchange({ baseUrl: url, fetchImpl }, "DC");
+    expect(r.kind).toBe("device_session");
+  });
+
+  it("returns api_key kind for project_api_key credential type", async () => {
+    const body = {
+      kind: "api_key",
+      api_key: "sk-lw-live-x",
+      project: { id: "p_1", slug: "acme-prod", name: "Acme Prod" },
+      user: { id: "u_1", email: "j@miro.com", name: "Jane" },
+      organization: { id: "o_1", slug: "miro", name: "Miro" },
+      endpoint: "http://x",
+    };
+    const fetchImpl = vi.fn().mockResolvedValue(jsonResponse(200, body));
+    const r = await exchange({ baseUrl: url, fetchImpl }, "DC");
+    expect(r.kind).toBe("api_key");
+    if (r.kind !== "api_key") throw new Error("unreachable");
+    expect(r.api_key).toBe("sk-lw-live-x");
+    expect(r.project.slug).toBe("acme-prod");
   });
 
   for (const [status, kind] of [
@@ -115,6 +152,8 @@ describe("pollUntilDone", () => {
       { baseUrl: "http://x", fetchImpl },
       { device_code: "DC", user_code: "u", verification_uri: "http://x/cli/auth", expires_in: 60, interval: 0.05 } as any,
     );
+    expect(r.kind).toBe("device_session");
+    if (r.kind !== "device_session") throw new Error("unreachable");
     expect(r.access_token).toBe("at");
     expect(calls).toBe(2);
   });

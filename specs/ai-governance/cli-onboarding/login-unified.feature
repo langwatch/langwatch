@@ -184,6 +184,55 @@ Feature: Unified `langwatch login` UX — endpoint + auth-mode + storage discipl
     And no interactive prompt fires
     And no device flow runs
 
+  # ─────────────────────────────────────────────────────────────────────
+  # No-paste convergence — both modes mint via device-code-poll
+  # (sergey f9fcc3927 backend + alexis bfef4ebab project-picker)
+  # ─────────────────────────────────────────────────────────────────────
+
+  @bdd @cli @login @no-paste @api-key
+  Scenario: Interactive login (project mode) mints API key via device-code-poll, no copy-paste
+    Given the user is in an interactive terminal and selected
+      "Project / SDK API key" in the unified prompt
+    When the CLI calls `POST /api/auth/cli/device-code` with body
+      `{ credential_type: "project_api_key" }`
+    And the user clicks "Generate API key" on the /cli/auth page
+      after picking a project
+    Then the server records the picked `project_id` on the device-code
+      record + stamps the freshly-minted `Project.apiKey`
+    And the CLI's `POST /api/auth/cli/exchange` poll returns:
+      | field    | value                                              |
+      | kind     | "api_key"                                          |
+      | api_key  | the project's apiKey verbatim (sk-lw-…)            |
+      | project  | { id, slug, name } of the picked project           |
+    And the CLI writes `LANGWATCH_API_KEY=<api_key>` to `$CWD/.env`
+    And the CLI writes `LANGWATCH_ENDPOINT=<endpoint>` to `$CWD/.env`
+      when the response includes a non-default endpoint
+    And the user is NEVER prompted to copy + paste the key
+
+  @bdd @cli @login @no-paste @device-session
+  Scenario: Interactive login (AI tools mode) mints device session, no copy-paste
+    Given the user is in an interactive terminal and selected
+      "AI tools / agentic flows" in the unified prompt
+    When the CLI calls `POST /api/auth/cli/device-code` with body
+      `{ credential_type: "device_session" }`
+    And the user clicks "Approve" on the /cli/auth page
+    Then the CLI's `POST /api/auth/cli/exchange` poll returns:
+      | field         | value                                       |
+      | kind          | "device_session"                            |
+      | access_token  | OAuth bearer                                |
+      | refresh_token | refresh token                               |
+      | user / org    | identity payload                            |
+    And the CLI persists the session to `~/.langwatch/config.json`
+    And the user is NEVER prompted to copy + paste anything
+
+  @bdd @cli @login @back-compat
+  Scenario: Older servers without `kind` field still work (back-compat)
+    Given the user runs `langwatch login --device` against a pre-f9fcc3927 server
+    When the server's `POST /api/auth/cli/exchange` response omits `kind`
+    Then the CLI normalises the response to `{ kind: "device_session", ... }`
+      so callers can always switch on the discriminated union
+    And the persistence path is unchanged from prior versions
+
   @bdd @cli @login @token
   Scenario: `langwatch login --token <token>` non-interactively imports a pre-minted device session
     Given the user has minted an access token in the dashboard "Personal Access Tokens" surface

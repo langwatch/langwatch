@@ -1,11 +1,12 @@
 import * as fs from "fs";
 import * as path from "path";
 import chalk from "chalk";
-import ora from "ora";
 import prompts from "prompts";
 import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
-import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
-import { runDeviceFlowLogin } from "@/cli/utils/governance/login-flow";
+import {
+  runDeviceFlowLogin,
+  runUnifiedLoginFlow,
+} from "@/cli/utils/governance/login-flow";
 import {
   loadConfig,
   saveConfig,
@@ -189,8 +190,10 @@ export const loginCommand = async (
     console.log();
 
     // Q1 — endpoint (cloud vs self-hosted). Skipped if --endpoint was
-    // passed (already persisted above).
-    let chosenEndpoint = resolveControlPlaneUrl();
+    // passed (already persisted above). On 'self-hosted' the entered
+    // URL is persisted to ~/.langwatch/config.json so subsequent
+    // `runUnifiedLoginFlow` calls (and every CLI command's resolver
+    // read) target the right host.
     if (!options?.endpoint) {
       const where = await prompts({
         type: "select",
@@ -231,9 +234,8 @@ export const loginCommand = async (
           console.log(chalk.yellow("Login cancelled"));
           process.exit(0);
         }
-        chosenEndpoint = (url.url as string).replace(/\/+$/, "");
         const cfg = loadConfig();
-        cfg.control_plane_url = chosenEndpoint;
+        cfg.control_plane_url = (url.url as string).replace(/\/+$/, "");
         saveConfig(cfg);
       }
     }
@@ -271,7 +273,15 @@ export const loginCommand = async (
       await runDeviceFlowLogin({ browser: options?.browser });
     }
     if (mode.mode === "api-key" || mode.mode === "both") {
-      await runInteractiveApiKeyFlow(chosenEndpoint);
+      // No-paste convergence (sergey f9fcc3927 + alexis bfef4ebab):
+      // /authorize page shows a project-picker + 'Generate API key'
+      // button; the freshly-minted key flows back to the CLI over the
+      // same RFC 8628 poll endpoint as the device-session flow. No
+      // copy-paste of the credential ever.
+      await runUnifiedLoginFlow({
+        kind: "project_api_key",
+        browser: options?.browser,
+      });
     }
     return;
   } catch (error) {
@@ -286,71 +296,4 @@ export const loginCommand = async (
   }
 };
 
-/**
- * Legacy paste-back API-key flow. Opens /authorize, prompts the user to
- * paste the key shown on that page. Persists to project-local `.env`.
- *
- * Note: a follow-up PR converges this with the device-flow's no-paste UX
- * by minting the API key over the same poll endpoint. This v1 keeps the
- * existing paste flow so `langwatch login` (interactive, project mode)
- * works exactly as it does today — just routed through the unified prompt.
- */
-async function runInteractiveApiKeyFlow(endpoint: string): Promise<void> {
-  const authUrl = `${endpoint}/authorize`;
-
-  console.log(chalk.cyan(`Opening: ${authUrl}`));
-
-  const spinner = ora("Opening browser...").start();
-  try {
-    const open = (await import("open")).default;
-    await open(authUrl);
-    spinner.succeed("Browser opened");
-  } catch {
-    spinner.fail("Failed to open browser");
-    console.log(chalk.yellow(`Please manually open: ${chalk.cyan(authUrl)}`));
-  }
-
-  console.log();
-  console.log(chalk.gray("1. Log in to LangWatch in your browser"));
-  console.log(chalk.gray("2. Copy your API key"));
-  console.log(chalk.gray("3. Come back here and paste it"));
-  console.log();
-
-  const response = await prompts({
-    type: "password",
-    name: "apiKey",
-    message: "Paste your API key here:",
-    validate: (value: string) => {
-      if (!value || value.trim() === "") {
-        return "API key is required";
-      }
-      if (value.length < 10) {
-        return "API key seems too short. Please check and try again.";
-      }
-      return true;
-    },
-  });
-
-  if (!response.apiKey) {
-    console.log(chalk.yellow("Login cancelled"));
-    process.exit(0);
-  }
-
-  const apiKey = response.apiKey.trim();
-  const envResult = updateEnvFile(apiKey);
-
-  console.log();
-  console.log(chalk.green("✓ API key saved successfully!"));
-  if (envResult.created) {
-    console.log(chalk.gray(`• Created .env file with your API key`));
-  } else if (envResult.updated) {
-    console.log(chalk.gray(`• Updated existing API key in .env file`));
-  } else {
-    console.log(chalk.gray(`• Added API key to existing .env file`));
-  }
-  console.log();
-  console.log(chalk.green("🎉 You're all set! You can now use:"));
-  console.log(chalk.cyan("  langwatch prompt add <name>"));
-  console.log(chalk.cyan("  langwatch prompt sync"));
-}
 
