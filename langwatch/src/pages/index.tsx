@@ -36,17 +36,29 @@ export default function Index() {
       void router.replace(`/${project.slug}`);
       return;
     }
-    // Persona-1 (personal-only): authenticated user with no org membership.
-    // Their home is /me, NOT /onboarding/welcome — the persona-aware-chrome
-    // spec treats org-less CLI/IDE devs as a first-class persona, not as
-    // unfinished onboarding. Falls through to the org-creation bounce only
-    // if the user explicitly opens /onboarding/welcome themselves.
+    // No org membership → bootstrap. Caught by Ariana QA dogfood (G73):
+    // the previous behavior routed all org-less users to /me, which is
+    // a dead-end for fresh-signup admins (no projects → skeleton cards
+    // → no discoverable path to /onboarding/welcome → /governance hits
+    // organization:manage gate and renders Access Restricted). The
+    // /auth/signup → /me → stuck funnel was the actual onboarding break.
+    //
+    // /onboarding/welcome is the bootstrap page that creates the org +
+    // first project (via `api.onboarding.initializeOrganization`); after
+    // that step the user has an org and the LLMOps / governance home
+    // resolver picks the right destination on subsequent hits. Persona-1
+    // (genuinely-personal-only OSS CLI/IDE devs) can opt out from the
+    // welcome page if/when that surface ships an explicit skip — until
+    // then, treating org-less users as needing onboarding is the
+    // less-broken default (admin funnel works; personal-only user hits
+    // an extra page they can navigate away from, vs admin funnel
+    // hitting an unrecoverable dead-end on /me).
     if (
       !isLoading &&
       !organization &&
       (organizations?.length ?? 0) === 0
     ) {
-      void router.replace("/me");
+      void router.replace("/onboarding/welcome");
     }
   }, [
     resolved.data,
