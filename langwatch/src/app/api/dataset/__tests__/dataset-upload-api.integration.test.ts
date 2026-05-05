@@ -157,6 +157,7 @@ describe("Feature: Dataset File Upload REST API", () => {
         });
       });
 
+      /** @scenario "Upload a CSV file to an existing dataset" */
       it("creates records and returns 200", async () => {
         const csv = "input,output\nhello,Hi there!\ngoodbye,See you later!";
         const form = buildFormData({
@@ -198,6 +199,7 @@ describe("Feature: Dataset File Upload REST API", () => {
         });
       });
 
+      /** @scenario "Upload a JSONL file to an existing dataset" */
       it("creates records and returns 200", async () => {
         const jsonl =
           '{"message": "started", "level": "info"}\n{"message": "crashed", "level": "error"}';
@@ -224,6 +226,7 @@ describe("Feature: Dataset File Upload REST API", () => {
         });
       });
 
+      /** @scenario "Upload a JSON array file to an existing dataset" */
       it("creates records and returns 200", async () => {
         const json =
           '[{"name": "Widget", "price": "9.99"}, {"name": "Gadget", "price": "19.99"}, {"name": "Doohickey", "price": "4.50"}]';
@@ -251,6 +254,7 @@ describe("Feature: Dataset File Upload REST API", () => {
         });
       });
 
+      /** @scenario "Upload converts values to match column types" */
       it("coerces string values to numbers, booleans, and dates", async () => {
         const csv = "count,active,created\n42,true,2024-01-15";
         const form = buildFormData({
@@ -286,6 +290,7 @@ describe("Feature: Dataset File Upload REST API", () => {
         });
       });
 
+      /** @scenario "Upload to dataset referenced by ID" */
       it("adds records to the dataset", async () => {
         const csv = "input,output\nhello,world";
         const form = buildFormData({
@@ -308,6 +313,7 @@ describe("Feature: Dataset File Upload REST API", () => {
         });
       });
 
+      /** @scenario "Upload fails when file columns do not match dataset columns" */
       it("returns 400 Bad Request", async () => {
         const csv = "question,answer\nWhat?,42";
         const form = buildFormData({
@@ -322,6 +328,7 @@ describe("Feature: Dataset File Upload REST API", () => {
     });
 
     describe("when uploading to a non-existent dataset", () => {
+      /** @scenario "Upload to a non-existent dataset returns 404" */
       it("returns 404 Not Found", async () => {
         const csv = "input,output\nhello,world";
         const form = buildFormData({
@@ -338,6 +345,7 @@ describe("Feature: Dataset File Upload REST API", () => {
         await createDataset({ name: "Empty", slug: "empty" });
       });
 
+      /** @scenario "Upload without a file field returns 422" */
       it("returns 422 Unprocessable Entity", async () => {
         const form = new FormData();
         const res = await uploadToExisting("empty", form);
@@ -358,6 +366,7 @@ describe("Feature: Dataset File Upload REST API", () => {
         });
       });
 
+      /** @scenario "Upload an empty file returns 422" */
       it("returns 422 Unprocessable Entity", async () => {
         const csv = "input,output\n";
         const form = buildFormData({
@@ -380,6 +389,7 @@ describe("Feature: Dataset File Upload REST API", () => {
         });
       });
 
+      /** @scenario "Upload exceeding row limit is rejected" */
       it("returns 400 Bad Request", async () => {
         const header = "value";
         const rows = Array.from({ length: 10_001 }, (_, i) => `row${i}`);
@@ -404,6 +414,7 @@ describe("Feature: Dataset File Upload REST API", () => {
         });
       });
 
+      /** @scenario "Upload exceeding file size limit is rejected" */
       it("returns 400 Bad Request", async () => {
         // Create content larger than 25MB
         const bigContent = "value\n" + "x".repeat(26 * 1024 * 1024);
@@ -423,6 +434,7 @@ describe("Feature: Dataset File Upload REST API", () => {
         await createDataset({ name: "Any", slug: "any" });
       });
 
+      /** @scenario "Upload with unsupported file format is rejected" */
       it("returns 422 Unprocessable Entity", async () => {
         const form = buildFormData({
           file: { content: "some binary data", filename: "data.xlsx" },
@@ -440,6 +452,7 @@ describe("Feature: Dataset File Upload REST API", () => {
 
   describe("POST /api/dataset/upload", () => {
     describe("when creating a new dataset from a CSV file", () => {
+      /** @scenario "Create a new dataset from an uploaded CSV file" */
       it("creates the dataset with inferred columns and returns 201", async () => {
         const csv = "question,answer\nWhat is 2+2?,4\nCapital of UK?,London";
         const form = buildFormData({
@@ -461,6 +474,7 @@ describe("Feature: Dataset File Upload REST API", () => {
     });
 
     describe("when creating a new dataset from a JSONL file", () => {
+      /** @scenario "Create a new dataset from a JSONL file" */
       it("creates the dataset with inferred columns", async () => {
         const jsonl =
           '{"message": "started", "level": "info"}\n{"message": "crashed", "level": "error"}';
@@ -481,6 +495,7 @@ describe("Feature: Dataset File Upload REST API", () => {
     });
 
     describe("when creating infers column types as string by default", () => {
+      /** @scenario "Create + upload infers column types as string by default" */
       it("creates all columns with type 'string'", async () => {
         const csv = "age,active,notes\n25,true,hello";
         const form = buildFormData({
@@ -500,6 +515,7 @@ describe("Feature: Dataset File Upload REST API", () => {
     });
 
     describe("when creating renames reserved column names", () => {
+      /** @scenario "Create + upload renames reserved column names" */
       it("renames 'id' to 'id_' and 'selected' to 'selected_'", async () => {
         const csv = "id,input,selected\n1,hello,true";
         const form = buildFormData({
@@ -531,6 +547,7 @@ describe("Feature: Dataset File Upload REST API", () => {
     });
 
     describe("when name field is missing", () => {
+      /** @scenario "Create + upload requires a name field" */
       it("returns 422 Unprocessable Entity", async () => {
         const csv = "col1,col2\na,b";
         const form = buildFormData({
@@ -543,6 +560,7 @@ describe("Feature: Dataset File Upload REST API", () => {
     });
 
     describe("when file field is missing", () => {
+      /** @scenario "Create + upload requires a file field" */
       it("returns 422 Unprocessable Entity", async () => {
         const form = new FormData();
         form.append("name", "No File");
@@ -562,6 +580,7 @@ describe("Feature: Dataset File Upload REST API", () => {
         });
       });
 
+      /** @scenario "Create + upload enforces dataset plan limits" */
       it("returns 403 Forbidden", async () => {
         const csv = "input\nhello";
         const form = buildFormData({
@@ -581,6 +600,7 @@ describe("Feature: Dataset File Upload REST API", () => {
         await createDataset({ name: "Duplicate", slug: "duplicate" });
       });
 
+      /** @scenario "Create + upload fails when slug conflicts with existing dataset" */
       it("returns 409 Conflict", async () => {
         const csv = "input\nhello";
         const form = buildFormData({
@@ -594,6 +614,7 @@ describe("Feature: Dataset File Upload REST API", () => {
     });
 
     describe("when file exceeds row limit", () => {
+      /** @scenario "Create + upload rejects file exceeding row limit" */
       it("returns 400 Bad Request", async () => {
         const header = "value";
         const rows = Array.from({ length: 10_001 }, (_, i) => `row${i}`);
@@ -615,6 +636,7 @@ describe("Feature: Dataset File Upload REST API", () => {
 
   describe("Authentication", () => {
     describe("when uploading without X-Auth-Token header", () => {
+      /** @scenario "Upload without API key returns 401" */
       it("returns 401 for create+upload", async () => {
         const form = buildFormData({
           file: { content: "input\nhello", filename: "data.csv" },
@@ -627,6 +649,7 @@ describe("Feature: Dataset File Upload REST API", () => {
         expect(res.status).toBe(401);
       });
 
+      /** @scenario "Upload to existing without API key returns 401" */
       it("returns 401 for upload to existing", async () => {
         const form = buildFormData({
           file: { content: "input\nhello", filename: "data.csv" },

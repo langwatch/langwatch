@@ -10,6 +10,7 @@ import { formatRunStatusLabel } from "../format-run-status-label";
 describe("formatRunStatusLabel()", () => {
   describe("when status is success", () => {
     describe("when the run has met and unmet criteria", () => {
+      /** @scenario 'Successful run shows "passed" with criteria count' */
       it("returns 'passed' with criteria count", () => {
         const result = formatRunStatusLabel({
           status: ScenarioRunStatus.SUCCESS,
@@ -23,6 +24,7 @@ describe("formatRunStatusLabel()", () => {
     });
 
     describe("when the run has no evaluation results", () => {
+      /** @scenario "Run with no criteria results shows status without count" */
       it("returns 'passed' without count", () => {
         const result = formatRunStatusLabel({
           status: ScenarioRunStatus.SUCCESS,
@@ -58,6 +60,7 @@ describe("formatRunStatusLabel()", () => {
 
   describe("when status is failed", () => {
     describe("when the run has met and unmet criteria", () => {
+      /** @scenario 'Failed run shows "failed" with criteria count' */
       it("returns 'failed' with criteria count", () => {
         const result = formatRunStatusLabel({
           status: ScenarioRunStatus.FAILED,
@@ -108,6 +111,7 @@ describe("formatRunStatusLabel()", () => {
   });
 
   describe("when status is in_progress", () => {
+    /** @scenario 'In-progress run shows "running" without criteria count' */
     it("returns 'running' without criteria count", () => {
       const result = formatRunStatusLabel({
         status: ScenarioRunStatus.IN_PROGRESS,
@@ -118,6 +122,7 @@ describe("formatRunStatusLabel()", () => {
   });
 
   describe("when status is pending", () => {
+    /** @scenario 'Pending run shows "pending" without criteria count' */
     it("returns 'pending' without criteria count", () => {
       const result = formatRunStatusLabel({
         status: ScenarioRunStatus.PENDING,

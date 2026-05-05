@@ -206,6 +206,7 @@ describe("Simulation Page URL Routing", () => {
       expect(screen.getByText("Simulations")).toBeInTheDocument();
     });
 
+    /** @scenario "Detail panel empty state button" */
     it("displays New Run Plan button", async () => {
       await renderSimulationsPage();
       expect(screen.getByText(/New Run Plan/)).toBeInTheDocument();

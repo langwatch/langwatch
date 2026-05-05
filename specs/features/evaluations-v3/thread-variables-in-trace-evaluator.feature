@@ -3,6 +3,11 @@ Feature: Thread variables available in trace-level evaluator input mapping
   I want to map thread-level variables (thread_id, traces, formatted_traces) to evaluator inputs at the trace level
   So that I can build evaluators that consider full conversation context even when triggered per-trace
 
+  # Parity status: 10 of 11 scenarios bound to existing tests.
+  # Remaining @unimplemented scenarios (#3458):
+  #   (none — all implemented scenarios are bound)
+  # Sections list: (all bound or deleted)
+
   Note: Trace-level evaluations fire per incoming trace. Thread context reflects
   whatever traces exist at evaluation time — trace #1 sees only itself,
   trace #5 sees all five. There is no thread idle timeout at trace level.
@@ -15,21 +20,21 @@ Feature: Thread variables available in trace-level evaluator input mapping
   # Frontend: EvaluatorMappingsSection exposes thread sources alongside trace sources
   # --------------------------------------------------------------------------
 
-  @unit @unimplemented
+  @unit
   Scenario: Trace-level mapping UI includes both trace and thread available sources
     Given the evaluator mapping level is "trace"
     When the available sources are computed for the mapping UI
     Then the sources include a "Trace" group with trace-level fields
     And the sources include a "Thread" group with thread-level fields
 
-  @unit @unimplemented
+  @unit
   Scenario: Thread-level mapping UI still shows only thread sources
     Given the evaluator mapping level is "thread"
     When the available sources are computed for the mapping UI
     Then the sources include a "Thread" group with thread-level fields
     And the sources do not include a "Trace" group
 
-  @unit @unimplemented
+  @unit
   Scenario: Thread source fields include thread_id, traces, and formatted_traces
     Given the evaluator mapping level is "trace"
     When the available sources are computed for the mapping UI
@@ -41,13 +46,13 @@ Feature: Thread variables available in trace-level evaluator input mapping
   # Serialization: OnlineEvaluationDrawer handles mixed trace + thread mappings
   # --------------------------------------------------------------------------
 
-  @unit @unimplemented
+  @unit
   Scenario: Serialization marks thread sources with type "thread" including SERVER_ONLY_THREAD_SOURCES
     Given a trace-level evaluator with "conversation" mapped to "thread.formatted_traces"
     When the mapping is serialized to MappingState
     Then the "conversation" entry has type "thread" and source "formatted_traces"
 
-  @unit @unimplemented
+  @unit
   Scenario: Deserialization assigns sourceId "thread" for thread-typed mappings at trace level
     Given a saved trace-level monitor with a thread-typed mapping for "conversation"
     When the mapping is deserialized for the UI
@@ -58,21 +63,21 @@ Feature: Thread variables available in trace-level evaluator input mapping
   # Backend: buildDataForEvaluation resolves mixed trace + thread sources per-field
   # --------------------------------------------------------------------------
 
-  @integration @unimplemented
+  @integration
   Scenario: Trace-level evaluation resolves a thread source mapping
     Given a trace-level evaluator with an input mapped to "thread.traces"
     When buildDataForEvaluation runs for a trace with thread_id "abc"
     Then it fetches all traces in thread "abc"
     And the evaluator input contains the thread traces data
 
-  @integration @unimplemented
+  @integration
   Scenario: Trace-level evaluation resolves mixed trace and thread source mappings
     Given a trace-level evaluator with "input" mapped to "trace.input" and "conversation" mapped to "thread.formatted_traces"
     When buildDataForEvaluation runs for a trace with thread_id "abc"
     Then the "input" field contains the trace input value
     And the "conversation" field contains the formatted thread digest
 
-  @integration @unimplemented
+  @integration
   Scenario: Trace-level evaluation with thread source but trace has no thread_id
     Given a trace-level evaluator with an input mapped to "thread.traces"
     When buildDataForEvaluation runs for a trace without thread_id
@@ -80,7 +85,7 @@ Feature: Thread variables available in trace-level evaluator input mapping
     And trace-sourced fields still resolve normally
     And the evaluation does not fail
 
-  @unit @unimplemented
+  @unit
   Scenario: hasThreadMappings detects thread-typed mappings in a mixed config
     Given a mapping state with one trace source and one thread source
     When hasThreadMappings is called
@@ -90,18 +95,10 @@ Feature: Thread variables available in trace-level evaluator input mapping
   # Background worker: same resolution logic applies
   # --------------------------------------------------------------------------
 
-  @integration @unimplemented
+  @integration
   Scenario: Background worker resolves mixed trace and thread mappings
     Given a trace-level monitor with "input" mapped to "trace.input" and "history" mapped to "thread.traces"
     When the evaluations worker processes a trace with thread_id "xyz"
     Then both trace and thread fields resolve correctly
 
-  # --------------------------------------------------------------------------
-  # UI label: rename "Threads" tab to "Thread" in DatasetMappingPreview
-  # --------------------------------------------------------------------------
 
-  @unit @unimplemented
-  Scenario: DatasetMappingPreview tab label reads "Thread" not "Threads"
-    Given the DatasetMappingPreview component is rendered
-    When the user views the mapping toggle tabs
-    Then the thread tab label is "Thread"

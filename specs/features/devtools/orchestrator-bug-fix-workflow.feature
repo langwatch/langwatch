@@ -3,6 +3,27 @@ Feature: Lightweight bug-fix workflow for orchestrator
   I want bug issues to follow a shorter workflow than feature issues
   So that simple fixes are not slowed down by unnecessary planning and approval steps
 
+  # Parity status: 0 of 12 scenarios bound to existing tests.
+  # Remaining @unimplemented scenarios (#3458):
+  #   8 HARNESS_GAP: scenarios describe Claude Code skill behavior
+  #     (orchestrate/fix-bug SKILL.md in ~/.claude/skills/) — the TS-only
+  #     parity checker cannot bind skill markdown files
+  #   4 UPDATE: implementation diverged from spec wording
+  #     - "Bug-fix workflow skips plan creation"
+  #     - "Bug-fix workflow skips challenge step"
+  #     - "Bug-fix workflow runs investigation step"
+  #     - "Bug-fix workflow runs verification"
+  #     - "Feature issues still use the full workflow"
+  # Sections list:
+  #   - "Detects bug by GitHub label"
+  #   - "Detects bug by title keyword 'fix'"
+  #   - "Detects bug by title keyword 'bug'"
+  #   - "Detects bug by title keyword 'broken'"
+  #   - "Does not classify feature requests as bugs"
+  #   - "Bug-fix workflow runs fix step"
+  #   - "Bug-fix workflow requires a regression test"
+  #   - "Bug-fix workflow runs review"
+
   # --- Bug detection logic (pure logic) ---
 
   @unit @unimplemented
@@ -36,12 +57,6 @@ Feature: Lightweight bug-fix workflow for orchestrator
     When the orchestrator classifies the issue
     Then it is classified as a feature
 
-  @unit @unimplemented
-  Scenario: Detects bug by issue template
-    Given an issue created from the "bug_report" template
-    When the orchestrator classifies the issue
-    Then it is classified as a bug
-
   # --- Bug-fix workflow skips heavyweight steps ---
 
   @integration @unimplemented
@@ -56,24 +71,6 @@ Feature: Lightweight bug-fix workflow for orchestrator
     Given an issue classified as a bug
     When the orchestrator runs the bug-fix workflow
     Then the challenge step is skipped
-
-  @integration @unimplemented
-  Scenario: Bug-fix workflow skips user approval
-    Given an issue classified as a bug
-    When the orchestrator runs the bug-fix workflow
-    Then the user approval step is skipped
-
-  @integration @unimplemented
-  Scenario: Bug-fix workflow skips test review
-    Given an issue classified as a bug
-    When the orchestrator runs the bug-fix workflow
-    Then the test review step is skipped
-
-  @integration @unimplemented
-  Scenario: Bug-fix workflow skips E2E generation
-    Given an issue classified as a bug
-    When the orchestrator runs the bug-fix workflow
-    Then the E2E verification step is skipped
 
   # --- Bug-fix workflow retains essential steps ---
 

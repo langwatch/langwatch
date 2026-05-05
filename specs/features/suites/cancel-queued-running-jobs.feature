@@ -3,6 +3,15 @@ Feature: Cancel queued and running suite jobs
   I want to cancel queued or in-progress suite jobs
   So that I can stop work I no longer need without waiting for it to finish
 
+  # Parity status: 10 of 14 scenarios bound to existing tests.
+  # Remaining scenarios (#3458):
+  #   4 NO_TEST: shipped behavior, no integration test yet
+  # NO_TEST gaps:
+  #   - "Cancellation reaches a worker on a different pod"
+  #   - "Batch cancel across multiple workers terminates all active runs"
+  #   - "Fold projection sets CancellationRequestedAt without changing Status"
+  #   - "Cancel request is idempotent"
+
   Background:
     Cancellation is implemented via event-sourcing. When the user requests
     cancellation, a `cancel_requested` event is written to the event log.
@@ -13,7 +22,7 @@ Feature: Cancel queued and running suite jobs
   # Event-sourcing: cancel_requested event lifecycle
   # ---------------------------------------------------------------------------
 
-  @unit @unimplemented
+  @unit
   Scenario: Cancel request produces a cancel_requested event
     Given a simulation run is in progress
     When the user requests cancellation
@@ -37,7 +46,7 @@ Feature: Cancel queued and running suite jobs
   # Reactor: broadcast cancel signal to workers
   # ---------------------------------------------------------------------------
 
-  @integration @unimplemented
+  @integration
   Scenario: Cancel reactor broadcasts to Redis on cancel_requested event
     Given the cancellation broadcast reactor is registered
     When a cancel_requested event is processed by the pipeline
@@ -48,7 +57,7 @@ Feature: Cancel queued and running suite jobs
   # Worker: cancel signal reaches the right worker
   # ---------------------------------------------------------------------------
 
-  @integration @unimplemented
+  @integration
   Scenario: Worker kills its own child process on cancel broadcast
     Given worker A is running scenario X as a child process
     And worker A is subscribed to the "scenario:cancel" Redis channel
@@ -56,7 +65,7 @@ Feature: Cancel queued and running suite jobs
     Then worker A terminates the child process for scenario X
     And a finished event with status CANCELLED is dispatched
 
-  @integration @unimplemented
+  @integration
   Scenario: Worker ignores cancel broadcast for scenarios it does not own
     Given worker B is running scenario Y
     When a cancel broadcast arrives for scenario X
@@ -75,7 +84,7 @@ Feature: Cancel queued and running suite jobs
   # Pre-spawn check: cancel before execution starts
   # ---------------------------------------------------------------------------
 
-  @integration @unimplemented
+  @integration
   Scenario: Worker skips execution if cancel was already requested
     Given a simulation run has CancellationRequestedAt set in the projection
     When a worker picks up the job for that run
@@ -86,7 +95,7 @@ Feature: Cancel queued and running suite jobs
   # Queued job cancellation
   # ---------------------------------------------------------------------------
 
-  @unit @unimplemented
+  @unit
   Scenario: Cancelling a queued run writes both cancel and finished events
     Given a simulation run has Status "QUEUED"
     When the user requests cancellation
@@ -98,7 +107,7 @@ Feature: Cancel queued and running suite jobs
   # Batch cancellation
   # ---------------------------------------------------------------------------
 
-  @integration @unimplemented
+  @integration
   Scenario: Batch cancel dispatches cancel events for all non-terminal runs
     Given a batch run has 3 runs: one QUEUED, one IN_PROGRESS, one SUCCESS
     When the user cancels the entire batch
@@ -117,21 +126,21 @@ Feature: Cancel queued and running suite jobs
   # UI: cancel eligibility and status display
   # ---------------------------------------------------------------------------
 
-  @integration @unimplemented
+  @integration
   Scenario: User cancels a single running job from the run card
     Given a suite run has running jobs
     When the user clicks cancel on a running job
     Then the job status changes to cancelled
     And the UI reflects the cancelled state
 
-  @integration @unimplemented
+  @integration
   Scenario: User cancels all remaining jobs for a batch run
     Given a suite run has multiple queued and running jobs
     When the user clicks cancel all on the batch run
     Then all non-terminal jobs are cancelled
     And the UI reflects the cancelled state for each job
 
-  @integration @unimplemented
+  @integration
   Scenario: Cancel button is hidden for jobs that already completed
     Given a suite run has a job with a terminal status
     When the user views the run card
@@ -141,7 +150,7 @@ Feature: Cancel queued and running suite jobs
   # Race conditions
   # ---------------------------------------------------------------------------
 
-  @unit @unimplemented
+  @unit
   Scenario Outline: Cancellation does not overwrite terminal results
     Given a simulation run has already finished with status <status>
     When a cancel_requested event arrives
@@ -154,7 +163,7 @@ Feature: Cancel queued and running suite jobs
       | FAILED  |
       | ERROR   |
 
-  @unit @unimplemented
+  @unit
   Scenario: Late finish does not overwrite cancelled status
     Given a simulation run has been marked as CANCELLED via a finished event
     When a late finished event arrives with status SUCCESS
