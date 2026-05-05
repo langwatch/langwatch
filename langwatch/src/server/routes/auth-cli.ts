@@ -88,12 +88,29 @@ type DeviceCodeStatus =
   | "denied"
   | "expired";
 
+/**
+ * What the CLI is asking the browser to mint on approval.
+ *
+ * - `device_session` (default, back-compat): personal VK + access/refresh tokens
+ *   for governance-plane CLI use (`langwatch claude`, `whoami`, etc.). Lands in
+ *   `~/.langwatch/config.json`.
+ * - `project_api_key`: the existing API key of a user-selected project, returned
+ *   verbatim so the SDK can use it. Lands in `$CWD/.env` as `LANGWATCH_API_KEY`.
+ *   No fresh key is minted; the user picks an existing project they have access
+ *   to and the server returns its already-issued `Project.apiKey`.
+ *
+ * Older CLIs that don't send `credential_type` default to `device_session`.
+ */
+type CliCredentialType = "device_session" | "project_api_key";
+
 interface DeviceCodeRecord {
   device_code: string;
   user_code: string;
   status: DeviceCodeStatus;
   created_at: number; // unix ms
   expires_at: number; // unix ms
+  /** What the CLI is asking the browser to mint. Defaults to `device_session`. */
+  credential_type: CliCredentialType;
   /** Set after browser-side approval. */
   user_id?: string;
   organization_id?: string;
@@ -103,6 +120,17 @@ interface DeviceCodeRecord {
     label: string;
     secret: string;
     base_url: string;
+  };
+  /**
+   * For `credential_type: "project_api_key"` after approval — the picked
+   * project's existing API key + identifying fields, shipped to the CLI on
+   * the next /exchange poll. Mutable across approvals (user can re-pick).
+   */
+  project_api_key?: {
+    project_id: string;
+    project_slug: string;
+    project_name: string;
+    api_key: string;
   };
 }
 
@@ -252,6 +280,17 @@ function getRedis() {
 }
 
 /**
+ * Control-plane base URL the CLI persists post-login (no trailing slash).
+ * Falls back to `https://app.langwatch.ai` when neither `NEXTAUTH_URL` nor
+ * `BASE_HOST` is set — same fallback the CLI uses on the client side, so
+ * the round-trip self-hosted UX stays consistent.
+ */
+function controlPlaneBaseUrl(): string {
+  const base = env.NEXTAUTH_URL ?? env.BASE_HOST ?? "https://app.langwatch.ai";
+  return base.replace(/\/+$/, "");
+}
+
+/**
  * Resolve the verification URI a user opens in their browser.
  * Honors `NEXTAUTH_URL` / `BASE_HOST` so this works in dev (localhost),
  * staging, and prod without per-env config.
@@ -269,6 +308,14 @@ const deviceCodeRequestSchema = z.object({
   // Reserved for future: scope hints (e.g. ["claude_code", "codex"]).
   // Accepted but unused today — every CLI session gets the same scope set.
   scopes: z.array(z.string()).optional(),
+  /**
+   * What the CLI is asking the browser to mint on approval. Defaults to
+   * `device_session` so older CLIs that pre-date the no-paste convergence
+   * keep working unchanged (their /exchange response shape is also unchanged).
+   */
+  credential_type: z
+    .enum(["device_session", "project_api_key"])
+    .default("device_session"),
 });
 
 app.post("/device-code", async (c: Context) => {
@@ -295,6 +342,7 @@ app.post("/device-code", async (c: Context) => {
     status: "pending",
     created_at: now,
     expires_at: now + DEVICE_CODE_TTL_SECONDS * 1000,
+    credential_type: parsed.data.credential_type,
   };
 
   const ttl = DEVICE_CODE_TTL_SECONDS;
@@ -426,12 +474,12 @@ app.post("/exchange", async (c: Context) => {
   }
 
   if (record.status === "approved") {
-    if (!record.user_id || !record.organization_id || !record.personal_vk) {
+    if (!record.user_id || !record.organization_id) {
       // Should not happen — approval handler always populates these. Treat
       // as a transient pending state so the CLI keeps polling rather than
       // crashing. Worst case the user re-runs `langwatch login`.
       logger.warn(
-        `[auth-cli] approved device_code ${device_code} missing user/org/vk payload — returning pending`,
+        `[auth-cli] approved device_code ${device_code} missing user/org payload — returning pending`,
       );
       return c.json(
         {
@@ -462,6 +510,65 @@ app.post("/exchange", async (c: Context) => {
           error_description: "User or organization no longer exists",
         },
         500,
+      );
+    }
+
+    const responseEndpoint = controlPlaneBaseUrl();
+
+    // No-paste API-key flow: the user picked a project on /cli/auth and the
+    // approve handler stamped the project's existing apiKey onto the record.
+    // Return the verbatim apiKey + project identity; CLI writes it to .env.
+    // No access/refresh tokens needed — the apiKey IS the credential the
+    // SDK uses, and it's already revocable from /settings/projects.
+    if ((record.credential_type ?? "device_session") === "project_api_key") {
+      if (!record.project_api_key) {
+        logger.warn(
+          `[auth-cli] approved project_api_key device_code ${device_code} missing project payload — returning pending`,
+        );
+        return c.json(
+          {
+            error: "authorization_pending",
+            error_description: "Approval received but project key not ready yet",
+          },
+          428,
+        );
+      }
+      // Single-use device_code: delete after successful exchange. Per-key
+      // dels — Redis cluster CROSSSLOT-rejects multi-key ops on differing
+      // hash slots.
+      await redis.del(deviceCodeKey(device_code));
+      await redis.del(userCodeKey(record.user_code));
+      return c.json(
+        {
+          kind: "api_key" as const,
+          api_key: record.project_api_key.api_key,
+          project: {
+            id: record.project_api_key.project_id,
+            slug: record.project_api_key.project_slug,
+            name: record.project_api_key.project_name,
+          },
+          user: { id: user.id, email: user.email, name: user.name },
+          organization: {
+            id: organization.id,
+            name: organization.name,
+            slug: organization.slug,
+          },
+          endpoint: responseEndpoint,
+        },
+        200,
+      );
+    }
+
+    if (!record.personal_vk) {
+      logger.warn(
+        `[auth-cli] approved device_session device_code ${device_code} missing personal_vk payload — returning pending`,
+      );
+      return c.json(
+        {
+          error: "authorization_pending",
+          error_description: "Approval received but session not ready yet",
+        },
+        428,
       );
     }
 
@@ -525,8 +632,9 @@ app.post("/exchange", async (c: Context) => {
 
     return c.json(
       {
+        kind: "device_session" as const,
         access_token: accessToken,
-        token_type: "Bearer",
+        token_type: "Bearer" as const,
         expires_in: ACCESS_TOKEN_TTL_SECONDS,
         refresh_token: refreshToken,
         refresh_expires_in: REFRESH_TOKEN_TTL_SECONDS,
@@ -541,6 +649,7 @@ app.post("/exchange", async (c: Context) => {
           slug: organization.slug,
         },
         default_personal_vk: record.personal_vk,
+        endpoint: responseEndpoint,
       },
       200,
     );
@@ -1131,6 +1240,11 @@ app.get("/lookup", async (c: Context) => {
       status: record.status,
       created_at: record.created_at,
       expires_at: record.expires_at,
+      // The browser approval page branches its UX on this — `device_session`
+      // shows today's approve-only flow, `project_api_key` shows a project
+      // picker + "Generate" CTA. Defaults to device_session for back-compat
+      // with records minted before this field existed.
+      credential_type: record.credential_type ?? "device_session",
     },
     200,
   );
@@ -1146,6 +1260,13 @@ app.get("/lookup", async (c: Context) => {
 const approveRequestSchema = z.object({
   user_code: z.string().min(1),
   organization_id: z.string().min(1),
+  /**
+   * Required when the device-code's `credential_type` is `project_api_key` —
+   * the project the user picked on the browser approval page. Server returns
+   * that project's existing API key (no new key is minted; the CLI gets a
+   * verbatim copy of `Project.apiKey` for the SDK to consume).
+   */
+  project_id: z.string().optional(),
 });
 
 app.post("/approve", async (c: Context) => {
@@ -1168,7 +1289,7 @@ app.post("/approve", async (c: Context) => {
       400,
     );
   }
-  const { user_code, organization_id } = parsed.data;
+  const { user_code, organization_id, project_id } = parsed.data;
 
   // Verify caller is a member of the org they're issuing a key for.
   const membership = await prisma.organizationUser.findUnique({
@@ -1206,6 +1327,70 @@ app.post("/approve", async (c: Context) => {
         error_description: `Code is in '${record.status}' state — restart langwatch login`,
       },
       409,
+    );
+  }
+
+  // Branch on the credential type the CLI requested at /device-code time.
+  // `project_api_key` returns the user-picked project's existing apiKey; no
+  // new key is minted, so existing consumers (other team members, CI, etc.)
+  // keep working unchanged. The CLI writes the key into `$CWD/.env`.
+  if ((record.credential_type ?? "device_session") === "project_api_key") {
+    if (!project_id) {
+      return c.json(
+        {
+          error: "invalid_request",
+          error_description: "project_id is required when credential_type is project_api_key",
+        },
+        400,
+      );
+    }
+    // Verify the user actually has access to the project: the project must
+    // belong to a team in the chosen org, and the user must be a member of
+    // that team (PG schema enforces this via TeamUser; we re-check here so
+    // a hostile browser request can't be tricked into leaking another org's
+    // key by spoofing project_id).
+    const project = await prisma.project.findFirst({
+      where: {
+        id: project_id,
+        archivedAt: null,
+        team: {
+          organizationId: organization_id,
+          members: { some: { userId: session.user.id } },
+        },
+      },
+      select: { id: true, slug: true, name: true, apiKey: true },
+    });
+    if (!project) {
+      return c.json(
+        {
+          error: "forbidden",
+          error_description:
+            "Project not found in this organization, or you do not have access to it",
+        },
+        403,
+      );
+    }
+
+    await approveDeviceCode({
+      deviceCode: record.device_code,
+      userId: session.user.id,
+      organizationId: organization_id,
+      projectApiKey: {
+        project_id: project.id,
+        project_slug: project.slug,
+        project_name: project.name,
+        api_key: project.apiKey,
+      },
+    });
+
+    return c.json(
+      {
+        ok: true,
+        kind: "api_key" as const,
+        project: { id: project.id, slug: project.slug, name: project.name },
+        organization_id,
+      },
+      200,
     );
   }
 
@@ -1398,25 +1583,38 @@ export async function findDeviceCodeByUserCode(
 
 /**
  * Approve a device-code session — flips status to `approved` and stamps
- * the user/org/personal-VK payload that the next /exchange poll returns.
+ * the user/org/credential payload that the next /exchange poll returns.
+ * The shape of the credential payload depends on the device-code's
+ * `credential_type`:
  *
- * Called by the browser approval handler after the user has completed
- * SSO and confirmed the CLI authorization request.
+ *   - `device_session` (default): caller supplies `personalVk`
+ *   - `project_api_key`: caller supplies `projectApiKey`
+ *
+ * Exactly one of `personalVk` / `projectApiKey` must be passed; the
+ * caller (browser approval handler) is responsible for picking the right
+ * one based on `record.credential_type`.
  */
 export async function approveDeviceCode({
   deviceCode,
   userId,
   organizationId,
   personalVk,
+  projectApiKey,
 }: {
   deviceCode: string;
   userId: string;
   organizationId: string;
-  personalVk: {
+  personalVk?: {
     id: string;
     label: string;
     secret: string;
     base_url: string;
+  };
+  projectApiKey?: {
+    project_id: string;
+    project_slug: string;
+    project_name: string;
+    api_key: string;
   };
 }): Promise<{ approved: boolean }> {
   const redis = getRedis();
@@ -1432,6 +1630,7 @@ export async function approveDeviceCode({
     user_id: userId,
     organization_id: organizationId,
     personal_vk: personalVk,
+    project_api_key: projectApiKey,
   };
 
   // Preserve original TTL by computing remaining seconds.
