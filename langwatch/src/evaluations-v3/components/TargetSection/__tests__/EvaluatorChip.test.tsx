@@ -139,6 +139,7 @@ describe("EvaluatorChip", () => {
   describe("Run/Rerun menu items", () => {
     describe("when status is pending", () => {
       describe("when target output exists", () => {
+        /** @scenario 'Pending evaluator chip shows "Run" when target output exists' */
         it("shows 'Run' menu item", async () => {
           const onRerun = vi.fn();
           const user = userEvent.setup();
@@ -189,6 +190,7 @@ describe("EvaluatorChip", () => {
       });
 
       describe("when no target output exists", () => {
+        /** @scenario 'Pending evaluator chip hides "Run" when no target output exists' */
         it("shows disabled 'Run' menu item", async () => {
           const onRerun = vi.fn();
           const user = userEvent.setup();
@@ -217,6 +219,7 @@ describe("EvaluatorChip", () => {
     });
 
     describe("when status is completed", () => {
+      /** @scenario 'Completed evaluator chip shows "Rerun" instead of "Run"' */
       it("shows 'Rerun' instead of 'Run'", async () => {
         const onRerun = vi.fn();
         const user = userEvent.setup();
@@ -282,6 +285,7 @@ describe("EvaluatorChip", () => {
     });
 
     describe("when status is running", () => {
+      /** @scenario 'Running evaluator chip hides both "Run" and "Rerun"' */
       it("hides both 'Run' and 'Rerun'", async () => {
         const onRerun = vi.fn();
         const user = userEvent.setup();
@@ -309,6 +313,7 @@ describe("EvaluatorChip", () => {
 
   describe("Run on all rows menu item", () => {
     describe("when target outputs exist for at least one row", () => {
+      /** @scenario 'Evaluator chip menu shows "Run on all rows" when target outputs exist' */
       it("shows 'Run on all rows' menu item", async () => {
         const onRunOnAllRows = vi.fn();
         const user = userEvent.setup();
@@ -387,6 +392,7 @@ describe("EvaluatorChip", () => {
     });
 
     describe("when evaluator is running", () => {
+      /** @scenario '"Run on all rows" is hidden while evaluator is running' */
       it("does not show 'Run on all rows'", async () => {
         const onRunOnAllRows = vi.fn();
         const user = userEvent.setup();
