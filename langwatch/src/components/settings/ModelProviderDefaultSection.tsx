@@ -210,8 +210,8 @@ export const DefaultProviderSection = ({
             />
             {chatOptions.length === 0 ? (
               <Text fontSize="xs" color="fg.muted" marginTop={1}>
-                No {providerName} models available. Add a custom model below to
-                enable this.
+                No {providerName} models available. Add one in the Custom
+                Models section above to enable this.
               </Text>
             ) : (
               state.projectDefaultModel &&
@@ -219,8 +219,8 @@ export const DefaultProviderSection = ({
                 `${provider.provider}/`,
               ) && (
                 <Text fontSize="xs" color="orange.600" marginTop={1}>
-                  Persisted default belongs to a different provider — pick a{" "}
-                  {providerName} model to switch.
+                  Persisted default belongs to a different provider — pick a
+                  model from {providerName} to switch.
                 </Text>
               )
             )}
@@ -240,8 +240,8 @@ export const DefaultProviderSection = ({
             />
             {chatOptions.length === 0 ? (
               <Text fontSize="xs" color="fg.muted" marginTop={1}>
-                No {providerName} models available. Add a custom model below to
-                enable this.
+                No {providerName} models available. Add one in the Custom
+                Models section above to enable this.
               </Text>
             ) : (
               state.projectTopicClusteringModel &&
@@ -249,8 +249,8 @@ export const DefaultProviderSection = ({
                 `${provider.provider}/`,
               ) && (
                 <Text fontSize="xs" color="orange.600" marginTop={1}>
-                  Persisted default belongs to a different provider — pick a{" "}
-                  {providerName} model to switch.
+                  Persisted default belongs to a different provider — pick a
+                  model from {providerName} to switch.
                 </Text>
               )
             )}
