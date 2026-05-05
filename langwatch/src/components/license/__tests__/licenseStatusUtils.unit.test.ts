@@ -183,6 +183,7 @@ describe("isCorruptedLicense", () => {
 });
 
 describe("formatLimitOrUnlimited", () => {
+  /** @scenario License details card handles Infinity display */
   it("returns 'Unlimited' for Infinity", () => {
     expect(formatLimitOrUnlimited(Infinity)).toBe("Unlimited");
   });
