@@ -235,11 +235,15 @@ function GovernanceOverviewPage() {
               subline={
                 summary.spentThisWindowUsd === 0
                   ? "no traffic this window"
-                  : `${summary.windowOverPreviousPct >= 0 ? "↑" : "↓"} ${Math.abs(
-                      summary.windowOverPreviousPct,
-                    )}% vs previous`
+                  : !summary.hasPriorBaseline
+                    ? "no prior-window baseline"
+                    : `${summary.windowOverPreviousPct >= 0 ? "↑" : "↓"} ${fmtTrendPct(summary.windowOverPreviousPct)} vs previous`
               }
-              tone={summary.windowOverPreviousPct > 25 ? "amber" : "default"}
+              tone={
+                summary.hasPriorBaseline && summary.windowOverPreviousPct > 25
+                  ? "amber"
+                  : "default"
+              }
             />
             <SummaryCard
               title="Active users (30 d)"
@@ -944,6 +948,21 @@ function TeamRowHeader() {
  *      Threshold matches `summary.windowOverPreviousPct` palette.
  *   3. otherwise: gray neutral with arrow + %.
  */
+/**
+ * Cap absurd display values caused by tiny prior baselines (e.g.
+ * prior=$0.0001, current=$1 → +999900%). Above 1000% we just show
+ * ">1000%" — the actual number is uninformative noise. Below 1% we
+ * show "+0%" / "-0%" rather than "+0.0034%" pixel grit. The tone
+ * threshold uses the raw value so a real 5000% growth still flags
+ * orange-amber even though we display ">1000%".
+ */
+function fmtTrendPct(pct: number): string {
+  const abs = Math.abs(pct);
+  if (abs >= 1000) return ">1000%";
+  if (abs < 1) return "0%";
+  return `${Math.round(abs)}%`;
+}
+
 function TrendCell({
   pct,
   hasBaseline,
@@ -963,7 +982,7 @@ function TrendCell({
     pct > 25 ? "orange.500" : pct < -25 ? "blue.500" : "fg.muted";
   return (
     <Box flex={2} color={color}>
-      {arrow} {Math.abs(pct)}%
+      {arrow} {fmtTrendPct(pct)}
     </Box>
   );
 }
