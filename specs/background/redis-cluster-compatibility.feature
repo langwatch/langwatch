@@ -33,6 +33,13 @@ Feature: BullMQ Redis Cluster Compatibility
     Then every background worker queue name contains a hash tag
     And adding a job to each queue succeeds on the cluster
 
+  # The two `@unimplemented` scenarios below describe live-cluster
+  # behaviour for queues that are created *dynamically* inside the
+  # event-sourcing service (`eventSourcingService` / pipeline factory)
+  # rather than from a static constant. Asserting their names contain
+  # a hash tag would require constructing the service with mocks and
+  # inspecting each registered queue — feasible but not yet wired up.
+  # Static queue constants are covered by the bound scenarios above.
   @integration @unimplemented
   Scenario: Event sourcing maintenance worker queue operates on Redis Cluster
     Given a Redis Cluster is running
