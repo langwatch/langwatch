@@ -296,6 +296,7 @@ describe("SuiteService", () => {
 
     describe("given a suite references a removed prompt target", () => {
       describe("when the suite run is triggered", () => {
+        /** @scenario "Run validation rejects prompt from unrelated project without org scope" */
         it("throws InvalidTargetReferencesError before reaching suiteRunService", async () => {
           const { service, suiteRunService } = createService({
             llmConfigRepository: {
