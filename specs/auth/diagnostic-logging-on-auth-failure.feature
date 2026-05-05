@@ -8,7 +8,7 @@ Feature: Diagnostic logging on auth failure
     Given the unified auth middleware is mounted on a Hono route
     And a request reaches the middleware
 
-  @unit @unimplemented
+  @unit
   Scenario: extractCredentials returns null because no auth header was sent
     # Partially bound: extractCredentials null-return is verified at
     # api-key/__tests__/auth-middleware.unit.test.ts. WARN emission and
@@ -18,7 +18,7 @@ Feature: Diagnostic logging on auth failure
     And the log line contains userAgent, traceparent, x-forwarded-for, path, method
     And the log line records hasEmptyAuthToken=false (no header at all)
 
-  @unit @unimplemented
+  @unit
   Scenario: extractCredentials returns null because X-Auth-Token was sent empty
     # Partially bound: hasEmptyAuthToken field is verified at
     # api-key/__tests__/auth-middleware.unit.test.ts (collectAuthDiagnostics).
@@ -42,7 +42,7 @@ Feature: Diagnostic logging on auth failure
     When the middleware passes auth
     Then no diagnostic auth-failure log is emitted
 
-  @unit @unimplemented
+  @unit
   Scenario: Diagnostic fields are safe to log
     Then the log NEVER includes the raw token value
     And the log NEVER includes the request body
