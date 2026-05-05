@@ -74,6 +74,12 @@ export APP_PORT=$(find_free_port 5560)
 export BULLBOARD_PORT=$(find_free_port 6380)
 export AI_SERVER_PORT=$(find_free_port 3456)
 
+# Strip any stale http://localhost:<oldport> exports of NEXTAUTH_URL /
+# BASE_HOST so dynamic-port worktrees don't 403 on login (lw#3453). Real
+# overrides (e.g. boxd proxy URLs) are left alone — see comment in helper.
+. "$(dirname "$0")/lib/sanitize-dev-env.sh"
+sanitize_localhost_dev_env
+
 # Load last choice if exists
 LAST=""
 if [ -f "$LAST_CHOICE_FILE" ]; then

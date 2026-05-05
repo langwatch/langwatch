@@ -37,6 +37,7 @@ const SPECS_ROOT = resolve(REPO_ROOT, "specs");
 const DEFAULT_TEST_ROOTS: string[] = [
   "langwatch/src",
   "langwatch/ee",
+  "langwatch/scripts",
   "mcp-server/src",
   "typescript-sdk/src",
   "python-sdk/src",

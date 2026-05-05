@@ -10,6 +10,13 @@
 
 COMPOSE = docker compose -f compose.dev.yml
 
+# Sources scripts/lib/sanitize-dev-env.sh and rewrites stale localhost-pinned
+# NEXTAUTH_URL / BASE_HOST exports to the compose-derived APP_PORT (default
+# 5560). Real overrides like boxd-proxy URLs are left untouched. Prepended
+# to every dev `up` recipe so `make dev*` paths can't silently 403 on login
+# if a previous session leaked the env (lw#3453).
+SANITIZE_DEV_ENV = APP_PORT=$${APP_PORT:-5560} . scripts/lib/sanitize-dev-env.sh && sanitize_localhost_dev_env
+
 # Install git hooks (idempotent, runs automatically before dev targets)
 setup-hooks:
 	@git config core.hooksPath .githooks 2>/dev/null || true
@@ -44,23 +51,23 @@ service-watch:
 
 # Minimal: postgres + redis + clickhouse + app
 dev:
-	$(COMPOSE) up
+	@$(SANITIZE_DEV_ENV) && $(COMPOSE) up
 
 # + NLP service + langevals (for evaluations)
 dev-nlp:
-	$(COMPOSE) --profile nlp up
+	@$(SANITIZE_DEV_ENV) && $(COMPOSE) --profile nlp up
 
 # + scenario worker + bullboard + NLP
 dev-scenarios:
-	$(COMPOSE) --profile scenarios up
+	@$(SANITIZE_DEV_ENV) && $(COMPOSE) --profile scenarios up
 
 # + AI test server (for HTTP agent testing)
 dev-test:
-	$(COMPOSE) --profile test up
+	@$(SANITIZE_DEV_ENV) && $(COMPOSE) --profile test up
 
 # Everything
 dev-full:
-	$(COMPOSE) --profile full up
+	@$(SANITIZE_DEV_ENV) && $(COMPOSE) --profile full up
 
 # Stop all services
 down:
