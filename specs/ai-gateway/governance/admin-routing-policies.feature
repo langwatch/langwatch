@@ -130,6 +130,40 @@ Feature: AI Gateway Governance — Admin RoutingPolicies (decoupled from VK)
       | Set as default       | checkbox                                                                    |
     And the "Providers" picker only shows providers in the current scope or above
 
+  @bdd @ui @routing-policy @admin-drawer @regression
+  Scenario: Provider picker is a structured multi-select, not a free-text CUID input
+    Given the org has connected ModelProviders "Acme Anthropic Prod" + "Acme OpenAI Prod"
+    When carol opens the new-policy drawer
+    Then the "Providers" field renders a multi-select widget that lists those
+        ModelProviders by their human-readable name (NOT by their CUID `mp_…`)
+    And the field is NOT a free-text input
+    And there is NO placeholder hint that suggests a literal slug
+        ("mp_anthropic" or similar) — the literal slug is not a valid value;
+        only the org's actual ModelProvider rows are
+    And selecting a provider from the dropdown sends the corresponding
+        ModelProvider id to `routingPolicy.create` (so the
+        `providerCredentialIds[].belongsToOrg` server check passes)
+
+    # Regression-invariant — Ariana QA G19/G82 caught the implementation
+    # using a free-text input with the literal placeholder `mp_anthropic`,
+    # then `routingPolicy.create` rejecting with 403 "One or more provider
+    # credentials do not belong to this organization" because the literal
+    # slug is not a valid ModelProvider id. The combination with G82 (UI
+    # swallowed the 403) made this a P1 onboarding blocker on fresh orgs:
+    # admins thought the form was broken with no actionable signal. The
+    # spec at the parent scenario already pinned the multi-select shape;
+    # this scenario asserts the implementation matches.
+
+  @bdd @ui @routing-policy @admin-drawer @regression
+  Scenario: tRPC errors on policy create surface as toast or inline message
+    Given carol submits a policy create call that the server rejects (any 4xx)
+    When `routingPolicy.create` returns a tRPC error
+    Then the drawer surfaces the error to the admin via toast or inline alert
+    And the drawer does NOT silently no-op (Ariana QA G82 — pre-fix the
+        drawer stayed open with no toast / inline error / spinner state
+        change, leaving the admin to discover the 403 only by opening
+        DevTools console)
+
   # ---------------------------------------------------------------------------
   # Visibility back to users
   # ---------------------------------------------------------------------------
