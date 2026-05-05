@@ -3,6 +3,19 @@ Feature: Real-time run updates via SSE and adaptive polling
   I want new runs and status changes to appear within about one second
   So that I get near-instant feedback without unnecessary network traffic
 
+  # Parity status: 5 of 13 scenarios bound to existing tests.
+  # Remaining @unimplemented scenarios (#3458):
+  #   8 NO_TEST: shipped behavior, no integration test yet
+  # NO_TEST gaps:
+  #   - "New run appears immediately in suite run history when SSE event fires"
+  #   - "SSE events for a different suite do not trigger refetch"
+  #   - "New run appears immediately in All Runs when SSE event fires"
+  #   - "SSE subscription stays active after Load More in All Runs"
+  #   - "First SSE event triggers immediate refetch"
+  #   - "Rapid SSE events are coalesced into a single refetch"
+  #   - "SSE events are ignored when the browser tab is hidden"
+  #   - "Pending updates are applied when the tab becomes visible again"
+
   Background:
     Given a project with at least one suite
 
@@ -43,19 +56,19 @@ Feature: Real-time run updates via SSE and adaptive polling
 
   # --- Adaptive polling (RunHistoryList) ---
 
-  @unit @unimplemented
+  @unit
   Scenario: Polling interval is fast when runs are in progress
     Given the run data contains rows with PENDING or IN_PROGRESS status
     When the polling interval is computed
     Then it is between 2 and 3 seconds
 
-  @unit @unimplemented
+  @unit
   Scenario: Polling interval is slow when all runs are settled
     Given the run data contains only SUCCESS, FAILED, or ERROR rows
     When the polling interval is computed
     Then it is between 15 and 30 seconds
 
-  @unit @unimplemented
+  @unit
   Scenario: Polling interval returns to fast when a new run starts
     Given the run data previously contained only settled rows
     When a row transitions to IN_PROGRESS status
@@ -63,13 +76,13 @@ Feature: Real-time run updates via SSE and adaptive polling
 
   # --- Adaptive polling (AllRunsPanel) ---
 
-  @unit @unimplemented
+  @unit
   Scenario: All Runs polling interval is fast when any run is active
     Given the All Runs data contains at least one PENDING or IN_PROGRESS row
     When the polling interval is computed
     Then it is between 2 and 3 seconds
 
-  @unit @unimplemented
+  @unit
   Scenario: All Runs polling interval is slow when all runs are settled
     Given the All Runs data contains only settled rows
     When the polling interval is computed

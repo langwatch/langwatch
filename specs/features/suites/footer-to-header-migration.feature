@@ -3,6 +3,19 @@ Feature: Suite table footer info moved to header for clarity
   I want run summary info displayed in the row header instead of a footer
   So that I can immediately see metadata without scrolling past content
 
+  # Parity status: 0 of 8 scenarios bound to existing tests.
+  # Remaining @unimplemented scenarios (#3458):
+  #   8 NO_TEST: shipped behavior, no integration test yet
+  # NO_TEST gaps:
+  #   - "Run row header displays summary counts alongside existing info"
+  #   - "Run row no longer renders a summary footer whether expanded or collapsed"
+  #   - "Group row header additionally displays passed and failed counts"
+  #   - "Group row no longer renders a summary footer whether expanded or collapsed"
+  #   - "Stalled and cancelled counts appear only when non-zero (per-row only)"
+  #   - "Stalled and cancelled counts are hidden when zero"
+  #   - "Run history list shows aggregate totals in table header"
+  #   - "All runs panel shows aggregate totals in table header"
+
   # Previously, run rows and group rows showed summary statistics (total runs,
   # passed, failed, stalled, cancelled counts) in a footer bar below expanded
   # content. The run history list and all-runs panel showed aggregate totals

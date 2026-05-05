@@ -137,6 +137,7 @@ describe("<ScenarioGridCard/>", () => {
   });
 
   describe("when rendered with all data", () => {
+    /** @scenario "Grid card shows scenario name, target, and iteration" */
     it("displays title with target prefix, scenario, and iteration", () => {
       render(
         <ScenarioGridCard
