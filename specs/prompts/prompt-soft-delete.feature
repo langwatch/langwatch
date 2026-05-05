@@ -6,7 +6,7 @@ Feature: Prompt soft-delete
   Background:
     Given I am logged into project "my-project"
 
-  @integration @unimplemented
+  @integration
   Scenario: A user can reuse the handle of an archived prompt for a new prompt
     Given a prompt with handle "support-bot" exists
     And the prompt has been archived
@@ -14,7 +14,7 @@ Feature: Prompt soft-delete
     Then the new prompt is available for use
     And it is independent of the archived prompt
 
-  @integration @unimplemented
+  @integration
   Scenario: A user can sync a fresh prompt from the CLI after the previous one was archived
     Given a prompt with handle "greeter" has been archived
     When I sync a local prompt with handle "greeter" from the CLI
