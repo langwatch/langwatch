@@ -37,6 +37,7 @@ import { toaster } from "~/components/ui/toaster";
 import { useFeatureFlag } from "~/hooks/useFeatureFlag";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api, type RouterOutputs } from "~/utils/api";
+import { docsUrl } from "~/utils/docsUrl";
 
 type Policy = RouterOutputs["routingPolicy"]["list"][number];
 type Scope = "organization" | "team" | "project";
@@ -338,7 +339,7 @@ function RoutingPoliciesPage() {
                     <Plus size={12} /> Add organization default
                   </Button>
                   <Link
-                    href="https://docs.langwatch.ai/ai-gateway/governance/routing-policies"
+                    href={docsUrl("/ai-gateway/governance/routing-policies")}
                     isExternal
                     color="orange.700"
                     fontSize="xs"

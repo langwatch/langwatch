@@ -10,8 +10,29 @@ import {
 import { Check, ChevronDown, ChevronRight, Copy } from "lucide-react";
 import { useState } from "react";
 
+import { getDocsBaseUrl } from "~/utils/docsUrl";
+
 import { TileIcon } from "./TileIcon";
 import type { CodingAssistantConfig } from "./types";
+
+/**
+ * Admins typed the canonical `https://docs.langwatch.ai/...` URL when
+ * curating the catalog — but on a localhost dev install where Mintlify
+ * is also running locally, those clicks should land on the worktree's
+ * docs preview instead of bouncing to production. Rewrite the host
+ * piece transparently at render time so admin-stored URLs round-trip
+ * to whichever docs host matches the user's current control plane.
+ * Foreign URLs (acme-internal docs, public links the admin pasted on
+ * purpose) are returned untouched.
+ */
+function rewriteDocsHostForLocalDev(url: string | undefined): string | undefined {
+  if (!url) return url;
+  const productionPrefix = "https://docs.langwatch.ai";
+  if (!url.startsWith(productionPrefix)) return url;
+  const base = getDocsBaseUrl();
+  if (base === productionPrefix) return url;
+  return base + url.slice(productionPrefix.length);
+}
 
 interface Props {
   displayName: string;
@@ -94,7 +115,7 @@ export function CodingAssistantTile({ displayName, config, iconKey }: Props) {
               alignSelf="start"
             >
               <a
-                href={config.setupDocsUrl}
+                href={rewriteDocsHostForLocalDev(config.setupDocsUrl)}
                 target="_blank"
                 rel="noopener noreferrer"
               >

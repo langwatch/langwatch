@@ -23,6 +23,7 @@ import { EnterpriseLockedSurface } from "~/components/enterprise/EnterpriseLocke
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { Drawer } from "~/components/ui/drawer";
 import { Link } from "~/components/ui/link";
+import { docsUrl } from "~/utils/docsUrl";
 import { toaster } from "~/components/ui/toaster";
 import { useFeatureFlag } from "~/hooks/useFeatureFlag";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -776,7 +777,7 @@ function RuleComposer({
             </Text>
             <Spacer />
             <Link
-              href="https://docs.langwatch.ai/ai-governance/anomaly-rules#threshold-config"
+              href={docsUrl("/ai-governance/anomaly-rules#threshold-config")}
               isExternal
               color="orange.600"
               fontSize="xs"
