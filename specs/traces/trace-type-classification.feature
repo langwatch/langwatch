@@ -260,7 +260,7 @@ Feature: Trace origin classification
   # Leave generic keys (environment, etc.) untouched.
   # TODO(2027): remove this stripping code once all clients are upgraded.
 
-  @unit @unimplemented
+  @unit
   Scenario: Projection strips metadata.platform "optimization_studio" on new traces
     Given a new trace with "langwatch.origin" = "workflow"
     And metadata.platform = "optimization_studio" is set on a span
@@ -268,7 +268,7 @@ Feature: Trace origin classification
     Then the trace summary attributes contain "langwatch.origin" = "workflow"
     And the trace summary attributes do not contain "langwatch.platform"
 
-  @unit @unimplemented
+  @unit
   Scenario: Projection strips metadata.labels "scenario-runner" on new traces
     Given a new trace with "langwatch.origin" = "simulation"
     And metadata.labels contains "scenario-runner"
@@ -276,13 +276,13 @@ Feature: Trace origin classification
     Then the trace summary attributes contain "langwatch.origin" = "simulation"
     And the trace summary attributes do not contain "scenario-runner" in labels
 
-  @unit @unimplemented
+  @unit
   Scenario: Projection preserves user-set metadata.platform values
     Given a trace with metadata.platform = "my-custom-platform"
     When the fold projection processes the span
     Then the trace summary attributes contain "langwatch.platform" = "my-custom-platform"
 
-  @unit @unimplemented
+  @unit
   Scenario: Projection preserves generic metadata keys like environment
     Given a new trace with "langwatch.origin" = "workflow"
     And metadata.environment = "production" is set on a span
@@ -299,34 +299,34 @@ Feature: Trace origin classification
   # sets langwatch.origin. If the root span doesn't set it, the value
   # from child spans is preserved.
 
-  @unit @unimplemented
+  @unit
   Scenario: Origin is hoisted from root span to trace summary
     Given a trace with root span containing "langwatch.origin" = "evaluation"
     And child spans that do not contain "langwatch.origin"
     When the fold projection processes all spans
     Then the trace summary attributes contain "langwatch.origin" = "evaluation"
 
-  @unit @unimplemented
+  @unit
   Scenario: Root span overrides child span origin when it has an opinion
     Given a trace where a child span arrives first with "langwatch.origin" = "evaluation"
     And the root span arrives later with "langwatch.origin" = "simulation"
     When the fold projection processes all spans in arrival order
     Then the trace summary attributes contain "langwatch.origin" = "simulation"
 
-  @unit @unimplemented
+  @unit
   Scenario: Root span without origin preserves child span origin
     Given a trace where a child span sets "langwatch.origin" = "evaluation"
     And the root span arrives later without "langwatch.origin"
     When the fold projection processes all spans in arrival order
     Then the trace summary attributes contain "langwatch.origin" = "evaluation"
 
-  @unit @unimplemented
+  @unit
   Scenario: Traces without any origin attribute remain unset
     Given a trace where no span sets "langwatch.origin"
     When the fold projection processes all spans
     Then the trace summary attributes do not contain key "langwatch.origin"
 
-  @unit @unimplemented
+  @unit
   Scenario: Black-box scenario trace propagates origin through traceparent
     Given a scenario simulation sends a request with traceparent header
     And the root span of the trace has "langwatch.origin" = "simulation"
@@ -350,21 +350,21 @@ Feature: Trace origin classification
   #   7. span attribute evaluation.run_id present → "evaluation"
   #   8. No signal → unset (treated as "application" at query time)
 
-  @unit @unimplemented
+  @unit
   Scenario: Infer origin from instrumentationScope.name "langwatch-evaluation"
     Given a trace from an older Python SDK that does not set "langwatch.origin"
     And the root span has instrumentationScope.name = "langwatch-evaluation"
     When the fold projection processes the span
     Then the trace summary attributes contain "langwatch.origin" = "evaluation"
 
-  @unit @unimplemented
+  @unit
   Scenario: Infer origin from instrumentationScope.name "@langwatch/scenario"
     Given a trace from an older scenario tool that does not set "langwatch.origin"
     And spans have instrumentationScope.name = "@langwatch/scenario"
     When the fold projection processes the spans
     Then the trace summary attributes contain "langwatch.origin" = "simulation"
 
-  @unit @unimplemented
+  @unit
   Scenario: Infer origin from metadata.platform "optimization_studio"
     Given a trace from an older platform version
     And metadata.platform = "optimization_studio" is set
@@ -372,7 +372,7 @@ Feature: Trace origin classification
     When the fold projection processes the span
     Then the trace summary attributes contain "langwatch.origin" = "workflow"
 
-  @unit @unimplemented
+  @unit
   Scenario: Infer origin from metadata.labels containing "scenario-runner"
     Given a trace from an older platform scenario execution
     And metadata.labels contains "scenario-runner"
@@ -380,7 +380,7 @@ Feature: Trace origin classification
     When the fold projection processes the span
     Then the trace summary attributes contain "langwatch.origin" = "simulation"
 
-  @unit @unimplemented
+  @unit
   Scenario: Infer origin from resource attribute scenario.labels
     Given a trace from an older scenario tool
     And resource attributes contain "scenario.labels"
@@ -388,7 +388,7 @@ Feature: Trace origin classification
     When the fold projection processes the span
     Then the trace summary attributes contain "langwatch.origin" = "simulation"
 
-  @unit @unimplemented
+  @unit
   Scenario: Infer origin from span attribute evaluation.run_id
     Given a trace from an older SDK experiment
     And a span contains attribute "evaluation.run_id"
@@ -396,7 +396,7 @@ Feature: Trace origin classification
     When the fold projection processes the span
     Then the trace summary attributes contain "langwatch.origin" = "evaluation"
 
-  @unit @unimplemented
+  @unit
   Scenario: Explicit langwatch.origin takes precedence over all inferred signals
     Given a trace where the root span sets "langwatch.origin" = "evaluation"
     And metadata.platform = "optimization_studio" is also set
