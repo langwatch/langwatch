@@ -204,14 +204,19 @@ export const DefaultProviderSection = ({
               For general tasks within LangWatch
             </Text>
             <ProviderModelSelector
-              model={
-                state.projectDefaultModel?.startsWith(`${provider.provider}/`)
-                  ? state.projectDefaultModel
-                  : (chatOptions[0] ?? "")
-              }
+              model={state.projectDefaultModel ?? ""}
               options={chatOptions}
               onChange={(model) => actions.setProjectDefaultModel(model)}
             />
+            {state.projectDefaultModel &&
+              !state.projectDefaultModel.startsWith(
+                `${provider.provider}/`,
+              ) && (
+                <Text fontSize="xs" color="orange.600" marginTop={1}>
+                  Persisted default belongs to a different provider — pick a{" "}
+                  {providerName} model to switch.
+                </Text>
+              )}
           </Field.Root>
 
           <Field.Root width="full">
@@ -220,18 +225,21 @@ export const DefaultProviderSection = ({
               For generating topic names
             </Text>
             <ProviderModelSelector
-              model={
-                state.projectTopicClusteringModel?.startsWith(
-                  `${provider.provider}/`,
-                )
-                  ? state.projectTopicClusteringModel
-                  : (chatOptions[0] ?? "")
-              }
+              model={state.projectTopicClusteringModel ?? ""}
               options={chatOptions}
               onChange={(model) =>
                 actions.setProjectTopicClusteringModel(model)
               }
             />
+            {state.projectTopicClusteringModel &&
+              !state.projectTopicClusteringModel.startsWith(
+                `${provider.provider}/`,
+              ) && (
+                <Text fontSize="xs" color="orange.600" marginTop={1}>
+                  Persisted default belongs to a different provider — pick a{" "}
+                  {providerName} model to switch.
+                </Text>
+              )}
           </Field.Root>
 
           <Field.Root width="full">
