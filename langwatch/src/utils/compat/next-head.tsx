@@ -2,10 +2,48 @@
  * Compatibility layer: next/head → react-helmet-async
  * Provides a simple Head component that updates document head.
  */
-import { useLayoutEffect, type ReactNode } from "react";
+import { Fragment, isValidElement, useLayoutEffect, type ReactNode } from "react";
 
 interface HeadProps {
   children?: ReactNode;
+}
+
+/**
+ * Recursively flatten title children to a plain string. Handles:
+ *   - strings / numbers → coerce to string
+ *   - arrays → flatten + join
+ *   - React Fragments (<>foo {bar}</>) → recurse into their children
+ *   - other React elements → recurse into their children (best-effort;
+ *     anything not text-shaped is dropped rather than rendered as
+ *     "[object Object]")
+ *
+ * G62: when DashboardLayout renders `<title>{pageTitle ?? <>...</>}</title>`
+ * without a string `pageTitle`, the fallback is a single Fragment element.
+ * The previous `String(c)` path serialised that Fragment as "[object Object]"
+ * and leaked it into document.title for any route that didn't pass the
+ * `pageTitle` prop (settings sub-routes, /me, /-deep links pre-onboarding).
+ */
+export function extractTitleText(node: ReactNode): string {
+  if (node === null || node === undefined || typeof node === "boolean") {
+    return "";
+  }
+  if (typeof node === "string" || typeof node === "number") {
+    return String(node);
+  }
+  if (Array.isArray(node)) {
+    return node.map(extractTitleText).join("");
+  }
+  if (isValidElement(node)) {
+    const props = node.props as { children?: ReactNode } | undefined;
+    if (node.type === Fragment) {
+      return extractTitleText(props?.children);
+    }
+    if (props?.children !== undefined) {
+      return extractTitleText(props.children);
+    }
+    return "";
+  }
+  return "";
 }
 
 /**
@@ -20,19 +58,16 @@ interface HeadProps {
  */
 export default function Head({ children }: HeadProps) {
   useLayoutEffect(() => {
-    // Extract title from children
     if (children) {
       const childArray = Array.isArray(children) ? children : [children];
       for (const child of childArray) {
         if (
-          child &&
-          typeof child === "object" &&
-          "type" in child &&
-          child.type === "title" &&
-          child.props?.children
+          isValidElement(child) &&
+          child.type === "title"
         ) {
-          const c = child.props.children;
-          document.title = Array.isArray(c) ? c.join("") : String(c);
+          const props = child.props as { children?: ReactNode } | undefined;
+          const text = extractTitleText(props?.children).trim();
+          if (text.length > 0) document.title = text;
         }
       }
     }
