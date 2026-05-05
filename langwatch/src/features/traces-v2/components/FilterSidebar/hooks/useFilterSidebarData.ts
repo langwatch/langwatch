@@ -366,13 +366,17 @@ type Descriptors = NonNullable<ReturnType<typeof useTraceFacets>["data"]>;
 function synthesizeDefaultDescriptors(): Descriptors {
   const out: Descriptors[number][] = [];
   for (const [key, values] of Object.entries(FACET_DEFAULTS)) {
+    // Every key in FACET_DEFAULTS (origin, status, spanType, etc.) is a
+    // trace-level field — synthesise them under the "trace" group so the
+    // sidebar can render the well-known section before discover responds.
     out.push({
       kind: "categorical",
       key,
       label: key,
-      group: undefined,
+      group: "trace",
       topValues: values.map((value) => ({ value, count: 0 })),
-    } as Descriptors[number]);
+      totalDistinct: 0,
+    });
   }
   return out;
 }

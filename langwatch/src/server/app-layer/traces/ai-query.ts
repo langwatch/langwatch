@@ -182,11 +182,6 @@ export async function generateTraceAction(
     try {
       const { object } = await generateObject({
         model,
-        // `mode: "json"` forces response_format=json_object across providers
-        // (incl. LiteLLM proxies). OpenAI's API rejects this mode unless the
-        // word "json" appears in the messages — the system prompt already
-        // includes "JSON output rules" below to satisfy that constraint.
-        mode: "json",
         schemaName: "TraceAction",
         schemaDescription:
           "Either an apply_query (filter the current view) or a create_lens (create a saved view) action with a trace query language string.",
