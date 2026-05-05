@@ -98,6 +98,7 @@ describe("validateTagName()", () => {
 
   describe("when name is a protected tag", () => {
     /** @scenario 'Validation rejects creating a tag named "latest"' */
+    /** @scenario 'Cannot create a tag that shadows the protected "latest" tag' */
     it("throws PromptTagValidationError mentioning protected for 'latest'", () => {
       expect(() => validateTagName("latest")).toThrow(
         expect.objectContaining({ name: "PromptTagValidationError", message: expect.stringMatching(/protected/i) }),
@@ -107,6 +108,7 @@ describe("validateTagName()", () => {
 
   describe("when inspecting PROTECTED_TAGS", () => {
     /** @scenario 'Only "latest" is a protected tag' */
+    /** @scenario 'Only "latest" is a protected (built-in) tag' */
     it("contains only 'latest'", () => {
       expect([...PROTECTED_TAGS]).toEqual(["latest"]);
     });
