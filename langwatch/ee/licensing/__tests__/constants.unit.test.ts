@@ -74,6 +74,7 @@ describe("UNLIMITED_PLAN", () => {
 
 describe("FREE_PLAN", () => {
   /** @scenario FREE_PLAN has correct limits for expired/invalid licenses */
+  /** @scenario PlanInfo defaults maxMembers to 1 when not specified */
   it("has the expected fallback limits for expired/invalid licenses", () => {
     expect(FREE_PLAN.type).toBe("FREE");
     expect(FREE_PLAN.name).toBe("Free");
