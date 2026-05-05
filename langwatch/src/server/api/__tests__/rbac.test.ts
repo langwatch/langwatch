@@ -454,6 +454,7 @@ describe("RBAC Permission System", () => {
 
   describe("Permission Retrieval Functions", () => {
     describe("getTeamRolePermissions", () => {
+      /** @scenario "Effective role maps to correct permission grants" */
       it("returns all permissions for ADMIN role", () => {
         const permissions = getTeamRolePermissions(TeamUserRole.ADMIN);
         expect(permissions).toContain("project:view");
