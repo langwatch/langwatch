@@ -75,7 +75,7 @@ Feature: Online Evaluation Preconditions Renewal
   # In-Memory Trace Matching
   # ────────────────────────────────────────────
 
-  @unit @unimplemented
+  @unit
   Scenario: Origin "is" application matches only explicit application origin
     Given a precondition: traces.origin is "application"
     When a trace arrives with langwatch.origin = "application"
@@ -155,7 +155,7 @@ Feature: Online Evaluation Preconditions Renewal
     When a trace arrives with satisfaction_score -0.5
     Then the precondition fails
 
-  @unit @unimplemented
+  @unit
   Scenario: All preconditions must pass (AND logic)
     Given preconditions:
       | field         | rule     | value       |
