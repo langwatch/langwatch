@@ -3,10 +3,7 @@ Feature: Scenario ID format uses full prefix and KSUID
   I want scenario IDs to use the full "scenario" prefix and KSUID generation
   So that IDs are consistent with the project's KSUID naming conventions
 
-  # Parity status: 2 of 3 scenarios bound to existing tests.
-  # The remaining 1 @unimplemented scenario describes shipped behavior
-  # that does not yet have an integration test (#3458):
-  #   - "Synthetic scenario run ID uses \"scenariorun_\" prefix with KSUID"
+  # Parity status: 3 of 3 scenarios bound to existing tests.
 
   Background:
     Given a project exists
@@ -24,7 +21,7 @@ Feature: Scenario ID format uses full prefix and KSUID
     Then it is recognized as a scenario entity
     And scenarios with the legacy "scen_" prefix are also recognized
 
-  @unit @unimplemented
+  @unit
   Scenario: Synthetic scenario run ID uses "scenariorun_" prefix with KSUID
     When a synthetic scenario run ID is generated
     Then it starts with "scenariorun_"
