@@ -340,8 +340,24 @@ describe("aiToolsRouter integration", () => {
         },
       });
       // Re-grant adminUserId on the fresh org so the RBAC gate passes.
+      // Mirrors the suite-level admin setup: OrganizationUser ADMIN +
+      // RoleBinding at ORGANIZATION scope (the rbac middleware reads
+      // both — OrgUser alone isn't enough for `aiTools:manage`).
       await prisma.organizationUser.create({
-        data: { userId: adminUserId, organizationId: freshOrgId, role: "ADMIN" },
+        data: {
+          userId: adminUserId,
+          organizationId: freshOrgId,
+          role: OrganizationUserRole.ADMIN,
+        },
+      });
+      await prisma.roleBinding.create({
+        data: {
+          organizationId: freshOrgId,
+          userId: adminUserId,
+          role: TeamUserRole.ADMIN,
+          scopeType: RoleBindingScopeType.ORGANIZATION,
+          scopeId: freshOrgId,
+        },
       });
 
       try {
@@ -378,6 +394,9 @@ describe("aiToolsRouter integration", () => {
         expect(after).toHaveLength(8);
       } finally {
         await prisma.aiToolEntry
+          .deleteMany({ where: { organizationId: freshOrgId } })
+          .catch(() => undefined);
+        await prisma.roleBinding
           .deleteMany({ where: { organizationId: freshOrgId } })
           .catch(() => undefined);
         await prisma.organizationUser
