@@ -45,7 +45,11 @@ export type AiToolScope = (typeof SUPPORTED_SCOPES)[number];
 
 const codingAssistantConfig = z.object({
   setupCommand: z.string().min(1).max(256),
-  setupDocsUrl: z.string().url().max(2048),
+  // Drawer labels "Setup docs URL (optional)" and only includes the
+  // field in the wire payload when filled. Schema must match — when
+  // required, every catalog publish 400'd with `Required` (Ariana QA
+  // admin-hat #2). Type label says optional, behavior should too.
+  setupDocsUrl: z.string().url().max(2048).optional(),
   helperText: z.string().max(2048).optional(),
 });
 
@@ -114,6 +118,113 @@ function toDto(row: {
     config: (row.config as Record<string, unknown>) ?? {},
   };
 }
+
+/**
+ * The starter pack documented in docs/ai-governance/personal-portal/
+ * admin-catalog.mdx §"Starter pack" — a sensible default set that gives
+ * a fresh org an immediately useful /me portal grid. Coding assistants
+ * point at the `langwatch <tool>` device-flow command; model providers
+ * carry a `providerKey` slug so the user-side click-to-expand can mint
+ * a personal VK against the right backend without further admin input.
+ *
+ * External tools deliberately omitted — admins fill those in per-org
+ * with internal links (no useful default exists across orgs).
+ */
+const STARTER_PACK_TILES: ReadonlyArray<{
+  type: AiToolType;
+  slug: string;
+  displayName: string;
+  iconKey?: string;
+  config: Record<string, unknown>;
+}> = [
+  {
+    type: "coding_assistant",
+    slug: "claude-code",
+    displayName: "Claude Code",
+    iconKey: "claude-code",
+    config: {
+      setupCommand: "langwatch claude",
+      setupDocsUrl:
+        "https://docs.langwatch.ai/ai-governance/personal-portal/end-user",
+      helperText: "Run from your terminal to provision a VK and launch Claude Code.",
+    },
+  },
+  {
+    type: "coding_assistant",
+    slug: "copilot",
+    displayName: "GitHub Copilot",
+    iconKey: "copilot",
+    config: {
+      setupCommand: "langwatch copilot",
+      setupDocsUrl:
+        "https://docs.langwatch.ai/ai-governance/personal-portal/end-user",
+    },
+  },
+  {
+    type: "coding_assistant",
+    slug: "cursor",
+    displayName: "Cursor",
+    iconKey: "cursor",
+    config: {
+      setupCommand: "langwatch cursor",
+      setupDocsUrl:
+        "https://docs.langwatch.ai/ai-governance/personal-portal/end-user",
+    },
+  },
+  {
+    type: "coding_assistant",
+    slug: "codex",
+    displayName: "Codex",
+    iconKey: "codex",
+    config: {
+      setupCommand: "langwatch codex",
+      setupDocsUrl:
+        "https://docs.langwatch.ai/ai-governance/personal-portal/end-user",
+    },
+  },
+  {
+    type: "model_provider",
+    slug: "openai",
+    displayName: "OpenAI",
+    iconKey: "openai",
+    config: {
+      providerKey: "openai",
+      defaultLabel: "OpenAI key",
+      projectSuggestionText:
+        "Building an app? Create a project to track its usage separately.",
+    },
+  },
+  {
+    type: "model_provider",
+    slug: "anthropic",
+    displayName: "Anthropic",
+    iconKey: "anthropic",
+    config: {
+      providerKey: "anthropic",
+      defaultLabel: "Anthropic key",
+    },
+  },
+  {
+    type: "model_provider",
+    slug: "bedrock",
+    displayName: "AWS Bedrock",
+    iconKey: "bedrock",
+    config: {
+      providerKey: "bedrock",
+      defaultLabel: "Bedrock key",
+    },
+  },
+  {
+    type: "model_provider",
+    slug: "gemini",
+    displayName: "Google Gemini",
+    iconKey: "gemini",
+    config: {
+      providerKey: "gemini",
+      defaultLabel: "Gemini key",
+    },
+  },
+];
 
 export class AiToolEntryService {
   constructor(private readonly prisma: PrismaClient) {}
@@ -301,6 +412,65 @@ export class AiToolEntryService {
       data: { archivedAt: new Date(), enabled: false },
     });
     return toDto(row);
+  }
+
+  /**
+   * Seed the documented starter pack onto an org's catalog (Phase 7
+   * "fresh-org friction killer" per docs/ai-governance/personal-portal/
+   * admin-catalog.mdx). Idempotent: skips any tile whose `slug` is
+   * already published as an org-scoped entry — admins who already
+   * curated their catalog by hand and then click "Import starter pack"
+   * just get filled-in gaps, never duplicates or re-skinned tiles.
+   *
+   * Returns the count of tiles actually created so the UI can report
+   * "imported N tiles" or "starter pack already in place" correctly.
+   */
+  async seedStarterPack(input: {
+    organizationId: string;
+    actorUserId?: string | null;
+  }): Promise<{ created: number; skipped: number }> {
+    const existing = await this.prisma.aiToolEntry.findMany({
+      where: {
+        organizationId: input.organizationId,
+        scope: "organization",
+        scopeId: input.organizationId,
+      },
+      select: { slug: true },
+    });
+    const taken = new Set(existing.map((e) => e.slug));
+
+    const tiles = STARTER_PACK_TILES.filter((t) => !taken.has(t.slug));
+    if (tiles.length === 0) {
+      return { created: 0, skipped: STARTER_PACK_TILES.length };
+    }
+
+    await this.prisma.$transaction(
+      tiles.map((tile, index) =>
+        this.prisma.aiToolEntry.create({
+          data: {
+            organizationId: input.organizationId,
+            scope: "organization",
+            scopeId: input.organizationId,
+            type: tile.type,
+            displayName: tile.displayName,
+            slug: tile.slug,
+            iconKey: tile.iconKey ?? null,
+            // Append after any tiles the admin already created — keeps
+            // their hand-curated order on top.
+            order: existing.length + index,
+            enabled: true,
+            config: tile.config as Prisma.InputJsonValue,
+            createdById: input.actorUserId ?? null,
+            updatedById: input.actorUserId ?? null,
+          },
+        }),
+      ),
+    );
+
+    return {
+      created: tiles.length,
+      skipped: STARTER_PACK_TILES.length - tiles.length,
+    };
   }
 
   /**

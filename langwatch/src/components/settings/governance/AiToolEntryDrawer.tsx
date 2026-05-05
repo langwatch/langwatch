@@ -307,7 +307,7 @@ export function AiToolEntryDrawer({ organizationId, state, onClose }: Props) {
             <FormSection label="Display name">
               <Input
                 size="sm"
-                placeholder="Claude Code"
+                placeholder="e.g. Claude Code"
                 value={form.displayName}
                 onChange={(e) =>
                   setForm({ ...form, displayName: e.target.value })
@@ -321,7 +321,7 @@ export function AiToolEntryDrawer({ organizationId, state, onClose }: Props) {
             >
               <Input
                 size="sm"
-                placeholder="claude-code"
+                placeholder="e.g. claude-code"
                 value={form.slug}
                 onChange={(e) => setForm({ ...form, slug: e.target.value })}
               />
@@ -450,7 +450,7 @@ function CodingAssistantFields({
       <FormSection label="Setup command">
         <Input
           size="sm"
-          placeholder="langwatch claude"
+          placeholder="e.g. langwatch claude"
           value={form.setupCommand}
           onChange={(e) =>
             setForm({ ...form, setupCommand: e.target.value })
@@ -495,7 +495,7 @@ function ModelProviderFields({
       >
         <Input
           size="sm"
-          placeholder="anthropic"
+          placeholder="e.g. anthropic"
           value={form.providerKey}
           onChange={(e) => setForm({ ...form, providerKey: e.target.value })}
         />

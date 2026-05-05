@@ -316,6 +316,91 @@ describe("aiToolsRouter integration", () => {
     });
   });
 
+  describe("importStarterPack", () => {
+    it("seeds the documented default tile set into a fresh org's catalog", async () => {
+      // Use a brand-new org so the starter pack has a clean slate
+      // (the suite-level org is reused across tests so it accumulates
+      // state — picking a fresh one here keeps assertions stable on
+      // exactly the starter set).
+      const freshOrgId = `starter-org-${nanoid(8)}`;
+      const freshTeamId = `starter-team-${nanoid(8)}`;
+      await prisma.organization.create({
+        data: {
+          id: freshOrgId,
+          name: `Starter ${nanoid(4)}`,
+          slug: `starter-${nanoid(6)}`,
+        },
+      });
+      await prisma.team.create({
+        data: {
+          id: freshTeamId,
+          name: `Starter Team ${nanoid(4)}`,
+          slug: `starter-team-${nanoid(6)}`,
+          organizationId: freshOrgId,
+        },
+      });
+      // Re-grant adminUserId on the fresh org so the RBAC gate passes.
+      await prisma.organizationUser.create({
+        data: { userId: adminUserId, organizationId: freshOrgId, role: "ADMIN" },
+      });
+
+      try {
+        const result = await callerFor(adminUserId).aiTools.importStarterPack({
+          organizationId: freshOrgId,
+        });
+        expect(result.created).toBe(8); // 4 coding assistants + 4 model providers
+        expect(result.skipped).toBe(0);
+
+        const adminList = await callerFor(adminUserId).aiTools.adminList({
+          organizationId: freshOrgId,
+        });
+        const slugs = adminList.map((e) => e.slug).sort();
+        expect(slugs).toEqual([
+          "anthropic",
+          "bedrock",
+          "claude-code",
+          "codex",
+          "copilot",
+          "cursor",
+          "gemini",
+          "openai",
+        ]);
+
+        // Idempotency: re-importing must not duplicate.
+        const second = await callerFor(adminUserId).aiTools.importStarterPack({
+          organizationId: freshOrgId,
+        });
+        expect(second.created).toBe(0);
+        expect(second.skipped).toBe(8);
+        const after = await callerFor(adminUserId).aiTools.adminList({
+          organizationId: freshOrgId,
+        });
+        expect(after).toHaveLength(8);
+      } finally {
+        await prisma.aiToolEntry
+          .deleteMany({ where: { organizationId: freshOrgId } })
+          .catch(() => undefined);
+        await prisma.organizationUser
+          .deleteMany({ where: { organizationId: freshOrgId } })
+          .catch(() => undefined);
+        await prisma.team
+          .deleteMany({ where: { id: freshTeamId } })
+          .catch(() => undefined);
+        await prisma.organization
+          .deleteMany({ where: { id: freshOrgId } })
+          .catch(() => undefined);
+      }
+    });
+
+    it("rejects MEMBER callers — manage-permission required", async () => {
+      await expect(
+        callerFor(memberPlatformUserId).aiTools.importStarterPack({
+          organizationId,
+        }),
+      ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+    });
+  });
+
   describe("setEnabled + archive", () => {
     it("setEnabled toggles visibility on the user-facing list", async () => {
       const adminCaller = callerFor(adminUserId);

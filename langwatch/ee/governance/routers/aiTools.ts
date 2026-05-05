@@ -209,6 +209,28 @@ export const aiToolsRouter = createTRPCRouter({
       });
     }),
 
+  /**
+   * One-click "import starter pack" — publishes the documented default
+   * tile set (4 coding assistants + 4 model providers, all org-scoped)
+   * onto a fresh org's catalog. Idempotent: re-imports skip slugs the
+   * admin already has, so re-clicking after partial setup just fills
+   * gaps without duplicating or re-skinning hand-curated entries.
+   *
+   * Closes the docs/code mismatch surfaced in the proper-governance
+   * dogfood (admin-catalog.mdx promised the CTA, code didn't ship the
+   * handler).
+   */
+  importStarterPack: protectedProcedure
+    .input(z.object({ organizationId: z.string() }))
+    .use(checkOrganizationPermission("aiTools:manage"))
+    .mutation(async ({ ctx, input }) => {
+      const service = AiToolEntryService.create(ctx.prisma);
+      return await service.seedStarterPack({
+        organizationId: input.organizationId,
+        actorUserId: ctx.session.user.id,
+      });
+    }),
+
   reorder: protectedProcedure
     .input(
       z.object({

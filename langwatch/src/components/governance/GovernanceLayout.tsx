@@ -9,6 +9,7 @@ import {
 import {
   AlertTriangle,
   Eye,
+  PackageOpen,
   PlugZap,
   Route,
 } from "lucide-react";
@@ -88,6 +89,13 @@ export default function GovernanceLayout({
                   icon={<Route size={14} />}
                 >
                   Routing Policies
+                </MenuLink>
+                <MenuLink
+                  href="/settings/governance/tool-catalog"
+                  includePath="/settings/governance/tool-catalog"
+                  icon={<PackageOpen size={14} />}
+                >
+                  Tool Catalog
                 </MenuLink>
               </VStack>
               <Box paddingX={3} paddingTop={4}>
