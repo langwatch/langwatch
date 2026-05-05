@@ -438,6 +438,58 @@ describe("RoutingPolicyService", () => {
       });
     });
 
+    describe("when create() supplies an empty providerCredentialIds (EC3)", () => {
+      it("throws RoutingPolicyMustHaveProviderError — empty chains fail closed silently otherwise", async () => {
+        await expect(
+          service.create({
+            organizationId: ORG_ID,
+            scope: "organization",
+            scopeId: ORG_ID,
+            name: `empty-create-${suffix}`,
+            providerCredentialIds: [],
+            isDefault: false,
+            actorUserId: USER_ID,
+          }),
+        ).rejects.toMatchObject({
+          name: "RoutingPolicyMustHaveProviderError",
+          code: "routing_policy_must_have_provider",
+        });
+      });
+    });
+
+    describe("when update() supplies an empty providerCredentialIds (EC3)", () => {
+      it("throws RoutingPolicyMustHaveProviderError — clearing the chain isn't allowed", async () => {
+        const seed = await service.create({
+          organizationId: ORG_ID,
+          scope: "organization",
+          scopeId: ORG_ID,
+          name: `empty-update-${suffix}`,
+          providerCredentialIds: [CRED_1],
+          isDefault: false,
+          actorUserId: USER_ID,
+        });
+
+        await expect(
+          service.update({
+            id: seed.id,
+            organizationId: ORG_ID,
+            providerCredentialIds: [],
+            actorUserId: USER_ID,
+          }),
+        ).rejects.toMatchObject({
+          name: "RoutingPolicyMustHaveProviderError",
+          code: "routing_policy_must_have_provider",
+        });
+
+        // The chain on disk must still be the original — partial-overwrite
+        // safety just like the cross-org test above.
+        const after = await prisma.routingPolicy.findUnique({
+          where: { id: seed.id },
+        });
+        expect(after?.providerCredentialIds).toEqual([CRED_1]);
+      });
+    });
+
     describe("when update() omits providerCredentialIds entirely", () => {
       it("skips the validation (name-only edit must not require chain re-check)", async () => {
         const seed = await service.create({

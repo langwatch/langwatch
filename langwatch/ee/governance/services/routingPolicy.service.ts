@@ -22,6 +22,21 @@ import { TRPCError } from "@trpc/server";
 
 export type RoutingPolicyScope = "organization" | "team" | "project";
 
+/**
+ * EC#3 — a routing policy must reference at least one provider
+ * credential. An empty `providerCredentialIds` produces a policy that
+ * silently fails closed at materialise-time (chain length 0) without
+ * a clear admin signal. The router maps this to 422 with the
+ * `routing_policy_must_have_provider` code.
+ */
+export class RoutingPolicyMustHaveProviderError extends Error {
+  readonly code = "routing_policy_must_have_provider" as const;
+  constructor(message = "Routing policy must include at least one provider credential") {
+    super(message);
+    this.name = "RoutingPolicyMustHaveProviderError";
+  }
+}
+
 export interface CreateRoutingPolicyInput {
   organizationId: string;
   scope: RoutingPolicyScope;
@@ -80,6 +95,9 @@ export class RoutingPolicyService {
     // queries scope='organization' (lowercase) so any uppercase row
     // becomes silently invisible. Lowercase here as belt-and-suspenders.
     const scope = input.scope.toLowerCase() as RoutingPolicyScope;
+    if (input.providerCredentialIds.length === 0) {
+      throw new RoutingPolicyMustHaveProviderError();
+    }
     await this.assertProviderCredentialsBelongToOrg(
       input.organizationId,
       input.providerCredentialIds,
@@ -122,6 +140,9 @@ export class RoutingPolicyService {
   async update(input: UpdateRoutingPolicyInput): Promise<RoutingPolicy> {
     const existing = await this.requireOwn(input.id, input.organizationId);
     if (input.providerCredentialIds !== undefined) {
+      if (input.providerCredentialIds.length === 0) {
+        throw new RoutingPolicyMustHaveProviderError();
+      }
       await this.assertProviderCredentialsBelongToOrg(
         input.organizationId,
         input.providerCredentialIds,
