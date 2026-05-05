@@ -100,7 +100,7 @@ Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators, Scenarios, 
     Then the request fails with FORBIDDEN
     And the error message contains "maximum number of prompts"
 
-  @integration @unimplemented
+  @integration
   Scenario: Counts prompts across all projects in organization
     Given the organization has a license with maxPrompts 3
     And project "proj-A" has 2 prompts
@@ -127,7 +127,7 @@ Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators, Scenarios, 
     Then the request fails with FORBIDDEN
     And the error message contains "maximum number of evaluators"
 
-  @integration @unimplemented
+  @integration
   Scenario: Counts evaluators across all projects in organization
     Given the organization has a license with maxEvaluators 3
     And project "proj-A" has 2 evaluators
@@ -162,7 +162,7 @@ Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators, Scenarios, 
     Then the request fails with FORBIDDEN
     And the error message contains "maximum number of scenarios"
 
-  @integration @unimplemented
+  @integration
   Scenario: Counts scenarios across all projects in organization
     Given the organization has a license with maxScenarios 3
     And project "proj-A" has 2 scenarios
