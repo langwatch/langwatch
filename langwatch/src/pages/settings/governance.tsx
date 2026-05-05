@@ -247,54 +247,14 @@ function GovernanceOverviewPage() {
           </SimpleGrid>
         )}
 
-        <SectionCard
-          title="Ingestion sources"
-          subline="External AI platforms reporting activity to LangWatch."
-        >
-          {sourceHealth.length === 0 ? (
-            <VStack align="start" gap={2}>
-              <Text color="fg.muted" fontSize="sm">
-                No ingestion sources configured.
-              </Text>
-              <Link
-                href="/settings/governance/ingestion-sources"
-                color="orange.600"
-              >
-                + Add a source
-              </Link>
-            </VStack>
-          ) : (
-            <HStack gap={3} wrap="wrap">
-              {sourceHealth.map((src) => (
-                <SourceChip key={src.id} source={src} />
-              ))}
-            </HStack>
-          )}
-        </SectionCard>
-
-        <SectionCard
-          title="Recent anomalies"
-          subline="Cross-source rules that fired and haven't been acknowledged."
-          aria-live="polite"
-        >
-          {anomalies.length === 0 ? (
-            <Text color="fg.muted" fontSize="sm">
-              {hasTraffic
-                ? "All quiet — no active alerts."
-                : "Available when the detection backend ships."}
-            </Text>
-          ) : (
-            <VStack align="stretch" gap={2}>
-              {anomalies.map((a) => (
-                <AnomalyRow key={a.id} alert={a} />
-              ))}
-            </VStack>
-          )}
-        </SectionCard>
-
-        <SessionPolicySection organizationId={orgId} />
-
-        <ContentModeSection organizationId={orgId} />
+        {/*
+         * Monitoring sections lead the page when populated — admin's
+         * daily-driver answer to "what happened, where, who" without
+         * scrolling past config knobs. Config (CLI session TTL +
+         * content-logging mode) lives below as occasional-touch
+         * controls. Setup checklist + empty-state ingestion-sources
+         * placeholder render above when there's no traffic yet.
+         */}
 
         <SectionCard
           title="By team"
@@ -331,6 +291,55 @@ function GovernanceOverviewPage() {
             </VStack>
           )}
         </SectionCard>
+
+        <SectionCard
+          title="Recent anomalies"
+          subline="Cross-source rules that fired and haven't been acknowledged."
+          aria-live="polite"
+        >
+          {anomalies.length === 0 ? (
+            <Text color="fg.muted" fontSize="sm">
+              {hasTraffic
+                ? "All quiet — no active alerts."
+                : "Available when the detection backend ships."}
+            </Text>
+          ) : (
+            <VStack align="stretch" gap={2}>
+              {anomalies.map((a) => (
+                <AnomalyRow key={a.id} alert={a} />
+              ))}
+            </VStack>
+          )}
+        </SectionCard>
+
+        <SectionCard
+          title="Ingestion sources"
+          subline="External AI platforms reporting activity to LangWatch."
+        >
+          {sourceHealth.length === 0 ? (
+            <VStack align="start" gap={2}>
+              <Text color="fg.muted" fontSize="sm">
+                No ingestion sources configured.
+              </Text>
+              <Link
+                href="/settings/governance/ingestion-sources"
+                color="orange.600"
+              >
+                + Add a source
+              </Link>
+            </VStack>
+          ) : (
+            <HStack gap={3} wrap="wrap">
+              {sourceHealth.map((src) => (
+                <SourceChip key={src.id} source={src} />
+              ))}
+            </HStack>
+          )}
+        </SectionCard>
+
+        <SessionPolicySection organizationId={orgId} />
+
+        <ContentModeSection organizationId={orgId} />
       </VStack>
     </GovernanceLayout>
   );
