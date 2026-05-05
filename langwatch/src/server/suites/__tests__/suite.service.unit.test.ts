@@ -167,6 +167,7 @@ describe("SuiteService", () => {
     });
 
     describe("given 2 scenarios, 1 target, and repeat count 3", () => {
+      /** @scenario "Suite run respects repeat count" */
       it("returns 6 jobs", () => {
         const result = SuiteService.calculateJobCount({
           scenarioCount: 2,
