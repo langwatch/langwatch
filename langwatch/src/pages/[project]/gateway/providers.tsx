@@ -33,6 +33,7 @@ import { modelProviderIcons } from "~/server/modelProviders/iconsMap";
 type ProviderRow = {
   id: string;
   modelProviderName: string;
+  modelProviderEnabled: boolean;
   slot: string;
   rateLimitRpm: number | null;
   rateLimitTpm: number | null;
@@ -169,9 +170,22 @@ function ProvidersPage() {
                             {icon}
                           </Box>
                           <VStack align="start" gap={0}>
-                            <Text fontWeight="medium">
-                              {row.modelProviderName}
-                            </Text>
+                            <HStack gap={2}>
+                              <Text fontWeight="medium">
+                                {row.modelProviderName}
+                              </Text>
+                              {!row.modelProviderEnabled && (
+                                <Tooltip content="The underlying ModelProvider is disabled in Settings → Model Providers. Routing through this binding will fail until it's re-enabled.">
+                                  <Badge
+                                    size="sm"
+                                    colorPalette="orange"
+                                    variant="subtle"
+                                  >
+                                    Provider disabled
+                                  </Badge>
+                                </Tooltip>
+                              )}
+                            </HStack>
                             {row.disabledAt && (
                               <Text fontSize="2xs" color="fg.muted">
                                 disabled{" "}

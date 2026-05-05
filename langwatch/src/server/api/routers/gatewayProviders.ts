@@ -39,6 +39,7 @@ export const gatewayProvidersRouter = createTRPCRouter({
         id: row.id,
         modelProviderId: row.modelProviderId,
         modelProviderName: row.modelProvider.provider,
+        modelProviderEnabled: row.modelProvider.enabled,
         slot: row.slot,
         rateLimitRpm: row.rateLimitRpm,
         rateLimitTpm: row.rateLimitTpm,
@@ -68,10 +69,34 @@ export const gatewayProvidersRouter = createTRPCRouter({
         projectId: row.projectId,
         modelProviderId: row.modelProviderId,
         modelProviderName: row.modelProvider.provider,
+        modelProviderEnabled: row.modelProvider.enabled,
         slot: row.slot,
         healthStatus: row.healthStatus,
         disabledAt: row.disabledAt?.toISOString() ?? null,
       }));
+    }),
+
+  /**
+   * G88 — count active gateway bindings pointing at a given ModelProvider,
+   * scoped to the org (ModelProvider rows are org-/team-/project-scoped, so
+   * a single MP can be bound across multiple projects in the org). Used by
+   * /settings/model-providers' disable dialog to warn the admin that
+   * disabling will leave bindings in an unusable state.
+   */
+  countByModelProvider: protectedProcedure
+    .input(
+      z.object({
+        organizationId: z.string(),
+        modelProviderId: z.string(),
+      }),
+    )
+    .use(checkOrganizationPermission("organization:manage"))
+    .query(async ({ ctx, input }) => {
+      const service = GatewayProviderCredentialService.create(ctx.prisma);
+      const rows = await service.getAllForOrg(input.organizationId);
+      return rows.filter(
+        (row) => row.modelProviderId === input.modelProviderId,
+      ).length;
     }),
 
   create: protectedProcedure

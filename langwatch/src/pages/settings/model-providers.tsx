@@ -60,6 +60,25 @@ export default function ModelsPage() {
     name: string;
   } | null>(null);
 
+  // G88 — surface how many gateway bindings would be left orphaned by
+  // disabling this provider. The "Delete Provider" action is misnamed
+  // (it sets enabled:false rather than deleting), so the cascade
+  // semantics that Prisma's onDelete:Cascade would have applied to
+  // GatewayProviderCredential never fire. Without the count below, the
+  // admin had no signal that downstream gateway routes would silently
+  // break.
+  const gatewayBindingsCountQuery = api.gatewayProviders.countByModelProvider.useQuery(
+    {
+      organizationId: organization?.id ?? "",
+      modelProviderId: providerToDisable?.id ?? "",
+    },
+    {
+      enabled: !!organization?.id && !!providerToDisable?.id,
+      refetchOnWindowFocus: false,
+    },
+  );
+  const gatewayBindingsCount = gatewayBindingsCountQuery.data ?? 0;
+
   const enabledProviders = useMemo(() => {
     if (!providers) return [];
     return Object.values(providers).filter((provider) => provider.enabled);
@@ -276,7 +295,7 @@ export default function ModelsPage() {
                           >
                             <Box display="flex" alignItems="center" gap={2}>
                               <Trash2 size={14} />
-                              Delete Provider
+                              Disable Provider
                             </Box>
                           </Menu.Item>
                         </Menu.Content>
@@ -301,7 +320,7 @@ export default function ModelsPage() {
         >
           <Dialog.Content>
             <Dialog.Header>
-              <Dialog.Title>Delete {providerToDisable?.name}?</Dialog.Title>
+              <Dialog.Title>Disable {providerToDisable?.name}?</Dialog.Title>
             </Dialog.Header>
             <Dialog.Body>
               {providerToDisable &&
@@ -309,10 +328,10 @@ export default function ModelsPage() {
                 <VStack gap={3} align="start">
                   <Text>
                     This provider is currently being used for one or more
-                    default models and cannot be deleted.
+                    default models and cannot be disabled.
                   </Text>
                   <Text fontWeight="medium">
-                    Please change the following before deleting:
+                    Please change the following before disabling:
                   </Text>
                   <VStack gap={2} align="start" paddingLeft={4}>
                     {isProviderUsedForDefaultModels(
@@ -336,7 +355,33 @@ export default function ModelsPage() {
                   </VStack>
                 </VStack>
               ) : (
-                <Text>This provider will no longer be available for use.</Text>
+                <VStack gap={3} align="start">
+                  <Text>This provider will no longer be available for use.</Text>
+                  {gatewayBindingsCount > 0 && (
+                    <Box
+                      borderWidth="1px"
+                      borderColor="orange.300"
+                      borderRadius="md"
+                      backgroundColor="orange.50"
+                      padding={3}
+                      width="full"
+                    >
+                      <Text fontSize="sm" fontWeight="semibold" color="orange.800">
+                        {gatewayBindingsCount}{" "}
+                        {gatewayBindingsCount === 1
+                          ? "gateway binding"
+                          : "gateway bindings"}{" "}
+                        will become unusable
+                      </Text>
+                      <Text fontSize="xs" color="orange.700" marginTop={1}>
+                        Routing policies and virtual keys that route through
+                        this provider will start failing. Re-enable the
+                        provider, or remove the bindings on the AI Gateway →
+                        Providers page first.
+                      </Text>
+                    </Box>
+                  )}
+                </VStack>
               )}
             </Dialog.Body>
             <Dialog.Footer>
@@ -364,7 +409,7 @@ export default function ModelsPage() {
                   await refetch();
                 }}
               >
-                Delete
+                Disable
               </Button>
             </Dialog.Footer>
             <Dialog.CloseTrigger />
