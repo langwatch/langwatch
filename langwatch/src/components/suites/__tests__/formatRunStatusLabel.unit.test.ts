@@ -74,6 +74,7 @@ describe("formatRunStatusLabel()", () => {
     });
 
     describe("when the run has zero criteria", () => {
+      /** @scenario Run with zero criteria shows status without count */
       it("returns 'failed' without count", () => {
         const result = formatRunStatusLabel({
           status: ScenarioRunStatus.FAILED,

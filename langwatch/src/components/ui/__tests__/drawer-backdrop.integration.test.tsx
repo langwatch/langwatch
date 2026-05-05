@@ -29,6 +29,7 @@ describe("DrawerContent transparency", () => {
   afterEach(cleanup);
 
   describe("when a drawer opens", () => {
+    /** @scenario Drawer content panel applies blur filter and transparency */
     it("renders the drawer content panel", () => {
       renderDrawer();
 
