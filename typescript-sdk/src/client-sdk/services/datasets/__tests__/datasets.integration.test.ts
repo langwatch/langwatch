@@ -557,6 +557,37 @@ describe("Feature: Dataset TypeScript SDK", () => {
         ).rejects.toThrow(DatasetNotFoundError);
       });
     });
+
+    describe("when called with explicit pagination", () => {
+      let capturedUrl: URL | undefined;
+
+      beforeEach(() => {
+        capturedUrl = undefined;
+        server.use(
+          http.get(
+            `${TEST_ENDPOINT}/api/dataset/:slugOrId/records`,
+            ({ request }) => {
+              capturedUrl = new URL(request.url);
+              return HttpResponse.json({
+                data: [],
+                pagination: { page: 2, limit: 20, total: 0, totalPages: 0 },
+              });
+            },
+          ),
+        );
+      });
+
+      /** @scenario "List records with explicit pagination" */
+      it("includes page and limit query parameters in the request", async () => {
+        await langwatch.datasets.listRecords("my-data", {
+          page: 2,
+          limit: 20,
+        });
+
+        expect(capturedUrl?.searchParams.get("page")).toBe("2");
+        expect(capturedUrl?.searchParams.get("limit")).toBe("20");
+      });
+    });
   });
 
   // ── Upload (unified with ifExists strategy) ────────────────────

@@ -3,11 +3,8 @@ Feature: Dataset TypeScript SDK
   I want full CRUD access to datasets and records through the SDK client
   So that I can programmatically manage datasets without using the REST API directly
 
-  # 31 of 32 scenarios are bound to integration/unit tests in
+  # 32 of 32 scenarios bound to integration/unit tests in
   # typescript-sdk/src/client-sdk/services/datasets/__tests__/.
-  # The 1 remaining @unimplemented scenario is a gap in test coverage:
-  #   - "List records with explicit pagination"
-  # Tracked under #3458.
 
   Background:
     Given a LangWatch client initialized with a valid API key
@@ -172,7 +169,7 @@ Feature: Dataset TypeScript SDK
     When I call langwatch.datasets.listRecords("my-data")
     Then I receive records with pagination metadata including total, page, limit, and totalPages
 
-  @integration @unimplemented
+  @integration
   Scenario: List records with explicit pagination
     When I call langwatch.datasets.listRecords("my-data", { page: 2, limit: 20 })
     Then the request includes page=2 and limit=20 query parameters
