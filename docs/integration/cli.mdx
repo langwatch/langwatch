@@ -20,6 +20,9 @@ Or run any command with `npx`:
 npx langwatch --help
 ```
 
+For pnpm / yarn equivalents, self-hosted endpoint pre-config, and
+enterprise-network notes, see the [full install guide](/integration/install).
+
 ## Authenticate
 
 Sign in once and the CLI saves your API key to `.env` in the current directory:
@@ -43,7 +46,18 @@ export LANGWATCH_ENDPOINT=https://langwatch.mycompany.com
 langwatch login
 ```
 
-The `authorize` flow, docs fetcher, and every API call will automatically use that endpoint. Add `LANGWATCH_ENDPOINT` to your `.env` so it persists.
+The `authorize` flow, docs fetcher, and every API call will automatically use that endpoint. Add `LANGWATCH_ENDPOINT` to your `.env` so it persists across sessions, or to your shell profile (`~/.zshrc`, `~/.bashrc`) so it's available globally.
+
+For one-off commands against a different endpoint without exporting:
+
+```bash
+LANGWATCH_ENDPOINT=https://langwatch.mycompany.com langwatch trace search
+```
+
+The dashboard's "Install CLI" empty-state cards (`/me`, `/me/sessions`,
+governance setup checklist) auto-detect the deployment URL and render
+copy-paste commands with the endpoint pre-filled — handy for onboarding
+your team without each member needing to remember the URL.
 
 ### Letting an agent do it
 
