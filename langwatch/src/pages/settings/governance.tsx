@@ -22,6 +22,7 @@ import numeral from "numeral";
 import Head from "~/utils/compat/next-head";
 
 import GovernanceLayout from "~/components/governance/GovernanceLayout";
+import { SpendByTeamBar } from "~/components/governance/SpendByTeamBar";
 import { InstallCliCard } from "~/components/me/InstallCliCard";
 import { LoadingScreen } from "~/components/LoadingScreen";
 import { NotFoundScene } from "~/components/NotFoundScene";
@@ -31,6 +32,7 @@ import { toaster } from "~/components/ui/toaster";
 import { useFeatureFlag } from "~/hooks/useFeatureFlag";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api, type RouterOutputs } from "~/utils/api";
+import { getChartColorForName } from "~/utils/governanceChartColors";
 
 /**
  * Org-admin overview of AI governance state — spend, users, anomalies,
@@ -260,6 +262,12 @@ function GovernanceOverviewPage() {
          * controls. Setup checklist + empty-state ingestion-sources
          * placeholder render above when there's no traffic yet.
          */}
+
+        {teams.length > 0 && (
+          <SectionCard title="Spend share across teams">
+            <SpendByTeamBar teams={teams} />
+          </SectionCard>
+        )}
 
         <SectionCard
           title="Top teams by spend"
@@ -896,6 +904,7 @@ function TrendCell({
 
 function TeamRow({ team }: { team: SpendByTeam }) {
   const isOrgWide = !team.teamId;
+  const dotColor = isOrgWide ? "#94a3b8" : getChartColorForName(team.teamName);
   return (
     <HStack
       paddingY={2}
@@ -905,9 +914,18 @@ function TeamRow({ team }: { team: SpendByTeam }) {
       fontSize="sm"
     >
       <Box flex={3}>
-        <Text fontWeight="medium" color={isOrgWide ? "fg.muted" : "fg"}>
-          {team.teamName}
-        </Text>
+        <HStack gap={2}>
+          <Box
+            width="10px"
+            height="10px"
+            borderRadius="full"
+            backgroundColor={dotColor}
+            flexShrink={0}
+          />
+          <Text fontWeight="medium" color={isOrgWide ? "fg.muted" : "fg"}>
+            {team.teamName}
+          </Text>
+        </HStack>
       </Box>
       <Box flex={2}>{fmtUsd(team.spendUsd)}</Box>
       <Box flex={2}>{numeral(team.requestCount).format("0,0")}</Box>
@@ -926,6 +944,7 @@ function TeamRow({ team }: { team: SpendByTeam }) {
 }
 
 function UserRow({ user }: { user: SpendByUser }) {
+  const dotColor = getChartColorForName(user.actor);
   return (
     <HStack
       paddingY={2}
@@ -935,7 +954,16 @@ function UserRow({ user }: { user: SpendByUser }) {
       fontSize="sm"
     >
       <Box flex={3}>
-        <Text fontWeight="medium">{user.actor}</Text>
+        <HStack gap={2}>
+          <Box
+            width="10px"
+            height="10px"
+            borderRadius="full"
+            backgroundColor={dotColor}
+            flexShrink={0}
+          />
+          <Text fontWeight="medium">{user.actor}</Text>
+        </HStack>
       </Box>
       <Box flex={2}>{fmtUsd(user.spendUsd)}</Box>
       <Box flex={2}>{numeral(user.requests).format("0,0")}</Box>
