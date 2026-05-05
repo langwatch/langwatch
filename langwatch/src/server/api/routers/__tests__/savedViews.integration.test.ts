@@ -54,6 +54,7 @@ describe("SavedViews Endpoints", () => {
       await prisma.savedView.deleteMany({ where: { projectId } });
     });
 
+    /** @scenario "First-visit projects auto-seed and show All Traces plus 4 seed views" */
     it("seeds views on first access for a project", async () => {
       const result = await caller.savedViews.getAll({ projectId });
 
@@ -67,6 +68,7 @@ describe("SavedViews Endpoints", () => {
       ]);
     });
 
+    /** @scenario "getAll returns views ordered by position" */
     it("returns views ordered by order field", async () => {
       const result = await caller.savedViews.getAll({ projectId });
 

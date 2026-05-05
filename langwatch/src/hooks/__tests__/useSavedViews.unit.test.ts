@@ -84,6 +84,7 @@ describe("savedViewsLogic", () => {
     });
 
     describe("when arrays have different order", () => {
+      /** @scenario "View matching ignores array order" */
       it("returns true (order-insensitive)", () => {
         const a: Partial<Record<FilterField, FilterParam>> = {
           "spans.model": ["gpt-4", "claude-3"],
@@ -208,6 +209,7 @@ describe("savedViewsLogic", () => {
     });
 
     describe("when filters match a custom view", () => {
+      /** @scenario "Re-applying saved view's exact filters re-selects the badge" */
       it("returns the custom view id", () => {
         const result = findMatchingView({
           currentFilters: { "spans.model": ["gpt-4"] },
