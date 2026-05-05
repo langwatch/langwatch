@@ -16,6 +16,7 @@ import {
 import {
   ArrowDown,
   ArrowUp,
+  Lightbulb,
   Pencil,
   Plus,
   Star,
@@ -24,11 +25,12 @@ import {
 } from "lucide-react";
 import { useMemo, useState } from "react";
 
+import GovernanceLayout from "~/components/governance/GovernanceLayout";
 import { LoadingScreen } from "~/components/LoadingScreen";
 import { NotFoundScene } from "~/components/NotFoundScene";
-import SettingsLayout from "~/components/SettingsLayout";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { Drawer } from "~/components/ui/drawer";
+import { Link } from "~/components/ui/link";
 import { toaster } from "~/components/ui/toaster";
 import { useFeatureFlag } from "~/hooks/useFeatureFlag";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -169,7 +171,11 @@ function RoutingPoliciesPage() {
     return out;
   }, [policiesQuery.data]);
 
-  const startNew = (scope: Scope, scopeIdDefault: string) => {
+  const startNew = (
+    scope: Scope,
+    scopeIdDefault: string,
+    initialIsDefault = false,
+  ) => {
     setEditingId("new");
     setComposer({
       scope,
@@ -179,7 +185,7 @@ function RoutingPoliciesPage() {
       strategy: "priority",
       providerCredentialIds: [],
       modelAllowlist: [],
-      isDefault: false,
+      isDefault: initialIsDefault,
     });
   };
 
@@ -238,8 +244,18 @@ function RoutingPoliciesPage() {
     return <NotFoundScene />;
   }
 
+  const hasAnyPolicy =
+    grouped.organization.length +
+      grouped.team.length +
+      grouped.project.length >
+    0;
+  const hasAnyDefault =
+    [...grouped.organization, ...grouped.team, ...grouped.project].some(
+      (p) => p.isDefault,
+    );
+
   return (
-    <SettingsLayout>
+    <GovernanceLayout pageTitle="Routing Policies · Governance · LangWatch">
       <VStack align="stretch" gap={6} width="full" maxW="container.xl">
         <HStack alignItems="end">
           <VStack align="start" gap={0}>
@@ -256,6 +272,57 @@ function RoutingPoliciesPage() {
         </HStack>
 
         {policiesQuery.isLoading && <Spinner size="sm" />}
+
+        {!policiesQuery.isLoading && !hasAnyDefault && (
+          <Box
+            borderWidth="1px"
+            borderColor="orange.300"
+            borderRadius="md"
+            backgroundColor="orange.50"
+            padding={4}
+          >
+            <HStack alignItems="start" gap={3}>
+              <Box color="orange.600" paddingTop="2px">
+                <Lightbulb size={18} />
+              </Box>
+              <VStack align="start" gap={1}>
+                <Text fontSize="sm" fontWeight="semibold">
+                  {hasAnyPolicy
+                    ? "Mark one of your policies as default"
+                    : "Publish a default policy to unblock end-user keys"}
+                </Text>
+                <Text fontSize="xs" color="fg.muted">
+                  Without an applicable default, {`'langwatch login'`} (and
+                  every personal-key issue path) returns 409{" "}
+                  <Text as="span" fontFamily="mono">
+                    no_default_routing_policy
+                  </Text>
+                  . Start with an Organization default that points at
+                  whichever provider credentials your team should use, then
+                  override per-team or per-project as needed.
+                </Text>
+                <HStack gap={3} paddingTop={1}>
+                  <Button
+                    size="xs"
+                    colorPalette="orange"
+                    onClick={() => startNew("organization", orgId, true)}
+                  >
+                    <Plus size={12} /> Add organization default
+                  </Button>
+                  <Link
+                    href="https://docs.langwatch.ai/ai-gateway/governance/routing-policies"
+                    isExternal
+                    color="orange.700"
+                    fontSize="xs"
+                    fontWeight="medium"
+                  >
+                    Docs →
+                  </Link>
+                </HStack>
+              </VStack>
+            </HStack>
+          </Box>
+        )}
 
         {SCOPE_GROUPS.map(({ scope, label, subtitle }) => (
           <Box
@@ -343,7 +410,7 @@ function RoutingPoliciesPage() {
           setComposer(null);
         }}
       />
-    </SettingsLayout>
+    </GovernanceLayout>
   );
 }
 
