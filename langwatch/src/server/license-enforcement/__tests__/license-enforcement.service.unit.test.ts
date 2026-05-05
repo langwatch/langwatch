@@ -194,7 +194,8 @@ describe("LicenseEnforcementService", () => {
       );
     });
 
-    it("includes current and max in LimitExceededError", async () => {
+    /** @scenario Blocks prompt creation when at limit */
+    it("includes current, max, and prompts label in LimitExceededError", async () => {
       vi.mocked(mockRepository.getPromptCount).mockResolvedValue(5);
 
       try {
@@ -206,6 +207,7 @@ describe("LicenseEnforcementService", () => {
         expect(limitError.limitType).toBe("prompts");
         expect(limitError.current).toBe(5);
         expect(limitError.max).toBe(5);
+        expect(limitError.message).toContain("maximum number of prompts");
       }
     });
 
@@ -250,7 +252,8 @@ describe("LicenseEnforcementService", () => {
       expect(mockRepository.getProjectCount).toHaveBeenCalledWith("org-456");
     });
 
-    it("throws LimitExceededError when limit is reached", async () => {
+    /** @scenario Blocks team creation when at limit */
+    it("throws LimitExceededError mentioning teams when team limit is reached", async () => {
       vi.mocked(mockRepository.getTeamCount).mockResolvedValue(5);
 
       await expect(
@@ -258,7 +261,7 @@ describe("LicenseEnforcementService", () => {
           organizationId: "org-123",
           limitType: "teams",
         })
-      ).rejects.toThrow(LimitExceededError);
+      ).rejects.toThrow(/maximum number of teams/);
     });
 
     /** @scenario Allows project creation when under limit */
