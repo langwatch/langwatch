@@ -94,6 +94,7 @@ describe("filter-translator", () => {
 
     describe("trace filters", () => {
       describe("when filtering by origin", () => {
+        /** @scenario "ClickHouse origin filter for specific values" */
         it("translates non-application origin values with IN clause", () => {
           const result = translateFilter("traces.origin", ["evaluation"]);
           expect(result.whereClause).toContain("ts.Attributes['langwatch.origin'] IN");
@@ -102,6 +103,7 @@ describe("filter-translator", () => {
           expect(result.requiredJoins).toHaveLength(0);
         });
 
+        /** @scenario 'ClickHouse origin filter for "application" matches absent values' */
         it("translates application origin as empty-or-null-or-literal check", () => {
           const result = translateFilter("traces.origin", ["application"]);
           expect(result.whereClause).toContain("ts.Attributes['langwatch.origin'] = ''");
@@ -110,6 +112,7 @@ describe("filter-translator", () => {
           expect(result.params).toEqual({});
         });
 
+        /** @scenario 'ClickHouse origin filter for mixed values including "application"' */
         it("combines application and other origins with OR", () => {
           const result = translateFilter("traces.origin", [
             "application",

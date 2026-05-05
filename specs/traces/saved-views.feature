@@ -73,20 +73,20 @@ Feature: Saved Views on Traces List
     Then I see an "Origin" filter option
     And it lists the available origin values with counts
 
-  @unit @unimplemented
+  @unit
   Scenario: ClickHouse origin filter for "application" matches absent values
     Given the ClickHouse filter condition builder for "traces.origin"
     When I build a condition for values ["application"]
     Then the SQL checks for empty or null origin attribute
     And it does not use a simple IN clause with "application"
 
-  @unit @unimplemented
+  @unit
   Scenario: ClickHouse origin filter for specific values
     Given the ClickHouse filter condition builder for "traces.origin"
     When I build a condition for values ["evaluation"]
     Then the SQL uses an IN clause matching the attribute value
 
-  @unit @unimplemented
+  @unit
   Scenario: ClickHouse origin filter for mixed values including "application"
     Given the ClickHouse filter condition builder for "traces.origin"
     When I build a condition for values ["application", "evaluation"]
