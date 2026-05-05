@@ -3,6 +3,19 @@ Feature: Subscription service refactor
   existing createSubscriptionService factory. Both coexist; the router
   continues using the old factory until Part 4.
 
+  # Parity status: 0 of 6 scenarios bound to existing tests.
+  # The remaining are tracked under #3458:
+  #   - 5 NO_TEST: behavior shipped + correct, no integration test yet exists
+  #   - 1 UPDATE: implementation diverged from the spec wording — needs scenario rewrite
+  # NO_TEST gaps:
+  #   - "EESubscriptionService updates subscription items via Stripe"
+  #   - "EESubscriptionService creates checkout for new subscription"
+  #   - "EESubscriptionService cancels subscription when downgrading to free"
+  #   - "EESubscriptionService creates billing portal session"
+  #   - "EESubscriptionService notifies for prospective subscription"
+  # UPDATE divergences:
+  #   - "New class implements the same interface as old factory"
+
   @unit @unimplemented
   Scenario: New class implements the same interface as old factory
     Given the SubscriptionService interface in app-layer
@@ -44,20 +57,3 @@ Feature: Subscription service refactor
     When notifyProspective is called with plan and contact details
     Then a prospective notification event is dispatched
 
-  @unit @unimplemented
-  Scenario: NullSubscriptionService throws on Stripe-dependent methods
-    Given the NullSubscriptionService for self-hosted deployments
-    When any Stripe-dependent method is called
-    Then SubscriptionServiceUnavailableError is thrown
-
-  @unit @unimplemented
-  Scenario: NullSubscriptionService returns null for queries
-    Given the NullSubscriptionService for self-hosted deployments
-    When getLastNonCancelledSubscription is called
-    Then null is returned
-
-  @unit @unimplemented
-  Scenario: Old factory remains unchanged
-    Given the existing createSubscriptionService factory
-    Then it continues to be exported and used by the subscription router
-    And no existing tests break

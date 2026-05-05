@@ -117,6 +117,7 @@ describe("Evaluators API", () => {
         });
       });
 
+      /** @scenario PUT /api/evaluators/:id updates an evaluator */
       it("updates the evaluator name", async () => {
         const res = await helpers.api.put(
           `/api/evaluators/${evaluator.id}`,
@@ -209,6 +210,7 @@ describe("Evaluators API", () => {
         });
       });
 
+      /** @scenario DELETE /api/evaluators/:id archives an evaluator */
       it("archives the evaluator and returns success", async () => {
         const res = await helpers.api.delete(
           `/api/evaluators/${evaluator.id}`,
