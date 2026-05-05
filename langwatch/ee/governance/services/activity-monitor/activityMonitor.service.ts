@@ -708,19 +708,23 @@ export class ActivityMonitorService {
           ? `ts.Attributes[{userKey:String}]`
           : `arrayElement(ts.Models, 1)`;
 
-    // `OccurredAt` is already DateTime64(3, 'UTC'); `toStartOfDay`
-    // preserves DateTime64 precision so we can pass it straight into
-    // `toUnixTimestamp64Milli`. The earlier `OccurredAt / 1000 →
-    // toDateTime64(…, 3)` round-trip was treating the ms-precision tick
-    // count as a seconds value and re-wrapping, which double-shifted
-    // every bucket far outside the requested window — bucket lookups
-    // missed every row and the chart rendered as empty `points: []`
-    // arrays despite live data. Pattern matches the working
-    // `spendByUser` query (`toUnixTimestamp64Milli(max(occurredAt))`).
+    // `OccurredAt` is DateTime64(3, 'UTC'). `toStartOfDay()` returns
+    // plain `DateTime` (seconds resolution), and `toUnixTimestamp64Milli`
+    // refuses anything but DateTime64 — so we go the other way:
+    // `toUnixTimestamp()` gives seconds, then multiply by 1000 to get
+    // millisecond ticks. Same wire shape as `toUnixTimestamp64Milli`
+    // would produce; matches the JS-side `windowStart`/dayMs math.
+    //
+    // Two earlier shapes that DON'T work:
+    //   `toUnixTimestamp64Milli(toStartOfDay(OccurredAt))` → type error
+    //     (DateTime, not DateTime64)
+    //   `toUnixTimestamp64Milli(toStartOfDay(toDateTime64(OccurredAt/1000, 3)))`
+    //     → divides ms-precision by 1000 then re-wraps, double-shifting
+    //     every bucket far outside the window
     const result = await ch.query({
       query: `
         SELECT
-          toString(toUnixTimestamp64Milli(toStartOfDay(ts.OccurredAt))) AS bucketMs,
+          toString(toUnixTimestamp(toStartOfDay(ts.OccurredAt)) * 1000) AS bucketMs,
           ${groupExpr} AS groupKey,
           toString(sum(coalesce(ts.TotalCost, 0))) AS spendUsdStr
         FROM trace_summaries ts
