@@ -43,7 +43,21 @@ function defaults(): GovernanceConfig {
   // `LANGWATCH_URL` legacy alias intentionally NOT read (was undocumented;
   // dropped per rchaves directive 2026-05-05).
   const cp = process.env.LANGWATCH_ENDPOINT ?? "https://app.langwatch.ai";
-  const gw = process.env.LANGWATCH_GATEWAY_URL ?? "https://gateway.langwatch.ai";
+  const explicitGw = process.env.LANGWATCH_GATEWAY_URL;
+  // Self-hosted detection: when the user pointed `LANGWATCH_ENDPOINT` at
+  // localhost (the standard `make dev` shape) and didn't override the
+  // gateway URL, default to the local AI gateway port (5563 per
+  // langwatch/CLAUDE.md `make service svc=aigateway`). Without this,
+  // `langwatch login` + `whoami` printed the production gateway URL on
+  // self-hosted installs and the user's `langwatch claude` calls would
+  // route at the wrong place (Ariana QA — same shape as the /me tile
+  // base-URL bug Sergey c45e69987 / Alexis 30e52a718 fixed on the
+  // control-plane side).
+  const gw =
+    explicitGw ??
+    (/^https?:\/\/(localhost|127\.0\.0\.1)/.test(cp)
+      ? "http://localhost:5563"
+      : "https://gateway.langwatch.ai");
   return { gateway_url: gw, control_plane_url: cp };
 }
 

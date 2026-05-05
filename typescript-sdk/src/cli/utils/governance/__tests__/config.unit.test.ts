@@ -37,6 +37,47 @@ describe("governance config persistence", () => {
     expect(isLoggedIn(cfg)).toBe(false);
   });
 
+  describe("self-hosted gateway-URL inference", () => {
+    let prevEndpoint: string | undefined;
+    let prevGateway: string | undefined;
+    beforeEach(() => {
+      prevEndpoint = process.env.LANGWATCH_ENDPOINT;
+      prevGateway = process.env.LANGWATCH_GATEWAY_URL;
+      delete process.env.LANGWATCH_GATEWAY_URL;
+    });
+    afterEach(() => {
+      if (prevEndpoint === undefined) delete process.env.LANGWATCH_ENDPOINT;
+      else process.env.LANGWATCH_ENDPOINT = prevEndpoint;
+      if (prevGateway === undefined) delete process.env.LANGWATCH_GATEWAY_URL;
+      else process.env.LANGWATCH_GATEWAY_URL = prevGateway;
+    });
+
+    it("defaults gateway to localhost:5563 when LANGWATCH_ENDPOINT is localhost", () => {
+      process.env.LANGWATCH_ENDPOINT = "http://localhost:5560";
+      const cfg = loadConfig();
+      expect(cfg.gateway_url).toBe("http://localhost:5563");
+    });
+
+    it("defaults gateway to localhost:5563 when LANGWATCH_ENDPOINT is 127.0.0.1", () => {
+      process.env.LANGWATCH_ENDPOINT = "http://127.0.0.1:5560";
+      const cfg = loadConfig();
+      expect(cfg.gateway_url).toBe("http://localhost:5563");
+    });
+
+    it("defaults gateway to production when LANGWATCH_ENDPOINT is unset", () => {
+      delete process.env.LANGWATCH_ENDPOINT;
+      const cfg = loadConfig();
+      expect(cfg.gateway_url).toBe("https://gateway.langwatch.ai");
+    });
+
+    it("explicit LANGWATCH_GATEWAY_URL always wins regardless of endpoint", () => {
+      process.env.LANGWATCH_ENDPOINT = "http://localhost:5560";
+      process.env.LANGWATCH_GATEWAY_URL = "https://custom.example/v1";
+      const cfg = loadConfig();
+      expect(cfg.gateway_url).toBe("https://custom.example/v1");
+    });
+  });
+
   it("save → load roundtrip preserves all fields, file is mode 0600", () => {
     const original = {
       gateway_url: "http://gw.example",
