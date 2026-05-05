@@ -180,6 +180,7 @@ describe("Prompt Tags REST API (/api/prompts/tags)", () => {
     describe("when creating a valid custom tag", () => {
       /** @scenario "Creating a custom tag" */
       /** @scenario 'Recreating "production" after deletion succeeds' */
+      /** @scenario "Accepts valid non-numeric tag during creation" */
       it("returns 201 with id and name", async () => {
         const res = await post("/api/prompts/tags", { name: "canary" });
 
@@ -191,8 +192,17 @@ describe("Prompt Tags REST API (/api/prompts/tags)", () => {
     });
 
     describe("when name is purely numeric", () => {
+      /** @scenario "Rejects zero as a tag name during creation" */
       it("returns 422", async () => {
         const res = await post("/api/prompts/tags", { name: "42" });
+
+        expect(res.status).toBe(422);
+        const body = await res.json();
+        expect(body.message).toMatch(/numeric/i);
+      });
+
+      it("rejects '0' as a numeric tag name", async () => {
+        const res = await post("/api/prompts/tags", { name: "0" });
 
         expect(res.status).toBe(422);
         const body = await res.json();
