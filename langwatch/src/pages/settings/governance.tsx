@@ -95,6 +95,10 @@ function GovernanceOverviewPage() {
     { organizationId: orgId },
     { enabled: !!orgId, refetchOnWindowFocus: false },
   );
+  const anomalyRulesQuery = api.anomalyRules.list.useQuery(
+    { organizationId: orgId },
+    { enabled: !!orgId, refetchOnWindowFocus: false },
+  );
   const summaryQuery = api.activityMonitor.summary.useQuery(
     { organizationId: orgId, windowDays: 30 },
     { enabled: !!orgId, refetchOnWindowFocus: false },
@@ -131,9 +135,11 @@ function GovernanceOverviewPage() {
   const teams = teamsQuery.data ?? [];
   const sourceHealth = healthQuery.data ?? [];
   const anomalies = anomaliesQuery.data ?? [];
+  const anomalyRules = anomalyRulesQuery.data ?? [];
 
   const hasSources = sources.length > 0;
   const hasPolicies = policies.length > 0;
+  const hasAnomalyRules = anomalyRules.length > 0;
   const hasTraffic =
     !!summary &&
     (summary.spentThisWindowUsd > 0 ||
@@ -173,7 +179,10 @@ function GovernanceOverviewPage() {
               <Text fontSize="sm" color="fg.muted">
                 Complete each step to start collecting governance data.
                 Live metrics replace this checklist once your first
-                source is reporting events.
+                ingestion source is reporting events. (AI Gateway
+                traffic shows in <Link href="/gateway/usage">Gateway →
+                Usage</Link>; this dashboard rolls up signals from
+                ingestion sources beyond the gateway.)
               </Text>
             </VStack>
             <VStack align="stretch" gap={2}>
@@ -200,11 +209,15 @@ function GovernanceOverviewPage() {
                 }
               />
               <SetupItem
-                done={false}
+                done={hasAnomalyRules}
                 title="Define anomaly rules"
                 description="Set thresholds that page on-call when activity drifts."
                 href="/settings/governance/anomaly-rules"
-                ctaLabel="Anomaly rules"
+                ctaLabel={
+                  hasAnomalyRules
+                    ? `${anomalyRules.length} rule${anomalyRules.length === 1 ? "" : "s"} configured`
+                    : "Anomaly rules"
+                }
               />
             </VStack>
             <Box marginTop={5}>
