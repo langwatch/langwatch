@@ -2,7 +2,7 @@ import { on } from "node:events";
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
-import { checkOpsPermission } from "~/server/api/rbac";
+import { checkOpsPermission, type PermissionMiddleware } from "~/server/api/rbac";
 import { getApp } from "~/server/app-layer/app";
 import { DASHBOARD_EVENT } from "~/server/app-layer/ops/metrics-collector";
 import type { DashboardData } from "~/server/app-layer/ops/types";
@@ -11,6 +11,21 @@ import { getProjectionMetadata, getReactorMetadata } from "~/server/event-sourci
 const opsViewPermission = checkOpsPermission("ops:view");
 
 const opsManagePermission = checkOpsPermission("ops:manage");
+
+/**
+ * Inline permission-skip middleware for `getScope` only — the exported
+ * `skipPermissionCheck` from rbac.ts is typed for `object` input which
+ * doesn't unify with `protectedProcedure`'s `_input_out: void` for the
+ * no-input introspection query. Same effect (sets
+ * `permissionChecked = true` so `enforcePermissionCheck` passes),
+ * scoped to this single procedure so no broader RBAC bypass surface
+ * is added.
+ */
+const skipOpsScopeIntrospectionPermission: PermissionMiddleware<void> =
+  async ({ ctx, next }) => {
+    ctx.permissionChecked = true;
+    return await next();
+  };
 
 function requireOps() {
   const ops = getApp().ops;
@@ -24,9 +39,29 @@ function requireOps() {
 }
 
 export const opsRouter = createTRPCRouter({
-  getScope: protectedProcedure.use(opsViewPermission).query(({ ctx }) => {
-    return { scope: ctx.opsScope! };
-  }),
+  /**
+   * Introspection: returns the caller's ops scope, or `null` when they
+   * lack `ops:view`. Deliberately uses `skipPermissionCheck` instead
+   * of `opsViewPermission` — "no scope" is a valid answer to the
+   * question "what scope do I have", not an error. Throwing 403 here
+   * would spam the browser console for every non-ops user (which is
+   * most users) on every page-load that mounts a layout consuming
+   * `useOpsPermission` (MainMenu, SettingsLayout, command-bar,
+   * ReplayStatusBanner, ReplayProgressDrawer). All other procedures
+   * in this router keep their `opsViewPermission` /
+   * `opsManagePermission` gates.
+   *
+   * Caught by ariana's QA dogfood (G9): non-ops users saw 3 console
+   * errors per page load. Authentication is still required (the
+   * `protectedProcedure` chain remains), so this is not an open
+   * endpoint — anonymous callers still get UNAUTHORIZED.
+   */
+  getScope: protectedProcedure
+    .input(z.void())
+    .use(skipOpsScopeIntrospectionPermission)
+    .query(({ ctx }) => {
+      return { scope: ctx.opsScope ?? null };
+    }),
 
   getDashboardSnapshot: protectedProcedure
     .use(opsViewPermission)

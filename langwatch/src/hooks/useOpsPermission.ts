@@ -12,8 +12,12 @@ export function useOpsPermission() {
     staleTime: OPS_SCOPE_STALE_TIME_MS,
   });
 
+  // `getScope` returns `{scope: null}` for callers who lack `ops:view`
+  // (no longer throws 403 — that produced console-error spam on every
+  // page load for non-ops users). `hasAccess` is now derived from the
+  // scope value rather than the query's success state.
   return {
-    hasAccess: query.isSuccess,
+    hasAccess: query.data?.scope != null,
     scope: query.data?.scope ?? null,
     isLoading: query.isLoading,
   };
