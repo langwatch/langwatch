@@ -295,9 +295,17 @@ async function seedTraceSummaries({
       completionTokens * model.costPerOutputToken;
     const durationMs = rand(400, 6000);
     const daysAgo = pickDaysAgo(args.days);
-    const occurredAt = new Date();
-    occurredAt.setUTCDate(occurredAt.getUTCDate() - daysAgo);
+    const now = new Date();
+    const occurredAt = new Date(now);
+    occurredAt.setUTCDate(now.getUTCDate() - daysAgo);
     occurredAt.setUTCHours(rand(0, 24), rand(0, 60), rand(0, 60), 0);
+    // Clamp to the past — when daysAgo === 0 the random hour can land in
+    // the future, which makes "last active" formatters render negative
+    // seconds. Cap occurredAt at now-1s so the display path always sees
+    // a positive elapsed time without skewing the curve.
+    if (occurredAt.getTime() > now.getTime()) {
+      occurredAt.setTime(now.getTime() - 1000);
+    }
     const occurredAtMs = occurredAt.getTime();
     // Skew distribution: source 0 (Customer Support) dominates so the
     // rollup has a clear winner and a long tail. Persona skew matches.
