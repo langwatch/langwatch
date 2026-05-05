@@ -23,6 +23,10 @@ import Head from "~/utils/compat/next-head";
 
 import GovernanceLayout from "~/components/governance/GovernanceLayout";
 import { SpendByTeamBar } from "~/components/governance/SpendByTeamBar";
+import {
+  SpendOverTimeChart,
+  type GroupBy,
+} from "~/components/governance/SpendOverTimeChart";
 import { InstallCliCard } from "~/components/me/InstallCliCard";
 import { LoadingScreen } from "~/components/LoadingScreen";
 import { NotFoundScene } from "~/components/NotFoundScene";
@@ -111,6 +115,11 @@ function GovernanceOverviewPage() {
   );
   const anomaliesQuery = api.activityMonitor.recentAnomalies.useQuery(
     { organizationId: orgId },
+    { enabled: !!orgId, refetchOnWindowFocus: false },
+  );
+  const [chartGroupBy, setChartGroupBy] = useState<GroupBy>("team");
+  const spendOverTimeQuery = api.activityMonitor.spendOverTime.useQuery(
+    { organizationId: orgId, windowDays: 30, groupBy: chartGroupBy },
     { enabled: !!orgId, refetchOnWindowFocus: false },
   );
 
@@ -262,6 +271,25 @@ function GovernanceOverviewPage() {
          * controls. Setup checklist + empty-state ingestion-sources
          * placeholder render above when there's no traffic yet.
          */}
+
+        {hasTraffic && (
+          <SectionCard
+            title="Spend over time"
+            subline="Daily UTC buckets, last 30 days. Toggle the breakdown to see which dimension is driving the trend."
+            actions={
+              <GroupByToggle
+                value={chartGroupBy}
+                onChange={setChartGroupBy}
+              />
+            }
+          >
+            <SpendOverTimeChart
+              buckets={spendOverTimeQuery.data?.buckets}
+              groupBy={chartGroupBy}
+              emptyHint="Connect an ingestion source to start collecting governance data."
+            />
+          </SectionCard>
+        )}
 
         {teams.length > 0 && (
           <SectionCard title="Spend share across teams">
@@ -667,6 +695,44 @@ function SummaryCard({
         {subline}
       </Text>
     </Box>
+  );
+}
+
+function GroupByToggle({
+  value,
+  onChange,
+}: {
+  value: GroupBy;
+  onChange: (next: GroupBy) => void;
+}) {
+  const options: GroupBy[] = ["team", "user", "model"];
+  return (
+    <HStack
+      gap={0}
+      borderWidth="1px"
+      borderColor="border.muted"
+      borderRadius="md"
+      overflow="hidden"
+    >
+      {options.map((opt, i) => {
+        const active = opt === value;
+        return (
+          <Button
+            key={opt}
+            size="xs"
+            variant={active ? "solid" : "ghost"}
+            colorPalette={active ? "orange" : "gray"}
+            onClick={() => onChange(opt)}
+            borderRadius={0}
+            borderRightWidth={i < options.length - 1 ? "1px" : 0}
+            borderColor="border.muted"
+            textTransform="capitalize"
+          >
+            By {opt}
+          </Button>
+        );
+      })}
+    </HStack>
   );
 }
 
