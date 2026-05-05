@@ -140,6 +140,55 @@ describe("G86 diagnostic — getAllForOrg sees project-scoped binds", () => {
     expect(found?.modelProviderId).toBe(MP_ID);
   });
 
+  it("disableAllForModelProvider cascades disabledAt to dependent bindings (G88/G89 follow-up)", async () => {
+    // Seed two binds against the same MP — G88 admin-disable cascade
+    // must flip both. The first bind is reused from the previous test
+    // already in `disabledAt: null` state; create a second so the
+    // updateMany branch is exercised with > 1 row.
+    const second = await service.create({
+      projectId: PROJECT_ID,
+      organizationId: ORG_ID,
+      modelProviderId: MP_ID,
+      slot: "secondary",
+      actorUserId: USER_ID,
+    });
+
+    const before = await service.getAllForOrg(ORG_ID);
+    const beforeDisabledCount = before.filter(
+      (r) => r.disabledAt !== null,
+    ).length;
+
+    const flipped = await service.disableAllForModelProvider({
+      modelProviderId: MP_ID,
+      projectId: PROJECT_ID,
+      organizationId: ORG_ID,
+      actorUserId: USER_ID,
+    });
+    expect(flipped).toBeGreaterThanOrEqual(1);
+
+    const after = await service.getAllForOrg(ORG_ID);
+    const afterDisabledCount = after.filter(
+      (r) => r.disabledAt !== null,
+    ).length;
+    // Every bind that was previously enabled should now be disabled.
+    expect(afterDisabledCount).toBe(before.length);
+    // And the count should have actually moved (otherwise the cascade
+    // didn't do its job).
+    expect(afterDisabledCount).toBeGreaterThan(beforeDisabledCount);
+
+    // Idempotent — second call flips zero rows because all are already
+    // disabled.
+    const flippedAgain = await service.disableAllForModelProvider({
+      modelProviderId: MP_ID,
+      projectId: PROJECT_ID,
+      organizationId: ORG_ID,
+      actorUserId: USER_ID,
+    });
+    expect(flippedAgain).toBe(0);
+
+    void second; // silence unused-binding lint
+  });
+
   it("getAllForOrg returns empty array for an org with no credentials", async () => {
     // Sanity check — distinct fresh org with no binds returns [],
     // not a leak from the parent test's seeded credential.

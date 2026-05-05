@@ -230,6 +230,70 @@ export class GatewayProviderCredentialService {
     });
   }
 
+  /**
+   * Cascade-disable every GatewayProviderCredential row bound to the
+   * given ModelProvider. Invoked by ModelProviderService when an admin
+   * flips the MP's `enabled` to false (G88/G89 follow-up — without
+   * this, soft-disabling the MP leaves visible binding rows that look
+   * routable but route through a disabled provider).
+   *
+   * Idempotent — rows already `disabledAt != null` are skipped so a
+   * re-disable doesn't churn audit logs / change events. Returns the
+   * count of rows actually flipped this call so the caller can
+   * surface "N bindings disabled along with the provider" if needed.
+   *
+   * Skips per-row audit-log writes for the cascade itself; the audit
+   * trail of the parent ModelProvider disable is the discoverable
+   * story. The change-event stream still fires per row so the gateway
+   * dispatcher's warm cache invalidates correctly.
+   */
+  async disableAllForModelProvider(args: {
+    modelProviderId: string;
+    projectId: string;
+    organizationId: string;
+    actorUserId: string;
+    tx?: Prisma.TransactionClient;
+  }): Promise<number> {
+    const exec = async (
+      tx: Prisma.TransactionClient,
+    ): Promise<number> => {
+      const candidates = await tx.gatewayProviderCredential.findMany({
+        where: {
+          projectId: args.projectId,
+          modelProviderId: args.modelProviderId,
+          disabledAt: null,
+        },
+        select: { id: true },
+      });
+      if (candidates.length === 0) return 0;
+
+      const result = await tx.gatewayProviderCredential.updateMany({
+        where: {
+          projectId: args.projectId,
+          id: { in: candidates.map((c) => c.id) },
+        },
+        data: { disabledAt: new Date() },
+      });
+
+      // One change event per row so the dispatcher's warm cache
+      // invalidates each binding individually (the warm-cache key is
+      // per-credential, not per-MP).
+      for (const candidate of candidates) {
+        await this.changeEvents.append(
+          {
+            organizationId: args.organizationId,
+            projectId: args.projectId,
+            kind: "PROVIDER_BINDING_UPDATED",
+            providerCredentialId: candidate.id,
+          },
+          tx,
+        );
+      }
+      return result.count;
+    };
+    return args.tx ? exec(args.tx) : this.prisma.$transaction(exec);
+  }
+
   async disable(args: {
     id: string;
     projectId: string;

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { customModelUpdateInputSchema } from "../../modelProviders/customModel.schema";
 import { ModelProviderService } from "../../modelProviders/modelProvider.service";
+import { GatewayProviderCredentialService } from "../../gateway/providerCredential.service";
 import {
   checkProjectPermission,
   checkOrganizationPermission,
@@ -100,7 +101,7 @@ export const modelProviderRouter = createTRPCRouter({
     .use(checkProjectPermission("project:update"))
     .mutation(async ({ input, ctx }) => {
       const service = ModelProviderService.create(ctx.prisma);
-      return await service.updateModelProvider(
+      const result = await service.updateModelProvider(
         {
           id: input.id,
           projectId: input.projectId,
@@ -121,6 +122,50 @@ export const modelProviderRouter = createTRPCRouter({
         },
         { prisma: ctx.prisma, session: ctx.session },
       );
+
+      // G88/G89 follow-up: when an admin disables a ModelProvider via
+      // the "Delete Provider" → soft-disable flow, cascade the disable
+      // to dependent GatewayProviderCredential rows so the gateway
+      // dispatcher's warm cache invalidates and routing through this
+      // provider rejects fast. Without this, soft-disabling left
+      // visible binding rows that looked routable but routed through
+      // a disabled provider — the orphan binding Ariana caught.
+      //
+      // Idempotent at the credential service layer (rows already
+      // `disabledAt != null` are skipped). Runs after the MP update
+      // succeeded — any cascade failure is logged but doesn't roll
+      // back the parent disable (the MP being disabled IS the
+      // source-of-truth; the cascade is a UX + warm-cache hint).
+      if (input.enabled === false && result?.id) {
+        const credentialService = GatewayProviderCredentialService.create(
+          ctx.prisma,
+        );
+        const project = await ctx.prisma.project.findUnique({
+          where: { id: input.projectId },
+          select: { team: { select: { organizationId: true } } },
+        });
+        const organizationId = project?.team.organizationId;
+        if (organizationId) {
+          try {
+            await credentialService.disableAllForModelProvider({
+              modelProviderId: result.id,
+              projectId: input.projectId,
+              organizationId,
+              actorUserId: ctx.session.user.id,
+            });
+          } catch (err) {
+            // Log but don't fail the parent — the MP is already disabled,
+            // the cascade is best-effort.
+            // eslint-disable-next-line no-console
+            console.error(
+              `[modelProvider.update] Failed to cascade-disable bindings for MP ${result.id}:`,
+              err,
+            );
+          }
+        }
+      }
+
+      return result;
     }),
 
   delete: protectedProcedure
