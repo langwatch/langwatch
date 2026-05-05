@@ -57,7 +57,7 @@ Feature: Suite run validation uses repository classes
     When the suite run is triggered
     Then the run schedules jobs successfully
 
-  @unit @unimplemented
+  @unit
   Scenario: Suite run succeeds when prompt config is org-scoped
     Given a suite with a prompt target referencing an org-scoped config
     When the suite run is triggered
@@ -69,7 +69,7 @@ Feature: Suite run validation uses repository classes
     When the suite run is triggered
     Then the run fails with an invalid target references error
 
-  @unit @unimplemented
+  @unit
   Scenario: Suite run fails when prompt config belongs to another organization
     Given a suite with a prompt target referencing a config from another organization
     When the suite run is triggered
