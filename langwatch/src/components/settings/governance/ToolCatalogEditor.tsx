@@ -25,7 +25,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { GripVertical, Plus } from "lucide-react";
+import { GripVertical, PackageOpen, Plus } from "lucide-react";
 import type React from "react";
 
 import type { AiToolEntry } from "~/components/me/tiles/types";
@@ -83,6 +83,31 @@ export function ToolCatalogEditor({
     onError: (err) => {
       toaster.create({
         title: "Failed to reorder",
+        description: err.message,
+        type: "error",
+      });
+    },
+  });
+
+  const importStarterPackMutation = api.aiTools.importStarterPack.useMutation({
+    onSuccess: ({ created, skipped }) => {
+      void utils.aiTools.adminList.invalidate({ organizationId });
+      void utils.aiTools.list.invalidate({ organizationId });
+      toaster.create({
+        title:
+          created === 0
+            ? "Starter pack already published"
+            : `Imported ${created} ${created === 1 ? "tile" : "tiles"}`,
+        description:
+          skipped > 0
+            ? `${skipped} ${skipped === 1 ? "tile was" : "tiles were"} already published and skipped.`
+            : "Coding assistants and model providers are now visible to your team on /me.",
+        type: "success",
+      });
+    },
+    onError: (err) => {
+      toaster.create({
+        title: "Failed to import starter pack",
         description: err.message,
         type: "error",
       });
@@ -154,8 +179,51 @@ export function ToolCatalogEditor({
       );
     };
 
+  const isCatalogEmpty = entries.length === 0;
+
   return (
     <VStack align="stretch" gap={6} width="full">
+      {isCatalogEmpty && (
+        <Box
+          borderWidth="1px"
+          borderColor="orange.300"
+          borderRadius="md"
+          backgroundColor="orange.50"
+          padding={4}
+        >
+          <HStack alignItems="start" gap={3}>
+            <Box color="orange.600" paddingTop="2px">
+              <PackageOpen size={20} />
+            </Box>
+            <VStack align="start" gap={1} flex={1} minWidth={0}>
+              <Text fontSize="sm" fontWeight="semibold">
+                Publish a starter pack to get going
+              </Text>
+              <Text fontSize="xs" color="fg.muted">
+                One click adds the standard set — Coding assistants
+                (Claude Code, GitHub Copilot, Cursor, Codex) and Model
+                providers (Anthropic, OpenAI, Bedrock, Gemini) — at org
+                scope so every member sees them on /me. You can
+                rename, reorder, disable, or remove individual tiles
+                afterwards. Re-running is safe; only new slugs get
+                added.
+              </Text>
+              <HStack paddingTop={1}>
+                <Button
+                  size="sm"
+                  colorPalette="orange"
+                  loading={importStarterPackMutation.isPending}
+                  onClick={() =>
+                    importStarterPackMutation.mutate({ organizationId })
+                  }
+                >
+                  <PackageOpen size={14} /> Import starter pack
+                </Button>
+              </HStack>
+            </VStack>
+          </HStack>
+        </Box>
+      )}
       {SECTION_ORDER.map((type) => {
         const items = grouped[type];
         return (
