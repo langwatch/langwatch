@@ -22,6 +22,7 @@ import numeral from "numeral";
 import Head from "~/utils/compat/next-head";
 
 import GovernanceLayout from "~/components/governance/GovernanceLayout";
+import { InstallCliCard } from "~/components/me/InstallCliCard";
 import { LoadingScreen } from "~/components/LoadingScreen";
 import { NotFoundScene } from "~/components/NotFoundScene";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
@@ -201,6 +202,12 @@ function GovernanceOverviewPage() {
                 upcoming
               />
             </VStack>
+            <Box marginTop={5}>
+              <InstallCliCard
+                heading="Install the CLI to onboard your team"
+                subline="Members install the CLI on their devices to start using AI tools through LangWatch. Run `langwatch login` after install to authenticate."
+              />
+            </Box>
           </Box>
         )}
 

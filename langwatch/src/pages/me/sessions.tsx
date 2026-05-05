@@ -14,6 +14,7 @@ import Head from "~/utils/compat/next-head";
 
 import { LoadingScreen } from "~/components/LoadingScreen";
 import { NotFoundScene } from "~/components/NotFoundScene";
+import { InstallCliCard } from "~/components/me/InstallCliCard";
 import MyLayout from "~/components/me/MyLayout";
 import { usePersonalContext } from "~/components/me/usePersonalContext";
 import { toaster } from "~/components/ui/toaster";
@@ -187,22 +188,27 @@ export default function MySessionsPage() {
             </Text>
           </Box>
         ) : sessions.length === 0 ? (
-          <Box
-            borderWidth="1px"
-            borderColor="border.muted"
-            borderRadius="md"
-            padding={6}
-          >
-            <VStack align="start" gap={2}>
-              <Text fontSize="sm" fontWeight="medium">
-                No active CLI sessions
-              </Text>
-              <Text fontSize="sm" color="fg.muted">
-                Run <code>langwatch login</code> in your terminal to sign in
-                from this device.
-              </Text>
-            </VStack>
-          </Box>
+          <VStack align="stretch" gap={4}>
+            <Box
+              borderWidth="1px"
+              borderColor="border.muted"
+              borderRadius="md"
+              padding={6}
+            >
+              <VStack align="start" gap={2}>
+                <Text fontSize="sm" fontWeight="medium">
+                  No active CLI sessions
+                </Text>
+                <Text fontSize="sm" color="fg.muted">
+                  Sign in from a new device to see it appear here.
+                </Text>
+              </VStack>
+            </Box>
+            <InstallCliCard
+              heading="Sign in from a new device"
+              subline="Install the CLI on the device you want to authorize, then run `langwatch login` to start the SSO flow. The session will appear above."
+            />
+          </VStack>
         ) : (
           <VStack align="stretch" gap={2}>
             {sessions.map((s) => (
