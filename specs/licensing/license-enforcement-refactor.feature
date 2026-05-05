@@ -38,7 +38,7 @@ Feature: License Enforcement
   # PlanInfo Type Updates (maxMembers and maxMembersLite defaults)
   # ============================================================================
 
-  @unit @unimplemented
+  @unit
   Scenario: PlanInfo defaults maxMembers to 1 when not specified
     Given a plan without explicit maxMembers
     When the plan is constructed
