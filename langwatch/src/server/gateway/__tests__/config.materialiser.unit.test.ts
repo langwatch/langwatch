@@ -213,6 +213,73 @@ describe("GatewayConfigMaterialiser", () => {
       });
     });
 
+    it("EC4 — overrides stale PG spentUsd with the CH rollup when chRepo is wired", async () => {
+      // The PG column is the legacy that no writer updates; the CH
+      // rollup is the source of truth post trace-fold cutover. The
+      // materialiser must prefer CH so the gateway's Bundle.Config
+      // .Budget.Scopes.SpentMicroUSD reflects fresh state and the
+      // Precheck (limit - spent <= 0) actually fires on breach.
+      const prisma = mockPrisma({
+        project: {
+          findUnique: async () => ({
+            id: "project_01",
+            teamId: "team_01",
+            name: "p",
+            slug: "p",
+            team: { id: "team_01", name: "t", organizationId: "org_01" },
+          }),
+          findMany: async () => [{ id: "project_01" }, { id: "project_02" }],
+        } as any,
+        gatewayProviderCredential: { findMany: async () => [] } as any,
+        gatewayBudget: {
+          findMany: async () => [
+            {
+              id: "b_breach",
+              scopeType: "PROJECT",
+              scopeId: "project_01",
+              window: "MONTH",
+              limitUsd: { toString: () => "0.001000", toNumber: () => 0.001 },
+              // PG says no spend — the canonical EC4 misalignment.
+              spentUsd: { toString: () => "0.000000", toNumber: () => 0 },
+              resetsAt: new Date("2026-06-01T00:00:00Z"),
+              onBreach: "BLOCK",
+            },
+          ],
+        } as any,
+        gatewayCacheRule: { findMany: async () => [] } as any,
+      });
+      const chRepo = {
+        getSpendForBudgetsAcrossTenants: async (
+          tenantIds: string[],
+          budgets: any[],
+        ) => {
+          // Boundary check: every project in the org gets queried,
+          // not just the VK's own — ORG/TEAM-scoped budgets need this
+          // to see spend from sibling projects.
+          expect(tenantIds).toEqual(["project_01", "project_02"]);
+          return [
+            {
+              budgetId: budgets[0].id,
+              scope: "project",
+              scopeId: "project_01",
+              spentUsd: "0.010130", // 1013% over limit
+            },
+          ];
+        },
+      } as any;
+      const sut = new GatewayConfigMaterialiser(prisma, chRepo);
+
+      const bundle = await sut.materialise(stubVk());
+
+      expect(bundle.budgets).toHaveLength(1);
+      expect(bundle.budgets[0]?.spent_micro_usd).toBe(10130);
+      expect(bundle.budgets[0]?.limit_micro_usd).toBe(1000);
+      // Sanity: spent > limit so the gateway's Precheck would block.
+      expect(bundle.budgets[0]!.spent_micro_usd).toBeGreaterThan(
+        bundle.budgets[0]!.limit_micro_usd,
+      );
+    });
+
     describe("when cache rules are configured for the organisation", () => {
       it("includes them pre-sorted by priority desc, enabled-only, with matcher/action passthrough", async () => {
         // Simulates the bundle projection — GatewayCacheRuleService.bundleFor

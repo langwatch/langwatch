@@ -353,7 +353,26 @@ app.get("/config/:vk_id", async (c) => {
     });
   }
 
-  const payload = await new GatewayConfigMaterialiser(prisma).materialise(vk);
+  // EC4 — wire the CH repo so the materialiser stamps current-period
+  // spend (sumMerge from the rollup) onto each applicable budget. The
+  // gateway's existing Bundle.Config.Budget.Scopes.SpentMicroUSD ->
+  // Precheck path then sees fresh state on every re-materialise after
+  // a BUDGET_UPDATED eviction. Without this the wire output reads the
+  // stale `GatewayBudget.spentUsd` PG column that no writer updates.
+  const chRepo = isClickHouseEnabled()
+    ? new GatewayBudgetClickHouseRepository(async (projectId) => {
+        const client = await getClickHouseClientForProject(projectId);
+        if (!client) {
+          throw new Error(
+            `ClickHouse enabled but no client for project ${projectId}`,
+          );
+        }
+        return client;
+      })
+    : null;
+  const payload = await new GatewayConfigMaterialiser(prisma, chRepo).materialise(
+    vk,
+  );
   return c.json(payload, 200, {
     ETag: currentRevision,
     "Cache-Control": "no-store",

@@ -17,6 +17,7 @@ import type {
 } from "@prisma/client";
 
 import { decrypt } from "../../utils/encryption";
+import { GatewayBudgetClickHouseRepository } from "./budget.clickhouse.repository";
 import { GatewayCacheRuleService } from "./cacheRule.service";
 import { parseVirtualKeyConfig } from "./virtualKey.config";
 import type { VirtualKeyWithChain } from "./virtualKey.repository";
@@ -138,12 +139,32 @@ export type GatewayConfigPayload = {
 type ProviderRow = GatewayProviderCredential & { modelProvider: ModelProvider };
 
 export class GatewayConfigMaterialiser {
-  constructor(private readonly prisma: PrismaClient) {}
+  /**
+   * `chRepo` is optional. When provided, the materialiser stamps the
+   * current-period spend for each applicable budget directly from the
+   * ClickHouse rollup (the source of truth post trace-fold cutover).
+   * When nil — test fixtures, or deploys without CH wired — falls back
+   * to `GatewayBudget.spentUsd` which is the legacy PG column that is
+   * no longer updated by writers and therefore always stale.
+   *
+   * EC4 lived in this gap: the gateway's Bundle.Config.Budget.Scopes
+   * is correctly invalidated on BUDGET_UPDATED change events (per
+   * 7d9632929), but the next re-materialise was reading the same
+   * stale PG number, so on-breach=block could never fire. With chRepo
+   * wired, every re-materialise reads fresh CH spend and the gateway's
+   * existing Precheck path (BlockMicroUSD - SpentMicroUSD <= 0) does
+   * the rest.
+   */
+  constructor(
+    private readonly prisma: PrismaClient,
+    private readonly chRepo: GatewayBudgetClickHouseRepository | null = null,
+  ) {}
 
   async materialise(vk: VirtualKeyWithChain): Promise<GatewayConfigPayload> {
     const project = await this.requireProject(vk.projectId);
     const chain = await this.loadProviderChain(vk);
     const budgets = await this.applicableBudgets(vk, project);
+    const spendByBudgetId = await this.loadCurrentSpend(project, budgets);
     const cacheRules = await this.applicableCacheRules(
       project.team.organizationId,
     );
@@ -201,7 +222,12 @@ export class GatewayConfigMaterialiser {
         scope_id: b.scopeId,
         window: b.window.toLowerCase(),
         limit_micro_usd: decimalToMicroUSD(b.limitUsd),
-        spent_micro_usd: decimalToMicroUSD(b.spentUsd),
+        // EC4 — prefer the CH rollup (current-period sumMerge) over
+        // the stale PG column. Falls back to PG only when chRepo
+        // wasn't injected (legacy callers, test fixtures).
+        spent_micro_usd: spendByBudgetId.has(b.id)
+          ? decimalUSDStringToMicroUSD(spendByBudgetId.get(b.id)!)
+          : decimalToMicroUSD(b.spentUsd),
         resets_at: Math.floor(b.resetsAt.getTime() / 1000),
         on_breach: b.onBreach === "BLOCK" ? "block" : "warn",
       })),
@@ -318,6 +344,52 @@ export class GatewayConfigMaterialiser {
     return credIds
       .map((id) => byId.get(id))
       .filter((r): r is ProviderRow => Boolean(r));
+  }
+
+  /**
+   * Pull the current-period spend for the supplied budgets from CH and
+   * return a `budgetId → spentUsd (decimal string)` map. ORG/TEAM/
+   * PRINCIPAL-scoped budgets accumulate ledger rows under whichever
+   * project actually emitted the trace, so we hand CH every project
+   * id in the org rather than only the VK's own project (mirrors the
+   * `getSpendForBudgetsAcrossTenants` pattern from the budget service).
+   *
+   * Best-effort: any CH error logs and falls through to an empty map,
+   * which the caller treats as "no fresh spend, fall back to PG". Bias
+   * here is open — the gateway's request-handler still has Precheck as
+   * a downstream chokepoint, and a stale-but-non-zero spend is safer
+   * than a hard fail at config-fetch time.
+   */
+  private async loadCurrentSpend(
+    project: Project & { team: Team },
+    budgets: GatewayBudget[],
+  ): Promise<Map<string, string>> {
+    if (this.chRepo === null || budgets.length === 0) {
+      return new Map();
+    }
+    try {
+      const orgProjects = await this.prisma.project.findMany({
+        where: { team: { organizationId: project.team.organizationId } },
+        select: { id: true },
+      });
+      const tenantIds = orgProjects.map((p) => p.id);
+      if (tenantIds.length === 0) return new Map();
+      const spends = await this.chRepo.getSpendForBudgetsAcrossTenants(
+        tenantIds,
+        budgets,
+      );
+      const out = new Map<string, string>();
+      for (const s of spends) {
+        out.set(s.budgetId, s.spentUsd);
+      }
+      return out;
+    } catch {
+      // CH unavailable — let the caller fall back to PG. Logging is
+      // intentionally suppressed at this layer so a CH outage doesn't
+      // pour error noise per request; the budget.service.check path
+      // logs at the canonical layer.
+      return new Map();
+    }
   }
 
   private async applicableBudgets(
@@ -518,4 +590,15 @@ function cacheRuleToWire(rule: GatewayCacheRule): CacheRuleWire {
 
 function decimalToMicroUSD(d: { toNumber(): number }): number {
   return Math.round(d.toNumber() * 1_000_000);
+}
+
+/**
+ * Same conversion as `decimalToMicroUSD` but starting from CH's wire
+ * shape (decimal string, e.g. "0.01013"). Used for the spend stamped
+ * by `loadCurrentSpend` from `getSpendForBudgetsAcrossTenants`.
+ */
+function decimalUSDStringToMicroUSD(s: string): number {
+  const n = Number.parseFloat(s);
+  if (!Number.isFinite(n)) return 0;
+  return Math.round(n * 1_000_000);
 }
