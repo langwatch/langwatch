@@ -73,6 +73,116 @@ describe("groupRunsByBatchId()", () => {
   });
 });
 
+describe("groupRunsByScenarioId()", () => {
+  describe("when given runs across multiple scenarios", () => {
+    /** @scenario "groupRunsByScenarioId groups runs by their scenarioId" */
+    it("groups runs into one entry per scenarioId", () => {
+      const runs = [
+        makeScenarioRunData({ scenarioId: "s1", scenarioRunId: "r1" }),
+        makeScenarioRunData({ scenarioId: "s1", scenarioRunId: "r2" }),
+        makeScenarioRunData({ scenarioId: "s2", scenarioRunId: "r3" }),
+        makeScenarioRunData({ scenarioId: "s2", scenarioRunId: "r4" }),
+        makeScenarioRunData({ scenarioId: "s2", scenarioRunId: "r5" }),
+      ];
+
+      const result = groupRunsByScenarioId({ runs });
+
+      expect(result).toHaveLength(2);
+      const byKey = new Map(result.map((g) => [g.groupKey, g]));
+      expect(byKey.get("s1")!.scenarioRuns).toHaveLength(2);
+      expect(byKey.get("s2")!.scenarioRuns).toHaveLength(3);
+    });
+
+    /** @scenario "Every grouping mode returns groups with identifier, label, type, timestamp, and runs" */
+    it("returns groups with the consistent structure shape", () => {
+      const runs = [makeScenarioRunData({ scenarioId: "s1" })];
+
+      const [group] = groupRunsByScenarioId({ runs });
+
+      expect(group).toMatchObject({
+        groupKey: expect.any(String),
+        groupLabel: expect.any(String),
+        groupType: "scenario",
+        timestamp: expect.any(Number),
+        scenarioRuns: expect.any(Array),
+      });
+    });
+  });
+
+  describe("when groups span multiple timestamps", () => {
+    /** @scenario "Groups are sorted by most recent timestamp descending" */
+    it("sorts groups by their most-recent run timestamp descending", () => {
+      const now = Date.now();
+      const runs = [
+        makeScenarioRunData({ scenarioId: "old", scenarioRunId: "r1", timestamp: now - 60_000 }),
+        makeScenarioRunData({ scenarioId: "new", scenarioRunId: "r2", timestamp: now }),
+      ];
+
+      const result = groupRunsByScenarioId({ runs });
+
+      expect(result[0]!.groupKey).toBe("new");
+      expect(result[1]!.groupKey).toBe("old");
+    });
+  });
+});
+
+describe("groupRunsByTarget()", () => {
+  describe("when runs carry targetReferenceId metadata", () => {
+    /** @scenario "groupRunsByTarget groups runs by their targetReferenceId" */
+    it("groups runs by their target reference id", () => {
+      const targetNameMap = new Map<string, string>([
+        ["agent-1", "Agent 1"],
+        ["prompt-1", "Prompt 1"],
+      ]);
+      const runs = [
+        makeScenarioRunData({
+          scenarioRunId: "r1",
+          metadata: { langwatch: { targetReferenceId: "agent-1" } },
+        }),
+        makeScenarioRunData({
+          scenarioRunId: "r2",
+          metadata: { langwatch: { targetReferenceId: "agent-1" } },
+        }),
+        makeScenarioRunData({
+          scenarioRunId: "r3",
+          metadata: { langwatch: { targetReferenceId: "prompt-1" } },
+        }),
+      ];
+
+      const result = groupRunsByTarget({ runs, targetNameMap });
+
+      expect(result).toHaveLength(2);
+      const byKey = new Map(result.map((g) => [g.groupKey, g]));
+      expect(byKey.get("agent-1")!.scenarioRuns).toHaveLength(2);
+      expect(byKey.get("prompt-1")!.scenarioRuns).toHaveLength(1);
+    });
+  });
+
+  describe('when some runs have no target metadata', () => {
+    /** @scenario 'groupRunsByTarget places runs without target metadata in an "Unknown" group' */
+    it('puts runs without targetReferenceId in the "Unknown" group', () => {
+      const targetNameMap = new Map<string, string>([["agent-1", "Agent 1"]]);
+      const runs = [
+        makeScenarioRunData({
+          scenarioRunId: "r1",
+          metadata: { langwatch: { targetReferenceId: "agent-1" } },
+        }),
+        makeScenarioRunData({
+          scenarioRunId: "r2",
+          metadata: undefined,
+        }),
+      ];
+
+      const result = groupRunsByTarget({ runs, targetNameMap });
+
+      const unknown = result.find((g) => g.groupLabel === "Unknown");
+      expect(unknown).toBeDefined();
+      expect(unknown!.scenarioRuns).toHaveLength(1);
+      expect(unknown!.scenarioRuns[0]!.scenarioRunId).toBe("r2");
+    });
+  });
+});
+
 describe("groupRunsByBatchId() with scenarioSetIds", () => {
   describe("when given an empty array", () => {
     it("returns an empty array", () => {

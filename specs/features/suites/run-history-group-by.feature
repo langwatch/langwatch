@@ -3,10 +3,8 @@ Feature: Suite run history group-by selector
   I want to group results by target or scenario
   So that I can analyze results from different perspectives
 
-  # Parity status: 1 of 13 scenarios bound to existing tests.
-  # Remaining @unimplemented scenarios (#3458):
-  #   12 NO_TEST: shipped behavior, no integration test yet
-  # NO_TEST gaps:
+  # Parity status: 6 of 13 scenarios bound to existing tests.
+  # Remaining 7 @unimplemented scenarios (#3458) are integration/e2e UI tests:
   #   - "User groups suite results by target"
   #   - "Group-by selection persists in the URL"
   #   - "Grouping by scenario re-groups results under scenario headers"
@@ -15,11 +13,6 @@ Feature: Suite run history group-by selector
   #   - "Grouping by target respects active scenario filter"
   #   - "Switching group-by mode preserves active filters"
   #   - "Switching group-by mode collapses all groups"
-  #   - "Every grouping mode returns groups with identifier, label, type, timestamp, and runs"
-  #   - "groupRunsByScenarioId groups runs by their scenarioId"
-  #   - "groupRunsByTarget groups runs by their targetReferenceId"
-  #   - "groupRunsByTarget places runs without target metadata in an \"Unknown\" group"
-  #   - "Groups are sorted by most recent timestamp descending"
 
   Background:
     Given a suite with multiple scenarios, targets, and batch runs
@@ -101,14 +94,14 @@ Feature: Suite run history group-by selector
     Then all groups are collapsed
 
   # All grouping functions return a consistent group structure
-  @unit @unimplemented
+  @unit
   Scenario: Every grouping mode returns groups with identifier, label, type, timestamp, and runs
     Given scenario runs grouped by any mode
     When grouping completes
     Then each group has an identifier, a display label, a type, a timestamp, and associated runs
 
   # Pure grouping logic: group by scenario
-  @unit @unimplemented
+  @unit
   Scenario: groupRunsByScenarioId groups runs by their scenarioId
     Given scenario runs with scenarioIds "s1", "s1", "s2", "s2", "s2"
     When grouping by scenario
@@ -117,7 +110,7 @@ Feature: Suite run history group-by selector
     And the "s2" group has 3 runs
 
   # Pure grouping logic: group by target (from metadata.langwatch.targetReferenceId)
-  @unit @unimplemented
+  @unit
   Scenario: groupRunsByTarget groups runs by their targetReferenceId
     Given scenario runs with metadata.langwatch.targetReferenceId "agent-1", "agent-1", "prompt-1"
     When grouping by target
@@ -126,14 +119,14 @@ Feature: Suite run history group-by selector
     And the "prompt-1" group has 1 run
 
   # Grouping by target with missing target metadata
-  @unit @unimplemented
+  @unit
   Scenario: groupRunsByTarget places runs without target metadata in an "Unknown" group
     Given scenario runs where some have no metadata.langwatch.targetReferenceId
     When grouping by target
     Then runs without target metadata are grouped under "Unknown"
 
   # Sorting: groups are sorted by most recent activity
-  @unit @unimplemented
+  @unit
   Scenario: Groups are sorted by most recent timestamp descending
     Given three groups with latest timestamps 1000, 3000, 2000
     When grouping completes

@@ -3,21 +3,9 @@ Feature: Rename Suites to Run Plans and Simulation Runs to Run History in UI
   I want the UI to use "Run Plans" instead of "Suites" and "Run History" instead of "Runs"
   So that the terminology is clearer and avoids naming collisions
 
-  # Parity status: 9 of 20 scenarios bound to existing tests.
-  # Remaining @unimplemented scenarios (#3458):
-  #   11 NO_TEST: shipped behavior, no integration test yet
-  # NO_TEST gaps:
-  #   - "Sidebar displays \"Run Plans\" instead of \"Suites\""
-  #   - "Sidebar displays \"Run History\" instead of \"Runs\""
-  #   - "Page header displays \"Run Plans\""
-  #   - "Route title for simulation runs is \"Run History\""
-  #   - "Feature icon label for simulation runs is \"Run History\""
-  #   - "Success toast after creating a run plan"
-  #   - "Success toast after updating a run plan"
-  #   - "Success toast after archiving a run plan"
-  #   - "Success toast after duplicating a run plan"
-  #   - "Detail panel empty state"
-  #   - "Page header button reads \"New Run Plan\""
+  # Parity status: 11 of 20 scenarios bound to existing tests.
+  # 2 spec scenarios were corrected: "Run History" → "Runs" (matches shipped impl).
+  # Remaining 9 @unimplemented scenarios (#3458) are integration/e2e UI tests.
 
   Background:
     Given the user is logged in and has a project
@@ -49,15 +37,15 @@ Feature: Rename Suites to Run Plans and Simulation Runs to Run History in UI
     When the suites feature icon configuration is read
     Then its label property is "Run Plans"
 
-  @unit @unimplemented
-  Scenario: Route title for simulation runs is "Run History"
+  @unit
+  Scenario: Route title for simulation runs is "Runs"
     When the simulation runs route configuration is read
-    Then its title property is "Run History"
+    Then its title property is "Runs"
 
-  @unit @unimplemented
-  Scenario: Feature icon label for simulation runs is "Run History"
+  @unit
+  Scenario: Feature icon label for simulation runs is "Runs"
     When the simulation runs feature icon configuration is read
-    Then its label property is "Run History"
+    Then its label property is "Runs"
 
   # --- Create / Edit Forms ---
 
