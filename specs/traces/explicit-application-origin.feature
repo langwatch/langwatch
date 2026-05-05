@@ -4,6 +4,12 @@ Feature: Explicit application origin for race condition prevention
   So that online evaluations never incorrectly fire on evaluation or simulation traces
   when child spans arrive before the root span
 
+  # All scenarios describe the trace projection's origin tagging during
+  # the event-sourcing pipeline. Need targeted unit tests in
+  # `langwatch/src/server/event-sourcing/pipelines/trace-processing/`
+  # for the origin-tagging projection. Backend logic is implemented;
+  # test cases for these specific race scenarios aren't written yet.
+
   # =========================================================================
   # Problem
   # =========================================================================

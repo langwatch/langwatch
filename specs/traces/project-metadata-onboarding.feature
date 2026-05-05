@@ -3,6 +3,11 @@ Feature: Project becomes integrated after first trace ingestion
   when the first trace arrives, enabling the messages page to render
   the trace list instead of the welcome screen.
 
+  # The 2 @unimplemented scenarios describe the trace-processing
+  # pipeline marking projects as integrated. Need a targeted unit test
+  # in `langwatch/src/server/event-sourcing/pipelines/trace-processing/`
+  # for the project.firstMessage projection.
+
   @integration @unimplemented
   Scenario: Project marks as integrated after first trace ingestion
     Given a project with firstMessage set to false

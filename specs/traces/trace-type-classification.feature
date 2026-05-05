@@ -4,6 +4,11 @@ Feature: Trace origin classification
   So that I can distinguish production traces from internal/testing traces
   And online evaluations can be scoped to application traces only
 
+  # All scenarios describe the trace projection's origin classification
+  # in the event-sourcing pipeline. Need targeted unit tests in
+  # `langwatch/src/server/event-sourcing/pipelines/trace-processing/projections/`
+  # for the origin-classification projection. Cheap to add.
+
   # =========================================================================
   # Design decisions
   # =========================================================================
