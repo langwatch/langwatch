@@ -100,6 +100,69 @@ export interface IngestionSourceHealthRow {
   eventsLast24h: number;
 }
 
+/** One bucket-major entry in the spend-over-time time series. */
+export interface SpendOverTimeBucket {
+  /** Day-aligned ISO timestamp (UTC midnight). */
+  bucketIso: string;
+  /**
+   * One point per group-key with non-zero spend in this bucket. Empty
+   * array when nothing spent on this day across any group; the bucket
+   * is still emitted so the chart's X axis has no gaps.
+   */
+  points: Array<{
+    /**
+     * Stable group identifier — teamId, user_id, or model name. Used
+     * for color-derivation (name-hash) + click-through scope params.
+     */
+    key: string;
+    /** Human-readable label for legend / tooltip. */
+    label: string;
+    spendUsd: number;
+  }>;
+}
+
+export interface SpendOverTimeResult {
+  buckets: SpendOverTimeBucket[];
+}
+
+export type SpendOverTimeGroupBy = "team" | "user" | "model";
+
+/** Sort field accepted by `spendByUser` / `spendByTeam`. */
+export type SpendSortField = "spend" | "requests" | "lastActivity";
+export type SortDir = "asc" | "desc";
+
+/**
+ * Whitelist mapping from external sort field names to the aggregate
+ * expressions we splice into the ORDER BY clause. CH parameter binding
+ * does NOT support column-name interpolation; this whitelist is the
+ * boundary that prevents injection through the public API.
+ */
+const SORT_FIELD_TO_AGG_EXPR: Record<SpendSortField, string> = {
+  spend: "sum(spendUsd)",
+  requests: "count()",
+  lastActivity: "max(occurredAt)",
+};
+
+/**
+ * Per-row sort key extractors for the in-memory `spendByTeam` ranker.
+ * Pagination + sort happen post-aggregation in TS because the team
+ * rollup happens after a PG join (CH only sees sourceId, the team
+ * mapping is in PG). All keys are numeric so the comparator stays
+ * stable regardless of locale.
+ */
+const TEAM_ROW_SORT_KEYS: Record<
+  SpendSortField,
+  (row: {
+    thisSpend: number;
+    requestCount: number;
+    lastActivityMs: number;
+  }) => number
+> = {
+  spend: (r) => r.thisSpend,
+  requests: (r) => r.requestCount,
+  lastActivity: (r) => r.lastActivityMs,
+};
+
 export interface ActivityEventDetailRow {
   eventId: string;
   eventType: string;
@@ -165,6 +228,34 @@ function extractSourceLabel(detail: unknown): string {
   if (typeof d.sourceLabel === "string") return d.sourceLabel;
   if (typeof d.source === "string") return d.source;
   return "";
+}
+
+function startOfUtcDay(ms: number): number {
+  const d = new Date(ms);
+  return Date.UTC(
+    d.getUTCFullYear(),
+    d.getUTCMonth(),
+    d.getUTCDate(),
+    0,
+    0,
+    0,
+    0,
+  );
+}
+
+function emptyDenseBuckets(
+  windowStartMs: number,
+  windowDays: number,
+): SpendOverTimeBucket[] {
+  const dayMs = 24 * 60 * 60 * 1000;
+  const buckets: SpendOverTimeBucket[] = [];
+  for (let i = 0; i < windowDays; i++) {
+    buckets.push({
+      bucketIso: new Date(windowStartMs + i * dayMs).toISOString(),
+      points: [],
+    });
+  }
+  return buckets;
 }
 
 export class ActivityMonitorService {
@@ -300,6 +391,9 @@ export class ActivityMonitorService {
     organizationId: string;
     windowDays: number;
     limit?: number;
+    offset?: number;
+    sortBy?: SpendSortField;
+    sortDir?: SortDir;
   }): Promise<SpendByUserRow[]> {
     const govProjectId = await this.resolveGovProjectId(input.organizationId);
     if (!govProjectId) return [];
@@ -310,6 +404,14 @@ export class ActivityMonitorService {
     const now = Date.now();
     const windowMs = input.windowDays * 24 * 60 * 60 * 1000;
     const limit = input.limit ?? 50;
+    const offset = Math.max(0, input.offset ?? 0);
+    const sortBy = input.sortBy ?? "spend";
+    const sortDir = input.sortDir ?? "desc";
+    // Whitelist the ORDER BY expression — the sortBy/sortDir values come
+    // from a Zod enum at the route layer but we re-validate here so a
+    // direct service-layer caller (tests, scripts) can't smuggle SQL.
+    const orderExpr = SORT_FIELD_TO_AGG_EXPR[sortBy];
+    const orderDir = sortDir === "asc" ? "ASC" : "DESC";
 
     // ClickHouse 25.x resolves bare column names in ORDER BY to outer
     // aliases when the alias shadows a subquery column — so
@@ -346,8 +448,8 @@ export class ActivityMonitorService {
             )
         )
         GROUP BY actor
-        ORDER BY sum(spendUsd) DESC
-        LIMIT {limit:UInt32}
+        ORDER BY ${orderExpr} ${orderDir}
+        LIMIT {limit:UInt32} OFFSET {offset:UInt32}
       `,
       query_params: {
         tenantId: govProjectId,
@@ -356,6 +458,7 @@ export class ActivityMonitorService {
         originValue: ORIGIN_KIND_VALUE,
         userKey: ATTR_USER_ID,
         limit,
+        offset,
       },
       format: "JSONEachRow",
     });
@@ -403,6 +506,9 @@ export class ActivityMonitorService {
     organizationId: string;
     windowDays: number;
     limit?: number;
+    offset?: number;
+    sortBy?: SpendSortField;
+    sortDir?: SortDir;
   }): Promise<SpendByTeamRow[]> {
     const govProjectId = await this.resolveGovProjectId(input.organizationId);
     if (!govProjectId) return [];
@@ -413,6 +519,9 @@ export class ActivityMonitorService {
     const now = Date.now();
     const windowMs = input.windowDays * 24 * 60 * 60 * 1000;
     const limit = input.limit ?? 50;
+    const offset = Math.max(0, input.offset ?? 0);
+    const sortBy = input.sortBy ?? "spend";
+    const sortDir = input.sortDir ?? "desc";
 
     const previousWindowStart = now - 2 * windowMs;
     const result = await ch.query({
@@ -518,10 +627,12 @@ export class ActivityMonitorService {
       }
     }
 
+    const sortKey = TEAM_ROW_SORT_KEYS[sortBy];
+    const sign = sortDir === "asc" ? 1 : -1;
     return [...byTeam.values()]
       .filter((t) => t.thisSpend > 0 || t.requestCount > 0)
-      .sort((a, b) => b.thisSpend - a.thisSpend)
-      .slice(0, limit)
+      .sort((a, b) => sign * (sortKey(a) - sortKey(b)))
+      .slice(offset, offset + limit)
       .map((t) => ({
         teamId: t.teamId,
         teamName: t.teamName,
@@ -535,6 +646,186 @@ export class ActivityMonitorService {
             : null,
         sourceCount: t.sourceCount,
       }));
+  }
+
+  /**
+   * Time-series spend rollup for the bird's-eye `<SpendOverTimeChart>`.
+   * Bucketed daily, grouped by team / user / model. The wire shape is
+   * bucket-major (one entry per day with all non-zero groups inside)
+   * which round-trips exactly the cross-product the chart legend
+   * needs without any client-side reshape gymnastics.
+   *
+   * Density invariant: `buckets` covers every day in the window, even
+   * empty ones — Recharts AreaChart with `stackId="1"` requires a
+   * dense X axis or it draws gaps that visually misrepresent quiet
+   * days as "missing data". Empty days surface as `points: []`.
+   *
+   * Tenancy: same as every other read in this service — every CH query
+   * filters by `TenantId = govProjectId`. groupBy='team' rolls up
+   * IngestionSource rows (CH-side spend) by their teamId via a PG join
+   * (Org-wide bucket for null-teamId sources). groupBy='user' /
+   * 'model' read the corresponding attribute / Models[1] directly.
+   *
+   * Spec: specs/ai-gateway/governance/birds-eye-dashboard-v2.feature
+   *   §"Spend-over-time stacked-area chart renders by team"
+   *   §"spendOverTime API contract"
+   *   §"spendOverTime CH query honors TenantId scoping"
+   */
+  async spendOverTime(input: {
+    organizationId: string;
+    windowDays: number;
+    groupBy: SpendOverTimeGroupBy;
+  }): Promise<SpendOverTimeResult> {
+    const windowDays = Math.max(1, Math.floor(input.windowDays));
+    const dayMs = 24 * 60 * 60 * 1000;
+    const now = Date.now();
+    const todayStart = startOfUtcDay(now);
+    const windowStart = todayStart - (windowDays - 1) * dayMs;
+
+    const govProjectId = await this.resolveGovProjectId(input.organizationId);
+    if (!govProjectId) {
+      return { buckets: emptyDenseBuckets(windowStart, windowDays) };
+    }
+
+    const ch = await this.getClickhouse(input.organizationId);
+    if (!ch) {
+      return { buckets: emptyDenseBuckets(windowStart, windowDays) };
+    }
+
+    const groupExpr =
+      input.groupBy === "team"
+        ? `ts.Attributes[{sourceKey:String}]`
+        : input.groupBy === "user"
+          ? `ts.Attributes[{userKey:String}]`
+          : `arrayElement(ts.Models, 1)`;
+
+    const result = await ch.query({
+      query: `
+        SELECT
+          toString(toUnixTimestamp64Milli(toStartOfDay(toDateTime64(ts.OccurredAt / 1000, 3)))) AS bucketMs,
+          ${groupExpr} AS groupKey,
+          toString(sum(coalesce(ts.TotalCost, 0))) AS spendUsdStr
+        FROM trace_summaries ts
+        WHERE ts.TenantId = {tenantId:String}
+          AND ts.OccurredAt >= fromUnixTimestamp64Milli({windowStart:UInt64})
+          AND ts.Attributes[{originKey:String}] = {originValue:String}
+          AND (ts.TenantId, ts.TraceId, ts.UpdatedAt) IN (
+            SELECT TenantId, TraceId, max(UpdatedAt)
+            FROM trace_summaries
+            WHERE TenantId = {tenantId:String}
+              AND OccurredAt >= fromUnixTimestamp64Milli({windowStart:UInt64})
+            GROUP BY TenantId, TraceId
+          )
+        GROUP BY bucketMs, groupKey
+        ORDER BY bucketMs ASC
+      `,
+      query_params: {
+        tenantId: govProjectId,
+        windowStart,
+        originKey: ATTR_ORIGIN_KIND,
+        originValue: ORIGIN_KIND_VALUE,
+        sourceKey: ATTR_INGESTION_SOURCE_ID,
+        userKey: ATTR_USER_ID,
+      },
+      format: "JSONEachRow",
+    });
+    const rows = (await result.json()) as Array<{
+      bucketMs: string;
+      groupKey: string | null;
+      spendUsdStr: string;
+    }>;
+
+    let labelByKey: Map<string, { key: string; label: string }>;
+    let rolledRows: Array<{ bucketMs: number; key: string; spendUsd: number }>;
+
+    if (input.groupBy === "team") {
+      const sourceIds = Array.from(
+        new Set(
+          rows
+            .map((r) => r.groupKey)
+            .filter((s): s is string => typeof s === "string" && s !== ""),
+        ),
+      );
+      const sources = sourceIds.length
+        ? await this.prisma.ingestionSource.findMany({
+            where: {
+              id: { in: sourceIds },
+              organizationId: input.organizationId,
+            },
+            select: {
+              id: true,
+              team: { select: { id: true, name: true } },
+            },
+          })
+        : [];
+      const teamBySource = new Map(sources.map((s) => [s.id, s.team] as const));
+      const ORG_WIDE_KEY = "__org_wide__";
+      labelByKey = new Map();
+      rolledRows = [];
+      for (const row of rows) {
+        const sourceId = row.groupKey ?? "";
+        if (!sourceId) continue;
+        const team = teamBySource.get(sourceId) ?? null;
+        const key = team?.id ?? ORG_WIDE_KEY;
+        const label = team?.name ?? "Org-wide";
+        labelByKey.set(key, { key, label });
+        rolledRows.push({
+          bucketMs: Number(row.bucketMs),
+          key,
+          spendUsd: Number(row.spendUsdStr),
+        });
+      }
+    } else {
+      labelByKey = new Map();
+      rolledRows = [];
+      for (const row of rows) {
+        const key = row.groupKey ?? "";
+        if (!key) continue;
+        labelByKey.set(key, { key, label: key });
+        rolledRows.push({
+          bucketMs: Number(row.bucketMs),
+          key,
+          spendUsd: Number(row.spendUsdStr),
+        });
+      }
+    }
+
+    // Roll up (bucket, key) duplicates that come out of the team-side
+    // sourceId → teamId remapping (multiple sources can share one team).
+    const aggregated = new Map<string, number>();
+    for (const r of rolledRows) {
+      const k = `${r.bucketMs}::${r.key}`;
+      aggregated.set(k, (aggregated.get(k) ?? 0) + r.spendUsd);
+    }
+
+    const buckets = emptyDenseBuckets(windowStart, windowDays);
+    const bucketIndexByMs = new Map(
+      buckets.map((b, i) => [Date.parse(b.bucketIso), i] as const),
+    );
+    for (const [composite, spendUsd] of aggregated.entries()) {
+      const sep = composite.indexOf("::");
+      const bucketMs = Number(composite.slice(0, sep));
+      const key = composite.slice(sep + 2);
+      const idx = bucketIndexByMs.get(bucketMs);
+      if (idx === undefined) continue;
+      const meta = labelByKey.get(key);
+      if (!meta) continue;
+      if (spendUsd <= 0) continue;
+      buckets[idx]!.points.push({
+        key: meta.key,
+        label: meta.label,
+        spendUsd,
+      });
+    }
+
+    // Stable per-bucket ordering — descending spend so the largest
+    // contributor renders at the bottom of the stacked area (Recharts
+    // stacks in array order; bottom-up = largest-first).
+    for (const bucket of buckets) {
+      bucket.points.sort((a, b) => b.spendUsd - a.spendUsd);
+    }
+
+    return { buckets };
   }
 
   /**

@@ -52,7 +52,11 @@ export const activityMonitorRouter = createTRPCRouter({
     }),
 
   /**
-   * Per-user spend breakdown (top-N). Sorted by spend desc.
+   * Per-user spend breakdown (top-N or paginated).
+   *
+   * Default `limit=50`, `offset=0`, `sortBy='spend'`, `sortDir='desc'`
+   * → backwards-compat with the bird's-eye top-N capture. Pagination +
+   * sort args back the View-all-users listing page.
    */
   spendByUser: protectedProcedure
     .input(
@@ -60,6 +64,11 @@ export const activityMonitorRouter = createTRPCRouter({
         organizationId: z.string(),
         windowDays: z.number().int().min(1).max(365).default(30),
         limit: z.number().int().min(1).max(500).default(50),
+        offset: z.number().int().min(0).default(0),
+        sortBy: z
+          .enum(["spend", "requests", "lastActivity"])
+          .default("spend"),
+        sortDir: z.enum(["asc", "desc"]).default("desc"),
       }),
     )
     .use(checkOrganizationPermission("activityMonitor:view"))
@@ -70,6 +79,9 @@ export const activityMonitorRouter = createTRPCRouter({
         organizationId: input.organizationId,
         windowDays: input.windowDays,
         limit: input.limit,
+        offset: input.offset,
+        sortBy: input.sortBy,
+        sortDir: input.sortDir,
       });
     }),
 
@@ -77,6 +89,9 @@ export const activityMonitorRouter = createTRPCRouter({
    * Per-team spend rollup. Aggregates ingestion-source events by the
    * source's `teamId` (with an "Org-wide" bucket for null-teamId
    * sources). Pairs with `spendByUser` for the admin bird's-eye home.
+   *
+   * Default args match `spendByUser` → backwards-compat top-N capture;
+   * pagination + sort back the View-all-teams listing page.
    */
   spendByTeam: protectedProcedure
     .input(
@@ -84,6 +99,11 @@ export const activityMonitorRouter = createTRPCRouter({
         organizationId: z.string(),
         windowDays: z.number().int().min(1).max(365).default(30),
         limit: z.number().int().min(1).max(500).default(50),
+        offset: z.number().int().min(0).default(0),
+        sortBy: z
+          .enum(["spend", "requests", "lastActivity"])
+          .default("spend"),
+        sortDir: z.enum(["asc", "desc"]).default("desc"),
       }),
     )
     .use(checkOrganizationPermission("activityMonitor:view"))
@@ -94,6 +114,37 @@ export const activityMonitorRouter = createTRPCRouter({
         organizationId: input.organizationId,
         windowDays: input.windowDays,
         limit: input.limit,
+        offset: input.offset,
+        sortBy: input.sortBy,
+        sortDir: input.sortDir,
+      });
+    }),
+
+  /**
+   * Spend-over-time daily buckets, grouped by team / user / model.
+   * Powers the bird's-eye `<SpendOverTimeChart>` (Recharts stacked
+   * area). Bucket-major envelope so the chart can iterate days
+   * directly; `points: []` is emitted for empty days so the X axis
+   * is dense (no Recharts stack-id rendering gaps).
+   *
+   * Spec: specs/ai-gateway/governance/birds-eye-dashboard-v2.feature
+   */
+  spendOverTime: protectedProcedure
+    .input(
+      z.object({
+        organizationId: z.string(),
+        windowDays: z.number().int().min(1).max(365).default(30),
+        groupBy: z.enum(["team", "user", "model"]).default("team"),
+      }),
+    )
+    .use(checkOrganizationPermission("activityMonitor:view"))
+    .use(enterpriseGate)
+    .query(async ({ ctx, input }) => {
+      const service = ActivityMonitorService.create(ctx.prisma);
+      return await service.spendOverTime({
+        organizationId: input.organizationId,
+        windowDays: input.windowDays,
+        groupBy: input.groupBy,
       });
     }),
 

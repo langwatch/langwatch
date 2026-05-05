@@ -548,6 +548,169 @@ describe("ActivityMonitorService — read-side queries against unified trace sto
     });
   });
 
+  describe("when querying spendOverTime() for the bird's-eye stacked-area chart", () => {
+    it("returns dense daily buckets covering windowDays — empty days emit `points: []` so the X axis has no gaps", async () => {
+      const service = ActivityMonitorService.create(prisma);
+      const result = await service.spendOverTime({
+        organizationId: primaryOrg.id,
+        windowDays: 30,
+        groupBy: "team",
+      });
+
+      expect(result.buckets).toHaveLength(30);
+      // Every bucket has an ISO timestamp at UTC midnight (no time-of-day drift).
+      for (const bucket of result.buckets) {
+        expect(new Date(bucket.bucketIso).getUTCHours()).toBe(0);
+        expect(new Date(bucket.bucketIso).getUTCMinutes()).toBe(0);
+      }
+      // Buckets are strictly ascending by day.
+      for (let i = 1; i < result.buckets.length; i++) {
+        expect(
+          new Date(result.buckets[i]!.bucketIso).getTime(),
+        ).toBeGreaterThan(new Date(result.buckets[i - 1]!.bucketIso).getTime());
+      }
+    });
+
+    it("groups by team — primary team appears in the recent bucket; Org-wide in the 14d-ago bucket", async () => {
+      const service = ActivityMonitorService.create(prisma);
+      const result = await service.spendOverTime({
+        organizationId: primaryOrg.id,
+        windowDays: 30,
+        groupBy: "team",
+      });
+
+      const totalSpend = result.buckets
+        .flatMap((b) => b.points)
+        .reduce((sum, p) => sum + p.spendUsd, 0);
+      // tr-primary-1 ($0.50) + tr-primary-2 ($1.50) + tr-primary-3 ($0.25)
+      // governance-origin only — app trace ($99) excluded.
+      expect(totalSpend).toBeCloseTo(2.25, 2);
+
+      const primaryTeamPoints = result.buckets
+        .flatMap((b) => b.points)
+        .filter((p) => p.key === primaryTeamId);
+      const primarySpend = primaryTeamPoints.reduce(
+        (sum, p) => sum + p.spendUsd,
+        0,
+      );
+      expect(primarySpend).toBeCloseTo(2.0, 2);
+
+      const orgWidePoints = result.buckets
+        .flatMap((b) => b.points)
+        .filter((p) => p.key === "__org_wide__");
+      const orgWideSpend = orgWidePoints.reduce(
+        (sum, p) => sum + p.spendUsd,
+        0,
+      );
+      expect(orgWideSpend).toBeCloseTo(0.25, 2);
+      expect(orgWidePoints[0]?.label).toBe("Org-wide");
+    });
+
+    it("groups by user — alice + bob in recent bucket, carol in 14d-ago bucket", async () => {
+      const service = ActivityMonitorService.create(prisma);
+      const result = await service.spendOverTime({
+        organizationId: primaryOrg.id,
+        windowDays: 30,
+        groupBy: "user",
+      });
+
+      const flatPoints = result.buckets.flatMap((b) =>
+        b.points.map((p) => ({ ...p, bucketIso: b.bucketIso })),
+      );
+
+      const alice = flatPoints.find((p) => p.key === "alice@example.com");
+      const bob = flatPoints.find((p) => p.key === "bob@example.com");
+      const carol = flatPoints.find((p) => p.key === "carol@example.com");
+
+      expect(alice?.spendUsd).toBeCloseTo(0.5, 2);
+      expect(bob?.spendUsd).toBeCloseTo(1.5, 2);
+      expect(carol?.spendUsd).toBeCloseTo(0.25, 2);
+
+      // 'should-not-count@example.com' came from a non-governance-origin trace
+      // — it MUST NOT appear in any bucket.
+      expect(
+        flatPoints.find((p) => p.key === "should-not-count@example.com"),
+      ).toBeUndefined();
+    });
+
+    it("groups by model — claude-sonnet-4 only; app-model is excluded by origin filter", async () => {
+      const service = ActivityMonitorService.create(prisma);
+      const result = await service.spendOverTime({
+        organizationId: primaryOrg.id,
+        windowDays: 30,
+        groupBy: "model",
+      });
+
+      const distinctModels = new Set(
+        result.buckets.flatMap((b) => b.points.map((p) => p.key)),
+      );
+      expect(distinctModels.has("claude-sonnet-4")).toBe(true);
+      // app-model is on a non-governance-origin trace → excluded.
+      expect(distinctModels.has("app-model")).toBe(false);
+    });
+
+    it("honors TenantId isolation — cross-org $50 spend never appears in primary org's series", async () => {
+      const service = ActivityMonitorService.create(prisma);
+      const result = await service.spendOverTime({
+        organizationId: primaryOrg.id,
+        windowDays: 30,
+        groupBy: "user",
+      });
+
+      const flatPoints = result.buckets.flatMap((b) => b.points);
+      // The cross-org actor MUST NOT leak.
+      expect(
+        flatPoints.find((p) => p.key === "alice@cross.example.com"),
+      ).toBeUndefined();
+      // Total spend bounded by primary's seeded amount (2.25) — proves no
+      // cross-org $50 leaked even into a different attribution dimension.
+      const totalSpend = flatPoints.reduce((sum, p) => sum + p.spendUsd, 0);
+      expect(totalSpend).toBeCloseTo(2.25, 2);
+    });
+
+    it("orders points within a bucket by spend desc — largest contributor first for stable Recharts stack rendering", async () => {
+      const service = ActivityMonitorService.create(prisma);
+      const result = await service.spendOverTime({
+        organizationId: primaryOrg.id,
+        windowDays: 30,
+        groupBy: "user",
+      });
+
+      // The recent (12h-ago) bucket carries both alice (0.5) and bob (1.5).
+      const populated = result.buckets.find((b) => b.points.length >= 2);
+      expect(populated).toBeDefined();
+      // Sorted desc: bob (1.5) before alice (0.5).
+      expect(populated!.points[0]!.spendUsd).toBeGreaterThanOrEqual(
+        populated!.points[1]!.spendUsd,
+      );
+    });
+
+    it("returns dense empty-bucket structure for orgs with no governance project (no IngestionSource minted yet)", async () => {
+      const orphan = await prisma.organization.create({
+        data: {
+          name: `Orphan Org Spend ${nanoid(6)}`,
+          slug: `orphan-spend-${nanoid(6)}`,
+        },
+      });
+      try {
+        const service = ActivityMonitorService.create(prisma);
+        const result = await service.spendOverTime({
+          organizationId: orphan.id,
+          windowDays: 7,
+          groupBy: "team",
+        });
+        expect(result.buckets).toHaveLength(7);
+        for (const bucket of result.buckets) {
+          expect(bucket.points).toEqual([]);
+        }
+      } finally {
+        await prisma.organization
+          .delete({ where: { id: orphan.id } })
+          .catch(() => undefined);
+      }
+    });
+  });
+
   describe("Layer-1 invariant: hidden Governance Project", () => {
     it("created with PROJECT_KIND.INTERNAL_GOVERNANCE", () => {
       expect(primaryGovProject.kind).toBe(PROJECT_KIND.INTERNAL_GOVERNANCE);
