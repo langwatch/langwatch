@@ -144,11 +144,22 @@ function GovernanceTeamDetailPage() {
               <Text fontSize="sm" fontWeight="medium" marginBottom={1}>
                 Detail metrics
               </Text>
-              <Text fontSize="xs" color="fg.muted">
+              <Text fontSize="xs" color="fg.muted" marginBottom={3}>
                 Per-day spend, per-user breakdown, and model mix for this
-                team will land here in a follow-up. The bird's-eye chart
-                already supports a {`'By Team'`} toggle that exercises the
-                same data through one orthogonal lens.
+                team will land here in a follow-up.
+              </Text>
+              <Link
+                href="/settings/governance"
+                color="orange.600"
+                fontSize="sm"
+                fontWeight="medium"
+              >
+                See this team in the bird's-eye chart →
+              </Link>
+              <Text fontSize="xs" color="fg.subtle" marginTop={1}>
+                The chart's {`'By Team'`} toggle exercises the same data
+                through one orthogonal lens until the dedicated drilldown
+                ships.
               </Text>
             </Box>
           </>

@@ -6,9 +6,9 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { useState } from "react";
 import numeral from "numeral";
 import Head from "~/utils/compat/next-head";
+import { useRouter } from "~/utils/compat/next-router";
 
 import GovernanceLayout from "~/components/governance/GovernanceLayout";
 import { LoadingScreen } from "~/components/LoadingScreen";
@@ -22,6 +22,50 @@ import { getHexColorForString } from "~/utils/rotatingColors";
 
 type SpendByUser = RouterOutputs["activityMonitor"]["spendByUser"][number];
 type SortField = "spend" | "requests" | "lastActivity";
+
+const SORT_LABEL: Record<SortField, string> = {
+  spend: "spend",
+  requests: "requests",
+  lastActivity: "last activity",
+};
+
+function isSortField(v: string | string[] | undefined): v is SortField {
+  return v === "spend" || v === "requests" || v === "lastActivity";
+}
+
+/** See teams.tsx SortChip — same a11y rationale. */
+function SortChip({
+  label,
+  active,
+  onClick,
+}: {
+  label: string;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      role="radio"
+      aria-checked={active}
+      onClick={onClick}
+      style={{
+        padding: "4px 12px",
+        borderRadius: 9999,
+        borderWidth: 1,
+        borderStyle: "solid",
+        borderColor: active ? "var(--chakra-colors-orange-500)" : "var(--chakra-colors-border-muted)",
+        backgroundColor: active ? "var(--chakra-colors-orange-50)" : "transparent",
+        color: active ? "var(--chakra-colors-orange-700)" : "var(--chakra-colors-fg-muted)",
+        fontSize: 12,
+        fontWeight: 500,
+        cursor: "pointer",
+      }}
+    >
+      {label}
+    </button>
+  );
+}
 
 const fmtUsd = (n: number) =>
   n === 0 ? "$0.00" : numeral(n).format("$0,0.00");
@@ -50,6 +94,7 @@ function fmtTrendPct(pct: number): string {
 }
 
 function GovernanceUsersListPage() {
+  const router = useRouter();
   const { organization } = useOrganizationTeamProject({
     redirectToOnboarding: false,
   });
@@ -62,7 +107,15 @@ function GovernanceUsersListPage() {
     },
   );
 
-  const [sortBy, setSortBy] = useState<SortField>("spend");
+  const sortBy: SortField = isSortField(router.query.sort)
+    ? router.query.sort
+    : "spend";
+  const setSortBy = (next: SortField) => {
+    const params = new URLSearchParams();
+    if (next !== "spend") params.set("sort", next);
+    void router.replace(params.toString() ? `?${params.toString()}` : "?");
+  };
+
   const usersQuery = api.activityMonitor.spendByUser.useQuery(
     {
       organizationId: orgId,
@@ -93,7 +146,7 @@ function GovernanceUsersListPage() {
               </Link>{" "}
               · All users
             </Text>
-            <Heading size="md">All users by spend</Heading>
+            <Heading size="md">All users by {SORT_LABEL[sortBy]}</Heading>
             <Text color="fg.muted" fontSize="sm">
               Every LangWatch member that reported activity in the last
               30 days. Click a row to drill into a single user.
@@ -102,10 +155,14 @@ function GovernanceUsersListPage() {
         </HStack>
 
         <HStack gap={2}>
-          <Text fontSize="sm" color="fg.muted">
+          <Text fontSize="sm" color="fg.muted" id="sort-by-label">
             Sort by:
           </Text>
-          <SortChips value={sortBy} onChange={setSortBy} />
+          <SortChips
+            value={sortBy}
+            onChange={setSortBy}
+            ariaLabelledBy="sort-by-label"
+          />
         </HStack>
 
         <VStack
@@ -140,9 +197,11 @@ function GovernanceUsersListPage() {
 function SortChips({
   value,
   onChange,
+  ariaLabelledBy,
 }: {
   value: SortField;
   onChange: (v: SortField) => void;
+  ariaLabelledBy?: string;
 }) {
   const opts: Array<{ key: SortField; label: string }> = [
     { key: "spend", label: "Spend" },
@@ -150,29 +209,15 @@ function SortChips({
     { key: "lastActivity", label: "Last active" },
   ];
   return (
-    <HStack gap={1}>
-      {opts.map((o) => {
-        const active = o.key === value;
-        return (
-          <Box
-            key={o.key}
-            paddingX={3}
-            paddingY={1}
-            borderRadius="full"
-            borderWidth="1px"
-            borderColor={active ? "orange.500" : "border.muted"}
-            backgroundColor={active ? "orange.50" : "transparent"}
-            color={active ? "orange.700" : "fg.muted"}
-            fontSize="xs"
-            fontWeight="medium"
-            cursor="pointer"
-            onClick={() => onChange(o.key)}
-            _hover={active ? undefined : { borderColor: "orange.300" }}
-          >
-            {o.label}
-          </Box>
-        );
-      })}
+    <HStack gap={1} role="radiogroup" aria-labelledby={ariaLabelledBy}>
+      {opts.map((o) => (
+        <SortChip
+          key={o.key}
+          label={o.label}
+          active={o.key === value}
+          onClick={() => onChange(o.key)}
+        />
+      ))}
     </HStack>
   );
 }

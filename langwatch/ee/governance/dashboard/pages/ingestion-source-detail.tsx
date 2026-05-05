@@ -27,9 +27,9 @@ import numeral from "numeral";
 import { useState } from "react";
 
 import { EnterpriseLockedSurface } from "~/components/enterprise/EnterpriseLockedSurface";
+import GovernanceLayout from "~/components/governance/GovernanceLayout";
 import { LoadingScreen } from "~/components/LoadingScreen";
 import { NotFoundScene } from "~/components/NotFoundScene";
-import SettingsLayout from "~/components/SettingsLayout";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import {
   DialogBody,
@@ -172,14 +172,14 @@ function IngestionSourceDetailPage() {
 
   if (!source) {
     return (
-      <SettingsLayout>
+      <GovernanceLayout>
         <EnterpriseLockedSurface
           featureName="Ingestion Source detail"
           description="Source-level health metrics and event drill-downs are part of the Enterprise plan."
         >
           <Spinner size="sm" />
         </EnterpriseLockedSurface>
-      </SettingsLayout>
+      </GovernanceLayout>
     );
   }
 
@@ -188,7 +188,7 @@ function IngestionSourceDetailPage() {
   const StatusIcon = status.icon;
 
   return (
-    <SettingsLayout>
+    <GovernanceLayout>
       <EnterpriseLockedSurface
         featureName="Ingestion Source detail"
         description="Source-level health metrics and event drill-downs are part of the Enterprise plan."
@@ -322,7 +322,7 @@ function IngestionSourceDetailPage() {
         onClose={() => setSecretReveal(null)}
       />
       </EnterpriseLockedSurface>
-    </SettingsLayout>
+    </GovernanceLayout>
   );
 }
 

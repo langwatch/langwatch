@@ -138,11 +138,22 @@ function GovernanceUserDetailPage() {
               <Text fontSize="sm" fontWeight="medium" marginBottom={1}>
                 Detail metrics
               </Text>
-              <Text fontSize="xs" color="fg.muted">
+              <Text fontSize="xs" color="fg.muted" marginBottom={3}>
                 Per-day spend trend and per-model breakdown for this user
-                will land here in a follow-up. The bird's-eye chart
-                already supports a {`'By User'`} toggle that exercises the
-                same data through one orthogonal lens.
+                will land here in a follow-up.
+              </Text>
+              <Link
+                href="/settings/governance"
+                color="orange.600"
+                fontSize="sm"
+                fontWeight="medium"
+              >
+                See this user in the bird's-eye chart →
+              </Link>
+              <Text fontSize="xs" color="fg.subtle" marginTop={1}>
+                The chart's {`'By User'`} toggle exercises the same data
+                through one orthogonal lens until the dedicated drilldown
+                ships.
               </Text>
             </Box>
           </>

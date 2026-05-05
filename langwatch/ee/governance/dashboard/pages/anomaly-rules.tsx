@@ -16,9 +16,9 @@ import {
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 
+import GovernanceLayout from "~/components/governance/GovernanceLayout";
 import { LoadingScreen } from "~/components/LoadingScreen";
 import { NotFoundScene } from "~/components/NotFoundScene";
-import SettingsLayout from "~/components/SettingsLayout";
 import { EnterpriseLockedSurface } from "~/components/enterprise/EnterpriseLockedSurface";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { Drawer } from "~/components/ui/drawer";
@@ -258,7 +258,7 @@ function AnomalyRulesPage() {
   const isPending = createMutation.isPending || updateMutation.isPending;
 
   return (
-    <SettingsLayout>
+    <GovernanceLayout>
       <EnterpriseLockedSurface
         featureName="Anomaly Rules"
         description="Anomaly Rules let your governance team define thresholds that page on-call when ingestion drifts. Available on Enterprise plans."
@@ -363,7 +363,7 @@ function AnomalyRulesPage() {
         })}
       </VStack>
       </EnterpriseLockedSurface>
-    </SettingsLayout>
+    </GovernanceLayout>
   );
 }
 

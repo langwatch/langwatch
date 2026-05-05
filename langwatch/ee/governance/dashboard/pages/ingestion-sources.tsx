@@ -27,9 +27,9 @@ import {
 import { useMemo, useState } from "react";
 
 import { EnterpriseLockedSurface } from "~/components/enterprise/EnterpriseLockedSurface";
+import GovernanceLayout from "~/components/governance/GovernanceLayout";
 import { LoadingScreen } from "~/components/LoadingScreen";
 import { NotFoundScene } from "~/components/NotFoundScene";
-import SettingsLayout from "~/components/SettingsLayout";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import {
   DialogBody,
@@ -387,7 +387,7 @@ function IngestionSourcesPage() {
   }
 
   return (
-    <SettingsLayout>
+    <GovernanceLayout>
       <EnterpriseLockedSurface
         featureName="Ingestion Sources"
         description="Custom ingestion sources beyond the OTel generic endpoint require an Enterprise plan. Existing OTel ingestion remains available on every plan."
@@ -508,7 +508,7 @@ function IngestionSourcesPage() {
         onClose={() => setSecretModal(null)}
       />
       </EnterpriseLockedSurface>
-    </SettingsLayout>
+    </GovernanceLayout>
   );
 }
 

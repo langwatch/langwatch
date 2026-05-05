@@ -90,7 +90,9 @@ export default function GovernanceLayout({ children }: PropsWithChildren) {
               <Box paddingX={3} paddingTop={4}>
                 <Text fontSize="xs" color="fg.subtle" lineHeight="1.5">
                   Sub-pages above are admin-config surfaces under
-                  Settings. This Overview is the daily-use home.
+                  Settings. This Overview is the daily-use home —
+                  plus a few lightweight org-policy toggles at the
+                  bottom.
                 </Text>
               </Box>
             </Box>

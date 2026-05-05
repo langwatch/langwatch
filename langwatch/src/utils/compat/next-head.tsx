@@ -2,7 +2,7 @@
  * Compatibility layer: next/head → react-helmet-async
  * Provides a simple Head component that updates document head.
  */
-import { useEffect, type ReactNode } from "react";
+import { useLayoutEffect, type ReactNode } from "react";
 
 interface HeadProps {
   children?: ReactNode;
@@ -11,9 +11,15 @@ interface HeadProps {
 /**
  * Simple Head component that processes children to update document.title.
  * For the basic usage in this app (just <title>), we don't need react-helmet-async.
+ *
+ * `useLayoutEffect` (not `useEffect`) fires before the browser paints, so
+ * the tab title is correct on first paint instead of flashing the parent
+ * route's title (e.g. "LangWatch - Personal Workspace") before flipping
+ * to the page-specific title on the next tick. Surfaced as Ariana QA
+ * finding G12: cold-load title regression on /settings/governance/teams.
  */
 export default function Head({ children }: HeadProps) {
-  useEffect(() => {
+  useLayoutEffect(() => {
     // Extract title from children
     if (children) {
       const childArray = Array.isArray(children) ? children : [children];

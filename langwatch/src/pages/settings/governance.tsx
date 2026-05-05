@@ -235,12 +235,15 @@ function GovernanceOverviewPage() {
               subline={
                 summary.spentThisWindowUsd === 0
                   ? "no traffic this window"
-                  : !summary.hasPriorBaseline
-                    ? "no prior-window baseline"
+                  : !summary.hasPriorBaseline ||
+                      summary.spentThisWindowUsd < 10
+                    ? "insufficient baseline"
                     : `${summary.windowOverPreviousPct >= 0 ? "↑" : "↓"} ${fmtTrendPct(summary.windowOverPreviousPct)} vs previous`
               }
               tone={
-                summary.hasPriorBaseline && summary.windowOverPreviousPct > 25
+                summary.hasPriorBaseline &&
+                summary.spentThisWindowUsd >= 10 &&
+                summary.windowOverPreviousPct > 25
                   ? "amber"
                   : "default"
               }
@@ -1009,9 +1012,16 @@ function TeamRow({ team }: { team: SpendByTeam }) {
             backgroundColor={dotColor}
             flexShrink={0}
           />
-          <Text fontWeight="medium" color={isOrgWide ? "fg.muted" : "fg"}>
-            {team.teamName}
-          </Text>
+          <VStack align="start" gap={0}>
+            <Text fontWeight="medium" color={isOrgWide ? "fg.muted" : "fg"}>
+              {team.teamName}
+            </Text>
+            {isOrgWide && (
+              <Text fontSize="xs" color="fg.subtle">
+                synthetic — sources without a team
+              </Text>
+            )}
+          </VStack>
         </HStack>
       </Box>
       <Box flex={2}>{fmtUsd(team.spendUsd)}</Box>
