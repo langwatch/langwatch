@@ -33,6 +33,40 @@ Feature: Persona-aware home CONTENT — what each persona sees on landing
     And resolution is via `governance.resolveHome` tRPC
 
   # ---------------------------------------------------------------------------
+  # Pre-persona: fresh-signup org-less user — must NOT enter the persona
+  # resolver yet. They land on /onboarding/welcome to bootstrap their first
+  # org + Personal Team + Personal Project + RoleBindings, then the resolver
+  # picks their canonical persona destination. (Ariana QA G73 caught the
+  # regression where org-less users dead-ended at /me with skeleton cards
+  # + Access-Restricted on /governance; fixed by `137965526`.)
+  # ---------------------------------------------------------------------------
+
+  @bdd @ui @persona-content @bootstrap @regression
+  Scenario: Fresh-signup user with no org bootstraps via /onboarding/welcome before the persona resolver runs
+    Given a user has just completed /auth/signup
+    And the user has zero Organization memberships (no org, no team, no project)
+    When they hit "/" or any post-auth landing
+    Then they are routed to "/onboarding/welcome" (NOT /me, NOT /governance)
+    And the welcome page calls `api.onboarding.initializeOrganization`
+    And that call creates: an Organization, a Personal Team membership,
+        2 RoleBindings (Owner on the org + Member on the personal team),
+        and a first project under the new org
+    And only after that step completes does `governance.resolveHome` run
+    And the resolver then routes the user per their canonical persona
+        (org owner with no IngestionSources → /governance with the
+        empty-state setup checklist)
+
+    # Regression-invariant — `pages/index.tsx:39-50` previously routed all
+    # org-less users to /me with a "persona-1 personal-only is a first-class
+    # persona" comment, but persona-1 by spec definition has Personal Team +
+    # Personal Project + Personal VK — which means non-empty
+    # `organizations.length`. The org-less branch was actually catching
+    # post-signup admins between signup and `initializeOrganization`,
+    # dead-ending them at /me skeletons + Access-Restricted on /governance.
+    # The bootstrap step is the missing precondition for the persona
+    # resolver, not a special case OF the persona resolver.
+
+  # ---------------------------------------------------------------------------
   # Persona 1 — personal_only — /me with AiToolsPortal + personal usage
   # ---------------------------------------------------------------------------
 
