@@ -263,6 +263,8 @@
         "mcp-server",
         "langevals",
         "clickhouse-serverless",
+        "python-sdk",
+        "skills",
         ".github",
         ".cursor",
         "assets"
