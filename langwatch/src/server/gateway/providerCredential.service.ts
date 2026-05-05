@@ -119,12 +119,77 @@ export class GatewayProviderCredentialService {
       });
     }
 
+    const slot = input.slot ?? "primary";
     return this.prisma.$transaction(async (tx) => {
+      // G115 — `(projectId, modelProviderId, slot)` is a hard unique
+      // constraint independent of `disabledAt`. If a soft-disabled row
+      // already occupies this tuple, the bind would fail with a P2002.
+      // The user clicked "Bind", which they consider a fresh action;
+      // the right outcome is to revive the existing row with the new
+      // settings rather than ask them to navigate elsewhere first.
+      const conflicting = await tx.gatewayProviderCredential.findUnique({
+        where: {
+          projectId_modelProviderId_slot: {
+            projectId: input.projectId,
+            modelProviderId: input.modelProviderId,
+            slot,
+          },
+        },
+        include: { modelProvider: true },
+      });
+      if (conflicting) {
+        if (conflicting.disabledAt === null) {
+          throw new TRPCError({
+            code: "CONFLICT",
+            message: `A binding for this provider at slot "${slot}" already exists`,
+          });
+        }
+        const before = serializeRowForAudit(conflicting);
+        const revived = await tx.gatewayProviderCredential.update({
+          where: { id: conflicting.id },
+          data: {
+            disabledAt: null,
+            slot,
+            rateLimitRpm: input.rateLimitRpm ?? null,
+            rateLimitTpm: input.rateLimitTpm ?? null,
+            rateLimitRpd: input.rateLimitRpd ?? null,
+            rotationPolicy: input.rotationPolicy ?? "MANUAL",
+            extraHeaders: input.extraHeaders ?? undefined,
+            providerConfig: input.providerConfig ?? undefined,
+            fallbackPriorityGlobal: input.fallbackPriorityGlobal ?? null,
+          },
+          include: { modelProvider: true },
+        });
+        await this.changeEvents.append(
+          {
+            organizationId: input.organizationId,
+            projectId: input.projectId,
+            kind: "PROVIDER_BINDING_UPDATED",
+            providerCredentialId: revived.id,
+          },
+          tx,
+        );
+        await this.auditLog.append(
+          {
+            organizationId: input.organizationId,
+            projectId: input.projectId,
+            actorUserId: input.actorUserId,
+            action: "gateway.provider_binding.created",
+            targetKind: "provider_binding",
+            targetId: revived.id,
+            before,
+            after: serializeRowForAudit(revived),
+          },
+          tx,
+        );
+        return revived;
+      }
+
       const row = await tx.gatewayProviderCredential.create({
         data: {
           projectId: input.projectId,
           modelProviderId: input.modelProviderId,
-          slot: input.slot ?? "primary",
+          slot,
           rateLimitRpm: input.rateLimitRpm ?? null,
           rateLimitTpm: input.rateLimitTpm ?? null,
           rateLimitRpd: input.rateLimitRpd ?? null,
