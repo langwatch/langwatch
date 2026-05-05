@@ -98,7 +98,7 @@ Feature: License Enforcement
     And the response should include currentMessagesPerMonth and maxMessagesPerMonth
     And the response should include currentEvaluationsCredit and maxEvaluationsCredit
 
-  @unit @unimplemented
+  @unit
   Scenario: License details card handles Infinity display
     Given an organization with UNLIMITED_PLAN
     When the license details are rendered
