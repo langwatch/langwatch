@@ -39,6 +39,7 @@ describe("KSUID resource patterns", () => {
     const generateScenarioId = () =>
       generate(KSUID_RESOURCES.SCENARIO).toString();
 
+    /** @scenario New scenario ID uses "scenario_" prefix with KSUID */
     it("generates IDs with scenario_ prefix", () => {
       const id = generateScenarioId();
       expect(id).toMatch(/^scenario_/);

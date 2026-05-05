@@ -3,16 +3,21 @@ Feature: Scenario ID format uses full prefix and KSUID
   I want scenario IDs to use the full "scenario" prefix and KSUID generation
   So that IDs are consistent with the project's KSUID naming conventions
 
+  # Parity status: 2 of 3 scenarios bound to existing tests.
+  # The remaining 1 @unimplemented scenario describes shipped behavior
+  # that does not yet have an integration test (#3458):
+  #   - "Synthetic scenario run ID uses \"scenariorun_\" prefix with KSUID"
+
   Background:
     Given a project exists
 
-  @unit @unimplemented
+  @unit
   Scenario: New scenario ID uses "scenario_" prefix with KSUID
     When a scenario is created
     Then its ID starts with "scenario_"
     And the suffix is a valid KSUID
 
-  @unit @unimplemented
+  @unit
   Scenario: Command bar entity registry recognizes both prefixes
     Given the entity registry maps prefixes to entity types
     When a scenario has the "scenario_" prefix

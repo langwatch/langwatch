@@ -3,6 +3,14 @@ Feature: Workflow Management UI
   I want to manage my workflows through the UI
   So that I can organize and maintain my workflow library
 
+  # All scenarios in this file describe a delete-confirmation dialog
+  # interaction on the WorkflowCard. They need a JSDOM/component test
+  # for the confirmation dialog (no such test file exists today —
+  # `CascadeArchiveDialog.test.tsx` covers a different surface).
+  # The behavioral piece (delete mutation success/failure) is covered
+  # by the Workflow REST API tests in
+  # `langwatch/src/app/api/workflows/__tests__/`.
+
   Background:
     Given I am authenticated as a project member
     And the project has existing workflows

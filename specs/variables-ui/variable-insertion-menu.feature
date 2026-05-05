@@ -4,6 +4,21 @@ Feature: Variable insertion menu
   I want to easily insert variables referencing data sources
   So that I can build dynamic prompts with proper mappings
 
+  # All scenarios describe the VariableInsertMenu component (open
+  # via {{ trigger, source-grouped fields, type icons, search, key
+  # navigation, insertion). Tests exist at
+  # `langwatch/src/components/variables/__tests__/VariableInsertMenu
+  # .test.tsx` and the trigger logic in
+  # `prompt-textarea/__tests__/PromptTextAreaWithVariables.test.tsx`.
+  #
+  # All scenarios are pre-classified KEEP/UPDATE in
+  # `specs/variables-ui/AUDIT_MANIFEST.md`. The 5 UPDATE rows
+  # describe behaviour that diverges from current source (e.g.
+  # search input only renders in `buttonMenuMode`, badges show
+  # "Text"/"Number"/"Object" not "STRING"/"OBJECT") — those need
+  # the spec rewritten before binding. The remaining KEEP rows
+  # need per-case JSDoc markers — deferred to keep this PR small.
+
   Background:
     Given a prompt textarea is rendered
     And available sources include:
