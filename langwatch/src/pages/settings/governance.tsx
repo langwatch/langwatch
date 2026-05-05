@@ -1032,6 +1032,8 @@ function TeamRow({ team }: { team: SpendByTeam }) {
   return (
     <Link
       href={`/settings/governance/teams/${team.teamId}`}
+      display="block"
+      width="full"
       _hover={{ textDecoration: "none" }}
     >
       {inner}
@@ -1044,6 +1046,8 @@ function UserRow({ user }: { user: SpendByUser }) {
   return (
     <Link
       href={`/settings/governance/users/${encodeURIComponent(user.actor)}`}
+      display="block"
+      width="full"
       _hover={{ textDecoration: "none" }}
     >
     <HStack

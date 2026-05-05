@@ -108,7 +108,9 @@ function GovernanceTeamsListPage() {
           <SortChips value={sortBy} onChange={setSortBy} />
         </HStack>
 
-        <Box
+        <VStack
+          align="stretch"
+          gap={0}
           borderWidth="1px"
           borderColor="border.muted"
           borderRadius="md"
@@ -126,7 +128,7 @@ function GovernanceTeamsListPage() {
           ) : (
             teams.map((t) => <Row key={t.teamId ?? "org-wide"} team={t} />)
           )}
-        </Box>
+        </VStack>
         <Text fontSize="xs" color="fg.muted">
           {teams.length} team{teams.length === 1 ? "" : "s"} shown.
         </Text>
@@ -258,6 +260,8 @@ function Row({ team }: { team: SpendByTeam }) {
   return (
     <Link
       href={`/settings/governance/teams/${team.teamId}`}
+      display="block"
+      width="full"
       _hover={{ textDecoration: "none" }}
     >
       {inner}

@@ -108,7 +108,9 @@ function GovernanceUsersListPage() {
           <SortChips value={sortBy} onChange={setSortBy} />
         </HStack>
 
-        <Box
+        <VStack
+          align="stretch"
+          gap={0}
           borderWidth="1px"
           borderColor="border.muted"
           borderRadius="md"
@@ -126,7 +128,7 @@ function GovernanceUsersListPage() {
           ) : (
             users.map((u) => <Row key={u.actor} user={u} />)
           )}
-        </Box>
+        </VStack>
         <Text fontSize="xs" color="fg.muted">
           {users.length} user{users.length === 1 ? "" : "s"} shown.
         </Text>
@@ -217,6 +219,8 @@ function Row({ user }: { user: SpendByUser }) {
   return (
     <Link
       href={`/settings/governance/users/${encodeURIComponent(user.actor)}`}
+      display="block"
+      width="full"
       _hover={{ textDecoration: "none" }}
     >
       <HStack
