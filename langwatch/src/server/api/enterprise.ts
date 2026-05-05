@@ -11,8 +11,13 @@ import type { PlanProviderUser } from "~/server/app-layer/subscription/plan-prov
  *
  * Set `LANGWATCH_DEV_FORCE_ENTERPRISE=true` in .env to opt in. Has no
  * effect when IS_SAAS=true (production SaaS deploys ignore the bypass).
+ *
+ * Test runs are always opted out: integration tests assert real plan
+ * resolution (e.g. 402 on FREE), and a leaked dev-bypass would mask
+ * those assertions. NODE_ENV === 'test' short-circuits the bypass.
  */
 function isDevForceEnterpriseEnabled(): boolean {
+  if (env.NODE_ENV === "test") return false;
   return !env.IS_SAAS && env.LANGWATCH_DEV_FORCE_ENTERPRISE === true;
 }
 
