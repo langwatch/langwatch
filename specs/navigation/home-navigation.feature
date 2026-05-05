@@ -4,6 +4,15 @@ Feature: Home Navigation
   I want consistent navigation to and from the home page
   So that I can easily access the dashboard and other features
 
+  # All 10 `@unimplemented` scenarios in this file describe page-
+  # level navigation and routing (logo click, sidebar menu items,
+  # active-page highlighting, conditional render of WelcomeLayout
+  # vs messages list, analytics alert when no traces, direct URL
+  # access). The MainMenu / sidebar components have no JSDOM render
+  # tests today, and there are no Playwright/E2E navigation tests
+  # for these routes yet. Cheap follow-up — write either a
+  # MainMenu render test or a Playwright suite under `e2e/`.
+
   Background:
     Given I am logged in
     And I have access to project "test-project"
