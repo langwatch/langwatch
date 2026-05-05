@@ -842,10 +842,27 @@ type StringTypeToType = {
   array: any[];
 };
 
+// Returns the unwrapped .value if v is an OTel typed-object wrapper ({ type, value } with exactly
+// those two own keys and a string type). Returns undefined to signal "no unwrap needed" — this
+// lets null/0/false/etc. pass through correctly as unwrapped values.
+const unwrapTypedObject = (v: unknown): unknown => {
+  if (v === null || typeof v !== "object" || Array.isArray(v)) return undefined;
+  const keys = Object.keys(v as object);
+  if (keys.length !== 2 || !keys.includes("type") || !keys.includes("value"))
+    return undefined;
+  const obj = v as { type: unknown; value: unknown };
+  if (typeof obj.type !== "string") return undefined;
+  return obj.value;
+};
+
 export const tryAndConvertTo = <T extends keyof StringTypeToType>(
   value: any,
   type: T,
 ): StringTypeToType[T] | undefined => {
+  // Unwrap OTel typed-object wrappers first so downstream coercion sees the bare value.
+  // OTel SDK auto-wraps span IO as { type: <string>, value: <any> }; evaluators need bare values. (#3875)
+  const unwrapped = unwrapTypedObject(value);
+  if (unwrapped !== undefined) value = unwrapped;
   if (value === null || value === undefined) {
     return undefined;
   }
