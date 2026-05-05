@@ -88,6 +88,7 @@ export function createGatewayBudgetSyncReactor(
             id: true,
             projectId: true,
             principalUserId: true,
+            lastUsedAt: true,
           },
         });
         if (!vk || vk.projectId !== projectId) {
@@ -96,6 +97,38 @@ export function createGatewayBudgetSyncReactor(
             "gateway trace references unknown or cross-tenant VK — skipping fold",
           );
           return;
+        }
+
+        // EC6 — touch lastUsedAt on every gateway trace, regardless of
+        // whether the VK has applicable budgets. The /budget/check
+        // hook in gateway-internal.ts only fires when the gateway
+        // calls it (which it skips when there are no budgets to
+        // precheck), so VKs without budgets had `lastUsedAt = null`
+        // forever and admin oversight ("when did this user last
+        // use their personal VK") was broken on the most common case.
+        //
+        // 60s throttle mirrors the /budget/check fix — admin
+        // dashboards refresh on minute-scale, no need to thrash the
+        // row on every request.
+        const now = new Date();
+        if (
+          !vk.lastUsedAt ||
+          now.getTime() - vk.lastUsedAt.getTime() > 60 * 1000
+        ) {
+          try {
+            await deps.prisma.virtualKey.update({
+              where: { id: vk.id },
+              data: { lastUsedAt: now },
+            });
+          } catch (touchErr) {
+            // Best-effort: a row update failure here doesn't poison
+            // the budget fold below, and the /budget/check hook is
+            // a fallback for the budgeted-VK case.
+            logger.warn(
+              { projectId, virtualKeyId, error: touchErr },
+              "failed to touch virtualKey.lastUsedAt during gateway trace fold",
+            );
+          }
         }
 
         const project = await deps.prisma.project.findUnique({
