@@ -21,6 +21,14 @@
  * SpendByTeam rollup actually has a per-team breakdown), and an
  * optional AnomalyAlert seed so "Recent anomalies" isn't empty.
  *
+ * Time distribution: rows span `2 * --days` with a recent-heavy power
+ * curve (~65% in the dashboard window, ~35% in the prior window). The
+ * prior-window mass is what makes `windowOverPreviousPct` /
+ * `deltaPctVsPriorWindow` produce realistic single-digit-to-double-digit
+ * deltas instead of `+100%-from-zero` artifacts on every team/user row.
+ * `--days N` keeps the dashboard window unchanged; the seed quietly
+ * fills 2*N days underneath.
+ *
  * Usage (from langwatch/ workspace, app container running):
  *   docker exec wise-mixing-zebra-app-1 sh -c \
  *     'cd /app && pnpm tsx scripts/dogfood/governance/seed-bird-eye.ts \
@@ -84,7 +92,12 @@ const PERSONAS = [
 ];
 
 function parseArgs(argv: string[]): Args {
-  const out: Partial<Args> = { days: 30, rows: 240, withAnomaly: true };
+  // 480 rows distributed across 2 * days (see pickDaysAgo): the recent
+  // half captures ~65% (~310 rows) — comparable density to the old
+  // 240-rows-over-1-window default — and the prior half captures ~35%
+  // for trend baselines. `--rows N` still overrides for sparse/dense
+  // captures.
+  const out: Partial<Args> = { days: 30, rows: 480, withAnomaly: true };
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === "--org") out.organizationId = argv[++i];
     else if (argv[i] === "--days") out.days = Number(argv[++i]);
@@ -114,9 +127,18 @@ function hex(n: number): string {
 }
 
 function pickDaysAgo(maxDays: number): number {
-  // Recent-weighted curve so the top-of-list "last activity" stays fresh.
+  // Distribute over 2 * maxDays with a recent-heavy power curve. The
+  // dashboard window is `maxDays` (the most-recent maxDays), so events
+  // landing in [maxDays, 2*maxDays) form the prior-window baseline that
+  // `windowOverPreviousPct` / `deltaPctVsPriorWindow` compare against.
+  // Without this the prior bucket is empty and every trend renders +100%.
+  //
+  // Power 1.6 over [0, 1) → integrating t^1.6 gives ~65% mass in the
+  // recent half, ~35% in the prior half → a realistic +86% delta on
+  // average, with per-team variance from the existing source-skew. Top
+  // of the list still feels fresh because the curve front-loads recent.
   const r = Math.random();
-  return Math.floor(maxDays * Math.pow(r, 1.6));
+  return Math.floor(2 * maxDays * Math.pow(r, 1.6));
 }
 
 /**
@@ -458,7 +480,10 @@ async function maybeSeedAnomalyAlert({
 
 async function main(): Promise<void> {
   const args = parseArgs(process.argv.slice(2));
-  console.log(`[seed-bird-eye] org=${args.organizationId} window=${args.days}d rows=${args.rows}`);
+  console.log(
+    `[seed-bird-eye] org=${args.organizationId} dashboard-window=${args.days}d ` +
+      `data-spread=${args.days * 2}d rows=${args.rows}`,
+  );
 
   const govProject = await ensureHiddenGovernanceProject(prisma, args.organizationId);
   console.log(`[seed-bird-eye] hidden Governance Project: id=${govProject.id}`);
