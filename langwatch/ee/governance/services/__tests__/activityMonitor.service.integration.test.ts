@@ -569,6 +569,14 @@ describe("ActivityMonitorService — read-side queries against unified trace sto
           new Date(result.buckets[i]!.bucketIso).getTime(),
         ).toBeGreaterThan(new Date(result.buckets[i - 1]!.bucketIso).getTime());
       }
+      // Anti-regression for the bucket-key arithmetic that produced
+      // empty `points: []` despite live data (CH date-math bug caught
+      // by Alexis on 82d485fe3 dogfood). At least one bucket must
+      // populate against the seeded fixture — a structurally-correct
+      // dense response with no points anywhere is exactly the symptom
+      // we're guarding against.
+      const populated = result.buckets.filter((b) => b.points.length > 0);
+      expect(populated.length).toBeGreaterThan(0);
     });
 
     it("groups by team — primary team appears in the recent bucket; Org-wide in the 14d-ago bucket", async () => {

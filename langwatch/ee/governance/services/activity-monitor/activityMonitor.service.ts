@@ -40,6 +40,13 @@ import {
 export interface SummaryResult {
   spentThisWindowUsd: number;
   windowOverPreviousPct: number;
+  /**
+   * False when the previous-window spend was zero (no baseline data
+   * to compare against). UI mutes the trend subline rather than
+   * rendering '↑ 100% vs previous' on every brand-new org. Same
+   * semantics as `SpendByTeamRow.hasPriorBaseline`.
+   */
+  hasPriorBaseline: boolean;
   activeUsersThisWindow: number;
   newUsersThisWindow: number;
   openAnomalyCount: number;
@@ -207,6 +214,7 @@ export interface SourceHealthMetrics {
 const EMPTY_SUMMARY: SummaryResult = {
   spentThisWindowUsd: 0,
   windowOverPreviousPct: 0,
+  hasPriorBaseline: false,
   activeUsersThisWindow: 0,
   newUsersThisWindow: 0,
   openAnomalyCount: 0,
@@ -360,6 +368,7 @@ export class ActivityMonitorService {
     return {
       spentThisWindowUsd: thisSpend,
       windowOverPreviousPct: pctChange(thisSpend, prevSpend),
+      hasPriorBaseline: prevSpend > 0,
       activeUsersThisWindow: thisUsers,
       // newUsers requires a baseline-window comparison query which is a
       // follow-up (3b: governance_kpis fold materialises the per-user
@@ -699,10 +708,19 @@ export class ActivityMonitorService {
           ? `ts.Attributes[{userKey:String}]`
           : `arrayElement(ts.Models, 1)`;
 
+    // `OccurredAt` is already DateTime64(3, 'UTC'); `toStartOfDay`
+    // preserves DateTime64 precision so we can pass it straight into
+    // `toUnixTimestamp64Milli`. The earlier `OccurredAt / 1000 →
+    // toDateTime64(…, 3)` round-trip was treating the ms-precision tick
+    // count as a seconds value and re-wrapping, which double-shifted
+    // every bucket far outside the requested window — bucket lookups
+    // missed every row and the chart rendered as empty `points: []`
+    // arrays despite live data. Pattern matches the working
+    // `spendByUser` query (`toUnixTimestamp64Milli(max(occurredAt))`).
     const result = await ch.query({
       query: `
         SELECT
-          toString(toUnixTimestamp64Milli(toStartOfDay(toDateTime64(ts.OccurredAt / 1000, 3)))) AS bucketMs,
+          toString(toUnixTimestamp64Milli(toStartOfDay(ts.OccurredAt))) AS bucketMs,
           ${groupExpr} AS groupKey,
           toString(sum(coalesce(ts.TotalCost, 0))) AS spendUsdStr
         FROM trace_summaries ts
