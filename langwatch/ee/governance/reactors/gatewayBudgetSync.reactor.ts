@@ -125,8 +125,14 @@ export function createGatewayBudgetSyncReactor(
         );
         if (shouldTouch) {
           try {
+            // Same multitenancy guard wrinkle as 918731f06: bare `id`
+            // is rejected by the dbMultiTenancyProtection middleware
+            // on every project-scoped model. `projectId` is required
+            // (or `projectId.in`) — Ariana caught this via the WARN
+            // log after EC6 part 1 landed. The reactor already has
+            // both pieces, just bind them in the where clause.
             await deps.prisma.virtualKey.update({
-              where: { id: vk.id },
+              where: { id: vk.id, projectId: vk.projectId },
               data: { lastUsedAt: now },
             });
             logger.info(
