@@ -15,6 +15,7 @@ import {
   PersonalVirtualKeyService,
   PersonalVirtualKeyNotFoundError,
   NoDefaultRoutingPolicyError,
+  RoutingPolicyHasNoProvidersError,
 } from "@ee/governance/services/personalVirtualKey.service";
 import { PersonalWorkspaceService } from "@ee/governance/services/personalWorkspace.service";
 
@@ -139,6 +140,21 @@ export const personalVirtualKeysRouter = createTRPCRouter({
         if (err instanceof NoDefaultRoutingPolicyError) {
           throw new TRPCError({
             code: "CONFLICT",
+            message: err.message,
+            cause: err,
+          });
+        }
+        // G34 — empty routing policy (provider list is []). Mapping to
+        // 422 (UNPROCESSABLE_CONTENT) per master_orchestrator's
+        // contract for validate-before-mint: the request is
+        // syntactically fine but the org's state doesn't yet support
+        // processing it. /me consumes the actionable
+        // "ask your admin to add providers" message at mint time
+        // instead of letting the user discover the gap via a
+        // copy-pasted curl that 504s.
+        if (err instanceof RoutingPolicyHasNoProvidersError) {
+          throw new TRPCError({
+            code: "UNPROCESSABLE_CONTENT",
             message: err.message,
             cause: err,
           });
