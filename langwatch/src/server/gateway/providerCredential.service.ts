@@ -102,13 +102,53 @@ export class GatewayProviderCredentialService {
   async create(
     input: CreateProviderCredentialInput,
   ): Promise<GatewayProviderCredentialRow> {
+    // G116 — ModelProvider is multi-scope (iter 109): an org-scoped MP
+    // is reachable from any project in the org via the
+    // ModelProviderScope join, but its own `projectId` column points
+    // at whichever project originally minted it. Looking the MP up by
+    // `(id, projectId)` therefore drops org/team-scoped rows on the
+    // floor — the bind drawer's dropdown lists them (correctly via
+    // `findAllAccessibleForProject`) so the admin sees a 'NOT_FOUND'
+    // mismatch only after clicking Bind. Walk the scope ladder
+    // (PROJECT → TEAM → ORGANIZATION) instead, mirroring the
+    // repository helper. Tenancy boundary still holds: we resolve the
+    // caller's project to its team + org once, and only consider MPs
+    // whose scope grant matches one of those three IDs.
+    const project = await this.prisma.project.findUnique({
+      where: { id: input.projectId },
+      select: {
+        id: true,
+        teamId: true,
+        team: { select: { organizationId: true } },
+      },
+    });
+    if (!project) {
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message: "Project not found",
+      });
+    }
     const modelProvider = await this.prisma.modelProvider.findFirst({
-      where: { id: input.modelProviderId, projectId: input.projectId },
+      where: {
+        id: input.modelProviderId,
+        scopes: {
+          some: {
+            OR: [
+              { scopeType: "PROJECT", scopeId: project.id },
+              { scopeType: "TEAM", scopeId: project.teamId },
+              {
+                scopeType: "ORGANIZATION",
+                scopeId: project.team.organizationId,
+              },
+            ],
+          },
+        },
+      },
     });
     if (!modelProvider) {
       throw new TRPCError({
         code: "NOT_FOUND",
-        message: "ModelProvider not found for this project",
+        message: "ModelProvider not accessible from this project",
       });
     }
     if (!modelProvider.enabled) {
