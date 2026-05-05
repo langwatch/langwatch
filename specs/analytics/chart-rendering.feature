@@ -92,7 +92,7 @@ Feature: Analytics Chart Rendering
   # Error state when query fails (bug fix #2599)
   # ---------------------------------------------------------------------------
 
-  @regression @integration @unimplemented
+  @regression @integration
   Scenario: Chart shows error state when analytics query fails
     Given an analytics chart with no cached data
     When the ClickHouse query returns an error
@@ -107,7 +107,7 @@ Feature: Analytics Chart Rendering
     Then the chart continues showing the cached data
     And a badge indicates the data may be stale with a retry option
 
-  @regression @integration @unimplemented
+  @regression @integration
   Scenario: Error state is visually distinct from empty data state
     Given an analytics chart
     When the query fails with an error
