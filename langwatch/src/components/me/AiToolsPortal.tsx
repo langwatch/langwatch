@@ -8,6 +8,7 @@ import {
 } from "@chakra-ui/react";
 import { useMemo } from "react";
 
+import { Link } from "~/components/ui/link";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 
@@ -35,10 +36,11 @@ const SECTION_ORDER: AiToolEntry["type"][] = [
 ];
 
 export function AiToolsPortal() {
-  const { organization } = useOrganizationTeamProject({
+  const { organization, hasPermission } = useOrganizationTeamProject({
     redirectToOnboarding: false,
   });
   const orgId = organization?.id ?? "";
+  const canManageCatalog = hasPermission("aiTools:manage");
 
   const listQuery = api.aiTools.list.useQuery(
     { organizationId: orgId },
@@ -96,11 +98,25 @@ export function AiToolsPortal() {
             <Heading as="h3" size="md">
               Your AI tools portal
             </Heading>
-            <Text fontSize="sm" color="fg.muted">
-              Your admin hasn&apos;t added any AI tools to your portal yet.
-              In the meantime, install the LangWatch CLI below to get started
-              with a coding assistant of your choice.
-            </Text>
+            {canManageCatalog ? (
+              <Text fontSize="sm" color="fg.muted">
+                No tools published to your org yet. Visit{" "}
+                <Link
+                  href="/settings/governance/tool-catalog"
+                  color="orange.600"
+                >
+                  Settings → Tool Catalog
+                </Link>{" "}
+                to import the starter pack or add tiles individually. The
+                LangWatch CLI below will work for any admin or member.
+              </Text>
+            ) : (
+              <Text fontSize="sm" color="fg.muted">
+                Your admin hasn&apos;t added any AI tools to your portal yet.
+                In the meantime, install the LangWatch CLI below to get
+                started with a coding assistant of your choice.
+              </Text>
+            )}
           </VStack>
         </Box>
         <InstallCliCard />

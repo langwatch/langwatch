@@ -185,7 +185,7 @@ export default function MySettingsPage() {
         </SectionCard>
 
         <SectionCard
-          title="Personal API Keys"
+          title="Personal Virtual Keys"
           description="These keys let your CLI tools (Claude Code, Cursor, etc.) talk to LangWatch."
           action={
             !showAddForm && (
