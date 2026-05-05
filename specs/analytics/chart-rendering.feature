@@ -32,7 +32,7 @@ Feature: Analytics Chart Rendering
   # Pass rate formatting
   # ---------------------------------------------------------------------------
 
-  @unit @unimplemented
+  @unit
   Scenario: Evaluation pass rate displays as percentage
     Given a chart showing evaluation pass rate data
     When the chart renders the Y-axis and tooltips
@@ -72,7 +72,7 @@ Feature: Analytics Chart Rendering
   # Event metrics coexistence
   # ---------------------------------------------------------------------------
 
-  @unit @unimplemented
+  @unit
   Scenario: Event details and event score metrics use distinct aggregation keys
     Given a dashboard with both event score and event details metrics
     When both metrics query the same event key and subkey
@@ -82,7 +82,7 @@ Feature: Analytics Chart Rendering
   # Tokens per second metric completeness
   # ---------------------------------------------------------------------------
 
-  @unit @unimplemented
+  @unit
   Scenario: Tokens per second metric resolves duration from stored spans
     Given an analytics query for the performance tokens per second metric
     When the ClickHouse query is built
