@@ -143,7 +143,14 @@ async function ensureSeedTeam({
   shortKey: string;
 }): Promise<{ id: string; name: string }> {
   const slug = `birdseye-${shortKey}-${orgSlugSuffix}`;
-  const existing = await prisma.team.findUnique({ where: { slug } });
+  // `findFirst` (not `findUnique`) so the multitenancy middleware sees
+  // organizationId in the WHERE clause — every org-scoped Prisma query
+  // must filter by org per `dbOrganizationIdProtection.ts`. Slug is
+  // already globally unique (`@unique` in schema) so narrowing by both
+  // fields still resolves at most one row, no behavior delta.
+  const existing = await prisma.team.findFirst({
+    where: { slug, organizationId },
+  });
   if (existing) {
     return { id: existing.id, name: existing.name };
   }
