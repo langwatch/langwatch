@@ -17,7 +17,6 @@ Feature: PlanProvider License Integration
     When I call planProvider.getActivePlan
     Then maxMembers is 1
 
-  @unimplemented
   Scenario: Limits to 2 projects when no license
     Given the organization has no license
     When I call planProvider.getActivePlan
@@ -27,7 +26,6 @@ Feature: PlanProvider License Integration
   # LicenseHandler Singleton
   # ============================================================================
 
-  @unimplemented
   Scenario: getLicenseHandler returns same instance
     When I call getLicenseHandler twice
     Then both calls return the same instance
