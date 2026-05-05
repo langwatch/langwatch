@@ -64,6 +64,31 @@ export class GatewayProviderCredentialService {
     });
   }
 
+  /**
+   * G19 — list every gateway provider credential reachable from any project
+   * in the org. Used by org-scoped pickers (routing-policy drawer) where
+   * the admin needs to choose credentials regardless of which project they
+   * happen to be defined under. Two-step query mirrors
+   * routingPolicy.service.assertProviderCredentialsBelongToOrg — the
+   * dbMultiTenancyProtection middleware refuses any direct query against
+   * gatewayProviderCredential without projectId in the WHERE clause.
+   */
+  async getAllForOrg(
+    organizationId: string,
+  ): Promise<GatewayProviderCredentialRow[]> {
+    const projects = await this.prisma.project.findMany({
+      where: { team: { organizationId } },
+      select: { id: true },
+    });
+    const projectIds = projects.map((p) => p.id);
+    if (projectIds.length === 0) return [];
+    return this.prisma.gatewayProviderCredential.findMany({
+      where: { projectId: { in: projectIds } },
+      include: { modelProvider: true },
+      orderBy: [{ fallbackPriorityGlobal: "asc" }, { createdAt: "asc" }],
+    });
+  }
+
   async getById(
     id: string,
     projectId: string,

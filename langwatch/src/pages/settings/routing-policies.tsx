@@ -71,6 +71,7 @@ function RoutingPoliciesPage() {
     redirectToOnboarding: false,
   });
   const orgId = organization?.id ?? "";
+  const projectSlug = project?.slug ?? "";
   // Admin-in-empty-org (org but no project) is exempted from the no-org
   // bouncer for this route — the FF query must resolve on org alone, not
   // gate on project. Project remains a hint for PostHog cohort targeting.
@@ -82,6 +83,15 @@ function RoutingPoliciesPage() {
     });
 
   const policiesQuery = api.routingPolicy.list.useQuery(
+    { organizationId: orgId },
+    { enabled: !!orgId, refetchOnWindowFocus: false },
+  );
+
+  // G19 — fuel the structured picker on the drawer with the org's actual
+  // gateway provider credentials. Without this, admins were left typing
+  // raw CUIDs against a `mp_anthropic` placeholder that didn't match any
+  // real ID format and sat below the visible toast layer.
+  const credentialsQuery = api.gatewayProviders.listForOrg.useQuery(
     { organizationId: orgId },
     { enabled: !!orgId, refetchOnWindowFocus: false },
   );
@@ -102,19 +112,28 @@ function RoutingPoliciesPage() {
   const refetch = () =>
     utils.routingPolicy.list.invalidate({ organizationId: orgId });
 
+  // G82 — surface tRPC errors INSIDE the drawer in addition to the toast.
+  // The toast was racing the drawer's own scrim/overlay z-index on some
+  // viewport heights and silently failed to render, leaving "Create
+  // policy" looking like a no-op. Inline alert is the durable signal.
+  const [drawerError, setDrawerError] = useState<string | null>(null);
+
   const createMutation = api.routingPolicy.create.useMutation({
     onSuccess: () => {
       void refetch();
       setEditingId(null);
       setComposer(null);
+      setDrawerError(null);
       toaster.create({ title: "Routing policy created", type: "success" });
     },
-    onError: (e) =>
+    onError: (e) => {
+      setDrawerError(e.message);
       toaster.create({
         title: "Failed to create policy",
         description: e.message,
         type: "error",
-      }),
+      });
+    },
   });
 
   const updateMutation = api.routingPolicy.update.useMutation({
@@ -122,14 +141,17 @@ function RoutingPoliciesPage() {
       void refetch();
       setEditingId(null);
       setComposer(null);
+      setDrawerError(null);
       toaster.create({ title: "Routing policy updated", type: "success" });
     },
-    onError: (e) =>
+    onError: (e) => {
+      setDrawerError(e.message);
       toaster.create({
         title: "Failed to update policy",
         description: e.message,
         type: "error",
-      }),
+      });
+    },
   });
 
   const setDefaultMutation = api.routingPolicy.setDefault.useMutation({
@@ -176,6 +198,7 @@ function RoutingPoliciesPage() {
     scopeIdDefault: string,
     initialIsDefault = false,
   ) => {
+    setDrawerError(null);
     setEditingId("new");
     setComposer({
       scope,
@@ -190,6 +213,7 @@ function RoutingPoliciesPage() {
   };
 
   const startEdit = (p: Policy) => {
+    setDrawerError(null);
     setEditingId(p.id);
     setComposer({
       scope: p.scope as Scope,
@@ -404,8 +428,16 @@ function RoutingPoliciesPage() {
             ? createMutation.isPending
             : updateMutation.isPending
         }
+        availableCredentials={credentialsQuery.data ?? []}
+        credentialsLoading={credentialsQuery.isLoading}
+        gatewayProvidersAdminPath={
+          projectSlug ? `/${projectSlug}/gateway/providers` : null
+        }
+        errorMessage={drawerError}
+        onClearError={() => setDrawerError(null)}
         onSubmit={onSubmit}
         onCancel={() => {
+          setDrawerError(null);
           setEditingId(null);
           setComposer(null);
         }}
@@ -652,12 +684,220 @@ const SCOPE_LABEL: Record<Scope, string> = {
   project: "Project",
 };
 
+type ProviderCredentialOption = {
+  id: string;
+  modelProviderName: string;
+  slot: string;
+  disabledAt: string | null;
+  healthStatus: string;
+};
+
+/**
+ * Structured ordered multi-select for provider credentials. Replaces
+ * the prior free-text ChipListEditor (G19) — the input expected raw
+ * GatewayProviderCredential CUIDs and the placeholder hinted at slugs
+ * like `mp_anthropic`, so admins typed slugs and got a 403 rejection
+ * (G82). Now: dropdown of the org's configured credentials by name +
+ * slot, ordered fallback list, no way to type an invalid ID.
+ */
+function ProviderCredentialPicker({
+  selectedIds,
+  onChange,
+  available,
+  loading,
+  gatewayProvidersAdminPath,
+}: {
+  selectedIds: string[];
+  onChange: (next: string[]) => void;
+  available: ProviderCredentialOption[];
+  loading: boolean;
+  gatewayProvidersAdminPath: string | null;
+}) {
+  const byId = useMemo(() => {
+    const map = new Map<string, ProviderCredentialOption>();
+    for (const c of available) map.set(c.id, c);
+    return map;
+  }, [available]);
+
+  const remaining = useMemo(
+    () => available.filter((c) => !selectedIds.includes(c.id)),
+    [available, selectedIds],
+  );
+
+  const removeAt = (i: number) =>
+    onChange(selectedIds.filter((_, idx) => idx !== i));
+
+  const swap = (a: number, b: number) => {
+    if (a < 0 || b < 0 || a >= selectedIds.length || b >= selectedIds.length)
+      return;
+    const next = selectedIds.slice();
+    const tmp = next[a]!;
+    next[a] = next[b]!;
+    next[b] = tmp;
+    onChange(next);
+  };
+
+  const addById = (id: string) => {
+    if (!id || selectedIds.includes(id)) return;
+    onChange([...selectedIds, id]);
+  };
+
+  const formatLabel = (option: ProviderCredentialOption) =>
+    option.slot && option.slot !== "primary"
+      ? `${option.modelProviderName} (${option.slot})`
+      : option.modelProviderName;
+
+  if (loading) {
+    return (
+      <HStack gap={2}>
+        <Spinner size="xs" />
+        <Text fontSize="sm" color="fg.muted">
+          Loading provider credentials…
+        </Text>
+      </HStack>
+    );
+  }
+
+  if (available.length === 0) {
+    return (
+      <Box
+        borderWidth="1px"
+        borderColor="orange.300"
+        borderRadius="md"
+        backgroundColor="orange.50"
+        padding={3}
+      >
+        <VStack align="start" gap={1}>
+          <Text fontSize="sm" fontWeight="semibold">
+            No gateway provider credentials yet
+          </Text>
+          <Text fontSize="xs" color="fg.muted">
+            A routing policy points at one or more gateway provider
+            credentials. Configure at least one before saving this
+            policy.
+          </Text>
+          {gatewayProvidersAdminPath && (
+            <Link
+              href={gatewayProvidersAdminPath}
+              color="orange.700"
+              fontSize="xs"
+              fontWeight="medium"
+            >
+              Open Gateway Providers admin →
+            </Link>
+          )}
+        </VStack>
+      </Box>
+    );
+  }
+
+  return (
+    <VStack align="stretch" gap={2}>
+      {selectedIds.length > 0 && (
+        <VStack align="stretch" gap={1}>
+          {selectedIds.map((id, i) => {
+            const option = byId.get(id);
+            const label = option ? formatLabel(option) : null;
+            return (
+              <HStack
+                key={`${id}-${i}`}
+                borderWidth="1px"
+                borderColor={option ? "border.muted" : "red.300"}
+                borderRadius="sm"
+                paddingX={2}
+                paddingY={1}
+                gap={2}
+                backgroundColor={option ? "bg.subtle" : "red.50"}
+              >
+                <Text fontSize="xs" color="fg.muted" minWidth="20px">
+                  {i + 1}.
+                </Text>
+                <VStack align="start" gap={0} flex={1} minWidth={0}>
+                  <Text fontSize="sm" fontWeight="medium">
+                    {label ?? "Unknown credential"}
+                  </Text>
+                  <Text fontSize="xs" color="fg.muted" fontFamily="mono">
+                    {id}
+                  </Text>
+                  {option?.disabledAt && (
+                    <Text fontSize="xs" color="orange.600">
+                      Disabled — requests will skip this credential
+                    </Text>
+                  )}
+                </VStack>
+                <Button
+                  size="xs"
+                  variant="ghost"
+                  onClick={() => swap(i, i - 1)}
+                  disabled={i === 0}
+                  aria-label="Move up"
+                >
+                  <ArrowUp size={12} />
+                </Button>
+                <Button
+                  size="xs"
+                  variant="ghost"
+                  onClick={() => swap(i, i + 1)}
+                  disabled={i === selectedIds.length - 1}
+                  aria-label="Move down"
+                >
+                  <ArrowDown size={12} />
+                </Button>
+                <Button
+                  size="xs"
+                  variant="ghost"
+                  onClick={() => removeAt(i)}
+                  aria-label="Remove"
+                >
+                  <X size={12} />
+                </Button>
+              </HStack>
+            );
+          })}
+        </VStack>
+      )}
+      {remaining.length > 0 ? (
+        <NativeSelect.Root size="sm">
+          <NativeSelect.Field
+            value=""
+            aria-label="Add provider credential"
+            onChange={(e) => {
+              const value = e.target.value;
+              if (value) {
+                addById(value);
+                e.target.value = "";
+              }
+            }}
+          >
+            <option value="">+ Add provider credential…</option>
+            {remaining.map((option) => (
+              <option key={option.id} value={option.id}>
+                {formatLabel(option)}
+                {option.disabledAt ? " — disabled" : ""}
+              </option>
+            ))}
+          </NativeSelect.Field>
+        </NativeSelect.Root>
+      ) : (
+        <Text fontSize="xs" color="fg.muted">
+          All configured provider credentials are in this policy.
+        </Text>
+      )}
+    </VStack>
+  );
+}
+
 function RoutingPolicyDrawer({
   open,
   composer,
   setComposer,
   mode,
   isPending,
+  availableCredentials,
+  credentialsLoading,
+  gatewayProvidersAdminPath,
+  errorMessage,
+  onClearError,
   onSubmit,
   onCancel,
 }: {
@@ -666,6 +906,11 @@ function RoutingPolicyDrawer({
   setComposer: (next: ComposerState | null) => void;
   mode: "create" | "edit";
   isPending: boolean;
+  availableCredentials: ProviderCredentialOption[];
+  credentialsLoading: boolean;
+  gatewayProvidersAdminPath: string | null;
+  errorMessage: string | null;
+  onClearError: () => void;
   onSubmit: () => void;
   onCancel: () => void;
 }) {
@@ -766,14 +1011,14 @@ function RoutingPolicyDrawer({
 
               <Field.Root required>
                 <Field.Label>Provider credentials (ordered)</Field.Label>
-                <ChipListEditor
-                  values={composer.providerCredentialIds}
+                <ProviderCredentialPicker
+                  selectedIds={composer.providerCredentialIds}
                   onChange={(next) =>
                     setComposer({ ...composer, providerCredentialIds: next })
                   }
-                  placeholder="mp_anthropic"
-                  ordered
-                  inputAriaLabel="Add provider credential ID"
+                  available={availableCredentials}
+                  loading={credentialsLoading}
+                  gatewayProvidersAdminPath={gatewayProvidersAdminPath}
                 />
                 <Field.HelperText>
                   First match wins. Use ↑/↓ to set fallback priority.
@@ -828,18 +1073,53 @@ function RoutingPolicyDrawer({
           )}
         </Drawer.Body>
         <Drawer.Footer>
-          <HStack gap={2} width="full" justifyContent="flex-end">
-            <Button variant="ghost" onClick={onCancel} disabled={isPending}>
-              Cancel
-            </Button>
-            <Button
-              onClick={onSubmit}
-              loading={isPending}
-              disabled={submitDisabled}
-            >
-              {mode === "create" ? "Create policy" : "Save changes"}
-            </Button>
-          </HStack>
+          <VStack align="stretch" gap={3} width="full">
+            {errorMessage && (
+              <Box
+                borderWidth="1px"
+                borderColor="red.300"
+                borderRadius="md"
+                backgroundColor="red.50"
+                padding={3}
+              >
+                <HStack alignItems="start" gap={2}>
+                  <Box color="red.600" paddingTop="2px">
+                    <X size={14} />
+                  </Box>
+                  <VStack align="start" gap={0} flex={1} minWidth={0}>
+                    <Text fontSize="xs" fontWeight="semibold" color="red.700">
+                      {mode === "create"
+                        ? "Couldn't create the policy"
+                        : "Couldn't save the policy"}
+                    </Text>
+                    <Text fontSize="xs" color="red.700">
+                      {errorMessage}
+                    </Text>
+                  </VStack>
+                  <Button
+                    size="xs"
+                    variant="ghost"
+                    onClick={onClearError}
+                    aria-label="Dismiss error"
+                  >
+                    <X size={12} />
+                  </Button>
+                </HStack>
+              </Box>
+            )}
+            <HStack gap={2} width="full" justifyContent="flex-end">
+              <Button variant="ghost" onClick={onCancel} disabled={isPending}>
+                Cancel
+              </Button>
+              <Button
+                onClick={onSubmit}
+                loading={isPending}
+                disabled={submitDisabled}
+              >
+                {mode === "create" ? "Create policy" : "Save changes"}
+              </Button>
+            </HStack>
+          </VStack>
         </Drawer.Footer>
       </Drawer.Content>
     </Drawer.Root>

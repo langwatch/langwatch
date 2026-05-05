@@ -11,7 +11,7 @@ import { z } from "zod";
 
 import { GatewayProviderCredentialService } from "~/server/gateway/providerCredential.service";
 
-import { checkProjectPermission } from "../rbac";
+import { checkOrganizationPermission, checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 async function orgForProject(
@@ -49,6 +49,28 @@ export const gatewayProvidersRouter = createTRPCRouter({
         circuitOpenedAt: row.circuitOpenedAt?.toISOString() ?? null,
         disabledAt: row.disabledAt?.toISOString() ?? null,
         createdAt: row.createdAt.toISOString(),
+      }));
+    }),
+
+  /**
+   * G19 — list every gateway provider credential reachable from any project
+   * in the org. Powers the structured multi-select on the org-scoped routing
+   * policy drawer. Project-level callers should keep using `list`.
+   */
+  listForOrg: protectedProcedure
+    .input(z.object({ organizationId: z.string() }))
+    .use(checkOrganizationPermission("organization:manage"))
+    .query(async ({ ctx, input }) => {
+      const service = GatewayProviderCredentialService.create(ctx.prisma);
+      const rows = await service.getAllForOrg(input.organizationId);
+      return rows.map((row) => ({
+        id: row.id,
+        projectId: row.projectId,
+        modelProviderId: row.modelProviderId,
+        modelProviderName: row.modelProvider.provider,
+        slot: row.slot,
+        healthStatus: row.healthStatus,
+        disabledAt: row.disabledAt?.toISOString() ?? null,
       }));
     }),
 
