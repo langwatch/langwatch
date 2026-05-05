@@ -5,6 +5,7 @@ import { formatFetchError } from "../../utils/formatFetchError";
 import { failSpinner } from "../../utils/spinnerError";
 import { buildAuthHeaders } from "@/internal/api/auth";
 
+import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
 export const runWorkflowCommand = async (
   id: string,
   options: { input?: string; format?: string },
@@ -21,7 +22,7 @@ export const runWorkflowCommand = async (
 
     // Workflow run API is on the pages API, not the Hono app API
     const apiKey = process.env.LANGWATCH_API_KEY ?? "";
-    const endpoint = process.env.LANGWATCH_ENDPOINT ?? "https://app.langwatch.ai";
+    const endpoint = resolveControlPlaneUrl();
 
     const response = await fetch(`${endpoint}/api/workflows/${encodeURIComponent(id)}/run`, {
       method: "POST",

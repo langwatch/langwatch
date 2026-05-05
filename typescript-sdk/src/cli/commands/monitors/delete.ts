@@ -4,6 +4,7 @@ import { formatFetchError } from "../../utils/formatFetchError";
 import { failSpinner } from "../../utils/spinnerError";
 import { buildAuthHeaders } from "@/internal/api/auth";
 
+import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
 export const deleteMonitorCommand = async (
   id: string,
   options?: { format?: string }
@@ -12,7 +13,7 @@ export const deleteMonitorCommand = async (
 
   const apiKey = process.env.LANGWATCH_API_KEY ?? "";
   const endpoint =
-    process.env.LANGWATCH_ENDPOINT ?? "https://app.langwatch.ai";
+    resolveControlPlaneUrl();
 
   const spinner = ora(`Deleting monitor "${id}"...`).start();
 

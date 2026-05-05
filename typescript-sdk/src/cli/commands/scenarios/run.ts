@@ -7,6 +7,7 @@ import {
 import { checkApiKey } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
 import { buildAuthHeaders } from "@/internal/api/auth";
+import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
 
 function parseTarget(targetStr: string): SuiteTarget {
   const colonIndex = targetStr.indexOf(":");
@@ -88,7 +89,7 @@ export const runScenarioCommand = async (
     const pollSpinner = ora("Waiting for scenario run to complete...").start();
 
     const apiKey = process.env.LANGWATCH_API_KEY ?? "";
-    const endpoint = process.env.LANGWATCH_ENDPOINT ?? "https://app.langwatch.ai";
+    const endpoint = resolveControlPlaneUrl();
 
     let completed = false;
     const startTime = Date.now();

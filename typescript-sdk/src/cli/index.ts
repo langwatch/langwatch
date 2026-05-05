@@ -142,10 +142,11 @@ const loginCmd = program
   .command("login")
   .description(
     governancePreview
-      ? "Login to LangWatch. By default, prompts for an API key (or pass --api-key for CI). Use --device to authenticate via your company SSO and provision a personal AI Gateway virtual key."
+      ? "Login to LangWatch. With no flags, asks where (cloud vs self-hosted) and how (AI tools vs project SDK). For CI/agents pass --device, --api-key, or --token to skip prompts."
       : "Login to LangWatch. Prompts for an API key, or pass --api-key for CI."
   )
-  .option("--api-key <key>", "Set API key non-interactively (for CI/CD and agents)");
+  .option("--api-key <key>", "Set API key non-interactively (CI/agents that already have a project API key) — writes to .env")
+  .option("--endpoint <url>", "Override the LangWatch control-plane URL for this login (self-hosted instances)");
 
 if (governancePreview) {
   loginCmd
@@ -154,13 +155,17 @@ if (governancePreview) {
       "RFC 8628 device-flow login via your company SSO; provisions a personal virtual key for Claude Code / Codex / Cursor / Gemini CLI",
     )
     .option(
+      "--token <token>",
+      "Set device-session token non-interactively (CI/agents that already have a pre-minted token from the dashboard) — writes to ~/.langwatch/config.json",
+    )
+    .option(
       "--browser <name>",
       "browser to open for device-flow approval (chrome|chromium|firefox|safari|none|<path>)",
     );
 }
 
-loginCmd.action(async (options: { apiKey?: string; device?: boolean; browser?: string }) => {
-  if (options.device && !governancePreview) {
+loginCmd.action(async (options: { apiKey?: string; device?: boolean; browser?: string; endpoint?: string; token?: string }) => {
+  if ((options.device || options.token) && !governancePreview) {
     console.error(GOVERNANCE_PREVIEW_DISABLED_MESSAGE);
     process.exit(1);
   }
@@ -171,6 +176,37 @@ loginCmd.action(async (options: { apiKey?: string; device?: boolean; browser?: s
     process.exit(1);
   }
 });
+
+// `langwatch config <get|set|list>` — explicit persistence + introspection
+// for user-global CLI config. Mirrors `gh config` / `doctl auth init` /
+// `stripe config` patterns so users don't hand-edit ~/.langwatch/config.json.
+const configCmd = program
+  .command("config")
+  .description("Read or write user-global CLI configuration (endpoint, gateway-url)");
+
+configCmd
+  .command("set <key> <value>")
+  .description("Persist a config value to ~/.langwatch/config.json (e.g. `langwatch config set endpoint https://lw.acme.internal`)")
+  .action(async (key: string, value: string) => {
+    const { configSetCommand } = await import("./commands/config.js");
+    await configSetCommand(key, value);
+  });
+
+configCmd
+  .command("get <key>")
+  .description("Print the resolved value for a config key (uses the same flag > env > config > default priority as the CLI)")
+  .action(async (key: string) => {
+    const { configGetCommand } = await import("./commands/config.js");
+    await configGetCommand(key);
+  });
+
+configCmd
+  .command("list")
+  .description("List the current resolved values + their sources (no secrets shown)")
+  .action(async () => {
+    const { configListCommand } = await import("./commands/config.js");
+    await configListCommand();
+  });
 
 if (governancePreview) {
 // AI Gateway governance — read identity, deep-link, request budget increase.

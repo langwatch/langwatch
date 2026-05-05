@@ -36,7 +36,13 @@ export interface GovernanceConfig {
 }
 
 function defaults(): GovernanceConfig {
-  const cp = process.env.LANGWATCH_ENDPOINT ?? process.env.LANGWATCH_URL ?? "https://app.langwatch.ai";
+  // Note: the single source of truth for endpoint resolution at command
+  // boundaries is `resolveControlPlaneEndpoint()` in resolveEndpoint.ts.
+  // This function only seeds the *initial* GovernanceConfig shape when
+  // no file exists yet — at boot, before the user has logged in.
+  // `LANGWATCH_URL` legacy alias intentionally NOT read (was undocumented;
+  // dropped per rchaves directive 2026-05-05).
+  const cp = process.env.LANGWATCH_ENDPOINT ?? "https://app.langwatch.ai";
   const gw = process.env.LANGWATCH_GATEWAY_URL ?? "https://gateway.langwatch.ai";
   return { gateway_url: gw, control_plane_url: cp };
 }
