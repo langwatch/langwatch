@@ -3,6 +3,15 @@ Feature: Suite URL path nested under simulations
   I want suite pages to be under /simulations/suites in the URL
   So that the URL structure matches the navigation menu hierarchy
 
+  # Parity status: 0 of 4 scenarios bound to existing tests.
+  # Remaining @unimplemented scenarios (#3458):
+  #   4 UPDATE: implementation diverged from spec wording
+  # UPDATE divergences:
+  #   - "Suite route path is nested under simulations": URL is now /simulations/run-plans/:slug, not /simulations/suites
+  #   - "Navigation link points to the new suite URL": Sidebar link points to /simulations after #2320 rename to Run Plans
+  #   - "Only Suites is active in sidebar when viewing suites page": Menu item renamed to "Run Plans"/"Run History" per #2320; "Suites menu item" wording stale
+  #   - "User navigates to suites via simulations menu": Path/label diverged after #2320 + #2946; SuiteUrlRouting.integration.test.tsx covers current behavior
+
   Background:
     Given a project with slug "my-project"
 

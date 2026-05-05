@@ -109,6 +109,7 @@ describe("<SuiteSidebar/> External Sets", () => {
       );
     });
 
+    /** @scenario "External set batch entry displays the set name" */
     /** @scenario "External set uses scenarioSetId as its display name" */
     it("displays external set names", () => {
       render(

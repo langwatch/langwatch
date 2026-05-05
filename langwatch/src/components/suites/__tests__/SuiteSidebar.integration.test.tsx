@@ -85,6 +85,7 @@ describe("<SuiteSidebar/>", () => {
       makeSuite({ id: "suite_3", name: "Quick Run", slug: "quick-run" }),
     ];
 
+    /** @scenario "Sidebar still shows suite names and action buttons after label removal" */
     it("displays all suite names", () => {
       render(<SuiteSidebar {...defaultProps} suites={suites} />, {
         wrapper: Wrapper,
