@@ -7,8 +7,9 @@ import { KSUID_RESOURCES } from "../../../../../utils/constants";
 import { createLogger } from "../../../../../utils/logger/server";
 import type { ReactorDefinition } from "../../../reactors/reactor.types";
 import type { TraceSummaryData } from "../projections/traceSummary.foldProjection";
-import type { TraceProcessingEvent } from "../schemas/events";
+import { isSpanReceivedEvent, type TraceProcessingEvent } from "../schemas/events";
 import { defineOriginGuardedTraceReactor } from "./_originGuardedReactor";
+import { SYNTHETIC_SPAN_NAMES } from "~/server/tracer/constants";
 import { DEFERRED_CHECK_DELAY_MS } from "./originGate.reactor";
 
 const logger = createLogger(
@@ -35,6 +36,13 @@ export function createEvaluationTriggerReactor(
     name: "evaluationTrigger",
     jobIdPrefix: "eval-trigger",
     async handle(event, context) {
+      // Bug 2 / #3875: synthetic event spans (e.g. thumbs-up/down feedback via /api/track_event)
+      // do not contribute to fold IO and must not re-trigger ON_MESSAGE evaluator runs. We
+      // share `SYNTHETIC_SPAN_NAMES` with the trace-summary fold (foldProjection.ts:88) so a
+      // future synthetic name updates both sites at once.
+      if (isSpanReceivedEvent(event) && SYNTHETIC_SPAN_NAMES.has(event.data.span?.name)) {
+        return;
+      }
       const { tenantId, aggregateId: traceId, foldState } = context;
       // Origin is known — dispatch to monitors, precondition matchers filter by origin.
       await dispatchEvaluations({
