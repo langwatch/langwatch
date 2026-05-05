@@ -8,14 +8,14 @@ Feature: Diagnostic logging on auth failure
     Given the unified auth middleware is mounted on a Hono route
     And a request reaches the middleware
 
-  @unit @unimplemented
+  @unit
   Scenario: extractCredentials returns null because no auth header was sent
     When the request has no Authorization, X-Auth-Token, or X-Project-Id headers
     Then the middleware emits a single WARN-level log line at "langwatch:api:unified-auth"
     And the log line contains userAgent, traceparent, x-forwarded-for, path, method
     And the log line records hasEmptyAuthToken=false (no header at all)
 
-  @unit @unimplemented
+  @unit
   Scenario: extractCredentials returns null because X-Auth-Token was sent empty
     When the request has X-Auth-Token: "" (empty string)
     Then the middleware emits a single WARN-level log line at "langwatch:api:unified-auth"
@@ -36,13 +36,13 @@ Feature: Diagnostic logging on auth failure
     When the middleware passes auth
     Then no diagnostic auth-failure log is emitted
 
-  @unit @unimplemented
+  @unit
   Scenario: Diagnostic fields are safe to log
     Then the log NEVER includes the raw token value
     And the log NEVER includes the request body
     And only the prefix of the token (first 8 chars) is included when the resolver path is taken
 
-  @unit @unimplemented
+  @unit
   Scenario: Authorization header from a proxy does not poison X-Auth-Token fallback
     Given a corporate proxy injects "Authorization: Basic <its-own-base64>" into the request
     And the customer's request also carries "X-Auth-Token: <valid-key>"
@@ -51,7 +51,7 @@ Feature: Diagnostic logging on auth failure
     And the customer's legitimate token is used for project resolution
     And the request is not 401'd by the proxy header
 
-  @unit @unimplemented
+  @unit
   Scenario: Empty or whitespace-only Bearer token does not poison X-Auth-Token fallback
     Given a request carries "Authorization: Bearer " (empty or whitespace-only)
     And the same request carries "X-Auth-Token: <valid-key>"
