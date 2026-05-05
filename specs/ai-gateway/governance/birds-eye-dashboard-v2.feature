@@ -1,5 +1,5 @@
 Feature: Bird's-eye governance dashboard v2 — graphs, Top-N framing, click-through, color-coded series
-  The org-admin landing surface at "/settings/governance" was originally a
+  The org-admin landing surface at "/governance" was originally a
   set of summary cards + flat top-5 spend tables. Customer-demo signal
   said the page must answer "how is the company adopting AI?" at a
   glance — outliers, trends, departments, model mix, growth — not
@@ -23,7 +23,9 @@ Feature: Bird's-eye governance dashboard v2 — graphs, Top-N framing, click-thr
        series throughout the dashboard.
     7. Honest empty / zero / no-baseline states.
 
-  This is a v2 over the same `/settings/governance` page — the v1
+  This is a v2 over the same `/governance` page (canonical Overview;
+  `/settings/governance` is registered as a back-compat alias per
+  `langwatch/src/routes.tsx` comment) — the v1
   shape continues to ship as a regression invariant for orgs that
   haven't seeded multi-team data yet.
 
@@ -42,7 +44,7 @@ Feature: Bird's-eye governance dashboard v2 — graphs, Top-N framing, click-thr
     Given the user is signed in as an org admin of "acme-corp"
     And the governance preview flag is enabled for acme-corp
     And the org has activity from at least 4 teams across the last 60 days
-    And the user is on "/settings/governance"
+    And the user is on "/governance"
 
   # ---------------------------------------------------------------------------
   # Axis 1 — Bug fixes on the v1 surface (Phase A)
@@ -75,7 +77,7 @@ Feature: Bird's-eye governance dashboard v2 — graphs, Top-N framing, click-thr
   Scenario: KPI summary card mutes its trend when prior window is zero
     Given the org has > 0 spend in the current window
     And the org has zero spend in the prior window
-    When the KPI summary card renders at the top of /settings/governance
+    When the KPI summary card renders at the top of /governance
     Then its trend label renders muted "—" / "no prior data"
     And the trend label does NOT render a percentage value
     And the trend label does NOT render an absurd percentage like
@@ -321,7 +323,7 @@ Feature: Bird's-eye governance dashboard v2 — graphs, Top-N framing, click-thr
   Scenario: Fresh org with zero ingested events renders the v1 setup checklist
     Given the org has zero events in the last 30 days
     And the org has zero IngestionSources configured
-    When the user lands on /settings/governance
+    When the user lands on /governance
     Then the page renders the v1 "configure your first source"
       onboarding checklist (regression invariant — we do NOT show
       empty charts with $0 / blank legend)
@@ -370,7 +372,7 @@ Feature: Bird's-eye governance dashboard v2 — graphs, Top-N framing, click-thr
   @bdd @ch @birds-eye-v2 @perf
   Scenario: spendOverTime CH query honors TenantId scoping
     Given two orgs each with non-overlapping spend
-    When org A's admin loads /settings/governance and the page calls
+    When org A's admin loads /governance and the page calls
       spendOverTime
     Then the CH query has a WHERE clause beginning with
       "TenantId = {tenantId:String}"
@@ -382,7 +384,7 @@ Feature: Bird's-eye governance dashboard v2 — graphs, Top-N framing, click-thr
   Scenario: All bird's-eye queries return within budget on the live page
     Given an org with 60 days of activity across 10 teams + 50 users +
       8 models (representative seed shape)
-    When the user lands on /settings/governance
+    When the user lands on /governance
     Then summary + spendByTeam(top5) + spendByUser(top10) +
       ingestionSourcesHealth + recentAnomalies + spendOverTime(30d,
       groupBy=team) all complete within the page's loading budget

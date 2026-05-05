@@ -29,7 +29,7 @@ Feature: Persona-aware home CONTENT — what each persona sees on landing
       | personal_only      | /me                       |
       | mixed              | /me                       |
       | project_only       | /[project]/messages       |
-      | governance_admin   | /settings/governance      |
+      | governance_admin   | /governance               |
     And resolution is via `governance.resolveHome` tRPC
 
   # ---------------------------------------------------------------------------
@@ -129,14 +129,17 @@ Feature: Persona-aware home CONTENT — what each persona sees on landing
     And NO governance / spend-by-team cards appear
 
   # ---------------------------------------------------------------------------
-  # Persona 4 — governance_admin — /settings/governance bird's-eye
+  # Persona 4 — governance_admin — /governance bird's-eye
+  # (canonical Overview path; /settings/governance is registered as a
+  #  back-compat alias per langwatch/src/routes.tsx — both routes serve
+  #  the same page until the alias is removed in a future cleanup)
   # ---------------------------------------------------------------------------
 
   @bdd @ui @persona-content @persona-4
   Scenario: Governance-admin home renders the populated bird's-eye dashboard
     Given a user resolves to persona "governance_admin"
     And the org has at least one IngestionSource with recent activity
-    When the user lands on "/settings/governance"
+    When the user lands on "/governance"
     Then the body renders, in order:
       | section                | required                              |
       | Setup checklist        | hidden when all setup is complete     |
@@ -152,7 +155,7 @@ Feature: Persona-aware home CONTENT — what each persona sees on landing
   Scenario: Governance-admin home renders the setup checklist when not configured
     Given a user resolves to persona "governance_admin"
     And the org has zero IngestionSources
-    When the user lands on "/settings/governance"
+    When the user lands on "/governance"
     Then the body renders the SETUP CHECKLIST as the primary surface
     And the checklist enumerates: routing policy, ingestion source,
       anomaly rule (with a per-step "Set up" CTA)
