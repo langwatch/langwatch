@@ -54,6 +54,7 @@ describe("tagDeleteCommand", () => {
   });
 
   describe("when confirmation matches the tag name", () => {
+    /** @scenario "Delete tag with confirmation" */
     it("calls deleteTag with the tag name", async () => {
       setupReadlineMock("canary");
       mockDeleteTag.mockResolvedValue(undefined);
@@ -74,6 +75,7 @@ describe("tagDeleteCommand", () => {
   });
 
   describe("when confirmation does not match the tag name", () => {
+    /** @scenario "Delete tag aborted on confirmation mismatch" */
     it("does not call deleteTag", async () => {
       setupReadlineMock("wrong");
 
@@ -99,6 +101,7 @@ describe("tagDeleteCommand", () => {
   });
 
   describe("when --force flag is set", () => {
+    /** @scenario "Delete tag with --force skips confirmation" */
     it("skips confirmation and calls deleteTag directly", async () => {
       mockDeleteTag.mockResolvedValue(undefined);
 

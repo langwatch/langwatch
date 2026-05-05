@@ -38,20 +38,20 @@ Feature: CLI Prompt Tag Commands
 
   # --- tag list ---
 
-  @unit @unimplemented
+  @unit
   Scenario: List tags displays a formatted table
     Given the org has tags "latest", "production", "staging", and "canary"
     When I run "langwatch prompt tag list"
     Then I see a table with columns Name and Created
     And all four tags are listed
 
-  @unit @unimplemented
+  @unit
   Scenario: List tags when none exist
     Given the org has no custom tags
     When I run "langwatch prompt tag list"
     Then I see "No custom tags found. The 'latest' tag is always available."
 
-  @unit @unimplemented
+  @unit
   Scenario: List tags exits 1 on API error
     Given the API returns an error for listTags
     When I run "langwatch prompt tag list"
@@ -59,20 +59,20 @@ Feature: CLI Prompt Tag Commands
 
   # --- tag create ---
 
-  @unit @unimplemented
+  @unit
   Scenario: Create a custom tag
     When I run "langwatch prompt tag create canary"
     Then the SDK calls createTag with name "canary"
     And I see "Created tag: canary"
 
-  @unit @unimplemented
+  @unit
   Scenario: Create tag with invalid name exits 1 without calling API
     When I run "langwatch prompt tag create INVALID_NAME!"
     Then I see an error about invalid tag name format
     And createTag is not called
     And the command exits with code 1
 
-  @unit @unimplemented
+  @unit
   Scenario: Create duplicate tag surfaces API error
     Given a tag "canary" already exists
     When I run "langwatch prompt tag create canary"
@@ -81,13 +81,13 @@ Feature: CLI Prompt Tag Commands
 
   # --- tag rename ---
 
-  @unit @unimplemented
+  @unit
   Scenario: Rename a tag
     When I run "langwatch prompt tag rename canary beta"
     Then the SDK calls renameTag with tag "canary" and name "beta"
     And I see "Renamed tag: canary -> beta"
 
-  @unit @unimplemented
+  @unit
   Scenario: Rename tag with invalid new name exits 1
     When I run "langwatch prompt tag rename canary INVALID!"
     Then I see an error about invalid tag name format
@@ -96,7 +96,7 @@ Feature: CLI Prompt Tag Commands
 
   # --- tag assign ---
 
-  @unit @unimplemented
+  @unit
   Scenario: Assign tag to latest version when no --version given
     Given "my-prompt" latest version has versionId "cm_abc123"
     When I run "langwatch prompt tag assign my-prompt production"
@@ -104,14 +104,14 @@ Feature: CLI Prompt Tag Commands
     And calls assignTag with id "my-prompt", tag "production", versionId "cm_abc123"
     And I see confirmation of the assignment
 
-  @unit @unimplemented
+  @unit
   Scenario: Assign tag to specific version
     Given "my-prompt" version 3 has versionId "cm_def456"
     When I run "langwatch prompt tag assign my-prompt production --version 3"
     Then the SDK fetches version 3 to resolve the versionId
     And calls assignTag with id "my-prompt", tag "production", versionId "cm_def456"
 
-  @unit @unimplemented
+  @unit
   Scenario: Assign tag to nonexistent prompt exits 1
     Given "nonexistent" prompt does not exist
     When I run "langwatch prompt tag assign nonexistent production"
@@ -120,20 +120,20 @@ Feature: CLI Prompt Tag Commands
 
   # --- tag delete ---
 
-  @unit @unimplemented
+  @unit
   Scenario: Delete tag with confirmation
     When I run "langwatch prompt tag delete canary" and type "canary" to confirm
     Then the SDK calls deleteTag with "canary"
     And I see "Deleted tag: canary"
 
-  @unit @unimplemented
+  @unit
   Scenario: Delete tag aborted on confirmation mismatch
     When I run "langwatch prompt tag delete canary" and type "wrong" to confirm
     Then deleteTag is not called
     And I see "Aborted"
     And the command exits with code 0
 
-  @unit @unimplemented
+  @unit
   Scenario: Delete tag with --force skips confirmation
     When I run "langwatch prompt tag delete canary --force"
     Then deleteTag is called without prompting for confirmation

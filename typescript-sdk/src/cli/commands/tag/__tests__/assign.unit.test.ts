@@ -39,6 +39,7 @@ describe("tagAssignCommand", () => {
   });
 
   describe("when assigning to latest version (no --version given)", () => {
+    /** @scenario "Assign tag to latest version when no --version given" */
     it("fetches the prompt without version", async () => {
       mockGet.mockResolvedValue({ version: 5, versionId: "cm_abc123" });
       mockAssignTag.mockResolvedValue({});
@@ -74,6 +75,7 @@ describe("tagAssignCommand", () => {
   });
 
   describe("when assigning to a specific version", () => {
+    /** @scenario "Assign tag to specific version" */
     it("fetches the prompt with the version option", async () => {
       mockGet.mockResolvedValue({ version: 3, versionId: "cm_def456" });
       mockAssignTag.mockResolvedValue({});
@@ -98,6 +100,7 @@ describe("tagAssignCommand", () => {
   });
 
   describe("when the prompt does not exist", () => {
+    /** @scenario "Assign tag to nonexistent prompt exits 1" */
     it("prints an error message", async () => {
       mockGet.mockRejectedValue(new Error("Prompt not found"));
 
