@@ -262,6 +262,14 @@ const routes: RouteObject[] = [
     path: "/me/sessions",
     ...page(() => import("./pages/me/sessions")),
   },
+  {
+    // Budget-increase request page that the CLI's `langwatch request-increase`
+    // opens. The page file existed but routes.tsx is explicit (Vite migration)
+    // — without this entry the URL 404'd, breaking the per-spec
+    // budget-exceeded → request flow Ariana caught in dogfood.
+    path: "/me/budget/request",
+    ...page(() => import("./pages/me/budget/request")),
+  },
 
   // CLI device-flow approval (RFC 8628 user-facing screen)
   {
