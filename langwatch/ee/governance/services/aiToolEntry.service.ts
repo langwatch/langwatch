@@ -188,8 +188,13 @@ const STARTER_PACK_TILES: ReadonlyArray<{
     displayName: "OpenAI",
     iconKey: "openai",
     config: {
+      // Label must satisfy the personalVirtualKeys.issuePersonal regex
+      // (^[a-z0-9][a-z0-9_\-]*$) — Ariana caught the original
+      // "OpenAI key" defaults pre-filling a value that immediately
+      // failed validation. Keep the shape lowercase + dash so the user
+      // can submit without editing.
       providerKey: "openai",
-      defaultLabel: "OpenAI key",
+      defaultLabel: "openai-key",
       projectSuggestionText:
         "Building an app? Create a project to track its usage separately.",
     },
@@ -201,7 +206,7 @@ const STARTER_PACK_TILES: ReadonlyArray<{
     iconKey: "anthropic",
     config: {
       providerKey: "anthropic",
-      defaultLabel: "Anthropic key",
+      defaultLabel: "anthropic-key",
     },
   },
   {
@@ -211,7 +216,7 @@ const STARTER_PACK_TILES: ReadonlyArray<{
     iconKey: "bedrock",
     config: {
       providerKey: "bedrock",
-      defaultLabel: "Bedrock key",
+      defaultLabel: "bedrock-key",
     },
   },
   {
@@ -221,7 +226,7 @@ const STARTER_PACK_TILES: ReadonlyArray<{
     iconKey: "gemini",
     config: {
       providerKey: "gemini",
-      defaultLabel: "Gemini key",
+      defaultLabel: "gemini-key",
     },
   },
 ];
