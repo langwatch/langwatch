@@ -183,6 +183,7 @@ describe("<RunHistoryPanel/> (all-runs view)", () => {
       return render(<RunHistoryPanel period={defaultPeriod} />, { wrapper: Wrapper });
     }
 
+    /** @scenario "Quick run failure shows toast with drawer link instead of page link" */
     it("renders All Runs title", () => {
       renderWithRuns();
       expect(screen.getByText("All Runs")).toBeInTheDocument();
