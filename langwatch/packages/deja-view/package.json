@@ -24,7 +24,7 @@
 	],
 	"license": "MIT",
 	"dependencies": {
-		"@aws-sdk/client-secrets-manager": "^3.955.0",
+		"@aws-sdk/client-secrets-manager": "^3.974.0",
 		"@clickhouse/client": "^1.15.0",
 		"commander": "^14.0.2",
 		"fast-glob": "^3.3.3",
