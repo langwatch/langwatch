@@ -327,6 +327,7 @@ describe("column-pruning", () => {
   describe("query correctness after pruning", () => {
     describe("when building a timeseries query for trace_count", () => {
       /** @scenario "Pruned query generates syntactically valid SQL" */
+      /** @scenario "Pruned query resolves all column references from pruned sources" */
       it("generates syntactically valid SQL", () => {
         const result = buildTimeseriesQuery({
           ...baseInput,

@@ -62,7 +62,7 @@ Feature: ClickHouse Query Memory Safety Regression Tests
     When each analytics query path is executed
     Then no query returns a syntax or schema error
 
-  @integration @unimplemented
+  @integration
   Scenario: Analytics queries complete within a tight memory budget
     Given a running ClickHouse test container with schema applied
     And 10000 spans seeded with 50 attribute keys and 4KB values per span
@@ -76,7 +76,7 @@ Feature: ClickHouse Query Memory Safety Regression Tests
     When each analytics query path is executed
     Then every query completes within 5 seconds
 
-  @integration @unimplemented
+  @integration
   Scenario: Analytics query results are correct on seeded data
     Given a running ClickHouse test container with schema applied
     And 10000 spans seeded with known attribute values across 1000 traces
