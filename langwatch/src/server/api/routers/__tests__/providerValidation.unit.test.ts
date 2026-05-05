@@ -50,6 +50,7 @@ describe("validateProviderApiKey", () => {
       expect(mockFetch).not.toHaveBeenCalled();
     });
 
+    /** @scenario "Skip validation for masked placeholder in validation function" */
     it("skips validation when API key is masked placeholder", async () => {
       const result = await validateProviderApiKey("openai", {
         OPENAI_API_KEY: MASKED_KEY_PLACEHOLDER,
@@ -58,6 +59,7 @@ describe("validateProviderApiKey", () => {
       expect(mockFetch).not.toHaveBeenCalled();
     });
 
+    /** @scenario "Skip validation when no API key provided" */
     it("skips validation when no API key provided", async () => {
       const result = await validateProviderApiKey("openai", {
         OPENAI_API_KEY: "",
