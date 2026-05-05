@@ -92,7 +92,7 @@ Feature: Saved Views on Traces List
     When I build a condition for values ["application", "evaluation"]
     Then the SQL combines an absence check OR an IN clause
 
-  @unit @unimplemented
+  @unit
   Scenario: ClickHouse origin aggregation labels empty values as "application"
     Given the ClickHouse filter definition for "traces.origin"
     When the aggregation query runs
@@ -116,7 +116,7 @@ Feature: Saved Views on Traces List
     # MessagesTable.tsx:583-598 only renders the badge when `displayOrigin`
     # (raw langwatch.origin) is a non-empty string.
 
-  @unit @unimplemented
+  @unit
   Scenario: Origin colors follow the centralized originColors mapping
     Then the origin color mapping is:
       | origin      | background      | foreground         |
@@ -323,13 +323,13 @@ Feature: Saved Views on Traces List
     When I manually add a model filter in the sidebar
     Then no saved view badge appears selected
 
-  @unit @unimplemented
+  @unit
   Scenario: Re-applying saved view's exact filters re-selects the badge
     Given a saved view "Debug" with filters model=["gpt-4"]
     When I manually set the model filter to ["gpt-4"] via the sidebar
     Then the "Debug" badge appears selected
 
-  @unit @unimplemented
+  @unit
   Scenario: View matching ignores array order
     Given a saved view with model=["gpt-4", "claude-3"]
     When the URL has model=["claude-3", "gpt-4"]
@@ -348,11 +348,11 @@ Feature: Saved Views on Traces List
     When I try to save a view with a name longer than 50 characters
     Then the name is truncated to 50 characters
 
-  @unit @unimplemented
+  @unit
   Scenario: First-visit projects auto-seed and show All Traces plus 4 seed views
     Given the project has no saved views in the database
     When the bar renders for the first time
-    Then 4 seed views are auto-created (Application, Evaluations, Simulations, Playground)
+    Then 5 seed views are auto-created (Application, Evaluations, Simulations, Playground, Gateway)
     And they are shown alongside "All Traces"
     And the three-dot menu is still visible
     # The "Empty custom views list" wording was removed: saved-view.service.ts
@@ -360,7 +360,7 @@ Feature: Saved Views on Traces List
 
   # ─── Step 6: tRPC Endpoints ─────────────────────────────────────────
 
-  @integration @unimplemented
+  @integration
   Scenario: getAll returns views ordered by position
     Given the project has saved views in the database
     When I call savedViews.getAll with the projectId
