@@ -116,6 +116,7 @@ describe("Feature: Prompt version tags", () => {
 
   describe("when assigning a tag to a specific version", () => {
     /** @scenario "Assigning a tag that exists in the DB succeeds" */
+    /** @scenario "Assigning a tag to a specific version" */
     it("creates a PromptTagAssignment record with configId, tag, and versionId", async () => {
       const { allVersions } = await createPromptWithVersions({
         handle: `pizza-prompt-${nanoid()}`,
