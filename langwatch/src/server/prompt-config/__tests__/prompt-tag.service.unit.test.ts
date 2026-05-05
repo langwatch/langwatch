@@ -53,6 +53,7 @@ describe("validateTagName()", () => {
     });
 
     /** @scenario 'Validation accepts "production" as a tag name' */
+    /** @scenario "Accepts valid non-numeric tag during creation" */
     it("does not throw for the seeded 'production' tag name", () => {
       expect(() => validateTagName("production")).not.toThrow();
     });
@@ -76,6 +77,11 @@ describe("validateTagName()", () => {
       expect(() => validateTagName("42")).toThrow(
         expect.objectContaining({ name: "PromptTagValidationError", message: expect.stringMatching(/numeric/i) }),
       );
+    });
+
+    /** @scenario "Rejects zero as a tag name during creation" */
+    it("rejects '0' (single-digit numeric)", () => {
+      expect(() => validateTagName("0")).toThrow(PromptTagValidationError);
     });
   });
 
