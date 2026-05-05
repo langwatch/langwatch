@@ -136,9 +136,11 @@ export function getRangeValue(
   return result;
 }
 
-/** Check if there's a cross-facet OR at the top level (or recursively). */
+/** Check if there's a cross-facet OR — an OR group whose members span
+ * more than one field. Same-field ORs (`status:error OR status:warning`)
+ * are sidebar-friendly and don't count. */
 export function hasCrossFacetOR(ast: LiqeQuery): boolean {
-  return analyzeOrGroups(ast).groups.length > 0;
+  return analyzeOrGroups(ast).groups.some((g) => g.fields.size > 1);
 }
 
 /**
@@ -178,8 +180,25 @@ export interface OrGroup {
 
 export interface OrGroupAnalysis {
   groups: OrGroup[];
-  /** Field → group id, for O(1) "is this field in an OR group?" lookups. */
-  fieldToGroupId: Map<string, string>;
+  /**
+   * `${field}|${value}` → group id. An exact (field, value) participates
+   * in at most one OR group, so a single-id map is sound here.
+   * Use this for membership lookups from chip/row hover handlers.
+   */
+  memberToGroupId: Map<string, string>;
+  /**
+   * Field → list of group ids whose members include this field. A field
+   * can appear in multiple disjoint OR groups, so this is a list rather
+   * than a single id (e.g. `(status:error OR model:gpt-4) AND
+   * (status:warning OR service:api)` — `status` is in both groups).
+   * Sidebar consumers that want a single representative group should
+   * pick `[0]`; consumers that want all peers should iterate.
+   */
+  fieldToGroupIds: Map<string, string[]>;
+}
+
+function memberKey(field: string, value: string): string {
+  return `${field}|${value}`;
 }
 
 /**
@@ -195,7 +214,8 @@ export interface OrGroupAnalysis {
  */
 export function analyzeOrGroups(ast: LiqeQuery): OrGroupAnalysis {
   const groups: OrGroup[] = [];
-  const fieldToGroupId = new Map<string, string>();
+  const memberToGroupId = new Map<string, string>();
+  const fieldToGroupIds = new Map<string, string[]>();
 
   const visit = (node: LiqeQuery): void => {
     if (node.type === "LogicalExpression") {
@@ -211,7 +231,17 @@ export function analyzeOrGroups(ast: LiqeQuery): OrGroupAnalysis {
             start: node.location.start,
             end: node.location.end,
           });
-          for (const f of fields) fieldToGroupId.set(f, id);
+          for (const m of members) {
+            memberToGroupId.set(memberKey(m.field, m.value), id);
+          }
+          for (const f of fields) {
+            const existing = fieldToGroupIds.get(f);
+            if (existing) {
+              if (!existing.includes(id)) existing.push(id);
+            } else {
+              fieldToGroupIds.set(f, [id]);
+            }
+          }
           return;
         }
       }
@@ -229,7 +259,7 @@ export function analyzeOrGroups(ast: LiqeQuery): OrGroupAnalysis {
   };
   visit(ast);
 
-  return { groups, fieldToGroupId };
+  return { groups, memberToGroupId, fieldToGroupIds };
 }
 
 function collectOrMembers(node: LiqeQuery, negated = false): OrGroupMember[] {

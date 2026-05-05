@@ -102,21 +102,17 @@ export const FacetRow = memo(function FacetRow({
   // every other member too. Just being in a *field* that participates
   // in some OR group isn't enough — `origin:simulation` hovered
   // shouldn't drag `origin:evaluation` and `origin:application`
-  // along just because they happen to share the field. So check
+  // along just because they happen to share the field. So look up
   // membership at the (field, value) level, not the field level.
   const handleMouseEnter = useCallback(() => {
     if (!field) return;
     const ast = useFilterStore.getState().ast;
     const orAnalysis = analyzeOrGroups(ast);
-    const groupId = orAnalysis.fieldToGroupId.get(field);
+    const groupId = orAnalysis.memberToGroupId.get(`${field}|${item.value}`);
     const group = groupId
       ? orAnalysis.groups.find((g) => g.id === groupId)
       : null;
-    const isMember =
-      group?.members.some(
-        (m) => m.field === field && m.value === item.value,
-      ) ?? false;
-    if (group && isMember) {
+    if (group) {
       setHoveredGroup(group);
     } else {
       setHoveredFacet({ field, value: item.value });
@@ -141,6 +137,9 @@ export const FacetRow = memo(function FacetRow({
       overflow="hidden"
       background={isActive ? subtleBg : "transparent"}
       borderWidth={0}
+      outline={orPalette ? "1px solid" : undefined}
+      outlineColor={orPalette ? `${orPalette}.muted` : undefined}
+      outlineOffset="-1px"
       data-state={state}
       data-or-group={orGroupId}
       data-facet-field={field}

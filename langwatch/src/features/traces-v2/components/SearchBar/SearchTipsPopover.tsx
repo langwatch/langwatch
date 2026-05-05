@@ -53,16 +53,17 @@ const TIPS: Tip[] = [
   {
     body: (
       <>
-        Hold <Kbd>⇧</Kbd> or <Kbd>⌘</Kbd> while clicking a facet to
-        combine it with <Kbd>OR</Kbd> instead of the default <Kbd>AND</Kbd>.
+        Hold <Kbd>⇧</Kbd> or <Kbd>Ctrl</Kbd>/<Kbd>⌘</Kbd> while clicking a
+        facet to combine it with <Kbd>OR</Kbd> instead of the default{" "}
+        <Kbd>AND</Kbd>.
       </>
     ),
   },
   {
     body: (
       <>
-        Press <Kbd>⌘</Kbd> <Kbd>I</Kbd> to ask AI for help building a
-        query — describe what you want in plain English.
+        Press <Kbd>Ctrl</Kbd>/<Kbd>⌘</Kbd> <Kbd>I</Kbd> to ask AI for help
+        building a query — describe what you want in plain English.
       </>
     ),
   },

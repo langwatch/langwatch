@@ -1,6 +1,6 @@
 import { Box } from "@chakra-ui/react";
 import type React from "react";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useState } from "react";
 import type { OrGroup } from "~/server/app-layer/traces/query-language/queries";
 import { useFacetHoverStore } from "../../stores/facetHoverStore";
 
@@ -118,7 +118,7 @@ export const OrConnectorOverlay: React.FC<OrConnectorOverlayProps> = ({
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
-    const observer = new ResizeObserver(recompute);
+    const observer = new ResizeObserver(() => recompute());
     observer.observe(container);
     container.addEventListener("scroll", recompute, true);
     return () => {
@@ -128,7 +128,7 @@ export const OrConnectorOverlay: React.FC<OrConnectorOverlayProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [containerRef, groups]);
 
-  if (sortedGroups.length === 0 && !hoveredFacet) return null;
+  if (sortedGroups.length === 0 && !hoveredFacet && !hoveredGroup) return null;
 
   return (
     <>
@@ -213,7 +213,18 @@ const HoverHighlightStyle: React.FC<{
 }> = ({ group, facet }) => {
   if (!group && !facet) return null;
   const palette = group ? orGroupColor(group.id) : "blue";
-  const escape = (s: string) => s.replace(/"/g, '\\"');
+  // Escape characters that would break a CSS attribute-value string.
+  // Backslashes must be escaped first (otherwise the subsequent
+  // double-quote escape's own backslash would be re-escaped). Newlines
+  // and carriage returns are illegal in CSS strings without the `\A `
+  // form. Without this, user-controlled facet values with `\` or
+  // line-breaks could break the selector or inject CSS.
+  const escape = (s: string) =>
+    s
+      .replace(/\\/g, "\\\\")
+      .replace(/"/g, '\\"')
+      .replace(/\n/g, "\\A ")
+      .replace(/\r/g, "\\D ");
   const memberSelectors: string[] = [];
   if (group) {
     for (const m of group.members) {

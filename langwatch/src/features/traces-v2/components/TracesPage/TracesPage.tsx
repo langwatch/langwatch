@@ -23,6 +23,7 @@ import { useUIStore } from "../../stores/uiStore";
 import { analyzeOrGroups } from "~/server/app-layer/traces/query-language/queries";
 import { DensityProvider } from "../DensityProvider";
 import { FilterSidebar } from "../FilterSidebar/FilterSidebar";
+import { ConnectorLaneWidth } from "../FilterSidebar/OrConnectorOverlay";
 import { FindBar } from "../FindBar";
 import { SearchBar } from "../SearchBar/SearchBar";
 import { BulkActionBar } from "../Toolbar/BulkActionBar";
@@ -42,9 +43,6 @@ import { useTracesPageTitle } from "./usePageTitle";
 
 const SIDEBAR_WIDTH_EXPANDED = 220;
 const SIDEBAR_WIDTH_COLLAPSED = 40;
-/** Width per OR-group connector lane added to the right of the
- * sidebar. Must match `OrConnectorOverlay`'s LANE_WIDTH. */
-const OR_GROUP_LANE_WIDTH = 16;
 
 const DIMMED_PROPS = {
   opacity: 0.45,
@@ -193,7 +191,7 @@ const FilterAside: React.FC<{
     (s) => analyzeOrGroups(s.ast).groups.length,
   );
 
-  const expandedWidth = SIDEBAR_WIDTH_EXPANDED + orGroupCount * OR_GROUP_LANE_WIDTH;
+  const expandedWidth = SIDEBAR_WIDTH_EXPANDED + orGroupCount * ConnectorLaneWidth;
 
   return (
     <Box

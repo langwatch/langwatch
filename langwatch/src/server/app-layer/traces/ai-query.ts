@@ -171,7 +171,12 @@ export async function generateTraceAction(
 
   let lastError = "Unknown error";
   let lastQuery = "";
-  let providerErrored = false;
+  // Track only the *last* attempt's failure kind so the UI message
+  // matches what actually happened on the final try. A transient
+  // provider blip on attempt 1 followed by a validation failure on
+  // attempt 2 should surface as "couldn't parse the query," not
+  // "provider error."
+  let lastFailure: "provider" | "validation" | null = null;
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     let parsedAction: z.infer<typeof aiActionSchema>;
     try {
@@ -195,7 +200,7 @@ export async function generateTraceAction(
       });
       parsedAction = object;
     } catch (e) {
-      providerErrored = true;
+      lastFailure = "provider";
       lastError = e instanceof Error ? e.message : "Unknown generation error.";
       logger.error(
         { projectId: input.projectId, attempt, lastError, err: e },
@@ -216,6 +221,7 @@ export async function generateTraceAction(
             query: parsedAction.query,
           };
     }
+    lastFailure = "validation";
     lastError = validation.error;
     logger.info(
       { projectId: input.projectId, attempt, lastError, lastQuery },
@@ -229,9 +235,10 @@ export async function generateTraceAction(
   // unparseable query" so the message can be tailored without losing context.
   return {
     ok: false,
-    error: providerErrored
-      ? "AI couldn't generate a query right now. Try again, or rephrase."
-      : "AI's reply didn't match the trace query syntax. Try rephrasing.",
+    error:
+      lastFailure === "provider"
+        ? "AI couldn't generate a query right now. Try again, or rephrase."
+        : "AI's reply didn't match the trace query syntax. Try rephrasing.",
   };
 }
 

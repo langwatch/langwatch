@@ -58,6 +58,10 @@ export function useAiTraceAction({
   // alongside the model's response — no plumbing through the mutation
   // result, which is keyed off the server reply only.
   const lastSubmittedPromptRef = useRef<string>("");
+  // Pin the project id at submit time so a late-arriving response can't
+  // record the translation against the wrong project if the user
+  // navigated workspaces while the request was in flight.
+  const lastSubmittedProjectIdRef = useRef<string | null>(null);
 
   // If the hosting composer unmounts (user closed it, navigated away,
   // reopened it for a new prompt), drop the in-flight mutation's response
@@ -86,9 +90,12 @@ export function useAiTraceAction({
       // out of the store instead of seeding the composer with the
       // (already-displayed) generated query — they get to keep editing
       // their original wording rather than start from the syntax.
-      if (project?.id && lastSubmittedPromptRef.current) {
+      if (
+        lastSubmittedProjectIdRef.current &&
+        lastSubmittedPromptRef.current
+      ) {
         recordAiTranslation({
-          projectId: project.id,
+          projectId: lastSubmittedProjectIdRef.current,
           prompt: lastSubmittedPromptRef.current,
           query: result.query,
         });
@@ -112,6 +119,7 @@ export function useAiTraceAction({
     if (!project?.id || !prompt.trim() || aiAction.isPending) return;
     const trimmed = prompt.trim();
     lastSubmittedPromptRef.current = trimmed;
+    lastSubmittedProjectIdRef.current = project.id;
     setError(null);
     aiAction.mutate({
       projectId: project.id,

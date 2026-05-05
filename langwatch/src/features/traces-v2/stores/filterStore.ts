@@ -177,7 +177,7 @@ function safeParseAndSerialize(text: string): ParseResult {
 
 function applyMutation(state: FilterState, mutate: (text: string) => string) {
   const next = safeParseAndSerialize(mutate(state.queryText));
-  return { ...next, page: 1 };
+  return { ...next, page: 1, lastAiTranslation: null };
 }
 
 /**
@@ -208,7 +208,11 @@ export const useFilterStore = create<FilterState>((set, get) => ({
         ) {
           return state;
         }
-        return { queryText: text, parseError: result.parseError };
+        return {
+          queryText: text,
+          parseError: result.parseError,
+          lastAiTranslation: null,
+        };
       }
       // Canonical text matches and we're already error-free → the AST is
       // structurally the same. Keep the previous reference so `s.ast`
@@ -216,7 +220,7 @@ export const useFilterStore = create<FilterState>((set, get) => ({
       if (result.queryText === state.queryText && state.parseError === null) {
         return state;
       }
-      return { ...result, page: 1 };
+      return { ...result, page: 1, lastAiTranslation: null };
     }),
 
   setQuery: (text, ast) =>
@@ -225,6 +229,7 @@ export const useFilterStore = create<FilterState>((set, get) => ({
       queryText: text,
       parseError: null,
       page: 1,
+      lastAiTranslation: null,
     }),
 
   setFilterFromLens: (text) =>
@@ -238,9 +243,10 @@ export const useFilterStore = create<FilterState>((set, get) => ({
           queryText: "",
           parseError: null,
           page: 1,
+          lastAiTranslation: null,
         };
       }
-      return { ...result, page: 1 };
+      return { ...result, page: 1, lastAiTranslation: null };
     }),
 
   toggleFacet: (field, value, options) =>
@@ -310,6 +316,7 @@ export const useFilterStore = create<FilterState>((set, get) => ({
       queryText: "",
       parseError: null,
       page: 1,
+      lastAiTranslation: null,
     }),
 
   commitDebounced: () => {

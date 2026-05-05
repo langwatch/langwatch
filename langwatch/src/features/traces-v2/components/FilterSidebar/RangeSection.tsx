@@ -14,7 +14,10 @@ const CLEAR_EPSILON = 0.01;
  * "12,300" → 12300. Returns null for anything that doesn't yield a
  * finite number after the strip. */
 function parseEditedValue(input: string): number | null {
-  const cleaned = input.replace(/[$,a-zA-Z\s]/g, "");
+  // Strip currency, separators, whitespace, and unit letters — but keep
+  // `e`/`E` so scientific notation (`1e6`, `2.5E-3`) parses correctly.
+  // Without this carve-out a paste like "1e6" became "16".
+  const cleaned = input.replace(/[$,\s]|[a-df-zA-DF-Z]/g, "");
   if (cleaned === "") return null;
   const n = Number(cleaned);
   return Number.isFinite(n) ? n : null;

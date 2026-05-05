@@ -526,23 +526,23 @@ describe("hasCrossFacetOR", () => {
     });
   });
 
-  describe("given an OR whose arms are compound (known limitation)", () => {
-    it("returns false when the OR's left arm is a compound AND — `topField(AND) = null`", () => {
-      // `a AND b OR c` parses as `OR(AND(a,b), c)` because AND binds
-      // tighter than OR. `topField` of an AND is null, so the helper
-      // can't classify the left vs right field — short-circuits to false.
-      // Pinning current behaviour; if we ever harden the helper, flip.
+  describe("given an OR whose arms are compound", () => {
+    it("returns false when the OR's left arm is a compound AND — group has only one classifiable field", () => {
+      // `a AND b OR c` parses as `OR(AND(a,b), c)`. The OR analyzer
+      // stops at AND boundaries, so the left arm contributes no
+      // members; only `c` makes it into the group, which can't form a
+      // cross-facet OR on its own.
       expect(
         hasCrossFacetOR(parse("origin:application AND status:error OR model:gpt-4o")),
       ).toBe(false);
     });
 
-    it("returns false when an OR is wrapped in parens — helper doesn't recurse into them", () => {
-      // The sidebar cross-facet banner won't trigger for `a AND (b OR c)`
-      // even when b/c are different fields.
+    it("returns true when an OR is wrapped in parens with two different fields", () => {
+      // The analyzer recurses into ParenthesizedExpressions, so a
+      // nested cross-facet OR is detected even with an outer AND.
       expect(
         hasCrossFacetOR(parse("origin:application AND (status:error OR model:gpt-4o)")),
-      ).toBe(false);
+      ).toBe(true);
     });
   });
 

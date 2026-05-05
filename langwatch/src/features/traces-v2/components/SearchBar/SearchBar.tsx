@@ -121,6 +121,14 @@ export const SearchBar: React.FC = () => {
   // `facetHoverStore`. The sidebar listens to that store and
   // cross-highlights the matching row + any OR-group peers.
   useEffect(() => {
+    // When the chip layer disappears (AI mode swap, unmount) no DOM
+    // mouseout fires for the removed chip nodes — clear up front so a
+    // mid-hover transition can't leave the sidebar latched on a chip
+    // that no longer exists.
+    if (aiMode) {
+      useFacetHoverStore.getState().clearHover();
+      return;
+    }
     const root = placeholderRef.current;
     if (!root) return;
     const enter = (e: Event) => {
@@ -138,14 +146,11 @@ export const SearchBar: React.FC = () => {
       // because they happen to be grouped under the same field.
       const ast = useFilterStore.getState().ast;
       const orAnalysis = analyzeOrGroups(ast);
-      const groupId = orAnalysis.fieldToGroupId.get(field);
+      const groupId = orAnalysis.memberToGroupId.get(`${field}|${value}`);
       const group = groupId
         ? orAnalysis.groups.find((g) => g.id === groupId)
         : null;
-      const isMember =
-        group?.members.some((m) => m.field === field && m.value === value) ??
-        false;
-      if (group && isMember) {
+      if (group) {
         useFacetHoverStore.getState().setHoveredGroup(group);
       } else {
         useFacetHoverStore.getState().setHoveredFacet({ field, value });
@@ -164,8 +169,9 @@ export const SearchBar: React.FC = () => {
     return () => {
       root.removeEventListener("mouseover", enter, true);
       root.removeEventListener("mouseout", leave, true);
+      useFacetHoverStore.getState().clearHover();
     };
-  }, []);
+  }, [aiMode]);
 
   // ⌘I / Ctrl+I anywhere on the page enters AI mode. Gated through the
   // same provider-primer popover the button uses — pressing the shortcut

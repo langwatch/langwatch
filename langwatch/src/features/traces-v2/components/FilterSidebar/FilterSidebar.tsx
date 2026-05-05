@@ -169,24 +169,33 @@ export const FilterSidebar: React.FC = () => {
             setRange={setRange}
             removeRange={removeRange}
             onShiftToggle={handleShiftToggle}
-            orGroupId={orAnalysis.fieldToGroupId.get(key)}
+            orGroupId={orAnalysis.fieldToGroupIds.get(key)?.[0]}
             orPeers={(() => {
-              const id = orAnalysis.fieldToGroupId.get(key);
-              if (!id) return undefined;
-              const group = orAnalysis.groups.find((g) => g.id === id);
-              if (!group) return undefined;
-              return [...group.fields].filter((f) => f !== key);
+              const ids = orAnalysis.fieldToGroupIds.get(key);
+              if (!ids || ids.length === 0) return undefined;
+              // Union peers across every group this field touches — when
+              // a field shows up in multiple disjoint OR groups, the
+              // sidebar should mention all of its co-facets.
+              const peers = new Set<string>();
+              for (const id of ids) {
+                const group = orAnalysis.groups.find((g) => g.id === id);
+                if (!group) continue;
+                for (const f of group.fields) if (f !== key) peers.add(f);
+              }
+              return peers.size > 0 ? [...peers] : undefined;
             })()}
             orMemberValues={(() => {
-              const id = orAnalysis.fieldToGroupId.get(key);
-              if (!id) return undefined;
-              const group = orAnalysis.groups.find((g) => g.id === id);
-              if (!group) return undefined;
-              return new Set(
-                group.members
-                  .filter((m) => m.field === key)
-                  .map((m) => m.value),
-              );
+              const ids = orAnalysis.fieldToGroupIds.get(key);
+              if (!ids || ids.length === 0) return undefined;
+              const values = new Set<string>();
+              for (const id of ids) {
+                const group = orAnalysis.groups.find((g) => g.id === id);
+                if (!group) continue;
+                for (const m of group.members) {
+                  if (m.field === key) values.add(m.value);
+                }
+              }
+              return values.size > 0 ? values : undefined;
             })()}
           />
         </IsolatedErrorBoundary>

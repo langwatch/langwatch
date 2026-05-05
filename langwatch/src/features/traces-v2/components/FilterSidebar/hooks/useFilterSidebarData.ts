@@ -40,8 +40,8 @@ export function useFilterSidebarData() {
   const removeRange = useFilterStore((s) => s.removeRange);
 
   // Cross-facet OR analysis. Sections whose field shows up in
-  // `fieldToGroupId` are part of an OR group; the colour is derived
-  // from the group id so multiple distinct OR groups visually
+  // `fieldToGroupIds` are part of (at least) one OR group; the colour is
+  // derived from the group id so multiple distinct OR groups visually
   // distinguish themselves on the rail.
   const orAnalysisRaw = useMemo(() => analyzeOrGroups(ast), [ast]);
 
@@ -58,7 +58,10 @@ export function useFilterSidebarData() {
       value: string,
       options?: { modifierKey?: boolean },
     ) => {
-      const groupId = orAnalysisRaw.fieldToGroupId.get(field);
+      // A field can legitimately be in multiple disjoint OR groups; the
+      // first group is the most natural target for "extend this group".
+      const groupIds = orAnalysisRaw.fieldToGroupIds.get(field);
+      const groupId = groupIds?.[0];
       const group = groupId
         ? orAnalysisRaw.groups.find((g) => g.id === groupId)
         : undefined;
