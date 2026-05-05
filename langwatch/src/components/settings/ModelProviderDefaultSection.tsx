@@ -195,7 +195,7 @@ export const DefaultProviderSection = ({
         </Text>
       )}
       {state.useAsDefaultProvider && chatOptions.length === 0 && (
-        <Text fontSize="xs" color="fg.muted">
+        <Text fontSize="xs" color="orange.600">
           No {providerName} models available. Add one in the Custom Models
           section above to enable this.
         </Text>
