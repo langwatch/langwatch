@@ -14,24 +14,32 @@ Feature: Target selector Select All and Clear All
   # Decision: "Select All" selects filtered targets only (matching ScenarioPicker).
   # "Clear" clears all targets regardless of filter (matching ScenarioPicker).
 
+  # Parity status: 3 of 6 scenarios bound to existing tests.
+  # Remaining @unimplemented scenarios (#3458):
+  #   3 NO_TEST: shipped behavior, no integration test yet
+  # NO_TEST gaps:
+  #   - "Select All adds to partial selection"
+  #   - "Select All applies to visible filtered targets"
+  #   - "Clear removes every selected target regardless of filter"
+
   Background:
     Given the suite form drawer is open
     And there are 5 available targets
 
-  @integration @unimplemented
+  @integration
   Scenario: Target picker displays Select All and Clear buttons
     When I view the target picker
     Then I see a "Select All" button in the target picker footer
     And I see a "Clear" button in the target picker footer
 
-  @integration @unimplemented
+  @integration
   Scenario: Clicking Select All selects all targets
     Given no targets are selected
     When I click "Select All" in the target picker
     Then all 5 targets are selected
     And the footer shows "5 of 5 selected"
 
-  @integration @unimplemented
+  @integration
   Scenario: Clicking Clear deselects all targets
     Given all 5 targets are selected
     When I click "Clear" in the target picker

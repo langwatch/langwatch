@@ -185,6 +185,7 @@ describe("<RunHistoryPanel/> (all-runs view)", () => {
 
     /** @scenario "Pre-suite scenario runs appear in All Runs" */
     /** @scenario "Suite-created runs still appear in All Runs" */
+    /** @scenario "Quick run failure shows toast with drawer link instead of page link" */
     it("renders All Runs title", () => {
       renderWithRuns();
       expect(screen.getByText("All Runs")).toBeInTheDocument();

@@ -10,6 +10,17 @@ Feature: Collapsible suite sidebar
   #   (new suite, all runs), and suite avatar icons only.
   # The collapse toggle is the «/» button in the sidebar header.
 
+  # Parity status: 0 of 6 scenarios bound to existing tests.
+  # Remaining @unimplemented scenarios (#3458):
+  #   6 NO_TEST: shipped behavior, no integration test yet
+  # NO_TEST gaps:
+  #   - "Sidebar is expanded by default"
+  #   - "Clicking the collapse button collapses the sidebar"
+  #   - "Clicking the expand button expands the sidebar"
+  #   - "All Runs action is accessible when collapsed"
+  #   - "Clicking a suite icon when collapsed navigates to that suite"
+  #   - "Collapse state persists across page navigations"
+
   Background:
     Given the suite sidebar contains suites
 
