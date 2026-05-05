@@ -13,7 +13,8 @@ import { RedisPresenceRepository } from "./presence/repositories/presence.redis.
 import { InMemoryPresenceRepository } from "./presence/repositories/presence.memory.repository";
 import { createClickHouseClientFromConfig } from "./clients/clickhouse.factory";
 import { GatewayBudgetRepository } from "~/server/gateway/budget.repository";
-import { PlanTypes, PLAN_LIMITS } from "../../../ee/licensing/planInfo";
+import { PLAN_LIMITS } from "../../../ee/billing/planLimits";
+import { PlanTypes } from "../../../ee/billing/planTypes";
 import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
 import { GovernanceKpisClickHouseRepository } from "@ee/governance/services/governanceKpis.clickhouse.repository";
 import { GovernanceOcsfEventsClickHouseRepository } from "@ee/governance/services/governanceOcsfEvents.clickhouse.repository";

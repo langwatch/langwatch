@@ -1,6 +1,7 @@
-import { PlanTypes, PLAN_LIMITS } from "../../../../ee/licensing/planInfo";
 import type { PlanInfo } from "../../../../ee/licensing/planInfo";
 import { isAdmin } from "../../../../ee/billing/planProvider";
+import { PLAN_LIMITS } from "../../../../ee/billing/planLimits";
+import { PlanTypes } from "../../../../ee/billing/planTypes";
 import { env } from "~/env.mjs";
 import type { PlanProvider, PlanProviderUser } from "./plan-provider";
 
