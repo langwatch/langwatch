@@ -141,20 +141,20 @@ Feature: CLI Prompt Tag Commands
 
   # --- pull --tag ---
 
-  @unit @unimplemented
+  @unit
   Scenario: Pull prompts by tag instead of version
     Given prompts.json has "my-prompt" tracked as a remote dependency
     When I run "langwatch prompt pull --tag production"
     Then the SDK fetches each prompt using { tag: "production" } instead of version
     And I see the pull result referencing the tag
 
-  @unit @unimplemented
+  @unit
   Scenario: Pull --tag overrides version spec in prompts.json
     Given prompts.json has "my-prompt" pinned to version 2
     When I run "langwatch prompt pull --tag staging"
     Then the SDK fetches using { tag: "staging" }, ignoring the version spec
 
-  @unit @unimplemented
+  @unit
   Scenario: Pull --tag with missing tag on server exits 1
     Given the "nonexistent" tag is not assigned to "my-prompt"
     When I run "langwatch prompt pull --tag nonexistent"

@@ -48,6 +48,7 @@ describe("pullPrompts", () => {
   });
 
   describe("when --tag is provided", () => {
+    /** @scenario "Pull prompts by tag instead of version" */
     it("fetches each prompt using { tag } instead of version", async () => {
       mockGet.mockResolvedValue({
         version: 3,
@@ -72,6 +73,7 @@ describe("pullPrompts", () => {
       expect(mockGet).toHaveBeenCalledWith("my-prompt", { tag: "production" });
     });
 
+    /** @scenario "Pull --tag overrides version spec in prompts.json" */
     it("overrides the version spec from prompts.json", async () => {
       mockGet.mockResolvedValue({
         version: 2,
@@ -156,6 +158,7 @@ describe("pullPrompts", () => {
   });
 
   describe("when the tag is not assigned to the prompt (API error)", () => {
+    /** @scenario "Pull --tag with missing tag on server exits 1" */
     it("adds the error to result.errors", async () => {
       mockGet.mockRejectedValue(new Error("tag not found"));
 
