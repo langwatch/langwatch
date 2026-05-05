@@ -52,7 +52,7 @@ Feature: Model params preparation error feedback
     Then it returns failure with reason "preparation_error"
     And the error message includes the original error detail
 
-  @unit @unimplemented
+  @unit
   Scenario: Return success with LiteLLM params on valid configuration
     Given a model string "openai/gpt-4" with valid format
     And the provider "openai" is enabled with a valid API key
@@ -65,7 +65,7 @@ Feature: Model params preparation error feedback
   # prefetchScenarioData must forward the reason code and actionable message
   # from the modelParamsProvider instead of a generic error.
 
-  @unit @unimplemented
+  @unit
   Scenario: Prefetcher logs model params failure with reason
     Given modelParamsProvider returns failure with reason "invalid_model_format"
     When prefetchScenarioData is called
