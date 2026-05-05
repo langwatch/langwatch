@@ -156,6 +156,7 @@ describe("originGate reactor", () => {
   });
 
   describe("when origin is absent (pure OTEL trace)", () => {
+    /** @scenario "Deferred check deduplicates per trace" */
     it("schedules deferred origin resolution with traceId as id", async () => {
       const deps = createDeps();
       const reactor = createOriginGateReactor(deps);
@@ -229,6 +230,7 @@ describe("originGate reactor", () => {
 
 describe("createDeferredOriginHandler()", () => {
   describe("when called", () => {
+    /** @scenario 'Deferred check treats still-empty origin as "application"' */
     it("dispatches resolveOrigin command unconditionally", async () => {
       const resolveOriginFn = vi.fn().mockResolvedValue(undefined);
       const handler = createDeferredOriginHandler(resolveOriginFn);

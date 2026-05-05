@@ -159,7 +159,7 @@ Feature: Explicit application origin for race condition prevention
   # These are pure OTEL exporters, third-party integrations, etc.
   # The single reactor handles both phases — no separate deferred reactor.
 
-  @unit @unimplemented
+  @unit
   Scenario: Deferred check treats still-empty origin as "application"
     Given the deferred evaluation check fires for a trace
     And the fold state (re-read from projection store) still has no langwatch.origin
@@ -184,7 +184,7 @@ Feature: Explicit application origin for race condition prevention
     And the fold state (re-read from store) now has langwatch.origin = "application"
     Then evaluation commands are dispatched for matching monitors
 
-  @unit @unimplemented
+  @unit
   Scenario: Deferred check deduplicates per trace
     Given a trace receives multiple span batches with no origin or SDK info
     And each reactor dispatch schedules a deferred check
