@@ -12,6 +12,7 @@ import type {
   ApplicableScopes,
   GatewayBudgetRepository,
 } from "~/server/gateway/budget.repository";
+import { ChangeEventRepository } from "~/server/gateway/changeEvent.repository";
 import { createLogger } from "~/utils/logger/server";
 import { captureException } from "~/utils/posthogErrorCapture";
 import type { ReactorContext, ReactorDefinition } from "~/server/event-sourcing/reactors/reactor.types";
@@ -154,6 +155,42 @@ export function createGatewayBudgetSyncReactor(
         }));
 
         await deps.budgetCHRepository.insertDebit(rows);
+
+        // EC4 — emit a BUDGET_UPDATED change event so the gateway's
+        // /changes subscriber (services/aigateway/adapters/authresolver)
+        // evicts cached bundles for this project and the next request
+        // re-resolves with fresh spend. Without this, Bundle.Config.
+        // Budget.SpentMicroUSD stays frozen at populateConfig time and
+        // the on-breach=block precheck never fires until the JWT TTL
+        // (~15min) rolls.
+        //
+        // v2 TODO: dedupe — emit at most once per (projectId, budgetId)
+        // per ~10s window to avoid every gateway request triggering an
+        // L1 sweep + cold-miss on every other VK in the project. For
+        // current dogfood / single-tenant scale the unconditional emit
+        // is correct (just noisier than ideal).
+        try {
+          const changeEvents = new ChangeEventRepository(deps.prisma);
+          await changeEvents.append({
+            organizationId: project.team.organizationId,
+            projectId,
+            kind: "BUDGET_UPDATED",
+            payload: {
+              gatewayRequestId,
+              virtualKeyId: vk.id,
+              budgetIds: budgets.map((b) => b.id),
+              amountUsd,
+            },
+          });
+        } catch (changeErr) {
+          // Best-effort. The CH ledger row already landed; failing the
+          // change event would just leave the gateway's cache slightly
+          // staler than it could be, not corrupt any state.
+          logger.warn(
+            { projectId, virtualKeyId, gatewayRequestId, error: changeErr },
+            "failed to emit BUDGET_UPDATED change event after fold",
+          );
+        }
       } catch (error) {
         logger.error(
           {

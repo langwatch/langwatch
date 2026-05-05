@@ -46,6 +46,7 @@ type Client struct {
 	sign              func(req *http.Request, body []byte)
 	verifier          *jwtverify.JWTVerifier
 	client            *http.Client
+	pollClient        *http.Client
 	logger            *zap.Logger
 	guardrailTimeouts GuardrailTimeouts
 }
@@ -74,12 +75,25 @@ func NewClient(opts ClientOptions) *Client {
 	if opts.GuardrailTimeouts.StreamChunk == 0 {
 		opts.GuardrailTimeouts.StreamChunk = 50 * time.Millisecond
 	}
+	// pollClient is the long-poll-friendly variant: same Transport pool
+	// (no extra TCP/TLS overhead) but with no overall Timeout. The
+	// /changes endpoint holds the connection for up to ~10s server-side;
+	// using the shared client (Timeout=10s) was racing the server's
+	// 204 response and dropping events. Cancellation flows through
+	// context.Done so shutdown still works.
+	pollClient := &http.Client{
+		Transport: opts.HTTPClient.Transport,
+		Jar:       opts.HTTPClient.Jar,
+		// Timeout intentionally unset — the per-request context is the
+		// binding deadline.
+	}
 	return &Client{
 		baseURL:           opts.BaseURL,
 		userAgent:         opts.UserAgent,
 		sign:              opts.Sign,
 		verifier:          opts.Verifier,
 		client:            opts.HTTPClient,
+		pollClient:        pollClient,
 		logger:            opts.Logger,
 		guardrailTimeouts: opts.GuardrailTimeouts,
 	}
@@ -163,8 +177,16 @@ func (c *Client) PollChanges(ctx context.Context, organizationID, since string) 
 	if organizationID == "" {
 		return nil, since, fmt.Errorf("PollChanges: organizationID is required")
 	}
+	// Per-request deadline: server long-poll holds for up to ~10s
+	// (gateway-internal.ts: timeoutSeconds capped at 25, default 10).
+	// Give the client a 5s buffer so the server's 204 lands cleanly
+	// before our ctx fires. Without this buffer, a transient race
+	// dropped almost every long-poll on transport-deadline errors.
+	pollCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
+	defer cancel()
+
 	endpoint, _ := url.JoinPath(c.baseURL, "/api/internal/gateway/changes")
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	req, err := http.NewRequestWithContext(pollCtx, http.MethodGet, endpoint, nil)
 	if err != nil {
 		return nil, since, err
 	}
@@ -180,7 +202,7 @@ func (c *Client) PollChanges(ctx context.Context, organizationID, since string) 
 	c.setCommonHeaders(req)
 	c.sign(req, nil)
 
-	resp, err := c.client.Do(req)
+	resp, err := c.pollClient.Do(req)
 	if err != nil {
 		return nil, since, err
 	}
