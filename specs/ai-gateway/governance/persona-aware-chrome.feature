@@ -157,6 +157,7 @@ Feature: AI Gateway Governance — Persona-aware chrome (sidebar + header)
       | /settings/governance/ingestion-sources             |
       | /settings/governance/ingestion-sources/<id>        |
       | /settings/governance/anomaly-rules                 |
+      | /settings/governance/tool-catalog                  |
       | /settings/governance/teams                         |
       | /settings/governance/teams/<id>                    |
       | /settings/governance/users                         |
@@ -177,7 +178,9 @@ Feature: AI Gateway Governance — Persona-aware chrome (sidebar + header)
         `ee/governance/dashboard/pages/{ingestion-sources,
         ingestion-source-detail, anomaly-rules}.tsx` rendering under
         the legacy `<SettingsLayout>` instead of `<GovernanceLayout>`;
-        fixed by `a8f2342c8`)
+        fixed by `a8f2342c8`. Sibling regression on
+        `/settings/governance/tool-catalog` flagged separately as
+        Ariana QA G43; same fix shape — swap layout)
 
   @bdd @ui @persona-chrome @persona-4 @ff-off-regression
   Scenario: Govern section vanishes when its feature flag flips off (independent of Gateway)
