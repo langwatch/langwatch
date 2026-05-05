@@ -8,6 +8,7 @@ import {
 import type {
     SimulationMessageSnapshotEvent,
     SimulationProcessingEvent,
+    SimulationRunCancelRequestedEvent,
     SimulationRunDeletedEvent,
     SimulationRunFinishedEvent,
     SimulationRunStartedEvent,
@@ -109,6 +110,27 @@ function createRunDeletedEvent(
     occurredAt: 4000,
     type: SIMULATION_RUN_EVENT_TYPES.DELETED,
     version: SIMULATION_EVENT_VERSIONS.DELETED,
+    data: {
+      scenarioRunId: "scenario-run-1",
+      ...overrides,
+    },
+    ...eventOverrides,
+  };
+}
+
+function createCancelRequestedEvent(
+  overrides: Partial<SimulationRunCancelRequestedEvent["data"]> = {},
+  eventOverrides: Partial<SimulationRunCancelRequestedEvent> = {},
+): SimulationRunCancelRequestedEvent {
+  return {
+    id: "event-cancel-1",
+    aggregateId: "scenario-run-1",
+    aggregateType: "simulation_run",
+    tenantId: TEST_TENANT_ID,
+    createdAt: 5000,
+    occurredAt: 5000,
+    type: SIMULATION_RUN_EVENT_TYPES.CANCEL_REQUESTED,
+    version: SIMULATION_EVENT_VERSIONS.CANCEL_REQUESTED,
     data: {
       scenarioRunId: "scenario-run-1",
       ...overrides,
@@ -459,6 +481,32 @@ describe("simulationRunStateFoldProjection", () => {
 
       expect(state.ArchivedAt).toBe(4000); // RunDeleted occurredAt
       expect(state.UpdatedAt).toBeGreaterThanOrEqual(4000);
+    });
+  });
+
+  describe("when CancelRequested event is applied to an in-progress run", () => {
+    /** @scenario "Fold projection sets CancellationRequestedAt without changing Status" */
+    it("sets CancellationRequestedAt without changing Status", () => {
+      const state = foldEvents([
+        createRunStartedEvent(),
+        createCancelRequestedEvent({}, { occurredAt: 5500 }),
+      ]);
+
+      expect(state.CancellationRequestedAt).toBe(5500);
+      expect(state.Status).toBe("IN_PROGRESS");
+    });
+  });
+
+  describe("when CancelRequested event is applied a second time", () => {
+    /** @scenario "Cancel request is idempotent" */
+    it("preserves the original CancellationRequestedAt", () => {
+      const state = foldEvents([
+        createRunStartedEvent(),
+        createCancelRequestedEvent({}, { id: "event-cancel-first", occurredAt: 5500 }),
+        createCancelRequestedEvent({}, { id: "event-cancel-second", occurredAt: 7000 }),
+      ]);
+
+      expect(state.CancellationRequestedAt).toBe(5500);
     });
   });
 
