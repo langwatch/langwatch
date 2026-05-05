@@ -513,6 +513,21 @@ app.post("/budget/check", async (c) => {
     );
   }
 
+  // EC6 — admin oversight ("when did this user last use their VK")
+  // was broken because /resolve-key only fires on bundle cache miss
+  // (~once per JWT TTL = 15 min). The gateway hits /budget/check on
+  // every dispatch, so this is the right hook for last-used updates.
+  // Throttle to 60s to avoid hot-row contention at high RPS — admin
+  // dashboards refresh on minute-scale anyway. Fire-and-forget so a
+  // DB blip doesn't deny the request.
+  if (
+    !vk.lastUsedAt ||
+    Date.now() - vk.lastUsedAt.getTime() > 60 * 1000
+  ) {
+    const vkService = VirtualKeyService.create(prisma);
+    void vkService.touchUsage(vk.id).catch(() => {});
+  }
+
   const service = GatewayBudgetService.create(
     prisma,
     isClickHouseEnabled()
