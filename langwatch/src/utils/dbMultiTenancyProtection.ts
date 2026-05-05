@@ -229,6 +229,7 @@ const _guardProjectId = ({ params }: { params: Prisma.MiddlewareParams }) => {
     !params.args?.where?.projectId &&
     !params.args?.where?.projectId_slug &&
     !params.args?.where?.projectId_date &&
+    !params.args?.where?.projectId_modelProviderId_slot &&
     !params.args?.where?.projectId?.in &&
     !params.args?.where?.OR?.every((o: any) => o.projectId || o.organizationId)
   ) {

@@ -189,6 +189,54 @@ describe("G86 diagnostic — getAllForOrg sees project-scoped binds", () => {
     void second; // silence unused-binding lint
   });
 
+  it("create transparently revives a disabled binding at the same slot (G115)", async () => {
+    // After the cascade test the (PROJECT_ID, MP_ID, "primary") tuple is
+    // held by a row with disabledAt != null. The unique constraint is
+    // independent of disabledAt, so a naive INSERT would P2002 → 500.
+    // Service contract: detect the disabled-row conflict and revive it
+    // in place with the new settings.
+    const before = await prisma.gatewayProviderCredential.findUnique({
+      where: {
+        projectId_modelProviderId_slot: {
+          projectId: PROJECT_ID,
+          modelProviderId: MP_ID,
+          slot: "primary",
+        },
+      },
+    });
+    expect(before).not.toBeNull();
+    expect(before?.disabledAt).not.toBeNull();
+    const beforeId = before!.id;
+
+    const revived = await service.create({
+      projectId: PROJECT_ID,
+      organizationId: ORG_ID,
+      modelProviderId: MP_ID,
+      slot: "primary",
+      rateLimitRpm: 4242,
+      actorUserId: USER_ID,
+    });
+
+    // Same id — proves we revived in place, did not insert a fresh row.
+    expect(revived.id).toBe(beforeId);
+    expect(revived.disabledAt).toBeNull();
+    // Settings on the call propagate (covers the "user expects a fresh
+    // bind" half of the mental model).
+    expect(revived.rateLimitRpm).toBe(4242);
+
+    // A second create against the now-active row must throw CONFLICT,
+    // not P2002 — caller (UI) gets a typed tRPC error to react to.
+    await expect(
+      service.create({
+        projectId: PROJECT_ID,
+        organizationId: ORG_ID,
+        modelProviderId: MP_ID,
+        slot: "primary",
+        actorUserId: USER_ID,
+      }),
+    ).rejects.toMatchObject({ code: "CONFLICT" });
+  });
+
   it("getAllForOrg returns empty array for an org with no credentials", async () => {
     // Sanity check — distinct fresh org with no binds returns [],
     // not a leak from the parent test's seeded credential.

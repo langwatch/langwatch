@@ -146,7 +146,7 @@ export class GatewayProviderCredentialService {
         }
         const before = serializeRowForAudit(conflicting);
         const revived = await tx.gatewayProviderCredential.update({
-          where: { id: conflicting.id },
+          where: { id: conflicting.id, projectId: input.projectId },
           data: {
             disabledAt: null,
             slot,
