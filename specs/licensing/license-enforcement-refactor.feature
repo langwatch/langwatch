@@ -20,7 +20,7 @@ Feature: License Enforcement
   # maxMembersLite in License Schema
   # ============================================================================
 
-  @unit @unimplemented
+  @unit
   Scenario: License schema accepts maxMembersLite as optional field
     Given a license payload with maxMembersLite set to 5
     When the license is validated
