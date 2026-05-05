@@ -23,6 +23,11 @@ Feature: Message/Trace Limit Enforcement with License
   # Caching Behavior
   # ============================================================================
 
+  # KEPT @unimplemented: TTL-based cache for trace counts is not yet
+  # implemented in TraceUsageService — current code calls Elasticsearch on
+  # every check. Adding the cache + tests requires deciding TTL window,
+  # invalidation strategy, and where to inject the clock. Out of parity
+  # scope; tracked as a future feature.
   @unimplemented
   Scenario: Uses cached count within TTL
     Given the organization has a license with maxMessagesPerMonth 10000
@@ -32,6 +37,8 @@ Feature: Message/Trace Limit Enforcement with License
     Then the Elasticsearch query is not executed
     And the cached count is returned
 
+  # KEPT @unimplemented: see preceding scenario — the trace-count cache
+  # itself does not exist in code yet.
   @unimplemented
   Scenario: Refreshes count after cache expires
     Given the organization has a license with maxMessagesPerMonth 10000

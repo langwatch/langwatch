@@ -1,5 +1,15 @@
 @integration
 Feature: Billing Meter Dispatch
+
+  # All scenarios in this file describe the SaaS-only billing usage
+  # reporting worker (cross-project event aggregation, SaaS-mode skip,
+  # crash recovery with two-phase checkpoint, transient-error retry,
+  # event deduplication). Backend code lives in
+  # ee/billing/services/usageReportingService and the BillingDispatchReactor;
+  # the integration-test fixture covers happy-path Stripe report submission
+  # but not the worker-loop / recovery / dedup paths — all aspirational
+  # pending the worker-test harness.
+
   As a SaaS billing system
   I want to report billable event usage to Stripe
   So that organizations are billed accurately for their consumption

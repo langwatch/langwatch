@@ -1,4 +1,14 @@
 Feature: License Enforcement
+
+  # The maxMembersLite-default scenario below is bound. The remaining
+  # @unimplemented scenarios in this file are either UI-level (settings
+  # menu placement, license-card field listing, Infinity rendering — need
+  # a page-level component test against the License settings page) or
+  # require an end-to-end "store license → retrieve license" fixture
+  # against a live database that does not exist yet outside
+  # licenseHandler.integration.test.ts. Aspirational pending the page
+  # test harness and a richer license-status response schema.
+
   As a self-hosted LangWatch administrator
   I want license enforcement to manage plan limits
   So that the system enforces appropriate limits based on organization licenses
@@ -34,7 +44,7 @@ Feature: License Enforcement
     When the plan is constructed
     Then maxMembers should default to 1
 
-  @unit @unimplemented
+  @unit
   Scenario: PlanInfo defaults maxMembersLite to 1 when not specified
     Given a plan without explicit maxMembersLite
     When the plan is constructed

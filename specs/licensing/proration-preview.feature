@@ -1,4 +1,12 @@
 Feature: Proration Preview Before Seat Update
+
+  # All scenarios in this file describe the Seat-update proration-preview
+  # modal on the Subscription page (loading state, error state, calculation
+  # base, cancel behavior). The previewProration backend method is unit
+  # tested in subscription.service.unit.test.ts but the modal UI itself
+  # has no component-test fixture yet — all aspirational pending the
+  # modal harness.
+
   As a Growth plan (SEAT_EVENT) administrator
   I want to see the prorated charges before confirming a seat update
   So that I understand exactly what I'll be charged immediately before committing

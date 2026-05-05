@@ -1,4 +1,12 @@
 Feature: Subscription Page Plan Management
+
+  # All scenarios in this file describe page-level UX of the
+  # /settings/subscription route — pricing-model-conditional rendering
+  # (TIERED vs SEAT_EVENT), Add Seat button placement, loading states,
+  # invoice list pagination, post-checkout activation. Need a page-level
+  # integration test against the rendered Subscription page in both
+  # pricing modes — no such harness exists yet.
+
   As an organization administrator
   I want to view and manage my subscription plan and users
   So that I can understand my current plan limits and upgrade when needed
