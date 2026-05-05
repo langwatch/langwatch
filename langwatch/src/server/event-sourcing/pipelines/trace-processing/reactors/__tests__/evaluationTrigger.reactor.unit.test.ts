@@ -58,8 +58,9 @@ function createFoldState(
 }
 
 function createEvent(
-  overrides: Partial<TraceProcessingEvent> = {},
+  overrides: Partial<TraceProcessingEvent> & { spanName?: string } = {},
 ): TraceProcessingEvent {
+  const { spanName, ...rest } = overrides;
   return {
     id: "event-1",
     aggregateId: "trace-1",
@@ -69,9 +70,9 @@ function createEvent(
     occurredAt: Date.now(),
     type: "lw.obs.trace.span_received",
     version: 1,
-    data: {},
+    data: spanName !== undefined ? { span: { name: spanName } } : {},
     metadata: { spanId: "span-1", traceId: "trace-1" },
-    ...overrides,
+    ...rest,
   } as TraceProcessingEvent;
 }
 
@@ -210,7 +211,7 @@ describe("evaluationTrigger reactor", () => {
         attributes: { "langwatch.origin": "application" },
       });
       const syntheticSpanName = [...SYNTHETIC_SPAN_NAMES][0]!;
-      const event = createEvent({ data: { span: { name: syntheticSpanName } } });
+      const event = createEvent({ spanName: syntheticSpanName });
 
       await reactor.handle(event, createContext(state));
 
@@ -225,7 +226,7 @@ describe("evaluationTrigger reactor", () => {
         attributes: { "langwatch.origin": "application" },
       });
       const syntheticSpanName = [...SYNTHETIC_SPAN_NAMES][0]!;
-      const event = createEvent({ data: { span: { name: syntheticSpanName } } });
+      const event = createEvent({ spanName: syntheticSpanName });
 
       await reactor.handle(event, createContext(state));
 
@@ -240,7 +241,7 @@ describe("evaluationTrigger reactor", () => {
       const state = createFoldState({
         attributes: { "langwatch.origin": "application" },
       });
-      const event = createEvent({ data: { span: { name: "openai.chat" } } });
+      const event = createEvent({ spanName: "openai.chat" });
 
       await reactor.handle(event, createContext(state));
 
