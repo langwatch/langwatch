@@ -47,6 +47,24 @@ export function AiToolsPortal() {
     { enabled: !!orgId, refetchOnWindowFocus: false },
   );
 
+  const availabilityQuery = api.aiTools.providerAvailability.useQuery(
+    { organizationId: orgId },
+    { enabled: !!orgId, refetchOnWindowFocus: false },
+  );
+
+  // Stay `undefined` until the preflight resolves so model-provider
+  // tiles default to "configured" during the load window — a brief
+  // flicker of "Provider not configured" at every tile on page-open
+  // would be louder than any single false positive (and less honest
+  // than the empty-set we'd get from an absent query result).
+  const configuredProviders = useMemo<Set<string> | undefined>(
+    () =>
+      availabilityQuery.data
+        ? new Set(availabilityQuery.data.configuredProviders)
+        : undefined,
+    [availabilityQuery.data],
+  );
+
   const entries = (listQuery.data ?? []) as unknown as AiToolEntry[];
 
   const grouped = useMemo(() => {
@@ -136,7 +154,12 @@ export function AiToolsPortal() {
             </Heading>
             <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} gap={3}>
               {items.map((entry) => (
-                <RenderTile key={entry.id} entry={entry} orgId={orgId} />
+                <RenderTile
+                  key={entry.id}
+                  entry={entry}
+                  orgId={orgId}
+                  configuredProviders={configuredProviders}
+                />
               ))}
             </SimpleGrid>
           </VStack>
@@ -149,9 +172,11 @@ export function AiToolsPortal() {
 function RenderTile({
   entry,
   orgId,
+  configuredProviders,
 }: {
   entry: AiToolEntry;
   orgId: string;
+  configuredProviders: Set<string> | undefined;
 }) {
   switch (entry.type) {
     case "coding_assistant":
@@ -162,15 +187,22 @@ function RenderTile({
           iconKey={entry.iconKey}
         />
       );
-    case "model_provider":
+    case "model_provider": {
+      const cfg = entry.config as ModelProviderConfig;
       return (
         <ModelProviderTile
           displayName={entry.displayName}
-          config={entry.config as ModelProviderConfig}
+          config={cfg}
           organizationId={orgId}
           iconKey={entry.iconKey}
+          providerConfigured={
+            configuredProviders
+              ? configuredProviders.has(cfg.providerKey)
+              : undefined
+          }
         />
       );
+    }
     case "external_tool":
       return (
         <ExternalToolTile

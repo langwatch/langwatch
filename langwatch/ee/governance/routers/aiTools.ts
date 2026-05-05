@@ -55,6 +55,26 @@ export const aiToolsRouter = createTRPCRouter({
     }),
 
   /**
+   * Per-org provider availability — drives the model_provider tile
+   * preflight on /me. Returns the distinct set of `provider` strings
+   * the calling user has access to via the scope ladder; the tile
+   * compares its `config.providerKey` against this and renders an
+   * actionable "Provider not configured" hint when missing, instead
+   * of silently minting a VK that 502s on first curl.
+   */
+  providerAvailability: protectedProcedure
+    .input(z.object({ organizationId: z.string() }))
+    .use(checkOrganizationPermission("aiTools:view"))
+    .query(async ({ ctx, input }) => {
+      const service = AiToolEntryService.create(ctx.prisma);
+      const configuredProviders = await service.listConfiguredProvidersForUser({
+        organizationId: input.organizationId,
+        userId: ctx.session.user.id,
+      });
+      return { configuredProviders };
+    }),
+
+  /**
    * Admin list — includes disabled + archived. Powers the catalog
    * editor at /settings/governance/tool-catalog.
    */

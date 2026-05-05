@@ -56,6 +56,17 @@ interface Props {
   config: ModelProviderConfig;
   organizationId: string;
   iconKey?: string | null;
+  /**
+   * Whether the org has at least one ModelProvider row configured for
+   * this tile's `providerKey` at any scope visible to the calling user.
+   * When false, we replace the issue form with an actionable
+   * "Provider not configured" hint instead of letting the user mint a
+   * VK that 502s on first curl with `provider_error`. Computed once at
+   * the portal level and threaded through (one query per portal load,
+   * not per tile). Defaults to `true` so the form still renders if the
+   * preflight query is in-flight or fails open.
+   */
+  providerConfigured?: boolean;
 }
 
 interface IssuedKey {
@@ -94,6 +105,7 @@ export function ModelProviderTile({
   config,
   organizationId,
   iconKey,
+  providerConfigured = true,
 }: Props) {
   const [expanded, setExpanded] = useState(false);
   const [label, setLabel] = useState(sanitizeDefaultLabel(config.defaultLabel));
@@ -163,14 +175,62 @@ export function ModelProviderTile({
           <Text fontSize="sm" fontWeight="semibold">
             {displayName}
           </Text>
-          <Text fontSize="xs" color="fg.muted">
-            Issue your own virtual key
+          <Text
+            fontSize="xs"
+            color={providerConfigured ? "fg.muted" : "orange.700"}
+          >
+            {providerConfigured
+              ? "Issue your own virtual key"
+              : "Provider not configured"}
           </Text>
         </VStack>
         {expanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
       </HStack>
 
-      {expanded && !issued && (
+      {expanded && !providerConfigured && (
+        <Box
+          marginTop={4}
+          padding={3}
+          borderWidth="1px"
+          borderColor="orange.200"
+          borderRadius="sm"
+          backgroundColor="orange.50"
+        >
+          <Text fontSize="sm" color="orange.900" marginBottom={2}>
+            Your organization doesn&apos;t have {articleFor(displayName)}{" "}
+            {displayName} credential configured yet — issuing a key here would
+            mint a VK that fails on first call with{" "}
+            <Code fontSize="xs" backgroundColor="transparent">
+              provider_error
+            </Code>
+            .
+          </Text>
+          <Text fontSize="xs" color="orange.800">
+            Ask your organization admin to add {articleFor(displayName)}{" "}
+            {displayName} provider in{" "}
+            <Link
+              href="/settings/model-providers"
+              color="orange.800"
+              fontWeight="medium"
+              textDecoration="underline"
+            >
+              Settings → Model Providers
+            </Link>
+            . They&apos;ll also need to bind it into the{" "}
+            <Link
+              href="/settings/routing-policies"
+              color="orange.800"
+              fontWeight="medium"
+              textDecoration="underline"
+            >
+              default routing policy
+            </Link>{" "}
+            so personal keys can route to it.
+          </Text>
+        </Box>
+      )}
+
+      {expanded && providerConfigured && !issued && (
         <VStack align="stretch" gap={3} marginTop={4}>
           <Text fontSize="sm" fontWeight="medium">
             Issue {articleFor(displayName)} {displayName} virtual key

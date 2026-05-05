@@ -479,6 +479,57 @@ export class AiToolEntryService {
   }
 
   /**
+   * Returns the distinct set of `provider` strings the org has at
+   * least one *bindable* credential for — i.e. a live
+   * `GatewayProviderCredential` (`disabledAt: null`) on a project in
+   * the org whose parent `ModelProvider` is enabled. Drives the
+   * per-tile "Provider not configured" preflight on /me — without
+   * this, clicking an OpenAI tile in an Anthropic-only org silently
+   * mints a VK that 502s on first curl with `provider_error` (Sergey
+   * 3bbd7fbfc dogfood).
+   *
+   * Why this exact predicate: it mirrors the materialiser's
+   * fail-closed binding contract (a5601f80a). If a credential
+   * matching this shape exists anywhere in the org, the personal-VK
+   * routing policy can route through it — guaranteeing the tile's
+   * green state matches what the gateway will actually accept at
+   * request time. Using the bare ModelProvider table (without the
+   * `disabledAt: null` join) would over-report for orgs that have
+   * an enabled MP but soft-disabled all of its bindings.
+   *
+   * Both `Project` and `ModelProvider` are exempt from
+   * `dbMultiTenancyProtection`. `GatewayProviderCredential` is NOT
+   * exempt but the `projectId: { in: ... }` shape satisfies the
+   * guard's `projectId.in` allowance (line 233 of that middleware).
+   */
+  async listConfiguredProvidersForUser({
+    organizationId,
+  }: {
+    organizationId: string;
+    userId: string;
+  }): Promise<string[]> {
+    const projects = await this.prisma.project.findMany({
+      where: { team: { organizationId } },
+      select: { id: true },
+    });
+    const projectIds = projects.map((p) => p.id);
+    if (projectIds.length === 0) return [];
+
+    const rows = await this.prisma.gatewayProviderCredential.findMany({
+      where: {
+        projectId: { in: projectIds },
+        disabledAt: null,
+        modelProvider: { enabled: true },
+      },
+      select: { modelProvider: { select: { provider: true } } },
+    });
+
+    return Array.from(
+      new Set(rows.map((r) => r.modelProvider.provider).filter(Boolean)),
+    );
+  }
+
+  /**
    * Bulk reorder. Admins drag-to-reorder in the catalog editor; the
    * client sends back the full ordered list of (id, order) pairs and
    * we apply them in a transaction so a partial failure doesn't leave
