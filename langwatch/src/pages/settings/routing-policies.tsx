@@ -719,10 +719,21 @@ function ProviderCredentialPicker({
     return map;
   }, [available]);
 
-  const remaining = useMemo(
-    () => available.filter((c) => !selectedIds.includes(c.id)),
-    [available, selectedIds],
+  // G86 — disabled credentials never appear as new pick options. They
+  // can stay in the selected list (an existing policy may already
+  // reference one), but the dropdown only offers active ones so an
+  // admin doesn't pick a credential that will fail the moment a VK
+  // routes through it.
+  const activeAvailable = useMemo(
+    () => available.filter((c) => !c.disabledAt),
+    [available],
   );
+  const remaining = useMemo(
+    () => activeAvailable.filter((c) => !selectedIds.includes(c.id)),
+    [activeAvailable, selectedIds],
+  );
+  const onlyDisabledExist =
+    available.length > 0 && activeAvailable.length === 0;
 
   const removeAt = (i: number) =>
     onChange(selectedIds.filter((_, idx) => idx !== i));
@@ -758,7 +769,7 @@ function ProviderCredentialPicker({
     );
   }
 
-  if (available.length === 0) {
+  if (available.length === 0 && selectedIds.length === 0) {
     return (
       <Box
         borderWidth="1px"
@@ -775,6 +786,41 @@ function ProviderCredentialPicker({
             A routing policy points at one or more gateway provider
             credentials. Configure at least one before saving this
             policy.
+          </Text>
+          {gatewayProvidersAdminPath && (
+            <Link
+              href={gatewayProvidersAdminPath}
+              color="orange.700"
+              fontSize="xs"
+              fontWeight="medium"
+            >
+              Open Gateway Providers admin →
+            </Link>
+          )}
+        </VStack>
+      </Box>
+    );
+  }
+
+  if (onlyDisabledExist && selectedIds.length === 0) {
+    return (
+      <Box
+        borderWidth="1px"
+        borderColor="orange.300"
+        borderRadius="md"
+        backgroundColor="orange.50"
+        padding={3}
+      >
+        <VStack align="start" gap={1}>
+          <Text fontSize="sm" fontWeight="semibold">
+            All gateway provider credentials are disabled
+          </Text>
+          <Text fontSize="xs" color="fg.muted">
+            {available.length === 1
+              ? "The org has 1 gateway binding, but it's disabled."
+              : `The org has ${available.length} gateway bindings, but all are disabled.`}
+            {" "}Re-enable one (or bind a fresh credential) before this
+            policy can route traffic.
           </Text>
           {gatewayProvidersAdminPath && (
             <Link

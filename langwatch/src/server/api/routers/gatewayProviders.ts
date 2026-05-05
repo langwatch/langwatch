@@ -164,4 +164,38 @@ export const gatewayProvidersRouter = createTRPCRouter({
         actorUserId: ctx.session.user.id,
       });
     }),
+
+  /** G93 — recover a disabled binding by clearing `disabledAt`. */
+  enable: protectedProcedure
+    .input(z.object({ projectId: z.string(), id: z.string() }))
+    .use(checkProjectPermission("gatewayProviders:manage"))
+    .mutation(async ({ ctx, input }) => {
+      const organizationId = await orgForProject(ctx, input.projectId);
+      const service = GatewayProviderCredentialService.create(ctx.prisma);
+      return service.enable({
+        id: input.id,
+        projectId: input.projectId,
+        organizationId,
+        actorUserId: ctx.session.user.id,
+      });
+    }),
+
+  /**
+   * G93 — permanent delete. Frees the (projectId, modelProviderId, slot)
+   * tuple so the same MP can be re-bound at the same slot. Cascades to
+   * VirtualKeyProviderCredential via Prisma onDelete:Cascade.
+   */
+  destroy: protectedProcedure
+    .input(z.object({ projectId: z.string(), id: z.string() }))
+    .use(checkProjectPermission("gatewayProviders:manage"))
+    .mutation(async ({ ctx, input }) => {
+      const organizationId = await orgForProject(ctx, input.projectId);
+      const service = GatewayProviderCredentialService.create(ctx.prisma);
+      return service.destroy({
+        id: input.id,
+        projectId: input.projectId,
+        organizationId,
+        actorUserId: ctx.session.user.id,
+      });
+    }),
 });

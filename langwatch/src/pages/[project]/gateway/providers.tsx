@@ -11,7 +11,15 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { MoreVertical, Pencil, Plug, Plus, PowerOff } from "lucide-react";
+import {
+  MoreVertical,
+  Pencil,
+  Plug,
+  Plus,
+  Power,
+  PowerOff,
+  Trash2,
+} from "lucide-react";
 import { useState } from "react";
 
 import { DashboardLayout } from "~/components/DashboardLayout";
@@ -52,14 +60,28 @@ function ProvidersPage() {
     { enabled: !!project?.id },
   );
   const utils = api.useContext();
+  const invalidateLists = () => {
+    void utils.gatewayProviders.list.invalidate({ projectId: project?.id });
+    // The org-scoped picker on /settings/routing-policies reads from a
+    // different cache key — invalidate both so the routing-policy
+    // drawer reflects the new state without a manual reload.
+    void utils.gatewayProviders.listForOrg.invalidate();
+  };
+
   const disableMutation = api.gatewayProviders.disable.useMutation({
-    onSuccess: () =>
-      utils.gatewayProviders.list.invalidate({ projectId: project?.id }),
+    onSuccess: invalidateLists,
+  });
+  const enableMutation = api.gatewayProviders.enable.useMutation({
+    onSuccess: invalidateLists,
+  });
+  const destroyMutation = api.gatewayProviders.destroy.useMutation({
+    onSuccess: invalidateLists,
   });
 
   const [bindOpen, setBindOpen] = useState(false);
   const [editing, setEditing] = useState<ProviderRow | null>(null);
   const [disabling, setDisabling] = useState<ProviderRow | null>(null);
+  const [destroying, setDestroying] = useState<ProviderRow | null>(null);
 
   const confirmDisable = async () => {
     if (!disabling || !project?.id) return;
@@ -72,6 +94,37 @@ function ProvidersPage() {
     } catch (error) {
       toaster.create({
         title: error instanceof Error ? error.message : "Failed to disable",
+        type: "error",
+      });
+    }
+  };
+
+  const confirmDestroy = async () => {
+    if (!destroying || !project?.id) return;
+    try {
+      await destroyMutation.mutateAsync({
+        projectId: project.id,
+        id: destroying.id,
+      });
+      setDestroying(null);
+    } catch (error) {
+      toaster.create({
+        title: error instanceof Error ? error.message : "Failed to delete",
+        type: "error",
+      });
+    }
+  };
+
+  const reEnable = async (row: ProviderRow) => {
+    if (!project?.id) return;
+    try {
+      await enableMutation.mutateAsync({
+        projectId: project.id,
+        id: row.id,
+      });
+    } catch (error) {
+      toaster.create({
+        title: error instanceof Error ? error.message : "Failed to re-enable",
         type: "error",
       });
     }
@@ -219,7 +272,7 @@ function ProvidersPage() {
                         </Text>
                       </Table.Cell>
                       <Table.Cell>
-                        {canManage && !row.disabledAt && (
+                        {canManage && (
                           <Menu.Root>
                             <Menu.Trigger asChild>
                               <Button
@@ -231,25 +284,46 @@ function ProvidersPage() {
                               </Button>
                             </Menu.Trigger>
                             <Menu.Content>
-                              <Menu.Item
-                                value="edit"
-                                onClick={() => setEditing(row)}
-                              >
-                                <Pencil size={14} /> Edit
-                              </Menu.Item>
-                              <Menu.Item
-                                value="disable"
-                                onClick={() => setDisabling(row)}
-                              >
-                                <PowerOff size={14} /> Disable
-                              </Menu.Item>
+                              {row.disabledAt ? (
+                                <>
+                                  <Menu.Item
+                                    value="enable"
+                                    onClick={() => reEnable(row)}
+                                  >
+                                    <Power size={14} /> Re-enable
+                                  </Menu.Item>
+                                  <Menu.Item
+                                    value="edit"
+                                    onClick={() => setEditing(row)}
+                                  >
+                                    <Pencil size={14} /> Edit
+                                  </Menu.Item>
+                                  <Menu.Item
+                                    value="destroy"
+                                    color="red"
+                                    onClick={() => setDestroying(row)}
+                                  >
+                                    <Trash2 size={14} /> Delete permanently
+                                  </Menu.Item>
+                                </>
+                              ) : (
+                                <>
+                                  <Menu.Item
+                                    value="edit"
+                                    onClick={() => setEditing(row)}
+                                  >
+                                    <Pencil size={14} /> Edit
+                                  </Menu.Item>
+                                  <Menu.Item
+                                    value="disable"
+                                    onClick={() => setDisabling(row)}
+                                  >
+                                    <PowerOff size={14} /> Disable
+                                  </Menu.Item>
+                                </>
+                              )}
                             </Menu.Content>
                           </Menu.Root>
-                        )}
-                        {row.disabledAt && (
-                          <Badge colorPalette="gray" variant="subtle">
-                            disabled
-                          </Badge>
                         )}
                       </Table.Cell>
                     </Table.Row>
@@ -296,6 +370,18 @@ function ProvidersPage() {
         tone="warning"
         loading={disableMutation.isPending}
         onConfirm={confirmDisable}
+      />
+      <ConfirmDialog
+        open={!!destroying}
+        onOpenChange={(open) => {
+          if (!open) setDestroying(null);
+        }}
+        title={`Permanently delete ${destroying?.modelProviderName ?? "provider"} binding?`}
+        message="This frees the provider/slot tuple so a new credential can be bound at the same slot. Virtual keys still referencing this binding will lose the reference and fail closed at request time. This cannot be undone."
+        confirmLabel="Delete permanently"
+        tone="danger"
+        loading={destroyMutation.isPending}
+        onConfirm={confirmDestroy}
       />
     </GatewayLayout>
   );

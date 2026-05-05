@@ -118,8 +118,16 @@ export function ProviderBindingCreateDrawer({
   const enabledProviders = Object.values(providersRecord).filter(
     (p: any) => p?.enabled && p?.id,
   ) as BindableProvider[];
+  // G91 — disabled bindings should NOT block re-binding. The
+  // (projectId, modelProviderId, slot) unique constraint still applies,
+  // so if the same MP + slot tuple is occupied by a disabled row the
+  // admin needs to re-enable or permanently delete it first; this
+  // filter only stops disabled rows from being treated as actively
+  // squatting the slot.
   const boundIds = new Set(
-    (existingBindingsQuery.data ?? []).map((b) => b.modelProviderId),
+    (existingBindingsQuery.data ?? [])
+      .filter((b) => !b.disabledAt)
+      .map((b) => b.modelProviderId),
   );
   const available: BindableProvider[] = enabledProviders.filter(
     (p) => !boundIds.has(p.id),

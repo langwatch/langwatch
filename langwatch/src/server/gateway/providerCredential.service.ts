@@ -335,4 +335,100 @@ export class GatewayProviderCredentialService {
       return updated;
     });
   }
+
+  /**
+   * G93 — recover a disabled binding by clearing `disabledAt`. Mirror of
+   * `disable`; emits the same change-event + audit trail with the
+   * `enabled` action so the gateway dispatcher's warm cache picks up
+   * the row again.
+   */
+  async enable(args: {
+    id: string;
+    projectId: string;
+    organizationId: string;
+    actorUserId: string;
+  }): Promise<GatewayProviderCredentialRow> {
+    const existing = await this.getById(args.id, args.projectId);
+    if (!existing) throw new TRPCError({ code: "NOT_FOUND" });
+    const before = serializeRowForAudit(existing);
+
+    return this.prisma.$transaction(async (tx) => {
+      const updated = await tx.gatewayProviderCredential.update({
+        where: { id: args.id, projectId: args.projectId },
+        data: { disabledAt: null },
+        include: { modelProvider: true },
+      });
+      await this.changeEvents.append(
+        {
+          organizationId: args.organizationId,
+          projectId: args.projectId,
+          kind: "PROVIDER_BINDING_UPDATED",
+          providerCredentialId: updated.id,
+        },
+        tx,
+      );
+      await this.auditLog.append(
+        {
+          organizationId: args.organizationId,
+          projectId: args.projectId,
+          actorUserId: args.actorUserId,
+          action: "gateway.provider_binding.updated",
+          targetKind: "provider_binding",
+          targetId: updated.id,
+          before,
+          after: serializeRowForAudit(updated),
+        },
+        tx,
+      );
+      return updated;
+    });
+  }
+
+  /**
+   * G93 — hard delete. Used by admins to clear a binding row entirely
+   * (so its (projectId, modelProviderId, slot) tuple frees up for a
+   * fresh bind). Cascades to `VirtualKeyProviderCredential` via the
+   * Prisma onDelete:Cascade on that join — VKs that referenced this
+   * binding lose the reference and (per existing chain validation)
+   * fail closed at request time. Soft-disable remains the default
+   * surface; this is the explicit-recovery escape hatch.
+   */
+  async destroy(args: {
+    id: string;
+    projectId: string;
+    organizationId: string;
+    actorUserId: string;
+  }): Promise<{ id: string }> {
+    const existing = await this.getById(args.id, args.projectId);
+    if (!existing) throw new TRPCError({ code: "NOT_FOUND" });
+    const before = serializeRowForAudit(existing);
+
+    return this.prisma.$transaction(async (tx) => {
+      await tx.gatewayProviderCredential.delete({
+        where: { id: args.id, projectId: args.projectId },
+      });
+      await this.changeEvents.append(
+        {
+          organizationId: args.organizationId,
+          projectId: args.projectId,
+          kind: "PROVIDER_BINDING_UPDATED",
+          providerCredentialId: args.id,
+        },
+        tx,
+      );
+      await this.auditLog.append(
+        {
+          organizationId: args.organizationId,
+          projectId: args.projectId,
+          actorUserId: args.actorUserId,
+          action: "gateway.provider_binding.deleted",
+          targetKind: "provider_binding",
+          targetId: args.id,
+          before,
+        },
+        tx,
+      );
+      return { id: args.id };
+    });
+  }
 }
