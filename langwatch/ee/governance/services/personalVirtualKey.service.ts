@@ -60,13 +60,23 @@ export class PersonalVirtualKeyService {
 
   static create(
     prisma: PrismaClient,
-    options?: { gatewayBaseUrl?: string },
+    options?: { gatewayBaseUrl?: string; isSaas?: boolean },
   ): PersonalVirtualKeyService {
     return new PersonalVirtualKeyService(
       prisma,
       new PersonalWorkspaceService(prisma),
       new RoutingPolicyService(prisma),
-      options?.gatewayBaseUrl ?? "https://gateway.langwatch.com",
+      // Resolution: explicit `LW_GATEWAY_BASE_URL` always wins, else
+      // pick the right default by deployment shape. Self-hosted/dev
+      // installs without an explicit override would otherwise show
+      // `gateway.langwatch.com` on the VK reveal card and the user's
+      // curl would route to production — Ariana caught this on a
+      // self-hosted dogfood. The Go gateway listens on :5563 by
+      // default (see langwatch/CLAUDE.md → "make service svc=aigateway").
+      options?.gatewayBaseUrl ??
+        (options?.isSaas
+          ? "https://gateway.langwatch.com"
+          : "http://localhost:5563"),
     );
   }
 
