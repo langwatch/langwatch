@@ -64,9 +64,6 @@ export function createEnvConfig() {
       // Argon2id pepper mixed into virtual-key hashing. Rotating this
       // invalidates all existing VKs — treat as append-only / key-management.
       LW_VIRTUAL_KEY_PEPPER: z.string().min(32).optional(),
-      ELASTICSEARCH_NODE_URL: z.string().optional(),
-      ELASTICSEARCH_API_KEY: z.string().optional(),
-      ELASTICSEARCH_CONFIGURED: z.boolean().optional(),
       REDIS_URL: z.string().optional(),
       REDIS_CLUSTER_ENDPOINTS: z.string().optional(),
       REDIS_DB_INDEX: z.preprocess(
@@ -87,8 +84,6 @@ export function createEnvConfig() {
       DEMO_PROJECT_ID: z.string().optional(),
       DEMO_PROJECT_USER_ID: z.string().optional(),
       DEMO_PROJECT_SLUG: z.string().optional(),
-      IS_OPENSEARCH: z.boolean().optional(),
-      IS_QUICKWIT: z.boolean().optional(),
       USE_AWS_SES: z.string().optional(),
       AWS_REGION: z.string().optional(),
       EMAIL_DEFAULT_FROM: z.string().optional(),
@@ -208,9 +203,6 @@ export function createEnvConfig() {
       AUTH0_MGMT_CLIENT_ID: process.env.AUTH0_MGMT_CLIENT_ID,
       AUTH0_MGMT_CLIENT_SECRET: process.env.AUTH0_MGMT_CLIENT_SECRET,
       API_TOKEN_JWT_SECRET: process.env.API_TOKEN_JWT_SECRET,
-      ELASTICSEARCH_NODE_URL: process.env.ELASTICSEARCH_NODE_URL,
-      ELASTICSEARCH_API_KEY: process.env.ELASTICSEARCH_API_KEY,
-      ELASTICSEARCH_CONFIGURED: !!(process.env.ELASTICSEARCH_NODE_URL),
       REDIS_URL: process.env.REDIS_URL,
       REDIS_CLUSTER_ENDPOINTS: process.env.REDIS_CLUSTER_ENDPOINTS,
       REDIS_DB_INDEX: process.env.REDIS_DB_INDEX,
@@ -228,13 +220,6 @@ export function createEnvConfig() {
       DEMO_PROJECT_ID: process.env.DEMO_PROJECT_ID,
       DEMO_PROJECT_USER_ID: process.env.DEMO_PROJECT_USER_ID,
       DEMO_PROJECT_SLUG: process.env.DEMO_PROJECT_SLUG,
-      IS_OPENSEARCH:
-        process.env.IS_OPENSEARCH === "1" ||
-        process.env.IS_OPENSEARCH?.toLowerCase() === "true",
-      IS_QUICKWIT:
-        process.env.IS_QUICKWIT === "1" ||
-        process.env.IS_QUICKWIT?.toLowerCase() === "true" ||
-        process.env.ELASTICSEARCH_NODE_URL?.startsWith("quickwit://"),
       USE_AWS_SES: process.env.USE_AWS_SES,
       AWS_REGION: process.env.AWS_REGION,
       EMAIL_DEFAULT_FROM: process.env.EMAIL_DEFAULT_FROM,

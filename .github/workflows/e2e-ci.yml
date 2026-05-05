@@ -45,7 +45,6 @@ jobs:
       # App configuration
       DATABASE_URL: "postgresql://prisma:prisma@localhost:5433/testdb?schema=testdb"
       CLICKHOUSE_URL: "http://default:ci_password@localhost:8123/langwatch"
-      ELASTICSEARCH_NODE_URL: "http://localhost:9201"
       IS_OPENSEARCH: "true"
       REDIS_URL: "redis://localhost:6380"
       LANGWATCH_NLP_SERVICE: "http://localhost:5563"
@@ -174,10 +173,6 @@ jobs:
         working-directory: langwatch
         run: pnpm clickhouse:migrate
 
-      - name: Setup Elasticsearch
-        working-directory: langwatch
-        run: pnpm elastic:migrate
-
       - name: Build app
         working-directory: langwatch
         run: NODE_ENV=test pnpm build
@@ -186,7 +181,6 @@ jobs:
         env:
           # Migrations already ran in earlier steps; skip them during pnpm start
           SKIP_PRISMA_MIGRATE: "true"
-          SKIP_ELASTIC_MIGRATE: "true"
           SKIP_CLICKHOUSE_MIGRATE: "true"
         run: |
           # Start the app in background
