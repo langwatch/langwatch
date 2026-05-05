@@ -7,15 +7,15 @@ Feature: Unified FREE plan experience
     Given the platform is running in SaaS mode
 
   # 6 of 12 scenarios are bound to existing tests in langwatch/ee/billing/__tests__/planProvider.unit.test.ts.
-  # The remaining 6 @unimplemented scenarios are UPDATE-class per AUDIT_MANIFEST
-  # — no span/trace counting tests exist in planLimits.unit.test.ts yet — and need
-  # tests written before binding (tracked under #3458):
-  #   - "Free TIERED organization counts each span toward the limit"
-  #   - "Free SEAT_EVENT organization counts each span toward the limit"
-  #   - "Paid TIERED organization counts each trace as one unit"
-  #   - "Paid SEAT_EVENT organization counts each span toward the limit"
-  #   - "Licensed organization respects its own counting rule"
+  # 5 counting-unit scenarios are now bound in
+  # langwatch/src/server/app-layer/usage/__tests__/usage-meter-policy.unit.test.ts
+  # (the "counting unit by organization profile" describe block).
+  #
+  # NoTest gap (1 scenario remains @unimplemented):
   #   - "Self-hosted free organization is never blocked"
+  #     UsageService.checkLimit has no IS_SAAS short-circuit — it still returns
+  #     exceeded: true on self-hosted when limits are hit. The scenario describes
+  #     behaviour that is not yet implemented in the service layer.
 
   # ============================================================================
   # Event Limits
@@ -73,31 +73,31 @@ Feature: Unified FREE plan experience
   # Usage counting — free tier counts every span as one unit
   # ============================================================================
 
-  @unit @unimplemented
+  @unit
   Scenario: Free TIERED organization counts each span toward the limit
     Given a free organization originally on the TIERED pricing model
     When a trace with 5 spans is ingested
     Then 5 units are counted toward the monthly limit
 
-  @unit @unimplemented
+  @unit
   Scenario: Free SEAT_EVENT organization counts each span toward the limit
     Given a free organization on the SEAT_EVENT pricing model
     When a trace with 5 spans is ingested
     Then 5 units are counted toward the monthly limit
 
-  @unit @unimplemented
+  @unit
   Scenario: Paid TIERED organization counts each trace as one unit
     Given a paid organization on the TIERED pricing model
     When a trace with 5 spans is ingested
     Then 1 unit is counted toward the monthly limit
 
-  @unit @unimplemented
+  @unit
   Scenario: Paid SEAT_EVENT organization counts each span toward the limit
     Given a paid organization on the SEAT_EVENT pricing model
     When a trace with 5 spans is ingested
     Then 5 units are counted toward the monthly limit
 
-  @unit @unimplemented
+  @unit
   Scenario: Licensed organization respects its own counting rule
     Given an organization with an active license that specifies trace-based counting
     When a trace with 5 spans is ingested
