@@ -3,11 +3,10 @@ Feature: Suite list view status with criteria count
   I want the list view to show passed/failed status with criteria counts
   So that I can see at a glance whether a scenario passed and how many criteria were met
 
-  # Parity status: 7 of 11 scenarios bound to existing tests.
+  # Parity status: 8 of 11 scenarios bound to existing tests.
   # Remaining scenarios (#3458):
-  #   4 NO_TEST: shipped behavior, no integration test yet
+  #   3 NO_TEST: shipped behavior, no integration test yet
   # NO_TEST gaps:
-  #   - "Run with zero criteria shows status without count"
   #   - "List view row with iteration shows iteration number in title"
   #   - "Suite detail panel list view uses the same status format"
   #   - "All runs panel list view uses the same status format"
@@ -43,7 +42,7 @@ Feature: Suite list view status with criteria count
     When the status label is computed
     Then the label reads "passed"
 
-  @unit @unimplemented
+  @unit
   Scenario: Run with zero criteria shows status without count
     Given a scenario run with status "failed"
     And the run has 0 met criteria and 0 unmet criteria
