@@ -84,10 +84,12 @@ export function PendingTasksCard({
   const overview = overviewQuery.data ?? null;
   const isOverviewLoading = !!queueName && overviewQuery.isLoading;
 
-  // Filter is lifted here so the state badges can act as toggles for the
-  // search section below.
+  // Filter, sort, and page are lifted here so the state badges can act as
+  // toggles for the search section below, and so the refresh handler can
+  // force-fetch the canonical search query with the right params.
   const [filter, setFilter] = useState<PendingJobFilter>({});
   const [sort, setSort] = useState<PendingJobSort>("oldest");
+  const [page, setPage] = useState(1);
 
   const toggleStateFilter = (state: SearchableJobState) => {
     setFilter((f) => {
@@ -102,20 +104,26 @@ export function PendingTasksCard({
     if (!queueName) return;
     setIsForceRefreshing(true);
     try {
-      // Send force=true under a separate cache key so the canonical key the
-      // component watches doesn't change. Mirror the result back so the
-      // watching query updates without triggering another fetch.
-      const fresh = await utils.ops.getQueueOverview.fetch({
+      // Send force=true under separate cache keys so the canonical keys the
+      // queries watch don't change. Mirror the results back so the watching
+      // queries update without triggering another fetch. Both the overview
+      // and the search are server-side cached, so both need the bypass.
+      const searchParams = {
         queueName,
-        force: true,
-      });
-      utils.ops.getQueueOverview.setData({ queueName }, fresh);
+        filter,
+        sort,
+        page,
+        pageSize: SEARCH_PAGE_SIZE,
+      };
+      const [freshOverview, freshSearch] = await Promise.all([
+        utils.ops.getQueueOverview.fetch({ queueName, force: true }),
+        utils.ops.searchPendingJobs.fetch({ ...searchParams, force: true }),
+      ]);
+      utils.ops.getQueueOverview.setData({ queueName }, freshOverview);
+      utils.ops.searchPendingJobs.setData(searchParams, freshSearch);
     } finally {
       setIsForceRefreshing(false);
     }
-    // Clear search results too so the table doesn't lag behind the new
-    // overview counts.
-    void utils.ops.searchPendingJobs.invalidate({ queueName });
   };
 
   if (!queueName) {
@@ -151,6 +159,8 @@ export function PendingTasksCard({
         setFilter={setFilter}
         sort={sort}
         setSort={setSort}
+        page={page}
+        setPage={setPage}
       />
     </VStack>
   );
@@ -418,6 +428,8 @@ function SearchSection({
   setFilter,
   sort,
   setSort,
+  page,
+  setPage,
 }: {
   queueName: string;
   overview: QueueOverview | null;
@@ -425,8 +437,9 @@ function SearchSection({
   setFilter: React.Dispatch<React.SetStateAction<PendingJobFilter>>;
   sort: PendingJobSort;
   setSort: React.Dispatch<React.SetStateAction<PendingJobSort>>;
+  page: number;
+  setPage: React.Dispatch<React.SetStateAction<number>>;
 }) {
-  const [page, setPage] = useState(1);
   const [jobDetail, setJobDetail] = useState<{ groupId: string; jobId: string } | null>(null);
   const [groupDetail, setGroupDetail] = useState<{ groupId: string } | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -445,10 +458,16 @@ function SearchSection({
   const result = searchQuery.data;
   const jobs = result?.jobs ?? [];
 
+  // Reset queue-scoped state on filter/sort/queue change. queueName needs to
+  // be in the deps because a stale `page`, `jobDetail`, or `groupDetail` from
+  // the previous queue can render an empty page or open a dialog that points
+  // at the wrong queue.
   useEffect(() => {
     setPage(1);
+    setJobDetail(null);
+    setGroupDetail(null);
     if (scrollRef.current) scrollRef.current.scrollTop = 0;
-  }, [filter, sort]);
+  }, [filter, sort, queueName, setPage]);
 
   const updateFilter = (patch: Partial<PendingJobFilter>) => {
     setFilter((f) => {

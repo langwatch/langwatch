@@ -47,6 +47,17 @@ export function PendingJobDetailDialog({
         <Dialog.Body>
           {detail.isLoading ? (
             <Center paddingY={6}><Spinner size="sm" /></Center>
+          ) : detail.isError ? (
+            // Distinguish real errors (network, permission, server) from a
+            // genuine NOT_FOUND so ops engineers don't confuse a transient
+            // failure with a missing job.
+            detail.error.data?.code === "NOT_FOUND" ? (
+              <Text textStyle="xs" color="fg.muted">Job not found.</Text>
+            ) : (
+              <Text textStyle="xs" color="red.500">
+                {detail.error.message || "Failed to load job details."}
+              </Text>
+            )
           ) : data ? (
             <VStack align="stretch" gap={4}>
               <HStack gap={4} flexWrap="wrap">

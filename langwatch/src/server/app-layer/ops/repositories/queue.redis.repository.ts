@@ -1630,6 +1630,8 @@ export class QueueRedisRepository implements QueueRepository {
     sliceN?: number;
   }): Promise<QueueOverview> {
     const startedAt = Date.now();
+    // Fix all chunks to a single clock so age/sort don't drift mid-scan.
+    const nowMs = String(startedAt);
     const sliceN = params.sliceN ?? AGGREGATOR_SLICE_N;
     const prefix = `${params.queueName}:gq:`;
     const blockedKey = `${prefix}blocked`;
@@ -1664,7 +1666,7 @@ export class QueueRedisRepository implements QueueRepository {
           1,
           blockedKey,
           prefix,
-          String(Date.now()),
+          nowMs,
           String(sliceN),
           String(chunk.length),
           ...chunk,
@@ -1692,6 +1694,9 @@ export class QueueRedisRepository implements QueueRepository {
     page: number;
   }): Promise<PendingJobSearchResult> {
     const startedAt = Date.now();
+    // Fix all chunks to a single clock so age filters and sorts evaluate
+    // against the same snapshot.
+    const nowMs = String(startedAt);
     const prefix = `${params.queueName}:gq:`;
     const blockedKey = `${prefix}blocked`;
 
@@ -1714,7 +1719,7 @@ export class QueueRedisRepository implements QueueRepository {
           1,
           blockedKey,
           prefix,
-          String(Date.now()),
+          nowMs,
           filtersJson,
           String(chunk.length),
           ...chunk,

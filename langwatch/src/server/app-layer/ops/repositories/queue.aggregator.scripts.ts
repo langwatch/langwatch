@@ -371,22 +371,38 @@ for gIdx = 1, groupCount do
         local n = tonumber(errTs)
         if n then staleScore = n end
       end
-      matchedCount = matchedCount + 1
-      if #matched < MAX_MATCHED_PER_CHUNK then
-        matched[#matched + 1] = {
-          jobId = "<stale-block>",
-          groupId = groupId,
-          score = staleScore,
-          ageMs = nowMs - staleScore,
-          pipelineName = "unknown",
-          jobType = "unknown",
-          jobName = "unknown",
-          tenantId = "unknown",
-          state = "stale",
-          retryCount = cjson.null,
-        }
-      else
-        truncated = true
+      -- Stale rows carry "unknown" for pipelineName/jobType/tenantId, so any
+      -- non-empty value of those filters excludes them. Age filters still
+      -- apply against the derived staleScore.
+      local staleAge = nowMs - staleScore
+      local keepStale = true
+      if filters.pipelineName ~= nil and filters.pipelineName ~= "" then keepStale = false end
+      if keepStale and filters.jobType ~= nil and filters.jobType ~= "" then keepStale = false end
+      if keepStale and filters.tenantId ~= nil and filters.tenantId ~= "" then keepStale = false end
+      if keepStale and filters.ageGtMs ~= nil then
+        if staleAge <= tonumber(filters.ageGtMs) then keepStale = false end
+      end
+      if keepStale and filters.ageLtMs ~= nil then
+        if staleAge >= tonumber(filters.ageLtMs) then keepStale = false end
+      end
+      if keepStale then
+        matchedCount = matchedCount + 1
+        if #matched < MAX_MATCHED_PER_CHUNK then
+          matched[#matched + 1] = {
+            jobId = "<stale-block>",
+            groupId = groupId,
+            score = staleScore,
+            ageMs = staleAge,
+            pipelineName = "unknown",
+            jobType = "unknown",
+            jobName = "unknown",
+            tenantId = "unknown",
+            state = "stale",
+            retryCount = cjson.null,
+          }
+        else
+          truncated = true
+        end
       end
     end
   end
