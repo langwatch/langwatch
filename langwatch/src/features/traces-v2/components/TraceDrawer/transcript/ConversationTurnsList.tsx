@@ -326,16 +326,19 @@ function TurnRow({ turn, index, total, layout, collapseTools }: TurnRowProps) {
   }
   // Thread layout: default-expand the last turn (always), plus the
   // immediately-prior assistant turn on short threads. User turns stay
-  // collapsed unless they're the only thing showing — they're usually the
-  // prompt the operator already knows they sent.
+  // collapsed unless they're the actual last turn — they're usually the
+  // prompt the operator already knows they sent. Anchoring "always expand
+  // the last turn" first ensures a final user message stays open instead
+  // of leaving the previous assistant turn expanded with the latest user
+  // turn collapsed.
   const isLast = index === total - 1;
   const isLong = total > LONG_THREAD_THRESHOLD;
   const isLastTwo = index >= total - 2;
-  const defaultExpanded = isLong
-    ? isLast
-    : turn.kind === "user"
+  const defaultExpanded = isLast
+    ? true
+    : isLong
       ? false
-      : isLastTwo;
+      : turn.kind !== "user" && isLastTwo;
   return (
     <ThreadedTurnView
       turn={turn}

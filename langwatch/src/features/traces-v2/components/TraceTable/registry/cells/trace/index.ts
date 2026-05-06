@@ -10,6 +10,8 @@ import { EventsCell } from "./EventsCell";
 import { InputCell } from "./InputCell";
 import { ModelCell } from "./ModelCell";
 import { OutputCell } from "./OutputCell";
+import { RootSpanNameCell } from "./RootSpanNameCell";
+import { RootSpanTypeCell } from "./RootSpanTypeCell";
 import { ServiceCell } from "./ServiceCell";
 import {
   ConversationIdCell,
@@ -21,20 +23,15 @@ import {
   UserIdCell,
 } from "./SimpleCells";
 import { SpanCountCell } from "./SpanCountCell";
-import { SpanNameCell } from "./SpanNameCell";
-import { SpanTypeCell } from "./SpanTypeCell";
 import { TimeCell } from "./TimeCell";
 import { TokensCell } from "./TokensCell";
 import { TraceCell } from "./TraceCell";
 import { TraceIdCell } from "./TraceIdCell";
+import { TraceNameCell } from "./TraceNameCell";
 
 /**
  * Cell renderers keyed by column id. Every TraceColumnId must have a cell;
  * the helper type below enforces this at compile time.
- *
- * Cells beyond TraceColumnId (atomic columns like `input`, `output`,
- * `error-text`, `span-name`, `span-type`, `trace-id` — used by lens
- * comfortable-mode expansion) are allowed as extras.
  */
 type RequiredTraceCells = Record<
   TraceColumnId | typeof SELECT_COLUMN_ID,
@@ -45,6 +42,13 @@ export const traceCells = {
   [TraceSelectCell.id]: TraceSelectCell,
   [TimeCell.id]: TimeCell,
   [TraceCell.id]: TraceCell,
+  [TraceNameCell.id]: TraceNameCell,
+  [RootSpanNameCell.id]: RootSpanNameCell,
+  [RootSpanTypeCell.id]: RootSpanTypeCell,
+  [TraceIdCell.id]: TraceIdCell,
+  [InputCell.id]: InputCell,
+  [OutputCell.id]: OutputCell,
+  [ErrorTextCell.id]: ErrorTextCell,
   [ServiceCell.id]: ServiceCell,
   [DurationCell.id]: DurationCell,
   [CostCell.id]: CostCell,
@@ -53,8 +57,6 @@ export const traceCells = {
   [EvaluationsCell.id]: EvaluationsCell,
   [EventsCell.id]: EventsCell,
   [SpanCountCell.id]: SpanCountCell,
-  [SpanNameCell.id]: SpanNameCell,
-  [SpanTypeCell.id]: SpanTypeCell,
   [StatusCell.id]: StatusCell,
   [TtftCell.id]: TtftCell,
   [UserIdCell.id]: UserIdCell,
@@ -62,8 +64,4 @@ export const traceCells = {
   [OriginCell.id]: OriginCell,
   [TokensInCell.id]: TokensInCell,
   [TokensOutCell.id]: TokensOutCell,
-  [TraceIdCell.id]: TraceIdCell,
-  [InputCell.id]: InputCell,
-  [OutputCell.id]: OutputCell,
-  [ErrorTextCell.id]: ErrorTextCell,
-} satisfies RequiredTraceCells & Record<string, CellDef<TraceListItem>>;
+} satisfies RequiredTraceCells;

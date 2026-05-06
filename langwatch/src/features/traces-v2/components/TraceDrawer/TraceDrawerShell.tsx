@@ -1,6 +1,6 @@
 import { Box, CodeBlock, VStack } from "@chakra-ui/react";
 import { motion } from "motion/react";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useColorMode } from "~/components/ui/color-mode";
 import { Drawer } from "~/components/ui/drawer";
 import { IsolatedErrorBoundary } from "~/components/ui/IsolatedErrorBoundary";
@@ -138,8 +138,15 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
           // the left to click outside / peek at what's underneath. Capping at
           // `calc(100vw - 80px)` keeps the page edge visible and clickable
           // while still giving the drawer effectively all the horizontal
-          // room it needs for waterfall views.
-          maxWidth={isMaximized ? "calc(100vw - 10px)" : "45%"}
+          // room it needs for waterfall views. Below the `md` breakpoint
+          // there isn't useful underlying surface to peek at — drop the
+          // gap and let the drawer take the full viewport so users on
+          // phones get a usable surface instead of a 45%-wide column.
+          maxWidth={{
+            base: "100vw",
+            md: isMaximized ? "calc(100vw - 10px)" : "45%",
+          }}
+          width={{ base: "100vw", md: "auto" }}
           transition="max-width 0.2s ease"
           // Anchor for the empty-state onboarding tour: a global
           // CSS rule keyed off `body[data-traces-tour-stage]`
@@ -149,7 +156,7 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
           data-tour-target="drawer"
         >
           <ResizeEdgeGrip
-            onDoubleClick={toggleMaximized}
+            onToggle={toggleMaximized}
             isMaximized={isMaximized}
           />
           <Drawer.Body
@@ -333,21 +340,34 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
 }
 
 function ResizeEdgeGrip({
-  onDoubleClick,
+  onToggle,
   isMaximized,
 }: {
-  onDoubleClick: () => void;
+  onToggle: () => void;
   isMaximized: boolean;
 }) {
   // When the drawer is maximized, the only direction it can resize toward is
   // west (shrinking). When restored, the only direction is east (expanding).
   // The OS cursor reflects that — `w-resize` for the maximized state and
-  // `e-resize` for the restored state. Double-click on the bar still toggles
-  // between the two.
+  // `e-resize` for the restored state. Single-click toggles between the
+  // two; the previous double-click-only handler made the grip feel
+  // unresponsive (users tapped once, nothing happened, gave up). Both
+  // `onClick` and `onDoubleClick` are wired so a fast double-tap still
+  // toggles exactly once instead of toggling and immediately reverting.
   const cursor = isMaximized ? "w-resize" : "e-resize";
+  const lastClickRef = useRef(0);
+  const handleClick = () => {
+    const now = Date.now();
+    // Browsers fire `click` once for the first press of a double-click
+    // sequence and then a `dblclick` event afterward. Coalescing inside a
+    // 350ms window prevents the two events from racing and toggling twice.
+    if (now - lastClickRef.current < 350) return;
+    lastClickRef.current = now;
+    onToggle();
+  };
   return (
     <Tooltip
-      content="Double-click to expand · click again to restore"
+      content={isMaximized ? "Click to restore" : "Click to expand"}
       positioning={{ placement: "right" }}
       openDelay={500}
     >
@@ -356,12 +376,21 @@ function ResizeEdgeGrip({
         top={0}
         bottom={0}
         left={0}
-        width="6px"
+        width="8px"
         cursor={cursor}
-        zIndex={2}
-        onDoubleClick={onDoubleClick}
+        // Bumped from `2` so the grip can't be obscured by anything the
+        // drawer body renders flush to its left edge — at zIndex 2 a
+        // sticky table header / focus outline could swallow the click.
+        zIndex={10}
+        onClick={handleClick}
+        onDoubleClick={onToggle}
         _hover={{ "& > [data-edge-grip]": { opacity: 1 } }}
-        aria-label="Drag edge to resize, double-click to toggle"
+        aria-label={
+          isMaximized
+            ? "Restore drawer width (click)"
+            : "Expand drawer width (click)"
+        }
+        role="button"
         // Doubles as the anchor point for the empty-state
         // onboarding hero during drawer-tour stages — the hero
         // queries `[data-edge-grip="true"]` and pins its right

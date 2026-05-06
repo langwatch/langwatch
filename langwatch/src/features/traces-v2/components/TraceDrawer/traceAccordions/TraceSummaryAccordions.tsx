@@ -13,6 +13,7 @@ import { IOViewer } from "../IOViewer";
 import { ScopeBlock, ScopeChip } from "../ScopeChip";
 import { AccordionShell, Section } from "./AccordionShell";
 import { EmptyEventsState, EmptyHint } from "./EmptyStates";
+import { EventCard } from "./EventCard";
 import { useAutoOpenSections } from "./sectionPresence";
 import { countFlatLeaves } from "./utils";
 
@@ -278,31 +279,17 @@ export function TraceSummaryAccordions({
               open={isOpen}
             >
               {traceEvents.length > 0 ? (
-                <VStack align="stretch" gap={1}>
+                <VStack align="stretch" gap={2}>
                   {traceEvents.map((evt, i) => (
-                    <HStack key={`${evt.spanId}-${evt.timestamp}-${i}`} gap={3}>
-                      <Text textStyle="xs" fontWeight="medium">
-                        {evt.name}
-                      </Text>
-                      <Text textStyle="xs" color="fg.subtle" fontFamily="mono">
-                        +
-                        {Math.max(
-                          0,
-                          Math.round(evt.timestamp - trace.timestamp),
-                        )}
-                        ms
-                      </Text>
-                      {onSelectSpan && evt.spanId && (
-                        <Button
-                          size="xs"
-                          variant="ghost"
-                          marginLeft="auto"
-                          onClick={() => onSelectSpan(evt.spanId)}
-                        >
-                          View span
-                        </Button>
-                      )}
-                    </HStack>
+                    <EventCard
+                      key={`${evt.spanId}-${evt.timestamp}-${i}`}
+                      name={evt.name}
+                      timestampMs={evt.timestamp}
+                      anchorMs={trace.timestamp}
+                      attributes={evt.attributes}
+                      spanId={evt.spanId}
+                      onSelectSpan={onSelectSpan}
+                    />
                   ))}
                 </VStack>
               ) : (

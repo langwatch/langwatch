@@ -18,6 +18,7 @@ import { useViewStore } from "../../stores/viewStore";
 // Evaluations began without scrolling.
 const SECTIONS: { key: ColumnConfig["section"]; title: string }[] = [
   { key: "standard", title: "Standard" },
+  { key: "fields", title: "Trace fields" },
   { key: "evaluations", title: "Evaluations" },
   { key: "events", title: "Events" },
 ];

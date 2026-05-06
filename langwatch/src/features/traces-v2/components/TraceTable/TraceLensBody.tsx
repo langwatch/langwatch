@@ -35,7 +35,6 @@ export const TraceLensBody: React.FC<TraceLensBodyProps> = ({
 }) => {
   const { columns, registry, minWidth } = useTraceLensColumns({
     logicalColumnIds: lens.columns,
-    traces,
   });
   const {
     selectedTraceId,

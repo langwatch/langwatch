@@ -6,8 +6,7 @@ import type { AddonDef } from "../../types";
 export const IOPreviewAddon: AddonDef<TraceListItem> = {
   id: "io-preview",
   label: "I/O preview",
-  shouldRender: ({ row, isExpanded, densityMode }) => {
-    if (densityMode === "comfortable") return false;
+  shouldRender: ({ row, isExpanded }) => {
     const hasIO = row.input !== null || row.output !== null;
     const isLLM = row.input !== null && row.output !== null;
     return isLLM && hasIO && !isExpanded;

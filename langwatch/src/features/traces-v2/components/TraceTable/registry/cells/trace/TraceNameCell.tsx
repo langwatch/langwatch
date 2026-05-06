@@ -2,12 +2,17 @@ import { Text } from "@chakra-ui/react";
 import type { TraceListItem } from "../../../../../types/trace";
 import type { CellDef } from "../../types";
 
-export const SpanNameCell = {
-  id: "span-name",
-  label: "Name",
+export const TraceNameCell = {
+  id: "trace-name",
+  label: "Trace name",
   render: ({ row }) => (
-    <Text textStyle="sm" color="fg" fontWeight="500" truncate>
-      {row.traceName || row.name || "—"}
+    <Text
+      textStyle="sm"
+      color={row.traceName ? "fg" : "fg.subtle"}
+      fontWeight="500"
+      truncate
+    >
+      {row.traceName || "—"}
     </Text>
   ),
 } as const satisfies CellDef<TraceListItem>;

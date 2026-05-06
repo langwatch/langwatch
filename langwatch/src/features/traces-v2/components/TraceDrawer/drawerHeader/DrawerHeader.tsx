@@ -12,8 +12,8 @@ import {
   LuArrowLeft,
   LuMaximize2,
   LuMinimize2,
-  LuPin,
-  LuPinOff,
+  LuPanelRight,
+  LuPanelRightDashed,
   LuRefreshCw,
   LuX,
 } from "react-icons/lu";
@@ -632,8 +632,8 @@ export const DrawerHeader = memo(function DrawerHeader({
           <Tooltip
             content={
               pinned
-                ? "Pinned — clicks outside don't close. Click to unpin."
-                : "Unpinned — click outside to close. Click to pin."
+                ? "Docked — drawer stays open when you click outside. Click to undock."
+                : "Modal — click outside (or press Esc) to close. Click to dock."
             }
             positioning={{ placement: "bottom" }}
           >
@@ -643,13 +643,16 @@ export const DrawerHeader = memo(function DrawerHeader({
               onClick={togglePinned}
               aria-label={
                 pinned
-                  ? "Unpin drawer (click outside closes)"
-                  : "Pin drawer (click outside ignored)"
+                  ? "Undock drawer (click outside closes)"
+                  : "Dock drawer (click outside ignored)"
               }
               aria-pressed={pinned}
               color={pinned ? "blue.fg" : "fg.muted"}
             >
-              <Icon as={pinned ? LuPin : LuPinOff} boxSize={3.5} />
+              <Icon
+                as={pinned ? LuPanelRight : LuPanelRightDashed}
+                boxSize={3.5}
+              />
             </Button>
           </Tooltip>
           <Tooltip

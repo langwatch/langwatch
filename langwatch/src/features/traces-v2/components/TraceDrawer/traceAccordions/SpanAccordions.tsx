@@ -18,6 +18,7 @@ import { hasPromptMetadata, PromptAccordion } from "../PromptAccordion";
 import { ScopeBlock, ScopeChip } from "../ScopeChip";
 import { AccordionShell, Section } from "./AccordionShell";
 import { EmptyEventsState, EmptyHint } from "./EmptyStates";
+import { EventCard } from "./EventCard";
 import { useAutoOpenSections } from "./sectionPresence";
 import { countFlatLeaves } from "./utils";
 
@@ -298,20 +299,15 @@ export function SpanAccordions({
                 open={isOpen}
               >
                 {hasEvents ? (
-                  <VStack align="stretch" gap={1}>
-                    {detail!.events.map((evt) => (
-                      <HStack key={`${evt.timestampMs}-${evt.name}`} gap={3}>
-                        <Text textStyle="xs" fontWeight="medium">
-                          {evt.name}
-                        </Text>
-                        <Text
-                          textStyle="xs"
-                          color="fg.subtle"
-                          fontFamily="mono"
-                        >
-                          +{Math.round(evt.timestampMs - span.startTimeMs)}ms
-                        </Text>
-                      </HStack>
+                  <VStack align="stretch" gap={2}>
+                    {detail!.events.map((evt, i) => (
+                      <EventCard
+                        key={`${evt.timestampMs}-${evt.name}-${i}`}
+                        name={evt.name}
+                        timestampMs={evt.timestampMs}
+                        anchorMs={span.startTimeMs}
+                        attributes={evt.attributes}
+                      />
                     ))}
                   </VStack>
                 ) : (

@@ -3,9 +3,9 @@ import type { TraceListItem } from "../../../../../types/trace";
 import type { CellDef } from "../../types";
 import { SpanTypeBadge } from "./SpanTypeBadge";
 
-export const SpanTypeCell = {
-  id: "span-type",
-  label: "Type",
+export const RootSpanTypeCell = {
+  id: "root-span-type",
+  label: "Root span type",
   render: ({ row }) => {
     const spanType = row.rootSpanType;
     if (!spanType) {

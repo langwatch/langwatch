@@ -86,7 +86,13 @@ export function applySpanToSummary({
   span: NormalizedSpan;
 }): TraceSummaryData {
   if (SYNTHETIC_SPAN_NAMES.has(span.name)) {
-    return state;
+    // Synthetic spans (e.g. `langwatch.track_event`) must not contribute to
+    // timing/cost/I-O — they don't represent real execution. But the
+    // `/api/track_event` endpoint stuffs the user-tracked event payload
+    // into `span.events`, so we still need to hoist those onto the trace
+    // summary; otherwise the event vanishes between the span and the
+    // trace-level events list.
+    return { ...state, events: accumulateEvents({ state, span }) };
   }
 
   const timing = spanTimingService.accumulateTiming({ state, span });

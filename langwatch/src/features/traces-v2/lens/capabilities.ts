@@ -44,7 +44,19 @@ export interface LensCapability {
 const TRACE_CAPABILITY: LensCapability = {
   columns: [
     { id: "time", label: "Time", section: "Standard", pinned: true },
-    { id: "trace", label: "Trace", section: "Standard" },
+    { id: "trace", label: "Trace (summary)", section: "Standard" },
+    // Broken-out alternates to the composite Trace summary — let users
+    // assemble the column shape they prefer (engineer-friendly summary
+    // vs. PM-friendly per-field columns) without a hidden density mode.
+    // Trace name and root span name are split because the composite
+    // falls back between them; either may be empty in real data.
+    { id: "trace-name", label: "Trace name", section: "Trace fields" },
+    { id: "root-span-name", label: "Root span name", section: "Trace fields" },
+    { id: "root-span-type", label: "Root span type", section: "Trace fields" },
+    { id: "trace-id", label: "Trace ID", section: "Trace fields" },
+    { id: "input", label: "Input", section: "Trace fields" },
+    { id: "output", label: "Output", section: "Trace fields" },
+    { id: "error-text", label: "Error", section: "Trace fields" },
     { id: "service", label: "Service", section: "Standard" },
     { id: "duration", label: "Duration", section: "Standard" },
     { id: "cost", label: "Cost", section: "Standard" },

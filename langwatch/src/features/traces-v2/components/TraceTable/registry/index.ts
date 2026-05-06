@@ -28,6 +28,5 @@ export const groupRegistry: Registry<TraceGroup> = {
 };
 
 export { buildGroups, type TraceGroup } from "./cells/group/types";
-export { expandTraceColumns } from "./expanders";
 export { RegistryRow } from "./RegistryRow";
 export type { Registry, RowKind } from "./types";

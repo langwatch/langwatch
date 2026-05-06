@@ -1,4 +1,4 @@
-import { Box, Flex, HStack, VStack } from "@chakra-ui/react";
+import { Box, Flex, HStack, useBreakpointValue, VStack } from "@chakra-ui/react";
 import React, { useMemo } from "react";
 import { ExportConfigDialog } from "~/components/messages/ExportConfigDialog";
 import { ExportProgress } from "~/components/messages/ExportProgress";
@@ -183,7 +183,17 @@ export const TracesPage: React.FC = () => {
 const FilterAside: React.FC<{
   dimmed?: boolean;
 }> = React.memo(({ dimmed = false }) => {
-  const collapsed = useUIStore((s) => s.sidebarCollapsed);
+  const persistedCollapsed = useUIStore((s) => s.sidebarCollapsed);
+  // Below `md` the expanded sidebar steals 240px+ from a 390px-wide
+  // viewport, leaving the actual trace table unreadable. Force the
+  // collapsed rail on small screens regardless of the persisted preference
+  // — the keyboard shortcut and the explicit expand button still work, so
+  // a power user on a narrow screen can opt back in.
+  const forceCollapsedSmallScreen = useBreakpointValue(
+    { base: true, md: false },
+    { fallback: "md" },
+  );
+  const collapsed = forceCollapsedSmallScreen ? true : persistedCollapsed;
   // Grow the aside by one lane per active OR group so the connector
   // overlay has room to draw without squeezing the facet rows. When
   // the AST has no cross-facet OR the width is identical to before.
