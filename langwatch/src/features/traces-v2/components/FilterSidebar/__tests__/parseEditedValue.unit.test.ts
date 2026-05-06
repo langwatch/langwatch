@@ -2,76 +2,98 @@ import { describe, expect, it } from "vitest";
 import { parseEditedValue } from "../RangeSection";
 
 describe("parseEditedValue", () => {
-  describe("happy path — formatted labels round-trip", () => {
+  describe("given a formatted label with a unit suffix", () => {
     it.each([
       ["1.5s", 1.5],
-      ["$0.05", 0.05],
-      ["12,300", 12_300],
       ["100ms", 100],
       ["1.5kg", 1.5],
-      ["  42  ", 42],
-    ])("`%s` parses to %s", (input, expected) => {
+    ])("strips the suffix and parses `%s` to %s", (input, expected) => {
       expect(parseEditedValue(input)).toBe(expected);
     });
   });
 
-  describe("scientific notation", () => {
+  describe("given a formatted label with a currency prefix", () => {
+    it("strips `$` and parses the remainder", () => {
+      expect(parseEditedValue("$0.05")).toBe(0.05);
+    });
+  });
+
+  describe("given a formatted label with thousand separators", () => {
+    it("strips `,` and parses the remainder", () => {
+      expect(parseEditedValue("12,300")).toBe(12_300);
+    });
+  });
+
+  describe("given surrounding whitespace", () => {
+    it("trims and parses the inner number", () => {
+      expect(parseEditedValue("  42  ")).toBe(42);
+    });
+  });
+
+  describe("given scientific notation", () => {
     it.each([
       ["1e6", 1_000_000],
       ["2.5E-3", 0.0025],
       ["1.5e2", 150],
       ["1E10", 1e10],
-    ])("`%s` parses to %s", (input, expected) => {
+    ])("parses `%s` to %s — `e/E` is preserved through the strip", (input, expected) => {
       expect(parseEditedValue(input)).toBe(expected);
     });
   });
 
-  describe("plain numbers", () => {
+  describe("given a plain number", () => {
     it.each([
       ["0", 0],
       ["-5", -5],
       ["3.14159", 3.14159],
       ["1000000", 1_000_000],
-    ])("`%s` parses to %s", (input, expected) => {
+    ])("parses `%s` to %s", (input, expected) => {
       expect(parseEditedValue(input)).toBe(expected);
     });
   });
 
-  describe("returns null for unparseable input", () => {
+  describe("given input that strips to an empty string", () => {
     it.each([
-      ["", "empty string"],
+      ["", "empty input"],
       ["   ", "whitespace only"],
-      ["abc", "letters only — strip leaves empty"],
-      ["$,kg", "punctuation/units only — strip leaves empty"],
-    ])("`%s` returns null (%s)", (input) => {
+      ["abc", "letters only"],
+      ["$,kg", "punctuation and units only"],
+    ])("returns null when `%s` (%s)", (input) => {
       expect(parseEditedValue(input)).toBeNull();
     });
   });
 
-  describe("known opinionated edges (pinned to surface regressions)", () => {
-    it("`0xFF` strips the `xF` letters → `0` (does NOT parse hex)", () => {
-      // Opinionated: hex notation isn't supported. The strip removes
-      // `x`, `F`, and the second `F` (only `e/E` are preserved), so
-      // `0xFF` becomes `0`. Documented limitation.
+  describe("given hex notation", () => {
+    it("strips `xF` letters and resolves `0xFF` to 0 — hex is NOT supported", () => {
+      // Documented limitation: only `e/E` are preserved through the
+      // strip, so `0xFF` becomes `0`.
       expect(parseEditedValue("0xFF")).toBe(0);
     });
+  });
 
-    it("`1,234.5kg` resolves to 1234.5 — comma-stripping plus unit-stripping", () => {
+  describe("given a number with both unit suffix and thousand separators", () => {
+    it("strips both and parses the remainder", () => {
       expect(parseEditedValue("1,234.5kg")).toBe(1234.5);
     });
+  });
 
-    it("`1.5e2x` resolves to 150 — `x` is stripped, `e` preserved", () => {
+  describe("given scientific notation followed by a stray unit letter", () => {
+    it("strips the unit letter and preserves the sci-notation digits", () => {
       expect(parseEditedValue("1.5e2x")).toBe(150);
     });
+  });
 
-    it("`Infinity` is NOT preserved — `I/n/f/y` are stripped, the literal can't survive", () => {
-      // `Infinity` → strip removes I/n/f/i/n/i/t/y → empty → null.
-      // (NB: even if it survived, `Number.isFinite(Infinity)` is false
-      // so it would still return null — defence-in-depth.)
+  describe("given the literal `Infinity`", () => {
+    it("returns null — letters strip to empty", () => {
+      // `Infinity` → strip removes I/n/f/i/n/i/t/y → empty → null. Even
+      // if it survived, `Number.isFinite(Infinity)` is false, so the
+      // function would still reject it.
       expect(parseEditedValue("Infinity")).toBeNull();
     });
+  });
 
-    it("`NaN` is NOT preserved — strip leaves empty (and Number.isFinite would reject it anyway)", () => {
+  describe("given the literal `NaN`", () => {
+    it("returns null — letters strip to empty", () => {
       expect(parseEditedValue("NaN")).toBeNull();
     });
   });

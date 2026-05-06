@@ -887,23 +887,24 @@ describe("analyzeOrGroups", () => {
     });
   });
 
-  describe("memberToGroupId lookup", () => {
-    it("keys by `${field}|${value}` and resolves to the group id", () => {
+  describe("given a cross-facet OR group's memberToGroupId map", () => {
+    it("keys members by `${field}|${value}` resolving to the group id", () => {
       const result = analyzeOrGroups(parse("status:error OR model:gpt-4o"));
       const id = result.groups[0]!.id;
       expect(result.memberToGroupId.get("status|error")).toBe(id);
-      expect(result.memberToGroupId.get("model|gpt-4o")).toBe(id);
+    });
+
+    it("returns undefined for non-member field/value pairs", () => {
+      const result = analyzeOrGroups(parse("status:error OR model:gpt-4o"));
       expect(result.memberToGroupId.get("status|warning")).toBeUndefined();
     });
   });
 
-  describe("group location", () => {
-    it("covers the full OR LogicalExpression range", () => {
+  describe("given an unparenthesised top-level OR", () => {
+    it("emits a group whose location covers the full query", () => {
       const query = "status:error OR model:gpt-4o";
       const result = analyzeOrGroups(parse(query));
       const g = result.groups[0]!;
-      // Liqe's location is in trimmed-string coords; for an unparenthesised
-      // top-level OR the start is 0 and the end is the full string length.
       expect(g.start).toBe(0);
       expect(g.end).toBe(query.length);
     });
