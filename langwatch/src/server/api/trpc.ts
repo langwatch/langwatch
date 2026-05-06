@@ -212,6 +212,66 @@ const auditLogTRPCErrors = t.middleware(
   },
 );
 
+/**
+ * Pull the resource ID + kind from a tRPC mutation result so the audit
+ * row's `targetId` / `targetKind` columns are populated. Without this,
+ * the audit log shows an empty Target column for Platform-side rows
+ * (Ariana caught this on the γ post-dogfood UI bug-bash — admin
+ * auditing "what did I just create?" couldn't see the new resource id
+ * on their own click's audit row, only on the gateway-side mirror row).
+ *
+ * Best-effort: tries common shapes (id at root, .source.id, .{tail}.id
+ * where tail is the resource name from the path), and derives kind
+ * from the path's leading segment via a small map. Returns nulls
+ * when the result shape isn't one we know — leaving the columns blank
+ * is fine, that's the legacy behavior.
+ */
+function deriveAuditTarget(
+  path: string,
+  data: unknown,
+): { targetKind?: string; targetId?: string } {
+  if (!data || typeof data !== "object") return {};
+  const root = path.split(".")[0] ?? "";
+  // Path-prefix → targetKind. Mirrors the gateway adapter's
+  // GATEWAY_AUDIT_TARGET_KINDS where applicable; new platform-side
+  // resources land here.
+  const TARGET_KIND_BY_ROUTER: Record<string, string> = {
+    gatewayBudgets: "budget",
+    virtualKeys: "virtual_key",
+    personalVirtualKeys: "virtual_key",
+    gatewayProviders: "provider_binding",
+    cacheRules: "cache_rule",
+    ingestionSources: "ingestion_source",
+    anomalyRules: "anomaly_rule",
+    routingPolicy: "routing_policy",
+    aiTools: "ai_tool_entry",
+    aiToolsCatalog: "ai_tool_entry",
+    organization: "organization",
+    project: "project",
+    team: "team",
+    user: "user",
+  };
+  const targetKind = TARGET_KIND_BY_ROUTER[root];
+  // Best-effort id extraction. Mutations typically return either the
+  // entity directly (`{ id, ... }`), wrapped (`{ source: { id, ... } }`,
+  // `{ budget: {...} }`, `{ virtualKey: {...} }`), or a tuple with the
+  // id alongside a one-shot secret (`{ source, ingestSecret }` /
+  // `{ key, secret }`). Walk one level deep before giving up.
+  const obj = data as Record<string, unknown>;
+  const direct = obj.id;
+  if (typeof direct === "string") return { targetKind, targetId: direct };
+  for (const key of Object.keys(obj)) {
+    const child = obj[key];
+    if (child && typeof child === "object") {
+      const childId = (child as Record<string, unknown>).id;
+      if (typeof childId === "string") {
+        return { targetKind, targetId: childId };
+      }
+    }
+  }
+  return { targetKind };
+}
+
 const auditLogMutations = t.middleware(
   async ({ ctx, next, type, path, input }) => {
     if (
@@ -224,6 +284,10 @@ const auditLogMutations = t.middleware(
 
     let result = await next();
 
+    const target = result.ok
+      ? deriveAuditTarget(path, result.data)
+      : {};
+
     await auditLog({
       userId: ctx.session.user.id,
       organizationId: (input as any)?.organizationId,
@@ -232,6 +296,8 @@ const auditLogMutations = t.middleware(
       args: input,
       error: !result.ok ? result.error : undefined,
       req: ctx.req,
+      targetKind: target.targetKind,
+      targetId: target.targetId,
       // Stamp the real admin id when the action is happening during
       // impersonation. `userId` above is the impersonated target (the
       // RBAC actor); metadata.impersonatorId is the human performing it.

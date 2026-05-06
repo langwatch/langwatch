@@ -12,6 +12,8 @@ export const auditLog = async ({
   error,
   req,
   metadata,
+  targetKind,
+  targetId,
 }: {
   userId: string;
   organizationId?: string;
@@ -21,6 +23,8 @@ export const auditLog = async ({
   error?: Error;
   req?: NextApiRequest;
   metadata?: any;
+  targetKind?: string;
+  targetId?: string;
 }) => {
   const userAgent = req?.headers["user-agent"];
   const ipAddress = getClientIp(req);
@@ -38,6 +42,8 @@ export const auditLog = async ({
       ipAddress,
       userAgent,
       metadata,
+      targetKind,
+      targetId,
     },
   });
 };

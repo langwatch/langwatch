@@ -49,12 +49,17 @@ if (!existing) {
   console.log("user already exists", userId);
 }
 
+if (!userId) {
+  console.error("failed to resolve user id");
+  process.exit(1);
+}
+
 const orgUser = await prisma.organizationUser.findFirst({
   where: { userId, organizationId: ORG_ID },
 });
 if (!orgUser) {
   await prisma.organizationUser.create({
-    data: { userId, organizationId: ORG_ID, role: "MEMBER" },
+    data: { userId: userId, organizationId: ORG_ID, role: "MEMBER" },
   });
   console.log("added to org");
 } else {
