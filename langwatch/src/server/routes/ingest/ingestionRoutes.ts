@@ -50,7 +50,9 @@ import {
   readOtlpBody,
 } from "~/server/otel/parseOtlpBody";
 import { createLogger } from "~/utils/logger/server";
+import { extractCanonicalCostEvents, type CanonicalCostEvent } from "@ee/governance/services/activity-monitor/canonicalCostExtractor.service";
 import { extractClaudeCodeCostEvents } from "@ee/governance/services/activity-monitor/claudeCodeIngestionExtractor.service";
+import { transformOttlPayload } from "@ee/governance/services/activity-monitor/ottlGatewayClient";
 import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
 import { GatewayBudgetRepository } from "~/server/gateway/budget.repository";
 import {
@@ -180,6 +182,95 @@ function buildWebhookLogRequest(
 }
 
 const logger = createLogger("langwatch:ingest");
+
+/**
+ * Cost-event extraction with OTTL-first dispatch:
+ *
+ *   1. If `source.parserConfig.ottlStatements` is non-empty, round-trip
+ *      the original payload through the aigateway's `/internal/transform`
+ *      (which embeds `pkg/ottl`), re-parse the mutated payload, and
+ *      read canonical `langwatch.*` fields via `extractCanonicalCostEvents`.
+ *   2. Otherwise, for sources of type `claude_code` (back-compat with
+ *      pre-OTTL provisioning), fall back to the legacy hardcoded
+ *      `extractClaudeCodeCostEvents`.
+ *   3. Otherwise return [].
+ *
+ * On gateway/transform errors, falls back to canonical extraction over
+ * the un-mutated payload so the receiver still 202-acks the upstream
+ * (keeping the door open for a manual reconciliation later) — better
+ * than dropping the whole batch when the UI-configured statements have
+ * a bug.
+ */
+async function extractCostEventsForSource(input: {
+  source: IngestionSource;
+  parsed: IExportLogsServiceRequest;
+  rawBody: ArrayBuffer;
+  contentType: string | undefined;
+}): Promise<CanonicalCostEvent[]> {
+  const parserConfig =
+    (input.source.parserConfig as Record<string, unknown> | null) ?? {};
+  const ottlStatements = Array.isArray(parserConfig.ottlStatements)
+    ? (parserConfig.ottlStatements as unknown[]).filter(
+        (s): s is string => typeof s === "string" && s.trim().length > 0,
+      )
+    : [];
+
+  if (ottlStatements.length === 0) {
+    if (input.source.sourceType === "claude_code") {
+      return extractClaudeCodeCostEvents(input.parsed) as CanonicalCostEvent[];
+    }
+    return [];
+  }
+
+  const encoding: "json" | "proto" =
+    (input.contentType ?? "").toLowerCase().includes("json") ? "json" : "proto";
+  const payloadB64 = Buffer.from(input.rawBody).toString("base64");
+
+  try {
+    const result = await transformOttlPayload({
+      sourceId: input.source.id,
+      kind: "log",
+      encoding,
+      payloadB64,
+      statements: ottlStatements,
+    });
+    if (!result.ok) {
+      logger.warn(
+        {
+          sourceId: input.source.id,
+          errorCount: result.errors.length,
+          firstError: result.errors[0]?.message,
+        },
+        "OTTL transform rejected statements at receive — falling back to un-mutated extraction",
+      );
+      return extractCanonicalCostEvents(input.parsed);
+    }
+    const mutatedBuffer = Buffer.from(result.payloadB64, "base64");
+    const mutatedBytes = mutatedBuffer.buffer.slice(
+      mutatedBuffer.byteOffset,
+      mutatedBuffer.byteOffset + mutatedBuffer.byteLength,
+    ) as ArrayBuffer;
+    const mutatedContentType =
+      result.encoding === "json"
+        ? "application/json"
+        : "application/x-protobuf";
+    const reparsed = parseOtlpLogs(mutatedBytes, mutatedContentType);
+    if (!reparsed.ok) {
+      logger.warn(
+        { sourceId: input.source.id, err: reparsed.error },
+        "OTTL transform returned unparseable payload — falling back to un-mutated extraction",
+      );
+      return extractCanonicalCostEvents(input.parsed);
+    }
+    return extractCanonicalCostEvents(reparsed.request);
+  } catch (transformErr) {
+    logger.warn(
+      { sourceId: input.source.id, err: String(transformErr) },
+      "OTTL transform request failed — falling back to un-mutated extraction",
+    );
+    return extractCanonicalCostEvents(input.parsed);
+  }
+}
 
 export const app = new Hono().basePath("/api/ingest");
 
@@ -483,7 +574,8 @@ app.post("/otel/:sourceId/v1/logs", async (c: Context) => {
   try {
     const body = await readOtlpBody(c.req.raw);
     bodyBytes = body.byteLength;
-    const parsed = parseOtlpLogs(body, c.req.header("content-type"));
+    const contentType = c.req.header("content-type");
+    const parsed = parseOtlpLogs(body, contentType);
     if (!parsed.ok) {
       parseHint = parsed.error;
     } else {
@@ -520,11 +612,19 @@ app.post("/otel/:sourceId/v1/logs", async (c: Context) => {
           );
         }
 
-        // Cost extraction: ledger-write one row per matched event per
-        // applicable budget. Budget aggregation reuses the gateway's
-        // CH rollup so anomaly rules + budget pre-checks see Claude
-        // Code spend identically to gateway spend.
-        const events = extractClaudeCodeCostEvents(parsed.request);
+        // Cost extraction: when the source carries OTTL statements in
+        // parserConfig, round-trip the payload through the gateway's
+        // /internal/transform (which embeds pkg/ottl) and read the
+        // canonical `langwatch.*` namespace from the mutated payload.
+        // Otherwise fall back to the legacy hardcoded claude_code
+        // extractor for sources created before OTTL config existed.
+        // Ledger-write one row per event per applicable budget.
+        const events = await extractCostEventsForSource({
+          source,
+          parsed: parsed.request,
+          rawBody: body,
+          contentType,
+        });
         costEventCount = events.length;
 
         if (events.length > 0 && isClickHouseEnabled()) {
@@ -659,7 +759,7 @@ app.post("/otel/:sourceId/v1/logs", async (c: Context) => {
                   requestId: event.requestId,
                   err: String(eventErr),
                 },
-                "claude_code event ledger-write failed (continuing batch)",
+                "ingestion-source event ledger-write failed (continuing batch)",
               );
             }
           }

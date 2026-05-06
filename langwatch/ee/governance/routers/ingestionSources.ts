@@ -25,6 +25,12 @@ import {
   SUPPORTED_RETENTION_CLASSES,
   SUPPORTED_SOURCE_TYPES,
 } from "@ee/governance/services/activity-monitor/ingestionSource.service";
+import { validateOttlStatements } from "@ee/governance/services/activity-monitor/ottlGatewayClient";
+import {
+  getStarterTemplate,
+  isOttlEnabledSourceType,
+  OTTL_ENABLED_SOURCE_TYPES,
+} from "@ee/governance/services/activity-monitor/ottlStarterTemplates";
 
 import {
   ENTERPRISE_FEATURE_ERRORS,
@@ -227,5 +233,61 @@ export const ingestionSourcesRouter = createTRPCRouter({
         input.organizationId,
       );
       return toDto(archived);
+    }),
+
+  /**
+   * Static helper for the composer/drawer: returns the canonical OTTL
+   * starter statements for a source type and whether OTTL editing is
+   * enabled for it. Pure function over a constant — but exposed via
+   * tRPC so the catalog stays a single source of truth (and so we can
+   * later swap the starter map for an admin-curated set without a
+   * client redeploy).
+   */
+  ottlStarter: protectedProcedure
+    .input(
+      z.object({
+        organizationId: z.string(),
+        sourceType: z.string(),
+      }),
+    )
+    .use(checkOrganizationPermission("ingestionSources:view"))
+    .use(enterpriseGate)
+    .query(({ input }) => {
+      return {
+        enabled: isOttlEnabledSourceType(input.sourceType),
+        statements: [...getStarterTemplate(input.sourceType)],
+        enabledSourceTypes: [...OTTL_ENABLED_SOURCE_TYPES],
+      };
+    }),
+
+  /**
+   * Validate a list of OTTL statements via the aigateway. The gateway
+   * embeds `pkg/ottl` from the OpenTelemetry Collector and parses each
+   * statement; on parse / type errors, returns per-statement coordinates
+   * so the editor can surface line/col error markers.
+   *
+   * When `LW_GATEWAY_BASE_URL` is unset (dev fast-path) or the gateway
+   * is up but doesn't yet ship the endpoint, the client returns
+   * `{ ok: true }` so the composer doesn't block on infra.
+   */
+  validateOttl: protectedProcedure
+    .input(
+      z.object({
+        organizationId: z.string(),
+        statements: z.array(z.string()).min(0).max(64),
+      }),
+    )
+    .use(checkOrganizationPermission("ingestionSources:manage"))
+    .use(enterpriseGate)
+    .mutation(async ({ input }) => {
+      try {
+        return await validateOttlStatements(input.statements);
+      } catch (err) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: `OTTL validation request failed: ${(err as Error).message}`,
+          cause: err,
+        });
+      }
     }),
 });

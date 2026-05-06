@@ -130,8 +130,11 @@ export function usePersonalContext(): PersonalContext {
       status: raw.status,
       spentUsd: Number(raw.spentUsd),
       limitUsd: Number(raw.limitUsd),
-      period: raw.period,
-      scope: raw.scope,
+      // Server returns lowercase window slug (e.g. "monthly" from
+      // `topScope.window.toLowerCase()`); coerce missing to empty so
+      // the strict consumer type holds. Same for `scope`.
+      period: raw.period ?? "",
+      scope: raw.scope ?? "",
       requestIncreaseUrl:
         "requestIncreaseUrl" in raw ? raw.requestIncreaseUrl ?? null : null,
       adminEmail: "adminEmail" in raw ? raw.adminEmail ?? null : null,

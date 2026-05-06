@@ -26,6 +26,9 @@ import {
 } from "lucide-react";
 import { useMemo, useState } from "react";
 
+import { OttlEditor } from "@ee/governance/dashboard/components/OttlEditor";
+import { isOttlEnabledSourceType } from "@ee/governance/services/activity-monitor/ottlStarterTemplates";
+
 import { EnterpriseLockedSurface } from "~/components/enterprise/EnterpriseLockedSurface";
 import GovernanceLayout from "~/components/governance/GovernanceLayout";
 import { LoadingScreen } from "~/components/LoadingScreen";
@@ -189,6 +192,13 @@ interface ComposerState {
   name: string;
   description: string;
   parserConfig: Record<string, string>;
+  /**
+   * OTTL extraction statements applied by the aigateway before the
+   * canonical extractor reads `langwatch.*` attributes. Only persisted
+   * for OTTL-enabled source types (otel_generic + claude_code today);
+   * pull-mode sources ignore.
+   */
+  ottlStatements: string[];
   retentionClass: RetentionClass;
   /**
    * Phase 10: optional cron override for puller-mode sources. When the
@@ -232,6 +242,7 @@ const blankComposer = (): ComposerState => ({
   name: "",
   description: "",
   parserConfig: {},
+  ottlStatements: [],
   retentionClass: "thirty_days",
   pullSchedule: "",
 });
@@ -435,6 +446,7 @@ function IngestionSourcesPage() {
 
         <SourceComposerDrawer
           isOpen={composing}
+          organizationId={orgId}
           composer={composer}
           setComposer={setComposer}
           isPending={createMutation.isPending}
@@ -604,6 +616,7 @@ function SourceRow({
 
 function SourceComposerDrawer({
   isOpen,
+  organizationId,
   composer,
   setComposer,
   isPending,
@@ -611,6 +624,7 @@ function SourceComposerDrawer({
   onClose,
 }: {
   isOpen: boolean;
+  organizationId: string;
   composer: ComposerState;
   setComposer: (next: ComposerState) => void;
   isPending: boolean;
@@ -659,6 +673,7 @@ function SourceComposerDrawer({
                   ...composer,
                   sourceType: e.target.value as SourceType,
                   parserConfig: {},
+                  ottlStatements: [],
                 })
               }
               style={{
@@ -721,6 +736,16 @@ function SourceComposerDrawer({
           sourceType={composer.sourceType}
           values={composer.parserConfig}
           onChange={(parserConfig) => setComposer({ ...composer, parserConfig })}
+        />
+
+        <OttlEditor
+          organizationId={organizationId}
+          sourceType={composer.sourceType}
+          statements={composer.ottlStatements}
+          onChange={(ottlStatements) =>
+            setComposer({ ...composer, ottlStatements })
+          }
+          enabled={isOttlEnabledSourceType(composer.sourceType)}
         />
 
         <PullScheduleField
@@ -806,6 +831,10 @@ const PARSER_FIELDS: Record<SourceType, FieldDef[]> = {
   // normaliser doesn't actually implement; removed during bugbash so
   // the composer doesn't promise behaviour we don't ship.)
   otel_generic: [],
+  // Claude Code's per-request shape is conveyed through OTTL statements
+  // (parserConfig.ottlStatements), which the OttlEditor renders as its
+  // own panel. No extra parser fields needed at the per-source level.
+  claude_code: [],
   claude_cowork: [
     {
       key: "workspaceId",
@@ -1148,6 +1177,15 @@ function buildParserConfig(c: ComposerState): Record<string, unknown> {
       continue;
     }
     out[k] = v;
+  }
+  // Strip empty rows from the OTTL statement list — admins may leave a
+  // blank trailing row from clicking "Add statement"; persisting it
+  // would force the gateway parser to handle empty input as an error.
+  const ottl = c.ottlStatements
+    .map((s) => s)
+    .filter((s) => s.trim().length > 0);
+  if (ottl.length > 0) {
+    out.ottlStatements = ottl;
   }
   return out;
 }

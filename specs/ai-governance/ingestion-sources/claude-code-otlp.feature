@@ -1,273 +1,294 @@
-Feature: Claude Code OTLP ingestion source — extract usage + spend from
-  Anthropic's OAuth-billed Claude Code traffic so anomaly rules and budgets
-  can govern external (non-virtual-key) usage.
+Feature: OTTL-driven OTLP ingestion source — extract usage + spend
+  from any OTLP-emitting tool (Claude Code, Codex, Gemini, Copilot
+  Studio, custom in-house) by mapping its wire-specific attributes
+  onto the canonical `langwatch.*` namespace, so anomaly rules and
+  budgets can govern external (non-virtual-key) usage.
 
-  As an admin who pays for Claude Code via an Anthropic OAuth seat
-  (e.g. a 20x sub) and not via a LangWatch-issued virtual key, I still
-  want spend + per-user attribution + anomaly alerts for that traffic,
-  by pointing Claude Code's native OTLP exporter at a LangWatch
-  ingestion source.
+  As an admin who pays for a coding assistant via an upstream OAuth
+  seat (Anthropic / OpenAI / Google) and not via a LangWatch-issued
+  virtual key, I still want spend + per-user attribution + anomaly
+  alerts for that traffic, by pointing the upstream tool's native
+  OTLP exporter at a LangWatch ingestion source AND telling LangWatch
+  how to read its wire shape via OTTL statements.
+
+  Architecture: each ingestion source carries
+  `parserConfig.ottlStatements: string[]` — OpenTelemetry
+  Transformation Language lines that the aigateway evaluates (via
+  embedded `pkg/ottl` from opentelemetry-collector-contrib) over
+  every incoming OTLP payload. After transform, a single generic
+  reader walks the canonical fields. Adding a new tool is a data-only
+  PR: paste statements in the admin composer, ship.
 
   Reference: https://code.claude.com/docs/en/monitoring-usage
   Pairs with: specs/ai-governance/puller-framework/http-polling.feature
   (the JSONPath eventMapping pattern for pull adapters; this spec is
-  push-mode, no admin mapping authoring required for v0 because
-  Claude Code's emission shape is well-defined and stable enough to
-  bake in.)
+  push-mode, where the per-source mapping language is OTTL — closer
+  in shape to what OTel tooling expresses natively.)
 
   Background:
     Given an organization "ACME" with an enterprise license
     And admin Alex with `ingestionSources:manage` permission
     And the hidden Governance Project for ACME exists
+    And the aigateway's `/internal/validate-ottl` and `/internal/transform`
+      endpoints are reachable from the control plane
 
   # -------------------------------------------------------------------
-  # What Claude Code actually emits (locked to Ariana's payload capture
-  # against Claude Code 2.1.129 OAuth-billed seat, 2026-05-06)
+  # The canonical contract — what OTTL statements must produce
   # -------------------------------------------------------------------
-  # Two OTLP/HTTP endpoint paths, both with JSON content-type (NOT
-  # protobuf):
-  #   POST /v1/logs    — events (claude_code.api_request, .user_prompt,
-  #                      .mcp_server_connection, .hook_execution_*,
-  #                      .internal_error)
-  #   POST /v1/metrics — counters (claude_code.cost.usage,
-  #                      claude_code.token.usage)
+  # Post-transform LogRecord attribute keys the receiver reads:
+  #   langwatch.cost.usd                (double)
+  #   langwatch.request_id              (string, idempotency key)
+  #   langwatch.model                   (string)
+  #   langwatch.input_tokens            (int)
+  #   langwatch.output_tokens           (int)
+  #   langwatch.cache_read_tokens       (int)
+  #   langwatch.cache_creation_tokens   (int)
+  #   langwatch.principal.email         (string, optional)
+  #   langwatch.team.id_hint            (string, optional)
   #
-  # Scopes inside the OTLP envelope: `com.anthropic.claude_code`
-  # (metrics) + `com.anthropic.claude_code.events` (logs).
-  #
-  # Cost-bearing event — `claude_code.api_request` LogRecord:
-  #   body.stringValue = "claude_code.api_request"
-  #   timeUnixNano     = string nanoseconds
-  #   attributes:
-  #     event.name             = "api_request"
-  #     event.sequence         = intValue (monotonic per session.id)
-  #     event.timestamp        = ISO 8601 string
-  #     model                  = "claude-opus-4-7" (NOT gen_ai.request.model)
-  #     cost_usd               = doubleValue (e.g. 0.12528625)
-  #     input_tokens           = intValue (NOT gen_ai.usage.input_tokens)
-  #     output_tokens          = intValue
-  #     cache_read_tokens      = intValue
-  #     cache_creation_tokens  = intValue
-  #     duration_ms            = intValue
-  #     request_id             = "req_011CakjXP5x6Z…" (Anthropic API id)
-  #     prompt.id              = uuid (Claude Code session-scoped)
-  #     speed                  = "normal" | "fast" | …
-  #     query_source           = "sdk" | "interactive" | …
-  #     effort                 = "xhigh" | "high" | …
-  #     user.email             = "rogerio@langwatch.ai"
-  #     user.id                = anonymous device hash
-  #     user.account_uuid      = uuid
-  #     user.account_id        = "user_01RPBSwk…" (Anthropic-tagged)
-  #     organization.id        = Anthropic org UUID (from OAuth)
-  #     session.id             = Claude Code session uuid
-  #     terminal.type          = "tmux" | "iterm" | …
-  #
-  # Cumulative cost metric — `claude_code.cost.usage`:
-  #   Sum, monotonic, USD unit, aggregationTemporality=1 (DELTA — so
-  #   each data point is an increment, not a running total)
-  #   dataPoint.asDouble = USD delta
-  #   dataPoint.attributes: model, query_source, speed, effort,
-  #                          user.email, organization.id, …
-  #   NOTE: model name is `claude-opus-4-7[1m]` here (1M-context
-  #   suffix) vs the bare `claude-opus-4-7` on the event. Extractor
-  #   should preserve both verbatim, NOT normalise — admins queries
-  #   may want to slice by 1m vs base context.
-  #
-  # Resource attributes (set on every batch — applies to ALL signals
-  # in the batch via OTLP's resource→scope→signal nesting):
-  #   service.name      = "claude-code"
-  #   service.version   = "2.1.129"
-  #   host.arch         = "arm64"
-  #   os.type           = "darwin"
-  #   os.version        = "25.2.0"
-  #   PLUS admin-layered OTEL_RESOURCE_ATTRIBUTES splits:
-  #     team.id         = "ariana-zone-co"     (admin custom)
-  #     cost_center     = "eng-dogfood"        (admin custom)
-  #
-  # Critical extractor invariant: principal + team attribution lives
-  # at the RESOURCE level, not on the individual LogRecord/metric.
-  # The receiver MUST walk resource→scope→signal and merge resource
-  # attrs onto each downstream summary row. Naive "read attributes
-  # off the LogRecord" won't surface user.email or team.id.
+  # Statements that emit any other key are not extracted. The
+  # canonical names exist so a single per-source receiver path
+  # handles every upstream tool without per-tool branches.
 
   # -------------------------------------------------------------------
-  # Source creation + endpoint discovery
+  # Source creation — starter template flow (claude_code)
   # -------------------------------------------------------------------
-  Scenario: Admin creates a Claude Code OTLP source and gets the wire info
+  Scenario: Admin creates a Claude Code source — starter template auto-fills
     When Alex visits "/settings/governance/ingestion-sources" and clicks
       "Add ingestion source"
-    Then the create drawer offers "Claude Code (OTLP)" as a push-mode
-      source type
-    And selecting it auto-detects Claude Code's emission shape — no
-      mapping editor is shown for the happy path
+    And selects source type "Claude Code (OTLP)"
+    Then the OTTL editor pre-fills with 9 starter statements that map
+      Claude Code's wire shape onto the canonical namespace, one per
+      output field, all gated on `attributes["event.name"] == "api_request"`
+    And each statement passes validation (green dot per row)
     When Alex saves the source with name "claude-code-personal"
-    Then the save response includes:
-      | field            | shape                                                  |
-      | endpoint         | https://app.langwatch.ai/api/ingest/otel/{sourceId}    |
-      | ingestSecret     | lw_is_…                                                |
-      | exporterEnvBlock | shell-ready copy-paste                                 |
-    And the exporterEnvBlock contains exactly these env vars (matching
-      the OTLP/HTTP endpoint convention — Claude Code suffixes
-      `/v1/logs` and `/v1/metrics` itself):
-      | CLAUDE_CODE_ENABLE_TELEMETRY    | 1                                          |
-      | OTEL_METRICS_EXPORTER           | otlp                                       |
-      | OTEL_LOGS_EXPORTER              | otlp                                       |
-      | OTEL_EXPORTER_OTLP_PROTOCOL     | http/json                                  |
-      | OTEL_EXPORTER_OTLP_ENDPOINT     | the endpoint above (no `/v1/*` suffix)     |
-      | OTEL_EXPORTER_OTLP_HEADERS      | Authorization=Bearer lw_is_…               |
-    And the drawer offers an OPTIONAL `OTEL_RESOURCE_ATTRIBUTES`
-      builder that admins can use to layer team / cost_center tags
-      onto every signal without typing the env-var syntax by hand
+    Then the source row's `parserConfig.ottlStatements` matches the
+      starter template byte-for-byte
+    And the save response includes the OTLP endpoint URL +
+      one-time ingest secret + shell-ready exporter env block
 
   # -------------------------------------------------------------------
-  # Receive-time mapping — auto-detected, no admin authoring
+  # Source creation — hand-rolled flow (otel_generic, future tools)
   # -------------------------------------------------------------------
-  Scenario: Cost extraction via the claude_code.cost.usage metric
-    Given the source above is configured
-    And Claude Code emits a metrics batch carrying
-      `claude_code.cost.usage{model=claude-sonnet-4-5, query_source=interactive}`
-      with delta value 0.042 USD
-    When the receiver processes the metrics body
-    Then the resulting summary row credits 0.042 USD against the source
-    And the spend rolls up into /governance "Spend (30d)" with no
-      catalog-lookup involved
-    And `langwatch.cost.basis = "claude_code.cost.usage"` is stamped on
-      the synthetic event so the trace viewer can show the derivation
-      chain when admins debug a number
+  Scenario: Admin creates a generic OTLP source — empty editor, admin pastes own
+    When Alex selects source type "Generic OTLP"
+    Then the OTTL editor renders with zero statements and no starter
+    When Alex pastes statements that map an in-house tool's
+      `usage.cost_dollars` attribute to `langwatch.cost.usd` and
+      `usage.req_id` to `langwatch.request_id`
+    Then per-statement validation runs against the gateway's pkg/ottl
+    And green dots indicate every line parsed successfully
+    When Alex saves the source
+    Then the receiver applies those statements at receive time without
+      any code changes for the new tool
 
-  Scenario: Token extraction via the claude_code.token.usage metric
-    Given Claude Code emits
-      `claude_code.token.usage{type=input, model=…}` value 1,234
-      and `claude_code.token.usage{type=output, model=…}` value 567
-    When the receiver processes the batch
-    Then the trace summary fields `tokensInput` and `tokensOutput`
-      hold 1234 and 567 respectively
-    And cacheRead / cacheCreation token counts surface as their own
-      `tokensCacheRead` / `tokensCacheCreation` fields (NOT folded into
-      the input/output total — admins want to see cache-hit rates
-      separately for cost optimisation)
-
-  Scenario: Per-request audit via the claude_code.api_request event
-    Given Claude Code emits a `claude_code.api_request` log/event with
-      `cost_usd=0.042 model=claude-sonnet-4-5 input_tokens=1234
-       output_tokens=567 request_id=req_abc duration_ms=2410`
-    When the receiver processes the log batch
-    Then a per-request row lands in trace_summaries
-    And the trace viewer drill-down shows `request_id=req_abc` so admins
-      can correlate with Anthropic's own dashboards
-    And the event passes through OtlpSpanPiiRedactionService as today
+  Scenario: Admin pastes an OTTL statement with a syntax error
+    Given Alex is editing OTTL statements on a new source
+    When Alex enters `set(attributes["langwatch.cost.usd"], attribues["cost_usd"])`
+      (typo: `attribues` vs `attributes`)
+    Then the row shows a red dot with the gateway's parser error
+      message and line/col coordinates
+    And the Create button stays enabled — saving with a known-broken
+      statement is allowed (admin's choice; receiver-time errors will
+      surface in the source's events-rejected counter)
 
   # -------------------------------------------------------------------
-  # Attribution — user / org / team carries through
+  # Receive-time path — OTTL drives extraction
   # -------------------------------------------------------------------
-  Scenario: User attribution from Claude Code's OAuth context
+  Scenario: Cost extraction via OTTL transform on a Claude Code payload
+    Given the Claude Code source with the starter template is configured
+    And Claude Code emits a `claude_code.api_request` LogRecord with
+      `cost_usd=0.042`, `request_id=req_abc`,
+      `model=claude-sonnet-4-5`, `input_tokens=1234`, `output_tokens=567`,
+      `cache_read_tokens=200`, `cache_creation_tokens=10`,
+      `user.email=bob@acme.test`, plus resource attribute `team.id=platform`
+    When the receiver POSTs the payload + statements to
+      aigateway `/internal/transform`
+    Then the mutated payload carries the same record but with
+      additional canonical attributes set:
+      | langwatch.cost.usd              | 0.042                |
+      | langwatch.request_id            | req_abc              |
+      | langwatch.model                 | claude-sonnet-4-5    |
+      | langwatch.input_tokens          | 1234                 |
+      | langwatch.output_tokens         | 567                  |
+      | langwatch.cache_read_tokens     | 200                  |
+      | langwatch.cache_creation_tokens | 10                   |
+      | langwatch.principal.email       | bob@acme.test        |
+      | langwatch.team.id_hint          | platform             |
+    And the canonical extractor reads those fields and writes one
+      ledger row per applicable budget keyed by `request_id`
+
+  Scenario: Regression-equivalence — starter template matches legacy hardcoded extractor
+    Given a Claude Code source with the starter template is configured
+    And a fixture batch from the 2026-05-06 capture (Claude Code 2.1.129)
+    When the OTTL receiver path processes the fixture
+    Then the resulting ledger rows are byte-identical (excluding
+      timestamps) to the rows the legacy hardcoded
+      `extractClaudeCodeCostEvents` would have produced for the same
+      fixture
+    # This is the rchaves dogfood gate: "skip the claude code service
+    # and use a generic OTLP + OTTL mapping done via the UI directly
+    # and prove it works, then we can replace the claude code mapping".
+
+  Scenario: New tool mapped purely via admin OTTL — no code change
+    Given Alex has created a generic OTLP source named "Codex test"
+    And Alex has pasted OTTL statements mapping Codex's wire shape:
+      | set(attributes["langwatch.cost.usd"], attributes["openai.usage.cost_usd"]) where attributes["event.name"] == "completion" |
+      | set(attributes["langwatch.request_id"], attributes["openai.response_id"]) where attributes["event.name"] == "completion"  |
+      | set(attributes["langwatch.model"], attributes["openai.model"]) where attributes["event.name"] == "completion"             |
+      | set(attributes["langwatch.input_tokens"], attributes["openai.usage.prompt_tokens"]) where attributes["event.name"] == "completion"     |
+      | set(attributes["langwatch.output_tokens"], attributes["openai.usage.completion_tokens"]) where attributes["event.name"] == "completion" |
+    When Codex emits a completion LogRecord at the source's endpoint
+    Then the receiver folds the cost into the gateway budget rollup
+      identically to a Claude Code event — no per-tool code path
+      was needed
+
+  # -------------------------------------------------------------------
+  # Back-compat — sources without OTTL still work
+  # -------------------------------------------------------------------
+  Scenario: Pre-OTTL claude_code source still extracts via legacy reader
+    Given Alex created a claude_code source before OTTL config existed
+    And `parserConfig.ottlStatements` is unset
+    When Claude Code emits a batch
+    Then the receiver falls back to the hardcoded
+      `extractClaudeCodeCostEvents` reader
+    And the ledger row lands exactly as before
+    # Lets us ship the OTTL path without forcing existing customers
+    # to re-create their sources. Migration to the OTTL path is a
+    # follow-up data backfill (set ottlStatements = starter template
+    # for every existing claude_code source) and can be reverted if
+    # γ ships breakage.
+
+  Scenario: OTTL transform error mid-batch — receiver still acks, falls back
+    Given a source has OTTL statements that parse but reference a key
+      with a wrong type
+    When the gateway returns `ok: false` with a per-statement error
+    Then the receiver logs the error with sourceId + first error
+      message
+    And falls back to extracting against the un-mutated payload
+      (which yields zero canonical fields, so zero ledger rows)
+    And still returns 202 to the upstream — the trace pipeline
+      handoff for forensic activity already happened, dropping the
+      whole batch over an admin-side mapping bug would be louder than
+      missing the spend rollup
+
+  # -------------------------------------------------------------------
+  # Attribution — OTTL maps principal + team
+  # -------------------------------------------------------------------
+  Scenario: User attribution from upstream OAuth context
     Given Bob's Claude Code is authenticated against Anthropic OAuth as
       bob@acme.test
-    And Claude Code emits any of the signals above with attribute
-      `user.email=bob@acme.test`
-    When the receiver processes the batch
-    Then the resulting summary row carries `langwatch.user_id=bob@acme.test`
-    And /governance "spendByUser" attributes the spend to Bob without
-      any custom mapping configuration
+    And Bob is a member of organization ACME with email bob@acme.test
+    When Claude Code emits a request with `user.email=bob@acme.test`
+    And the OTTL starter statement
+      `set(attributes["langwatch.principal.email"], attributes["user.email"])`
+      runs
+    Then the resulting ledger row's `principal_user_id` resolves to
+      Bob's User row by email match within the source's organization
+    And /governance "spendByUser" attributes the spend to Bob
 
-  Scenario: Team attribution via OTEL_RESOURCE_ATTRIBUTES
-    Given Alex set `OTEL_RESOURCE_ATTRIBUTES=team.id=platform,
-      cost_center=eng-123` in the env block
+  Scenario: Team attribution via OTEL_RESOURCE_ATTRIBUTES + OTTL
+    Given Alex set `OTEL_RESOURCE_ATTRIBUTES=team.id=platform` in the
+      env block on Bob's machine
+    And the OTTL starter statement
+      `set(attributes["langwatch.team.id_hint"], resource.attributes["team.id"])`
+      runs
     When Bob runs Claude Code with that env
-    Then every emitted signal carries the `team.id` and `cost_center`
-      resource attributes
+    Then the receiver carries `team.id_hint=platform` through the
+      ledger row
     And /governance "spendByTeam" attributes the spend to "platform"
-    And custom dimensions are queryable via the trace viewer's filter UI
 
   # -------------------------------------------------------------------
-  # End-to-end with the user's actual Claude Code workflow
+  # End-to-end with the user's actual workflow
   # -------------------------------------------------------------------
   Scenario: User runs Claude Code with the env block — usage shows up
-    Given Alex has copied the exporterEnvBlock into the Claude Code shell
-    And user Bob runs `claude` with those env vars set (no langwatch CLI
-      wrapper — Bob's Claude Code is OAuth-authed against his personal
-      Anthropic seat, NOT against a LangWatch-issued virtual key)
+    Given Alex has copied the exporter env block from the source row
+    And user Bob runs `claude` with those env vars set (no langwatch
+      CLI wrapper — Bob's Claude Code is OAuth-authed against his
+      personal Anthropic seat)
     And Bob completes a 3-message conversation
     Within 60 seconds:
-    Then /governance dashboard's "Spend (30d)" reflects the
-      claude_code.cost.usage delta for that traffic
+    Then /governance dashboard's "Spend (30d)" reflects the spend for
+      that traffic
     And /governance dashboard's "active users" counts Bob
-    And /governance "Recent activity" lists the per-request rows
-      with model name "claude-sonnet-4-5" and request_id
+    And /me dashboard's "Recent activity" lists per-request rows with
+      model name and request_id
     And the source row's "events received" counter increments
 
   # -------------------------------------------------------------------
   # Anomaly rules + budgets work against ingestion-source spend
   # -------------------------------------------------------------------
-  Scenario: spend_spike anomaly fires on Claude Code OTLP traffic
+  Scenario: spend_spike anomaly fires on OTTL-extracted traffic
     Given Alex has saved a spend_spike rule scoped to the Claude Code source
     And there is a 7-day baseline with a $5/day median
     When Bob's daily usage spikes to $50 (10× over baseline)
     Then the anomaly detector evaluates the rule against the
-      ingestion-source-origin spend (NOT just gateway-origin spend)
+      ingestion-source-origin spend folded from canonical fields
     And an anomaly_alert row is created
     And the anomaly is visible on the governance dashboard's
       "Recent anomalies" panel
-    And the alert payload references the contributing spans / metrics
 
   Scenario: GatewayBudget honors ingestion-source spend
     Given Alex has saved a $50/month organization-scope budget
     And gateway traffic this month totals $20
-    And Claude Code OTLP traffic this month totals $40
+    And ingestion-source traffic (extracted via OTTL) this month totals $40
     When the budget snapshot recomputes
     Then the budget shows $60/$50 spent (over)
-    And the budget-exceeded UI shows which sources contributed (so
-      admins can decide whether to throttle the gateway VK or revoke
-      the OTLP source's ingestSecret)
+    And the budget-exceeded UI shows which sources contributed
 
   # -------------------------------------------------------------------
   # Cross-cutting concerns
   # -------------------------------------------------------------------
   Scenario: Source disable kills further OTLP ingest immediately
-    Given the Claude Code source has `disabledAt` set
+    Given the source has `disabledAt` set
     When Bob's Claude Code instance posts a fresh OTLP batch
     Then the receiver returns 401 unauthorized (treats the bearer as
       revoked)
-    And no trace_summaries row is written
+    And no ledger row is written
     And the source row's "events rejected" counter increments
 
   Scenario: PII in chat content is redacted per the source's retention class
     Given the source's retention class is "thirty_days"
     And Bob's prompt includes a credit-card number
     When the OTLP body lands
-    Then the existing OtlpSpanPiiRedactionService runs against the trace
-      (same as gateway path — origin doesn't change PII handling)
-    And the redacted content shows in /governance's trace viewer with
-      the redaction banner already documented at
+    Then the existing OtlpSpanPiiRedactionService runs against the
+      trace handoff (same as gateway path — origin doesn't change PII
+      handling)
+    And the redacted content shows in the trace viewer with the
+      redaction banner already documented at
       "/ai-governance/pii-redaction"
 
-  Scenario: Unknown OTel attribute keys pass through without rejection
-    Given Claude Code ships a new attribute (e.g. `claude_code.future_flag`)
-      in a future release that the v0 mapper doesn't know about
+  Scenario: Unknown OTel attribute keys pass through
+    Given an upstream tool ships a new attribute (e.g.
+      `claude_code.future_flag`) that no statement targets
     When the receiver processes the batch
     Then the unknown attribute is preserved on the trace_summaries row
       under the generic Attributes map
-    And the receiver does NOT fail the whole batch on it
-    And the trace viewer shows the unknown attribute alongside known
-      ones so admins can iterate without a code change
+    And the receiver does NOT fail the whole batch
 
   # -------------------------------------------------------------------
-  # Decisions locked from Ariana's 2026-05-06 capture
+  # Decisions locked from rchaves's γ verdict (2026-05-06)
   # -------------------------------------------------------------------
-  # 1. Body shape: standard OTLP/HTTP JSON envelope —
-  #    `{ resourceLogs: […], resourceMetrics: […] }`. Sergey's receiver
-  #    extends `parseOtlpRequest` to walk all three of resourceSpans,
-  #    resourceLogs, resourceMetrics from the same envelope.
-  # 2. Claude Code uses the BASE `OTEL_EXPORTER_OTLP_ENDPOINT` and
-  #    suffixes `/v1/logs` and `/v1/metrics` itself. No per-signal
-  #    `OTEL_EXPORTER_OTLP_LOGS_ENDPOINT` override needed in the
-  #    happy path. Receiver routes by sub-path.
-  # 3. `claude_code.api_request` is an OTel LogRecord (handoff via
-  #    `getApp().traces.logCollection.handleOtlpLogRequest`). Span
-  #    pipeline only fires for the trace beta variant.
+  # 1. OTTL statements live on `IngestionSource.parserConfig.ottlStatements`
+  #    — JSON column, no Prisma migration. Strings stored verbatim;
+  #    parsing happens server-side in Go (pkg/ottl) at receive time.
+  # 2. Validation is a tRPC mutation on the control plane that proxies
+  #    to aigateway `/internal/validate-ottl`. Falls open ({ok:true})
+  #    when the gateway is unreachable so the composer doesn't block
+  #    on infra during dev — real syntax errors surface only when the
+  #    gateway is up, but the alternative (busted-looking editor any
+  #    time the gateway is down) is louder than the missed errors.
+  # 3. Transform widens sergey's original contract from proto-only to
+  #    {encoding: "proto"|"json", payload_b64} — Claude Code emits
+  #    JSON OTLP/HTTP, and pdata supports both unmarshallers.
+  # 4. Resource→scope→record attribute merge happens INSIDE the OTTL
+  #    transform step (pkg/ottl's log context provides this natively),
+  #    so canonical statements can target either log attrs OR resource
+  #    attrs interchangeably — `resource.attributes["team.id"]` reads
+  #    the same way `attributes["cost_usd"]` does.
   #
   # Open: behaviour when admin has BOTH the gateway VK path AND the
-  # ingestion source path active for the same Anthropic seat (double-
-  # counting risk). Probably out of scope for v0 — admins pick one or
-  # the other; Lane-S adds a dedup invariant in a follow-up if it
-  # becomes a real customer issue.
+  # ingestion source path active for the same upstream seat (double-
+  # counting risk). Out of scope for v1 — admins pick one or the
+  # other; Lane-S adds a dedup invariant in a follow-up if it becomes
+  # a real customer issue.
