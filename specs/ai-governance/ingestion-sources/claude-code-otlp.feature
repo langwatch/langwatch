@@ -118,14 +118,14 @@ Feature: OTTL-driven OTLP ingestion source — extract usage + spend
     And the canonical extractor reads those fields and writes one
       ledger row per applicable budget keyed by `request_id`
 
-  Scenario: Regression-equivalence — starter template matches legacy hardcoded extractor
+  Scenario: Starter template extracts canonical fields from a captured fixture
     Given a Claude Code source with the starter template is configured
     And a fixture batch from the 2026-05-06 capture (Claude Code 2.1.129)
     When the OTTL receiver path processes the fixture
-    Then the resulting ledger rows are byte-identical (excluding
-      timestamps) to the rows the legacy hardcoded
-      `extractClaudeCodeCostEvents` would have produced for the same
-      fixture
+    Then a ledger row lands carrying the per-request cost, model,
+      input/output tokens, cache_read/cache_creation tokens, request_id,
+      principal email, and team id_hint, sourced byte-faithfully from
+      the OTLP attributes
     # This is the rchaves dogfood gate: "skip the claude code service
     # and use a generic OTLP + OTTL mapping done via the UI directly
     # and prove it works, then we can replace the claude code mapping".
@@ -142,22 +142,6 @@ Feature: OTTL-driven OTLP ingestion source — extract usage + spend
     Then the receiver folds the cost into the gateway budget rollup
       identically to a Claude Code event — no per-tool code path
       was needed
-
-  # -------------------------------------------------------------------
-  # Back-compat — sources without OTTL still work
-  # -------------------------------------------------------------------
-  Scenario: Pre-OTTL claude_code source still extracts via legacy reader
-    Given Alex created a claude_code source before OTTL config existed
-    And `parserConfig.ottlStatements` is unset
-    When Claude Code emits a batch
-    Then the receiver falls back to the hardcoded
-      `extractClaudeCodeCostEvents` reader
-    And the ledger row lands exactly as before
-    # Lets us ship the OTTL path without forcing existing customers
-    # to re-create their sources. Migration to the OTTL path is a
-    # follow-up data backfill (set ottlStatements = starter template
-    # for every existing claude_code source) and can be reverted if
-    # γ ships breakage.
 
   Scenario: OTTL transform error mid-batch — receiver still acks, falls back
     Given a source has OTTL statements that parse but reference a key

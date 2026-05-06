@@ -51,7 +51,6 @@ import {
 } from "~/server/otel/parseOtlpBody";
 import { createLogger } from "~/utils/logger/server";
 import { extractCanonicalCostEvents, type CanonicalCostEvent } from "@ee/governance/services/activity-monitor/canonicalCostExtractor.service";
-import { extractClaudeCodeCostEvents } from "@ee/governance/services/activity-monitor/claudeCodeIngestionExtractor.service";
 import { transformOttlPayload } from "@ee/governance/services/activity-monitor/ottlGatewayClient";
 import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
 import { GatewayBudgetRepository } from "~/server/gateway/budget.repository";
@@ -184,22 +183,21 @@ function buildWebhookLogRequest(
 const logger = createLogger("langwatch:ingest");
 
 /**
- * Cost-event extraction with OTTL-first dispatch:
+ * Cost-event extraction via OTTL.
  *
- *   1. If `source.parserConfig.ottlStatements` is non-empty, round-trip
- *      the original payload through the aigateway's `/internal/transform`
- *      (which embeds `pkg/ottl`), re-parse the mutated payload, and
- *      read canonical `langwatch.*` fields via `extractCanonicalCostEvents`.
- *   2. Otherwise, for sources of type `claude_code` (back-compat with
- *      pre-OTTL provisioning), fall back to the legacy hardcoded
- *      `extractClaudeCodeCostEvents`.
- *   3. Otherwise return [].
+ * Every push-mode source carries `parserConfig.ottlStatements` (the
+ * composer auto-fills the canonical starter for known source types
+ * and admins paste their own for `otel_generic`). The receiver
+ * round-trips the original payload through the aigateway's
+ * `/internal/transform` (which embeds `pkg/ottl`), re-parses the
+ * mutated payload, and reads canonical `langwatch.*` fields via
+ * `extractCanonicalCostEvents`.
  *
- * On gateway/transform errors, falls back to canonical extraction over
- * the un-mutated payload so the receiver still 202-acks the upstream
- * (keeping the door open for a manual reconciliation later) — better
- * than dropping the whole batch when the UI-configured statements have
- * a bug.
+ * On gateway/transform errors, falls back to canonical extraction
+ * over the un-mutated payload so the receiver still 202-acks the
+ * upstream (keeping the door open for a manual reconciliation later)
+ * — better than dropping the whole batch when the UI-configured
+ * statements have a bug.
  */
 async function extractCostEventsForSource(input: {
   source: IngestionSource;
@@ -216,9 +214,6 @@ async function extractCostEventsForSource(input: {
     : [];
 
   if (ottlStatements.length === 0) {
-    if (input.source.sourceType === "claude_code") {
-      return extractClaudeCodeCostEvents(input.parsed) as CanonicalCostEvent[];
-    }
     return [];
   }
 

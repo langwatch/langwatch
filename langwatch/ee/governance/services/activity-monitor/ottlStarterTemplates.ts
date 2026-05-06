@@ -19,10 +19,9 @@
  */
 
 /**
- * The post-transform reader walks LogRecord attributes for these keys
- * (resource attributes are merged into the per-record bag by the
- * receiver before extraction, matching the legacy
- * claudeCodeIngestionExtractor merge order). Statements that target
+ * The post-transform reader walks LogRecord attributes for these keys.
+ * Resource attributes are merged into the per-record bag by the
+ * receiver before extraction, so statements that target
  * `resource.attributes["..."]` flow through the same merge path.
  */
 export const LANGWATCH_OTTL_FIELDS = {

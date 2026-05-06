@@ -21,10 +21,9 @@ import (
 
 // canonicalClaudeCodeStatements mirrors the 9-statement starter in
 // `langwatch/ee/governance/services/activity-monitor/ottlStarterTemplates.ts`.
-// Keep these in sync — the regression-equivalence guarantee is that
-// applying THESE statements to a captured Claude Code OTLP/JSON
-// payload yields the same per-event signals that the legacy
-// `claudeCodeIngestionExtractor.service.ts` extracted by hand.
+// Keep these in sync — the contract is that applying THESE statements
+// to a captured Claude Code OTLP/JSON payload yields the canonical
+// `langwatch.*` fields the cost ledger reads from.
 var canonicalClaudeCodeStatements = []string{
 	`set(attributes["langwatch.cost.usd"], attributes["cost_usd"]) where attributes["event.name"] == "api_request"`,
 	`set(attributes["langwatch.request_id"], attributes["request_id"]) where attributes["event.name"] == "api_request"`,
@@ -71,12 +70,10 @@ func TestServer_HandleValidate_BadStatement_ReturnsParseError(t *testing.T) {
 	assert.NotEmpty(t, out.Errors[0].Message)
 }
 
-// TestServer_HandleTransform_ClaudeCodeFixture is the regression-
-// equivalence proof point: feed Ariana's recorded Claude Code OTLP
-// capture through the canonical 9-statement starter, then assert the
-// mutated payload carries every `langwatch.*` attribute that the
-// legacy hardcoded extractor produced. This is the contract that
-// lets us delete `claudeCodeIngestionExtractor.service.ts`.
+// TestServer_HandleTransform_ClaudeCodeFixture is the canonical
+// proof point: feed Ariana's recorded Claude Code OTLP capture
+// through the canonical 9-statement starter, then assert the
+// mutated payload carries every expected `langwatch.*` attribute.
 func TestServer_HandleTransform_ClaudeCodeFixture(t *testing.T) {
 	t.Parallel()
 	fixturePath := findFixture(t, "specs/ai-governance/ingestion-sources/fixtures/claude-code-2.1.129-otlp-capture.jsonl")
