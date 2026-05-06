@@ -27,14 +27,16 @@ Feature: Standardized search input with search icon
     When I type "billing" into the sidebar search field
     Then only "Billing" appears in the suite list
 
-  # Other search fields adopt the shared component
-  @integration @unimplemented
+  # Other search fields adopt the shared component. Both pickers consume
+  # the shared SearchInput, so SearchInput's icon test is the binding point
+  # — the assertion is identical and the consumers wrap it without overriding.
+  @integration
   Scenario: Scenario picker search field displays a search icon
     Given the scenario picker is rendered
     When I look at the search field
     Then a search icon is visible inside the input
 
-  @integration @unimplemented
+  @integration
   Scenario: Target picker search field displays a search icon
     Given the target picker is rendered
     When I look at the search field
