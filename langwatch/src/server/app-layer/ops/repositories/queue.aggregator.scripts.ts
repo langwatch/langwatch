@@ -263,12 +263,16 @@ return cjson.encode({
  *   "scannedGroups": N
  * }
  *
- * The script returns every match in the chunk so the Node-side global sort
- * (oldest/youngest/mostOverdue) sees a complete population. Truncation is
- * only signalled when the caller ran out of group budget, never inside a
- * chunk, otherwise sort order would silently drop legitimate rows.
+ * The script returns every match up to MAX_MATCHED_PER_CHUNK so the
+ * Node-side global sort (oldest/youngest/mostOverdue) sees a near-complete
+ * population. The cap is a memory safety net for pathological queues
+ * (a single chunk with tens of thousands of matches would otherwise blow
+ * Lua heap or proto-max-bulk-len). 10k is high enough that real workloads
+ * never hit it; if they do, truncated=true is signalled.
  */
 const SEARCH_CHUNK_LUA = LUA_PROLOGUE + `
+local MAX_MATCHED_PER_CHUNK = 10000
+
 local blockedKey = KEYS[1]
 
 local keyPrefix  = ARGV[1]
@@ -337,18 +341,22 @@ for gIdx = 1, groupCount do
 
         if keep then
           matchedCount = matchedCount + 1
-          matched[#matched + 1] = {
-            jobId = jobId,
-            groupId = groupId,
-            score = score,
-            ageMs = nowMs - score,
-            pipelineName = pipelineName,
-            jobType = jobType,
-            jobName = jobName,
-            tenantId = tenantId,
-            state = state,
-            retryCount = parseRetryCount(jobId),
-          }
+          if #matched < MAX_MATCHED_PER_CHUNK then
+            matched[#matched + 1] = {
+              jobId = jobId,
+              groupId = groupId,
+              score = score,
+              ageMs = nowMs - score,
+              pipelineName = pipelineName,
+              jobType = jobType,
+              jobName = jobName,
+              tenantId = tenantId,
+              state = state,
+              retryCount = parseRetryCount(jobId),
+            }
+          else
+            truncated = true
+          end
         end
       end
     elseif isBlocked and not hasActive and filters.state == "stale" then
@@ -364,18 +372,22 @@ for gIdx = 1, groupCount do
         if n then staleScore = n end
       end
       matchedCount = matchedCount + 1
-      matched[#matched + 1] = {
-        jobId = "<stale-block>",
-        groupId = groupId,
-        score = staleScore,
-        ageMs = nowMs - staleScore,
-        pipelineName = "unknown",
-        jobType = "unknown",
-        jobName = "unknown",
-        tenantId = "unknown",
-        state = "stale",
-        retryCount = cjson.null,
-      }
+      if #matched < MAX_MATCHED_PER_CHUNK then
+        matched[#matched + 1] = {
+          jobId = "<stale-block>",
+          groupId = groupId,
+          score = staleScore,
+          ageMs = nowMs - staleScore,
+          pipelineName = "unknown",
+          jobType = "unknown",
+          jobName = "unknown",
+          tenantId = "unknown",
+          state = "stale",
+          retryCount = cjson.null,
+        }
+      else
+        truncated = true
+      end
     end
   end
 end
