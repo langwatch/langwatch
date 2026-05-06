@@ -6,8 +6,6 @@ import {
   generateTraceQueryFromPrompt,
 } from "~/server/app-layer/traces/ai-query";
 import { TraceNotFoundError } from "~/server/app-layer/traces/errors";
-import { TraceService } from "~/server/traces/trace.service";
-import { getUserProtectionsForProject } from "../utils";
 import { translateFilterToClickHouse } from "~/server/app-layer/traces/filter-to-clickhouse";
 import type { SpanSummaryRow } from "~/server/app-layer/traces/repositories/span-storage.repository";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
@@ -468,37 +466,6 @@ export const tracesV2Router = createTRPCRouter({
         throw new TraceNotFoundError(input.traceId);
       }
       return mapTraceSummaryToHeader(summary);
-    }),
-
-  /**
-   * User-events (a.k.a. "track" events) attached to a trace via the legacy
-   * `/track-event` REST endpoint — e.g. `thumbs_up_down` votes from the
-   * SDK's feedback helper. These don't flow through the OTel span pipeline
-   * so the v2 fold projection can't see them; we read them off the legacy
-   * trace doc instead. Returned shape matches `TraceListEvent` so the
-   * drawer's events accordion can merge them into its existing list.
-   */
-  userEvents: protectedProcedure
-    .input(z.object({ projectId: z.string(), traceId: z.string() }))
-    .use(checkProjectPermission("traces:view"))
-    .query(async ({ ctx, input }) => {
-      const protections = await getUserProtectionsForProject(ctx, {
-        projectId: input.projectId,
-      });
-      const traceService = TraceService.create(ctx.prisma);
-      const trace = await traceService.getById(
-        input.projectId,
-        input.traceId,
-        protections,
-      );
-      const events = trace?.events ?? [];
-      return events.map((e) => ({
-        // User events aren't span-scoped — leave spanId empty so the
-        // drawer's "View span" affordance hides itself for these rows.
-        spanId: "",
-        timestamp: e.timestamps.started_at,
-        name: e.event_type,
-      }));
     }),
 
   spansPaginated: protectedProcedure
