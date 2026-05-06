@@ -165,6 +165,13 @@ export class EvaluationsApiService {
       this.handleApiError(`get run results for "${runId}"`, fauxError);
     }
 
-    return (await response.json()) as EvaluationRunResultsResponse;
+    const body = (await response.json()) as EvaluationRunResultsResponse | null;
+    if (body === null) {
+      this.handleApiError(`get run results for "${runId}"`, {
+        response: { status: 404 },
+        data: { error: `Run not found: ${runId}` },
+      });
+    }
+    return body;
   }
 }
