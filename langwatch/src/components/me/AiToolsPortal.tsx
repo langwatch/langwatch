@@ -185,6 +185,7 @@ function RenderTile({
           displayName={entry.displayName}
           config={entry.config as CodingAssistantConfig}
           iconKey={entry.iconKey}
+          slug={entry.slug}
         />
       );
     case "model_provider": {

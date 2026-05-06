@@ -38,16 +38,45 @@ interface Props {
   displayName: string;
   config: CodingAssistantConfig;
   iconKey?: string | null;
+  /**
+   * Catalog slug — drives surface-specific UX. Today only `claude-code`
+   * gets the optional OTLP-from-existing-OAuth section (Anthropic
+   * monitoring-usage path, see Sergey baf9445e3 receiver). Other
+   * assistants surface the bare wrapper-command flow today.
+   */
+  slug?: string;
 }
 
-export function CodingAssistantTile({ displayName, config, iconKey }: Props) {
+const CLAUDE_CODE_OTLP_ENV_TEMPLATE = [
+  `export CLAUDE_CODE_ENABLE_TELEMETRY=1`,
+  `export OTEL_LOGS_EXPORTER=otlp`,
+  `export OTEL_METRICS_EXPORTER=otlp`,
+  `export OTEL_EXPORTER_OTLP_PROTOCOL=http/json`,
+  `export OTEL_EXPORTER_OTLP_ENDPOINT="<your-org-LangWatch-ingestion-URL>"`,
+  `export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer <ingest-secret-from-admin>"`,
+].join("\n");
+
+export function CodingAssistantTile({
+  displayName,
+  config,
+  iconKey,
+  slug,
+}: Props) {
   const [expanded, setExpanded] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [otlpCopied, setOtlpCopied] = useState(false);
+  const isClaudeCode = slug === "claude-code";
 
   const onCopy = () => {
     void navigator.clipboard.writeText(config.setupCommand);
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
+  };
+
+  const onCopyOtlpTemplate = () => {
+    void navigator.clipboard.writeText(CLAUDE_CODE_OTLP_ENV_TEMPLATE);
+    setOtlpCopied(true);
+    setTimeout(() => setOtlpCopied(false), 1500);
   };
 
   return (
@@ -122,6 +151,62 @@ export function CodingAssistantTile({ displayName, config, iconKey }: Props) {
                 Setup guide ↗
               </a>
             </Button>
+          )}
+
+          {isClaudeCode && (
+            <Box
+              marginTop={2}
+              paddingTop={3}
+              borderTop="1px solid"
+              borderColor="border.muted"
+            >
+              <Text fontSize="sm" fontWeight="medium" marginBottom={1}>
+                Already using Claude Code with your Anthropic OAuth login?
+              </Text>
+              <Text fontSize="xs" color="fg.muted" marginBottom={2}>
+                Keep your existing seat — your admin can publish a
+                LangWatch OTLP ingestion source so spend, anomaly rules,
+                and budgets work against your Claude Code traffic without
+                changing how you call the API. Paste the env block below
+                in your shell once your admin shares the bearer token.
+              </Text>
+              <HStack justifyContent="space-between" marginBottom={1}>
+                <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
+                  Shell env block
+                </Text>
+                <Button
+                  size="xs"
+                  variant="outline"
+                  onClick={onCopyOtlpTemplate}
+                >
+                  <Copy size={12} /> {otlpCopied ? "Copied" : "Copy"}
+                </Button>
+              </HStack>
+              <Code
+                padding={3}
+                fontSize="xs"
+                whiteSpace="pre"
+                display="block"
+                overflowX="auto"
+              >
+                {CLAUDE_CODE_OTLP_ENV_TEMPLATE}
+              </Code>
+              <Text fontSize="xs" color="fg.muted" marginTop={2}>
+                Replace{" "}
+                <Code fontSize="xs" backgroundColor="transparent">
+                  &lt;your-org-LangWatch-ingestion-URL&gt;
+                </Code>{" "}
+                and{" "}
+                <Code fontSize="xs" backgroundColor="transparent">
+                  &lt;ingest-secret-from-admin&gt;
+                </Code>{" "}
+                with values your admin gives you. Optional: also export{" "}
+                <Code fontSize="xs" backgroundColor="transparent">
+                  OTEL_RESOURCE_ATTRIBUTES=team.id=…,cost_center=…
+                </Code>{" "}
+                for team / department slicing.
+              </Text>
+            </Box>
           )}
         </VStack>
       )}
