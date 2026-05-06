@@ -49,9 +49,9 @@ const teamA = {
   teamSlug: "team-a",
   orgId: "org_acme",
   orgName: "Acme",
+  orgSlug: "acme",
   href: "/settings/teams/team-a",
   label: "Acme Engineering",
-  subtitle: "Team I'm part of",
 };
 
 const projectFoo = {
@@ -61,9 +61,9 @@ const projectFoo = {
   teamId: "team_a",
   orgId: "org_acme",
   orgName: "Acme",
+  orgSlug: "acme",
   href: "/project-foo",
   label: "Foo Project",
-  subtitle: "Acme Engineering",
 };
 
 describe("WorkspaceSwitcher", () => {
@@ -318,9 +318,9 @@ describe("WorkspaceSwitcher", () => {
       teamSlug: "acme-default",
       orgId: "org_acme",
       orgName: "Acme",
+      orgSlug: "acme",
       href: "/settings/teams/acme-default",
       label: "Default Team",
-      subtitle: "Team I'm part of",
     };
     const teamGlobexDefault = {
       kind: "team" as const,
@@ -328,16 +328,38 @@ describe("WorkspaceSwitcher", () => {
       teamSlug: "globex-default",
       orgId: "org_globex",
       orgName: "Globex",
+      orgSlug: "globex",
       href: "/settings/teams/globex-default",
       label: "Default Team",
-      subtitle: "Team I'm part of",
+    };
+    const projectAcme = {
+      kind: "project" as const,
+      projectId: "project_acme",
+      projectSlug: "acme-project",
+      teamId: "team_acme_default",
+      orgId: "org_acme",
+      orgName: "Acme",
+      orgSlug: "acme",
+      href: "/acme-project",
+      label: "Acme Project",
+    };
+    const projectGlobex = {
+      kind: "project" as const,
+      projectId: "project_globex",
+      projectSlug: "globex-project",
+      teamId: "team_globex_default",
+      orgId: "org_globex",
+      orgName: "Globex",
+      orgSlug: "globex",
+      href: "/globex-project",
+      label: "Globex Project",
     };
 
     it("groups teams under their org name as section headers", () => {
       renderSwitcher({
         personal,
         teams: [teamAcmeDefault, teamGlobexDefault],
-        projects: [],
+        projects: [projectAcme, projectGlobex],
         current: { kind: "personal" },
       });
 
@@ -354,7 +376,7 @@ describe("WorkspaceSwitcher", () => {
       renderSwitcher({
         personal,
         teams: [teamAcmeDefault, teamGlobexDefault],
-        projects: [],
+        projects: [projectAcme, projectGlobex],
         current: { kind: "personal" },
       });
 
@@ -364,10 +386,42 @@ describe("WorkspaceSwitcher", () => {
       // orgs each org name is its own header.
       expect(screen.queryByText("Teams & projects")).not.toBeInTheDocument();
     });
+
+    it("disambiguates same-name orgs by appending the slug to the header", () => {
+      const teamAcmeAlt = {
+        ...teamAcmeDefault,
+        teamId: "team_acme_alt",
+        teamSlug: "acme-alt",
+        orgId: "org_acme_2",
+        orgName: "Acme",
+        orgSlug: "acme-2",
+      };
+      const projectAcmeAlt = {
+        ...projectAcme,
+        projectId: "project_acme_alt",
+        teamId: "team_acme_alt",
+        orgId: "org_acme_2",
+        orgName: "Acme",
+        orgSlug: "acme-2",
+        label: "Acme Alt Project",
+      };
+      renderSwitcher({
+        personal,
+        teams: [teamAcmeDefault, teamAcmeAlt],
+        projects: [projectAcme, projectAcmeAlt],
+        current: { kind: "personal" },
+      });
+
+      screen.getByRole("button", { name: /switch workspace/i }).click();
+
+      // Two orgs both named "Acme" should be distinguishable in the dropdown.
+      expect(screen.getByText("Acme · acme")).toBeInTheDocument();
+      expect(screen.getByText("Acme · acme-2")).toBeInTheDocument();
+    });
   });
 
   describe("when a user belongs to a single org", () => {
-    it("uses the generic 'Teams & projects' header (org name is redundant)", () => {
+    it("renders no section header — org context is implicit when there is only one", () => {
       renderSwitcher({
         personal,
         teams: [teamA],
@@ -377,7 +431,8 @@ describe("WorkspaceSwitcher", () => {
 
       screen.getByRole("button", { name: /switch workspace/i }).click();
 
-      expect(screen.getByText("Teams & projects")).toBeInTheDocument();
+      expect(screen.queryByText("Teams & projects")).not.toBeInTheDocument();
+      expect(screen.queryByText("Acme")).not.toBeInTheDocument();
     });
   });
 });

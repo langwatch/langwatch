@@ -27,6 +27,7 @@ export type WorkspaceSwitcherEntry =
       teamSlug: string;
       orgId: string;
       orgName: string;
+      orgSlug: string;
       href: string;
       label: string;
       subtitle?: string;
@@ -44,6 +45,7 @@ export type WorkspaceSwitcherEntry =
       teamId: string;
       orgId: string;
       orgName: string;
+      orgSlug: string;
       href: string;
       label: string;
       subtitle?: string;
@@ -167,27 +169,52 @@ export const WorkspaceSwitcher = React.memo(function WorkspaceSwitcher({
     }
   }
 
+  // Hide teams with zero projects — they're navigation dead-ends in the
+  // dropdown (clicking the team name takes you to /settings/teams/<slug>
+  // which is admin-only). Empty teams are an org-admin curiosity, not a
+  // workspace-switcher target. Re-add later if rchaves wants team-level
+  // usage as a discoverable surface.
+  const teamsWithProjects = teams.filter(
+    (team) => (projectsByTeam.get(team.teamId) ?? []).length > 0,
+  );
+
   // Group teams by org so multi-org users see clear org boundaries instead
   // of flattened lists of same-named teams from different orgs (Acme P3
-  // dogfood reproduces this). Single-org users keep the original
-  // "Teams & projects" header.
+  // dogfood reproduces this). Single-org users see no org header at all —
+  // teams flow directly under "My Workspace" since the org context is
+  // implicit. Same-name orgs are disambiguated by their slug.
   const teamsByOrg = new Map<
     string,
-    { orgName: string; teams: typeof teams }
+    { orgName: string; orgSlug: string; teams: typeof teams }
   >();
-  for (const team of teams) {
+  for (const team of teamsWithProjects) {
     const bucket =
-      teamsByOrg.get(team.orgId) ??
-      { orgName: team.orgName, teams: [] as typeof teams };
+      teamsByOrg.get(team.orgId) ?? {
+        orgName: team.orgName,
+        orgSlug: team.orgSlug,
+        teams: [] as typeof teams,
+      };
     bucket.teams.push(team);
     teamsByOrg.set(team.orgId, bucket);
   }
   const orgs = Array.from(teamsByOrg.entries()).map(([orgId, value]) => ({
     orgId,
     orgName: value.orgName,
+    orgSlug: value.orgSlug,
     teams: value.teams,
   }));
   const multipleOrgs = orgs.length > 1;
+  // Disambiguate same-name orgs: append slug to any name that appears
+  // more than once across the user's orgs. Single-org users see nothing
+  // (no header rendered for them anyway).
+  const orgNameCount = orgs.reduce<Record<string, number>>((acc, o) => {
+    acc[o.orgName] = (acc[o.orgName] ?? 0) + 1;
+    return acc;
+  }, {});
+  const orgHeader = (org: { orgName: string; orgSlug: string }) =>
+    (orgNameCount[org.orgName] ?? 0) > 1
+      ? `${org.orgName} · ${org.orgSlug}`
+      : org.orgName;
 
   return (
     <Menu.Root open={open} onOpenChange={({ open }) => setOpen(open)}>
@@ -237,7 +264,7 @@ export const WorkspaceSwitcher = React.memo(function WorkspaceSwitcher({
               {orgs.map((org) => (
                 <Group
                   key={org.orgId}
-                  title={multipleOrgs ? org.orgName : "Teams & projects"}
+                  title={multipleOrgs ? orgHeader(org) : undefined}
                 >
                   {org.teams.map((team) => {
                     const teamProjects = projectsByTeam.get(team.teamId) ?? [];
@@ -308,9 +335,19 @@ function Group({
   title,
   children,
 }: {
-  title: string;
+  title?: string;
   children: React.ReactNode;
 }) {
+  // No title → render the items inline without the ItemGroup wrapper so
+  // the section header doesn't render an empty stripe. Used for the
+  // single-org case where the org context is implicit.
+  if (!title) {
+    return (
+      <VStack gap={0} align="stretch">
+        {children}
+      </VStack>
+    );
+  }
   return (
     <Menu.ItemGroup title={title}>
       <VStack gap={0} align="stretch">
