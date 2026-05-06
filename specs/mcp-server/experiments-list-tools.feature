@@ -18,6 +18,7 @@ Feature: MCP tools for listing experiments and evaluation runs
     And the response lists each experiment slug
     And the response includes the count of runs per experiment when known
 
+  @unimplemented
   Scenario: Limit caps the number of experiments returned
     Given the project owns 60 experiments
     When the agent invokes platform_experiment_list with limit 10
@@ -32,6 +33,7 @@ Feature: MCP tools for listing experiments and evaluation runs
   # platform_evaluation_list_runs
   # ==========================================================================
 
+  @unimplemented
   Scenario: Listing runs requires experimentSlug
     When the agent invokes platform_evaluation_list_runs without experimentSlug
     Then the call fails with a validation error mentioning "experimentSlug"

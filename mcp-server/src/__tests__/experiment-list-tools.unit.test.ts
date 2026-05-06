@@ -21,6 +21,7 @@ describe("handleExperimentList()", () => {
 
   describe("given experiments exist", () => {
     describe("when invoked with default limit", () => {
+      /** @scenario "Lists experiments as markdown" */
       it("renders a markdown table with each slug", async () => {
         mockMakeRequest.mockResolvedValueOnce({
           experiments: [
@@ -52,6 +53,7 @@ describe("handleExperimentList()", () => {
     });
 
     describe("when invoked with limit above the cap", () => {
+      /** @scenario "Limit is bounded to protect agent context" */
       it("clamps the effective pageSize to 100", async () => {
         mockMakeRequest.mockResolvedValueOnce({
           experiments: [],
@@ -86,6 +88,7 @@ describe("handleEvaluationListRuns()", () => {
 
   describe("given a known experiment with runs", () => {
     describe("when invoked", () => {
+      /** @scenario "Lists runs for a known experiment" */
       it("renders a markdown table with each runId", async () => {
         mockMakeRequest.mockResolvedValueOnce({
           experimentId: "exp_1",
@@ -118,6 +121,7 @@ describe("handleEvaluationListRuns()", () => {
 
   describe("given the experiment slug is unknown", () => {
     describe("when the API throws 404", () => {
+      /** @scenario "Unknown experiment slug returns a graceful not-found message" */
       it("returns a graceful not-found message suggesting platform_experiment_list", async () => {
         mockMakeRequest.mockRejectedValueOnce(
           new Error("LangWatch API error 404: experiment not found"),

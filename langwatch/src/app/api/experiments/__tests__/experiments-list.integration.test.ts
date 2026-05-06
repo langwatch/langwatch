@@ -47,6 +47,7 @@ describe.skipIf(process.env.CI)("GET /api/experiments", () => {
 
   describe("given no api key is provided", () => {
     describe("when calling the endpoint", () => {
+      /** @scenario "Unauthenticated request returns 401" */
       it("rejects with 401", async () => {
         const response = await fetch(`${getBaseUrl()}/api/experiments`);
         expect(response.status).toBe(401);
@@ -56,6 +57,7 @@ describe.skipIf(process.env.CI)("GET /api/experiments", () => {
 
   describe("given a valid api key", () => {
     describe("when calling the endpoint", () => {
+      /** @scenario "Authenticated request lists experiments scoped to the project" */
       it("returns 200 with the project's experiments", async () => {
         const response = await fetch(`${getBaseUrl()}/api/experiments`, {
           headers: { "X-Auth-Token": project.apiKey },
@@ -91,6 +93,7 @@ describe.skipIf(process.env.CI)("GET /api/experiments", () => {
     });
 
     describe("when paginating with pageSize=2", () => {
+      /** @scenario "Pagination returns the requested page" */
       it("returns at most 2 entries and reports hasMore correctly", async () => {
         const response = await fetch(
           `${getBaseUrl()}/api/experiments?pageSize=2&page=1`,

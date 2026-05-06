@@ -67,6 +67,7 @@ describe("experimentListCommand()", () => {
 
   describe("given the project owns experiments", () => {
     describe("when format is json", () => {
+      /** @scenario "JSON format dumps the raw payload" */
       it("emits the raw payload", async () => {
         mockListExperiments.mockResolvedValue({
           experiments: [
@@ -97,6 +98,7 @@ describe("experimentListCommand()", () => {
     });
 
     describe("when format is table", () => {
+      /** @scenario "Listing experiments prints a table by default" */
       it("renders rows including the slug", async () => {
         mockListExperiments.mockResolvedValue({
           experiments: [

@@ -71,6 +71,7 @@ describe("evaluationListRunsCommand()", () => {
 
   describe("given no --experiment flag", () => {
     describe("when invoked", () => {
+      /** @scenario "Listing runs requires --experiment" */
       it("exits with non-zero code", async () => {
         await expect(evaluationListRunsCommand({})).rejects.toBeInstanceOf(
           ProcessExitError,
@@ -81,6 +82,7 @@ describe("evaluationListRunsCommand()", () => {
 
   describe("given an experiment slug with runs", () => {
     describe("when format is json", () => {
+      /** @scenario "JSON format on runs dumps the raw payload" */
       it("emits the raw payload as JSON", async () => {
         const payload = {
           experimentId: "exp_1",
@@ -118,6 +120,7 @@ describe("evaluationListRunsCommand()", () => {
     });
 
     describe("when format is table", () => {
+      /** @scenario "Listing runs prints a table for a known slug" */
       it("includes the run id in stdout", async () => {
         mockListRuns.mockResolvedValue({
           experimentId: "exp_1",

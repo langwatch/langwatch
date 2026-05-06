@@ -24,12 +24,14 @@ Feature: List experiments and evaluation runs from the LangWatch CLI
     And the output is valid JSON
     And each entry has "id", "slug", "name", "type"
 
+  @unimplemented
   Scenario: Limit caps the number of rows shown
     Given the project owns 30 experiments
     When I run "langwatch experiment list --limit 5"
     Then the exit code is 0
     And at most 5 experiment rows are printed
 
+  @unimplemented
   Scenario: Missing API key prints a friendly error
     Given LANGWATCH_API_KEY is not set
     When I run "langwatch experiment list"
@@ -57,6 +59,7 @@ Feature: List experiments and evaluation runs from the LangWatch CLI
     Then the exit code is 0
     And the output is valid JSON
 
+  @unimplemented
   Scenario: Unknown experiment slug exits non-zero with a 404 message
     When I run "langwatch evaluation list-runs --experiment does-not-exist"
     Then the exit code is non-zero

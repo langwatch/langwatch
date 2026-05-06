@@ -43,6 +43,7 @@ describe.skipIf(process.env.CI)("GET /api/evaluations/v3/runs", () => {
 
   describe("given no api key is provided", () => {
     describe("when calling the endpoint", () => {
+      /** @scenario "Unauthenticated runs request returns 401" */
       it("rejects with 401", async () => {
         const response = await fetch(
           `${getBaseUrl()}/api/evaluations/v3/runs?experimentSlug=${testSlug}`,
@@ -54,6 +55,7 @@ describe.skipIf(process.env.CI)("GET /api/evaluations/v3/runs", () => {
 
   describe("given a valid api key", () => {
     describe("when experimentSlug is missing", () => {
+      /** @scenario "Missing experimentSlug returns 400" */
       it("rejects with 400", async () => {
         const response = await fetch(
           `${getBaseUrl()}/api/evaluations/v3/runs`,
@@ -66,6 +68,7 @@ describe.skipIf(process.env.CI)("GET /api/evaluations/v3/runs", () => {
     });
 
     describe("when the experiment slug is unknown", () => {
+      /** @scenario "Unknown experiment slug returns 404" */
       it("returns 404", async () => {
         const response = await fetch(
           `${getBaseUrl()}/api/evaluations/v3/runs?experimentSlug=does-not-exist-${Date.now()}`,
@@ -76,6 +79,8 @@ describe.skipIf(process.env.CI)("GET /api/evaluations/v3/runs", () => {
     });
 
     describe("when the experiment exists", () => {
+      /** @scenario "Authenticated request returns runs for the experiment" */
+      /** @scenario "Experiment without runs returns an empty list" */
       it("returns 200 with a runs array (possibly empty)", async () => {
         const response = await fetch(
           `${getBaseUrl()}/api/evaluations/v3/runs?experimentSlug=${testSlug}`,
