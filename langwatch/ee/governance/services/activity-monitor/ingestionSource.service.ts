@@ -33,6 +33,7 @@ import { ensureHiddenGovernanceProject } from "@ee/governance/services/governanc
 
 export type SourceType =
   | "otel_generic"
+  | "claude_code"
   | "claude_cowork"
   | "workato"
   | "copilot_studio"
@@ -43,6 +44,7 @@ export type SourceType =
 
 export const SUPPORTED_SOURCE_TYPES: readonly SourceType[] = [
   "otel_generic",
+  "claude_code",
   "claude_cowork",
   "workato",
   "copilot_studio",

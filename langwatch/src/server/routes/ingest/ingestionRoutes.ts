@@ -259,9 +259,17 @@ app.post("/otel/:sourceId", async (c: Context) => {
   if (sourceId !== source.id) {
     return c.json({ error: "unauthorized" }, 401);
   }
-  if (source.sourceType !== "otel_generic" && source.sourceType !== "claude_cowork") {
+  if (
+    source.sourceType !== "otel_generic" &&
+    source.sourceType !== "claude_cowork" &&
+    source.sourceType !== "claude_code"
+  ) {
     return c.json(
-      { error: "wrong_endpoint", error_description: "OTLP path is only valid for otel_generic and claude_cowork sources" },
+      {
+        error: "wrong_endpoint",
+        error_description:
+          "OTLP path is only valid for otel_generic, claude_cowork, and claude_code sources",
+      },
       400,
     );
   }

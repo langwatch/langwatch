@@ -60,6 +60,7 @@ import { api, type RouterOutputs } from "~/utils/api";
 type Source = RouterOutputs["ingestionSources"]["list"][number];
 type SourceType =
   | "otel_generic"
+  | "claude_code"
   | "claude_cowork"
   | "workato"
   | "copilot_studio"
@@ -80,6 +81,13 @@ const SOURCE_TYPE_OPTIONS: Array<{
     mode: "push",
     blurb:
       "Anything that speaks OTLP/HTTP. Simplest setup — paste an OTLP URL + bearer token into the upstream agent's exporter config.",
+  },
+  {
+    value: "claude_code",
+    label: "Claude Code (Anthropic OAuth)",
+    mode: "push",
+    blurb:
+      "Native OTLP from Anthropic's Claude Code (the standalone CLI authed against an OAuth seat — distinct from the Cowork workspace path). Cost lands as a first-class signal via the claude_code.cost.usage metric + per-request claude_code.api_request events; no token-catalog lookup needed. Admins paste the bare endpoint into Claude Code's OTEL_EXPORTER_OTLP_ENDPOINT and the SDK suffixes /v1/logs and /v1/metrics itself.",
   },
   {
     value: "claude_cowork",
@@ -1168,8 +1176,28 @@ function SecretModal({
     : "";
   const usesPushUrl =
     details?.sourceType === "otel_generic" ||
-    details?.sourceType === "claude_cowork";
+    details?.sourceType === "claude_cowork" ||
+    details?.sourceType === "claude_code";
   const usesWebhookUrl = details?.sourceType === "workato";
+  const isClaudeCode = details?.sourceType === "claude_code";
+
+  // Claude Code's monitoring-usage doc requires both
+  // CLAUDE_CODE_ENABLE_TELEMETRY=1 and the standard OTEL_*_EXPORTER
+  // env vars before any signals are emitted. Pre-build the shell
+  // export block so admins paste once instead of stitching six lines
+  // off the docs page. SDK suffixes /v1/logs + /v1/metrics off the
+  // base endpoint.
+  const claudeCodeEnvBlock = useMemo(() => {
+    if (!isClaudeCode || !details) return "";
+    return [
+      `export CLAUDE_CODE_ENABLE_TELEMETRY=1`,
+      `export OTEL_LOGS_EXPORTER=otlp`,
+      `export OTEL_METRICS_EXPORTER=otlp`,
+      `export OTEL_EXPORTER_OTLP_PROTOCOL=http/json`,
+      `export OTEL_EXPORTER_OTLP_ENDPOINT="${otlpUrl}"`,
+      `export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer ${details.secret}"`,
+    ].join("\n");
+  }, [isClaudeCode, details, otlpUrl]);
 
   // F-OTEL-3 (Sergey draft): a copy-paste curl that exercises the full
   // happy path — body parses, attribute parser sees the canonical
@@ -1367,6 +1395,52 @@ function SecretModal({
                     <Copy size={14} />
                   </Button>
                 </HStack>
+              </VStack>
+            )}
+            {isClaudeCode && (
+              <VStack align="stretch" gap={1}>
+                <HStack justify="space-between" alignItems="center">
+                  <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
+                    Claude Code shell env block
+                  </Text>
+                  <Button
+                    size="xs"
+                    variant="outline"
+                    onClick={() => copy(claudeCodeEnvBlock)}
+                  >
+                    <Copy size={12} /> Copy block
+                  </Button>
+                </HStack>
+                <Code
+                  padding={3}
+                  fontSize="xs"
+                  whiteSpace="pre"
+                  display="block"
+                  overflowX="auto"
+                >
+                  {claudeCodeEnvBlock}
+                </Code>
+                <Text fontSize="xs" color="fg.muted">
+                  Paste into your Claude Code shell, then run{" "}
+                  <Code fontSize="xs" backgroundColor="transparent">
+                    claude
+                  </Code>
+                  . Claude Code&apos;s SDK appends{" "}
+                  <Code fontSize="xs" backgroundColor="transparent">
+                    /v1/logs
+                  </Code>{" "}
+                  and{" "}
+                  <Code fontSize="xs" backgroundColor="transparent">
+                    /v1/metrics
+                  </Code>{" "}
+                  itself off the base endpoint. To attribute spend to a
+                  specific team or cost center, also export{" "}
+                  <Code fontSize="xs" backgroundColor="transparent">
+                    OTEL_RESOURCE_ATTRIBUTES=team.id=…,cost_center=…
+                  </Code>
+                  {" "}— those land as resource attributes and slot into
+                  /governance&apos;s spendByTeam without further config.
+                </Text>
               </VStack>
             )}
             {testCurl && (

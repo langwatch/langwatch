@@ -636,8 +636,29 @@ function SecretRevealModal({
   const otlpUrl = `${baseUrl}/api/ingest/otel/${sourceId}`;
   const webhookUrl = `${baseUrl}/api/ingest/webhook/${sourceId}`;
   const usesPushUrl =
-    sourceType === "otel_generic" || sourceType === "claude_cowork";
+    sourceType === "otel_generic" ||
+    sourceType === "claude_cowork" ||
+    sourceType === "claude_code";
   const usesWebhookUrl = sourceType === "workato";
+  const isClaudeCode = sourceType === "claude_code";
+
+  // Claude Code's monitoring-usage doc requires both
+  // CLAUDE_CODE_ENABLE_TELEMETRY=1 and the standard OTEL_*_EXPORTER
+  // env vars before any signals are emitted. Pre-build the shell
+  // export block so admins paste once instead of stitching six lines
+  // off the docs page. SDK suffixes /v1/logs + /v1/metrics off the
+  // base endpoint (Ariana's 2026-05-06 capture confirmed the
+  // SDK-side suffixing — admins paste the bare base).
+  const claudeCodeEnvBlock = isClaudeCode
+    ? [
+        `export CLAUDE_CODE_ENABLE_TELEMETRY=1`,
+        `export OTEL_LOGS_EXPORTER=otlp`,
+        `export OTEL_METRICS_EXPORTER=otlp`,
+        `export OTEL_EXPORTER_OTLP_PROTOCOL=http/json`,
+        `export OTEL_EXPORTER_OTLP_ENDPOINT="${otlpUrl}"`,
+        `export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer ${details.secret}"`,
+      ].join("\n")
+    : "";
 
   const copy = (value: string) => {
     void navigator.clipboard?.writeText(value);
@@ -701,6 +722,64 @@ function SecretRevealModal({
                 <Code padding={2} fontSize="xs">
                   {otlpUrl}
                 </Code>
+                {isClaudeCode && (
+                  <Text fontSize="xs" color="fg.muted">
+                    Paste this URL into Claude Code&apos;s
+                    {" "}
+                    <Code fontSize="xs" backgroundColor="transparent">
+                      OTEL_EXPORTER_OTLP_ENDPOINT
+                    </Code>
+                    {" "}— Claude Code&apos;s SDK appends
+                    {" "}
+                    <Code fontSize="xs" backgroundColor="transparent">
+                      /v1/logs
+                    </Code>
+                    {" "}and
+                    {" "}
+                    <Code fontSize="xs" backgroundColor="transparent">
+                      /v1/metrics
+                    </Code>
+                    {" "}itself.
+                  </Text>
+                )}
+              </VStack>
+            )}
+            {isClaudeCode && (
+              <VStack align="stretch" gap={1}>
+                <HStack justify="space-between" alignItems="center">
+                  <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
+                    Claude Code shell env block
+                  </Text>
+                  <Button
+                    size="xs"
+                    variant="outline"
+                    onClick={() => copy(claudeCodeEnvBlock)}
+                  >
+                    <Copy size={12} /> Copy block
+                  </Button>
+                </HStack>
+                <Code
+                  padding={3}
+                  fontSize="xs"
+                  whiteSpace="pre"
+                  display="block"
+                  overflowX="auto"
+                >
+                  {claudeCodeEnvBlock}
+                </Code>
+                <Text fontSize="xs" color="fg.muted">
+                  Paste in your Claude Code shell, then run{" "}
+                  <Code fontSize="xs" backgroundColor="transparent">
+                    claude
+                  </Code>
+                  . To attribute spend to a specific team or cost center,
+                  also export{" "}
+                  <Code fontSize="xs" backgroundColor="transparent">
+                    OTEL_RESOURCE_ATTRIBUTES=team.id=…,cost_center=…
+                  </Code>
+                  {" "}— those land as resource attributes and slot into
+                  /governance&apos;s spendByTeam without further config.
+                </Text>
               </VStack>
             )}
             {usesWebhookUrl && (
