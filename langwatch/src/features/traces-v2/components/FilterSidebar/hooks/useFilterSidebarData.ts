@@ -22,6 +22,7 @@ import {
   SPAN_ATTRIBUTES_SECTION_KEY,
   VIBRANT_FIELDS,
 } from "../constants";
+import { routeToggleViaOrGroups } from "../routeToggleViaOrGroups";
 import type {
   AttributeKey,
   AttributesSectionData,
@@ -45,32 +46,25 @@ export function useFilterSidebarData() {
   // distinguish themselves on the rail.
   const orAnalysisRaw = useMemo(() => analyzeOrGroups(ast), [ast]);
 
-  // Translate the sidebar's `modifierKey` modifier (raised when the user
-  // holds Shift / Ctrl / Cmd while clicking a facet row) into the
-  // store's `combinator` option. Also auto-detect when the toggled
-  // field already participates in an OR group: a fresh value goes into
-  // *that* group via `orGroupLocation` instead of opening a new
-  // top-level OR scope. The user holds modifier only when they want to
-  // start a new OR scope across unrelated facets.
+  // Translate the sidebar's `modifierKey` modifier (raised when the
+  // user holds Shift / Ctrl / Cmd while clicking a facet row) into
+  // the store's `combinator`/`orGroupLocation` options. The actual
+  // routing rules live in `routeToggleViaOrGroups` so they can be
+  // unit-tested without rendering the sidebar — this hook is just the
+  // glue that hands the analysis + field to the helper and forwards
+  // the result.
   const toggleFacet = useCallback(
     (
       field: string,
       value: string,
       options?: { modifierKey?: boolean },
     ) => {
-      // A field can legitimately be in multiple disjoint OR groups; the
-      // first group is the most natural target for "extend this group".
-      const groupIds = orAnalysisRaw.fieldToGroupIds.get(field);
-      const groupId = groupIds?.[0];
-      const group = groupId
-        ? orAnalysisRaw.groups.find((g) => g.id === groupId)
-        : undefined;
-      storeToggleFacet(field, value, {
-        combinator: options?.modifierKey ? "OR" : "AND",
-        orGroupLocation: group
-          ? { start: group.start, end: group.end }
-          : undefined,
+      const routing = routeToggleViaOrGroups({
+        analysis: orAnalysisRaw,
+        field,
+        modifierKey: options?.modifierKey ?? false,
       });
+      storeToggleFacet(field, value, routing);
     },
     [storeToggleFacet, orAnalysisRaw],
   );

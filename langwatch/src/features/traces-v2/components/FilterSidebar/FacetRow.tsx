@@ -3,6 +3,7 @@ import { memo, useCallback } from "react";
 import { analyzeOrGroups } from "~/server/app-layer/traces/query-language/queries";
 import { useFacetHoverStore } from "../../stores/facetHoverStore";
 import { useFilterStore } from "../../stores/filterStore";
+import { orGroupColor } from "./orGroupPalette";
 import { RowButton } from "./RowButton";
 import type { FacetItem, FacetValueState } from "./types";
 import { formatCount, paletteFromColor } from "./utils";
@@ -16,25 +17,6 @@ function parseTypedLabel(label: string): { typeTag?: string; text: string } {
 }
 
 const MIN_VISIBLE_FILL_PCT = 4;
-
-// Mirror of SidebarSection's hash → palette so OR-group rings here use
-// the same colour as their section header. Six well-spaced pastel hues.
-const OR_GROUP_PALETTE = [
-  "purple",
-  "teal",
-  "pink",
-  "yellow",
-  "cyan",
-  "green",
-] as const;
-
-function orGroupColor(id: string): (typeof OR_GROUP_PALETTE)[number] {
-  let h = 0;
-  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) | 0;
-  return OR_GROUP_PALETTE[
-    Math.abs(h) % OR_GROUP_PALETTE.length
-  ] as (typeof OR_GROUP_PALETTE)[number];
-}
 
 export const FacetRow = memo(function FacetRow({
   item,

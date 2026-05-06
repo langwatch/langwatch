@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { escapeCssAttributeValue as escape } from "../OrConnectorOverlay";
+import { escapeCssAttributeValue as escape } from "../HoverHighlightStyle";
 
 /**
  * The escape function is the only thing standing between a malformed

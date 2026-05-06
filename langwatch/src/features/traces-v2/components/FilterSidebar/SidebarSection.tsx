@@ -10,6 +10,7 @@ import {
 import { ChevronDown, ChevronUp, GripVertical } from "lucide-react";
 import type React from "react";
 import { useState } from "react";
+import { orGroupColor } from "./orGroupPalette";
 
 interface SidebarSectionProps {
   title: string;
@@ -54,28 +55,6 @@ interface SidebarSectionProps {
    */
   pinnedContent?: React.ReactNode;
   children: React.ReactNode;
-}
-
-/**
- * Six well-spaced pastel hues. Index by a hash of the group id so a
- * stable colour follows a given OR group across renders, and multiple
- * concurrent OR groups stay visually distinct.
- */
-const OR_GROUP_PALETTE = [
-  "purple",
-  "teal",
-  "pink",
-  "yellow",
-  "cyan",
-  "green",
-] as const;
-
-function orGroupColor(id: string): (typeof OR_GROUP_PALETTE)[number] {
-  let h = 0;
-  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) | 0;
-  return OR_GROUP_PALETTE[
-    Math.abs(h) % OR_GROUP_PALETTE.length
-  ] as (typeof OR_GROUP_PALETTE)[number];
 }
 
 const DRAG_HANDLE_HIT_AREA = "16px";

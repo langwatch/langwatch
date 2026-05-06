@@ -1,33 +1,18 @@
 import { Box } from "@chakra-ui/react";
 import type React from "react";
-import { useEffect, useLayoutEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import type { OrGroup } from "~/server/app-layer/traces/query-language/queries";
 import { useFacetHoverStore } from "../../stores/facetHoverStore";
+import { ConnectorTooltip } from "./ConnectorTooltip";
+import { HoverHighlightStyle } from "./HoverHighlightStyle";
+import {
+  type OrGroupPaletteColor,
+  orGroupColor,
+} from "./orGroupPalette";
 
 const LANE_WIDTH = 14;
 const LINE_THICKNESS = 2;
 const HIT_AREA_WIDTH = 10;
-
-/**
- * Six well-spaced pastel hues — must match the palette in
- * `SidebarSection` so a group's pill and connector line share a colour.
- */
-const OR_GROUP_PALETTE = [
-  "purple",
-  "teal",
-  "pink",
-  "yellow",
-  "cyan",
-  "green",
-] as const;
-
-function orGroupColor(id: string): (typeof OR_GROUP_PALETTE)[number] {
-  let h = 0;
-  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) | 0;
-  return OR_GROUP_PALETTE[
-    Math.abs(h) % OR_GROUP_PALETTE.length
-  ] as (typeof OR_GROUP_PALETTE)[number];
-}
 
 export const ConnectorLaneWidth = LANE_WIDTH;
 
@@ -45,7 +30,7 @@ interface OrConnectorOverlayProps {
 
 interface LineGeometry {
   groupId: string;
-  palette: (typeof OR_GROUP_PALETTE)[number];
+  palette: OrGroupPaletteColor;
   laneIndex: number;
   topY: number;
   bottomY: number;
@@ -81,8 +66,14 @@ export const OrConnectorOverlay: React.FC<OrConnectorOverlayProps> = ({
   const hoveredFacet = useFacetHoverStore((s) => s.hoveredFacet);
 
   // Stable lane assignment: sort groups by id so the lane index for a
-  // given group doesn't shuffle between renders.
-  const sortedGroups = [...groups].sort((a, b) => a.id.localeCompare(b.id));
+  // given group doesn't shuffle between renders. Memoised so downstream
+  // consumers (the layout effect, the JSX render loop, the overlay
+  // width calc) all see the same array reference unless `groups` itself
+  // actually changes.
+  const sortedGroups = useMemo(
+    () => [...groups].sort((a, b) => a.id.localeCompare(b.id)),
+    [groups],
+  );
 
   const recompute = (): void => {
     const container = containerRef.current;
@@ -204,137 +195,5 @@ export const OrConnectorOverlay: React.FC<OrConnectorOverlayProps> = ({
         ) : null;
       })()}
     </>
-  );
-};
-
-/**
- * Escape characters that would break a CSS attribute-value string.
- * Backslashes must be escaped first (otherwise the subsequent
- * double-quote escape's own backslash would be re-escaped). Newlines
- * and carriage returns are illegal in CSS strings without the `\A `
- * form. Without this, user-controlled facet values with `\` or
- * line-breaks could break the selector or inject CSS. Exported so a
- * unit test can hammer it with hostile inputs (`</style>`, NUL bytes,
- * the escape sequences themselves) — the escape function is the only
- * thing standing between a malformed search query and arbitrary CSS
- * injection on the page.
- */
-export function escapeCssAttributeValue(s: string): string {
-  return s
-    .replace(/\\/g, "\\\\")
-    .replace(/"/g, '\\"')
-    .replace(/\n/g, "\\A ")
-    .replace(/\r/g, "\\D ");
-}
-
-const HoverHighlightStyle: React.FC<{
-  group: OrGroup | null;
-  facet: { field: string; value: string } | null;
-}> = ({ group, facet }) => {
-  if (!group && !facet) return null;
-  const palette = group ? orGroupColor(group.id) : "blue";
-  const escape = escapeCssAttributeValue;
-  const memberSelectors: string[] = [];
-  if (group) {
-    for (const m of group.members) {
-      // Match both the search-bar chip span (data-filter-chip-*) and
-      // the sidebar row (data-facet-field + data-facet-value). One
-      // style block lights up everything that participates.
-      memberSelectors.push(
-        `[data-filter-chip-field="${escape(m.field)}"][data-filter-chip-value="${escape(m.value)}"]`,
-        `[data-facet-field="${escape(m.field)}"][data-facet-value="${escape(m.value)}"]`,
-      );
-    }
-  } else if (facet) {
-    memberSelectors.push(
-      `[data-filter-chip-field="${escape(facet.field)}"][data-filter-chip-value="${escape(facet.value)}"]`,
-      `[data-facet-field="${escape(facet.field)}"][data-facet-value="${escape(facet.value)}"]`,
-    );
-  }
-  if (memberSelectors.length === 0) return null;
-  // Background-fill highlight rather than outline. Outlines were
-  // getting clipped by parent overflow:hidden (TipTap renders chips
-  // inside a contained scroll area) and even when visible they read
-  // as a debug ring rather than a confident highlight. The fill ties
-  // the chip + sidebar row visually to the OR group's pill colour:
-  // same `subtle` background, same `fg` text colour, same `muted`
-  // border. `border-radius: inherit` lets the highlight take on
-  // whatever shape the chip already has, so it never spills outside
-  // a rounded chip into the surrounding text.
-  return (
-    <style>{`
-      ${memberSelectors.join(",\n      ")} {
-        background-color: var(--chakra-colors-${palette}-subtle) !important;
-        color: var(--chakra-colors-${palette}-fg) !important;
-        border-color: var(--chakra-colors-${palette}-muted) !important;
-        transition: background-color 100ms ease, color 100ms ease;
-      }
-    `}</style>
-  );
-};
-
-const TOOLTIP_WIDTH = 240;
-const ConnectorTooltip: React.FC<{
-  group: OrGroup;
-  pos: { x: number; y: number };
-}> = ({ group, pos }) => {
-  const palette = orGroupColor(group.id);
-  // Anchor just to the right of the cursor — the connector line lives
-  // on the sidebar's right edge so there's always space in the
-  // adjacent results pane. Clamp against the viewport edges so a
-  // bottom-near-edge hover doesn't push the body offscreen.
-  const top = Math.min(
-    window.innerHeight - 80,
-    Math.max(8, pos.y + 8),
-  );
-  const left = Math.min(
-    window.innerWidth - TOOLTIP_WIDTH - 8,
-    pos.x + 12,
-  );
-  return (
-    <Box
-      position="fixed"
-      top={`${top}px`}
-      left={`${left}px`}
-      width={`${TOOLTIP_WIDTH}px`}
-      maxWidth={`${TOOLTIP_WIDTH}px`}
-      bg="bg.panel"
-      borderWidth="1px"
-      borderColor={`${palette}.muted`}
-      borderRadius="md"
-      paddingX={2.5}
-      paddingY={1.5}
-      boxShadow="md"
-      pointerEvents="none"
-      zIndex={2100}
-    >
-      <Box
-        fontSize="2xs"
-        color="fg.muted"
-        fontWeight="600"
-        letterSpacing="0.04em"
-        textTransform="uppercase"
-        mb={1}
-      >
-        Linked by OR
-      </Box>
-      <Box fontSize="xs" fontFamily="mono" lineHeight="1.5">
-        {group.members.map((m, i) => (
-          <Box key={i}>
-            {m.negated && (
-              <Box as="span" color={`${palette}.fg`} fontWeight="600">
-                NOT&nbsp;
-              </Box>
-            )}
-            <Box as="span" color="fg.muted">
-              {m.field}:
-            </Box>
-            <Box as="span" color="fg" fontWeight="500">
-              {m.value}
-            </Box>
-          </Box>
-        ))}
-      </Box>
-    </Box>
   );
 };
