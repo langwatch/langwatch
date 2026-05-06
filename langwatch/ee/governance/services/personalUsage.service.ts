@@ -28,7 +28,10 @@
  */
 import type { ClickHouseClient } from "@clickhouse/client";
 
-import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
+import {
+  getClickHouseClientForProject,
+  isClickHouseEnabled,
+} from "~/server/clickhouse/clickhouseClient";
 import { ANALYTICS_CLICKHOUSE_SETTINGS } from "~/server/analytics/clickhouse/clickhouse-analytics.service";
 
 export interface PersonalUsageWindow {
@@ -73,7 +76,40 @@ export interface PersonalUsageQueryInput {
   personalProjectId: string;
   /** Defaults to start-of-current-month → now if omitted. */
   window?: PersonalUsageWindow;
+  /**
+   * Owner's userId. When supplied, the service unions in any
+   * gateway_budget_ledger_events written under PRINCIPAL scope for
+   * this user — picks up Claude Code OTLP / other ingestion-source
+   * traffic that lands under the hidden Governance Project tenant
+   * rather than the user's personal-project tenant. Without it,
+   * summaries / buckets / breakdowns reflect only gateway-VK traffic.
+   */
+  userId?: string;
 }
+
+/**
+ * gateway_budget_ledger_events schema — captured here so callers
+ * outside the budget repository can reason about it.
+ *
+ * Receivers (gateway VK fold + claude_code OTLP receiver) write one
+ * row per (request, applicable budget). The ReplacingMergeTree
+ * collapses replays on (TenantId, BudgetId, GatewayRequestId).
+ *
+ *   TenantId: hidden Governance Project id (for ingestion sources) or
+ *             the trace's tenantId (for gateway VKs).
+ *   Scope:    one of ORGANIZATION / TEAM / PROJECT / VIRTUAL_KEY /
+ *             PRINCIPAL — matches the budget that was applicable.
+ *   ScopeId:  the budget's scopeId (org/team/project/vk id, or for
+ *             PRINCIPAL the User.id).
+ *   AmountUSD, TokensInput, TokensOutput, Model, OccurredAt, etc.
+ *
+ * Personal-usage queries pin Scope='PRINCIPAL' AND ScopeId=userId so
+ * we get exactly the per-user ledger rows. Multi-budget events show
+ * up multiple times across scope rows (one row per applicable budget),
+ * but the Scope/ScopeId pair narrows to the user's principal slice
+ * cleanly.
+ */
+const PRINCIPAL_SCOPE = "PRINCIPAL";
 
 export class PersonalUsageService {
   /**
@@ -96,17 +132,53 @@ export class PersonalUsageService {
       window,
     });
 
+    // Ingestion-source events (Claude Code OTLP, etc.) land under the
+    // hidden governance project tenant, NOT the user's personal
+    // project — so the trace_summaries query above misses them. Pull
+    // per-principal ledger rows and merge.
+    const ingestion = input.userId
+      ? await this.queryIngestionPrincipalSummary(client, {
+          userId: input.userId,
+          window,
+        })
+      : null;
+
+    const totalCost = summaryRow.totalCost + (ingestion?.totalCost ?? 0);
+    const totalRequests =
+      summaryRow.requestCount + (ingestion?.requestCount ?? 0);
+    const totalPromptTokens =
+      summaryRow.promptTokens + (ingestion?.promptTokens ?? 0);
+    const totalCompletionTokens =
+      summaryRow.completionTokens + (ingestion?.completionTokens ?? 0);
+
+    // Most-used model: prefer the larger requestCount source
+    // (gateway-VK vs ingestion). When both have data, pick the one
+    // contributing more requests to the user's total. Recompute
+    // usagePct against the merged total so the percentage reflects
+    // the union, not just the per-source slice.
+    let mergedTopModel: { name: string; requests: number } | null = null;
+    if (topModel && summaryRow.requestCount > 0) {
+      mergedTopModel = { name: topModel.model, requests: topModel.requests };
+    }
+    if (
+      ingestion?.topModel &&
+      (!mergedTopModel ||
+        ingestion.topModel.requests > mergedTopModel.requests)
+    ) {
+      mergedTopModel = ingestion.topModel;
+    }
+
     return {
-      spentUsd: summaryRow.totalCost,
-      requests: summaryRow.requestCount,
-      promptTokens: summaryRow.promptTokens,
-      completionTokens: summaryRow.completionTokens,
+      spentUsd: totalCost,
+      requests: totalRequests,
+      promptTokens: totalPromptTokens,
+      completionTokens: totalCompletionTokens,
       mostUsedModel:
-        topModel && summaryRow.requestCount > 0
+        mergedTopModel && totalRequests > 0
           ? {
-              name: topModel.model,
+              name: mergedTopModel.name,
               usagePct: Math.round(
-                (topModel.requests / summaryRow.requestCount) * 100,
+                (mergedTopModel.requests / totalRequests) * 100,
               ),
             }
           : null,
@@ -162,7 +234,62 @@ export class PersonalUsageService {
       byDay.set(r.Day, existing);
     }
 
+    // Ingestion-source ledger union: per-day spend for the user's
+    // PRINCIPAL-scope rows, merged into the same byDay map.
+    if (input.userId) {
+      const ledgerBuckets = await this.queryIngestionPrincipalBuckets(client, {
+        userId: input.userId,
+        window,
+      });
+      for (const r of ledgerBuckets) {
+        const existing = byDay.get(r.day) ?? { spentUsd: 0, requests: 0 };
+        existing.spentUsd += r.spentUsd;
+        existing.requests += r.requests;
+        byDay.set(r.day, existing);
+      }
+    }
+
     return fillEmptyBuckets(window, byDay);
+  }
+
+  private async queryIngestionPrincipalBuckets(
+    client: ClickHouseClient,
+    params: { userId: string; window: PersonalUsageWindow },
+  ): Promise<PersonalUsageBucket[]> {
+    if (!isClickHouseEnabled()) return [];
+    try {
+      const result = await client.query({
+        query: `
+          SELECT
+            toDate(OccurredAt) AS Day,
+            sum(AmountUSD)     AS SpentUsd,
+            countDistinct(GatewayRequestId) AS Requests
+          FROM gateway_budget_ledger_events
+          WHERE Scope = 'PRINCIPAL'
+            AND ScopeId = {userId:String}
+            AND OccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64})
+            AND OccurredAt <  fromUnixTimestamp64Milli({toMs:Int64})
+          GROUP BY Day
+          ORDER BY Day
+          SETTINGS ${formatSettings(ANALYTICS_CLICKHOUSE_SETTINGS)}
+        `,
+        query_params: {
+          userId: params.userId,
+          fromMs: params.window.start.getTime(),
+          toMs: params.window.end.getTime(),
+        },
+        format: "JSONEachRow",
+      });
+      type Raw = { Day: string; SpentUsd: number; Requests: number };
+      const rows = (await result.json()) as Raw[];
+      return rows.map((r) => ({
+        day: r.Day,
+        spentUsd: Number(r.SpentUsd) || 0,
+        requests: Number(r.Requests) || 0,
+      }));
+    } catch {
+      return [];
+    }
   }
 
   /**
@@ -234,9 +361,69 @@ export class PersonalUsageService {
       existing.requests += Number(r.Requests) || 0;
       aggregated.set(r.Model, existing);
     }
+
+    // Ingestion-source ledger union: per-model spend for the user's
+    // PRINCIPAL-scope rows, merged into the same map.
+    if (input.userId) {
+      const ledgerBreakdown = await this.queryIngestionPrincipalBreakdown(
+        client,
+        { userId: input.userId, window },
+      );
+      for (const r of ledgerBreakdown) {
+        const existing = aggregated.get(r.label) ?? {
+          label: r.label,
+          spentUsd: 0,
+          requests: 0,
+        };
+        existing.spentUsd += r.spentUsd;
+        existing.requests += r.requests;
+        aggregated.set(r.label, existing);
+      }
+    }
+
     return Array.from(aggregated.values())
       .sort((a, b) => b.spentUsd - a.spentUsd)
       .slice(0, limit);
+  }
+
+  private async queryIngestionPrincipalBreakdown(
+    client: ClickHouseClient,
+    params: { userId: string; window: PersonalUsageWindow },
+  ): Promise<PersonalUsageBreakdown[]> {
+    if (!isClickHouseEnabled()) return [];
+    try {
+      const result = await client.query({
+        query: `
+          SELECT
+            Model AS Label,
+            sum(AmountUSD)             AS SpentUsd,
+            countDistinct(GatewayRequestId) AS Requests
+          FROM gateway_budget_ledger_events
+          WHERE Scope = 'PRINCIPAL'
+            AND ScopeId = {userId:String}
+            AND OccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64})
+            AND OccurredAt <  fromUnixTimestamp64Milli({toMs:Int64})
+          GROUP BY Label
+          ORDER BY SpentUsd DESC
+          SETTINGS ${formatSettings(ANALYTICS_CLICKHOUSE_SETTINGS)}
+        `,
+        query_params: {
+          userId: params.userId,
+          fromMs: params.window.start.getTime(),
+          toMs: params.window.end.getTime(),
+        },
+        format: "JSONEachRow",
+      });
+      type Raw = { Label: string; SpentUsd: number; Requests: number };
+      const rows = (await result.json()) as Raw[];
+      return rows.map((r) => ({
+        label: r.Label,
+        spentUsd: Number(r.SpentUsd) || 0,
+        requests: Number(r.Requests) || 0,
+      }));
+    } catch {
+      return [];
+    }
   }
 
   /**
@@ -366,6 +553,111 @@ export class PersonalUsageService {
       promptTokens: Number(row.PromptTokens) || 0,
       completionTokens: Number(row.CompletionTokens) || 0,
     };
+  }
+
+  /**
+   * Per-user spend rollup from `gateway_budget_ledger_events` filtered
+   * to PRINCIPAL-scope rows for this user. Picks up Claude Code OTLP /
+   * other ingestion-source events that don't land in the user's
+   * personal-project trace_summaries.
+   *
+   * Caveats:
+   *   - Only catches events that hit a PRINCIPAL-scope budget. Events
+   *     that only hit ORG/PROJECT-scope budgets undercount here. v2
+   *     fix: write per-user rows on every ingestion event regardless of
+   *     scope (or pivot the receiver to write to user's personal
+   *     project tenant directly so the existing trace_summaries query
+   *     captures them).
+   *   - `request_id` is the dedup key on the underlying
+   *     ReplacingMergeTree. We sum `AmountUSD` directly — duplicates
+   *     across (Scope, BudgetId) for the same request are deduped at
+   *     the (TenantId, BudgetId, GatewayRequestId) ORDER BY level.
+   *     Filtering Scope='PRINCIPAL' already isolates to one row per
+   *     request per user.
+   */
+  private async queryIngestionPrincipalSummary(
+    client: ClickHouseClient,
+    params: { userId: string; window: PersonalUsageWindow },
+  ): Promise<{
+    totalCost: number;
+    requestCount: number;
+    promptTokens: number;
+    completionTokens: number;
+    topModel: { name: string; requests: number } | null;
+  } | null> {
+    if (!isClickHouseEnabled()) return null;
+    try {
+      const result = await client.query({
+        query: `
+          SELECT
+            sum(AmountUSD)            AS TotalCost,
+            countDistinct(GatewayRequestId) AS RequestCount,
+            sum(TokensInput)          AS PromptTokens,
+            sum(TokensOutput)         AS CompletionTokens
+          FROM gateway_budget_ledger_events
+          WHERE Scope = 'PRINCIPAL'
+            AND ScopeId = {userId:String}
+            AND OccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64})
+            AND OccurredAt <  fromUnixTimestamp64Milli({toMs:Int64})
+          SETTINGS ${formatSettings(ANALYTICS_CLICKHOUSE_SETTINGS)}
+        `,
+        query_params: {
+          userId: params.userId,
+          fromMs: params.window.start.getTime(),
+          toMs: params.window.end.getTime(),
+        },
+        format: "JSONEachRow",
+      });
+
+      type RawSummary = {
+        TotalCost: number | null;
+        RequestCount: number | null;
+        PromptTokens: number | null;
+        CompletionTokens: number | null;
+      };
+      const [row] = (await result.json()) as RawSummary[];
+      if (!row || !Number(row.RequestCount)) return null;
+
+      const topModelResult = await client.query({
+        query: `
+          SELECT
+            Model AS Name,
+            countDistinct(GatewayRequestId) AS Requests
+          FROM gateway_budget_ledger_events
+          WHERE Scope = 'PRINCIPAL'
+            AND ScopeId = {userId:String}
+            AND OccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64})
+            AND OccurredAt <  fromUnixTimestamp64Milli({toMs:Int64})
+          GROUP BY Model
+          ORDER BY Requests DESC
+          LIMIT 1
+          SETTINGS ${formatSettings(ANALYTICS_CLICKHOUSE_SETTINGS)}
+        `,
+        query_params: {
+          userId: params.userId,
+          fromMs: params.window.start.getTime(),
+          toMs: params.window.end.getTime(),
+        },
+        format: "JSONEachRow",
+      });
+      type RawTop = { Name: string; Requests: number | null };
+      const [topRow] = (await topModelResult.json()) as RawTop[];
+
+      return {
+        totalCost: Number(row.TotalCost) || 0,
+        requestCount: Number(row.RequestCount) || 0,
+        promptTokens: Number(row.PromptTokens) || 0,
+        completionTokens: Number(row.CompletionTokens) || 0,
+        topModel: topRow
+          ? { name: topRow.Name, requests: Number(topRow.Requests) || 0 }
+          : null,
+      };
+    } catch {
+      // CH unavailable / table not provisioned. Personal usage
+      // queries already render zeros gracefully when the trace path
+      // misses; do the same for the ingestion-ledger union.
+      return null;
+    }
   }
 
   private async queryTopModel(

@@ -552,13 +552,29 @@ export const userRouter = createTRPCRouter({
       // Run the four queries in parallel — they're independent and the
       // CH server happily multiplexes. Cuts wall time roughly in half
       // for the dashboard initial-render p95.
+      // userId threaded so PersonalUsageService can union ingestion-
+      // source ledger rows (Claude Code OTLP, etc.) keyed on
+      // PRINCIPAL-scope budgets where ScopeId=userId. Without it, the
+      // /me dashboard misses third-party traffic landing in the hidden
+      // governance project tenant. Recent activity stays gateway-only
+      // for now — that surface needs LogRecord-tenant duplication, not
+      // just ledger-row union (Lane-B follow-up).
       const [summary, dailyBuckets, breakdownByModel, recentActivity] =
         await Promise.all([
-          usage.summary({ personalProjectId: workspace.project.id, window }),
-          usage.dailyBuckets({ personalProjectId: workspace.project.id, window }),
+          usage.summary({
+            personalProjectId: workspace.project.id,
+            window,
+            userId,
+          }),
+          usage.dailyBuckets({
+            personalProjectId: workspace.project.id,
+            window,
+            userId,
+          }),
           usage.breakdownByModel({
             personalProjectId: workspace.project.id,
             window,
+            userId,
           }),
           usage.recentActivity({
             personalProjectId: workspace.project.id,
