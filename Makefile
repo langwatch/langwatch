@@ -1,5 +1,5 @@
 .PHONY: help start sync-all-openapi user-delete-dry-run user-delete es-delete-dry-run es-delete
-.PHONY: dev dev-nlp dev-scenarios dev-full down logs clean ps quickstart worktree
+.PHONY: dev dev-nlp dev-scenarios dev-full down logs clean ps quickstart quickstart-help worktree
 .PHONY: dev-up dev-down dev-logs setup-hooks service service-watch
 .PHONY: _dev-deprecation-warning _dev-up-deprecation-warning
 
@@ -9,7 +9,7 @@ help:
 	@echo ""
 	@echo "  Primary (Docker dev environment):"
 	@echo "    make quickstart                     interactive launcher (single entry point)"
-	@echo "    make quickstart help                non-interactive mode reference"
+	@echo "    make quickstart-help                non-interactive mode reference"
 	@echo "    make service svc=<name>             run a Go service (e.g. aigateway)"
 	@echo "    make service-watch svc=<name>       run a Go service with live reload (air)"
 	@echo "    make worktree <issue|name>          create a git worktree for an issue/feature"
@@ -78,24 +78,29 @@ service-watch:
 			--build.include_ext "go" \
 			--build.exclude_dir "tmp,vendor,node_modules"
 
+# Deprecation warning for dev* targets — kept for one release. (#3860 AC#9)
+_dev-deprecation-warning:
+	@printf '\033[33m[deprecated] make %s → make quickstart (or scripts/dev.sh help)\033[0m\n' "$(MAKECMDGOALS)" >&2
+	@printf 'See: dev/docs/adr/004-docker-dev-environment.md\n' >&2
+
 # Minimal: postgres + redis + clickhouse + app
-dev:
+dev: _dev-deprecation-warning
 	@$(SANITIZE_DEV_ENV) && $(COMPOSE) up
 
 # + NLP service + langevals (for evaluations)
-dev-nlp:
+dev-nlp: _dev-deprecation-warning
 	@$(SANITIZE_DEV_ENV) && $(COMPOSE) --profile nlp up
 
 # + scenario worker + bullboard + NLP
-dev-scenarios:
+dev-scenarios: _dev-deprecation-warning
 	@$(SANITIZE_DEV_ENV) && $(COMPOSE) --profile scenarios up
 
 # + AI test server (for HTTP agent testing)
-dev-test:
+dev-test: _dev-deprecation-warning
 	@$(SANITIZE_DEV_ENV) && $(COMPOSE) --profile test up
 
 # Everything
-dev-full:
+dev-full: _dev-deprecation-warning
 	@$(SANITIZE_DEV_ENV) && $(COMPOSE) --profile full up
 
 # Stop all services
@@ -132,9 +137,15 @@ start/postgres:
 tsc-watch:
 	cd langwatch && pnpm tsc-watch
 
-# Interactive profile chooser
+# Single entry point — interactive launcher (#3860 AC#1).
 quickstart:
 	@./scripts/dev.sh
+
+# Non-interactive mode reference (#3860 AC#8). `make quickstart help` would
+# collide with the existing `help` target so the discoverable form is
+# `make quickstart-help` (or `./scripts/dev.sh help` directly).
+quickstart-help:
+	@./scripts/dev.sh help
 
 # =============================================================================
 # ISOLATED DEV INSTANCES (for AI agents / parallel worktrees)
@@ -142,16 +153,20 @@ quickstart:
 # Each worktree gets its own containers, volumes, and ports.
 # Port info saved to .dev-port for agent/skill discovery.
 
+# Deprecation warning for dev-up / dev-down / dev-logs (#3860 AC#9).
+_dev-up-deprecation-warning:
+	@printf '\033[33m[deprecated] make %s → make quickstart (single entry point)\033[0m\n' "$(MAKECMDGOALS)" >&2
+
 # Start isolated instance (detached). Usage: make dev-up [PROFILE=scenarios]
-dev-up:
+dev-up: _dev-up-deprecation-warning
 	@./scripts/dev-up.sh $(PROFILE)
 
 # Stop isolated instance
-dev-down:
+dev-down: _dev-up-deprecation-warning
 	@./scripts/dev-down.sh
 
 # Tail logs for isolated instance
-dev-logs:
+dev-logs: _dev-up-deprecation-warning
 	@if [ -f .dev-port ]; then . ./.dev-port && COMPOSE_PROJECT_NAME=$$COMPOSE_PROJECT_NAME VOLUME_PREFIX=$$VOLUME_PREFIX docker compose -f compose.dev.yml --profile full logs -f; \
 	else echo "No .dev-port found. Is the instance running?"; fi
 

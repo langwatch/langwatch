@@ -1,8 +1,36 @@
 #!/bin/bash
-# Interactive development environment launcher
+# Interactive development environment launcher (single entry point — #3860 AC#1).
 set -e
 
 COMPOSE="docker compose -f compose.dev.yml"
+
+# Non-interactive mode reference (#3860 AC#8). Lets agents and CI discover modes
+# without going through the prompt.
+if [ "${1:-}" = "help" ]; then
+  cat <<'EOF'
+LangWatch dev environment
+
+Modes:
+  dev              postgres + redis + clickhouse + app
+  dev-nlp          + langwatch_nlp + langevals (for evaluations)
+  dev-scenarios    + scenario worker + bullboard + nlp
+  dev-test         + ai test server (HTTP agent testing)
+  dev-full         everything above
+
+Stateful services share data across worktrees:
+  langwatch-db-data, langwatch-clickhouse-data, langwatch-redis-data
+  → sign up once, persist across worktree switches.
+  → only one worktree can have postgres / clickhouse 'up' at a time.
+
+Stateless redis is a singleton on host :6379.
+
+Per-worktree node_modules stay isolated (platform deps — see ADR-004).
+
+Run 'make quickstart' to launch interactively, or 'make dev' / etc. for the
+specific modes (those will be removed after one release — use 'make quickstart').
+EOF
+  exit 0
+fi
 
 # Auto-detect worktree for container/volume isolation
 if git rev-parse --is-inside-work-tree &>/dev/null; then
@@ -44,9 +72,47 @@ check_env_files() {
   fi
 }
 
+# Fail-fast on insecure SaaS-mode config (#3860 AC#7). compose.dev.yml's
+# common-env always sets BLOCK_LOCAL_HTTP_CALLS=true at runtime, but a stale
+# `.env` with IS_SAAS=true and BLOCK_LOCAL_HTTP_CALLS=false in the same file
+# ships a broken combo to anywhere else (workers without compose, lambda).
+check_saas_ssrf_guard() {
+  if [ ! -f "langwatch/.env" ]; then return 0; fi
+  if grep -qE '^IS_SAAS\s*=\s*"?true"?\s*$' langwatch/.env \
+     && grep -qE '^BLOCK_LOCAL_HTTP_CALLS\s*=\s*"?false"?\s*$' langwatch/.env; then
+    echo "ERROR: langwatch/.env has IS_SAAS=true with BLOCK_LOCAL_HTTP_CALLS=false." >&2
+    echo "       SaaS mode requires SSRF blocking. Set BLOCK_LOCAL_HTTP_CALLS=true." >&2
+    exit 1
+  fi
+}
+
+# Detect when another worktree is already using a shared stateful volume
+# (#3860 AC#4). Postgres locks /var/lib/postgresql/data, so the second up
+# would fail to start anyway — fail fast with a clear message.
+check_stateful_collision() {
+  local me="${COMPOSE_PROJECT_NAME:-langwatch}"
+  local vol cid project
+  for vol in langwatch-db-data langwatch-clickhouse-data; do
+    for cid in $(docker ps -q --filter "volume=$vol" 2>/dev/null); do
+      project=$(docker inspect -f '{{index .Config.Labels "com.docker.compose.project"}}' "$cid" 2>/dev/null || true)
+      if [ -n "$project" ] && [ "$project" != "$me" ]; then
+        cat >&2 <<EOF
+ERROR: Shared volume '$vol' is already in use by compose project '$project'.
+       Only one worktree can run postgres / clickhouse at a time.
+       Stop the other one first:
+         (cd that worktree && make down)
+EOF
+        exit 1
+      fi
+    done
+  done
+}
+
 # Run prep steps on host (curl available, prisma generate needs node_modules)
 ensure_prepared() {
   check_env_files
+  check_saas_ssrf_guard
+  check_stateful_collision
   cd langwatch
   # Host needs its own node_modules for prep (separate from container's Linux deps)
   if [ ! -d node_modules ]; then

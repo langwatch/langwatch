@@ -121,3 +121,39 @@ We considered switching node_modules to bind mounts for automatic per-worktree i
 - Collapses the host/container node_modules separation (Linux ELF binaries would appear on host, breaking IDE tooling)
 
 Instead, we use per-worktree named volumes via `VOLUME_PREFIX`, which gives the same isolation without these downsides.
+
+## Amendment: Stateful volumes + entry point (2026-05, #3860)
+
+### Context
+
+The 2026-03 worktree-isolation amendment treated **every** volume as per-worktree. That worked for `node_modules` (Linux ELF deps that diverge across branches) but had two side effects:
+
+1. Sign-up state didn't persist across worktrees. Sign up `browser-test@langwatch.ai` in worktree A; switch to worktree B; the account is gone.
+2. Profiles conflated *what services exist* with *what I want containers for*. Frontend-only work doesn't actually need its own postgres / redis / clickhouse — it could share with whatever else is running.
+
+### Changes
+
+**Stateful services share volumes across worktrees.** `db-data`, `clickhouse-data`, and `redis-data` use stable names (`langwatch-db-data`, `langwatch-clickhouse-data`, `langwatch-redis-data`) — they no longer interpolate `VOLUME_PREFIX`. Sign up once, persist forever.
+
+Trade-off: only one worktree can have the same stateful container `up` at a time (postgres locks `/var/lib/postgresql/data`). `scripts/dev.sh` detects this (`check_stateful_collision`) and fails fast with a clear message pointing at the other compose project.
+
+**Redis is a singleton with a fixed host port.** `redis:alpine` exposes `:6379` on the host and uses the shared `langwatch-redis-data` volume. Parallel worktrees reuse the same redis instance.
+
+**Per-worktree volumes still apply to:** `app_modules`, `bullboard_modules`, `goose_bin`. These hold Linux-platform dependencies that vary by branch lockfile and must stay isolated.
+
+**`make quickstart` is now the single entry point.** `make dev`, `make dev-nlp`, etc. and `make dev-up` / `make dev-down` / `make dev-logs` print a deprecation warning on stderr and forward to the same compose flow for one release before being removed. New: `make quickstart-help` (or `./scripts/dev.sh help`) prints a non-interactive mode reference for agents and CI.
+
+**Fail-fast SSRF guard.** `scripts/dev.sh` errors if `langwatch/.env` has `IS_SAAS=true` with `BLOCK_LOCAL_HTTP_CALLS=false`. (Compose's runtime always sets `BLOCK_LOCAL_HTTP_CALLS=true` via `x-common-env`, but workers running outside compose / lambdas would inherit the broken combo.)
+
+### Migration
+
+Existing worktrees have stale `lw-<hash>-db-data` / `lw-<hash>-clickhouse-data` / `lw-<hash>-redis-data` volumes from the previous scheme. The first `make quickstart` after upgrading creates the new shared volumes (`langwatch-*-data`) — old volumes are not deleted automatically. To recover space:
+
+```
+docker volume ls | grep -E '^local +lw-[0-9a-f]{8}-(db|redis|clickhouse)-data'
+docker volume rm <volume-name>   # one per worktree, after confirming you don't need the data
+```
+
+### Deferred (separate follow-up)
+
+This amendment intentionally does not change the **default** of `make quickstart`. AC#2 / AC#3 of #3860 — intent-based prompting and "frontend-only → `pnpm dev` against remote dev services" — depend on remote dev services existing as a documented user-facing surface. They don't yet. A separate issue tracks that prerequisite work; until then, the existing local-services default stays.

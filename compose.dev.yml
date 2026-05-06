@@ -67,9 +67,14 @@ services:
           memory: 256m
           cpus: "0.5"
 
+  # Singleton across worktrees (#3860 AC#5). Exposed on a fixed host port so
+  # parallel worktrees reuse the same container instead of spinning up their
+  # own. Compose treats this as belonging to the first project that brings it
+  # up; subsequent `quickstart`s detect the running container and reuse it.
   redis:
     image: redis:alpine
-    # No host port - accessed via docker network as "redis:6379"
+    ports:
+      - "6379:6379"
     volumes:
       - redis-data:/data
     healthcheck:
@@ -331,17 +336,25 @@ services:
           cpus: "0.25"
 
 volumes:
+  # Stateful — shared across worktrees (#3860 AC#4 / AC#5).
+  # Sign-up persists when switching worktrees; ClickHouse traces survive too.
+  # Two worktrees can't have the same stateful container `up` simultaneously
+  # (postgres locks the volume) — `scripts/dev.sh` detects and warns.
   db-data:
-    name: ${VOLUME_PREFIX:-langwatch}-db-data
+    name: langwatch-db-data
   redis-data:
-    name: ${VOLUME_PREFIX:-langwatch}-redis-data
+    name: langwatch-redis-data
   clickhouse-data:
-    name: ${VOLUME_PREFIX:-langwatch}-clickhouse-data
+    name: langwatch-clickhouse-data
+  # Per-worktree — Linux-vs-host platform isolation per ADR-004.
+  # node_modules differs across branches with different lockfiles, so these
+  # stay namespaced.
   goose_bin:
     name: ${VOLUME_PREFIX:-langwatch}-goose-bin
   app_modules:
     name: ${VOLUME_PREFIX:-langwatch}-app-modules
-  pnpm_store:
-    name: langwatch-pnpm-store # Always shared (cache only)
   bullboard_modules:
     name: ${VOLUME_PREFIX:-langwatch}-bullboard-modules
+  # Always shared (cache only).
+  pnpm_store:
+    name: langwatch-pnpm-store
