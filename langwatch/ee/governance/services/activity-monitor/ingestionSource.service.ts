@@ -218,6 +218,22 @@ export class IngestionSourceService {
 
     const ingestSecret = generateIngestSecret();
     const ingestSecretHash = hashIngestSecret(ingestSecret);
+
+    // Phase 10 carryover — the schema has `parserConfig` but no
+    // `pullConfig` column; the puller worker actually reads
+    // `source.parserConfig` as the adapter config (see
+    // pullerWorker.ts:89 `const pullConfig = source.parserConfig`).
+    // The earlier service shape exposed both inputs as if they were
+    // separate columns, which 500'd at create time (Ariana caught
+    // this on the OTLP-ingestion-source dogfood). Merge here so
+    // callers can keep using either field name without a schema
+    // change. `parserConfig` wins on key conflicts (it's the
+    // canonical input for push-mode sources); `pullConfig` data
+    // fills in for pull-mode adapters.
+    const mergedParserConfig: Record<string, unknown> = {
+      ...(input.pullConfig ?? {}),
+      ...(input.parserConfig ?? {}),
+    };
     const source = await this.prisma.ingestionSource.create({
       data: {
         organizationId: input.organizationId,
@@ -226,13 +242,7 @@ export class IngestionSourceService {
         name: input.name,
         description: input.description ?? null,
         ingestSecretHash,
-        parserConfig: (input.parserConfig ?? {}) as Prisma.InputJsonValue,
-        pullConfig:
-          input.pullConfig === undefined
-            ? undefined
-            : input.pullConfig === null
-              ? Prisma.JsonNull
-              : (input.pullConfig as Prisma.InputJsonValue),
+        parserConfig: mergedParserConfig as Prisma.InputJsonValue,
         pullSchedule: input.pullSchedule ?? null,
         retentionClass,
         status: "awaiting_first_event",
