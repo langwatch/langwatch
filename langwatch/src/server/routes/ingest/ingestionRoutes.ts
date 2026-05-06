@@ -44,10 +44,20 @@ import { prisma } from "~/server/db";
 import { IngestionSourceService } from "@ee/governance/services/activity-monitor/ingestionSource.service";
 import { ensureHiddenGovernanceProject } from "@ee/governance/services/governanceProject.service";
 import {
+  parseOtlpLogs,
+  parseOtlpMetrics,
   parseOtlpTraces,
   readOtlpBody,
 } from "~/server/otel/parseOtlpBody";
 import { createLogger } from "~/utils/logger/server";
+import { extractClaudeCodeCostEvents } from "@ee/governance/services/activity-monitor/claudeCodeIngestionExtractor.service";
+import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
+import { GatewayBudgetRepository } from "~/server/gateway/budget.repository";
+import {
+  getClickHouseClientForProject,
+  isClickHouseEnabled,
+} from "~/server/clickhouse/clickhouseClient";
+import { ChangeEventRepository } from "~/server/gateway/changeEvent.repository";
 
 import { checkIpRateLimit, extractClientIp } from "./rateLimit";
 
@@ -418,4 +428,305 @@ app.post("/webhook/:sourceId", async (c: Context) => {
   );
 
   return c.json({ accepted: true, bytes: bodyBytes, eventId: envelopeId }, 202);
+});
+
+// ---------------------------------------------------------------------------
+// POST /api/ingest/otel/:sourceId/v1/logs
+// POST /api/ingest/otel/:sourceId/v1/metrics
+// ---------------------------------------------------------------------------
+// Claude Code (and other OTLP-emitting tools) post per-request events
+// + cost metrics on the standard OTLP/HTTP sub-paths. The exporter
+// suffixes `OTEL_EXPORTER_OTLP_ENDPOINT` with `/v1/logs` / `/v1/metrics`
+// — admins paste `{base-url}/api/ingest/otel/{sourceId}` as the
+// endpoint and the SDK appends the suffix.
+//
+// /v1/logs path:
+//   - Hands LogRecords off to the existing log pipeline so /me Recent
+//     Activity / trace viewer drill-down works for forensics
+//   - Filters for `claude_code.api_request` events and writes one
+//     ledger row per (request_id, applicable budget) so anomaly rules
+//     + per-principal budgets fire on third-party traffic
+//
+// /v1/metrics path: v0 acks-only. Counter delta synthesis is a v2 add
+// for sources that emit metrics but no per-request events. Logged at
+// info-level for inspection.
+//
+// Spec: docs/ai-governance/ingestion-sources/claude-code-otlp.feature
+// ---------------------------------------------------------------------------
+app.post("/otel/:sourceId/v1/logs", async (c: Context) => {
+  const limited = await rateLimitGuard(c);
+  if (limited) return limited;
+
+  const source = await authIngestionSource(c);
+  if (!source) {
+    return c.json({ error: "unauthorized" }, 401);
+  }
+  const sourceId = c.req.param("sourceId");
+  if (sourceId !== source.id) {
+    return c.json({ error: "unauthorized" }, 401);
+  }
+
+  let bodyBytes = 0;
+  let logRecordCount = 0;
+  let costEventCount = 0;
+  let ledgerRowsWritten = 0;
+  let parseHint: string | undefined;
+
+  try {
+    const body = await readOtlpBody(c.req.raw);
+    bodyBytes = body.byteLength;
+    const parsed = parseOtlpLogs(body, c.req.header("content-type"));
+    if (!parsed.ok) {
+      parseHint = parsed.error;
+    } else {
+      logRecordCount = (parsed.request.resourceLogs ?? []).reduce(
+        (acc, rl) =>
+          acc +
+          (rl.scopeLogs ?? []).reduce(
+            (a, sl) => a + (sl.logRecords?.length ?? 0),
+            0,
+          ),
+        0,
+      );
+
+      // Audit / forensics: hand the raw LogRecords to the existing log
+      // pipeline so they show up alongside spans in the trace viewer
+      // + /me Recent Activity. Origin-stamping happens at the resource
+      // attr level; the existing pipeline picks them up the same way
+      // it does for the webhook receiver.
+      if (logRecordCount > 0) {
+        const govProject = await ensureHiddenGovernanceProject(
+          prisma,
+          source.organizationId,
+        );
+        try {
+          await getApp().traces.logCollection.handleOtlpLogRequest({
+            tenantId: govProject.id,
+            logRequest: parsed.request,
+            piiRedactionLevel: govProject.piiRedactionLevel,
+          });
+        } catch (handoffErr) {
+          logger.warn(
+            { sourceId: source.id, err: String(handoffErr) },
+            "log pipeline handoff failed (cost extraction continues)",
+          );
+        }
+
+        // Cost extraction: ledger-write one row per matched event per
+        // applicable budget. Budget aggregation reuses the gateway's
+        // CH rollup so anomaly rules + budget pre-checks see Claude
+        // Code spend identically to gateway spend.
+        const events = extractClaudeCodeCostEvents(parsed.request);
+        costEventCount = events.length;
+
+        if (events.length > 0 && isClickHouseEnabled()) {
+          const budgetRepo = new GatewayBudgetRepository(prisma);
+          const budgetCHRepo = new GatewayBudgetClickHouseRepository(
+            async (projectId) => {
+              const client = await getClickHouseClientForProject(projectId);
+              if (!client) {
+                throw new Error(
+                  `ClickHouse enabled but no client for project ${projectId}`,
+                );
+              }
+              return client;
+            },
+          );
+          const changeEvents = new ChangeEventRepository(prisma);
+
+          for (const event of events) {
+            try {
+              // Resolve principal: user.email → User.id (org member only).
+              // Fallback to null on unknown users — the budget still rolls
+              // up at org/team/project scope, just no per-user attribution.
+              let principalUserId: string | null = null;
+              if (event.userEmail) {
+                const user = await prisma.user.findFirst({
+                  where: {
+                    email: event.userEmail,
+                    organizations: {
+                      some: { organizationId: source.organizationId },
+                    },
+                  },
+                  select: { id: true },
+                });
+                principalUserId = user?.id ?? null;
+              }
+
+              // Sentinel teamId/virtualKeyId for ingestion-source rows.
+              // ApplicableScopes typed signature requires non-null
+              // strings; the budget query filters TEAM-scoped budgets
+              // by `scope=TEAM AND scopeId=teamId` so a sentinel that
+              // can't be a real team id naturally excludes those
+              // narrow budgets while still letting ORG / PROJECT /
+              // PRINCIPAL budgets match. Same shape for VIRTUAL_KEY:
+              // ingestion sources have no VK, the sentinel ensures
+              // VK-scoped budgets correctly skip.
+              const sentinelVK = `_ingestion_:${source.id}`;
+              const scopes = {
+                organizationId: source.organizationId,
+                teamId: source.teamId ?? `_ingestion_:${source.id}`,
+                projectId: govProject.id,
+                virtualKeyId: sentinelVK,
+                principalUserId,
+              };
+              const budgets = await budgetRepo.applicableForRequest(scopes);
+              if (budgets.length === 0) continue;
+
+              const rows = budgets.map((b) => ({
+                tenantId: govProject.id,
+                budgetId: b.id,
+                scope: b.scopeType,
+                scopeId: b.scopeId,
+                window: b.window,
+                virtualKeyId: sentinelVK,
+                gatewayRequestId: event.requestId,
+                amountUsd: event.costUsd.toFixed(10),
+                tokensInput: event.inputTokens,
+                tokensOutput: event.outputTokens,
+                tokensCacheRead: event.cacheReadTokens,
+                tokensCacheWrite: event.cacheCreationTokens,
+                model: event.model,
+                durationMs: 0,
+                status: "SUCCESS" as const,
+                occurredAt: event.occurredAt,
+              }));
+              await budgetCHRepo.insertDebit(rows);
+              ledgerRowsWritten += rows.length;
+
+              // BUDGET_UPDATED so the gateway's /changes subscriber
+              // evicts L1 and the next request re-resolves with the
+              // fresh spend. Ariana's anomaly + budget pipelines fire
+              // identically to the gateway VK path.
+              try {
+                await changeEvents.append({
+                  organizationId: source.organizationId,
+                  projectId: govProject.id,
+                  kind: "BUDGET_UPDATED",
+                  payload: {
+                    source: "ingestion_source",
+                    sourceId: source.id,
+                    requestId: event.requestId,
+                    userEmail: event.userEmail,
+                    budgetIds: budgets.map((b) => b.id),
+                    amountUsd: event.costUsd,
+                  },
+                });
+              } catch (changeErr) {
+                logger.warn(
+                  {
+                    sourceId: source.id,
+                    requestId: event.requestId,
+                    err: String(changeErr),
+                  },
+                  "BUDGET_UPDATED emit failed (ledger row already landed)",
+                );
+              }
+            } catch (eventErr) {
+              logger.warn(
+                {
+                  sourceId: source.id,
+                  requestId: event.requestId,
+                  err: String(eventErr),
+                },
+                "claude_code event ledger-write failed (continuing batch)",
+              );
+            }
+          }
+        }
+      }
+    }
+  } catch (err) {
+    parseHint = String(err);
+    logger.warn(
+      { sourceId: source.id, err: String(err) },
+      "otel logs ingest receive failed (still ack'ing)",
+    );
+  }
+
+  const service = IngestionSourceService.create(prisma);
+  await service.recordEventReceived(source.id);
+  logger.info(
+    {
+      sourceId: source.id,
+      sourceType: source.sourceType,
+      bytes: bodyBytes,
+      logRecords: logRecordCount,
+      costEvents: costEventCount,
+      ledgerRows: ledgerRowsWritten,
+    },
+    "otel logs ingest landed",
+  );
+
+  const responseBody: Record<string, unknown> = {
+    accepted: true,
+    bytes: bodyBytes,
+    logRecords: logRecordCount,
+    costEvents: costEventCount,
+    ledgerRows: ledgerRowsWritten,
+  };
+  if (parseHint) responseBody.hint = parseHint;
+  return c.json(responseBody, 202);
+});
+
+app.post("/otel/:sourceId/v1/metrics", async (c: Context) => {
+  const limited = await rateLimitGuard(c);
+  if (limited) return limited;
+
+  const source = await authIngestionSource(c);
+  if (!source) {
+    return c.json({ error: "unauthorized" }, 401);
+  }
+  const sourceId = c.req.param("sourceId");
+  if (sourceId !== source.id) {
+    return c.json({ error: "unauthorized" }, 401);
+  }
+
+  // V0: ack + log only. Counter delta synthesis is a v2 add (only
+  // matters for sources that emit metrics-only without the per-request
+  // event path). Today every Claude Code call also emits a
+  // claude_code.api_request log record which the /v1/logs path turns
+  // into a ledger row; metrics here are redundant for cost.
+  let bodyBytes = 0;
+  let metricCount = 0;
+  let parseHint: string | undefined;
+  try {
+    const body = await readOtlpBody(c.req.raw);
+    bodyBytes = body.byteLength;
+    const parsed = parseOtlpMetrics(body, c.req.header("content-type"));
+    if (!parsed.ok) {
+      parseHint = parsed.error;
+    } else {
+      metricCount = (parsed.request.resourceMetrics ?? []).reduce(
+        (acc, rm) =>
+          acc +
+          (rm.scopeMetrics ?? []).reduce(
+            (a, sm) => a + (sm.metrics?.length ?? 0),
+            0,
+          ),
+        0,
+      );
+    }
+  } catch (err) {
+    parseHint = String(err);
+  }
+
+  const service = IngestionSourceService.create(prisma);
+  await service.recordEventReceived(source.id);
+  logger.info(
+    {
+      sourceId: source.id,
+      bytes: bodyBytes,
+      metrics: metricCount,
+    },
+    "otel metrics ingest landed (ack-only in v0)",
+  );
+
+  const responseBody: Record<string, unknown> = {
+    accepted: true,
+    bytes: bodyBytes,
+    metrics: metricCount,
+  };
+  if (parseHint) responseBody.hint = parseHint;
+  return c.json(responseBody, 202);
 });
