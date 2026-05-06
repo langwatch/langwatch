@@ -21,37 +21,74 @@ Feature: Claude Code OTLP ingestion source — extract usage + spend from
     And the hidden Governance Project for ACME exists
 
   # -------------------------------------------------------------------
-  # What Claude Code actually emits (locked from Ariana's payload capture)
+  # What Claude Code actually emits (locked to Ariana's payload capture
+  # against Claude Code 2.1.129 OAuth-billed seat, 2026-05-06)
   # -------------------------------------------------------------------
-  # Per docs at code.claude.com/docs/en/monitoring-usage, Claude Code
-  # emits OTLP **metrics + logs/events by default**; traces are
-  # beta-gated behind CLAUDE_CODE_ENHANCED_TELEMETRY_BETA=1. The v0
-  # receiver path therefore needs metrics support — not just the
-  # existing traces path. Cost is a first-class signal: no list-price
-  # equivalent guessing, no per-token catalog lookup needed.
+  # Two OTLP/HTTP endpoint paths, both with JSON content-type (NOT
+  # protobuf):
+  #   POST /v1/logs    — events (claude_code.api_request, .user_prompt,
+  #                      .mcp_server_connection, .hook_execution_*,
+  #                      .internal_error)
+  #   POST /v1/metrics — counters (claude_code.cost.usage,
+  #                      claude_code.token.usage)
   #
-  # Concrete signals:
-  #   Metric `claude_code.cost.usage`     (USD counter; attrs: model,
-  #                                        query_source, speed, effort)
-  #   Metric `claude_code.token.usage`    (token counter; attrs: type =
-  #                                        input|output|cacheRead|cacheCreation)
-  #   Event  `claude_code.api_request`    (per call: model, cost_usd,
-  #                                        duration_ms, input_tokens,
-  #                                        output_tokens, cache_read_tokens,
-  #                                        cache_creation_tokens, request_id,
-  #                                        speed, query_source, effort)
+  # Scopes inside the OTLP envelope: `com.anthropic.claude_code`
+  # (metrics) + `com.anthropic.claude_code.events` (logs).
   #
-  # Attribution attrs on every signal:
-  #   organization.id      Anthropic org UUID (OAuth)
-  #   user.account_uuid    Anthropic-tagged form `user_01BWBe…`
-  #   user.email           when OAuth-authed → maps directly to LangWatch user
-  #   user.id              anonymous device id
-  #   session.id, app.version, terminal.type
+  # Cost-bearing event — `claude_code.api_request` LogRecord:
+  #   body.stringValue = "claude_code.api_request"
+  #   timeUnixNano     = string nanoseconds
+  #   attributes:
+  #     event.name             = "api_request"
+  #     event.sequence         = intValue (monotonic per session.id)
+  #     event.timestamp        = ISO 8601 string
+  #     model                  = "claude-opus-4-7" (NOT gen_ai.request.model)
+  #     cost_usd               = doubleValue (e.g. 0.12528625)
+  #     input_tokens           = intValue (NOT gen_ai.usage.input_tokens)
+  #     output_tokens          = intValue
+  #     cache_read_tokens      = intValue
+  #     cache_creation_tokens  = intValue
+  #     duration_ms            = intValue
+  #     request_id             = "req_011CakjXP5x6Z…" (Anthropic API id)
+  #     prompt.id              = uuid (Claude Code session-scoped)
+  #     speed                  = "normal" | "fast" | …
+  #     query_source           = "sdk" | "interactive" | …
+  #     effort                 = "xhigh" | "high" | …
+  #     user.email             = "rogerio@langwatch.ai"
+  #     user.id                = anonymous device hash
+  #     user.account_uuid      = uuid
+  #     user.account_id        = "user_01RPBSwk…" (Anthropic-tagged)
+  #     organization.id        = Anthropic org UUID (from OAuth)
+  #     session.id             = Claude Code session uuid
+  #     terminal.type          = "tmux" | "iterm" | …
   #
-  # Custom dimensions: admins can layer `OTEL_RESOURCE_ATTRIBUTES=
-  # team.id=platform,cost_center=eng-123` on the env block; those land
-  # as resource attributes and slot into LangWatch's principal/team
-  # scope filters for free.
+  # Cumulative cost metric — `claude_code.cost.usage`:
+  #   Sum, monotonic, USD unit, aggregationTemporality=1 (DELTA — so
+  #   each data point is an increment, not a running total)
+  #   dataPoint.asDouble = USD delta
+  #   dataPoint.attributes: model, query_source, speed, effort,
+  #                          user.email, organization.id, …
+  #   NOTE: model name is `claude-opus-4-7[1m]` here (1M-context
+  #   suffix) vs the bare `claude-opus-4-7` on the event. Extractor
+  #   should preserve both verbatim, NOT normalise — admins queries
+  #   may want to slice by 1m vs base context.
+  #
+  # Resource attributes (set on every batch — applies to ALL signals
+  # in the batch via OTLP's resource→scope→signal nesting):
+  #   service.name      = "claude-code"
+  #   service.version   = "2.1.129"
+  #   host.arch         = "arm64"
+  #   os.type           = "darwin"
+  #   os.version        = "25.2.0"
+  #   PLUS admin-layered OTEL_RESOURCE_ATTRIBUTES splits:
+  #     team.id         = "ariana-zone-co"     (admin custom)
+  #     cost_center     = "eng-dogfood"        (admin custom)
+  #
+  # Critical extractor invariant: principal + team attribution lives
+  # at the RESOURCE level, not on the individual LogRecord/metric.
+  # The receiver MUST walk resource→scope→signal and merge resource
+  # attrs onto each downstream summary row. Naive "read attributes
+  # off the LogRecord" won't surface user.email or team.id.
 
   # -------------------------------------------------------------------
   # Source creation + endpoint discovery
@@ -67,16 +104,16 @@ Feature: Claude Code OTLP ingestion source — extract usage + spend from
     Then the save response includes:
       | field            | shape                                                  |
       | endpoint         | https://app.langwatch.ai/api/ingest/otel/{sourceId}    |
-      | metricsEndpoint  | https://app.langwatch.ai/api/ingest/otel-metrics/{sourceId} |
       | ingestSecret     | lw_is_…                                                |
       | exporterEnvBlock | shell-ready copy-paste                                 |
-    And the exporterEnvBlock includes every env var Claude Code
-      needs per its monitoring-usage doc:
+    And the exporterEnvBlock contains exactly these env vars (matching
+      the OTLP/HTTP endpoint convention — Claude Code suffixes
+      `/v1/logs` and `/v1/metrics` itself):
       | CLAUDE_CODE_ENABLE_TELEMETRY    | 1                                          |
       | OTEL_METRICS_EXPORTER           | otlp                                       |
       | OTEL_LOGS_EXPORTER              | otlp                                       |
-      | OTEL_EXPORTER_OTLP_PROTOCOL     | http/json (or http/protobuf, both accepted) |
-      | OTEL_EXPORTER_OTLP_ENDPOINT     | the endpoint above                         |
+      | OTEL_EXPORTER_OTLP_PROTOCOL     | http/json                                  |
+      | OTEL_EXPORTER_OTLP_ENDPOINT     | the endpoint above (no `/v1/*` suffix)     |
       | OTEL_EXPORTER_OTLP_HEADERS      | Authorization=Bearer lw_is_…               |
     And the drawer offers an OPTIONAL `OTEL_RESOURCE_ATTRIBUTES`
       builder that admins can use to layer team / cost_center tags
@@ -215,13 +252,22 @@ Feature: Claude Code OTLP ingestion source — extract usage + spend from
       ones so admins can iterate without a code change
 
   # -------------------------------------------------------------------
-  # Open questions (locked when Ariana's live capture artifact lands)
+  # Decisions locked from Ariana's 2026-05-06 capture
   # -------------------------------------------------------------------
-  # 1. Exact OTLP/HTTP body shape for metrics. Sergey to mirror the
-  #    receiver shape against the captured bytes.
-  # 2. Whether Claude Code respects the `OTEL_EXPORTER_OTLP_*` env
-  #    vars per-signal (METRICS / LOGS / TRACES suffixed) or only the
-  #    base. The exporterEnvBlock template adapts once we know.
-  # 3. Whether `claude_code.api_request` lands as an OTel log_record
-  #    (use logCollection) or as a span (use trace pipeline). Decides
-  #    the handoff target inside the receiver.
+  # 1. Body shape: standard OTLP/HTTP JSON envelope —
+  #    `{ resourceLogs: […], resourceMetrics: […] }`. Sergey's receiver
+  #    extends `parseOtlpRequest` to walk all three of resourceSpans,
+  #    resourceLogs, resourceMetrics from the same envelope.
+  # 2. Claude Code uses the BASE `OTEL_EXPORTER_OTLP_ENDPOINT` and
+  #    suffixes `/v1/logs` and `/v1/metrics` itself. No per-signal
+  #    `OTEL_EXPORTER_OTLP_LOGS_ENDPOINT` override needed in the
+  #    happy path. Receiver routes by sub-path.
+  # 3. `claude_code.api_request` is an OTel LogRecord (handoff via
+  #    `getApp().traces.logCollection.handleOtlpLogRequest`). Span
+  #    pipeline only fires for the trace beta variant.
+  #
+  # Open: behaviour when admin has BOTH the gateway VK path AND the
+  # ingestion source path active for the same Anthropic seat (double-
+  # counting risk). Probably out of scope for v0 — admins pick one or
+  # the other; Lane-S adds a dedup invariant in a follow-up if it
+  # becomes a real customer issue.
