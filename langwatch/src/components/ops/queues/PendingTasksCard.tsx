@@ -67,13 +67,8 @@ export function PendingTasksCard({
   const queueName = selectedQueueName ?? queueNames[0];
   const utils = api.useUtils();
 
-  // Force-refresh flag is sent on the next overview query after the user
-  // hits Refresh; reset to false once the fetch completes so subsequent
-  // background refetches use the cached snapshot again.
-  const [forceOverview, setForceOverview] = useState(false);
-
   const overviewQuery = api.ops.getQueueOverview.useQuery(
-    { queueName: queueName ?? "", force: forceOverview || undefined },
+    { queueName: queueName ?? "" },
     {
       enabled: !!queueName,
       refetchInterval: false,
@@ -81,9 +76,10 @@ export function PendingTasksCard({
     },
   );
 
-  useEffect(() => {
-    if (forceOverview && !overviewQuery.isFetching) setForceOverview(false);
-  }, [forceOverview, overviewQuery.isFetching]);
+  // Force-refresh runs through the raw trpc client so `force` stays out of
+  // the React Query cache key — otherwise toggling state-driven force would
+  // fire two fetches per click (force=true then force=undefined).
+  const [isForceRefreshing, setIsForceRefreshing] = useState(false);
 
   const overview = overviewQuery.data ?? null;
   const isOverviewLoading = !!queueName && overviewQuery.isLoading;
@@ -102,12 +98,23 @@ export function PendingTasksCard({
     });
   };
 
-  const onRefresh = () => {
-    setForceOverview(true);
-    void overviewQuery.refetch();
+  const onRefresh = async () => {
+    if (!queueName) return;
+    setIsForceRefreshing(true);
+    try {
+      // Send force=true under a separate cache key so the canonical key the
+      // component watches doesn't change. Mirror the result back so the
+      // watching query updates without triggering another fetch.
+      const fresh = await utils.ops.getQueueOverview.fetch({
+        queueName,
+        force: true,
+      });
+      utils.ops.getQueueOverview.setData({ queueName }, fresh);
+    } finally {
+      setIsForceRefreshing(false);
+    }
     // Clear search results too so the table doesn't lag behind the new
-    // overview counts. We invalidate rather than passing force per call to
-    // avoid stale cached pages for any other open tabs.
+    // overview counts.
     void utils.ops.searchPendingJobs.invalidate({ queueName });
   };
 
@@ -129,7 +136,7 @@ export function PendingTasksCard({
         connectionStatus={connectionStatus}
         isLoading={isOverviewLoading}
         onRefresh={onRefresh}
-        isRefreshing={overviewQuery.isFetching}
+        isRefreshing={overviewQuery.isFetching || isForceRefreshing}
         activeStateFilter={filter.state}
         onToggleState={toggleStateFilter}
         queueNames={queueNames}
