@@ -4,9 +4,8 @@ import { mappingStateSchema } from "~/server/tracer/tracesMapping";
 
 // Mirror of the schema used by the monitors POST/PATCH endpoints.
 // Kept inline here to avoid exporting an internal helper purely for tests.
-const monitorMappingsSchema = z
-  .unknown()
-  .transform((value) => {
+const monitorMappingsSchema = z.preprocess(
+  (value) => {
     if (value === null || value === undefined) return value;
     if (
       typeof value === "object" &&
@@ -16,8 +15,9 @@ const monitorMappingsSchema = z
       return value;
     }
     return { mapping: {}, expansions: [] };
-  })
-  .pipe(mappingStateSchema.nullable().optional());
+  },
+  mappingStateSchema.nullable().optional(),
+);
 
 describe("monitorMappingsSchema (write-path coercion)", () => {
   describe("when mappings is omitted (undefined)", () => {

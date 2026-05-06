@@ -54,9 +54,11 @@ const monitorResponseWithPlatformUrlSchema = monitorResponseSchema.extend({
 // end up missing the `.mapping` subkey, which crashes downstream evaluator code
 // at `Object.values(mappingState.mapping)` (see threadMappingResolver.ts). The
 // read-side guard there is defensive; this is the canonical write-side fix.
-const monitorMappingsSchema = z
-  .unknown()
-  .transform((value) => {
+//
+// Using z.preprocess (vs z.unknown().transform().pipe()) so hono-openapi can
+// infer the output type from the inner mappingStateSchema for the OpenAPI spec.
+const monitorMappingsSchema = z.preprocess(
+  (value) => {
     if (value === null || value === undefined) return value;
     if (
       typeof value === "object" &&
@@ -66,8 +68,9 @@ const monitorMappingsSchema = z
       return value;
     }
     return { mapping: {}, expansions: [] };
-  })
-  .pipe(mappingStateSchema.nullable().optional());
+  },
+  mappingStateSchema.nullable().optional(),
+);
 
 const createMonitorSchema = z.object({
   name: z.string().min(1, "name is required"),
