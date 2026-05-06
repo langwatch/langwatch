@@ -12,7 +12,14 @@ describe("buildDecorationSlots", () => {
   describe("given a single tag", () => {
     it("decorates the whole field:value span as a filter-token", () => {
       const slots = buildDecorationSlots("status:error");
-      expect(slots).toEqual([{ from: 0, to: 12, className: "filter-token" }]);
+      expect(slots).toEqual([
+        {
+          from: 0,
+          to: 12,
+          className: "filter-token",
+          chipToken: { start: 0, end: 12, field: "status", value: "error" },
+        },
+      ]);
     });
   });
 
@@ -20,7 +27,17 @@ describe("buildDecorationSlots", () => {
     it("uses the scenario accent class", () => {
       const slots = buildDecorationSlots("scenarioVerdict:success");
       expect(slots).toEqual([
-        { from: 0, to: 23, className: "filter-token filter-token-scenario" },
+        {
+          from: 0,
+          to: 23,
+          className: "filter-token filter-token-scenario",
+          chipToken: {
+            start: 0,
+            end: 23,
+            field: "scenarioVerdict",
+            value: "success",
+          },
+        },
       ]);
     });
   });
@@ -30,7 +47,12 @@ describe("buildDecorationSlots", () => {
       const slots = buildDecorationSlots("NOT status:error");
       expect(slots).toEqual([
         { from: 0, to: 3, className: "filter-keyword filter-keyword-not" },
-        { from: 4, to: 16, className: "filter-token filter-token-exclude" },
+        {
+          from: 4,
+          to: 16,
+          className: "filter-token filter-token-exclude",
+          chipToken: { start: 4, end: 16, field: "status", value: "error" },
+        },
       ]);
     });
   });
@@ -40,7 +62,12 @@ describe("buildDecorationSlots", () => {
       const slots = buildDecorationSlots("-status:error");
       expect(slots).toEqual([
         { from: 0, to: 1, className: "filter-keyword filter-keyword-not" },
-        { from: 1, to: 13, className: "filter-token filter-token-exclude" },
+        {
+          from: 1,
+          to: 13,
+          className: "filter-token filter-token-exclude",
+          chipToken: { start: 1, end: 13, field: "status", value: "error" },
+        },
       ]);
     });
   });
@@ -49,9 +76,25 @@ describe("buildDecorationSlots", () => {
     it("decorates each tag and the AND keyword separately", () => {
       const slots = buildDecorationSlots("status:error AND model:gpt-4o");
       expect(slots).toEqual([
-        { from: 0, to: 12, className: "filter-token" },
-        { from: 13, to: 16, className: "filter-keyword filter-keyword-and" },
-        { from: 17, to: 29, className: "filter-token" },
+        {
+          from: 0,
+          to: 12,
+          className: "filter-token",
+          chipToken: { start: 0, end: 12, field: "status", value: "error" },
+        },
+        {
+          from: 13,
+          to: 16,
+          className:
+            "filter-keyword filter-keyword-and filter-keyword-clickable",
+          opLoc: { start: 13, end: 16 },
+        },
+        {
+          from: 17,
+          to: 29,
+          className: "filter-token",
+          chipToken: { start: 17, end: 29, field: "model", value: "gpt-4o" },
+        },
       ]);
     });
   });
@@ -60,9 +103,25 @@ describe("buildDecorationSlots", () => {
     it("decorates each tag and the OR keyword separately", () => {
       const slots = buildDecorationSlots("status:error OR status:warning");
       expect(slots).toEqual([
-        { from: 0, to: 12, className: "filter-token" },
-        { from: 13, to: 15, className: "filter-keyword filter-keyword-or" },
-        { from: 16, to: 30, className: "filter-token" },
+        {
+          from: 0,
+          to: 12,
+          className: "filter-token",
+          chipToken: { start: 0, end: 12, field: "status", value: "error" },
+        },
+        {
+          from: 13,
+          to: 15,
+          className:
+            "filter-keyword filter-keyword-or filter-keyword-clickable",
+          opLoc: { start: 13, end: 15 },
+        },
+        {
+          from: 16,
+          to: 30,
+          className: "filter-token",
+          chipToken: { start: 16, end: 30, field: "status", value: "warning" },
+        },
       ]);
     });
   });
@@ -86,7 +145,14 @@ describe("buildDecorationSlots", () => {
   describe("given leading whitespace", () => {
     it("offsets locations to match the original string", () => {
       const slots = buildDecorationSlots("  status:error");
-      expect(slots).toEqual([{ from: 2, to: 14, className: "filter-token" }]);
+      expect(slots).toEqual([
+        {
+          from: 2,
+          to: 14,
+          className: "filter-token",
+          chipToken: { start: 0, end: 12, field: "status", value: "error" },
+        },
+      ]);
     });
   });
 
@@ -102,7 +168,14 @@ describe("buildDecorationSlots", () => {
   describe("given a baseOffset", () => {
     it("shifts every decoration by the offset", () => {
       const slots = buildDecorationSlots("status:error", 5);
-      expect(slots).toEqual([{ from: 5, to: 17, className: "filter-token" }]);
+      expect(slots).toEqual([
+        {
+          from: 5,
+          to: 17,
+          className: "filter-token",
+          chipToken: { start: 0, end: 12, field: "status", value: "error" },
+        },
+      ]);
     });
   });
 });
@@ -117,15 +190,27 @@ describe("buildDecorationPlan — wildcard + boolean cases", () => {
         s.className.includes("filter-token"),
       );
       expect(tokenSlots).toEqual([
-        { from: 0, to: 11, className: "filter-token" },
-        { from: 16, to: 28, className: "filter-token" },
+        {
+          from: 0,
+          to: 11,
+          className: "filter-token",
+          chipToken: { start: 0, end: 11, field: "model", value: "gpt-*" },
+        },
+        {
+          from: 16,
+          to: 28,
+          className: "filter-token",
+          chipToken: { start: 16, end: 28, field: "status", value: "error" },
+        },
       ]);
 
       // AND keyword is its own decoration, not glued to either tag.
       expect(plan.slots).toContainEqual({
         from: 12,
         to: 15,
-        className: "filter-keyword filter-keyword-and",
+        className:
+          "filter-keyword filter-keyword-and filter-keyword-clickable",
+        opLoc: { start: 12, end: 15 },
       });
 
       // Two tag widgets, one per tag.
@@ -146,7 +231,12 @@ describe("buildDecorationPlan — wildcard + boolean cases", () => {
     it("decorates only the field:value span — the `*` is part of the value", () => {
       const plan = buildDecorationPlan("model:gpt-*");
       expect(plan.slots).toEqual([
-        { from: 0, to: 11, className: "filter-token" },
+        {
+          from: 0,
+          to: 11,
+          className: "filter-token",
+          chipToken: { start: 0, end: 11, field: "model", value: "gpt-*" },
+        },
       ]);
       expect(plan.tokens).toEqual([
         { start: 0, end: 11, field: "model", value: "gpt-*", kind: "ast" },
@@ -164,7 +254,9 @@ describe("buildDecorationPlan — wildcard + boolean cases", () => {
       expect(plan.slots).toContainEqual({
         from: 12,
         to: 14,
-        className: "filter-keyword filter-keyword-or",
+        className:
+          "filter-keyword filter-keyword-or filter-keyword-clickable",
+        opLoc: { start: 12, end: 14 },
       });
     });
   });
@@ -249,6 +341,12 @@ describe("buildDecorationPlan — wildcard + boolean cases", () => {
           from: 0,
           to: 'errorMessage:"rate limit"'.length,
           className: "filter-token",
+          chipToken: {
+            start: 0,
+            end: 'errorMessage:"rate limit"'.length,
+            field: "errorMessage",
+            value: "rate limit",
+          },
         },
       ]);
       // Widget delete payload carries the unquoted value.
@@ -554,6 +652,7 @@ describe("buildDecorationPlan — wildcard + boolean cases", () => {
         from: 3,
         to: 15,
         className: "filter-token",
+        chipToken: { start: 0, end: 12, field: "status", value: "error" },
       });
       // leadingWs is exposed on the plan so the editor can position the
       // widget correctly. Absolute end = leadingWs + token.end.
@@ -652,7 +751,12 @@ describe("buildDecorationPlan — wildcard + boolean cases", () => {
         s.className.includes("filter-token"),
       );
       expect(tokenSlots).toEqual([
-        { from: 0, to: 14, className: "filter-token" },
+        {
+          from: 0,
+          to: 14,
+          className: "filter-token",
+          chipToken: { start: 0, end: 14, field: "model", value: "gpt-*AND" },
+        },
       ]);
       expect(plan.tokens).toEqual([
         {
