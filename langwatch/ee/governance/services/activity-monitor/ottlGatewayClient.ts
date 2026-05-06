@@ -110,8 +110,29 @@ function sign(secret: string, canonicalString: string): string {
   return createHmac("sha256", secret).update(canonicalString).digest("hex");
 }
 
+/**
+ * Internal-URL resolution for the control-plane → gateway HMAC channel.
+ *
+ * `LW_GATEWAY_INTERNAL_URL` is the canonical name for "where this
+ * control plane reaches the gateway's /internal/* surface". It exists
+ * specifically because the older `LW_GATEWAY_BASE_URL` is overloaded:
+ * the Go gateway re-uses that exact name for the OPPOSITE direction
+ * (gateway → control-plane), and both processes source the same
+ * `langwatch/.env`, so dev would always have one of them wrong.
+ *
+ * Resolution order — prefer the new name, fall back to the old:
+ *   1. LW_GATEWAY_INTERNAL_URL  (canonical, defaults to :5563 in dev)
+ *   2. LW_GATEWAY_BASE_URL      (legacy fallback — keeps SaaS working
+ *                                where TF sets only the old name)
+ */
 function resolveBaseUrl(): string | null {
-  return env.LW_GATEWAY_BASE_URL ?? process.env.LW_GATEWAY_BASE_URL ?? null;
+  return (
+    env.LW_GATEWAY_INTERNAL_URL ??
+    process.env.LW_GATEWAY_INTERNAL_URL ??
+    env.LW_GATEWAY_BASE_URL ??
+    process.env.LW_GATEWAY_BASE_URL ??
+    null
+  );
 }
 
 function resolveSecret(): string | null {
@@ -138,7 +159,7 @@ async function postSigned(path: string, body: unknown): Promise<Response> {
   const secret = resolveSecret();
   if (!baseUrl || !secret) {
     throw new OttlGatewayUnavailableError(
-      "LW_GATEWAY_BASE_URL / LW_GATEWAY_INTERNAL_SECRET must both be set for OTTL endpoints",
+      "LW_GATEWAY_INTERNAL_URL (or legacy LW_GATEWAY_BASE_URL) and LW_GATEWAY_INTERNAL_SECRET must both be set for OTTL endpoints",
     );
   }
   const ts = Math.floor(Date.now() / 1000).toString();

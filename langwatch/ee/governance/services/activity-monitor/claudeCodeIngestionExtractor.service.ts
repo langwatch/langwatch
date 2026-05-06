@@ -1,6 +1,21 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 /**
+ * @deprecated Superseded by the canonical OTTL extraction path
+ * (`canonicalCostExtractor.service.ts` + the aigateway's
+ * `/internal/transform` endpoint). Sources created with
+ * `parserConfig.ottlStatements` populated route through the canonical
+ * path; this hardcoded reader stays only as the fall-back for legacy
+ * sources that were created before OTTL shipped.
+ *
+ * Removal target: once every IngestionSource row in production has
+ * `parserConfig.ottlStatements` set (either by manual admin migration
+ * or by a backfill that injects the canonical 9-statement starter for
+ * source_type='claude_code'), this file can be deleted along with the
+ * receiver-side fallback in `ingestionRoutes.ts`.
+ *
+ * --- original header below ---
+ *
  * Claude Code OTLP event-to-ledger extractor.
  *
  * Claude Code emits two OTLP signals on a successful API call:
@@ -75,9 +90,20 @@ export interface ClaudeCodeCostEvent {
 const EVENT_NAME_BODY = "claude_code.api_request";
 const EVENT_NAME_ATTR = "api_request";
 
+let deprecationWarnedOnce = false;
+
 export function extractClaudeCodeCostEvents(
   request: IExportLogsServiceRequest,
 ): ClaudeCodeCostEvent[] {
+  if (!deprecationWarnedOnce) {
+    deprecationWarnedOnce = true;
+    // One-shot per-process warning — this code path stays for sources
+    // created before OTTL shipped, but every NEW source carries a
+    // starter template so live traffic should drain off this reader.
+    console.warn(
+      "[deprecated] claudeCodeIngestionExtractor invoked — source has no parserConfig.ottlStatements; reading via legacy hardcoded extractor. Migrate by editing the source and saving the canonical starter template.",
+    );
+  }
   const out: ClaudeCodeCostEvent[] = [];
   for (const rl of request.resourceLogs ?? []) {
     const resourceAttrs = mergeAttributes(rl.resource?.attributes ?? []);
