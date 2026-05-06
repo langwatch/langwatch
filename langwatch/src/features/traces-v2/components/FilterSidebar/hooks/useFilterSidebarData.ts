@@ -360,9 +360,20 @@ type Descriptors = NonNullable<ReturnType<typeof useTraceFacets>["data"]>;
 function synthesizeDefaultDescriptors(): Descriptors {
   const out: Descriptors[number][] = [];
   for (const [key, values] of Object.entries(FACET_DEFAULTS)) {
-    // Every key in FACET_DEFAULTS (origin, status, spanType, etc.) is a
-    // trace-level field — synthesise them under the "trace" group so the
-    // sidebar can render the well-known section before discover responds.
+    // `descriptor.group` here uses the backend's `SectionGroup`
+    // taxonomy (evaluation/metadata/prompt/span/trace), which is
+    // distinct from the registry's UI-group taxonomy returned by
+    // `getFacetGroupId` (evaluators/metrics/prompts/span/subjects/
+    // trace) — they don't 1:1 map.
+    //
+    // Section PLACEMENT for the sidebar is driven by
+    // `getFacetGroupId(key)` downstream (in `partitionIntoGroups`),
+    // not by this `group` field. The field only feeds an icon
+    // fallback when `FACET_ICONS[key]` is missing. Every key in
+    // FACET_DEFAULTS except `spanStatus` has a curated icon today,
+    // so the synthetic placeholder still renders correctly. Pinning
+    // `"trace"` here keeps the type clean; if the icon-fallback path
+    // ever matters we'll wire a registry→SectionGroup mapping.
     out.push({
       kind: "categorical",
       key,
