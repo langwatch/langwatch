@@ -25,7 +25,12 @@
         seed-golden _boxd-fork-impl _boxd-require
 
 BOXD_FORK_LIB := scripts/boxd-fork.sh
-BOXD_RUN := bash -c '. $(BOXD_FORK_LIB) &&'
+# Recipes call bash explicitly so the bash-only sourcing helpers in
+# scripts/boxd-fork.sh (e.g. `[[ … ]]`) work even when Make's default SHELL
+# is /bin/sh. The prefix must be concatenated with the function call inside
+# the same `-c` argument; passing them as separate args is a common bash
+# pitfall (the second arg becomes $0, never executes).
+BOXD_RUN_PREFIX := . $(BOXD_FORK_LIB) &&
 
 # ---------------------------------------------------------------------------
 # Help
@@ -72,18 +77,19 @@ endef
 
 boxd-golden:
 	@echo "→ boxd-golden: building canonical base VM 'langwatch-golden'"
-	@$(BOXD_RUN) 'boxd_golden'
-	@$(MAKE) -s seed-golden 2>/dev/null || true
+	@bash -c '$(BOXD_RUN_PREFIX) boxd_golden'
+	@$(MAKE) -s seed-golden
 
 boxd-golden-reset:
 	@echo "→ boxd-golden-reset: destroying + rebuilding 'langwatch-golden'"
-	@$(BOXD_RUN) 'BOXD_FORK_YES=$(BOXD_FORK_YES) boxd_golden_reset'
-	@$(MAKE) -s seed-golden 2>/dev/null || true
+	@bash -c '$(BOXD_RUN_PREFIX) BOXD_FORK_YES=$(BOXD_FORK_YES) boxd_golden_reset'
+	@$(MAKE) -s seed-golden
 
 # Hook target — quickstart/seed work fills this in when there's something to
-# preload. By default it's a no-op and prints a hint (AC#7).
+# preload. By default it's a no-op and prints a hint (AC#7). Override in
+# Makefile.local to provide a real seed implementation.
 seed-golden:
-	@echo "  (no seed-golden hook configured — define one in your Makefile.local or here to seed langwatch-golden)"
+	@echo "  (no seed-golden hook configured — define one in Makefile.local to seed langwatch-golden)"
 
 # ---------------------------------------------------------------------------
 # Fork-for-source
@@ -92,17 +98,17 @@ seed-golden:
 boxd-fork-pr:
 	$(call _boxd_require,PR,$(PR))
 	@echo "→ boxd-fork-pr PR=$(PR)"
-	@$(BOXD_RUN) 'boxd_fork_pr "$(PR)"'
+	@bash -c '$(BOXD_RUN_PREFIX) boxd_fork_pr "$(PR)"'
 
 boxd-fork-branch:
 	$(call _boxd_require,BRANCH,$(BRANCH))
 	@echo "→ boxd-fork-branch BRANCH=$(BRANCH)"
-	@$(BOXD_RUN) 'boxd_fork_branch "$(BRANCH)"'
+	@bash -c '$(BOXD_RUN_PREFIX) boxd_fork_branch "$(BRANCH)"'
 
 boxd-fork-issue:
 	$(call _boxd_require,ISSUE,$(ISSUE))
 	@echo "→ boxd-fork-issue ISSUE=$(ISSUE)"
-	@$(BOXD_RUN) 'boxd_fork_issue "$(ISSUE)"'
+	@bash -c '$(BOXD_RUN_PREFIX) boxd_fork_issue "$(ISSUE)"'
 
 # ---------------------------------------------------------------------------
 # Connect-by-source
@@ -110,12 +116,12 @@ boxd-fork-issue:
 
 boxd-connect-pr:
 	$(call _boxd_require,PR,$(PR))
-	@$(BOXD_RUN) 'branch=$$(boxd_resolve_pr_branch "$(PR)") && boxd_connect pr "$$branch"'
+	@bash -c '$(BOXD_RUN_PREFIX) branch=$$(boxd_resolve_pr_branch "$(PR)") && boxd_connect pr "$$branch"'
 
 boxd-connect-branch:
 	$(call _boxd_require,BRANCH,$(BRANCH))
-	@$(BOXD_RUN) 'boxd_connect branch "$(BRANCH)"'
+	@bash -c '$(BOXD_RUN_PREFIX) boxd_connect branch "$(BRANCH)"'
 
 boxd-connect-issue:
 	$(call _boxd_require,ISSUE,$(ISSUE))
-	@$(BOXD_RUN) 'boxd_connect issue "$(ISSUE)"'
+	@bash -c '$(BOXD_RUN_PREFIX) boxd_connect issue "$(ISSUE)"'

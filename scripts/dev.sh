@@ -108,10 +108,12 @@ check_env_files() {
 }
 
 # Fail-fast on insecure SaaS-mode config (#3860 AC#7).
+# Patterns accept unquoted, single-quoted, and double-quoted values — all
+# valid `.env` syntax.
 check_saas_ssrf_guard() {
   if [ ! -f "langwatch/.env" ]; then return 0; fi
-  if grep -qE '^IS_SAAS\s*=\s*"?true"?\s*$' langwatch/.env \
-     && grep -qE '^BLOCK_LOCAL_HTTP_CALLS\s*=\s*"?false"?\s*$' langwatch/.env; then
+  if grep -qE "^IS_SAAS[[:space:]]*=[[:space:]]*['\"]?true['\"]?[[:space:]]*$" langwatch/.env \
+     && grep -qE "^BLOCK_LOCAL_HTTP_CALLS[[:space:]]*=[[:space:]]*['\"]?false['\"]?[[:space:]]*$" langwatch/.env; then
     echo "ERROR: langwatch/.env has IS_SAAS=true with BLOCK_LOCAL_HTTP_CALLS=false." >&2
     echo "       SaaS mode requires SSRF blocking. Set BLOCK_LOCAL_HTTP_CALLS=true." >&2
     exit 1
@@ -154,50 +156,15 @@ ensure_prepared() {
 
 # ---------------------------------------------------------------------------
 # URL overrides per mode (#3860 AC#2 / AC#6).
-# Writes `langwatch/.env.dev-up` listing only the URLs whose services are
-# starting locally for the given mode. Empty file ⇒ nothing is overridden.
+# Delegates to scripts/lib/write-dev-overrides.sh — same helper is sourced by
+# scripts/dev-up.sh so the two launchers can't drift on the overlay format.
 # ---------------------------------------------------------------------------
+. "$(dirname "$0")/lib/write-dev-overrides.sh"
+
 write_overrides() {
   local mode="$1"
   local out="langwatch/.env.dev-up"
-  : > "$out"
-  # The auth provider is always email in dev (no Auth0 dependency).
-  echo "NEXTAUTH_PROVIDER=email" >> "$out"
-  case "$mode" in
-    frontend-only)
-      ;;  # nothing — .env wins
-    backend-shared)
-      cat >> "$out" <<EOF
-DATABASE_URL=postgresql://prisma:prisma@postgres:5432/mydb?schema=mydb
-REDIS_URL=redis://redis:6379
-CLICKHOUSE_URL=http://default:langwatch@clickhouse:8123/langwatch
-EOF
-      ;;
-    migration)
-      cat >> "$out" <<EOF
-DATABASE_URL=postgresql://prisma:prisma@localhost:5432/mydb?schema=mydb
-CLICKHOUSE_URL=http://default:langwatch@localhost:8123/langwatch
-EOF
-      ;;
-    nlp)
-      cat >> "$out" <<EOF
-DATABASE_URL=postgresql://prisma:prisma@postgres:5432/mydb?schema=mydb
-REDIS_URL=redis://redis:6379
-CLICKHOUSE_URL=http://default:langwatch@clickhouse:8123/langwatch
-LANGWATCH_NLP_SERVICE=http://langwatch_nlp:5561
-LANGEVALS_ENDPOINT=http://langevals:5562
-EOF
-      ;;
-    full-local)
-      cat >> "$out" <<EOF
-DATABASE_URL=postgresql://prisma:prisma@postgres:5432/mydb?schema=mydb
-REDIS_URL=redis://redis:6379
-CLICKHOUSE_URL=http://default:langwatch@clickhouse:8123/langwatch
-LANGWATCH_NLP_SERVICE=http://langwatch_nlp:5561
-LANGEVALS_ENDPOINT=http://langevals:5562
-EOF
-      ;;
-  esac
+  write_dev_overrides "$mode" "$out"
   if [ -s "$out" ]; then
     echo "URL overrides for mode=$mode written to $out:"
     sed 's/^/  /' "$out" >&2
