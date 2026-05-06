@@ -8,7 +8,12 @@ help:
 	@echo "LangWatch dev targets:"
 	@echo ""
 	@echo "  Primary (Docker dev environment):"
-	@echo "    make quickstart                     interactive launcher (single entry point)"
+	@echo "    make quickstart                     interactive — asks 'what are you working on?'"
+	@echo "    make quickstart frontend-only       no compose; pure pnpm dev against your .env URLs"
+	@echo "    make quickstart backend-shared      postgres + redis + clickhouse + app, URLs → local"
+	@echo "    make quickstart migration           postgres + clickhouse on host ports (prisma migrate)"
+	@echo "    make quickstart nlp                 backend + langwatch_nlp + langevals"
+	@echo "    make quickstart full-local          everything (--profile full)"
 	@echo "    make quickstart-help                non-interactive mode reference"
 	@echo "    make service svc=<name>             run a Go service (e.g. aigateway)"
 	@echo "    make service-watch svc=<name>       run a Go service with live reload (air)"
@@ -79,29 +84,26 @@ service-watch:
 			--build.exclude_dir "tmp,vendor,node_modules"
 
 # Deprecation warning for dev* targets — kept for one release. (#3860 AC#9)
+# Each maps onto the equivalent quickstart mode so the URL-override behavior
+# is consistent regardless of which alias the user invoked.
 _dev-deprecation-warning:
-	@printf '\033[33m[deprecated] make %s → make quickstart (or scripts/dev.sh help)\033[0m\n' "$(MAKECMDGOALS)" >&2
+	@printf '\033[33m[deprecated] make %s → make quickstart (or ./scripts/dev.sh <mode>)\033[0m\n' "$(MAKECMDGOALS)" >&2
 	@printf 'See: dev/docs/adr/004-docker-dev-environment.md\n' >&2
 
-# Minimal: postgres + redis + clickhouse + app
 dev: _dev-deprecation-warning
-	@$(SANITIZE_DEV_ENV) && $(COMPOSE) up
+	@./scripts/dev.sh backend-shared
 
-# + NLP service + langevals (for evaluations)
 dev-nlp: _dev-deprecation-warning
-	@$(SANITIZE_DEV_ENV) && $(COMPOSE) --profile nlp up
+	@./scripts/dev.sh nlp
 
-# + scenario worker + bullboard + NLP
 dev-scenarios: _dev-deprecation-warning
-	@$(SANITIZE_DEV_ENV) && $(COMPOSE) --profile scenarios up
+	@./scripts/dev.sh full-local
 
-# + AI test server (for HTTP agent testing)
 dev-test: _dev-deprecation-warning
-	@$(SANITIZE_DEV_ENV) && $(COMPOSE) --profile test up
+	@./scripts/dev.sh full-local
 
-# Everything
 dev-full: _dev-deprecation-warning
-	@$(SANITIZE_DEV_ENV) && $(COMPOSE) --profile full up
+	@./scripts/dev.sh full-local
 
 # Stop all services
 down:
@@ -137,13 +139,25 @@ start/postgres:
 tsc-watch:
 	cd langwatch && pnpm tsc-watch
 
-# Single entry point — interactive launcher (#3860 AC#1).
+# Single entry point — interactive launcher or non-interactive mode runner.
+# (#3860 AC#1, AC#2). Positional usage via MAKECMDGOALS:
+#   make quickstart                  # interactive prompt
+#   make quickstart frontend-only    # no compose, fastest
+#   make quickstart backend-shared   # postgres + redis + clickhouse + app
+#   make quickstart migration        # postgres + clickhouse on host ports
+#   make quickstart nlp              # backend + nlp + langevals
+#   make quickstart full-local       # --profile full
+ifeq (quickstart,$(firstword $(MAKECMDGOALS)))
+  QUICKSTART_ARG := $(wordlist 2,$(words $(MAKECMDGOALS)),$(MAKECMDGOALS))
+  ifneq ($(QUICKSTART_ARG),)
+    $(eval $(QUICKSTART_ARG):;@:)
+  endif
+endif
 quickstart:
-	@./scripts/dev.sh
+	@./scripts/dev.sh $(QUICKSTART_ARG)
 
-# Non-interactive mode reference (#3860 AC#8). `make quickstart help` would
-# collide with the existing `help` target so the discoverable form is
-# `make quickstart-help` (or `./scripts/dev.sh help` directly).
+# Non-interactive mode reference (#3860 AC#8). Use `make quickstart-help` —
+# `make quickstart help` collides with the existing `help` target.
 quickstart-help:
 	@./scripts/dev.sh help
 

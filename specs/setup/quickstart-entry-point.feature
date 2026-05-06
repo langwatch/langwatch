@@ -1,14 +1,15 @@
-Feature: make quickstart is the single dev environment entry point
+Feature: make quickstart is the single dev environment entry point with intent-based modes
   As a developer working on LangWatch
-  I want one command to start dev with shared stateful data and a singleton redis
-  So that I don't lose my sign-up across worktrees and don't burn time on per-worktree containers
+  I want one command that asks what I'm working on, starts only the services I need, and overrides only the URLs whose services are local
+  So that my .env stays the source of truth and I don't lose state across worktrees
 
-  # Behavior is in `compose.dev.yml` (volume names + redis port), `Makefile`
-  # (deprecation wrappers), and `scripts/dev.sh` (help mode + fail-fast +
-  # collision detection). No JS-side tests cover these — they are shell /
-  # docker config behaviors. Scenarios stay `@unimplemented` for parity
-  # tracking; verified by hand and (for the bash slug + rewrite logic of
-  # boxd-fork) by `scripts/__tests__/boxd-fork.*.bats`.
+  # Behavior is in `compose.dev.yml` + `compose.dev.migration.yml` (volume
+  # names + env_file overlay + host port overlay), `Makefile` (deprecation
+  # wrappers + positional MODE arg pass-through), and `scripts/dev.sh`
+  # (intent-based prompt + write_overrides + fail-fast + collision detection).
+  # Pure-shell helpers (write_overrides) covered by
+  # scripts/__tests__/dev-overrides.unit.bats; the wider end-to-end behavior
+  # is shell + docker so scenarios stay `@unimplemented` for parity tracking.
 
   # --- Single entry point (#3860 AC#1) ---
 
@@ -22,31 +23,98 @@ Feature: make quickstart is the single dev environment entry point
   Scenario: make dev prints a deprecation warning before running
     When I run "make dev"
     Then a warning on stderr points at "make quickstart"
-    And the underlying compose flow still runs (one release of grace)
+    And the underlying mode runs (one release of grace)
 
-  # --- Non-interactive mode reference (#3860 AC#8) ---
+  # --- Intent-based prompting (#3860 AC#2) ---
 
   @unit @unimplemented
-  Scenario: make quickstart-help prints the mode list
+  Scenario: quickstart asks "what are you working on?" with five intent-based modes
+    When I run "make quickstart" with no arguments
+    Then the prompt lists modes: frontend-only, backend-shared, migration, nlp, full-local
+    And each mode has a one-line description of what services start and what URLs are rewritten
+
+  @unit @unimplemented
+  Scenario: make quickstart accepts a positional mode arg for non-interactive runs
+    When I run "make quickstart frontend-only"
+    Then dev.sh runs in frontend-only mode without prompting
+
+  @unit @unimplemented
+  Scenario: make quickstart-help prints the mode reference
     When I run "make quickstart-help"
-    Then the output lists modes "dev", "dev-nlp", "dev-scenarios", "dev-test", "dev-full"
-    And it explains shared stateful volumes
+    Then the output lists each of the five modes with services + URL overrides
     And it does not require interactive input
+
+  # --- Default = fastest path (#3860 AC#3) ---
+
+  @unit @unimplemented
+  Scenario: frontend-only mode starts no compose containers
+    When I run "make quickstart frontend-only"
+    Then no compose services are brought up
+    And langwatch/.env.dev-up contains only NEXTAUTH_PROVIDER=email
+    And no infrastructure URLs are overridden
+
+  @integration @unimplemented
+  Scenario: frontend-only mode is fast — under 5 seconds to ready hint
+    When I run "make quickstart frontend-only"
+    Then the command completes in under 5 seconds with a hint to run "pnpm dev"
+
+  # --- URL rewrite per mode (#3860 AC#6) ---
+
+  @unit @unimplemented
+  Scenario: backend-shared overrides only DATABASE_URL, REDIS_URL, CLICKHOUSE_URL
+    When write_overrides is called with mode=backend-shared
+    Then langwatch/.env.dev-up contains DATABASE_URL pointing at postgres:5432
+    And REDIS_URL pointing at redis:6379
+    And CLICKHOUSE_URL pointing at clickhouse:8123
+    And it does NOT contain LANGWATCH_NLP_SERVICE or LANGEVALS_ENDPOINT
+
+  @unit @unimplemented
+  Scenario: migration uses localhost host-port URLs for prisma migrate from host
+    When write_overrides is called with mode=migration
+    Then DATABASE_URL points at localhost:5432
+    And CLICKHOUSE_URL points at localhost:8123
+    And REDIS_URL is not overridden
+
+  @unit @unimplemented
+  Scenario: nlp adds LANGWATCH_NLP_SERVICE and LANGEVALS_ENDPOINT on top of backend
+    When write_overrides is called with mode=nlp
+    Then LANGWATCH_NLP_SERVICE points at langwatch_nlp:5561
+    And LANGEVALS_ENDPOINT points at langevals:5562
+    And the three backend URLs are also overridden
+
+  @unit @unimplemented
+  Scenario: full-local overrides every infrastructure URL
+    When write_overrides is called with mode=full-local
+    Then all five URLs (DATABASE_URL, REDIS_URL, CLICKHOUSE_URL, LANGWATCH_NLP_SERVICE, LANGEVALS_ENDPOINT) are present
+
+  @unit @unimplemented
+  Scenario: contributor's .env is the source of truth for non-overridden values
+    Given langwatch/.env defines OPENAI_API_KEY and LANGWATCH_NLP_SERVICE
+    When I run "make quickstart backend-shared"
+    Then OPENAI_API_KEY in the running container is the value from .env
+    And LANGWATCH_NLP_SERVICE is the value from .env (no override for this mode)
+
+  @unit @unimplemented
+  Scenario: write_overrides replaces langwatch/.env.dev-up — does not append
+    Given a previous run wrote backend-shared overrides
+    When write_overrides runs again with mode=frontend-only
+    Then langwatch/.env.dev-up no longer contains DATABASE_URL
+    And only the frontend-only override (NEXTAUTH_PROVIDER) remains
 
   # --- Stateful volume sharing (#3860 AC#4) ---
 
   @integration @unimplemented
   Scenario: postgres volume is shared across worktrees
     Given two worktrees of the langwatch repo
-    When worktree A runs "make quickstart" and signs up a user
+    When worktree A runs "make quickstart backend-shared" and signs up a user
     And worktree A stops with "make down"
-    And worktree B runs "make quickstart"
+    And worktree B runs "make quickstart backend-shared"
     Then the user signed up in worktree A is present in worktree B
 
   @integration @unimplemented
   Scenario: simultaneous postgres up across worktrees is detected
-    Given worktree A has postgres up via "make quickstart"
-    When worktree B runs "make quickstart"
+    Given worktree A has postgres up via "make quickstart backend-shared"
+    When worktree B runs "make quickstart backend-shared"
     Then quickstart errors with a clear message naming the colliding compose project
     And exits non-zero
 
@@ -61,7 +129,7 @@ Feature: make quickstart is the single dev environment entry point
   @integration @unimplemented
   Scenario: starting a second worktree reuses the existing redis
     Given worktree A has the dev environment up
-    When worktree B runs "make quickstart"
+    When worktree B runs "make quickstart backend-shared"
     Then no second redis container is started
     And worktree B reuses worktree A's redis on host :6379
 
@@ -70,7 +138,7 @@ Feature: make quickstart is the single dev environment entry point
   @unit @unimplemented
   Scenario: quickstart errors when langwatch/.env has IS_SAAS=true with BLOCK_LOCAL_HTTP_CALLS=false
     Given langwatch/.env contains IS_SAAS=true and BLOCK_LOCAL_HTTP_CALLS=false
-    When I run "make quickstart"
+    When I run "make quickstart backend-shared"
     Then quickstart exits non-zero with a SSRF-guard error message
 
   @integration @unimplemented

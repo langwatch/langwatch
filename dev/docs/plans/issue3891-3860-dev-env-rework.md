@@ -6,24 +6,40 @@
 
 ## Bundling decision
 
-**Verdict: keep bundled, but defer one slice of #3860 to a follow-up.**
+**Verdict: keep bundled, full scope of both issues.**
 
-#3891 is fully spec'd and unblocked. #3860 has an open question Drew himself wrote — *"Are remote dev services already provisioned and reachable?"* — and the answer is **no, not as a documented user-facing surface**. That blocks #3860 AC2 (intent-based mode prompting) and AC3 (frontend-only default = `pnpm dev` against remote dev). Without that infrastructure, "remote-by-default for stateless deps" is a UX promise that doesn't yet have a backing service.
+Re-scoped 2026-05-06 after Drew's clarification:
 
-What the bundle keeps from #3860:
-- AC1: `make quickstart` becomes the single entry point. `make dev*` and `make dev-up` survive as deprecation-warning thin wrappers for one release.
-- AC4: stateful volumes (`db-data`, `clickhouse-data`, opensearch if/when added) drop the per-worktree `${VOLUME_PREFIX}` and use stable shared names — sign-up persists across worktrees.
-- AC5: redis becomes a singleton (stable shared name + fixed exposed host port).
-- AC7 (subset): idempotency, fail-fast on `IS_SAAS=true && BLOCK_LOCAL_HTTP_CALLS!=true`, `make down` doesn't nuke shared singletons.
-- AC8 (subset): one-line hint per mode in the existing chooser; `make quickstart help` prints modes non-interactively.
-- AC9: deprecation warnings on `make dev*` / `make dev-up`.
-- AC10: no CI regression (CI uses raw `docker compose -f compose.dev.yml up` with `--profile`, which keeps working).
+> *"default to remote" really just means "default to whatever is in `.env`, everything else is an override." Profiles are URL-rewrite overrides on top of the contributor's existing `.env`. There is no shared remote dev backend to stand up — that was a misread of the spec.*
 
-What's **deferred** to a follow-up issue (filed in PR body):
-- AC2/AC3 intent-based prompting + `pnpm dev` against remote dev as the default. Needs the remote-dev infra question answered first.
-- AC6 (URL-rewrite-on-profile-flip) — requires an answered remote question to be coherent. The current `pnpm dev` localhost story still works, and developers can still set the env var manually.
+So #3860 AC2 / AC3 / AC6 are **back in scope**. The mental model:
 
-This trims the surface enough to ship together without holding #3891 hostage to infrastructure work.
+- **Contributor's `langwatch/.env` is the source of truth** for non-overridden URLs.
+- **Each mode is a URL-rewrite preset** — it controls (a) which compose services start and (b) which URLs in env get rewritten to localhost (overriding the `.env` value).
+- "default to remote" = "leave `.env` alone unless a mode explicitly overrides".
+
+Implementation: a `langwatch/.env.dev-up` overlay file is loaded LAST as `env_file` in the relevant services. Compose's `x-common-env` no longer hard-sets `DATABASE_URL` / `REDIS_URL` / `CLICKHOUSE_URL` / `LANGWATCH_NLP_SERVICE` / `LANGEVALS_ENDPOINT` — those come from `langwatch/.env` by default and are overridden by `.env.dev-up` when a mode wants the local container.
+
+Mode → (services, URL overrides):
+
+| Mode | Compose services | URL overrides written to `.env.dev-up` |
+|---|---|---|
+| `frontend-only` | (no compose) | (none — pure `pnpm dev` against `.env`) |
+| `backend-shared` | postgres + redis + clickhouse + app + init | `DATABASE_URL`, `REDIS_URL`, `CLICKHOUSE_URL` |
+| `migration` | postgres + clickhouse (host-ports exposed) | `DATABASE_URL`, `CLICKHOUSE_URL` (localhost forms) |
+| `nlp` | + langwatch_nlp + langevals | + `LANGWATCH_NLP_SERVICE`, `LANGEVALS_ENDPOINT` |
+| `full-local` | `--profile full` (everything) | all five |
+
+Migration mode uses a `compose.dev.migration.yml` overlay that adds host port mappings to postgres + clickhouse so the contributor can run `pnpm prisma migrate dev` and `pnpm clickhouse:migrate` from their host shell.
+
+`make quickstart` accepts a positional mode arg for non-interactive usage: `make quickstart frontend-only`, `make quickstart backend-shared`, etc. `make quickstart help` continues to print the mode reference.
+
+Deprecated targets (`make dev*` / `make dev-up`) become thin shims onto the new modes:
+- `make dev` → `backend-shared`
+- `make dev-nlp` → `nlp`
+- `make dev-scenarios` → `full-local`
+- `make dev-test` → `full-local`
+- `make dev-full` → `full-local`
 
 ## Investigation answers (#3860 open questions)
 
@@ -309,12 +325,12 @@ fi
 | AC | Where addressed | Status |
 |---|---|---|
 | 1 (single entry point) | `Makefile` deprecation wrappers, `CLAUDE.md`, `ADR-004` | done |
-| 2 (intent-based prompting) | — | **deferred** (needs remote dev infra answer) |
-| 3 (default = fastest path / pnpm dev remote) | — | **deferred** (same) |
+| 2 (intent-based prompting) | `scripts/dev.sh` 5-mode prompt | done |
+| 3 (default = fastest path) | `frontend-only` mode = no compose, ~instant | done |
 | 4 (stateful shared volumes + collision detection) | `compose.dev.yml`, `scripts/dev.sh` | done |
 | 5 (redis singleton + host port) | `compose.dev.yml` | done |
-| 6 (URL rewrite on profile flip) | — | **deferred** (couples to AC2/3) |
-| 7 (idempotent + fail-fast IS_SAAS guard) | `scripts/dev.sh` | done (subset) |
+| 6 (URL rewrite on profile flip) | `scripts/dev.sh` writes `langwatch/.env.dev-up` per mode; `compose.dev.yml` honours it via env_file overlay | done |
+| 7 (idempotent + fail-fast IS_SAAS guard) | `scripts/dev.sh` | done |
 | 8 (per-mode hints + `quickstart help`) | `scripts/dev.sh` | done |
 | 9 (deprecation warnings on old paths) | `Makefile`, `CLAUDE.md`, `ADR-004` | done |
 | 10 (no CI regressions, `pnpm test:*` pass) | verified by running typecheck + test:unit | gate |
