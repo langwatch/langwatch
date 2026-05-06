@@ -86,25 +86,14 @@ fi
 # ---------------------------------------------------------------------------
 echo "Starting LangWatch (project=${COMPOSE_PROJECT_NAME}, app_port=${APP_PORT})..."
 
-# Write URL overrides into langwatch/.env.dev-up. Loaded by app/workers/
-# ai-server services AFTER langwatch/.env (#3860 AC#6) — only the URLs
-# whose services are starting locally for this profile are overridden.
-# Profiles map to quickstart modes:
-#   (none) / dev  → backend-shared
-#   nlp           → nlp
-#   scenarios|test|full → full-local
-{
-  echo "NEXTAUTH_PROVIDER=email"
-  echo "DATABASE_URL=postgresql://prisma:prisma@postgres:5432/mydb?schema=mydb"
-  echo "REDIS_URL=redis://redis:6379"
-  echo "CLICKHOUSE_URL=http://default:langwatch@clickhouse:8123/langwatch"
-  case "$PROFILE" in
-    nlp|scenarios|test|full)
-      echo "LANGWATCH_NLP_SERVICE=http://langwatch_nlp:5561"
-      echo "LANGEVALS_ENDPOINT=http://langevals:5562"
-      ;;
-  esac
-} > langwatch/.env.dev-up
+# Write URL overrides into langwatch/.env.dev-up. Same shared helper as
+# scripts/dev.sh — only the URLs whose services actually start for this
+# profile are overridden (#3860 AC#6). The helper honors each service's
+# compose profile membership: langwatch_nlp runs under [nlp, scenarios,
+# full], langevals only under [nlp, full]. test/debug profiles add no
+# extra URL overrides.
+. "$(dirname "$0")/lib/write-dev-overrides.sh"
+write_dev_overrides "${PROFILE:-backend-shared}" langwatch/.env.dev-up
 
 $COMPOSE_CMD up -d
 

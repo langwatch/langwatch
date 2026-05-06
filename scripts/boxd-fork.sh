@@ -271,6 +271,8 @@ EOF
 }
 
 # boxd_map_ports VM — set up the standard set of proxies (AC#27).
+# Uses host-side `--vm` so we don't pay an extra `boxd exec` round-trip per
+# proxy just to invoke the in-VM CLI against itself.
 boxd_map_ports() {
   local vm="${1-}"
   [ -n "$vm" ] || { echo "VM name required" >&2; return 1; }
@@ -279,11 +281,11 @@ boxd_map_ports() {
     sub="${entry%%:*}"
     port="${entry##*:}"
     if [ "$sub" = "_default" ]; then
-      "$BOXD_BIN" exec "$vm" -- "boxd proxy set-port --port=$port" >/dev/null 2>&1 || true
+      "$BOXD_BIN" proxy set-port --port="$port" --vm "$vm" >/dev/null 2>&1 || true
       printf '  proxy: https://%s.boxd.sh -> :%s\n' "$vm" "$port" >&2
     else
       # `proxy new` errors if the subdomain already exists; that's idempotent.
-      "$BOXD_BIN" exec "$vm" -- "boxd proxy new $sub --port=$port" >/dev/null 2>&1 || true
+      "$BOXD_BIN" proxy new "$sub" --port="$port" --vm "$vm" >/dev/null 2>&1 || true
       printf '  proxy: https://%s.%s.boxd.sh -> :%s\n' "$sub" "$vm" "$port" >&2
     fi
   done
@@ -317,10 +319,11 @@ boxd_wake_if_suspended() {
 #   BRANCH     the actual git branch to check out inside the fork
 #   START_TMUX 1 to start a Claude tmux session (fork-issue), 0 otherwise
 _boxd_fork_impl() {
-  local source="$1" input="$2" user_arg="$3" branch="$4" start_tmux="${5:-0}"
-  local vm tmux
+  local source="$1" input="$2" user_arg="$3" branch="$4" start_tmux="${5:-0}" pr="${6:-}"
+  local vm tmux arg_name
   vm=$(boxd_vm_name "$source" "$input")
   tmux=$(boxd_tmux_name "$source" "$input")
+  arg_name=$(_boxd_arg_for_source "$source")
 
   printf 'Forking VM: %s (branch=%s, tmux=%s)\n' "$vm" "$branch" "$tmux" >&2
   printf '  proxies: https://%s.boxd.sh and configured subdomains\n' "$vm" >&2
@@ -331,7 +334,7 @@ _boxd_fork_impl() {
 ERROR: VM '$vm' already exists. Pick a different source or destroy it first:
          boxd destroy $vm
        Or connect to it:
-         make boxd-connect-${source%pr} ${source^^}=$input
+         make boxd-connect-${source} ${arg_name}=${user_arg}
 EOF
     return 1
   fi
@@ -342,9 +345,21 @@ EOF
     return 1
   fi
 
-  # Ensure the in-VM repo is on the right branch (AC#16: cross-fork PRs as
-  # detached head if the branch isn't local).
-  "$BOXD_BIN" exec "$vm" -- "cd langwatch && git fetch origin && git checkout '$branch' 2>/dev/null || git checkout -b '$branch' 'origin/$branch' 2>/dev/null || git checkout 'origin/$branch'" >/dev/null
+  # AC#16: for fork-pr, prefer `gh pr checkout` — it handles PRs from
+  # forked repos by adding the contributor's remote automatically.
+  # For branch/issue, fall back to fetch-then-checkout against origin.
+  if [ -n "$pr" ]; then
+    if ! "$BOXD_BIN" exec "$vm" -- "cd langwatch && gh pr checkout '$pr' --force 2>&1" >/dev/null; then
+      cat <<EOF >&2
+WARNING: 'gh pr checkout $pr' failed inside $vm. If the PR is from a fork
+         repo, the in-VM gh may not have access to it. Connect and inspect:
+           boxd connect $vm
+           cd langwatch && gh auth status && gh pr checkout $pr
+EOF
+    fi
+  else
+    "$BOXD_BIN" exec "$vm" -- "cd langwatch && git fetch origin && git checkout '$branch' 2>/dev/null || git checkout -b '$branch' 'origin/$branch' 2>/dev/null || git checkout 'origin/$branch'" >/dev/null
+  fi
 
   boxd_upload_creds "$vm"
   boxd_upload_envs "$vm"
@@ -384,7 +399,9 @@ boxd_fork_pr() {
   local slug
   slug=$(boxd_slug "$branch")
   boxd_branch_issue_collision_warning "$slug"
-  _boxd_fork_impl pr "$branch" "$pr" "$branch" 0
+  # Pass $pr as the 6th arg so _boxd_fork_impl uses `gh pr checkout` (AC#16:
+  # cross-fork PR support — gh adds the contributor's remote automatically).
+  _boxd_fork_impl pr "$branch" "$pr" "$branch" 0 "$pr"
 }
 
 # boxd_fork_branch BRANCH — fork for a branch that doesn't (yet) have a PR.
