@@ -120,17 +120,20 @@ check_saas_ssrf_guard() {
   fi
 }
 
-# Detect cross-worktree collision on stateful volumes (#3860 AC#4).
+# Detect cross-worktree collision on shared stateful volumes (#3860 AC#4).
+# Includes redis even though it's a singleton — a second worktree's compose
+# project would still try to start its own redis container against the
+# shared volume and fail with a less-helpful binding error.
 check_stateful_collision() {
   local me="${COMPOSE_PROJECT_NAME:-langwatch}"
   local vol cid project
-  for vol in langwatch-db-data langwatch-clickhouse-data; do
+  for vol in langwatch-db-data langwatch-clickhouse-data langwatch-redis-data; do
     for cid in $(docker ps -q --filter "volume=$vol" 2>/dev/null); do
       project=$(docker inspect -f '{{index .Config.Labels "com.docker.compose.project"}}' "$cid" 2>/dev/null || true)
       if [ -n "$project" ] && [ "$project" != "$me" ]; then
         cat >&2 <<EOF
 ERROR: Shared volume '$vol' is already in use by compose project '$project'.
-       Only one worktree can run postgres / clickhouse at a time.
+       Only one worktree can run postgres / clickhouse / redis at a time.
        Stop the other one first:
          (cd that worktree && make down)
 EOF
@@ -339,11 +342,20 @@ What are you working on?
 EOF
 if [ -n "$LAST" ]; then
   echo "Hit enter to repeat last: ${LAST}"
-  echo ""
+else
+  echo "Hit enter for frontend-only (the default)."
 fi
+echo ""
 
 read -p "Choice [1-5/d/l/p/c/r/q]: " choice
-[ -z "$choice" ] && [ -n "$LAST" ] && choice="$LAST"
+# Enter selects the saved choice if present, else the documented default.
+if [ -z "$choice" ]; then
+  if [ -n "$LAST" ]; then
+    choice="$LAST"
+  else
+    choice="frontend-only"
+  fi
+fi
 
 case "$choice" in
   1|frontend-only|frontend)
