@@ -3,6 +3,8 @@ import {
   createLangWatchApiClient,
   type LangwatchApiClient,
 } from "@/internal/api/client";
+import { buildAuthHeaders } from "@/internal/api/auth";
+import { DEFAULT_ENDPOINT } from "@/internal/constants";
 import { type InternalConfig } from "@/client-sdk/types";
 import {
   extractStatusFromResponse,
@@ -18,6 +20,77 @@ export interface EvaluationRunStartResponse {
 
 export type EvaluationRunStatusResponse =
   paths["/api/evaluations/v3/runs/{runId}"]["get"]["responses"]["200"]["content"]["application/json"];
+
+/**
+ * Summary entry returned by `GET /api/experiments`. Mirrors
+ * `experimentSummarySchema` from the control-plane Hono route. Hand-written
+ * because the route is not yet exposed via the generated OpenAPI types.
+ */
+export interface ExperimentSummary {
+  id: string;
+  slug: string;
+  name: string | null;
+  type: string;
+  workflowId: string | null;
+  createdAt: string;
+  updatedAt: string;
+  runsCount: number;
+  lastRunAt: string | null;
+}
+
+export interface ExperimentListPagination {
+  page: number;
+  pageSize: number;
+  totalHits: number;
+  hasMore: boolean;
+}
+
+export interface ExperimentListResponse {
+  experiments: ExperimentSummary[];
+  pagination: ExperimentListPagination;
+}
+
+/**
+ * Per-run entry returned by `GET /api/evaluations/v3/runs?experimentSlug=...`.
+ * Mirrors `ExperimentRun` from the control plane.
+ */
+export interface ExperimentRunSummaryEntry {
+  experimentId: string;
+  runId: string;
+  workflowVersion: {
+    id: string;
+    version: string;
+    commitMessage: string;
+    author: { name: string | null; image: string | null } | null;
+  } | null;
+  timestamps: {
+    createdAt: number;
+    updatedAt: number;
+    finishedAt?: number | null;
+    stoppedAt?: number | null;
+  };
+  progress?: number | null;
+  total?: number | null;
+  summary: {
+    datasetCost?: number;
+    evaluationsCost?: number;
+    datasetAverageCost?: number;
+    datasetAverageDuration?: number;
+    evaluationsAverageCost?: number;
+    evaluationsAverageDuration?: number;
+    evaluations: Record<
+      string,
+      { name: string; averageScore: number | null; averagePassed?: number }
+    >;
+  };
+}
+
+export interface EvaluationRunsListResponse {
+  experimentId: string;
+  experimentSlug: string;
+  runs: ExperimentRunSummaryEntry[];
+  pagination: ExperimentListPagination;
+}
 
 export class EvaluationsApiError extends Error {
   constructor(
@@ -64,5 +137,120 @@ export class EvaluationsApiService {
     );
     if (error) this.handleApiError(`get run status for "${runId}"`, error);
     return data;
+  }
+
+  /**
+   * List experiments for the current project.
+   *
+   * Hits `GET /api/experiments` directly via fetch (not the typed
+   * `apiClient`) because the route is not yet declared in the generated
+   * OpenAPI `paths`.
+   */
+  async listExperiments({
+    pageSize,
+    page,
+  }: {
+    pageSize?: number;
+    page?: number;
+  } = {}): Promise<ExperimentListResponse> {
+    const apiKey = process.env.LANGWATCH_API_KEY ?? "";
+    const endpoint = process.env.LANGWATCH_ENDPOINT ?? DEFAULT_ENDPOINT;
+    const projectId = process.env.LANGWATCH_PROJECT_ID;
+    const search = new URLSearchParams();
+    if (pageSize !== undefined) search.set("pageSize", String(pageSize));
+    if (page !== undefined) search.set("page", String(page));
+    const qs = search.toString();
+    const url = `${endpoint}/api/experiments${qs ? `?${qs}` : ""}`;
+
+    let response: Response;
+    try {
+      response = await fetch(url, {
+        method: "GET",
+        headers: {
+          ...buildAuthHeaders({ apiKey, projectId }),
+          "content-type": "application/json",
+        },
+      });
+    } catch (error) {
+      this.handleApiError("list experiments", error);
+    }
+
+    if (!response.ok) {
+      const text = await response.text().catch(() => "");
+      let parsed: unknown = text;
+      try {
+        parsed = JSON.parse(text);
+      } catch {
+        // keep raw text
+      }
+      const fauxError = {
+        response: { status: response.status },
+        data: parsed,
+      };
+      this.handleApiError("list experiments", fauxError);
+    }
+
+    return (await response.json()) as ExperimentListResponse;
+  }
+
+  /**
+   * List evaluation runs for an experiment slug.
+   *
+   * Hits `GET /api/evaluations/v3/runs?experimentSlug=...` directly via
+   * fetch because the route is not yet declared in the generated OpenAPI.
+   */
+  async listRuns({
+    experimentSlug,
+    pageSize,
+    page,
+  }: {
+    experimentSlug: string;
+    pageSize?: number;
+    page?: number;
+  }): Promise<EvaluationRunsListResponse> {
+    const apiKey = process.env.LANGWATCH_API_KEY ?? "";
+    const endpoint = process.env.LANGWATCH_ENDPOINT ?? DEFAULT_ENDPOINT;
+    const projectId = process.env.LANGWATCH_PROJECT_ID;
+    const search = new URLSearchParams();
+    search.set("experimentSlug", experimentSlug);
+    if (pageSize !== undefined) search.set("pageSize", String(pageSize));
+    if (page !== undefined) search.set("page", String(page));
+    const url = `${endpoint}/api/evaluations/v3/runs?${search.toString()}`;
+
+    let response: Response;
+    try {
+      response = await fetch(url, {
+        method: "GET",
+        headers: {
+          ...buildAuthHeaders({ apiKey, projectId }),
+          "content-type": "application/json",
+        },
+      });
+    } catch (error) {
+      this.handleApiError(
+        `list runs for experiment "${experimentSlug}"`,
+        error,
+      );
+    }
+
+    if (!response.ok) {
+      const text = await response.text().catch(() => "");
+      let parsed: unknown = text;
+      try {
+        parsed = JSON.parse(text);
+      } catch {
+        // keep raw text
+      }
+      const fauxError = {
+        response: { status: response.status },
+        data: parsed,
+      };
+      this.handleApiError(
+        `list runs for experiment "${experimentSlug}"`,
+        fauxError,
+      );
+    }
+
+    return (await response.json()) as EvaluationRunsListResponse;
   }
 }
