@@ -366,7 +366,11 @@ export const organizationRouter = createTRPCRouter({
         userId: z.string(),
       }),
     )
-    .use(checkOrganizationPermission("organization:view"))
+    // Tightened from organization:view to manage — exposing one
+    // member's full record (role assignments, team memberships) is an
+    // admin-surface read, not a peer-context read. No TS callers
+    // currently depend on member-role access to this procedure.
+    .use(checkOrganizationPermission("organization:manage"))
     .query(async ({ input, ctx }) => {
       const member = await getApp().organizations.getMemberById({
         organizationId: input.organizationId,
@@ -658,7 +662,11 @@ export const organizationRouter = createTRPCRouter({
         organizationId: z.string(),
       }),
     )
-    .use(checkOrganizationPermission("organization:view"))
+    // Tightened from organization:view to manage — pending invites
+    // expose admin intent (who's being added, with what role / to
+    // which teams). MEMBER reading this is a leak. Both TS callers
+    // (settings/members, SubscriptionPage) are admin-only surfaces.
+    .use(checkOrganizationPermission("organization:manage"))
     .query(async ({ input, ctx }) => {
       const prisma = ctx.prisma;
 
@@ -1236,7 +1244,12 @@ export const organizationRouter = createTRPCRouter({
         organizationId: z.string(),
       }),
     )
-    .use(checkOrganizationPermission("organization:view"))
+    // Tightened from organization:view to manage — full member list
+    // with PII (emails) is admin-surface data. No TS callers currently
+    // depend on this procedure; documented here so a future picker
+    // UX that needs member names knows to use a basic-view variant
+    // rather than re-loosening the permission.
+    .use(checkOrganizationPermission("organization:manage"))
     .query(async ({ input }) => {
       return getApp().organizations.getAllMembers(input.organizationId);
     }),

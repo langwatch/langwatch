@@ -119,7 +119,11 @@ export const teamRouter = createTRPCRouter({
    */
   getTeamsWithRoleBindings: protectedProcedure
     .input(z.object({ organizationId: z.string() }))
-    .use(checkOrganizationPermission("organization:view"))
+    // Tightened from organization:view to manage — exposes per-team
+    // direct members + role bindings + per-project access maps,
+    // which is admin-surface authorization data. Sole TS caller is
+    // settings/teams.tsx, an admin-only page.
+    .use(checkOrganizationPermission("organization:manage"))
     .query(async ({ input, ctx }) => {
       const service = new TeamService(ctx.prisma);
       return service.getTeamsWithRoleBindings({ organizationId: input.organizationId });
