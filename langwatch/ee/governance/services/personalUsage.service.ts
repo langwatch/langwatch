@@ -103,13 +103,22 @@ export interface PersonalUsageQueryInput {
  *             PRINCIPAL the User.id).
  *   AmountUSD, TokensInput, TokensOutput, Model, OccurredAt, etc.
  *
- * Personal-usage queries pin Scope='PRINCIPAL' AND ScopeId=userId so
+ * Personal-usage queries pin Scope='principal' (lowercase, matching
+ * `scopeToClickHouse` in budget.clickhouse.repository.ts:539) AND
+ * ScopeId=userId so
  * we get exactly the per-user ledger rows. Multi-budget events show
  * up multiple times across scope rows (one row per applicable budget),
  * but the Scope/ScopeId pair narrows to the user's principal slice
  * cleanly.
  */
-const PRINCIPAL_SCOPE = "PRINCIPAL";
+/**
+ * CH stores Scope as the lowercase form emitted by `scopeToClickHouse`
+ * (budget.clickhouse.repository.ts:539). Reader queries must match.
+ * Ariana caught the original 'PRINCIPAL' uppercase literal returning
+ * zero rows — the writer maps `GatewayBudgetScopeType.PRINCIPAL` →
+ * `"principal"` before insert.
+ */
+const PRINCIPAL_SCOPE = "principal";
 
 export class PersonalUsageService {
   /**
@@ -265,7 +274,7 @@ export class PersonalUsageService {
             sum(AmountUSD)     AS SpentUsd,
             countDistinct(GatewayRequestId) AS Requests
           FROM gateway_budget_ledger_events
-          WHERE Scope = 'PRINCIPAL'
+          WHERE Scope = 'principal'
             AND ScopeId = {userId:String}
             AND OccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64})
             AND OccurredAt <  fromUnixTimestamp64Milli({toMs:Int64})
@@ -399,7 +408,7 @@ export class PersonalUsageService {
             sum(AmountUSD)             AS SpentUsd,
             countDistinct(GatewayRequestId) AS Requests
           FROM gateway_budget_ledger_events
-          WHERE Scope = 'PRINCIPAL'
+          WHERE Scope = 'principal'
             AND ScopeId = {userId:String}
             AND OccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64})
             AND OccurredAt <  fromUnixTimestamp64Milli({toMs:Int64})
@@ -595,7 +604,7 @@ export class PersonalUsageService {
             sum(TokensInput)          AS PromptTokens,
             sum(TokensOutput)         AS CompletionTokens
           FROM gateway_budget_ledger_events
-          WHERE Scope = 'PRINCIPAL'
+          WHERE Scope = 'principal'
             AND ScopeId = {userId:String}
             AND OccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64})
             AND OccurredAt <  fromUnixTimestamp64Milli({toMs:Int64})
@@ -624,7 +633,7 @@ export class PersonalUsageService {
             Model AS Name,
             countDistinct(GatewayRequestId) AS Requests
           FROM gateway_budget_ledger_events
-          WHERE Scope = 'PRINCIPAL'
+          WHERE Scope = 'principal'
             AND ScopeId = {userId:String}
             AND OccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64})
             AND OccurredAt <  fromUnixTimestamp64Milli({toMs:Int64})
