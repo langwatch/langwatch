@@ -35,7 +35,7 @@ const summarizeEntry = (entry: Record<string, unknown>): string => {
     }
   }
   const firstString = Object.entries(entry).find(
-    ([, v]) => typeof v === "string" && (v as string).length > 0,
+    ([, v]) => typeof v === "string" && v.length > 0,
   );
   if (firstString) {
     const v = firstString[1] as string;

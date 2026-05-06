@@ -1,4 +1,4 @@
-import { makeRequest } from "../langwatch-api.js";
+import { LangWatchApiError, makeRequest } from "../langwatch-api.js";
 
 interface DatasetEntry {
   index: number;
@@ -77,7 +77,7 @@ export async function handleEvaluationResults(params: {
   const evaluatorFilter = params.evaluator?.trim();
   const limit =
     typeof params.limit === "number" && params.limit > 0
-      ? params.limit
+      ? Math.min(params.limit, DEFAULT_ROW_CAP)
       : DEFAULT_ROW_CAP;
 
   let results: EvaluationRunResults | null;
@@ -88,7 +88,18 @@ export async function handleEvaluationResults(params: {
     )) as EvaluationRunResults;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    if (/404|not found/i.test(message)) {
+    const status =
+      error instanceof LangWatchApiError
+        ? error.status
+        : error && typeof error === "object" &&
+            "status" in error &&
+            typeof (error as { status?: unknown }).status === "number"
+          ? (error as { status: number }).status
+          : undefined;
+    if (
+      status === 404 ||
+      (status === undefined && /404|not found/i.test(message))
+    ) {
       return [
         `# Evaluation Results: ${params.runId}`,
         "",
@@ -221,8 +232,12 @@ export async function handleEvaluationResults(params: {
     if (entry.traceId) {
       lines.push(`- **Trace ID**: \`${entry.traceId}\``);
     }
-    if (evaluatorNames.length === 0 && evaluations.length === 0) {
-      lines.push("- _No evaluations recorded_");
+    if (evaluations.length === 0) {
+      lines.push(
+        evaluatorNames.length === 0
+          ? "- _No evaluations recorded_"
+          : "- _No evaluations recorded for this row_",
+      );
     }
     for (const e of evaluations) {
       const parts: string[] = [`**${e.evaluator}**`];

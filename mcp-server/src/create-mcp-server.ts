@@ -1627,7 +1627,7 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
 
   server.tool(
     "platform_evaluation_results",
-    "Fetch per-row results for a completed evaluation run so you can debug evaluator scores and missed rows. Returns a markdown report: per-evaluator averages plus row-by-row scores and failure details. Output is capped at 50 rows by default to protect the agent's context window — narrow with `filter: 'failed'` or `evaluator` to see what matters, or raise `limit` if you really need more.",
+    "Fetch per-row results for a completed evaluation run so you can debug evaluator scores and missed rows. Returns a markdown report: per-evaluator averages plus row-by-row scores and failure details. Output is capped at 50 rows to protect the agent's context window — narrow with `filter: 'failed'` or `evaluator` to see what matters.",
     {
       runId: z
         .string()
@@ -1646,9 +1646,10 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
         .number()
         .int()
         .positive()
+        .max(50)
         .optional()
         .describe(
-          "Maximum number of rows to include in the markdown output (default 50). Higher values cost context window.",
+          "Maximum number of rows to include in the markdown output (default 50, hard-capped at 50).",
         ),
     },
     withToolLogging("platform_evaluation_results", async (params) => {

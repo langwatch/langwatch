@@ -105,13 +105,25 @@ export interface PromptMutationResponse {
 
 // --- HTTP client ---
 
+export class LangWatchApiError extends Error {
+  constructor(
+    message: string,
+    public readonly status: number,
+    public readonly responseBody: string,
+  ) {
+    super(message);
+    this.name = "LangWatchApiError";
+  }
+}
+
 /**
  * Sends an HTTP request to the LangWatch API.
  *
  * Builds the full URL from the configured endpoint, adds authentication,
  * and handles JSON serialization/deserialization.
  *
- * @throws Error with status code and response body when the response is not OK
+ * @throws LangWatchApiError with status code and response body when the
+ * response is not OK.
  */
 export async function makeRequest(
   method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE",
@@ -139,8 +151,10 @@ export async function makeRequest(
 
   if (!response.ok) {
     const responseBody = await response.text();
-    throw new Error(
-      `LangWatch API error ${response.status}: ${responseBody}`
+    throw new LangWatchApiError(
+      `LangWatch API error ${response.status}: ${responseBody}`,
+      response.status,
+      responseBody,
     );
   }
 

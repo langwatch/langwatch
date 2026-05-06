@@ -8,7 +8,7 @@ vi.mock("../langwatch-api.js", async (importOriginal) => {
   };
 });
 
-import { makeRequest } from "../langwatch-api.js";
+import { LangWatchApiError, makeRequest } from "../langwatch-api.js";
 import { handleEvaluationResults } from "../tools/get-evaluation-results.js";
 
 const mockMakeRequest = vi.mocked(makeRequest);
@@ -103,6 +103,51 @@ describe("handleEvaluationResults()", () => {
       });
     });
 
+    describe("when a caller asks for more than the row cap", () => {
+      it("still caps output at 50 rows", async () => {
+        const big = {
+          ...sample,
+          dataset: Array.from({ length: 80 }, (_, i) => ({
+            index: i,
+            entry: { input: `row ${i}` },
+          })),
+          evaluations: [],
+        };
+        mockMakeRequest.mockResolvedValueOnce(big);
+        const out = await handleEvaluationResults({
+          runId: "run_1",
+          limit: 5000,
+        });
+        expect(out).toContain("Output truncated to 50 rows of 80");
+      });
+    });
+
+    describe("when only some rows have evaluations", () => {
+      it("explains rows with no evaluation coverage", async () => {
+        mockMakeRequest.mockResolvedValueOnce({
+          ...sample,
+          dataset: [
+            { index: 0, entry: { input: "covered" } },
+            { index: 1, entry: { input: "uncovered" } },
+          ],
+          evaluations: [
+            {
+              evaluator: "quality",
+              index: 0,
+              status: "processed",
+              score: 0.9,
+              passed: true,
+            },
+          ],
+        });
+
+        const out = await handleEvaluationResults({ runId: "run_1" });
+
+        expect(out).toContain("uncovered");
+        expect(out).toContain("No evaluations recorded for this row");
+      });
+    });
+
     describe("when multiple targets share the same dataset index", () => {
       it("keeps evaluator rows target-scoped", async () => {
         mockMakeRequest.mockResolvedValueOnce({
@@ -147,7 +192,9 @@ describe("handleEvaluationResults()", () => {
   describe("given the run is missing", () => {
     describe("when the API throws a 404-shaped error", () => {
       it("returns a graceful 'not found' markdown", async () => {
-        mockMakeRequest.mockRejectedValueOnce(new Error("404 Not Found"));
+        mockMakeRequest.mockRejectedValueOnce(
+          new LangWatchApiError("missing", 404, "Run not found"),
+        );
         const out = await handleEvaluationResults({ runId: "missing" });
         expect(out).toContain("not found");
         expect(out).toContain("platform_evaluation_status");
