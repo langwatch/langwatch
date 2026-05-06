@@ -85,8 +85,27 @@ fi
 # Start services in detached mode
 # ---------------------------------------------------------------------------
 echo "Starting LangWatch (project=${COMPOSE_PROJECT_NAME}, app_port=${APP_PORT})..."
-# Use email auth for browser tests (overrides .env's NEXTAUTH_PROVIDER)
-echo "NEXTAUTH_PROVIDER=email" > langwatch/.env.dev-up
+
+# Write URL overrides into langwatch/.env.dev-up. Loaded by app/workers/
+# ai-server services AFTER langwatch/.env (#3860 AC#6) — only the URLs
+# whose services are starting locally for this profile are overridden.
+# Profiles map to quickstart modes:
+#   (none) / dev  → backend-shared
+#   nlp           → nlp
+#   scenarios|test|full → full-local
+{
+  echo "NEXTAUTH_PROVIDER=email"
+  echo "DATABASE_URL=postgresql://prisma:prisma@postgres:5432/mydb?schema=mydb"
+  echo "REDIS_URL=redis://redis:6379"
+  echo "CLICKHOUSE_URL=http://default:langwatch@clickhouse:8123/langwatch"
+  case "$PROFILE" in
+    nlp|scenarios|test|full)
+      echo "LANGWATCH_NLP_SERVICE=http://langwatch_nlp:5561"
+      echo "LANGEVALS_ENDPOINT=http://langevals:5562"
+      ;;
+  esac
+} > langwatch/.env.dev-up
+
 $COMPOSE_CMD up -d
 
 # ---------------------------------------------------------------------------
