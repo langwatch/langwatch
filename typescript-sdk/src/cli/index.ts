@@ -470,6 +470,42 @@ evaluationCmd
     await impl(runId, options);
   });
 
+evaluationCmd
+  .command("list-runs")
+  .description("List evaluation runs for an experiment by slug")
+  .requiredOption("--experiment <slug>", "Experiment slug to list runs for")
+  .option("-f, --format <format>", "Output format: table (default) or json", "table")
+  .option("--limit <n>", "Maximum runs to fetch (default 50, max 200)", "50")
+  .action(
+    async (options: {
+      experiment?: string;
+      format?: string;
+      limit?: string;
+    }) => {
+      const { evaluationListRunsCommand: impl } = await import(
+        "./commands/evaluation/list-runs.js"
+      );
+      await impl(options);
+    },
+  );
+
+// Add experiment command group
+const experimentCmd = program
+  .command("experiment")
+  .description("List and inspect experiments");
+
+experimentCmd
+  .command("list")
+  .description("List experiments in the project")
+  .option("-f, --format <format>", "Output format: table (default) or json", "table")
+  .option("--limit <n>", "Maximum experiments to fetch (default 50, max 200)", "50")
+  .action(async (options: { format?: string; limit?: string }) => {
+    const { experimentListCommand: impl } = await import(
+      "./commands/experiment/list.js"
+    );
+    await impl(options);
+  });
+
 // Add workflow command group
 const workflowCmd = program
   .command("workflow")
