@@ -81,7 +81,9 @@ export function createReplayRuntime(config: {
         aggregateType,
         source: "pipeline",
         definition: replayDef,
+        // Folds enqueue with `__jobType=projection`; pause middle segment matches.
         pauseKey: `${pipelineName}/projection/${foldDef.name}`,
+        kind: "fold",
       });
     }
 
@@ -94,7 +96,10 @@ export function createReplayRuntime(config: {
         aggregateType,
         source: "pipeline",
         definition: mapDef,
-        pauseKey: `${pipelineName}/projection/${mapDef.name}`,
+        // Maps enqueue with `__jobType=handler`; the dispatcher Lua script
+        // checks `{pipeline}/handler/{name}`, so the pauseKey must follow suit.
+        pauseKey: `${pipelineName}/handler/${mapDef.name}`,
+        kind: "map",
         targetTable: MAP_TARGET_TABLE[mapDef.name],
       });
     }

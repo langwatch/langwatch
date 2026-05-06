@@ -1,5 +1,6 @@
 import type IORedis from "ioredis";
 import type { DiscoveredAggregate } from "./replayEventLoader";
+import type { ProjectionKind } from "./types";
 
 /**
  * The GroupQueue's global key prefix. All event-sourcing jobs share one queue
@@ -8,35 +9,39 @@ import type { DiscoveredAggregate } from "./replayEventLoader";
 const GQ_KEY_PREFIX = "{event-sourcing/jobs}:gq:";
 
 /**
- * Pause a specific fold projection in the GroupQueue.
+ * groupId path segment used by `QueueManager` when building groupKeys.
+ * Folds use `fold/{name}`, maps use `map/{name}`.
+ */
+function groupSegment(kind: ProjectionKind): string {
+  return kind === "fold" ? "fold" : "map";
+}
+
+/**
+ * Pause a projection in the GroupQueue. The pauseKey is consumed by the
+ * dispatcher Lua script, which matches it against `{pipeline}/{__jobType}/{name}`
+ * — so callers must pass the pre-built pauseKey from the registered projection.
  */
 export async function pauseProjection({
   redis,
-  pipelineName,
-  projectionName,
+  pauseKey,
 }: {
   redis: IORedis;
-  pipelineName: string;
-  projectionName: string;
+  pauseKey: string;
 }): Promise<void> {
-  const pauseKey = `${pipelineName}/projection/${projectionName}`;
   const pausedSetKey = `${GQ_KEY_PREFIX}paused-jobs`;
   await redis.sadd(pausedSetKey, pauseKey);
 }
 
 /**
- * Unpause a fold projection and signal the dispatcher to wake up.
+ * Unpause a projection and signal the dispatcher to wake up.
  */
 export async function unpauseProjection({
   redis,
-  pipelineName,
-  projectionName,
+  pauseKey,
 }: {
   redis: IORedis;
-  pipelineName: string;
-  projectionName: string;
+  pauseKey: string;
 }): Promise<void> {
-  const pauseKey = `${pipelineName}/projection/${projectionName}`;
   const pausedSetKey = `${GQ_KEY_PREFIX}paused-jobs`;
   await redis.srem(pausedSetKey, pauseKey);
 
@@ -52,21 +57,24 @@ export async function waitForActiveJobs({
   redis,
   aggregates,
   projectionName,
+  kind,
   maxWaitMs = 60_000,
 }: {
   redis: IORedis;
   aggregates: DiscoveredAggregate[];
   projectionName: string;
+  kind: ProjectionKind;
   maxWaitMs?: number;
 }): Promise<void> {
   if (aggregates.length === 0) return;
 
+  const segment = groupSegment(kind);
   const start = Date.now();
 
   while (Date.now() - start < maxWaitMs) {
     const pipeline = redis.pipeline();
     for (const agg of aggregates) {
-      const groupId = `${agg.tenantId}/fold/${projectionName}/${agg.aggregateType}:${agg.aggregateId}`;
+      const groupId = `${agg.tenantId}/${segment}/${projectionName}/${agg.aggregateType}:${agg.aggregateId}`;
       pipeline.get(`${GQ_KEY_PREFIX}group:${groupId}:active`);
     }
     const results = await pipeline.exec();
@@ -99,7 +107,7 @@ export async function waitForAllActiveJobs({
 }: {
   redis: IORedis;
   aggregates: DiscoveredAggregate[];
-  projections: Array<{ projectionName: string }>;
+  projections: Array<{ projectionName: string; kind: ProjectionKind }>;
   maxWaitMs?: number;
 }): Promise<void> {
   if (aggregates.length === 0 || projections.length === 0) return;
@@ -110,7 +118,8 @@ export async function waitForAllActiveJobs({
     const pipeline = redis.pipeline();
     for (const agg of aggregates) {
       for (const proj of projections) {
-        const groupId = `${agg.tenantId}/fold/${proj.projectionName}/${agg.aggregateType}:${agg.aggregateId}`;
+        const segment = groupSegment(proj.kind);
+        const groupId = `${agg.tenantId}/${segment}/${proj.projectionName}/${agg.aggregateType}:${agg.aggregateId}`;
         pipeline.get(`${GQ_KEY_PREFIX}group:${groupId}:active`);
       }
     }

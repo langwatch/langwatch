@@ -37,15 +37,19 @@ function createTestProjection(opts?: { keyFn?: (event: any) => string }) {
 
 /** Helper: create a ReplayEvent with sensible defaults. */
 function makeEvent(overrides: Partial<ReplayEvent> = {}): ReplayEvent {
+  const id = `evt-${Math.random().toString(36).slice(2, 8)}`;
+  const now = Date.now();
   return {
-    id: `evt-${Math.random().toString(36).slice(2, 8)}`,
+    id,
     aggregateId: "agg-1",
     aggregateType: "test",
     tenantId: "tenant-1",
-    timestamp: Date.now(),
-    occurredAt: Date.now(),
+    createdAt: now,
+    timestamp: now,
+    occurredAt: now,
     type: "test.event",
     version: "2025-01-01",
+    idempotencyKey: id,
     data: { value: 10 },
     ...overrides,
   };
@@ -296,6 +300,31 @@ describe("FoldAccumulator", () => {
       expect(storeBatchSpy).not.toHaveBeenCalled();
     });
   });
+
+  describe("when fed events of types this projection does not declare", () => {
+    it("ignores them so co-discovered fold + map aggregates do not corrupt state", async () => {
+      // Optimized replay loads events for the union of all projections'
+      // event types per aggregate (one CH query per tenant). Each accumulator
+      // must drop events outside its own declared types — otherwise a fold
+      // co-discovered with a map projection will fold events it never
+      // accepted, corrupting state.
+      const { projection, storeBatchSpy } = createTestProjection();
+      const accumulator = new FoldAccumulator(projection);
+
+      accumulator.apply(makeEvent({ type: "test.event", data: { value: 10 } }));
+      accumulator.apply(makeEvent({ type: "unrelated.event", data: { value: 999 } }));
+      accumulator.apply(makeEvent({ type: "test.event", data: { value: 20 } }));
+
+      expect(accumulator.processed).toBe(2);
+
+      await accumulator.flush();
+
+      const batch = storeBatchSpy.mock.calls[0]![0] as Array<{
+        state: { total: number; count: number };
+      }>;
+      expect(batch[0]!.state).toEqual({ total: 30, count: 2 });
+    });
+  });
 });
 
 function createTestMapProjection(opts?: { eventTypes?: string[] }) {
@@ -402,7 +431,7 @@ describe("MapAccumulator", () => {
   });
 
   describe("when store has no bulkAppend", () => {
-    it("falls back to sequential append calls", async () => {
+    it("falls back to sequential append calls preserving per-event context", async () => {
       const appendSpy = vi.fn().mockResolvedValue(undefined);
       const projection: MapProjectionDefinition<{ doubled: number }, any> = {
         name: "noBulk",
@@ -412,14 +441,19 @@ describe("MapAccumulator", () => {
       };
       const acc = new MapAccumulator(projection);
 
-      acc.apply(makeEvent({ data: { value: 5 } }));
-      acc.apply(makeEvent({ data: { value: 10 } }));
+      acc.apply(makeEvent({ aggregateId: "agg-A", data: { value: 5 } }));
+      acc.apply(makeEvent({ aggregateId: "agg-B", data: { value: 10 } }));
 
       await acc.flush();
 
       expect(appendSpy).toHaveBeenCalledTimes(2);
       expect(appendSpy.mock.calls[0]![0]).toEqual({ doubled: 10 });
       expect(appendSpy.mock.calls[1]![0]).toEqual({ doubled: 20 });
+      // Each append fallback call must carry the originating event's
+      // aggregateId — stores keying off context.aggregateId would diverge
+      // from the non-optimized replay path otherwise.
+      expect(appendSpy.mock.calls[0]![1]).toMatchObject({ aggregateId: "agg-A" });
+      expect(appendSpy.mock.calls[1]![1]).toMatchObject({ aggregateId: "agg-B" });
     });
   });
 

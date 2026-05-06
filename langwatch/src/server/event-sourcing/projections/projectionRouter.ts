@@ -399,7 +399,8 @@ export class ProjectionRouter<
         name,
         handler: {
           handle: async (event: EventType) => {
-            // Defer or skip if projection-replay is active for this aggregate
+            // Defer or skip if projection-replay is active for this aggregate.
+            // Mirrors the fold projection replay-marker check.
             if (this.replayMarkerChecker) {
               const decision = await this.replayMarkerChecker.check(name, event);
               if (decision === "skip") return;
@@ -671,7 +672,8 @@ export class ProjectionRouter<
           }
 
           try {
-            // Defer or skip if projection-replay is active for this aggregate
+            // Defer or skip if projection-replay is active for this aggregate.
+            // Mirrors the fold projection replay-marker check.
             if (this.replayMarkerChecker) {
               const decision = await this.replayMarkerChecker.check(name, event);
               if (decision === "skip") continue;

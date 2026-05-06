@@ -8,7 +8,12 @@ export interface RegisteredFoldProjection {
   aggregateType: string;
   source: "pipeline" | "global";
   definition: FoldProjectionDefinition<any, Event>;
+  /**
+   * Pause-set entry consumed by the GroupQueue Lua dispatcher. Folds are
+   * enqueued as `__jobType=projection`, so this is `{pipeline}/projection/{name}`.
+   */
   pauseKey: string;
+  kind: "fold";
   /** ClickHouse table name for OPTIMIZE after replay. Omit for non-CH stores. */
   targetTable?: string;
 }
@@ -19,7 +24,12 @@ export interface RegisteredMapProjection {
   aggregateType: string;
   source: "pipeline" | "global";
   definition: MapProjectionDefinition<any, Event>;
+  /**
+   * Pause-set entry consumed by the GroupQueue Lua dispatcher. Maps are
+   * enqueued as `__jobType=handler`, so this is `{pipeline}/handler/{name}`.
+   */
   pauseKey: string;
+  kind: "map";
   /** ClickHouse table name for OPTIMIZE after replay. Omit for non-CH stores. */
   targetTable?: string;
 }
