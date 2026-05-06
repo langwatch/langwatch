@@ -156,32 +156,35 @@ export async function handleEvaluationResults(params: {
   }
 
   const totalMatching = rows.length;
+  const rowsForSummary = rows;
   const truncated = rows.length > limit;
   rows = rows.slice(0, limit);
 
-  // Per-evaluator average score across the (filtered) evaluations
+  // Per-evaluator stats across the filtered rows (before truncation),
+  // so the summary matches the displayed subset when filter="failed".
   const evaluatorAverages = new Map<
     string,
     { sum: number; count: number; passed: number; failed: number; errored: number }
   >();
-  for (const e of results.evaluations) {
-    if (evaluatorFilter && e.evaluator !== evaluatorFilter) continue;
-    const stats =
-      evaluatorAverages.get(e.evaluator) ?? {
-        sum: 0,
-        count: 0,
-        passed: 0,
-        failed: 0,
-        errored: 0,
-      };
-    if (typeof e.score === "number") {
-      stats.sum += e.score;
-      stats.count += 1;
+  for (const r of rowsForSummary) {
+    for (const e of r.evaluations) {
+      const stats =
+        evaluatorAverages.get(e.evaluator) ?? {
+          sum: 0,
+          count: 0,
+          passed: 0,
+          failed: 0,
+          errored: 0,
+        };
+      if (typeof e.score === "number") {
+        stats.sum += e.score;
+        stats.count += 1;
+      }
+      if (e.status === "error") stats.errored += 1;
+      else if (e.passed === true) stats.passed += 1;
+      else if (e.passed === false) stats.failed += 1;
+      evaluatorAverages.set(e.evaluator, stats);
     }
-    if (e.status === "error") stats.errored += 1;
-    else if (e.passed === true) stats.passed += 1;
-    else if (e.passed === false) stats.failed += 1;
-    evaluatorAverages.set(e.evaluator, stats);
   }
 
   const lines: string[] = [];

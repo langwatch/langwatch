@@ -410,7 +410,7 @@ export class ClickHouseExperimentRunService {
               SELECT
                 ExperimentId,
                 RunId,
-                max(CreatedAt) AS CreatedAt
+                argMax(CreatedAt, UpdatedAt) AS CreatedAt
               FROM experiment_runs
               WHERE TenantId = {tenantId:String}
                 AND ExperimentId IN ({experimentIds:Array(String)})
@@ -502,7 +502,7 @@ export class ClickHouseExperimentRunService {
                     AND ExperimentId = {experimentId:String}
                   GROUP BY TenantId, RunId, ExperimentId
                 )
-              ORDER BY t.CreatedAt DESC
+              ORDER BY t.CreatedAt DESC, t.RunId DESC
               LIMIT {pageSize:UInt32}
               OFFSET {offset:UInt32}
             `,

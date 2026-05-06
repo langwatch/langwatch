@@ -44,7 +44,7 @@ export class ExperimentRepository {
     const client = options?.tx ?? this.prisma;
     return await client.experiment.findMany({
       where: { projectId: input.projectId },
-      orderBy: { updatedAt: "desc" },
+      orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
       skip: input.skip,
       take: input.take,
     });

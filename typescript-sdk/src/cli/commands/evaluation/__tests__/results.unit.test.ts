@@ -1,13 +1,13 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { EvaluationsApiError } from "@/client-sdk/services/evaluations/evaluations-api.service";
+import type * as EvaluationsApiModule from "@/client-sdk/services/evaluations/evaluations-api.service";
 
 const oraMocks = vi.hoisted(() => ({
   fail: vi.fn(),
 }));
 
 vi.mock("@/client-sdk/services/evaluations/evaluations-api.service", async (importOriginal) => {
-  // eslint-disable-next-line @typescript-eslint/consistent-type-imports
-  const actual = await importOriginal<typeof import("@/client-sdk/services/evaluations/evaluations-api.service")>();
+  const actual = await importOriginal<typeof EvaluationsApiModule>();
   return {
     ...actual,
     EvaluationsApiService: vi.fn(),

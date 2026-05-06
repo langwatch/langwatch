@@ -33,10 +33,10 @@ const formatTimestamp = (iso: string | null): string => {
 };
 
 const escapeMarkdownTableCell = (value: string): string =>
-  value.replace(/\\/g, "\\\\").replace(/\|/g, "\\|").replace(/\n/g, " ");
+  value.replace(/[\\|]/g, (c) => `\\${c}`).replace(/\n/g, " ");
 
 const formatInlineCode = (value: string): string =>
-  `\`${escapeMarkdownTableCell(value).replace(/`/g, "\\`")}\``;
+  `\`${value.replace(/[\\`|]/g, (c) => `\\${c}`).replace(/\n/g, " ")}\``;
 
 export async function handleExperimentList(params: {
   limit?: number;

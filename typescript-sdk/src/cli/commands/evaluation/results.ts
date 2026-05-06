@@ -183,7 +183,9 @@ export const evaluationResultsCommand = async ({
               ? `${entry.error.slice(0, 37)}...`
               : entry.error,
           )
-        : chalk.green("ok");
+        : evaluations.some(isFailedEvaluation)
+          ? chalk.red("failed")
+          : chalk.green("ok");
 
       return {
         "#": String(entry.index),
