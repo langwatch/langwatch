@@ -252,24 +252,59 @@ function deriveAuditTarget(
     user: "user",
   };
   const targetKind = TARGET_KIND_BY_ROUTER[root];
-  // Best-effort id extraction. Mutations typically return either the
-  // entity directly (`{ id, ... }`), wrapped (`{ source: { id, ... } }`,
-  // `{ budget: {...} }`, `{ virtualKey: {...} }`), or a tuple with the
-  // id alongside a one-shot secret (`{ source, ingestSecret }` /
-  // `{ key, secret }`). Walk one level deep before giving up.
-  const obj = data as Record<string, unknown>;
-  const direct = obj.id;
-  if (typeof direct === "string") return { targetKind, targetId: direct };
+  // Best-effort id extraction. Mutations return one of:
+  //   1. entity directly ({ id })
+  //   2. wrapped ({ source: { id } }, { budget: { id } })
+  //   3. tuple with one-shot secret ({ source, ingestSecret })
+  //   4. array of entities ([{ id }, ...]) — bulk creates
+  //   5. array of wrapped ([{ invite: { id } }, ...]) — createInvites shape
+  //   6. wrapped array ({ invites: [{ id }] }) — alt bulk shape
+  // First non-empty id wins; ok to log only the first when many exist
+  // (the args column already shows the input — Target is a navigation
+  // anchor, not a complete inventory).
+  const firstId = findFirstId(data);
+  return firstId ? { targetKind, targetId: firstId } : { targetKind };
+}
+
+function findFirstId(value: unknown): string | undefined {
+  if (!value) return undefined;
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const id = findFirstId(item);
+      if (id) return id;
+    }
+    return undefined;
+  }
+  if (typeof value !== "object") return undefined;
+  const obj = value as Record<string, unknown>;
+  if (typeof obj.id === "string") return obj.id;
+  // One level of named-field walk into objects + arrays. We don't
+  // recurse arbitrarily deep — the audit Target column is best-effort,
+  // and an unbounded walk would surface unrelated ids buried in nested
+  // payloads.
   for (const key of Object.keys(obj)) {
     const child = obj[key];
-    if (child && typeof child === "object") {
-      const childId = (child as Record<string, unknown>).id;
-      if (typeof childId === "string") {
-        return { targetKind, targetId: childId };
+    if (Array.isArray(child)) {
+      for (const item of child) {
+        if (item && typeof item === "object") {
+          const itemId = (item as Record<string, unknown>).id;
+          if (typeof itemId === "string") return itemId;
+          // One more level for {invites:[{invite:{id}}]} shape
+          for (const innerKey of Object.keys(item)) {
+            const inner = (item as Record<string, unknown>)[innerKey];
+            if (inner && typeof inner === "object" && !Array.isArray(inner)) {
+              const innerId = (inner as Record<string, unknown>).id;
+              if (typeof innerId === "string") return innerId;
+            }
+          }
+        }
       }
+    } else if (child && typeof child === "object") {
+      const childId = (child as Record<string, unknown>).id;
+      if (typeof childId === "string") return childId;
     }
   }
-  return { targetKind };
+  return undefined;
 }
 
 const auditLogMutations = t.middleware(
