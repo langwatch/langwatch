@@ -40,7 +40,7 @@ export function createEvaluationTriggerReactor(
       // do not contribute to fold IO and must not re-trigger ON_MESSAGE evaluator runs. We
       // share `SYNTHETIC_SPAN_NAMES` with the trace-summary fold (foldProjection.ts:88) so a
       // future synthetic name updates both sites at once.
-      if (isSpanReceivedEvent(event) && SYNTHETIC_SPAN_NAMES.has(event.data.span?.name)) {
+      if (isSpanReceivedEvent(event) && SYNTHETIC_SPAN_NAMES.has(event.data.span.name)) {
         return;
       }
       const { tenantId, aggregateId: traceId, foldState } = context;

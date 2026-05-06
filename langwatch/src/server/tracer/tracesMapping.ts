@@ -697,6 +697,47 @@ export const mappingStateSchema = z.object({
 
 export type MappingState = z.infer<typeof mappingStateSchema>;
 
+// Coerces legacy `{}` and other partial-shape payloads into a valid MappingState
+// before persisting. Without this, monitors created via API with `mappings: {}`
+// end up missing the `.mapping` subkey, which crashes downstream evaluator code
+// at `Object.values(mappingState.mapping)` (see threadMappingResolver.ts). The
+// read-side guard there is defensive; this is the canonical write-side fix.
+//
+// Using z.preprocess (vs z.unknown().transform().pipe()) so hono-openapi can
+// infer the output type from the inner mappingStateSchema for the OpenAPI spec.
+export const monitorMappingsSchema = z.preprocess(
+  (value) => {
+    if (value === null || value === undefined) return value;
+    if (
+      typeof value === "object" &&
+      !Array.isArray(value) &&
+      "mapping" in (value as object)
+    ) {
+      return value;
+    }
+    return { mapping: {}, expansions: [] };
+  },
+  mappingStateSchema.nullable().optional(),
+);
+
+// Runtime equivalent of monitorMappingsSchema for callers that don't validate
+// through Zod (e.g. internal tRPC routes that consume already-typed input).
+// Coerces null/undefined/malformed shapes into a canonical empty MappingState
+// so the persist layer never writes the `{}` shape that triggers the
+// `Object.values(undefined)` crash in evaluator code paths.
+export const coerceMonitorMappings = (value: unknown): MappingState => {
+  if (
+    value !== null &&
+    typeof value === "object" &&
+    !Array.isArray(value) &&
+    "mapping" in (value as object)
+  ) {
+    const parsed = mappingStateSchema.safeParse(value);
+    if (parsed.success) return parsed.data;
+  }
+  return { mapping: {}, expansions: [] };
+};
+
 /**
  * Thread mapping type used in the wizard UI
  * Single Responsibility: Type definition for thread mapping configuration in the UI
@@ -847,9 +888,8 @@ type StringTypeToType = {
 // lets null/0/false/etc. pass through correctly as unwrapped values.
 const unwrapTypedObject = (v: unknown): unknown => {
   if (v === null || typeof v !== "object" || Array.isArray(v)) return undefined;
-  const keys = Object.keys(v as object);
-  if (keys.length !== 2 || !keys.includes("type") || !keys.includes("value"))
-    return undefined;
+  if (!("type" in v) || !("value" in v)) return undefined;
+  if (Object.keys(v as object).length !== 2) return undefined;
   const obj = v as { type: unknown; value: unknown };
   if (typeof obj.type !== "string") return undefined;
   return obj.value;

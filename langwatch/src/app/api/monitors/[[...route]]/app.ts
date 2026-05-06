@@ -4,7 +4,7 @@ import { describeRoute } from "hono-openapi";
 import { resolver, validator as zValidator } from "hono-openapi/zod";
 import { z } from "zod";
 import { prisma } from "~/server/db";
-import { mappingStateSchema } from "~/server/tracer/tracesMapping";
+import { monitorMappingsSchema } from "~/server/tracer/tracesMapping";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { createLogger } from "~/utils/logger/server";
 import {
@@ -48,29 +48,6 @@ const monitorResponseSchema = z.object({
 const monitorResponseWithPlatformUrlSchema = monitorResponseSchema.extend({
   platformUrl: z.string().url(),
 });
-
-// Coerces legacy `{}` and other partial-shape payloads into a valid MappingState
-// before persisting. Without this, monitors created via API with `mappings: {}`
-// end up missing the `.mapping` subkey, which crashes downstream evaluator code
-// at `Object.values(mappingState.mapping)` (see threadMappingResolver.ts). The
-// read-side guard there is defensive; this is the canonical write-side fix.
-//
-// Using z.preprocess (vs z.unknown().transform().pipe()) so hono-openapi can
-// infer the output type from the inner mappingStateSchema for the OpenAPI spec.
-const monitorMappingsSchema = z.preprocess(
-  (value) => {
-    if (value === null || value === undefined) return value;
-    if (
-      typeof value === "object" &&
-      !Array.isArray(value) &&
-      "mapping" in (value as object)
-    ) {
-      return value;
-    }
-    return { mapping: {}, expansions: [] };
-  },
-  mappingStateSchema.nullable().optional(),
-);
 
 const createMonitorSchema = z.object({
   name: z.string().min(1, "name is required"),
@@ -281,10 +258,7 @@ export const app = new Hono<{ Variables: Variables }>()
           executionMode: body.executionMode,
           preconditions: body.preconditions as Prisma.InputJsonValue,
           parameters: body.parameters as Prisma.InputJsonValue,
-          mappings: (body.mappings ?? {
-            mapping: {},
-            expansions: [],
-          }) as Prisma.InputJsonValue,
+          mappings: (body.mappings ?? null) as Prisma.InputJsonValue,
           sample: body.sample,
           enabled: true,
           evaluatorId: body.evaluatorId ?? null,

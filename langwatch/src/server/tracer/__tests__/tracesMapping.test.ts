@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildMetadataFieldChildren,
   buildSpanFieldChildren,
+  coerceMonitorMappings,
   extractTracesFields,
   getThreadAvailableSources,
   getTraceAvailableSources,
@@ -886,6 +887,47 @@ describe("tryAndConvertTo", () => {
   describe("when given undefined", () => {
     it("returns undefined", () => {
       expect(tryAndConvertTo(undefined, "string")).toBeUndefined();
+    });
+  });
+});
+
+describe("coerceMonitorMappings (runtime write-path coercion for non-Zod callers)", () => {
+  describe("when value is null", () => {
+    it("coerces to canonical empty MappingState", () => {
+      expect(coerceMonitorMappings(null)).toEqual({
+        mapping: {},
+        expansions: [],
+      });
+    });
+  });
+
+  describe("when value is undefined", () => {
+    it("coerces to canonical empty MappingState", () => {
+      expect(coerceMonitorMappings(undefined)).toEqual({
+        mapping: {},
+        expansions: [],
+      });
+    });
+  });
+
+  describe("when value is the legacy `{}` shape that caused issue #3875", () => {
+    it("coerces to canonical empty MappingState", () => {
+      expect(coerceMonitorMappings({})).toEqual({
+        mapping: {},
+        expansions: [],
+      });
+    });
+  });
+
+  describe("when value is a properly shaped MappingState", () => {
+    it("preserves the value", () => {
+      const valid = {
+        mapping: {
+          input: { source: "input", key: undefined, subkey: undefined },
+        },
+        expansions: [],
+      };
+      expect(coerceMonitorMappings(valid)).toEqual(valid);
     });
   });
 });

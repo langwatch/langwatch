@@ -61,6 +61,24 @@ function createEvent(
   overrides: Partial<TraceProcessingEvent> & { spanName?: string } = {},
 ): TraceProcessingEvent {
   const { spanName, ...rest } = overrides;
+  // When spanName is provided, build a valid span_received event. When omitted,
+  // build an origin_resolved event — represents non-span events flowing through
+  // the reactor (must NOT be short-circuited by the synthetic-span filter).
+  if (spanName === undefined) {
+    return {
+      id: "event-1",
+      aggregateId: "trace-1",
+      aggregateType: "trace",
+      tenantId: "tenant-1",
+      createdAt: Date.now(),
+      occurredAt: Date.now(),
+      type: "lw.obs.trace.origin_resolved",
+      version: 1,
+      data: { origin: "application" },
+      metadata: { traceId: "trace-1" },
+      ...rest,
+    } as TraceProcessingEvent;
+  }
   return {
     id: "event-1",
     aggregateId: "trace-1",
@@ -70,7 +88,7 @@ function createEvent(
     occurredAt: Date.now(),
     type: "lw.obs.trace.span_received",
     version: 1,
-    data: spanName !== undefined ? { span: { name: spanName } } : {},
+    data: { span: { name: spanName } },
     metadata: { spanId: "span-1", traceId: "trace-1" },
     ...rest,
   } as TraceProcessingEvent;

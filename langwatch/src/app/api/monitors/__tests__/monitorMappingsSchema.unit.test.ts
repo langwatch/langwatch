@@ -1,23 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { z } from "zod";
-import { mappingStateSchema } from "~/server/tracer/tracesMapping";
-
-// Mirror of the schema used by the monitors POST/PATCH endpoints.
-// Kept inline here to avoid exporting an internal helper purely for tests.
-const monitorMappingsSchema = z.preprocess(
-  (value) => {
-    if (value === null || value === undefined) return value;
-    if (
-      typeof value === "object" &&
-      !Array.isArray(value) &&
-      "mapping" in (value as object)
-    ) {
-      return value;
-    }
-    return { mapping: {}, expansions: [] };
-  },
-  mappingStateSchema.nullable().optional(),
-);
+import { monitorMappingsSchema } from "~/server/tracer/tracesMapping";
 
 describe("monitorMappingsSchema (write-path coercion)", () => {
   describe("when mappings is omitted (undefined)", () => {
