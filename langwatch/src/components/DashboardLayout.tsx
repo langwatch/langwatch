@@ -94,15 +94,32 @@ const Breadcrumbs = ({ currentRoute }: { currentRoute: Route | undefined }) => {
 
 /**
  * Header chip rendered on personal-scope routes (`/me`, `/me/settings`).
- * Replaces the legacy `<ProjectSelector>` so the user sees ONE workspace
- * chip — the unified `WorkspaceSwitcher` with Personal + Teams + Projects
- * groups — not two competing context indicators.
+ * Pinned to `current = personal` so the trigger always reads "My
+ * Workspace" inside the personal-scope chrome, regardless of URL.
  *
  * Spec: specs/ai-gateway/governance/persona-aware-chrome.feature
  */
 const PersonalScopeHeaderSwitcher = React.memo(function PersonalScopeHeaderSwitcher() {
   const data = useWorkspaceData();
   return <WorkspaceSwitcher {...data} current={{ kind: "personal" }} />;
+});
+
+/**
+ * Header chip rendered on project-scope routes (`/[project]/*`,
+ * `/settings/*`, `/governance/*`). Same `<WorkspaceSwitcher>` component
+ * as the personal-scope chrome — the only switcher in the app — with
+ * `current` auto-derived from the URL via `useWorkspaceCurrent`. The
+ * legacy `<ProjectSelector>` was a separate component with overlapping
+ * but inconsistent UX (different drop list, different context grouping,
+ * different copy); having two switchers in different parts of the app
+ * was the root cause of rchaves's "TWO co-existing workspace switchers"
+ * bug-bash.
+ *
+ * Spec: specs/ai-gateway/governance/workspace-switcher.feature
+ */
+const ProjectScopeHeaderSwitcher = React.memo(function ProjectScopeHeaderSwitcher() {
+  const data = useWorkspaceData();
+  return <WorkspaceSwitcher {...data} />;
 });
 
 export const ProjectSelector = React.memo(function ProjectSelector({
@@ -555,10 +572,7 @@ export const DashboardLayout = ({
             </HStack>
           ) : organizations && project ? (
             <HStack gap={0} alignItems="center">
-              <ProjectSelector
-                organizations={organizations}
-                project={project}
-              />
+              <ProjectScopeHeaderSwitcher />
               <Box display={["none", "none", "flex"]}>
                 <Breadcrumbs currentRoute={currentRoute} />
               </Box>
