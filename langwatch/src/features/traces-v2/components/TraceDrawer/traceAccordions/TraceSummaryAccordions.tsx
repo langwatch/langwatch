@@ -27,6 +27,10 @@ export function TraceSummaryAccordions({
 }) {
   const hasIO = !!(trace.input || trace.output);
   const traceAttributes = trace.attributes ?? {};
+  // The trace summary fold projection hoists every span event onto the
+  // trace, including the legacy `/track-event` payloads (which the
+  // migration step attaches to the first span as OTel span events). One
+  // source, no merge.
   const traceEvents = trace.events ?? [];
   const resources = useTraceResources(trace.traceId);
   const hasResourceAttributes =
@@ -288,7 +292,7 @@ export function TraceSummaryAccordions({
                         )}
                         ms
                       </Text>
-                      {onSelectSpan && (
+                      {onSelectSpan && evt.spanId && (
                         <Button
                           size="xs"
                           variant="ghost"

@@ -136,22 +136,166 @@ export function getRangeValue(
   return result;
 }
 
-/** Check if there's a cross-facet OR at the top level (or recursively). */
+/** Check if there's a cross-facet OR — an OR group whose members span
+ * more than one field. Same-field ORs (`status:error OR status:warning`)
+ * are sidebar-friendly and don't count. */
 export function hasCrossFacetOR(ast: LiqeQuery): boolean {
-  if (ast.type !== "LogicalExpression") return false;
-  if (ast.operator.operator !== "OR") {
-    return hasCrossFacetOR(ast.left) || hasCrossFacetOR(ast.right);
-  }
-  const leftField = topField(ast.left);
-  const rightField = topField(ast.right);
-  if (leftField && rightField && leftField !== rightField) return true;
-  return hasCrossFacetOR(ast.left) || hasCrossFacetOR(ast.right);
+  return analyzeOrGroups(ast).groups.some((g) => g.fields.size > 1);
 }
 
-function topField(ast: LiqeQuery): string | null {
-  if (ast.type === "Tag") {
-    return ast.field.type === "ImplicitField" ? null : ast.field.name;
+/**
+ * One member of a cross-facet OR group: a single Tag value within the
+ * group's parenthesised expression.
+ */
+export interface OrGroupMember {
+  field: string;
+  value: string;
+  /** true when the Tag is wrapped in `NOT` / `-`. Excluded values still
+   * belong to the group — the sidebar renders them as exclude chips. */
+  negated: boolean;
+  /** Liqe-text-coordinate range of the Tag (for value swap / removal). */
+  start: number;
+  end: number;
+}
+
+/**
+ * Cross-facet OR group: a `LogicalExpression` whose OR-joined branches
+ * span more than one field. The sidebar reads this to render its
+ * "linked" badge + connector and to decide which facet rows belong to
+ * which OR group.
+ *
+ * `id` is a stable hash of the group's location so consumers can use
+ * it for coloring / connector-line keying without having to re-derive
+ * it on every render.
+ */
+export interface OrGroup {
+  id: string;
+  fields: ReadonlySet<string>;
+  members: OrGroupMember[];
+  /** Liqe-text-coordinate range of the group's outermost OR
+   * expression — used by mutations that add/remove members. */
+  start: number;
+  end: number;
+}
+
+export interface OrGroupAnalysis {
+  groups: OrGroup[];
+  /**
+   * `${field}|${value}` → group id. An exact (field, value) participates
+   * in at most one OR group, so a single-id map is sound here.
+   * Use this for membership lookups from chip/row hover handlers.
+   */
+  memberToGroupId: Map<string, string>;
+  /**
+   * Field → list of group ids whose members include this field. A field
+   * can appear in multiple disjoint OR groups, so this is a list rather
+   * than a single id (e.g. `(status:error OR model:gpt-4) AND
+   * (status:warning OR service:api)` — `status` is in both groups).
+   * Sidebar consumers that want a single representative group should
+   * pick `[0]`; consumers that want all peers should iterate.
+   */
+  fieldToGroupIds: Map<string, string[]>;
+}
+
+function memberKey(field: string, value: string): string {
+  return `${field}|${value}`;
+}
+
+/**
+ * Walk the AST and produce a structured map of every OR group. A
+ * group is any `LogicalExpression` (op = OR) with two or more Tag
+ * descendants — *including* same-field ORs like
+ * `(status:error OR status:warning)`, which the sidebar can already
+ * render as multiple selected values within one section but for
+ * which the user still wants the connector line as visual
+ * confirmation that those values are linked. Nested OR subtrees are
+ * flattened into the same group — the visual treatment doesn't
+ * distinguish `(a OR b OR c)` from `((a OR b) OR c)`.
+ */
+export function analyzeOrGroups(ast: LiqeQuery): OrGroupAnalysis {
+  const groups: OrGroup[] = [];
+  const memberToGroupId = new Map<string, string>();
+  const fieldToGroupIds = new Map<string, string[]>();
+
+  const visit = (node: LiqeQuery): void => {
+    if (node.type === "LogicalExpression") {
+      if (node.operator.operator === "OR") {
+        const members = collectOrMembers(node);
+        if (members.length > 1) {
+          const id = `or-${node.location.start}-${node.location.end}`;
+          const fields = new Set(members.map((m) => m.field));
+          groups.push({
+            id,
+            fields,
+            members,
+            start: node.location.start,
+            end: node.location.end,
+          });
+          for (const m of members) {
+            memberToGroupId.set(memberKey(m.field, m.value), id);
+          }
+          for (const f of fields) {
+            const existing = fieldToGroupIds.get(f);
+            if (existing) {
+              if (!existing.includes(id)) existing.push(id);
+            } else {
+              fieldToGroupIds.set(f, [id]);
+            }
+          }
+          return;
+        }
+      }
+      visit(node.left);
+      visit(node.right);
+      return;
+    }
+    if (node.type === "UnaryOperator") {
+      visit(node.operand);
+      return;
+    }
+    if (node.type === "ParenthesizedExpression") {
+      visit(node.expression);
+    }
+  };
+  visit(ast);
+
+  return { groups, memberToGroupId, fieldToGroupIds };
+}
+
+function collectOrMembers(node: LiqeQuery, negated = false): OrGroupMember[] {
+  // Flatten nested OR LogicalExpressions but stop at AND boundaries —
+  // an AND inside an OR group is treated as opaque (the sidebar can't
+  // represent it), so the caller's group.members may not enumerate
+  // every Tag. That's fine for visualisation; the warning still
+  // surfaces if the user expects the sidebar to be authoritative.
+  if (node.type === "LogicalExpression") {
+    if (node.operator.operator === "OR") {
+      return [
+        ...collectOrMembers(node.left, negated),
+        ...collectOrMembers(node.right, negated),
+      ];
+    }
+    return [];
   }
-  if (ast.type === "UnaryOperator") return topField(ast.operand);
-  return null;
+  if (node.type === "ParenthesizedExpression") {
+    return collectOrMembers(node.expression, negated);
+  }
+  if (node.type === "UnaryOperator") {
+    const isNeg = node.operator === "NOT" || node.operator === "-";
+    return collectOrMembers(node.operand, negated !== isNeg);
+  }
+  if (node.type === "Tag") {
+    if (node.field.type === "ImplicitField") return [];
+    if (node.expression.type !== "LiteralExpression") return [];
+    return [
+      {
+        field: (node.field as { name: string }).name,
+        value: String(node.expression.value),
+        negated,
+        start: node.location.start,
+        end: node.location.end,
+      },
+    ];
+  }
+  return [];
 }

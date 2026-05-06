@@ -38,13 +38,43 @@ const OPERATOR_SHAPED_WORD_REGEX = /\b([A-Z]{2,5})\b/g;
 // Tolerant fallback for queries that don't yet parse (mid-typing, unmatched
 // quotes, trailing operator). Decorates anything shaped like `field:value`
 // so users still get visual feedback while editing.
+//
+// Value alternatives (in match-precedence order):
+//   - "..."             quoted literal
+//   - [...]             bracketed range, e.g. duration:[100 TO 1000]
+//   - (>=|<=|>|<)NUM    comparison range, e.g. duration:>1000 / cost:<=5
+//   - ...               bare token (catch-all for everything else)
+//
+// The comparison-range alternative was missing originally — without it,
+// typing `duration:>1000` left the token unhighlighted, so users saw the
+// numeric facet "stop working" mid-edit.
 const FILTER_TOKEN_REGEX =
-  /(?<prefix>NOT\s+|-)?(?<field>[a-zA-Z][a-zA-Z0-9_.]*):(?:"[^"]*"|\[[^\]]*\]|[^\s()]+)/g;
+  /(?<prefix>NOT\s+|-)?(?<field>[a-zA-Z][a-zA-Z0-9_.]*):(?:"[^"]*"|\[[^\]]*\]|(?:>=|<=|>|<)[^\s()]+|[^\s()]+)/g;
 
 export interface DecorationSlot {
   from: number;
   to: number;
   className: string;
+  /**
+   * Optional liqe-text-coordinate range for click-to-cycle on the
+   * AND/OR keyword. Set when the slot wraps a BooleanOperator; the
+   * editor's mousedown handler reads `data-filter-op-start` /
+   * `data-filter-op-end` off the inline span to invoke
+   * `swapOperatorAtLocation`. Other slots leave this undefined.
+   */
+  opLoc?: { start: number; end: number };
+  /**
+   * Optional field+value+location reference for click-to-edit on the
+   * value chip. Set on Tag slots; the editor's mousedown handler reads
+   * `data-filter-chip-start` etc. off the inline span to open the
+   * value picker popover.
+   */
+  chipToken?: {
+    start: number;
+    end: number;
+    field: string;
+    value: string;
+  };
 }
 
 /**
@@ -222,6 +252,20 @@ function walkAst(
         from: start,
         to: end,
         className: tagClassName({ fieldName, negated }),
+        // Carry the parsed token coords through to the inline
+        // decoration so the editor's mousedown delegate can open the
+        // value picker without re-walking the AST. Only categorical
+        // (literal-value) chips qualify — range chips have no
+        // single-value picker.
+        chipToken:
+          value !== null
+            ? {
+                start: tag.location.start,
+                end: tag.location.end,
+                field: fieldName,
+                value,
+              }
+            : undefined,
       });
       return;
     }
@@ -245,7 +289,11 @@ function walkAst(
         plan.slots.push({
           from: baseOffset + op.location.start,
           to: baseOffset + op.location.end,
-          className: `filter-keyword filter-keyword-${op.operator.toLowerCase()}`,
+          className: `filter-keyword filter-keyword-${op.operator.toLowerCase()} filter-keyword-clickable`,
+          // Carry the liqe-text coordinates through to the inline
+          // decoration so the editor's click delegate can call
+          // `swapOperatorAtLocation` without re-walking the AST.
+          opLoc: { start: op.location.start, end: op.location.end },
         });
       }
       walkAst(logic.right, negated, baseOffset, plan);
@@ -360,6 +408,13 @@ function createDeleteWidget(token: TokenRef): HTMLElement {
   btn.dataset.field = token.field;
   btn.dataset.kind = token.kind;
   if (token.value !== null) btn.dataset.value = token.value;
+  // Mirror the chip's data-attrs onto the X button so the
+  // chip-highlight CSS picks it up as part of the same chip — without
+  // these, hovering the chip would tint just the field:value half and
+  // leave the right-half X button in its original colour, breaking
+  // the visual that the two halves form one pill.
+  btn.dataset.filterChipField = token.field;
+  if (token.value !== null) btn.dataset.filterChipValue = token.value;
 
   // Crisp SVG X — the "×" text glyph rendered chunky and uneven at this size.
   const svg = document.createElementNS(SVG_NS, "svg");
@@ -395,9 +450,19 @@ function computeDecorations(
     if (!node.isText || !node.text) return;
     const plan = buildDecorationPlan(node.text, pos);
     for (const slot of plan.slots) {
-      decorations.push(
-        Decoration.inline(slot.from, slot.to, { class: slot.className }),
-      );
+      const attrs: Record<string, string> = { class: slot.className };
+      if (slot.opLoc) {
+        attrs["data-filter-op-start"] = String(slot.opLoc.start);
+        attrs["data-filter-op-end"] = String(slot.opLoc.end);
+        attrs["title"] = "Click to switch AND ↔ OR";
+      }
+      if (slot.chipToken) {
+        attrs["data-filter-chip-start"] = String(slot.chipToken.start);
+        attrs["data-filter-chip-end"] = String(slot.chipToken.end);
+        attrs["data-filter-chip-field"] = slot.chipToken.field;
+        attrs["data-filter-chip-value"] = slot.chipToken.value;
+      }
+      decorations.push(Decoration.inline(slot.from, slot.to, attrs));
     }
     for (const token of plan.tokens) {
       // AST tokens carry liqe's trimmed-text coords, so we translate by

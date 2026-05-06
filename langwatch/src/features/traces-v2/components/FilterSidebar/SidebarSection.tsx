@@ -10,6 +10,7 @@ import {
 import { ChevronDown, ChevronUp, GripVertical } from "lucide-react";
 import type React from "react";
 import { useState } from "react";
+import { orGroupColor } from "./orGroupPalette";
 
 interface SidebarSectionProps {
   title: string;
@@ -31,6 +32,28 @@ interface SidebarSectionProps {
    * is moving toward.
    */
   onShiftToggle?: (nextOpen: boolean) => void;
+  /**
+   * Set when this section's facet participates in a cross-facet OR
+   * group. Renders an "OR · linked" pill in the header and a coloured
+   * left-border on the section background so users can tell at a
+   * glance that this row's value is OR-bound to other sections rather
+   * than independently AND-toggleable.
+   */
+  orGroupId?: string;
+  /**
+   * Other field names in the same OR group. Surfaced in the OR pill
+   * as "OR · model · service" so users know exactly which sections
+   * are linked without scanning the rail for matching colours.
+   */
+  orPeers?: readonly string[];
+  /**
+   * Content rendered between the header and the collapsible — always
+   * visible, even when the section is collapsed. Used by FacetSection
+   * to keep active values (and OR-group members) visible at all
+   * times so the connector line and at-a-glance read of "what's
+   * filtered" never depend on the section being expanded.
+   */
+  pinnedContent?: React.ReactNode;
   children: React.ReactNode;
 }
 
@@ -47,8 +70,17 @@ export const SidebarSection: React.FC<SidebarSectionProps> = ({
   hasActive = false,
   dragHandleProps,
   onShiftToggle,
+  orGroupId,
+  orPeers,
+  pinnedContent,
   children,
 }) => {
+  const orPalette = orGroupId ? orGroupColor(orGroupId) : undefined;
+  const peerLabel =
+    orPeers && orPeers.length > 0
+      ? orPeers.slice(0, 3).join(" · ") +
+        (orPeers.length > 3 ? ` +${orPeers.length - 3}` : "")
+      : null;
   const [internalOpen, setInternalOpen] = useState(false);
   const isControlled = open !== undefined;
   const effectiveOpen = isControlled ? open : internalOpen;
@@ -89,6 +121,27 @@ export const SidebarSection: React.FC<SidebarSectionProps> = ({
         gap={1}
         role="group"
         data-group
+        // When this section participates in a cross-facet OR group,
+        // anchor a 3px coloured rail on the left edge so the section
+        // visually links to its peers in the same group. Painting it
+        // as a pseudo-rail (insetInlineStart border) instead of a real
+        // border keeps the section's hit-rect unchanged.
+        position="relative"
+        _before={
+          orPalette
+            ? {
+                content: '""',
+                position: "absolute",
+                top: "6px",
+                bottom: "6px",
+                left: 0,
+                width: "3px",
+                borderRadius: "0 2px 2px 0",
+                bg: `${orPalette}.solid`,
+                opacity: 0.85,
+              }
+            : undefined
+        }
       >
         <HStack gap={1} width="full" align="center">
           {dragHandleProps && (
@@ -171,6 +224,41 @@ export const SidebarSection: React.FC<SidebarSectionProps> = ({
                       {valueCount}
                     </Text>
                   )}
+                {orPalette && (
+                  <Box
+                    as="span"
+                    display="inline-flex"
+                    alignItems="center"
+                    gap="3px"
+                    bg={`${orPalette}.subtle`}
+                    color={`${orPalette}.fg`}
+                    borderWidth="1px"
+                    borderColor={`${orPalette}.muted`}
+                    paddingX="6px"
+                    paddingY="0"
+                    borderRadius="4px"
+                    fontSize="2xs"
+                    fontWeight="700"
+                    letterSpacing="0.04em"
+                    title={
+                      peerLabel
+                        ? `OR-linked with: ${peerLabel}`
+                        : "This facet is OR-linked"
+                    }
+                  >
+                    OR
+                    {peerLabel && (
+                      <Box
+                        as="span"
+                        fontWeight="500"
+                        textTransform="lowercase"
+                        opacity={0.85}
+                      >
+                        · {peerLabel}
+                      </Box>
+                    )}
+                  </Box>
+                )}
                 {activeIndicator}
               </HStack>
               <Icon
@@ -185,8 +273,12 @@ export const SidebarSection: React.FC<SidebarSectionProps> = ({
           </Collapsible.Trigger>
         </HStack>
 
+        {pinnedContent && (
+          <Box marginTop={1}>{pinnedContent}</Box>
+        )}
+
         <Collapsible.Content>
-          <Box marginTop={1}>{children}</Box>
+          <Box marginTop={pinnedContent ? 0 : 1}>{children}</Box>
         </Collapsible.Content>
       </VStack>
     </Collapsible.Root>

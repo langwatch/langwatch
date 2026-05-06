@@ -187,15 +187,17 @@ function SortableHeaderButton({
             {sortDirection === "desc" ? <ChevronDown /> : <ChevronUp />}
           </Icon>
         ) : (
-          // Inactive sortable columns get a faint chevron that fades in on
-          // hover so the user knows the column *is* clickable. Hidden by
-          // default (`opacity: 0`) so it doesn't crowd numeric headers — the
-          // group hover state lifts it to 0.5 for the affordance hint.
+          // Inactive sortable columns show a faint chevron at all times so
+          // users can tell at a glance which columns are sortable without
+          // having to hover each one. Hover lifts it to make the click
+          // target obvious. Previously the chevron only appeared on hover,
+          // which made sortable and non-sortable headers visually
+          // identical and led to surprise no-ops on click.
           <Icon
             boxSize="12px"
             color="fg.muted"
-            opacity={0}
-            _groupHover={{ opacity: 0.5 }}
+            opacity={0.35}
+            _groupHover={{ opacity: 0.85 }}
             transition="opacity 0.1s ease"
           >
             <ChevronDown />
