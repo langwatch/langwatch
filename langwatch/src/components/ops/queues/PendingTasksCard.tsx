@@ -41,14 +41,6 @@ const TABLE_ROW_HEIGHT = 36;
 const SEARCH_PAGE_SIZE = 100;
 const CHART_HEIGHT = 280;
 
-const SEARCHABLE_STATES: SearchableJobState[] = [
-  "ready",
-  "scheduled",
-  "retrying",
-  "blocked",
-  "stale",
-];
-
 function formatNumber(n: number): string {
   return n.toLocaleString();
 }
@@ -596,19 +588,29 @@ function SearchSection({
                     getItemKey={(i) => `${jobs[i]!.groupId}/${jobs[i]!.jobId}`}
                     renderRow={(i) => {
                       const job = jobs[i]!;
+                      const openDetail = () => {
+                        // Stale rows have no real job behind them, so
+                        // open the group dialog instead of the job
+                        // dialog (which would just say "not found").
+                        if (job.state === "stale") {
+                          setGroupDetail({ groupId: job.groupId });
+                        } else {
+                          setJobDetail({ groupId: job.groupId, jobId: job.jobId });
+                        }
+                      };
                       return (
                         <Table.Row
                           key={`${job.groupId}/${job.jobId}`}
                           cursor="pointer"
                           _hover={{ bg: "bg.subtle" }}
-                          onClick={() => {
-                            // Stale rows have no real job behind them, so
-                            // open the group dialog instead of the job
-                            // dialog (which would just say "not found").
-                            if (job.state === "stale") {
-                              setGroupDetail({ groupId: job.groupId });
-                            } else {
-                              setJobDetail({ groupId: job.groupId, jobId: job.jobId });
+                          tabIndex={0}
+                          role="button"
+                          aria-label={`Open ${job.state} job ${job.jobId} in group ${job.groupId}`}
+                          onClick={openDetail}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault();
+                              openDetail();
                             }
                           }}
                         >

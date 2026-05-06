@@ -1,7 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
 import { QueueService } from "../queue.service";
 import type { QueueRepository, DlqGroupInfo } from "../repositories/queue.repository";
-import type { GroupInfo, QueueInfo } from "../types";
+import type {
+  GroupInfo,
+  QueueInfo,
+  PendingJobSummary,
+  PendingJobSearchResult,
+  QueueOverview,
+} from "../types";
 
 function createGroup(overrides: Partial<GroupInfo> = {}): GroupInfo {
   return {
@@ -379,6 +385,229 @@ describe("QueueService", () => {
 
         expect(result).toEqual({ unblockedCount: 2, groupIds: ["g1", "g2"] });
         expect(repo.canaryUnblock).toHaveBeenCalledWith({ queueName: "q1", count: 5 });
+      });
+    });
+  });
+
+  describe("getQueueOverview()", () => {
+    function createOverview(overrides: Partial<QueueOverview> = {}): QueueOverview {
+      return {
+        queueName: "q1",
+        generatedAtMs: 1,
+        computedDurationMs: 1,
+        groupsScanned: 0,
+        totals: { jobs: 0, groups: 0, ready: 0, scheduled: 0, retrying: 0, active: 0, blocked: 0, stale: 0, dlq: 0 },
+        byPipeline: [],
+        byJobType: [],
+        byTenant: [],
+        byState: [],
+        oldestJobs: [],
+        youngestJobs: [],
+        mostOverduePerTenant: [],
+        ...overrides,
+      };
+    }
+
+    describe("when called twice for the same queue", () => {
+      it("hits the cache on the second call", async () => {
+        const repo = createMockRepo({
+          getQueueOverview: vi.fn().mockResolvedValue(createOverview({ queueName: "cache-hit" })),
+        });
+        const service = new QueueService(repo);
+
+        await service.getQueueOverview({ queueName: "cache-hit" });
+        await service.getQueueOverview({ queueName: "cache-hit" });
+
+        expect(repo.getQueueOverview).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    describe("when force is true", () => {
+      it("bypasses the cache", async () => {
+        const repo = createMockRepo({
+          getQueueOverview: vi.fn().mockResolvedValue(createOverview({ queueName: "force-bypass" })),
+        });
+        const service = new QueueService(repo);
+
+        await service.getQueueOverview({ queueName: "force-bypass" });
+        await service.getQueueOverview({ queueName: "force-bypass", force: true });
+
+        expect(repo.getQueueOverview).toHaveBeenCalledTimes(2);
+      });
+
+      it("does not forward force to the repository call", async () => {
+        const repo = createMockRepo({
+          getQueueOverview: vi.fn().mockResolvedValue(createOverview()),
+        });
+        const service = new QueueService(repo);
+
+        await service.getQueueOverview({ queueName: "q1", force: true, sliceN: 25 });
+
+        expect(repo.getQueueOverview).toHaveBeenCalledWith({ queueName: "q1", sliceN: 25 });
+      });
+    });
+  });
+
+  describe("searchPendingJobs()", () => {
+    function createSummary(jobId: string): PendingJobSummary {
+      return {
+        jobId,
+        groupId: `${jobId}-grp`,
+        pipelineName: null,
+        jobType: null,
+        jobName: null,
+        tenantId: null,
+        score: parseInt(jobId.replace(/\D/g, ""), 10) || 0,
+        ageMs: 0,
+        state: "ready",
+        retryCount: null,
+      };
+    }
+
+    function createResult(overrides: Partial<PendingJobSearchResult> = {}): PendingJobSearchResult {
+      return {
+        jobs: [],
+        totalMatching: 0,
+        scannedGroups: 0,
+        truncated: false,
+        generatedAtMs: 0,
+        computedDurationMs: 0,
+        ...overrides,
+      };
+    }
+
+    describe("when first page is requested", () => {
+      it("returns the slice from the cached scan", async () => {
+        const allJobs = Array.from({ length: 250 }, (_, i) => createSummary(`j${i}`));
+        const repo = createMockRepo({
+          searchPendingJobs: vi.fn().mockResolvedValue(
+            createResult({ jobs: allJobs, totalMatching: 250 }),
+          ),
+        });
+        const service = new QueueService(repo);
+
+        const result = await service.searchPendingJobs({
+          queueName: "search-first-page",
+          filter: {},
+          sort: "oldest",
+          page: 1,
+          pageSize: 50,
+        });
+
+        expect(result.jobs).toHaveLength(50);
+        expect(result.jobs[0]!.jobId).toBe("j0");
+        expect(result.jobs[49]!.jobId).toBe("j49");
+        expect(result.totalMatching).toBe(250);
+      });
+    });
+
+    describe("when the requested page lies beyond the cached window", () => {
+      it("falls through to a direct repo call with the original params", async () => {
+        const search = vi.fn();
+        const cachedWindow = Array.from({ length: 5_000 }, (_, i) => createSummary(`j${i}`));
+        const directPage = [createSummary("deep-1"), createSummary("deep-2")];
+
+        // First call (cache fill) returns the 5k window. Second call is the
+        // fall-through for the deep page.
+        search
+          .mockResolvedValueOnce(createResult({ jobs: cachedWindow, totalMatching: 6_000 }))
+          .mockResolvedValueOnce(createResult({ jobs: directPage, totalMatching: 6_000 }));
+
+        const repo = createMockRepo({ searchPendingJobs: search });
+        const service = new QueueService(repo);
+
+        // Warm the cache.
+        await service.searchPendingJobs({
+          queueName: "deep-q",
+          filter: {},
+          sort: "oldest",
+          page: 1,
+          pageSize: 50,
+        });
+
+        const result = await service.searchPendingJobs({
+          queueName: "deep-q",
+          filter: {},
+          sort: "oldest",
+          page: 101, // start = 5_000 → past the cached window
+          pageSize: 50,
+        });
+
+        expect(result.jobs).toEqual(directPage);
+        expect(search).toHaveBeenCalledTimes(2);
+        expect(search.mock.calls[1]![0]).toMatchObject({
+          queueName: "deep-q",
+          page: 101,
+          pageSize: 50,
+        });
+      });
+    });
+
+    describe("when force is true", () => {
+      it("bypasses the cache for the search scan", async () => {
+        const fresh = createResult({ totalMatching: 1, jobs: [createSummary("j1")] });
+        const search = vi.fn().mockResolvedValue(fresh);
+        const repo = createMockRepo({ searchPendingJobs: search });
+        const service = new QueueService(repo);
+
+        await service.searchPendingJobs({
+          queueName: "search-force",
+          filter: {},
+          sort: "oldest",
+          page: 1,
+          pageSize: 50,
+        });
+        await service.searchPendingJobs({
+          queueName: "search-force",
+          filter: {},
+          sort: "oldest",
+          page: 1,
+          pageSize: 50,
+          force: true,
+        });
+
+        expect(search).toHaveBeenCalledTimes(2);
+      });
+    });
+  });
+
+  describe("getPendingJobDetail()", () => {
+    describe("when job exists", () => {
+      it("delegates to repo with the full identifier triple", async () => {
+        const detail = {
+          jobId: "j1",
+          groupId: "g1",
+          queueName: "q1",
+          score: 100,
+          state: "ready" as const,
+          isActive: false,
+          isBlocked: false,
+          data: null,
+          rawData: null,
+          error: null,
+        };
+        const repo = createMockRepo({
+          getPendingJobDetail: vi.fn().mockResolvedValue(detail),
+        });
+        const service = new QueueService(repo);
+
+        const result = await service.getPendingJobDetail({ queueName: "q1", groupId: "g1", jobId: "j1" });
+
+        expect(result).toEqual(detail);
+        expect(repo.getPendingJobDetail).toHaveBeenCalledWith({ queueName: "q1", groupId: "g1", jobId: "j1" });
+      });
+    });
+
+    describe("when job is missing", () => {
+      it("returns null", async () => {
+        const repo = createMockRepo({
+          getPendingJobDetail: vi.fn().mockResolvedValue(null),
+        });
+        const service = new QueueService(repo);
+
+        const result = await service.getPendingJobDetail({ queueName: "q1", groupId: "g1", jobId: "missing" });
+
+        expect(result).toBeNull();
       });
     });
   });
