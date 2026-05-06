@@ -207,24 +207,33 @@ export const OrConnectorOverlay: React.FC<OrConnectorOverlayProps> = ({
   );
 };
 
+/**
+ * Escape characters that would break a CSS attribute-value string.
+ * Backslashes must be escaped first (otherwise the subsequent
+ * double-quote escape's own backslash would be re-escaped). Newlines
+ * and carriage returns are illegal in CSS strings without the `\A `
+ * form. Without this, user-controlled facet values with `\` or
+ * line-breaks could break the selector or inject CSS. Exported so a
+ * unit test can hammer it with hostile inputs (`</style>`, NUL bytes,
+ * the escape sequences themselves) — the escape function is the only
+ * thing standing between a malformed search query and arbitrary CSS
+ * injection on the page.
+ */
+export function escapeCssAttributeValue(s: string): string {
+  return s
+    .replace(/\\/g, "\\\\")
+    .replace(/"/g, '\\"')
+    .replace(/\n/g, "\\A ")
+    .replace(/\r/g, "\\D ");
+}
+
 const HoverHighlightStyle: React.FC<{
   group: OrGroup | null;
   facet: { field: string; value: string } | null;
 }> = ({ group, facet }) => {
   if (!group && !facet) return null;
   const palette = group ? orGroupColor(group.id) : "blue";
-  // Escape characters that would break a CSS attribute-value string.
-  // Backslashes must be escaped first (otherwise the subsequent
-  // double-quote escape's own backslash would be re-escaped). Newlines
-  // and carriage returns are illegal in CSS strings without the `\A `
-  // form. Without this, user-controlled facet values with `\` or
-  // line-breaks could break the selector or inject CSS.
-  const escape = (s: string) =>
-    s
-      .replace(/\\/g, "\\\\")
-      .replace(/"/g, '\\"')
-      .replace(/\n/g, "\\A ")
-      .replace(/\r/g, "\\D ");
+  const escape = escapeCssAttributeValue;
   const memberSelectors: string[] = [];
   if (group) {
     for (const m of group.members) {

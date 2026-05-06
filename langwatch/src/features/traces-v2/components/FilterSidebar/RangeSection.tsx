@@ -12,8 +12,9 @@ const CLEAR_EPSILON = 0.01;
 /** Strip currency / unit suffixes so users can paste back the formatted
  * label and still get a parseable number. "1.5s" → 1.5, "$0.05" → 0.05,
  * "12,300" → 12300. Returns null for anything that doesn't yield a
- * finite number after the strip. */
-function parseEditedValue(input: string): number | null {
+ * finite number after the strip. Exported for unit testing — opinionated
+ * behaviour is easy to regress otherwise. */
+export function parseEditedValue(input: string): number | null {
   // Strip currency, separators, whitespace, and unit letters — but keep
   // `e`/`E` so scientific notation (`1e6`, `2.5E-3`) parses correctly.
   // Without this carve-out a paste like "1e6" became "16".

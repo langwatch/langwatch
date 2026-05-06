@@ -94,26 +94,39 @@ export const TokenValuePicker: React.FC<TokenValuePickerProps> = ({
   }, [anchor, onClose]);
 
   // Esc dismisses; arrow keys navigate; Enter commits.
+  // Scoped to the picker container — NOT the document — so peer
+  // document-level handlers (a host dialog's "close on Esc", the
+  // search bar's own Enter/Arrow shortcuts) don't fire alongside us
+  // for keys the picker is consuming. `stopPropagation` on the same
+  // event keeps the keystroke from bubbling further up the DOM tree
+  // toward those peers; without scoping AND stopping, the picker
+  // would race with whatever else listens at document.
   useEffect(() => {
     if (!anchor) return;
+    const node = containerRef.current;
+    if (!node) return;
     const handler = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         e.preventDefault();
+        e.stopPropagation();
         onClose();
         return;
       }
       if (e.key === "ArrowDown") {
         e.preventDefault();
+        e.stopPropagation();
         setActiveIndex((i) => Math.min(i + 1, values.length - 1));
         return;
       }
       if (e.key === "ArrowUp") {
         e.preventDefault();
+        e.stopPropagation();
         setActiveIndex((i) => Math.max(i - 1, 0));
         return;
       }
       if (e.key === "Enter") {
         e.preventDefault();
+        e.stopPropagation();
         const next = values[activeIndex];
         if (next) {
           setFacetValueAt(anchor.location.start, anchor.location.end, next.value);
@@ -121,8 +134,8 @@ export const TokenValuePicker: React.FC<TokenValuePickerProps> = ({
         }
       }
     };
-    document.addEventListener("keydown", handler);
-    return () => document.removeEventListener("keydown", handler);
+    node.addEventListener("keydown", handler);
+    return () => node.removeEventListener("keydown", handler);
   }, [anchor, values, activeIndex, onClose, setFacetValueAt]);
 
   if (!anchor) return null;

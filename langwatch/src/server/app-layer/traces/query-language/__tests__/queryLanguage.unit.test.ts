@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { ParseError, parse, serialize, stripAtSigils } from "../parse";
 import {
+  analyzeOrGroups,
   buildFacetStateLookup,
   getFacetValues,
   getRangeValue,
@@ -8,10 +9,13 @@ import {
   validateAst,
 } from "../queries";
 import {
+  addToOrGroupAtLocation,
   removeFacetValueFromQuery,
   removeFieldFromQuery,
   removeNodeAtLocation,
+  setFacetValueAtLocation,
   setRangeInQuery,
+  swapOperatorAtLocation,
   toggleFacetInQuery,
 } from "../mutations";
 
@@ -732,6 +736,396 @@ describe("buildFacetStateLookup", () => {
       expect(get("status", "error")).toBe("include");
       expect(get("status", "warning")).toBe("neutral");
       expect(get("model", "gpt-4o")).toBe("neutral");
+    });
+  });
+});
+
+describe("analyzeOrGroups", () => {
+  describe("given a query without any OR", () => {
+    it("returns an empty analysis", () => {
+      const result = analyzeOrGroups(parse("status:error AND model:gpt-4o"));
+      expect(result.groups).toEqual([]);
+      expect(result.memberToGroupId.size).toBe(0);
+      expect(result.fieldToGroupIds.size).toBe(0);
+    });
+  });
+
+  describe("given a same-field OR", () => {
+    it("emits one group with one field and two members", () => {
+      const result = analyzeOrGroups(parse("status:error OR status:warning"));
+      expect(result.groups).toHaveLength(1);
+      const g = result.groups[0]!;
+      expect(g.fields.size).toBe(1);
+      expect(g.fields.has("status")).toBe(true);
+      expect(g.members).toHaveLength(2);
+      expect(g.members.map((m) => m.value).sort()).toEqual([
+        "error",
+        "warning",
+      ]);
+    });
+  });
+
+  describe("given a cross-facet OR", () => {
+    it("emits one group whose fields span both Tags", () => {
+      const result = analyzeOrGroups(parse("status:error OR model:gpt-4o"));
+      expect(result.groups).toHaveLength(1);
+      const g = result.groups[0]!;
+      expect(g.fields.size).toBe(2);
+      expect(g.fields.has("status")).toBe(true);
+      expect(g.fields.has("model")).toBe(true);
+    });
+  });
+
+  describe("given a NOT-wrapped Tag inside an OR", () => {
+    it("marks that member as negated, peers as not-negated", () => {
+      const result = analyzeOrGroups(
+        parse("status:error OR NOT model:gpt-4o"),
+      );
+      const members = result.groups[0]!.members;
+      const status = members.find((m) => m.field === "status")!;
+      const model = members.find((m) => m.field === "model")!;
+      expect(status.negated).toBe(false);
+      expect(model.negated).toBe(true);
+    });
+
+    it("does NOT thread an outer NOT down to inner members (KNOWN LIMITATION)", () => {
+      // `analyzeOrGroups`'s walker descends through UnaryOperator
+      // without tracking negation, so `NOT (status:error OR
+      // status:warning)` produces a group where each member's
+      // `negated` flag is `false`. The sidebar consumer reads
+      // include/exclude state separately via `buildFacetStateLookup`,
+      // which DOES walk negation correctly — so the visible "excluded"
+      // chip styling lands. Pinning current behaviour so a later
+      // negation-threading fix is a deliberate, visible change rather
+      // than a silent shift.
+      const result = analyzeOrGroups(
+        parse("NOT (status:error OR status:warning)"),
+      );
+      const members = result.groups[0]!.members;
+      expect(members.every((m) => m.negated === false)).toBe(true);
+    });
+  });
+
+  describe("given a multi-arm OR", () => {
+    it("flattens nested ORs into a single group", () => {
+      const result = analyzeOrGroups(
+        parse("status:error OR status:warning OR model:gpt-4o"),
+      );
+      expect(result.groups).toHaveLength(1);
+      const g = result.groups[0]!;
+      expect(g.members).toHaveLength(3);
+      expect(g.fields.size).toBe(2);
+    });
+
+    it("flattens parenthesised OR shapes as one group", () => {
+      // `((a OR b) OR c)` and `(a OR (b OR c))` collapse to the same
+      // shape — the visualiser doesn't care which way liqe nested it.
+      const a = analyzeOrGroups(parse("(a:1 OR b:2) OR c:3"));
+      const b = analyzeOrGroups(parse("a:1 OR (b:2 OR c:3)"));
+      expect(a.groups[0]!.members).toHaveLength(3);
+      expect(b.groups[0]!.members).toHaveLength(3);
+    });
+  });
+
+  describe("given an AND boundary inside an OR", () => {
+    it("treats the AND-wrapped subtree as opaque (no members from inside)", () => {
+      // `(a AND b) OR c:3`: the analyzer sees an OR LogicalExpression
+      // and walks members, but stops at AND. Only `c:3` makes it in,
+      // so the group has 1 member — below the >1 threshold, no group
+      // emitted.
+      const result = analyzeOrGroups(
+        parse("(origin:application AND status:error) OR model:gpt-4o"),
+      );
+      expect(result.groups).toEqual([]);
+    });
+  });
+
+  describe("given multiple disjoint OR groups", () => {
+    it("emits one group per OR scope, each with its own id", () => {
+      const result = analyzeOrGroups(
+        parse(
+          "(status:error OR model:gpt-4o) AND (origin:application OR origin:simulation)",
+        ),
+      );
+      expect(result.groups).toHaveLength(2);
+      const ids = new Set(result.groups.map((g) => g.id));
+      expect(ids.size).toBe(2);
+    });
+
+    it("registers a field that appears in multiple groups under fieldToGroupIds", () => {
+      // `status` appears in both OR groups — fieldToGroupIds must hold
+      // both ids so a row in either group lights up correctly. (This
+      // is the regression Copilot caught on the singular `fieldToGroupId`.)
+      const result = analyzeOrGroups(
+        parse(
+          "(status:error OR model:gpt-4o) AND (status:warning OR origin:application)",
+        ),
+      );
+      const statusGroups = result.fieldToGroupIds.get("status");
+      expect(statusGroups).toBeDefined();
+      expect(statusGroups!.length).toBe(2);
+      expect(new Set(statusGroups)).toEqual(
+        new Set(result.groups.map((g) => g.id)),
+      );
+    });
+  });
+
+  describe("given non-Tag contents", () => {
+    it("ignores ImplicitField (free text) members", () => {
+      // `"refund" OR status:error` — the bare quoted free-text Tag is
+      // ImplicitField. It contributes no member; the group falls below
+      // the >1 threshold and is dropped.
+      const result = analyzeOrGroups(parse('"refund" OR status:error'));
+      expect(result.groups).toEqual([]);
+    });
+
+    it("ignores non-literal expressions (range bounds)", () => {
+      // `cost:[1 TO 10] OR status:error` — the range expression is
+      // skipped, leaving only the status member; group dropped.
+      const result = analyzeOrGroups(parse("cost:[1 TO 10] OR status:error"));
+      expect(result.groups).toEqual([]);
+    });
+  });
+
+  describe("memberToGroupId lookup", () => {
+    it("keys by `${field}|${value}` and resolves to the group id", () => {
+      const result = analyzeOrGroups(parse("status:error OR model:gpt-4o"));
+      const id = result.groups[0]!.id;
+      expect(result.memberToGroupId.get("status|error")).toBe(id);
+      expect(result.memberToGroupId.get("model|gpt-4o")).toBe(id);
+      expect(result.memberToGroupId.get("status|warning")).toBeUndefined();
+    });
+  });
+
+  describe("group location", () => {
+    it("covers the full OR LogicalExpression range", () => {
+      const query = "status:error OR model:gpt-4o";
+      const result = analyzeOrGroups(parse(query));
+      const g = result.groups[0]!;
+      // Liqe's location is in trimmed-string coords; for an unparenthesised
+      // top-level OR the start is 0 and the end is the full string length.
+      expect(g.start).toBe(0);
+      expect(g.end).toBe(query.length);
+    });
+  });
+});
+
+describe("addToOrGroupAtLocation", () => {
+  describe("given an empty query", () => {
+    it("returns the query unchanged (no group to add to)", () => {
+      expect(addToOrGroupAtLocation("", 0, 0, "status", "error")).toBe("");
+      expect(addToOrGroupAtLocation("   ", 0, 0, "status", "error")).toBe(
+        "   ",
+      );
+    });
+  });
+
+  describe("given an invalid location", () => {
+    it("returns the query unchanged when end <= start", () => {
+      const q = "status:error OR model:gpt-4o";
+      expect(addToOrGroupAtLocation(q, 5, 5, "x", "y")).toBe(q);
+      expect(addToOrGroupAtLocation(q, 10, 5, "x", "y")).toBe(q);
+    });
+  });
+
+  describe("given a top-level OR group", () => {
+    it("appends ` OR field:value` after the group's end", () => {
+      const query = "status:error OR model:gpt-4o";
+      const ast = analyzeOrGroups(parse(query));
+      const g = ast.groups[0]!;
+      expect(addToOrGroupAtLocation(query, g.start, g.end, "origin", "app")).toBe(
+        "status:error OR model:gpt-4o OR origin:app",
+      );
+    });
+  });
+
+  describe("given a parenthesised OR group", () => {
+    it("splices ` OR field:value` inside the parens", () => {
+      const query = "(status:error OR model:gpt-4o) AND name:bar";
+      const ast = analyzeOrGroups(parse(query));
+      const g = ast.groups[0]!;
+      // `g.start..g.end` covers the inner OR LogicalExpression — the
+      // splice lands before the closing `)` so parens stay balanced
+      // and the AND clause stays intact.
+      const result = addToOrGroupAtLocation(
+        query,
+        g.start,
+        g.end,
+        "origin",
+        "app",
+      );
+      expect(result).toBe(
+        "(status:error OR model:gpt-4o OR origin:app) AND name:bar",
+      );
+    });
+  });
+
+  describe("given leading whitespace on the query", () => {
+    it("offsets the splice point by leading whitespace", () => {
+      const query = "  status:error OR model:gpt-4o";
+      const ast = analyzeOrGroups(parse(query));
+      const g = ast.groups[0]!;
+      expect(addToOrGroupAtLocation(query, g.start, g.end, "origin", "app")).toBe(
+        "  status:error OR model:gpt-4o OR origin:app",
+      );
+    });
+  });
+
+  describe("given a value that needs quoting", () => {
+    it("quotes values containing spaces", () => {
+      const query = "status:error OR status:warning";
+      const ast = analyzeOrGroups(parse(query));
+      const g = ast.groups[0]!;
+      expect(
+        addToOrGroupAtLocation(query, g.start, g.end, "errorMessage", "rate limit"),
+      ).toBe('status:error OR status:warning OR errorMessage:"rate limit"');
+    });
+  });
+});
+
+describe("setFacetValueAtLocation", () => {
+  describe("given an empty query", () => {
+    it("returns the query unchanged", () => {
+      expect(setFacetValueAtLocation("", 0, 0, "x")).toBe("");
+      expect(setFacetValueAtLocation("   ", 0, 0, "x")).toBe("   ");
+    });
+  });
+
+  describe("given a single Tag", () => {
+    it("replaces the value while preserving the field name", () => {
+      const query = "status:error";
+      const { start, end } = locationOf(query, "status:error");
+      expect(setFacetValueAtLocation(query, start, end, "warning")).toBe(
+        "status:warning",
+      );
+    });
+  });
+
+  describe("given a NOT-wrapped Tag", () => {
+    it("preserves the leading NOT outside the swapped span", () => {
+      // Tag.location covers only `status:error` — `NOT ` is outside the
+      // [start, end), so the splice keeps the negation intact.
+      const query = "NOT status:error";
+      const { start, end } = locationOf(query, "status:error");
+      expect(setFacetValueAtLocation(query, start, end, "warning")).toBe(
+        "NOT status:warning",
+      );
+    });
+
+    it("preserves the leading `-` shorthand negation", () => {
+      const query = "-status:error";
+      const { start, end } = locationOf(query, "status:error");
+      expect(setFacetValueAtLocation(query, start, end, "warning")).toBe(
+        "-status:warning",
+      );
+    });
+  });
+
+  describe("given leading whitespace on the query", () => {
+    it("offsets the splice point by leading whitespace", () => {
+      const query = "  status:error";
+      // Tag.location is in trimmed coords, so `start: 0, end: 12`.
+      expect(setFacetValueAtLocation(query, 0, 12, "warning")).toBe(
+        "  status:warning",
+      );
+    });
+  });
+
+  describe("given a value that needs quoting", () => {
+    it("quotes values containing spaces", () => {
+      const query = "errorMessage:foo";
+      const { start, end } = locationOf(query, "errorMessage:foo");
+      expect(setFacetValueAtLocation(query, start, end, "rate limit")).toBe(
+        'errorMessage:"rate limit"',
+      );
+    });
+  });
+
+  describe("given a location that doesn't resolve to a Tag", () => {
+    it("returns the query unchanged when no Tag matches", () => {
+      const query = "status:error";
+      expect(setFacetValueAtLocation(query, 999, 1000, "warning")).toBe(query);
+    });
+
+    it("returns the query unchanged for a range Tag (not a literal)", () => {
+      const query = "cost:[1 TO 10]";
+      // Liqe's range Tag.location starts at `[`; we know `cost` is a
+      // Tag here but its expression is a RangeExpression, not a
+      // LiteralExpression — so the swap bails.
+      const ast = parse(query);
+      const tag = ast as { location: { start: number; end: number } };
+      expect(
+        setFacetValueAtLocation(query, tag.location.start, tag.location.end, "5"),
+      ).toBe(query);
+    });
+  });
+
+  describe("given an unparseable query", () => {
+    it("returns the query unchanged rather than throwing", () => {
+      const query = "status:error AND";
+      expect(setFacetValueAtLocation(query, 0, 12, "warning")).toBe(query);
+    });
+  });
+});
+
+describe("swapOperatorAtLocation", () => {
+  describe("given an empty query", () => {
+    it("returns the query unchanged", () => {
+      expect(swapOperatorAtLocation("", 0, 0)).toBe("");
+      expect(swapOperatorAtLocation("   ", 0, 0)).toBe("   ");
+    });
+  });
+
+  describe("given an AND operator", () => {
+    it("flips it to OR", () => {
+      const query = "status:error AND model:gpt-4o";
+      const { start, end } = locationOf(query, "AND");
+      expect(swapOperatorAtLocation(query, start, end)).toBe(
+        "status:error OR model:gpt-4o",
+      );
+    });
+  });
+
+  describe("given an OR operator", () => {
+    it("flips it to AND", () => {
+      const query = "status:error OR model:gpt-4o";
+      const { start, end } = locationOf(query, "OR");
+      expect(swapOperatorAtLocation(query, start, end)).toBe(
+        "status:error AND model:gpt-4o",
+      );
+    });
+  });
+
+  describe("given mixed-case input at the slice", () => {
+    it("normalises uppercase comparison and writes the canonical form", () => {
+      // The comparison is case-insensitive so `and`/`AND`/`And` all
+      // map; the replacement is always uppercase.
+      const query = "status:error and model:gpt-4o";
+      const { start, end } = locationOf(query, "and");
+      expect(swapOperatorAtLocation(query, start, end)).toBe(
+        "status:error OR model:gpt-4o",
+      );
+    });
+  });
+
+  describe("given a slice that isn't an operator", () => {
+    it("returns the query unchanged", () => {
+      const query = "status:error AND model:gpt-4o";
+      const { start, end } = locationOf(query, "status");
+      expect(swapOperatorAtLocation(query, start, end)).toBe(query);
+    });
+  });
+
+  describe("given leading whitespace on the query", () => {
+    it("offsets the splice point by leading whitespace", () => {
+      // The handler converts liqe-trimmed coords to absolute coords by
+      // adding leadingWs before the swap.
+      const query = "  status:error AND model:gpt-4o";
+      // In trimmed coords, AND is at 13..16. The function adds
+      // leadingWs (2) → swaps 15..18 in the absolute string.
+      expect(swapOperatorAtLocation(query, 13, 16)).toBe(
+        "  status:error OR model:gpt-4o",
+      );
     });
   });
 });

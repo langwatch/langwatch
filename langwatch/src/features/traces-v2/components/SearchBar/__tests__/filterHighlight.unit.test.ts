@@ -310,6 +310,54 @@ describe("buildDecorationPlan — wildcard + boolean cases", () => {
     });
   });
 
+  describe("regex fallback — comparison-range alternative", () => {
+    // The regex fallback fires when liqe's parser fails (mid-typing,
+    // dangling AND, unmatched paren). Without the comparison-range
+    // alternative, typing `duration:>1000 AND` left the comparison
+    // token unhighlighted, so users saw the numeric facet "stop
+    // working" mid-edit. These tests exercise the fallback path
+    // specifically by giving it queries that don't parse.
+    it("recognises `duration:>1000 AND` (regex fallback) as a single token", () => {
+      const plan = buildDecorationPlan("duration:>1000 AND");
+      const tokenSlots = plan.slots.filter((s) =>
+        s.className.includes("filter-token"),
+      );
+      expect(tokenSlots).toHaveLength(1);
+      expect(tokenSlots[0]?.from).toBe(0);
+      expect(tokenSlots[0]?.to).toBe("duration:>1000".length);
+      // Numeric class because `duration` is in NUMERIC_FIELDS.
+      expect(tokenSlots[0]?.className).toContain("filter-token-numeric");
+    });
+
+    it("recognises `cost:<=5 AND` (regex fallback) as a single token", () => {
+      const plan = buildDecorationPlan("cost:<=5 AND");
+      const tokenSlots = plan.slots.filter((s) =>
+        s.className.includes("filter-token"),
+      );
+      expect(tokenSlots).toHaveLength(1);
+      expect(tokenSlots[0]?.from).toBe(0);
+      expect(tokenSlots[0]?.to).toBe("cost:<=5".length);
+    });
+
+    it.each([
+      ["greater-than", "duration:>1000"],
+      ["greater-or-equal", "duration:>=1000"],
+      ["less-than", "cost:<5"],
+      ["less-or-equal", "cost:<=5"],
+    ])(
+      "`%s` (%s) survives the regex fallback path",
+      (_label, comparison) => {
+        // Force the fallback by appending a trailing `AND` (parse-fail).
+        const plan = buildDecorationPlan(`${comparison} AND`);
+        const tokenSlots = plan.slots.filter((s) =>
+          s.className.includes("filter-token"),
+        );
+        expect(tokenSlots).toHaveLength(1);
+        expect(tokenSlots[0]?.to).toBe(comparison.length);
+      },
+    );
+  });
+
   describe("operator matrix — range form (KNOWN BUG)", () => {
     it("`cost:[1 TO 10]` decoration is BROKEN — liqe's Tag.location for ranges starts at `[` and has no `end`", () => {
       // KNOWN BUG: liqe gives a Tag-with-RangeExpression a location of

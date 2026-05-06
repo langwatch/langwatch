@@ -169,6 +169,17 @@ export const FilterSidebar: React.FC = () => {
             setRange={setRange}
             removeRange={removeRange}
             onShiftToggle={handleShiftToggle}
+            // INTENTIONAL: `fieldToGroupIds` includes same-field OR groups
+            // (e.g. `status:error OR status:warning`), so a same-field OR
+            // query gets the full visual treatment — colored ring on rows,
+            // pinning via `orMemberValues`, AND a connector line via the
+            // overlay scanning `[data-or-group=...]`. Same-field ORs are
+            // already visually adjacent within their own facet section, but
+            // the connector + ring confirm to the user that those values
+            // are bound by OR (not just both checked under the implicit
+            // sidebar-ANDing). If this ever feels noisy, filter to
+            // `g.fields.size > 1` here — but the current call is to keep
+            // the link visible.
             orGroupId={orAnalysis.fieldToGroupIds.get(key)?.[0]}
             orPeers={(() => {
               const ids = orAnalysis.fieldToGroupIds.get(key);
