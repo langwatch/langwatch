@@ -470,6 +470,32 @@ evaluationCmd
     await impl(runId, options);
   });
 
+evaluationCmd
+  .command("results <runId>")
+  .description(
+    "Fetch per-row results for a completed evaluation run (debug evaluator scores and missed rows)",
+  )
+  .option("--filter <filter>", "Filter rows: failed | all (default)", "all")
+  .option("--evaluator <name>", "Show only this evaluator's column")
+  .option("-f, --format <format>", "Output format: table (default) or json", "table")
+  .option("--limit <n>", "Maximum rows to print in table mode (default 20)", "20")
+  .action(
+    async (
+      runId: string,
+      options: {
+        filter?: string;
+        evaluator?: string;
+        format?: string;
+        limit?: string;
+      },
+    ) => {
+      const { evaluationResultsCommand: impl } = await import(
+        "./commands/evaluation/results.js"
+      );
+      await impl(runId, options);
+    },
+  );
+
 // Add workflow command group
 const workflowCmd = program
   .command("workflow")
