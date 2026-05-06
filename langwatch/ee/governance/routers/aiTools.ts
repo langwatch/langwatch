@@ -75,6 +75,38 @@ export const aiToolsRouter = createTRPCRouter({
     }),
 
   /**
+   * Auto-fill helper for the Claude Code coding-assistant tile. Returns
+   * the OTLP endpoint URL of an active claude_code IngestionSource in
+   * the org so end users don't need a round-trip with admin to learn
+   * the URL — only the bearer token stays in the admin-handoff path
+   * (ingestSecret is hash-only on the server, members can't retrieve
+   * it). Returns `null` when the org hasn't published a claude_code
+   * source yet; tile then renders the all-placeholder template.
+   *
+   * Discloses ONLY the URL. No source name, no scope, no secret —
+   * the URL is publicly resolvable per source-id anyway (the bearer
+   * token gates the actual write). RBAC at `aiTools:view` (every org
+   * member has it) is the right grant for the discoverability surface.
+   */
+  claudeCodeOtlpEndpoint: protectedProcedure
+    .input(z.object({ organizationId: z.string() }))
+    .use(checkOrganizationPermission("aiTools:view"))
+    .query(async ({ ctx, input }) => {
+      const source = await ctx.prisma.ingestionSource.findFirst({
+        where: {
+          organizationId: input.organizationId,
+          sourceType: "claude_code",
+          archivedAt: null,
+          status: { not: "disabled" },
+        },
+        select: { id: true },
+        orderBy: { createdAt: "asc" },
+      });
+      if (!source) return { endpoint: null };
+      return { endpoint: `/api/ingest/otel/${source.id}` };
+    }),
+
+  /**
    * Admin list — includes disabled + archived. Powers the catalog
    * editor at /settings/governance/tool-catalog.
    */

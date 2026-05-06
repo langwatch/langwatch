@@ -8,8 +8,10 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { Check, ChevronDown, ChevronRight, Copy } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { api } from "~/utils/api";
 import { getDocsBaseUrl } from "~/utils/docsUrl";
 
 import { TileIcon } from "./TileIcon";
@@ -47,14 +49,18 @@ interface Props {
   slug?: string;
 }
 
-const CLAUDE_CODE_OTLP_ENV_TEMPLATE = [
-  `export CLAUDE_CODE_ENABLE_TELEMETRY=1`,
-  `export OTEL_LOGS_EXPORTER=otlp`,
-  `export OTEL_METRICS_EXPORTER=otlp`,
-  `export OTEL_EXPORTER_OTLP_PROTOCOL=http/json`,
-  `export OTEL_EXPORTER_OTLP_ENDPOINT="<your-org-LangWatch-ingestion-URL>"`,
-  `export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer <ingest-secret-from-admin>"`,
-].join("\n");
+const ENDPOINT_PLACEHOLDER = "<your-org-LangWatch-ingestion-URL>";
+
+function buildClaudeCodeOtlpEnvBlock(endpoint: string | null): string {
+  return [
+    `export CLAUDE_CODE_ENABLE_TELEMETRY=1`,
+    `export OTEL_LOGS_EXPORTER=otlp`,
+    `export OTEL_METRICS_EXPORTER=otlp`,
+    `export OTEL_EXPORTER_OTLP_PROTOCOL=http/json`,
+    `export OTEL_EXPORTER_OTLP_ENDPOINT="${endpoint ?? ENDPOINT_PLACEHOLDER}"`,
+    `export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer <ingest-secret-from-admin>"`,
+  ].join("\n");
+}
 
 export function CodingAssistantTile({
   displayName,
@@ -67,6 +73,35 @@ export function CodingAssistantTile({
   const [otlpCopied, setOtlpCopied] = useState(false);
   const isClaudeCode = slug === "claude-code";
 
+  const { organization } = useOrganizationTeamProject({
+    redirectToOnboarding: false,
+  });
+  const orgId = organization?.id ?? "";
+
+  // Auto-fill the URL when the admin has already published a
+  // claude_code IngestionSource in the org. Only the bearer token
+  // stays in the admin-handoff path (ingestSecret is hash-only on
+  // the server). Falls back to the all-placeholder template when no
+  // source has been published yet — copy still works, just with
+  // both fields as <…> placeholders.
+  const otlpEndpointQuery = api.aiTools.claudeCodeOtlpEndpoint.useQuery(
+    { organizationId: orgId },
+    {
+      enabled: isClaudeCode && expanded && !!orgId,
+      refetchOnWindowFocus: false,
+    },
+  );
+  const resolvedEndpoint = useMemo(() => {
+    const path = otlpEndpointQuery.data?.endpoint;
+    if (!path) return null;
+    if (typeof window === "undefined") return path;
+    return `${window.location.origin}${path}`;
+  }, [otlpEndpointQuery.data]);
+  const claudeCodeEnvBlock = useMemo(
+    () => buildClaudeCodeOtlpEnvBlock(resolvedEndpoint),
+    [resolvedEndpoint],
+  );
+
   const onCopy = () => {
     void navigator.clipboard.writeText(config.setupCommand);
     setCopied(true);
@@ -74,7 +109,7 @@ export function CodingAssistantTile({
   };
 
   const onCopyOtlpTemplate = () => {
-    void navigator.clipboard.writeText(CLAUDE_CODE_OTLP_ENV_TEMPLATE);
+    void navigator.clipboard.writeText(claudeCodeEnvBlock);
     setOtlpCopied(true);
     setTimeout(() => setOtlpCopied(false), 1500);
   };
