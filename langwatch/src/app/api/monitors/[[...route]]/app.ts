@@ -4,6 +4,7 @@ import { describeRoute } from "hono-openapi";
 import { resolver, validator as zValidator } from "hono-openapi/zod";
 import { z } from "zod";
 import { prisma } from "~/server/db";
+import { mappingStateSchema } from "~/server/tracer/tracesMapping";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { createLogger } from "~/utils/logger/server";
 import {
@@ -48,13 +49,33 @@ const monitorResponseWithPlatformUrlSchema = monitorResponseSchema.extend({
   platformUrl: z.string().url(),
 });
 
+// Coerces legacy `{}` and other partial-shape payloads into a valid MappingState
+// before persisting. Without this, monitors created via API with `mappings: {}`
+// end up missing the `.mapping` subkey, which crashes downstream evaluator code
+// at `Object.values(mappingState.mapping)` (see threadMappingResolver.ts). The
+// read-side guard there is defensive; this is the canonical write-side fix.
+const monitorMappingsSchema = z
+  .unknown()
+  .transform((value) => {
+    if (value === null || value === undefined) return value;
+    if (
+      typeof value === "object" &&
+      !Array.isArray(value) &&
+      "mapping" in (value as object)
+    ) {
+      return value;
+    }
+    return { mapping: {}, expansions: [] };
+  })
+  .pipe(mappingStateSchema.nullable().optional());
+
 const createMonitorSchema = z.object({
   name: z.string().min(1, "name is required"),
   checkType: z.string().min(1, "checkType is required"),
   executionMode: executionModeEnum.default("ON_MESSAGE"),
   preconditions: z.array(z.unknown()).default([]),
   parameters: z.record(z.unknown()).default({}),
-  mappings: z.record(z.unknown()).optional(),
+  mappings: monitorMappingsSchema,
   sample: z.number().min(0).max(1).default(1.0),
   evaluatorId: z.string().optional(),
   level: z.enum(["trace", "thread"]).default("trace"),
@@ -68,7 +89,7 @@ const updateMonitorSchema = z.object({
   executionMode: executionModeEnum.optional(),
   preconditions: z.array(z.unknown()).optional(),
   parameters: z.record(z.unknown()).optional(),
-  mappings: z.record(z.unknown()).optional(),
+  mappings: monitorMappingsSchema,
   sample: z.number().min(0).max(1).optional(),
   evaluatorId: z.string().nullable().optional(),
   level: z.enum(["trace", "thread"]).optional(),
