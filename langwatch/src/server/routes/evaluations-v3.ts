@@ -491,6 +491,75 @@ app.post("/:slug/run", async (c) => {
   });
 });
 
+// ── GET /runs?experimentSlug=... (list runs for an experiment) ──────
+
+app.get("/runs", async (c) => {
+  const authResult = await authenticateRequest(c, "evaluations:view");
+  if ("error" in authResult) {
+    return c.json({ error: authResult.error }, { status: authResult.status });
+  }
+  const { project } = authResult;
+
+  const experimentSlug = c.req.query("experimentSlug");
+  if (!experimentSlug) {
+    return c.json(
+      {
+        error: "experimentSlug query parameter is required",
+      },
+      { status: 400 },
+    );
+  }
+
+  const pageSizeRaw = c.req.query("pageSize");
+  const pageRaw = c.req.query("page");
+  const pageSize = (() => {
+    const parsed = pageSizeRaw ? parseInt(pageSizeRaw, 10) : 50;
+    if (!Number.isFinite(parsed) || parsed <= 0) return 50;
+    return Math.min(parsed, 200);
+  })();
+  const page = (() => {
+    const parsed = pageRaw ? parseInt(pageRaw, 10) : 1;
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
+  })();
+
+  const experiment = await prisma.experiment.findFirst({
+    where: { projectId: project.id, slug: experimentSlug },
+    select: { id: true, slug: true },
+  });
+
+  if (!experiment) {
+    return c.json({ error: "Experiment not found" }, { status: 404 });
+  }
+
+  const experimentRunService = ExperimentRunService.create(prisma);
+  const runsByExperimentId = await experimentRunService.listRuns({
+    projectId: project.id,
+    experimentIds: [experiment.id],
+  });
+
+  const runs = runsByExperimentId[experiment.id] ?? [];
+  // Newest first to match dashboard ordering.
+  const sorted = [...runs].sort(
+    (a, b) => b.timestamps.createdAt - a.timestamps.createdAt,
+  );
+
+  const totalHits = sorted.length;
+  const offset = (page - 1) * pageSize;
+  const paged = sorted.slice(offset, offset + pageSize);
+
+  return c.json({
+    experimentId: experiment.id,
+    experimentSlug: experiment.slug,
+    runs: paged,
+    pagination: {
+      page,
+      pageSize,
+      totalHits,
+      hasMore: offset + paged.length < totalHits,
+    },
+  });
+});
+
 // ── GET /runs/:runId (poll run status) ───────────────────────────────
 
 app.get("/runs/:runId", async (c) => {
