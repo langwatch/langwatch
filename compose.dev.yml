@@ -33,13 +33,14 @@ x-common-env: &common-env
   COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
   NODE_ENV: development
   SKIP_TIKTOKEN: 'true'
-  DATABASE_URL: postgresql://prisma:prisma@postgres:5432/mydb?schema=mydb
-  REDIS_URL: redis://redis:6379
-  CLICKHOUSE_URL: http://default:langwatch@clickhouse:8123/langwatch
-  LANGWATCH_NLP_SERVICE: http://langwatch_nlp:5561
-  LANGEVALS_ENDPOINT: http://langevals:5562
   # Prod-like dev: IS_SAAS=true (from langwatch/.env) requires SSRF blocking.
   BLOCK_LOCAL_HTTP_CALLS: "true"
+  # NOTE: infrastructure URLs (DATABASE_URL, REDIS_URL, CLICKHOUSE_URL,
+  # LANGWATCH_NLP_SERVICE, LANGEVALS_ENDPOINT) are NOT set here. The
+  # contributor's `langwatch/.env` is the source of truth — `quickstart`
+  # writes a per-mode overlay at `langwatch/.env.dev-up` that overrides
+  # only the URLs whose services are starting locally for that mode
+  # (#3860 AC#2 / AC#6).
 
 services:
   # =============================================================================
@@ -235,6 +236,8 @@ services:
       # To enable verbose scenario SDK logging, add: SCENARIO_VERBOSE: "true"
     env_file:
       - langwatch/.env
+      - path: langwatch/.env.dev-up
+        required: false
     depends_on:
       init:
         condition: service_completed_successfully
@@ -326,6 +329,8 @@ services:
       LOG_LEVEL: "debug"
     env_file:
       - langwatch/.env
+      - path: langwatch/.env.dev-up
+        required: false
     depends_on:
       init:
         condition: service_completed_successfully

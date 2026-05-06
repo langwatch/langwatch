@@ -122,16 +122,32 @@ We considered switching node_modules to bind mounts for automatic per-worktree i
 
 Instead, we use per-worktree named volumes via `VOLUME_PREFIX`, which gives the same isolation without these downsides.
 
-## Amendment: Stateful volumes + entry point (2026-05, #3860)
+## Amendment: Stateful volumes + intent-based modes (2026-05, #3860)
 
 ### Context
 
-The 2026-03 worktree-isolation amendment treated **every** volume as per-worktree. That worked for `node_modules` (Linux ELF deps that diverge across branches) but had two side effects:
+The 2026-03 worktree-isolation amendment treated **every** volume as per-worktree, and the compose profile names (`dev`, `nlp`, `scenarios`, `full`) named *which services exist*, not *what the developer is doing*. Two side effects:
 
 1. Sign-up state didn't persist across worktrees. Sign up `browser-test@langwatch.ai` in worktree A; switch to worktree B; the account is gone.
-2. Profiles conflated *what services exist* with *what I want containers for*. Frontend-only work doesn't actually need its own postgres / redis / clickhouse — it could share with whatever else is running.
+2. Profiles conflated "what services exist" with "what URLs the app should use". The `x-common-env` anchor hard-set `DATABASE_URL` / `REDIS_URL` / etc. to local Docker network names regardless of profile, so a contributor's `.env` URLs never won — even when their intent was "I'm doing UI work, just leave my .env alone."
 
-### Changes
+### Decision
+
+**The contributor's `langwatch/.env` is the source of truth.** A new `langwatch/.env.dev-up` overlay is loaded as `env_file` AFTER `.env` and contains only the URLs whose services are starting locally for the chosen mode. `x-common-env` no longer sets infrastructure URLs.
+
+**`make quickstart` is the single entry point** with five intent-based modes:
+
+| Mode | Compose services | URLs overridden in `.env.dev-up` |
+|---|---|---|
+| `frontend-only` | (none) | (none — pure `.env`) |
+| `backend-shared` | postgres + redis + clickhouse + app + init | `DATABASE_URL`, `REDIS_URL`, `CLICKHOUSE_URL` |
+| `migration` | postgres + clickhouse on host ports (5432, 8123) | `DATABASE_URL` and `CLICKHOUSE_URL` (localhost forms) |
+| `nlp` | + langwatch_nlp + langevals | + `LANGWATCH_NLP_SERVICE`, `LANGEVALS_ENDPOINT` |
+| `full-local` | `--profile full` (workers, scenarios, bullboard, ai-server) | all five infrastructure URLs |
+
+Migration mode uses `compose.dev.migration.yml` to expose host ports so the contributor can run `pnpm prisma migrate dev` and `pnpm clickhouse:migrate` from their host shell.
+
+`make quickstart` accepts a positional mode arg (`make quickstart frontend-only`) for non-interactive runs. `make quickstart-help` (or `./scripts/dev.sh help`) prints the mode reference.
 
 **Stateful services share volumes across worktrees.** `db-data`, `clickhouse-data`, and `redis-data` use stable names (`langwatch-db-data`, `langwatch-clickhouse-data`, `langwatch-redis-data`) — they no longer interpolate `VOLUME_PREFIX`. Sign up once, persist forever.
 
@@ -141,7 +157,7 @@ Trade-off: only one worktree can have the same stateful container `up` at a time
 
 **Per-worktree volumes still apply to:** `app_modules`, `bullboard_modules`, `goose_bin`. These hold Linux-platform dependencies that vary by branch lockfile and must stay isolated.
 
-**`make quickstart` is now the single entry point.** `make dev`, `make dev-nlp`, etc. and `make dev-up` / `make dev-down` / `make dev-logs` print a deprecation warning on stderr and forward to the same compose flow for one release before being removed. New: `make quickstart-help` (or `./scripts/dev.sh help`) prints a non-interactive mode reference for agents and CI.
+**Deprecated targets** (`make dev`, `dev-nlp`, `dev-scenarios`, `dev-test`, `dev-full`, and `dev-up` / `dev-down` / `dev-logs`) print a deprecation warning and forward to the corresponding `quickstart` mode for one release before being removed.
 
 **Fail-fast SSRF guard.** `scripts/dev.sh` errors if `langwatch/.env` has `IS_SAAS=true` with `BLOCK_LOCAL_HTTP_CALLS=false`. (Compose's runtime always sets `BLOCK_LOCAL_HTTP_CALLS=true` via `x-common-env`, but workers running outside compose / lambdas would inherit the broken combo.)
 
@@ -154,6 +170,4 @@ docker volume ls | grep -E '^local +lw-[0-9a-f]{8}-(db|redis|clickhouse)-data'
 docker volume rm <volume-name>   # one per worktree, after confirming you don't need the data
 ```
 
-### Deferred (separate follow-up)
-
-This amendment intentionally does not change the **default** of `make quickstart`. AC#2 / AC#3 of #3860 — intent-based prompting and "frontend-only → `pnpm dev` against remote dev services" — depend on remote dev services existing as a documented user-facing surface. They don't yet. A separate issue tracks that prerequisite work; until then, the existing local-services default stays.
+If you previously relied on `x-common-env`'s implicit `DATABASE_URL` / `REDIS_URL` / `CLICKHOUSE_URL` overrides, those moved to `langwatch/.env.dev-up` written by `quickstart`. Running `make dev` (deprecated alias for `quickstart backend-shared`) keeps the same effective behavior.
