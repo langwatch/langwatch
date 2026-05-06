@@ -629,7 +629,16 @@ export const userRouter = createTRPCRouter({
         organizationId: input.organizationId,
       });
       const personalVk = vks[0];
-      if (!personalVk) return { status: "ok" as const };
+      // OTLP-only users intentionally have no personal VK — they keep
+      // their existing Anthropic OAuth seat and rely on Claude Code's
+      // OTLP exporter (rchaves's headline "control my own personal
+      // claude usage" persona). They still need budget visibility on
+      // the principal scope. Use a sentinel virtualKeyId that won't
+      // match any VK-scoped budget; principal-scope budgets resolve
+      // via principalUserId regardless. Mirrors the pattern the
+      // ingestion-source receiver uses on ledger writes
+      // (`_ingestion_:<sourceId>`).
+      const sentinelVk = `_ingestion_:user:${userId}`;
 
       const chRepo = isClickHouseEnabled()
         ? new GatewayBudgetClickHouseRepository(async (projectId) => {
@@ -647,7 +656,7 @@ export const userRouter = createTRPCRouter({
         organizationId: input.organizationId,
         teamId: workspace.team.id,
         projectId: workspace.project.id,
-        virtualKeyId: personalVk.id,
+        virtualKeyId: personalVk?.id ?? sentinelVk,
         principalUserId: userId,
         projectedCostUsd: 0,
       });
