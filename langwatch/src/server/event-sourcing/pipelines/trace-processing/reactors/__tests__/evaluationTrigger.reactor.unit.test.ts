@@ -7,7 +7,7 @@ import {
   type EvaluationTriggerReactorDeps,
 } from "../evaluationTrigger.reactor";
 import { DEFERRED_CHECK_DELAY_MS } from "../originGate.reactor";
-import { SYNTHETIC_SPAN_NAMES } from "~/server/tracer/constants";
+import { TRACK_EVENT_SPAN_NAME } from "~/server/tracer/constants";
 
 function createFoldState(
   overrides: Partial<TraceSummaryData> = {},
@@ -200,9 +200,10 @@ describe("evaluationTrigger reactor", () => {
 
   describe("when inbound event is a synthetic span (langwatch.track_event)", () => {
     // Regression test for Bug 2 of issue #3875: the reactor must short-circuit
-    // BEFORE querying monitors when the inbound span name is in SYNTHETIC_SPAN_NAMES.
-    // Without this filter, thumbs-up/down feedback spans re-trigger ON_MESSAGE
-    // monitors and the presidio evaluator crashes on null computedInput/Output.
+    // BEFORE querying monitors when the inbound span name is a synthetic event
+    // like TRACK_EVENT_SPAN_NAME. Without this filter, thumbs-up/down feedback
+    // spans re-trigger ON_MESSAGE monitors and the presidio evaluator crashes
+    // on null computedInput/Output.
     it("does NOT invoke monitor service", async () => {
       const deps = createDeps();
       const reactor = createEvaluationTriggerReactor(deps);
@@ -210,8 +211,7 @@ describe("evaluationTrigger reactor", () => {
       const state = createFoldState({
         attributes: { "langwatch.origin": "application" },
       });
-      const syntheticSpanName = [...SYNTHETIC_SPAN_NAMES][0]!;
-      const event = createEvent({ spanName: syntheticSpanName });
+      const event = createEvent({ spanName: TRACK_EVENT_SPAN_NAME });
 
       await reactor.handle(event, createContext(state));
 
@@ -225,8 +225,7 @@ describe("evaluationTrigger reactor", () => {
       const state = createFoldState({
         attributes: { "langwatch.origin": "application" },
       });
-      const syntheticSpanName = [...SYNTHETIC_SPAN_NAMES][0]!;
-      const event = createEvent({ spanName: syntheticSpanName });
+      const event = createEvent({ spanName: TRACK_EVENT_SPAN_NAME });
 
       await reactor.handle(event, createContext(state));
 
