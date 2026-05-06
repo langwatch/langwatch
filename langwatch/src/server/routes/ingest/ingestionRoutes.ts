@@ -541,16 +541,38 @@ app.post("/otel/:sourceId/v1/logs", async (c: Context) => {
               // up at org/team/project scope, just no per-user attribution.
               let principalUserId: string | null = null;
               if (event.userEmail) {
+                // Prisma relation name on User is `orgMemberships` (not
+                // `organizations`) — Ariana caught this on the first
+                // real Claude Code call. The auto-detected user.email
+                // matched the captured OAuth account; the relation
+                // filter was the only blocker between extracted event
+                // and ledger row.
                 const user = await prisma.user.findFirst({
                   where: {
                     email: event.userEmail,
-                    organizations: {
+                    orgMemberships: {
                       some: { organizationId: source.organizationId },
                     },
                   },
                   select: { id: true },
                 });
                 principalUserId = user?.id ?? null;
+                if (!principalUserId) {
+                  // Audit hint: Anthropic OAuth user is emitting cost
+                  // but isn't a member of the source's org. Roll-up
+                  // still happens at org/team/project scope; admins
+                  // can grep this log to see who's leaking cost they
+                  // can't yet attribute per-user.
+                  logger.info(
+                    {
+                      sourceId: source.id,
+                      userEmail: event.userEmail,
+                      anthropicAccountId: event.raw["user.account_id"],
+                      requestId: event.requestId,
+                    },
+                    "ingestion-source event from non-member email — falling back to org/team/project scope only",
+                  );
+                }
               }
 
               // Sentinel teamId/virtualKeyId for ingestion-source rows.
