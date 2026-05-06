@@ -20,11 +20,12 @@ import {
   CircleX,
   Copy,
   KeyRound,
+  Pencil,
   Plus,
   RotateCw,
   Trash2,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { OttlEditor } from "@ee/governance/dashboard/components/OttlEditor";
 import { isOttlEnabledSourceType } from "@ee/governance/services/activity-monitor/ottlStarterTemplates";
@@ -283,6 +284,7 @@ function IngestionSourcesPage() {
 
   const [composing, setComposing] = useState(false);
   const [composer, setComposer] = useState<ComposerState>(blankComposer());
+  const [editingSourceId, setEditingSourceId] = useState<string | null>(null);
   const [secretModal, setSecretModal] = useState<{
     title: string;
     secret: string;
@@ -326,6 +328,20 @@ function IngestionSourcesPage() {
     onError: (e) =>
       toaster.create({
         title: "Failed to rotate secret",
+        description: e.message,
+        type: "error",
+      }),
+  });
+
+  const updateMutation = api.ingestionSources.update.useMutation({
+    onSuccess: () => {
+      void refetch();
+      setEditingSourceId(null);
+      toaster.create({ title: "Source updated", type: "success" });
+    },
+    onError: (e) =>
+      toaster.create({
+        title: "Failed to update source",
         description: e.message,
         type: "error",
       }),
@@ -504,6 +520,7 @@ function IngestionSourcesPage() {
                     archiveMutation.isPending &&
                     archiveMutation.variables?.id === source.id
                   }
+                  onEdit={() => setEditingSourceId(source.id)}
                   onRotate={() =>
                     rotateMutation.mutate({
                       organizationId: orgId,
@@ -527,6 +544,18 @@ function IngestionSourcesPage() {
         details={secretModal}
         onClose={() => setSecretModal(null)}
       />
+
+      <SourceEditDrawer
+        organizationId={orgId}
+        source={
+          editingSourceId
+            ? sourcesQuery.data?.find((s) => s.id === editingSourceId) ?? null
+            : null
+        }
+        onClose={() => setEditingSourceId(null)}
+        onSubmit={(input) => updateMutation.mutate(input)}
+        isPending={updateMutation.isPending}
+      />
       </EnterpriseLockedSurface>
     </GovernanceLayout>
   );
@@ -536,12 +565,14 @@ function SourceRow({
   source,
   isPendingRotate,
   isPendingArchive,
+  onEdit,
   onRotate,
   onArchive,
 }: {
   source: Source;
   isPendingRotate: boolean;
   isPendingArchive: boolean;
+  onEdit: () => void;
   onRotate: () => void;
   onArchive: () => void;
 }) {
@@ -591,6 +622,14 @@ function SourceRow({
           </Text>
         </HStack>
       </VStack>
+      <Button
+        size="sm"
+        variant="ghost"
+        onClick={onEdit}
+        title="Edit source — name, description, OTTL statements"
+      >
+        <Pencil size={14} /> Edit
+      </Button>
       <Button
         size="sm"
         variant="ghost"
@@ -808,6 +847,165 @@ function SourceComposerDrawer({
               disabled={!composer.name.trim()}
             >
               Create source
+            </Button>
+          </HStack>
+        </Drawer.Footer>
+      </Drawer.Content>
+    </Drawer.Root>
+  );
+}
+
+/**
+ * Edit a previously-created IngestionSource. Scoped to the fields that
+ * are safe to mutate without affecting the upstream operator's pasted
+ * env block — name, description, parserConfig (incl. ottlStatements).
+ *
+ * Source type + retention class are immutable after create (changing
+ * them would invalidate the upstream's running configuration); admins
+ * who need to change those archive + recreate.
+ */
+function SourceEditDrawer({
+  organizationId,
+  source,
+  onClose,
+  onSubmit,
+  isPending,
+}: {
+  organizationId: string;
+  source: Source | null;
+  onClose: () => void;
+  onSubmit: (input: {
+    organizationId: string;
+    id: string;
+    name: string;
+    description: string | null;
+    parserConfig: Record<string, unknown>;
+  }) => void;
+  isPending: boolean;
+}) {
+  const isOpen = !!source;
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [statements, setStatements] = useState<string[]>([]);
+
+  // Sync local state when the drawer opens for a new source — drives
+  // the form fields off whatever the row carries on the wire.
+  useEffect(() => {
+    if (!source) return;
+    setName(source.name);
+    setDescription(source.description ?? "");
+    const parser = (source.parserConfig as Record<string, unknown>) ?? {};
+    const raw = parser.ottlStatements;
+    setStatements(
+      Array.isArray(raw)
+        ? raw.filter((s): s is string => typeof s === "string")
+        : [],
+    );
+  }, [source?.id]);
+
+  if (!source) {
+    return (
+      <Drawer.Root open={false} placement="end" onOpenChange={() => onClose()}>
+        <Drawer.Content />
+      </Drawer.Root>
+    );
+  }
+
+  const handleSubmit = () => {
+    if (!name.trim()) return;
+    const parser = (source.parserConfig as Record<string, unknown>) ?? {};
+    // Strip empty rows from the OTTL list and merge into the existing
+    // parserConfig so we don't accidentally drop other fields the
+    // adapter cares about (workspaceId, sharedSecretLastFour, …).
+    const cleanedOttl = statements.filter((s) => s.trim().length > 0);
+    const nextParser = {
+      ...parser,
+      ottlStatements: cleanedOttl.length > 0 ? cleanedOttl : undefined,
+    };
+    if (nextParser.ottlStatements === undefined) {
+      delete nextParser.ottlStatements;
+    }
+    onSubmit({
+      organizationId,
+      id: source.id,
+      name: name.trim(),
+      description: description.trim() || null,
+      parserConfig: nextParser,
+    });
+  };
+
+  return (
+    <Drawer.Root
+      open={isOpen}
+      placement="end"
+      size="md"
+      onOpenChange={({ open }) => {
+        if (!open) onClose();
+      }}
+    >
+      <Drawer.Content>
+        <Drawer.Header>
+          <Drawer.CloseTrigger />
+          <Heading as="h2" size="md">
+            Edit source
+          </Heading>
+        </Drawer.Header>
+        <Drawer.Body>
+          <VStack align="stretch" gap={3}>
+            <VStack align="stretch" gap={1}>
+              <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
+                Display name
+              </Text>
+              <Input
+                size="sm"
+                backgroundColor="white"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+              />
+            </VStack>
+            <VStack align="stretch" gap={1}>
+              <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
+                Description (optional)
+              </Text>
+              <Textarea
+                size="sm"
+                backgroundColor="white"
+                rows={2}
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+              />
+            </VStack>
+
+            <OttlEditor
+              organizationId={organizationId}
+              sourceType={source.sourceType}
+              statements={statements}
+              onChange={setStatements}
+              enabled={isOttlEnabledSourceType(source.sourceType)}
+              autoFillStarter={false}
+            />
+
+            <Text fontSize="xs" color="fg.muted">
+              Source type, retention class, and ingest secret are
+              immutable after create. Use “Rotate secret” for the secret;
+              archive + recreate to change source type or retention.
+            </Text>
+          </VStack>
+        </Drawer.Body>
+        <Drawer.Footer>
+          <HStack gap={3} width="full">
+            <Spacer />
+            <Button size="sm" variant="ghost" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              colorPalette="blue"
+              onClick={handleSubmit}
+              loading={isPending}
+              disabled={!name.trim()}
+            >
+              Save changes
             </Button>
           </HStack>
         </Drawer.Footer>
