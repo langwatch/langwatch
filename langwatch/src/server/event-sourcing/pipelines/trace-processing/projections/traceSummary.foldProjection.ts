@@ -22,6 +22,7 @@ import type {
   AnnotationAddedEvent,
   AnnotationRemovedEvent,
   AnnotationsBulkSyncedEvent,
+  TraceNameChangedEvent,
 } from "../schemas/events";
 import {
   spanReceivedEventSchema,
@@ -32,6 +33,7 @@ import {
   annotationAddedEventSchema,
   annotationRemovedEventSchema,
   annotationsBulkSyncedEventSchema,
+  traceNameChangedEventSchema,
 } from "../schemas/events";
 import type { NormalizedSpan } from "../schemas/spans";
 import {
@@ -142,7 +144,14 @@ export function applySpanToSummary({
       rootSpanStartTimeMs !== undefined &&
       spanStartMs < rootSpanStartTimeMs;
     if (!haveNamedRoot || isEarlierNamedRoot) {
-      traceName = span.name;
+      // Skip the trace-name overwrite when the user has explicitly
+      // renamed the trace — otherwise a delayed root span landing
+      // post-rename would silently wipe the edit. rootSpanType /
+      // rootSpanStartTimeMs still update (those are derived from the
+      // span itself, not user intent).
+      if (!state.traceNameUserOverridden) {
+        traceName = span.name;
+      }
       rootSpanType = spanType || null;
       rootSpanStartTimeMs = spanStartMs;
     }
@@ -191,6 +200,7 @@ const traceSummaryEvents = [
   annotationAddedEventSchema,
   annotationRemovedEventSchema,
   annotationsBulkSyncedEventSchema,
+  traceNameChangedEventSchema,
 ] as const;
 
 /**
@@ -253,6 +263,7 @@ export class TraceSummaryFoldProjection
       annotationIds: [],
       traceName: "",
       rootSpanStartTimeMs: undefined,
+      traceNameUserOverridden: false,
       attributes: {},
       events: [],
       scenarioRoleCosts: {},
@@ -436,5 +447,21 @@ export class TraceSummaryFoldProjection
   ): TraceSummaryData {
     const merged = [...new Set([...(state.annotationIds ?? []), ...event.data.annotationIds])];
     return { ...state, annotationIds: merged };
+  }
+
+  handleTraceTraceNameChanged(
+    event: TraceNameChangedEvent,
+    state: TraceSummaryData,
+  ): TraceSummaryData {
+    return {
+      ...state,
+      traceId: state.traceId || event.data.traceId,
+      traceName: event.data.newName,
+      // Latch the override so any later root-span arrival doesn't
+      // silently revert the user's edit. The latch persists even if
+      // the new name happens to coincide with the discovered root span
+      // name — intent matters more than the value.
+      traceNameUserOverridden: true,
+    };
   }
 }

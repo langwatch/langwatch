@@ -89,6 +89,14 @@ export const traceSummaryDataSchema = z.object({
   traceName: z.string(),
   /** Start time of the root span that set traceName, used for deterministic tie-breaking when multiple root spans exist. Internal bookkeeping. */
   rootSpanStartTimeMs: z.number().optional(),
+  /**
+   * When true the user has explicitly renamed the trace via
+   * `ChangeTraceNameCommand`, and the fold projection must NOT clobber
+   * `traceName` from a later root-span arrival. Without this latch, a
+   * delayed root span landing post-rename would wipe out the user's edit
+   * the next time the projection re-folds.
+   */
+  traceNameUserOverridden: z.boolean().optional(),
   /** LangWatch SDK events hoisted from spans during fold projection. */
   events: z
     .array(

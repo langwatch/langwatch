@@ -53,6 +53,7 @@ import { splitChipsForOverflow } from "../ChipBar";
 import { ModeSwitch } from "../ModeSwitch";
 import { RawJsonDialog } from "../RawJsonDialog";
 import { useTraceHeaderChipDefs } from "../TraceHeaderChips";
+import { EditableTraceName } from "./EditableTraceName";
 import { MetricPill } from "./MetricPill";
 import {
   type CategorizedPin,
@@ -553,17 +554,11 @@ export const DrawerHeader = memo(function DrawerHeader({
               {trace.rootSpanType.toUpperCase()}
             </Text>
           )}
-          <Text
-            fontWeight="semibold"
-            textStyle="md"
-            truncate
-            fontFamily="mono"
-            letterSpacing="-0.005em"
-            minWidth={0}
-            color={titleIsFallback ? "fg.muted" : undefined}
-          >
-            {titleText}
-          </Text>
+          <EditableTraceName
+            traceId={trace.traceId}
+            titleText={titleText}
+            titleIsFallback={titleIsFallback}
+          />
           <HStack gap={1} flexShrink={0}>
             <Circle size="8px" bg={statusColor} flexShrink={0} />
             {trace.status !== "ok" && (
