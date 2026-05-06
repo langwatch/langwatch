@@ -17,7 +17,11 @@ import {
 } from "../../license-enforcement";
 import { captureException } from "~/utils/posthogErrorCapture";
 import { slugify } from "~/utils/slugify";
-import { checkOrganizationPermission, checkTeamPermission } from "../rbac";
+import {
+  checkOrganizationPermission,
+  checkTeamPermission,
+  hasOrganizationPermission,
+} from "../rbac";
 import { TeamService } from "~/server/teams/team.service";
 
 // Reusable schema for team member role validation
@@ -82,6 +86,10 @@ export const teamRouter = createTRPCRouter({
     }),
   getTeamsWithMembers: protectedProcedure
     .input(z.object({ organizationId: z.string() }))
+    // Stays at organization:view because non-admin callers
+    // (AddAutomationDrawer, GroupBindingInputRow, project pickers,
+    // onboarding) need to enumerate teams + their members. Member
+    // emails are PII and get redacted below for non-admin callers.
     .use(checkOrganizationPermission("organization:view"))
     .query(async ({ input, ctx }) => {
       const prisma = ctx.prisma;
@@ -107,6 +115,22 @@ export const teamRouter = createTRPCRouter({
         },
       });
 
+      const callerHasManage = await hasOrganizationPermission(
+        ctx,
+        input.organizationId,
+        "organization:manage",
+      );
+      if (!callerHasManage) {
+        const callerId = ctx.session.user.id;
+        for (const team of teams) {
+          for (const m of team.members ?? []) {
+            if (m.user.id !== callerId) {
+              m.user.email = null;
+            }
+          }
+        }
+      }
+
       return teams;
     }),
   /**
@@ -131,6 +155,9 @@ export const teamRouter = createTRPCRouter({
 
   getTeamWithMembers: protectedProcedure
     .input(z.object({ slug: z.string(), organizationId: z.string() }))
+    // Stays at organization:view for the same picker reasons as
+    // getTeamsWithMembers (AddAutomationDrawer, AlertDrawer, etc.).
+    // Member emails are redacted below for non-admin callers.
     .use(checkOrganizationPermission("organization:view"))
     .query(async ({ input, ctx }) => {
       const prisma = ctx.prisma;
@@ -154,6 +181,20 @@ export const teamRouter = createTRPCRouter({
 
       if (!team) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Team not found." });
+      }
+
+      const callerHasManage = await hasOrganizationPermission(
+        ctx,
+        input.organizationId,
+        "organization:manage",
+      );
+      if (!callerHasManage) {
+        const callerId = ctx.session.user.id;
+        for (const m of team.members ?? []) {
+          if (m.user.id !== callerId) {
+            m.user.email = null;
+          }
+        }
       }
 
       return team;

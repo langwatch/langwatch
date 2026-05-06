@@ -42,7 +42,11 @@ import {
 import { LimitExceededError } from "../../license-enforcement/errors";
 import { captureException } from "~/utils/posthogErrorCapture";
 import { skipPermissionCheck } from "../rbac";
-import { checkOrganizationPermission, checkTeamPermission } from "../rbac";
+import {
+  checkOrganizationPermission,
+  checkTeamPermission,
+  hasOrganizationPermission,
+} from "../rbac";
 import { signUpDataSchema } from "~/server/schemas/sign-up-data.schema";
 import { LITE_MEMBER_VIEWER_ONLY_ERROR } from "~/server/app-layer/organizations/compute-effective-team-role-updates";
 import { PersonalWorkspaceService } from "@ee/governance/services/personalWorkspace.service";
@@ -341,6 +345,11 @@ export const organizationRouter = createTRPCRouter({
         includeDeactivated: z.boolean().optional(),
       }),
     )
+    // Stays at organization:view because non-admin pickers (annotation
+    // queue assignment, trace participants, group dialogs) legitimately
+    // need to enumerate org members by name. The full record contains
+    // member emails, which are admin-surface PII — we redact them on
+    // the way out for non-admin callers below.
     .use(checkOrganizationPermission("organization:view"))
     .query(async ({ input, ctx }) => {
       const organization = await getApp().organizations.getOrganizationWithMembers({
@@ -354,6 +363,24 @@ export const organizationRouter = createTRPCRouter({
           code: "NOT_FOUND",
           message: "Organization not found",
         });
+      }
+
+      // PII guard for picker callers: when the caller doesn't have
+      // organization:manage, null out other members' emails. The
+      // caller's own email is preserved (a member can always see
+      // themselves). Name + id stay so picker UX still works.
+      const callerHasManage = await hasOrganizationPermission(
+        ctx,
+        input.organizationId,
+        "organization:manage",
+      );
+      if (!callerHasManage) {
+        const callerId = ctx.session.user.id;
+        for (const m of organization.members ?? []) {
+          if (m.user.id !== callerId) {
+            m.user.email = null;
+          }
+        }
       }
 
       return organization;
