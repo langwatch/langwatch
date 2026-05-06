@@ -467,16 +467,22 @@ EOF
   fi
   printf 'Creating golden VM %s\n' "$vm" >&2
   "$BOXD_BIN" new --name="$vm" >/dev/null
-  # Provision: install node, clone repo, install deps, run dev-full once.
+  # Provision: install Node 20 from NodeSource (apt's `nodejs` ships Node
+  # 12.x on Ubuntu 22.04 — older than corepack's 16.9.0 minimum, which
+  # would silently abort the rest of the recipe under `set -e`). Then
+  # clone repo and install deps. Errors surface (no outer `>/dev/null`).
   "$BOXD_BIN" exec "$vm" -- "
     set -e
-    sudo apt-get update -y >/dev/null 2>&1 || true
-    sudo apt-get install -y nodejs npm >/dev/null 2>&1 || true
+    if ! command -v node >/dev/null 2>&1 \\
+       || [ \"\$(node --version 2>/dev/null | cut -d. -f1 | tr -d v)\" -lt 18 ]; then
+      curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+      sudo apt-get install -y nodejs
+    fi
     if [ ! -d langwatch ]; then
       git clone https://github.com/$BOXD_FORK_REPO.git langwatch
     fi
     cd langwatch && corepack enable && pnpm -w install
-  " >/dev/null
+  "
   # Hook for seed-golden (AC#7): callable target the make file overrides.
   printf 'Done. Override the seed step by defining a seed-golden target.\n' >&2
 }
