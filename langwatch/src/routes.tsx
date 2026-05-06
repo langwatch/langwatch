@@ -111,8 +111,8 @@ const routes: RouteObject[] = [
   // Settings
   { path: "/settings", ...page(() => import("./pages/settings")) },
   {
-    path: "/settings/access-audit",
-    ...page(() => import("./pages/settings/access-audit")),
+    path: "/settings/role-bindings",
+    ...page(() => import("./pages/settings/role-bindings")),
   },
   {
     path: "/settings/annotation-scores",

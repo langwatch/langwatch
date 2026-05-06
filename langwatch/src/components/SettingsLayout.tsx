@@ -132,7 +132,7 @@ export default function SettingsLayout({
               "/settings/members",
               "/settings/groups",
               "/settings/roles",
-              "/settings/access-audit",
+              "/settings/role-bindings",
               "/settings/authentication",
               "/settings/scim",
               "/settings/audit-log",
@@ -151,7 +151,7 @@ export default function SettingsLayout({
               <MenuLink href="/settings/scim">SCIM Provisioning</MenuLink>
             )}
             {isEnterprise && !isLiteMember && (
-              <MenuLink href="/settings/access-audit">Role Bindings</MenuLink>
+              <MenuLink href="/settings/role-bindings">Role Bindings</MenuLink>
             )}
             {isEnterprise && !isLiteMember && hasPermission("auditLog:view") && (
               <MenuLink href="/settings/audit-log">Audit Log</MenuLink>
