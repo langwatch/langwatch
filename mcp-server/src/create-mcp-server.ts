@@ -1573,6 +1573,59 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
     })
   );
 
+  server.tool(
+    "platform_experiment_list",
+    "List experiments configured in the LangWatch project. Returns a markdown table with each experiment's slug, name, last-run timestamp, and run count. Use this to discover experiment slugs before drilling into runs with platform_evaluation_list_runs. Output is capped (default 25, max 100) to protect the agent's context window.",
+    {
+      limit: z
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe(
+          "Maximum number of experiments to include (default 25, hard-capped at 100)",
+        ),
+    },
+    withToolLogging("platform_experiment_list", async (params) => {
+      requireApiKey();
+      const { handleExperimentList } = await import(
+        "./tools/list-experiments.js"
+      );
+      return {
+        content: [{ type: "text", text: await handleExperimentList(params) }],
+      };
+    })
+  );
+
+  server.tool(
+    "platform_evaluation_list_runs",
+    "List evaluation runs for a specific experiment slug. Returns a markdown table with each run's id, status, started/finished timestamps, and pass-rate summary. Use this to discover run ids before calling platform_evaluation_results. Output is capped (default 25, max 100) to protect the agent's context window.",
+    {
+      experimentSlug: z
+        .string()
+        .describe(
+          "Experiment slug from platform_experiment_list (e.g. 'checkout-flow')",
+        ),
+      limit: z
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe(
+          "Maximum number of runs to include (default 25, hard-capped at 100)",
+        ),
+    },
+    withToolLogging("platform_evaluation_list_runs", async (params) => {
+      requireApiKey();
+      const { handleEvaluationListRuns } = await import(
+        "./tools/list-evaluation-runs.js"
+      );
+      return {
+        content: [{ type: "text", text: await handleEvaluationListRuns(params) }],
+      };
+    })
+  );
+
   // --- Platform Dataset Tools (require API key) ---
   // These tools manage datasets on the LangWatch platform via API.
 
