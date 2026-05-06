@@ -95,7 +95,7 @@ Feature: Evaluator Run/Rerun Enhancements
     When the user triggers "Run on all rows" for the evaluator
     Then each evaluator execution reuses the existing trace ID for its row
 
-  @unit @unimplemented
+  @unit
   Scenario: Running evaluator on all rows creates one execution per row with target output
     Given a request to run an evaluator on all rows for a target
     And pre-computed target outputs exist for some rows
