@@ -10,7 +10,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { DefaultChatTransport, type UIMessage } from "ai";
-import { forwardRef, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   LuArrowRight,
   LuCheck,
@@ -26,6 +26,15 @@ import { isHandledByGlobalHandler } from "~/utils/trpcError";
 
 const DRAWER_WIDTH = 420;
 const HANDLE_WIDTH = 26;
+const PANEL_GUTTER = 16;
+
+/**
+ * Total horizontal space the Langy panel occupies when docked open
+ * (panel width + the right-side gutter). Page layouts can use this
+ * to shift content out of the way with a matching transition.
+ */
+export const LANGY_DOCKED_OFFSET = DRAWER_WIDTH + PANEL_GUTTER;
+export const LANGY_TRANSITION = "360ms cubic-bezier(0.32, 0.72, 0, 1)";
 
 const SAMPLE_PROMPTS = [
   "Summarize my current experiment",
@@ -59,38 +68,33 @@ export type ProposalHandlers = Record<
 interface LangyDrawerProps {
   proposalHandlers?: ProposalHandlers;
   experimentSlug?: string;
+  /**
+   * Controlled open state. When provided, the parent owns visibility —
+   * which is what enables the surrounding layout to shift in lockstep.
+   * If omitted, the drawer manages its own state (overlay-style).
+   */
+  isOpen?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
 export function LangyDrawer({
   proposalHandlers,
   experimentSlug,
+  isOpen: isOpenProp,
+  onOpenChange,
 }: LangyDrawerProps) {
-  const [isOpen, setIsOpen] = useState(false);
-  const panelRef = useRef<HTMLDivElement>(null);
-  const handleRef = useRef<HTMLButtonElement>(null);
-
-  useEffect(() => {
-    if (!isOpen) return;
-    const onPointerDown = (event: PointerEvent) => {
-      const target = event.target as Node | null;
-      if (!target) return;
-      if (panelRef.current?.contains(target)) return;
-      if (handleRef.current?.contains(target)) return;
-      setIsOpen(false);
-    };
-    document.addEventListener("pointerdown", onPointerDown);
-    return () => document.removeEventListener("pointerdown", onPointerDown);
-  }, [isOpen]);
+  const isControlled = isOpenProp !== undefined;
+  const [internalOpen, setInternalOpen] = useState(false);
+  const isOpen = isControlled ? isOpenProp : internalOpen;
+  const setIsOpen = (next: boolean) => {
+    if (!isControlled) setInternalOpen(next);
+    onOpenChange?.(next);
+  };
 
   return (
     <>
-      <LangyHandle
-        ref={handleRef}
-        isOpen={isOpen}
-        onToggle={() => setIsOpen((v) => !v)}
-      />
+      <LangyHandle isOpen={isOpen} onToggle={() => setIsOpen(!isOpen)} />
       <LangyPanel
-        ref={panelRef}
         isOpen={isOpen}
         onClose={() => setIsOpen(false)}
         proposalHandlers={proposalHandlers}
@@ -100,18 +104,20 @@ export function LangyDrawer({
   );
 }
 
-const LangyHandle = forwardRef<
-  HTMLButtonElement,
-  { isOpen: boolean; onToggle: () => void }
->(function LangyHandle({ isOpen, onToggle }, ref) {
+function LangyHandle({
+  isOpen,
+  onToggle,
+}: {
+  isOpen: boolean;
+  onToggle: () => void;
+}) {
   return (
     <Box
-      ref={ref}
       as="button"
       onClick={onToggle}
       aria-label={isOpen ? "Close Langy" : "Open Langy"}
       position="fixed"
-      right={isOpen ? `${DRAWER_WIDTH}px` : 0}
+      right={isOpen ? `${DRAWER_WIDTH + PANEL_GUTTER / 2}px` : 0}
       top="50%"
       transform="translateY(-50%)"
       width={`${HANDLE_WIDTH}px`}
@@ -126,8 +132,8 @@ const LangyHandle = forwardRef<
       borderColor="border.emphasized"
       borderRightWidth={0}
       boxShadow="sm"
-      color="fg.muted"
-      transition="right 360ms cubic-bezier(0.32, 0.72, 0, 1), transform 180ms ease, color 180ms ease, background 180ms ease"
+      color={isOpen ? "blue.fg" : "fg.muted"}
+      transition={`right ${LANGY_TRANSITION}, transform 180ms ease, color 180ms ease, background 180ms ease`}
       _hover={{
         transform: "translate(-2px, -50%)",
         color: "blue.fg",
@@ -151,20 +157,19 @@ const LangyHandle = forwardRef<
       </VStack>
     </Box>
   );
-});
+}
 
-const LangyPanel = forwardRef<
-  HTMLDivElement,
-  {
-    isOpen: boolean;
-    onClose: () => void;
-    proposalHandlers?: ProposalHandlers;
-    experimentSlug?: string;
-  }
->(function LangyPanel(
-  { isOpen, onClose, proposalHandlers, experimentSlug },
-  ref,
-) {
+function LangyPanel({
+  isOpen,
+  onClose,
+  proposalHandlers,
+  experimentSlug,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  proposalHandlers?: ProposalHandlers;
+  experimentSlug?: string;
+}) {
   const { project } = useOrganizationTeamProject();
   const projectId = project?.id;
 
@@ -274,7 +279,6 @@ const LangyPanel = forwardRef<
 
   return (
     <Box
-      ref={ref}
       position="fixed"
       top={2}
       right={2}
@@ -282,17 +286,20 @@ const LangyPanel = forwardRef<
       width={`${DRAWER_WIDTH}px`}
       zIndex={1500}
       borderRadius="lg"
-      background="bg.surface/80"
-      backdropFilter="blur(25px)"
+      background="bg.surface/85"
+      backdropFilter="blur(28px) saturate(140%)"
       borderWidth="1px"
       borderColor="border.emphasized"
-      boxShadow="lg"
-      transition="transform 360ms cubic-bezier(0.32, 0.72, 0, 1), opacity 200ms ease"
+      boxShadow="0 24px 60px -20px rgba(15, 23, 42, 0.35), 0 8px 20px -8px rgba(15, 23, 42, 0.2)"
+      transition={`transform ${LANGY_TRANSITION}, opacity 220ms ease`}
       transform={
-        isOpen ? "translateX(0)" : `translateX(calc(${DRAWER_WIDTH}px + 16px))`
+        isOpen
+          ? "translateX(0)"
+          : `translateX(calc(${DRAWER_WIDTH}px + ${PANEL_GUTTER}px))`
       }
       opacity={isOpen ? 1 : 0}
       pointerEvents={isOpen ? "auto" : "none"}
+      aria-hidden={!isOpen}
     >
       <VStack gap={0} align="stretch" height="full">
         <PanelHeader onClose={onClose} />
@@ -328,7 +335,7 @@ const LangyPanel = forwardRef<
       </VStack>
     </Box>
   );
-});
+}
 
 function PanelHeader({ onClose }: { onClose: () => void }) {
   return (

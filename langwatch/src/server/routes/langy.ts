@@ -860,11 +860,12 @@ app.post("/langy/chat", async (c) => {
   };
 
   const model = await getVercelAIModel(projectId, LANGY_MODEL);
+  const modelMessages = await convertToModelMessages(messages);
 
   const result = streamText({
     model,
     system: LANGY_SYSTEM_PROMPT,
-    messages: convertToModelMessages(messages),
+    messages: modelMessages,
     tools,
     stopWhen: stepCountIs(8),
     maxRetries: 2,

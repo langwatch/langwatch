@@ -6,6 +6,8 @@ import { useEffect, useMemo, useState } from "react";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import {
   LangyDrawer,
+  LANGY_DOCKED_OFFSET,
+  LANGY_TRANSITION,
   type ProposalHandlers,
 } from "~/components/langy/LangySidebar";
 import { LoadingScreen } from "~/components/LoadingScreen";
@@ -35,6 +37,7 @@ export default function ExperimentsWorkbenchPage() {
   const router = useRouter();
   const { project } = useOrganizationTeamProject();
   const slug = router.query.slug as string | undefined;
+  const [isLangyOpen, setIsLangyOpen] = useState(false);
 
   const {
     name,
@@ -338,6 +341,8 @@ export default function ExperimentsWorkbenchPage() {
         gap={0}
         align="stretch"
         overflow="hidden"
+        paddingRight={isLangyOpen ? `${LANGY_DOCKED_OFFSET}px` : 0}
+        transition={`padding-right ${LANGY_TRANSITION}`}
       >
         {/* Header */}
         <HStack paddingX={6} paddingY={3} flexShrink={0}>
@@ -388,6 +393,8 @@ export default function ExperimentsWorkbenchPage() {
       <LangyDrawer
         proposalHandlers={proposalHandlers}
         experimentSlug={slug}
+        isOpen={isLangyOpen}
+        onOpenChange={setIsLangyOpen}
       />
 
       {/* Load saved dataset records - renders nothing, just triggers fetches */}
