@@ -8,6 +8,15 @@ import {
 const mockFetch = vi.fn();
 vi.stubGlobal("fetch", mockFetch);
 
+const jsonResponse = (body: unknown, init?: ResponseInit): Response =>
+  new Response(JSON.stringify(body), {
+    status: init?.status ?? 200,
+    headers: { "content-type": "application/json" },
+    ...init,
+  });
+
+const fetchedRequest = (): Request => mockFetch.mock.calls[0]![0] as Request;
+
 describe("EvaluationsApiService.getRunResults()", () => {
   const previousApiKey = process.env.LANGWATCH_API_KEY;
   const previousEndpoint = process.env.LANGWATCH_ENDPOINT;
@@ -36,34 +45,25 @@ describe("EvaluationsApiService.getRunResults()", () => {
           evaluations: [],
           timestamps: { createdAt: 0, updatedAt: 0 },
         };
-        mockFetch.mockResolvedValueOnce({
-          ok: true,
-          status: 200,
-          json: () => Promise.resolve(payload),
-        });
+        mockFetch.mockResolvedValueOnce(jsonResponse(payload));
 
         const service = new EvaluationsApiService();
         const result = await service.getRunResults({ runId: "run_1" });
 
         expect(result).toEqual(payload);
-        expect(mockFetch).toHaveBeenCalledWith(
+        expect(fetchedRequest().url).toBe(
           "https://api.langwatch.test/api/evaluations/v3/runs/run_1/results",
-          expect.objectContaining({ method: "GET" }),
         );
+        expect(fetchedRequest().method).toBe("GET");
       });
 
       it("url-encodes the run id", async () => {
-        mockFetch.mockResolvedValueOnce({
-          ok: true,
-          status: 200,
-          json: () => Promise.resolve({}),
-        });
+        mockFetch.mockResolvedValueOnce(jsonResponse({}));
 
         const service = new EvaluationsApiService();
         await service.getRunResults({ runId: "run/with slash" });
 
-        const url = mockFetch.mock.calls[0]![0] as string;
-        expect(url).toContain("run%2Fwith%20slash/results");
+        expect(fetchedRequest().url).toContain("run%2Fwith%20slash/results");
       });
     });
   });
@@ -71,11 +71,9 @@ describe("EvaluationsApiService.getRunResults()", () => {
   describe("given the API returns an error", () => {
     describe("when the run is missing", () => {
       it("throws EvaluationsApiError with operation context", async () => {
-        mockFetch.mockResolvedValueOnce({
-          ok: false,
-          status: 404,
-          text: () => Promise.resolve('{"error":"Run not found"}'),
-        });
+        mockFetch.mockResolvedValueOnce(
+          jsonResponse({ error: "Run not found" }, { status: 404 }),
+        );
 
         const service = new EvaluationsApiService();
         const err = await service
@@ -89,11 +87,7 @@ describe("EvaluationsApiService.getRunResults()", () => {
 
     describe("when the API returns 200 with a null body for a missing run", () => {
       it("throws EvaluationsApiError instead of crashing on null.dataset", async () => {
-        mockFetch.mockResolvedValueOnce({
-          ok: true,
-          status: 200,
-          json: () => Promise.resolve(null),
-        });
+        mockFetch.mockResolvedValueOnce(jsonResponse(null));
 
         const service = new EvaluationsApiService();
         const err = await service

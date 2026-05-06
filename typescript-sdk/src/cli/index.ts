@@ -7,6 +7,9 @@ config();
 import { Command } from "commander";
 import { parsePromptSpec } from "./types";
 import { formatApiErrorMessage } from "../client-sdk/services/_shared/format-api-error";
+import { evaluationListRunsCommand } from "./commands/evaluation/list-runs.js";
+import { evaluationResultsCommand } from "./commands/evaluation/results.js";
+import { experimentListCommand } from "./commands/experiment/list.js";
 
 declare const __CLI_VERSION__: string;
 
@@ -482,10 +485,7 @@ evaluationCmd
       format?: string;
       limit?: string;
     }) => {
-      const { evaluationListRunsCommand: impl } = await import(
-        "./commands/evaluation/list-runs.js"
-      );
-      await impl(options);
+      await evaluationListRunsCommand(options);
     },
   );
 
@@ -508,10 +508,7 @@ evaluationCmd
         limit?: string;
       },
     ) => {
-      const { evaluationResultsCommand: impl } = await import(
-        "./commands/evaluation/results.js"
-      );
-      await impl(runId, options);
+      await evaluationResultsCommand({ runId, options });
     },
   );
 
@@ -526,10 +523,7 @@ experimentCmd
   .option("-f, --format <format>", "Output format: table (default) or json", "table")
   .option("--limit <n>", "Maximum experiments to fetch (default 50, max 200)", "50")
   .action(async (options: { format?: string; limit?: string }) => {
-    const { experimentListCommand: impl } = await import(
-      "./commands/experiment/list.js"
-    );
-    await impl(options);
+    await experimentListCommand(options);
   });
 
 

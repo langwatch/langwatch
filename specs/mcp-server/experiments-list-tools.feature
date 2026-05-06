@@ -26,7 +26,7 @@ Feature: MCP tools for listing experiments and evaluation runs
 
   Scenario: Limit is bounded to protect agent context
     When the agent invokes platform_experiment_list with limit 5000
-    Then the effective limit applied is 100 or lower
+    Then the call fails with a validation error mentioning the maximum limit of 100
 
   # ==========================================================================
   # platform_evaluation_list_runs

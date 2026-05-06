@@ -55,6 +55,12 @@ export interface ExperimentRun {
   summary: ExperimentRunSummary;
 }
 
+/** Aggregate run metadata for an experiment list row. */
+export interface ExperimentRunAggregate {
+  runsCount: number;
+  lastRunAt: number | null;
+}
+
 /** A single dataset entry within a run. */
 export interface ExperimentRunDatasetEntry {
   index: number;
@@ -101,4 +107,3 @@ export interface ExperimentRunWithItems {
     stoppedAt?: number | null;
   };
 }
-

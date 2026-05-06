@@ -3,8 +3,6 @@ import {
   createLangWatchApiClient,
   type LangwatchApiClient,
 } from "@/internal/api/client";
-import { buildAuthHeaders } from "@/internal/api/auth";
-import { DEFAULT_ENDPOINT } from "@/internal/constants";
 import { type InternalConfig } from "@/client-sdk/types";
 import {
   extractStatusFromResponse,
@@ -168,6 +166,33 @@ export class EvaluationsApiService {
     throw new EvaluationsApiError(message, operation, error);
   }
 
+  private async getUndeclaredEndpoint<T>({
+    path,
+    operation,
+  }: {
+    path: string;
+    operation: string;
+  }): Promise<T> {
+    type UntypedClient = {
+      GET: (
+        path: string,
+        init?: { parseAs?: "json" },
+      ) => Promise<{ data?: unknown; error?: unknown; response: Response }>;
+    };
+
+    let result: { data?: unknown; error?: unknown; response: Response };
+    try {
+      result = await (this.apiClient as unknown as UntypedClient).GET(path, {
+        parseAs: "json",
+      });
+    } catch (error) {
+      this.handleApiError(operation, error);
+    }
+
+    if (result.error) this.handleApiError(operation, result.error);
+    return result.data as T;
+  }
+
   async startRun(slug: string): Promise<EvaluationRunStartResponse> {
     const { data, error } = await this.apiClient.POST(
       "/api/evaluations/v3/{slug}/run",
@@ -193,9 +218,9 @@ export class EvaluationsApiService {
   /**
    * List experiments for the current project.
    *
-   * Hits `GET /api/experiments` directly via fetch (not the typed
-   * `apiClient`) because the route is not yet declared in the generated
-   * OpenAPI `paths`.
+   * Hits `GET /api/experiments` through the configured API client transport.
+   * The route is not yet declared in generated OpenAPI types, so the path is
+   * dispatched through a narrow untyped helper.
    */
   async listExperiments({
     pageSize,
@@ -204,51 +229,22 @@ export class EvaluationsApiService {
     pageSize?: number;
     page?: number;
   } = {}): Promise<ExperimentListResponse> {
-    const apiKey = process.env.LANGWATCH_API_KEY ?? "";
-    const endpoint = process.env.LANGWATCH_ENDPOINT ?? DEFAULT_ENDPOINT;
-    const projectId = process.env.LANGWATCH_PROJECT_ID;
     const search = new URLSearchParams();
     if (pageSize !== undefined) search.set("pageSize", String(pageSize));
     if (page !== undefined) search.set("page", String(page));
     const qs = search.toString();
-    const url = `${endpoint}/api/experiments${qs ? `?${qs}` : ""}`;
-
-    let response: Response;
-    try {
-      response = await fetch(url, {
-        method: "GET",
-        headers: {
-          ...buildAuthHeaders({ apiKey, projectId }),
-          "content-type": "application/json",
-        },
-      });
-    } catch (error) {
-      this.handleApiError("list experiments", error);
-    }
-
-    if (!response.ok) {
-      const text = await response.text().catch(() => "");
-      let parsed: unknown = text;
-      try {
-        parsed = JSON.parse(text);
-      } catch {
-        // keep raw text
-      }
-      const fauxError = {
-        response: { status: response.status },
-        data: parsed,
-      };
-      this.handleApiError("list experiments", fauxError);
-    }
-
-    return (await response.json()) as ExperimentListResponse;
+    return this.getUndeclaredEndpoint<ExperimentListResponse>({
+      path: `/api/experiments${qs ? `?${qs}` : ""}`,
+      operation: "list experiments",
+    });
   }
 
   /**
    * List evaluation runs for an experiment slug.
    *
-   * Hits `GET /api/evaluations/v3/runs?experimentSlug=...` directly via
-   * fetch because the route is not yet declared in the generated OpenAPI.
+   * Hits `GET /api/evaluations/v3/runs?experimentSlug=...` through the
+   * configured API client transport because the route is not yet declared in
+   * the generated OpenAPI.
    */
   async listRuns({
     experimentSlug,
@@ -259,57 +255,21 @@ export class EvaluationsApiService {
     pageSize?: number;
     page?: number;
   }): Promise<EvaluationRunsListResponse> {
-    const apiKey = process.env.LANGWATCH_API_KEY ?? "";
-    const endpoint = process.env.LANGWATCH_ENDPOINT ?? DEFAULT_ENDPOINT;
-    const projectId = process.env.LANGWATCH_PROJECT_ID;
     const search = new URLSearchParams();
     search.set("experimentSlug", experimentSlug);
     if (pageSize !== undefined) search.set("pageSize", String(pageSize));
     if (page !== undefined) search.set("page", String(page));
-    const url = `${endpoint}/api/evaluations/v3/runs?${search.toString()}`;
-
-    let response: Response;
-    try {
-      response = await fetch(url, {
-        method: "GET",
-        headers: {
-          ...buildAuthHeaders({ apiKey, projectId }),
-          "content-type": "application/json",
-        },
-      });
-    } catch (error) {
-      this.handleApiError(
-        `list runs for experiment "${experimentSlug}"`,
-        error,
-      );
-    }
-
-    if (!response.ok) {
-      const text = await response.text().catch(() => "");
-      let parsed: unknown = text;
-      try {
-        parsed = JSON.parse(text);
-      } catch {
-        // keep raw text
-      }
-      const fauxError = {
-        response: { status: response.status },
-        data: parsed,
-      };
-      this.handleApiError(
-        `list runs for experiment "${experimentSlug}"`,
-        fauxError,
-      );
-    }
-
-    return (await response.json()) as EvaluationRunsListResponse;
+    return this.getUndeclaredEndpoint<EvaluationRunsListResponse>({
+      path: `/api/evaluations/v3/runs?${search.toString()}`,
+      operation: `list runs for experiment "${experimentSlug}"`,
+    });
   }
 
   /**
    * Fetch per-row results for a completed evaluation run.
    *
-   * Hits `GET /api/evaluations/v3/runs/{runId}/results` directly via fetch
-   * (not the typed `apiClient`) because the route is not yet declared in
+   * Hits `GET /api/evaluations/v3/runs/{runId}/results` through the
+   * configured API client transport because the route is not yet declared in
    * the generated OpenAPI `paths`.
    */
   async getRunResults({
@@ -317,41 +277,12 @@ export class EvaluationsApiService {
   }: {
     runId: string;
   }): Promise<EvaluationRunResultsResponse> {
-    const apiKey = process.env.LANGWATCH_API_KEY ?? "";
-    const endpoint =
-      process.env.LANGWATCH_ENDPOINT ?? DEFAULT_ENDPOINT;
-    const projectId = process.env.LANGWATCH_PROJECT_ID;
-    const url = `${endpoint}/api/evaluations/v3/runs/${encodeURIComponent(runId)}/results`;
-
-    let response: Response;
-    try {
-      response = await fetch(url, {
-        method: "GET",
-        headers: {
-          ...buildAuthHeaders({ apiKey, projectId }),
-          "content-type": "application/json",
-        },
-      });
-    } catch (error) {
-      this.handleApiError(`get run results for "${runId}"`, error);
-    }
-
-    if (!response.ok) {
-      const text = await response.text().catch(() => "");
-      let parsed: unknown = text;
-      try {
-        parsed = JSON.parse(text);
-      } catch {
-        // keep raw text
-      }
-      const fauxError = {
-        response: { status: response.status },
-        data: parsed,
-      };
-      this.handleApiError(`get run results for "${runId}"`, fauxError);
-    }
-
-    const body = (await response.json()) as EvaluationRunResultsResponse | null;
+    const body = await this.getUndeclaredEndpoint<
+      EvaluationRunResultsResponse | null
+    >({
+      path: `/api/evaluations/v3/runs/${encodeURIComponent(runId)}/results`,
+      operation: `get run results for "${runId}"`,
+    });
     if (body === null) {
       this.handleApiError(`get run results for "${runId}"`, {
         response: { status: 404 },

@@ -21,7 +21,21 @@ import {
   mapClickHouseItemsToRunWithItems,
   mapClickHouseRunToExperimentRun,
 } from "./mappers";
-import type { ExperimentRun, ExperimentRunWithItems } from "./types";
+import type {
+  ExperimentRun,
+  ExperimentRunAggregate,
+  ExperimentRunWithItems,
+} from "./types";
+
+interface ClickHouseExperimentRunAggregateRow {
+  ExperimentId: string;
+  runsCount: number | string;
+  lastRunAt: number | string | null;
+}
+
+interface ClickHouseCountRow {
+  totalHits: number | string;
+}
 
 /**
  * ClickHouse backend for experiment run queries.
@@ -356,6 +370,311 @@ export class ClickHouseExperimentRunService {
             "Failed to list experiment runs from ClickHouse",
           );
           throw new Error("Failed to list experiment runs from ClickHouse");
+        }
+      },
+    );
+  }
+
+  async getRunAggregatesForExperimentIds({
+    projectId,
+    experimentIds,
+  }: {
+    projectId: string;
+    experimentIds: string[];
+  }): Promise<Record<string, ExperimentRunAggregate> | null> {
+    return this.tracer.withActiveSpan(
+      "ClickHouseExperimentRunService.getRunAggregatesForExperimentIds",
+      {
+        attributes: {
+          "tenant.id": projectId,
+          "experiment.count": experimentIds.length,
+        },
+      },
+      async () => {
+        const clickHouseClient = await getClickHouseClientForProject(projectId);
+        if (!clickHouseClient) {
+          return null;
+        }
+
+        if (experimentIds.length === 0) {
+          return {};
+        }
+
+        const result = await clickHouseClient.query({
+          query: `
+            SELECT
+              ExperimentId,
+              count() AS runsCount,
+              max(toUnixTimestamp64Milli(CreatedAt)) AS lastRunAt
+            FROM (
+              SELECT
+                ExperimentId,
+                RunId,
+                max(CreatedAt) AS CreatedAt
+              FROM experiment_runs
+              WHERE TenantId = {tenantId:String}
+                AND ExperimentId IN ({experimentIds:Array(String)})
+              GROUP BY ExperimentId, RunId
+            )
+            GROUP BY ExperimentId
+          `,
+          query_params: {
+            tenantId: projectId,
+            experimentIds,
+          },
+          format: "JSONEachRow",
+        });
+
+        const rows =
+          (await result.json()) as ClickHouseExperimentRunAggregateRow[];
+
+        return rows.reduce<Record<string, ExperimentRunAggregate>>(
+          (acc, row) => {
+            acc[row.ExperimentId] = {
+              runsCount: Number(row.runsCount),
+              lastRunAt:
+                row.lastRunAt === null ? null : Number(row.lastRunAt),
+            };
+            return acc;
+          },
+          {},
+        );
+      },
+    );
+  }
+
+  async listRunsForExperimentPaginated({
+    projectId,
+    experimentId,
+    page,
+    pageSize,
+  }: {
+    projectId: string;
+    experimentId: string;
+    page: number;
+    pageSize: number;
+  }): Promise<{ runs: ExperimentRun[]; totalHits: number } | null> {
+    return this.tracer.withActiveSpan(
+      "ClickHouseExperimentRunService.listRunsForExperimentPaginated",
+      {
+        attributes: {
+          "tenant.id": projectId,
+          "experiment.id": experimentId,
+          page,
+          pageSize,
+        },
+      },
+      async () => {
+        const clickHouseClient = await getClickHouseClientForProject(projectId);
+        if (!clickHouseClient) {
+          return null;
+        }
+
+        const offset = (page - 1) * pageSize;
+
+        try {
+          const countResult = await clickHouseClient.query({
+            query: `
+              SELECT uniqExact(RunId) AS totalHits
+              FROM experiment_runs
+              WHERE TenantId = {tenantId:String}
+                AND ExperimentId = {experimentId:String}
+            `,
+            query_params: {
+              tenantId: projectId,
+              experimentId,
+            },
+            format: "JSONEachRow",
+          });
+          const countRows = (await countResult.json()) as ClickHouseCountRow[];
+          const totalHits = Number(countRows[0]?.totalHits ?? 0);
+
+          const runsResult = await clickHouseClient.query({
+            query: `
+              SELECT *
+              FROM experiment_runs AS t
+              WHERE t.TenantId = {tenantId:String}
+                AND t.ExperimentId = {experimentId:String}
+                AND (t.TenantId, t.RunId, t.ExperimentId, t.UpdatedAt) IN (
+                  SELECT TenantId, RunId, ExperimentId, max(UpdatedAt)
+                  FROM experiment_runs
+                  WHERE TenantId = {tenantId:String}
+                    AND ExperimentId = {experimentId:String}
+                  GROUP BY TenantId, RunId, ExperimentId
+                )
+              ORDER BY t.CreatedAt DESC
+              LIMIT {pageSize:UInt32}
+              OFFSET {offset:UInt32}
+            `,
+            query_params: {
+              tenantId: projectId,
+              experimentId,
+              pageSize,
+              offset,
+            },
+            format: "JSONEachRow",
+          });
+
+          const runRows =
+            (await runsResult.json()) as ClickHouseExperimentRunRow[];
+
+          if (runRows.length === 0) {
+            return { runs: [], totalHits };
+          }
+
+          const runPairs = runRows.map(
+            (r) => new TupleParam([r.ExperimentId, r.RunId]),
+          );
+          const occurredAtRange = computeOccurredAtRangeForRuns(runRows);
+          this.warnIfRunsAreOld({
+            projectId,
+            minMs: occurredAtRange.minMs,
+            runCount: runRows.length,
+          });
+
+          const breakdownResult = await clickHouseClient.query({
+            query: `
+              SELECT
+                ExperimentId,
+                RunId,
+                EvaluatorId,
+                max(EvaluatorName) AS EvaluatorName,
+                avg(Score) AS avgScore,
+                if(countIf(Passed IS NOT NULL) > 0, countIf(Passed = 1) / countIf(Passed IS NOT NULL), NULL) AS passRate,
+                countIf(Passed IS NOT NULL) AS hasPassedCount
+              FROM experiment_run_items
+              WHERE TenantId = {tenantId:String}
+                AND OccurredAt >= {minOccurredAt:DateTime64(3)}
+                AND OccurredAt <= {maxOccurredAt:DateTime64(3)}
+                AND (ExperimentId, RunId) IN {runPairs:Array(Tuple(String, String))}
+                AND ResultType = 'evaluator'
+                AND EvaluationStatus = 'processed'
+                AND (TenantId, ExperimentId, RunId, RowIndex, TargetId, ResultType, coalesce(EvaluatorId, ''), OccurredAt) IN (
+                  SELECT
+                    TenantId,
+                    ExperimentId,
+                    RunId,
+                    RowIndex,
+                    TargetId,
+                    ResultType,
+                    coalesce(EvaluatorId, ''),
+                    max(OccurredAt)
+                  FROM experiment_run_items
+                  WHERE TenantId = {tenantId:String}
+                    AND OccurredAt >= {minOccurredAt:DateTime64(3)}
+                    AND OccurredAt <= {maxOccurredAt:DateTime64(3)}
+                    AND (ExperimentId, RunId) IN {runPairs:Array(Tuple(String, String))}
+                  GROUP BY TenantId, ExperimentId, RunId, RowIndex, TargetId, ResultType, coalesce(EvaluatorId, '')
+                )
+              GROUP BY ExperimentId, RunId, EvaluatorId
+              LIMIT 10000
+            `,
+            query_params: {
+              tenantId: projectId,
+              runPairs,
+              minOccurredAt: occurredAtRange.minOccurredAt,
+              maxOccurredAt: occurredAtRange.maxOccurredAt,
+            },
+            format: "JSONEachRow",
+          });
+
+          const breakdownRows =
+            (await breakdownResult.json()) as ClickHouseEvaluatorBreakdownRow[];
+          const breakdownByExperimentRun = new Map<
+            string,
+            ClickHouseEvaluatorBreakdownRow[]
+          >();
+          for (const row of breakdownRows) {
+            const key = `${row.ExperimentId}:${row.RunId}`;
+            const existing = breakdownByExperimentRun.get(key) ?? [];
+            existing.push(row);
+            breakdownByExperimentRun.set(key, existing);
+          }
+
+          const costResult = await clickHouseClient.query({
+            query: `
+              SELECT
+                ExperimentId,
+                RunId,
+                sumIf(TargetCost, ResultType = 'target') AS datasetCost,
+                sumIf(EvaluationCost, ResultType = 'evaluator') AS evaluationsCost,
+                avgIf(TargetCost, ResultType = 'target' AND TargetCost IS NOT NULL) AS datasetAverageCost,
+                avgIf(TargetDurationMs, ResultType = 'target' AND TargetDurationMs IS NOT NULL) AS datasetAverageDuration,
+                avgIf(EvaluationCost, ResultType = 'evaluator' AND EvaluationCost IS NOT NULL) AS evaluationsAverageCost,
+                avgIf(EvaluationDurationMs, ResultType = 'evaluator' AND EvaluationDurationMs IS NOT NULL) AS evaluationsAverageDuration
+              FROM experiment_run_items
+              WHERE TenantId = {tenantId:String}
+                AND OccurredAt >= {minOccurredAt:DateTime64(3)}
+                AND OccurredAt <= {maxOccurredAt:DateTime64(3)}
+                AND (ExperimentId, RunId) IN {runPairs:Array(Tuple(String, String))}
+                AND (TenantId, ExperimentId, RunId, RowIndex, TargetId, ResultType, coalesce(EvaluatorId, ''), OccurredAt) IN (
+                  SELECT
+                    TenantId,
+                    ExperimentId,
+                    RunId,
+                    RowIndex,
+                    TargetId,
+                    ResultType,
+                    coalesce(EvaluatorId, ''),
+                    max(OccurredAt)
+                  FROM experiment_run_items
+                  WHERE TenantId = {tenantId:String}
+                    AND OccurredAt >= {minOccurredAt:DateTime64(3)}
+                    AND OccurredAt <= {maxOccurredAt:DateTime64(3)}
+                    AND (ExperimentId, RunId) IN {runPairs:Array(Tuple(String, String))}
+                  GROUP BY TenantId, ExperimentId, RunId, RowIndex, TargetId, ResultType, coalesce(EvaluatorId, '')
+                )
+              GROUP BY ExperimentId, RunId
+              LIMIT 10000
+            `,
+            query_params: {
+              tenantId: projectId,
+              runPairs,
+              minOccurredAt: occurredAtRange.minOccurredAt,
+              maxOccurredAt: occurredAtRange.maxOccurredAt,
+            },
+            format: "JSONEachRow",
+          });
+
+          const costRows =
+            (await costResult.json()) as ClickHouseCostSummaryRow[];
+          const costByExperimentRun = new Map<string, ClickHouseCostSummaryRow>();
+          for (const row of costRows) {
+            costByExperimentRun.set(`${row.ExperimentId}:${row.RunId}`, row);
+          }
+
+          const versionIds = runRows
+            .map((r) => r.WorkflowVersionId)
+            .filter((id): id is string => id !== null);
+          const versionsMap = await getVersionMap({
+            prisma: this.prisma,
+            projectId,
+            versionIds,
+          });
+
+          const runs = runRows.map((row) => {
+            const compositeKey = `${row.ExperimentId}:${row.RunId}`;
+            return mapClickHouseRunToExperimentRun({
+              record: row,
+              workflowVersion: row.WorkflowVersionId
+                ? (versionsMap[row.WorkflowVersionId] ?? null)
+                : null,
+              evaluatorBreakdown: breakdownByExperimentRun.get(compositeKey),
+              costSummary: costByExperimentRun.get(compositeKey),
+            });
+          });
+
+          return { runs, totalHits };
+        } catch (error) {
+          this.logger.error(
+            {
+              projectId,
+              experimentId,
+              error: error instanceof Error ? error.message : error,
+            },
+            "Failed to list paginated experiment runs from ClickHouse",
+          );
+          throw new Error("Failed to list paginated experiment runs from ClickHouse");
         }
       },
     );

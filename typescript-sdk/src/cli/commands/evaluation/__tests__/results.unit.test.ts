@@ -1,5 +1,9 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { EvaluationsApiError } from "@/client-sdk/services/evaluations/evaluations-api.service";
+
+const oraMocks = vi.hoisted(() => ({
+  fail: vi.fn(),
+}));
 
 vi.mock("@/client-sdk/services/evaluations/evaluations-api.service", async (importOriginal) => {
   // eslint-disable-next-line @typescript-eslint/consistent-type-imports
@@ -18,7 +22,7 @@ vi.mock("ora", () => ({
   default: () => ({
     start: vi.fn().mockReturnThis(),
     succeed: vi.fn(),
-    fail: vi.fn(),
+    fail: oraMocks.fail,
     warn: vi.fn(),
     text: "",
   }),
@@ -79,29 +83,46 @@ describe("evaluationResultsCommand()", () => {
     mockProcessExit();
   });
 
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   describe("given a completed run", () => {
     describe("when invoked without filters", () => {
       it("calls the service with the run id", async () => {
         mockGetRunResults.mockResolvedValue(sampleResults);
-        await evaluationResultsCommand("run_1");
+        await evaluationResultsCommand({ runId: "run_1" });
         expect(mockGetRunResults).toHaveBeenCalledWith({ runId: "run_1" });
       });
     });
 
     describe("when format is json", () => {
-      it("dumps the full payload to stdout", async () => {
+      it("applies filters and dumps the matching payload to stdout", async () => {
         mockGetRunResults.mockResolvedValue(sampleResults);
-        await evaluationResultsCommand("run_1", { format: "json" });
-        expect(logSpy).toHaveBeenCalledWith(
-          JSON.stringify(sampleResults, null, 2),
-        );
+        await evaluationResultsCommand({
+          runId: "run_1",
+          options: { format: "json", filter: "failed", limit: "1" },
+        });
+        const payload = JSON.parse(String(logSpy.mock.calls[0]![0]));
+        expect(payload.dataset).toHaveLength(1);
+        expect(payload.dataset[0].entry.input).toBe("broken row");
+        expect(payload.evaluations).toHaveLength(0);
+        expect(payload.meta).toMatchObject({
+          totalMatching: 2,
+          truncated: true,
+          limit: 1,
+          filter: "failed",
+        });
       });
     });
 
     describe("when filter is failed", () => {
       it("prints only failing rows", async () => {
         mockGetRunResults.mockResolvedValue(sampleResults);
-        await evaluationResultsCommand("run_1", { filter: "failed" });
+        await evaluationResultsCommand({
+          runId: "run_1",
+          options: { filter: "failed" },
+        });
         const printed = logSpy.mock.calls.map((c) => String(c[0])).join("\n");
         // Row 1 (errored) and row 2 (failed quality) should appear
         expect(printed).toMatch(/\b1\b/);
@@ -115,7 +136,10 @@ describe("evaluationResultsCommand()", () => {
     describe("when an evaluator name is provided", () => {
       it("narrows the column set to that evaluator", async () => {
         mockGetRunResults.mockResolvedValue(sampleResults);
-        await evaluationResultsCommand("run_1", { evaluator: "quality" });
+        await evaluationResultsCommand({
+          runId: "run_1",
+          options: { evaluator: "quality" },
+        });
         const printed = logSpy.mock.calls.map((c) => String(c[0])).join("\n");
         expect(printed).toContain("quality");
         // safety column should not appear in the header
@@ -137,7 +161,10 @@ describe("evaluationResultsCommand()", () => {
           evaluations: [],
         };
         mockGetRunResults.mockResolvedValue(big);
-        await evaluationResultsCommand("run_1", { limit: "5" });
+        await evaluationResultsCommand({
+          runId: "run_1",
+          options: { limit: "5" },
+        });
         const printed = logSpy.mock.calls.map((c) => String(c[0])).join("\n");
         expect(printed).toContain("Showing 5 of 50");
       });
@@ -148,11 +175,14 @@ describe("evaluationResultsCommand()", () => {
     describe("when the run is missing", () => {
       it("exits with code 1", async () => {
         mockGetRunResults.mockRejectedValue(
-          new EvaluationsApiError("Not found", "get run results"),
+          new EvaluationsApiError("Run not found", "get run results"),
         );
         await expect(
-          evaluationResultsCommand("missing"),
-        ).rejects.toThrow(ProcessExitError);
+          evaluationResultsCommand({ runId: "missing" }),
+        ).rejects.toMatchObject({ code: 1 });
+        expect(oraMocks.fail).toHaveBeenCalledWith(
+          expect.stringContaining("Run not found"),
+        );
       });
     });
   });

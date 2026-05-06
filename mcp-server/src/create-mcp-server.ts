@@ -7,6 +7,9 @@ import {
   createDatasetSchema,
   datasetColumnDefinitionSchema,
 } from "./schemas/create-dataset.js";
+import { handleEvaluationResults } from "./tools/get-evaluation-results.js";
+import { handleEvaluationListRuns } from "./tools/list-evaluation-runs.js";
+import { handleExperimentList } from "./tools/list-experiments.js";
 
 const modelSchema = z
   .string()
@@ -1581,6 +1584,7 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
         .number()
         .int()
         .positive()
+        .max(100)
         .optional()
         .describe(
           "Maximum number of experiments to include (default 25, hard-capped at 100)",
@@ -1588,9 +1592,6 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
     },
     withToolLogging("platform_experiment_list", async (params) => {
       requireApiKey();
-      const { handleExperimentList } = await import(
-        "./tools/list-experiments.js"
-      );
       return {
         content: [{ type: "text", text: await handleExperimentList(params) }],
       };
@@ -1610,6 +1611,7 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
         .number()
         .int()
         .positive()
+        .max(100)
         .optional()
         .describe(
           "Maximum number of runs to include (default 25, hard-capped at 100)",
@@ -1617,9 +1619,6 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
     },
     withToolLogging("platform_evaluation_list_runs", async (params) => {
       requireApiKey();
-      const { handleEvaluationListRuns } = await import(
-        "./tools/list-evaluation-runs.js"
-      );
       return {
         content: [{ type: "text", text: await handleEvaluationListRuns(params) }],
       };
@@ -1654,9 +1653,6 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
     },
     withToolLogging("platform_evaluation_results", async (params) => {
       requireApiKey();
-      const { handleEvaluationResults } = await import(
-        "./tools/get-evaluation-results.js"
-      );
       return {
         content: [
           { type: "text", text: await handleEvaluationResults(params) },

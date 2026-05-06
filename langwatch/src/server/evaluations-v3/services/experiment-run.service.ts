@@ -3,7 +3,11 @@ import { getLangWatchTracer } from "langwatch";
 import { prisma as defaultPrisma } from "~/server/db";
 import { ClickHouseExperimentRunService } from "./clickhouse-experiment-run.service";
 import { ElasticsearchExperimentRunService } from "./elasticsearch-experiment-run.service";
-import type { ExperimentRun, ExperimentRunWithItems } from "./types";
+import type {
+  ExperimentRun,
+  ExperimentRunAggregate,
+  ExperimentRunWithItems,
+} from "./types";
 
 /**
  * Unified service for fetching experiment runs from ClickHouse.
@@ -71,6 +75,91 @@ export class ExperimentRunService {
           );
         }
         return result;
+      },
+    );
+  }
+
+  async getRunAggregatesForExperimentIds(params: {
+    projectId: string;
+    experimentIds: string[];
+  }): Promise<Record<string, ExperimentRunAggregate>> {
+    return this.tracer.withActiveSpan(
+      "ExperimentRunService.getRunAggregatesForExperimentIds",
+      {
+        attributes: {
+          "tenant.id": params.projectId,
+          "experiment.count": params.experimentIds.length,
+        },
+      },
+      async (span) => {
+        span.setAttribute("backend", "clickhouse");
+
+        const result =
+          await this.clickHouseService.getRunAggregatesForExperimentIds(params);
+        if (result === null) {
+          throw new Error(
+            "ClickHouse is enabled but returned null for getRunAggregatesForExperimentIds — check ClickHouse client configuration",
+          );
+        }
+        return result;
+      },
+    );
+  }
+
+  async listRunsForExperimentSlugPaginated(params: {
+    projectId: string;
+    experimentSlug: string;
+    page: number;
+    pageSize: number;
+  }): Promise<{
+    experiment: { id: string; slug: string } | null;
+    runs: ExperimentRun[];
+    totalHits: number;
+  }> {
+    return this.tracer.withActiveSpan(
+      "ExperimentRunService.listRunsForExperimentSlugPaginated",
+      {
+        attributes: {
+          "tenant.id": params.projectId,
+          "experiment.slug": params.experimentSlug,
+          page: params.page,
+          pageSize: params.pageSize,
+        },
+      },
+      async (span) => {
+        const experiment = await this.prisma.experiment.findFirst({
+          where: {
+            projectId: params.projectId,
+            slug: params.experimentSlug,
+          },
+          select: { id: true, slug: true },
+        });
+
+        if (!experiment) {
+          return { experiment: null, runs: [], totalHits: 0 };
+        }
+
+        span.setAttribute("experiment.id", experiment.id);
+        span.setAttribute("backend", "clickhouse");
+
+        const result =
+          await this.clickHouseService.listRunsForExperimentPaginated({
+            projectId: params.projectId,
+            experimentId: experiment.id,
+            page: params.page,
+            pageSize: params.pageSize,
+          });
+        if (result === null) {
+          throw new Error(
+            "ClickHouse is enabled but returned null for listRunsForExperimentPaginated — check ClickHouse client configuration",
+          );
+        }
+
+        return {
+          experiment,
+          runs: result.runs,
+          totalHits: result.totalHits,
+        };
       },
     );
   }

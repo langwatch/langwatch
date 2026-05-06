@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 vi.mock(
   "@/client-sdk/services/evaluations/evaluations-api.service",
@@ -63,6 +63,10 @@ describe("evaluationListRunsCommand()", () => {
     logSpy = vi.spyOn(console, "log").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
     mockProcessExit();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   describe("given no --experiment flag", () => {

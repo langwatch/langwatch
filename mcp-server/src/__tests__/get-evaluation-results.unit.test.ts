@@ -29,7 +29,7 @@ const sample = {
     { evaluator: "quality", index: 2, status: "processed", score: 0.2, passed: false, details: "off-topic" },
     { evaluator: "safety", index: 0, status: "processed", score: 1.0, passed: true },
   ],
-  timestamps: { createdAt: 0, updatedAt: 0 },
+  timestamps: { createdAt: 0, updatedAt: 0, finishedAt: 1 },
 };
 
 beforeEach(() => {
@@ -102,6 +102,46 @@ describe("handleEvaluationResults()", () => {
         expect(out).toContain("Output truncated to 50 rows of 80");
       });
     });
+
+    describe("when multiple targets share the same dataset index", () => {
+      it("keeps evaluator rows target-scoped", async () => {
+        mockMakeRequest.mockResolvedValueOnce({
+          ...sample,
+          dataset: [
+            { index: 0, targetId: "a", entry: { input: "target a" } },
+            { index: 0, targetId: "b", entry: { input: "target b" } },
+          ],
+          evaluations: [
+            {
+              evaluator: "quality",
+              index: 0,
+              targetId: "a",
+              status: "processed",
+              score: 0.9,
+              passed: true,
+            },
+            {
+              evaluator: "quality",
+              index: 0,
+              targetId: "b",
+              status: "processed",
+              score: 0.1,
+              passed: false,
+              details: "target-b-only",
+            },
+          ],
+        });
+
+        const out = await handleEvaluationResults({
+          runId: "run_1",
+          filter: "failed",
+        });
+
+        expect(out).toContain("target b");
+        expect(out).toContain("target-b-only");
+        expect(out).not.toContain("target a");
+      });
+    });
   });
 
   describe("given the run is missing", () => {
@@ -110,6 +150,24 @@ describe("handleEvaluationResults()", () => {
         mockMakeRequest.mockRejectedValueOnce(new Error("404 Not Found"));
         const out = await handleEvaluationResults({ runId: "missing" });
         expect(out).toContain("not found");
+        expect(out).toContain("platform_evaluation_status");
+      });
+    });
+  });
+
+  describe("given the run is still in progress", () => {
+    describe("when results are requested", () => {
+      it("returns guidance to check status instead of partial results", async () => {
+        mockMakeRequest.mockResolvedValueOnce({
+          ...sample,
+          progress: 2,
+          total: 3,
+          timestamps: { createdAt: 0, updatedAt: 0, finishedAt: null },
+        });
+
+        const out = await handleEvaluationResults({ runId: "unfinished" });
+
+        expect(out).toContain("results are not yet available");
         expect(out).toContain("platform_evaluation_status");
       });
     });

@@ -15,6 +15,7 @@ interface EvaluationItem {
   evaluator: string;
   name?: string | null;
   index: number;
+  targetId?: string | null;
   status: "processed" | "skipped" | "error";
   score?: number | null;
   label?: string | null;
@@ -40,6 +41,9 @@ interface EvaluationRunResults {
 }
 
 const DEFAULT_ROW_CAP = 50;
+
+const rowKey = (index: number, targetId?: string | null): string =>
+  `${index}:${targetId ?? ""}`;
 
 const summarizeEntry = (entry: Record<string, unknown>): string => {
   const candidates = ["input", "question", "query", "prompt", "user"];
@@ -76,7 +80,7 @@ export async function handleEvaluationResults(params: {
       ? params.limit
       : DEFAULT_ROW_CAP;
 
-  let results: EvaluationRunResults;
+  let results: EvaluationRunResults | null;
   try {
     results = (await makeRequest(
       "GET",
@@ -98,13 +102,26 @@ export async function handleEvaluationResults(params: {
     throw error;
   }
 
-  // Group evaluations by row index, applying evaluator filter
-  const evaluationsByIndex = new Map<number, EvaluationItem[]>();
+  if (!results || results.timestamps.finishedAt == null) {
+    return [
+      `# Evaluation Results: ${params.runId}`,
+      "",
+      "**Status**: results are not yet available",
+      "",
+      `Results for run \`${params.runId}\` are not ready yet.`,
+      "",
+      "> Try `platform_evaluation_status` first to confirm the run id and that it is completed.",
+    ].join("\n");
+  }
+
+  // Group evaluations by target-scoped row key, applying evaluator filter.
+  const evaluationsByRow = new Map<string, EvaluationItem[]>();
   for (const evaluation of results.evaluations) {
     if (evaluatorFilter && evaluation.evaluator !== evaluatorFilter) continue;
-    const list = evaluationsByIndex.get(evaluation.index) ?? [];
+    const key = rowKey(evaluation.index, evaluation.targetId);
+    const list = evaluationsByRow.get(key) ?? [];
     list.push(evaluation);
-    evaluationsByIndex.set(evaluation.index, list);
+    evaluationsByRow.set(key, list);
   }
 
   const evaluatorNames = Array.from(
@@ -118,7 +135,7 @@ export async function handleEvaluationResults(params: {
 
   let rows = results.dataset.map((entry) => ({
     entry,
-    evaluations: evaluationsByIndex.get(entry.index) ?? [],
+    evaluations: evaluationsByRow.get(rowKey(entry.index, entry.targetId)) ?? [],
   }));
 
   if (filter === "failed") {

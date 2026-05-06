@@ -22,6 +22,9 @@ export interface EvaluationResultsOptions {
 
 const DEFAULT_LIMIT = 20;
 
+const rowKey = (index: number, targetId?: string | null): string =>
+  `${index}:${targetId ?? ""}`;
+
 const summarizeEntry = (entry: Record<string, unknown>): string => {
   // Pick something meaningful: input, question, query, prompt, or first string field
   const candidates = ["input", "question", "query", "prompt", "user"];
@@ -58,10 +61,13 @@ const isFailedRow = ({
   return evaluations.some((e) => isFailedEvaluation(e));
 };
 
-export const evaluationResultsCommand = async (
-  runId: string,
-  options: EvaluationResultsOptions = {},
-): Promise<void> => {
+export const evaluationResultsCommand = async ({
+  runId,
+  options = {},
+}: {
+  runId: string;
+  options?: EvaluationResultsOptions;
+}): Promise<void> => {
   checkApiKey();
 
   const filter: EvaluationResultsFilter =
@@ -85,18 +91,14 @@ export const evaluationResultsCommand = async (
       `Loaded results for ${chalk.cyan(runId)} (${results.dataset.length} rows, ${results.evaluations.length} evaluations)`,
     );
 
-    if (format === "json") {
-      console.log(JSON.stringify(results, null, 2));
-      return;
-    }
-
-    // Group evaluations by row index
-    const evaluationsByIndex = new Map<number, EvaluationRunEvaluation[]>();
+    // Group evaluations by target-scoped row key.
+    const evaluationsByRow = new Map<string, EvaluationRunEvaluation[]>();
     for (const evaluation of results.evaluations) {
       if (evaluatorFilter && evaluation.evaluator !== evaluatorFilter) continue;
-      const list = evaluationsByIndex.get(evaluation.index) ?? [];
+      const key = rowKey(evaluation.index, evaluation.targetId);
+      const list = evaluationsByRow.get(key) ?? [];
       list.push(evaluation);
-      evaluationsByIndex.set(evaluation.index, list);
+      evaluationsByRow.set(key, list);
     }
 
     // Determine evaluator columns to show
@@ -108,7 +110,7 @@ export const evaluationResultsCommand = async (
 
     let rows = results.dataset.map((entry) => ({
       entry,
-      evaluations: evaluationsByIndex.get(entry.index) ?? [],
+      evaluations: evaluationsByRow.get(rowKey(entry.index, entry.targetId)) ?? [],
     }));
 
     if (filter === "failed") {
@@ -120,6 +122,28 @@ export const evaluationResultsCommand = async (
     const totalMatching = rows.length;
     const truncated = rows.length > limit;
     rows = rows.slice(0, limit);
+
+    if (format === "json") {
+      console.log(
+        JSON.stringify(
+          {
+            ...results,
+            dataset: rows.map((row) => row.entry),
+            evaluations: rows.flatMap((row) => row.evaluations),
+            meta: {
+              totalMatching,
+              truncated,
+              limit,
+              filter,
+              evaluator: evaluatorFilter ?? null,
+            },
+          },
+          null,
+          2,
+        ),
+      );
+      return;
+    }
 
     if (rows.length === 0) {
       console.log(chalk.gray("No rows matched the filter."));

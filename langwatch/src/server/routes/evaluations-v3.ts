@@ -524,40 +524,31 @@ app.get("/runs", async (c) => {
     return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
   })();
 
-  const experiment = await prisma.experiment.findFirst({
-    where: { projectId: project.id, slug: experimentSlug },
-    select: { id: true, slug: true },
-  });
+  const experimentRunService = ExperimentRunService.create(prisma);
+  const { experiment, runs, totalHits } =
+    await experimentRunService.listRunsForExperimentSlugPaginated({
+      projectId: project.id,
+      experimentSlug,
+      page,
+      pageSize,
+    });
 
   if (!experiment) {
     return c.json({ error: "Experiment not found" }, { status: 404 });
   }
 
-  const experimentRunService = ExperimentRunService.create(prisma);
-  const runsByExperimentId = await experimentRunService.listRuns({
-    projectId: project.id,
-    experimentIds: [experiment.id],
-  });
-
-  const runs = runsByExperimentId[experiment.id] ?? [];
-  // Newest first to match dashboard ordering.
-  const sorted = [...runs].sort(
-    (a, b) => b.timestamps.createdAt - a.timestamps.createdAt,
-  );
-
-  const totalHits = sorted.length;
   const offset = (page - 1) * pageSize;
-  const paged = sorted.slice(offset, offset + pageSize);
+  await authResult.markUsed?.();
 
   return c.json({
     experimentId: experiment.id,
     experimentSlug: experiment.slug,
-    runs: paged,
+    runs,
     pagination: {
       page,
       pageSize,
       totalHits,
-      hasMore: offset + paged.length < totalHits,
+      hasMore: offset + runs.length < totalHits,
     },
   });
 });

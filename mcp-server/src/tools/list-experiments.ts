@@ -32,6 +32,12 @@ const formatTimestamp = (iso: string | null): string => {
   return d.toISOString().replace("T", " ").slice(0, 19) + " UTC";
 };
 
+const escapeMarkdownTableCell = (value: string): string =>
+  value.replace(/\\/g, "\\\\").replace(/\|/g, "\\|").replace(/\n/g, " ");
+
+const formatInlineCode = (value: string): string =>
+  `\`${escapeMarkdownTableCell(value).replace(/`/g, "\\`")}\``;
+
 export async function handleExperimentList(params: {
   limit?: number;
 }): Promise<string> {
@@ -75,9 +81,9 @@ export async function handleExperimentList(params: {
   lines.push("|------|------|------|----------|");
 
   for (const exp of result.experiments) {
-    const name = (exp.name ?? exp.slug).replace(/\|/g, "\\|");
+    const name = escapeMarkdownTableCell(exp.name ?? exp.slug);
     lines.push(
-      `| \`${exp.slug}\` | ${name} | ${exp.runsCount} | ${formatTimestamp(exp.lastRunAt)} |`,
+      `| ${formatInlineCode(exp.slug)} | ${name} | ${exp.runsCount} | ${formatTimestamp(exp.lastRunAt)} |`,
     );
   }
 

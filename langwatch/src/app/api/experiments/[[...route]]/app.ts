@@ -8,10 +8,9 @@
  *
  * Auth: standard project API key (X-Auth-Token / Bearer / Basic).
  *
- * Routes go through `ExperimentService` (app-layer pattern) — no direct
- * Prisma access here. Experiment runs are joined in via
- * `ExperimentRunService.listRuns` so each summary includes a run count and
- * the latest run's timestamps, matching what the dashboard already shows.
+ * Routes go through app-layer services — no direct Prisma access here.
+ * Experiment runs are joined in via aggregate metadata so each summary
+ * includes a run count and latest run timestamp without loading run history.
  */
 import type { Experiment } from "@prisma/client";
 import { Hono } from "hono";
@@ -139,44 +138,36 @@ export const app = new Hono<{ Variables: Variables }>()
         "Listing experiments",
       );
 
-      const experimentService = ExperimentService.create(prisma);
-      const all = await experimentService.getAll({ projectId: project.id });
-
-      // Sort by updatedAt desc to match the dashboard's evaluation list.
-      const sorted = [...all].sort(
-        (a, b) => b.updatedAt.getTime() - a.updatedAt.getTime(),
-      );
-
-      const totalHits = sorted.length;
-      const offset = (page - 1) * pageSize;
-      const paged = sorted.slice(offset, offset + pageSize);
-
-      let runsByExperimentId: Record<
-        string,
-        Array<{ timestamps: { createdAt: number } }>
-      > = {};
-      if (paged.length > 0) {
-        const runService = ExperimentRunService.create(prisma);
-        runsByExperimentId = (await runService.listRuns({
+      const { experiments: paged, totalHits } =
+        await ExperimentService.create(prisma).getPage({
           projectId: project.id,
-          experimentIds: paged.map((e) => e.id),
-        })) as typeof runsByExperimentId;
-      }
+          page,
+          pageSize,
+        });
+
+      const runAggregates =
+        paged.length > 0
+          ? await ExperimentRunService.create(
+              prisma,
+            ).getRunAggregatesForExperimentIds({
+              projectId: project.id,
+              experimentIds: paged.map((e) => e.id),
+            })
+          : {};
 
       const experiments = paged.map((experiment) => {
-        const runs = runsByExperimentId[experiment.id] ?? [];
-        const lastRunAt = runs.reduce<number | null>((acc, run) => {
-          const t = run.timestamps?.createdAt ?? null;
-          if (t === null) return acc;
-          return acc === null || t > acc ? t : acc;
-        }, null);
+        const aggregate = runAggregates[experiment.id] ?? {
+          runsCount: 0,
+          lastRunAt: null,
+        };
         return toExperimentSummary({
           experiment,
-          runsCount: runs.length,
-          lastRunAt,
+          runsCount: aggregate.runsCount,
+          lastRunAt: aggregate.lastRunAt,
         });
       });
 
+      const offset = (page - 1) * pageSize;
       return c.json({
         experiments,
         pagination: {

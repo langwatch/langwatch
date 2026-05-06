@@ -9,6 +9,18 @@ import {
 const mockFetch = vi.fn();
 vi.stubGlobal("fetch", mockFetch);
 
+const jsonResponse = (body: unknown, init?: ResponseInit): Response =>
+  new Response(JSON.stringify(body), {
+    status: init?.status ?? 200,
+    headers: { "content-type": "application/json" },
+    ...init,
+  });
+
+const fetchedUrl = (): string => {
+  const request = mockFetch.mock.calls[0]![0];
+  return request instanceof Request ? request.url : String(request);
+};
+
 describe("EvaluationsApiService list endpoints", () => {
   const previousApiKey = process.env.LANGWATCH_API_KEY;
   const previousEndpoint = process.env.LANGWATCH_ENDPOINT;
@@ -39,35 +51,29 @@ describe("EvaluationsApiService list endpoints", () => {
               hasMore: false,
             },
           };
-          mockFetch.mockResolvedValueOnce({
-            ok: true,
-            status: 200,
-            json: () => Promise.resolve(payload),
-          });
+          mockFetch.mockResolvedValueOnce(jsonResponse(payload));
 
           const service = new EvaluationsApiService();
           const result = await service.listExperiments();
 
           expect(result).toEqual(payload);
-          const url = mockFetch.mock.calls[0]![0] as string;
-          expect(url).toBe("https://api.langwatch.test/api/experiments");
+          expect(fetchedUrl()).toBe(
+            "https://api.langwatch.test/api/experiments",
+          );
         });
       });
 
       describe("when called with pageSize and page", () => {
         it("includes them in the query string", async () => {
-          mockFetch.mockResolvedValueOnce({
-            ok: true,
-            status: 200,
-            json: () => Promise.resolve({ experiments: [], pagination: {} }),
-          });
+          mockFetch.mockResolvedValueOnce(
+            jsonResponse({ experiments: [], pagination: {} }),
+          );
 
           const service = new EvaluationsApiService();
           await service.listExperiments({ pageSize: 10, page: 2 });
 
-          const url = mockFetch.mock.calls[0]![0] as string;
-          expect(url).toContain("pageSize=10");
-          expect(url).toContain("page=2");
+          expect(fetchedUrl()).toContain("pageSize=10");
+          expect(fetchedUrl()).toContain("page=2");
         });
       });
     });
@@ -75,11 +81,12 @@ describe("EvaluationsApiService list endpoints", () => {
     describe("given the API returns 401", () => {
       describe("when called", () => {
         it("throws EvaluationsApiError with 'list experiments' operation", async () => {
-          mockFetch.mockResolvedValueOnce({
-            ok: false,
-            status: 401,
-            text: () => Promise.resolve('{"error":"Missing credentials"}'),
-          });
+          mockFetch.mockResolvedValueOnce(
+            jsonResponse(
+              { error: "Missing credentials" },
+              { status: 401 },
+            ),
+          );
 
           const service = new EvaluationsApiService();
           const err = await service.listExperiments().catch((e) => e);
@@ -108,11 +115,7 @@ describe("EvaluationsApiService list endpoints", () => {
               hasMore: false,
             },
           };
-          mockFetch.mockResolvedValueOnce({
-            ok: true,
-            status: 200,
-            json: () => Promise.resolve(payload),
-          });
+          mockFetch.mockResolvedValueOnce(jsonResponse(payload));
 
           const service = new EvaluationsApiService();
           const result = await service.listRuns({
@@ -120,8 +123,7 @@ describe("EvaluationsApiService list endpoints", () => {
           });
 
           expect(result).toEqual(payload);
-          const url = mockFetch.mock.calls[0]![0] as string;
-          expect(url).toContain(
+          expect(fetchedUrl()).toContain(
             "/api/evaluations/v3/runs?experimentSlug=checkout-flow",
           );
         });
@@ -131,11 +133,12 @@ describe("EvaluationsApiService list endpoints", () => {
     describe("given the experiment slug is unknown", () => {
       describe("when the API returns 404", () => {
         it("throws EvaluationsApiError mentioning the slug", async () => {
-          mockFetch.mockResolvedValueOnce({
-            ok: false,
-            status: 404,
-            text: () => Promise.resolve('{"error":"Experiment not found"}'),
-          });
+          mockFetch.mockResolvedValueOnce(
+            jsonResponse(
+              { error: "Experiment not found" },
+              { status: 404 },
+            ),
+          );
 
           const service = new EvaluationsApiService();
           const err = await service

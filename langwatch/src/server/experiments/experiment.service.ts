@@ -55,6 +55,24 @@ export class ExperimentService {
     return this.repository.findAll({ projectId });
   }
 
+  async getPage({
+    projectId,
+    page,
+    pageSize,
+  }: {
+    projectId: string;
+    page: number;
+    pageSize: number;
+  }): Promise<{ experiments: Experiment[]; totalHits: number }> {
+    const skip = (page - 1) * pageSize;
+    const [experiments, totalHits] = await Promise.all([
+      this.repository.findPage({ projectId, skip, take: pageSize }),
+      this.repository.countByProject({ projectId }),
+    ]);
+
+    return { experiments, totalHits };
+  }
+
   async getLatest({
     projectId,
   }: {
