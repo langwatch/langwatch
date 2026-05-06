@@ -87,6 +87,24 @@ describe("EvaluationsApiService.getRunResults()", () => {
       });
     });
 
+    describe("when the API returns 200 with a null body for a missing run", () => {
+      it("throws EvaluationsApiError instead of crashing on null.dataset", async () => {
+        mockFetch.mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve(null),
+        });
+
+        const service = new EvaluationsApiService();
+        const err = await service
+          .getRunResults({ runId: "ghost" })
+          .catch((e) => e);
+
+        expect(err).toBeInstanceOf(EvaluationsApiError);
+        expect((err as EvaluationsApiError).operation).toContain("ghost");
+      });
+    });
+
     describe("when the network call rejects", () => {
       it("wraps fetch errors in EvaluationsApiError", async () => {
         mockFetch.mockRejectedValueOnce(new Error("ECONNRESET"));
