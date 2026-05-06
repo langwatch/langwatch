@@ -1,6 +1,35 @@
-.PHONY: start sync-all-openapi user-delete-dry-run user-delete es-delete-dry-run es-delete
+.PHONY: help start sync-all-openapi user-delete-dry-run user-delete es-delete-dry-run es-delete
 .PHONY: dev dev-nlp dev-scenarios dev-full down logs clean ps quickstart worktree
 .PHONY: dev-up dev-down dev-logs setup-hooks service service-watch
+.PHONY: _dev-deprecation-warning _dev-up-deprecation-warning
+
+# Surface every target — boxd-* are pulled in via include below.
+help:
+	@echo "LangWatch dev targets:"
+	@echo ""
+	@echo "  Primary (Docker dev environment):"
+	@echo "    make quickstart                     interactive launcher (single entry point)"
+	@echo "    make quickstart help                non-interactive mode reference"
+	@echo "    make service svc=<name>             run a Go service (e.g. aigateway)"
+	@echo "    make service-watch svc=<name>       run a Go service with live reload (air)"
+	@echo "    make worktree <issue|name>          create a git worktree for an issue/feature"
+	@echo "    make down                           stop all services"
+	@echo ""
+	@echo "  Boxd workflows (multi-step orchestration over the boxd CLI):"
+	@echo "    make boxd-help                      full boxd target reference"
+	@echo "    make boxd-golden                    create the canonical base VM"
+	@echo "    make boxd-fork-pr PR=<n>            fork golden for an existing PR"
+	@echo "    make boxd-fork-branch BRANCH=<n>    fork golden for a branch"
+	@echo "    make boxd-fork-issue ISSUE=<n>      fork + worktree + tmux+claude in VM"
+	@echo "    make boxd-connect-{pr,branch,issue} <ARG>=<v>   attach to the in-VM session"
+	@echo ""
+	@echo "  Deprecated (use 'make quickstart' — kept for one release):"
+	@echo "    make dev / dev-nlp / dev-scenarios / dev-test / dev-full"
+	@echo "    make dev-up / dev-down / dev-logs"
+	@echo ""
+	@echo "  See: dev/docs/adr/004-docker-dev-environment.md, dev/docs/boxd-makefile.md"
+
+include boxd.mk
 
 # =============================================================================
 # DOCKER DEV ENVIRONMENT (compose.dev.yml)
