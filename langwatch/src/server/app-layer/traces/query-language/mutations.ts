@@ -3,6 +3,10 @@
  * mutates the AST, and re-serialises — keeping liqe as the single source of
  * truth for AST structure. On parse failure, returns the original string so
  * mid-edit mutations don't blow up.
+ *
+ * All helpers take a single destructured params object — the location-based
+ * mutators in particular have several positional primitives (start/end +
+ * field/value) that were easy to mis-order with positional args.
  */
 
 import type { FacetState } from "./metadata";
@@ -18,14 +22,24 @@ import { filterAST, walkAST } from "./walk";
  * user is shift/ctrl-clicking to add an alternative rather than narrowing
  * the result set further.
  */
-export function toggleFacetInQuery(
-  currentQuery: string,
-  fieldName: string,
-  value: string,
-  currentState: FacetState,
-  combinator: "AND" | "OR" = "AND",
-): string {
-  const cleaned = removeFacetValueFromQuery(currentQuery, fieldName, value);
+export function toggleFacetInQuery({
+  currentQuery,
+  fieldName,
+  value,
+  currentState,
+  combinator = "AND",
+}: {
+  currentQuery: string;
+  fieldName: string;
+  value: string;
+  currentState: FacetState;
+  combinator?: "AND" | "OR";
+}): string {
+  const cleaned = removeFacetValueFromQuery({
+    currentQuery,
+    fieldName,
+    value,
+  });
   if (currentState === "neutral") {
     return appendClause(cleaned, `${fieldName}:${escapeValue(value)}`, combinator);
   }
@@ -50,13 +64,19 @@ export function toggleFacetInQuery(
  * facet that's part of an OR group adds it to the same group rather
  * than AND-combining at the top level.
  */
-export function addToOrGroupAtLocation(
-  currentQuery: string,
-  groupStart: number,
-  groupEnd: number,
-  fieldName: string,
-  value: string,
-): string {
+export function addToOrGroupAtLocation({
+  currentQuery,
+  groupStart,
+  groupEnd,
+  fieldName,
+  value,
+}: {
+  currentQuery: string;
+  groupStart: number;
+  groupEnd: number;
+  fieldName: string;
+  value: string;
+}): string {
   if (!currentQuery.trim()) return currentQuery;
   const trimmed = currentQuery.trimStart();
   const leadingWs = currentQuery.length - trimmed.length;
@@ -80,12 +100,17 @@ export function addToOrGroupAtLocation(
  * Returns the original query if the location doesn't resolve to a Tag
  * with a literal expression (e.g. range tokens, structural mismatch).
  */
-export function setFacetValueAtLocation(
-  currentQuery: string,
-  start: number,
-  end: number,
-  newValue: string,
-): string {
+export function setFacetValueAtLocation({
+  currentQuery,
+  start,
+  end,
+  newValue,
+}: {
+  currentQuery: string;
+  start: number;
+  end: number;
+  newValue: string;
+}): string {
   if (!currentQuery.trim()) return currentQuery;
   try {
     const ast = parse(currentQuery);
@@ -120,11 +145,15 @@ export function setFacetValueAtLocation(
  * search bar. Locations are in liqe's @-stripped trimmed-text coordinate
  * space — the same convention `removeNodeAtLocation` uses.
  */
-export function swapOperatorAtLocation(
-  currentQuery: string,
-  start: number,
-  end: number,
-): string {
+export function swapOperatorAtLocation({
+  currentQuery,
+  start,
+  end,
+}: {
+  currentQuery: string;
+  start: number;
+  end: number;
+}): string {
   if (!currentQuery.trim()) return currentQuery;
   // The operator keyword's text content lives at [start, end) in the
   // trimmed-string projection. We don't need to re-parse: a literal
@@ -152,20 +181,28 @@ export function swapOperatorAtLocation(
   );
 }
 
-export function setRangeInQuery(
-  currentQuery: string,
-  fieldName: string,
-  from: string,
-  to: string,
-): string {
-  const cleaned = removeFieldFromQuery(currentQuery, fieldName);
+export function setRangeInQuery({
+  currentQuery,
+  fieldName,
+  from,
+  to,
+}: {
+  currentQuery: string;
+  fieldName: string;
+  from: string;
+  to: string;
+}): string {
+  const cleaned = removeFieldFromQuery({ currentQuery, fieldName });
   return appendClause(cleaned, `${fieldName}:[${from} TO ${to}]`);
 }
 
-export function removeFieldFromQuery(
-  currentQuery: string,
-  fieldName: string,
-): string {
+export function removeFieldFromQuery({
+  currentQuery,
+  fieldName,
+}: {
+  currentQuery: string;
+  fieldName: string;
+}): string {
   if (!currentQuery.trim()) return "";
   try {
     const next = filterAST(parse(currentQuery), (node) => {
@@ -179,11 +216,15 @@ export function removeFieldFromQuery(
   }
 }
 
-export function removeFacetValueFromQuery(
-  currentQuery: string,
-  fieldName: string,
-  value: string,
-): string {
+export function removeFacetValueFromQuery({
+  currentQuery,
+  fieldName,
+  value,
+}: {
+  currentQuery: string;
+  fieldName: string;
+  value: string;
+}): string {
   if (!currentQuery.trim()) return "";
   try {
     const next = filterAST(parse(currentQuery), (node) => {
@@ -205,11 +246,15 @@ export function removeFacetValueFromQuery(
  * `filterAST` collapses any orphaned logical/parenthesized parents so we
  * don't end up with stray operators or empty parens.
  */
-export function removeNodeAtLocation(
-  currentQuery: string,
-  start: number,
-  end: number,
-): string {
+export function removeNodeAtLocation({
+  currentQuery,
+  start,
+  end,
+}: {
+  currentQuery: string;
+  start: number;
+  end: number;
+}): string {
   if (!currentQuery.trim()) return "";
   try {
     const next = filterAST(parse(currentQuery), (node) => {
@@ -238,7 +283,16 @@ function appendClause(
   return `${trimmed} AND ${clause}`;
 }
 
+/**
+ * Wrap a value in liqe-compatible quotes when it contains characters
+ * that would break unquoted parsing (whitespace, quotes, parens, or a
+ * backslash). Embedded `"` and `\` are escaped so values like
+ * `He said "no"` round-trip cleanly instead of producing malformed
+ * liqe and silently bailing the splice.
+ */
 function escapeValue(value: string): string {
-  if (/[\s"()]/.test(value)) return `"${value}"`;
+  if (/[\s"()\\]/.test(value)) {
+    return `"${value.replace(/[\\"]/g, "\\$&")}"`;
+  }
   return value;
 }

@@ -536,7 +536,11 @@ export function useFilterEditor({
         const end = Number(opEl.dataset.filterOpEnd);
         if (!Number.isFinite(start) || !Number.isFinite(end)) return;
         const current = editor.getText();
-        const next = swapOperatorAtLocation(current, start, end);
+        const next = swapOperatorAtLocation({
+          currentQuery: current,
+          start,
+          end,
+        });
         if (next === current) return;
         isProgrammaticRef.current = true;
         editor.commands.setContent(buildDocument(next));
@@ -562,7 +566,7 @@ export function useFilterEditor({
       // out of the raw text and tidy any AND/OR glue we leave behind.
       const next =
         kind === "ast"
-          ? removeNodeAtLocation(current, start, end)
+          ? removeNodeAtLocation({ currentQuery: current, start, end })
           : sliceFallbackTokenRange(current, start, end);
       // Update the editor directly — the sync effect skips while focused
       // (so it doesn't race with typing), so a delete from a still-focused

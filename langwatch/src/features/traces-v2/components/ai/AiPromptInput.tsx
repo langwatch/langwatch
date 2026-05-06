@@ -160,11 +160,19 @@ export const AiPromptInput: React.FC<AiPromptInputProps> = ({
   placeholderExamples = DEFAULT_PLACEHOLDER_EXAMPLES,
   thinkingVerbs = DEFAULT_THINKING_VERBS,
 }) => {
+  const reduceMotion = useReducedMotion();
   const typewriter = useTypewriterPlaceholder(
     !prompt && !isPending,
     placeholderExamples,
   );
   const verb = useCyclingVerb(isPending, thinkingVerbs);
+  // The shimmer's `animation` property comes from `thinkingShimmerStyles`;
+  // override it to `none` for users who prefer reduced motion. Static
+  // gradient stays so the text still reads as the AI brand colour
+  // sweep, just without the infinite sweep.
+  const shimmerCss = reduceMotion
+    ? { ...thinkingShimmerStyles, animation: "none" }
+    : thinkingShimmerStyles;
 
   return (
     <Flex align="center" gap={2} width="full" position="relative">
@@ -203,7 +211,7 @@ export const AiPromptInput: React.FC<AiPromptInputProps> = ({
           fontWeight="500"
           letterSpacing="-0.005em"
           truncate
-          css={thinkingShimmerStyles}
+          css={shimmerCss}
         >
           {`${verb} ${prompt}…`}
         </Box>

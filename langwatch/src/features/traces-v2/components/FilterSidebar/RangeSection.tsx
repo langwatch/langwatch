@@ -79,6 +79,18 @@ export const RangeSection: React.FC<RangeSectionProps> = ({
     [],
   );
 
+  // Clamp to [min, max] and sort low/high so callers can't briefly emit
+  // an inverted or out-of-range tuple. Pulled out so both the
+  // commit/debounce path and the typed-edit path go through the same
+  // normalisation step.
+  const normalizeRange = useCallback(
+    (rawFrom: number, rawTo: number): [number, number] => [
+      Math.max(min, Math.min(rawFrom, rawTo)),
+      Math.min(max, Math.max(rawFrom, rawTo)),
+    ],
+    [min, max],
+  );
+
   const commitRange = useCallback(
     (rawFrom: number, rawTo: number) => {
       // Drop NaN / Infinity straight away so we never emit `[NaN TO NaN]`
@@ -90,8 +102,7 @@ export const RangeSection: React.FC<RangeSectionProps> = ({
       // value that overshot the slider range — a 5h duration filter on a
       // project where the slowest trace is 30s should clamp to the
       // observed max rather than fail server-side.
-      const lo = Math.max(min, Math.min(rawFrom, rawTo));
-      const hi = Math.min(max, Math.max(rawFrom, rawTo));
+      const [lo, hi] = normalizeRange(rawFrom, rawTo);
       const isFullRange =
         Math.abs(lo - min) < span * CLEAR_EPSILON &&
         Math.abs(hi - max) < span * CLEAR_EPSILON;
@@ -101,7 +112,7 @@ export const RangeSection: React.FC<RangeSectionProps> = ({
         onChange(lo, hi);
       }
     },
-    [min, max, span, onChange, onClear],
+    [min, max, span, onChange, onClear, normalizeRange],
   );
 
   const handleChangeEnd = useCallback(
@@ -114,6 +125,25 @@ export const RangeSection: React.FC<RangeSectionProps> = ({
       }, COMMIT_DEBOUNCE_MS);
     },
     [commitRange],
+  );
+
+  // Typed-edit commits cancel any pending slider debounce + normalise
+  // before writing localValue. Without this, a stale drag commit could
+  // overwrite the typed value moments later, and the slider could
+  // briefly receive an inverted/out-of-range tuple while parent state
+  // syncs back. Both paths now route through the same shape.
+  const commitImmediate = useCallback(
+    (rawFrom: number, rawTo: number) => {
+      if (!Number.isFinite(rawFrom) || !Number.isFinite(rawTo)) return;
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+        debounceRef.current = null;
+      }
+      const [lo, hi] = normalizeRange(rawFrom, rawTo);
+      setLocalValue([lo, hi]);
+      commitRange(lo, hi);
+    },
+    [commitRange, normalizeRange],
   );
 
   const summary = isActive
@@ -181,20 +211,14 @@ export const RangeSection: React.FC<RangeSectionProps> = ({
                 value={localValue[0]}
                 format={formatValue}
                 ariaLabel={`${title} minimum`}
-                onCommit={(n) => {
-                  setLocalValue([n, localValue[1]]);
-                  commitRange(n, localValue[1]);
-                }}
+                onCommit={(n) => commitImmediate(n, localValue[1])}
               />
               <RangeEndpointInput
                 value={localValue[1]}
                 format={formatValue}
                 ariaLabel={`${title} maximum`}
                 align="right"
-                onCommit={(n) => {
-                  setLocalValue([localValue[0], n]);
-                  commitRange(localValue[0], n);
-                }}
+                onCommit={(n) => commitImmediate(localValue[0], n)}
               />
             </HStack>
           </>

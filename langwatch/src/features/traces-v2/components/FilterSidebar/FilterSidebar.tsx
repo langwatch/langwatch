@@ -180,7 +180,19 @@ export const FilterSidebar: React.FC = () => {
             // sidebar-ANDing). If this ever feels noisy, filter to
             // `g.fields.size > 1` here — but the current call is to keep
             // the link visible.
-            orGroupId={orAnalysis.fieldToGroupIds.get(key)?.[0]}
+            //
+            // Only project a single id when the field belongs to exactly
+            // one group. With multiple disjoint OR groups (e.g.
+            // `(status:error OR model:gpt-4o) AND (status:warning OR
+            // origin:application)`), `status:warning` would otherwise
+            // render under the FIRST group's id/colour/lane — wrong half
+            // of the time. Leaving it `undefined` for ambiguous fields
+            // means the row drops the ring/lane assignment but still
+            // joins both groups' peer/member sets via the unions below.
+            orGroupId={(() => {
+              const ids = orAnalysis.fieldToGroupIds.get(key);
+              return ids && ids.length === 1 ? ids[0] : undefined;
+            })()}
             orPeers={(() => {
               const ids = orAnalysis.fieldToGroupIds.get(key);
               if (!ids || ids.length === 0) return undefined;

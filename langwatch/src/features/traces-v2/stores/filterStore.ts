@@ -260,51 +260,67 @@ export const useFilterStore = create<FilterState>((set, get) => ({
       // walks the whole AST.
       if (state === "neutral" && options?.orGroupLocation) {
         return applyMutation(s, (q) =>
-          addToOrGroupAtLocation(
-            q,
-            options.orGroupLocation!.start,
-            options.orGroupLocation!.end,
-            field,
+          addToOrGroupAtLocation({
+            currentQuery: q,
+            groupStart: options.orGroupLocation!.start,
+            groupEnd: options.orGroupLocation!.end,
+            fieldName: field,
             value,
-          ),
+          }),
         );
       }
       return applyMutation(s, (q) =>
-        toggleFacetInQuery(
-          q,
-          field,
+        toggleFacetInQuery({
+          currentQuery: q,
+          fieldName: field,
           value,
-          state,
-          options?.combinator ?? "AND",
-        ),
+          currentState: state,
+          combinator: options?.combinator ?? "AND",
+        }),
       );
     }),
 
   swapOperator: (start, end) =>
     set((s) =>
-      applyMutation(s, (q) => swapOperatorAtLocation(q, start, end)),
+      applyMutation(s, (q) =>
+        swapOperatorAtLocation({ currentQuery: q, start, end }),
+      ),
     ),
 
   setFacetValueAt: (start, end, newValue) =>
     set((s) =>
       applyMutation(s, (q) =>
-        setFacetValueAtLocation(q, start, end, newValue),
+        setFacetValueAtLocation({ currentQuery: q, start, end, newValue }),
       ),
     ),
 
   removeFacet: (field, value) =>
     set((s) =>
-      applyMutation(s, (q) => removeFacetValueFromQuery(q, field, value)),
+      applyMutation(s, (q) =>
+        removeFacetValueFromQuery({ currentQuery: q, fieldName: field, value }),
+      ),
     ),
 
   removeField: (field) =>
-    set((s) => applyMutation(s, (q) => removeFieldFromQuery(q, field))),
+    set((s) =>
+      applyMutation(s, (q) =>
+        removeFieldFromQuery({ currentQuery: q, fieldName: field }),
+      ),
+    ),
 
   setRange: (field, from, to) =>
-    set((s) => applyMutation(s, (q) => setRangeInQuery(q, field, from, to))),
+    set((s) =>
+      applyMutation(s, (q) =>
+        setRangeInQuery({ currentQuery: q, fieldName: field, from, to }),
+      ),
+    ),
 
   removeRange: (field) =>
-    set((s) => applyMutation(s, (q) => removeFieldFromQuery(q, field))),
+    set((s) =>
+      applyMutation(s, (q) =>
+        removeFieldFromQuery({ currentQuery: q, fieldName: field }),
+      ),
+    ),
 
   setTimeRange: (range) => set({ timeRange: range, page: 1 }),
   rollTimeRange: (range) => set({ timeRange: range }),

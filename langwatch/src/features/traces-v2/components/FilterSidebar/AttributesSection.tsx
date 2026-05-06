@@ -19,7 +19,11 @@ interface AttributesSectionProps {
   getValueState: (attrKey: string, value: string) => FacetValueState;
   /** Active state for `none:<prefix>.<key>` */
   getNoneActive: (attrKey: string) => boolean;
-  onToggleValue: (attrKey: string, value: string) => void;
+  onToggleValue: (
+    attrKey: string,
+    value: string,
+    options?: { modifierKey?: boolean },
+  ) => void;
   onToggleNone: (attrKey: string) => void;
   dragHandleProps?: React.HTMLAttributes<HTMLDivElement>;
   onShiftToggle?: (nextOpen: boolean) => void;

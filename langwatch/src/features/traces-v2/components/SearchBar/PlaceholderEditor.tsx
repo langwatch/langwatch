@@ -185,11 +185,11 @@ export const PlaceholderEditor: React.FC<PlaceholderEditorProps> = ({
                     // same time.
                     event.preventDefault();
                     event.stopPropagation();
-                    const next = removeNodeAtLocation(
-                      queryText,
-                      token.start,
-                      token.end,
-                    );
+                    const next = removeNodeAtLocation({
+                      currentQuery: queryText,
+                      start: token.start,
+                      end: token.end,
+                    });
                     onApplyQueryText(next);
                   }}
                 >
@@ -224,11 +224,11 @@ export const PlaceholderEditor: React.FC<PlaceholderEditorProps> = ({
                     // mounting the heavier ProseMirror editor.
                     event.preventDefault();
                     event.stopPropagation();
-                    const next = swapOperatorAtLocation(
-                      queryText,
+                    const next = swapOperatorAtLocation({
+                      currentQuery: queryText,
                       start,
                       end,
-                    );
+                    });
                     if (next !== queryText) onApplyQueryText(next);
                   }}
                 >

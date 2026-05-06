@@ -73,7 +73,9 @@ describe("removeNodeAtLocation", () => {
     it("returns an empty query", () => {
       const query = "status:error";
       const { start, end } = locationOf(query, "status:error");
-      expect(removeNodeAtLocation(query, start, end)).toBe("");
+      expect(
+        removeNodeAtLocation({ currentQuery: query, start, end }),
+      ).toBe("");
     });
   });
 
@@ -81,7 +83,9 @@ describe("removeNodeAtLocation", () => {
     it("drops the targeted tag and the now-orphaned AND keyword", () => {
       const query = "status:error AND model:gpt-4o";
       const { start, end } = locationOf(query, "status:error");
-      expect(removeNodeAtLocation(query, start, end)).toBe("model:gpt-4o");
+      expect(
+        removeNodeAtLocation({ currentQuery: query, start, end }),
+      ).toBe("model:gpt-4o");
     });
   });
 
@@ -90,16 +94,18 @@ describe("removeNodeAtLocation", () => {
       const query = "(status:error OR status:warning) AND model:gpt-4o";
       const { start, end } = locationOf(query, "status:warning");
       // The orphan paren wrapping a single tag is collapsed by the serializer.
-      expect(removeNodeAtLocation(query, start, end)).toBe(
-        "status:error AND model:gpt-4o",
-      );
+      expect(
+        removeNodeAtLocation({ currentQuery: query, start, end }),
+      ).toBe("status:error AND model:gpt-4o");
     });
   });
 
   describe("given a tag whose location does not match", () => {
     it("leaves the query unchanged", () => {
       const query = "status:error AND model:gpt-4o";
-      expect(removeNodeAtLocation(query, 999, 1000)).toBe(query);
+      expect(
+        removeNodeAtLocation({ currentQuery: query, start: 999, end: 1000 }),
+      ).toBe(query);
     });
   });
 });
@@ -560,52 +566,104 @@ describe("hasCrossFacetOR", () => {
 describe("toggleFacetInQuery", () => {
   describe("starting from an empty query", () => {
     it("appends the clause as-is when transitioning neutral → include", () => {
-      expect(toggleFacetInQuery("", "status", "error", "neutral")).toBe(
-        "status:error",
-      );
+      expect(
+        toggleFacetInQuery({
+          currentQuery: "",
+          fieldName: "status",
+          value: "error",
+          currentState: "neutral",
+        }),
+      ).toBe("status:error");
     });
   });
 
   describe("starting from include", () => {
     it("flips include → exclude (rewrites the same value as `NOT`)", () => {
-      expect(toggleFacetInQuery("status:error", "status", "error", "include")).toBe(
-        "NOT status:error",
-      );
+      expect(
+        toggleFacetInQuery({
+          currentQuery: "status:error",
+          fieldName: "status",
+          value: "error",
+          currentState: "include",
+        }),
+      ).toBe("NOT status:error");
     });
   });
 
   describe("starting from exclude", () => {
     it("collapses back to neutral (drops the clause entirely)", () => {
-      expect(toggleFacetInQuery("NOT status:error", "status", "error", "exclude")).toBe(
-        "",
-      );
+      expect(
+        toggleFacetInQuery({
+          currentQuery: "NOT status:error",
+          fieldName: "status",
+          value: "error",
+          currentState: "exclude",
+        }),
+      ).toBe("");
     });
   });
 
   describe("alongside other clauses", () => {
     it("appends with AND when the query already has content", () => {
       expect(
-        toggleFacetInQuery("model:gpt-4o", "status", "error", "neutral"),
+        toggleFacetInQuery({
+          currentQuery: "model:gpt-4o",
+          fieldName: "status",
+          value: "error",
+          currentState: "neutral",
+        }),
       ).toBe("model:gpt-4o AND status:error");
     });
 
     it("removes only the targeted value, leaving siblings intact", () => {
       expect(
-        toggleFacetInQuery(
-          "status:error AND status:warning",
-          "status",
-          "error",
-          "exclude",
-        ),
+        toggleFacetInQuery({
+          currentQuery: "status:error AND status:warning",
+          fieldName: "status",
+          value: "error",
+          currentState: "exclude",
+        }),
       ).toBe("status:warning");
     });
   });
 
   describe("when the value contains spaces", () => {
     it("quotes the value when appending", () => {
-      expect(toggleFacetInQuery("", "errorMessage", "rate limit", "neutral")).toBe(
-        'errorMessage:"rate limit"',
-      );
+      expect(
+        toggleFacetInQuery({
+          currentQuery: "",
+          fieldName: "errorMessage",
+          value: "rate limit",
+          currentState: "neutral",
+        }),
+      ).toBe('errorMessage:"rate limit"');
+    });
+  });
+
+  describe("when the value contains embedded double-quotes", () => {
+    it("escapes inner quotes so the result round-trips through liqe", () => {
+      // `He said "no"` would otherwise produce malformed liqe and
+      // bail the splice. Escaping inner `"` keeps the value intact.
+      const out = toggleFacetInQuery({
+        currentQuery: "",
+        fieldName: "errorMessage",
+        value: 'He said "no"',
+        currentState: "neutral",
+      });
+      expect(out).toBe('errorMessage:"He said \\"no\\""');
+      expect(() => parse(out)).not.toThrow();
+    });
+  });
+
+  describe("when the value contains a backslash", () => {
+    it("escapes the backslash so it survives round-tripping", () => {
+      const out = toggleFacetInQuery({
+        currentQuery: "",
+        fieldName: "path",
+        value: "C:\\foo\\bar",
+        currentState: "neutral",
+      });
+      expect(out).toBe('path:"C:\\\\foo\\\\bar"');
     });
   });
 });
@@ -613,29 +671,51 @@ describe("toggleFacetInQuery", () => {
 describe("setRangeInQuery", () => {
   describe("starting from an empty query", () => {
     it("inserts the range clause", () => {
-      expect(setRangeInQuery("", "cost", "1", "10")).toBe("cost:[1 TO 10]");
+      expect(
+        setRangeInQuery({
+          currentQuery: "",
+          fieldName: "cost",
+          from: "1",
+          to: "10",
+        }),
+      ).toBe("cost:[1 TO 10]");
     });
   });
 
   describe("when the field already has a range", () => {
     it("replaces the existing range rather than stacking another one", () => {
-      expect(setRangeInQuery("cost:[1 TO 5]", "cost", "1", "10")).toBe(
-        "cost:[1 TO 10]",
-      );
+      expect(
+        setRangeInQuery({
+          currentQuery: "cost:[1 TO 5]",
+          fieldName: "cost",
+          from: "1",
+          to: "10",
+        }),
+      ).toBe("cost:[1 TO 10]");
     });
 
     it("replaces an existing comparison with the new range", () => {
-      expect(setRangeInQuery("cost:>5", "cost", "1", "10")).toBe(
-        "cost:[1 TO 10]",
-      );
+      expect(
+        setRangeInQuery({
+          currentQuery: "cost:>5",
+          fieldName: "cost",
+          from: "1",
+          to: "10",
+        }),
+      ).toBe("cost:[1 TO 10]");
     });
   });
 
   describe("alongside unrelated clauses", () => {
     it("preserves the unrelated clauses and appends the range with AND", () => {
-      expect(setRangeInQuery("status:error", "cost", "1", "10")).toBe(
-        "status:error AND cost:[1 TO 10]",
-      );
+      expect(
+        setRangeInQuery({
+          currentQuery: "status:error",
+          fieldName: "cost",
+          from: "1",
+          to: "10",
+        }),
+      ).toBe("status:error AND cost:[1 TO 10]");
     });
   });
 });
@@ -643,14 +723,22 @@ describe("setRangeInQuery", () => {
 describe("removeFieldFromQuery", () => {
   describe("when the field is the only clause", () => {
     it("returns the empty string", () => {
-      expect(removeFieldFromQuery("status:error", "status")).toBe("");
+      expect(
+        removeFieldFromQuery({
+          currentQuery: "status:error",
+          fieldName: "status",
+        }),
+      ).toBe("");
     });
   });
 
   describe("when the field appears multiple times", () => {
     it("drops every value of the field", () => {
       expect(
-        removeFieldFromQuery("status:error AND status:warning AND model:gpt-4o", "status"),
+        removeFieldFromQuery({
+          currentQuery: "status:error AND status:warning AND model:gpt-4o",
+          fieldName: "status",
+        }),
       ).toBe("model:gpt-4o");
     });
   });
@@ -659,16 +747,22 @@ describe("removeFieldFromQuery", () => {
     it("returns the query unchanged via round-trip serialisation", () => {
       // Exact string can drift via serialiser whitespace; what matters is
       // that no clauses were dropped.
-      const result = removeFieldFromQuery("status:error AND model:gpt-4o", "cost");
+      const result = removeFieldFromQuery({
+        currentQuery: "status:error AND model:gpt-4o",
+        fieldName: "cost",
+      });
       expect(result).toBe("status:error AND model:gpt-4o");
     });
   });
 
   describe("when the input is unparseable mid-edit", () => {
     it("returns the original string rather than throwing", () => {
-      expect(removeFieldFromQuery("status:error AND", "status")).toBe(
-        "status:error AND",
-      );
+      expect(
+        removeFieldFromQuery({
+          currentQuery: "status:error AND",
+          fieldName: "status",
+        }),
+      ).toBe("status:error AND");
     });
   });
 });
@@ -677,26 +771,36 @@ describe("removeFacetValueFromQuery", () => {
   describe("when only the targeted value matches", () => {
     it("drops just that one value", () => {
       expect(
-        removeFacetValueFromQuery(
-          "status:error AND status:warning",
-          "status",
-          "error",
-        ),
+        removeFacetValueFromQuery({
+          currentQuery: "status:error AND status:warning",
+          fieldName: "status",
+          value: "error",
+        }),
       ).toBe("status:warning");
     });
   });
 
   describe("when the value is the only clause", () => {
     it("returns the empty string", () => {
-      expect(removeFacetValueFromQuery("status:error", "status", "error")).toBe("");
+      expect(
+        removeFacetValueFromQuery({
+          currentQuery: "status:error",
+          fieldName: "status",
+          value: "error",
+        }),
+      ).toBe("");
     });
   });
 
   describe("when the value isn't present", () => {
     it("leaves the query as-is", () => {
-      expect(removeFacetValueFromQuery("status:error", "status", "warning")).toBe(
-        "status:error",
-      );
+      expect(
+        removeFacetValueFromQuery({
+          currentQuery: "status:error",
+          fieldName: "status",
+          value: "warning",
+        }),
+      ).toBe("status:error");
     });
   });
 });
@@ -913,19 +1017,56 @@ describe("analyzeOrGroups", () => {
 
 describe("addToOrGroupAtLocation", () => {
   describe("given an empty query", () => {
-    it("returns the query unchanged (no group to add to)", () => {
-      expect(addToOrGroupAtLocation("", 0, 0, "status", "error")).toBe("");
-      expect(addToOrGroupAtLocation("   ", 0, 0, "status", "error")).toBe(
-        "   ",
-      );
+    it("returns an empty input unchanged", () => {
+      expect(
+        addToOrGroupAtLocation({
+          currentQuery: "",
+          groupStart: 0,
+          groupEnd: 0,
+          fieldName: "status",
+          value: "error",
+        }),
+      ).toBe("");
+    });
+
+    it("returns whitespace-only input unchanged", () => {
+      expect(
+        addToOrGroupAtLocation({
+          currentQuery: "   ",
+          groupStart: 0,
+          groupEnd: 0,
+          fieldName: "status",
+          value: "error",
+        }),
+      ).toBe("   ");
     });
   });
 
   describe("given an invalid location", () => {
-    it("returns the query unchanged when end <= start", () => {
+    it("returns the query unchanged when start === end", () => {
       const q = "status:error OR model:gpt-4o";
-      expect(addToOrGroupAtLocation(q, 5, 5, "x", "y")).toBe(q);
-      expect(addToOrGroupAtLocation(q, 10, 5, "x", "y")).toBe(q);
+      expect(
+        addToOrGroupAtLocation({
+          currentQuery: q,
+          groupStart: 5,
+          groupEnd: 5,
+          fieldName: "x",
+          value: "y",
+        }),
+      ).toBe(q);
+    });
+
+    it("returns the query unchanged when end < start", () => {
+      const q = "status:error OR model:gpt-4o";
+      expect(
+        addToOrGroupAtLocation({
+          currentQuery: q,
+          groupStart: 10,
+          groupEnd: 5,
+          fieldName: "x",
+          value: "y",
+        }),
+      ).toBe(q);
     });
   });
 
@@ -934,9 +1075,15 @@ describe("addToOrGroupAtLocation", () => {
       const query = "status:error OR model:gpt-4o";
       const ast = analyzeOrGroups(parse(query));
       const g = ast.groups[0]!;
-      expect(addToOrGroupAtLocation(query, g.start, g.end, "origin", "app")).toBe(
-        "status:error OR model:gpt-4o OR origin:app",
-      );
+      expect(
+        addToOrGroupAtLocation({
+          currentQuery: query,
+          groupStart: g.start,
+          groupEnd: g.end,
+          fieldName: "origin",
+          value: "app",
+        }),
+      ).toBe("status:error OR model:gpt-4o OR origin:app");
     });
   });
 
@@ -948,13 +1095,13 @@ describe("addToOrGroupAtLocation", () => {
       // `g.start..g.end` covers the inner OR LogicalExpression — the
       // splice lands before the closing `)` so parens stay balanced
       // and the AND clause stays intact.
-      const result = addToOrGroupAtLocation(
-        query,
-        g.start,
-        g.end,
-        "origin",
-        "app",
-      );
+      const result = addToOrGroupAtLocation({
+        currentQuery: query,
+        groupStart: g.start,
+        groupEnd: g.end,
+        fieldName: "origin",
+        value: "app",
+      });
       expect(result).toBe(
         "(status:error OR model:gpt-4o OR origin:app) AND name:bar",
       );
@@ -966,9 +1113,15 @@ describe("addToOrGroupAtLocation", () => {
       const query = "  status:error OR model:gpt-4o";
       const ast = analyzeOrGroups(parse(query));
       const g = ast.groups[0]!;
-      expect(addToOrGroupAtLocation(query, g.start, g.end, "origin", "app")).toBe(
-        "  status:error OR model:gpt-4o OR origin:app",
-      );
+      expect(
+        addToOrGroupAtLocation({
+          currentQuery: query,
+          groupStart: g.start,
+          groupEnd: g.end,
+          fieldName: "origin",
+          value: "app",
+        }),
+      ).toBe("  status:error OR model:gpt-4o OR origin:app");
     });
   });
 
@@ -978,7 +1131,13 @@ describe("addToOrGroupAtLocation", () => {
       const ast = analyzeOrGroups(parse(query));
       const g = ast.groups[0]!;
       expect(
-        addToOrGroupAtLocation(query, g.start, g.end, "errorMessage", "rate limit"),
+        addToOrGroupAtLocation({
+          currentQuery: query,
+          groupStart: g.start,
+          groupEnd: g.end,
+          fieldName: "errorMessage",
+          value: "rate limit",
+        }),
       ).toBe('status:error OR status:warning OR errorMessage:"rate limit"');
     });
   });
@@ -986,9 +1145,26 @@ describe("addToOrGroupAtLocation", () => {
 
 describe("setFacetValueAtLocation", () => {
   describe("given an empty query", () => {
-    it("returns the query unchanged", () => {
-      expect(setFacetValueAtLocation("", 0, 0, "x")).toBe("");
-      expect(setFacetValueAtLocation("   ", 0, 0, "x")).toBe("   ");
+    it("returns an empty input unchanged", () => {
+      expect(
+        setFacetValueAtLocation({
+          currentQuery: "",
+          start: 0,
+          end: 0,
+          newValue: "x",
+        }),
+      ).toBe("");
+    });
+
+    it("returns whitespace-only input unchanged", () => {
+      expect(
+        setFacetValueAtLocation({
+          currentQuery: "   ",
+          start: 0,
+          end: 0,
+          newValue: "x",
+        }),
+      ).toBe("   ");
     });
   });
 
@@ -996,9 +1172,14 @@ describe("setFacetValueAtLocation", () => {
     it("replaces the value while preserving the field name", () => {
       const query = "status:error";
       const { start, end } = locationOf(query, "status:error");
-      expect(setFacetValueAtLocation(query, start, end, "warning")).toBe(
-        "status:warning",
-      );
+      expect(
+        setFacetValueAtLocation({
+          currentQuery: query,
+          start,
+          end,
+          newValue: "warning",
+        }),
+      ).toBe("status:warning");
     });
   });
 
@@ -1008,17 +1189,27 @@ describe("setFacetValueAtLocation", () => {
       // [start, end), so the splice keeps the negation intact.
       const query = "NOT status:error";
       const { start, end } = locationOf(query, "status:error");
-      expect(setFacetValueAtLocation(query, start, end, "warning")).toBe(
-        "NOT status:warning",
-      );
+      expect(
+        setFacetValueAtLocation({
+          currentQuery: query,
+          start,
+          end,
+          newValue: "warning",
+        }),
+      ).toBe("NOT status:warning");
     });
 
     it("preserves the leading `-` shorthand negation", () => {
       const query = "-status:error";
       const { start, end } = locationOf(query, "status:error");
-      expect(setFacetValueAtLocation(query, start, end, "warning")).toBe(
-        "-status:warning",
-      );
+      expect(
+        setFacetValueAtLocation({
+          currentQuery: query,
+          start,
+          end,
+          newValue: "warning",
+        }),
+      ).toBe("-status:warning");
     });
   });
 
@@ -1026,9 +1217,14 @@ describe("setFacetValueAtLocation", () => {
     it("offsets the splice point by leading whitespace", () => {
       const query = "  status:error";
       // Tag.location is in trimmed coords, so `start: 0, end: 12`.
-      expect(setFacetValueAtLocation(query, 0, 12, "warning")).toBe(
-        "  status:warning",
-      );
+      expect(
+        setFacetValueAtLocation({
+          currentQuery: query,
+          start: 0,
+          end: 12,
+          newValue: "warning",
+        }),
+      ).toBe("  status:warning");
     });
   });
 
@@ -1036,16 +1232,28 @@ describe("setFacetValueAtLocation", () => {
     it("quotes values containing spaces", () => {
       const query = "errorMessage:foo";
       const { start, end } = locationOf(query, "errorMessage:foo");
-      expect(setFacetValueAtLocation(query, start, end, "rate limit")).toBe(
-        'errorMessage:"rate limit"',
-      );
+      expect(
+        setFacetValueAtLocation({
+          currentQuery: query,
+          start,
+          end,
+          newValue: "rate limit",
+        }),
+      ).toBe('errorMessage:"rate limit"');
     });
   });
 
   describe("given a location that doesn't resolve to a Tag", () => {
     it("returns the query unchanged when no Tag matches", () => {
       const query = "status:error";
-      expect(setFacetValueAtLocation(query, 999, 1000, "warning")).toBe(query);
+      expect(
+        setFacetValueAtLocation({
+          currentQuery: query,
+          start: 999,
+          end: 1000,
+          newValue: "warning",
+        }),
+      ).toBe(query);
     });
 
     it("returns the query unchanged for a range Tag (not a literal)", () => {
@@ -1056,7 +1264,12 @@ describe("setFacetValueAtLocation", () => {
       const ast = parse(query);
       const tag = ast as { location: { start: number; end: number } };
       expect(
-        setFacetValueAtLocation(query, tag.location.start, tag.location.end, "5"),
+        setFacetValueAtLocation({
+          currentQuery: query,
+          start: tag.location.start,
+          end: tag.location.end,
+          newValue: "5",
+        }),
       ).toBe(query);
     });
   });
@@ -1064,16 +1277,30 @@ describe("setFacetValueAtLocation", () => {
   describe("given an unparseable query", () => {
     it("returns the query unchanged rather than throwing", () => {
       const query = "status:error AND";
-      expect(setFacetValueAtLocation(query, 0, 12, "warning")).toBe(query);
+      expect(
+        setFacetValueAtLocation({
+          currentQuery: query,
+          start: 0,
+          end: 12,
+          newValue: "warning",
+        }),
+      ).toBe(query);
     });
   });
 });
 
 describe("swapOperatorAtLocation", () => {
   describe("given an empty query", () => {
-    it("returns the query unchanged", () => {
-      expect(swapOperatorAtLocation("", 0, 0)).toBe("");
-      expect(swapOperatorAtLocation("   ", 0, 0)).toBe("   ");
+    it("returns an empty input unchanged", () => {
+      expect(
+        swapOperatorAtLocation({ currentQuery: "", start: 0, end: 0 }),
+      ).toBe("");
+    });
+
+    it("returns whitespace-only input unchanged", () => {
+      expect(
+        swapOperatorAtLocation({ currentQuery: "   ", start: 0, end: 0 }),
+      ).toBe("   ");
     });
   });
 
@@ -1081,9 +1308,9 @@ describe("swapOperatorAtLocation", () => {
     it("flips it to OR", () => {
       const query = "status:error AND model:gpt-4o";
       const { start, end } = locationOf(query, "AND");
-      expect(swapOperatorAtLocation(query, start, end)).toBe(
-        "status:error OR model:gpt-4o",
-      );
+      expect(
+        swapOperatorAtLocation({ currentQuery: query, start, end }),
+      ).toBe("status:error OR model:gpt-4o");
     });
   });
 
@@ -1091,9 +1318,9 @@ describe("swapOperatorAtLocation", () => {
     it("flips it to AND", () => {
       const query = "status:error OR model:gpt-4o";
       const { start, end } = locationOf(query, "OR");
-      expect(swapOperatorAtLocation(query, start, end)).toBe(
-        "status:error AND model:gpt-4o",
-      );
+      expect(
+        swapOperatorAtLocation({ currentQuery: query, start, end }),
+      ).toBe("status:error AND model:gpt-4o");
     });
   });
 
@@ -1103,9 +1330,9 @@ describe("swapOperatorAtLocation", () => {
       // map; the replacement is always uppercase.
       const query = "status:error and model:gpt-4o";
       const { start, end } = locationOf(query, "and");
-      expect(swapOperatorAtLocation(query, start, end)).toBe(
-        "status:error OR model:gpt-4o",
-      );
+      expect(
+        swapOperatorAtLocation({ currentQuery: query, start, end }),
+      ).toBe("status:error OR model:gpt-4o");
     });
   });
 
@@ -1113,7 +1340,9 @@ describe("swapOperatorAtLocation", () => {
     it("returns the query unchanged", () => {
       const query = "status:error AND model:gpt-4o";
       const { start, end } = locationOf(query, "status");
-      expect(swapOperatorAtLocation(query, start, end)).toBe(query);
+      expect(
+        swapOperatorAtLocation({ currentQuery: query, start, end }),
+      ).toBe(query);
     });
   });
 
@@ -1124,9 +1353,13 @@ describe("swapOperatorAtLocation", () => {
       const query = "  status:error AND model:gpt-4o";
       // In trimmed coords, AND is at 13..16. The function adds
       // leadingWs (2) → swaps 15..18 in the absolute string.
-      expect(swapOperatorAtLocation(query, 13, 16)).toBe(
-        "  status:error OR model:gpt-4o",
-      );
+      expect(
+        swapOperatorAtLocation({
+          currentQuery: query,
+          start: 13,
+          end: 16,
+        }),
+      ).toBe("  status:error OR model:gpt-4o");
     });
   });
 });

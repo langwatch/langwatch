@@ -120,7 +120,9 @@ export const SectionRenderer: React.FC<SectionRendererProps> = ({
       getNoneActive={(attrKey) =>
         getFacetValueState(ast, "none", fieldFor(attrKey)) === "include"
       }
-      onToggleValue={(attrKey, value) => toggleFacet(fieldFor(attrKey), value)}
+      onToggleValue={(attrKey, value, options) =>
+        toggleFacet(fieldFor(attrKey), value, options)
+      }
       onToggleNone={(attrKey) => toggleFacet("none", fieldFor(attrKey))}
       onShiftToggle={onShiftToggle}
     />

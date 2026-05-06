@@ -186,8 +186,14 @@ export async function generateTraceAction(
         schemaDescription:
           "Either an apply_query (filter the current view) or a create_lens (create a saved view) action with a trace query language string.",
         schema: aiActionSchema,
+        // Only inject the retry-context blurb when the previous failure
+        // was a parse/validation issue. After a provider/SDK throw,
+        // `lastQuery` is "" and `lastError` is a stack-y SDK message —
+        // splicing those into a "previous attempt produced query X
+        // which failed to parse: Y" sentence misleads the model into
+        // thinking it produced an empty query that won't parse.
         system:
-          attempt === 1
+          attempt === 1 || lastFailure !== "validation"
             ? systemPrompt
             : `${systemPrompt}\n\nThe previous attempt produced query "${lastQuery}" which failed to parse: ${lastError}\nReturn a valid query this time.`,
         prompt: input.prompt,
