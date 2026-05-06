@@ -915,6 +915,30 @@ export async function hasOrganizationPermission(
     return permission === "organization:view";
   }
 
+  // Universal personal-context floor: every org member, regardless of
+  // role, gets MEMBER's base bag (`organization:view` + `aiTools:view`)
+  // so /me works. Without this floor, a bare org-member with no team
+  // membership AND no custom RoleBinding fell through every check
+  // below and was rejected from every personal-context tRPC procedure
+  // (user.personalContext / personalUsage / personalBudget /
+  // homePagePickerState / governance.resolveHome / limits.getUsage /
+  // aiTools.list — all gated on `organization:view`). Caught when
+  // MEMBER `rogerio@…` was added to an org for the Claude Code OTLP
+  // dogfood and his /me page permission-denied silently — the page
+  // rendered as if no data existed instead of "no access".
+  //
+  // Critical: floor is MEMBER's bag *only*, NOT the role's full bag.
+  // ADMIN-only org perms (`organization:manage` / `governance:manage`
+  // / `ingestionSources:create` / etc.) still require an explicit
+  // ORGANIZATION-scoped RoleBinding. A bare OrgUser.role=ADMIN with
+  // no RoleBinding doesn't escalate — the existing legacy fallback
+  // semantics expect RoleBindings (primary path) or TeamUser ADMIN
+  // (limited team-resource fallback) to be the source of admin
+  // power, not the OrgUser.role field by itself.
+  if (organizationRoleHasPermission(OrganizationUserRole.MEMBER, permission)) {
+    return true;
+  }
+
   // Primary path: resolve via ORGANIZATION-scoped RoleBindings.
   const permittedByBindings = await checkPermissionFromBindings({
     prisma: ctx.prisma,
