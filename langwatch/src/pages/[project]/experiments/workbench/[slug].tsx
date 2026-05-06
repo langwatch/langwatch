@@ -1,15 +1,11 @@
 import { Alert, Box, HStack, Spacer, VStack } from "@chakra-ui/react";
 import { nanoid } from "nanoid";
 import { useRouter } from "~/utils/compat/next-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo } from "react";
 
 import { DashboardLayout } from "~/components/DashboardLayout";
-import {
-  LangyDrawer,
-  LANGY_DOCKED_OFFSET,
-  LANGY_TRANSITION,
-  type ProposalHandlers,
-} from "~/components/langy/LangySidebar";
+import { useRegisterLangyHandlers } from "~/components/langy/LangyContext";
+import type { ProposalHandlers } from "~/components/langy/LangySidebar";
 import { LoadingScreen } from "~/components/LoadingScreen";
 import { AutosaveStatus } from "~/evaluations-v3/components/AutosaveStatus";
 import { EditableHeading } from "~/evaluations-v3/components/EditableHeading";
@@ -37,7 +33,6 @@ export default function ExperimentsWorkbenchPage() {
   const router = useRouter();
   const { project } = useOrganizationTeamProject();
   const slug = router.query.slug as string | undefined;
-  const [isLangyOpen, setIsLangyOpen] = useState(false);
 
   const {
     name,
@@ -270,6 +265,8 @@ export default function ExperimentsWorkbenchPage() {
     openDrawer,
   ]);
 
+  useRegisterLangyHandlers(proposalHandlers, { experimentSlug: slug });
+
   // Warm up lambda instances in the background (invisible to user)
   useLambdaWarmup();
 
@@ -341,8 +338,6 @@ export default function ExperimentsWorkbenchPage() {
         gap={0}
         align="stretch"
         overflow="hidden"
-        paddingRight={isLangyOpen ? `${LANGY_DOCKED_OFFSET}px` : 0}
-        transition={`padding-right ${LANGY_TRANSITION}`}
       >
         {/* Header */}
         <HStack paddingX={6} paddingY={3} flexShrink={0}>
@@ -389,13 +384,6 @@ export default function ExperimentsWorkbenchPage() {
           </Box>
         </Box>
       </VStack>
-
-      <LangyDrawer
-        proposalHandlers={proposalHandlers}
-        experimentSlug={slug}
-        isOpen={isLangyOpen}
-        onOpenChange={setIsLangyOpen}
-      />
 
       {/* Load saved dataset records - renders nothing, just triggers fetches */}
       <SavedDatasetLoaders datasets={datasets} />
