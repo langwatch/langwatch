@@ -278,7 +278,10 @@ export const app = new Hono<{ Variables: Variables }>()
           executionMode: body.executionMode,
           preconditions: body.preconditions as Prisma.InputJsonValue,
           parameters: body.parameters as Prisma.InputJsonValue,
-          mappings: (body.mappings ?? {}) as Prisma.InputJsonValue,
+          mappings: (body.mappings ?? {
+            mapping: {},
+            expansions: [],
+          }) as Prisma.InputJsonValue,
           sample: body.sample,
           enabled: true,
           evaluatorId: body.evaluatorId ?? null,
