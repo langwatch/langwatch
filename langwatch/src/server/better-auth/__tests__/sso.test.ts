@@ -3,6 +3,7 @@ import { extractEmailDomain, isSsoProviderMatch } from "../sso";
 
 describe("isSsoProviderMatch", () => {
   describe("when the org has no ssoProvider", () => {
+    /** @scenario isSsoProviderMatch — org without ssoProvider */
     it("returns false even if the account looks like a match", () => {
       expect(
         isSsoProviderMatch(
@@ -14,6 +15,7 @@ describe("isSsoProviderMatch", () => {
   });
 
   describe("when the org ssoProvider matches the account providerId", () => {
+    /** @scenario isSsoProviderMatch — direct provider name match */
     it("returns true for a direct provider name match", () => {
       expect(
         isSsoProviderMatch(
@@ -25,6 +27,7 @@ describe("isSsoProviderMatch", () => {
   });
 
   describe("when the org ssoProvider is an Auth0 connection prefix", () => {
+    /** @scenario isSsoProviderMatch — Auth0 prefix match */
     it("returns true when providerAccountId starts with the prefix", () => {
       expect(
         isSsoProviderMatch(
@@ -77,6 +80,7 @@ describe("isSsoProviderMatch", () => {
   });
 
   describe("when the wrong provider is used", () => {
+    /** @scenario isSsoProviderMatch — wrong provider rejected */
     it("returns false", () => {
       expect(
         isSsoProviderMatch(

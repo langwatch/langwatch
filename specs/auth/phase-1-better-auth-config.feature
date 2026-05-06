@@ -42,28 +42,24 @@ Feature: BetterAuth config (unmounted)
   # SSO domain + provider matching (ported from NextAuth signIn callback)
   # ============================================================================
 
-  @unimplemented
   Scenario: isSsoProviderMatch — Auth0 prefix match
     Given an organization with ssoProvider "waad|acme-azure-connection"
     And an OAuth account with providerId "auth0" and providerAccountId "waad|acme-azure-connection|user-123"
     When I call isSsoProviderMatch(org, account)
     Then it returns true
 
-  @unimplemented
   Scenario: isSsoProviderMatch — direct provider name match
     Given an organization with ssoProvider "google"
     And an OAuth account with providerId "google" and providerAccountId "google-id-123"
     When I call isSsoProviderMatch(org, account)
     Then it returns true
 
-  @unimplemented
   Scenario: isSsoProviderMatch — wrong provider rejected
     Given an organization with ssoProvider "okta"
     And an OAuth account with providerId "google" and providerAccountId "google-id-123"
     When I call isSsoProviderMatch(org, account)
     Then it returns false
 
-  @unimplemented
   Scenario: isSsoProviderMatch — org without ssoProvider
     Given an organization with ssoProvider null
     And any OAuth account
