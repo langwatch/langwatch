@@ -579,6 +579,7 @@ export const userRouter = createTRPCRouter({
           usage.recentActivity({
             personalProjectId: workspace.project.id,
             window,
+            userId,
           }),
         ]);
 

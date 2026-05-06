@@ -492,13 +492,90 @@ export class PersonalUsageService {
       Preview: string | null;
     };
     const rows = (await result.json()) as RawActivity[];
-    return rows.map((r) => ({
+    const gateway: PersonalRecentActivity[] = rows.map((r) => ({
       traceId: r.TraceId,
       occurredAt: r.OccurredAt,
       models: r.Models ?? [],
       spentUsd: Number(r.SpentUsd) || 0,
       preview: (r.Preview ?? "").slice(0, 120),
     }));
+
+    // Ingestion-source ledger union: per-request rows for the user's
+    // PRINCIPAL-scope ledger entries (Claude Code OTLP / future
+    // OTLP-only sources). The ledger row carries Model + AmountUSD +
+    // OccurredAt + GatewayRequestId — enough for a list entry.
+    // Preview is empty since OTLP events don't carry chat content;
+    // the UI side surfaces an empty preview as "via OTLP" annotation.
+    let merged = gateway;
+    if (input.userId) {
+      const ingestion = await this.queryIngestionPrincipalActivity(client, {
+        userId: input.userId,
+        window,
+        limit,
+      });
+      // Sort-merge: oldest-first windows are uncommon, ORDER BY
+      // OccurredAt DESC is the contract. Both inputs are already
+      // sorted; concat + re-sort + truncate is fine for the ~10-row
+      // limit and avoids a manual two-pointer merge.
+      merged = [...gateway, ...ingestion]
+        .sort((a, b) => b.occurredAt.localeCompare(a.occurredAt))
+        .slice(0, limit);
+    }
+    return merged;
+  }
+
+  private async queryIngestionPrincipalActivity(
+    client: ClickHouseClient,
+    params: { userId: string; window: PersonalUsageWindow; limit: number },
+  ): Promise<PersonalRecentActivity[]> {
+    if (!isClickHouseEnabled()) return [];
+    try {
+      const result = await client.query({
+        query: `
+          SELECT
+            GatewayRequestId AS RequestId,
+            OccurredAt,
+            Model,
+            AmountUSD AS SpentUsd
+          FROM gateway_budget_ledger_events
+          WHERE Scope = '${PRINCIPAL_SCOPE}'
+            AND ScopeId = {userId:String}
+            AND OccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64})
+            AND OccurredAt <  fromUnixTimestamp64Milli({toMs:Int64})
+          ORDER BY OccurredAt DESC
+          LIMIT {lim:UInt32}
+          SETTINGS ${formatSettings(ANALYTICS_CLICKHOUSE_SETTINGS)}
+        `,
+        query_params: {
+          userId: params.userId,
+          fromMs: params.window.start.getTime(),
+          toMs: params.window.end.getTime(),
+          lim: params.limit,
+        },
+        format: "JSONEachRow",
+      });
+      type Raw = {
+        RequestId: string;
+        OccurredAt: string;
+        Model: string;
+        SpentUsd: number;
+      };
+      const rows = (await result.json()) as Raw[];
+      return rows.map((r) => ({
+        // GatewayRequestId is the per-request idempotency key the
+        // receiver wrote (Claude Code's `request_id` from the
+        // api_request event). Distinguishable from gateway-VK trace
+        // ids by shape (`req_…` for Anthropic) — Lane-B can branch
+        // the row chrome on it if it wants the "via OTLP" annotation.
+        traceId: r.RequestId,
+        occurredAt: r.OccurredAt,
+        models: r.Model ? [r.Model] : [],
+        spentUsd: Number(r.SpentUsd) || 0,
+        preview: "",
+      }));
+    } catch {
+      return [];
+    }
   }
 
   // --- internals ---------------------------------------------------------
