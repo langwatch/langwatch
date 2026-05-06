@@ -194,6 +194,12 @@ export const DefaultProviderSection = ({
           LangWatch features.
         </Text>
       )}
+      {state.useAsDefaultProvider && chatOptions.length === 0 && (
+        <Text fontSize="xs" color="orange.600">
+          No {providerName} models available. Add one in the Custom Models
+          section above to enable this.
+        </Text>
+      )}
 
       {/* Default Models Selection - Only visible when toggle is enabled */}
       {state.useAsDefaultProvider && (
@@ -204,14 +210,21 @@ export const DefaultProviderSection = ({
               For general tasks within LangWatch
             </Text>
             <ProviderModelSelector
-              model={
-                state.projectDefaultModel?.startsWith(`${provider.provider}/`)
-                  ? state.projectDefaultModel
-                  : (chatOptions[0] ?? "")
-              }
+              model={state.projectDefaultModel ?? ""}
               options={chatOptions}
               onChange={(model) => actions.setProjectDefaultModel(model)}
+              disabled={chatOptions.length === 0}
             />
+            {chatOptions.length > 0 &&
+              state.projectDefaultModel &&
+              !state.projectDefaultModel.startsWith(
+                `${provider.provider}/`,
+              ) && (
+                <Text fontSize="xs" color="orange.600" marginTop={1}>
+                  Persisted default belongs to a different provider — pick a{" "}
+                  {providerName} model to switch.
+                </Text>
+              )}
           </Field.Root>
 
           <Field.Root width="full">
@@ -220,18 +233,23 @@ export const DefaultProviderSection = ({
               For generating topic names
             </Text>
             <ProviderModelSelector
-              model={
-                state.projectTopicClusteringModel?.startsWith(
-                  `${provider.provider}/`,
-                )
-                  ? state.projectTopicClusteringModel
-                  : (chatOptions[0] ?? "")
-              }
+              model={state.projectTopicClusteringModel ?? ""}
               options={chatOptions}
               onChange={(model) =>
                 actions.setProjectTopicClusteringModel(model)
               }
+              disabled={chatOptions.length === 0}
             />
+            {chatOptions.length > 0 &&
+              state.projectTopicClusteringModel &&
+              !state.projectTopicClusteringModel.startsWith(
+                `${provider.provider}/`,
+              ) && (
+                <Text fontSize="xs" color="orange.600" marginTop={1}>
+                  Persisted default belongs to a different provider — pick a{" "}
+                  {providerName} model to switch.
+                </Text>
+              )}
           </Field.Root>
 
           <Field.Root width="full">

@@ -133,4 +133,161 @@ describe("<DefaultProviderSection/>", () => {
       });
     });
   });
+
+  // ---------------------------------------------------------------------------
+  // Regression tests — issue #3785: cross-provider default model mismatch warning
+  // ---------------------------------------------------------------------------
+
+  describe("given provider is azure, useAsDefaultProvider is true, and chatOptions has at least one azure model", () => {
+    describe("when projectDefaultModel belongs to a different provider (openai/gpt-5.2)", () => {
+      it("renders the orange mismatch warning under the Default Model field", () => {
+        const state = buildState({
+          useAsDefaultProvider: true,
+          customModels: [
+            { modelId: "my-azure-deployment", displayName: "My Azure Deployment", mode: "chat" },
+          ],
+          projectDefaultModel: "openai/gpt-5.2",
+        });
+        const actions = buildActions();
+
+        render(
+          <Wrapper>
+            <DefaultProviderSection
+              state={state}
+              actions={actions}
+              provider={azureProvider}
+              enabledProvidersCount={2}
+              project={{ defaultModel: "openai/gpt-5.2" }}
+              providers={{ azure: azureProvider }}
+            />
+          </Wrapper>,
+        );
+
+        expect(
+          screen.getByText(/Persisted default belongs to a different provider/i),
+        ).toBeTruthy();
+      });
+    });
+
+    describe("when projectTopicClusteringModel belongs to a different provider (openai/gpt-4o-mini)", () => {
+      it("renders the orange mismatch warning under the Topic Clustering Model field", () => {
+        const state = buildState({
+          useAsDefaultProvider: true,
+          customModels: [
+            { modelId: "my-azure-deployment", displayName: "My Azure Deployment", mode: "chat" },
+          ],
+          projectDefaultModel: "azure/gpt-5-mini",
+          projectTopicClusteringModel: "openai/gpt-4o-mini",
+        });
+        const actions = buildActions();
+
+        render(
+          <Wrapper>
+            <DefaultProviderSection
+              state={state}
+              actions={actions}
+              provider={azureProvider}
+              enabledProvidersCount={2}
+              project={{ defaultModel: "azure/gpt-5-mini" }}
+              providers={{ azure: azureProvider }}
+            />
+          </Wrapper>,
+        );
+
+        // Both Default Model and Topic Clustering use the same warning text;
+        // here only topic clustering should mismatch, so exactly one warning.
+        const warnings = screen.getAllByText(
+          /Persisted default belongs to a different provider/i,
+        );
+        expect(warnings).toHaveLength(1);
+      });
+    });
+
+    describe("when projectDefaultModel matches the azure prefix (azure/gpt-5-mini)", () => {
+      it("does not render the mismatch warning", () => {
+        const state = buildState({
+          useAsDefaultProvider: true,
+          customModels: [
+            { modelId: "gpt-5-mini", displayName: "GPT-5 Mini", mode: "chat" },
+          ],
+          projectDefaultModel: "azure/gpt-5-mini",
+        });
+        const actions = buildActions();
+
+        render(
+          <Wrapper>
+            <DefaultProviderSection
+              state={state}
+              actions={actions}
+              provider={azureProvider}
+              enabledProvidersCount={2}
+              project={{ defaultModel: "azure/gpt-5-mini" }}
+              providers={{ azure: azureProvider }}
+            />
+          </Wrapper>,
+        );
+
+        expect(
+          screen.queryByText(/Persisted default belongs to a different provider/i),
+        ).toBeNull();
+      });
+    });
+  });
+
+  describe("given provider is azure, useAsDefaultProvider is true, and chatOptions is empty", () => {
+    describe("when the section renders", () => {
+      it("renders the empty-state hint text", () => {
+        const state = buildState({
+          useAsDefaultProvider: true,
+          customModels: [],
+          projectDefaultModel: null,
+        });
+        const actions = buildActions();
+
+        render(
+          <Wrapper>
+            <DefaultProviderSection
+              state={state}
+              actions={actions}
+              provider={azureProvider}
+              enabledProvidersCount={2}
+              project={{ defaultModel: null }}
+              providers={{ azure: azureProvider }}
+            />
+          </Wrapper>,
+        );
+
+        expect(
+          screen.getByText(/No Azure OpenAI models available/i),
+        ).toBeTruthy();
+      });
+
+      it("does not render the mismatch warning", () => {
+        const state = buildState({
+          useAsDefaultProvider: true,
+          customModels: [],
+          projectDefaultModel: "openai/gpt-5.2",
+        });
+        const actions = buildActions();
+
+        render(
+          <Wrapper>
+            <DefaultProviderSection
+              state={state}
+              actions={actions}
+              provider={azureProvider}
+              enabledProvidersCount={2}
+              project={{ defaultModel: "openai/gpt-5.2" }}
+              providers={{ azure: azureProvider }}
+            />
+          </Wrapper>,
+        );
+
+        // Warning only shows when chatOptions.length > 0 (component logic)
+        expect(
+          screen.queryByText(/Persisted default belongs to a different provider/i),
+        ).toBeNull();
+      });
+    });
+  });
 });
