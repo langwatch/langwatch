@@ -10,6 +10,7 @@ import { app as copilotKitApp } from "../app/api/copilotkit/[[...route]]/app";
 import { app as dashboardsApp } from "../app/api/dashboards/[[...route]]/app";
 import { app as datasetApp } from "../app/api/dataset/[[...route]]/app";
 import { app as evaluatorsApp } from "../app/api/evaluators/[[...route]]/app";
+import { app as experimentsApp } from "../app/api/experiments/[[...route]]/app";
 import { app as exportTracesApp } from "../app/api/export/traces/[[...route]]/app";
 import { app as gatewayPlatformApp } from "../app/api/gateway-platform/[[...route]]/app";
 import { app as graphsApp } from "../app/api/graphs/[[...route]]/app";
@@ -79,6 +80,7 @@ export function createApiRouter() {
   api.route("/", dashboardsApp);
   api.route("/", datasetApp);
   api.route("/", evaluatorsApp);
+  api.route("/", experimentsApp);
   api.route("/", filesApp);
   api.route("/", exportTracesApp);
   api.route("/", gatewayPlatformApp);
