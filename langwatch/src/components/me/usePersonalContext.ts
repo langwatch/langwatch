@@ -37,11 +37,18 @@ export type PersonalApiKeyRow = {
  * Wire shape mirrors `api.user.personalBudget` (Sergey's dc07c772e) and
  * the gateway 402 body. status=ok → no banner; warning → yellow 80%
  * banner; exceeded → BudgetExceededBanner with the structured fields.
+ *
+ * The OK status carries the same snapshot fields as warning / exceeded
+ * when the user has a real applicable budget — the /me chip needs
+ * always-on data ("rogerio-claude-budget · 13% spent" at 13% used)
+ * even though no banner fires. Banners still gate on `status`. When
+ * the user has no applicable budget at all, the wire collapses to
+ * just `{ status: "ok" }` (no extra fields).
  */
 export type PersonalBudgetState =
   | { status: "ok" }
   | {
-      status: "warning" | "exceeded";
+      status: "ok" | "warning" | "exceeded";
       spentUsd: number;
       limitUsd: number;
       period: string;
@@ -112,17 +119,22 @@ export function usePersonalContext(): PersonalContext {
   // tRPC serializes Prisma Decimal fields as strings — coerce at the
   // hook boundary so downstream UI (BudgetExceededBanner, /me dashboard)
   // can use number arithmetic without re-coercing in every consumer.
+  // The chip needs always-on snapshot data even when status='ok'
+  // (under 80% used) — only collapse to bare {status:'ok'} when there
+  // is genuinely no applicable budget (no `limitUsd` on the wire).
   const budget = useMemo<PersonalBudgetState>(() => {
     const raw = personalBudgetQuery.data;
-    if (!raw || raw.status === "ok") return { status: "ok" };
+    if (!raw) return { status: "ok" };
+    if (!("limitUsd" in raw)) return { status: "ok" };
     return {
       status: raw.status,
       spentUsd: Number(raw.spentUsd),
       limitUsd: Number(raw.limitUsd),
       period: raw.period,
       scope: raw.scope,
-      requestIncreaseUrl: raw.requestIncreaseUrl ?? null,
-      adminEmail: raw.adminEmail ?? null,
+      requestIncreaseUrl:
+        "requestIncreaseUrl" in raw ? raw.requestIncreaseUrl ?? null : null,
+      adminEmail: "adminEmail" in raw ? raw.adminEmail ?? null : null,
     };
   }, [personalBudgetQuery.data]);
 
@@ -165,7 +177,10 @@ export function usePersonalContext(): PersonalContext {
     switcher,
     summary: {
       spentThisMonthUsd: personalUsageQuery.data?.summary.spentUsd ?? 0,
-      budgetUsd: budget.status === "ok" ? null : budget.limitUsd,
+      // Always-on chip data: `limitUsd` flows through whenever the user
+      // has any applicable budget, regardless of `status`. Banner-only
+      // surfaces (BudgetExceededBanner) still gate on `budget.status`.
+      budgetUsd: "limitUsd" in budget ? budget.limitUsd : null,
       requestsThisMonth: personalUsageQuery.data?.summary.requests ?? 0,
       // Month-over-month delta requires a second window query; defer.
       requestsDeltaPctVsLastMonth: null,

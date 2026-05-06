@@ -663,36 +663,46 @@ export const userRouter = createTRPCRouter({
 
       // Status mapping: hard_block → exceeded (red banner),
       // soft_warn → warning (yellow banner), allow → ok (no banner).
-      if (decision.decision === "allow") return { status: "ok" as const };
+      // The chip on /me however needs always-on snapshot data so it
+      // can render "rogerio-claude-budget · 13% spent" even at 13%
+      // (under the 80% banner threshold). Pick the best applicable
+      // budget regardless of decision and pass through spent/limit
+      // — the warning/exceeded banners still gate on `status` so
+      // "ok" suppresses banners, only the chip data flows through.
+      // Caught when MEMBER `rogerio@…` running OTLP-only Claude Code
+      // had a real principal-scope budget at 13% but the chip read
+      // "No budget set" — the early-return on allow threw away the
+      // snapshot fields the chip needed.
+      const sortedScopes = decision.scopes
+        .map((s) => ({ ...s, pctUsed: percentUsed(s.spentUsd, s.limitUsd) }))
+        .sort((a, b) => b.pctUsed - a.pctUsed);
+      const topScope = decision.blockedBy[0] ?? sortedScopes[0];
+      if (!topScope) return { status: "ok" as const };
 
-      const blocker =
-        decision.blockedBy[0] ??
-        decision.scopes
-          .map((s) => ({ ...s, pctUsed: percentUsed(s.spentUsd, s.limitUsd) }))
-          .filter((s) => s.pctUsed >= 80)
-          .sort((a, b) => b.pctUsed - a.pctUsed)[0];
-      if (!blocker) return { status: "ok" as const };
+      const baseStatus =
+        decision.decision === "hard_block"
+          ? ("exceeded" as const)
+          : decision.decision === "soft_warn" ||
+              ("pctUsed" in topScope && topScope.pctUsed >= 80)
+            ? ("warning" as const)
+            : ("ok" as const);
 
       const adminEmail = await resolveOrgAdminEmail({
         prisma: ctx.prisma,
         organizationId: input.organizationId,
       });
-      const baseStatus =
-        decision.decision === "hard_block"
-          ? ("exceeded" as const)
-          : ("warning" as const);
       return {
         status: baseStatus,
-        scope: normalizeScope(blocker.scope),
-        spentUsd: blocker.spentUsd,
-        limitUsd: blocker.limitUsd,
-        period: blocker.window.toLowerCase(),
+        scope: normalizeScope(topScope.scope),
+        spentUsd: topScope.spentUsd,
+        limitUsd: topScope.limitUsd,
+        period: topScope.window.toLowerCase(),
         requestIncreaseUrl: requestIncreaseUrl({
           baseUrl: env.NEXTAUTH_URL ?? env.BASE_HOST ?? null,
-          scope: normalizeScope(blocker.scope),
-          scopeId: blocker.scopeId,
-          limitUsd: blocker.limitUsd,
-          spentUsd: blocker.spentUsd,
+          scope: normalizeScope(topScope.scope),
+          scopeId: topScope.scopeId,
+          limitUsd: topScope.limitUsd,
+          spentUsd: topScope.spentUsd,
         }),
         adminEmail,
       };

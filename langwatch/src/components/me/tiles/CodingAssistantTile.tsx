@@ -224,18 +224,24 @@ export function CodingAssistantTile({
                 display="block"
                 overflowX="auto"
               >
-                {CLAUDE_CODE_OTLP_ENV_TEMPLATE}
+                {claudeCodeEnvBlock}
               </Code>
               <Text fontSize="xs" color="fg.muted" marginTop={2}>
                 Replace{" "}
                 <Code fontSize="xs" backgroundColor="transparent">
-                  &lt;your-org-LangWatch-ingestion-URL&gt;
-                </Code>{" "}
-                and{" "}
-                <Code fontSize="xs" backgroundColor="transparent">
                   &lt;ingest-secret-from-admin&gt;
                 </Code>{" "}
-                with values your admin gives you. Optional: also export{" "}
+                with the bearer token your admin shares
+                {resolvedEndpoint ? null : (
+                  <>
+                    {" "}and{" "}
+                    <Code fontSize="xs" backgroundColor="transparent">
+                      &lt;your-org-LangWatch-ingestion-URL&gt;
+                    </Code>{" "}
+                    once they publish a Claude Code OTLP source
+                  </>
+                )}
+                . Optional: also export{" "}
                 <Code fontSize="xs" backgroundColor="transparent">
                   OTEL_RESOURCE_ATTRIBUTES=team.id=…,cost_center=…
                 </Code>{" "}
