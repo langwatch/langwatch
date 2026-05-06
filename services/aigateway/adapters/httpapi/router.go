@@ -23,6 +23,7 @@ import (
 	"github.com/langwatch/langwatch/pkg/httpmiddleware"
 	"github.com/langwatch/langwatch/services/aigateway/adapters/customertracebridge"
 	"github.com/langwatch/langwatch/services/aigateway/adapters/gatewaytracer"
+	"github.com/langwatch/langwatch/services/aigateway/adapters/ottlserver"
 	"github.com/langwatch/langwatch/services/aigateway/app"
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
@@ -35,6 +36,14 @@ type RouterDeps struct {
 	Version               string
 	TraceRegistry         *customertracebridge.Registry
 	DefaultExportEndpoint string
+	// OTTLServer handles /internal/validate-ottl and /internal/transform.
+	// Optional; when nil, the /internal/* routes are not mounted. The
+	// service runs without it for backwards-compat with old configs that
+	// don't expect ingestion-source OTTL traffic.
+	OTTLServer *ottlserver.Server
+	// InternalSecret is the HMAC shared secret protecting /internal/*.
+	// Required when OTTLServer is set.
+	InternalSecret string
 	// MaxRequestBodyBytes caps the per-request body size. 0 falls back to
 	// config.DefaultMaxRequestBodyBytes (32 MiB) — sized for 1M-context LLM
 	// workloads where legitimate requests can be multi-MB. Set higher on
@@ -88,6 +97,20 @@ func NewRouter(deps RouterDeps) http.Handler {
 		v1beta.Use(TraceRegistryMiddleware(deps.TraceRegistry, deps.DefaultExportEndpoint))
 		v1beta.HandleFunc("/*", geminiPassthroughHandler(deps))
 	})
+
+	// Internal control-plane channel — protected by a shared HMAC
+	// secret (`LW_GATEWAY_INTERNAL_SECRET`). Currently used by the
+	// LangWatch governance ingestion pipeline to validate and execute
+	// OTTL statements over inbound OTLP payloads. See
+	// `langwatch/ee/governance/services/activity-monitor/ottlGatewayClient.ts`
+	// for the matching client.
+	if deps.OTTLServer != nil {
+		r.Route("/internal", func(in chi.Router) {
+			in.Use(InternalAuthMiddleware(deps.InternalSecret))
+			in.Post("/validate-ottl", deps.OTTLServer.HandleValidate)
+			in.Post("/transform", deps.OTTLServer.HandleTransform)
+		})
+	}
 
 	return r
 }
