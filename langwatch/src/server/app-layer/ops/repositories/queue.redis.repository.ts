@@ -440,6 +440,15 @@ function finalizeOverview(
   const mostOverduePerTenant = Array.from(merged.perTenantOverdue.values())
     .sort((a, b) => a.score - b.score);
 
+  // `groups` = every group with any state to report (pending jobs, blocked,
+  // stale, or active). `groupsScanned` covers everything in the ready zset
+  // ∪ blocked set, so it includes blocked-only and stale groups that
+  // `groupsWithJobs` would silently drop.
+  const groupsTotal = Math.max(
+    meta.groupsScanned,
+    merged.totals.groupsWithJobs + merged.totals.stale,
+  );
+
   return {
     queueName: meta.queueName,
     generatedAtMs: meta.generatedAtMs,
@@ -447,7 +456,7 @@ function finalizeOverview(
     groupsScanned: meta.groupsScanned,
     totals: {
       jobs: merged.totals.jobs,
-      groups: merged.totals.groupsWithJobs,
+      groups: groupsTotal,
       ready: merged.totals.ready,
       scheduled: merged.totals.scheduled,
       retrying: merged.totals.retrying,

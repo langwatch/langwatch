@@ -22,6 +22,11 @@ import { TtlCache } from "~/server/utils/ttlCache";
 const overviewCache = new TtlCache<QueueOverview>(5_000, "ops:queues:overview:");
 const searchCache = new TtlCache<PendingJobSearchResult>(5_000, "ops:queues:search:");
 
+// Size of the in-memory window cached per filter/sort. Pages within the
+// window slice from cache; pages beyond it fall through to a direct repo
+// call so deep pagination still returns real rows.
+const SEARCH_CACHE_WINDOW = 5_000;
+
 function stableStringify(input: unknown): string {
   if (input === null || typeof input !== "object") return JSON.stringify(input);
   if (Array.isArray(input)) return `[${input.map(stableStringify).join(",")}]`;
@@ -261,11 +266,17 @@ export class QueueService {
   async getQueueOverview(params: {
     queueName: string;
     sliceN?: number;
+    force?: boolean;
   }): Promise<QueueOverview> {
     const key = `${params.queueName}:${params.sliceN ?? "default"}`;
-    const cached = await overviewCache.get(key);
-    if (cached) return cached;
-    const fresh = await this.repo.getQueueOverview(params);
+    if (!params.force) {
+      const cached = await overviewCache.get(key);
+      if (cached) return cached;
+    }
+    const fresh = await this.repo.getQueueOverview({
+      queueName: params.queueName,
+      sliceN: params.sliceN,
+    });
     await overviewCache.set(key, fresh);
     return fresh;
   }
@@ -276,20 +287,35 @@ export class QueueService {
     sort: PendingJobSort;
     pageSize: number;
     page: number;
+    force?: boolean;
   }): Promise<PendingJobSearchResult> {
     // Cache the full scan keyed only on filter+sort. Pagination is applied
-    // here so different pages reuse the same scan.
+    // here so different pages reuse the same scan. If the requested page
+    // falls outside the cached window, fall through to a direct repo call
+    // with the original params so deep pages still return real rows.
     const baseKey = `${params.queueName}:${params.sort}:${stableStringify(params.filter)}`;
-    let full = await searchCache.get(baseKey);
+    let full = params.force ? undefined : await searchCache.get(baseKey);
     if (!full) {
       full = await this.repo.searchPendingJobs({
-        ...params,
+        queueName: params.queueName,
+        filter: params.filter,
+        sort: params.sort,
         page: 1,
-        pageSize: 5_000,
+        pageSize: SEARCH_CACHE_WINDOW,
       });
       await searchCache.set(baseKey, full);
     }
     const start = (params.page - 1) * params.pageSize;
+    if (start >= full.jobs.length && start < full.totalMatching) {
+      // Beyond the cached window — re-fetch the actual page from the repo.
+      return this.repo.searchPendingJobs({
+        queueName: params.queueName,
+        filter: params.filter,
+        sort: params.sort,
+        page: params.page,
+        pageSize: params.pageSize,
+      });
+    }
     const end = start + params.pageSize;
     return {
       ...full,

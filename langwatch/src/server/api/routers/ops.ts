@@ -500,6 +500,7 @@ export const opsRouter = createTRPCRouter({
       z.object({
         queueName: z.string(),
         sliceN: z.number().int().min(1).max(200).optional(),
+        force: z.boolean().optional(),
       }),
     )
     .query(async ({ input }) => {
@@ -531,6 +532,7 @@ export const opsRouter = createTRPCRouter({
         sort: z.enum(["oldest", "youngest", "mostOverdue"]).default("oldest"),
         page: z.number().int().min(1).default(1),
         pageSize: z.number().int().min(1).max(200).default(50),
+        force: z.boolean().optional(),
       }),
     )
     .query(async ({ input }) => {

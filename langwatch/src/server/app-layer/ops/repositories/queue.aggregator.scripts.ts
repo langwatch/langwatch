@@ -358,13 +358,24 @@ for gIdx = 1, groupCount do
         end
       end
     elseif isBlocked and not hasActive and filters.state == "stale" then
+      -- Stale groups have no jobs to derive an age from. Use the error
+      -- timestamp (set when the group's last job blocked) so age + sort
+      -- order are meaningful. Fall back to nowMs only if no error is
+      -- recorded — in that case the row really is freshly observed.
+      local errorKey = keyPrefix .. "group:" .. groupId .. ":error"
+      local errTs = redis.call("HGET", errorKey, "timestamp")
+      local staleScore = nowMs
+      if errTs and errTs ~= false then
+        local n = tonumber(errTs)
+        if n then staleScore = n end
+      end
       matchedCount = matchedCount + 1
       if #matched < maxResults then
         matched[#matched + 1] = {
           jobId = "<stale-block>",
           groupId = groupId,
-          score = nowMs,
-          ageMs = 0,
+          score = staleScore,
+          ageMs = nowMs - staleScore,
           pipelineName = "unknown",
           jobType = "unknown",
           jobName = "unknown",

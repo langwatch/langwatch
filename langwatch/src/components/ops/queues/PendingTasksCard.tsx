@@ -62,16 +62,36 @@ export function PendingTasksCard({
   data: DashboardData | null;
   connectionStatus: ConnectionStatus;
 }) {
-  const queueName = queueNames[0];
+  // Persist the selection across re-renders. Default to the first discovered
+  // queue, but let the user pick any of the others when more than one
+  // exists — previously additional queues were silently dropped.
+  const [selectedQueueName, setSelectedQueueName] = useState<string | undefined>(
+    queueNames[0],
+  );
+  useEffect(() => {
+    if (selectedQueueName && queueNames.includes(selectedQueueName)) return;
+    setSelectedQueueName(queueNames[0]);
+  }, [queueNames, selectedQueueName]);
+  const queueName = selectedQueueName ?? queueNames[0];
+  const utils = api.useUtils();
+
+  // Force-refresh flag is sent on the next overview query after the user
+  // hits Refresh; reset to false once the fetch completes so subsequent
+  // background refetches use the cached snapshot again.
+  const [forceOverview, setForceOverview] = useState(false);
 
   const overviewQuery = api.ops.getQueueOverview.useQuery(
-    { queueName: queueName ?? "" },
+    { queueName: queueName ?? "", force: forceOverview || undefined },
     {
       enabled: !!queueName,
       refetchInterval: false,
       refetchOnWindowFocus: false,
     },
   );
+
+  useEffect(() => {
+    if (forceOverview && !overviewQuery.isFetching) setForceOverview(false);
+  }, [forceOverview, overviewQuery.isFetching]);
 
   const overview = overviewQuery.data ?? null;
   const isOverviewLoading = !!queueName && overviewQuery.isLoading;
@@ -88,6 +108,15 @@ export function PendingTasksCard({
       else next.state = state;
       return next;
     });
+  };
+
+  const onRefresh = () => {
+    setForceOverview(true);
+    void overviewQuery.refetch();
+    // Clear search results too so the table doesn't lag behind the new
+    // overview counts. We invalidate rather than passing force per call to
+    // avoid stale cached pages for any other open tabs.
+    void utils.ops.searchPendingJobs.invalidate({ queueName });
   };
 
   if (!queueName) {
@@ -107,10 +136,13 @@ export function PendingTasksCard({
         data={data}
         connectionStatus={connectionStatus}
         isLoading={isOverviewLoading}
-        onRefresh={() => void overviewQuery.refetch()}
+        onRefresh={onRefresh}
         isRefreshing={overviewQuery.isFetching}
         activeStateFilter={filter.state}
         onToggleState={toggleStateFilter}
+        queueNames={queueNames}
+        selectedQueueName={queueName}
+        onSelectQueue={setSelectedQueueName}
       />
 
       <SearchSection
@@ -134,6 +166,9 @@ function OverviewCard({
   isRefreshing,
   activeStateFilter,
   onToggleState,
+  queueNames,
+  selectedQueueName,
+  onSelectQueue,
 }: {
   overview: QueueOverview | null;
   data: DashboardData | null;
@@ -143,6 +178,9 @@ function OverviewCard({
   isRefreshing: boolean;
   activeStateFilter: SearchableJobState | undefined;
   onToggleState: (state: SearchableJobState) => void;
+  queueNames: string[];
+  selectedQueueName: string;
+  onSelectQueue: (name: string) => void;
 }) {
   // Tick once per second so the freshness label degrades from grey → yellow →
   // orange → red as the snapshot ages, without waiting for a refetch.
@@ -170,6 +208,19 @@ function OverviewCard({
         >
           {/* SNAPSHOT cluster — count, badges, and freshness pill that owns them */}
           <HStack gap={2} alignItems="baseline">
+            {queueNames.length > 1 ? (
+              <NativeSelect.Root size="xs" width="180px">
+                <NativeSelect.Field
+                  value={selectedQueueName}
+                  onChange={(e) => onSelectQueue(e.target.value)}
+                >
+                  {queueNames.map((q) => (
+                    <option key={q} value={q}>{q}</option>
+                  ))}
+                </NativeSelect.Field>
+                <NativeSelect.Indicator />
+              </NativeSelect.Root>
+            ) : null}
             <Text textStyle="lg" fontWeight="semibold" fontFamily="mono">
               {totals ? formatNumber(totals.groups) : "—"}
             </Text>
@@ -550,7 +601,16 @@ function SearchSection({
                           key={`${job.groupId}/${job.jobId}`}
                           cursor="pointer"
                           _hover={{ bg: "bg.subtle" }}
-                          onClick={() => setJobDetail({ groupId: job.groupId, jobId: job.jobId })}
+                          onClick={() => {
+                            // Stale rows have no real job behind them, so
+                            // open the group dialog instead of the job
+                            // dialog (which would just say "not found").
+                            if (job.state === "stale") {
+                              setGroupDetail({ groupId: job.groupId });
+                            } else {
+                              setJobDetail({ groupId: job.groupId, jobId: job.jobId });
+                            }
+                          }}
                         >
                           <Table.Cell overflow="hidden">
                             <VStack align="start" gap={0} minWidth={0}>
