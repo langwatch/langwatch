@@ -310,7 +310,7 @@ boxd_wake_if_suspended() {
 # ---------------------------------------------------------------------------
 
 # Internal: the shared fork primitive (AC#10).
-# Args: SOURCE VM_INPUT USER_ARG BRANCH [START_TMUX]
+# Args: SOURCE VM_INPUT USER_ARG BRANCH [START_TMUX [PR]]
 #   SOURCE     pr | branch | issue
 #   VM_INPUT   value passed to boxd_vm_name (PR's branch, branch name, or issue number)
 #   USER_ARG   value the user originally typed — used to echo back the right
@@ -318,6 +318,8 @@ boxd_wake_if_suspended() {
 #              fork-issue: issue number.
 #   BRANCH     the actual git branch to check out inside the fork
 #   START_TMUX 1 to start a Claude tmux session (fork-issue), 0 otherwise
+#   PR         optional PR number; when set, checkout uses `gh pr checkout`
+#              inside the fork to handle PRs from forked repos (AC#16).
 _boxd_fork_impl() {
   local source="$1" input="$2" user_arg="$3" branch="$4" start_tmux="${5:-0}" pr="${6:-}"
   local vm tmux arg_name
