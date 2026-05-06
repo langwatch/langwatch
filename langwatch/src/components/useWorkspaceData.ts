@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 
+import { useRequiredSession } from "~/hooks/useRequiredSession";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 
 import type { WorkspaceSwitcherProps } from "./WorkspaceSwitcher";
@@ -12,6 +13,11 @@ import type { WorkspaceSwitcherProps } from "./WorkspaceSwitcher";
  * wiring. `current` is auto-derived inside the switcher via
  * `useWorkspaceCurrent`, so consumers don't need to thread it.
  *
+ * Personal teams owned by OTHER users are filtered out — every user has a
+ * private personal team (Team.isPersonal=true, ownerUserId=them) which
+ * never appears in another user's switcher, even when an org admin can
+ * structurally see them in the org.teams payload.
+ *
  * Spec: specs/ai-gateway/governance/workspace-switcher.feature
  */
 export function useWorkspaceData(): Pick<
@@ -22,6 +28,8 @@ export function useWorkspaceData(): Pick<
     redirectToOnboarding: false,
     redirectToProjectOnboarding: false,
   });
+  const session = useRequiredSession();
+  const meUserId = session.data?.user?.id;
 
   return useMemo(() => {
     const personal = {
@@ -31,9 +39,12 @@ export function useWorkspaceData(): Pick<
       subtitle: "Personal usage, personal budget",
     };
 
+    const isVisibleTeam = (team: { isPersonal?: boolean; ownerUserId?: string | null }) =>
+      !(team.isPersonal && team.ownerUserId && team.ownerUserId !== meUserId);
+
     const teams = (organizations ?? [])
       .flatMap((org) =>
-        (org.teams ?? []).map((team) => ({
+        (org.teams ?? []).filter(isVisibleTeam).map((team) => ({
           kind: "team" as const,
           teamId: team.id,
           teamSlug: team.slug,
@@ -41,14 +52,13 @@ export function useWorkspaceData(): Pick<
           orgName: org.name,
           href: `/settings/teams/${team.slug}`,
           label: team.name,
-          subtitle: "Team I'm part of",
         })),
       )
       .sort((a, b) => a.label.localeCompare(b.label));
 
     const projects = (organizations ?? [])
       .flatMap((org) =>
-        (org.teams ?? []).flatMap((team) =>
+        (org.teams ?? []).filter(isVisibleTeam).flatMap((team) =>
           (team.projects ?? []).map((project) => ({
             kind: "project" as const,
             projectId: project.id,
@@ -58,12 +68,11 @@ export function useWorkspaceData(): Pick<
             orgName: org.name,
             href: `/${project.slug}`,
             label: project.name,
-            subtitle: team.name,
           })),
         ),
       )
       .sort((a, b) => a.label.localeCompare(b.label));
 
     return { personal, teams, projects };
-  }, [organizations]);
+  }, [organizations, meUserId]);
 }

@@ -20,7 +20,7 @@ import { useWorkspaceCurrent } from "./useWorkspaceCurrent";
 // caller source from anywhere — the Sergey tRPC `user.personalContext` once
 // it lands, or the existing `useOrganizationTeamProject` shaped to fit.
 export type WorkspaceSwitcherEntry =
-  | { kind: "personal"; href: string; label: string; subtitle: string }
+  | { kind: "personal"; href: string; label: string; subtitle?: string }
   | {
       kind: "team";
       teamId: string;
@@ -29,7 +29,7 @@ export type WorkspaceSwitcherEntry =
       orgName: string;
       href: string;
       label: string;
-      subtitle: string;
+      subtitle?: string;
     }
   | {
       kind: "project";
@@ -46,7 +46,7 @@ export type WorkspaceSwitcherEntry =
       orgName: string;
       href: string;
       label: string;
-      subtitle: string;
+      subtitle?: string;
     };
 
 export type WorkspaceSwitcherCurrent =
@@ -386,9 +386,11 @@ function SwitcherItem({
                 </Box>
               )}
             </HStack>
-            <Text fontSize="xs" color="fg.muted" truncate>
-              {entry.subtitle}
-            </Text>
+            {entry.subtitle && (
+              <Text fontSize="xs" color="fg.muted" truncate>
+                {entry.subtitle}
+              </Text>
+            )}
           </VStack>
         </HStack>
       </Link>
