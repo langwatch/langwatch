@@ -308,13 +308,16 @@ boxd_wake_if_suspended() {
 # ---------------------------------------------------------------------------
 
 # Internal: the shared fork primitive (AC#10).
-# Args: SOURCE INPUT BRANCH [START_TMUX]
+# Args: SOURCE VM_INPUT USER_ARG BRANCH [START_TMUX]
 #   SOURCE     pr | branch | issue
-#   INPUT      arg the user passed (PR number / branch / issue number)
+#   VM_INPUT   value passed to boxd_vm_name (PR's branch, branch name, or issue number)
+#   USER_ARG   value the user originally typed — used to echo back the right
+#              connect command. fork-pr: PR number, fork-branch: branch,
+#              fork-issue: issue number.
 #   BRANCH     the actual git branch to check out inside the fork
 #   START_TMUX 1 to start a Claude tmux session (fork-issue), 0 otherwise
 _boxd_fork_impl() {
-  local source="$1" input="$2" branch="$3" start_tmux="${4:-0}"
+  local source="$1" input="$2" user_arg="$3" branch="$4" start_tmux="${5:-0}"
   local vm tmux
   vm=$(boxd_vm_name "$source" "$input")
   tmux=$(boxd_tmux_name "$source" "$input")
@@ -356,7 +359,7 @@ EOF
   fi
 
   printf 'Done. Connect with:\n  make boxd-connect-%s %s=%s\n' \
-    "${source}" "$(_boxd_arg_for_source "$source")" "$input" >&2
+    "${source}" "$(_boxd_arg_for_source "$source")" "$user_arg" >&2
 }
 
 # Helper: print the variable name expected by the connect target for a source.
@@ -381,7 +384,7 @@ boxd_fork_pr() {
   local slug
   slug=$(boxd_slug "$branch")
   boxd_branch_issue_collision_warning "$slug"
-  _boxd_fork_impl pr "$branch" "$branch" 0
+  _boxd_fork_impl pr "$branch" "$pr" "$branch" 0
 }
 
 # boxd_fork_branch BRANCH — fork for a branch that doesn't (yet) have a PR.
@@ -391,7 +394,7 @@ boxd_fork_branch() {
   local slug
   slug=$(boxd_slug "$branch")
   boxd_branch_issue_collision_warning "$slug"
-  _boxd_fork_impl branch "$branch" "$branch" 0
+  _boxd_fork_impl branch "$branch" "$branch" "$branch" 0
 }
 
 # boxd_fork_issue ISSUE — fork for an issue without a PR yet. Creates the
@@ -429,7 +432,7 @@ boxd_fork_issue() {
     fi
   fi
 
-  _boxd_fork_impl issue "$issue" "$branch" 1
+  _boxd_fork_impl issue "$issue" "$issue" "$branch" 1
 }
 
 # boxd_golden — build the golden VM. If it already exists, this is a no-op
