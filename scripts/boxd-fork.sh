@@ -198,11 +198,14 @@ BOXD_FORK_REPO="${BOXD_FORK_REPO:-langwatch/langwatch}"
 BOXD_CLAUDE_CREDS="${CLAUDE_CREDS:-$HOME/.claude/.credentials.json}"
 
 # boxd_vm_exists VM — true if a VM with that name exists.
+# Uses the same spacing-tolerant regex as boxd_vm_status so both functions
+# parse `boxd list --json` output consistently regardless of whether the
+# CLI compacts or pretty-prints the response.
 boxd_vm_exists() {
   local vm="${1-}"
   [ -n "$vm" ] || return 1
   "$BOXD_BIN" list --json 2>/dev/null \
-    | grep -Fq "\"name\":\"$vm\"" \
+    | grep -qE "\"name\"[[:space:]]*:[[:space:]]*\"$vm\"" \
     || return 1
 }
 
@@ -350,17 +353,24 @@ EOF
   # AC#16: for fork-pr, prefer `gh pr checkout` — it handles PRs from
   # forked repos by adding the contributor's remote automatically.
   # For branch/issue, fall back to fetch-then-checkout against origin.
+  # Fails closed: a partial fork (envs + proxies wired against the wrong
+  # branch) is worse than a hard error.
   if [ -n "$pr" ]; then
     if ! "$BOXD_BIN" exec "$vm" -- "cd langwatch && gh pr checkout '$pr' --force 2>&1" >/dev/null; then
       cat <<EOF >&2
-WARNING: 'gh pr checkout $pr' failed inside $vm. If the PR is from a fork
-         repo, the in-VM gh may not have access to it. Connect and inspect:
-           boxd connect $vm
-           cd langwatch && gh auth status && gh pr checkout $pr
+ERROR: 'gh pr checkout $pr' failed inside $vm. If the PR is from a fork
+       repo, the in-VM gh may not have access to it. Inspect with:
+         boxd connect $vm
+         cd langwatch && gh auth status && gh pr checkout $pr
+       Aborting before envs / proxies are wired against the wrong branch.
 EOF
+      return 1
     fi
   else
-    "$BOXD_BIN" exec "$vm" -- "cd langwatch && git fetch origin && git checkout '$branch' 2>/dev/null || git checkout -b '$branch' 'origin/$branch' 2>/dev/null || git checkout 'origin/$branch'" >/dev/null
+    if ! "$BOXD_BIN" exec "$vm" -- "cd langwatch && git fetch origin && git checkout '$branch' 2>/dev/null || git checkout -b '$branch' 'origin/$branch' 2>/dev/null || git checkout 'origin/$branch'" >/dev/null; then
+      echo "ERROR: failed to check out '$branch' inside $vm." >&2
+      return 1
+    fi
   fi
 
   boxd_upload_creds "$vm"
@@ -369,10 +379,13 @@ EOF
 
   if [ "$start_tmux" = "1" ]; then
     # AC#12: tmux + Claude session inside the VM, named claude-<slug>/issue<N>.
-    "$BOXD_BIN" exec "$vm" -- \
-      "tmux new-session -d -s '$tmux' 'cd langwatch && claude --dangerously-skip-permissions'" \
-      >/dev/null 2>&1 || true
-    printf '  started tmux session %s on %s\n' "$tmux" "$vm" >&2
+    if "$BOXD_BIN" exec "$vm" -- \
+        "tmux new-session -d -s '$tmux' 'cd langwatch && claude --dangerously-skip-permissions'" \
+        >/dev/null 2>&1; then
+      printf '  started tmux session %s on %s\n' "$tmux" "$vm" >&2
+    else
+      printf '  WARNING: failed to start tmux session %s on %s — start it manually after `boxd connect %s`\n' "$tmux" "$vm" "$vm" >&2
+    fi
   fi
 
   printf 'Done. Connect with:\n  make boxd-connect-%s %s=%s\n' \
@@ -398,6 +411,12 @@ boxd_fork_pr() {
     echo "ERROR: could not resolve PR #$pr via gh." >&2
     return 1
   }
+  # gh can return exit 0 with empty output on permissions edge cases —
+  # guard so we don't synthesize a degenerate VM name like `langwatch-`.
+  if [ -z "$branch" ]; then
+    echo "ERROR: gh returned an empty headRefName for PR #$pr." >&2
+    return 1
+  fi
   local slug
   slug=$(boxd_slug "$branch")
   boxd_branch_issue_collision_warning "$slug"
@@ -466,13 +485,18 @@ EOF
     return 0
   fi
   printf 'Creating golden VM %s\n' "$vm" >&2
-  "$BOXD_BIN" new --name="$vm" >/dev/null
+  if ! "$BOXD_BIN" new --name="$vm" >/dev/null; then
+    echo "ERROR: 'boxd new --name=$vm' failed." >&2
+    return 1
+  fi
   # Provision: install Node 20 from NodeSource (apt's `nodejs` ships Node
   # 12.x on Ubuntu 22.04 — older than corepack's 16.9.0 minimum, which
   # would silently abort the rest of the recipe under `set -e`). Then
-  # clone repo and install deps. Errors surface (no outer `>/dev/null`).
-  "$BOXD_BIN" exec "$vm" -- "
-    set -e
+  # clone repo and install deps. The `set -e` is INSIDE the remote shell
+  # only; we additionally check the host-side `boxd exec` exit code so
+  # provisioning failures don't slip past the success printf.
+  if ! "$BOXD_BIN" exec "$vm" -- "
+    set -euo pipefail
     if ! command -v node >/dev/null 2>&1 \\
        || [ \"\$(node --version 2>/dev/null | cut -d. -f1 | tr -d v)\" -lt 18 ]; then
       curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
@@ -482,7 +506,10 @@ EOF
       git clone https://github.com/$BOXD_FORK_REPO.git langwatch
     fi
     cd langwatch && corepack enable && pnpm -w install
-  "
+  "; then
+    echo "ERROR: provisioning $vm failed. Inspect with 'boxd connect $vm'." >&2
+    return 1
+  fi
   # Hook for seed-golden (AC#7): callable target the make file overrides.
   printf 'Done. Override the seed step by defining a seed-golden target.\n' >&2
 }
