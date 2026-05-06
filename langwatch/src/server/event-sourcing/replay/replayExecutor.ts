@@ -29,14 +29,25 @@ export class FoldAccumulator {
   private keyTenantIds = new Map<string, string>();
   private touchedKeys = new Set<string>();
   private _processed = 0;
+  private readonly eventTypeSet: Set<string>;
 
-  constructor(private readonly projection: FoldProjectionDefinition<any, any>) {}
+  constructor(private readonly projection: FoldProjectionDefinition<any, any>) {
+    this.eventTypeSet = new Set(projection.eventTypes);
+  }
 
   get processed(): number {
     return this._processed;
   }
 
   apply(event: ReplayEvent): void {
+    // Optimized replay loads events for the union of all projections' event
+    // types per aggregate (one CH query, no eventTypes filter), so each
+    // accumulator must drop events its projection doesn't accept. Without
+    // this guard, a fold projection co-discovered with another projection
+    // through a different event type would be fed events of types it never
+    // declared and `apply()` would corrupt or crash.
+    if (!this.eventTypeSet.has(event.type)) return;
+
     const projectionKey = this.projection.key?.(event) ?? event.aggregateId;
     const scopedKey = tenantScopedKey(event.tenantId, projectionKey);
 
@@ -99,15 +110,22 @@ export class FoldAccumulator {
  * Accumulates map projection records as events are fed in one at a time.
  *
  * Unlike FoldAccumulator (which merges state per aggregate), MapAccumulator
- * buffers one output record per event. Records are grouped by tenantId and
- * flushed in bulk via `store.bulkAppend()` (or sequential `store.append()`
- * as fallback).
+ * buffers one output record per event along with the originating event's
+ * `ProjectionStoreContext`. Records are grouped by tenantId and flushed in
+ * bulk via `store.bulkAppend()` (or sequential `store.append()` as fallback);
+ * the per-event context is preserved on the fallback path so stores keying
+ * off `context.aggregateId` behave the same as the non-optimized replay.
  *
  * Memory is bounded by the number of events in a single aggregate batch
  * that match this projection's eventTypes.
  */
+interface BufferedMapRecord {
+  record: any;
+  context: ProjectionStoreContext;
+}
+
 export class MapAccumulator {
-  private byTenant = new Map<string, any[]>();
+  private byTenant = new Map<string, BufferedMapRecord[]>();
   private _processed = 0;
   private readonly eventTypeSet: Set<string>;
 
@@ -125,12 +143,17 @@ export class MapAccumulator {
     const record = this.projection.map(event as any);
     if (record === null) return;
 
+    const context: ProjectionStoreContext = {
+      aggregateId: event.aggregateId,
+      tenantId: event.tenantId as unknown as TenantId,
+    };
+
     let list = this.byTenant.get(event.tenantId);
     if (!list) {
       list = [];
       this.byTenant.set(event.tenantId, list);
     }
-    list.push(record);
+    list.push({ record, context });
     this._processed++;
   }
 
@@ -139,20 +162,23 @@ export class MapAccumulator {
 
     const store = this.projection.store;
 
-    for (const [tenantId, records] of this.byTenant) {
-      const context: ProjectionStoreContext = {
-        aggregateId: "",
-        tenantId: tenantId as unknown as TenantId,
-      };
-
+    for (const [tenantId, entries] of this.byTenant) {
       if (store.bulkAppend) {
-        for (let i = 0; i < records.length; i += writeBatchSize) {
-          const chunk = records.slice(i, i + writeBatchSize);
-          await store.bulkAppend(chunk, context);
+        // bulkAppend takes one context per chunk — use a tenant-scoped one;
+        // individual records carry their aggregateId on the record itself.
+        const bulkContext: ProjectionStoreContext = {
+          aggregateId: "",
+          tenantId: tenantId as unknown as TenantId,
+        };
+        for (let i = 0; i < entries.length; i += writeBatchSize) {
+          const chunk = entries.slice(i, i + writeBatchSize).map((e) => e.record);
+          await store.bulkAppend(chunk, bulkContext);
         }
       } else {
-        for (const record of records) {
-          await store.append(record, context);
+        // Sequential fallback: pass each record's original per-event context
+        // so stores that key off `context.aggregateId` get the real value.
+        for (const entry of entries) {
+          await store.append(entry.record, entry.context);
         }
       }
     }

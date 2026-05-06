@@ -1,7 +1,5 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import type IORedis from "ioredis";
-import type { TenantId } from "../domain/tenantId";
-import type { ProjectionStoreContext } from "../projections/projectionStoreContext";
 import type {
   RegisteredFoldProjection,
   RegisteredMapProjection,
@@ -361,8 +359,7 @@ export class ReplayService {
 
           await unpauseProjection({
             redis,
-            pipelineName: projection.pipelineName,
-            projectionName: projection.projectionName,
+            pauseKey: projection.pauseKey,
           }).catch(() => {});
 
           return {
@@ -422,12 +419,12 @@ export class ReplayService {
 
     // 2. PAUSE
     onBatchPhase("pause");
-    await pauseProjection({ redis, pipelineName: projection.pipelineName, projectionName });
+    await pauseProjection({ redis, pauseKey: projection.pauseKey });
 
     // 3. DRAIN
     onBatchPhase("drain");
     const drainStart = Date.now();
-    await waitForActiveJobs({ redis, aggregates: batch, projectionName });
+    await waitForActiveJobs({ redis, aggregates: batch, projectionName, kind: "fold" });
     log.write({ step: "drain-batch", tenant: tenantId, count: batch.length, durationMs: Date.now() - drainStart });
 
     // 4. CUTOFF
@@ -457,7 +454,7 @@ export class ReplayService {
 
     if (withCutoffKeys.length === 0) {
       onBatchPhase("unmark");
-      await unpauseProjection({ redis, pipelineName: projection.pipelineName, projectionName });
+      await unpauseProjection({ redis, pauseKey: projection.pauseKey });
       return { eventsReplayed: 0 };
     }
 
@@ -524,7 +521,7 @@ export class ReplayService {
     // 7. UNMARK + UNPAUSE
     onBatchPhase("unmark", totalBatchEvents);
     await unmarkBatch({ redis, projectionName, aggKeys: withCutoffKeys });
-    await unpauseProjection({ redis, pipelineName: projection.pipelineName, projectionName });
+    await unpauseProjection({ redis, pauseKey: projection.pauseKey });
     log.write({ step: "unmark-batch", tenant: tenantId, count: withCutoffKeys.length });
 
     return { eventsReplayed: totalBatchEvents };
@@ -700,8 +697,7 @@ export class ReplayService {
 
           await unpauseProjection({
             redis,
-            pipelineName: projection.pipelineName,
-            projectionName: projection.projectionName,
+            pauseKey: projection.pauseKey,
           }).catch(() => {});
 
           return {
@@ -762,12 +758,12 @@ export class ReplayService {
 
     // 2. PAUSE
     onBatchPhase("pause");
-    await pauseProjection({ redis, pipelineName: projection.pipelineName, projectionName });
+    await pauseProjection({ redis, pauseKey: projection.pauseKey });
 
     // 3. DRAIN
     onBatchPhase("drain");
     const drainStart = Date.now();
-    await waitForActiveJobs({ redis, aggregates: batch, projectionName });
+    await waitForActiveJobs({ redis, aggregates: batch, projectionName, kind: "map" });
     log.write({ step: "drain-batch", tenant: tenantId, count: batch.length, durationMs: Date.now() - drainStart, kind: "map" });
 
     // 4. CUTOFF
@@ -797,13 +793,16 @@ export class ReplayService {
 
     if (withCutoffKeys.length === 0) {
       onBatchPhase("unmark");
-      await unpauseProjection({ redis, pipelineName: projection.pipelineName, projectionName });
+      await unpauseProjection({ redis, pauseKey: projection.pauseKey });
       return { eventsReplayed: 0 };
     }
 
     await markCutoffBatch({ redis, projectionName, cutoffs });
 
-    // 5. REPLAY — per-event map + append. No accumulator; no separate WRITE.
+    // 5. REPLAY — buffer through MapAccumulator so the WRITE phase can flush
+    //    via `store.bulkAppend` instead of awaiting one INSERT per event.
+    //    For ClickHouse-backed AppendStores this turns N round-trips into
+    //    a small number of chunked bulk inserts.
     onBatchPhase("replay", 0);
     const maxCutoffEventId = [...cutoffs.values()]
       .map((c) => c.eventId)
@@ -812,6 +811,7 @@ export class ReplayService {
       .filter((a) => cutoffs.has(aggregateKey(a)))
       .map((a) => a.aggregateId);
 
+    const accumulator = new MapAccumulator(projection.definition);
     let cursorEventId = "";
     let eventsProcessed = 0;
     const replayStart = Date.now();
@@ -837,16 +837,7 @@ export class ReplayService {
         });
         const cutoff = cutoffs.get(key);
         if (cutoff != null && isAtOrBeforeCutoff(e.timestamp, e.id, cutoff.timestamp, cutoff.eventId)) {
-          // `projection.map` is typed on the domain `Event`; ReplayEvent is the
-          // CH-row shape that satisfies the same structural contract.
-          const record = projection.definition.map(e as unknown as Parameters<typeof projection.definition.map>[0]);
-          if (record !== null) {
-            const storeContext: ProjectionStoreContext = {
-              aggregateId: e.aggregateId,
-              tenantId: e.tenantId as unknown as TenantId,
-            };
-            await projection.definition.store.append(record, storeContext);
-          }
+          accumulator.apply(e);
           eventsProcessed++;
           onBatchPhase("replay", eventsProcessed);
         }
@@ -866,11 +857,15 @@ export class ReplayService {
       kind: "map",
     });
 
-    // 6. WRITE is implicit (already appended); skip directly to UNMARK.
+    // 6. WRITE — flush accumulated records via bulkAppend (or sequential
+    //    append fallback, which carries each record's per-event context).
+    onBatchPhase("write", eventsProcessed);
+    await accumulator.flush();
+
     // 7. UNMARK + UNPAUSE
     onBatchPhase("unmark", eventsProcessed);
     await unmarkBatch({ redis, projectionName, aggKeys: withCutoffKeys });
-    await unpauseProjection({ redis, pipelineName: projection.pipelineName, projectionName });
+    await unpauseProjection({ redis, pauseKey: projection.pauseKey });
     log.write({ step: "unmark-batch", tenant: tenantId, count: withCutoffKeys.length, kind: "map" });
 
     return { eventsReplayed: eventsProcessed };
@@ -1003,8 +998,7 @@ export class ReplayService {
     for (const p of allProjectionsToPause) {
       await pauseProjection({
         redis: this.deps.redis,
-        pipelineName: p.pipelineName,
-        projectionName: p.projectionName,
+        pauseKey: p.pauseKey,
       });
     }
     log.write({ step: "pause-all", projections: allProjectionsToPause.map((p) => p.projectionName) });
@@ -1022,7 +1016,10 @@ export class ReplayService {
       await waitForAllActiveJobs({
         redis: this.deps.redis,
         aggregates: allDiscoveredAggregates,
-        projections: allProjectionsToPause,
+        projections: allProjectionsToPause.map((p) => ({
+          projectionName: p.projectionName,
+          kind: p.kind,
+        })),
       });
       log.write({ step: "drain-all", aggregateCount: allDiscoveredAggregates.length });
 
@@ -1118,8 +1115,7 @@ export class ReplayService {
       for (const p of allProjectionsToPause) {
         await unpauseProjection({
           redis: this.deps.redis,
-          pipelineName: p.pipelineName,
-          projectionName: p.projectionName,
+          pauseKey: p.pauseKey,
         }).catch(() => {});
       }
       log.write({ step: "unpause-all", projections: allProjectionsToPause.map((p) => p.projectionName) });

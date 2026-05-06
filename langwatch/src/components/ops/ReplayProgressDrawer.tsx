@@ -178,7 +178,7 @@ export function ReplayProgressDrawer({
                 <Stat.Root>
                   <Stat.Label>Elapsed</Stat.Label>
                   <Stat.ValueText textStyle="lg">
-                    {status.startedAt ? formatDuration(status.startedAt) : "—"}
+                    {status.startedAt ? formatDuration(status.startedAt, status.completedAt) : "—"}
                   </Stat.ValueText>
                 </Stat.Root>
               </HStack>

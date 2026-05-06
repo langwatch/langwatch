@@ -12,18 +12,23 @@ export interface ClickHouseEventRow {
   EventVersion?: string;
   EventPayload: string;
   ProcessingTraceparent?: string;
+  IdempotencyKey?: string;
 }
 
-/** Simplified event type matching what fold projections consume. */
+/** Simplified event type matching what fold and map projections consume. */
 export interface ReplayEvent {
   id: string;
   aggregateId: string;
   aggregateType: string;
   tenantId: string;
+  /** Alias of `timestamp`; matches the canonical domain `Event.createdAt`. */
+  createdAt: number;
+  /** Retained for backwards-compat with replay-internal call sites. */
   timestamp: number;
   occurredAt: number;
   type: string;
   version: string;
+  idempotencyKey: string;
   data: unknown;
   metadata?: { processingTraceparent?: string };
 }
@@ -51,10 +56,12 @@ function rowToEvent(row: ClickHouseEventRow): ReplayEvent {
     aggregateId: row.AggregateId,
     aggregateType: row.AggregateType,
     tenantId: row.TenantId,
+    createdAt: row.EventTimestamp,
     timestamp: row.EventTimestamp,
     occurredAt,
     type: row.EventType,
     version: row.EventVersion ?? "2025-01-01",
+    idempotencyKey: row.IdempotencyKey ?? row.EventId,
     data,
     metadata: row.ProcessingTraceparent
       ? { processingTraceparent: row.ProcessingTraceparent }
@@ -214,7 +221,8 @@ export async function loadEventsForAggregatesBulk({
   const result = await client.query({
     query: `
       SELECT EventId, EventTimestamp, EventOccurredAt, EventType, EventPayload,
-             EventVersion, TenantId, AggregateType, AggregateId, ProcessingTraceparent
+             EventVersion, TenantId, AggregateType, AggregateId, ProcessingTraceparent,
+             IdempotencyKey
       FROM event_log
       WHERE TenantId = {tenantId:String}
         AND AggregateId IN ({aggregateIds:Array(String)})

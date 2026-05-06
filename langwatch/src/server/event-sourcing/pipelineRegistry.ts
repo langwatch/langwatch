@@ -719,7 +719,9 @@ export function getProjectionMetadata(): ProjectionMetadata[] {
       pipelineName,
       aggregateType,
       source: "pipeline" as const,
-      pauseKey: `${pipelineName}/projection/${definition.name}`,
+      // Maps run as `__jobType=handler` in the GroupQueue, so the pause-set
+      // entry must use the `handler` segment to match the dispatcher's Lua check.
+      pauseKey: `${pipelineName}/handler/${definition.name}`,
       kind: "map" as const,
     }));
     return [...folds, ...maps];
