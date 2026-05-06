@@ -1626,6 +1626,45 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
     })
   );
 
+  server.tool(
+    "platform_evaluation_results",
+    "Fetch per-row results for a completed evaluation run so you can debug evaluator scores and missed rows. Returns a markdown report: per-evaluator averages plus row-by-row scores and failure details. Output is capped at 50 rows by default to protect the agent's context window — narrow with `filter: 'failed'` or `evaluator` to see what matters, or raise `limit` if you really need more.",
+    {
+      runId: z
+        .string()
+        .describe("The run ID returned from platform_run_evaluation"),
+      filter: z
+        .enum(["all", "failed"])
+        .optional()
+        .describe(
+          "Filter rows: 'failed' shows only rows that errored or failed an evaluation; 'all' (default) shows everything",
+        ),
+      evaluator: z
+        .string()
+        .optional()
+        .describe("Show only this evaluator's results (matched on `evaluator` field)"),
+      limit: z
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe(
+          "Maximum number of rows to include in the markdown output (default 50). Higher values cost context window.",
+        ),
+    },
+    withToolLogging("platform_evaluation_results", async (params) => {
+      requireApiKey();
+      const { handleEvaluationResults } = await import(
+        "./tools/get-evaluation-results.js"
+      );
+      return {
+        content: [
+          { type: "text", text: await handleEvaluationResults(params) },
+        ],
+      };
+    })
+  );
+
   // --- Platform Dataset Tools (require API key) ---
   // These tools manage datasets on the LangWatch platform via API.
 
