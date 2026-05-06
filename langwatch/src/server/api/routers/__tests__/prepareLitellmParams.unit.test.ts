@@ -58,6 +58,48 @@ describe("prepareLitellmParams", () => {
     });
   });
 
+  describe("when the model is an Anthropic Claude version with dots", () => {
+    /** @scenario "prepareLitellmParams translates Anthropic model ID" */
+    it("translates anthropic/claude-opus-4.5 to anthropic/claude-opus-4-5 in params.model", async () => {
+      const baseAnthropicProvider = {
+        provider: "anthropic" as const,
+        enabled: true,
+        customKeys: { ANTHROPIC_API_KEY: "sk-ant-test" },
+        extraHeaders: null,
+        deploymentMapping: null,
+      };
+
+      const params = await prepareLitellmParams({
+        model: "anthropic/claude-opus-4.5",
+        modelProvider: baseAnthropicProvider,
+        projectId: "project-123",
+      });
+
+      expect(params.model).toBe("anthropic/claude-opus-4-5");
+    });
+  });
+
+  describe("when the model is an OpenAI model", () => {
+    /** @scenario "prepareLitellmParams preserves OpenAI model ID" */
+    it("preserves openai/gpt-5 unchanged in params.model", async () => {
+      const baseOpenAIProvider = {
+        provider: "openai" as const,
+        enabled: true,
+        customKeys: { OPENAI_API_KEY: "sk-openai-test" },
+        extraHeaders: null,
+        deploymentMapping: null,
+      };
+
+      const params = await prepareLitellmParams({
+        model: "openai/gpt-5",
+        modelProvider: baseOpenAIProvider,
+        projectId: "project-123",
+      });
+
+      expect(params.model).toBe("openai/gpt-5");
+    });
+  });
+
   describe("when provider is azure", () => {
     it("preserves azure deployment model ID in params.model", async () => {
       const params = await prepareLitellmParams({

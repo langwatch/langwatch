@@ -16,7 +16,6 @@ Feature: BetterAuth config (unmounted)
   # Provider selection via NEXTAUTH_PROVIDER env
   # ============================================================================
 
-  @unimplemented
   Scenario: Credentials-only on-prem mode
     Given NEXTAUTH_PROVIDER is "email"
     And AUTH0_* envs are not set
@@ -75,7 +74,6 @@ Feature: BetterAuth config (unmounted)
   # signIn guards (ported from NextAuth signIn callback)
   # ============================================================================
 
-  @unimplemented
   Scenario: Deactivated user is blocked
     Given a user exists with deactivatedAt set to yesterday
     When that user signs in via any provider
@@ -87,7 +85,6 @@ Feature: BetterAuth config (unmounted)
     When an OAuth callback returns a profile with email "b@example.com"
     Then the signin is rejected with a DIFFERENT_EMAIL_NOT_ALLOWED error
 
-  @unimplemented
   Scenario: New user with matching SSO domain joins the SSO org
     Given an organization with ssoDomain "acme.com" exists
     And no user exists with email "new@acme.com"
@@ -96,7 +93,6 @@ Feature: BetterAuth config (unmounted)
     And the user is added to the organization as a MEMBER
     And an Account row is created for the OAuth account
 
-  @unimplemented
   Scenario: Existing user with correct SSO provider auto-links
     Given an organization with ssoDomain "acme.com" and ssoProvider "google" exists
     And a user exists with email "existing@acme.com" and pendingSsoSetup=false
@@ -104,7 +100,6 @@ Feature: BetterAuth config (unmounted)
     Then the Account row is upserted
     And pendingSsoSetup remains false
 
-  @unimplemented
   Scenario: Existing user with wrong SSO provider gets pending flag
     Given an organization with ssoDomain "acme.com" and ssoProvider "okta" exists
     And a user exists with email "existing@acme.com" and pendingSsoSetup=false

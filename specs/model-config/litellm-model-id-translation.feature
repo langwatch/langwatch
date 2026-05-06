@@ -47,14 +47,14 @@ Feature: LiteLLM Model ID Translation
 
   # Unit Tests: Boundary Integration
 
-  @unit @unimplemented
+  @unit
   Scenario: prepareLitellmParams translates Anthropic model ID
     Given a call to prepareLitellmParams with model "anthropic/claude-opus-4.5"
     And a valid Anthropic model provider
     When the function returns
     Then params.model should be "anthropic/claude-opus-4-5"
 
-  @unit @unimplemented
+  @unit
   Scenario: prepareLitellmParams preserves OpenAI model ID
     Given a call to prepareLitellmParams with model "openai/gpt-5"
     And a valid OpenAI model provider
