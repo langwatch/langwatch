@@ -78,6 +78,31 @@ if (!teamUser) {
   console.log("team membership already exists");
 }
 
+const roleBinding = await prisma.roleBinding.findFirst({
+  where: {
+    userId,
+    organizationId: ORG_ID,
+    role: "MEMBER",
+    scopeType: "ORGANIZATION",
+    scopeId: ORG_ID,
+    customRoleId: null,
+  },
+});
+if (!roleBinding) {
+  await prisma.roleBinding.create({
+    data: {
+      organizationId: ORG_ID,
+      userId,
+      role: "MEMBER",
+      scopeType: "ORGANIZATION",
+      scopeId: ORG_ID,
+    },
+  });
+  console.log("added MEMBER RoleBinding (org scope)");
+} else {
+  console.log("RoleBinding already exists");
+}
+
 console.log(`done — ${EMAIL} is now a member of ${TEAM_NAME}`);
 console.log(`fixture replay: principal lookup will resolve user.email → User.id=${userId}`);
 await prisma.$disconnect();
