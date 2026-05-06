@@ -18,13 +18,18 @@ If no feature file exists for your task, create one before writing code.
 From repo root (requires Docker):
 
 ```bash
-make dev              # Minimal: postgres + redis + app
-make dev-scenarios    # + workers (includes scenarios) + bullboard + ai-server + nlp
-make dev-full         # Everything including opensearch
-make quickstart       # Interactive profile chooser
-make down             # Stop all services
-make service svc=aigateway  # Start the Go AI Gateway data plane on :5563
+make quickstart            # Interactive launcher (single entry point)
+make quickstart-help       # Non-interactive mode reference (modes + service set)
+make down                  # Stop all services
+make service svc=aigateway # Start the Go AI Gateway data plane on :5563
+make help                  # Full target list including boxd workflows
 ```
+
+`make dev`, `make dev-nlp`, `make dev-scenarios`, `make dev-test`, `make dev-full`, `make dev-up`, `make dev-down`, and `make dev-logs` still work for one release with a deprecation warning — use `make quickstart` instead.
+
+Stateful services (`langwatch-db-data`, `langwatch-clickhouse-data`, `langwatch-redis-data`) share data across worktrees: sign up once, persist across worktree switches. Only one worktree can have postgres or clickhouse `up` at a time — `quickstart` detects collisions and points at the other compose project. Redis is a singleton on host `:6379`.
+
+For per-PR / per-issue cloud environments via boxd, see `dev/docs/boxd-makefile.md` and `make boxd-help`.
 
 See `dev/docs/adr/004-docker-dev-environment.md` for architecture decisions.
 
