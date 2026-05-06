@@ -39,8 +39,12 @@ export function useWorkspaceData(): Pick<
       subtitle: "Personal usage, personal budget",
     };
 
+    // Fail-closed: a personal team without ownerUserId set (data drift) is
+    // hidden from everyone except via the explicit caller-owns check below.
+    // Previous form short-circuited to "visible" on null ownerUserId, which
+    // would silently leak orphaned personal teams.
     const isVisibleTeam = (team: { isPersonal?: boolean; ownerUserId?: string | null }) =>
-      !(team.isPersonal && team.ownerUserId && team.ownerUserId !== meUserId);
+      !team.isPersonal || team.ownerUserId === meUserId;
 
     const teams = (organizations ?? [])
       .flatMap((org) =>
