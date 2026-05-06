@@ -366,9 +366,10 @@ export const organizationRouter = createTRPCRouter({
       }
 
       // PII guard for picker callers: when the caller doesn't have
-      // organization:manage, null out other members' emails. The
-      // caller's own email is preserved (a member can always see
-      // themselves). Name + id stay so picker UX still works.
+      // organization:manage, null out other members' emails AND
+      // strip their personal-workspace teamMemberships (existence of
+      // someone else's personal workspace is itself private). The
+      // caller's own email + own personal workspace stay visible.
       const callerHasManage = await hasOrganizationPermission(
         ctx,
         input.organizationId,
@@ -379,6 +380,16 @@ export const organizationRouter = createTRPCRouter({
         for (const m of organization.members ?? []) {
           if (m.user.id !== callerId) {
             m.user.email = null;
+          }
+          // Drop teamMembership rows that point at someone else's
+          // personal workspace. The caller's own personal workspace
+          // stays even when iterating someone else's memberships
+          // (it's their team too — they belong to it).
+          if (m.user.teamMemberships) {
+            m.user.teamMemberships = m.user.teamMemberships.filter((tm) => {
+              if (!tm.team.isPersonal) return true;
+              return tm.team.ownerUserId === callerId;
+            });
           }
         }
       }

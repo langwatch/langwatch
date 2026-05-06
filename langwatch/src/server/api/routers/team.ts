@@ -89,15 +89,33 @@ export const teamRouter = createTRPCRouter({
     // Stays at organization:view because non-admin callers
     // (AddAutomationDrawer, GroupBindingInputRow, project pickers,
     // onboarding) need to enumerate teams + their members. Member
-    // emails are PII and get redacted below for non-admin callers.
+    // emails are PII and get redacted below for non-admin callers,
+    // and other users' personal-workspace teams are filtered out
+    // entirely (their existence is itself private).
     .use(checkOrganizationPermission("organization:view"))
     .query(async ({ input, ctx }) => {
       const prisma = ctx.prisma;
+      const callerId = ctx.session.user.id;
+      const callerHasManage = await hasOrganizationPermission(
+        ctx,
+        input.organizationId,
+        "organization:manage",
+      );
 
       const teams = await prisma.team.findMany({
         where: {
           organizationId: input.organizationId,
           archivedAt: null,
+          // Privacy floor: a member never sees another user's personal
+          // workspace as a "team". Admins see everything.
+          ...(callerHasManage
+            ? {}
+            : {
+                OR: [
+                  { isPersonal: false },
+                  { isPersonal: true, ownerUserId: callerId },
+                ],
+              }),
         },
         include: {
           members: {
@@ -115,13 +133,7 @@ export const teamRouter = createTRPCRouter({
         },
       });
 
-      const callerHasManage = await hasOrganizationPermission(
-        ctx,
-        input.organizationId,
-        "organization:manage",
-      );
       if (!callerHasManage) {
-        const callerId = ctx.session.user.id;
         for (const team of teams) {
           for (const m of team.members ?? []) {
             if (m.user.id !== callerId) {
@@ -157,10 +169,18 @@ export const teamRouter = createTRPCRouter({
     .input(z.object({ slug: z.string(), organizationId: z.string() }))
     // Stays at organization:view for the same picker reasons as
     // getTeamsWithMembers (AddAutomationDrawer, AlertDrawer, etc.).
-    // Member emails are redacted below for non-admin callers.
+    // Member emails are redacted below for non-admin callers, and a
+    // non-admin lookup of someone else's personal workspace returns
+    // NOT_FOUND (existence itself is private).
     .use(checkOrganizationPermission("organization:view"))
     .query(async ({ input, ctx }) => {
       const prisma = ctx.prisma;
+      const callerId = ctx.session.user.id;
+      const callerHasManage = await hasOrganizationPermission(
+        ctx,
+        input.organizationId,
+        "organization:manage",
+      );
 
       const team = await prisma.team.findFirst({
         where: {
@@ -183,13 +203,14 @@ export const teamRouter = createTRPCRouter({
         throw new TRPCError({ code: "NOT_FOUND", message: "Team not found." });
       }
 
-      const callerHasManage = await hasOrganizationPermission(
-        ctx,
-        input.organizationId,
-        "organization:manage",
-      );
+      // Privacy floor: a non-admin probing for someone else's personal
+      // workspace by slug gets a NOT_FOUND, not a 200-with-team. We
+      // surface the same error a missing slug would for non-distinguishability.
+      if (!callerHasManage && team.isPersonal && team.ownerUserId !== callerId) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Team not found." });
+      }
+
       if (!callerHasManage) {
-        const callerId = ctx.session.user.id;
         for (const m of team.members ?? []) {
           if (m.user.id !== callerId) {
             m.user.email = null;
