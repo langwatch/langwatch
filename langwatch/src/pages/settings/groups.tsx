@@ -270,6 +270,6 @@ function GroupsSettings() {
   );
 }
 
-export default withPermissionGuard("organization:view", {
+export default withPermissionGuard("organization:manage", {
   layoutComponent: SettingsLayout,
 })(GroupsSettings);

@@ -702,6 +702,6 @@ function AuditLogPage() {
   );
 }
 
-export default withPermissionGuard("auditLog:view", {
+export default withPermissionGuard("organization:manage", {
   layoutComponent: SettingsLayout,
 })(AuditLogPage);
