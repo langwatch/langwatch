@@ -252,9 +252,8 @@ return cjson.encode({
  * ARGV[1]      = keyPrefix
  * ARGV[2]      = nowMs
  * ARGV[3]      = filtersJson  -- { pipelineName?, jobType?, tenantId?, state?, groupIdContains?, ageGtMs?, ageLtMs? }
- * ARGV[4]      = maxResults   -- cap matches returned per chunk to avoid oversized replies
- * ARGV[5]      = groupCount
- * ARGV[6..]    = groupIds
+ * ARGV[4]      = groupCount
+ * ARGV[5..]    = groupIds
  *
  * Returns cjson:
  * {
@@ -263,6 +262,11 @@ return cjson.encode({
  *   "truncated": bool,
  *   "scannedGroups": N
  * }
+ *
+ * The script returns every match in the chunk so the Node-side global sort
+ * (oldest/youngest/mostOverdue) sees a complete population. Truncation is
+ * only signalled when the caller ran out of group budget, never inside a
+ * chunk, otherwise sort order would silently drop legitimate rows.
  */
 const SEARCH_CHUNK_LUA = LUA_PROLOGUE + `
 local blockedKey = KEYS[1]
@@ -270,8 +274,7 @@ local blockedKey = KEYS[1]
 local keyPrefix  = ARGV[1]
 local nowMs      = tonumber(ARGV[2])
 local filtersJson = ARGV[3]
-local maxResults = tonumber(ARGV[4])
-local groupCount = tonumber(ARGV[5])
+local groupCount = tonumber(ARGV[4])
 
 local filters = {}
 if filtersJson and filtersJson ~= "" then
@@ -290,12 +293,7 @@ local truncated = false
 local scannedGroups = 0
 
 for gIdx = 1, groupCount do
-  if matchedCount >= maxResults * 4 then
-    truncated = true
-    break
-  end
-
-  local groupId = ARGV[5 + gIdx]
+  local groupId = ARGV[4 + gIdx]
   local skipGroup = groupIdNeedle ~= nil and string.find(string.lower(groupId), groupIdNeedle, 1, true) == nil
 
   if not skipGroup then
@@ -339,22 +337,18 @@ for gIdx = 1, groupCount do
 
         if keep then
           matchedCount = matchedCount + 1
-          if #matched < maxResults then
-            matched[#matched + 1] = {
-              jobId = jobId,
-              groupId = groupId,
-              score = score,
-              ageMs = nowMs - score,
-              pipelineName = pipelineName,
-              jobType = jobType,
-              jobName = jobName,
-              tenantId = tenantId,
-              state = state,
-              retryCount = parseRetryCount(jobId),
-            }
-          else
-            truncated = true
-          end
+          matched[#matched + 1] = {
+            jobId = jobId,
+            groupId = groupId,
+            score = score,
+            ageMs = nowMs - score,
+            pipelineName = pipelineName,
+            jobType = jobType,
+            jobName = jobName,
+            tenantId = tenantId,
+            state = state,
+            retryCount = parseRetryCount(jobId),
+          }
         end
       end
     elseif isBlocked and not hasActive and filters.state == "stale" then
@@ -370,22 +364,18 @@ for gIdx = 1, groupCount do
         if n then staleScore = n end
       end
       matchedCount = matchedCount + 1
-      if #matched < maxResults then
-        matched[#matched + 1] = {
-          jobId = "<stale-block>",
-          groupId = groupId,
-          score = staleScore,
-          ageMs = nowMs - staleScore,
-          pipelineName = "unknown",
-          jobType = "unknown",
-          jobName = "unknown",
-          tenantId = "unknown",
-          state = "stale",
-          retryCount = cjson.null,
-        }
-      else
-        truncated = true
-      end
+      matched[#matched + 1] = {
+        jobId = "<stale-block>",
+        groupId = groupId,
+        score = staleScore,
+        ageMs = nowMs - staleScore,
+        pipelineName = "unknown",
+        jobType = "unknown",
+        jobName = "unknown",
+        tenantId = "unknown",
+        state = "stale",
+        retryCount = cjson.null,
+      }
     end
   end
 end

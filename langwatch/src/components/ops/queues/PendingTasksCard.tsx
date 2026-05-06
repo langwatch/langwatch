@@ -185,7 +185,7 @@ function OverviewCard({
   const totals = overview?.totals;
   const computedMs = overview?.computedDurationMs ?? null;
   const ageMs = overview ? now - overview.generatedAtMs : null;
-  const freshness = freshnessFor(ageMs, isRefreshing);
+  const freshness = freshnessFor({ ageMs, isRefreshing });
 
   return (
     <Card.Root overflow="hidden">
@@ -333,10 +333,13 @@ function RateInline({
   );
 }
 
-function freshnessFor(
-  ageMs: number | null,
-  isRefreshing: boolean,
-): { label: string; color: string; variant: "subtle" | "outline" | "solid" } {
+function freshnessFor({
+  ageMs,
+  isRefreshing,
+}: {
+  ageMs: number | null;
+  isRefreshing: boolean;
+}): { label: string; color: string; variant: "subtle" | "outline" | "solid" } {
   if (isRefreshing) return { label: "Refreshing…", color: "gray", variant: "outline" };
   if (ageMs === null) return { label: "Refresh", color: "gray", variant: "outline" };
   const seconds = Math.floor(ageMs / 1000);

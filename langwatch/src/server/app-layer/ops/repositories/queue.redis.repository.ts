@@ -182,7 +182,6 @@ const AGGREGATOR_SLICE_N = 50;
 // RTT stalls and overlaps JSON parse with the next eval. 4 keeps us from
 // monopolising the connection pool while still hiding latency.
 const AGGREGATOR_CONCURRENCY = 4;
-const SEARCH_MAX_RESULTS_PER_CHUNK = 200;
 const SEARCH_TOTAL_GROUP_BUDGET = 50_000;
 
 
@@ -193,18 +192,22 @@ function stripHashTag(name: string): string {
   return name;
 }
 
-function chunkArray<T>(items: T[], size: number): T[][] {
+function chunkArray<T>({ items, size }: { items: T[]; size: number }): T[][] {
   if (size <= 0) return [items];
   const out: T[][] = [];
   for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
   return out;
 }
 
-async function runWithConcurrency<T>(
-  items: T[],
-  concurrency: number,
-  worker: (item: T) => Promise<void>,
-): Promise<void> {
+async function runWithConcurrency<T>({
+  items,
+  concurrency,
+  worker,
+}: {
+  items: T[];
+  concurrency: number;
+  worker: (item: T) => Promise<void>;
+}): Promise<void> {
   let cursor = 0;
   const runners = Array.from({ length: Math.min(concurrency, items.length) }, async () => {
     while (cursor < items.length) {
@@ -215,10 +218,13 @@ async function runWithConcurrency<T>(
   await Promise.all(runners);
 }
 
-function deriveJobDetailState(
-  parsed: { isActive: boolean; isBlocked: boolean; score: number | null },
-  jobId: string,
-): JobState {
+function deriveJobDetailState({
+  parsed,
+  jobId,
+}: {
+  parsed: { isActive: boolean; isBlocked: boolean; score: number | null };
+  jobId: string;
+}): JobState {
   if (parsed.isActive) return "active";
   if (parsed.isBlocked) return "blocked";
   if (parsed.score === null) return "blocked";
@@ -1648,20 +1654,24 @@ export class QueueRedisRepository implements QueueRepository {
       perTenantOverdue: new Map<string, PendingJobSummary>(),
     };
 
-    const chunks = chunkArray(allGroupIds, AGGREGATOR_GROUP_CHUNK);
-    await runWithConcurrency(chunks, AGGREGATOR_CONCURRENCY, async (chunk) => {
-      const raw = await this.redis.eval(
-        AGGREGATOR_SCRIPTS.OVERVIEW_CHUNK_LUA,
-        1,
-        blockedKey,
-        prefix,
-        String(Date.now()),
-        String(sliceN),
-        String(chunk.length),
-        ...chunk,
-      );
-      const parsed = JSON.parse(String(raw)) as ChunkOverviewResult;
-      mergeOverviewChunk(merged, parsed, sliceN);
+    const chunks = chunkArray({ items: allGroupIds, size: AGGREGATOR_GROUP_CHUNK });
+    await runWithConcurrency({
+      items: chunks,
+      concurrency: AGGREGATOR_CONCURRENCY,
+      worker: async (chunk) => {
+        const raw = await this.redis.eval(
+          AGGREGATOR_SCRIPTS.OVERVIEW_CHUNK_LUA,
+          1,
+          blockedKey,
+          prefix,
+          String(Date.now()),
+          String(sliceN),
+          String(chunk.length),
+          ...chunk,
+        );
+        const parsed = JSON.parse(String(raw)) as ChunkOverviewResult;
+        mergeOverviewChunk(merged, parsed, sliceN);
+      },
     });
 
     return finalizeOverview(merged, {
@@ -1694,28 +1704,31 @@ export class QueueRedisRepository implements QueueRepository {
     let scannedGroups = 0;
     let truncated = false;
 
-    const chunks = chunkArray(groupIds, AGGREGATOR_GROUP_CHUNK);
-    await runWithConcurrency(chunks, AGGREGATOR_CONCURRENCY, async (chunk) => {
-      const raw = await this.redis.eval(
-        AGGREGATOR_SCRIPTS.SEARCH_CHUNK_LUA,
-        1,
-        blockedKey,
-        prefix,
-        String(Date.now()),
-        filtersJson,
-        String(SEARCH_MAX_RESULTS_PER_CHUNK),
-        String(chunk.length),
-        ...chunk,
-      );
-      const parsed = JSON.parse(String(raw)) as ChunkSearchResult;
-      totalMatching += parsed.matchedCount ?? 0;
-      scannedGroups += parsed.scannedGroups ?? 0;
-      if (parsed.truncated) truncated = true;
-      // lua-cjson encodes an empty Lua table as `{}`, not `[]`; guard so
-      // a chunk that produced zero matches doesn't blow up the merge.
-      for (const match of asArray(parsed.matched)) {
-        collected.push(toSummary(match));
-      }
+    const chunks = chunkArray({ items: groupIds, size: AGGREGATOR_GROUP_CHUNK });
+    await runWithConcurrency({
+      items: chunks,
+      concurrency: AGGREGATOR_CONCURRENCY,
+      worker: async (chunk) => {
+        const raw = await this.redis.eval(
+          AGGREGATOR_SCRIPTS.SEARCH_CHUNK_LUA,
+          1,
+          blockedKey,
+          prefix,
+          String(Date.now()),
+          filtersJson,
+          String(chunk.length),
+          ...chunk,
+        );
+        const parsed = JSON.parse(String(raw)) as ChunkSearchResult;
+        totalMatching += parsed.matchedCount ?? 0;
+        scannedGroups += parsed.scannedGroups ?? 0;
+        if (parsed.truncated) truncated = true;
+        // lua-cjson encodes an empty Lua table as `{}`, not `[]`; guard so
+        // a chunk that produced zero matches doesn't blow up the merge.
+        for (const match of asArray(parsed.matched)) {
+          collected.push(toSummary(match));
+        }
+      },
     });
 
     if (groupIds.length < allGroupIds.length) truncated = true;
@@ -1771,7 +1784,7 @@ export class QueueRedisRepository implements QueueRepository {
       }
     }
 
-    const state = deriveJobDetailState(parsed, params.jobId);
+    const state = deriveJobDetailState({ parsed, jobId: params.jobId });
 
     return {
       jobId: params.jobId,
@@ -1806,20 +1819,35 @@ export class QueueRedisRepository implements QueueRepository {
     const blockedKey = `${prefix}blocked`;
     const seen = new Set<string>();
 
-    const readyMembers = await this.redis.zrange(readyKey, 0, -1);
-    for (const id of readyMembers) seen.add(id);
-
-    let cursor = "0";
+    // ZSCAN avoids materialising the entire ready zset in one Redis call —
+    // ZRANGE 0 -1 can spike memory and latency on large queues.
+    let readyCursor = "0";
     do {
-      const [next, members] = await this.redis.sscan(
-        blockedKey,
-        cursor,
+      const [next, entries] = await this.redis.zscan(
+        readyKey,
+        readyCursor,
         "COUNT",
         SSCAN_BATCH,
       );
-      cursor = next;
+      readyCursor = next;
+      // ZSCAN returns flat [member, score, member, score, ...]; pick members.
+      for (let i = 0; i < entries.length; i += 2) {
+        const member = entries[i];
+        if (typeof member === "string") seen.add(member);
+      }
+    } while (readyCursor !== "0");
+
+    let blockedCursor = "0";
+    do {
+      const [next, members] = await this.redis.sscan(
+        blockedKey,
+        blockedCursor,
+        "COUNT",
+        SSCAN_BATCH,
+      );
+      blockedCursor = next;
       for (const id of members) seen.add(id);
-    } while (cursor !== "0");
+    } while (blockedCursor !== "0");
 
     return Array.from(seen);
   }
