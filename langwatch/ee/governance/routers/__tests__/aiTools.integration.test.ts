@@ -333,6 +333,55 @@ describe("aiToolsRouter integration", () => {
         }),
       ).rejects.toMatchObject({ code: "BAD_REQUEST" });
     });
+
+    it("accepts namespaced iconAsset preset shapes (preset:<ns>:<kind>)", async () => {
+      // Drives B1.1 G2 — the internal-tool drawer's preset picker
+      // writes `preset:tool:<kind>`. The original single-colon regex
+      // rejected the nested-namespace shape, breaking every preset
+      // pick except the wrench fallback. Both flat and namespaced
+      // shapes must validate.
+      const flat = await callerFor(adminUserId).aiTools.create({
+        organizationId,
+        teamIds: [],
+        type: "coding_assistant",
+        displayName: `Flat preset ${nanoid(4)}`,
+        iconAsset: "preset:claude_code",
+        config: {
+          assistantKind: "claude_code",
+          setupCommand: "langwatch claude",
+        },
+      });
+      expect(flat.iconAsset).toBe("preset:claude_code");
+
+      const namespaced = await callerFor(adminUserId).aiTools.create({
+        organizationId,
+        teamIds: [],
+        type: "external_tool",
+        displayName: `Namespaced preset ${nanoid(4)}`,
+        iconAsset: "preset:tool:globe",
+        config: {
+          descriptionMarkdown: "x",
+          linkUrl: "https://example.com",
+        },
+      });
+      expect(namespaced.iconAsset).toBe("preset:tool:globe");
+    });
+
+    it("rejects iconAsset values that aren't preset or data URL", async () => {
+      await expect(
+        callerFor(adminUserId).aiTools.create({
+          organizationId,
+          teamIds: [],
+          type: "external_tool",
+          displayName: `Bad icon ${nanoid(4)}`,
+          iconAsset: "not-a-preset",
+          config: {
+            descriptionMarkdown: "x",
+            linkUrl: "https://example.com",
+          },
+        }),
+      ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    });
   });
 
   describe("importStarterPack", () => {

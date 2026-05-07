@@ -36,16 +36,27 @@ const typeSchema = z.enum(
 );
 
 /// Tightened from a free-string to a base64 data URL for uploaded
-/// icons or "preset:<kind>" for built-ins. Cap at ~256KB encoded
-/// (≈ 192KB binary) — large enough for an SVG / 256×256 PNG, small
-/// enough to keep the Postgres row footprint reasonable.
+/// icons or "preset:<kind>" / "preset:<namespace>:<kind>" for
+/// built-ins. The nested-namespace shape lets each tile type carve
+/// out its own preset registry without colliding (assistants ship
+/// brand SVGs at `preset:claude_code`; internal tools ship lucide
+/// icons at `preset:tool:globe`). Caught in B1.1 G2: the original
+/// single-colon regex rejected `preset:tool:globe` from the
+/// internal-tool drawer's preset picker.
+///
+/// Cap at ~256KB encoded (≈ 192KB binary) — large enough for an SVG
+/// / 256×256 PNG, small enough to keep the Postgres row footprint
+/// reasonable.
 const iconAssetSchema = z
   .string()
   .max(262_144)
-  .regex(/^(preset:[a-z0-9_]+|data:image\/(svg\+xml|png|jpeg|webp);base64,[A-Za-z0-9+/=]+)$/, {
-    message:
-      "iconAsset must be 'preset:<kind>' or a base64 data URL (svg, png, jpeg, webp)",
-  })
+  .regex(
+    /^(preset:[a-z0-9_]+(?::[a-z0-9_]+)?|data:image\/(svg\+xml|png|jpeg|webp);base64,[A-Za-z0-9+/=]+)$/,
+    {
+      message:
+        "iconAsset must be 'preset:<kind>', 'preset:<namespace>:<kind>', or a base64 data URL (svg, png, jpeg, webp)",
+    },
+  )
   .nullable()
   .optional();
 
