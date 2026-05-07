@@ -1,5 +1,5 @@
 import { Box, VStack } from "@chakra-ui/react";
-import { Gauge, KeyRound, Smartphone } from "lucide-react";
+import { Gauge, KeyRound, LogIn, Smartphone } from "lucide-react";
 import React, { useState } from "react";
 import { useRouter } from "~/utils/compat/next-router";
 
@@ -31,6 +31,7 @@ export const PersonalSidebar = React.memo(function PersonalSidebar({
   const isUsageActive = router.pathname === "/me";
   const isSettingsActive = router.pathname.startsWith("/me/settings");
   const isSessionsActive = router.pathname.startsWith("/me/sessions");
+  const isSignInActive = router.pathname.startsWith("/me/sign-in-methods");
 
   return (
     <Box
@@ -76,6 +77,13 @@ export const PersonalSidebar = React.memo(function PersonalSidebar({
               label="Sessions"
               href="/me/sessions"
               isActive={isSessionsActive}
+              showLabel={showExpanded}
+            />
+            <SideMenuLink
+              icon={LogIn}
+              label="Sign-in Methods"
+              href="/me/sign-in-methods"
+              isActive={isSignInActive}
               showLabel={showExpanded}
             />
             <SideMenuLink
