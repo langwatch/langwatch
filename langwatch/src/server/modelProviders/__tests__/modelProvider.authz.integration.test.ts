@@ -272,7 +272,7 @@ describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
       });
 
       describe("when the caller is only a team admin (not org admin)", () => {
-        /** @scenario Service rejects assigning an MP to an org the user is not a member of */
+        /** @scenario Assigning a provider to an org without manage permission is denied */
         it("rejects with FORBIDDEN and does not persist", async () => {
           const before = await prisma.modelProvider.count({
             where: { projectId: projectAId, provider: "anthropic" },
@@ -345,7 +345,7 @@ describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
       });
 
       describe("when the caller is team admin for a DIFFERENT team", () => {
-        /** @scenario Service rejects assigning an MP to a team the user cannot manage */
+        /** @scenario Assigning a provider to an unmanageable team is denied */
         it("rejects with FORBIDDEN", async () => {
           await expect(
             service().updateModelProvider(
@@ -369,7 +369,7 @@ describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
 
     describe("given a multi-scope write (ORG + TEAM)", () => {
       describe("when the caller can manage ONLY the team (not the org)", () => {
-        /** @scenario Service rejects updating scopes to add a team the user cannot manage */
+        /** @scenario Adding an unauthorized team scope to an existing provider is rejected */
         it("rejects the entire mutation with no partial persistence", async () => {
           const before = await prisma.modelProvider.count({
             where: { projectId: projectAId, provider: "deepseek" },
@@ -486,7 +486,7 @@ describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
 
     describe("given an ORG-scoped MP that the caller cannot see", () => {
       describe("when an unrelated user calls getById", () => {
-        /** @scenario getById rejects reading an MP outside the user's scope */
+        /** @scenario Reading a provider outside my access scope returns not found */
         it("surfaces NOT_FOUND to prevent id enumeration across tenants", async () => {
           const mp = await service().updateModelProvider(
             {

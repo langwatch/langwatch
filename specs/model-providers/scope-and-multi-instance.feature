@@ -268,7 +268,7 @@ Feature: Model Provider Scope and Multi-Instance
   #      every scope falls outside that set are never read.
 
   @integration @security
-  Scenario: Service rejects assigning an MP to an org the user is not a member of
+  Scenario: Assigning a provider to an org without manage permission is denied
     Given I am a member of org "acme" only
     And I tamper with a tRPC payload to set scopes to ORGANIZATION=beta
     When the request hits modelProviderRouter.create
@@ -278,7 +278,7 @@ Feature: Model Provider Scope and Multi-Instance
     And an audit log entry is written with outcome FAILED_AUTHZ
 
   @integration @security
-  Scenario: Service rejects assigning an MP to a team the user cannot manage
+  Scenario: Assigning a provider to an unmanageable team is denied
     Given I am a member of team "platform" in org "acme"
     And I have no manage permission on team "marketing" in the same org
     When I submit a create request with scopes = [TEAM=marketing]
@@ -286,7 +286,7 @@ Feature: Model Provider Scope and Multi-Instance
     And the row is not created
 
   @integration @security
-  Scenario: Service rejects updating scopes to add a team the user cannot manage
+  Scenario: Adding an unauthorized team scope to an existing provider is rejected
     Given I own an MP scoped to TEAM=platform
     When I submit an update that replaces scopes with [TEAM=platform, TEAM=marketing]
     And I cannot manage team "marketing"
@@ -305,7 +305,7 @@ Feature: Model Provider Scope and Multi-Instance
     # This protects enumeration: we don't want clients probing ids.
 
   @integration @security
-  Scenario: getById rejects reading an MP outside the user's scope
+  Scenario: Reading a provider outside my access scope returns not found
     Given a ModelProvider "Y" scoped to team "marketing"
     And I have no access to team "marketing"
     When I call the getById tRPC procedure with the id of "Y"
