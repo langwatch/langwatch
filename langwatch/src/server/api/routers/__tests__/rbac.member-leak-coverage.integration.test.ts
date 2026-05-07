@@ -518,4 +518,34 @@ describe("#47 RBAC member-leak coverage (integration)", () => {
       expect(allGroups.map((g) => g.id)).toContain(GROUP_ID);
     });
   });
+
+  // ── 5. limits.checkAndSendUsageLimitNotification (df6457852) ──────
+
+  describe("limits router (df6457852)", () => {
+    it("limits.checkAndSendUsageLimitNotification → UNAUTHORIZED for member", async () => {
+      // Mutation takes caller-supplied counts and triggers an admin
+      // email. Member calling it directly via tRPC curl is the spam
+      // vector — must deny.
+      await expect(
+        memberCaller.limits.checkAndSendUsageLimitNotification({
+          organizationId: ORG_ID,
+          currentMonthMessagesCount: 99999,
+          maxMonthlyUsageLimit: 100,
+        }),
+      ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+    });
+
+    it("admin can call limits.checkAndSendUsageLimitNotification", async () => {
+      // Sanity: admin reaches the (null-impl) usage-limits service in
+      // the test App. The test isn't asserting an email actually got
+      // sent — just that the permission gate lets admin through and
+      // the procedure returns its declared shape.
+      const result = await adminCaller.limits.checkAndSendUsageLimitNotification({
+        organizationId: ORG_ID,
+        currentMonthMessagesCount: 1,
+        maxMonthlyUsageLimit: 100,
+      });
+      expect(result).toMatchObject({ sent: expect.any(Boolean) });
+    });
+  });
 });
