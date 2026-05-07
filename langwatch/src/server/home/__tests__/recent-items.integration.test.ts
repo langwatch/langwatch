@@ -232,7 +232,6 @@ describe("Recent Items Integration", () => {
     });
 
     /** @scenario Excludes archived workflows from results */
-    /** @scenario Excludes archived workflows from results */
     it("excludes archived workflows from results", async () => {
       // Create an archived workflow
       const archivedWorkflow = await prisma.workflow.create({
