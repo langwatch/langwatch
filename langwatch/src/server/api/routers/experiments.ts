@@ -24,6 +24,7 @@ import {
   workflowJsonSchema,
 } from "../../../optimization_studio/types/dsl";
 import { slugify } from "../../../utils/slugify";
+import { coerceMonitorMappings } from "../../tracer/tracesMapping";
 import { getClickHouseClientForProject } from "../../clickhouse/clickhouseClient";
 import { DatasetService } from "../../datasets/dataset.service";
 import { prisma } from "../../db";
@@ -411,7 +412,7 @@ export const experimentsRouter = createTRPCRouter({
             param.value,
           ]),
         ) as Record<string, any>,
-        mappings: workbenchState.realTimeTraceMappings ?? {},
+        mappings: coerceMonitorMappings(workbenchState.realTimeTraceMappings),
         sample: workbenchState.realTimeExecution?.sample ?? 1,
         enabled: true,
         executionMode: EvaluationExecutionMode.ON_MESSAGE,
