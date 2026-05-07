@@ -252,8 +252,10 @@ run_migration() {
   # Use the same prep path as backend-shared / nlp / full-local so a fresh
   # clone running migration as its first mode still has node_modules and
   # the generated Prisma client available for the host-side
-  # `pnpm prisma migrate dev` call below.
-  ensure_prepared
+  # `pnpm prisma migrate dev` call below. Migration mode only starts
+  # postgres + clickhouse — redis isn't bound to :6379 here, so a
+  # host-side redis is irrelevant; skip that collision check.
+  SKIP_HOST_REDIS_CHECK=1 ensure_prepared
   write_overrides migration
   echo "Starting: postgres + clickhouse with HOST ports (mode=migration)"
   $COMPOSE_MIGRATION up -d postgres clickhouse
