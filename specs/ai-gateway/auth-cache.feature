@@ -1,4 +1,12 @@
 Feature: Gateway auth cache — hot path is zero RTT after first hit
+
+  # All scenarios in this file describe auth-cache behaviour in the Go
+  # gateway data plane (services/aigateway/). Three-tier cache, JWT
+  # refresh, stale-on-failure fallback — none of this lives in the
+  # TypeScript control plane. The parity check only scans TS test roots,
+  # so these are aspirational at this layer; verified end-to-end via
+  # Go integration tests in services/aigateway/.
+
   The gateway is in the hot path of every LLM request. Auth cannot add
   measurable latency. We keep a three-tier cache (in-mem LRU → optional
   Redis L2 → background refresh + optional bootstrap-pull) and verify the

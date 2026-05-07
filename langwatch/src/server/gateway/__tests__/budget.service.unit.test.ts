@@ -117,6 +117,7 @@ describe("GatewayBudgetService.check", () => {
   });
 
   describe("when projected spend reaches the hard limit on a BLOCK budget", () => {
+    /** @scenario Hard-block budget returns 402 when spent >= limit */
     it("returns hard_block with a descriptive reason", async () => {
       const sut = GatewayBudgetService.create(
         mockPrismaWithBudgets([
@@ -172,6 +173,7 @@ describe("GatewayBudgetService.check", () => {
   });
 
   describe("when a WARN budget crosses its limit", () => {
+    /** @scenario Soft budget emits warning header but allows the call */
     it("warns but does not block", async () => {
       const sut = GatewayBudgetService.create(
         mockPrismaWithBudgets([
@@ -190,6 +192,8 @@ describe("GatewayBudgetService.check", () => {
   });
 
   describe("when one BLOCK budget is at limit and another WARN budget is fine", () => {
+    /** @scenario Sum-of-breaches rule — any block-breach blocks */
+    /** @scenario Most restrictive budget wins when multiple apply */
     it("still hard_blocks (sum-of-breaches semantics)", async () => {
       const sut = GatewayBudgetService.create(
         mockPrismaWithBudgets([

@@ -1,4 +1,16 @@
 Feature: Public REST API — /api/gateway/v1/*
+
+  # All scenarios in this file describe the public REST API surface
+  # for the AI Gateway control plane (VK CRUD, budget CRUD, provider
+  # binding CRUD, RBAC scope checks, OpenAPI schema). The tRPC routers
+  # exist (langwatch/src/server/api/routers/{virtualKeys,gatewayBudgets,
+  # gatewayProviders,gatewayCacheRules}.ts) but no integration test
+  # harness has been added in langwatch/src/server/api/routers/__tests__/
+  # for these specific routers. All aspirational pending the router
+  # integration tests; the underlying service-layer business logic is
+  # already covered by langwatch/src/server/gateway/__tests__/ and
+  # bound piecewise from virtual-keys.feature and budgets.feature.
+
   As a LangWatch customer integrating with the AI Gateway programmatically
   I want a stable REST API that mirrors the tRPC routers used by the UI
   So that CLI/scripts/CI/SDKs can manage VKs, budgets, and provider bindings
