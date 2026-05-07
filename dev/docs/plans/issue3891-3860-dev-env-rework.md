@@ -116,7 +116,7 @@ Distinct from `scripts/worktree.sh::generate_slug` (50 chars, word-boundary trun
 
 | Target | VM name | tmux session |
 |---|---|---|
-| `boxd-golden` | `langwatch-golden` | n/a |
+| `boxd-golden` | `<namespace>--langwatch-golden` (namespace from `BOXD_NAMESPACE` → `gh api user` → `whoami`) | n/a |
 | `boxd-fork-pr PR=N` | `langwatch-<branch_slug(PR.head)>` | `claude-<branch_slug>` |
 | `boxd-fork-branch BRANCH=B` | `langwatch-<branch_slug(B)>` | `claude-<branch_slug>` |
 | `boxd-fork-issue ISSUE=N` | **always** `langwatch-issue<N>` (literal) | `claude-issue<N>` |

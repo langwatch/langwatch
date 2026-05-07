@@ -214,3 +214,61 @@ teardown_env_fixture() {
     | boxd_rewrite_env "langwatch-issue42")
   [[ "$result" == *"langwatch-other.boxd.sh"* ]]
 }
+
+# --- boxd_namespace + boxd_golden_vm_name ---
+
+@test "boxd_namespace: BOXD_NAMESPACE env override wins over gh + whoami" {
+  BOXD_NAMESPACE="acme-team" run boxd_namespace
+  [ "$status" -eq 0 ]
+  [ "$output" = "acme-team" ]
+}
+
+@test "boxd_namespace: slugifies the override (lowercase, dashes)" {
+  BOXD_NAMESPACE="ACME Team!" run boxd_namespace
+  [ "$status" -eq 0 ]
+  [ "$output" = "acme-team" ]
+}
+
+@test "boxd_namespace: falls back to gh login when override unset" {
+  # Mock gh to return a stable login.
+  local gh_dir
+  gh_dir=$(mktemp -d)
+  cat > "$gh_dir/gh" <<'EOF'
+#!/bin/bash
+[ "$1" = "api" ] && [ "$2" = "user" ] && echo "drewdrewthis" && exit 0
+exit 1
+EOF
+  chmod +x "$gh_dir/gh"
+  GH_BIN="$gh_dir/gh" run env -u BOXD_NAMESPACE bash -c '
+    source "'"$SCRIPT_DIR"'/boxd-fork.sh"
+    boxd_namespace
+  '
+  [ "$status" -eq 0 ]
+  [ "$output" = "drewdrewthis" ]
+  rm -rf "$gh_dir"
+}
+
+@test "boxd_namespace: falls back to whoami when gh fails and no override" {
+  # gh that always fails.
+  local gh_dir
+  gh_dir=$(mktemp -d)
+  cat > "$gh_dir/gh" <<'EOF'
+#!/bin/bash
+exit 1
+EOF
+  chmod +x "$gh_dir/gh"
+  GH_BIN="$gh_dir/gh" run env -u BOXD_NAMESPACE bash -c '
+    source "'"$SCRIPT_DIR"'/boxd-fork.sh"
+    boxd_namespace
+  '
+  [ "$status" -eq 0 ]
+  # Should match `whoami` output (slugified).
+  [ "$output" = "$(whoami)" ]
+  rm -rf "$gh_dir"
+}
+
+@test "boxd_golden_vm_name: <namespace>--langwatch-golden" {
+  BOXD_NAMESPACE="alice" run boxd_golden_vm_name
+  [ "$status" -eq 0 ]
+  [ "$output" = "alice--langwatch-golden" ]
+}

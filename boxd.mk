@@ -41,8 +41,9 @@ boxd-help:
 	@echo "use the 'boxd' CLI directly."
 	@echo ""
 	@echo "Golden VM:"
-	@echo "  boxd-golden                          create langwatch-golden (canonical base)"
+	@echo "  boxd-golden                          create <user>--langwatch-golden (canonical base)"
 	@echo "  boxd-golden-reset                    BOXD_FORK_YES=1 to confirm destroy+rebuild"
+	@echo "  (override the namespace prefix with BOXD_NAMESPACE=<name> for shared/team-owned goldens)"
 	@echo ""
 	@echo "Fork-for-source:"
 	@echo "  boxd-fork-pr PR=<n>                  fork golden for an existing PR"
@@ -59,6 +60,7 @@ boxd-help:
 	@echo "Customizable env vars:"
 	@echo "  CLAUDE_CREDS=/path/to/credentials.json   override the source credentials"
 	@echo "  BOXD_FORK_YES=1                          confirm destructive ops"
+	@echo "  BOXD_NAMESPACE=<name>                    override golden namespace (default: gh user → whoami)"
 
 # ---------------------------------------------------------------------------
 # Argument guards
@@ -76,12 +78,12 @@ endef
 # ---------------------------------------------------------------------------
 
 boxd-golden:
-	@echo "→ boxd-golden: building canonical base VM 'langwatch-golden'"
+	@bash -c '$(BOXD_RUN_PREFIX) printf "→ boxd-golden: building canonical base VM \"%s\"\n" "$$(boxd_golden_vm_name)"'
 	@bash -c '$(BOXD_RUN_PREFIX) boxd_golden'
 	@$(MAKE) -s seed-golden
 
 boxd-golden-reset:
-	@echo "→ boxd-golden-reset: destroying + rebuilding 'langwatch-golden'"
+	@bash -c '$(BOXD_RUN_PREFIX) printf "→ boxd-golden-reset: destroying + rebuilding \"%s\"\n" "$$(boxd_golden_vm_name)"'
 	@bash -c '$(BOXD_RUN_PREFIX) BOXD_FORK_YES=$(BOXD_FORK_YES) boxd_golden_reset'
 	@$(MAKE) -s seed-golden
 
@@ -89,7 +91,7 @@ boxd-golden-reset:
 # preload. By default it's a no-op and prints a hint (AC#7). Override in
 # Makefile.local to provide a real seed implementation.
 seed-golden:
-	@echo "  (no seed-golden hook configured — define one in Makefile.local to seed langwatch-golden)"
+	@bash -c '$(BOXD_RUN_PREFIX) printf "  (no seed-golden hook configured — define one in Makefile.local to seed %s)\n" "$$(boxd_golden_vm_name)"'
 
 # ---------------------------------------------------------------------------
 # Fork-for-source

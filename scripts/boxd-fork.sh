@@ -19,6 +19,39 @@ set -uo pipefail
 # Naming primitives
 # ---------------------------------------------------------------------------
 
+# boxd_namespace — return the per-user/team prefix for shared boxd VM names.
+# Boxd subdomains are globally unique across all accounts, so any VM name we
+# create needs a stable prefix to avoid colliding with other LangWatch users
+# / teams who also dev on boxd.
+#
+# Resolution order:
+#   1. $BOXD_NAMESPACE (explicit override, e.g. for shared/team-owned goldens)
+#   2. `gh api user --jq .login` (the human's GitHub login — stable, distinct)
+#   3. `whoami` (last-resort fallback when gh is offline / not auth'd)
+#
+# Output is slugified through the same rules as boxd_slug for safety.
+boxd_namespace() {
+  local raw=""
+  if [ -n "${BOXD_NAMESPACE:-}" ]; then
+    raw="$BOXD_NAMESPACE"
+  elif raw=$("$GH_BIN" api user --jq .login 2>/dev/null) && [ -n "$raw" ]; then
+    :
+  else
+    raw=$(whoami 2>/dev/null || echo unknown)
+  fi
+  boxd_slug "$raw"
+}
+
+# boxd_golden_vm_name — return the namespaced golden VM name.
+# Pattern: <namespace>--langwatch-golden (e.g. drewdrewthis--langwatch-golden).
+# The `--` separator is intentional — visually distinct from intra-segment
+# hyphens, fully RFC-1035-compliant inside a DNS label.
+boxd_golden_vm_name() {
+  local ns
+  ns=$(boxd_namespace) || return 1
+  printf '%s--langwatch-golden' "$ns"
+}
+
 # boxd_slug — slugify a string per issue #3891 AC#13.
 # Lowercase, replace `/` and non-`[a-z0-9-]` with `-`, collapse repeated `-`,
 # trim leading/trailing `-`, truncate at 40 chars (no word-boundary cut).
@@ -313,6 +346,10 @@ boxd_map_ports() {
 }
 
 # boxd_wake_if_suspended VM — resume the VM if it's paused/standby (AC#20).
+# `boxd resume` returns as soon as the request is dispatched, but the VM
+# isn't actually accepting `boxd exec` until it reaches `running`. Poll the
+# status with a 30s budget so callers (boxd exec / boxd connect) don't
+# silently fail with confusing errors against a not-yet-ready VM.
 boxd_wake_if_suspended() {
   local vm="${1-}"
   [ -n "$vm" ] || return 1
@@ -322,6 +359,17 @@ boxd_wake_if_suspended() {
     paused|standby|suspended)
       printf '  resuming suspended VM %s\n' "$vm" >&2
       "$BOXD_BIN" resume "$vm" >/dev/null 2>&1 || true
+      local i=0
+      while [ "$i" -lt "${BOXD_RESUME_TIMEOUT_SECS:-30}" ]; do
+        if [ "$(boxd_vm_status "$vm")" = "running" ]; then
+          return 0
+        fi
+        sleep 1
+        i=$((i + 1))
+      done
+      printf '  WARNING: VM %s did not reach running state within %ss\n' \
+        "$vm" "${BOXD_RESUME_TIMEOUT_SECS:-30}" >&2
+      return 1
       ;;
   esac
 }
@@ -362,9 +410,36 @@ EOF
     return 1
   fi
 
-  # AC#10 / AC#11: fork from langwatch-golden, then check out the branch.
-  if ! "$BOXD_BIN" fork langwatch-golden --name="$vm" >/dev/null; then
-    echo "ERROR: 'boxd fork langwatch-golden --name=$vm' failed." >&2
+  # For fork-branch / fork-issue, the in-VM checkout below uses `git fetch
+  # origin && git checkout '$branch'` — that requires the ref to exist on
+  # the origin remote. fork-pr handles its own remotes via `gh pr checkout`.
+  # Push the local branch to origin first so the in-VM checkout can find
+  # it; bail with a clear hint if push fails (no upstream, no auth, etc.).
+  if [ -z "$pr" ]; then
+    if ! "$GIT_BIN" rev-parse --verify "refs/remotes/origin/$branch" >/dev/null 2>&1; then
+      printf '  pushing %s to origin (required for in-VM checkout)\n' "$branch" >&2
+      if ! "$GIT_BIN" push -u origin "$branch" 2>&1; then
+        cat <<EOF >&2
+ERROR: 'git push -u origin $branch' failed.
+       The in-VM checkout needs origin/$branch to exist. Push the branch
+       manually (or set its upstream) and re-run, or use fork-pr if this
+       branch is already in a PR.
+EOF
+        return 1
+      fi
+    fi
+  fi
+
+  # AC#10 / AC#11: fork from the namespaced golden, then check out the branch.
+  local golden
+  golden=$(boxd_golden_vm_name) || return 1
+  if ! "$BOXD_BIN" fork "$golden" --name="$vm" >/dev/null; then
+    echo "ERROR: 'boxd fork $golden --name=$vm' failed." >&2
+    cat <<EOF >&2
+       Did you build the golden VM yet? It is not shared across boxd accounts:
+         make boxd-golden
+       Override the namespace explicitly with BOXD_NAMESPACE=<name> if needed.
+EOF
     return 1
   fi
 
@@ -498,10 +573,11 @@ boxd_fork_issue() {
   _boxd_fork_impl issue "$issue" "$issue" "$branch" 1
 }
 
-# boxd_golden — build the golden VM. If it already exists, this is a no-op
-# pointing the user at boxd-golden-reset (AC#5).
+# boxd_golden — build the namespaced golden VM. If it already exists, this is
+# a no-op pointing the user at boxd-golden-reset (AC#5).
 boxd_golden() {
-  local vm="langwatch-golden"
+  local vm
+  vm=$(boxd_golden_vm_name) || return 1
   if boxd_vm_exists "$vm"; then
     cat <<EOF >&2
 '$vm' already exists. To rebuild from scratch:
@@ -539,10 +615,11 @@ EOF
   printf 'Done. Override the seed step by defining a seed-golden target.\n' >&2
 }
 
-# boxd_golden_reset — destroy + rebuild langwatch-golden (AC#6).
+# boxd_golden_reset — destroy + rebuild the namespaced golden VM (AC#6).
 # Requires user confirmation per AC#4 (destructive).
 boxd_golden_reset() {
-  local vm="langwatch-golden"
+  local vm
+  vm=$(boxd_golden_vm_name) || return 1
   if [ "${BOXD_FORK_YES:-}" != "1" ]; then
     printf 'This will destroy %s and rebuild it. Re-run with BOXD_FORK_YES=1 to confirm.\n' "$vm" >&2
     return 1

@@ -1,5 +1,5 @@
 .PHONY: help start sync-all-openapi user-delete-dry-run user-delete es-delete-dry-run es-delete
-.PHONY: dev dev-nlp dev-scenarios dev-full down logs clean ps quickstart quickstart-help worktree
+.PHONY: dev dev-nlp dev-scenarios dev-test dev-full down logs clean ps quickstart quickstart-help worktree
 .PHONY: dev-up dev-down dev-logs setup-hooks service service-watch
 .PHONY: _dev-deprecation-warning _dev-up-deprecation-warning
 
@@ -149,6 +149,13 @@ tsc-watch:
 #   make quickstart full-local       # --profile full
 ifeq (quickstart,$(firstword $(MAKECMDGOALS)))
   QUICKSTART_ARG := $(wordlist 2,$(words $(MAKECMDGOALS)),$(MAKECMDGOALS))
+  # The eval below silently overrides whatever name the user passed with a
+  # no-op recipe. If they pass an existing target name (e.g. `help`, `down`,
+  # `logs`), make would happily overwrite the real recipe and run the empty
+  # one — so we error out explicitly with a hint instead.
+  ifneq ($(filter $(QUICKSTART_ARG),help dev dev-up dev-down dev-logs dev-nlp dev-scenarios dev-test dev-full down logs clean ps quickstart quickstart-help worktree start),)
+    $(error 'make quickstart $(QUICKSTART_ARG)' collides with target '$(QUICKSTART_ARG)' — use `make quickstart-help` for the mode reference, or pass a mode like `frontend-only` / `backend-shared` / `nlp` / `migration` / `full-local`)
+  endif
   ifneq ($(QUICKSTART_ARG),)
     $(eval $(QUICKSTART_ARG):;@:)
   endif

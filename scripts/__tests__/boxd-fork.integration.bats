@@ -36,7 +36,21 @@ case "$1" in
     esac
     exit 0
     ;;
-  fork|cp|new|destroy|resume|pause|reboot|proxy|connect|info|auto-suspend)
+  destroy)
+    # Empty the vms fixture so subsequent boxd_vm_exists returns false;
+    # mirrors real CLI behavior and lets `golden-reset` recreate.
+    [ -f "$TEST_DIR/vms" ] && echo "[]" > "$TEST_DIR/vms"
+    exit 0
+    ;;
+  resume)
+    # Flip VM status standby/paused/suspended → running so the post-resume
+    # readiness poll sees a healthy VM and doesn't time out the test.
+    if [ -f "$TEST_DIR/vms" ]; then
+      sed -i 's/"status":"\(standby\|paused\|suspended\)"/"status":"running"/g' "$TEST_DIR/vms"
+    fi
+    exit 0
+    ;;
+  fork|cp|new|pause|reboot|proxy|connect|info|auto-suspend)
     exit 0
     ;;
   *)
@@ -94,6 +108,9 @@ MOCKEOF
   export GH_BIN="$MOCK_BIN/gh"
   export GIT_BIN="$MOCK_BIN/git"
   export BOXD_FORK_REPO="langwatch/langwatch"
+  # Pin the namespace so tests don't depend on `gh api user` / `whoami`.
+  # All golden-VM assertions below should use "test--langwatch-golden".
+  export BOXD_NAMESPACE="test"
   export CLAUDE_CREDS="$TEST_DIR/creds"
   : > "$TEST_DIR/creds"
 
@@ -122,7 +139,7 @@ teardown() {
   [ "$status" -eq 0 ]
   # Expected sequence (greppable):
   grep -q "gh issue view 4242" "$CALL_LOG"
-  grep -q "boxd fork langwatch-golden --name=langwatch-issue4242" "$CALL_LOG"
+  grep -q "boxd fork test--langwatch-golden --name=langwatch-issue4242" "$CALL_LOG"
   grep -q "boxd exec langwatch-issue4242" "$CALL_LOG"
   grep -q "boxd cp .* langwatch-issue4242:.claude/.credentials.json" "$CALL_LOG"
   # At least one .env was uploaded
@@ -148,13 +165,38 @@ EOF
   [ "$status" -eq 0 ]
   [[ "$output" == *"Consider 'make boxd-fork-issue ISSUE=42'"* ]]
   # Distinct VM name from fork-issue ISSUE=42
-  grep -q "boxd fork langwatch-golden --name=langwatch-issue42-foo-bar" "$CALL_LOG"
+  grep -q "boxd fork test--langwatch-golden --name=langwatch-issue42-foo-bar" "$CALL_LOG"
 }
 
 @test "fork-branch: produces langwatch-<slug> for normal branches" {
   run boxd_fork_branch "feat/dark-mode"
   [ "$status" -eq 0 ]
-  grep -q "boxd fork langwatch-golden --name=langwatch-feat-dark-mode" "$CALL_LOG"
+  grep -q "boxd fork test--langwatch-golden --name=langwatch-feat-dark-mode" "$CALL_LOG"
+}
+
+@test "fork-branch: pushes branch to origin when missing remote ref" {
+  run boxd_fork_branch "feat/local-only"
+  [ "$status" -eq 0 ]
+  # rev-parse for refs/remotes/origin/... returns 128 (no fixture), so
+  # the impl should `git push -u origin` before forking.
+  grep -q "git push -u origin feat/local-only" "$CALL_LOG"
+}
+
+@test "fork-branch: errors when 'git push' fails" {
+  # Override git mock to fail on push.
+  cat > "$MOCK_BIN/git" << 'MOCKEOF'
+#!/bin/bash
+echo "git $*" >> "$CALL_LOG"
+case "$1" in
+  rev-parse) exit 128 ;;
+  push)      exit 1 ;;
+  *)         exit 0 ;;
+esac
+MOCKEOF
+  chmod +x "$MOCK_BIN/git"
+  run boxd_fork_branch "feat/no-upstream"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"git push -u origin feat/no-upstream"* ]]
 }
 
 @test "fork-pr: resolves head ref via gh and forks (AC#16)" {
@@ -162,7 +204,7 @@ EOF
   run boxd_fork_pr 1234
   [ "$status" -eq 0 ]
   grep -q "gh pr view 1234" "$CALL_LOG"
-  grep -q "boxd fork langwatch-golden --name=langwatch-feat-from-fork" "$CALL_LOG"
+  grep -q "boxd fork test--langwatch-golden --name=langwatch-feat-from-fork" "$CALL_LOG"
 }
 
 # --- env upload + rewrite ---
@@ -206,28 +248,49 @@ EOF
   grep -q "boxd resume langwatch-issue4242" "$CALL_LOG"
 }
 
+@test "wake: returns non-zero when VM never reaches running (timeout)" {
+  cat > "$TEST_DIR/vms" <<EOF
+[{"name":"langwatch-stuck","status":"standby"}]
+EOF
+  # Hijack the boxd mock for `resume` so it does NOT flip status — simulates
+  # a VM that never finishes resuming. Cap the readiness wait at 2s so the
+  # test stays fast.
+  cat > "$MOCK_BIN/boxd" << 'MOCKEOF'
+#!/bin/bash
+echo "boxd $*" >> "$CALL_LOG"
+case "$1" in
+  list)   [ -f "$TEST_DIR/vms" ] && cat "$TEST_DIR/vms"; exit 0 ;;
+  *)      exit 0 ;;
+esac
+MOCKEOF
+  chmod +x "$MOCK_BIN/boxd"
+  BOXD_RESUME_TIMEOUT_SECS=2 run boxd_wake_if_suspended langwatch-stuck
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"did not reach running"* ]]
+}
+
 # --- golden ---
 
 @test "golden: skips creation if VM already exists" {
   cat > "$TEST_DIR/vms" <<EOF
-[{"name":"langwatch-golden","status":"running"}]
+[{"name":"test--langwatch-golden","status":"running"}]
 EOF
   run boxd_golden
   [ "$status" -eq 0 ]
   # Did NOT call `boxd new` for the existing VM
-  ! grep -q "boxd new --name=langwatch-golden" "$CALL_LOG"
+  ! grep -q "boxd new --name=test--langwatch-golden" "$CALL_LOG"
 }
 
 @test "golden: creates VM when absent" {
   echo "[]" > "$TEST_DIR/vms"
   run boxd_golden
   [ "$status" -eq 0 ]
-  grep -q "boxd new --name=langwatch-golden" "$CALL_LOG"
+  grep -q "boxd new --name=test--langwatch-golden" "$CALL_LOG"
 }
 
 @test "golden-reset: refuses without BOXD_FORK_YES=1 (AC#4)" {
   cat > "$TEST_DIR/vms" <<EOF
-[{"name":"langwatch-golden","status":"running"}]
+[{"name":"test--langwatch-golden","status":"running"}]
 EOF
   run boxd_golden_reset
   [ "$status" -ne 0 ]
@@ -236,13 +299,12 @@ EOF
 
 @test "golden-reset: destroys + recreates with BOXD_FORK_YES=1" {
   cat > "$TEST_DIR/vms" <<EOF
-[{"name":"langwatch-golden","status":"running"}]
+[{"name":"test--langwatch-golden","status":"running"}]
 EOF
   BOXD_FORK_YES=1 run boxd_golden_reset
   [ "$status" -eq 0 ]
-  grep -q "boxd destroy langwatch-golden" "$CALL_LOG"
-  # `boxd_vm_exists` will return false after destroy on a fresh fixture, so
-  # `boxd new` should have been called. Note: the mock list still returns the
-  # old VM, but the implementation calls `boxd new` after `boxd destroy`
-  # unconditionally for reset.
+  grep -q "boxd destroy test--langwatch-golden" "$CALL_LOG"
+  # The boxd mock empties $TEST_DIR/vms on `destroy`, so the subsequent
+  # boxd_golden() sees no existing VM and calls `boxd new`.
+  grep -q "boxd new --name=test--langwatch-golden" "$CALL_LOG"
 }

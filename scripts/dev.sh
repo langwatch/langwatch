@@ -110,12 +110,23 @@ check_env_files() {
 # Fail-fast on insecure SaaS-mode config (#3860 AC#7).
 # Patterns accept unquoted, single-quoted, and double-quoted values — all
 # valid `.env` syntax.
+#
+# The app code reads `BLOCK_LOCAL_HTTP_CALLS` as `!!env.BLOCK_LOCAL_HTTP_CALLS`,
+# i.e. truthy / falsy in JS terms — absence and explicit `false` both
+# disable SSRF blocking. So with `IS_SAAS=true`, we need the var present AND
+# set to a truthy value (true / 1 / yes), not just "not literally false".
 check_saas_ssrf_guard() {
   if [ ! -f "langwatch/.env" ]; then return 0; fi
-  if grep -qE "^IS_SAAS[[:space:]]*=[[:space:]]*['\"]?true['\"]?[[:space:]]*$" langwatch/.env \
-     && grep -qE "^BLOCK_LOCAL_HTTP_CALLS[[:space:]]*=[[:space:]]*['\"]?false['\"]?[[:space:]]*$" langwatch/.env; then
-    echo "ERROR: langwatch/.env has IS_SAAS=true with BLOCK_LOCAL_HTTP_CALLS=false." >&2
-    echo "       SaaS mode requires SSRF blocking. Set BLOCK_LOCAL_HTTP_CALLS=true." >&2
+  if ! grep -qE "^IS_SAAS[[:space:]]*=[[:space:]]*['\"]?true['\"]?[[:space:]]*$" langwatch/.env; then
+    return 0
+  fi
+  if ! grep -qE "^BLOCK_LOCAL_HTTP_CALLS[[:space:]]*=[[:space:]]*['\"]?(true|1|yes)['\"]?[[:space:]]*$" langwatch/.env; then
+    cat >&2 <<'EOF'
+ERROR: langwatch/.env has IS_SAAS=true but BLOCK_LOCAL_HTTP_CALLS is not
+       explicitly set to a truthy value. SaaS mode requires SSRF blocking;
+       absence of the variable counts as disabled. Add:
+         BLOCK_LOCAL_HTTP_CALLS=true
+EOF
     exit 1
   fi
 }
@@ -143,10 +154,38 @@ EOF
   done
 }
 
+# Detect a host-side process holding port 6379 before redis tries to bind.
+# Compose's own error is `Error response from daemon: ports are not available`,
+# which sends contributors hunting through compose for a problem that's
+# actually `redis-server` running on the host. Only fires when we're about
+# to start the redis container (skipped in frontend-only mode where the
+# caller passes SKIP_HOST_REDIS_CHECK=1).
+check_host_redis_collision() {
+  [ "${SKIP_HOST_REDIS_CHECK:-0}" = "1" ] && return 0
+  # ss is in iproute2, present on every modern Linux + WSL; lsof on macOS.
+  local pid=""
+  if command -v lsof >/dev/null 2>&1; then
+    pid=$(lsof -iTCP:6379 -sTCP:LISTEN -t 2>/dev/null | head -n1)
+  elif command -v ss >/dev/null 2>&1; then
+    ss -ltnH "sport = :6379" 2>/dev/null | grep -q ":6379" && pid="<unknown>"
+  fi
+  [ -z "$pid" ] && return 0
+  cat >&2 <<EOF
+ERROR: A process is already listening on host port 6379 (redis).
+       The dev-stack redis container needs that port to bind. Stop the
+       host-side redis first (e.g. 'brew services stop redis' on macOS,
+       'sudo systemctl stop redis-server' on Linux), or set
+       SKIP_HOST_REDIS_CHECK=1 if you've intentionally repointed the dev
+       stack at a host redis.
+EOF
+  exit 1
+}
+
 ensure_prepared() {
   check_env_files
   check_saas_ssrf_guard
   check_stateful_collision
+  check_host_redis_collision
   ( cd langwatch
     if [ ! -d node_modules ]; then
       echo "Installing host dependencies (for prep)..."
@@ -284,6 +323,7 @@ run_meta() {
       $COMPOSE --profile full down
       docker volume rm "${VOLUME_PREFIX:-langwatch}-app-modules" 2>/dev/null || true
       docker volume rm "${VOLUME_PREFIX:-langwatch}-bullboard-modules" 2>/dev/null || true
+      docker volume rm "${VOLUME_PREFIX:-langwatch}-goose-bin" 2>/dev/null || true
       ;;
   esac
 }
