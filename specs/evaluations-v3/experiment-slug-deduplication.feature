@@ -31,6 +31,6 @@ Feature: Experiment slug deduplication
 
   @regression @integration
   Scenario: Unrelated slug sharing the same prefix is not treated as a conflict
-    Given an experiment exists with slug "my-exp-extended"
+    Given an experiment exists in the project with slug "my-exp-extended"
     When a new experiment is saved with a name that generates slug "my-exp"
     Then the new experiment is created with slug "my-exp" without a suffix
