@@ -263,10 +263,6 @@ const routes: RouteObject[] = [
     ...page(() => import("./pages/me/sessions")),
   },
   {
-    path: "/me/sign-in-methods",
-    ...page(() => import("./pages/me/sign-in-methods")),
-  },
-  {
     // Budget-increase request page that the CLI's `langwatch request-increase`
     // opens. The page file existed but routes.tsx is explicit (Vite migration)
     // — without this entry the URL 404'd, breaking the per-spec
