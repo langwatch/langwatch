@@ -8,7 +8,7 @@ Feature: Scenario Failure Handler
   # pollForScenarioRun.unit.test.ts) + 2 DELETE (synthetic ID generation no
   # longer applies; idempotency moved downstream) + 5 UPDATE (handler emits
   # only finishRun unconditionally; scenarioRunId now pre-assigned; 15min
-  # timeout not 5min) + 6 KEEP. The 11 remaining @unimplemented scenarios
+  # timeout not 5min) + 6 KEEP. The 8 remaining @unimplemented scenarios
   # need rewrites or new tests in PR #3458.
 
   # ============================================================================
