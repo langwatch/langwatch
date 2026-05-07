@@ -53,7 +53,7 @@ describe("evaluatePreconditions()", () => {
     ];
 
     describe("when a trace arrives with no origin attribute", () => {
-      /** @scenario Origin "is" application matches only explicit application origin */
+      /** @scenario Origin "is" application treats missing origin as application (legacy default) */
       it("passes the precondition", () => {
         const traceData = makeTraceData({ origin: undefined });
         expect(
