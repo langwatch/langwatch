@@ -59,7 +59,11 @@ describe("child-logger", () => {
     describe("when the child requests its base logger", () => {
       /** @scenario child process tolerates missing context env var */
       it("returns a logger without bindings and without throwing", () => {
-        expect(() => createChildProcessLogger("test", {})).not.toThrow();
+        const logger = createChildProcessLogger("test", {}) as unknown as {
+          bindings: () => Record<string, unknown>;
+        };
+        expect(logger).toBeDefined();
+        expect(logger.bindings()).toEqual({});
       });
     });
   });

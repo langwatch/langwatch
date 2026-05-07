@@ -35,6 +35,20 @@ function previewResponseBody(body: string): string {
 }
 
 /**
+ * Strip query string before logging. URL templates can interpolate
+ * user-supplied secrets (?api_key=…, ?access_token=…) and CloudWatch
+ * persists every log line — drop the query so credentials don't leak.
+ */
+function redactUrlForLogs(url: string): string {
+  try {
+    const parsed = new URL(url);
+    return `${parsed.origin}${parsed.pathname}`;
+  } catch {
+    return url;
+  }
+}
+
+/**
  * Serialized HTTP agent adapter that uses pre-fetched configuration.
  * No database access required.
  */
@@ -101,6 +115,7 @@ export class SerializedHttpAgentAdapter extends AgentAdapter {
   ): Promise<unknown> {
     const method = this.config.method.toUpperCase();
     const startedAt = Date.now();
+    const loggedUrl = redactUrlForLogs(url);
     let response: Awaited<ReturnType<typeof ssrfSafeFetch>>;
     try {
       response = await ssrfSafeFetch(url, {
@@ -114,7 +129,7 @@ export class SerializedHttpAgentAdapter extends AgentAdapter {
       const message = error instanceof Error ? error.message : String(error);
       this.logger.error(
         {
-          url,
+          url: loggedUrl,
           method,
           errorClass,
           message,
@@ -134,7 +149,7 @@ export class SerializedHttpAgentAdapter extends AgentAdapter {
           : "";
       this.logger.warn(
         {
-          url,
+          url: loggedUrl,
           method,
           statusCode: response.status,
           durationMs,
@@ -147,7 +162,7 @@ export class SerializedHttpAgentAdapter extends AgentAdapter {
 
     this.logger.info(
       {
-        url,
+        url: loggedUrl,
         method,
         statusCode: response.status,
         durationMs,
