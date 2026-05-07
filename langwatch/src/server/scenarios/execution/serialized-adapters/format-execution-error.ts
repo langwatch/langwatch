@@ -23,10 +23,10 @@ const MAX_DETAIL_LENGTH = 2_000;
 
 /** Lines we strip from the rendered surface (still preserved on the raw payload). */
 const NOISE_PATTERNS: ReadonlyArray<RegExp> = [
-  /^AI SDK Warning .*$/m,
-  /^OTEL .*flushed.*$/m,
-  /^Flushing OTEL traces\.\.\.$/m,
-  /^\s*at v2 specification compatibility mode\..*$/m,
+  /^AI SDK Warning .*$/gm,
+  /^OTEL .*flushed.*$/gm,
+  /^Flushing OTEL traces\.\.\.$/gm,
+  /^\s*at v2 specification compatibility mode\..*$/gm,
 ];
 
 /** ANSI escape sequences from upstream Python loggers. */
