@@ -133,7 +133,7 @@ describe("EvaluatorCategorySelectorDrawer", () => {
     });
 
     /** @scenario Evaluator types available */
-    /** @scenario Custom workflow evaluator skips category/type selection */
+    /** @scenario Custom workflow evaluator option is shown */
     it("shows Custom (from Workflow) option", async () => {
       renderDrawer();
 

@@ -236,6 +236,12 @@ Feature: Evaluator management
     And required fields are marked
     And I can enter values for all settings
 
+  @unit
+  Scenario: Custom workflow evaluator option is shown
+    Given the EvaluatorCategorySelectorDrawer is open
+    Then the option "Custom (from Workflow)" is rendered alongside the built-in evaluator categories
+
+  @unimplemented
   Scenario: Custom workflow evaluator skips category/type selection
     Given the EvaluatorCategorySelectorDrawer is open
     When I select "Custom (from Workflow)"
