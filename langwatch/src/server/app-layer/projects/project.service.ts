@@ -92,12 +92,11 @@ export class ProjectService {
       return null;
     }
 
-    const [project, modelProviders] = await Promise.all([
-      this.repo.getById(projectId),
-      this.modelProviderService.getProjectModelProviders(projectId, true),
-    ]);
-
+    const project = await this.repo.getById(projectId);
     if (!project) return null;
+
+    const modelProviders =
+      await this.modelProviderService.getProjectModelProviders(projectId, true);
 
     // 1. User override wins when its provider is still enabled.
     if (project.defaultModel) {

@@ -55,6 +55,7 @@ function makeRepo(project: Project | null): ProjectRepository {
     updateMetadata: vi.fn(),
     getWithOrgAdmin: vi.fn(),
     searchByQuery: vi.fn(),
+    getPresenceConfig: vi.fn(),
   };
 }
 
