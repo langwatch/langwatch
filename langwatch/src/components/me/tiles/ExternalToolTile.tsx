@@ -16,10 +16,16 @@ import type { ExternalToolConfig } from "./types";
 interface Props {
   displayName: string;
   config: ExternalToolConfig;
+  iconAsset?: string | null;
   iconKey?: string | null;
 }
 
-export function ExternalToolTile({ displayName, config, iconKey }: Props) {
+export function ExternalToolTile({
+  displayName,
+  config,
+  iconAsset,
+  iconKey,
+}: Props) {
   const [expanded, setExpanded] = useState(false);
 
   return (
@@ -35,7 +41,11 @@ export function ExternalToolTile({ displayName, config, iconKey }: Props) {
         onClick={() => setExpanded(!expanded)}
         gap={3}
       >
-        <TileIcon iconKey={iconKey} type="external_tool" />
+        <TileIcon
+          iconAsset={iconAsset}
+          iconKey={iconKey}
+          type="external_tool"
+        />
         <VStack align="start" gap={0} flex={1}>
           <Text fontSize="sm" fontWeight="semibold">
             {displayName}

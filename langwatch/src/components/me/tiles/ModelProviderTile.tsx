@@ -55,6 +55,7 @@ interface Props {
   displayName: string;
   config: ModelProviderConfig;
   organizationId: string;
+  iconAsset?: string | null;
   iconKey?: string | null;
   /**
    * Whether the org has at least one ModelProvider row configured for
@@ -104,6 +105,7 @@ export function ModelProviderTile({
   displayName,
   config,
   organizationId,
+  iconAsset,
   iconKey,
   providerConfigured = true,
 }: Props) {
@@ -168,6 +170,7 @@ export function ModelProviderTile({
         gap={3}
       >
         <TileIcon
+          iconAsset={iconAsset}
           iconKey={iconKey ?? config.providerKey}
           type="model_provider"
         />

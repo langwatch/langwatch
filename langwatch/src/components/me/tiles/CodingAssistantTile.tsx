@@ -39,6 +39,7 @@ function rewriteDocsHostForLocalDev(url: string | undefined): string | undefined
 interface Props {
   displayName: string;
   config: CodingAssistantConfig;
+  iconAsset?: string | null;
   iconKey?: string | null;
   /**
    * Catalog slug — drives surface-specific UX. Today only `claude-code`
@@ -65,6 +66,7 @@ function buildClaudeCodeOtlpEnvBlock(endpoint: string | null): string {
 export function CodingAssistantTile({
   displayName,
   config,
+  iconAsset,
   iconKey,
   slug,
 }: Props) {
@@ -127,7 +129,11 @@ export function CodingAssistantTile({
         onClick={() => setExpanded(!expanded)}
         gap={3}
       >
-        <TileIcon iconKey={iconKey} type="coding_assistant" />
+        <TileIcon
+          iconAsset={iconAsset}
+          iconKey={iconKey}
+          type="coding_assistant"
+        />
         <VStack align="start" gap={0} flex={1}>
           <Text fontSize="sm" fontWeight="semibold">
             {displayName}

@@ -43,12 +43,35 @@ export type AiToolConfig =
 
 export interface AiToolEntry {
   id: string;
+  /**
+   * Legacy single-scope shape, retained for back-compat reads while the
+   * service layer migrates to `teamIds: string[]` (5aaa232d3 schema).
+   */
   scope: AiToolScope;
   scopeId: string;
+  /**
+   * Multi-team scope (post-5aaa232d3). Empty array = whole organization.
+   * Non-empty = restricted to those teams. May be undefined on older
+   * cached responses; treat as empty array.
+   */
+  teamIds?: string[];
   type: AiToolTileType;
   displayName: string;
   slug: string;
+  /**
+   * Legacy preset-key icon lookup (e.g. "anthropic"). Kept for back-compat
+   * reads. New writes go to `iconAsset`; resolver prefers iconAsset when
+   * both present.
+   */
   iconKey?: string;
+  /**
+   * Prefix-discriminated icon source (5aaa232d3):
+   *   "preset:claude_code" / "preset:codex" / ... → built-in icon
+   *   "data:image/svg+xml;base64,..."             → admin-uploaded
+   *   null/undefined                              → fall back to iconKey
+   *                                                  or type-default
+   */
+  iconAsset?: string | null;
   order: number;
   enabled: boolean;
   config:

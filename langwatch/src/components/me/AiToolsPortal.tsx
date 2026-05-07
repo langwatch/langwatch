@@ -184,6 +184,7 @@ function RenderTile({
         <CodingAssistantTile
           displayName={entry.displayName}
           config={entry.config as CodingAssistantConfig}
+          iconAsset={entry.iconAsset}
           iconKey={entry.iconKey}
           slug={entry.slug}
         />
@@ -195,6 +196,7 @@ function RenderTile({
           displayName={entry.displayName}
           config={cfg}
           organizationId={orgId}
+          iconAsset={entry.iconAsset}
           iconKey={entry.iconKey}
           providerConfigured={
             configuredProviders
@@ -209,6 +211,7 @@ function RenderTile({
         <ExternalToolTile
           displayName={entry.displayName}
           config={entry.config as ExternalToolConfig}
+          iconAsset={entry.iconAsset}
           iconKey={entry.iconKey}
         />
       );
