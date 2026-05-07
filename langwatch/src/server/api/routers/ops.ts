@@ -45,7 +45,17 @@ export const opsRouter = createTRPCRouter({
    * variant of `checkOpsPermission` — only this status probe relaxes it.
    */
   getScope: protectedProcedure.use(opsViewProbe).query(({ ctx }) => {
-    return { scope: ctx.opsScope! };
+    // The opsViewProbe middleware (checkOpsPermission with throwOnDeny=false)
+    // always populates ctx.opsScope before calling next(). The runtime guard
+    // here is belt-and-suspenders — if it ever fires, the middleware contract
+    // has been violated and we want to know, not silently return undefined.
+    if (!ctx.opsScope) {
+      throw new TRPCError({
+        code: "INTERNAL_SERVER_ERROR",
+        message: "opsScope not populated by middleware (probable bug)",
+      });
+    }
+    return { scope: ctx.opsScope };
   }),
 
   getDashboardSnapshot: protectedProcedure
