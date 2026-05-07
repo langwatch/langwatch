@@ -40,13 +40,6 @@ def mock_platform_run():
 @pytest.mark.e2e
 class TestErrorHandling:
     def test_raises_experiment_not_found_for_non_existent_slug(self):
-        # Needs a valid LANGWATCH_API_KEY in env: with no key, run() raises
-        # ValueError at the local pre-flight before it can hit the API to get
-        # the 404 → ExperimentNotFoundError mapping this test asserts. Skip
-        # cleanly on fork PRs / local runs without the secret (same pattern
-        # as the other e2e files, e.g. test_fetch_policies_e2e.py).
-        if not os.getenv("LANGWATCH_API_KEY"):
-            pytest.skip("LANGWATCH_API_KEY environment variable not set")
         with pytest.raises(ExperimentNotFoundError) as exc_info:
             run("non-existent-experiment-slug-12345")
         assert "non-existent-experiment-slug-12345" in str(exc_info.value)
