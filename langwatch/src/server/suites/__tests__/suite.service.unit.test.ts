@@ -322,7 +322,6 @@ describe("SuiteService", () => {
       describe("when the suite run is triggered", () => {
         /** @scenario Suite run excludes archived scenarios from job scheduling */
         /** @scenario Filters out archived scenarios from a reference list */
-        /** @scenario Returns all scenarios when none are archived */
         it("passes only active scenario IDs to suiteRunService", async () => {
           const archivedAt = new Date();
           const { service, suiteRunService } = createService({
@@ -393,7 +392,6 @@ describe("SuiteService", () => {
     describe("given all scenarios in a suite are archived", () => {
       describe("when the suite run is triggered", () => {
         /** @scenario Suite run fails when all scenarios are archived */
-        /** @scenario Returns empty list when all scenarios are archived */
         it("throws AllScenariosArchivedError", async () => {
           const archivedAt = new Date();
           const { service, suiteRunService } = createService({
