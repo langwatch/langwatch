@@ -6,7 +6,7 @@ Feature: Guardrails API Backward Compatibility
 
   # All 12 @unimplemented scenarios remain unbound — no integration test file exists
   # for evaluations-legacy.ts. Per AUDIT_MANIFEST.md classifications:
-  # KEEP (8): "Execute with evaluator slug" (legacy:617-658), "Legacy raw settings"
+  # KEEP (9): "Execute with evaluator slug" (legacy:617-658), "Legacy raw settings"
   # (legacy:665-680), "Name is injected from evaluator" (legacy:657,892), "Slug
   # lookup fails gracefully" (legacy:659-663), "Legacy API without prefix"
   # (legacy:665-680), "Project scoping for slug lookup" (legacy:621), "Archived
