@@ -6,10 +6,7 @@ describe("generateScenarioRunId()", () => {
   it("returns an id with the 'scenariorun_' prefix and a KSUID suffix", () => {
     const id = generateScenarioRunId();
 
-    expect(id).toMatch(/^scenariorun_[A-Za-z0-9]+$/);
-
-    const suffix = id.slice("scenariorun_".length);
-    expect(suffix.length).toBeGreaterThanOrEqual(20);
+    expect(id).toMatch(/^scenariorun_[A-Za-z0-9]{29}$/);
   });
 
   it("produces a different id on each call", () => {
@@ -23,6 +20,6 @@ describe("generateBatchRunId()", () => {
   it("returns an id with the 'scenariobatch_' prefix and a KSUID suffix", () => {
     const id = generateBatchRunId();
 
-    expect(id).toMatch(/^scenariobatch_[A-Za-z0-9]+$/);
+    expect(id).toMatch(/^scenariobatch_[A-Za-z0-9]{29}$/);
   });
 });

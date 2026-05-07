@@ -66,8 +66,13 @@ describe("validateTagName()", () => {
 
   describe("when name is empty", () => {
     /** @scenario "Validation rejects empty tag names" */
-    it("throws PromptTagValidationError", () => {
-      expect(() => validateTagName("")).toThrow(PromptTagValidationError);
+    it("throws PromptTagValidationError mentioning empty", () => {
+      expect(() => validateTagName("")).toThrow(
+        expect.objectContaining({
+          name: "PromptTagValidationError",
+          message: expect.stringMatching(/empty/i),
+        }),
+      );
     });
   });
 
@@ -87,8 +92,13 @@ describe("validateTagName()", () => {
 
   describe("when name contains invalid characters", () => {
     /** @scenario "Validation rejects uppercase tag names" */
-    it("throws for uppercase names", () => {
-      expect(() => validateTagName("CANARY")).toThrow(PromptTagValidationError);
+    it("throws for uppercase names mentioning lowercase", () => {
+      expect(() => validateTagName("CANARY")).toThrow(
+        expect.objectContaining({
+          name: "PromptTagValidationError",
+          message: expect.stringMatching(/lowercase/i),
+        }),
+      );
     });
 
     it("throws for names starting with a digit", () => {

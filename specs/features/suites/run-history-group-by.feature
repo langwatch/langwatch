@@ -3,8 +3,8 @@ Feature: Suite run history group-by selector
   I want to group results by target or scenario
   So that I can analyze results from different perspectives
 
-  # Parity status: 6 of 13 scenarios bound to existing tests.
-  # Remaining 7 @unimplemented scenarios (#3458) are integration/e2e UI tests:
+  # Parity status: 6 of 14 scenarios bound to existing tests.
+  # Remaining 8 @unimplemented scenarios (#3458) are integration/e2e UI tests:
   #   - "User groups suite results by target"
   #   - "Group-by selection persists in the URL"
   #   - "Grouping by scenario re-groups results under scenario headers"
