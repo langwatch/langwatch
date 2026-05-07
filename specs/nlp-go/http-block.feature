@@ -7,11 +7,13 @@ Feature: HTTP block — call an external endpoint with templated body and JSONPa
 
   See _shared/contract.md §5; Python parity: langwatch_nlp/langwatch_nlp/studio/execute/http_node.py
 
-  # All scenarios are @unimplemented because services/nlpgo/ does not yet exist.
-  # The TS feature-parity checker only scans TS test roots, so Go-side HTTP
-  # block scenarios cannot be bound via @scenario JSDoc. Python parity tests:
+  # All scenarios are @unimplemented because the TS feature-parity checker only
+  # scans TS test roots, so Go-side HTTP block scenarios in services/nlpgo/
+  # cannot be bound via @scenario JSDoc until the checker grows Go-side support
+  # (or a parallel Go-side binder ships). services/nlpgo/ exists; the gap is
+  # tooling/binding, not service stand-up. Python parity tests:
   # langwatch_nlp/tests/studio/test_http_node_integration.py.
-  # Aspirational pending nlpgo service stand-up.
+  # Aspirational pending parity-binder coverage.
 
   Background:
     Given nlpgo is listening on :5562

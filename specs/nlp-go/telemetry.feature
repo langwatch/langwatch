@@ -9,11 +9,15 @@ Feature: Telemetry — every span carries the correct origin
   # → provider call. Sarah's engine threads it through context.Context; this spec
   # pins down the wire format and the attribute name.
 
-  # All scenarios are @unimplemented because services/nlpgo/ + AI Gateway origin
-  # threading do not yet exist. The TS feature-parity checker only scans TS
-  # test roots; Go-side OTel attribute scenarios cannot be bound via @scenario
-  # JSDoc. TS entrypoint origin emission lives in nlpgoFetch / studio routes
-  # but lacks dedicated tests. Aspirational pending nlpgo stand-up.
+  # All scenarios are @unimplemented because the origin-threading work is still
+  # incomplete: AI Gateway origin propagation and the matching nlpgo HTTP-handler
+  # → engine → block executor → gateway-client chain do not yet emit
+  # langwatch.origin on every child span. services/nlpgo/ exists; the missing
+  # piece is the cross-service threading work plus parity-binding (the TS
+  # checker only scans TS test roots, so Go-side OTel attribute scenarios
+  # cannot be bound via @scenario JSDoc). TS entrypoint origin emission lives
+  # in nlpgoFetch / studio routes but lacks dedicated tests. Aspirational
+  # pending the threading work + parity-binder coverage.
 
   Background:
     Given nlpgo is running and the AI Gateway is reachable
