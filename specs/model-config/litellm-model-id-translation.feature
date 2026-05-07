@@ -27,7 +27,7 @@ Feature: LiteLLM Model ID Translation
   Scenario: Translates Anthropic Claude 3.5 Sonnet model ID
     Given a model ID "anthropic/claude-3.5-sonnet"
     When calling translateModelIdForLitellm
-    Then the result should be "anthropic/claude-3-5-sonnet"
+    Then the result should be "anthropic/claude-3-5-sonnet-20240620"
 
     # Gemini uses dashes natively, no conversion needed
 

@@ -32,6 +32,9 @@ describe("translateModelIdForLitellm", () => {
 
     /** @scenario Translates Anthropic Claude 3.5 Sonnet model ID */
     it("translates anthropic/claude-3.5-sonnet to anthropic/claude-3-5-sonnet-20240620", () => {
+      // The MODEL_ALIASES map expands 3.5-sonnet to its full dated version
+      // (claude-3-5-sonnet-20240620), which LiteLLM requires. The dot-to-dash
+      // conversion of "3.5" → "3-5" is implicit in that expanded form.
       const result = translateModelIdForLitellm("anthropic/claude-3.5-sonnet");
       expect(result).toBe("anthropic/claude-3-5-sonnet-20240620");
     });
