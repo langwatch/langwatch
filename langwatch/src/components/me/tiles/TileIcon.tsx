@@ -8,6 +8,7 @@ import {
   ASSISTANT_PRESETS,
   type AssistantKind,
 } from "./assistantIcons";
+import { TOOL_PRESETS, resolveToolPreset } from "./toolIcons";
 import type { AiToolTileType } from "./types";
 
 const FALLBACK_ICONS: Record<AiToolTileType, ReactNode> = {
@@ -19,21 +20,29 @@ const FALLBACK_ICONS: Record<AiToolTileType, ReactNode> = {
 const PRESET_PREFIX = "preset:";
 const DATA_URL_PREFIX = "data:";
 
-interface ResolvedAsset {
-  url: string;
-  darkModeInvert: boolean;
-}
+type ResolvedAsset =
+  | { kind: "image"; url: string; darkModeInvert: boolean }
+  | { kind: "node"; node: ReactNode };
 
-function resolveIconAsset(value: string): ResolvedAsset | null {
+function resolveIconAsset(value: string, size: number): ResolvedAsset | null {
   if (value.startsWith(DATA_URL_PREFIX)) {
-    return { url: value, darkModeInvert: false };
+    return { kind: "image", url: value, darkModeInvert: false };
+  }
+  const toolKey = resolveToolPreset(value);
+  if (toolKey) {
+    const Icon = TOOL_PRESETS[toolKey].Icon;
+    return { kind: "node", node: <Icon size={size - 10} /> };
   }
   if (value.startsWith(PRESET_PREFIX)) {
     const key = value.slice(PRESET_PREFIX.length) as AssistantKind;
     if (key === "custom") return null;
     const preset = ASSISTANT_PRESETS[key];
     if (!preset?.iconUrl) return null;
-    return { url: preset.iconUrl, darkModeInvert: preset.darkModeInvert };
+    return {
+      kind: "image",
+      url: preset.iconUrl,
+      darkModeInvert: preset.darkModeInvert,
+    };
   }
   return null;
 }
@@ -54,10 +63,10 @@ export function TileIcon({
   type: AiToolTileType;
   size?: number;
 }) {
-  const resolved = iconAsset ? resolveIconAsset(iconAsset) : null;
+  const resolved = iconAsset ? resolveIconAsset(iconAsset, size) : null;
 
   let inner: ReactNode;
-  if (resolved) {
+  if (resolved?.kind === "image") {
     inner = (
       <Image
         src={resolved.url}
@@ -72,6 +81,8 @@ export function TileIcon({
         }
       />
     );
+  } else if (resolved?.kind === "node") {
+    inner = resolved.node;
   } else if (iconKey) {
     const brand =
       modelProviderIcons[iconKey as keyof typeof modelProviderIcons];

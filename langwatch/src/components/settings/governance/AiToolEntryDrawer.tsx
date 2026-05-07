@@ -21,6 +21,12 @@ import {
   ASSISTANT_PRESETS,
   type AssistantKind,
 } from "~/components/me/tiles/assistantIcons";
+import {
+  TOOL_KINDS,
+  TOOL_PRESETS,
+  isToolPresetAsset,
+  toolPresetAsset,
+} from "~/components/me/tiles/toolIcons";
 import { Drawer } from "~/components/ui/drawer";
 import { Link } from "~/components/ui/link";
 import { toaster } from "~/components/ui/toaster";
@@ -184,6 +190,9 @@ function configFromForm(form: FormState): Record<string, unknown> {
 function deriveDefaultIconAsset(form: FormState): string | null {
   if (form.type === "coding_assistant" && form.assistantKind !== "custom") {
     return `preset:${form.assistantKind}`;
+  }
+  if (form.type === "external_tool") {
+    return toolPresetAsset("wrench");
   }
   return null;
 }
@@ -529,6 +538,16 @@ function IconPreview({
   iconAsset: string | null;
   fallback: React.ReactNode;
 }) {
+  if (iconAsset && isToolPresetAsset(iconAsset)) {
+    const key = iconAsset.slice("preset:tool:".length) as
+      | (typeof TOOL_KINDS)[number]
+      | string;
+    const preset = TOOL_PRESETS[key as (typeof TOOL_KINDS)[number]];
+    if (preset) {
+      const Icon = preset.Icon;
+      return <Icon size={28} />;
+    }
+  }
   if (iconAsset?.startsWith(PRESET_PREFIX)) {
     const key = iconAsset.slice(PRESET_PREFIX.length);
     if (isAssistantKind(key) && key !== "custom") {
@@ -841,24 +860,61 @@ function ExternalToolFields({
     <>
       <FormSection
         label="Icon"
-        hint="Defaults to the wrench icon. Upload an SVG or PNG to override."
+        hint="Pick a built-in icon or upload your own SVG / PNG."
       >
-        <HStack gap={3} align="center">
-          <IconPreview iconAsset={iconAsset} fallback={<Wrench size={28} />} />
-          <IconUploadButton
-            onUploaded={onIconAssetChange}
-            label={iconAsset ? "Replace icon" : "Upload icon"}
-          />
-          {iconAsset && (
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => onIconAssetChange(null)}
-            >
-              Use default
-            </Button>
-          )}
-        </HStack>
+        <VStack align="stretch" gap={2}>
+          <HStack gap={2} flexWrap="wrap">
+            {TOOL_KINDS.map((kind) => {
+              const preset = TOOL_PRESETS[kind];
+              const Icon = preset.Icon;
+              const value = toolPresetAsset(kind);
+              const selected = iconAsset === value;
+              return (
+                <Box
+                  key={kind}
+                  as="button"
+                  type="button"
+                  onClick={() => onIconAssetChange(value)}
+                  borderWidth="1px"
+                  borderColor={selected ? "blue.500" : "border.muted"}
+                  backgroundColor={selected ? "blue.50" : "transparent"}
+                  borderRadius="sm"
+                  paddingX={3}
+                  paddingY={2}
+                  cursor="pointer"
+                  display="flex"
+                  alignItems="center"
+                  gap={2}
+                  aria-label={preset.label}
+                  aria-pressed={selected}
+                >
+                  <Icon size={18} />
+                  <Text fontSize="xs">{preset.label}</Text>
+                </Box>
+              );
+            })}
+          </HStack>
+          <HStack gap={2} align="center">
+            <IconPreview iconAsset={iconAsset} fallback={<Wrench size={28} />} />
+            <IconUploadButton
+              onUploaded={onIconAssetChange}
+              label={
+                iconAsset?.startsWith(DATA_URL_PREFIX)
+                  ? "Replace uploaded icon"
+                  : "Upload custom icon"
+              }
+            />
+            {iconAsset?.startsWith(DATA_URL_PREFIX) && (
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => onIconAssetChange(toolPresetAsset("wrench"))}
+              >
+                Use default
+              </Button>
+            )}
+          </HStack>
+        </VStack>
       </FormSection>
       <FormSection
         label="Description (markdown)"
