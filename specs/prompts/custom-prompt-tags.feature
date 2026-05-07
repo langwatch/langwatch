@@ -9,24 +9,24 @@ Feature: Custom prompt tag definitions (CRUD)
 
   # --- Create ---
 
-  @integration
+  @integration @unimplemented
   Scenario: Create a custom tag
     When I POST /api/orgs/:orgId/prompt-tags with name "canary"
     Then the response status is 201
     And the response body contains an id and name "canary"
 
-  @integration
+  @integration @unimplemented
   Scenario: Reject numeric tag names
     When I POST /api/orgs/:orgId/prompt-tags with name "42"
     Then the request is rejected with a validation error
     And the error mentions that tag names must not be numeric
 
-  @integration
+  @integration @unimplemented
   Scenario: Reject empty tag names
     When I POST /api/orgs/:orgId/prompt-tags with name ""
     Then the request is rejected with a validation error
 
-  @integration
+  @integration @unimplemented
   Scenario: Reject tag names with invalid characters
     When I POST /api/orgs/:orgId/prompt-tags with name "my tag"
     Then the request is rejected with a validation error
@@ -35,13 +35,13 @@ Feature: Custom prompt tag definitions (CRUD)
     When I POST /api/orgs/:orgId/prompt-tags with name "CANARY"
     Then the request is rejected with a validation error
 
-  @integration
+  @integration @unimplemented
   Scenario: Reject duplicate tag names within the same org
     Given a custom tag "canary" exists
     When I POST /api/orgs/:orgId/prompt-tags with name "canary"
     Then the request is rejected with a conflict error
 
-  @integration
+  @integration @unimplemented
   Scenario: Reject tag names that clash with built-in tags
     When I POST /api/orgs/:orgId/prompt-tags with name "production"
     Then the request is rejected with a validation error
@@ -49,7 +49,7 @@ Feature: Custom prompt tag definitions (CRUD)
 
   # --- Assign custom tags (existing endpoints) ---
 
-  @integration
+  @integration @unimplemented
   Scenario: Assign a custom tag to a prompt version
     Given a custom tag "canary" exists
     When I assign "canary" to v2 of "pizza-prompt"
@@ -57,35 +57,35 @@ Feature: Custom prompt tag definitions (CRUD)
 
   # --- List ---
 
-  @integration
+  @integration @unimplemented
   Scenario: List tags returns all org tags
     Given custom tags "canary" and "ab-test" exist
     When I GET /api/orgs/:orgId/prompt-tags
     Then the response includes tags "canary" and "ab-test"
     And each tag has an id and createdAt
 
-  @integration
+  @integration @unimplemented
   Scenario: List tags for an org with no custom tags
     When I GET /api/orgs/:orgId/prompt-tags
     Then the response is an empty array
 
   # --- Delete ---
 
-  @integration
+  @integration @unimplemented
   Scenario: Delete a custom tag removes the definition
     Given a custom tag "canary" exists with no assignments
     When I DELETE /api/orgs/:orgId/prompt-tags/:tagId
     Then the response status is 204
     And the tag "canary" no longer exists
 
-  @integration
+  @integration @unimplemented
   Scenario: Delete a custom tag cascades to assignments
     Given a custom tag "canary" exists
     And "canary" is assigned to v2 of "pizza-prompt"
     When I DELETE /api/orgs/:orgId/prompt-tags/:tagId
     Then the "canary" assignment on "pizza-prompt" is cleared
 
-  @integration
+  @integration @unimplemented
   Scenario: Cannot delete protected tags
     When I attempt to DELETE the "production" protected tag
     Then the request is rejected with a validation error
@@ -93,19 +93,19 @@ Feature: Custom prompt tag definitions (CRUD)
 
   # --- Authorization ---
 
-  @integration
+  @integration @unimplemented
   Scenario: Non-admin cannot create custom tags
     Given I am authenticated as a viewer for "my-org"
     When I POST /api/orgs/:orgId/prompt-tags with name "canary"
     Then the request is rejected with a 403 forbidden error
 
-  @integration
+  @integration @unimplemented
   Scenario: Tags are scoped to the org on list
     Given org "other-org" has a custom tag "canary"
     When I GET /api/orgs/:orgId/prompt-tags for "my-org"
     Then the response does not include "canary"
 
-  @integration
+  @integration @unimplemented
   Scenario: Cannot delete another org's tag
     Given org "other-org" has a custom tag "canary"
     When I attempt to DELETE the "canary" tag using other-org's tag ID

@@ -8,14 +8,14 @@ Feature: Azure Safety model provider
     And I have access to a project
     And I have "project:manage" permission
 
-  @integration
+  @integration @unimplemented
   Scenario: Azure Safety appears in the Add Model Provider list
     When I open the model providers settings page
     And I click "Add Model Provider"
     Then I see "Azure Safety" in the provider list
     And "Azure Safety" is described as "Azure Content Safety for content moderation, prompt injection, and jailbreak detection"
 
-  @integration
+  @integration @unimplemented
   Scenario: Configure Azure Safety saves endpoint and subscription key
     Given I open the model provider configuration drawer for "azure_safety"
     When I enter "https://my-account.cognitiveservices.azure.com/" in the "AZURE_CONTENT_SAFETY_ENDPOINT" field
@@ -24,7 +24,7 @@ Feature: Azure Safety model provider
     Then the Azure Safety provider is saved for the project
     And the drawer closes
 
-  @integration
+  @integration @unimplemented
   Scenario: Azure Safety form only shows credentials and extra headers
     When I open the model provider configuration drawer for "azure_safety"
     Then I see the following fields:
@@ -36,7 +36,7 @@ Feature: Azure Safety model provider
     And I do not see a "Default Model" section
     And I do not see a "Use API Gateway" toggle
 
-  @integration
+  @integration @unimplemented
   Scenario: Azure Safety validates endpoint is a URL
     Given I open the model provider configuration drawer for "azure_safety"
     When I enter "not-a-url" in the "AZURE_CONTENT_SAFETY_ENDPOINT" field
@@ -45,7 +45,7 @@ Feature: Azure Safety model provider
     Then I see a validation error for "AZURE_CONTENT_SAFETY_ENDPOINT"
     And the provider is not saved
 
-  @integration
+  @integration @unimplemented
   Scenario: Azure Safety validates subscription key is non-empty
     Given I open the model provider configuration drawer for "azure_safety"
     When I enter "https://my-account.cognitiveservices.azure.com/" in the "AZURE_CONTENT_SAFETY_ENDPOINT" field
@@ -54,14 +54,14 @@ Feature: Azure Safety model provider
     Then I see a validation error for "AZURE_CONTENT_SAFETY_KEY"
     And the provider is not saved
 
-  @integration
+  @integration @unimplemented
   Scenario: Subscription key is masked when editing existing Azure Safety provider
     Given I have "azure_safety" provider configured with key "real-subscription-key"
     When I open the model provider configuration drawer for "azure_safety"
     Then the "AZURE_CONTENT_SAFETY_KEY" field shows "HAS_KEY••••••••••••••••••••••••"
     And the actual subscription key value is not displayed
 
-  @integration
+  @integration @unimplemented
   Scenario: Preserve original subscription key when saving with masked placeholder
     Given I have "azure_safety" provider configured with key "real-subscription-key"
     When I open the model provider configuration drawer for "azure_safety"
@@ -71,7 +71,7 @@ Feature: Azure Safety model provider
     Then the original subscription key "real-subscription-key" is preserved
     And the endpoint is updated to "https://new-account.cognitiveservices.azure.com/"
 
-  @integration
+  @integration @unimplemented
   Scenario: Disable Azure Safety provider
     Given I have "azure_safety" provider enabled with valid credentials
     When I open the model provider configuration drawer for "azure_safety"

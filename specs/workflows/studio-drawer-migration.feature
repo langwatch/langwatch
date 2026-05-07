@@ -27,32 +27,32 @@ Feature: Studio Drawer Migration (Properties Panels to Drawers)
 
   # --- Node Selection Opens Drawer ---
 
-  @integration
+  @integration @unimplemented
   Scenario: Selecting a node opens a drawer instead of right-sidebar panel
     When I click on an LLM node on the canvas
     Then a drawer opens from the right side
     And the right-sidebar properties panel does not appear
     And the drawer shows the node editing content
 
-  @integration
+  @integration @unimplemented
   Scenario: Selecting an evaluator node opens its drawer
     When I click on an evaluator node on the canvas
     Then the evaluator editor drawer opens
     And the drawer shows evaluator settings and mappings
 
-  @integration
+  @integration @unimplemented
   Scenario: Selecting a code node opens its drawer
     When I click on a code node on the canvas
     Then a drawer opens with the code editor content
 
-  @integration
+  @integration @unimplemented
   Scenario: Deselecting a node closes the drawer
     Given I have a node selected and its drawer open
     When I click on the canvas background
     Then the drawer closes
     And any in-progress edits are auto-applied as local state
 
-  @integration
+  @integration @unimplemented
   Scenario: Selecting a different node switches the drawer content
     Given I have an LLM node selected and its drawer open
     When I click on a different evaluator node
@@ -61,21 +61,21 @@ Feature: Studio Drawer Migration (Properties Panels to Drawers)
 
   # --- Drawer Controls (Play + Expand) ---
 
-  @integration
+  @integration @unimplemented
   Scenario: Drawer has play and expand buttons at the top
     Given I have an executable node selected and its drawer open
     Then the drawer header shows a play button
     And the drawer header shows an expand button
     And the drawer header shows a close button
 
-  @integration
+  @integration @unimplemented
   Scenario: Play button executes the node
     Given I have an LLM node drawer open
     When I click the play button in the drawer header
     Then the node execution starts
     And the execution results appear in the output panel
 
-  @integration
+  @integration @unimplemented
   Scenario: Expand button opens the execution view
     Given I have an LLM node drawer open
     When I click the expand button in the drawer header
@@ -84,13 +84,13 @@ Feature: Studio Drawer Migration (Properties Panels to Drawers)
     And an OutputPanel appears on the right side
     And a dimmed backdrop covers the canvas
 
-  @integration
+  @integration @unimplemented
   Scenario: Pressing Escape closes the expanded execution view
     Given I am in the expanded execution view
     When I press the Escape key
     Then the execution view collapses back to the drawer
 
-  @integration
+  @integration @unimplemented
   Scenario: Clicking the backdrop closes the expanded execution view
     Given I am in the expanded execution view
     When I click on the dimmed backdrop
@@ -98,13 +98,13 @@ Feature: Studio Drawer Migration (Properties Panels to Drawers)
 
   # --- Entry/End Nodes ---
 
-  @integration
+  @integration @unimplemented
   Scenario: Entry point node opens a drawer with input field configuration
     When I click on the entry point node
     Then a drawer opens showing the entry point input fields
     And I can add, remove, and rename input fields
 
-  @integration
+  @integration @unimplemented
   Scenario: End node opens a drawer with output field configuration
     When I click on the end node
     Then a drawer opens showing the end node output fields
@@ -112,7 +112,7 @@ Feature: Studio Drawer Migration (Properties Panels to Drawers)
 
   # --- Non-Executable Nodes ---
 
-  @integration
+  @integration @unimplemented
   Scenario: Non-executable nodes do not show play button
     When I click on the entry point node
     Then the drawer opens without a play button

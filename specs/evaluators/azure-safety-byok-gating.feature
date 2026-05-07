@@ -12,7 +12,7 @@ Feature: Azure safety evaluators require BYOK provider
   # Evaluator Type Selector Drawer gating
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: Azure evaluators are disabled when no Azure Safety provider is configured
     Given the project has no "azure_safety" model provider configured
     When I open the evaluator type selector for the "Safety" category
@@ -21,7 +21,7 @@ Feature: Azure safety evaluators require BYOK provider
     And the "Azure Jailbreak Detection" card is disabled
     And each disabled card shows a tooltip saying "Configure Azure Safety provider in Settings → Model Providers"
 
-  @integration
+  @integration @unimplemented
   Scenario: Disabled Azure card shows CTA to configure the provider
     Given the project has no "azure_safety" model provider configured
     When I open the evaluator type selector for the "Safety" category
@@ -29,7 +29,7 @@ Feature: Azure safety evaluators require BYOK provider
     Then I navigate to the model providers settings page
     And the Azure Safety provider configuration drawer opens
 
-  @integration
+  @integration @unimplemented
   Scenario: Configuring Azure Safety enables all three Azure evaluators
     Given the project has no "azure_safety" model provider configured
     And the evaluator type selector is open on the "Safety" category
@@ -39,13 +39,13 @@ Feature: Azure safety evaluators require BYOK provider
     And the "Azure Prompt Injection" card is enabled
     And the "Azure Jailbreak Detection" card is enabled
 
-  @integration
+  @integration @unimplemented
   Scenario: Disabled Azure provider counts as not configured
     Given the project has an "azure_safety" model provider with disabled=true
     When I open the evaluator type selector for the "Safety" category
     Then the "Azure Content Safety" card is disabled
 
-  @integration
+  @integration @unimplemented
   Scenario: Non-Azure safety evaluators are unaffected by Azure Safety config
     Given the project has no "azure_safety" model provider configured
     When I open the evaluator type selector for the "Safety" category
@@ -56,7 +56,7 @@ Feature: Azure safety evaluators require BYOK provider
   # availableEvaluators router
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: availableEvaluators reports missing env vars for Azure when provider is absent
     Given the project has no "azure_safety" model provider configured
     When the client queries availableEvaluators for the project
@@ -66,13 +66,13 @@ Feature: Azure safety evaluators require BYOK provider
       | azure/prompt_injection | AZURE_CONTENT_SAFETY_ENDPOINT, AZURE_CONTENT_SAFETY_KEY   |
       | azure/jailbreak        | AZURE_CONTENT_SAFETY_ENDPOINT, AZURE_CONTENT_SAFETY_KEY   |
 
-  @integration
+  @integration @unimplemented
   Scenario: availableEvaluators reports no missing env vars when provider is fully configured
     Given the project has an enabled "azure_safety" model provider with both keys set
     When the client queries availableEvaluators for the project
     Then the response marks the Azure evaluators with an empty missingEnvVars list
 
-  @integration
+  @integration @unimplemented
   Scenario: availableEvaluators ignores process.env for Azure evaluators
     Given the process environment has AZURE_CONTENT_SAFETY_ENDPOINT and AZURE_CONTENT_SAFETY_KEY set
     And the project has no "azure_safety" model provider configured
@@ -83,7 +83,7 @@ Feature: Azure safety evaluators require BYOK provider
   # Runtime skip for ON_MESSAGE monitors
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: ON_MESSAGE monitor using azure/content_safety without provider emits skipped
     Given a monitor with checkType "azure/content_safety" enabled ON_MESSAGE
     And the project has no "azure_safety" model provider configured
@@ -92,7 +92,7 @@ Feature: Azure safety evaluators require BYOK provider
     And the details say "Azure Safety provider not configured. Configure it in Settings → Model Providers to run this evaluator."
     And the langevals client is not called
 
-  @integration
+  @integration @unimplemented
   Scenario: ON_MESSAGE monitor using azure/prompt_injection without provider emits skipped
     Given a monitor with checkType "azure/prompt_injection" enabled ON_MESSAGE
     And the project has no "azure_safety" model provider configured
@@ -101,7 +101,7 @@ Feature: Azure safety evaluators require BYOK provider
     And the details say "Azure Safety provider not configured. Configure it in Settings → Model Providers to run this evaluator."
     And the langevals client is not called
 
-  @integration
+  @integration @unimplemented
   Scenario: ON_MESSAGE monitor using azure/jailbreak without provider emits skipped
     Given a monitor with checkType "azure/jailbreak" enabled ON_MESSAGE
     And the project has no "azure_safety" model provider configured
@@ -110,7 +110,7 @@ Feature: Azure safety evaluators require BYOK provider
     And the details say "Azure Safety provider not configured. Configure it in Settings → Model Providers to run this evaluator."
     And the langevals client is not called
 
-  @integration
+  @integration @unimplemented
   Scenario: Configured Azure provider passes keys to langevals at runtime
     Given a monitor with checkType "azure/content_safety" enabled ON_MESSAGE
     And the project has an enabled "azure_safety" provider with:
@@ -121,7 +121,7 @@ Feature: Azure safety evaluators require BYOK provider
     Then the langevals client is called with env containing both keys
     And the evaluation is reported with status "processed"
 
-  @integration
+  @integration @unimplemented
   Scenario: Existing disabled monitors start succeeding after provider is configured
     Given a monitor with checkType "azure/content_safety" enabled ON_MESSAGE
     And the project has no "azure_safety" model provider configured
@@ -131,7 +131,7 @@ Feature: Azure safety evaluators require BYOK provider
     Then the new evaluation is reported with status "processed"
     And the monitor did not need to be re-enabled
 
-  @integration
+  @integration @unimplemented
   Scenario: Runtime skip ignores process.env for Azure evaluators
     Given the process environment has AZURE_CONTENT_SAFETY_ENDPOINT and AZURE_CONTENT_SAFETY_KEY set
     And the project has no "azure_safety" model provider configured

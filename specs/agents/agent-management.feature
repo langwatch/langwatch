@@ -11,6 +11,7 @@ Feature: Agent management
   # Agent types
   # ============================================================================
 
+  @unimplemented
   Scenario: Agent types available
     When I create a new agent
     Then I can choose from the following types:
@@ -22,6 +23,7 @@ Feature: Agent management
   # Agent CRUD - Create
   # ============================================================================
 
+  @unimplemented
   Scenario: Create code-based agent
     Given I am on the agents page
     When I click "New Agent"
@@ -33,6 +35,7 @@ Feature: Agent management
     Then the agent "Python Processor" is saved to the database
     And the agent appears in the agents list
 
+  @unimplemented
   Scenario: Create workflow-based agent
     Given I am on the agents page
     And workflow "Complex Pipeline" exists in the project
@@ -49,18 +52,21 @@ Feature: Agent management
   # Agent CRUD - Read/List
   # ============================================================================
 
+  @unimplemented
   Scenario: View agents list
     Given agents "Code Processor" and "Pipeline Agent" exist
     When I navigate to the agents page
     Then I see a list of agents
     And each agent shows its name, type, and last updated date
 
+  @unimplemented
   Scenario: Empty state when no agents
     Given no agents exist in the project
     When I navigate to the agents page
     Then I see an empty state message
     And I see a "Create your first agent" call to action
 
+  @unimplemented
   Scenario: Agents are project-scoped
     Given I am in project "Project A"
     And agent "Code Processor" exists in "Project A"
@@ -73,6 +79,7 @@ Feature: Agent management
   # Agent CRUD - Update
   # ============================================================================
 
+  @unimplemented
   Scenario: Edit code-based agent
     Given agent "Python Processor" of type "code" exists
     When I click on agent "Python Processor"
@@ -82,6 +89,7 @@ Feature: Agent management
     Then the agent is updated in the database
     And the updatedAt timestamp is refreshed
 
+  @unimplemented
   Scenario: Edit workflow-based agent
     Given agent "Pipeline Agent" of type "workflow" exists
     When I click on agent "Pipeline Agent"
@@ -94,6 +102,7 @@ Feature: Agent management
   # Agent CRUD - Delete (soft delete)
   # ============================================================================
 
+  @unimplemented
   Scenario: Archive agent
     Given agent "Old Agent" exists
     When I click the delete button for "Old Agent"
@@ -101,6 +110,7 @@ Feature: Agent management
     Then the agent is soft-deleted (archivedAt is set)
     And "Old Agent" no longer appears in the agents list
 
+  @unimplemented
   Scenario: Archived agents are excluded from list
     Given agent "Active Agent" exists
     And agent "Archived Agent" was archived
@@ -112,6 +122,7 @@ Feature: Agent management
   # Agent config storage
   # ============================================================================
 
+  @unimplemented
   Scenario: Code agent config stored as JSON
     Given I create a code-based agent with:
       | name | Python Processor           |
@@ -119,6 +130,7 @@ Feature: Agent management
     Then the agent record has type "code"
     And the config JSON contains the code configuration
 
+  @unimplemented
   Scenario: Workflow agent has workflowId at top level
     Given I create a workflow-based agent referencing workflow "Pipeline"
     Then the agent record has type "workflow"
@@ -129,18 +141,21 @@ Feature: Agent management
   # Agent selection drawer (for use in Evaluations V3)
   # ============================================================================
 
+  @unimplemented
   Scenario: AgentListDrawer shows available agents
     Given agents "Code Processor" and "Pipeline Agent" exist
     When the AgentListDrawer opens
     Then I see both agents listed
     And I see a "New Agent" button at the top
 
+  @unimplemented
   Scenario: AgentListDrawer empty state
     Given no agents exist
     When the AgentListDrawer opens
     Then I see "Create your first agent" message
     And I see a "New Agent" button
 
+  @unimplemented
   Scenario: Select agent from drawer
     Given the AgentListDrawer is open
     And agent "Code Processor" exists
@@ -148,6 +163,7 @@ Feature: Agent management
     Then the drawer closes
     And "Code Processor" is selected for use
 
+  @unimplemented
   Scenario: Create new agent from drawer flow
     Given the AgentListDrawer is open
     When I click "New Agent"
@@ -162,6 +178,7 @@ Feature: Agent management
   # Agent type selector drawer
   # ============================================================================
 
+  @unimplemented
   Scenario: AgentTypeSelectorDrawer shows two options
     When the AgentTypeSelectorDrawer opens
     Then I see two options:
@@ -169,6 +186,7 @@ Feature: Agent management
       | Code Agent     | code     | Create a Python code executor  |
       | Workflow Agent | workflow | Use an existing workflow       |
 
+  @unimplemented
   Scenario: Selecting type navigates to appropriate editor
     Given the AgentTypeSelectorDrawer is open
     When I select "Code Agent"
@@ -180,18 +198,21 @@ Feature: Agent management
   # Workflow selector drawer
   # ============================================================================
 
+  @unimplemented
   Scenario: WorkflowSelectorDrawer lists project workflows
     Given workflows "Pipeline A" and "Pipeline B" exist in the project
     When the WorkflowSelectorDrawer opens
     Then I see both workflows listed
     And I see a "+ New Workflow" button at the top
 
+  @unimplemented
   Scenario: WorkflowSelectorDrawer empty state
     Given no workflows exist in the project
     When the WorkflowSelectorDrawer opens
     Then I see "No workflows yet" message
     And I see a "+ New Workflow" button
 
+  @unimplemented
   Scenario: New Workflow button navigates to workflows page
     Given the WorkflowSelectorDrawer is open
     When I click "+ New Workflow"

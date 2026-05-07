@@ -8,7 +8,7 @@ Feature: Dataset File Upload REST API
 
   # ── Upload to Existing Dataset ─────────────────────────────────
 
-  @integration
+  @integration @unimplemented
   Scenario: Upload a CSV file to an existing dataset
     Given a dataset "user-feedback" exists with columns [{"name": "input", "type": "string"}, {"name": "output", "type": "string"}]
     When I POST /api/dataset/user-feedback/upload with a CSV file containing:
@@ -18,7 +18,7 @@ Feature: Dataset File Upload REST API
     Then the response status is 200
     And the dataset contains 2 new records with the uploaded values
 
-  @integration
+  @integration @unimplemented
   Scenario: Upload a JSONL file to an existing dataset
     Given a dataset "logs" exists with columns [{"name": "message", "type": "string"}, {"name": "level", "type": "string"}]
     When I POST /api/dataset/logs/upload with a .jsonl file containing:
@@ -29,66 +29,66 @@ Feature: Dataset File Upload REST API
     Then the response status is 200
     And the dataset contains 2 new records
 
-  @integration
+  @integration @unimplemented
   Scenario: Upload a JSON array file to an existing dataset
     Given a dataset "items" exists with columns [{"name": "name", "type": "string"}, {"name": "price", "type": "number"}]
     When I POST /api/dataset/items/upload with a .json file containing a JSON array of 3 objects
     Then the response status is 200
     And the dataset contains 3 new records
 
-  @integration
+  @integration @unimplemented
   Scenario: Upload converts values to match column types
     Given a dataset "typed" exists with columns [{"name": "count", "type": "number"}, {"name": "active", "type": "boolean"}, {"name": "created", "type": "date"}]
     When I POST /api/dataset/typed/upload with a CSV file where all values are strings
     Then string values are coerced to numbers, booleans, and dates based on columnTypes
 
-  @integration
+  @integration @unimplemented
   Scenario: Upload to dataset referenced by ID
     Given a dataset with id "dataset_abc123" exists
     When I POST /api/dataset/dataset_abc123/upload with a valid CSV file
     Then the response status is 200
     And records are added to the dataset
 
-  @integration
+  @integration @unimplemented
   Scenario: Upload fails when file columns do not match dataset columns
     Given a dataset "strict" exists with columns [{"name": "input", "type": "string"}]
     When I POST /api/dataset/strict/upload with a CSV file containing columns "question" and "answer"
     Then the request fails with 400 Bad Request
     And the error indicates the uploaded columns do not match the dataset schema
 
-  @integration
+  @integration @unimplemented
   Scenario: Upload to a non-existent dataset returns 404
     When I POST /api/dataset/does-not-exist/upload with a valid CSV file
     Then the request fails with 404 Not Found
 
-  @integration
+  @integration @unimplemented
   Scenario: Upload without a file field returns 422
     Given a dataset "empty" exists
     When I POST /api/dataset/empty/upload with no file attached
     Then the request fails with 422 Unprocessable Entity
 
-  @integration
+  @integration @unimplemented
   Scenario: Upload an empty file returns 422
     Given a dataset "empty" exists
     When I POST /api/dataset/empty/upload with a CSV file containing only headers and no data rows
     Then the request fails with 422 Unprocessable Entity
     And the error indicates the file contains no data rows
 
-  @integration
+  @integration @unimplemented
   Scenario: Upload exceeding row limit is rejected
     Given a dataset "big" exists
     When I POST /api/dataset/big/upload with a CSV file containing 10,001 rows
     Then the request fails with 400 Bad Request
     And the error indicates the row limit of 10,000 has been exceeded
 
-  @integration
+  @integration @unimplemented
   Scenario: Upload exceeding file size limit is rejected
     Given a dataset "big" exists
     When I POST /api/dataset/big/upload with a file larger than 25MB
     Then the request fails with 400 Bad Request
     And the error indicates the file size limit has been exceeded
 
-  @integration
+  @integration @unimplemented
   Scenario: Upload with unsupported file format is rejected
     Given a dataset "any" exists
     When I POST /api/dataset/any/upload with a .xlsx file
@@ -97,7 +97,7 @@ Feature: Dataset File Upload REST API
 
   # ── Create + Upload in One Call ────────────────────────────────
 
-  @integration
+  @integration @unimplemented
   Scenario: Create a new dataset from an uploaded CSV file
     When I POST /api/dataset/upload with name "From CSV" and a CSV file containing:
       | question       | answer     |
@@ -108,47 +108,47 @@ Feature: Dataset File Upload REST API
     And the dataset contains 2 records
     And the response status is 201
 
-  @integration
+  @integration @unimplemented
   Scenario: Create a new dataset from a JSONL file
     When I POST /api/dataset/upload with name "Logs" and a .jsonl file
     Then a new dataset "Logs" is created
     And column types are inferred from the JSONL keys, all defaulting to "string"
 
-  @integration
+  @integration @unimplemented
   Scenario: Create + upload infers column types as string by default
     When I POST /api/dataset/upload with name "Inferred" and a CSV file with headers "age", "active", "notes"
     Then all three columns are created with type "string"
 
-  @integration
+  @integration @unimplemented
   Scenario: Create + upload renames reserved column names
     When I POST /api/dataset/upload with name "Reserved" and a CSV file with columns "id", "input", "selected"
     Then the dataset is created with columns "id_", "input", "selected_"
     And the records use the renamed column names
 
-  @integration
+  @integration @unimplemented
   Scenario: Create + upload requires a name field
     When I POST /api/dataset/upload with a CSV file but no name field
     Then the request fails with 422 Unprocessable Entity
 
-  @integration
+  @integration @unimplemented
   Scenario: Create + upload requires a file field
     When I POST /api/dataset/upload with name "No File" but no file attached
     Then the request fails with 422 Unprocessable Entity
 
-  @integration
+  @integration @unimplemented
   Scenario: Create + upload enforces dataset plan limits
     Given the project has reached its dataset plan limit
     When I POST /api/dataset/upload with name "Over Limit" and a valid CSV file
     Then the request fails with 403 Forbidden
     And the error indicates the dataset limit has been reached
 
-  @integration
+  @integration @unimplemented
   Scenario: Create + upload fails when slug conflicts with existing dataset
     Given a dataset with slug "duplicate" already exists
     When I POST /api/dataset/upload with name "Duplicate" and a valid CSV file
     Then the request fails with 409 Conflict
 
-  @integration
+  @integration @unimplemented
   Scenario: Create + upload rejects file exceeding row limit
     When I POST /api/dataset/upload with name "Too Big" and a CSV file containing 10,001 rows
     Then the request fails with 400 Bad Request
@@ -156,25 +156,25 @@ Feature: Dataset File Upload REST API
 
   # ── Format Detection ───────────────────────────────────────────
 
-  @unit
+  @unit @unimplemented
   Scenario: Detect CSV format from .csv extension
     Given a file named "data.csv"
     When the format is detected from the file extension
     Then the detected format is "csv"
 
-  @unit
+  @unit @unimplemented
   Scenario: Detect JSON format from .json extension
     Given a file named "data.json"
     When the format is detected from the file extension
     Then the detected format is "json"
 
-  @unit
+  @unit @unimplemented
   Scenario: Detect JSONL format from .jsonl extension
     Given a file named "data.jsonl"
     When the format is detected from the file extension
     Then the detected format is "jsonl"
 
-  @unit
+  @unit @unimplemented
   Scenario: Reject unknown file extension
     Given a file named "data.parquet"
     When the format is detected from the file extension
@@ -182,13 +182,13 @@ Feature: Dataset File Upload REST API
 
   # ── CSV Parsing ────────────────────────────────────────────────
 
-  @unit
+  @unit @unimplemented
   Scenario: Parse CSV with first row as headers
     Given a CSV string with headers "a", "b" and 2 data rows
     When the CSV is parsed
     Then the result contains 2 records with keys "a" and "b"
 
-  @unit
+  @unit @unimplemented
   Scenario: Parse CSV handles quoted values with commas
     Given a CSV string where a value contains a comma inside quotes
     When the CSV is parsed
@@ -196,25 +196,25 @@ Feature: Dataset File Upload REST API
 
   # ── JSON/JSONL Parsing ─────────────────────────────────────────
 
-  @unit
+  @unit @unimplemented
   Scenario: Parse JSONL with one object per line
     Given a JSONL string with 3 lines
     When the JSONL is parsed
     Then the result contains 3 records
 
-  @unit
+  @unit @unimplemented
   Scenario: Parse JSONL ignores blank lines
     Given a JSONL string with blank lines between objects
     When the JSONL is parsed
     Then blank lines are skipped and only valid objects are returned
 
-  @unit
+  @unit @unimplemented
   Scenario: Parse JSON array file
     Given a JSON string containing an array of 2 objects
     When the JSON is parsed
     Then the result contains 2 records
 
-  @unit
+  @unit @unimplemented
   Scenario: Parse JSON falls back to JSONL when array parse fails
     Given a string that is not valid JSON but is valid JSONL
     When the JSON is parsed with JSONL fallback
@@ -222,19 +222,19 @@ Feature: Dataset File Upload REST API
 
   # ── Reserved Column Renaming (server-side) ─────────────────────
 
-  @unit
+  @unit @unimplemented
   Scenario: Rename "id" column to "id_"
     Given a list of column names including "id"
     When reserved columns are renamed
     Then "id" becomes "id_"
 
-  @unit
+  @unit @unimplemented
   Scenario: Rename "selected" column to "selected_"
     Given a list of column names including "selected"
     When reserved columns are renamed
     Then "selected" becomes "selected_"
 
-  @unit
+  @unit @unimplemented
   Scenario: Non-reserved columns are unchanged
     Given a list of column names "input", "output"
     When reserved columns are renamed
@@ -242,12 +242,12 @@ Feature: Dataset File Upload REST API
 
   # ── Authentication ─────────────────────────────────────────────
 
-  @integration
+  @integration @unimplemented
   Scenario: Upload without API key returns 401
     When I POST /api/dataset/upload without X-Auth-Token header
     Then the request fails with 401 Unauthorized
 
-  @integration
+  @integration @unimplemented
   Scenario: Upload to existing without API key returns 401
     When I POST /api/dataset/some-dataset/upload without X-Auth-Token header
     Then the request fails with 401 Unauthorized

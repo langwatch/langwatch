@@ -11,7 +11,7 @@ Feature: Evaluator error details reach the UI
   # Backend error propagation
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: langevals returns status=error with a detail message
     Given a monitor configured for azure/content_safety
     And the Azure Safety provider is configured with an endpoint that rejects the request
@@ -20,7 +20,7 @@ Feature: Evaluator error details reach the UI
     And the emitted event carries the real failure message in the error field
     And the emitted event does not lose the failure message
 
-  @integration
+  @integration @unimplemented
   Scenario: evaluator throws an exception mid-execution
     Given a monitor that will raise an unexpected exception during execution
     When the pipeline executes the monitor
@@ -32,14 +32,14 @@ Feature: Evaluator error details reach the UI
   # Frontend visibility
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: the trace evaluations tab shows the failure message on an errored row
     Given an evaluation run has been persisted with status "error" and an error message
     When I open the Trace Details drawer and switch to the Evaluations tab
     Then the errored evaluator row shows the error message inline
     And the error message is visually distinct from a passing row
 
-  @integration
+  @integration @unimplemented
   Scenario: the trace evaluations tab shows details even when error message is empty
     Given a legacy evaluation run row has status "error" with only a details string and no error field
     When I open the Trace Details drawer and switch to the Evaluations tab

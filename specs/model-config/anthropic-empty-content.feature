@@ -10,25 +10,25 @@ Feature: Anthropic Empty Content Block Handling
   # Issue: Anthropic rejects any message with empty content
   # Error: "text content blocks must be non-empty"
 
-  @unit
+  @unit @unimplemented
   Scenario: Filters empty system message when instructions are empty
     Given a prompt with empty instructions ""
     When formatting messages for Anthropic
     Then the system message should be omitted
 
-  @unit
+  @unit @unimplemented
   Scenario: Filters system message with only whitespace
     Given a prompt with instructions "   "
     When formatting messages for Anthropic
     Then the system message should be omitted
 
-  @unit
+  @unit @unimplemented
   Scenario: Preserves non-empty system message
     Given a prompt with instructions "You are a helpful assistant"
     When formatting messages for Anthropic
     Then the system message should be included with content "You are a helpful assistant"
 
-  @unit
+  @unit @unimplemented
   Scenario: Filters empty text content blocks from list content
     Given a message with content blocks:
       | type | text    |
@@ -37,7 +37,7 @@ Feature: Anthropic Empty Content Block Handling
     When filtering empty content
     Then only the "Hello" text block should remain
 
-  @unit
+  @unit @unimplemented
   Scenario: Removes message entirely if all content blocks are empty
     Given a message with content blocks:
       | type | text |
@@ -46,7 +46,7 @@ Feature: Anthropic Empty Content Block Handling
     When filtering empty content
     Then the message should be removed
 
-  @unit
+  @unit @unimplemented
   Scenario: Handles mixed content types (preserves non-text blocks)
     Given a message with content blocks:
       | type  | text    |
@@ -55,19 +55,19 @@ Feature: Anthropic Empty Content Block Handling
     When filtering empty content
     Then only the image block should remain
 
-  @unit
+  @unit @unimplemented
   Scenario: String content filtering
     Given a message with string content ""
     When filtering empty content
     Then the message should be removed
 
-  @unit
+  @unit @unimplemented
   Scenario: String content with whitespace
     Given a message with string content "   "
     When filtering empty content
     Then the message should be removed
 
-  @unit
+  @unit @unimplemented
   Scenario: Template variables rendering to empty
     Given a prompt with template "Hello {{ name }}"
     And input name=""

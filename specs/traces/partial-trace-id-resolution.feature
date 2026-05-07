@@ -13,12 +13,14 @@ Feature: Partial trace ID resolution on trace GET
     Given I am authenticated with an API key for a project
     And the project has traces stored in ClickHouse
 
+  @unimplemented
   Scenario: Full trace ID resolves exactly
     Given a trace exists with ID "63dc535cea6335c506bc81ef3543a07d"
     When I call GET /api/traces/63dc535cea6335c506bc81ef3543a07d
     Then the response status is 200
     And the response body contains the trace with that ID
 
+  @unimplemented
   Scenario: Unique prefix resolves to the full trace
     Given a trace exists with ID "63dc535cea6335c506bc81ef3543a07d"
     And no other trace in the project starts with "63dc535cea6335c506bc"
@@ -26,6 +28,7 @@ Feature: Partial trace ID resolution on trace GET
     Then the response status is 200
     And the response body contains the trace "63dc535cea6335c506bc81ef3543a07d"
 
+  @unimplemented
   Scenario: Ambiguous prefix returns 409 with the matching IDs
     Given two traces exist with IDs "abc12345def456..." and "abc12345def999..."
     When I call GET /api/traces/abc12345
@@ -33,28 +36,33 @@ Feature: Partial trace ID resolution on trace GET
     And the response body includes an error message mentioning "ambiguous"
     And the response body lists the matching full trace IDs
 
+  @unimplemented
   Scenario: No match returns 404
     Given no trace in the project starts with "deadbeef"
     When I call GET /api/traces/deadbeef
     Then the response status is 404
     And the response body message is "Trace not found."
 
+  @unimplemented
   Scenario: Prefix match is scoped to the current project
     Given project A has a trace with ID "aaaa111122223333444455556666777788889999"
     And project B has no trace starting with "aaaa1111"
     When I call GET /api/traces/aaaa1111 authenticated as project B
     Then the response status is 404
 
+  @unimplemented
   Scenario: Too-short prefix falls through to 404
     When I call GET /api/traces/ab
     Then the response status is 404
     And the response body message is "Trace not found."
 
+  @unimplemented
   Scenario: Non-hex input skips prefix scan and returns 404
     When I call GET /api/traces/not-a-hex-id-zzzz
     Then the response status is 404
     And the response body message is "Trace not found."
 
+  @unimplemented
   Scenario: CLI `trace get` with truncated ID from `trace search` succeeds
     Given I run `langwatch trace search --limit 1` and copy the displayed 20-char trace ID
     When I run `langwatch trace get <that-20-char-id>`

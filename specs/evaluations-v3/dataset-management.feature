@@ -12,17 +12,20 @@ Feature: Dataset management in evaluations workbench
   # Dataset tabs display
   # ============================================================================
 
+  @unimplemented
   Scenario: View dataset header with label
     Then I see the "Datasets" label with a database icon in the header
     And I see the "Test Data" tab
     And I see a "+" button to add more datasets
     And I see an edit button for the current dataset
 
+  @unimplemented
   Scenario: Dataset tab shows database icon indicator
     Given I have both inline and saved datasets in the workbench
     Then saved dataset tabs show a blue database icon
     And inline dataset tabs show a default colored database icon
 
+  @unimplemented
   Scenario: Active tab shows dropdown, inactive does not
     Given I have datasets "Test Data" and "Other Dataset" in the workbench
     And "Test Data" is the active dataset
@@ -33,6 +36,7 @@ Feature: Dataset management in evaluations workbench
   # Switching datasets
   # ============================================================================
 
+  @unimplemented
   Scenario: Switch datasets by clicking inactive tab
     Given I have datasets "Test Data" and "Production Samples" in the workbench
     And "Test Data" is the active dataset
@@ -45,12 +49,14 @@ Feature: Dataset management in evaluations workbench
   # Add dataset menu
   # ============================================================================
 
+  @unimplemented
   Scenario: Add dataset menu shows options in correct order
     When I click the "+" button in the dataset header
     Then I see "Select existing dataset" option first
     And I see "Upload CSV" option second
     And I see "Create new" option third
 
+  @unimplemented
   Scenario: Select existing dataset opens drawer
     When I click the "+" button in the dataset header
     And I select "Select existing dataset" from the dropdown
@@ -58,12 +64,14 @@ Feature: Dataset management in evaluations workbench
     And I see a search input to filter datasets
     And I see a list of datasets with entry count, column count, and last edit date
 
+  @unimplemented
   Scenario: Search datasets in drawer
     Given the "Choose Dataset" drawer is open
     And there are datasets "thread_test2", "Draft Evaluation (245)" in the project
     When I type "thread" in the search input
     Then only "thread_test2" is shown in the list
 
+  @unimplemented
   Scenario: Add existing dataset to workbench
     Given the "Choose Dataset" drawer is open
     When I click on dataset "Production Samples"
@@ -72,6 +80,7 @@ Feature: Dataset management in evaluations workbench
     And "Production Samples" becomes the active dataset
     And the dataset columns are loaded into the workbench
 
+  @unimplemented
   Scenario: Upload CSV opens existing modal
     When I click the "+" button in the dataset header
     And I select "Upload CSV" from the dropdown
@@ -79,6 +88,7 @@ Feature: Dataset management in evaluations workbench
     And after uploading, the dataset is saved to the database
     And the saved dataset is added to the workbench
 
+  @unimplemented
   Scenario: Create new dataset copies first dataset columns
     Given "Test Data" has columns "input", "expected_output", "context"
     When I click the "+" button in the dataset header
@@ -91,23 +101,27 @@ Feature: Dataset management in evaluations workbench
   # Active dataset dropdown menu
   # ============================================================================
 
+  @unimplemented
   Scenario: Active tab dropdown shows save option for inline
     Given "Test Data" is an inline dataset and is active
     When I click on the active "Test Data" tab dropdown
     Then I see "Save as dataset" option
     And I do NOT see "Switch to dataset" option
 
+  @unimplemented
   Scenario: Active tab dropdown shows remove when multiple datasets
     Given I have datasets "Test Data" and "Other Dataset" in the workbench
     And "Test Data" is the active dataset
     When I click on the active "Test Data" tab dropdown
     Then I see "Remove from workbench" option
 
+  @unimplemented
   Scenario: Active tab dropdown hides remove for single dataset
     Given I only have "Test Data" in the workbench
     When I click on the active "Test Data" tab dropdown
     Then I do NOT see "Remove from workbench" option
 
+  @unimplemented
   Scenario: Saved dataset dropdown has no save option
     Given "Production Samples" is a saved dataset and is active
     When I click on the active "Production Samples" tab dropdown
@@ -117,6 +131,7 @@ Feature: Dataset management in evaluations workbench
   # Save as dataset
   # ============================================================================
 
+  @unimplemented
   Scenario: Save inline dataset opens AddOrEditDatasetDrawer
     Given "Test Data" has been modified with custom rows
     When I click on the active "Test Data" tab dropdown
@@ -125,6 +140,7 @@ Feature: Dataset management in evaluations workbench
     And I can edit the dataset name
     And I can review columns and data
 
+  @unimplemented
   Scenario: After saving, tab references saved dataset
     Given I am saving "Test Data" via AddOrEditDatasetDrawer
     When the save completes successfully
@@ -135,6 +151,7 @@ Feature: Dataset management in evaluations workbench
   # Remove dataset
   # ============================================================================
 
+  @unimplemented
   Scenario: Remove dataset from workbench
     Given I have datasets "Test Data" and "Production Samples" in the workbench
     And "Production Samples" is active
@@ -148,6 +165,7 @@ Feature: Dataset management in evaluations workbench
   # Edit dataset
   # ============================================================================
 
+  @unimplemented
   Scenario: Edit dataset button opens panel
     When I click the edit button in the dataset header
     Then a translucent panel opens on the right side
@@ -155,6 +173,7 @@ Feature: Dataset management in evaluations workbench
     And I can add, remove, or rename columns
     And changes are applied to the current active dataset
 
+  @unimplemented
   Scenario: Toggle column visibility in edit panel
     When I click the edit button in the dataset header
     Then each column row shows an eye icon button
@@ -162,12 +181,14 @@ Feature: Dataset management in evaluations workbench
     Then the "metadata" column is hidden from the table
     And the eye icon changes to indicate hidden state
 
+  @unimplemented
   Scenario: Column visibility is UI-only state
     Given the "metadata" column is hidden via the eye toggle
     When I save the dataset
     Then the column visibility state is NOT saved to the dataset
     And the column visibility persists only in the evaluation UI state
 
+  @unimplemented
   Scenario: Show hidden column again
     Given the "metadata" column is hidden
     When I click the edit button in the dataset header
@@ -178,6 +199,7 @@ Feature: Dataset management in evaluations workbench
   # Execution with active dataset
   # ============================================================================
 
+  @unimplemented
   Scenario: Active dataset used for execution
     Given I have datasets "Test Data" and "Production Samples" in the workbench
     And "Production Samples" is the active dataset
@@ -189,11 +211,13 @@ Feature: Dataset management in evaluations workbench
   # Mapping integration
   # ============================================================================
 
+  @unimplemented
   Scenario: Cleanup mappings when removing dataset
     Given agent "GPT-4o" has input mapping from "External Dataset" column "question"
     When I remove "External Dataset" from the workbench
     Then the mapping from "External Dataset.question" is removed
 
+  @unimplemented
   Scenario: Mappings show dataset source in agent config
     Given I have multiple datasets in the workbench
     When I open the agent configuration panel

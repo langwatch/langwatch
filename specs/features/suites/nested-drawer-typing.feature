@@ -7,7 +7,7 @@ Feature: Nested drawer typing
     Given I am on the suites page with a project
 
   # Full user workflow: open suite editor, open child drawer, type in it
-  @e2e
+  @e2e @unimplemented
   Scenario: User types in a nested drawer opened from the suite editor
     Given the suite editor drawer is open
     When I open the scenario editor from the suite editor
@@ -15,7 +15,7 @@ Feature: Nested drawer typing
     Then the name field contains "My new scenario"
 
   # Verify focus is correctly transferred when navigating between drawers
-  @integration
+  @integration @unimplemented
   Scenario: Focus moves to the nested drawer when it opens
     Given the suite editor drawer is open
     When I open the scenario editor from the suite editor
@@ -23,7 +23,7 @@ Feature: Nested drawer typing
     And keyboard input is captured by the scenario editor
 
   # Verify typing still works after returning from a nested drawer
-  @integration
+  @integration @unimplemented
   Scenario: Typing works in the parent drawer after closing a nested drawer
     Given the suite editor drawer is open
     And the scenario editor was opened and then closed via back navigation
@@ -31,7 +31,7 @@ Feature: Nested drawer typing
     Then the suite name field contains "Updated suite name"
 
   # Verify the command bar does not steal keystrokes from drawer inputs
-  @integration
+  @integration @unimplemented
   Scenario: Command bar does not intercept typing in a nested drawer
     Given the scenario editor drawer is open from the suite editor
     When I focus an input field in the scenario editor

@@ -9,19 +9,21 @@ Feature: Create Project Drawer
     And I have permission to create projects
     And I am on a page with an "Add new project" button
 
+  @unimplemented
   Scenario: Open drawer from settings projects page
     Given I am on the settings/projects page
     When I click the "Add new project" button
     Then the CreateProjectDrawer opens
     And I remain on the settings/projects page
 
+  @unimplemented
   Scenario: Open drawer from project selector dropdown
     Given I am viewing the project selector dropdown in the navbar
     When I click "New Project"
     Then the CreateProjectDrawer opens
     And the dropdown closes
 
-  @e2e
+  @e2e @unimplemented
   Scenario: Create project in different organization from dropdown
     Given I am a member of organizations "Org A" and "Org B"
     And I am currently viewing a project in "Org A"
@@ -32,7 +34,7 @@ Feature: Create Project Drawer
     Then the project is created in "Org B"
     And I am navigated to the new project in "Org B"
 
-  @integration
+  @integration @unimplemented
   Scenario: Drawer receives correct organization when opened from different org
     Given I am a member of organizations "Org A" and "Org B"
     And I am currently viewing a project in "Org A"
@@ -40,46 +42,53 @@ Feature: Create Project Drawer
     Then the CreateProjectDrawer opens with organizationId for "Org B"
     And the form submission uses "Org B" organizationId
 
+  @unimplemented
   Scenario: Open drawer from team settings page
     Given I am on the team settings page
     When I click the "Add new project" button
     Then the CreateProjectDrawer opens
 
-  @visual
+  @visual @unimplemented
   Scenario: Drawer displays with correct structure
     When the CreateProjectDrawer opens
     Then I see a drawer sliding in from the right
     And I see a close button
     And I see a "Create New Project" title
 
+  @unimplemented
   Scenario: Drawer displays all form fields
     When the CreateProjectDrawer opens
     Then I see a "Project Name" input field
     And I see a "Team" selector
     And I see a "Create" or "Save" button
 
+  @unimplemented
   Scenario: Team selector shows available teams
     Given I belong to teams "Engineering" and "Data Science"
     When the CreateProjectDrawer opens
     Then the team selector shows "Engineering" and "Data Science"
     And there is an option to create a new team
 
+  @unimplemented
   Scenario: Close drawer via close button
     Given the CreateProjectDrawer is open
     When I click the close button
     Then the drawer closes
     And no project is created
 
+  @unimplemented
   Scenario: Close drawer via overlay click
     Given the CreateProjectDrawer is open
     When I click outside the drawer (on the overlay)
     Then the drawer closes
 
+  @unimplemented
   Scenario: Close drawer via Escape key
     Given the CreateProjectDrawer is open
     When I press the Escape key
     Then the drawer closes
 
+  @unimplemented
   Scenario: Project name is required
     Given the CreateProjectDrawer is open
     And the project name field is empty
@@ -87,29 +96,34 @@ Feature: Create Project Drawer
     Then validation prevents submission
     And the project name field shows an error state
 
+  @unimplemented
   Scenario: Project name with only whitespace is invalid
     Given the CreateProjectDrawer is open
     When I enter "   " (only spaces) as the project name
     And I try to submit the form
     Then validation prevents submission
 
+  @unimplemented
   Scenario: Team selection is required
     Given the CreateProjectDrawer is open
     And no team is selected
     When I try to submit the form
     Then validation prevents submission
 
+  @unimplemented
   Scenario: Valid form enables submit button
     Given the CreateProjectDrawer is open
     When I enter a valid project name
     And I select a team
     Then the submit button is enabled
 
+  @unimplemented
   Scenario: Show new team name field when creating new team
     Given the CreateProjectDrawer is open
     When I select "Create new team" from the team selector
     Then a "New Team Name" input field appears
 
+  @unimplemented
   Scenario: New team name is required when creating team
     Given I have selected "Create new team"
     And the new team name field is empty
@@ -117,6 +131,7 @@ Feature: Create Project Drawer
     Then validation prevents submission
     And the new team name field shows an error state
 
+  @unimplemented
   Scenario: Show upgrade modal when submitting at max projects
     Given my organization has reached the maximum project limit
     And the plan does not override adding limitations
@@ -127,6 +142,7 @@ Feature: Create Project Drawer
     Then the upgrade modal appears
     And the project is not created
 
+  @unimplemented
   Scenario: Drawer opens without warnings when at limit
     Given my organization has reached the maximum project limit
     When I click "Add new project"
@@ -134,7 +150,7 @@ Feature: Create Project Drawer
     And I do not see any inline limit warnings
     And the submit button is enabled
 
-  @unit
+  @unit @unimplemented
   Scenario: Allow creation when plan has override enabled
     Given my organization has reached the maximum project limit
     But the plan has overrideAddingLimitations enabled
@@ -142,13 +158,14 @@ Feature: Create Project Drawer
     Then the Create button is enabled
     And I can submit the form successfully
 
-  @visual
+  @visual @unimplemented
   Scenario: Show loading state during submission
     Given I have filled out the form correctly
     When I click the submit button
     Then the submit button shows a loading indicator
     And the form fields are disabled during submission
 
+  @unimplemented
   Scenario: Disable submit button while loading
     Given the form is being submitted
     Then the submit button is disabled

@@ -18,7 +18,7 @@ Feature: OTel tracing on ScenarioEventRepository methods
   # Span creation for each untraced public method
   # ============================================================================
 
-  @unit
+  @unit @unimplemented
   Scenario Outline: <method> emits an OTel span with correct attributes
     When <method> is called
     Then a span named "ScenarioEventRepository.<method>" is created

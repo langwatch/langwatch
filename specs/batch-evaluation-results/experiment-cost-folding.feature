@@ -13,6 +13,7 @@ Feature: Experiment trace cost folding
   # Trace Attribute Hoisting
   # ============================================================================
 
+  @unimplemented
   Scenario: evaluation.run_id is hoisted to trace-level attributes
     Given a span has the attribute evaluation.run_id set to "run-abc"
     When the trace processing pipeline processes the span
@@ -22,6 +23,7 @@ Feature: Experiment trace cost folding
   # ECST: Trace-side Metrics Publishing
   # ============================================================================
 
+  @unimplemented
   Scenario: Trace metrics are published to experiment pipeline after stabilisation
     Given a trace has evaluation.run_id = "run-abc" in its attributes
     And the trace has a total cost of $0.003
@@ -29,11 +31,13 @@ Feature: Experiment trace cost folding
     Then the experimentMetricsSync reactor dispatches computeExperimentRunMetrics
     And the command payload includes traceId and totalCost = 0.003
 
+  @unimplemented
   Scenario: Reactor does not fire for traces without evaluation.run_id
     Given a trace has no evaluation.run_id attribute
     When the trace stabilises
     Then the experimentMetricsSync reactor does not dispatch any command
 
+  @unimplemented
   Scenario: Reactor does not fire when trace has no cost data
     Given a trace has evaluation.run_id = "run-abc"
     And the trace has no cost data
@@ -44,16 +48,19 @@ Feature: Experiment trace cost folding
   # Fold Projection: Aggregate Cost Accumulation
   # ============================================================================
 
+  @unimplemented
   Scenario: Trace cost is accumulated into experiment run TotalCost
     Given an experiment run fold state with TotalCost = null
     When a TraceMetricsComputedEvent arrives with totalCost = 0.003
     Then the fold state TotalCost becomes 0.003
 
+  @unimplemented
   Scenario: Multiple trace costs accumulate
     Given an experiment run fold state with TotalCost = 0.003
     When a TraceMetricsComputedEvent arrives with totalCost = 0.002
     Then the fold state TotalCost becomes 0.005
 
+  @unimplemented
   Scenario: Per-trace cost breakdown is maintained
     Given an experiment run has processed traces t1 (cost=0.003) and t2 (cost=0.002)
     Then the fold state TraceMetrics contains entries for both t1 and t2
@@ -64,12 +71,14 @@ Feature: Experiment trace cost folding
   # Read-time Enrichment: Per-item Costs
   # ============================================================================
 
+  @unimplemented
   Scenario: Single-target experiment items get cost from their trace
     Given an experiment run item has traceId = "trace-1"
     And trace_summaries has TotalCost = 0.003 for trace-1
     When fetching run results via getRun()
     Then the dataset entry for trace-1 has cost = 0.003
 
+  @unimplemented
   Scenario: Multi-target items split trace cost evenly
     Given an experiment run has two target items sharing traceId = "trace-1"
     And trace_summaries has TotalCost = 0.006 for trace-1
@@ -80,6 +89,7 @@ Feature: Experiment trace cost folding
   # End-to-end
   # ============================================================================
 
+  @unimplemented
   Scenario: Cost appears in SDK experiment results DataFrame
     Given I run an SDK experiment with evaluation.loop()
     And the model calls incur real LLM costs
@@ -87,6 +97,7 @@ Feature: Experiment trace cost folding
     Then the DataFrame includes a cost column with non-null values
     And the cost values match the LLM usage from the traces
 
+  @unimplemented
   Scenario: Cost appears in experiment results UI
     Given an experiment run has completed with trace costs folded
     When I view the experiment results page

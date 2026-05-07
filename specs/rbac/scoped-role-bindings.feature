@@ -94,7 +94,7 @@ Feature: Scoped role bindings
   # Permission checking from effective role
   # ============================================================================
 
-  @unit
+  @unit @unimplemented
   Scenario Outline: Effective role maps to correct permission grants
     Given user "alice" has a RoleBinding: <role> on team "client-a"
     When the platform checks if alice has permission "<permission>" on project "clienta-dev"

@@ -8,16 +8,19 @@ Feature: MCP Trace Tools
     Given the MCP server is configured with a valid API key
     And the LangWatch project has traces
 
+  @unimplemented
   Scenario: Agent searches traces with a text query
     When the agent calls search_traces with query "login error"
     Then the response contains matching traces with summaries
     And each trace summary includes trace_id, input preview, timestamps, and status
     And the response defaults to the last 24 hours
 
+  @unimplemented
   Scenario: Agent searches traces filtered by user_id
     When the agent calls search_traces with filters {"metadata.user_id": ["user-123"]}
     Then the response contains only traces from user "user-123"
 
+  @unimplemented
   Scenario: Agent paginates through trace results
     Given there are more than 25 traces
     When the agent calls search_traces with pageSize 25
@@ -25,6 +28,7 @@ Feature: MCP Trace Tools
     When the agent calls search_traces with the returned scrollId
     Then the response contains the next page of results
 
+  @unimplemented
   Scenario: Agent gets a single trace by ID in AI-readable format
     Given a trace exists with id "trace-abc-123"
     When the agent calls get_trace with traceId "trace-abc-123"
@@ -33,6 +37,7 @@ Feature: MCP Trace Tools
     And the response includes evaluation results
     And timestamps are formatted as relative time (e.g., "2 hours ago")
 
+  @unimplemented
   Scenario: Agent gets a trace that does not exist
     When the agent calls get_trace with traceId "nonexistent-trace"
     Then the response contains an error message "Trace not found"

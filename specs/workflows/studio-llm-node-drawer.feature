@@ -28,7 +28,7 @@ Feature: Studio LLM Node Drawer
 
   # --- Drag and Drop Creates New Prompt ---
 
-  @integration
+  @integration @unimplemented
   Scenario: Dragging LLM node to canvas creates a new unsaved prompt
     When I drag the "LLM" item from the sidebar onto the canvas
     Then an LLM node is created on the canvas with name "New Prompt"
@@ -36,7 +36,7 @@ Feature: Studio LLM Node Drawer
     And the node has default LLM settings as local state
     And the prompt editor drawer opens automatically
 
-  @integration
+  @integration @unimplemented
   Scenario: Saving the new prompt from the drawer creates a DB record
     Given I have dragged a new LLM node onto the canvas
     And the prompt editor drawer is open with default content
@@ -49,7 +49,7 @@ Feature: Studio LLM Node Drawer
 
   # --- Selecting Existing Prompt ---
 
-  @integration
+  @integration @unimplemented
   Scenario: User can select an existing prompt from the library
     Given I have an LLM node on the canvas
     When I open the LLM node drawer
@@ -61,7 +61,7 @@ Feature: Studio LLM Node Drawer
 
   # --- Local State for LLM Nodes ---
 
-  @integration
+  @integration @unimplemented
   Scenario: Editing prompt messages creates local state
     Given I have an LLM node referencing a saved prompt
     When I open the drawer and edit the prompt messages
@@ -69,14 +69,14 @@ Feature: Studio LLM Node Drawer
     And the saved prompt in the database is not modified
     And the node shows an unsaved changes indicator
 
-  @integration
+  @integration @unimplemented
   Scenario: Changing LLM model creates local state
     Given I have an LLM node referencing a saved prompt
     When I open the drawer and change the LLM model
     Then the model change is stored in localPromptConfig
     And the saved prompt retains its original model setting
 
-  @integration
+  @integration @unimplemented
   Scenario: Changing temperature or other LLM parameters creates local state
     Given I have an LLM node referencing a saved prompt
     When I open the drawer and change the temperature
@@ -85,7 +85,7 @@ Feature: Studio LLM Node Drawer
 
   # --- Apply / Save / Discard ---
 
-  @integration
+  @integration @unimplemented
   Scenario: Apply closes drawer and keeps local prompt changes
     Given I have unsaved prompt changes in the drawer
     When I click "Apply"
@@ -93,7 +93,7 @@ Feature: Studio LLM Node Drawer
     And the local changes remain on the LLM node
     And the orange dot stays visible on the node
 
-  @integration
+  @integration @unimplemented
   Scenario: Save persists prompt changes to DB
     Given I have unsaved prompt changes in the drawer
     When I click "Save"
@@ -101,7 +101,7 @@ Feature: Studio LLM Node Drawer
     And the local state is cleared from the LLM node
     And the orange dot disappears
 
-  @integration
+  @integration @unimplemented
   Scenario: Discard reverts to saved prompt version
     Given I have unsaved prompt changes in the drawer
     When I click "Discard changes"
@@ -111,14 +111,14 @@ Feature: Studio LLM Node Drawer
 
   # --- Input/Output Variables ---
 
-  @integration
+  @integration @unimplemented
   Scenario: Adding input variables updates the node inputs
     Given I have an LLM node with the drawer open
     When I add an input variable "context" of type "str"
     Then the LLM node's inputs on the canvas update to include "context"
     And edges can be connected to the new "context" input handle
 
-  @integration
+  @integration @unimplemented
   Scenario: Adding output variables updates the node outputs
     Given I have an LLM node with the drawer open
     When I add an output variable "summary" of type "str"
@@ -126,14 +126,14 @@ Feature: Studio LLM Node Drawer
 
   # --- Execution ---
 
-  @integration
+  @integration @unimplemented
   Scenario: Executing LLM node with local changes uses local config
     Given I have an LLM node with unsaved prompt changes
     When I execute the node
     Then the execution uses the local prompt config (messages, model, parameters)
     And the saved DB prompt version is not used
 
-  @integration
+  @integration @unimplemented
   Scenario: Executing LLM node without local changes uses saved prompt
     Given I have an LLM node referencing a saved prompt with no local changes
     When I execute the node
@@ -141,7 +141,7 @@ Feature: Studio LLM Node Drawer
 
   # --- Backward Compatibility ---
 
-  @unit
+  @unit @unimplemented
   Scenario: Existing workflows with inline LLM config continue to work
     Given a workflow was saved with LLM nodes using the old inline parameter format
     When the workflow loads
@@ -149,7 +149,7 @@ Feature: Studio LLM Node Drawer
     And the nodes can be edited through the drawer
     And the inline config is shown as editable content
 
-  @integration
+  @integration @unimplemented
   Scenario: Saving inline LLM config as a prompt requires explicit action
     Given I have an LLM node with old inline config (no prompt reference)
     When I open the drawer
@@ -161,7 +161,7 @@ Feature: Studio LLM Node Drawer
 
   # --- Unsaved New Prompt in Workflow ---
 
-  @integration
+  @integration @unimplemented
   Scenario: Unsaved new prompt persists in workflow
     Given I have dragged an LLM node onto the canvas but not saved the prompt
     When the workflow is saved

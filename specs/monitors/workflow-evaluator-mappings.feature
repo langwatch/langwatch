@@ -17,6 +17,7 @@ Feature: Workflow evaluator mappings in Online Evaluation
   # Workflow evaluator field detection
   # ============================================================================
 
+  @unimplemented
   Scenario: Workflow evaluator shows mapping fields from workflow entry node
     Given the online evaluation drawer is open at trace level
     When I select evaluator "My Scorer"
@@ -25,6 +26,7 @@ Feature: Workflow evaluator mappings in Online Evaluation
     And "input" and "output" should be auto-mapped to trace fields
     And "score" should be highlighted as needing mapping
 
+  @unimplemented
   Scenario: Workflow evaluator without entry outputs shows no mappings needed
     Given I have a workflow with no entry node outputs
     And I have a workflow evaluator "Empty Scorer" linked to it
@@ -32,6 +34,7 @@ Feature: Workflow evaluator mappings in Online Evaluation
     Then I should see "This evaluator does not require any input mappings"
     And I should be able to save immediately
 
+  @unimplemented
   Scenario: Workflow with only optional-like fields allows saving
     Given I have a workflow with entry outputs: "input", "output"
     And I have a workflow evaluator linked to it
@@ -44,6 +47,7 @@ Feature: Workflow evaluator mappings in Online Evaluation
   # Mapping persistence
   # ============================================================================
 
+  @unimplemented
   Scenario: Workflow evaluator mappings persist after configuration
     Given the online evaluation drawer is open at trace level
     And I selected workflow evaluator "My Scorer"
@@ -56,6 +60,7 @@ Feature: Workflow evaluator mappings in Online Evaluation
     Then the monitor should be created with the configured mappings
     And the mappings should include all three fields
 
+  @unimplemented
   Scenario: Editing existing monitor preserves workflow mappings
     Given I have an existing monitor with workflow evaluator "My Scorer"
     And the monitor has mappings for "input", "output", "score"
@@ -67,6 +72,7 @@ Feature: Workflow evaluator mappings in Online Evaluation
   # Switching between evaluators
   # ============================================================================
 
+  @unimplemented
   Scenario: Switching from built-in to workflow evaluator refreshes mappings
     Given the online evaluation drawer is open at trace level
     And I selected built-in evaluator "Exact Match" with auto-mapped fields
@@ -75,6 +81,7 @@ Feature: Workflow evaluator mappings in Online Evaluation
     And auto-mapping should run for common fields
     And new fields like "score" should need mapping
 
+  @unimplemented
   Scenario: Switching from workflow to built-in evaluator uses builtin fields
     Given the online evaluation drawer is open at trace level
     And I selected workflow evaluator "My Scorer"
@@ -86,6 +93,7 @@ Feature: Workflow evaluator mappings in Online Evaluation
   # Thread level mappings
   # ============================================================================
 
+  @unimplemented
   Scenario: Workflow evaluator at thread level uses thread sources
     Given the online evaluation drawer is open at thread level
     When I select workflow evaluator "My Scorer"
@@ -93,6 +101,7 @@ Feature: Workflow evaluator mappings in Online Evaluation
     And "traces" array should be available as a source
     And auto-mapping should use thread-appropriate defaults
 
+  @unimplemented
   Scenario: Switching levels clears and re-infers mappings
     Given I have workflow evaluator "My Scorer" selected at trace level
     And mappings are configured for trace sources

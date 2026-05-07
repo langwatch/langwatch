@@ -9,7 +9,7 @@ Feature: Model Parameter Constraints
 
   # Unit Tests: Constraint Resolution
 
-  @unit
+  @unit @unimplemented
   Scenario: Anthropic provider has temperature max 1.0
     Given the provider "anthropic" has parameterConstraints:
       | parameter   | min | max |
@@ -18,20 +18,20 @@ Feature: Model Parameter Constraints
     Then temperature constraint should have max 1.0
     And temperature constraint should have min 0
 
-  @unit
+  @unit @unimplemented
   Scenario: OpenAI provider uses global defaults
     Given the provider "openai" has no parameterConstraints for temperature
     When resolving constraints for model "openai/gpt-4.1"
     Then temperature constraint should be undefined
     # UI falls back to global default max 2.0 from parameterRegistry
 
-  @unit
+  @unit @unimplemented
   Scenario: Unknown provider returns undefined constraints
     Given a model ID "unknown-provider/some-model"
     When resolving constraints for that model
     Then the result should be undefined
 
-  @unit
+  @unit @unimplemented
   Scenario: Model ID without provider prefix returns undefined
     Given a model ID "standalone-model"
     When resolving constraints for that model
@@ -39,28 +39,28 @@ Feature: Model Parameter Constraints
 
   # Unit Tests: Value Clamping (Python Backend)
 
-  @unit
+  @unit @unimplemented
   Scenario: Clamping temperature above provider max
     Given a temperature value of 1.5
     And provider "anthropic" has temperature max 1.0
     When clamping the value to provider constraints
     Then the result should be 1.0
 
-  @unit
+  @unit @unimplemented
   Scenario: Clamping temperature below provider min
     Given a temperature value of -0.5
     And provider "anthropic" has temperature min 0
     When clamping the value to provider constraints
     Then the result should be 0
 
-  @unit
+  @unit @unimplemented
   Scenario: Value within constraints unchanged
     Given a temperature value of 0.7
     And provider "anthropic" has temperature min 0 and max 1.0
     When clamping the value to provider constraints
     Then the result should be 0.7
 
-  @unit
+  @unit @unimplemented
   Scenario: Provider without constraints returns original value
     Given a temperature value of 1.8
     And provider "openai" has no temperature constraints
@@ -69,7 +69,7 @@ Feature: Model Parameter Constraints
 
   # Integration Tests: UI Slider Behavior
 
-  @integration
+  @integration @unimplemented
   Scenario: Temperature slider respects Anthropic constraints
     Given I am on a page with the LLM Config popover
     And model providers are loaded for my project
@@ -78,7 +78,7 @@ Feature: Model Parameter Constraints
     Then the Temperature slider max should be 1.0
     And the Temperature slider min should be 0
 
-  @integration
+  @integration @unimplemented
   Scenario: Temperature slider uses global defaults for OpenAI
     Given I am on a page with the LLM Config popover
     And model providers are loaded for my project
@@ -87,7 +87,7 @@ Feature: Model Parameter Constraints
     Then the Temperature slider max should be 2.0
     And the Temperature slider min should be 0
 
-  @integration
+  @integration @unimplemented
   Scenario: Switching from OpenAI to Anthropic updates slider constraints
     Given I am on a page with the LLM Config popover
     And the selected model is "openai/gpt-4.1"
@@ -96,7 +96,7 @@ Feature: Model Parameter Constraints
     Then the Temperature slider max should be 1.0
     And the temperature value should be clamped to 1.0
 
-  @integration
+  @integration @unimplemented
   Scenario: Input field respects provider constraints
     Given I am on a page with the LLM Config popover
     And the selected model is "anthropic/claude-sonnet-4"
@@ -106,7 +106,7 @@ Feature: Model Parameter Constraints
 
   # Defense in Depth: API Validation
 
-  @integration
+  @integration @unimplemented
   Scenario: Backend clamps out-of-range temperature for Anthropic
     Given a prompt execution request with:
       | model                      | anthropic/claude-sonnet-4 |

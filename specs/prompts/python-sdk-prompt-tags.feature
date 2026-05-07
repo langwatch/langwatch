@@ -8,14 +8,14 @@ Feature: Python SDK Prompt Tag Support
 
   # --- Fetch by Tag ---
 
-  @integration
+  @integration @unimplemented
   Scenario: Fetch prompt by tag
     Given the API returns version v3 for "pizza-prompt" with tag "production"
     When I call langwatch.prompts.get("pizza-prompt", tag="production")
     Then the SDK sends GET /api/prompts/pizza-prompt?tag=production
     And I receive version v3 config data
 
-  @integration
+  @integration @unimplemented
   Scenario: Fetch without tag returns latest
     Given the API returns the latest version v4 for "pizza-prompt"
     When I call langwatch.prompts.get("pizza-prompt")
@@ -24,7 +24,7 @@ Feature: Python SDK Prompt Tag Support
 
   # --- Shorthand Syntax ---
 
-  @integration
+  @integration @unimplemented
   Scenario: Shorthand syntax passes through to API
     When I call langwatch.prompts.get("pizza-prompt:production")
     Then the SDK passes "pizza-prompt:production" as the ID to the generated client
@@ -32,7 +32,7 @@ Feature: Python SDK Prompt Tag Support
 
   # --- Cache Isolation ---
 
-  @integration
+  @integration @unimplemented
   Scenario: Tagged and untagged fetches return independent results
     Given the API returns v3 for tag "production" and v4 for no tag
     When I call get("pizza-prompt", tag="production") with CACHE_TTL policy
@@ -41,7 +41,7 @@ Feature: Python SDK Prompt Tag Support
     And the first call returns v3
     And the second call returns v4
 
-  @integration
+  @integration @unimplemented
   Scenario: Fetches with different tags return independent results
     Given the API returns v3 for tag "production" and v2 for tag "staging"
     When I call get("pizza-prompt", tag="production") with CACHE_TTL policy
@@ -51,7 +51,7 @@ Feature: Python SDK Prompt Tag Support
 
   # --- Fetch Policy + Tag Interaction ---
 
-  @integration
+  @integration @unimplemented
   Scenario: Tag with MATERIALIZED_FIRST skips local and fetches from API
     Given a local prompt file exists for "pizza-prompt"
     And the API returns v3 for tag "production"
@@ -61,7 +61,7 @@ Feature: Python SDK Prompt Tag Support
 
   # --- Error Propagation ---
 
-  @integration
+  @integration @unimplemented
   Scenario: Unassigned tag propagates API error
     Given the API returns a not-found error for tag "production" on "pizza-prompt"
     When I call langwatch.prompts.get("pizza-prompt", tag="production")
@@ -69,7 +69,7 @@ Feature: Python SDK Prompt Tag Support
 
   # --- Tag Assignment ---
 
-  @integration
+  @integration @unimplemented
   Scenario: Assign tag to existing version
     Given a valid prompt "pizza-prompt" with version_id "prompt_version_abc123"
     When I call langwatch.prompts.tags.assign("pizza-prompt", tag="production", version_id="prompt_version_abc123")
@@ -78,12 +78,12 @@ Feature: Python SDK Prompt Tag Support
 
   # --- Tags on Create/Update ---
 
-  @integration
+  @integration @unimplemented
   Scenario: Create prompt with tags
     When I call langwatch.prompts.create with tags=["production"]
     Then the SDK sends POST /api/prompts with tags ["production"] in the request body
 
-  @integration
+  @integration @unimplemented
   Scenario: Update prompt with tags
     When I call langwatch.prompts.update with tags=["staging"]
     Then the SDK sends PUT /api/prompts/{id} with tags ["staging"] in the request body

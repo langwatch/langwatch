@@ -7,26 +7,31 @@ Feature: MCP Scenario Management Tools
   Background:
     Given the MCP server is configured with a valid API key
 
+  @unimplemented
   Scenario: Agent lists all scenarios in a project
     Given the project has scenarios configured
     When the agent calls list_scenarios
     Then the response contains a list of scenarios
 
+  @unimplemented
   Scenario: Agent lists scenarios when none exist
     Given the project has no scenarios
     When the agent calls list_scenarios
     Then the response contains a message "No scenarios found"
     And the response includes a tip to use create_scenario
 
+  @unimplemented
   Scenario: Agent gets full details of a scenario
     Given a scenario exists with id "scen_abc123"
     When the agent calls get_scenario with scenarioId "scen_abc123"
     Then the response includes the scenario name, situation, criteria, and labels
 
+  @unimplemented
   Scenario: Agent gets a scenario that does not exist
     When the agent calls get_scenario with scenarioId "scen_nonexistent"
     Then the response contains an error message "Scenario not found"
 
+  @unimplemented
   Scenario: Agent creates a new scenario
     When the agent calls create_scenario with:
       | field     | value                                    |
@@ -43,10 +48,12 @@ Feature: MCP Scenario Management Tools
     Then the response confirms the scenario was created
     And the response includes the new scenario ID
 
+  @unimplemented
   Scenario: Agent creates a scenario with missing required fields
     When the agent calls create_scenario with an empty name
     Then the response contains a validation error
 
+  @unimplemented
   Scenario: Agent updates an existing scenario
     Given a scenario exists with id "scen_abc123"
     When the agent calls update_scenario with:
@@ -62,10 +69,12 @@ Feature: MCP Scenario Management Tools
     Then the response confirms the scenario was updated
     And the response includes the updated scenario details
 
+  @unimplemented
   Scenario: Agent updates a scenario that does not exist
     When the agent calls update_scenario with scenarioId "scen_nonexistent"
     Then the response contains an error message "Scenario not found"
 
+  @unimplemented
   Scenario: Agent archives a scenario
     Given a scenario exists with id "scen_abc123"
     When the agent calls archive_scenario with scenarioId "scen_abc123"

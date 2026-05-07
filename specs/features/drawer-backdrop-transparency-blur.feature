@@ -6,7 +6,7 @@ Feature: Drawer backdrop transparency and blur
   Background:
     Given the application is loaded
 
-  @integration
+  @integration @unimplemented
   Scenario: Drawer content panel applies blur filter and transparency
     When a drawer opens
     Then the drawer content panel has a backdrop-filter with 25px blur

@@ -6,7 +6,7 @@ Feature: Scenario drawer closes after saving completes
   Background:
     Given I am logged into project "my-project"
 
-  @e2e
+  @e2e @unimplemented
   Scenario: Drawer closes after saving a new scenario
     Given I opened the scenario editor via "New Scenario"
     And I filled in "Name" with "Refund Request Test"
@@ -16,7 +16,7 @@ Feature: Scenario drawer closes after saving completes
     Then the scenario drawer closes
     And "Refund Request Test" appears in the scenarios list
 
-  @e2e
+  @e2e @unimplemented
   Scenario: Drawer closes after updating an existing scenario
     Given scenario "Refund Flow" exists
     And I am editing scenario "Refund Flow" in the drawer
@@ -25,7 +25,7 @@ Feature: Scenario drawer closes after saving completes
     Then the scenario drawer closes
     And "Refund Flow (Updated)" appears in the scenarios list
 
-  @integration
+  @integration @unimplemented
   Scenario: Drawer stays open when save fails
     Given I am editing a scenario in the drawer
     And the save request will fail
@@ -33,7 +33,7 @@ Feature: Scenario drawer closes after saving completes
     Then I see an error message
     And the scenario drawer remains open
 
-  @integration
+  @integration @unimplemented
   Scenario: Drawer stays open after save-and-run
     Given I am editing scenario "Refund Flow" in the drawer
     And a target is selected

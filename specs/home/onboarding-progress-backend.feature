@@ -9,6 +9,7 @@ Feature: Onboarding Progress Backend
     And I have access to project "project-456"
 
   # All steps
+  @unimplemented
   Scenario: Returns all steps with completion status
     When I request the onboarding status
     Then I should receive all onboarding steps:
@@ -21,33 +22,39 @@ Feature: Onboarding Progress Backend
       | createDataset     | 6     |
 
   # Create project step (always complete)
+  @unimplemented
   Scenario: Step createProject is always complete
     Given the project exists
     When I request the onboarding status
     Then step "createProject" should be complete
 
   # Sync first message step
+  @unimplemented
   Scenario: Step syncFirstMessage is incomplete when project has no firstMessage
     Given the project has firstMessage set to false
     When I request the onboarding status
     Then step "syncFirstMessage" should be incomplete
 
+  @unimplemented
   Scenario: Step syncFirstMessage is complete when project has firstMessage
     Given the project has firstMessage set to true
     When I request the onboarding status
     Then step "syncFirstMessage" should be complete
 
   # Create workflow step
+  @unimplemented
   Scenario: Step createWorkflow is incomplete when no workflows exist
     Given the project has 0 workflows
     When I request the onboarding status
     Then step "createWorkflow" should be incomplete
 
+  @unimplemented
   Scenario: Step createWorkflow is complete when at least one workflow exists
     Given the project has 1 workflow
     When I request the onboarding status
     Then step "createWorkflow" should be complete
 
+  @unimplemented
   Scenario: Step createWorkflow ignores archived workflows
     Given the project has 1 archived workflow
     And the project has 0 active workflows
@@ -55,39 +62,46 @@ Feature: Onboarding Progress Backend
     Then step "createWorkflow" should be incomplete
 
   # Create simulation step
+  @unimplemented
   Scenario: Step createSimulation is incomplete when no simulations exist
     Given the project has 0 scenario sets
     When I request the onboarding status
     Then step "createSimulation" should be incomplete
 
+  @unimplemented
   Scenario: Step createSimulation is complete when at least one simulation exists
     Given the project has 1 scenario set
     When I request the onboarding status
     Then step "createSimulation" should be complete
 
   # Setup evaluation step
+  @unimplemented
   Scenario: Step setupEvaluation is incomplete when no evaluations exist
     Given the project has 0 monitors
     When I request the onboarding status
     Then step "setupEvaluation" should be incomplete
 
+  @unimplemented
   Scenario: Step setupEvaluation is complete when at least one evaluation exists
     Given the project has 1 monitor
     When I request the onboarding status
     Then step "setupEvaluation" should be complete
 
   # Create dataset step
+  @unimplemented
   Scenario: Step createDataset is incomplete when no datasets exist
     Given the project has 0 datasets
     When I request the onboarding status
     Then step "createDataset" should be incomplete
 
+  @unimplemented
   Scenario: Step createDataset is complete when at least one dataset exists
     Given the project has 1 dataset
     When I request the onboarding status
     Then step "createDataset" should be complete
 
   # Overall completion
+  @unimplemented
   Scenario: Returns overall completion percentage - none complete
     Given the project has:
       | firstMessage | false |
@@ -98,6 +112,7 @@ Feature: Onboarding Progress Backend
     When I request the onboarding status
     Then the completion percentage should be approximately 17
 
+  @unimplemented
   Scenario: Returns overall completion percentage - all complete
     Given the project has:
       | firstMessage | true |
@@ -108,6 +123,7 @@ Feature: Onboarding Progress Backend
     When I request the onboarding status
     Then the completion percentage should be 100
 
+  @unimplemented
   Scenario: Returns overall completion percentage - half complete
     Given the project has:
       | firstMessage | true |
@@ -119,11 +135,13 @@ Feature: Onboarding Progress Backend
     Then the completion percentage should be 50
 
   # All complete flag
+  @unimplemented
   Scenario: Returns allComplete false when steps remain
     Given the project has firstMessage set to false
     When I request the onboarding status
     Then allComplete should be false
 
+  @unimplemented
   Scenario: Returns allComplete true when all steps done
     Given the project has:
       | firstMessage | true |

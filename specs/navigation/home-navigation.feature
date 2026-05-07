@@ -9,55 +9,65 @@ Feature: Home Navigation
     And I have access to project "test-project"
 
   # Logo navigation
+  @unimplemented
   Scenario: Logo click navigates to home page
     Given I am on the messages page
     When I click on the LangWatch logo
     Then I should be navigated to "/test-project"
 
   # Menu navigation
+  @unimplemented
   Scenario: Home menu item navigates to home page
     Given I am on any page within the project
     When I click on "Home" in the sidebar menu
     Then I should be navigated to "/test-project"
 
+  @unimplemented
   Scenario: Home menu item is highlighted when on home
     Given I am on the home page
     When I view the sidebar menu
     Then the "Home" menu item should be highlighted as active
 
   # Analytics navigation
+  @unimplemented
   Scenario: Analytics menu item navigates to analytics
     Given I am on the home page
     When I click on "Analytics" in the sidebar menu
     Then I should be navigated to "/test-project/analytics"
 
+  @unimplemented
   Scenario: Analytics menu item is highlighted when on analytics
     Given I am on the analytics page
     When I view the sidebar menu
     Then the "Analytics" menu item should be highlighted as active
 
   # Messages page behavior
+  @unimplemented
   Scenario: Messages page shows WelcomeLayout when no traces
     Given the project has no traces (firstMessage is false)
     When I navigate to "/test-project/messages"
     Then I should see the setup/welcome layout
 
+  @unimplemented
   Scenario: Messages page shows messages when traces exist
     Given the project has traces (firstMessage is true)
     When I navigate to "/test-project/messages"
     Then I should see the messages list
 
   # Analytics page behavior
+  @unimplemented
   Scenario: Analytics page shows alert when no traces
     Given the project has no traces (firstMessage is false)
     When I navigate to "/test-project/analytics"
     Then I should see an alert about pending setup
 
   # Direct URL access
+  @unimplemented
   Scenario: Can access home page directly via URL
     When I navigate directly to "/test-project"
     Then I should see the home page
 
+  @unimplemented
   Scenario: Can access analytics page directly via URL
     When I navigate directly to "/test-project/analytics"
     Then I should see the analytics page

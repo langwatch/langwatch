@@ -8,7 +8,7 @@ Feature: Billing Meter Dispatch
   # Usage Reporting Worker — Happy Path
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: Reports delta to Stripe when org has billable events
     Given I am in SaaS mode
     And an organization with a Stripe customer ID and active subscription
@@ -18,7 +18,7 @@ Feature: Billing Meter Dispatch
     Then it reports a delta of 50 events to Stripe
     And the checkpoint is updated to 150
 
-  @integration
+  @integration @unimplemented
   Scenario: Aggregates events across all projects in the organization
     Given I am in SaaS mode
     And an organization with 3 projects
@@ -26,14 +26,14 @@ Feature: Billing Meter Dispatch
     When the usage reporting job runs for the organization
     Then the total billable count is 100
 
-  @integration
+  @integration @unimplemented
   Scenario: Self-re-triggers when delta is positive
     Given I am in SaaS mode
     And an organization with billable events exceeding the checkpoint
     When the usage reporting job runs and reports a positive delta
     Then it enqueues a delayed follow-up job for the organization
 
-  @integration
+  @integration @unimplemented
   Scenario: Creates checkpoint on first run for a new organization
     Given I am in SaaS mode
     And an organization with no existing checkpoint
@@ -46,27 +46,27 @@ Feature: Billing Meter Dispatch
   # Usage Reporting Worker — Skip Conditions
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: Skips when not in SaaS mode
     Given I am not in SaaS mode
     When the usage reporting job runs
     Then no usage is reported to Stripe
 
-  @integration
+  @integration @unimplemented
   Scenario: Skips when organization has no Stripe customer ID
     Given I am in SaaS mode
     And an organization without a Stripe customer ID
     When the usage reporting job runs for the organization
     Then no usage is reported to Stripe
 
-  @integration
+  @integration @unimplemented
   Scenario: Skips when organization has no active subscription
     Given I am in SaaS mode
     And an organization with a Stripe customer ID but no active subscription
     When the usage reporting job runs for the organization
     Then no usage is reported to Stripe
 
-  @integration
+  @integration @unimplemented
   Scenario: Skips when delta is zero
     Given I am in SaaS mode
     And an organization with 100 billable events this month
@@ -74,7 +74,7 @@ Feature: Billing Meter Dispatch
     When the usage reporting job runs for the organization
     Then no usage is reported to Stripe
 
-  @integration
+  @integration @unimplemented
   Scenario: Skips when organization has no projects
     Given I am in SaaS mode
     And an organization with no projects
@@ -85,7 +85,7 @@ Feature: Billing Meter Dispatch
   # Usage Reporting Worker — Crash Recovery (Two-Phase Checkpoint)
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: Recovers from crash using pending checkpoint
     Given I am in SaaS mode
     And a checkpoint with a pending value of 200 from a previous crash
@@ -95,7 +95,7 @@ Feature: Billing Meter Dispatch
     And the idempotency key is deterministic based on the checkpoint values
     And the checkpoint is updated to 200 with pending cleared
 
-  @integration
+  @integration @unimplemented
   Scenario: Catches up after crash recovery when count has grown
     Given I am in SaaS mode
     And a checkpoint with a pending value of 200 that was recovered
@@ -104,14 +104,14 @@ Feature: Billing Meter Dispatch
     Then it first reports the pending delta with the original idempotency key
     And then self-re-triggers to catch the remaining difference
 
-  @integration
+  @integration @unimplemented
   Scenario: Re-throws transient errors for worker retry
     Given I am in SaaS mode
     And the Stripe reporting service throws a transient error
     When the usage reporting job runs for the organization
     Then the error is re-thrown for the worker to retry
 
-  @integration
+  @integration @unimplemented
   Scenario: Handles permanent Stripe rejection without updating checkpoint
     Given I am in SaaS mode
     And the Stripe reporting service returns a permanent rejection
@@ -123,39 +123,39 @@ Feature: Billing Meter Dispatch
   # Billing Dispatch Reactor — Post-Fold Side Effect
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: Dispatch fires after fold succeeds
     Given a project belonging to an organization
     When a billable event fold completes successfully
     Then the reactor enqueues a usage reporting job for the organization
 
-  @integration
+  @integration @unimplemented
   Scenario: Dispatch does not fire if fold fails
     Given a project belonging to an organization
     When the billable event fold fails
     Then no usage reporting job is enqueued
 
-  @integration
+  @integration @unimplemented
   Scenario: Resolves organization from cache on subsequent events
     Given a project whose organization was previously resolved
     When another billable event fold completes for the same project
     Then the organization is resolved from cache without a DB query
 
-  @integration
+  @integration @unimplemented
   Scenario: Skips orphan projects gracefully
     Given a project that does not belong to any organization
     When the billing dispatch reactor fires
     Then no job is enqueued
     And a warning is logged
 
-  @integration
+  @integration @unimplemented
   Scenario: Skips silently when queue is unavailable
     Given the job queue is not available
     When the billing dispatch reactor fires
     Then no job is enqueued
     And no error is thrown
 
-  @integration
+  @integration @unimplemented
   Scenario: Deduplicates concurrent events for the same organization
     Given multiple billable events for the same organization arrive rapidly
     When the billing dispatch reactor processes them

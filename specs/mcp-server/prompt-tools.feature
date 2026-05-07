@@ -7,12 +7,14 @@ Feature: MCP Prompt Tools
   Background:
     Given the MCP server is configured with a valid API key
 
+  @unimplemented
   Scenario: Agent lists all prompts
     Given the project has prompts configured
     When the agent calls list_prompts
     Then the response contains a list of prompts
     And each prompt includes handle, name, description, and latest version number
 
+  @unimplemented
   Scenario: Agent gets a prompt by handle
     Given a prompt exists with handle "customer-support-v2"
     When the agent calls get_prompt with idOrHandle "customer-support-v2"
@@ -20,6 +22,7 @@ Feature: MCP Prompt Tools
     And the response includes model configuration
     And the response includes version history
 
+  @unimplemented
   Scenario: Agent creates a new prompt
     When the agent calls create_prompt with:
       | name          | Bug Triage Assistant         |
@@ -30,6 +33,7 @@ Feature: MCP Prompt Tools
     Then the response confirms the prompt was created
     And the response includes the new prompt ID and handle
 
+  @unimplemented
   Scenario: Agent updates a prompt with a new version
     Given a prompt exists with handle "customer-support-v2"
     When the agent calls update_prompt with:

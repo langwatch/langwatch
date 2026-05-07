@@ -8,24 +8,28 @@ Feature: Guardrails Drawer
     Given I am logged in to a project
     And I have at least one evaluator created
 
+  @unimplemented
   Scenario: Open evaluator list directly from menu
     Given I am on the evaluations page
     When I select "New Guardrail" from the menu
     Then the evaluator list drawer should open
     And I should see my existing evaluators
 
+  @unimplemented
   Scenario: Select existing evaluator for guardrail
     Given I selected "New Guardrail" and the evaluator list is open
     When I select evaluator "PII Check" with slug "pii-check-abc12"
     Then the guardrails drawer should show code integration
     And the code should reference "evaluators/pii-check-abc12"
 
+  @unimplemented
   Scenario: Python code shows async by default
     Given the guardrails code block is displayed
     Then the Python tab should be active by default
     And the code should use async/await pattern
     And the code should show the langwatch SDK usage
 
+  @unimplemented
   Scenario: Python async code template
     Given I selected an evaluator with slug "safety-check-xyz99"
     Then the Python code should include:
@@ -39,12 +43,14 @@ Feature: Guardrails Drawer
       )
       """
 
+  @unimplemented
   Scenario: Switch to TypeScript tab
     Given the guardrails code block is displayed
     When I click "TypeScript" tab
     Then TypeScript code should be shown
     And it should use the langwatch TypeScript SDK
 
+  @unimplemented
   Scenario: TypeScript code template
     Given I selected an evaluator with slug "safety-check-xyz99"
     When I switch to TypeScript tab
@@ -61,12 +67,14 @@ Feature: Guardrails Drawer
       });
       """
 
+  @unimplemented
   Scenario: Switch to curl tab
     Given the guardrails code block is displayed
     When I click "curl" tab
     Then curl example should be shown
     And it should show the raw API endpoint
 
+  @unimplemented
   Scenario: Curl code template
     Given I selected an evaluator with slug "safety-check-xyz99"
     When I switch to curl tab
@@ -78,12 +86,14 @@ Feature: Guardrails Drawer
         -d '{"input": "user input", "output": "llm output"}'
       """
 
+  @unimplemented
   Scenario: Copy code to clipboard
     Given the guardrails code block is displayed
     When I click the copy button
     Then the code should be copied to clipboard
     And a success feedback should appear
 
+  @unimplemented
   Scenario: Close without saving
     Given the guardrails code is displayed
     When I click "Close"
@@ -91,6 +101,7 @@ Feature: Guardrails Drawer
     And no monitor should be created
     Because guardrails are code-based, not stored as monitors
 
+  @unimplemented
   Scenario: Create new evaluator during guardrail setup
     Given the evaluator list is open for guardrail setup
     When I click "Create New Evaluator"
@@ -99,22 +110,26 @@ Feature: Guardrails Drawer
     Then I should return with the new evaluator selected
     And the code block should show the new evaluator's slug
 
+  @unimplemented
   Scenario: Evaluator without slug shows ID (fallback)
     Given I have an old evaluator without a slug (legacy)
     When I select this evaluator
     Then the code should use the evaluator ID as fallback
     Or a warning should suggest generating a slug
 
+  @unimplemented
   Scenario: API key placeholder in code
     Given the guardrails code block is displayed
     Then the code should include a placeholder for the API key
     And it should reference the environment variable LANGWATCH_API_KEY
 
+  @unimplemented
   Scenario: Project-specific API endpoint
     Given my project has a custom API endpoint
     When the code block is displayed
     Then the endpoint in curl should reflect the project settings
 
+  @unimplemented
   Scenario: Show evaluator description in drawer
     Given I selected an evaluator with description "Checks for PII"
     Then the guardrails drawer should show the evaluator name

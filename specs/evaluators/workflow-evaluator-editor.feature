@@ -13,6 +13,7 @@ Feature: Workflow evaluator editor with workflow link
   # Edit Workflow button visibility
   # ============================================================================
 
+  @unimplemented
   Scenario: Configure button for workflow evaluator shows workflow link
     Given I am on the evaluators page
     When I click "Configure" on evaluator "My Scorer"
@@ -20,6 +21,7 @@ Feature: Workflow evaluator editor with workflow link
     And I should see an "Edit Workflow" button
     And the button should be prominently displayed
 
+  @unimplemented
   Scenario: Built-in evaluator does not show workflow link
     Given I have a built-in evaluator "Exact Match"
     When I click "Configure" on evaluator "Exact Match"
@@ -27,6 +29,7 @@ Feature: Workflow evaluator editor with workflow link
     And I should NOT see an "Edit Workflow" button
     And I should see the settings form instead
 
+  @unimplemented
   Scenario: Workflow evaluator shows workflow name and icon
     Given workflow "Custom Scorer" has icon "checkmark"
     When I open the evaluator editor for "My Scorer"
@@ -37,18 +40,21 @@ Feature: Workflow evaluator editor with workflow link
   # Navigation to workflow
   # ============================================================================
 
+  @unimplemented
   Scenario: Click Edit Workflow navigates to studio
     Given the evaluator editor drawer is open for "My Scorer"
     When I click "Edit Workflow"
     Then I should be navigated to the workflow studio
     And the URL should be /[project]/studio/[workflow-id]
 
+  @unimplemented
   Scenario: Edit Workflow opens in same tab by default
     Given the evaluator editor drawer is open for "My Scorer"
     When I click "Edit Workflow"
     Then the navigation should happen in the same tab
     And the drawer should close
 
+  @unimplemented
   Scenario: Workflow link includes correct workflow ID
     Given workflow "Custom Scorer" has ID "wf_123abc"
     When I open the evaluator editor for "My Scorer"
@@ -58,12 +64,14 @@ Feature: Workflow evaluator editor with workflow link
   # Workflow evaluator editor content
   # ============================================================================
 
+  @unimplemented
   Scenario: Workflow evaluator shows name field only
     Given I open the evaluator editor for "My Scorer"
     Then I should see the name field
     And I should see the "Edit Workflow" button
     And I should NOT see a settings form (no schema for workflows)
 
+  @unimplemented
   Scenario: Can rename workflow evaluator
     Given I open the evaluator editor for "My Scorer"
     When I change the name to "Renamed Scorer"
@@ -75,6 +83,7 @@ Feature: Workflow evaluator editor with workflow link
   # Edge cases
   # ============================================================================
 
+  @unimplemented
   Scenario: Workflow evaluator with deleted workflow shows warning
     Given workflow "Deleted Workflow" has been deleted
     And evaluator "Orphan Scorer" still references it

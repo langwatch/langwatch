@@ -12,23 +12,28 @@ Feature: Undo/Redo in Evaluations Workbench
   # UI Controls
   # ============================================================================
 
+  @unimplemented
   Scenario: Undo/Redo buttons are visible in the header
     Then I see an undo button in the header
     And I see a redo button in the header
 
+  @unimplemented
   Scenario: Undo button is disabled when there is no history
     Given I have not made any changes
     Then the undo button is disabled
 
+  @unimplemented
   Scenario: Redo button is disabled when there is no future state
     Given I have not undone any changes
     Then the redo button is disabled
 
+  @unimplemented
   Scenario: Undo button becomes enabled after making a change
     Given the dataset has 3 rows
     When I edit cell at row 0, column "input" to "hello"
     Then the undo button is enabled
 
+  @unimplemented
   Scenario: Redo button becomes enabled after undoing
     Given the dataset has 3 rows
     And I edit cell at row 0, column "input" to "hello"
@@ -39,6 +44,7 @@ Feature: Undo/Redo in Evaluations Workbench
   # Keyboard Shortcuts
   # ============================================================================
 
+  @unimplemented
   Scenario: Cmd+Z triggers undo when not editing a cell
     Given the dataset has 3 rows
     And I edit cell at row 0, column "input" to "hello"
@@ -46,6 +52,7 @@ Feature: Undo/Redo in Evaluations Workbench
     When I press Cmd+Z
     Then the cell at row 0, column "input" is empty
 
+  @unimplemented
   Scenario: Cmd+Shift+Z triggers redo
     Given the dataset has 3 rows
     And I edit cell at row 0, column "input" to "hello"
@@ -53,6 +60,7 @@ Feature: Undo/Redo in Evaluations Workbench
     When I press Cmd+Shift+Z
     Then the cell at row 0, column "input" displays "hello"
 
+  @unimplemented
   Scenario: Keyboard shortcuts do not trigger while editing cell
     Given the dataset has 3 rows
     And I am editing a cell in a textarea
@@ -64,6 +72,7 @@ Feature: Undo/Redo in Evaluations Workbench
   # Cell Editing - Inline Dataset
   # ============================================================================
 
+  @unimplemented
   Scenario: Undo single cell edit
     Given the dataset has 3 rows
     And row 0 has "input" value ""
@@ -71,6 +80,7 @@ Feature: Undo/Redo in Evaluations Workbench
     And I click the undo button
     Then the cell at row 0, column "input" is empty
 
+  @unimplemented
   Scenario: Redo single cell edit
     Given the dataset has 3 rows
     When I edit cell at row 0, column "input" to "hello world"
@@ -78,6 +88,7 @@ Feature: Undo/Redo in Evaluations Workbench
     And I click the redo button
     Then the cell at row 0, column "input" displays "hello world"
 
+  @unimplemented
   Scenario: Multiple sequential undos
     Given the dataset has 3 rows
     When I edit cell at row 0, column "input" to "first"
@@ -87,6 +98,7 @@ Feature: Undo/Redo in Evaluations Workbench
     When I click the undo button
     Then the cell at row 0, column "input" is empty
 
+  @unimplemented
   Scenario: Undo clears redo stack when new change is made
     Given the dataset has 3 rows
     And I edit cell at row 0, column "input" to "first"
@@ -98,6 +110,7 @@ Feature: Undo/Redo in Evaluations Workbench
   # Cell Editing - Saved Dataset with DB Sync
   # ============================================================================
 
+  @unimplemented
   Scenario: Undo cell edit in saved dataset triggers DB sync
     Given I have a saved dataset with records loaded
     And the original value of cell (0, "input") is "original"
@@ -107,6 +120,7 @@ Feature: Undo/Redo in Evaluations Workbench
     Then the cell at row 0, column "input" displays "original"
     And a sync to the database is triggered with "original"
 
+  @unimplemented
   Scenario: Redo cell edit in saved dataset triggers DB sync
     Given I have a saved dataset with records loaded
     And I edit cell at row 0, column "input" to "new value"
@@ -119,6 +133,7 @@ Feature: Undo/Redo in Evaluations Workbench
   # Dataset Management
   # ============================================================================
 
+  @unimplemented
   Scenario: Undo adding a new inline dataset
     Given I have only "Test Data" in the workbench
     When I add a new dataset via "Create new"
@@ -127,6 +142,7 @@ Feature: Undo/Redo in Evaluations Workbench
     Then "Dataset 2" is removed from the workbench
     And "Test Data" is the active dataset
 
+  @unimplemented
   Scenario: Redo adding a dataset restores it
     Given I have only "Test Data" in the workbench
     And I add a new dataset via "Create new"
@@ -134,6 +150,7 @@ Feature: Undo/Redo in Evaluations Workbench
     When I click the redo button
     Then "Dataset 2" is in the workbench
 
+  @unimplemented
   Scenario: Undo switching active dataset
     Given I have datasets "Test Data" and "Dataset 2" in the workbench
     And "Test Data" is active
@@ -146,6 +163,7 @@ Feature: Undo/Redo in Evaluations Workbench
   # Row Operations
   # ============================================================================
 
+  @unimplemented
   Scenario: Undo deleting rows in inline dataset
     Given the dataset has 3 rows with data
     And row 0 has "input" value "row0"
@@ -159,6 +177,7 @@ Feature: Undo/Redo in Evaluations Workbench
     And row 0 has "input" value "row0"
     And row 1 has "input" value "row1"
 
+  @unimplemented
   Scenario: Undo deleting rows in saved dataset triggers DB sync
     Given I have a saved dataset with 3 records
     When I select rows 0 and 1 via checkboxes
@@ -173,6 +192,7 @@ Feature: Undo/Redo in Evaluations Workbench
   # Rapid Changes Batching
   # ============================================================================
 
+  @unimplemented
   Scenario: Rapid cell edits are batched into single undo entry
     Given the dataset has 3 rows
     When I type "hello" in cell (0, "input") character by character within 100ms

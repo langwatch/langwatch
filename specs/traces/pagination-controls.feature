@@ -33,28 +33,28 @@ Feature: Traces tab pagination controls
 
   # ─── Items Per Page ─────────────────────────────────────────────
 
-  @e2e
+  @e2e @unimplemented
   Scenario: Changing items per page reloads the trace list with new size
     Given the default page size of 25 is active
     When I change the "Items per page" dropdown to 10
     Then the trace list displays exactly 10 traces
     And the displayed traces are a subset of the original 25
 
-  @integration
+  @integration @unimplemented
   Scenario: Changing items per page updates URL parameters
     Given the current URL has no pageSize parameter
     When I change the "Items per page" dropdown to 50
     Then the URL query parameter "pageSize" is set to "50"
     And the "pageOffset" query parameter is absent
 
-  @integration
+  @integration @unimplemented
   Scenario: Changing items per page resets to first page
     Given I am on page 2 with pageOffset 25
     When I change the "Items per page" dropdown to 10
     Then the pageOffset is reset to 0
     And the trace list reloads from the beginning
 
-  @integration
+  @integration @unimplemented
   Scenario: Page size persists across page reload
     Given I have changed the page size to 50
     When I reload the page
@@ -63,20 +63,20 @@ Feature: Traces tab pagination controls
 
   # ─── Next Page Navigation ───────────────────────────────────────
 
-  @e2e
+  @e2e @unimplemented
   Scenario: Navigating to the next page shows different traces
     Given the trace list shows the first 25 traces
     When I click the "next page" button
     Then the trace list shows a different set of traces
     And the page position indicator shows "26-50"
 
-  @integration
+  @integration @unimplemented
   Scenario: Next page button updates URL offset
     Given the current pageOffset is 0 and pageSize is 25
     When I click the "next page" button
     Then the URL query parameter "pageOffset" is set to "25"
 
-  @integration
+  @integration @unimplemented
   Scenario: Next page button is disabled on the last page
     Given the page size is 25
     And the total number of traces is less than the current offset plus page size
@@ -84,12 +84,12 @@ Feature: Traces tab pagination controls
 
   # ─── Previous Page Navigation ───────────────────────────────────
 
-  @integration
+  @integration @unimplemented
   Scenario: Previous page button is disabled on the first page
     Given the pageOffset is 0
     Then the "previous page" button is disabled
 
-  @integration
+  @integration @unimplemented
   Scenario: Navigating back to the previous page
     Given I am on page 2 with pageOffset 25
     When I click the "previous page" button
@@ -98,25 +98,25 @@ Feature: Traces tab pagination controls
 
   # ─── Page Position Indicator ────────────────────────────────────
 
-  @integration
+  @integration @unimplemented
   Scenario: Page position indicator shows correct range
     Given the pageOffset is 0 and pageSize is 25 and totalHits is 100
     Then the page position indicator shows "1-25 of 100 items"
 
-  @integration
+  @integration @unimplemented
   Scenario: Page position indicator adjusts on the last page
     Given the pageOffset is 75 and pageSize is 25 and totalHits is 90
     Then the page position indicator shows "76-90 of 90 items"
 
   # ─── Cursor-Based Pagination (Deep Pagination) ─────────────────
 
-  @integration
+  @integration @unimplemented
   Scenario: Cursor pagination displays page estimate
     Given cursor-based pagination is active via a scrollId in the URL
     Then the page position indicator shows "Page N of ~M (X total items)"
     And the previous page button label says "Go to first page"
 
-  @integration
+  @integration @unimplemented
   Scenario: Previous page in cursor mode resets to first page
     Given cursor-based pagination is active via a scrollId in the URL
     When I click the "previous page" button
@@ -126,14 +126,14 @@ Feature: Traces tab pagination controls
 
   # ─── Query/Filter Interaction ───────────────────────────────────
 
-  @unit
+  @unit @unimplemented
   Scenario: Changing search query resets pagination to defaults
     Given the pageOffset is 50 and pageSize is 100
     When the search query changes
     Then the pageOffset is reset to 0
     And the pageSize is reset to the default of 25
 
-  @unit
+  @unit @unimplemented
   Scenario: Page size dropdown reflects current URL parameter
     Given the URL has pageSize set to 100
     When the NavigationFooter renders
@@ -141,7 +141,7 @@ Feature: Traces tab pagination controls
 
   # ─── Filter Interaction ────────────────────────────────────────
 
-  @integration
+  @integration @unimplemented
   Scenario: Applying a filter resets pagination to first page
     Given I am on page 2 with pageOffset 25
     When I apply a filter from the sidebar

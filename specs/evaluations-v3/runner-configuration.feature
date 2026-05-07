@@ -16,13 +16,16 @@ Feature: Runner configuration
   # Header and button display
   # ============================================================================
 
+  @unimplemented
   Scenario: Super header displays "Prompts or Agents"
     Then the super header column displays "Prompts or Agents"
 
+  @unimplemented
   Scenario: Show required indicator when no runners configured
     Given no runners are configured
     Then the "+ Add" button displays a warning indicator
 
+  @unimplemented
   Scenario: Button text changes based on runner count
     Given no runners are configured
     Then I see a "+ Add" button
@@ -33,17 +36,20 @@ Feature: Runner configuration
   # Runner type selection flow
   # ============================================================================
 
+  @unimplemented
   Scenario: Click Add opens runner type selector
     When I click the "+ Add" button
     Then the RunnerTypeSelectorDrawer opens
     And I see two options: "Prompt" and "Agent"
 
+  @unimplemented
   Scenario: Select Prompt type opens prompt list
     Given the RunnerTypeSelectorDrawer is open
     When I select "Prompt"
     Then the PromptListDrawer opens
     And I can select from existing prompts
 
+  @unimplemented
   Scenario: Select Agent type opens agent list
     Given the RunnerTypeSelectorDrawer is open
     When I select "Agent"
@@ -54,6 +60,7 @@ Feature: Runner configuration
   # Adding prompts as runners
   # ============================================================================
 
+  @unimplemented
   Scenario: Add existing prompt as runner
     Given prompt "my-assistant" exists with version 3
     When I click "+ Add"
@@ -63,6 +70,7 @@ Feature: Runner configuration
     And the runner header shows the prompt name and model icon
     And the runner type is "prompt"
 
+  @unimplemented
   Scenario: Add prompt from folder
     Given prompt "shared/ts-guidelines" exists in folder "shared"
     When I click "+ Add"
@@ -72,6 +80,7 @@ Feature: Runner configuration
     And I select prompt "ts-guidelines"
     Then the runner is added with name "ts-guidelines"
 
+  @unimplemented
   Scenario: Create new prompt inline
     When I click "+ Add"
     And I select "Prompt"
@@ -86,6 +95,7 @@ Feature: Runner configuration
   # Adding agents as runners
   # ============================================================================
 
+  @unimplemented
   Scenario: Add existing code agent as runner
     Given agent "Python Processor" of type "code" exists
     When I click "+ Add"
@@ -95,6 +105,7 @@ Feature: Runner configuration
     And the runner header shows a code icon
     And the runner type is "agent"
 
+  @unimplemented
   Scenario: Add existing workflow agent as runner
     Given agent "Pipeline Agent" of type "workflow" exists
     When I click "+ Add"
@@ -103,6 +114,7 @@ Feature: Runner configuration
     Then a new runner column appears in the table
     And the runner header shows a workflow icon
 
+  @unimplemented
   Scenario: Create new code agent inline
     When I click "+ Add"
     And I select "Agent"
@@ -117,6 +129,7 @@ Feature: Runner configuration
   # Comparison flow
   # ============================================================================
 
+  @unimplemented
   Scenario: Add multiple runners for comparison
     Given a prompt runner "my-assistant" is configured
     When I click "+ Add Comparison"
@@ -125,6 +138,7 @@ Feature: Runner configuration
     Then 2 runner columns are visible in the table
     And I can compare prompt vs agent outputs
 
+  @unimplemented
   Scenario: Compare two prompts
     Given prompt "prompt-v1" exists
     And prompt "prompt-v2" exists
@@ -134,6 +148,7 @@ Feature: Runner configuration
     Then 2 runner columns show the different prompts
     And I can compare their outputs side by side
 
+  @unimplemented
   Scenario: Compare prompt with code agent
     Given prompt "my-assistant" exists
     And agent "Custom Logic" of type "code" exists
@@ -146,6 +161,7 @@ Feature: Runner configuration
   # Runner header interactions
   # ============================================================================
 
+  @unimplemented
   Scenario: Runner header shows popover on click
     Given a prompt runner "my-assistant" is configured
     When I click on the runner header "my-assistant"
@@ -153,11 +169,13 @@ Feature: Runner configuration
       | Edit Prompt          |
       | Remove from Workbench|
 
+  @unimplemented
   Scenario: Runner header shows play button
     Given a prompt runner "my-assistant" is configured
     Then the runner header shows a play button on the far right
     # Note: Play button functionality to be implemented later
 
+  @unimplemented
   Scenario: Edit prompt from header popover
     Given a prompt runner "my-assistant" is configured
     When I click on the runner header "my-assistant"
@@ -167,12 +185,14 @@ Feature: Runner configuration
     And I see the prompt's inputs section
     And I see the prompt's outputs section
 
+  @unimplemented
   Scenario: Remove runner from workbench
     Given a prompt runner "my-assistant" is configured
     When I click on the runner header "my-assistant"
     And I click "Remove from Workbench" in the popover
     Then the runner column is removed from the table
 
+  @unimplemented
   Scenario: Agent header popover shows Edit Agent
     Given an agent runner "Python Processor" is configured
     When I click on the runner header "Python Processor"
@@ -180,6 +200,7 @@ Feature: Runner configuration
       | Edit Agent           |
       | Remove from Workbench|
 
+  @unimplemented
   Scenario: Edit code agent from header popover
     Given an agent runner "Python Processor" of type "code" exists in the database
     When I click on the runner header "Python Processor"
@@ -187,6 +208,7 @@ Feature: Runner configuration
     Then the system fetches the agent data via tRPC
     And the AgentCodeEditorDrawer opens
 
+  @unimplemented
   Scenario: Edit workflow agent opens in new tab
     Given an agent runner "Pipeline Agent" of type "workflow" exists in the database
     When I click on the runner header "Pipeline Agent"
@@ -198,6 +220,7 @@ Feature: Runner configuration
   # Runner configuration and mapping
   # ============================================================================
 
+  @unimplemented
   Scenario: Edit existing runner configuration
     Given a prompt runner "my-assistant" is configured
     When I click on the runner header "my-assistant"
@@ -205,12 +228,14 @@ Feature: Runner configuration
     Then the PromptEditorDrawer opens with the current config
     And I can modify the prompt and save changes
 
+  @unimplemented
   Scenario: Runner with unmapped required inputs shows warning
     Given a runner with input "userQuestion" is configured
     And the dataset has column "input"
     And "userQuestion" is not mapped to any dataset column
     Then the runner column header shows a warning indicator
 
+  @unimplemented
   Scenario: Map runner input to dataset column
     Given a runner with input "userQuestion" is configured
     And the dataset has column "input"
@@ -222,17 +247,20 @@ Feature: Runner configuration
   # UI interactions
   # ============================================================================
 
+  @unimplemented
   Scenario: Interact with table while drawer is open
     When I click the "+ Add" button
     And the RunnerTypeSelectorDrawer is open
     Then I can still click and edit cells in the table
     And I can scroll the table
 
+  @unimplemented
   Scenario: Close drawer by clicking X button
     When I click the "+ Add" button
     And I click the close button on the drawer
     Then the RunnerTypeSelectorDrawer closes
 
+  @unimplemented
   Scenario: Navigate back in drawer flow
     When I click "+ Add"
     And I select "Prompt"
@@ -244,6 +272,7 @@ Feature: Runner configuration
   # Unpublished prompt modifications (local tinkering)
   # ============================================================================
 
+  @unimplemented
   Scenario: Edit prompt and close without saving persists local changes
     Given a prompt runner "my-assistant" is configured
     When I click on the runner header "my-assistant"
@@ -253,12 +282,14 @@ Feature: Runner configuration
     Then the local modifications are preserved in the runner config
     And no new version is published to the Prompts system
 
+  @unimplemented
   Scenario: Runner header shows orange dot for unpublished modifications
     Given a prompt runner "my-assistant" is configured
     And the runner has unpublished local modifications
     Then the runner header shows an orange dot next to the name
     And hovering the dot shows tooltip "Unpublished modifications"
 
+  @unimplemented
   Scenario: Orange dot disappears after publishing
     Given a prompt runner "my-assistant" has unpublished modifications
     When I click "Edit Prompt" in the menu
@@ -266,12 +297,14 @@ Feature: Runner configuration
     Then the orange dot disappears from the runner header
     And a new version is created in the Prompts system
 
+  @unimplemented
   Scenario: Run evaluation with unpublished modifications
     Given a prompt runner "my-assistant" has unpublished modifications
     When I run the evaluation
     Then the evaluation uses the unpublished local configuration
     And the published version remains unchanged
 
+  @unimplemented
   Scenario: PromptEditorDrawer header matches prompt playground
     Given a prompt runner "my-assistant" is configured
     When I click "Edit Prompt" in the menu
@@ -281,16 +314,19 @@ Feature: Runner configuration
     And the header contains a Save/Saved button
     And there is no save button in the footer
 
+  @unimplemented
   Scenario: Save button shows "Saved" when no changes
     Given the PromptEditorDrawer is open for prompt "my-assistant"
     And no modifications have been made
     Then the Save button shows "Saved" and is disabled
 
+  @unimplemented
   Scenario: Save button shows "Save" when changes exist
     Given the PromptEditorDrawer is open for prompt "my-assistant"
     When I modify any field (model, message, inputs, or outputs)
     Then the Save button shows "Save" and is enabled
 
+  @unimplemented
   Scenario: Version history restore updates form
     Given the PromptEditorDrawer is open for prompt "my-assistant"
     When I click the version history button
@@ -298,6 +334,7 @@ Feature: Runner configuration
     Then the form is updated with the restored version's content
     And the Save button shows "Save" (indicating unsaved changes)
 
+  @unimplemented
   Scenario: Discard local changes from version history drawer
     Given the PromptEditorDrawer is open for prompt "my-assistant"
     And I have made unpublished modifications
@@ -308,6 +345,7 @@ Feature: Runner configuration
     And the Save button shows "Saved"
     And the orange dot disappears from the runner header
 
+  @unimplemented
   Scenario: Local config updates immediately on form change
     Given a prompt runner "my-assistant" is configured
     When I click "Edit Prompt" in the menu
@@ -315,6 +353,7 @@ Feature: Runner configuration
     Then the orange dot appears immediately on the runner header
     And I can run the evaluation with the modified config without closing the drawer
 
+  @unimplemented
   Scenario: Orange dot disappears when changes are reverted
     Given a prompt runner "my-assistant" has unpublished modifications
     When I click "Edit Prompt" in the menu

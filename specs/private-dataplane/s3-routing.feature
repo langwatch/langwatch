@@ -16,14 +16,14 @@ Feature: Private Dataplane S3 Routing
   # Env var parsing
   # ---------------------------------------------------------------------------
 
-  @unit
+  @unit @unimplemented
   Scenario: Parse private S3 config from env var
     Given env var "DATAPLANE_S3__acme__org123" is set to JSON with endpoint, bucket, accessKeyId, secretAccessKey
     When the private S3 config is loaded at startup
     Then org "org123" maps to the parsed S3 config
     And the label "acme" is ignored by the routing logic
 
-  @unit
+  @unit @unimplemented
   Scenario: Invalid JSON in S3 env var is logged and skipped
     Given env var "DATAPLANE_S3__bad__org999" is set to "not-json"
     When the private S3 config is loaded at startup
@@ -34,13 +34,13 @@ Feature: Private Dataplane S3 Routing
   # Organization-level routing
   # ---------------------------------------------------------------------------
 
-  @unit
+  @unit @unimplemented
   Scenario: Org with private S3 gets dedicated config
     Given org "org123" has a private S3 configured via env var
     When getS3ConfigForOrganization("org123") is called
     Then the returned config points to the private S3 bucket
 
-  @unit
+  @unit @unimplemented
   Scenario: Org without private S3 gets shared config
     Given org "org456" has no private S3 env var
     When getS3ConfigForOrganization("org456") is called
@@ -50,7 +50,7 @@ Feature: Private Dataplane S3 Routing
   # Project-level routing
   # ---------------------------------------------------------------------------
 
-  @integration
+  @integration @unimplemented
   Scenario: Project in a private-S3 org routes to the private bucket
     Given org "org123" has a private S3 configured
     And a project exists under org "org123"

@@ -12,6 +12,7 @@ Feature: License tRPC Router
   # getStatus Endpoint
   # ============================================================================
 
+  @unimplemented
   Scenario: Gets license status for organization without license
     Given the organization has no license
     When I call license.getStatus with organizationId "org-456"
@@ -20,6 +21,7 @@ Feature: License tRPC Router
       | valid          | false       |
       | planName       | Open Source |
 
+  @unimplemented
   Scenario: Gets license status with current member count
     Given the organization has a valid license with maxMembers 10
     And the organization has 5 members
@@ -30,16 +32,19 @@ Feature: License tRPC Router
       | currentMembers | 5     |
       | maxMembers     | 10    |
 
+  @unimplemented
   Scenario: Gets license status with expiration date
     Given the organization has a valid license expiring "2099-12-31"
     When I call license.getStatus with organizationId "org-456"
     Then the response expiresAt is "2099-12-31"
 
+  @unimplemented
   Scenario: Requires organization:view permission
     Given I am a member but not admin of organization "org-456"
     When I call license.getStatus with organizationId "org-456"
     Then the request succeeds
 
+  @unimplemented
   Scenario: Rejects request for unauthorized organization
     Given I am not a member of organization "other-org"
     When I call license.getStatus with organizationId "other-org"
@@ -49,6 +54,7 @@ Feature: License tRPC Router
   # upload Endpoint
   # ============================================================================
 
+  @unimplemented
   Scenario: Uploads and activates valid license
     Given a valid license key for plan "PRO"
     When I call license.upload with:
@@ -58,6 +64,7 @@ Feature: License tRPC Router
       | success | true |
       | plan    | Pro  |
 
+  @unimplemented
   Scenario: Returns error for invalid license key
     When I call license.upload with:
       | organizationId | org-456            |
@@ -73,12 +80,14 @@ Feature: License tRPC Router
     Then the request fails with BAD_REQUEST
     And the error message is "License expired"
 
+  @unimplemented
   Scenario: Requires organization:manage permission
     Given I am a member but not admin of organization "org-456"
     And a valid license key
     When I call license.upload with organizationId "org-456"
     Then the request fails with FORBIDDEN
 
+  @unimplemented
   Scenario: Rejects empty license key
     When I call license.upload with:
       | organizationId | org-456 |
@@ -89,6 +98,7 @@ Feature: License tRPC Router
   # remove Endpoint
   # ============================================================================
 
+  @unimplemented
   Scenario: Removes license from organization
     Given the organization has a valid license
     When I call license.remove with organizationId "org-456"
@@ -98,12 +108,14 @@ Feature: License tRPC Router
     And the organization licenseExpiresAt is null
     And the organization licenseLastValidatedAt is null
 
+  @unimplemented
   Scenario: Succeeds even when no license exists
     Given the organization has no license
     When I call license.remove with organizationId "org-456"
     Then the response includes:
       | success | true |
 
+  @unimplemented
   Scenario: Requires organization:manage permission for remove
     Given I am a member but not admin of organization "org-456"
     When I call license.remove with organizationId "org-456"

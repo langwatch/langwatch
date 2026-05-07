@@ -19,19 +19,19 @@ Feature: Open existing prompt from trace
 
   # --- SDK: emit handle:version or nothing ---
 
-  @unit
+  @unit @unimplemented
   Scenario: SDK emits combined prompt handle and version attribute
     Given a prompt "team/sample-prompt" at version 3 is used in an LLM call
     When the SDK traces the call
     Then the span attribute "langwatch.prompt.id" is set to "team/sample-prompt:3"
 
-  @unit
+  @unit @unimplemented
   Scenario: SDK emits nothing when prompt has no handle
     Given a prompt without a handle is used in an LLM call
     When the SDK traces the call
     Then no "langwatch.prompt.id" attribute is set
 
-  @unit
+  @unit @unimplemented
   Scenario: SDK captures variables from compile
     Given a prompt is compiled with variables name="Alice" and topic="AI"
     When the SDK traces the compile call
@@ -39,7 +39,7 @@ Feature: Open existing prompt from trace
 
   # --- UI: "Open in Prompts" becomes a menu when prompt reference exists ---
 
-  @unit
+  @unit @unimplemented
   Scenario: Button becomes a dropdown menu when trace has prompt reference
     Given a traced LLM span has attribute "langwatch.prompt.id" = "team/sample-prompt:3"
     When I view the span details
@@ -47,7 +47,7 @@ Feature: Open existing prompt from trace
     And the menu has option "Open team/sample-prompt:3"
     And the menu has option "Create new prompt"
 
-  @unit
+  @unit @unimplemented
   Scenario: Button stays as simple button when trace has no prompt reference
     Given a traced LLM span has no "langwatch.prompt.id" attribute
     When I view the span details
@@ -56,7 +56,7 @@ Feature: Open existing prompt from trace
 
   # --- "Open team/sample-prompt:3" action ---
 
-  @unit
+  @unit @unimplemented
   Scenario: Opens existing prompt at traced version with variables applied
     Given a traced LLM call has "langwatch.prompt.id" = "team/sample-prompt:3"
     And the trace has variables name="Alice" and topic="AI"
@@ -65,7 +65,7 @@ Feature: Open existing prompt from trace
     And the playground variables are set to name="Alice" and topic="AI"
     And the chat history from the trace is loaded
 
-  @unit
+  @unit @unimplemented
   Scenario: Creates missing variables on the prompt when they dont exist
     Given prompt "team/sample-prompt" version 3 has variables name and topic
     And the trace has variables name="Alice", topic="AI", and extra_context="some context"
@@ -74,7 +74,7 @@ Feature: Open existing prompt from trace
     And variable extra_context is added to the playground variables
     And all three variables are populated with the traced values
 
-  @unit
+  @unit @unimplemented
   Scenario: Trace references a prompt that no longer exists
     Given a traced LLM call has "langwatch.prompt.id" = "team/deleted-prompt:1"
     And prompt "team/deleted-prompt" does not exist in the project
@@ -82,7 +82,7 @@ Feature: Open existing prompt from trace
     Then a new playground tab is created from the trace data
     And a warning toast is shown that the original prompt was not found
 
-  @unit
+  @unit @unimplemented
   Scenario: Trace references a version that no longer exists
     Given a traced LLM call has "langwatch.prompt.id" = "team/sample-prompt:99"
     And version 99 does not exist for "team/sample-prompt"
@@ -92,7 +92,7 @@ Feature: Open existing prompt from trace
 
   # --- "Create new prompt" action ---
 
-  @unit
+  @unit @unimplemented
   Scenario: Create new prompt from trace data
     Given a traced LLM call has "langwatch.prompt.id" = "team/sample-prompt:3"
     When I choose "Create new prompt" from the menu
@@ -102,7 +102,7 @@ Feature: Open existing prompt from trace
 
   # --- Backend extraction ---
 
-  @integration
+  @integration @unimplemented
   Scenario: Backend extracts prompt reference and variables from span attributes
     Given a span with attribute "langwatch.prompt.id" = "team/sample-prompt:3"
     And attribute "langwatch.prompt.variables" with variables name="Alice"
@@ -110,7 +110,7 @@ Feature: Open existing prompt from trace
     Then the response includes promptHandle "team/sample-prompt" and promptVersionNumber 3
     And the response includes promptVariables with name="Alice"
 
-  @integration
+  @integration @unimplemented
   Scenario: Backend returns null prompt reference when no prompt attributes exist
     Given a span with no langwatch.prompt.* attributes
     When the getForPromptStudio API is called
@@ -121,21 +121,21 @@ Feature: Open existing prompt from trace
   # The SDK sets langwatch.prompt.id on the Prompt.compile/get span (parent),
   # not on the LLM span itself. The backend must walk up the parent chain.
 
-  @unit
+  @unit @unimplemented
   Scenario: Prompt reference found on immediate parent span
     Given an LLM span with no langwatch.prompt.id attribute
     And its parent span has "langwatch.prompt.id" = "team/sample-prompt:3"
     When the prompt reference is looked up
     Then the prompt reference is found with handle "team/sample-prompt" and version 3
 
-  @unit
+  @unit @unimplemented
   Scenario: Prompt reference found on grandparent span
     Given an LLM span with no langwatch.prompt.id attribute
     And its grandparent span has "langwatch.prompt.id" = "team/sample-prompt:3"
     When the prompt reference is looked up
     Then the prompt reference is found with handle "team/sample-prompt" and version 3
 
-  @unit
+  @unit @unimplemented
   Scenario: No prompt reference on any ancestor span
     Given an LLM span with no langwatch.prompt.id attribute
     And no ancestor spans have a langwatch.prompt.id attribute
@@ -144,20 +144,20 @@ Feature: Open existing prompt from trace
 
   # --- Metadata hoisting: combine prompt IDs across spans ---
 
-  @unit
+  @unit @unimplemented
   Scenario: Single span prompt ID is hoisted to trace-level metadata
     Given a trace with one span having "langwatch.prompt.id" = "team/sample-prompt:3"
     When the trace summary is computed
     Then the trace attribute "langwatch.prompt_ids" contains ["team/sample-prompt:3"]
     And the per-span "langwatch.prompt.id" is not present at trace level
 
-  @unit
+  @unit @unimplemented
   Scenario: Multiple spans with different prompts are combined
     Given a trace with spans using "team/prompt-a:1" and "team/prompt-b:2"
     When the trace summary is computed
     Then the trace attribute "langwatch.prompt_ids" contains ["team/prompt-a:1", "team/prompt-b:2"]
 
-  @unit
+  @unit @unimplemented
   Scenario: Duplicate prompt IDs across spans are deduplicated
     Given two spans both using "team/sample-prompt:3"
     When the trace summary is computed
@@ -167,7 +167,7 @@ Feature: Open existing prompt from trace
   # Old SDKs emitted separate attributes. We still parse them for backward compat
   # but don't emit them from new SDKs.
 
-  @integration
+  @integration @unimplemented
   Scenario: Backend extracts old-format separate prompt attributes
     Given a span with attribute "langwatch.prompt.handle" = "team/sample-prompt"
     And attribute "langwatch.prompt.version.number" = "2"
@@ -183,7 +183,7 @@ Feature: Open existing prompt from trace
   # sees the current tagged version, not the version that ran. This is accepted
   # behavior for tags (use version numbers for exact reproducibility).
 
-  @unit
+  @unit @unimplemented
   Scenario: Opens existing prompt at tagged version with variables applied
     Given a traced LLM call has "langwatch.prompt.id" = "team/sample-prompt:production"
     And the trace has variables name="Alice" and topic="AI"
@@ -192,20 +192,20 @@ Feature: Open existing prompt from trace
     And the playground variables are set to name="Alice" and topic="AI"
     And the chat history from the trace is loaded
 
-  @unit
+  @unit @unimplemented
   Scenario: Auto-detects open-existing action for tagged prompt reference
     Given a traced LLM span has attribute "langwatch.prompt.id" = "team/sample-prompt:production"
     When the playground determines the action for this span
     Then the effective action is "open-existing"
 
-  @unit
+  @unit @unimplemented
   Scenario: Tag-based open does not show version-not-found toast
     Given a traced LLM call has "langwatch.prompt.id" = "team/sample-prompt:production"
     When I choose "Open team/sample-prompt:production" from the menu
     Then the Playground opens the prompt at the version tagged "production"
     And no "version not found" toast is shown
 
-  @unit
+  @unit @unimplemented
   Scenario: Button dropdown shows tag reference in menu option
     Given a traced LLM span has attribute "langwatch.prompt.id" = "team/sample-prompt:production"
     When I view the span details
@@ -213,7 +213,7 @@ Feature: Open existing prompt from trace
     And the menu has option "Open team/sample-prompt:production"
     And the menu has option "Create new prompt"
 
-  @unit
+  @unit @unimplemented
   Scenario: Trace references a tag that is not assigned to any version
     Given a traced LLM call has "langwatch.prompt.id" = "team/sample-prompt:staging"
     And tag "staging" is not assigned to any version of "team/sample-prompt"
@@ -221,7 +221,7 @@ Feature: Open existing prompt from trace
     Then a new playground tab is created from the trace data
     And a warning toast is shown that the tag could not be resolved
 
-  @unit
+  @unit @unimplemented
   Scenario: Trace references a tagged prompt that no longer exists
     Given a traced LLM call has "langwatch.prompt.id" = "team/deleted-prompt:production"
     And prompt "team/deleted-prompt" does not exist in the project
@@ -231,7 +231,7 @@ Feature: Open existing prompt from trace
 
   # Note: This scenario is already covered by existing trace service tests from PR #2826
   # which added promptTag propagation through ClickHouse and Elasticsearch services.
-  @integration
+  @integration @unimplemented
   Scenario: Backend extracts prompt tag from span attributes
     Given a span with attribute "langwatch.prompt.id" = "team/sample-prompt:production"
     And the span is stored in the trace service

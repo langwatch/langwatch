@@ -8,6 +8,7 @@ Feature: Online Evaluation Drawer Complete Flow
     Given I am logged in to a project
     And I have evaluators available
 
+  @unimplemented
   Scenario: Create trace-level online evaluation with auto-mappings
     Given I open the Online Evaluation drawer
     And I keep "Trace" level selected (default)
@@ -23,6 +24,7 @@ Feature: Online Evaluation Drawer Complete Flow
     Then a monitor should be created with evaluatorId reference
     And the drawer should close
 
+  @unimplemented
   Scenario: Create with pending mappings that need configuration
     Given I open the Online Evaluation drawer
     When I select evaluator "Custom LLM Judge" requiring "custom_criteria"
@@ -35,6 +37,7 @@ Feature: Online Evaluation Drawer Complete Flow
     When I click Save
     Then the monitor should be created successfully
 
+  @unimplemented
   Scenario: User closes editor without completing mappings
     Given I selected an evaluator with pending mappings
     And the evaluator editor opened automatically
@@ -45,6 +48,7 @@ Feature: Online Evaluation Drawer Complete Flow
     When I click the warning banner
     Then the evaluator editor should re-open
 
+  @unimplemented
   Scenario: Remove evaluator shows pending state
     Given I have selected an evaluator with all mappings complete
     When I click the X button on the evaluator box
@@ -53,6 +57,7 @@ Feature: Online Evaluation Drawer Complete Flow
     And the Save button should be disabled
     And a subtle message should say "Select an evaluator to continue"
 
+  @unimplemented
   Scenario: Switch from trace to thread level
     Given I have selected an evaluator at trace level
     And mappings are auto-completed
@@ -61,6 +66,7 @@ Feature: Online Evaluation Drawer Complete Flow
     Because thread mappings require manual configuration
     And the mapping sources should now show thread options
 
+  @unimplemented
   Scenario: Switch back from thread to trace level
     Given I am at thread level with manual mappings configured
     When I switch to "Trace" level
@@ -68,6 +74,7 @@ Feature: Online Evaluation Drawer Complete Flow
     And mappings should update to trace sources
     And the editor may open if there are pending mappings
 
+  @unimplemented
   Scenario: Edit existing online evaluation
     Given a monitor "My PII Check" exists
     When I click edit on the monitor
@@ -81,12 +88,14 @@ Feature: Online Evaluation Drawer Complete Flow
     And I click Save
     Then the monitor should be updated
 
+  @unimplemented
   Scenario: Evaluator has no required fields
     Given I select an evaluator with no required fields
     Then no mappings UI should be shown
     And no editor should open automatically
     And I should be able to save immediately
 
+  @unimplemented
   Scenario: Create new evaluator on the spot
     Given I open the Online Evaluation drawer
     When I click "Select Evaluator"
@@ -96,12 +105,14 @@ Feature: Online Evaluation Drawer Complete Flow
     When I save the new evaluator
     Then I should return with the new evaluator selected
 
+  @unimplemented
   Scenario: Cancel online evaluation creation
     Given I have partially configured an online evaluation
     When I click Cancel or close the drawer
     Then no monitor should be created
     And my changes should be discarded
 
+  @unimplemented
   Scenario: Drawer preserves state during sub-drawer navigation
     Given I have selected trace level
     And I have set sampling to 50%
@@ -112,6 +123,7 @@ Feature: Online Evaluation Drawer Complete Flow
     And trace level should still be selected
     And sampling should still be 50%
 
+  @unimplemented
   Scenario: Configure all options before save
     Given I open the Online Evaluation drawer
     When I select "Trace" level
@@ -127,6 +139,7 @@ Feature: Online Evaluation Drawer Complete Flow
       | preconditions| [input contains PII]     |
       | evaluatorId  | [selected evaluator id]  |
 
+  @unimplemented
   Scenario: Validation errors prevent save
     Given I have an evaluator selected
     But the name field is empty

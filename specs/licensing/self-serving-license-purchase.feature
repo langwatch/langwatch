@@ -8,7 +8,7 @@ Feature: Self-Serving License Purchase
     And the Stripe license payment link is configured
 
   # Core webhook flow
-  @integration
+  @integration @unimplemented
   Scenario: Generate and email license on successful Stripe purchase
     Given a user completes checkout via the license payment link with 5 seats
     When the Stripe checkout.session.completed webhook fires
@@ -17,47 +17,47 @@ Feature: Self-Serving License Purchase
     And the license expires 1 year from the purchase date
     And the license is emailed to the buyer's email address
 
-  @integration
+  @integration @unimplemented
   Scenario: Route license purchase separately from subscription checkout
     Given a checkout.session.completed event with a payment_link matching the license payment link ID
     When the webhook handler processes the event
     Then the event is routed to the license generation flow
     And the subscription checkout flow is NOT executed
 
-  @integration
+  @integration @unimplemented
   Scenario: Route subscription checkout normally when not a license purchase
     Given a checkout.session.completed event without a matching payment_link
     When the webhook handler processes the event
     Then the existing subscription checkout flow executes
     And the license generation flow is NOT triggered
 
-  @integration
+  @integration @unimplemented
   Scenario: Default to 1 seat when quantity is missing
     Given a user completes checkout via the license payment link with no quantity specified
     When the Stripe checkout.session.completed webhook fires
     Then a GROWTH license is generated with maxMembers set to 1
 
-  @integration
+  @integration @unimplemented
   Scenario: Use business name as organization name in license
     Given a user completes checkout with business name "Acme Corp" and email "buyer@acme.com"
     When the license is generated
     Then the license organization name is "Acme Corp"
     And the license email is "buyer@acme.com"
 
-  @integration
+  @integration @unimplemented
   Scenario: Fall back to email when business name is empty
     Given a user completes checkout with no business name and email "buyer@solo.dev"
     When the license is generated
     Then the license organization name is "buyer@solo.dev"
 
   # Slack notification
-  @integration
+  @integration @unimplemented
   Scenario: Notify Slack channel on license purchase
     Given the Slack license webhook URL is configured
     When a license is successfully generated from a purchase
     Then a Slack notification is sent with buyer email, plan type, seat count, and amount paid
 
-  @integration
+  @integration @unimplemented
   Scenario: Continue license delivery when Slack notification fails
     Given the Slack license webhook URL is configured but unreachable
     When a license is successfully generated from a purchase
@@ -65,7 +65,7 @@ Feature: Self-Serving License Purchase
     And the Slack failure is logged but does not block delivery
 
   # Error handling
-  @integration
+  @integration @unimplemented
   Scenario: Handle missing private key gracefully
     Given the license signing private key is NOT configured
     When a license purchase webhook fires
@@ -73,7 +73,7 @@ Feature: Self-Serving License Purchase
     And the webhook returns a 500 status
     And no email is sent
 
-  @integration
+  @integration @unimplemented
   Scenario: Handle missing email configuration gracefully
     Given the email sender is NOT configured
     When a license purchase webhook fires
@@ -81,7 +81,7 @@ Feature: Self-Serving License Purchase
     And the error is logged
 
   # GROWTH plan template
-  @integration
+  @integration @unimplemented
   Scenario: GROWTH plan includes all features with no artificial limits
     Given a user purchases a GROWTH license with 10 seats
     When the license is generated
@@ -91,13 +91,13 @@ Feature: Self-Serving License Purchase
     And publishing is enabled
 
   # UI: configurable payment link
-  @integration
+  @integration @unimplemented
   Scenario: Purchase button uses configured payment link URL
     Given the STRIPE_LICENSE_PAYMENT_LINK_URL is set to "https://buy.stripe.com/test123"
     When the license page renders for a user without a license
     Then the "Purchase license" button links to "https://buy.stripe.com/test123"
 
-  @integration
+  @integration @unimplemented
   Scenario: Purchase button hidden when payment link URL is not configured
     Given the STRIPE_LICENSE_PAYMENT_LINK_URL is NOT set
     When the license page renders for a user without a license

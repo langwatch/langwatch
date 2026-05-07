@@ -18,14 +18,14 @@ Feature: Standardized GitHub issue creation via /create-issue skill
 
   # --- Issue creation workflow ---
 
-  @integration
+  @integration @unimplemented
   Scenario: Confirms detected type before creating issue
     Given the user runs /create-issue "Refactor the auth module and add OAuth support"
     When the skill detects a type from the description
     Then it displays the detected type and asks the user to confirm or change it
     And waits for user confirmation before creating the issue
 
-  @integration
+  @integration @unimplemented
   Scenario: Creates bug issue with template body sections
     Given the user runs /create-issue "Login page throws 500 error"
     And the user confirms type BUG
@@ -34,7 +34,7 @@ Feature: Standardized GitHub issue creation via /create-issue skill
     And the issue body contains Describe the bug, To reproduce, and Expected behavior sections
     And the issue is labeled "bug"
 
-  @integration
+  @integration @unimplemented
   Scenario: Creates feature request with template body sections
     Given the user runs /create-issue "Add CSV export for evaluation results"
     And the user confirms type FEAT
@@ -42,7 +42,7 @@ Feature: Standardized GitHub issue creation via /create-issue skill
     Then the issue body contains Problem, Proposed solution, and Alternatives considered sections
     And the issue is labeled "feature"
 
-  @integration
+  @integration @unimplemented
   Scenario: Creates chore with template body sections
     Given the user runs /create-issue "Upgrade Prisma to v6"
     And the user confirms type CHORE
@@ -50,28 +50,28 @@ Feature: Standardized GitHub issue creation via /create-issue skill
     Then the issue body contains Description and Scope sections
     And the issue is labeled "chore"
 
-  @integration
+  @integration @unimplemented
   Scenario: Assigns issue to current GitHub user
     Given the user runs /create-issue "Fix pagination in traces view"
     And the user confirms the detected type
     When the skill creates the issue
     Then the created issue is assigned to the current GitHub user
 
-  @integration
+  @integration @unimplemented
   Scenario: Adds issue to LangWatch Kanban project with default status
     Given the user runs /create-issue "Add dark mode support"
     And the user confirms the detected type
     When the skill creates the issue
     Then the issue appears in project number 5 with Status set to "Backlog"
 
-  @integration
+  @integration @unimplemented
   Scenario: Sets optional project fields when user specifies them
     Given the user runs /create-issue "Add dark mode support" with priority P1 and size M
     And the user confirms the detected type
     When the skill creates the issue
     Then the project Priority field is "P1" and Size field is "M"
 
-  @integration
+  @integration @unimplemented
   Scenario: Sets Epic project field when user specifies an epic category
     Given the user runs /create-issue "Fix trace filtering" with epic "Traces UI/UX Extreme Makeover"
     And the user confirms the detected type
@@ -80,14 +80,14 @@ Feature: Standardized GitHub issue creation via /create-issue skill
 
   # --- Sub-issue linking ---
 
-  @integration
+  @integration @unimplemented
   Scenario: Links issue as sub-issue of parent epic
     Given the user runs /create-issue "Fix trace date picker" with parent epic issue 500
     And the user confirms the detected type
     When the skill creates the issue
     Then the new issue appears as a sub-issue of issue 500
 
-  @integration
+  @integration @unimplemented
   Scenario: Skips sub-issue linking when no parent epic specified
     Given the user runs /create-issue "Update README" without specifying a parent epic
     And the user confirms the detected type
@@ -96,7 +96,7 @@ Feature: Standardized GitHub issue creation via /create-issue skill
 
   # --- Implementation handoff ---
 
-  @integration
+  @integration @unimplemented
   Scenario: Offers to launch implementation after creation
     Given the user runs /create-issue "Add webhook support"
     And the user confirms the detected type
@@ -105,18 +105,18 @@ Feature: Standardized GitHub issue creation via /create-issue skill
 
   # --- Error handling ---
 
-  @integration
+  @integration @unimplemented
   Scenario: Shows usage instructions when invoked with no arguments
     When the skill is invoked with no arguments
     Then it shows usage instructions with examples of valid invocations
 
-  @integration
+  @integration @unimplemented
   Scenario: Shows authentication error when not logged in
     Given the gh CLI is not authenticated
     When the skill attempts to create an issue
     Then it shows an error about authentication and does not create an issue
 
-  @integration
+  @integration @unimplemented
   Scenario: Shows access error when project is unreachable
     Given the gh CLI is authenticated but cannot access project 5
     When the skill attempts to create an issue

@@ -11,24 +11,24 @@ Feature: Runs Page — Unified Navigation & URL Routing
   # Menu & Naming
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: Sidebar shows "Runs" menu item without beta badge
     When I view the main navigation
     Then I see a "Runs" link under Simulations with a play-circle icon
     And the link does not have a beta badge
 
-  @integration
+  @integration @unimplemented
   Scenario: No separate "Run History" or "Run Plans" menu items exist
     When I view the main navigation
     Then I do not see a "Run History" link
     And I do not see a "Run Plans" link with a beta badge
 
-  @integration
+  @integration @unimplemented
   Scenario: Page heading reads "Simulations"
     When I navigate to "/my-project/simulations"
     Then the page heading is "Simulations"
 
-  @integration
+  @integration @unimplemented
   Scenario: New Run Plan button text is unchanged
     When I navigate to "/my-project/simulations"
     Then I see a "+ New Run Plan" button
@@ -37,19 +37,19 @@ Feature: Runs Page — Unified Navigation & URL Routing
   # URL Routing — Base
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: Navigating to /simulations shows All Runs view
     When I navigate to "/my-project/simulations"
     Then I see the "All Runs" view with the sidebar and run history panel
 
-  @integration
+  @integration @unimplemented
   Scenario: Navigating to /simulations/run-plans/:suiteSlug shows suite detail
     Given suite "critical-path" exists in the project
     When I navigate to "/my-project/simulations/run-plans/critical-path"
     Then the sidebar highlights "critical-path"
     And the main panel shows the suite detail for "critical-path"
 
-  @integration
+  @integration @unimplemented
   Scenario: Navigating to /simulations/:externalSetSlug shows external set
     Given external set "python-examples" exists in the project
     When I navigate to "/my-project/simulations/python-examples"
@@ -60,7 +60,7 @@ Feature: Runs Page — Unified Navigation & URL Routing
   # URL Routing — With Batch ID (Scroll-to-Batch)
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: Navigating to /simulations/run-plans/:suiteSlug/:batchId loads suite and highlights batch
     Given suite "critical-path" exists with batch runs:
       | batchRunId                        |
@@ -72,7 +72,7 @@ Feature: Runs Page — Unified Navigation & URL Routing
     And the batch row for "scenariobatch_target" is highlighted with a yellow flash
     And the page scrolls to the "scenariobatch_target" row
 
-  @integration
+  @integration @unimplemented
   Scenario: No scroll when target batch is already the first row
     Given suite "critical-path" exists with batch runs:
       | batchRunId                        |
@@ -82,7 +82,7 @@ Feature: Runs Page — Unified Navigation & URL Routing
     Then the batch row for "scenariobatch_newest" is highlighted with a yellow flash
     And no scrolling occurs because it is already at the top
 
-  @integration
+  @integration @unimplemented
   Scenario: Navigating to /simulations/:externalSetSlug/:batchId highlights batch in external set
     Given external set "python-examples" exists with batch runs:
       | batchRunId                        |
@@ -92,7 +92,7 @@ Feature: Runs Page — Unified Navigation & URL Routing
     Then the main panel shows the external set detail for "python-examples"
     And the batch row for "scenariobatch_second" is highlighted with a yellow flash
 
-  @integration
+  @integration @unimplemented
   Scenario: Yellow flash fades after a short duration
     Given I navigated to a page with a highlighted batch
     When 2 seconds have elapsed
@@ -102,7 +102,7 @@ Feature: Runs Page — Unified Navigation & URL Routing
   # Sidebar Navigation
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: Clicking a suite in the sidebar navigates to /simulations/run-plans/:slug
     Given suite "critical-path" exists in the project
     When I am on the simulations page
@@ -110,7 +110,7 @@ Feature: Runs Page — Unified Navigation & URL Routing
     Then the URL changes to "/my-project/simulations/run-plans/critical-path"
     And the main panel shows the suite detail
 
-  @integration
+  @integration @unimplemented
   Scenario: Clicking an external set in the sidebar navigates to /simulations/:setSlug
     Given external set "python-examples" exists in the project
     When I am on the simulations page
@@ -118,7 +118,7 @@ Feature: Runs Page — Unified Navigation & URL Routing
     Then the URL changes to "/my-project/simulations/python-examples"
     And the main panel shows the external set detail
 
-  @integration
+  @integration @unimplemented
   Scenario: Clicking "All Runs" navigates to /simulations
     Given I am viewing a specific suite at "/my-project/simulations/run-plans/critical-path"
     When I click "All Runs" in the sidebar
@@ -129,7 +129,7 @@ Feature: Runs Page — Unified Navigation & URL Routing
   # SDK Compatibility
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: SDK-generated URL lands on unified page with external set selected
     Given the scenario SDK posts events for external set "python-examples"
     And the API returns URL "https://app.langwatch.ai/my-project/simulations/python-examples"
@@ -142,22 +142,22 @@ Feature: Runs Page — Unified Navigation & URL Routing
   # Old URL Redirects
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: Old suites URL with suite param redirects to new path
     When I navigate to "/my-project/simulations/suites?suite=critical-path"
     Then I am redirected to "/my-project/simulations/run-plans/critical-path"
 
-  @integration
+  @integration @unimplemented
   Scenario: Old suites URL with externalSet param redirects to new path
     When I navigate to "/my-project/simulations/suites?externalSet=python-examples"
     Then I am redirected to "/my-project/simulations/python-examples"
 
-  @integration
+  @integration @unimplemented
   Scenario: Old suites URL without params redirects to simulations root
     When I navigate to "/my-project/simulations/suites"
     Then I am redirected to "/my-project/simulations"
 
-  @integration
+  @integration @unimplemented
   Scenario: Old individual run URL redirects to unified page with drawer
     When I navigate to "/my-project/simulations/python-examples/scenariobatch_abc/scenariorun_xyz"
     Then I am redirected to "/my-project/simulations/python-examples/scenariobatch_abc?openRun=scenariorun_xyz"
@@ -167,7 +167,7 @@ Feature: Runs Page — Unified Navigation & URL Routing
   # Save and Run Redirect
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: Save and Run from scenario drawer redirects to simulations page
     Given I am on the scenarios library page
     And I open the scenario editor drawer for a scenario
@@ -180,7 +180,7 @@ Feature: Runs Page — Unified Navigation & URL Routing
   # Pending Run Placeholder
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: Initializing placeholder shown while run starts from suite detail
     Given I am viewing suite "critical-path" detail
     When I click "Run" in the suite header

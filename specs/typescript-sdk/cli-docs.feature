@@ -9,60 +9,60 @@ Feature: CLI Docs Commands
 
   # --- langwatch docs ---
 
-  @unit
+  @unit @unimplemented
   Scenario: docs with no argument fetches the LangWatch llms.txt index
     When I run "langwatch docs"
     Then the CLI fetches "https://langwatch.ai/docs/llms.txt"
     And the markdown contents are written to stdout
 
-  @unit
+  @unit @unimplemented
   Scenario: docs with a relative path appends .md and resolves under /docs
     When I run "langwatch docs integration/python/guide"
     Then the CLI fetches "https://langwatch.ai/docs/integration/python/guide.md"
 
-  @unit
+  @unit @unimplemented
   Scenario: docs is forgiving about leading slashes
     When I run "langwatch docs /integration/python/guide"
     Then the CLI fetches "https://langwatch.ai/docs/integration/python/guide.md"
 
-  @unit
+  @unit @unimplemented
   Scenario: docs is forgiving about a redundant docs/ prefix
     When I run "langwatch docs docs/integration/python/guide"
     Then the CLI fetches "https://langwatch.ai/docs/integration/python/guide.md"
 
-  @unit
+  @unit @unimplemented
   Scenario: docs accepts a full URL ending in .md unchanged
     When I run "langwatch docs https://langwatch.ai/docs/prompt-management/cli.md"
     Then the CLI fetches "https://langwatch.ai/docs/prompt-management/cli.md"
 
-  @unit
+  @unit @unimplemented
   Scenario: docs accepts a full URL without an extension and appends .md
     When I run "langwatch docs https://langwatch.ai/docs/prompt-management/cli"
     Then the CLI fetches "https://langwatch.ai/docs/prompt-management/cli.md"
 
-  @unit
+  @unit @unimplemented
   Scenario: docs strips wrapping quotes that agents sometimes paste
     When I run `langwatch docs "integration/python/guide"`
     Then the CLI fetches "https://langwatch.ai/docs/integration/python/guide.md"
 
-  @unit
+  @unit @unimplemented
   Scenario: docs preserves an absolute URL ending in .txt (e.g. llms.txt)
     When I run "langwatch docs https://langwatch.ai/docs/llms.txt"
     Then the CLI fetches "https://langwatch.ai/docs/llms.txt"
 
   # --- langwatch scenario-docs ---
 
-  @unit
+  @unit @unimplemented
   Scenario: scenario-docs with no argument fetches the Scenario llms.txt index
     When I run "langwatch scenario-docs"
     Then the CLI fetches "https://langwatch.ai/scenario/llms.txt"
 
-  @unit
+  @unit @unimplemented
   Scenario: scenario-docs with a relative path resolves under /scenario
     When I run "langwatch scenario-docs advanced/red-teaming"
     Then the CLI fetches "https://langwatch.ai/scenario/advanced/red-teaming.md"
 
-  @unit
+  @unit @unimplemented
   Scenario: scenario-docs is forgiving about a redundant scenario/ prefix
     When I run "langwatch scenario-docs scenario/advanced/red-teaming"
     Then the CLI fetches "https://langwatch.ai/scenario/advanced/red-teaming.md"

@@ -22,18 +22,21 @@ Feature: BetterAuth cutover — mount, swap consumers, delete NextAuth
   # Migration correctness
   # ============================================================================
 
+  @unimplemented
   Scenario: Credential passwords survive the cutover
     Given a user "alice@acme.com" had a bcrypt password on User.password before the migration
     When the destructive migration runs
     Then an Account row exists with userId=alice.id, providerId='credential', password=<the same bcrypt hash>
     And User.password column no longer exists
 
+  @unimplemented
   Scenario: Sessions are wiped on cutover
     Given sessions existed in the Session table before the migration
     When the destructive migration runs
     Then the Session table has zero rows
     And all active users must re-authenticate
 
+  @unimplemented
   Scenario: emailVerified type conversion preserves verification state
     Given 3 users with emailVerified=2024-01-01 and 2 users with emailVerified=null
     When the destructive migration runs
@@ -45,6 +48,7 @@ Feature: BetterAuth cutover — mount, swap consumers, delete NextAuth
   # Signin flows
   # ============================================================================
 
+  @unimplemented
   Scenario: On-prem credentials signin works end-to-end
     Given NEXTAUTH_PROVIDER is "email"
     And a user exists with a bcrypt password in their Account row
@@ -52,6 +56,7 @@ Feature: BetterAuth cutover — mount, swap consumers, delete NextAuth
     Then the response sets a session cookie
     And GET /api/auth/session returns the user
 
+  @unimplemented
   Scenario: New user signup via credentials creates User + Account rows
     Given NEXTAUTH_PROVIDER is "email"
     When I sign up with email "new@example.com" + password
@@ -59,6 +64,7 @@ Feature: BetterAuth cutover — mount, swap consumers, delete NextAuth
     And an Account row is created with providerId='credential', accountId=<user.id>
     And a session is started
 
+  @unimplemented
   Scenario: Google OAuth signin works end-to-end
     Given NEXTAUTH_PROVIDER is "google"
     And GOOGLE_CLIENT_* envs are set
@@ -66,6 +72,7 @@ Feature: BetterAuth cutover — mount, swap consumers, delete NextAuth
     Then I am redirected to google.com
     And on callback I land signed in at /
 
+  @unimplemented
   Scenario: Auth0 OAuth signin works end-to-end
     Given NEXTAUTH_PROVIDER is "auth0"
     And AUTH0_* envs are set
@@ -83,6 +90,7 @@ Feature: BetterAuth cutover — mount, swap consumers, delete NextAuth
   # SSO domain matching (ported behavior from NextAuth signIn callback)
   # ============================================================================
 
+  @unimplemented
   Scenario: New SSO user is auto-added to the matching org
     Given an organization with ssoDomain "acme.com" and ssoProvider "google" exists
     And no user exists with email "new@acme.com"
@@ -91,6 +99,7 @@ Feature: BetterAuth cutover — mount, swap consumers, delete NextAuth
     And an OrganizationUser row is created with role=MEMBER and organizationId=<the matching org>
     And pendingSsoSetup is false
 
+  @unimplemented
   Scenario: Existing user with correct SSO provider auto-links
     Given an organization with ssoDomain "acme.com" and ssoProvider "google" exists
     And a user exists with email "existing@acme.com" and pendingSsoSetup=true
@@ -98,6 +107,7 @@ Feature: BetterAuth cutover — mount, swap consumers, delete NextAuth
     Then pendingSsoSetup is set to false
     And the Account row is upserted
 
+  @unimplemented
   Scenario: EXISTING user (with prior linked account) + wrong SSO provider → soft-block
     Given an organization with ssoDomain "acme.com" and ssoProvider "okta" exists
     And a user exists with email "existing@acme.com" and at least 1 linked Account
@@ -106,6 +116,7 @@ Feature: BetterAuth cutover — mount, swap consumers, delete NextAuth
     And pendingSsoSetup is set to true
     And the DashboardLayout banner is shown
 
+  @unimplemented
   Scenario: FIRST-TIME signup (no prior account) + wrong SSO provider → hard-block
     Given an organization with ssoDomain "acme.com" and ssoProvider "okta" exists
     And no user exists with email "newsignup@acme.com"
@@ -120,6 +131,7 @@ Feature: BetterAuth cutover — mount, swap consumers, delete NextAuth
   # Admin impersonation
   # ============================================================================
 
+  @unimplemented
   Scenario: Admin impersonates a user
     Given an admin user (email in ADMIN_EMAILS) is signed in
     When POST /api/admin/impersonate with userIdToImpersonate=<target> and reason=<string>
@@ -129,16 +141,19 @@ Feature: BetterAuth cutover — mount, swap consumers, delete NextAuth
     And subsequent calls to getServerAuthSession return session.user = target
     And session.user.impersonator = the admin's identity
 
+  @unimplemented
   Scenario: Admin cannot impersonate another admin
     Given an admin user is signed in
     When POST /api/admin/impersonate with userIdToImpersonate=<another admin>
     Then the response is HTTP 403 {"message":"Cannot impersonate another admin"}
 
+  @unimplemented
   Scenario: Admin cannot impersonate a deactivated user
     Given an admin user is signed in
     When POST /api/admin/impersonate with userIdToImpersonate=<deactivated user>
     Then the response is HTTP 400 {"message":"Cannot impersonate a deactivated user"}
 
+  @unimplemented
   Scenario: Non-admin cannot impersonate
     Given a non-admin user is signed in
     When POST /api/admin/impersonate with any userIdToImpersonate
@@ -146,6 +161,7 @@ Feature: BetterAuth cutover — mount, swap consumers, delete NextAuth
     (404 rather than 403 to hide the existence of admin endpoints from
     non-admins — matches the legacy NextAuth behavior)
 
+  @unimplemented
   Scenario: Admin ends impersonation
     Given an admin user is currently impersonating a target
     When DELETE /api/admin/impersonate
@@ -158,12 +174,14 @@ Feature: BetterAuth cutover — mount, swap consumers, delete NextAuth
   # tRPC context + getServerAuthSession-style helpers
   # ============================================================================
 
+  @unimplemented
   Scenario: tRPC ctx.session is populated from BetterAuth
     Given a signed-in user hits a tRPC endpoint
     When the protected procedure runs
     Then ctx.session.user.id is the user's id
     And ctx.session.user.email is the user's email
 
+  @unimplemented
   Scenario: Unauthenticated tRPC call is UNAUTHORIZED
     Given no session cookie
     When a protected procedure runs
@@ -173,12 +191,14 @@ Feature: BetterAuth cutover — mount, swap consumers, delete NextAuth
   # Delete NextAuth
   # ============================================================================
 
+  @unimplemented
   Scenario: NextAuth handler is gone
     When I search the repo for imports from "next-auth" or "next-auth/react"
     Then there are zero results
     And the src/pages/api/auth/[...nextauth].ts file does not exist
     And package.json has no "next-auth" or "@next-auth/prisma-adapter" entries
 
+  @unimplemented
   Scenario: Typecheck and lint pass
     When I run "pnpm typecheck"
     Then it exits with code 0

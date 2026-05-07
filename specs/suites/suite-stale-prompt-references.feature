@@ -17,28 +17,28 @@ Feature: Suite run validation for organization-scoped prompts
   # same pattern used by the UI and the worker's data prefetcher.
   #
 
-  @unit
+  @unit @unimplemented
   Scenario: Run validation accepts org-scoped prompt from another project
     Given an org-scoped prompt "Shared Bot" exists in project "other-project"
     And a suite in "my-project" references that prompt as a target
     When the suite run is triggered
     Then the run proceeds without validation errors
 
-  @unit
+  @unit @unimplemented
   Scenario: Run validation accepts project-scoped prompt from same project
     Given a project-scoped prompt "Local Bot" exists in "my-project"
     And a suite in "my-project" references that prompt as a target
     When the suite run is triggered
     Then the run proceeds without validation errors
 
-  @unit
+  @unit @unimplemented
   Scenario: Run validation rejects prompt from unrelated project without org scope
     Given a project-scoped prompt "Private Bot" exists in "other-project"
     And a suite in "my-project" references that prompt as a target
     When the suite run is triggered
     Then the run fails with an error about an invalid target reference
 
-  @unit
+  @unit @unimplemented
   Scenario: Run validation rejects soft-deleted prompts
     Given a prompt "Retired Bot" has been soft-deleted
     And a suite still holds a reference to that prompt
@@ -54,14 +54,14 @@ Feature: Suite run validation for organization-scoped prompts
   # silently removed — so the user can decide what to do.
   #
 
-  @integration
+  @integration @unimplemented
   Scenario: Edit drawer warns about deleted prompt targets
     Given suite "Critical Path" was saved with prompt targets "Active Bot" and "Deleted Bot"
     And "Deleted Bot" has since been soft-deleted
     When I open the edit drawer for "Critical Path"
     Then I see a warning that "Deleted Bot" is no longer available
 
-  @integration
+  @integration @unimplemented
   Scenario: Edit drawer shows no warning when all references are valid
     Given suite "Critical Path" was saved with prompt target "Active Bot"
     And "Active Bot" still exists

@@ -17,42 +17,42 @@ Feature: Detect and display stalled scenario runs
   # ============================================================================
   # Pure logic: given event timestamps and current time, derive the correct status.
 
-  @unit
+  @unit @unimplemented
   Scenario: Run without RUN_FINISHED within threshold remains IN_PROGRESS
     Given a scenario run has RUN_STARTED at 3 minutes ago
     And no RUN_FINISHED event exists
     When the service resolves the run status
     Then the status is IN_PROGRESS
 
-  @unit
+  @unit @unimplemented
   Scenario: Run without RUN_FINISHED beyond threshold becomes STALLED
     Given a scenario run has RUN_STARTED at 15 minutes ago
     And no RUN_FINISHED event exists
     When the service resolves the run status
     Then the status is STALLED
 
-  @unit
+  @unit @unimplemented
   Scenario: Run at exactly the threshold boundary becomes STALLED
     Given a scenario run has RUN_STARTED at exactly 10 minutes ago
     And no RUN_FINISHED event exists
     When the service resolves the run status
     Then the status is STALLED
 
-  @unit
+  @unit @unimplemented
   Scenario: Run with RUN_FINISHED keeps its original status regardless of age
     Given a scenario run has RUN_STARTED at 30 minutes ago
     And a RUN_FINISHED event exists with status SUCCESS
     When the service resolves the run status
     Then the status is SUCCESS
 
-  @unit
+  @unit @unimplemented
   Scenario: Failed run with RUN_FINISHED is not marked as STALLED
     Given a scenario run has RUN_STARTED at 20 minutes ago
     And a RUN_FINISHED event exists with status ERROR
     When the service resolves the run status
     Then the status is ERROR
 
-  @unit
+  @unit @unimplemented
   Scenario: Stall detection uses the last event timestamp, not just RUN_STARTED
     Given a scenario run has RUN_STARTED at 20 minutes ago
     And a MESSAGE_SNAPSHOT event exists at 3 minutes ago
@@ -65,7 +65,7 @@ Feature: Detect and display stalled scenario runs
   # ============================================================================
   # The batch query path must also apply stall detection consistently.
 
-  @unit
+  @unit @unimplemented
   Scenario: Batch query marks individual stalled runs within a batch
     Given a batch run contains 3 scenario runs
     And run "A" has RUN_FINISHED with status SUCCESS at 20 minutes ago
@@ -81,28 +81,28 @@ Feature: Detect and display stalled scenario runs
   # ============================================================================
   # Verify that STALLED status renders with the correct visual treatment.
 
-  @integration
+  @integration @unimplemented
   Scenario: Stalled run displays with warning visual in status icon
     Given a scenario run has status STALLED
     When the ScenarioRunStatusIcon renders
     Then the icon uses a warning color distinct from error red
     And the icon is visually distinct from IN_PROGRESS
 
-  @integration
+  @integration @unimplemented
   Scenario: Stalled run displays warning badge in previous runs list
     Given a scenario has a past run with status STALLED
     When the previous runs list renders
     Then the stalled run shows a warning-colored badge
     And the badge label indicates the run stalled
 
-  @integration
+  @integration @unimplemented
   Scenario: Status display shows STALLED text in simulation console
     Given a scenario run has status STALLED
     When the StatusDisplay component renders
     Then the status text reads "STALLED"
     And the text uses a warning color
 
-  @integration
+  @integration @unimplemented
   Scenario: Stalled run is treated as complete for overlay purposes
     Given a scenario run has status STALLED
     When the SimulationStatusOverlay evaluates completion
@@ -114,7 +114,7 @@ Feature: Detect and display stalled scenario runs
   # ============================================================================
   # Full user-visible flow: user sees a stalled run and understands what happened.
 
-  @e2e
+  @e2e @unimplemented
   Scenario: User sees stalled indicator for a run that never completed
     Given I am logged into project "my-project"
     And scenario "Flaky Agent" had a run that started over 10 minutes ago

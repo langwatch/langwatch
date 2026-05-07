@@ -10,14 +10,14 @@ Feature: Custom Models Management
 
   # Custom Models Section in Provider Drawer
 
-  @integration
+  @integration @unimplemented
   Scenario: Custom Models section appears in provider drawer
     When I open the model provider configuration drawer for "openai"
     Then I see a "Custom Models" section
     And the section shows an empty table when no custom models exist
     And I see an "+ Add" button
 
-  @integration
+  @integration @unimplemented
   Scenario: Add button shows options for model types
     Given I open the model provider configuration drawer for "openai"
     When I click the "+ Add" button
@@ -27,7 +27,7 @@ Feature: Custom Models Management
 
   # Add Model Dialog
 
-  @integration
+  @integration @unimplemented
   Scenario: Add model dialog shows all configuration fields
     Given I open the model provider configuration drawer for "openai"
     And I click the "+ Add" button
@@ -43,7 +43,7 @@ Feature: Custom Models Management
 
   # Add Embeddings Model Dialog
 
-  @integration
+  @integration @unimplemented
   Scenario: Add embeddings model dialog shows minimal fields
     Given I open the model provider configuration drawer for "openai"
     And I click the "+ Add" button
@@ -55,7 +55,7 @@ Feature: Custom Models Management
 
   # Managing Custom Models
 
-  @integration
+  @integration @unimplemented
   Scenario: Adding a model through the dialog adds it to the table
     Given I open the model provider configuration drawer for "openai"
     And I click the "+ Add" button
@@ -65,7 +65,7 @@ Feature: Custom Models Management
     And I confirm the dialog
     Then "GPT-5 Custom" appears in the custom models table
 
-  @integration
+  @integration @unimplemented
   Scenario: Removing a custom model from the table
     Given I have a custom model "gpt-5-custom" configured for "openai"
     And I open the model provider configuration drawer for "openai"
@@ -74,7 +74,7 @@ Feature: Custom Models Management
 
   # See All Models
 
-  @integration
+  @integration @unimplemented
   Scenario: See all models link opens read-only registry modal
     Given I open the model provider configuration drawer for "openai"
     When I click the "See all models" link
@@ -83,7 +83,7 @@ Feature: Custom Models Management
 
   # Custom Models in ModelSelector
 
-  @integration
+  @integration @unimplemented
   Scenario: Custom models appear alongside registry models in ModelSelector
     Given I have a custom model "gpt-5-custom" configured for "openai"
     When I open the model selector dropdown
@@ -92,7 +92,7 @@ Feature: Custom Models Management
 
   # Custom Model Metadata in Config Settings
 
-  @integration
+  @integration @unimplemented
   Scenario: Custom model metadata drives config settings
     Given I have a custom model with specific parameter support and max tokens
     When I select that custom model in the model selector
@@ -102,7 +102,7 @@ Feature: Custom Models Management
 
   # Migration Logic
 
-  @unit
+  @unit @unimplemented
   Scenario: Migration drops custom models that match registry entries
     Given a provider has custom models stored as plain strings
     And some custom model names match existing registry models

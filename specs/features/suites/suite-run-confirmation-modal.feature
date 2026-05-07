@@ -8,13 +8,13 @@ Feature: Suite run confirmation modal
     And the suite "Regression Tests" has 3 scenarios and 2 targets
 
   # Dialog appearance and informative content
-  @integration
+  @integration @unimplemented
   Scenario: Confirmation modal appears when clicking Run
     When I click the "Run" button
     Then I see a confirmation modal with the title "Run suite?"
     And the modal displays the suite name "Regression Tests"
 
-  @integration
+  @integration @unimplemented
   Scenario: Modal displays execution summary with estimated job count
     Given the confirmation modal is open for "Regression Tests"
     Then the modal shows 3 scenarios
@@ -22,7 +22,7 @@ Feature: Suite run confirmation modal
     And the modal shows an estimated 6 jobs
 
   # Confirm proceeds with the run
-  @integration
+  @integration @unimplemented
   Scenario: Confirming the modal triggers the suite run
     Given the confirmation modal is open for "Regression Tests"
     When I click "Run" in the modal
@@ -30,7 +30,7 @@ Feature: Suite run confirmation modal
     And the modal closes
 
   # Cancel aborts without side effects
-  @integration
+  @integration @unimplemented
   Scenario: Cancelling the modal does not trigger a run
     Given the confirmation modal is open for "Regression Tests"
     When I click "Cancel"
@@ -38,7 +38,7 @@ Feature: Suite run confirmation modal
     And no suite run is triggered
 
   # Prevent double-submission while run is being scheduled
-  @integration
+  @integration @unimplemented
   Scenario: Buttons are disabled while run is being scheduled
     Given the confirmation modal is open for "Regression Tests"
     When the run request is in progress
@@ -46,7 +46,7 @@ Feature: Suite run confirmation modal
     And the Run button is disabled
 
   # Error handling
-  @integration
+  @integration @unimplemented
   Scenario: Modal closes and error toast appears when run fails
     Given the confirmation modal is open for "Regression Tests"
     When I click "Run" in the modal

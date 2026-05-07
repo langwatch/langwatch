@@ -14,14 +14,14 @@ Feature: Scenario Job ID Uniqueness
   # Multi-Target: distinct jobs per target
   # ============================================================================
 
-  @unit
+  @unit @unimplemented
   Scenario: Scheduling same scenario against two different targets produces distinct job IDs
     Given scenario "Refund Flow" in project "proj_1" with batch "batch_1"
     When the scenario is scheduled against target "prompt_A"
     And the scenario is scheduled against target "prompt_B"
     Then the two jobs have different IDs
 
-  @unit
+  @unit @unimplemented
   Scenario: Job ID includes target reference ID
     Given scenario "Refund Flow" in project "proj_1" with batch "batch_1"
     When the scenario is scheduled against target "prompt_A"
@@ -31,7 +31,7 @@ Feature: Scenario Job ID Uniqueness
   # Repeated Runs: distinct jobs per repeat
   # ============================================================================
 
-  @unit
+  @unit @unimplemented
   Scenario: Scheduling same scenario three times in one batch produces three distinct job IDs
     Given scenario "Refund Flow" in project "proj_1" with batch "batch_1" and target "prompt_A"
     When the scenario is scheduled 3 times
@@ -41,7 +41,7 @@ Feature: Scenario Job ID Uniqueness
   # Combined: multi-target with repeats
   # ============================================================================
 
-  @unit
+  @unit @unimplemented
   Scenario: Running scenario against two targets with repeat=2 produces four distinct jobs
     Given scenario "Refund Flow" exists in project "proj_1"
     And targets "prompt_A" and "prompt_B" are configured

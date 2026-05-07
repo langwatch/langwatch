@@ -5,50 +5,50 @@ Feature: Shorthand prompt tag syntax (server-side)
 
   # --- Shorthand Parsing (pure logic, no tag allowlist needed) ---
 
-  @unit
+  @unit @unimplemented
   Scenario: Parses tag shorthand from slug:tag format
     When parsePromptShorthand receives "pizza-prompt:production"
     Then it returns slug "pizza-prompt" with tag "production"
 
-  @unit
+  @unit @unimplemented
   Scenario: Parses version shorthand from slug:number format
     When parsePromptShorthand receives "pizza-prompt:2"
     Then it returns slug "pizza-prompt" with version 2
 
-  @unit
+  @unit @unimplemented
   Scenario: Parses bare slug without suffix
     When parsePromptShorthand receives "pizza-prompt"
     Then it returns slug "pizza-prompt" with no tag or version
 
-  @unit
+  @unit @unimplemented
   Scenario: Treats "latest" as no tag
     When parsePromptShorthand receives "pizza-prompt:latest"
     Then it returns slug "pizza-prompt" with no tag or version
 
-  @unit
+  @unit @unimplemented
   Scenario: Preserves slugs containing a single slash
     When parsePromptShorthand receives "my-org/prompt:staging"
     Then it returns slug "my-org/prompt" with tag "staging"
 
-  @unit
+  @unit @unimplemented
   Scenario: Rejects empty slug before colon
     When parsePromptShorthand receives ":production"
     Then it returns an error indicating invalid format
 
-  @unit
+  @unit @unimplemented
   Scenario: Rejects empty suffix after colon
     When parsePromptShorthand receives "pizza-prompt:"
     Then it returns an error indicating invalid format
 
   # --- Span attribute parsing (tag extension) ---
 
-  @unit
+  @unit @unimplemented
   Scenario: Span attribute containing slug:tag shorthand resolves to handle and tag
     Given span attribute "langwatch.prompt.id" is "pizza-prompt:production"
     When parsePromptReference parses the attributes
     Then it returns handle "pizza-prompt" with label "production"
 
-  @unit
+  @unit @unimplemented
   Scenario: Span attribute containing slug:number shorthand resolves to handle and version
     Given span attribute "langwatch.prompt.id" is "pizza-prompt:3"
     When parsePromptReference parses the attributes
@@ -56,26 +56,26 @@ Feature: Shorthand prompt tag syntax (server-side)
 
   # --- Non-numeric tag enforcement (requires tag allowlist context) ---
 
-  @unit
+  @unit @unimplemented
   Scenario: Rejects purely numeric tag name during creation
     Given the allowed tags are "production" and "staging"
     When a user tries to create a tag named "42"
     Then the creation is rejected with a validation error
     And the error explains that tag names must not be purely numeric
 
-  @unit
+  @unit @unimplemented
   Scenario: Rejects zero as a tag name during creation
     Given the allowed tags are "production" and "staging"
     When a user tries to create a tag named "0"
     Then the creation is rejected with a validation error
 
-  @unit
+  @unit @unimplemented
   Scenario: Accepts valid non-numeric tag during creation
     Given the allowed tags are "production" and "staging"
     When a user tries to create a tag named "production"
     Then the creation succeeds
 
-  @unit
+  @unit @unimplemented
   Scenario: Rejects "latest" as a tag name during creation
     Given "latest" is a reserved keyword in shorthand syntax
     When a user tries to create a tag named "latest"
@@ -83,29 +83,29 @@ Feature: Shorthand prompt tag syntax (server-side)
 
   # --- REST API shorthand integration ---
 
-  @integration
+  @integration @unimplemented
   Scenario: REST API resolves shorthand in the path
     Given "pizza-prompt" has production=v3
     When I call GET /api/prompts/pizza-prompt:production
     Then I receive version v3
 
-  @integration
+  @integration @unimplemented
   Scenario: REST API rejects shorthand path combined with tag query param
     Given "pizza-prompt" has production=v3 and staging=v2
     When I call GET /api/prompts/pizza-prompt:production?tag=staging
     Then the request fails with a 422 error explaining the conflict
 
-  @integration
+  @integration @unimplemented
   Scenario: Malformed shorthand returns 422 not 500
     When I call GET /api/prompts/:production
     Then the request fails with a 422 error about invalid format
 
-  @integration
+  @integration @unimplemented
   Scenario: Empty suffix shorthand returns 422 not 500
     When I call GET /api/prompts/pizza-prompt:
     Then the request fails with a 422 error about invalid format
 
-  @integration
+  @integration @unimplemented
   Scenario: Shorthand is not parsed in the tag-assignment route
     Given "pizza-prompt" exists
     When I call PUT /api/prompts/pizza-prompt/tags/production with a versionId

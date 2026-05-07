@@ -17,14 +17,14 @@ Feature: Private ClickHouse Routing
   # Env var parsing
   # ---------------------------------------------------------------------------
 
-  @unit
+  @unit @unimplemented
   Scenario: Parse private ClickHouse URL from env var
     Given env var "CLICKHOUSE_URL__acme__org123" is set to "http://private-ch:8123/langwatch"
     When the private ClickHouse config is loaded at startup
     Then org "org123" maps to connection URL "http://private-ch:8123/langwatch"
     And the label "acme" is ignored by the routing logic
 
-  @unit
+  @unit @unimplemented
   Scenario: Multiple private ClickHouse env vars are parsed
     Given env var "CLICKHOUSE_URL__acme__org1" is set to "http://ch1:8123/langwatch"
     And env var "CLICKHOUSE_URL__beta__org2" is set to "http://ch2:8123/langwatch"
@@ -32,7 +32,7 @@ Feature: Private ClickHouse Routing
     Then org "org1" maps to "http://ch1:8123/langwatch"
     And org "org2" maps to "http://ch2:8123/langwatch"
 
-  @unit
+  @unit @unimplemented
   Scenario: No private ClickHouse env vars results in empty map
     Given no env vars matching "CLICKHOUSE_URL__*__*" are set
     When the private ClickHouse config is loaded at startup
@@ -42,20 +42,20 @@ Feature: Private ClickHouse Routing
   # Organization-level routing
   # ---------------------------------------------------------------------------
 
-  @unit
+  @unit @unimplemented
   Scenario: Org with private ClickHouse gets a dedicated client
     Given org "org123" has a private ClickHouse URL configured via env var
     When getClickHouseClientForOrganization("org123") is called
     Then the returned client connects to the private ClickHouse URL
     And no database query is made for credentials
 
-  @unit
+  @unit @unimplemented
   Scenario: Org without private ClickHouse gets the shared client
     Given org "org456" has no private ClickHouse env var
     When getClickHouseClientForOrganization("org456") is called
     Then the returned client connects to the shared ClickHouse from CLICKHOUSE_URL
 
-  @unit
+  @unit @unimplemented
   Scenario: Private clients are cached per organization
     When getClickHouseClientForOrganization("org123") is called twice
     Then the same client instance is returned both times
@@ -64,14 +64,14 @@ Feature: Private ClickHouse Routing
   # Project-level routing
   # ---------------------------------------------------------------------------
 
-  @integration
+  @integration @unimplemented
   Scenario: Project in a private-CH org routes to the private instance
     Given org "org123" has a private ClickHouse configured
     And a project exists under org "org123"
     When getClickHouseClientForProject(projectId) is called
     Then the returned client connects to the private ClickHouse
 
-  @integration
+  @integration @unimplemented
   Scenario: Project in a standard org routes to the shared instance
     Given org "org456" has no private ClickHouse configured
     And a project exists under org "org456"
@@ -82,7 +82,7 @@ Feature: Private ClickHouse Routing
   # Admin / migration operations
   # ---------------------------------------------------------------------------
 
-  @unit
+  @unit @unimplemented
   Scenario: getAllClickHouseInstances returns shared and all private instances
     Given the shared ClickHouse is configured
     And 2 private ClickHouse instances are configured via env vars
@@ -95,7 +95,7 @@ Feature: Private ClickHouse Routing
   # Data isolation proof
   # ---------------------------------------------------------------------------
 
-  @integration
+  @integration @unimplemented
   Scenario: Data written for a private-CH org does not appear in shared
     Given org "org123" has a private ClickHouse (container A)
     And the shared ClickHouse is container B
@@ -104,7 +104,7 @@ Feature: Private ClickHouse Routing
     Then the row exists in container A
     And the row does NOT exist in container B
 
-  @integration
+  @integration @unimplemented
   Scenario: Data written for a standard org does not appear in private
     Given org "org456" uses the shared ClickHouse (container B)
     And org "org123" has a private ClickHouse (container A)

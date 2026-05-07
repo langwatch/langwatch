@@ -8,14 +8,14 @@ Feature: License Settings Page Styling
     And I am on the license settings page at /settings/license
 
   # Layout consistency with members page pattern
-  @e2e
+  @e2e @unimplemented
   Scenario: License page uses members-style layout with description
     Then the page header shows "License" as the heading
     And the page has a description below the header explaining license management
     And the content uses the full available width
     And the layout follows the same pattern as /settings/members
 
-  @e2e
+  @e2e @unimplemented
   Scenario: License details card shows only essential information
     Given a valid license is installed
     Then the license card displays only:
@@ -26,7 +26,7 @@ Feature: License Settings Page Styling
     And the card does NOT display resource limits
     And the card does NOT display usage statistics
 
-  @integration
+  @integration @unimplemented
   Scenario: Resource limits are shown on Usage page instead of License page
     Given a valid license is installed
     When I navigate to /settings/usage
@@ -41,7 +41,7 @@ Feature: License Settings Page Styling
     And each resource shows current usage vs limit
 
   # Visual consistency with platform patterns - full system verification
-  @e2e
+  @e2e @unimplemented
   Scenario: License generator drawer follows platform drawer styling
     When I click the "New License" button
     Then the license generator drawer opens
@@ -50,7 +50,7 @@ Feature: License Settings Page Styling
     And the drawer header and footer styling matches EvaluatorEditorDrawer
     And the primary action button uses colorPalette "blue"
 
-  @e2e
+  @e2e @unimplemented
   Scenario: License activation form follows platform form patterns
     Given no license is installed
     Then the "Activate License" button uses colorPalette "blue"
@@ -58,7 +58,7 @@ Feature: License Settings Page Styling
     And the card uses platform border styling
 
   # Drawer structure compliance
-  @integration
+  @integration @unimplemented
   Scenario: License generator drawer uses standard close behavior
     When I open the license generator drawer
     Then the drawer does not use Drawer.Backdrop component
@@ -66,14 +66,14 @@ Feature: License Settings Page Styling
     And the drawer uses modal false
     And clicking outside the drawer closes it
 
-  @integration
+  @integration @unimplemented
   Scenario: License generator drawer header follows platform pattern
     When I open the license generator drawer
     Then the drawer header uses Heading component without explicit size override
     And the drawer header does not have explicit borderBottomWidth prop
     And the Drawer.CloseTrigger is a direct child of Drawer.Content
 
-  @integration
+  @integration @unimplemented
   Scenario: License generator drawer body uses standard layout pattern
     When I open the license generator drawer
     Then the drawer body has padding 0
@@ -81,20 +81,20 @@ Feature: License Settings Page Styling
     And internal content uses VStack with paddingX 6 and paddingY 4
     And internal content has overflowY auto for scrollable content
 
-  @integration
+  @integration @unimplemented
   Scenario: License generator drawer footer follows platform pattern
     When I open the license generator drawer
     Then the drawer footer has borderTopWidth 1px
     And the drawer footer has borderColor border
     And the footer buttons use HStack with gap 3 for alignment
 
-  @integration
+  @integration @unimplemented
   Scenario: License generator drawer uses correct size
     When I open the license generator drawer
     Then the drawer uses size "lg" for adequate form space
 
   # Form field styling compliance
-  @integration
+  @integration @unimplemented
   Scenario: Form fields use Field.Root component pattern
     Given I open the license generator drawer
     Then each form field is wrapped in Field.Root
@@ -102,7 +102,7 @@ Feature: License Settings Page Styling
     And helper text uses Field.HelperText or Text with fg.muted color
     And error messages use Field.ErrorText component
 
-  @integration
+  @integration @unimplemented
   Scenario: Form inputs use consistent sizing
     Given I open the license generator drawer
     Then text inputs do not specify explicit size (use default)
@@ -110,27 +110,27 @@ Feature: License Settings Page Styling
     And select fields use NativeSelect.Root pattern
 
   # Button styling compliance
-  @integration
+  @integration @unimplemented
   Scenario: Primary buttons use colorPalette instead of colorScheme
     Given I view license components
     Then the "Generate License" button uses colorPalette "blue"
     And the "Activate License" button uses colorPalette "blue"
     And the "Copy to Clipboard" button uses colorPalette "blue"
 
-  @integration
+  @integration @unimplemented
   Scenario: Secondary buttons use outline variant
     Given I view license components
     Then the "Generate Another" button uses variant "outline"
     And the "Remove License" button uses variant "outline"
 
-  @integration
+  @integration @unimplemented
   Scenario: Danger buttons use red colorPalette with outline variant
     Given a license is installed
     Then the "Remove License" button uses colorPalette "red"
     And the "Remove License" button uses variant "outline"
 
   # Card styling compliance
-  @integration
+  @integration @unimplemented
   Scenario: License cards use platform border and spacing
     Given I view the license status section
     Then license cards use borderWidth "1px"
@@ -138,7 +138,7 @@ Feature: License Settings Page Styling
     And license cards use padding 6
     And card content uses VStack with gap 4
 
-  @integration
+  @integration @unimplemented
   Scenario: Status badges use appropriate styling
     Given a valid license is installed
     Then the status badge uses colorPalette instead of colorScheme
@@ -147,7 +147,7 @@ Feature: License Settings Page Styling
     And the badge uses "red" colorPalette for expired or invalid status
 
   # Typography styling compliance
-  @integration
+  @integration @unimplemented
   Scenario: Text elements use semantic colors
     Given I view license components
     Then label text uses "gray.500" or "fg.muted" color
@@ -155,14 +155,14 @@ Feature: License Settings Page Styling
     And section headers use fontWeight "semibold"
     And muted descriptive text uses "fg.muted" color
 
-  @integration
+  @integration @unimplemented
   Scenario: Loading skeleton matches platform patterns
     Given the license status is loading
     Then the skeleton wrapper uses consistent card styling
     And skeleton elements use Chakra Skeleton components
 
   # Alert and notification styling
-  @integration
+  @integration @unimplemented
   Scenario: Warning and error boxes follow platform patterns
     Given an expired license is installed
     Then the warning box uses backgroundColor based on status color
@@ -170,7 +170,7 @@ Feature: License Settings Page Styling
     And the warning text uses appropriate status color
 
   # License activation error messages - user-friendly
-  @e2e
+  @e2e @unimplemented
   Scenario: Show user-friendly error when activating invalid license
     Given no license is installed
     When I paste an invalid license key
@@ -178,7 +178,7 @@ Feature: License Settings Page Styling
     Then I see an error toast with title "Failed to activate license"
     And the error message is "The license key is invalid or has been tampered with. Please check the key and try again."
 
-  @e2e
+  @e2e @unimplemented
   Scenario: Show user-friendly error when activating expired license
     Given no license is installed
     When I paste an expired license key
@@ -186,7 +186,7 @@ Feature: License Settings Page Styling
     Then I see an error toast with title "Failed to activate license"
     And the error message is "This license has expired. Please contact support to renew your license."
 
-  @integration
+  @integration @unimplemented
   Scenario: License validation errors are user-friendly
     Given the license validation returns an error
     Then the error messages map as follows:
@@ -196,21 +196,21 @@ Feature: License Settings Page Styling
       | License expired     | This license has expired. Please contact support to renew your license.            |
 
   # Unit tests for style constants
-  @unit
+  @unit @unimplemented
   Scenario: Components export consistent style constants
     Given the license component files
     Then border radius values are "lg" for cards and "md" for inner elements
     And padding values follow the 6/4/3/2 scale pattern
     And color tokens use semantic naming (fg.muted, bg.subtle)
 
-  @unit
+  @unit @unimplemented
   Scenario: Button props use colorPalette over colorScheme
     Given button component props
     When buttons need color variants
     Then colorPalette prop is used instead of colorScheme
     And this applies to all license-related buttons
 
-  @unit
+  @unit @unimplemented
   Scenario: LicenseGeneratorDrawer uses correct Drawer configuration props
     Given the LicenseGeneratorDrawer component
     Then the Drawer.Root has size "lg"
@@ -218,7 +218,7 @@ Feature: License Settings Page Styling
     And the Drawer.Root has modal false
     And the component does not render Drawer.Backdrop
 
-  @unit
+  @unit @unimplemented
   Scenario: LicenseGeneratorForm uses correct layout structure
     Given the LicenseGeneratorForm component
     Then the root VStack has paddingX 6

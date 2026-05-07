@@ -11,6 +11,7 @@ Feature: Organization role awareness across the platform
   # The platform recognizes each organization role type
   # ============================================================================
 
+  @unimplemented
   Scenario Outline: Platform identifies the user's organization role
     Given a user who is a <orgRole> in organization "acme"
     And the user has access to project "chatbot"
@@ -23,11 +24,13 @@ Feature: Organization role awareness across the platform
       | MEMBER   |
       | EXTERNAL |
 
+  @unimplemented
   Scenario: Non-members are denied access
     Given a user who is not a member of organization "acme"
     When the user tries to access project "chatbot"
     Then access is denied
 
+  @unimplemented
   Scenario: Demo projects are accessible without organization membership
     Given project "chatbot" is a demo project
     When any user accesses the project
@@ -38,6 +41,7 @@ Feature: Organization role awareness across the platform
   # Existing permissions are unchanged
   # ============================================================================
 
+  @unimplemented
   Scenario Outline: Team role permissions are unaffected by org role awareness
     Given a user who is a MEMBER in organization "acme"
     And the user is a <teamRole> on the project's team
@@ -60,6 +64,7 @@ Feature: Organization role awareness across the platform
   # Custom roles work alongside org role awareness
   # ============================================================================
 
+  @unimplemented
   Scenario: Custom role grants are honored and org role is still known
     Given a user who is a MEMBER in organization "acme"
     And the user has a custom role with permissions ["analytics:view", "datasets:view"]
@@ -67,6 +72,7 @@ Feature: Organization role awareness across the platform
     Then the action is allowed
     And the platform identifies them as MEMBER
 
+  @unimplemented
   Scenario: Custom role restrictions are honored and org role is still known
     Given a user who is a MEMBER in organization "acme"
     And the user has a custom role with permissions ["analytics:view"]
@@ -78,6 +84,7 @@ Feature: Organization role awareness across the platform
   # Org admins retain elevated access
   # ============================================================================
 
+  @unimplemented
   Scenario: Org admin can manage any team regardless of team membership
     Given a user who is an ADMIN in organization "acme"
     And the user is not a member of any team
@@ -88,7 +95,7 @@ Feature: Organization role awareness across the platform
   # Frontend knows the user's role
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario Outline: The UI reflects the user's organization role
     Given a user who is a <orgRole> in organization "acme"
     When the user loads the platform

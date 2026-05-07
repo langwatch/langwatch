@@ -25,7 +25,7 @@ Feature: Provider Deletion
     Then I see blocking reasons as a bulleted list
     And the "Delete" button appears disabled
 
-  @integration
+  @integration @unimplemented
   Scenario: Show delete confirmation dialog
     Given I have "openai" provider enabled
     When I click the menu button for "openai" provider
@@ -34,7 +34,7 @@ Feature: Provider Deletion
     And the dialog title is "Delete openai?"
     And the dialog shows "This provider will no longer be available for use."
 
-  @integration
+  @integration @unimplemented
   Scenario: Prevent deletion when provider used for Default Model
     Given I have "openai" provider enabled
     And the project's default model is "openai/gpt-4o"
@@ -45,7 +45,7 @@ Feature: Provider Deletion
     And the dialog lists "• Default Model" as a blocking reason
     And the "Delete" button is disabled
 
-  @integration
+  @integration @unimplemented
   Scenario: Prevent deletion when provider used for Topic Clustering Model
     Given I have "openai" provider enabled
     And the project's topic clustering model is "openai/gpt-4o-mini"
@@ -56,7 +56,7 @@ Feature: Provider Deletion
     And the dialog lists "• Topic Clustering Model" as a blocking reason
     And the "Delete" button is disabled
 
-  @integration
+  @integration @unimplemented
   Scenario: Prevent deletion when provider used for Embeddings Model
     Given I have "openai" provider enabled
     And the project's embeddings model is "openai/text-embedding-3-small"
@@ -67,7 +67,7 @@ Feature: Provider Deletion
     And the dialog lists "• Embeddings Model" as a blocking reason
     And the "Delete" button is disabled
 
-  @integration
+  @integration @unimplemented
   Scenario: Show all blocking reasons when provider used for multiple defaults
     Given I have "openai" provider enabled
     And the project's default model is "openai/gpt-4o"
@@ -81,7 +81,7 @@ Feature: Provider Deletion
     And the dialog lists "• Embeddings Model"
     And the "Delete" button is disabled
 
-  @integration
+  @integration @unimplemented
   Scenario: Allow deletion when provider not used for defaults
     Given I have "openai" provider enabled
     And the project's default model is "anthropic/claude-sonnet-4"
@@ -91,7 +91,7 @@ Feature: Provider Deletion
     And the dialog shows "This provider will no longer be available for use."
     And the "Delete" button is enabled
 
-  @integration
+  @integration @unimplemented
   Scenario: Successfully delete provider
     Given I have "openai" provider enabled
     And the provider is not used for any default models
@@ -102,7 +102,7 @@ Feature: Provider Deletion
     And the provider no longer appears in the provider list
     And the dialog closes
 
-  @integration
+  @integration @unimplemented
   Scenario: Cancel deletion
     Given I have "openai" provider enabled
     When I click the menu button for "openai" provider
@@ -112,7 +112,7 @@ Feature: Provider Deletion
     And the provider remains enabled
     And the provider still appears in the provider list
 
-  @integration
+  @integration @unimplemented
   Scenario: Disable delete option without manage permission
     Given I do not have "project:manage" permission
     When I navigate to the Model Providers settings page

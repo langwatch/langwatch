@@ -11,7 +11,7 @@ Feature: AI Create Modal for Scenarios
   # Happy Path - Generate with AI
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: Open AI create modal from scenarios list
     When I click the "New Scenario" button
     Then I see the AI create modal
@@ -20,7 +20,7 @@ Feature: AI Create Modal for Scenarios
     And I see the "Generate with AI" button
     And I see the "I'll write it myself" button
 
-  @e2e
+  @e2e @unimplemented
   Scenario: Generate scenario with AI using custom description
     When I click the "New Scenario" button
     And I enter "A customer support agent that helps users reset their passwords" in the textarea
@@ -31,7 +31,7 @@ Feature: AI Create Modal for Scenarios
     Then I am navigated to the scenario editor
     And the editor is pre-filled with the generated scenario
 
-  @integration
+  @integration @unimplemented
   Scenario: Use example template to generate scenario
     When I click the "New Scenario" button
     And I click the "Customer Support" example pill
@@ -44,7 +44,7 @@ Feature: AI Create Modal for Scenarios
   # Skip to Builder Flow
   # ============================================================================
 
-  @e2e
+  @e2e @unimplemented
   Scenario: Skip AI generation and create blank scenario
     When I click the "New Scenario" button
     And I click "I'll write it myself"
@@ -56,20 +56,20 @@ Feature: AI Create Modal for Scenarios
   # Modal States and Controls
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: Textarea allows unlimited text input
     When I click the "New Scenario" button
     And I enter a very long description (1000+ characters)
     Then the full text is accepted without truncation
 
-  @integration
+  @integration @unimplemented
   Scenario: Close modal with close button in default state
     When I click the "New Scenario" button
     And I click the close button
     Then the modal closes
     And I remain on the scenarios list page
 
-  @integration
+  @integration @unimplemented
   Scenario: Modal is not dismissable during generation
     When I click the "New Scenario" button
     And I enter a description
@@ -82,19 +82,19 @@ Feature: AI Create Modal for Scenarios
   # Example Templates
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: Customer Support example fills textarea
     When I click the "New Scenario" button
     And I click the "Customer Support" example pill
     Then the textarea contains "A customer support agent that handles complaints. Test an angry customer who was charged twice and wants a refund."
 
-  @integration
+  @integration @unimplemented
   Scenario: RAG Q&A example fills textarea
     When I click the "New Scenario" button
     And I click the "RAG Q&A" example pill
     Then the textarea contains "A knowledge bot that answers questions from documentation. Test a question that requires combining info from multiple sources."
 
-  @integration
+  @integration @unimplemented
   Scenario: Tool-calling Agent example fills textarea
     When I click the "New Scenario" button
     And I click the "Tool-calling Agent" example pill
@@ -104,7 +104,7 @@ Feature: AI Create Modal for Scenarios
   # Error Handling
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: Display error state when generation fails
     Given the AI generation service returns an error
     When I click the "New Scenario" button
@@ -117,7 +117,7 @@ Feature: AI Create Modal for Scenarios
     And I see the "I'll write it myself" button
     And the close button is visible
 
-  @integration
+  @integration @unimplemented
   Scenario: Retry generation after error
     Given the AI generation service returns an error
     When I click the "New Scenario" button
@@ -130,7 +130,7 @@ Feature: AI Create Modal for Scenarios
     When generation completes successfully
     Then I am navigated to the scenario editor
 
-  @integration
+  @integration @unimplemented
   Scenario: Skip to blank editor from error state
     Given the AI generation service returns an error
     When I click the "New Scenario" button
@@ -141,7 +141,7 @@ Feature: AI Create Modal for Scenarios
     Then a new empty scenario is created
     And I am navigated to the scenario editor
 
-  @integration
+  @integration @unimplemented
   Scenario: Display error when API keys not configured
     Given the user has no API keys configured for the default model
     When I click the "New Scenario" button
@@ -155,7 +155,7 @@ Feature: AI Create Modal for Scenarios
   # No Model Provider Warning (Proactive)
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: Warning replaces AI generation area when no model providers configured
     Given I have no model providers configured
     When I click the "New Scenario" button
@@ -166,21 +166,21 @@ Feature: AI Create Modal for Scenarios
     And I do not see the example template pills
     And I see "I'll write it myself" button
 
-  @integration
+  @integration @unimplemented
   Scenario: Warning message includes link to model provider settings
     Given I have no model providers configured
     When I click the "New Scenario" button
     Then I see a warning explaining that model providers must be configured
     And the warning contains a link to the model provider settings page
 
-  @integration
+  @integration @unimplemented
   Scenario: Navigate to model provider settings from warning
     Given I have no model providers configured
     When I click the "New Scenario" button
     And I click the link to configure model providers
     Then I am navigated to the model provider settings page
 
-  @integration
+  @integration @unimplemented
   Scenario: Manual scenario creation available despite no providers
     Given I have no model providers configured
     When I click the "New Scenario" button
@@ -188,7 +188,7 @@ Feature: AI Create Modal for Scenarios
     Then a new empty scenario is created
     And I am navigated to the scenario editor
 
-  @integration
+  @integration @unimplemented
   Scenario: Normal AI generation UI when model providers are configured
     Given I have "openai" provider configured with valid API keys
     When I click the "New Scenario" button
@@ -197,7 +197,7 @@ Feature: AI Create Modal for Scenarios
     And I see the "Generate with AI" button
     And I see the example template pills
 
-  @integration
+  @integration @unimplemented
   Scenario: Generation times out after 60 seconds
     Given the AI generation service does not respond
     When I click the "New Scenario" button
@@ -207,7 +207,7 @@ Feature: AI Create Modal for Scenarios
     Then I see the error state
     And I see a timeout error message
 
-  @integration
+  @integration @unimplemented
   Scenario: Close modal from error state
     Given the AI generation service returns an error
     When I click the "New Scenario" button
@@ -222,7 +222,7 @@ Feature: AI Create Modal for Scenarios
   # URL Parameter Integration
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: Generated scenario passes prompt via URL parameter
     When I click the "New Scenario" button
     And I enter "My test scenario description" in the textarea
@@ -235,31 +235,31 @@ Feature: AI Create Modal for Scenarios
   # Component Reusability (Unit Tests)
   # ============================================================================
 
-  @unit
+  @unit @unimplemented
   Scenario: AICreateModal accepts custom title prop
     Given an AICreateModal component
     When rendered with title "Create new prompt"
     Then it displays "Create new prompt" as the title
 
-  @unit
+  @unit @unimplemented
   Scenario: AICreateModal accepts custom placeholder prop
     Given an AICreateModal component
     When rendered with custom placeholder text
     Then the textarea displays the custom placeholder
 
-  @unit
+  @unit @unimplemented
   Scenario: AICreateModal calls onGenerate callback with description
     Given an AICreateModal component with onGenerate callback
     When user enters "Test description" and clicks generate
     Then the onGenerate callback is called with "Test description"
 
-  @unit
+  @unit @unimplemented
   Scenario: AICreateModal calls onSkip callback
     Given an AICreateModal component with onSkip callback
     When user clicks "I'll write it myself"
     Then the onSkip callback is called
 
-  @unit
+  @unit @unimplemented
   Scenario: AICreateModal transitions between states correctly
     Given an AICreateModal component
     When state changes from idle to generating
@@ -269,14 +269,14 @@ Feature: AI Create Modal for Scenarios
     When state changes from error to idle
     Then the UI updates to show idle state
 
-  @unit
+  @unit @unimplemented
   Scenario: Example templates are configurable
     Given an AICreateModal component
     When rendered with custom example templates
     Then it displays the custom example pills
     And clicking a pill fills the textarea with the template text
 
-  @unit
+  @unit @unimplemented
   Scenario: AICreateModal shows warning state when hasModelProviders is false
     Given an AICreateModal component
     When rendered with hasModelProviders set to false
@@ -286,7 +286,7 @@ Feature: AI Create Modal for Scenarios
     And the example template pills are not rendered
     And the "I'll write it myself" button is visible
 
-  @unit
+  @unit @unimplemented
   Scenario: AICreateModal shows normal UI when hasModelProviders is true
     Given an AICreateModal component
     When rendered with hasModelProviders set to true

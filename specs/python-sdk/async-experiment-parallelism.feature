@@ -9,7 +9,7 @@ Feature: Python SDK async-native experiment parallelism
 
   # --- Core isolation: each item gets its own trace ---
 
-  @unit
+  @unit @unimplemented
   Scenario: each concurrent item runs under its own OTel trace
     Given an async loop iterates a dataset of 10 items with concurrency 4
     And each item is processed by an async callable submitted via asubmit
@@ -17,7 +17,7 @@ Feature: Python SDK async-native experiment parallelism
     Then 10 distinct trace IDs are emitted
     And no span is attributed to more than one trace
 
-  @unit
+  @unit @unimplemented
   Scenario: iteration context does not leak between concurrent items
     Given an async loop iterates a dataset with concurrency 4
     When two items read the iteration index concurrently
@@ -26,7 +26,7 @@ Feature: Python SDK async-native experiment parallelism
 
   # --- Loop-bound resource survival (the customer's regression) ---
 
-  @unit
+  @unit @unimplemented
   Scenario: a loop-bound resource created outside the loop is reused by all items
     Given a single async resource is created on the caller's event loop
     And the loop-bound resource would raise "attached to a different loop" if touched from a different loop
@@ -36,7 +36,7 @@ Feature: Python SDK async-native experiment parallelism
 
   # --- Mixed sync + async callables ---
 
-  @unit
+  @unit @unimplemented
   Scenario: a sync callable submitted to an async loop does not block concurrent items
     Given an async loop running with concurrency 2
     And one item submits a sync callable that sleeps
@@ -47,7 +47,7 @@ Feature: Python SDK async-native experiment parallelism
 
   # --- Concurrency bound ---
 
-  @unit
+  @unit @unimplemented
   Scenario: concurrency limit caps in-flight items
     Given an async loop with concurrency 3
     When 10 items are submitted
@@ -55,7 +55,7 @@ Feature: Python SDK async-native experiment parallelism
 
   # --- Per-item failure isolation ---
 
-  @unit
+  @unit @unimplemented
   Scenario: one failing item does not abort siblings
     Given an async loop iterates 5 items
     When the third item raises an exception in its submitted callable
@@ -65,14 +65,14 @@ Feature: Python SDK async-native experiment parallelism
 
   # --- Backend recording ---
 
-  @integration
+  @integration @unimplemented
   Scenario: every item reports a trace_id in the batch payload
     Given an async loop has completed 10 items
     When the batch log_results requests are inspected
     Then each dataset entry carries a non-empty trace_id
     And the collected trace_ids are all distinct
 
-  @integration
+  @integration @unimplemented
   Scenario: final batch reports progress and finished_at
     Given an async loop has completed all items
     When the final batch request is inspected
@@ -81,7 +81,7 @@ Feature: Python SDK async-native experiment parallelism
 
   # --- Google ADK end-to-end ---
 
-  @e2e
+  @e2e @unimplemented
   Scenario: ADK runner singleton is reused across concurrent async items
     Given the Google ADK instrumentor is configured
     And an InMemoryRunner is created once on the caller's event loop
@@ -89,7 +89,7 @@ Feature: Python SDK async-native experiment parallelism
     Then no "attached to a different loop" error is raised
     And every item receives a final response from the agent
 
-  @e2e
+  @e2e @unimplemented
   Scenario: ADK traces land in ClickHouse, isolated per item
     Given an async loop has completed 10 items backed by an ADK agent
     When the experiment run is queried from ClickHouse
@@ -97,7 +97,7 @@ Feature: Python SDK async-native experiment parallelism
     And experiment_run_items links each item to exactly one of those trace IDs
     And stored_spans for each trace contain only spans that belong to that trace
 
-  @e2e
+  @e2e @unimplemented
   Scenario: costs and token counts are collected per item
     Given an async loop has completed items that produced LLM cost via ADK
     When trace_summaries is queried for the run

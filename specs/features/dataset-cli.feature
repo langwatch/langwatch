@@ -76,12 +76,12 @@ Feature: Dataset CLI Commands
     When I pipe JSON records to langwatch dataset records add my-dataset --stdin
     Then the records are created and I see their IDs
 
-  @unit
+  @unit @unimplemented
   Scenario: Add records rejects non-array JSON
     When I provide a JSON object instead of an array
     Then the CLI reports that a JSON array is expected
 
-  @unit
+  @unit @unimplemented
   Scenario: Add records rejects invalid JSON
     When I provide malformed JSON
     Then the CLI reports that the JSON could not be parsed

@@ -11,27 +11,27 @@ Feature: Migrate satisfaction score to sentiment evaluator
     This is a breaking change - existing customers lose the automatic satisfaction score.
     They can re-enable it by configuring the new sentiment evaluator.
 
-  @unit
+  @unit @unimplemented
   Scenario: Sentiment evaluator computes sentiment from input text
     Given an evaluator entry with input text
     When the evaluator runs
     Then it returns a score between -1 and 1
     And it returns a label of "positive" or "negative"
 
-  @unit
+  @unit @unimplemented
   Scenario: Sentiment evaluator uses embedding similarity
     Given an evaluator entry with positive input text
     When the evaluator computes embeddings
     Then the positive similarity is higher than negative similarity
     And the final score is positive
 
-  @integration
+  @integration @unimplemented
   Scenario: Analytics dashboard no longer shows satisfaction graph
     Given the analytics home dashboard
     When the page renders
     Then there is no satisfaction score graph section
 
-  @unit
+  @unit @unimplemented
   Scenario: Trace processing pipeline no longer computes satisfaction score
     Given the trace processing pipeline
     When a new trace is ingested
