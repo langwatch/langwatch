@@ -23,7 +23,7 @@ Feature: LiteLLM Model ID Translation
 
     # LiteLLM requires the full dated version for Claude 3.5 Haiku
 
-  @unit @unimplemented
+  @unit
   Scenario: Translates Anthropic Claude 3.5 Sonnet model ID
     Given a model ID "anthropic/claude-3.5-sonnet"
     When calling translateModelIdForLitellm
@@ -46,6 +46,12 @@ Feature: LiteLLM Model ID Translation
     # LiteLLM requires the full dated version for Claude 4 models
 
   # Unit Tests: Boundary Integration
+  #
+  # @unimplemented: prepareLitellmParams isn't directly tested with
+  # the dot-to-dash translation assertion — `modelIdBoundary.integration.test.ts`
+  # exercises the same boundary against a real provider, but the
+  # specific "translates / preserves" cases would benefit from
+  # dedicated unit cases. Cheap to add.
 
   @unit
   Scenario: prepareLitellmParams translates Anthropic model ID

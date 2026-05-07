@@ -30,6 +30,7 @@ describe("translateModelIdForLitellm", () => {
       expect(result).toBe("anthropic/claude-3-7-sonnet");
     });
 
+    /** @scenario Translates Anthropic Claude 3.5 Sonnet model ID */
     it("translates anthropic/claude-3.5-sonnet to anthropic/claude-3-5-sonnet-20240620", () => {
       const result = translateModelIdForLitellm("anthropic/claude-3.5-sonnet");
       expect(result).toBe("anthropic/claude-3-5-sonnet-20240620");
