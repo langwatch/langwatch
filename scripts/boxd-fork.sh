@@ -250,7 +250,11 @@ boxd_upload_envs() {
     boxd_rewrite_env "$vm" < "$f" > "$rewritten"
     # Preserve monorepo path under /home/boxd/langwatch (the in-VM repo path)
     target="langwatch/$rel"
-    "$BOXD_BIN" cp "$rewritten" "$vm:$target" >/dev/null
+    if ! "$BOXD_BIN" cp "$rewritten" "$vm:$target" >/dev/null; then
+      rm -f "$rewritten"
+      echo "ERROR: failed to upload $rel to $vm:$target" >&2
+      return 1
+    fi
     rm -f "$rewritten"
     printf '  uploaded %s\n' "$rel" >&2
   done < <(boxd_env_files)
@@ -269,7 +273,10 @@ WARNING: Claude credentials not found at $BOXD_CLAUDE_CREDS.
 EOF
     return 0
   fi
-  "$BOXD_BIN" cp "$BOXD_CLAUDE_CREDS" "$vm:.claude/.credentials.json" >/dev/null
+  if ! "$BOXD_BIN" cp "$BOXD_CLAUDE_CREDS" "$vm:.claude/.credentials.json" >/dev/null; then
+    echo "ERROR: failed to upload Claude credentials to $vm" >&2
+    return 1
+  fi
   printf '  uploaded Claude credentials\n' >&2
 }
 
@@ -373,9 +380,9 @@ EOF
     fi
   fi
 
-  boxd_upload_creds "$vm"
-  boxd_upload_envs "$vm"
-  boxd_map_ports "$vm"
+  boxd_upload_creds "$vm" || return 1
+  boxd_upload_envs "$vm" || return 1
+  boxd_map_ports "$vm" || return 1
 
   if [ "$start_tmux" = "1" ]; then
     # AC#12: tmux + Claude session inside the VM, named claude-<slug>/issue<N>.
