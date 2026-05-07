@@ -4,12 +4,15 @@ Feature: Template logic autocomplete in prompt textarea
   So that I can quickly insert conditional and iteration blocks without memorizing syntax
 
   # 2 scenarios bound to templateLogicAutocomplete.integration.test.tsx
-  # (if/endif and for/endfor insertion). The remaining 12 @unimplemented
-  # scenarios are KEEP/UPDATE per AUDIT_MANIFEST.md: assign/unless/comment/elsif/
-  # else only verify menu close in current tests (need stronger assertions);
+  # (if/endif and for/endfor insertion). PARTIAL-COVERAGE caveat: the two
+  # bound scenarios each include a "And the cursor is positioned between..."
+  # step that the current test does not assert — bound only on the
+  # textarea-content side. The remaining 12 @unimplemented scenarios are
+  # KEEP/UPDATE per AUDIT_MANIFEST.md: assign/unless/comment/elsif/else
+  # only verify menu close in current tests (need stronger assertions);
   # ArrowUp/ArrowDown highlight movement, click-outside, and mutex switching
-  # need new dedicated tests. Aspirational pending UPDATE-class scenario rewrites
-  # and KEEP-class test additions tracked in PR #3458.
+  # need new dedicated tests. Aspirational pending UPDATE-class scenario
+  # rewrites and KEEP-class test additions tracked in PR #3458.
 
   Background:
     Given a prompt textarea is rendered with variables "input" and "context"
