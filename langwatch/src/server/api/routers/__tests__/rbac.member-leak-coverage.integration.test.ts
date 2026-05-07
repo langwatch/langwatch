@@ -43,6 +43,7 @@ const ADMIN_USER_ID = `usr-admin-${ns}`;
 const MEMBER_USER_ID = `usr-member-${ns}`;
 const ADMIN_PERSONAL_TEAM_ID = `team-admin-personal-${ns}`;
 const MEMBER_PERSONAL_TEAM_ID = `team-member-personal-${ns}`;
+const GROUP_ID = `group-rbac-leak-${ns}`;
 
 const ADMIN_EMAIL = `admin-${ns}@rbac-leak.test`;
 const MEMBER_EMAIL = `member-${ns}@rbac-leak.test`;
@@ -174,6 +175,21 @@ describe("#47 RBAC member-leak coverage (integration)", () => {
       },
     });
 
+    // Group fixture so admin happy-path tests have something to find.
+    // Group + 1 admin member; member denial tests don't depend on the
+    // group existing because the permission gate fires before the query.
+    await prisma.group.create({
+      data: {
+        id: GROUP_ID,
+        organizationId: ORG_ID,
+        name: `RBAC Leak Group ${ns}`,
+        slug: `rbac-leak-group-${ns}`,
+      },
+    });
+    await prisma.groupMembership.create({
+      data: { groupId: GROUP_ID, userId: ADMIN_USER_ID },
+    });
+
     adminCaller = appRouter.createCaller(
       createInnerTRPCContext({
         session: { user: { id: ADMIN_USER_ID }, expires: "1" },
@@ -187,6 +203,8 @@ describe("#47 RBAC member-leak coverage (integration)", () => {
   });
 
   afterAll(async () => {
+    await prisma.groupMembership.deleteMany({ where: { groupId: GROUP_ID } });
+    await prisma.group.deleteMany({ where: { organizationId: ORG_ID } });
     await prisma.roleBinding.deleteMany({ where: { organizationId: ORG_ID } });
     await prisma.teamUser.deleteMany({
       where: {
@@ -385,6 +403,62 @@ describe("#47 RBAC member-leak coverage (integration)", () => {
         organizationId: ORG_ID,
       });
       expect(team.id).toBe(MEMBER_PERSONAL_TEAM_ID);
+    });
+  });
+
+  // ── 4. Group router admin reads (0936a76b8) ───────────────────────
+
+  describe("group router (0936a76b8)", () => {
+    it("group.getById → UNAUTHORIZED for member", async () => {
+      // Member can't pull the full member roster (which exposes emails)
+      // for any group, regardless of whether they're in it.
+      await expect(
+        memberCaller.group.getById({
+          organizationId: ORG_ID,
+          groupId: GROUP_ID,
+        }),
+      ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+    });
+
+    it("group.listForMember → UNAUTHORIZED for member", async () => {
+      // Member can't enumerate any user's group memberships — that's
+      // admin-surface authz visibility (which role bindings get
+      // inherited via group membership).
+      await expect(
+        memberCaller.group.listForMember({
+          organizationId: ORG_ID,
+          userId: ADMIN_USER_ID,
+        }),
+      ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+    });
+
+    it("group.listAll → UNAUTHORIZED for member", async () => {
+      // Member can't enumerate every group's role-binding map.
+      await expect(
+        memberCaller.group.listAll({ organizationId: ORG_ID }),
+      ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+    });
+
+    it("admin can call all three group procedures successfully", async () => {
+      // Sanity: admin still has access. Confirms the bumps didn't
+      // break the admin path (and that the seeded group fixture is
+      // discoverable via the live router).
+      const detail = await adminCaller.group.getById({
+        organizationId: ORG_ID,
+        groupId: GROUP_ID,
+      });
+      expect(detail.id).toBe(GROUP_ID);
+
+      const memberGroups = await adminCaller.group.listForMember({
+        organizationId: ORG_ID,
+        userId: ADMIN_USER_ID,
+      });
+      expect(memberGroups.map((g) => g.id)).toContain(GROUP_ID);
+
+      const allGroups = await adminCaller.group.listAll({
+        organizationId: ORG_ID,
+      });
+      expect(allGroups.map((g) => g.id)).toContain(GROUP_ID);
     });
   });
 });
