@@ -286,19 +286,30 @@ EOF
 boxd_map_ports() {
   local vm="${1-}"
   [ -n "$vm" ] || { echo "VM name required" >&2; return 1; }
-  local entry sub port
+  local entry sub port out failed=0
   for entry in "${BOXD_FORK_PORTS[@]}"; do
     sub="${entry%%:*}"
     port="${entry##*:}"
     if [ "$sub" = "_default" ]; then
-      "$BOXD_BIN" proxy set-port --port="$port" --vm "$vm" >/dev/null 2>&1 || true
-      printf '  proxy: https://%s.boxd.sh -> :%s\n' "$vm" "$port" >&2
+      if out=$("$BOXD_BIN" proxy set-port --port="$port" --vm "$vm" 2>&1); then
+        printf '  proxy: https://%s.boxd.sh -> :%s\n' "$vm" "$port" >&2
+      else
+        printf '  ERROR: failed to set default proxy for %s -> :%s\n%s\n' "$vm" "$port" "$out" >&2
+        failed=1
+      fi
     else
       # `proxy new` errors if the subdomain already exists; that's idempotent.
-      "$BOXD_BIN" proxy new "$sub" --port="$port" --vm "$vm" >/dev/null 2>&1 || true
-      printf '  proxy: https://%s.%s.boxd.sh -> :%s\n' "$sub" "$vm" "$port" >&2
+      if out=$("$BOXD_BIN" proxy new "$sub" --port="$port" --vm "$vm" 2>&1); then
+        printf '  proxy: https://%s.%s.boxd.sh -> :%s\n' "$sub" "$vm" "$port" >&2
+      elif printf '%s' "$out" | grep -qiE 'already exists|conflict'; then
+        printf '  proxy: https://%s.%s.boxd.sh -> :%s (existing)\n' "$sub" "$vm" "$port" >&2
+      else
+        printf '  ERROR: failed to create proxy %s.%s.boxd.sh -> :%s\n%s\n' "$sub" "$vm" "$port" "$out" >&2
+        failed=1
+      fi
     fi
   done
+  return $failed
 }
 
 # boxd_wake_if_suspended VM — resume the VM if it's paused/standby (AC#20).
@@ -453,6 +464,13 @@ boxd_fork_issue() {
   local title slug branch
   title=$("$GH_BIN" issue view "$issue" --repo "$BOXD_FORK_REPO" --json title --jq .title) \
     || { echo "ERROR: could not resolve issue #$issue via gh." >&2; return 1; }
+  # Mirror the empty-headRefName guard above — gh can return exit 0 with an
+  # empty .title on permissions/edge cases, which would slug to "" and yield
+  # a degenerate ref like `issue<N>/`.
+  if [ -z "$title" ]; then
+    echo "ERROR: gh returned an empty title for issue #$issue." >&2
+    return 1
+  fi
   # Inline the worktree.sh slug rules (max 50, word-boundary truncation)
   # to avoid sourcing it from here. Keep VM name on the canonical issue<N>
   # form regardless of title.
@@ -531,7 +549,10 @@ boxd_golden_reset() {
   fi
   if boxd_vm_exists "$vm"; then
     printf 'Destroying %s\n' "$vm" >&2
-    "$BOXD_BIN" destroy "$vm" >/dev/null 2>&1 || true
+    if ! "$BOXD_BIN" destroy "$vm" >/dev/null 2>&1; then
+      echo "ERROR: 'boxd destroy $vm' failed; aborting reset." >&2
+      return 1
+    fi
   fi
   boxd_golden
 }
