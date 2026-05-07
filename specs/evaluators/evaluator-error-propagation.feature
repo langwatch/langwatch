@@ -3,12 +3,11 @@ Feature: Evaluator error details reach the UI
   I want to see the actual error message when an evaluator fails
   So that I can fix the underlying problem (bad credentials, unreachable endpoint, bad settings) without guessing
 
-  # The backend (langevals + monitor pipeline) and frontend (Trace
-  # Details drawer Evaluations tab) sides of this flow each need a
-  # dedicated integration harness — the existing evaluator-pipeline
-  # tests don't assert on the EvaluationReportedEvent error/errorDetails
-  # fields, and the trace-evaluations-tab Component lacks a render
-  # test for the "errored row" case. Tracked here.
+  # The frontend "errored row" render is now covered by
+  # langwatch/src/components/traces/__tests__/EvaluationStatusItem.error.integration.test.tsx.
+  # The backend (langevals + monitor pipeline) side still needs a dedicated
+  # integration harness — the existing evaluator-pipeline tests don't assert
+  # on the EvaluationReportedEvent error/errorDetails fields. Tracked here.
 
   Background:
     Given I am logged in
