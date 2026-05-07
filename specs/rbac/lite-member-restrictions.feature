@@ -290,6 +290,13 @@ Feature: Lite member access restrictions
     Then she sees a restriction modal explaining the limitation
     And existing prompts and datasets are fully viewable
 
+  @integration
+  Scenario: Lite member does not see edit or delete actions on datasets
+    Given a dataset "queries" exists in project "chatbot"
+    When sarah views the datasets list
+    Then she does not see "Edit dataset" in the row actions
+    And she does not see "Delete dataset" in the row actions
+
   @integration @unimplemented
   Scenario: Lite member clicks edit on settings and sees restriction modal
     When sarah opens the settings page
