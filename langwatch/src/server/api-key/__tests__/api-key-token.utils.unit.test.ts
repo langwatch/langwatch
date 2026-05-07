@@ -9,6 +9,7 @@ import {
 } from "../api-key-token.utils";
 
 describe("generateApiKeyToken", () => {
+  /** @scenario "New API keys are minted with sk-lw- prefix" */
   it("produces a token with sk-lw- prefix", () => {
     const { token } = generateApiKeyToken();
     expect(token.startsWith("sk-lw-")).toBe(true);
@@ -43,6 +44,7 @@ describe("splitApiKeyToken", () => {
   });
 
   describe("when given an old pat-lw- token", () => {
+    /** @scenario "Old pat-lw- tokens still authenticate" */
     it("extracts lookupId and secret (backward compat)", () => {
       const result = splitApiKeyToken("pat-lw-abcdefghijklmnop_secretsecretsecretsecretsecretsecretsecretsecretsecretsecr");
       expect(result).not.toBeNull();
@@ -100,6 +102,7 @@ describe("verifySecret", () => {
 
 describe("getTokenType", () => {
   describe("when given an old pat-lw- token", () => {
+    /** @scenario "Token type detection distinguishes API keys from legacy project keys" */
     it("returns apiKey", () => {
       expect(getTokenType("pat-lw-abc_def")).toBe("apiKey");
     });

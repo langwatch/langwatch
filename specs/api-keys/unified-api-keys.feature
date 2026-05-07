@@ -10,12 +10,14 @@ Feature: Unified API Keys
 
   # ── Unified table ──────────────────────────────────────────────
 
+  @unimplemented
   Scenario: Single table replaces tabs
     When I navigate to Settings > API Keys
     Then I see a single "API Keys" heading with no tab switcher
     And a "+ Create new secret key" button in the header
     And one table with columns: NAME, STATUS, SECRET KEY, CREATED, LAST USED, CREATED BY, PERMISSIONS
 
+  @unimplemented
   Scenario: Personal API key row displays in table
     Given I have created an API key named "CI Pipeline" with "All" permissions
     When I navigate to Settings > API Keys
@@ -26,6 +28,7 @@ Feature: Unified API Keys
       | PERMISSIONS | All          |
     And the row has an edit icon button and a revoke icon button
 
+  @unimplemented
   Scenario: Legacy project key row displays in table
     When I navigate to Settings > API Keys
     Then the table contains a legacy project key row with:
@@ -36,11 +39,13 @@ Feature: Unified API Keys
       | PERMISSIONS | All             |
     And the legacy project key row has no edit or revoke button
 
+  @unimplemented
   Scenario: Expired API key shows expired status
     Given I have an API key that has passed its expiration date
     When I navigate to Settings > API Keys
     Then that API key row shows STATUS "Expired"
 
+  @unimplemented
   Scenario: Non-admin sees own keys plus service keys
     Given I am a member (not admin)
     And there are service API keys in the organization
@@ -48,6 +53,7 @@ Feature: Unified API Keys
     Then I see my own API keys and all service keys
     And I do not see other users' personal keys
 
+  @unimplemented
   Scenario: Admin sees all API keys in the organization
     Given I am an organization admin
     And another user has created a personal API key
@@ -57,6 +63,7 @@ Feature: Unified API Keys
 
   # ── Personal API keys ─────────────────────────────────────────
 
+  @unimplemented
   Scenario: Non-admin creates personal API key
     When I click "+ Create new secret key"
     Then the create drawer opens
@@ -67,12 +74,14 @@ Feature: Unified API Keys
     Then a new API key is created assigned to me
     And the token is displayed once for copying
 
+  @unimplemented
   Scenario: Personal API key is bounded by user's role binding ceiling
     Given my role on "Project Alpha" is Member
     When I create an API key with "All" permissions
     Then the key's effective permissions are bounded by my Member role on "Project Alpha"
     And using the key for admin-only operations on "Project Alpha" is denied
 
+  @unimplemented
   Scenario: Restricted permission mode limits key to selected projects
     When I select "Restricted" in the permission toggle
     Then I see a list of all projects in the organization
@@ -82,16 +91,19 @@ Feature: Unified API Keys
     Then the key only grants Viewer access to "Project Alpha"
     And the key has no access to "Project Beta"
 
+  @unimplemented
   Scenario: Restricted mode respects user ceiling per project
     Given my role on "Project Alpha" is Member
     When I select "Restricted" and look at "Project Alpha"
     Then the role selector does not include "Admin" (exceeds my ceiling)
 
+  @unimplemented
   Scenario: Read only mode sets all bindings to Viewer
     When I select "Read only" in the permission toggle
     And I click "Create secret key"
     Then all role bindings on the key are set to VIEWER
 
+  @unimplemented
   Scenario: Personal API key is disabled when user is removed from org
     Given I have created a personal API key
     When my user is removed from the organization
@@ -99,12 +111,14 @@ Feature: Unified API Keys
 
   # ── Admin: create for another user ─────────────────────────────
 
+  @unimplemented
   Scenario: Admin sees key type toggle and user picker
     Given I am an organization admin
     When I click "+ Create new secret key"
     Then the create drawer shows a "Key type" toggle with "Personal" and "Service"
     And under "Personal" there is a user picker defaulting to myself
 
+  @unimplemented
   Scenario: Admin creates API key for another user
     Given I am an organization admin
     When I select "Personal" key type
@@ -115,6 +129,7 @@ Feature: Unified API Keys
     And the ceiling validation uses Alice's permissions, not the admin's
     And createdByUserId is set to the admin's userId
 
+  @unimplemented
   Scenario: Non-admin cannot create API key for another user
     Given I am a member (not admin)
     When I call apiKey.create with assignedToUserId = another user
@@ -122,6 +137,7 @@ Feature: Unified API Keys
 
   # ── Service API keys ───────────────────────────────────────────
 
+  @unimplemented
   Scenario: Admin creates service API key
     Given I am an organization admin
     When I select "Service" key type
@@ -131,22 +147,26 @@ Feature: Unified API Keys
     And the key has full organization access (no user ceiling)
     And the permissions section is not shown (service keys are always "All")
 
+  @unimplemented
   Scenario: Multiple service keys can coexist
     Given I am an organization admin
     When I create service keys named "CI Pipeline" and "Staging Deploy"
     Then both keys appear in the table
     And the CREATED BY column shows "Service" for both
 
+  @unimplemented
   Scenario: Non-admin cannot create service API key
     Given I am a member (not admin)
     When I call apiKey.create with keyType = "service"
     Then the request is rejected with a permission error
 
+  @unimplemented
   Scenario: Service key survives user removal
     Given a service API key exists
     When the admin who created it is removed from the organization
     Then the service API key still authenticates
 
+  @unimplemented
   Scenario: Non-admin can see but not edit or revoke service keys
     Given I am a member (not admin)
     And a service API key exists
@@ -156,18 +176,21 @@ Feature: Unified API Keys
 
   # ── Legacy project key backward compatibility ──────────────────
 
+  @unimplemented
   Scenario: Legacy project key (Project.apiKey) continues to work
     Given a project has the legacy apiKey string attribute set
     When I authenticate with the legacy sk-lw-{projectKey} token (no underscore)
     Then authentication succeeds as a legacy project key
     And the request is scoped to that project
 
+  @unimplemented
   Scenario: Legacy project key is never deleted by new API key operations
     When I create, update, or revoke API keys via the new system
     Then the Project.apiKey string attribute is never modified
 
   # ── Edit API key ───────────────────────────────────────────────
 
+  @unimplemented
   Scenario: Edit personal API key name
     Given I have an API key named "CI Pipeline"
     When I click the edit icon on "CI Pipeline"
@@ -177,6 +200,7 @@ Feature: Unified API Keys
     Then the table shows the key with name "Production CI"
     And the token value has not changed
 
+  @unimplemented
   Scenario: Edit personal API key permissions
     Given I have an API key with "All" permissions
     When I open the edit drawer and select "Restricted"
@@ -185,22 +209,26 @@ Feature: Unified API Keys
     Then the key's permissions are updated to "Restricted"
     And the role bindings reflect the new Viewer-on-Alpha scope
 
+  @unimplemented
   Scenario: Admin can edit another user's personal key
     Given I am an organization admin
     And "bob@example.com" has a personal API key
     When I edit Bob's key name
     Then the update succeeds
 
+  @unimplemented
   Scenario: Non-admin cannot edit another user's key
     Given I am a member (not admin)
     When I call apiKey.update on another user's key
     Then the update is rejected with a not-owned error
 
+  @unimplemented
   Scenario: Cannot edit a revoked API key
     Given an API key has been revoked
     When I call apiKey.update on it
     Then the update is rejected with an already-revoked error
 
+  @unimplemented
   Scenario: Service key can only be edited by admin
     Given a service API key exists
     And I am a member (not admin)
@@ -209,6 +237,7 @@ Feature: Unified API Keys
 
   # ── Revoke ─────────────────────────────────────────────────────
 
+  @unimplemented
   Scenario: Owner revokes their own API key
     Given I have a personal API key
     When I click the revoke icon and confirm
@@ -216,12 +245,14 @@ Feature: Unified API Keys
     And the key no longer appears in the active list
     And authenticating with the token fails
 
+  @unimplemented
   Scenario: Admin revokes another user's API key
     Given I am an organization admin
     And "bob@example.com" has a personal API key
     When I revoke Bob's key
     Then the revocation succeeds
 
+  @unimplemented
   Scenario: Admin revokes a service API key
     Given I am an organization admin
     And a service API key exists
@@ -251,20 +282,24 @@ Feature: Unified API Keys
 
   # ── Audit logging ──────────────────────────────────────────────
 
+  @unimplemented
   Scenario: API key creation is audit logged
     When I create an API key
     Then an audit log entry is recorded with action "apiKey.create"
     And the entry includes the key name, permission mode, and key type
 
+  @unimplemented
   Scenario: API key update is audit logged
     When I update an API key's name or permissions
     Then an audit log entry is recorded with action "apiKey.update"
 
+  @unimplemented
   Scenario: API key revocation is audit logged
     When I revoke an API key
     Then an audit log entry is recorded with action "apiKey.revoke"
     And the entry includes the revoked key's ID
 
+  @unimplemented
   Scenario: API key authentication is logged on use
     When a request is authenticated via an API key
     Then the lastUsedAt timestamp is updated on the key
