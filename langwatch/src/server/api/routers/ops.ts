@@ -8,15 +8,18 @@ import { DASHBOARD_EVENT } from "~/server/app-layer/ops/metrics-collector";
 import type { DashboardData } from "~/server/app-layer/ops/types";
 import { getProjectionMetadata, getReactorMetadata } from "~/server/event-sourcing/pipelineRegistry";
 
-const opsViewPermission = checkOpsPermission("ops:view");
+const opsViewPermission = checkOpsPermission({ permission: "ops:view" });
 
 // Status-probe variant of the ops:view middleware — populates `ctx.opsScope`
 // (with `kind: "none"` for non-ops users) without throwing FORBIDDEN. Lets
 // `getScope` be a probe that the global menu can poll on every page load
 // without spamming the console (lw#3584).
-const opsViewProbe = checkOpsPermission("ops:view", { throwOnDeny: false });
+const opsViewProbe = checkOpsPermission({
+  permission: "ops:view",
+  throwOnDeny: false,
+});
 
-const opsManagePermission = checkOpsPermission("ops:manage");
+const opsManagePermission = checkOpsPermission({ permission: "ops:manage" });
 
 function requireOps() {
   const ops = getApp().ops;

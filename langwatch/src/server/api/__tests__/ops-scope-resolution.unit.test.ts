@@ -59,7 +59,7 @@ describe("checkOpsPermission middleware (lw#3584)", () => {
 
   /** @scenario checkOpsPermission still throws FORBIDDEN for non-ops callers */
   it("throws FORBIDDEN when resolveOpsScope returns kind=none (default behavior)", async () => {
-    const middleware = checkOpsPermission("ops:view");
+    const middleware = checkOpsPermission({ permission: "ops:view" });
     const next = vi.fn();
     await expect(
       middleware({
@@ -73,7 +73,7 @@ describe("checkOpsPermission middleware (lw#3584)", () => {
 
   /** @scenario checkOpsPermission grants access for admin callers */
   it("grants access (calls next, populates ctx.opsScope) for admin callers", async () => {
-    const middleware = checkOpsPermission("ops:view");
+    const middleware = checkOpsPermission({ permission: "ops:view" });
     const next = vi.fn().mockResolvedValue("OK");
     const ctx = fakeCtx("admin@langwatch.ai");
     const result = await middleware({
@@ -90,7 +90,10 @@ describe("checkOpsPermission middleware (lw#3584)", () => {
 
   /** @scenario checkOpsPermission with throwOnDeny=false populates kind=none for status probes */
   it("with throwOnDeny=false: calls next with ctx.opsScope.kind=none for non-ops callers", async () => {
-    const middleware = checkOpsPermission("ops:view", { throwOnDeny: false });
+    const middleware = checkOpsPermission({
+      permission: "ops:view",
+      throwOnDeny: false,
+    });
     const next = vi.fn().mockResolvedValue("OK");
     const ctx = fakeCtx("person@example.com");
     const result = await middleware({

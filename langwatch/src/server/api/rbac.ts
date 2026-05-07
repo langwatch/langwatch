@@ -1104,12 +1104,17 @@ export function resolveOpsScope({
 }
 
 export const checkOpsPermission =
-  (permission: Permission, options: { throwOnDeny?: boolean } = {}) =>
+  ({
+    permission,
+    throwOnDeny = true,
+  }: {
+    permission: Permission;
+    throwOnDeny?: boolean;
+  }) =>
   async ({
     ctx,
     next,
   }: PermissionMiddlewareParams<unknown>) => {
-    const { throwOnDeny = true } = options;
     const user = ctx.session?.user;
     if (!user) {
       throw new TRPCError({ code: "UNAUTHORIZED" });
