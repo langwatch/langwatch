@@ -118,6 +118,8 @@ describe("EvaluatorCategorySelectorDrawer", () => {
       });
     });
 
+    /** @scenario Evaluator categories displayed */
+    /** @scenario EvaluatorCategorySelectorDrawer shows categories */
     it("shows all evaluator categories", async () => {
       renderDrawer();
 
@@ -130,6 +132,8 @@ describe("EvaluatorCategorySelectorDrawer", () => {
       });
     });
 
+    /** @scenario Evaluator types available */
+    /** @scenario Custom workflow evaluator option is shown */
     it("shows Custom (from Workflow) option", async () => {
       renderDrawer();
 
@@ -140,6 +144,7 @@ describe("EvaluatorCategorySelectorDrawer", () => {
   });
 
   describe("Navigation", () => {
+    /** @scenario Select category opens type selector */
     it("switches to the type view when selecting a category", async () => {
       const user = userEvent.setup();
       renderDrawer();
