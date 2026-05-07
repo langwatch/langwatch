@@ -313,9 +313,9 @@ function flattenMixed(content: any[], msg: RawMessage): DisplayItem[] {
       typeof item === "object" &&
       (item.type === "input_audio" || item.type === "audio")
     ) {
-      const payload =
-        (item.input_audio as { data?: string; format?: string } | undefined) ??
-        (item.audio as { data?: string; format?: string } | undefined);
+      const payload = (
+        item.type === "input_audio" ? item.input_audio : item.audio
+      ) as { data?: string; format?: string } | undefined;
       const data = payload?.data ?? "";
       items.push({
         kind: "audio",
