@@ -130,8 +130,8 @@ describe("generateEvaluatorSlug", () => {
   /** @scenario Handle unicode characters in name */
   it("removes or transliterates unicode characters in the name", () => {
     // slugify (strict mode) strips non-ASCII, leaving the latin parts.
-    const slug = generateEvaluatorSlug("Safety Check");
-    expect(slug).toMatch(/^safety-check-[a-z0-9]{5}$/);
+    const slug = generateEvaluatorSlug("Säfety チェック");
+    expect(slug).toMatch(/^[a-z0-9-]+-[a-z0-9]{5}$/);
   });
 
   /** @scenario Retry on unique constraint violation */
