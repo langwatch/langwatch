@@ -36,11 +36,14 @@ Feature: Diagnostic logging on auth failure
     When the middleware passes auth
     Then no diagnostic auth-failure log is emitted
 
-  @unit
+  @unit @unimplemented
   Scenario: Diagnostic fields are safe to log
     Then the log NEVER includes the raw token value
     And the log NEVER includes the request body
     And only the prefix of the token (first 8 chars) is included when the resolver path is taken
+    # Currently bound only on the raw-token-omission assertion. Body-omission
+    # and resolver-prefix-only assertions are aspirational pending dedicated
+    # logger fixtures that observe the actual logger output.
 
   @unit
   Scenario: Authorization header from a proxy does not poison X-Auth-Token fallback
