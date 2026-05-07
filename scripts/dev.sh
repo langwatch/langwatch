@@ -153,7 +153,7 @@ ensure_prepared() {
       pnpm install
     fi
     echo "Preparing files..."
-    pnpm run start:prepare:files 2>/dev/null || true
+    pnpm run start:prepare:files
   )
 }
 
