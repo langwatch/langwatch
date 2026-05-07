@@ -30,11 +30,20 @@ import {
   TeamUserRole,
 } from "@prisma/client";
 import { nanoid } from "nanoid";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { prisma } from "../../../db";
+import { createTestApp } from "../../../app-layer/presets";
+import { globalForApp, resetApp } from "../../../app-layer/app";
+import { PlanProviderService } from "../../../app-layer/subscription/plan-provider";
+import { OrganizationService } from "../../../app-layer/organizations/organization.service";
+import { PrismaOrganizationRepository } from "../../../app-layer/organizations/repositories/organization.prisma.repository";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
+
+const { mockGetActivePlan } = vi.hoisted(() => ({
+  mockGetActivePlan: vi.fn(),
+}));
 
 const ns = nanoid(8);
 const ORG_ID = `org-rbac-leak-${ns}`;
@@ -56,6 +65,53 @@ describe("#47 RBAC member-leak coverage (integration)", () => {
   let memberPersonalSlug: string;
 
   beforeAll(async () => {
+    // Wire the App singleton — procedures that touch
+    // `getApp().organizations.*` (getOrganizationWithMembersAndTheirTeams)
+    // or `assertEnterprisePlan` (the group router) require a live App.
+    // Same pattern as organization.invites.integration.test.ts (#3240
+    // workaround) — bypass initializeDefaultApp() which has a require()
+    // chain that fails under vitest, and instead build a test App with
+    // (a) a real Prisma org repo so picker procedures resolve fixtures,
+    // (b) an ENTERPRISE plan provider so group.* assertEnterprisePlan
+    // doesn't 402 the admin happy-path tests.
+    mockGetActivePlan.mockResolvedValue({
+      planSource: "subscription" as const,
+      type: "ENTERPRISE",
+      name: "Enterprise",
+      free: false,
+      maxMembers: 100,
+      maxMembersLite: 100,
+      maxTeams: 50,
+      maxProjects: 100,
+      maxMessagesPerMonth: 1_000_000,
+      maxWorkflows: 50,
+      maxPrompts: 50,
+      maxEvaluators: 50,
+      maxScenarios: 50,
+      maxAgents: 50,
+      maxExperiments: 50,
+      maxOnlineEvaluations: 50,
+      maxDatasets: 50,
+      maxDashboards: 50,
+      maxCustomGraphs: 50,
+      maxAutomations: 50,
+      canPublish: true,
+      prices: { USD: 0, EUR: 0 },
+      overrideAddingLimitations: false,
+    });
+    globalForApp.__langwatch_app = createTestApp({
+      organizations: new OrganizationService(
+        new PrismaOrganizationRepository(prisma),
+        // OrganizationService needs a PromptTagRepository but it's not
+        // exercised by our tests — null-stub satisfies the constructor.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        { seedForOrg: async () => { } } as any,
+      ),
+      planProvider: PlanProviderService.create({
+        getActivePlan: mockGetActivePlan,
+      }),
+    });
+
     // Org + 2 users + 1 regular team + 2 personal-workspace teams.
     await prisma.organization.create({
       data: { id: ORG_ID, name: `RBAC Leak Org ${ns}`, slug: `rbac-leak-${ns}` },
@@ -221,6 +277,7 @@ describe("#47 RBAC member-leak coverage (integration)", () => {
       where: { id: { in: [ADMIN_USER_ID, MEMBER_USER_ID] } },
     });
     await prisma.organization.deleteMany({ where: { id: ORG_ID } });
+    resetApp();
   });
 
   // ── 1. Admin-surface procedures deny MEMBER ───────────────────────
