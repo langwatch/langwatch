@@ -13,7 +13,9 @@ Feature: Online Evaluation Preconditions Renewal
   # - "Sentiment filter": DELETE per manifest (no sentiment.input_sentiment matcher
   #   in PRECONDITION_FIELD_MATCHERS — field not implemented)
   # - "Migration adds origin precondition": KEEP per manifest, no migration test exists
-  # - "Nested key with contains rule" / "Clicking add precondition expands":
+  # - "Nested key with contains rule": KEEP — metadata.value/contains backend
+  #   logic not yet covered by a unit test
+  # - "Clicking add precondition expands":
   #   covered by drawer integration test "expands the form showing the origin row"
   # - "All preconditions must pass": UPDATE — scenario's "no origin" branch
   #   contradicts default-application semantics
@@ -167,7 +169,7 @@ Feature: Online Evaluation Preconditions Renewal
     Then the evaluation is skipped
 
   @unit
-  Scenario: Missing field values fail "is" and "contains" checks
+  Scenario: Missing field values fail "is" checks
     Given a precondition: metadata.user_id is "admin"
     When a trace arrives with no user_id set
     Then the precondition fails

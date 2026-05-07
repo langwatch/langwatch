@@ -691,7 +691,7 @@ describe("evaluatePreconditions()", () => {
     ];
 
     describe("when a trace arrives with no userId set", () => {
-      /** @scenario Missing field values fail "is" and "contains" checks */
+      /** @scenario Missing field values fail "is" checks */
       it("fails the precondition", () => {
         const traceData = makeTraceData({ userId: undefined });
         expect(
