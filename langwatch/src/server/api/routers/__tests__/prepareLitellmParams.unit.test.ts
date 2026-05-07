@@ -100,12 +100,12 @@ describe("prepareLitellmParams", () => {
       // Only Anthropic and custom providers need dot-to-dash translation.
       // OpenAI model IDs already use the format LiteLLM expects.
       const params = await prepareLitellmParams({
-        model: "openai/gpt-5",
+        model: "openai/gpt-5-mini",
         modelProvider: baseOpenAIProvider,
         projectId: "project-123",
       });
 
-      expect(params.model).toBe("openai/gpt-5");
+      expect(params.model).toBe("openai/gpt-5-mini");
     });
   });
 
