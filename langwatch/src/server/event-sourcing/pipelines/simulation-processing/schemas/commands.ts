@@ -104,7 +104,7 @@ export type DeleteRunCommandData = z.infer<typeof deleteRunCommandDataSchema>;
 export const archiveSetCommandDataSchema = z.object({
   tenantId: z.string(),
   scenarioSetId: z.string(),
-  scenarioRunIds: z.array(z.string()),
+  scenarioRunIds: z.array(z.string()).min(1),
   occurredAt: z.number(),
 });
 export type ArchiveSetCommandData = z.infer<typeof archiveSetCommandDataSchema>;

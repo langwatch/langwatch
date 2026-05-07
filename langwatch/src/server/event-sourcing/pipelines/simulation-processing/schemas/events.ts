@@ -201,7 +201,7 @@ export const simulationSetArchivedEventDataSchema = z.object({
    * payload so replay produces the same projection state regardless of
    * later run inserts/deletes.
    */
-  scenarioRunIds: z.array(z.string()),
+  scenarioRunIds: z.array(z.string()).min(1),
 });
 export type SimulationSetArchivedEventData = z.infer<typeof simulationSetArchivedEventDataSchema>;
 

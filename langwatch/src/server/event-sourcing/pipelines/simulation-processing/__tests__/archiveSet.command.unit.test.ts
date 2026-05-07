@@ -110,4 +110,16 @@ describe("ArchiveSetCommand (lw#3636)", () => {
       });
     });
   });
+
+  describe("given a candidate event with an empty scenarioRunIds array", () => {
+    describe("when SimulationSetArchivedEventSchema.safeParse runs", () => {
+      it("rejects the payload (empty archive is a no-op masquerading as a valid event)", () => {
+        const result = simulationSetArchivedEventDataSchema.safeParse({
+          scenarioSetId: "set-1",
+          scenarioRunIds: [],
+        });
+        expect(result.success).toBe(false);
+      });
+    });
+  });
 });
