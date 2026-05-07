@@ -371,15 +371,15 @@ Feature: Customer.io nurturing integration
       | manually             | manual_sdk     |
 
   @integration
-  Scenario: Product interest identify call is fire-and-forget
-    Given a user reaches the "Pick your flavour" onboarding screen
+  Scenario: Integration-method identify call is fire-and-forget
+    Given a user reaches the "How do you want to integrate?" onboarding screen
     When the user selects "Observability"
-    Then the product_interest identify call is dispatched without awaiting a response
+    Then the integration_method identify call is dispatched without awaiting a response
     And the caller receives control back immediately
 
   @integration
-  Scenario: Product interest identify failure does not break onboarding navigation
-    Given a user reaches the "Pick your flavour" onboarding screen
+  Scenario: Integration-method identify failure does not break onboarding navigation
+    Given a user reaches the "How do you want to integrate?" onboarding screen
     And the Customer.io API is unavailable
     When the user selects "Evaluations"
     Then the user navigates to the evaluations onboarding screens

@@ -1,6 +1,6 @@
-Feature: Rename Suites to Run Plans and Simulation Runs to Run History in UI
+Feature: Rename Suites to Run Plans and Simulation Runs to Runs in UI
   As a user
-  I want the UI to use "Run Plans" instead of "Suites" and "Run History" instead of "Runs"
+  I want the UI to use "Run Plans" instead of "Suites" and "Runs" instead of "Simulation Runs"
   So that the terminology is clearer and avoids naming collisions
 
   # Parity status: 11 of 20 scenarios bound to existing tests.
