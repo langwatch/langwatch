@@ -1,23 +1,34 @@
 import {
+  Alert,
   Box,
   Button,
-  Heading,
+  Checkbox,
   HStack,
+  Heading,
+  Image,
   Input,
+  NativeSelect,
   Spacer,
   Text,
   Textarea,
   VStack,
 } from "@chakra-ui/react";
-import { useEffect, useMemo, useState } from "react";
+import { Bot, Wrench } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
+import {
+  ASSISTANT_OPTIONS,
+  ASSISTANT_PRESETS,
+  type AssistantKind,
+} from "~/components/me/tiles/assistantIcons";
 import { Drawer } from "~/components/ui/drawer";
+import { Link } from "~/components/ui/link";
 import { toaster } from "~/components/ui/toaster";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 
 import type {
   AiToolEntry,
-  AiToolScope,
   AiToolTileType,
 } from "~/components/me/tiles/types";
 
@@ -27,15 +38,27 @@ const TILE_TYPE_OPTIONS: Array<{ value: AiToolTileType; label: string }> = [
   { value: "external_tool", label: "Internal tool" },
 ];
 
-const SCOPE_OPTIONS: Array<{ value: AiToolScope; label: string }> = [
-  { value: "organization", label: "Whole organization" },
-  { value: "team", label: "Specific team" },
-];
+const PRESET_PREFIX = "preset:";
+const DATA_URL_PREFIX = "data:";
+const MAX_ICON_BASE64_BYTES = 256 * 1024; // matches server-side iconAssetSchema cap
+
+const ASSISTANT_KIND_VALUES = new Set<AssistantKind>([
+  "claude_code",
+  "codex",
+  "gemini",
+  "opencode",
+  "cursor",
+  "custom",
+]);
+
+function isAssistantKind(value: string): value is AssistantKind {
+  return ASSISTANT_KIND_VALUES.has(value as AssistantKind);
+}
 
 interface CodingAssistantForm {
   type: "coding_assistant";
   displayName: string;
-  slug: string;
+  assistantKind: AssistantKind;
   setupCommand: string;
   helperText: string;
   setupDocsUrl: string;
@@ -44,7 +67,6 @@ interface CodingAssistantForm {
 interface ModelProviderForm {
   type: "model_provider";
   displayName: string;
-  slug: string;
   providerKey: string;
   defaultLabel: string;
   suggestedRoutingPolicyId: string;
@@ -54,7 +76,6 @@ interface ModelProviderForm {
 interface ExternalToolForm {
   type: "external_tool";
   displayName: string;
-  slug: string;
   descriptionMarkdown: string;
   linkUrl: string;
   ctaLabel: string;
@@ -67,7 +88,7 @@ function blankForm(type: AiToolTileType): FormState {
     return {
       type,
       displayName: "",
-      slug: "",
+      assistantKind: "claude_code",
       setupCommand: "",
       helperText: "",
       setupDocsUrl: "",
@@ -77,7 +98,6 @@ function blankForm(type: AiToolTileType): FormState {
     return {
       type,
       displayName: "",
-      slug: "",
       providerKey: "",
       defaultLabel: "",
       suggestedRoutingPolicyId: "",
@@ -87,7 +107,6 @@ function blankForm(type: AiToolTileType): FormState {
   return {
     type,
     displayName: "",
-    slug: "",
     descriptionMarkdown: "",
     linkUrl: "",
     ctaLabel: "",
@@ -95,16 +114,17 @@ function blankForm(type: AiToolTileType): FormState {
 }
 
 function formFromEntry(entry: AiToolEntry): FormState {
-  const cfg = entry.config as unknown as Record<string, unknown>;
+  const cfg = entry.config as Record<string, unknown>;
   const baseStr = (key: string): string => {
     const v = cfg[key];
     return typeof v === "string" ? v : "";
   };
   if (entry.type === "coding_assistant") {
+    const rawKind = typeof cfg.assistantKind === "string" ? cfg.assistantKind : "";
     return {
       type: "coding_assistant",
       displayName: entry.displayName,
-      slug: entry.slug,
+      assistantKind: isAssistantKind(rawKind) ? rawKind : "custom",
       setupCommand: baseStr("setupCommand"),
       helperText: baseStr("helperText"),
       setupDocsUrl: baseStr("setupDocsUrl"),
@@ -114,7 +134,6 @@ function formFromEntry(entry: AiToolEntry): FormState {
     return {
       type: "model_provider",
       displayName: entry.displayName,
-      slug: entry.slug,
       providerKey: baseStr("providerKey"),
       defaultLabel: baseStr("defaultLabel"),
       suggestedRoutingPolicyId: baseStr("suggestedRoutingPolicyId"),
@@ -124,7 +143,6 @@ function formFromEntry(entry: AiToolEntry): FormState {
   return {
     type: "external_tool",
     displayName: entry.displayName,
-    slug: entry.slug,
     descriptionMarkdown: baseStr("descriptionMarkdown"),
     linkUrl: baseStr("linkUrl"),
     ctaLabel: baseStr("ctaLabel"),
@@ -134,6 +152,7 @@ function formFromEntry(entry: AiToolEntry): FormState {
 function configFromForm(form: FormState): Record<string, unknown> {
   if (form.type === "coding_assistant") {
     return {
+      assistantKind: form.assistantKind,
       setupCommand: form.setupCommand.trim(),
       ...(form.helperText.trim() ? { helperText: form.helperText.trim() } : {}),
       ...(form.setupDocsUrl.trim()
@@ -162,6 +181,13 @@ function configFromForm(form: FormState): Record<string, unknown> {
   };
 }
 
+function deriveDefaultIconAsset(form: FormState): string | null {
+  if (form.type === "coding_assistant" && form.assistantKind !== "custom") {
+    return `preset:${form.assistantKind}`;
+  }
+  return null;
+}
+
 interface Props {
   organizationId: string;
   state:
@@ -173,33 +199,69 @@ interface Props {
 
 export function AiToolEntryDrawer({ organizationId, state, onClose }: Props) {
   const utils = api.useUtils();
+  const { organization } = useOrganizationTeamProject();
+  const teams = organization?.teams ?? [];
+
   const [form, setForm] = useState<FormState>(() =>
     state?.mode === "edit"
       ? formFromEntry(state.entry)
       : blankForm(state?.type ?? "coding_assistant"),
   );
-  const [scope, setScope] = useState<AiToolScope>(
-    state?.mode === "edit" ? state.entry.scope : "organization",
+  const [teamIds, setTeamIds] = useState<string[]>(
+    state?.mode === "edit" ? state.entry.teamIds ?? [] : [],
   );
-  const [scopeId, setScopeId] = useState<string>(
-    state?.mode === "edit" ? state.entry.scopeId : organizationId,
+  const [iconAsset, setIconAsset] = useState<string | null>(
+    state?.mode === "edit"
+      ? state.entry.iconAsset ?? null
+      : deriveDefaultIconAsset(blankForm(state?.type ?? "coding_assistant")),
   );
 
-  // When the drawer opens for a different entry/type, reset state
+  // Reset state when drawer opens for a different entry/type
   useEffect(() => {
     if (!state) return;
-    setForm(
+    const nextForm =
+      state.mode === "edit" ? formFromEntry(state.entry) : blankForm(state.type);
+    setForm(nextForm);
+    setTeamIds(state.mode === "edit" ? state.entry.teamIds ?? [] : []);
+    setIconAsset(
       state.mode === "edit"
-        ? formFromEntry(state.entry)
-        : blankForm(state.type),
+        ? state.entry.iconAsset ?? null
+        : deriveDefaultIconAsset(nextForm),
     );
-    setScope(state.mode === "edit" ? state.entry.scope : "organization");
-    setScopeId(
-      state.mode === "edit" ? state.entry.scopeId : organizationId,
-    );
-  }, [state, organizationId]);
+  }, [state]);
 
   const isEdit = state?.mode === "edit";
+
+  // When the user changes the assistantKind picker on a coding_assistant
+  // tile, auto-update iconAsset to the corresponding preset (unless they
+  // already have a custom upload they don't want to lose).
+  const onAssistantKindChange = (kind: AssistantKind) => {
+    if (form.type !== "coding_assistant") return;
+    setForm({ ...form, assistantKind: kind });
+    if (kind !== "custom") {
+      setIconAsset(`preset:${kind}`);
+    } else if (
+      iconAsset?.startsWith(PRESET_PREFIX) ||
+      iconAsset === null
+    ) {
+      // Switching from preset → custom clears the preset until they upload
+      setIconAsset(null);
+    }
+  };
+
+  const providerOptionsQuery = api.aiTools.providerOptions.useQuery(
+    { organizationId },
+    {
+      enabled: !!state && form.type === "model_provider",
+    },
+  );
+
+  const routingPolicyOptionsQuery = api.aiTools.routingPolicyOptions.useQuery(
+    { organizationId },
+    {
+      enabled: !!state && form.type === "model_provider",
+    },
+  );
 
   const onSuccess = () => {
     void utils.aiTools.adminList.invalidate({ organizationId });
@@ -225,10 +287,10 @@ export function AiToolEntryDrawer({ organizationId, state, onClose }: Props) {
   const isPending = createMutation.isPending || updateMutation.isPending;
 
   const canSave = useMemo(() => {
-    if (!form.displayName.trim() || !form.slug.trim()) return false;
-    if (scope === "team" && !scopeId.trim()) return false;
-    if (form.type === "coding_assistant" && !form.setupCommand.trim()) {
-      return false;
+    if (!form.displayName.trim()) return false;
+    if (form.type === "coding_assistant") {
+      if (!form.setupCommand.trim()) return false;
+      if (form.assistantKind === "custom" && !iconAsset) return false;
     }
     if (form.type === "model_provider" && !form.providerKey.trim()) {
       return false;
@@ -240,7 +302,7 @@ export function AiToolEntryDrawer({ organizationId, state, onClose }: Props) {
       return false;
     }
     return true;
-  }, [form, scope, scopeId]);
+  }, [form, iconAsset]);
 
   const onSave = () => {
     if (!canSave || !state) return;
@@ -248,11 +310,10 @@ export function AiToolEntryDrawer({ organizationId, state, onClose }: Props) {
     if (state.mode === "create") {
       createMutation.mutate({
         organizationId,
-        scope,
-        scopeId,
+        teamIds,
         type: form.type,
         displayName: form.displayName.trim(),
-        slug: form.slug.trim(),
+        iconAsset,
         config,
       });
     } else {
@@ -261,6 +322,8 @@ export function AiToolEntryDrawer({ organizationId, state, onClose }: Props) {
         id: state.entry.id,
         type: form.type,
         displayName: form.displayName.trim(),
+        iconAsset,
+        teamIds,
         config,
       });
     }
@@ -297,10 +360,51 @@ export function AiToolEntryDrawer({ organizationId, state, onClose }: Props) {
                       key={opt.value}
                       label={opt.label}
                       checked={form.type === opt.value}
-                      onSelect={() => setForm(blankForm(opt.value))}
+                      onSelect={() => {
+                        const next = blankForm(opt.value);
+                        setForm(next);
+                        setIconAsset(deriveDefaultIconAsset(next));
+                      }}
                     />
                   ))}
                 </HStack>
+              )}
+            </FormSection>
+
+            <FormSection
+              label="Visible to"
+              hint={
+                teamIds.length === 0
+                  ? "Whole organization — every member sees this tile."
+                  : `${teamIds.length} team${teamIds.length === 1 ? "" : "s"} — only members of these teams see it.`
+              }
+            >
+              {teams.length === 0 ? (
+                <Text fontSize="xs" color="fg.muted">
+                  No teams in this organization yet. Tile will be visible to
+                  every member.
+                </Text>
+              ) : (
+                <VStack align="stretch" gap={1}>
+                  {teams.map((team) => (
+                    <Checkbox.Root
+                      key={team.id}
+                      size="sm"
+                      checked={teamIds.includes(team.id)}
+                      onCheckedChange={({ checked }) => {
+                        setTeamIds((prev) =>
+                          checked
+                            ? [...prev, team.id]
+                            : prev.filter((id) => id !== team.id),
+                        );
+                      }}
+                    >
+                      <Checkbox.HiddenInput />
+                      <Checkbox.Control />
+                      <Checkbox.Label>{team.name}</Checkbox.Label>
+                    </Checkbox.Root>
+                  ))}
+                </VStack>
               )}
             </FormSection>
 
@@ -315,56 +419,36 @@ export function AiToolEntryDrawer({ organizationId, state, onClose }: Props) {
               />
             </FormSection>
 
-            <FormSection
-              label="Slug"
-              hint="Lowercase alphanumeric, dash, or underscore (no spaces). Used for icon lookup and team-overrides-org matching."
-            >
-              <Input
-                size="sm"
-                placeholder="e.g. claude-code"
-                value={form.slug}
-                onChange={(e) => setForm({ ...form, slug: e.target.value })}
-              />
-            </FormSection>
-
             {form.type === "coding_assistant" && (
-              <CodingAssistantFields form={form} setForm={setForm} />
+              <CodingAssistantFields
+                form={form}
+                setForm={setForm}
+                onAssistantKindChange={onAssistantKindChange}
+                iconAsset={iconAsset}
+                onIconAssetChange={setIconAsset}
+              />
             )}
             {form.type === "model_provider" && (
-              <ModelProviderFields form={form} setForm={setForm} />
+              <ModelProviderFields
+                form={form}
+                setForm={setForm}
+                providerOptions={providerOptionsQuery.data}
+                providerOptionsLoading={providerOptionsQuery.isLoading}
+                routingPolicyOptions={routingPolicyOptionsQuery.data}
+                routingPolicyOptionsLoading={
+                  routingPolicyOptionsQuery.isLoading
+                }
+              />
             )}
             {form.type === "external_tool" && (
-              <ExternalToolFields form={form} setForm={setForm} />
+              <ExternalToolFields
+                form={form}
+                setForm={setForm}
+                iconAsset={iconAsset}
+                onIconAssetChange={setIconAsset}
+              />
             )}
 
-            <FormSection label="Scope">
-              <HStack gap={3}>
-                {SCOPE_OPTIONS.map((opt) => (
-                  <RadioCard
-                    key={opt.value}
-                    label={opt.label}
-                    checked={scope === opt.value}
-                    onSelect={() => {
-                      setScope(opt.value);
-                      if (opt.value === "organization") {
-                        setScopeId(organizationId);
-                      } else {
-                        setScopeId("");
-                      }
-                    }}
-                  />
-                ))}
-              </HStack>
-              {scope === "team" && (
-                <Input
-                  size="sm"
-                  placeholder="team_xxxxxxxx (paste team id)"
-                  value={scopeId}
-                  onChange={(e) => setScopeId(e.target.value)}
-                  marginTop={2}
-                />
-              )}
-            </FormSection>
             <HStack gap={2} marginTop={4}>
               <Button variant="ghost" size="sm" onClick={onClose}>
                 Cancel
@@ -438,15 +522,162 @@ function RadioCard({
   );
 }
 
+function IconPreview({
+  iconAsset,
+  fallback,
+}: {
+  iconAsset: string | null;
+  fallback: React.ReactNode;
+}) {
+  if (iconAsset?.startsWith(PRESET_PREFIX)) {
+    const key = iconAsset.slice(PRESET_PREFIX.length);
+    if (isAssistantKind(key) && key !== "custom") {
+      const url = ASSISTANT_PRESETS[key].iconUrl;
+      if (url) {
+        return (
+          <Image
+            src={url}
+            alt=""
+            width="32px"
+            height="32px"
+            objectFit="contain"
+            _dark={
+              ASSISTANT_PRESETS[key].darkModeInvert
+                ? { filter: "invert(1) hue-rotate(180deg)" }
+                : undefined
+            }
+          />
+        );
+      }
+    }
+  }
+  if (iconAsset?.startsWith(DATA_URL_PREFIX)) {
+    return (
+      <Image
+        src={iconAsset}
+        alt=""
+        width="32px"
+        height="32px"
+        objectFit="contain"
+      />
+    );
+  }
+  return <>{fallback}</>;
+}
+
+function IconUploadButton({
+  onUploaded,
+  label = "Upload custom icon",
+}: {
+  onUploaded: (dataUrl: string) => void;
+  label?: string;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const onFile = (file: File) => {
+    if (file.size > MAX_ICON_BASE64_BYTES) {
+      toaster.create({
+        title: "Icon too large",
+        description: "Maximum upload size is 256 KB.",
+        type: "error",
+      });
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === "string") {
+        onUploaded(reader.result);
+      }
+    };
+    reader.onerror = () => {
+      toaster.create({
+        title: "Failed to read file",
+        type: "error",
+      });
+    };
+    reader.readAsDataURL(file);
+  };
+
+  return (
+    <>
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/svg+xml,image/png,image/jpeg,image/webp"
+        style={{ display: "none" }}
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) onFile(file);
+          e.target.value = "";
+        }}
+      />
+      <Button
+        size="sm"
+        variant="outline"
+        onClick={() => inputRef.current?.click()}
+      >
+        {label}
+      </Button>
+    </>
+  );
+}
+
 function CodingAssistantFields({
   form,
   setForm,
+  onAssistantKindChange,
+  iconAsset,
+  onIconAssetChange,
 }: {
   form: CodingAssistantForm;
   setForm: (f: FormState) => void;
+  onAssistantKindChange: (kind: AssistantKind) => void;
+  iconAsset: string | null;
+  onIconAssetChange: (value: string | null) => void;
 }) {
+  const isCustom = form.assistantKind === "custom";
+
   return (
     <>
+      <FormSection label="Assistant">
+        <HStack gap={3} align="center">
+          <IconPreview iconAsset={iconAsset} fallback={<Bot size={28} />} />
+          <NativeSelect.Root size="sm" flex={1}>
+            <NativeSelect.Field
+              value={form.assistantKind}
+              onChange={(e) => {
+                if (isAssistantKind(e.target.value)) {
+                  onAssistantKindChange(e.target.value);
+                }
+              }}
+            >
+              {ASSISTANT_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </NativeSelect.Field>
+            <NativeSelect.Indicator />
+          </NativeSelect.Root>
+        </HStack>
+        {isCustom && (
+          <HStack gap={2} marginTop={2}>
+            <IconUploadButton
+              onUploaded={onIconAssetChange}
+              label={iconAsset ? "Replace icon" : "Upload icon (SVG / PNG)"}
+            />
+            {iconAsset?.startsWith(DATA_URL_PREFIX) && (
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => onIconAssetChange(null)}
+              >
+                Clear
+              </Button>
+            )}
+          </HStack>
+        )}
+      </FormSection>
       <FormSection label="Setup command">
         <Input
           size="sm"
@@ -483,22 +714,67 @@ function CodingAssistantFields({
 function ModelProviderFields({
   form,
   setForm,
+  providerOptions,
+  providerOptionsLoading,
+  routingPolicyOptions,
+  routingPolicyOptionsLoading,
 }: {
   form: ModelProviderForm;
   setForm: (f: FormState) => void;
+  providerOptions:
+    | Array<{ providerKey: string; displayName: string; configured: boolean }>
+    | undefined;
+  providerOptionsLoading: boolean;
+  routingPolicyOptions: Array<{ id: string; name: string }> | undefined;
+  routingPolicyOptionsLoading: boolean;
 }) {
+  const selectedProvider = providerOptions?.find(
+    (p) => p.providerKey === form.providerKey,
+  );
+
   return (
     <>
       <FormSection
-        label="Provider key"
-        hint="e.g. anthropic, openai, bedrock — used to bind issued VKs to the right provider credential."
+        label="Provider"
+        hint="Used to bind issued VKs to the right provider credential."
       >
-        <Input
-          size="sm"
-          placeholder="e.g. anthropic"
-          value={form.providerKey}
-          onChange={(e) => setForm({ ...form, providerKey: e.target.value })}
-        />
+        <NativeSelect.Root size="sm">
+          <NativeSelect.Field
+            value={form.providerKey}
+            onChange={(e) =>
+              setForm({ ...form, providerKey: e.target.value })
+            }
+          >
+            <option value="">
+              {providerOptionsLoading
+                ? "Loading providers…"
+                : "— select a provider —"}
+            </option>
+            {(providerOptions ?? []).map((p) => (
+              <option key={p.providerKey} value={p.providerKey}>
+                {p.displayName}
+                {p.configured ? "" : " (not configured)"}
+              </option>
+            ))}
+          </NativeSelect.Field>
+          <NativeSelect.Indicator />
+        </NativeSelect.Root>
+        {selectedProvider && !selectedProvider.configured && (
+          <Alert.Root status="warning" variant="surface" marginTop={2}>
+            <Alert.Indicator />
+            <Alert.Content>
+              <Alert.Title>Provider not configured</Alert.Title>
+              <Alert.Description fontSize="xs">
+                This provider has no enabled credential yet. Tiles will publish
+                but VK issuance will 502 until you{" "}
+                <Link href="/settings/model-providers" color="orange.600">
+                  configure it
+                </Link>
+                .
+              </Alert.Description>
+            </Alert.Content>
+          </Alert.Root>
+        )}
       </FormSection>
       <FormSection label="Default label suggestion (optional)">
         <Input
@@ -511,17 +787,29 @@ function ModelProviderFields({
         />
       </FormSection>
       <FormSection
-        label="Suggested routing policy id (optional)"
+        label="Routing policy (optional)"
         hint="If set, issued VKs will bind to this routing policy instead of the org default."
       >
-        <Input
-          size="sm"
-          placeholder="rp_..."
-          value={form.suggestedRoutingPolicyId}
-          onChange={(e) =>
-            setForm({ ...form, suggestedRoutingPolicyId: e.target.value })
-          }
-        />
+        <NativeSelect.Root size="sm">
+          <NativeSelect.Field
+            value={form.suggestedRoutingPolicyId}
+            onChange={(e) =>
+              setForm({ ...form, suggestedRoutingPolicyId: e.target.value })
+            }
+          >
+            <option value="">
+              {routingPolicyOptionsLoading
+                ? "Loading policies…"
+                : "— use organization default —"}
+            </option>
+            {(routingPolicyOptions ?? []).map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </NativeSelect.Field>
+          <NativeSelect.Indicator />
+        </NativeSelect.Root>
       </FormSection>
       <FormSection label="Project-suggestion hint (optional)">
         <Textarea
@@ -541,12 +829,37 @@ function ModelProviderFields({
 function ExternalToolFields({
   form,
   setForm,
+  iconAsset,
+  onIconAssetChange,
 }: {
   form: ExternalToolForm;
   setForm: (f: FormState) => void;
+  iconAsset: string | null;
+  onIconAssetChange: (value: string | null) => void;
 }) {
   return (
     <>
+      <FormSection
+        label="Icon"
+        hint="Defaults to the wrench icon. Upload an SVG or PNG to override."
+      >
+        <HStack gap={3} align="center">
+          <IconPreview iconAsset={iconAsset} fallback={<Wrench size={28} />} />
+          <IconUploadButton
+            onUploaded={onIconAssetChange}
+            label={iconAsset ? "Replace icon" : "Upload icon"}
+          />
+          {iconAsset && (
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => onIconAssetChange(null)}
+            >
+              Use default
+            </Button>
+          )}
+        </HStack>
+      </FormSection>
       <FormSection
         label="Description (markdown)"
         hint="Rendered in the tile body when end users expand it. Markdown is sanitized."
@@ -580,3 +893,4 @@ function ExternalToolFields({
     </>
   );
 }
+
