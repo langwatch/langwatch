@@ -192,6 +192,7 @@ model Team {
   ownerUser   User?   @relation("PersonalTeamOwner", fields: [ownerUserId], references: [id])
 
   ingestionSources IngestionSource[]
+  aiToolEntryTeams AiToolEntryTeam[]
 
   @@index([organizationId])
   @@index([isPersonal])
@@ -1982,11 +1983,22 @@ model AiToolEntry {
 
   displayName String
 
-  /// Stable slug for icon lookup + team-overrides-org resolution
-  /// (a team-scoped entry with the same slug as an org-scoped one
-  /// hides the org default for users in that team).
+  /// Stable slug for team-overrides-org resolution (a team-scoped
+  /// entry with the same slug as an org-scoped one hides the org
+  /// default for users in that team). Server-owned: generated from
+  /// displayName + nanoid(6) on create, immutable on update.
   slug    String
+
+  /// @deprecated Use `iconAsset` instead. Kept for back-compat with
+  /// pre-refactor rows; new writes should populate iconAsset.
   iconKey String?
+
+  /// Icon source — single column, prefix-discriminated:
+  ///   "preset:claude_code" / "preset:codex" / ...   (built-in)
+  ///   "data:image/svg+xml;base64,..."               (admin-uploaded)
+  ///   null                                          → fall back to
+  ///                                                   type-default in UI
+  iconAsset String? @db.Text
 
   /// Admin-curated sort within the user-facing portal grid.
   order Int @default(0)
@@ -2007,9 +2019,30 @@ model AiToolEntry {
   createdById String?
   updatedById String?
 
+  /// Multi-team scope. Empty = org-wide (visible to every member).
+  /// Non-empty = restricted to those teams. Replaces the legacy
+  /// scope+scopeId pair, which stays populated for back-compat
+  /// during the rollout (scope='organization' when teams is empty,
+  /// scope='team' with scopeId=teams[0] when teams has one row;
+  /// undefined for >1 — readers should prefer this relation).
+  teams AiToolEntryTeam[]
+
   @@index([organizationId, scope, scopeId])
   @@index([organizationId, enabled, archivedAt])
   @@index([organizationId, type])
+}
+
+/// Per-team scope binding for AiToolEntry. Empty set = org-wide.
+/// Non-empty = entry visible only to members of those teams.
+model AiToolEntryTeam {
+  id      String      @id @default(nanoid())
+  entryId String
+  teamId  String
+  entry   AiToolEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  team    Team        @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@unique([entryId, teamId])
+  @@index([teamId])
 }
 
 model GatewayProviderCredential {
