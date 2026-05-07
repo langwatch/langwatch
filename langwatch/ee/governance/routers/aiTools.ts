@@ -25,17 +25,29 @@ import { z } from "zod";
 
 import {
   AiToolEntryService,
-  SUPPORTED_SCOPES,
   SUPPORTED_TILE_TYPES,
 } from "@ee/governance/services/aiToolEntry.service";
 
 import { checkOrganizationPermission } from "~/server/api/rbac";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 
-const scopeSchema = z.enum(SUPPORTED_SCOPES as readonly [string, ...string[]]);
 const typeSchema = z.enum(
   SUPPORTED_TILE_TYPES as readonly [string, ...string[]],
 );
+
+/// Tightened from a free-string to a base64 data URL for uploaded
+/// icons or "preset:<kind>" for built-ins. Cap at ~256KB encoded
+/// (≈ 192KB binary) — large enough for an SVG / 256×256 PNG, small
+/// enough to keep the Postgres row footprint reasonable.
+const iconAssetSchema = z
+  .string()
+  .max(262_144)
+  .regex(/^(preset:[a-z0-9_]+|data:image\/(svg\+xml|png|jpeg|webp);base64,[A-Za-z0-9+/=]+)$/, {
+    message:
+      "iconAsset must be 'preset:<kind>' or a base64 data URL (svg, png, jpeg, webp)",
+  })
+  .nullable()
+  .optional();
 
 export const aiToolsRouter = createTRPCRouter({
   /**
@@ -137,19 +149,12 @@ export const aiToolsRouter = createTRPCRouter({
     .input(
       z.object({
         organizationId: z.string(),
-        scope: scopeSchema,
-        scopeId: z.string().min(1),
+        /// Empty array = org-wide (visible to every member).
+        /// Non-empty = entry visible only to members of those teams.
+        teamIds: z.array(z.string()).default([]),
         type: typeSchema,
         displayName: z.string().min(1).max(128),
-        slug: z
-          .string()
-          .min(1)
-          .max(64)
-          .regex(/^[a-z0-9][a-z0-9_\-]*$/, {
-            message:
-              "Slug must be lowercase alphanumeric, dash, or underscore (no spaces)",
-          }),
-        iconKey: z.string().max(64).nullable().optional(),
+        iconAsset: iconAssetSchema,
         order: z.number().int().min(0).optional(),
         config: z.record(z.string(), z.unknown()),
       }),
@@ -160,12 +165,10 @@ export const aiToolsRouter = createTRPCRouter({
       try {
         return await service.create({
           organizationId: input.organizationId,
-          scope: input.scope as (typeof SUPPORTED_SCOPES)[number],
-          scopeId: input.scopeId,
+          teamIds: input.teamIds,
           type: input.type as (typeof SUPPORTED_TILE_TYPES)[number],
           displayName: input.displayName,
-          slug: input.slug,
-          iconKey: input.iconKey,
+          iconAsset: input.iconAsset,
           order: input.order,
           config: input.config,
           actorUserId: ctx.session.user.id,
@@ -188,7 +191,10 @@ export const aiToolsRouter = createTRPCRouter({
         organizationId: z.string(),
         id: z.string(),
         displayName: z.string().min(1).max(128).optional(),
-        iconKey: z.string().max(64).nullable().optional(),
+        iconAsset: iconAssetSchema,
+        /// Pass to overwrite the team binding set. Empty = org-wide.
+        /// Omit to leave the existing binding untouched.
+        teamIds: z.array(z.string()).optional(),
         order: z.number().int().min(0).optional(),
         enabled: z.boolean().optional(),
         type: typeSchema.optional(),
@@ -203,7 +209,8 @@ export const aiToolsRouter = createTRPCRouter({
           id: input.id,
           organizationId: input.organizationId,
           displayName: input.displayName,
-          iconKey: input.iconKey,
+          iconAsset: input.iconAsset,
+          teamIds: input.teamIds,
           order: input.order,
           enabled: input.enabled,
           type: input.type as
@@ -280,6 +287,40 @@ export const aiToolsRouter = createTRPCRouter({
       return await service.seedStarterPack({
         organizationId: input.organizationId,
         actorUserId: ctx.session.user.id,
+      });
+    }),
+
+  /**
+   * Admin drawer dropdown source for the model_provider tile's
+   * `providerKey`. Returns every provider the org has any
+   * `ModelProvider` row for, with a `configured: boolean` flag the
+   * drawer surfaces as a "Configure provider →" hint when false.
+   * Wider than `providerAvailability`: an admin needs to see every
+   * option they *could* expose, not only the live ones.
+   */
+  providerOptions: protectedProcedure
+    .input(z.object({ organizationId: z.string() }))
+    .use(checkOrganizationPermission("aiTools:manage"))
+    .query(async ({ ctx, input }) => {
+      const service = AiToolEntryService.create(ctx.prisma);
+      return await service.listProviderOptionsForAdmin({
+        organizationId: input.organizationId,
+      });
+    }),
+
+  /**
+   * Admin drawer dropdown source for the model_provider tile's
+   * `suggestedRoutingPolicyId`. Returns the org-scoped routing
+   * policies (only — team-scoped policies are bound to a team's
+   * personal-VK flow and not surfaceable through a tile config).
+   */
+  routingPolicyOptions: protectedProcedure
+    .input(z.object({ organizationId: z.string() }))
+    .use(checkOrganizationPermission("aiTools:manage"))
+    .query(async ({ ctx, input }) => {
+      const service = AiToolEntryService.create(ctx.prisma);
+      return await service.listRoutingPolicyOptionsForAdmin({
+        organizationId: input.organizationId,
       });
     }),
 

@@ -183,11 +183,9 @@ describe("aiToolsRouter integration", () => {
       await expect(
         memberCaller.aiTools.create({
           organizationId,
-          scope: "organization",
-          scopeId: organizationId,
+          teamIds: [],
           type: "external_tool",
-          displayName: "Wiki",
-          slug: `wiki-${nanoid(4).toLowerCase()}`,
+          displayName: `Wiki ${nanoid(4)}`,
           config: {
             descriptionMarkdown: "Hi",
             linkUrl: "https://wiki.example.com",
@@ -200,17 +198,24 @@ describe("aiToolsRouter integration", () => {
       const adminCaller = callerFor(adminUserId);
       const created = await adminCaller.aiTools.create({
         organizationId,
-        scope: "organization",
-        scopeId: organizationId,
+        teamIds: [],
         type: "coding_assistant",
-        displayName: "Claude Code",
-        slug: `cc-${nanoid(4).toLowerCase()}`,
+        displayName: `Claude Code ${nanoid(4)}`,
+        iconAsset: "preset:claude_code",
         config: {
+          assistantKind: "claude_code",
           setupCommand: "langwatch claude",
           setupDocsUrl: "https://docs.langwatch.ai/claude",
         },
       });
       expect(created.id).toBeDefined();
+      // Server-owned slug: must auto-generate from displayName.
+      expect(created.slug).toMatch(/^claude-code-/);
+      // teamIds[] mirrors back-compat scope/scopeId ('organization'
+      // when empty) — listForUser uses the new join-table path.
+      expect(created.teamIds).toEqual([]);
+      expect(created.scope).toBe("organization");
+      expect(created.iconAsset).toBe("preset:claude_code");
 
       const adminList = await adminCaller.aiTools.adminList({ organizationId });
       expect(adminList.some((e) => e.id === created.id)).toBe(true);
@@ -220,49 +225,62 @@ describe("aiToolsRouter integration", () => {
   describe("Scoping", () => {
     it("filters team-scoped entries to team members", async () => {
       const adminCaller = callerFor(adminUserId);
-      const platformOnlySlug = `bedrock-${nanoid(4).toLowerCase()}`;
-      await adminCaller.aiTools.create({
+      const created = await adminCaller.aiTools.create({
         organizationId,
-        scope: "team",
-        scopeId: teamPlatformId,
+        teamIds: [teamPlatformId],
         type: "model_provider",
-        displayName: "Bedrock — Platform team",
-        slug: platformOnlySlug,
+        displayName: `Bedrock — Platform team ${nanoid(4)}`,
+        iconAsset: "preset:bedrock",
         config: { providerKey: "bedrock" },
       });
 
       const platformList = await callerFor(memberPlatformUserId).aiTools.list({
         organizationId,
       });
-      expect(platformList.some((e) => e.slug === platformOnlySlug)).toBe(true);
+      expect(platformList.some((e) => e.id === created.id)).toBe(true);
+      expect(
+        platformList.find((e) => e.id === created.id)?.teamIds,
+      ).toEqual([teamPlatformId]);
 
       const orphanList = await callerFor(memberOrphanUserId).aiTools.list({
         organizationId,
       });
-      expect(orphanList.some((e) => e.slug === platformOnlySlug)).toBe(false);
+      expect(orphanList.some((e) => e.id === created.id)).toBe(false);
     });
 
     it("team entry shadows org default by slug", async () => {
-      const adminCaller = callerFor(adminUserId);
-      const sharedSlug = `openai-${nanoid(4).toLowerCase()}`;
-
-      await adminCaller.aiTools.create({
-        organizationId,
-        scope: "organization",
-        scopeId: organizationId,
-        type: "model_provider",
-        displayName: "OpenAI (default)",
-        slug: sharedSlug,
-        config: { providerKey: "openai" },
+      // Slug is server-owned (auto-generated with a nanoid suffix),
+      // so admins can't trigger shadowing via the public API by
+      // re-using a slug. We exercise the listForUser shadowing path
+      // directly via prisma writes — the contract that *if* two
+      // entries share a slug the team-bound one wins for users in
+      // that team is still load-bearing for any future admin tool
+      // that imports catalogs by slug.
+      const sharedSlug = `openai-shadow-${nanoid(6).toLowerCase()}`;
+      const orgEntry = await prisma.aiToolEntry.create({
+        data: {
+          organizationId,
+          scope: "organization",
+          scopeId: organizationId,
+          type: "model_provider",
+          displayName: "OpenAI (default)",
+          slug: sharedSlug,
+          config: { providerKey: "openai" },
+        },
       });
-      await adminCaller.aiTools.create({
-        organizationId,
-        scope: "team",
-        scopeId: teamPlatformId,
-        type: "model_provider",
-        displayName: "OpenAI — Platform override",
-        slug: sharedSlug,
-        config: { providerKey: "openai" },
+      const teamEntry = await prisma.aiToolEntry.create({
+        data: {
+          organizationId,
+          scope: "team",
+          scopeId: teamPlatformId,
+          type: "model_provider",
+          displayName: "OpenAI — Platform override",
+          slug: sharedSlug,
+          config: { providerKey: "openai" },
+        },
+      });
+      await prisma.aiToolEntryTeam.create({
+        data: { entryId: teamEntry.id, teamId: teamPlatformId },
       });
 
       const platformList = await callerFor(memberPlatformUserId).aiTools.list({
@@ -278,6 +296,11 @@ describe("aiToolsRouter integration", () => {
       const orphanMatches = orphanList.filter((e) => e.slug === sharedSlug);
       expect(orphanMatches).toHaveLength(1);
       expect(orphanMatches[0]?.displayName).toBe("OpenAI (default)");
+
+      // Cleanup so other tests don't see the shadow rows.
+      await prisma.aiToolEntry
+        .deleteMany({ where: { id: { in: [orgEntry.id, teamEntry.id] } } })
+        .catch(() => undefined);
     });
   });
 
@@ -286,11 +309,9 @@ describe("aiToolsRouter integration", () => {
       await expect(
         callerFor(adminUserId).aiTools.create({
           organizationId,
-          scope: "organization",
-          scopeId: organizationId,
+          teamIds: [],
           type: "coding_assistant",
-          displayName: "Broken",
-          slug: `broken-${nanoid(4).toLowerCase()}`,
+          displayName: `Broken ${nanoid(4)}`,
           config: {
             setupDocsUrl: "https://docs.example.com",
           },
@@ -302,11 +323,9 @@ describe("aiToolsRouter integration", () => {
       await expect(
         callerFor(adminUserId).aiTools.create({
           organizationId,
-          scope: "organization",
-          scopeId: organizationId,
+          teamIds: [],
           type: "external_tool",
-          displayName: "Bad link",
-          slug: `bl-${nanoid(4).toLowerCase()}`,
+          displayName: `Bad link ${nanoid(4)}`,
           config: {
             descriptionMarkdown: "Hi",
             linkUrl: "not-a-url",
@@ -376,9 +395,9 @@ describe("aiToolsRouter integration", () => {
           "bedrock",
           "claude-code",
           "codex",
-          "copilot",
           "cursor",
           "gemini",
+          "google",
           "openai",
         ]);
 
@@ -423,14 +442,11 @@ describe("aiToolsRouter integration", () => {
   describe("setEnabled + archive", () => {
     it("setEnabled toggles visibility on the user-facing list", async () => {
       const adminCaller = callerFor(adminUserId);
-      const slug = `toggle-${nanoid(4).toLowerCase()}`;
       const entry = await adminCaller.aiTools.create({
         organizationId,
-        scope: "organization",
-        scopeId: organizationId,
+        teamIds: [],
         type: "external_tool",
-        displayName: "Toggleable",
-        slug,
+        displayName: `Toggleable ${nanoid(4)}`,
         config: {
           descriptionMarkdown: "x",
           linkUrl: "https://example.com",

@@ -156,6 +156,14 @@ const EXEMPT_MODELS = [
    * are authorised via TeamUser membership at read time.
    */
   "AiToolEntry",
+  /**
+   * AiToolEntryTeam (iter governance-platform / Phase 7 multi-team
+   * scope refactor) is the join table binding AiToolEntry rows to
+   * teams. Same rationale as AiToolEntry — org-scoped via the
+   * referenced entry, no projectId; service layer authorises by the
+   * parent entry's organizationId before any mutation.
+   */
+  "AiToolEntryTeam",
 ];
 
 const _guardProjectId = ({ params }: { params: Prisma.MiddlewareParams }) => {
