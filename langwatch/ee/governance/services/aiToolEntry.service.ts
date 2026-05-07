@@ -34,6 +34,8 @@ import type { Prisma, PrismaClient } from "@prisma/client";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 
+import { modelProviders as supportedModelProviders } from "~/server/modelProviders/registry";
+
 export const SUPPORTED_TILE_TYPES = [
   "coding_assistant",
   "model_provider",
@@ -752,12 +754,20 @@ export class AiToolEntryService {
 
   /**
    * Admin-side dropdown source for the model_provider tile drawer.
-   * Returns the distinct set of providers the org has any
-   * `ModelProvider` row for — even disabled / unconfigured ones —
-   * marking each with a `configured` flag the drawer surfaces as
-   * an inline "Configure provider →" hint when false. Wider than
-   * `listConfiguredProvidersForUser` on purpose: an admin needs to
-   * see every option they *could* expose, not only the live ones.
+   * Returns EVERY supported LLM provider the platform knows about
+   * (sourced from `modelProviders` registry), each marked with a
+   * `configured` flag based on whether the org has a bindable live
+   * GatewayProviderCredential for that provider. The drawer surfaces
+   * `configured: false` rows as a "Configure provider →" hint pointing
+   * at /settings/model-providers — without that contract the warning
+   * path is unreachable on a fresh org (caught in B1.1 G1: dev
+   * fixture only had Anthropic configured, list collapsed to one row,
+   * unconfigured-warning UX could never fire).
+   *
+   * The `configured` predicate matches the gateway's fail-closed
+   * binding contract (`disabledAt: null` + parent ModelProvider
+   * `enabled: true`) so a green flag in the drawer means the gateway
+   * will actually accept a personal-VK request through that provider.
    */
   async listProviderOptionsForAdmin({
     organizationId,
@@ -771,46 +781,33 @@ export class AiToolEntryService {
       select: { id: true },
     });
     const projectIds = projects.map((p) => p.id);
-    if (projectIds.length === 0) return [];
 
-    const modelProviders = await this.prisma.modelProvider.findMany({
-      where: { projectId: { in: projectIds } },
-      select: { provider: true, enabled: true },
-    });
+    const configured =
+      projectIds.length > 0
+        ? new Set(
+            (
+              await this.prisma.gatewayProviderCredential.findMany({
+                where: {
+                  projectId: { in: projectIds },
+                  disabledAt: null,
+                  modelProvider: { enabled: true },
+                },
+                select: { modelProvider: { select: { provider: true } } },
+              })
+            )
+              .map((c) => c.modelProvider.provider)
+              .filter(Boolean),
+          )
+        : new Set<string>();
 
-    const credentials = await this.prisma.gatewayProviderCredential.findMany({
-      where: {
-        projectId: { in: projectIds },
-        disabledAt: null,
-        modelProvider: { enabled: true },
-      },
-      select: { modelProvider: { select: { provider: true } } },
-    });
-    const configured = new Set(
-      credentials.map((c) => c.modelProvider.provider).filter(Boolean),
-    );
-
-    const byProvider = new Map<
-      string,
-      { providerKey: string; displayName: string; configured: boolean }
-    >();
-    for (const mp of modelProviders) {
-      if (!mp.provider) continue;
-      const existing = byProvider.get(mp.provider);
-      const isConfigured = configured.has(mp.provider);
-      if (!existing) {
-        byProvider.set(mp.provider, {
-          providerKey: mp.provider,
-          displayName: providerDisplayName(mp.provider),
-          configured: isConfigured,
-        });
-      } else if (isConfigured) {
-        existing.configured = true;
-      }
-    }
-    return Array.from(byProvider.values()).sort((a, b) =>
-      a.displayName.localeCompare(b.displayName),
-    );
+    return Object.entries(supportedModelProviders)
+      .filter(([, def]) => def.type === "llm")
+      .map(([providerKey, def]) => ({
+        providerKey,
+        displayName: def.name ?? providerDisplayName(providerKey),
+        configured: configured.has(providerKey),
+      }))
+      .sort((a, b) => a.displayName.localeCompare(b.displayName));
   }
 
   /**

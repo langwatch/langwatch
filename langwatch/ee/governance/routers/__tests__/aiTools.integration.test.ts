@@ -473,4 +473,76 @@ describe("aiToolsRouter integration", () => {
       expect(adminAfter.some((e) => e.id === entry.id && e.enabled === false)).toBe(true);
     });
   });
+
+  describe("providerOptions", () => {
+    it("returns every supported LLM provider with a configured flag", async () => {
+      // Drives B1.1 G1 — a fresh dev org with zero
+      // GatewayProviderCredential rows must still see the full
+      // platform catalog so the drawer's 'Configure provider →'
+      // hint is reachable. Pre-fix, this returned [] and the
+      // unconfigured-warning UX was dead.
+      const result = await callerFor(adminUserId).aiTools.providerOptions({
+        organizationId,
+      });
+      // Must include the canonical big-three at minimum.
+      const keys = result.map((r) => r.providerKey);
+      expect(keys).toContain("openai");
+      expect(keys).toContain("anthropic");
+      expect(keys).toContain("azure");
+      // Every row carries displayName + boolean configured.
+      for (const row of result) {
+        expect(typeof row.displayName).toBe("string");
+        expect(row.displayName.length).toBeGreaterThan(0);
+        expect(typeof row.configured).toBe("boolean");
+      }
+      // Test fixture has no GatewayProviderCredential rows seeded —
+      // every provider is unconfigured, exposing the warning path.
+      expect(result.every((r) => r.configured === false)).toBe(true);
+    });
+
+    it("rejects MEMBER callers — manage-permission required", async () => {
+      await expect(
+        callerFor(memberPlatformUserId).aiTools.providerOptions({
+          organizationId,
+        }),
+      ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+    });
+  });
+
+  describe("routingPolicyOptions", () => {
+    it("returns org-scoped routing policies for the drawer dropdown", async () => {
+      const policy = await prisma.routingPolicy.create({
+        data: {
+          organizationId,
+          scope: "organization",
+          scopeId: organizationId,
+          name: `Drawer Default ${nanoid(4)}`,
+          providerCredentialIds: [],
+          strategy: "priority",
+          isDefault: true,
+          createdById: adminUserId,
+          updatedById: adminUserId,
+        },
+      });
+
+      try {
+        const result = await callerFor(adminUserId).aiTools.routingPolicyOptions({
+          organizationId,
+        });
+        expect(result.some((r) => r.id === policy.id)).toBe(true);
+        const match = result.find((r) => r.id === policy.id);
+        expect(match?.name).toBe(policy.name);
+      } finally {
+        await prisma.routingPolicy.delete({ where: { id: policy.id } });
+      }
+    });
+
+    it("rejects MEMBER callers — manage-permission required", async () => {
+      await expect(
+        callerFor(memberPlatformUserId).aiTools.routingPolicyOptions({
+          organizationId,
+        }),
+      ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+    });
+  });
 });
