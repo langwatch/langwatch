@@ -132,7 +132,7 @@ Feature: Recent Items Backend
       | updatedAt | 2024-01-15T10:30:00Z |
 
   # Deleted entities
-  Scenario: Excludes deleted entities from results
+  Scenario: Excludes soft-deleted prompts from results
     Given I have an audit log entry for action "prompts.update" with args:
       | configId | deleted-prompt |
     And no prompt exists with id "deleted-prompt"

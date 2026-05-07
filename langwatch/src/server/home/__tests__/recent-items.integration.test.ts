@@ -197,7 +197,7 @@ describe("Recent Items Integration", () => {
       expect(datasetItem?.href?.includes("/datasets/")).toBe(true);
     });
 
-    /** @scenario Excludes deleted entities from results */
+    /** @scenario Excludes soft-deleted prompts from results */
     it("excludes deleted prompts from results", async () => {
       // Create a deleted prompt
       const deletedPrompt = await prisma.llmPromptConfig.create({
