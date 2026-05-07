@@ -376,8 +376,8 @@ describe("LicenseHandler Integration", () => {
   // ==========================================================================
 
   describe("getActivePlan", () => {
-    /** @scenario Limits to 1 member when no license */
-    /** @scenario Limits to 2 projects when no license */
+    /** @scenario Limits members to FREE_PLAN limit when no license */
+    /** @scenario Limits projects to FREE_PLAN limit when no license */
     it("returns FREE_PLAN when no license exists", async () => {
       const plan = await handler.getActivePlan(organizationId);
 

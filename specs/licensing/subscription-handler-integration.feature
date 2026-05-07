@@ -12,15 +12,15 @@ Feature: PlanProvider License Integration
   # License-Based Plan Resolution
   # ============================================================================
 
-  Scenario: Limits to 1 member when no license
+  Scenario: Limits members to FREE_PLAN limit when no license
     Given the organization has no license
     When I call planProvider.getActivePlan
-    Then maxMembers is 1
+    Then maxMembers equals FREE_PLAN.maxMembers
 
-  Scenario: Limits to 2 projects when no license
+  Scenario: Limits projects to FREE_PLAN limit when no license
     Given the organization has no license
     When I call planProvider.getActivePlan
-    Then maxProjects is 2
+    Then maxProjects equals FREE_PLAN.maxProjects
 
   # ============================================================================
   # LicenseHandler Singleton
