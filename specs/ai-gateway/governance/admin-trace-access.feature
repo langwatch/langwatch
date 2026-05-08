@@ -125,6 +125,35 @@ Feature: Admin trace access — bird's-eye drill-in with persistent 'viewing as'
         does NOT silently bypass the audit-log emission — the audit
         row writes server-side independent of the banner DOM
 
+  @bdd @ui @admin-trace-access @banner @no-leak @regression
+  Scenario: Banner is scoped to project-anchored URLs only — does NOT leak onto admin-self surfaces
+    Given carol previously drilled into ariana's Personal Workspace
+    And `useOrganizationTeamProject` has resolved the team / project
+        context to ariana's workspace and KEEPS that resolved across
+        navigation (sticky resolution is by design — the cache makes
+        navigation back-and-forth fast)
+    When carol navigates AWAY from the impersonating context to any
+        admin-self surface:
+      | route                | scope                              |
+      | /governance          | org-scope admin home              |
+      | /settings/*          | org-scope admin config            |
+      | /me                  | personal-self                     |
+      | /me/settings         | personal-self config              |
+      | /me/sessions         | personal-self                     |
+      | /ops/*               | platform-internal admin           |
+    Then the AdminViewingAsBanner DOES NOT render on any of those
+        routes (regardless of the still-resolved sticky-team-context
+        from the prior drill-in)
+    And the banner detection rule is gated on
+        `router.pathname.startsWith("/[project]")` — only project-
+        anchored URLs are candidates for the impersonating-context
+        check (Ariana QA caught the leak in `3b712dd4a` where the
+        banner stayed on /governance after a back-navigate from
+        the personal-project drill-in)
+    # Regression-invariant: banner detection MUST NOT depend on
+    # team-resolution alone — the route shape is the load-bearing
+    # signal that 'this is a workspace view' vs 'this is admin-self'.
+
   @bdd @ui @admin-trace-access @banner @reload-safe
   Scenario: Banner survives reload + direct-paste without client-side state seeding
     Given carol is in the impersonating context viewing ariana's traces
