@@ -59,26 +59,20 @@ Feature: Personal-workspace progressive feature unlock — minimal-by-default, c
         (the v2 explorer is project-URL-scoped per Lane-B's probe; personal
         project IS a project with `Project.isPersonal=true` + `ownerUserId`
         per `prisma/schema.prisma:407`)
-    And the target UX is `/me/traces` — a thin wrapper that resolves the
-        user's personalProjectId and mounts `<TracesPage projectId={...}/>`
-        WHILE PRESERVING the PersonalSidebar chrome (no chrome-flip on
-        click; the `/me` chrome is the persona-aware design surface, and
-        flipping to project-shell on click would be a UX regression
-        relative to the persona-aware design rchaves locked earlier)
+    And clicking 'Traces' must NOT flip the chrome to the project-shell
+        — the PersonalSidebar stays present throughout the user's
+        navigation in their own personal project (the `/me` chrome
+        is the persona-aware design surface; chrome-flipping on click
+        would be a UX regression relative to the persona-aware
+        design rchaves locked earlier)
+    And the implementation shape is open per Lane-B's mount choice
+        as long as the chrome-retention invariant holds. Two valid
+        shapes (Lane-B shipped the second):
+      | shape                                                                    | how chrome-retention is achieved                                              |
+      | `/me/traces` thin wrapper mounting `<TracesPage projectId={...}/>`        | wrapper renders inside MyLayout; explicit prop bypasses URL-scoped project    |
+      | `/[personalProjectSlug]/*` URLs render PersonalSidebar via layout discriminator (`isPersonal=true && ownerUserId=me`) | chrome layer consults `Project.isPersonal + ownerUserId`; TracesPage hooks unchanged (40+ useOrganizationTeamProject callsites still resolve project from URL) |
     And the user's personal project slug + id are resolvable via the
         existing `personalProject` resolver (no new tRPC needed)
-    # Note on temporary compromise: Lane-B's v1 ship may route the
-    # 'Traces' entry directly at `/[personalProjectSlug]/traces`
-    # (chrome-flips to project-shell) because the existing TracesPage
-    # hooks deeply assume project-via-URL routing and a faithful
-    # /me-shell embed needs either a prop refactor or Context override.
-    # That v1 is acceptable as an in-PR step but Personal Traces is
-    # NOT considered complete until v2 ships the chrome-retained
-    # wrapper per master orchestrator's directive
-    # (2026-05-08 channel ratification). The spec asserts the target
-    # state, not the v1 compromise; v1 retest scenarios pass
-    # visibility + isolation but explicitly defer chrome-retention
-    # validation to v2.
     And the sidebar does NOT show:
       | Evaluations | (gated by `personalFeatures.evaluations`)         |
       | Datasets    | (gated by `personalFeatures.datasets`)            |
