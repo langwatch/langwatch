@@ -27,7 +27,13 @@ Feature: AI Gateway Governance — Ingestion Templates Catalog (personal-workspa
       | claude_code         | claude_code       | NULL              | platform  |
       | cursor              | cursor            | NULL              | platform  |
       | claude_cowork       | claude_cowork     | NULL              | platform  |
-      | raw_otlp_advanced   | generic_otlp      | NULL              | platform  |
+    And a client-side **discovery card** "raw_otlp_advanced" renders alongside the
+        platform-template tiles. The card is NOT an IngestionTemplate row — it deep-
+        links to /me/settings#otlp where the user grabs the personal-project OTLP
+        token. It does NOT mint a UserIngestionBinding. Its presence in the catalog
+        is for discovery parity (so the no-template fallback is visible from the
+        same surface as templates), not because it shares the IngestionTemplate
+        contract.
 
   # ---------------------------------------------------------------------------
   # User catalog visibility
@@ -36,14 +42,16 @@ Feature: AI Gateway Governance — Ingestion Templates Catalog (personal-workspa
   @bdd @ingestion-templates @catalog @user-visibility
   Scenario: User sees the v1 catalog on /me Trace Ingest
     When jane navigates to "/me" and scrolls to the "Trace Ingest" section
-    Then she sees a tile-grid with exactly 4 visible tiles:
-      | tile slug          | label                      |
-      | claude_code        | "Connect Claude Code"      |
-      | cursor             | "Connect Cursor"           |
-      | claude_cowork      | "Connect Claude cowork"    |
-      | raw_otlp_advanced  | "Raw OTLP (advanced)"      |
-    And each tile shows the platform iconKey for that template
-    And the raw_otlp_advanced tile is visually distinct from the three install tiles
+    Then she sees a tile-grid with exactly 4 visible items:
+      | tile slug          | label                      | source                     |
+      | claude_code        | "Connect Claude Code"      | api.ingestionTemplates.list |
+      | cursor             | "Connect Cursor"           | api.ingestionTemplates.list |
+      | claude_cowork      | "Connect Claude cowork"    | api.ingestionTemplates.list |
+      | raw_otlp_advanced  | "Raw OTLP (advanced)"      | client-side discovery card  |
+    And the three install tiles are sourced from `api.ingestionTemplates.list`
+    And the raw_otlp_advanced card is rendered client-side (no server query)
+    And the raw_otlp_advanced card is visually distinct from the three install tiles
+        (e.g. dashed border + subtle background per Lane-B Iter 2)
 
   @bdd @ingestion-templates @catalog @copy-disambiguation
   Scenario: Catalog copy distinguishes auto-shape vs raw OTLP
