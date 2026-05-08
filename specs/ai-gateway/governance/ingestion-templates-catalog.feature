@@ -94,7 +94,9 @@ Feature: AI Gateway Governance — Ingestion Templates Catalog (personal-workspa
     When carol navigates to "/settings/governance/tool-catalog" and selects the "Ingestion Templates" tab
     # Existing P7-B6 ToolCatalogEditor surface (AiToolEntry catalog) gets a
     # second tab here. No new admin route v1.
-    Then she sees the 4 platform-default templates listed
+    Then she sees the 3 platform-default IngestionTemplate rows listed
+        (claude_code, cursor, claude_cowork — raw_otlp_advanced is a client-side
+        card and does NOT appear in the admin templates table)
     And each template row has a "View OTTL" affordance opening a read-only modal
     But there is NO "Edit" button, NO "Disable" button, and NO "Fork" button v1
     And the page footer reads "Need a custom template? Request via [docs link]."
