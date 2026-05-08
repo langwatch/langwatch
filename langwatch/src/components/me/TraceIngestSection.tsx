@@ -1,7 +1,6 @@
 import {
   Badge,
   Box,
-  Button,
   Heading,
   HStack,
   SimpleGrid,
@@ -15,10 +14,12 @@ import { useState, type ReactNode } from "react";
 import {
   IngestionTemplateInstallDrawer,
   type IngestionBindingResult,
-  type IngestionTemplateMeta,
 } from "~/components/me/IngestionTemplateInstallDrawer";
+import { usePersonalContext } from "~/components/me/usePersonalContext";
 import { Link } from "~/components/ui/link";
+import { toaster } from "~/components/ui/toaster";
 import { usePublicEnv } from "~/hooks/usePublicEnv";
+import { api } from "~/utils/api";
 
 /**
  * /me Trace Ingest section — tile-grid for IngestionTemplate v1 catalog.
@@ -28,85 +29,112 @@ import { usePublicEnv } from "~/hooks/usePublicEnv";
  *   (otlp_token install) + raw_otlp_advanced (visually distinct fallback
  *   discovery card pointing at /me/settings#otlp).
  *
- * Iter 3 wires the install drawer scaffold against a STUB onInstall.
- * Real wiring lands when `api.ingestionTemplates.list` +
- * `api.userIngestionBindings.install` ship — replace TEMPLATE_METADATA
- * with the tRPC list result, swap stub install with the real mutation.
+ * Tile metadata comes from `api.ingestionTemplates.list` (server is the
+ * source of truth — admin can disable / org-author / archive). v1
+ * platform-published rows are seeded by Sergey's seeders. Per-template
+ * iconography is resolved client-side from a slug map since v1 platform
+ * defaults ship with iconAsset=NULL.
  *
- * Per the no-leak invariant in catalog.feature:
- *   This component MUST NOT render under /[project] chrome — only on
- *   /me. Embedding lives on /me/index.tsx.
+ * Install fires `api.userIngestionBindings.install` mutation. The
+ * plaintext lwub_<base32> token is shown ONCE in the drawer and stored
+ * in component state for the session — bindings list query tells us
+ * which templates are installed (drives green-check), but the token
+ * doesn't survive page reload (matches "shown once" UX).
+ *
+ * raw_otlp_advanced is rendered as a SEPARATE static tile (no
+ * IngestionTemplate row, no install). It deep-links to
+ * /me/settings#otlp — the BYO-OTLP fallback discovery card.
+ *
+ * Per the no-leak invariant in catalog.feature: this component MUST
+ * NOT render under /[project] chrome — only on /me. Embedding lives on
+ * /me/index.tsx.
  */
-const TEMPLATE_METADATA: Array<
-  IngestionTemplateMeta & { subtitle: string; icon: ReactNode }
-> = [
-  {
-    slug: "claude_code",
-    displayName: "Claude Code",
-    subtitle: "Anthropic Claude Code CLI",
-    credentialSchema: null,
+const TILE_META: Record<
+  string,
+  { icon: ReactNode; subtitle: string }
+> = {
+  claude_code: {
     icon: <Bot size={20} />,
+    subtitle: "Anthropic Claude Code CLI",
   },
-  {
-    slug: "cursor",
-    displayName: "Cursor",
-    subtitle: "Cursor IDE telemetry",
-    credentialSchema: null,
+  cursor: {
     icon: <MousePointer2 size={20} />,
+    subtitle: "Cursor IDE telemetry",
   },
-  {
-    slug: "claude_cowork",
-    displayName: "Claude cowork",
-    subtitle: "Multi-agent Claude sessions",
-    credentialSchema: null,
+  claude_cowork: {
     icon: <Users size={20} />,
+    subtitle: "Multi-agent Claude sessions",
   },
-];
+};
+
+const FALLBACK_ICON = <Bot size={20} />;
 
 export function TraceIngestSection() {
+  const ctx = usePersonalContext();
+  const orgId = ctx.organizationId ?? "";
+
+  const templatesQuery = api.ingestionTemplates.list.useQuery(
+    { organizationId: orgId },
+    { enabled: !!orgId, refetchOnWindowFocus: false },
+  );
+  const bindingsQuery = api.userIngestionBindings.list.useQuery(undefined, {
+    refetchOnWindowFocus: false,
+  });
+
+  const utils = api.useUtils();
+  const installMutation = api.userIngestionBindings.install.useMutation({
+    onSuccess: () => {
+      void utils.userIngestionBindings.list.invalidate();
+    },
+    onError: (err) => {
+      toaster.create({
+        title: "Install failed",
+        description: err.message,
+        type: "error",
+      });
+    },
+  });
+
   const publicEnv = usePublicEnv();
-  const baseHost = publicEnv.data?.BASE_HOST ?? "";
+  const otlpEndpoint = publicEnv.data?.BASE_HOST
+    ? `${publicEnv.data.BASE_HOST}/api/otel`
+    : "/api/otel";
 
   const [openSlug, setOpenSlug] = useState<string | null>(null);
+  /** Per-session install results, keyed by slug. Cleared on reload. */
   const [installResults, setInstallResults] = useState<
     Record<string, IngestionBindingResult | null>
   >({});
-  const [installing, setInstalling] = useState<Record<string, boolean>>({});
-  const [installErrors, setInstallErrors] = useState<
-    Record<string, string | null>
-  >({});
 
+  const templates = templatesQuery.data ?? [];
+  const bindings = bindingsQuery.data ?? [];
+
+  const bindingByTemplateId = new Map(bindings.map((b) => [b.templateId, b]));
   const openTemplate = openSlug
-    ? TEMPLATE_METADATA.find((t) => t.slug === openSlug) ?? null
+    ? templates.find((t) => t.slug === openSlug) ?? null
     : null;
 
-  /**
-   * STUB install — wires to api.userIngestionBindings.install when
-   * Sergey's tRPC router lands. Returns a synthetic token for UI
-   * verification only; receiver path will reject this token until
-   * the real mutation lands. NOT a security-relevant secret.
-   */
-  const stubInstall = async (slug: string): Promise<IngestionBindingResult> => {
-    await new Promise((r) => setTimeout(r, 500));
-    return {
-      token: `lwub_${slug}_PENDING_BINDING_SERVICE`,
-      endpoint: baseHost ? `${baseHost}/api/otel` : "/api/otel",
-    };
+  const handleInstall = async (templateId: string, slug: string) => {
+    try {
+      const result = await installMutation.mutateAsync({ templateId });
+      setInstallResults((s) => ({
+        ...s,
+        [slug]: { token: result.token, endpoint: otlpEndpoint },
+      }));
+    } catch {
+      // surfaced via toaster + drawer error state
+    }
   };
 
-  const handleInstall = async (slug: string) => {
-    setInstalling((s) => ({ ...s, [slug]: true }));
-    setInstallErrors((s) => ({ ...s, [slug]: null }));
-    try {
-      const result = await stubInstall(slug);
-      setInstallResults((s) => ({ ...s, [slug]: result }));
-    } catch (err) {
-      setInstallErrors((s) => ({
-        ...s,
-        [slug]: err instanceof Error ? err.message : "Install failed",
-      }));
-    } finally {
-      setInstalling((s) => ({ ...s, [slug]: false }));
+  const handleTileClick = (templateId: string, slug: string) => {
+    setOpenSlug(slug);
+    const isAlreadyBound = bindingByTemplateId.has(templateId);
+    if (
+      !isAlreadyBound &&
+      !installResults[slug] &&
+      !installMutation.isPending
+    ) {
+      void handleInstall(templateId, slug);
     }
   };
 
@@ -117,9 +145,6 @@ export function TraceIngestSection() {
   const handleOpenChange = (slug: string, next: boolean) => {
     if (!next) {
       setOpenSlug(null);
-      // Keep installResults so the tile stays green-checked across
-      // open/close — until the real tRPC list query lands and the
-      // server is the source of truth.
     } else {
       setOpenSlug(slug);
     }
@@ -139,34 +164,53 @@ export function TraceIngestSection() {
       </VStack>
 
       <SimpleGrid columns={{ base: 1, md: 2, lg: 4 }} gap={3}>
-        {TEMPLATE_METADATA.map((t) => (
-          <InstallTile
-            key={t.slug}
-            slug={t.slug}
-            label={t.displayName}
-            subtitle={t.subtitle}
-            icon={t.icon}
-            installed={!!installResults[t.slug]}
-            onClick={() => {
-              setOpenSlug(t.slug);
-              if (!installResults[t.slug] && !installing[t.slug]) {
-                void handleInstall(t.slug);
-              }
-            }}
-          />
-        ))}
+        {templatesQuery.isLoading
+          ? Array.from({ length: 3 }).map((_, idx) => (
+              <TileSkeleton key={`skeleton-${idx}`} />
+            ))
+          : templates.map((t) => {
+              const binding = bindingByTemplateId.get(t.id);
+              const meta = TILE_META[t.slug] ?? {
+                icon: FALLBACK_ICON,
+                subtitle: t.description ?? t.sourceType,
+              };
+              return (
+                <InstallTile
+                  key={t.id}
+                  slug={t.slug}
+                  label={t.displayName}
+                  subtitle={meta.subtitle}
+                  icon={meta.icon}
+                  installed={!!binding}
+                  prefix={binding?.bindingAccessTokenPrefix ?? null}
+                  onClick={() => handleTileClick(t.id, t.slug)}
+                />
+              );
+            })}
         <RawOtlpAdvancedTile />
       </SimpleGrid>
 
       {openTemplate && (
         <IngestionTemplateInstallDrawer
           open={!!openSlug}
-          onOpenChange={(next) => handleOpenChange(openTemplate.slug, next)}
-          template={openTemplate}
+          onOpenChange={(next) =>
+            handleOpenChange(openTemplate.slug, next)
+          }
+          template={{
+            slug: openTemplate.slug,
+            displayName: openTemplate.displayName,
+            description: openTemplate.description,
+            credentialSchema: openTemplate.credentialSchema,
+          }}
           installResult={installResults[openTemplate.slug] ?? null}
-          isInstalling={!!installing[openTemplate.slug]}
-          installError={installErrors[openTemplate.slug] ?? null}
-          onInstall={() => void handleInstall(openTemplate.slug)}
+          isInstalling={installMutation.isPending}
+          installError={
+            installMutation.error?.message &&
+            installMutation.variables?.templateId === openTemplate.id
+              ? installMutation.error.message
+              : null
+          }
+          onInstall={() => void handleInstall(openTemplate.id, openTemplate.slug)}
           onMarkInstalled={handleMarkInstalled}
         />
       )}
@@ -180,6 +224,7 @@ function InstallTile({
   subtitle,
   icon,
   installed,
+  prefix,
   onClick,
 }: {
   slug: string;
@@ -187,6 +232,7 @@ function InstallTile({
   subtitle: string;
   icon: ReactNode;
   installed: boolean;
+  prefix: string | null;
   onClick: () => void;
 }) {
   return (
@@ -235,9 +281,27 @@ function InstallTile({
           <Text fontSize="xs" color="fg.muted" lineClamp={2}>
             {subtitle}
           </Text>
+          {installed && prefix && (
+            <Text fontSize="xs" color="fg.subtle" fontFamily="mono">
+              {prefix}…
+            </Text>
+          )}
         </VStack>
       </HStack>
     </Box>
+  );
+}
+
+function TileSkeleton() {
+  return (
+    <Box
+      borderWidth="1px"
+      borderColor="border.muted"
+      borderRadius="md"
+      padding={3}
+      height="76px"
+      backgroundColor="bg.subtle"
+    />
   );
 }
 
