@@ -651,7 +651,9 @@
           {
             "group": "Get Started",
             "pages": [
-              "ai-governance/overview"
+              "ai-governance/overview",
+              "ai-governance/getting-started-developer",
+              "ai-governance/getting-started-admin"
             ]
           },
           {
@@ -661,6 +663,20 @@
               "ai-governance/personal-portal/end-user",
               "ai-governance/personal-portal/admin-catalog",
               "ai-governance/personal-portal/sessions"
+            ]
+          },
+          {
+            "group": "Workspaces & Access",
+            "pages": [
+              "ai-governance/workspaces",
+              "ai-governance/members-and-invites",
+              "ai-governance/roles-and-permissions"
+            ]
+          },
+          {
+            "group": "Dashboards",
+            "pages": [
+              "ai-governance/governance-dashboard"
             ]
           },
           {
