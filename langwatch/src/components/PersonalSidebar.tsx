@@ -1,7 +1,10 @@
 import { Box, VStack } from "@chakra-ui/react";
-import { Gauge, KeyRound, Smartphone } from "lucide-react";
-import React, { useState } from "react";
+import { Gauge, KeyRound, ListTree, Smartphone } from "lucide-react";
+import React, { useMemo, useState } from "react";
 import { useRouter } from "~/utils/compat/next-router";
+
+import { useRequiredSession } from "~/hooks/useRequiredSession";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 
 import { MENU_WIDTH_COMPACT, MENU_WIDTH_EXPANDED } from "./MainMenu";
 import { SideMenuLink } from "./sidebar/SideMenuLink";
@@ -31,6 +34,28 @@ export const PersonalSidebar = React.memo(function PersonalSidebar({
   const isUsageActive = router.pathname === "/me";
   const isSettingsActive = router.pathname.startsWith("/me/settings");
   const isSessionsActive = router.pathname.startsWith("/me/sessions");
+
+  const session = useRequiredSession();
+  const { organizations } = useOrganizationTeamProject({
+    redirectToOnboarding: false,
+    redirectToProjectOnboarding: false,
+  });
+  const personalProjectSlug = useMemo(() => {
+    const userId = session.data?.user?.id;
+    if (!userId || !organizations) return null;
+    for (const org of organizations) {
+      for (const team of org.teams ?? []) {
+        if (team.isPersonal && team.ownerUserId === userId) {
+          const project = team.projects?.[0];
+          if (project) return project.slug;
+        }
+      }
+    }
+    return null;
+  }, [organizations, session.data?.user?.id]);
+  const tracesHref = personalProjectSlug
+    ? `/${personalProjectSlug}/traces`
+    : null;
 
   return (
     <Box
@@ -71,6 +96,15 @@ export const PersonalSidebar = React.memo(function PersonalSidebar({
               isActive={isUsageActive}
               showLabel={showExpanded}
             />
+            {tracesHref && (
+              <SideMenuLink
+                icon={ListTree}
+                label="Traces"
+                href={tracesHref}
+                isActive={false}
+                showLabel={showExpanded}
+              />
+            )}
             <SideMenuLink
               icon={Smartphone}
               label="Sessions"
