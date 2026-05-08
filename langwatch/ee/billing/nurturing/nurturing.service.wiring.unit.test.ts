@@ -25,6 +25,7 @@ vi.mock("../../../src/utils/posthogErrorCapture", () => ({
 
 describe("NurturingService app wiring", () => {
   describe("when the app config includes a customerIoApiKey", () => {
+    /** @scenario 'Service is active when CUSTOMER_IO_API_KEY is configured' */
     it("creates an active NurturingService instance", () => {
       const service = NurturingService.create({
         config: {

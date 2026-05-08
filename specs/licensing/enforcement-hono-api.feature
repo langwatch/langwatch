@@ -1,4 +1,12 @@
 Feature: Resource limit enforcement on API endpoints
+
+  # All scenarios in this file describe Hono /public-rest-api enforcement
+  # behavior — read/update/delete passing through, second-create rejected,
+  # notification suppression on self-hosted, deduplicated repeated blocks.
+  # The middleware itself is exercised via Hono integration tests, but
+  # there is no end-to-end fixture covering each resource × API verb
+  # combination yet — all aspirational pending the API integration harness.
+
   As a platform operator
   I want the API to enforce the same resource limits as the dashboard
   So that users cannot bypass plan limits by creating resources via the API directly

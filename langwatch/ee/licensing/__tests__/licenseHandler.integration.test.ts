@@ -376,11 +376,14 @@ describe("LicenseHandler Integration", () => {
   // ==========================================================================
 
   describe("getActivePlan", () => {
+    /** @scenario Limits members to FREE_PLAN limit when no license */
+    /** @scenario Limits projects to FREE_PLAN limit when no license */
     it("returns FREE_PLAN when no license exists", async () => {
       const plan = await handler.getActivePlan(organizationId);
 
       expect(plan.type).toBe(FREE_PLAN.type);
       expect(plan.maxMembers).toBe(FREE_PLAN.maxMembers);
+      expect(plan.maxProjects).toBe(FREE_PLAN.maxProjects);
     });
 
     it("returns license plan when valid license exists", async () => {

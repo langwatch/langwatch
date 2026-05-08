@@ -3,26 +3,31 @@ Feature: Model Parameter Constraints
   I want parameter inputs to respect provider-specific limits
   So that I don't send invalid values to the API
 
+  # All scenarios describe the constraint resolver in registry.ts. The
+  # registry has a unit test (`registry.unit.test.ts`) but it doesn't
+  # cover the per-provider constraint resolution paths described here.
+  # Cheap to add as additional cases.
+
   Background:
     Given llmModels.json is immutable and cannot be modified
     And parameter constraints are defined per provider in registry.ts
 
   # Unit Tests: Constraint Resolution
 
-  @unit @unimplemented
+  @unit
   Scenario: OpenAI provider uses global defaults
     Given the provider "openai" has no parameterConstraints for temperature
     When resolving constraints for model "openai/gpt-4.1"
     Then temperature constraint should be undefined
     # UI falls back to global default max 2.0 from parameterRegistry
 
-  @unit @unimplemented
+  @unit
   Scenario: Unknown provider returns undefined constraints
     Given a model ID "unknown-provider/some-model"
     When resolving constraints for that model
     Then the result should be undefined
 
-  @unit @unimplemented
+  @unit
   Scenario: Model ID without provider prefix returns undefined
     Given a model ID "standalone-model"
     When resolving constraints for that model

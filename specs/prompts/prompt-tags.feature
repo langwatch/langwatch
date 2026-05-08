@@ -8,7 +8,7 @@ Feature: Prompt version tags
 
   # --- Assignment ---
 
-  @integration @unimplemented
+  @integration
   Scenario: Assigning a tag to a specific version
     Given a prompt "pizza-prompt" with versions v1, v2, v3
     When I assign "production" to v2

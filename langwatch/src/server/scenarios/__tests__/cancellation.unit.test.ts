@@ -85,6 +85,7 @@ describe("ScenarioCancellationService", () => {
         result = await service.cancelJob(defaultJobParams);
       });
 
+      /** @scenario "Cancel request produces a cancel_requested event" */
       it("dispatches cancel_requested event", () => {
         expect(mockDispatchCancelRequested).toHaveBeenCalledWith(
           expect.objectContaining({
@@ -94,6 +95,7 @@ describe("ScenarioCancellationService", () => {
         );
       });
 
+      /** @scenario "Cancelling a queued run writes both cancel and finished events" */
       it("also dispatches finished(CANCELLED) since no worker will pick it up", () => {
         expect(mockDispatchFinishRun).toHaveBeenCalledWith(
           expect.objectContaining({
@@ -188,6 +190,7 @@ describe("ScenarioCancellationService", () => {
         });
       });
 
+      /** @scenario "Batch cancel dispatches cancel events for all non-terminal runs" */
       it("dispatches cancel events for cancellable runs", () => {
         expect(mockDispatchCancelRequested).toHaveBeenCalledTimes(2);
       });

@@ -3,6 +3,20 @@ Feature: Platform MCP tools for evaluators and model providers
   I want to manage evaluators and model providers on the platform
   So that I can set up LLM-as-judge evaluators and configure the API keys needed to run them
 
+  # Parity status: 4 of 13 scenarios bound to existing tests.
+  # The remaining are tracked under #3458:
+  #   - 9 NO_TEST: behavior shipped + correct, no integration test yet exists
+  # NO_TEST gaps:
+  #   - "List all evaluators for a project"
+  #   - "Get evaluator details by ID or slug"
+  #   - "Create a built-in evaluator"
+  #   - "Update an existing evaluator"
+  #   - "Discover evaluator types overview"
+  #   - "Discover specific evaluator type details"
+  #   - "List all model providers for a project"
+  #   - "Set or update a model provider"
+  #   - "Update model provider without changing keys"
+
   Background:
     Given the MCP server is connected with a valid LangWatch API key
 
@@ -56,7 +70,7 @@ Feature: Platform MCP tools for evaluators and model providers
 
   # --- Hono Endpoints for Evaluators (missing: update and archive) ---
 
-  @integration @unimplemented
+  @integration
   Scenario: PUT /api/evaluators/:id updates an evaluator
     Given an evaluator exists with a known ID
     When I send a PUT request with updated name and config
@@ -64,7 +78,7 @@ Feature: Platform MCP tools for evaluators and model providers
     And the evaluatorType in config is immutable
     And the response matches the apiResponseEvaluatorSchema
 
-  @integration @unimplemented
+  @integration
   Scenario: DELETE /api/evaluators/:id archives an evaluator
     Given an evaluator exists with a known ID
     When I send a DELETE request for that evaluator
@@ -95,13 +109,13 @@ Feature: Platform MCP tools for evaluators and model providers
 
   # --- Hono Endpoints for Model Providers (greenfield) ---
 
-  @integration @unimplemented
+  @integration
   Scenario: GET /api/model-providers lists providers with masked keys
     When I send a GET request to /api/model-providers
     Then I receive all providers for the project
     And all API key values are masked
 
-  @integration @unimplemented
+  @integration
   Scenario: PUT /api/model-providers/:provider upserts provider config
     When I send a PUT request with provider name and customKeys
     Then the provider is created or updated (upsert)

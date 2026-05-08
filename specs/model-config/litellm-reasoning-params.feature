@@ -3,6 +3,12 @@ Feature: LiteLLM Reasoning Parameter Unification
   I want all reasoning parameters sent to LiteLLM as 'reasoning_effort'
   So that LiteLLM can transform them correctly for each provider's API
 
+  # The Python boundary layer (`node_llm_config_to_dspy_lm`) and Jinja
+  # macros tested here live in `langwatch_nlp/`; LangWatch-side bindings
+  # don't apply. The TypeScript-side mapping is bound via existing
+  # `reasoningBoundary.unit.test.ts`. These scenarios should be moved
+  # to or duplicated in the langwatch_nlp test suite.
+
   Background:
     Given LiteLLM expects 'reasoning_effort' for ALL providers
     And LiteLLM internally transforms:

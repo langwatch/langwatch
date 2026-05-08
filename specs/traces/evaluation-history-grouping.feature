@@ -3,6 +3,10 @@ Feature: Evaluation history grouping in trace details
   I want evaluation re-runs grouped by evaluator
   So that I see the latest result without confusing duplicates
 
+  # All scenarios describe TraceEvaluationsTab UI rendering. Need a
+  # JSDOM render of the tab component with a mocked evaluations
+  # response. No test fixture exists yet for the tab's grouping logic.
+
   Background:
     Given I am viewing the evaluations tab of a trace
     And the trace has an evaluator "Toxicity Check" that ran 3 times

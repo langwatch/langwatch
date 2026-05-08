@@ -42,6 +42,7 @@ describe("<ScenarioTargetRow/>", () => {
       ).toBeInTheDocument();
     });
 
+    /** @scenario "List view row displays passed status with criteria count" */
     it("displays 'passed' with criteria count for SUCCESS status", () => {
       render(
         <ScenarioTargetRow
@@ -127,6 +128,7 @@ describe("<ScenarioTargetRow/>", () => {
   });
 
   describe("given a failed scenario run (ERROR status)", () => {
+    /** @scenario "List view row displays failed status with criteria count" */
     it("displays 'failed' with criteria count for ERROR status", () => {
       render(
         <ScenarioTargetRow

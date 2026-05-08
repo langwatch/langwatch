@@ -16,36 +16,36 @@ Feature: ClickHouse Query Memory Safety Regression Tests
   # Layer 1: SQL structure assertions (unit tests, no DB)
   # ---------------------------------------------------------------------------
 
-  @unit @unimplemented
+  @unit
   Scenario: Analytics queries access SpanAttributes only via key extraction
     When any builder-generated analytics query produces SQL
     Then the outermost SELECT clause never includes a bare "SpanAttributes" column
     And SpanAttributes is only accessed via specific key extraction like SpanAttributes['key']
 
-  @unit @unimplemented
+  @unit
   Scenario: Topic and field-discovery queries access only specific attributes
     When the topic counting query SQL is inspected
     Then the SQL does not select the full SpanAttributes Map column
     When the field discovery query SQL is inspected
     Then the SQL does not select the full SpanAttributes Map column
 
-  @unit @unimplemented
+  @unit
   Scenario: Topic counting query includes a LIMIT clause
     When the topic counting query SQL is inspected
     Then the SQL includes a LIMIT clause
 
-  @unit @unimplemented
+  @unit
   Scenario: Field discovery query includes a LIMIT clause
     When the field discovery query SQL is inspected
     Then the SQL includes a LIMIT clause
 
-  @unit @unimplemented
+  @unit
   Scenario: All query execution paths include memory safety settings
     When each ClickHouse query execution call in the analytics service is inspected
     Then every call passes clickhouse_settings
     And clickhouse_settings contains max_bytes_before_external_group_by
 
-  @unit @unimplemented
+  @unit
   Scenario: Every metric prefix in metric-translator has a column-pruning test
     Given the set of all metric prefixes registered in metric-translator
     And the set of all metric prefixes covered by column-pruning tests
@@ -62,7 +62,7 @@ Feature: ClickHouse Query Memory Safety Regression Tests
     When each analytics query path is executed
     Then no query returns a syntax or schema error
 
-  @integration @unimplemented
+  @integration
   Scenario: Analytics queries complete within a tight memory budget
     Given a running ClickHouse test container with schema applied
     And 10000 spans seeded with 50 attribute keys and 4KB values per span
@@ -76,7 +76,7 @@ Feature: ClickHouse Query Memory Safety Regression Tests
     When each analytics query path is executed
     Then every query completes within 5 seconds
 
-  @integration @unimplemented
+  @integration
   Scenario: Analytics query results are correct on seeded data
     Given a running ClickHouse test container with schema applied
     And 10000 spans seeded with known attribute values across 1000 traces

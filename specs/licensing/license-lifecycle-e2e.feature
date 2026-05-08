@@ -1,5 +1,14 @@
 @wip @e2e
 Feature: License Lifecycle End-to-End
+
+  # All scenarios in this file are full-stack walking-skeleton flows
+  # (login → upload license → invite members → remove license → fall
+  # back to FREE). Component-level paths are individually covered by
+  # license.integration / licenseHandler.integration / member-classification
+  # tests, but the end-to-end driver requires Playwright against the
+  # license settings page UI which does not exist yet. Aspirational
+  # pending the e2e harness.
+
   As a LangWatch self-hosted administrator
   I want to manage the complete license lifecycle
   So that I can activate, use, and remove licenses for my deployment

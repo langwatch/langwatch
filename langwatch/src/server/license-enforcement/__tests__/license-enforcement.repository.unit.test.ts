@@ -83,6 +83,8 @@ describe("LicenseEnforcementRepository", () => {
   });
 
   describe("getWorkflowCount", () => {
+    /** @scenario Counts workflows across all projects in organization */
+    /** @scenario Counts only non-archived workflows toward limit */
     it("queries workflows with organization filter and archivedAt null", async () => {
       mockPrisma.workflow.count.mockResolvedValue(5);
 
@@ -107,6 +109,7 @@ describe("LicenseEnforcementRepository", () => {
   });
 
   describe("getPromptCount", () => {
+    /** @scenario Counts prompts across all projects in organization */
     it("queries prompts with organization filter and deletedAt null", async () => {
       mockPrisma.llmPromptConfig.count.mockResolvedValue(10);
 
@@ -128,6 +131,8 @@ describe("LicenseEnforcementRepository", () => {
   });
 
   describe("getEvaluatorCount", () => {
+    /** @scenario Counts evaluators across all projects in organization */
+    /** @scenario Counts only non-archived evaluators toward limit */
     it("queries evaluators with organization filter and archivedAt null", async () => {
       mockPrisma.evaluator.count.mockResolvedValue(3);
 
@@ -152,6 +157,7 @@ describe("LicenseEnforcementRepository", () => {
   });
 
   describe("getActiveScenarioCount", () => {
+    /** @scenario Counts scenarios across all projects in organization */
     it("queries only active (non-archived) scenarios with organization filter", async () => {
       mockPrisma.scenario.count.mockResolvedValue(7);
 
@@ -173,13 +179,15 @@ describe("LicenseEnforcementRepository", () => {
   });
 
   describe("getProjectCount", () => {
-    it("queries projects with organization filter", async () => {
+    /** @scenario Counts projects across all teams */
+    /** @scenario Counts only non-archived projects toward limit */
+    it("queries non-archived projects with organization filter that traverses every team", async () => {
       mockPrisma.project.count.mockResolvedValue(4);
 
       const result = await repository.getProjectCount(organizationId);
 
       expect(mockPrisma.project.count).toHaveBeenCalledWith({
-        where: { team: { organizationId } },
+        where: { team: { organizationId }, archivedAt: null },
       });
       expect(result).toBe(4);
     });

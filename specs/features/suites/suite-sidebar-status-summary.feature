@@ -3,6 +3,20 @@ Feature: Suite sidebar status summary
   I want to see pass count and recency for each suite in the sidebar
   So that I can assess suite health at a glance without clicking into each one
 
+  # Parity status: 0 of 9 scenarios bound to existing tests.
+  # Remaining @unimplemented scenarios (#3458):
+  #   9 NO_TEST: shipped behavior, no integration test yet
+  # NO_TEST gaps:
+  #   - "Suite item shows pass count and time since last run"
+  #   - "Suite item shows partial pass count with failure icon"
+  #   - "Suite item with no runs shows no summary"
+  #   - "\"All Runs\" item does not show a status summary"
+  #   - "Summary reflects latest run data"
+  #   - "Three-dot menu button appears on hover"
+  #   - "Three-dot menu button is hidden when not hovering"
+  #   - "Clicking three-dot menu opens context menu"
+  #   - "Context menu stays open after mouse leaves suite item"
+
   Background:
     Given I am logged into project "my-project"
 

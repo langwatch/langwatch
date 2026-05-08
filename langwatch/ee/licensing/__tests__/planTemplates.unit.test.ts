@@ -120,6 +120,7 @@ describe("GROWTH_TEMPLATE", () => {
   });
 
   describe("when inspecting feature limits", () => {
+    /** @scenario GROWTH plan includes all features with no artificial limits */
     it("sets all other limits to unlimited (DEFAULT_LIMIT)", () => {
       const unlimitedFields = [
         "maxMembersLite",

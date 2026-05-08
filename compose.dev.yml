@@ -19,10 +19,7 @@
 # Debug logging (set in shell or .env.dev):
 #   PINO_LOG_LEVEL=debug    # For verbose worker/app logs
 #
-# Resource limits:
-#   minimal (dev):     ~10.3GB (postgres 256 + redis 64 + clickhouse 2048 + app 8192)
-#   scenarios:         ~13.6GB (+ workers 1536 + nlp 1024 + bullboard 512 + ai-server 256)
-#   full:              ~13.8GB (+ langevals 256)
+# Per-service memory limits are configured below on each service.
 #
 # AI Gateway (Go data plane) — NOT in this compose:
 #   The Go gateway runs on the host via `make service svc=aigateway`,
@@ -41,6 +38,8 @@ x-common-env: &common-env
   CLICKHOUSE_URL: http://default:langwatch@clickhouse:8123/langwatch
   LANGWATCH_NLP_SERVICE: http://langwatch_nlp:5561
   LANGEVALS_ENDPOINT: http://langevals:5562
+  # Prod-like dev: IS_SAAS=true (from langwatch/.env) requires SSRF blocking.
+  BLOCK_LOCAL_HTTP_CALLS: "true"
 
 services:
   # =============================================================================
@@ -202,7 +201,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 8g
+          memory: 4g
           cpus: "2.0"
 
   # =============================================================================

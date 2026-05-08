@@ -368,6 +368,7 @@ describe("prefetchScenarioData", () => {
       };
 
       describe("when prefetching scenario data", () => {
+        /** @scenario "Prefetcher logs model params failure with reason" */
         it("returns failure with model params error", async () => {
           const deps = createMockDeps({
             promptFetcher: {
@@ -508,6 +509,7 @@ describe("prefetchScenarioData", () => {
       };
 
       describe("when prefetching scenario data", () => {
+        /** @scenario "Return success with LiteLLM params on valid configuration" */
         it("returns success with complete data", async () => {
           // The source reads process.env.LANGWATCH_ENDPOINT directly (not via env.mjs)
           const previousLangwatchEndpoint = process.env.LANGWATCH_ENDPOINT;

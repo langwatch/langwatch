@@ -59,7 +59,6 @@ function validateEnvironment(): void {
   const appEnvVars = [
     "DATABASE_URL",
     "REDIS_URL",
-    "ELASTICSEARCH_NODE_URL",
     "NEXTAUTH_SECRET",
   ];
 
@@ -73,7 +72,6 @@ function validateEnvironment(): void {
     // Check if common test ports are being used (indicates test env)
     const dbUrl = process.env.DATABASE_URL ?? "";
     const redisUrl = process.env.REDIS_URL ?? "";
-    const elasticUrl = process.env.ELASTICSEARCH_NODE_URL ?? "";
 
     if (dbUrl.includes(":5432") && !dbUrl.includes(":5433")) {
       warnings.push(
@@ -83,11 +81,6 @@ function validateEnvironment(): void {
     if (redisUrl.includes(":6379") && !redisUrl.includes(":6380")) {
       warnings.push(
         "REDIS_URL uses default port 6379 - consider using test port 6380 to avoid conflicts"
-      );
-    }
-    if (elasticUrl.includes(":9200") && !elasticUrl.includes(":9201")) {
-      warnings.push(
-        "ELASTICSEARCH_NODE_URL uses default port 9200 - consider using test port 9201"
       );
     }
   }

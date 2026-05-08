@@ -128,6 +128,7 @@ describe("GET /:traceId", () => {
   });
 
   describe("when fetching a trace", () => {
+    /** @scenario Full trace ID resolves exactly */
     it("uses TraceService.getById instead of Elasticsearch directly", async () => {
       const res = await makeRequest("trace-abc", { format: "json" });
 
@@ -166,6 +167,9 @@ describe("GET /:traceId", () => {
   });
 
   describe("when trace is not found", () => {
+    /** @scenario No match returns 404 */
+    /** @scenario Too-short prefix falls through to 404 */
+    /** @scenario Non-hex input skips prefix scan and returns 404 */
     it("returns 404", async () => {
       mockGetById.mockResolvedValue(undefined);
 
@@ -178,6 +182,8 @@ describe("GET /:traceId", () => {
   });
 
   describe("when the caller passes a unique prefix", () => {
+    /** @scenario Unique prefix resolves to the full trace */
+    /** @scenario CLI `trace get` with truncated ID from `trace search` succeeds */
     it("returns the trace using the resolved full trace ID", async () => {
       // Service resolves the prefix and hands back the full trace
       const fullId = "63dc535cea6335c506bc81ef3543a07d";
@@ -204,6 +210,7 @@ describe("GET /:traceId", () => {
   });
 
   describe("when the prefix matches multiple traces", () => {
+    /** @scenario Ambiguous prefix returns 409 with the matching IDs */
     it("returns 409 with the candidate trace IDs", async () => {
       const candidates = [
         "abc1230000000000000000000000aaaa",

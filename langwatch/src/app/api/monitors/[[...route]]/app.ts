@@ -4,6 +4,7 @@ import { describeRoute } from "hono-openapi";
 import { resolver, validator as zValidator } from "hono-openapi/zod";
 import { z } from "zod";
 import { prisma } from "~/server/db";
+import { monitorMappingsSchema } from "~/server/tracer/tracesMapping";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { createLogger } from "~/utils/logger/server";
 import {
@@ -54,7 +55,7 @@ const createMonitorSchema = z.object({
   executionMode: executionModeEnum.default("ON_MESSAGE"),
   preconditions: z.array(z.unknown()).default([]),
   parameters: z.record(z.unknown()).default({}),
-  mappings: z.record(z.unknown()).optional(),
+  mappings: monitorMappingsSchema,
   sample: z.number().min(0).max(1).default(1.0),
   evaluatorId: z.string().optional(),
   level: z.enum(["trace", "thread"]).default("trace"),
@@ -68,7 +69,7 @@ const updateMonitorSchema = z.object({
   executionMode: executionModeEnum.optional(),
   preconditions: z.array(z.unknown()).optional(),
   parameters: z.record(z.unknown()).optional(),
-  mappings: z.record(z.unknown()).optional(),
+  mappings: monitorMappingsSchema,
   sample: z.number().min(0).max(1).optional(),
   evaluatorId: z.string().nullable().optional(),
   level: z.enum(["trace", "thread"]).optional(),
@@ -257,7 +258,7 @@ export const app = new Hono<{ Variables: Variables }>()
           executionMode: body.executionMode,
           preconditions: body.preconditions as Prisma.InputJsonValue,
           parameters: body.parameters as Prisma.InputJsonValue,
-          mappings: (body.mappings ?? {}) as Prisma.InputJsonValue,
+          mappings: (body.mappings ?? null) as Prisma.InputJsonValue,
           sample: body.sample,
           enabled: true,
           evaluatorId: body.evaluatorId ?? null,

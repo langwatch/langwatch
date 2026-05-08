@@ -79,6 +79,8 @@ describe("code-prompts Gemini CLI compatibility (issue #3104)", () => {
     "given $name pasted into Gemini CLI",
     ({ name, text }) => {
       describe("when Gemini's atCommandProcessor scans the prompt", () => {
+        /** @scenario 'Pasting the tracing setup prompt does not crash Gemini CLI' */
+        /** @scenario 'Pasting the "level up" prompt does not crash Gemini CLI' */
         it(`extracts no path component longer than ${MAX_COMPONENT_LENGTH} bytes`, () => {
           const { match, longestComponent } = longestAtTokenComponent(text);
           expect(

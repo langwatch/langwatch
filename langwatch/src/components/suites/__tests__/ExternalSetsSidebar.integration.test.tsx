@@ -69,6 +69,7 @@ describe("<SuiteSidebar/> External Sets", () => {
   });
 
   describe("given no external sets exist", () => {
+    /** @scenario "External Sets section is hidden when no external sets exist" */
     it("does not display the External Sets section header", () => {
       render(
         <SuiteSidebar
@@ -93,6 +94,7 @@ describe("<SuiteSidebar/> External Sets", () => {
       }),
     ];
 
+    /** @scenario "External sets section appears with SDK-submitted scenario runs" */
     it("displays the External Sets section header", () => {
       render(
         <SuiteSidebar
@@ -107,6 +109,8 @@ describe("<SuiteSidebar/> External Sets", () => {
       );
     });
 
+    /** @scenario "External set batch entry displays the set name" */
+    /** @scenario "External set uses scenarioSetId as its display name" */
     it("displays external set names", () => {
       render(
         <SuiteSidebar
@@ -120,6 +124,7 @@ describe("<SuiteSidebar/> External Sets", () => {
       expect(screen.getByText("ci-smoke-tests")).toBeInTheDocument();
     });
 
+    /** @scenario "External set entry shows pass rate and recency" */
     it("displays pass/fail summary for external sets", () => {
       render(
         <SuiteSidebar
@@ -148,6 +153,7 @@ describe("<SuiteSidebar/> External Sets", () => {
     });
 
     describe("when all runs pass in an external set", () => {
+      /** @scenario "External set shows correct status indicator" */
       it("displays 100% pass rate", () => {
         render(
           <SuiteSidebar

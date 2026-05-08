@@ -5,6 +5,7 @@ import {
   validateLicense,
   verifySignature,
 } from "../validation";
+import { LicensePlanLimitsSchema } from "../types";
 import {
   BASE_LICENSE,
   VALID_LICENSE_KEY,
@@ -16,6 +17,29 @@ import {
   GARBAGE_DATA,
 } from "./fixtures/testLicenses";
 import { TEST_PUBLIC_KEY, WRONG_PUBLIC_KEY } from "./fixtures/testKeys";
+
+describe("LicensePlanLimitsSchema", () => {
+  /** @scenario License schema accepts maxMembersLite as optional field */
+  it("accepts a license payload with maxMembersLite set to 5", () => {
+    const payload = {
+      type: "PRO",
+      name: "Pro",
+      maxMembers: 5,
+      maxMembersLite: 5,
+      maxProjects: 10,
+      maxMessagesPerMonth: 50000,
+      maxWorkflows: 25,
+      canPublish: true,
+    };
+
+    const result = LicensePlanLimitsSchema.safeParse(payload);
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.maxMembersLite).toBe(5);
+    }
+  });
+});
 
 describe("parseLicenseKey", () => {
   /** @scenario Parses valid base64-encoded license key */

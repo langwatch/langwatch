@@ -96,3 +96,15 @@ export const deleteRunCommandDataSchema = z.object({
   occurredAt: z.number(),
 });
 export type DeleteRunCommandData = z.infer<typeof deleteRunCommandDataSchema>;
+
+/**
+ * Bulk-archive command. One user intent collapses N runs into one event;
+ * tracks lw#3636.
+ */
+export const archiveSetCommandDataSchema = z.object({
+  tenantId: z.string(),
+  scenarioSetId: z.string(),
+  scenarioRunIds: z.array(z.string()).min(1),
+  occurredAt: z.number(),
+});
+export type ArchiveSetCommandData = z.infer<typeof archiveSetCommandDataSchema>;

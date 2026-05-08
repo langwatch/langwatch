@@ -13,7 +13,8 @@ import { createElasticsearchBatchEvaluationRepository } from "../elasticsearchBa
  * - ELASTICSEARCH_NODE_URL and ELASTICSEARCH_API_KEY in environment
  * - ES migrations to have been run
  */
-describe("BatchEvaluationRepository Integration", () => {
+// Skipped: requires live Elasticsearch. Run with ES available (make dev-full) to enable.
+describe.skip("BatchEvaluationRepository Integration", () => {
   let repository: BatchEvaluationRepository;
   let project: Project;
   let _user: User;

@@ -856,6 +856,7 @@ describe("Prompts API", () => {
 
   describe("archived prompt handle reuse", () => {
     describe("when a prompt was previously created and then archived", () => {
+      /** @scenario "A user can reuse the handle of an archived prompt for a new prompt" */
       it("allows creating a new prompt with the same handle", async () => {
         const handle = `reuse-handle-${nanoid(6).toLowerCase().replace(/[^a-z0-9_-]/g, "x")}`;
 
@@ -887,6 +888,7 @@ describe("Prompts API", () => {
         expect(recreated.handle).toBe(handle);
       });
 
+      /** @scenario "A user can sync a fresh prompt from the CLI after the previous one was archived" */
       it("allows the CLI sync flow to recreate a prompt with the same handle", async () => {
         const handle = `sync-reuse-${nanoid(6).toLowerCase().replace(/[^a-z0-9_-]/g, "x")}`;
 

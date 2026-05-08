@@ -183,6 +183,7 @@ describe("PromptService", () => {
 
     describe("given a new prompt that does not exist on the server", () => {
       describe("when synced with template variables", () => {
+        /** @scenario CLI hardcoded "input" default is kept only when it appears in the template */
         it("creates the prompt with auto-detected inputs merged", async () => {
           vi.spyOn(
             promptService,

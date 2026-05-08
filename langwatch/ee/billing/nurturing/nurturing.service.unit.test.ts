@@ -42,6 +42,7 @@ function createService({
 describe("NurturingService", () => {
   describe("identifyUser()", () => {
     describe("when created with an API key and region 'us'", () => {
+      /** @scenario 'Identify call authenticates with Basic Auth using the configured API key' */
       it("sends HTTP request to cdp.customer.io/v1/identify with Basic Auth", async () => {
         const { service, fetchFn } = createService();
 
@@ -75,6 +76,7 @@ describe("NurturingService", () => {
     });
 
     describe("when created with region 'eu'", () => {
+      /** @scenario 'Identify call routes to EU endpoint when region is eu' */
       it("sends request to cdp-eu.customer.io/v1/identify", async () => {
         const { service, fetchFn } = createService({ region: "eu" });
 
@@ -88,6 +90,7 @@ describe("NurturingService", () => {
 
   describe("trackEvent()", () => {
     describe("when called with user ID, event name, and properties", () => {
+      /** @scenario 'Track call sends event payload to Customer.io' */
       it("sends event payload to the track endpoint", async () => {
         const { service, fetchFn } = createService();
 
@@ -112,6 +115,7 @@ describe("NurturingService", () => {
 
   describe("groupUser()", () => {
     describe("when called with user ID, group ID, and org traits", () => {
+      /** @scenario 'Group call sends organization traits to Customer.io' */
       it("sends org traits to the group endpoint", async () => {
         const { service, fetchFn } = createService();
 
@@ -137,6 +141,7 @@ describe("NurturingService", () => {
 
   describe("batch()", () => {
     describe("when called with multiple identify and track calls", () => {
+      /** @scenario 'Batch call combines multiple operations into a single request' */
       it("sends a single HTTP request to the batch endpoint containing all calls", async () => {
         const { service, fetchFn } = createService();
 
@@ -194,6 +199,7 @@ describe("NurturingService", () => {
   });
 
   describe("when the Customer.io API does not respond within 10 seconds", () => {
+    /** @scenario 'NurturingService enforces a 10-second request timeout' */
     it("aborts the request", async () => {
       const { captureException } = await import(
         "../../../src/utils/posthogErrorCapture"
@@ -226,6 +232,7 @@ describe("NurturingService", () => {
   });
 
   describe("when the Customer.io API returns a 500 error", () => {
+    /** @scenario 'NurturingService swallows API errors without throwing' */
     it("resolves without throwing", async () => {
       const { service } = createService({
         fetchFn: createMockFetch({ ok: false, status: 500 }),

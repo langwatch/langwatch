@@ -1,4 +1,11 @@
 Feature: Plan Management Navigation
+
+  # All scenarios in this file describe deployment-mode-conditional
+  # navigation on the Usage page and from limit-reached banners (SaaS →
+  # /subscription, self-hosted → /license). Need a page-level integration
+  # test (or Playwright E2E) against the rendered Usage page in both
+  # deployment modes — no such harness exists yet.
+
   As a user
   I want plan management links to redirect me based on deployment type
   So that I can manage my plan or license appropriately

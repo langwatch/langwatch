@@ -166,6 +166,7 @@ describe("VirtualKeyService.create", () => {
   });
 
   describe("when a provider credential belongs to a different project", () => {
+    /** @scenario Virtual key cannot select a provider not configured on its project */
     it("throws BAD_REQUEST (cross-project credential injection guard)", async () => {
       // count() returns 0 for cross-project creds since they're filtered
       // by projectId in the WHERE.
@@ -178,6 +179,7 @@ describe("VirtualKeyService.create", () => {
   });
 
   describe("happy path", () => {
+    /** @scenario Create a virtual key with default config */
     it("mints a fresh secret, hashes it, and returns the raw secret exactly once", async () => {
       const mocks = makeService();
 
@@ -193,6 +195,7 @@ describe("VirtualKeyService.create", () => {
       expect(created.hashedSecret).not.toBe(result.secret);
     });
 
+    /** @scenario Every VK mutation writes an audit log entry */
     it("emits VK_CREATED change-event + gateway.virtual_key.created audit in same tx", async () => {
       const mocks = makeService();
 
@@ -369,6 +372,7 @@ describe("VirtualKeyService.update", () => {
 
 describe("VirtualKeyService.rotate", () => {
   describe("when the VK is REVOKED", () => {
+    /** @scenario Revoked virtual key cannot be restored (must mint new) */
     it("throws BAD_REQUEST — cannot rotate a revoked key", async () => {
       const mocks = makeService({
         existing: stubVkRow({ status: "REVOKED" }),
@@ -386,6 +390,7 @@ describe("VirtualKeyService.rotate", () => {
   });
 
   describe("happy path", () => {
+    /** @scenario Rotate virtual key issues a new secret and invalidates the previous one */
     it("returns a new secret and passes the old hash as previousSecret for the 24h grace window", async () => {
       const mocks = makeService();
 
@@ -426,6 +431,7 @@ describe("VirtualKeyService.revoke", () => {
   });
 
   describe("happy path", () => {
+    /** @scenario Revoke virtual key disables authentication immediately */
     it("calls repository.revoke + emits VK_REVOKED change-event + audit", async () => {
       const mocks = makeService();
 

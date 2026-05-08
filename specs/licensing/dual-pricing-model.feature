@@ -1,4 +1,13 @@
 Feature: Dual Pricing Model — Seat+Usage Billing
+
+  # All scenarios in this file describe end-to-end Stripe seat+usage
+  # checkout flows (creating a SEAT_EVENT subscription, computing
+  # maxMembers from webhook line items, billing-portal URL routing,
+  # TIERED→SEAT_EVENT migration with credit). Backend logic touches
+  # webhookService / customerService / planProvider but the full happy
+  # path needs a Stripe webhook fixture suite that does not exist yet.
+  # Aspirational pending that integration harness.
+
   As a LangWatch Cloud administrator
   I want to subscribe via the seat+usage pricing model through Stripe checkout
   So that I can pay per core member seat and access Growth features

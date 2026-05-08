@@ -1,5 +1,16 @@
 @unit
 Feature: Subscription Limit Overrides
+
+  # The "Only non-null overrides replace plan defaults" scenario is
+  # bound below. The remaining @unimplemented scenarios (per-field
+  # project/message overrides, multiple-overrides-applied-together,
+  # cancellation clears overrides) are exercised at the unit level by
+  # the it.each block in
+  # ee/billing/__tests__/planProvider.unit.test.ts (NUMERIC_OVERRIDE_FIELDS
+  # parameterization), but parameterized it.each tests cannot bind via
+  # @scenario JSDoc. Aspirational pending dedicated prose tests OR a
+  # parity-script enhancement that traverses it.each parameter sets.
+
   As a LangWatch Cloud operator
   I want per-subscription overrides to take precedence over plan defaults
   So that I can customize limits for individual organizations without creating new plans
@@ -11,13 +22,11 @@ Feature: Subscription Limit Overrides
   # Existing Overrides Still Work
   # ============================================================================
 
-  @unimplemented
   Scenario: Subscription with a project override uses that value
     Given the subscription overrides project capacity to 50
     When the plan is resolved for the organization
     Then the plan allows 50 projects
 
-  @unimplemented
   Scenario: Subscription with a monthly message override uses that value
     Given the subscription overrides monthly message capacity to 500000
     When the plan is resolved for the organization
@@ -35,7 +44,6 @@ Feature: Subscription Limit Overrides
   # Null Overrides Fall Back to Plan Defaults
   # ============================================================================
 
-  @unimplemented
   Scenario: Only non-null overrides replace plan defaults
     Given the subscription overrides member capacity to 20
     And all other override fields are null
@@ -51,7 +59,6 @@ Feature: Subscription Limit Overrides
   # Multiple Overrides Combine
   # ============================================================================
 
-  @unimplemented
   Scenario: Several overrides are applied together
     Given the subscription overrides member capacity to 20
     And the subscription overrides workflow capacity to 50
@@ -72,7 +79,6 @@ Feature: Subscription Limit Overrides
   # Cancellation Clears All Override Fields
   # ============================================================================
 
-  @unimplemented
   Scenario: Cancelled subscription nullifies all override fields
     Given the subscription had overrides for multiple limits
     When the subscription is cancelled

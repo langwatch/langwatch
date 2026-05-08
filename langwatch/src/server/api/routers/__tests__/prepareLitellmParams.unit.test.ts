@@ -30,6 +30,26 @@ const baseAzureProvider = {
   deploymentMapping: null,
 };
 
+const baseAnthropicProvider = {
+  provider: "anthropic" as const,
+  enabled: true,
+  customKeys: {
+    ANTHROPIC_API_KEY: "sk-ant-test",
+  },
+  extraHeaders: null,
+  deploymentMapping: null,
+};
+
+const baseOpenAIProvider = {
+  provider: "openai" as const,
+  enabled: true,
+  customKeys: {
+    OPENAI_API_KEY: "sk-openai-test",
+  },
+  extraHeaders: null,
+  deploymentMapping: null,
+};
+
 describe("prepareLitellmParams", () => {
   describe("when the caller passes the new canonical mp-id wire format", () => {
     it("normalises params.model to provider-prefixed form using the resolved MP", async () => {
@@ -55,6 +75,37 @@ describe("prepareLitellmParams", () => {
       });
 
       expect(params.model).toBe("azure/my-gpt4-deployment");
+    });
+  });
+
+  describe("when provider is anthropic", () => {
+    /** @scenario prepareLitellmParams translates Anthropic model ID */
+    it("translates dotted Anthropic model IDs to LiteLLM-compatible dashed form", async () => {
+      // llmModels.json uses "anthropic/claude-opus-4.5" (dot notation).
+      // LiteLLM expects "anthropic/claude-opus-4-5" (dash notation).
+      // prepareLitellmParams must translate at the boundary.
+      const params = await prepareLitellmParams({
+        model: "anthropic/claude-opus-4.5",
+        modelProvider: baseAnthropicProvider,
+        projectId: "project-123",
+      });
+
+      expect(params.model).toBe("anthropic/claude-opus-4-5");
+    });
+  });
+
+  describe("when provider is openai", () => {
+    /** @scenario prepareLitellmParams preserves OpenAI model ID */
+    it("preserves OpenAI model IDs unchanged", async () => {
+      // Only Anthropic and custom providers need dot-to-dash translation.
+      // OpenAI model IDs already use the format LiteLLM expects.
+      const params = await prepareLitellmParams({
+        model: "openai/gpt-5-mini",
+        modelProvider: baseOpenAIProvider,
+        projectId: "project-123",
+      });
+
+      expect(params.model).toBe("openai/gpt-5-mini");
     });
   });
 

@@ -5,13 +5,13 @@ Feature: Shorthand prompt tag syntax (server-side)
 
   # --- Shorthand Parsing (pure logic, no tag allowlist needed) ---
 
-  @unit @unimplemented
+  @integration
   Scenario: Rejects zero as a tag name during creation
     Given the allowed tags are "production" and "staging"
     When a user tries to create a tag named "0"
     Then the creation is rejected with a validation error
 
-  @unit @unimplemented
+  @integration
   Scenario: Accepts valid non-numeric tag during creation
     Given the allowed tags are "production" and "staging"
     When a user tries to create a tag named "production"

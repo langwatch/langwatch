@@ -9,6 +9,7 @@ import { STRIPE_PRICE_NAMES } from "../stripe/stripePrices.types";
 
 describe("stripeCatalog", () => {
   describe("parseStripePricesFile()", () => {
+    /** @scenario Extra development prices do not break required mapping validation */
     it("parses the committed stripe catalog file", () => {
       const parsed = parseStripePricesFile(stripeCatalogData);
 
@@ -32,6 +33,7 @@ describe("stripeCatalog", () => {
   });
 
   describe("resolveStripePriceMap()", () => {
+    /** @scenario Billing runtime resolves test price ids outside production */
     it("resolves test mode mappings", () => {
       const parsed = parseStripePricesFile(stripeCatalogData);
       const resolved = resolveStripePriceMap(parsed, "test");
@@ -41,6 +43,7 @@ describe("stripeCatalog", () => {
       }
     });
 
+    /** @scenario Billing runtime resolves live price ids in production */
     it("resolves live mode mappings", () => {
       const parsed = parseStripePricesFile(stripeCatalogData);
       const resolved = resolveStripePriceMap(parsed, "live");

@@ -4,6 +4,12 @@ Feature: MCP Prompt Tools
   I want to manage prompts via the MCP server
   So that I can view and update prompt configurations programmatically
 
+  # All scenarios describe MCP-side prompt list/get/update tool calls.
+  # The underlying prompts service has unit + integration coverage; the
+  # MCP wrapper around it needs targeted cases in
+  # `mcp-server/src/__tests__/all-tools.integration.test.ts`. Cheap to
+  # add when the prompt-tools wrapper changes.
+
   Background:
     Given the MCP server is configured with a valid API key
 

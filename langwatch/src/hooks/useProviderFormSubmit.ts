@@ -3,7 +3,10 @@ import { type ZodError, z } from "zod";
 import { fromZodError } from "zod-validation-error";
 import { toaster } from "../components/ui/toaster";
 import type { CustomModelEntry } from "../server/modelProviders/customModel.schema";
-import type { MaybeStoredModelProvider } from "../server/modelProviders/registry";
+import {
+  modelProviders,
+  type MaybeStoredModelProvider,
+} from "../server/modelProviders/registry";
 import { api } from "../utils/api";
 import {
   filterMaskedApiKeys,
@@ -153,6 +156,46 @@ export function useProviderFormSubmit({
         if (!parsed.success) {
           setErrors({
             customKeysRoot: fromZodError(parsed.error as ZodError).message,
+          });
+          setIsSaving(false);
+          return;
+        }
+      }
+
+      // Block save when "use as default provider" is enabled but the
+      // selected default model belongs to a different provider — otherwise
+      // updateProjectDefaultModels would silently persist a contradiction
+      // (this provider becomes the default while the model still points
+      // elsewhere). See #3785.
+      if (useAsDefaultProvider) {
+        const prefix = `${provider.provider}/`;
+        const mismatched: string[] = [];
+        if (projectDefaultModel && !projectDefaultModel.startsWith(prefix)) {
+          mismatched.push("Default model");
+        }
+        if (
+          projectTopicClusteringModel &&
+          !projectTopicClusteringModel.startsWith(prefix)
+        ) {
+          mismatched.push("Topic clustering model");
+        }
+        if (mismatched.length > 0) {
+          const providerDisplayName =
+            modelProviders[provider.provider as keyof typeof modelProviders]
+              ?.name ?? provider.provider;
+          toaster.create({
+            title:
+              mismatched.length === 1
+                ? `Cannot save: ${mismatched[0]?.toLowerCase()} is invalid`
+                : "Cannot save: default models are invalid",
+            description: `${mismatched.join(" and ")} ${
+              mismatched.length === 1 ? "belongs" : "belong"
+            } to a different provider. Pick a model from ${providerDisplayName}${
+              provider.provider === "azure" ? " (or add a custom deployment)" : ""
+            } before saving.`,
+            type: "error",
+            duration: 5000,
+            meta: { closable: true },
           });
           setIsSaving(false);
           return;

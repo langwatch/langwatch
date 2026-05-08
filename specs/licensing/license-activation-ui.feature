@@ -1,4 +1,12 @@
 Feature: License Activation UI
+
+  # All scenarios in this file describe page-level UX of the License
+  # activation flow (file dropzone, textarea, method-toggle checkboxes,
+  # success/error states). They require either a page-level integration
+  # test against the rendered LicenseActivationForm or Playwright E2E
+  # driving the file-upload/textarea flow. No such harness exists yet —
+  # all aspirational pending the page-test fixture.
+
   As a self-hosted user
   I want to activate a license by uploading a file or entering a key
   So that I can easily enable my LangWatch license using my preferred method

@@ -1,4 +1,20 @@
 Feature: AI Gateway — Virtual Keys
+
+  # Seven scenarios below are bound to virtualKey.service /
+  # virtualKey.crypto unit tests. The remaining @unimplemented scenarios
+  # fall in three unbindable categories:
+  # (1) UI flows (create drawer, edit drawer, list rendering, capability
+  #     preview, audit-history button, usage section) — need
+  #     component-test fixtures against the Gateway settings pages.
+  # (2) End-to-end gateway-internal endpoint scenarios
+  #     (POST /internal/gateway/resolve-key, GET /config/:vk_id,
+  #     GET /changes?since=N) — implemented in the Go gateway service.
+  # (3) Integration-level VK-config persistence (fallback chain,
+  #     trigger conditions, model aliases, ModelProvider linkage) —
+  #     could bind once a tRPC router integration test is added under
+  #     langwatch/src/server/api/routers/__tests__/.
+  # All aspirational pending those harnesses.
+
   As a LangWatch user with gateway permissions
   I want to mint, configure, and rotate virtual API keys
   So that I can give downstream clients (SDKs, coding CLIs, production apps) a single
@@ -25,7 +41,7 @@ Feature: AI Gateway — Virtual Keys
   # VK creation — secret show-once, format, default config
   # ============================================================================
 
-  @integration @unimplemented
+  @integration
   Scenario: Create a virtual key with default config
     When I open the "AI Gateway" section
     And I click "New virtual key"
@@ -39,7 +55,7 @@ Feature: AI Gateway — Virtual Keys
     And after dismissal the full secret can never be retrieved again
     And only the key prefix "lw_vk_live_xxxx…" is visible in the list
 
-  @integration @unimplemented
+  @integration
   Scenario: Virtual key secret is stored as peppered HMAC-SHA256 hash
     Given I created a virtual key "demo-key" with secret "lw_vk_live_01HZX9K3M…"
     When the database row for "demo-key" is inspected
@@ -142,7 +158,7 @@ Feature: AI Gateway — Virtual Keys
     And updating the ModelProvider's API key reflects for the virtual key on next
       gateway cache refresh
 
-  @integration @unimplemented
+  @integration
   Scenario: Virtual key cannot select a provider not configured on its project
     Given project "gateway-demo" does not have "bedrock" configured
     When I open the "new virtual key" drawer
@@ -186,7 +202,7 @@ Feature: AI Gateway — Virtual Keys
   # Rotation, revocation, restore
   # ============================================================================
 
-  @integration @unimplemented
+  @integration
   Scenario: Rotate virtual key issues a new secret and invalidates the previous one
     Given virtual key "prod-key" has secret "lw_vk_live_01HZX9K3MA…"
     When I click "Rotate secret" on "prod-key"
@@ -203,7 +219,7 @@ Feature: AI Gateway — Virtual Keys
     And the alert is in addition to the orange warning "You will only see this secret once"
     And the dialog title reads "Save your rotated secret" (not the create flow's "Save your virtual key secret")
 
-  @integration @unimplemented
+  @integration
   Scenario: Revoke virtual key disables authentication immediately
     Given virtual key "prod-key" is active
     When I click "Revoke" and confirm
@@ -211,7 +227,7 @@ Feature: AI Gateway — Virtual Keys
     And the gateway returns error type "virtual_key_revoked" (401)
     And the change propagates within the configured auth-cache TTL (default 60s)
 
-  @integration @unimplemented
+  @integration
   Scenario: Revoked virtual key cannot be restored (must mint new)
     Given virtual key "prod-key" is revoked
     When I look at its row in the list
@@ -251,7 +267,7 @@ Feature: AI Gateway — Virtual Keys
   # Audit and attribution
   # ============================================================================
 
-  @integration @unimplemented
+  @integration
   Scenario: Every VK mutation writes an audit log entry
     When I create, rotate, edit, or revoke a virtual key
     Then an audit log row is written with actor, action, target vk_id,

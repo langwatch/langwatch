@@ -1,4 +1,14 @@
 Feature: Self-Serving License Purchase
+
+  # Two scenarios below are bound to licensePurchaseHandler unit tests.
+  # The remaining @unimplemented scenarios cover Stripe-webhook-router
+  # behavior (how checkout.session.completed events are dispatched
+  # between license and subscription flows), error-path handling for
+  # missing private key / unreachable Slack / missing email config, and
+  # the configurable payment-link UI button. Each requires either a
+  # webhook-router integration fixture or a license-page component test
+  # — neither exists yet. Aspirational pending those harnesses.
+
   As a user wanting to run LangWatch self-hosted
   I want to purchase a license and receive it automatically
   So that I can activate my self-hosted deployment without manual intervention
@@ -23,7 +33,7 @@ Feature: Self-Serving License Purchase
     Then the existing subscription checkout flow executes
     And the license generation flow is NOT triggered
 
-  @integration @unimplemented
+  @integration
   Scenario: Use business name as organization name in license
     Given a user completes checkout with business name "Acme Corp" and email "buyer@acme.com"
     When the license is generated
@@ -54,7 +64,7 @@ Feature: Self-Serving License Purchase
     And the error is logged
 
   # GROWTH plan template
-  @integration @unimplemented
+  @integration
   Scenario: GROWTH plan includes all features with no artificial limits
     Given a user purchases a GROWTH license with 10 seats
     When the license is generated

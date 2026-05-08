@@ -3,6 +3,10 @@ Feature: Model Parameter Display
   I want to see and configure only the parameters supported by my selected model
   So that I can properly tune the model behavior without seeing irrelevant options
 
+  # All scenarios describe LLM Config popover UI rendering. Need a
+  # JSDOM render of the popover with mocked model providers — same
+  # popover-render harness gap as `unified-reasoning-ui.feature`.
+
   Background:
     Given I am on a page with the LLM Config popover
     And model providers are loaded for my project

@@ -16,6 +16,10 @@ Feature: Complete notification coverage for all limit enforcement paths
   # resolves projectId -> organizationId then delegates to this method.
   # All limit checks go through the service, not direct Prisma calls.
 
+  # KEPT @unimplemented: this scenario depends on
+  # enforceLimitByOrganization being added to LicenseEnforcementService
+  # (see file-level NOTE above). The notification end-to-end flow for
+  # member invites cannot be tested until the wiring exists.
   @unimplemented
   Scenario: Member invite triggers notification when limit reached
     Given the organization has reached the maximum number of full members
@@ -23,6 +27,7 @@ Feature: Complete notification coverage for all limit enforcement paths
     Then the invite is rejected
     And a Slack notification is sent to the ops team
 
+  # KEPT @unimplemented: same blocker as preceding scenario.
   @unimplemented
   Scenario: Lite member invite triggers notification when limit reached
     Given the organization has reached the maximum number of lite members

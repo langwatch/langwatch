@@ -36,6 +36,7 @@ describe("Prompt Retrieval", () => {
   });
 
   describe("Scenario: Default Behavior (Materialized First)", () => {
+    /** @scenario Fetch without tag returns latest */
     it("returns local version and does NOT call API when prompt exists locally", async () => {
       // Given the prompt exists locally and on server
       localPromptsService.get.mockResolvedValue(mockLocalPrompt);
@@ -246,6 +247,7 @@ describe("Prompt Retrieval", () => {
 
   describe("Scenario: Shorthand syntax passthrough (thin client)", () => {
     describe("when fetching with colon-separated shorthand", () => {
+      /** @scenario Shorthand syntax passes through to API without client-side parsing */
       it("passes the full string to the API without parsing", async () => {
         const productionPrompt = promptResponseFactory.build({ handle: testHandle, version: 3 });
         localPromptsService.get.mockResolvedValue(null);
@@ -300,6 +302,7 @@ describe("Prompt Retrieval", () => {
 
   describe("Scenario: Fetch by Tag", () => {
     describe("when fetching with a tag using MATERIALIZED_FIRST", () => {
+      /** @scenario Fetch prompt by tag via options */
       it("passes tag through to API service when no local prompt exists", async () => {
         const productionPrompt = promptResponseFactory.build({ handle: testHandle, version: 3 });
         localPromptsService.get.mockResolvedValue(null);
@@ -339,6 +342,7 @@ describe("Prompt Retrieval", () => {
 
   describe("Scenario: Invalid Tag Error", () => {
     describe("when the API returns an error for an invalid tag", () => {
+      /** @scenario Unassigned tag returns error */
       it("throws an error when API rejects and no local fallback exists", async () => {
         promptsApiService.get.mockRejectedValue(
           new Error("Invalid tag: must be 'production' or 'staging'")
@@ -359,6 +363,7 @@ describe("Prompt Retrieval", () => {
     beforeEach(() => vi.useFakeTimers());
     afterEach(() => vi.useRealTimers());
 
+    /** @scenario Tag is included in cache key */
     it("returns cached prompt on second call with same tag within TTL", async () => {
       const productionPrompt = promptResponseFactory.build({ handle: testHandle, version: 3 });
       promptsApiService.get.mockResolvedValue(productionPrompt);
@@ -397,6 +402,7 @@ describe("Prompt Retrieval", () => {
       expect(promptsApiService.get).toHaveBeenCalledTimes(1);
     });
 
+    /** @scenario Different tags produce different cache entries */
     it("returns different prompts for different tags with CACHE_TTL", async () => {
       const productionPrompt = promptResponseFactory.build({ handle: testHandle, version: 3 });
       const stagingPrompt = promptResponseFactory.build({ handle: testHandle, version: 4 });
@@ -462,6 +468,7 @@ describe("PromptsFacade.tags.rename", () => {
   });
 
   describe("when renaming a tag", () => {
+    /** @scenario Facade tags.rename delegates to renameTag */
     it("delegates to promptsApiService.renameTag with old and new names", async () => {
       promptsApiService.renameTag.mockResolvedValue(undefined);
 

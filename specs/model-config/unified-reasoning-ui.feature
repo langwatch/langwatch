@@ -3,6 +3,10 @@ Feature: Unified Reasoning UI Component
   I want to see a single "Reasoning" dropdown for all providers
   So that I don't need to know provider-specific parameter names
 
+  # All scenarios describe the LLM Config popover UI rendering. Need a
+  # JSDOM render of the popover component with mocked model registry —
+  # no test fixture exists yet for the popover.
+
   Background:
     Given I am on a page with the LLM Config popover
 

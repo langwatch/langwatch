@@ -86,6 +86,7 @@ describe("virtual key crypto", () => {
   });
 
   describe("hashVirtualKeySecret", () => {
+    /** @scenario Virtual key secret is stored as peppered HMAC-SHA256 hash */
     it("produces a 64-char hex sha256 hash", () => {
       const secret = mintVirtualKeySecret("live");
       const hash = hashVirtualKeySecret(secret);

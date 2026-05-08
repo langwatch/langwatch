@@ -8,6 +8,7 @@ import {
   simulationTextMessageEndEventDataSchema,
   simulationRunDeletedEventDataSchema,
   simulationRunCancelRequestedEventDataSchema,
+  simulationSetArchivedEventDataSchema,
 } from "./schemas/events";
 
 /**
@@ -136,4 +137,31 @@ export const DeleteRunCommand = defineCommand({
     "payload.scenarioRun.id": d.scenarioRunId,
   }),
   makeJobId: (d) => `${d.tenantId}:${d.scenarioRunId}:delete-run`,
+});
+
+/**
+ * Archive a whole scenario set in one shot. One user intent → one event,
+ * instead of N `lw.simulation_run.deleted` events for the same action.
+ *
+ * The aggregate is `simulation_set` (set-scoped); the payload carries the
+ * `scenarioRunIds` that were attached to the set at archive time so replay
+ * is deterministic.
+ *
+ * Wiring this event into the per-run fold projection (so each run's
+ * `ArchivedAt` flips in one pass) is tracked in lw#3636 follow-up — the
+ * dispatcher needs a fanout step from one set event to many run aggregates.
+ */
+export const ArchiveSetCommand = defineCommand({
+  commandType: "lw.simulation_set.archive",
+  eventType: "lw.simulation_set.archived",
+  eventVersion: "2026-05-04",
+  aggregateType: "simulation_set",
+  schema: simulationSetArchivedEventDataSchema,
+  aggregateId: (d) => d.scenarioSetId,
+  idempotencyKey: (d) => `${d.tenantId}:${d.scenarioSetId}:archiveSet`,
+  spanAttributes: (d) => ({
+    "payload.scenarioSet.id": d.scenarioSetId,
+    "payload.scenarioRun.count": d.scenarioRunIds.length,
+  }),
+  makeJobId: (d) => `${d.tenantId}:${d.scenarioSetId}:archive-set`,
 });

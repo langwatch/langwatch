@@ -12,6 +12,21 @@ export const MAX_ROWS_LIMIT = 10_000;
  */
 export const MAX_FILE_SIZE_BYTES = 25 * 1024 * 1024;
 
+// JSON.parse rejects U+0000 null bytes inside string literals as a
+// "Bad control character" syntax error, even though Postgres-bound
+// payloads only break later. Scrub null bytes from raw file content
+// before any parser sees them so user-supplied uploads with stray
+// null bytes (PDF copy-paste, broken CSV exports) no longer crash
+// the upload pipeline. The dataset-record sanitiser below catches
+// any null bytes that survive parsing (e.g. `\u0000` JSON escapes
+// resolved to a real null after JSON.parse).
+const NULL_BYTE_GLOBAL_RAW = /\u0000/g;
+function stripRawNullBytes(content: string): string {
+  return content.includes("\u0000")
+    ? content.replace(NULL_BYTE_GLOBAL_RAW, "")
+    : content;
+}
+
 export type FileFormat = "csv" | "json" | "jsonl";
 
 /**
@@ -176,26 +191,32 @@ export function convertRowsToColumnTypes(
 /**
  * Parses file content based on the detected format.
  * Returns headers (column names) and rows.
+ *
+ * Raw null bytes are scrubbed before parsing so JSON.parse does not throw
+ * on uploads where customers accidentally embed a U+0000 (PDF copy-paste,
+ * broken CSV exports). The dataset-record sanitiser still runs later to
+ * catch null bytes that appear via JSON escape sequences.
  */
 export function parseFileContent(params: {
   content: string;
   format: FileFormat;
 }): { headers: string[]; rows: Record<string, unknown>[] } {
   const { content, format } = params;
+  const cleanContent = stripRawNullBytes(content);
 
   switch (format) {
     case "csv": {
-      const result = parseCSV(content);
+      const result = parseCSV(cleanContent);
       return { headers: result.headers, rows: result.rows };
     }
     case "json": {
-      const records = parseJSON(content);
+      const records = parseJSON(cleanContent);
       const headers =
         records.length > 0 ? Object.keys(records[0]!) : [];
       return { headers, rows: records };
     }
     case "jsonl": {
-      const records = parseJSONL(content);
+      const records = parseJSONL(cleanContent);
       const headers =
         records.length > 0 ? Object.keys(records[0]!) : [];
       return { headers, rows: records };

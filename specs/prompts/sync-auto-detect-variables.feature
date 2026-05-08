@@ -9,7 +9,7 @@ Feature: Auto-detect prompt variables during sync
 
   # --- Variable extraction (pure logic) ---
 
-  @unit @unimplemented
+  @integration
   Scenario: CLI hardcoded "input" default is kept only when it appears in the template
     Given a prompt with text "hello {{name}}"
     And the sync payload has inputs [{ identifier: "input", type: "str" }] (CLI default)

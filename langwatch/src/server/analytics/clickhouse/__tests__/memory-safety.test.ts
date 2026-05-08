@@ -107,6 +107,7 @@ describe("memory-safety", () => {
     }
 
     describe("when generating SQL for any groupBy that touches stored_spans", () => {
+      /** @scenario "Analytics queries access SpanAttributes only via key extraction" */
       it("does not include bare SpanAttributes in the outermost SELECT", () => {
         const result = buildTimeseriesQuery({
           ...baseInput,
@@ -155,6 +156,7 @@ describe("memory-safety", () => {
     );
 
     describe("when the topic counting query SQL is inspected", () => {
+      /** @scenario "Topic and field-discovery queries access only specific attributes" */
       it("does not select the full SpanAttributes Map column", () => {
         expect(getTopicCountsBody).not.toBeNull();
         expect(getTopicCountsBody![0]).not.toContain("SpanAttributes");
@@ -168,6 +170,7 @@ describe("memory-safety", () => {
     });
 
     describe("when the field discovery query SQL is inspected", () => {
+      /** @scenario "Topic and field-discovery queries access only specific attributes" */
       it("does not select the full SpanAttributes Map column", () => {
         expect(getDistinctFieldNamesBody).not.toBeNull();
         expect(getDistinctFieldNamesBody![0]).not.toContain("SpanAttributes");
@@ -200,6 +203,7 @@ describe("memory-safety", () => {
     );
 
     describe("when the topic counting query SQL is inspected", () => {
+      /** @scenario "Topic counting query includes a LIMIT clause" */
       it("includes a LIMIT clause followed by a number", () => {
         expect(getTopicCountsBody).not.toBeNull();
         expect(getTopicCountsBody![0]).toMatch(/\bLIMIT\s+\d+/);
@@ -226,6 +230,7 @@ describe("memory-safety", () => {
     );
 
     describe("when the field discovery query SQL is inspected", () => {
+      /** @scenario "Field discovery query includes a LIMIT clause" */
       it("span names query includes a LIMIT clause followed by a number", () => {
         expect(getDistinctFieldNamesBody).not.toBeNull();
         // The body contains two queries (span names + metadata keys).
@@ -282,6 +287,7 @@ describe("memory-safety", () => {
        * passes clickhouse_settings. This reads the source file and checks
        * that all query() invocations include the settings parameter.
        */
+      /** @scenario "All query execution paths include memory safety settings" */
       it("passes clickhouse_settings to every .query() call in clickhouse-analytics.service.ts", () => {
         const servicePath = path.resolve(
           __dirname,
@@ -340,6 +346,7 @@ describe("memory-safety", () => {
   // -------------------------------------------------------------------------
   describe("metric prefix column-pruning test coverage", () => {
     describe("when comparing metric-translator prefixes to column-pruning tests", () => {
+      /** @scenario "Every metric prefix in metric-translator has a column-pruning test" */
       it("has at least one column-pruning test for every registered metric prefix", () => {
         // Extract metric prefixes from metric-translator.ts by reading the source
         const translatorPath = path.resolve(

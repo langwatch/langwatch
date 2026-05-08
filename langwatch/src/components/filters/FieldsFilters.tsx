@@ -178,6 +178,15 @@ function FieldsFilter({
 
 	const searchRef = React.useRef<HTMLInputElement | null>(null);
 	const [query, setQuery] = useDebounceValue("", 300);
+	// Cancel pending debounced setState on unmount. Without this, a trailing
+	// fire after teardown (e.g. in vitest workers tearing down jsdom) calls
+	// setState on an unmounted tree → "ReferenceError: window is not defined"
+	// inside react-dom's debounced scheduler.
+	useEffect(() => {
+		return () => {
+			setQuery.cancel();
+		};
+	}, [setQuery]);
 	const [immediateQuery, setImmediateQuery] = useState("");
 	const { open, setOpen } = useDisclosure();
 	const current = filters?.[filterId] ?? [];

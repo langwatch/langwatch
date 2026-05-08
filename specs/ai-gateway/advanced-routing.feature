@@ -1,4 +1,12 @@
 Feature: Advanced routing — weighted, canary, sticky-session, composable
+
+  # All scenarios in this file describe data-plane routing behaviour
+  # implemented in the Go gateway service (services/aigateway/). The
+  # parity check only scans TypeScript test roots — Go tests cannot
+  # bind via @scenario JSDoc. Aspirational at the parity-check level;
+  # the underlying behaviour is covered by Go unit tests inside the
+  # services/aigateway/ tree.
+
   As an enterprise customer running LLM traffic at scale
   I want routing policies richer than fallback-chains
   So that I can cost-optimize (80/20 mini vs full), roll out new models safely

@@ -3,6 +3,19 @@ Feature: Suite run confirmation modal
   I want a confirmation modal before a suite run is triggered
   So that I can review what will be executed and avoid accidentally scheduling many jobs
 
+  # Parity status: 0 of 6 scenarios bound to existing tests.
+  # Remaining @unimplemented scenarios (#3458):
+  #   1 UPDATE: implementation diverged from spec wording
+  #   5 NO_TEST: shipped behavior, no integration test yet
+  # UPDATE divergences:
+  #   - "Confirmation modal appears when clicking Run": dialog title is suite name with body "Run X simulations?", not literal "Run suite?"
+  # NO_TEST gaps:
+  #   - "Modal displays execution summary with estimated job count"
+  #   - "Confirming the modal triggers the suite run"
+  #   - "Cancelling the modal does not trigger a run"
+  #   - "Buttons are disabled while run is being scheduled"
+  #   - "Modal closes and error toast appears when run fails"
+
   Background:
     Given I am on the Suite detail page
     And the suite "Regression Tests" has 3 scenarios and 2 targets

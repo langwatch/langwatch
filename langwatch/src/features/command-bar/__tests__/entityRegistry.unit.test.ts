@@ -14,6 +14,7 @@ import {
 
 describe("entityRegistry", () => {
   describe("when looking up scenario prefixes", () => {
+    /** @scenario Command bar entity registry recognizes both prefixes */
     it("has an entry for the 'scenario_' prefix", () => {
       const entry = entityRegistry.find((e) => e.prefix === "scenario_");
       expect(entry).toBeDefined();

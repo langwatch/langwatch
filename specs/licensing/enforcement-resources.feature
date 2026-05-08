@@ -1,5 +1,30 @@
 @wip
 Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators, Scenarios, Teams, Experiments, Agents, Online Evaluations)
+
+  # Five workflow scenarios are bound below to license-enforcement.service
+  # and license-enforcement.repository tests. The remaining
+  # @unimplemented scenarios fall in three groups:
+  #   1. Per-resource-type backend variants (prompts/evaluators/scenarios/
+  #      teams/agents/experiments/onlineEvaluations) — exercised at the
+  #      unit level by the it.each(limitTypeTests) parameterized block in
+  #      license-enforcement.service.unit.test.ts (every LimitType is
+  #      verified to call the matching repository method against the
+  #      matching plan field). Parameterized it.each cases cannot bind via
+  #      @scenario JSDoc, so each backend variant is "covered but not
+  #      bindable" until either a parity-script enhancement traverses
+  #      it.each parameter sets, OR each scenario gets a dedicated
+  #      single-name prose test.
+  #   2. UI click-then-modal scenarios (Create-X button always clickable,
+  #      shows upgrade modal at limit, opens form when allowed) — require
+  #      page-level component tests against the rendered list pages,
+  #      drawer-open flows, and the upgrade modal. No fixture exists yet.
+  #   3. Expired-license FREE-tier fallback scenarios — require an
+  #      end-to-end fixture that mounts a tRPC create-router with an
+  #      expired license attached to the org. Indirectly verified by
+  #      licenseHandler.integration.test.ts ("returns FREE_PLAN when
+  #      license is expired") + the service test, but no scenario
+  #      exists that wires both together. Aspirational pending that
+  #      harness.
   As a LangWatch self-hosted deployment with a license
   I want resource creation limits to be enforced for workflows, prompts, evaluators, teams, and online evaluations
   So that organizations respect their licensed resource counts
@@ -14,14 +39,14 @@ Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators, Scenarios, 
   # Workflows: Backend Enforcement
   # ============================================================================
 
-  @integration @unimplemented
+  @integration
   Scenario: Allows workflow creation when under limit
     Given the organization has a license with maxWorkflows 5
     And the organization has 3 workflows across all projects
     When I create a workflow in project "proj-789"
     Then the workflow is created successfully
 
-  @integration @unimplemented
+  @integration
   Scenario: Blocks workflow creation when at limit
     Given the organization has a license with maxWorkflows 3
     And the organization has 3 workflows across all projects
@@ -29,7 +54,7 @@ Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators, Scenarios, 
     Then the request fails with FORBIDDEN
     And the error message contains "maximum number of workflows"
 
-  @integration @unimplemented
+  @integration
   Scenario: Counts workflows across all projects in organization
     Given the organization has a license with maxWorkflows 3
     And project "proj-A" has 2 workflows
@@ -37,7 +62,7 @@ Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators, Scenarios, 
     When I create a workflow in project "proj-789"
     Then the request fails with FORBIDDEN
 
-  @integration @unimplemented
+  @integration
   Scenario: Counts only non-archived workflows toward limit
     Given the organization has a license with maxWorkflows 3
     And the organization has 2 active workflows
@@ -67,7 +92,7 @@ Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators, Scenarios, 
     When I create a prompt in project "proj-789"
     Then the prompt is created successfully
 
-  @integration @unimplemented
+  @integration
   Scenario: Blocks prompt creation when at limit
     Given the organization has a license with maxPrompts 3
     And the organization has 3 prompts across all projects
@@ -75,7 +100,7 @@ Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators, Scenarios, 
     Then the request fails with FORBIDDEN
     And the error message contains "maximum number of prompts"
 
-  @integration @unimplemented
+  @integration
   Scenario: Counts prompts across all projects in organization
     Given the organization has a license with maxPrompts 3
     And project "proj-A" has 2 prompts
@@ -102,7 +127,7 @@ Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators, Scenarios, 
     Then the request fails with FORBIDDEN
     And the error message contains "maximum number of evaluators"
 
-  @integration @unimplemented
+  @integration
   Scenario: Counts evaluators across all projects in organization
     Given the organization has a license with maxEvaluators 3
     And project "proj-A" has 2 evaluators
@@ -110,7 +135,7 @@ Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators, Scenarios, 
     When I create an evaluator in project "proj-789"
     Then the request fails with FORBIDDEN
 
-  @integration @unimplemented
+  @integration
   Scenario: Counts only non-archived evaluators toward limit
     Given the organization has a license with maxEvaluators 3
     And the organization has 2 active evaluators
@@ -137,7 +162,7 @@ Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators, Scenarios, 
     Then the request fails with FORBIDDEN
     And the error message contains "maximum number of scenarios"
 
-  @integration @unimplemented
+  @integration
   Scenario: Counts scenarios across all projects in organization
     Given the organization has a license with maxScenarios 3
     And project "proj-A" has 2 scenarios
@@ -156,7 +181,7 @@ Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators, Scenarios, 
     When I create a team in the organization
     Then the team is created successfully
 
-  @integration @unimplemented
+  @integration
   Scenario: Blocks team creation when at limit
     Given the organization has a license with maxTeams 3
     And the organization has 3 teams

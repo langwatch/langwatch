@@ -195,7 +195,7 @@ export const MainMenu = React.memo(function MainMenu({
               paddingTop={3}
               paddingBottom={1}
             >
-              {showExpanded ? "Evaluate" : <div>&nbsp;</div>}
+              {showExpanded ? "Evaluate" : <>&nbsp;</>}
             </Text>
 
             <CollapsibleMenuGroup
@@ -262,7 +262,7 @@ export const MainMenu = React.memo(function MainMenu({
               paddingTop={3}
               paddingBottom={1}
             >
-              {showExpanded ? "Library" : <div>&nbsp;</div>}
+              {showExpanded ? "Library" : <>&nbsp;</>}
             </Text>
 
             <PageMenuLink
@@ -369,7 +369,7 @@ export const MainMenu = React.memo(function MainMenu({
                     textTransform="uppercase"
                     color="gray.500"
                   >
-                    {showExpanded ? "Gateway" : <div>&nbsp;</div>}
+                    {showExpanded ? "Gateway" : <>&nbsp;</>}
                   </Text>
                   {showExpanded && (
                     <Badge
@@ -550,7 +550,7 @@ const OpsSection = ({ showExpanded }: { showExpanded: boolean }) => {
         paddingTop={3}
         paddingBottom={1}
       >
-        {showExpanded ? "Ops" : <div>&nbsp;</div>}
+        {showExpanded ? "Ops" : <>&nbsp;</>}
       </Text>
       <SideMenuLink
         icon={Activity}

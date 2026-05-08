@@ -115,6 +115,8 @@ describe("Feature: Prompt version tags", () => {
   }
 
   describe("when assigning a tag to a specific version", () => {
+    /** @scenario "Assigning a tag that exists in the DB succeeds" */
+    /** @scenario "Assigning a tag to a specific version" */
     it("creates a PromptTagAssignment record with configId, tag, and versionId", async () => {
       const { allVersions } = await createPromptWithVersions({
         handle: `pizza-prompt-${nanoid()}`,
@@ -141,6 +143,7 @@ describe("Feature: Prompt version tags", () => {
   });
 
   describe("when reassigning a tag to a different version", () => {
+    /** @scenario "Assigning a recreated tag succeeds" */
     it("returns the new version when fetching by tag", async () => {
       const { allVersions } = await createPromptWithVersions({
         handle: `pizza-prompt-${nanoid()}`,
@@ -234,6 +237,9 @@ describe("Feature: Prompt version tags", () => {
   });
 
   describe("when fetching a prompt via service with a tag parameter", () => {
+    /** @scenario 'New org gets "production" and "staging" seeded' */
+    /** @scenario "Full lifecycle of a custom tag" */
+    /** @scenario "Delete and recreate a seeded tag" */
     it("returns the version pointed to by the tag", async () => {
       const { allVersions } = await createPromptWithVersions({
         handle: `pizza-prompt-${nanoid()}`,

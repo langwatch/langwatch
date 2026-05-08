@@ -55,6 +55,7 @@ describe("Signup identification hook", () => {
       },
     };
 
+    /** @scenario 'New signup identifies user with traits in Customer.io' */
     it("identifies user in Customer.io with email, name, role, and company_size", () => {
       fireSignupNurturingCalls(baseArgs);
 
@@ -81,6 +82,7 @@ describe("Signup identification hook", () => {
       });
     });
 
+    /** @scenario 'Signup defaults include has_prompts and has_simulations as false' */
     it("includes has_prompts false and has_simulations false in traits", () => {
       fireSignupNurturingCalls(baseArgs);
 
@@ -106,6 +108,7 @@ describe("Signup identification hook", () => {
       });
     });
 
+    /** @scenario 'Signup identification includes optional marketing fields when present' */
     it("includes utm_campaign and how_heard when present", () => {
       fireSignupNurturingCalls(baseArgs);
 
@@ -126,6 +129,7 @@ describe("Signup identification hook", () => {
       expect(new Date(args.traits.createdAt).toISOString()).toBe(args.traits.createdAt);
     });
 
+    /** @scenario 'New signup associates user with organization via group call' */
     it("associates user with organization via group call", () => {
       fireSignupNurturingCalls(baseArgs);
 
@@ -140,6 +144,7 @@ describe("Signup identification hook", () => {
       });
     });
 
+    /** @scenario 'New signup tracks signed_up event' */
     it("tracks signed_up event with signup metadata", () => {
       fireSignupNurturingCalls(baseArgs);
 
@@ -173,6 +178,7 @@ describe("Signup identification hook", () => {
       expect(args.traits.how_heard).toBeUndefined();
     });
 
+    /** @scenario 'Signup without attribution omits those fields from Customer.io traits' */
     it("omits lead_source, utm_source, utm_medium, utm_term, utm_content, and referrer from traits", () => {
       fireSignupNurturingCalls({
         userId: "user-123",
@@ -215,6 +221,7 @@ describe("Signup identification hook", () => {
       },
     };
 
+    /** @scenario 'Signup with ref in URL sends lead_source trait and event property to Customer.io' */
     it("maps leadSource to lead_source identify trait", () => {
       fireSignupNurturingCalls(attributionArgs);
 
@@ -226,6 +233,7 @@ describe("Signup identification hook", () => {
       });
     });
 
+    /** @scenario 'Signup forwards utm tuple to Customer.io' */
     it("maps the utm tuple to snake_case identify traits", () => {
       fireSignupNurturingCalls(attributionArgs);
 
@@ -272,6 +280,7 @@ describe("Signup identification hook", () => {
   });
 
   describe("when Customer.io API is unavailable", () => {
+    /** @scenario 'Customer.io failure during signup does not block onboarding' */
     it("does not throw (fire-and-forget)", async () => {
       const { captureException } = await import(
         "../../../../src/utils/posthogErrorCapture"
@@ -298,6 +307,7 @@ describe("Signup identification hook", () => {
   });
 
   describe("when nurturing is undefined (no Customer.io key)", () => {
+    /** @scenario 'Signup with no Customer.io key configured completes without errors' */
     it("silently skips without calling any nurturing methods", () => {
       currentNurturing = undefined;
 

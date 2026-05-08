@@ -83,7 +83,6 @@ jobs:
       NEXTAUTH_SECRET: "nextauth-secret-for-ci-testing"
       NEXTAUTH_URL: "http://localhost:3000"
       API_TOKEN_JWT_SECRET: "api-jwt-secret-for-ci-testing"
-      ELASTICSEARCH_NODE_URL: "http://localhost:9200"
       REDIS_URL: "redis://localhost:6379"
       BUILD_TIME: "true"
 
@@ -147,7 +146,6 @@ jobs:
       NEXTAUTH_SECRET: "nextauth-secret-for-ci-testing"
       NEXTAUTH_URL: "http://localhost:3000"
       API_TOKEN_JWT_SECRET: "api-jwt-secret-for-ci-testing"
-      ELASTICSEARCH_NODE_URL: "http://localhost:9200"
       CLICKHOUSE_URL: "http://default:ci_password@localhost:8123/test_langwatch"
       CI_REDIS_URL: "redis://localhost:6379"
       CI_CLICKHOUSE_URL: "http://default:ci_password@localhost:8123/test_langwatch"
@@ -165,23 +163,6 @@ jobs:
           --health-cmd "redis-cli ping"
           --health-interval 10s
           --health-timeout 5s
-          --health-retries 5
-
-      # ClickHouse is started manually via docker run (after checkout) to mount storage policy config
-      # See "Start ClickHouse with storage policy" step below
-
-      elasticsearch:
-        image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
-        ports:
-          - 9200:9200
-        env:
-          discovery.type: single-node
-          xpack.security.enabled: false
-          ES_JAVA_OPTS: "-Xms512m -Xmx512m"
-        options: >-
-          --health-cmd "curl -f http://localhost:9200/_cluster/health || exit 1"
-          --health-interval 30s
-          --health-timeout 10s
           --health-retries 5
 
       postgres:
@@ -214,10 +195,6 @@ jobs:
       - name: Setup database
         working-directory: langwatch
         run: pnpm prisma:migrate
-
-      - name: Setup Elasticsearch
-        working-directory: langwatch
-        run: pnpm elastic:migrate
 
       - name: Install Goose migration tool
         run: bash .github/scripts/install-goose.sh
