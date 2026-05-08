@@ -17,6 +17,7 @@ import { AiToolsPortal } from "~/components/me/AiToolsPortal";
 import { BudgetExceededBanner } from "~/components/me/BudgetExceededBanner";
 import { MyProjectsCard } from "~/components/me/MyProjectsCard";
 import MyLayout from "~/components/me/MyLayout";
+import { TraceIngestSection } from "~/components/me/TraceIngestSection";
 import { usePersonalContext } from "~/components/me/usePersonalContext";
 import { useFeatureFlag } from "~/hooks/useFeatureFlag";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -81,6 +82,8 @@ export default function MyUsagePage() {
           </Text>
           <AiToolsPortal />
         </VStack>
+
+        <TraceIngestSection />
 
         {ctx.organizationId ? (
           <MyProjectsCard organizationId={ctx.organizationId} />
