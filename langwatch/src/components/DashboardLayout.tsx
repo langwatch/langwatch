@@ -426,8 +426,19 @@ export const DashboardLayout = ({
   // bird's-eye list. Server-side-gated DOM (rendered at this layout
   // layer, NOT a client-side flag) so direct-paste of the URL still
   // surfaces the banner on first paint.
+  //
+  // Gated to URL-anchored project routes ONLY — admin-self surfaces
+  // (/governance, /settings/*, /me/*, /ops/*) MUST NOT fire the banner
+  // even when `team` is sticky-resolved from a previously-visited project
+  // context, otherwise the admin sees "Viewing X's workspace" plastered on
+  // their own governance dashboard. The URL-anchor check uses the
+  // `[project]` slug pattern: only `/[project]/*` routes are real
+  // project-scoped views where the impersonation chrome makes sense.
+  const isProjectAnchoredRoute = router.pathname.startsWith("/[project]");
   const adminViewingAs: { label: string; kind: "personal" | "team" } | null =
-    organizationRole === OrganizationUserRole.ADMIN && team
+    isProjectAnchoredRoute &&
+    organizationRole === OrganizationUserRole.ADMIN &&
+    team
       ? team.isPersonal
         ? team.ownerUserId !== session?.user?.id
           ? { label: team.name, kind: "personal" as const }
