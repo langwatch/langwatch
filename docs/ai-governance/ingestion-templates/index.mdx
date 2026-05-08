@@ -57,9 +57,10 @@ This walks through the whole flow end-to-end. By the end you'll have a Claude Co
 trace visible at `/me/traces` with `gen_ai.usage.*`, `gen_ai.response.model`, and
 `langwatch.cost.usd` populated.
 
-> **Before you start:** you need a LangWatch account. If you're brand new, sign up at
-> `<DEEP_LINK_SIGNUP_TBD>`, complete onboarding, and you'll land on your **personal workspace**
-> (`/me`).
+> **Before you start:** you need a LangWatch account. If you're brand new, sign in at
+> [`/auth/signin`](/auth/signin) — first-time sign-in completes onboarding and lands you on
+> your **personal workspace** (`/me`). On self-hosted instances the same path works against
+> your own deployment's host.
 
 ### Step 1 — open the catalog
 
@@ -340,8 +341,9 @@ Templates do not change that.
 
 For this iteration we ship 3 tool-specific templates (Claude Code, Cursor, Claude cowork)
 plus the Raw OTLP (advanced) fallback. If your tool emits OTLP natively, the Raw OTLP
-fallback works today. If you'd like a custom template for another tool, file a request via
-`<DOCS_REQUEST_LINK_TBD>` and we'll evaluate.
+fallback works today. If you'd like a custom template for another tool, file a request on
+[GitHub Issues](https://github.com/langwatch/langwatch/issues/new?labels=ingestion-template-request)
+and we'll evaluate.
 
 ---
 
