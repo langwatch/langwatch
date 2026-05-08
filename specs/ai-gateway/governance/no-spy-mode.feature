@@ -88,7 +88,6 @@ Feature: AI Gateway Governance — No-Spy Mode (org-level content stripping)
       | gen_ai.system                      | yes        |
       | gen_ai.usage.input_tokens          | yes        |
       | langwatch.cost.usd                 | yes        |
-      | langwatch.user.id (receiver-stamped)| yes        |
       | gen_ai.request.messages            | no         |
       | langwatch.user.input.system_prompt | no         |
       | custom.client.metadata             | no         |
@@ -104,11 +103,26 @@ Feature: AI Gateway Governance — No-Spy Mode (org-level content stripping)
         and holds binding token `lwub_TOKEN_JANE`
     When jane fires a trace through `lwub_TOKEN_JANE`
     Then the trace lands at /me/traces with:
-      | attribute                       | value                       |
-      | gen_ai.usage.* + cost.usd       | populated                    |
-      | langwatch.user.id               | jane.id (receiver-stamped)   |
-      | gen_ai.request.messages         | stripped                     |
-      | gen_ai.response.choices         | stripped                     |
+      | attribute                       | value                                                       |
+      | gen_ai.usage.* + cost.usd       | populated                                                    |
+      | langwatch.origin                | "binding" (receiver-stamped — bindingProvenance 5-key set)   |
+      | langwatch.organization_id       | acme-privacy.id (receiver-stamped — bindingProvenance)       |
+      | langwatch.template.id           | claude_code template id (receiver-stamped — bindingProvenance) |
+      | langwatch.binding.id            | jane's binding id (receiver-stamped — bindingProvenance)     |
+      | langwatch.source                | "claude_code" (receiver-stamped — bindingProvenance)         |
+      | gen_ai.request.messages         | stripped                                                     |
+      | gen_ai.response.choices         | stripped                                                     |
+    # v1 scope fence: the receiver re-stamps the 5-key bindingProvenance
+    # set authoritatively (origin / organization_id / source / template.id
+    # / binding.id). The 16-key B6 attribution set (langwatch.user.id /
+    # team.id / organization.id / project.id / tenant_id) is NOT receiver-
+    # restamped on binding-routed traces in v1 — that's v1.1+ deferred
+    # work (per MO ruling on Ariana's gap-#6 surfacing post-fc6d54100).
+    # Until v1.1+ ships, attribution-key forge attempts in OTLP payloads
+    # survive intact through the receiver on the binding path; defense
+    # rests on the binding token's receiver-resolved tenancy plus the
+    # 5-key bindingProvenance stamp that locks origin + organization_id.
+    #
     # Defense against compliance hole: per-trace stripping must consult
     # the trace's effective Organization (resolved from
     # binding.personalProject.team.organizationId), not just the
