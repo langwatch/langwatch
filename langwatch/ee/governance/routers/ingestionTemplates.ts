@@ -15,10 +15,28 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
-import { IngestionTemplateService } from "@ee/governance/services/ingestionTemplate.service";
+import {
+  IngestionTemplateService,
+  InvalidSourceTypeError,
+  PlatformTemplateImmutableError,
+  TemplateNotFoundError,
+} from "@ee/governance/services/ingestionTemplate.service";
 
 import { checkOrganizationPermission } from "~/server/api/rbac";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
+
+function mapServiceError(err: unknown): never {
+  if (err instanceof TemplateNotFoundError) {
+    throw new TRPCError({ code: "NOT_FOUND", message: err.message });
+  }
+  if (err instanceof PlatformTemplateImmutableError) {
+    throw new TRPCError({ code: "FORBIDDEN", message: err.message });
+  }
+  if (err instanceof InvalidSourceTypeError) {
+    throw new TRPCError({ code: "BAD_REQUEST", message: err.message });
+  }
+  throw err;
+}
 
 export const ingestionTemplatesRouter = createTRPCRouter({
   /**
@@ -70,5 +88,120 @@ export const ingestionTemplatesRouter = createTRPCRouter({
       });
       if (!row) throw new TRPCError({ code: "NOT_FOUND" });
       return row;
+    }),
+
+  /**
+   * Admin authoring: create an org-authored template. Slug is server-
+   * generated. Platform rows live with `organizationId IS NULL` and are
+   * never created via this endpoint.
+   */
+  create: protectedProcedure
+    .input(
+      z.object({
+        organizationId: z.string(),
+        sourceType: z.string(),
+        displayName: z.string().min(1).max(80),
+        description: z.string().max(2000).optional(),
+        iconAsset: z.string().max(20_000).optional(),
+        credentialSchema: z
+          .enum(["otlp_token", "static_api_key", "agent_id"])
+          .nullable()
+          .optional(),
+        ottlRules: z.string().max(50_000).optional(),
+      }),
+    )
+    .use(checkOrganizationPermission("aiTools:manage"))
+    .mutation(async ({ ctx, input }) => {
+      const service = IngestionTemplateService.create(ctx.prisma);
+      try {
+        return await service.createOrgTemplate({
+          organizationId: input.organizationId,
+          callerUserId: ctx.session.user.id,
+          sourceType: input.sourceType,
+          displayName: input.displayName,
+          description: input.description ?? null,
+          iconAsset: input.iconAsset ?? null,
+          credentialSchema:
+            input.credentialSchema === "otlp_token" ? null : input.credentialSchema ?? null,
+          ottlRules: input.ottlRules,
+        });
+      } catch (err) {
+        mapServiceError(err);
+      }
+    }),
+
+  /**
+   * Replace `ottlRules` on an org-authored template. Platform rows
+   * reject (FORBIDDEN). Audit-logged with line counts pre/post for the
+   * forensic trail.
+   */
+  updateOttlRules: protectedProcedure
+    .input(
+      z.object({
+        organizationId: z.string(),
+        id: z.string(),
+        ottlRules: z.string().max(50_000),
+      }),
+    )
+    .use(checkOrganizationPermission("aiTools:manage"))
+    .mutation(async ({ ctx, input }) => {
+      const service = IngestionTemplateService.create(ctx.prisma);
+      try {
+        return await service.updateOttlRules({
+          organizationId: input.organizationId,
+          callerUserId: ctx.session.user.id,
+          id: input.id,
+          ottlRules: input.ottlRules,
+        });
+      } catch (err) {
+        mapServiceError(err);
+      }
+    }),
+
+  /**
+   * Soft-archive an org-authored template. Platform rows reject.
+   */
+  archive: protectedProcedure
+    .input(z.object({ organizationId: z.string(), id: z.string() }))
+    .use(checkOrganizationPermission("aiTools:manage"))
+    .mutation(async ({ ctx, input }) => {
+      const service = IngestionTemplateService.create(ctx.prisma);
+      try {
+        await service.archiveOrgTemplate({
+          organizationId: input.organizationId,
+          callerUserId: ctx.session.user.id,
+          id: input.id,
+        });
+        return { ok: true as const };
+      } catch (err) {
+        mapServiceError(err);
+      }
+    }),
+
+  /**
+   * Clone a platform-published template into the caller's org. Allows
+   * admins to customize the OTTL of a platform default without touching
+   * the canonical row. The clone starts as an exact copy; admin edits
+   * via `updateOttlRules` from there.
+   */
+  cloneFromPlatform: protectedProcedure
+    .input(
+      z.object({
+        organizationId: z.string(),
+        sourceTemplateId: z.string(),
+      }),
+    )
+    .use(checkOrganizationPermission("aiTools:manage"))
+    .mutation(async ({ ctx, input }) => {
+      const service = IngestionTemplateService.create(ctx.prisma);
+      try {
+        return await service.cloneFromPlatform({
+          organizationId: input.organizationId,
+          callerUserId: ctx.session.user.id,
+          sourceTemplateId: input.sourceTemplateId,
+        });
+      } catch (err) {
+        mapServiceError(err);
+      }
     }),
 });
