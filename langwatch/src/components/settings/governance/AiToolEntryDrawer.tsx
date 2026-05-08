@@ -120,7 +120,7 @@ function blankForm(type: AiToolTileType): FormState {
 }
 
 function formFromEntry(entry: AiToolEntry): FormState {
-  const cfg = entry.config as Record<string, unknown>;
+  const cfg = entry.config as unknown as Record<string, unknown>;
   const baseStr = (key: string): string => {
     const v = cfg[key];
     return typeof v === "string" ? v : "";

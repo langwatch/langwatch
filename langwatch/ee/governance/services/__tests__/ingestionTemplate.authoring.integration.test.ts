@@ -97,7 +97,7 @@ describe("IngestionTemplateService admin authoring", () => {
           action: "gateway.ingestion_template.created",
           userId: ADMIN_ID,
         },
-        orderBy: { occurredAt: "desc" },
+        orderBy: { createdAt: "desc" },
       });
       expect(audit).not.toBeNull();
       expect(audit?.targetKind).toBe("ingestion_template");
