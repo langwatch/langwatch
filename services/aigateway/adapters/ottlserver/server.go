@@ -207,6 +207,14 @@ func (s *Server) transformLogs(w http.ResponseWriter, ctx context.Context, encod
 
 	// Execute every parsed statement against every (resource, scope, record)
 	// triple. OTTL mutates the record in place via pcommon.Map references.
+	//
+	// Principal-field guard (snapshot+restore) wraps each record's
+	// statement loop so any OTTL rule that touches a protected
+	// attribute is silently reverted post-transform. This is a
+	// defense-in-depth pass — even a misconfigured / hostile rule
+	// cannot rewrite the credential-derived attribution that the
+	// receiver + downstream OCSF/SIEM/forensics surfaces depend on.
+	// See principal_guard.go for the protected-key list + rationale.
 	rls := logs.ResourceLogs()
 	for i := 0; i < rls.Len(); i++ {
 		rl := rls.At(i)
@@ -215,7 +223,9 @@ func (s *Server) transformLogs(w http.ResponseWriter, ctx context.Context, encod
 			sl := sls.At(j)
 			lrs := sl.LogRecords()
 			for k := 0; k < lrs.Len(); k++ {
-				tCtx := ottllog.NewTransformContextPtr(rl, sl, lrs.At(k))
+				lr := lrs.At(k)
+				snapshot := snapshotProtectedAttrs(rl, sl, lr)
+				tCtx := ottllog.NewTransformContextPtr(rl, sl, lr)
 				for _, stmt := range parsed {
 					if _, _, err := stmt.Execute(ctx, tCtx); err != nil {
 						// A runtime error on one record shouldn't kill
@@ -228,6 +238,7 @@ func (s *Server) transformLogs(w http.ResponseWriter, ctx context.Context, encod
 					}
 				}
 				tCtx.Close()
+				restoreProtectedAttrs(rl, sl, lr, snapshot)
 			}
 		}
 	}
