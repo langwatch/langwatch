@@ -1,0 +1,110 @@
+---
+title: Governance MCP server
+description: An MCP server exposing every governance resource × verb as a tool under the governance_ namespace. Same RBAC, same audit emission, same service-layer source of truth as the REST API and CLI — built so an agent (Claude Code, Codex, Cursor) can fully set up governance via tool calls.
+sidebarTitle: MCP server
+---
+
+<Info>**Pairs with:** [Governance REST API](/ai-governance/api) (the MCP tools are a thin shell over it; both call the same service-layer functions) and [Governance CLI](/ai-governance/cli) (same surface for shell invocation). Distinct from LangWatch's general MCP server — this is a governance-namespaced toolset specifically for setting up and querying governance state.</Info>
+
+<Note>**RBAC enforced at the tool layer.** Per `specs/ai-gateway/governance/governance-api-cli-mcp-coverage.feature`, every MCP tool call resolves the caller's apiKey to its RBAC scopes and rejects with `FORBIDDEN` if the scope is missing. No tool can bypass the service-layer or the multitenancy middleware — the same defense-in-depth that protects the REST API protects the MCP surface.</Note>
+
+## Why an MCP server for governance
+
+Model Context Protocol (MCP) is the standard way for agents (Claude Code, Cursor, Codex, Claude desktop, custom MCP clients) to discover and call tools provided by a service. By exposing governance as MCP tools — rather than expecting agents to compose REST calls themselves — we give the agent:
+
+- **Tool discovery** — `tools/list` enumerates every governance verb with descriptions and input schemas the agent can reason about.
+- **Type-safe inputs** — the same Zod schemas the REST API and CLI consume are exposed via MCP `inputSchema`, so the agent gets validation feedback before the tool call leaves the client.
+- **Built-in RBAC + audit** — every successful tool call lands in the same audit log as a dashboard click, tagged with `surface="mcp"` for incident response.
+
+The MCP server is the most agent-native of the three governance surfaces. It's also the *highest-leverage* surface for self-hosted onboarding — drop the MCP server into Claude Code, point the agent at a fresh LangWatch deployment, and walk it through setting up the org via a chat conversation.
+
+## Tool naming
+
+Every governance MCP tool's name starts with `governance_`:
+
+```
+governance_anomaly_rules_list
+governance_anomaly_rules_get
+governance_anomaly_rules_create
+governance_anomaly_rules_update
+governance_anomaly_rules_delete
+
+governance_ingestion_templates_list
+governance_ingestion_templates_create
+governance_ingestion_templates_clone_from_platform
+…
+
+governance_role_bindings_assign_to_user
+governance_audit_log_query
+```
+
+The pattern is `governance_<resource_with_underscores>_<verb_with_underscores>` — MCP tool names by convention use snake_case while the REST API uses kebab-case. Description text on every tool summarises the verb + resource + RBAC scope so the agent can quickly decide whether to use it.
+
+## Authentication
+
+The MCP server reads the apiKey from a header set when the MCP client connects. The same apiKey resolution path as the REST API and CLI:
+
+```jsonc
+// MCP client config (for Claude Code, Cursor, etc.)
+{
+  "mcpServers": {
+    "langwatch-governance": {
+      "command": "langwatch",
+      "args": ["governance", "mcp", "serve"],
+      "env": {
+        "LANGWATCH_API_KEY": "lwsk_…"
+      }
+    }
+  }
+}
+```
+
+<Note>**TBD-IMPL — exact transport + entrypoint**: the umbrella spec locks the MCP namespace + tool naming + RBAC behaviour. The actual transport (stdio vs HTTP), command entrypoint, and config file shape land with Lane-Q's MCP-toolset commits (Ariana, gated on Sergey's first Hono route SHA so the tools dispatch through the new shared service layer).</Note>
+
+## RBAC enforcement
+
+If an agent connects with a narrowly-scoped apiKey (e.g. `governance:read` only) and tries to call a `:manage`-scoped tool:
+
+```jsonc
+// Agent calls governance_anomaly_rules_create with scope governance:read
+// Response:
+{
+  "isError": true,
+  "content": [{ "type": "text", "text": "FORBIDDEN: apiKey scope governance:read does not include anomaly-rules:manage" }]
+}
+```
+
+No record is created. No audit row is emitted (failed calls are not state-changes by design). The agent's harness can decide whether to ask the human for a more-privileged apiKey or back off.
+
+## Audit emission
+
+Every state-changing tool call emits an audit row tagged with `surface="mcp"`:
+
+| Tool | Audit row |
+|---|---|
+| `governance_anomaly_rules_create` | `gateway.anomaly_rule.created` with `surface="mcp"` |
+| `governance_ingestion_templates_clone_from_platform` | `gateway.ingestion_template.cloned` with `surface="mcp"` |
+| `governance_role_bindings_assign_to_user` | `organization.roleBinding.assignedToUser` with `surface="mcp"` |
+
+Payload shapes are identical to the REST API's audit rows apart from the surface field — every other field (actorUserId, apiKeyId, target, error) follows the same shape. This lets incident response queries answer "what did the agent do?" without changing the audit-row event-kind taxonomy.
+
+## Agent setup-from-scratch (the dogfood gate)
+
+The umbrella spec defines an end-to-end test: an agent connecting with admin apiKey can fully configure governance via a sequence of MCP tool calls:
+
+1. `governance_ingestion_templates_list` — read existing platform templates
+2. `governance_ingestion_templates_clone_from_platform` — clone `claude_code` into the org
+3. `governance_anomaly_rules_create` — rule on org spend > $100/day
+4. `governance_role_bindings_assign_to_user` — give a user `governance:view`
+5. `governance_audit_log_query` — verify steps 2–4 all emitted audit rows
+
+If every step succeeds and step 5 returns the matching audit rows, the MCP surface is genuinely agentic-usable. The dogfood-gate runbook is co-owned with QA (Lane-Q) and lives alongside the IngestionTemplate v1 dogfood discipline.
+
+## Cross-references
+
+- [Governance REST API](/ai-governance/api) — the API the MCP tools shell over
+- [Governance CLI](/ai-governance/cli) — same surface for shell invocation
+- [Roles and permissions](/ai-governance/roles-and-permissions) — RBAC scopes the MCP server enforces
+- [Audit log](/ai-governance/audit-log) — where state-change rows land
+- [Compliance architecture](/ai-governance/compliance-architecture) — how the OCSF v1.1 export consumes the same audit stream
+- Spec — `specs/ai-gateway/governance/governance-api-cli-mcp-coverage.feature`

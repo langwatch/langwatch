@@ -41,11 +41,14 @@ That's an Ingestion Template:
 - **Admin/platform side:** a curated catalog row (slug, source identifier, credential
   schema, optional `ottlRules`). Platform-published rows ship empty `ottlRules` —
   Claude Code, Cursor, and Claude cowork all emit OpenTelemetry `gen_ai.*` canonical
-  spans natively, so no transform is needed for the common case. **Org admins can fork
+  spans natively, so no transform is needed for the common case. **Org admins can clone
   a platform-default template into an org-authored template** and author OTTL via the
-  Monaco editor at `/settings/governance/tool-catalog → Ingestion Templates → Edit OTTL`,
-  to adapt a template to their org's upstream-tool quirks (an internal IDE wrapper, a
-  custom Cursor build, etc).
+  OttlEditor at `/settings/governance/tool-catalog → Ingestion Templates → Clone to
+  customise → Edit OTTL`, to adapt a template to their org's upstream-tool quirks (an
+  internal IDE wrapper, a custom Cursor build, etc). Platform rows are read-only —
+  admins click **Clone to customise** which calls
+  `ingestionTemplates.cloneFromPlatform`, then **Edit OTTL** on the new org-authored
+  row to refine the rules.
 - **User side:** a binding token (`lwub_…`) scoped to your personal project. You paste
   that token into your tool's OTLP exporter; the tool ships, the receiver attributes
   + applies the resolved template's OTTL (empty for platform defaults, admin-authored
@@ -156,7 +159,7 @@ An `IngestionTemplate` row has:
   because Claude Code, Cursor, and Claude cowork all emit OpenTelemetry `gen_ai.*`
   canonical spans natively — there is nothing to reshape for the common case. **Org
   admins can fork a platform-default template into an org-authored template and author
-  OTTL via the Monaco editor** in `/settings/governance/tool-catalog → Ingestion
+  OTTL via the OttlEditor** in `/settings/governance/tool-catalog → Ingestion
   Templates → Edit OTTL`. Forking lets the admin adapt a template to their org's
   upstream-tool quirks (an internal IDE wrapper, a custom Cursor build, a corporate
   Claude Code variant) without filing a request for a platform change.
@@ -225,7 +228,7 @@ For **platform-default templates** these stay receiver-derived (cost via
 `canonicalCostExtractor` reading upstream-emitted `gen_ai.usage.*`). Platform-default
 templates ship empty `ottlRules`, so the protected list is dormant on this path.
 
-For **org-authored templates** (forks created via the Monaco editor) the receiver
+For **org-authored templates** (forks created via the OttlEditor) the receiver
 applies a **tier-of-trust** addition: the org-authored OTTL is allowed to reshape
 upstream-specific attrs into the canonical keys (that's the template's whole job),
 but `langwatch.cost.usd*`, `gen_ai.usage.*`, and `gen_ai.response.model` are pinned
@@ -290,7 +293,7 @@ Claude Code, Cursor, and Claude cowork to populate `gen_ai.usage.*` correctly pe
 OTel semantic-conventions spec.
 
 **Tier 2 — Org-authored templates** (`organizationId NOT NULL`, forked from a tier-1
-template via the Monaco editor at `/settings/governance/tool-catalog → Ingestion
+template via the OttlEditor at `/settings/governance/tool-catalog → Ingestion
 Templates → Edit OTTL`). Admins author OTTL to adapt a template to their org's
 upstream-tool quirks. Trust here rides on **org-admin review at save time** — the
 admin who clicks "Save & validate" is accepting within-org responsibility for the
@@ -302,7 +305,7 @@ weaponized against the org or other orgs:
 2. A tier-2 superset that adds `langwatch.cost.usd*`, `gen_ai.usage.*`, and
    `gen_ai.response.model` to the protected set so admin OTTL cannot forge cost-
    attribution within the org.
-3. Static analysis at save time — the Monaco editor's "Save & validate" step rejects
+3. Static analysis at save time — the OttlEditor's "Save & validate" step rejects
    OTTL that would write any protected key BEFORE the rules are persisted, with an
    inline error pointing at the offending line.
 

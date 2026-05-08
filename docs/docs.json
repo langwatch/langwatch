@@ -701,6 +701,14 @@
               "ai-governance/cli-debug",
               "ai-governance/pull-mode-connectors"
             ]
+          },
+          {
+            "group": "Programmatic surfaces",
+            "pages": [
+              "ai-governance/api",
+              "ai-governance/cli",
+              "ai-governance/mcp"
+            ]
           }
         ]
       },

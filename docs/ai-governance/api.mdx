@@ -1,0 +1,98 @@
+---
+title: Governance REST API
+description: Hono-mounted REST/JSON API at /api/governance/* with an auto-generated OpenAPI spec consumed by the TypeScript and Python SDKs. Every governance feature exposes the same CRUD verb set, sharing one service-layer source of truth with the dashboard tRPC procedures — no duplicated business logic, identical RBAC enforcement.
+sidebarTitle: REST API
+---
+
+<Info>**Pairs with:** [Governance CLI](/ai-governance/cli) (the CLI is a thin shell over this API) and [Governance MCP server](/ai-governance/mcp) (the MCP tools are a thin shell over this API). All three surfaces dispatch through the same service-layer functions; the dashboard tRPC procedures call into the same services. There is exactly one place each governance verb is implemented.</Info>
+
+<Note>**Service-layer-shared, repository-pattern-backed.** Per `specs/ai-gateway/governance/governance-api-cli-mcp-coverage.feature`, every Hono route delegates to a shared service-layer function (`AnomalyRulesService.create`, `IngestionTemplatesService.update`, etc.). Services use repositories for persistence; services never import `prisma` directly. The umbrella spec also locks the no-bypass invariant — no UI page, route handler, CLI command, or MCP tool may call `prisma.<governanceModel>.*` directly.</Note>
+
+## Why a separate REST API alongside tRPC
+
+LangWatch's dashboard already uses tRPC — type-safe, but coupled to the Next.js / React render path. The Hono-mounted REST API exists for the surfaces that *aren't* the dashboard:
+
+- **Agentic workflows** — Claude Code, Codex, Cursor running `langwatch governance …` commands need a stable, OpenAPI-described surface they can call directly.
+- **CI / scripting** — the same OpenAPI spec is consumed by the TypeScript and Python SDKs (auto-regen on build), so any pipeline language with a generated client gets the full governance feature set.
+- **Future integrations** — partner platforms (SIEMs, ticketing, ops automations) want a documented API contract, not a tRPC client.
+
+Both paths call into the same service-layer functions — there is no business-logic duplication. The umbrella coverage spec locks that invariant.
+
+## Where it lives
+
+| Property | Value |
+|---|---|
+| Mount point | `/api/governance/<resource>` |
+| Spec | `openapi/governance.json` (checked into the repo, regenerated on every Hono route change) |
+| Auth | `Authorization: Bearer <apiKey>` — same apiKey resolution as `/api/dataset/*` and `/api/trace/*` |
+| RBAC | Per-record filter at the service layer; surface returns 403 / 401 / 404-collapse identically across Hono / CLI / MCP |
+| Tenancy | `organizationId` + `projectId` (where applicable) flow from the apiKey's resolved tenant scope into every service call |
+
+## Resource × verb matrix
+
+Every governance resource exposes the full CRUD triple — `list` / `get` / `create` / `update` / `delete` — over Hono, the CLI, and the MCP server. The umbrella spec lists the resource set; each resource gets its own OpenAPI path group.
+
+| Resource | OpenAPI path group | Detail page |
+|---|---|---|
+| Anomaly rules | `/api/governance/anomaly-rules` | [Anomaly rules](/ai-governance/anomaly-rules) |
+| Audit log (read-only) | `/api/governance/audit-log` | [Audit log](/ai-governance/audit-log) |
+| Gateway budgets | `/api/governance/gateway-budgets` | [Control plane](/ai-governance/control-plane) |
+| Ingestion sources | `/api/governance/ingestion-sources` | [Ingestion sources](/ai-governance/ingestion-sources) |
+| Ingestion templates | `/api/governance/ingestion-templates` | [Ingestion templates](/ai-governance/ingestion-templates) |
+| User ingestion bindings | `/api/governance/user-ingestion-bindings` | [Ingestion templates](/ai-governance/ingestion-templates) |
+| Members | `/api/governance/members` | [Members and invites](/ai-governance/members-and-invites) |
+| Invites | `/api/governance/invites` | [Members and invites](/ai-governance/members-and-invites) |
+| Role bindings | `/api/governance/role-bindings` | [Roles and permissions](/ai-governance/roles-and-permissions) |
+| AI tool entries | `/api/governance/ai-tool-entries` | [Personas](/ai-governance/personas) |
+| Sessions | `/api/governance/sessions` | [No-spy mode](/ai-governance/no-spy-mode) (sessions live alongside in `/me/sessions`) |
+| Virtual keys | `/api/governance/virtual-keys` | [Control plane](/ai-governance/control-plane) |
+
+`audit-log` is intentionally read-only (no create / update / delete) — audit rows are emitted by other state-changing routes and are immutable by design.
+
+## Verb shape
+
+For a typical resource (using `anomaly-rules` as an example — the same shape applies to every resource above):
+
+| Verb | Method + path | Returns | RBAC |
+|---|---|---|---|
+| `list` | `GET /api/governance/anomaly-rules` | `{ items: AnomalyRule[], cursor: string\|null }` | `anomaly-rules:view` |
+| `get` | `GET /api/governance/anomaly-rules/:id` | `{ rule: AnomalyRule }` | `anomaly-rules:view` |
+| `create` | `POST /api/governance/anomaly-rules` | `{ rule: AnomalyRule }` | `anomaly-rules:manage` |
+| `update` | `PATCH /api/governance/anomaly-rules/:id` | `{ rule: AnomalyRule }` | `anomaly-rules:manage` |
+| `delete` | `DELETE /api/governance/anomaly-rules/:id` | `{ deleted: true }` | `anomaly-rules:manage` |
+
+The Zod schemas backing each request and response body are the same schemas the corresponding service-layer function consumes. The OpenAPI generator reads them directly, so the spec and the runtime are guaranteed in sync.
+
+## OpenAPI spec generation + SDK regen
+
+```bash
+pnpm openapi:governance:emit       # regenerate openapi/governance.json from Hono routes
+pnpm sdk:regen --target typescript # regenerate the TS SDK governance namespace
+pnpm sdk:regen --target python     # regenerate the Python SDK governance namespace
+```
+
+<Note>**TBD-IMPL — script names**: the exact `package.json` script names land with Sergey's Ask B-1 commits. The umbrella spec at `specs/ai-gateway/governance/governance-api-cli-mcp-coverage.feature` locks the contract: a build step generates `openapi/governance.json`, both SDKs regenerate from that spec, and the regen is idempotent.</Note>
+
+The TS SDK exposes `langwatch.governance.<resource>.<verb>(...)`, the Python SDK exposes `langwatch.governance.<resource>.<verb>(...)`. Type signatures match the Zod-derived schemas exactly.
+
+## Audit emission
+
+State-changing calls always emit an audit row tagged with the surface that made the change:
+
+| Surface | Audit row `surface` field |
+|---|---|
+| Hono REST | `"hono"` |
+| CLI | `"cli"` |
+| MCP | `"mcp"` |
+| Dashboard tRPC | `"trpc"` |
+
+All four rows have **identical** payload shapes apart from the `surface` field. Surface attribution helps incident response (which automation made this change?) without changing the audit-row event-kind taxonomy.
+
+## Cross-references
+
+- [Governance CLI](/ai-governance/cli) — `langwatch governance <resource> <verb>` thin shell
+- [Governance MCP server](/ai-governance/mcp) — same surface as MCP tools for agent use
+- [Roles and permissions](/ai-governance/roles-and-permissions) — RBAC scopes that gate each verb
+- [Audit log](/ai-governance/audit-log) — where state-change rows land
+- [Compliance architecture](/ai-governance/compliance-architecture) — how the OCSF v1.1 export consumes the same audit stream
+- Spec — `specs/ai-gateway/governance/governance-api-cli-mcp-coverage.feature`

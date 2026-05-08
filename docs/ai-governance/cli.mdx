@@ -1,0 +1,143 @@
+---
+title: Governance CLI
+description: langwatch governance <resource> <verb> — a thin shell over the governance REST API for agentic workflows. Same auth as the rest of the CLI, same RBAC, same audit-row emission. Tagged with surface=cli for incident response.
+sidebarTitle: CLI
+---
+
+<Info>**Pairs with:** [Governance REST API](/ai-governance/api) (the CLI is a thin shell over it; both call into the same service-layer functions) and [Governance MCP server](/ai-governance/mcp) (same surface for agent invocation). Distinct from [`langwatch ingest …`](/ai-governance/cli-debug) — that namespace is for debugging ingestion sources; `langwatch governance …` is for managing every governance resource.</Info>
+
+<Note>**Agentic-first by design.** Per `specs/ai-gateway/governance/governance-api-cli-mcp-coverage.feature`, every governance feature exposes the full CRUD verb set under `langwatch governance <resource> <verb>`. The CLI is built so a customer can fully set up governance via an agent (Claude Code, Codex, Cursor) without ever opening the dashboard — useful for self-hosted onboarding scripts, CI/CD pipelines, and runbook automations.</Note>
+
+## Why a `langwatch governance …` namespace
+
+LangWatch already has top-level CLI commands for trace ingestion (`langwatch ingest …`), projects (`langwatch projects …`), and login (`langwatch login`). Governance gets its own namespace because:
+
+- **Discoverability** — `langwatch governance --help` lists every governance resource as a sub-command, so an agent (or a human) can enumerate the surface without prior knowledge.
+- **No collision** — top-level resource names like `members`, `invites`, `sessions` would overlap with non-governance concepts in a flat layout. Namespacing keeps them unambiguous.
+- **One mental model** — every governance verb sits under one prefix; once you know `langwatch governance anomaly-rules list`, you know the shape of every command in the namespace.
+
+## Help discovery
+
+```bash
+langwatch governance --help
+# Lists every governance resource as a sub-command:
+#   anomaly-rules           Manage anomaly detection rules
+#   audit-log               Query the audit log (read-only)
+#   gateway-budgets         Manage gateway budgets
+#   ingestion-sources       Manage governance ingestion sources
+#   ingestion-templates     Manage IngestionTemplates (catalog)
+#   user-ingestion-bindings Manage UserIngestionBindings
+#   members                 Manage org members
+#   invites                 Manage pending invites
+#   role-bindings           Manage role bindings
+#   ai-tool-entries         Manage AI tool catalog entries
+#   sessions                List + revoke active sessions
+#   virtual-keys            Manage gateway virtual keys
+
+langwatch governance anomaly-rules --help
+# Lists CRUD verbs for that resource:
+#   list      List anomaly rules
+#   get       Get one rule by id
+#   create    Create a new rule
+#   update    Update an existing rule
+#   delete    Delete a rule
+```
+
+<Note>**TBD-IMPL — exact help-text strings**: the precise descriptions render from the OpenAPI spec. The exact strings land with Lane-B's CLI scaffold commits (gated on Lane-S's first Hono route SHA per Lane-B's heartbeat at 04b983c3f).</Note>
+
+## Authentication
+
+The CLI uses the same `apiKey` resolution as `langwatch projects list` — once you've signed in via `langwatch login` your session lives at `~/.langwatch/sessions/<endpoint>.json`, and every governance command authenticates with that session's apiKey automatically.
+
+```bash
+langwatch login
+# Browser opens, you sign in, session persisted at ~/.langwatch/sessions/<endpoint>.json
+
+langwatch governance virtual-keys list
+# Authenticates with the session apiKey; per-record filter applied at the
+# service layer based on the apiKey's RBAC scopes.
+```
+
+If your apiKey is scoped narrowly (e.g. `governance:read` only), `list` succeeds but `create` / `update` / `delete` exits non-zero with a `FORBIDDEN` error message naming the missing scope.
+
+## Output formats
+
+```bash
+langwatch governance anomaly-rules list
+# Default: human-readable table
+
+langwatch governance anomaly-rules list --output json
+# One JSON object per record on stdout, suitable for piping through jq:
+langwatch governance anomaly-rules list --output json | jq '.[] | select(.severity=="high")'
+
+langwatch governance anomaly-rules get <id> --output json
+# Single JSON object on stdout
+```
+
+Use `--output json` in scripts and CI; the human table is for interactive exploration.
+
+## Resource × verb matrix
+
+| Resource | Verbs |
+|---|---|
+| `anomaly-rules` | `list` `get` `create` `update` `delete` |
+| `audit-log` | `query` (read-only) |
+| `gateway-budgets` | `list` `get` `create` `update` `delete` |
+| `ingestion-sources` | `list` `get` `create` `update` `delete` `rotate` |
+| `ingestion-templates` | `list` `get` `create` `update` `delete` `clone-from-platform` |
+| `user-ingestion-bindings` | `list` `get` `install` `uninstall` `rotate` |
+| `members` | `list` `get` `update` `remove` |
+| `invites` | `list` `get` `create` `revoke` |
+| `role-bindings` | `list` `get` `assign-to-user` `revoke-from-user` |
+| `ai-tool-entries` | `list` `get` `create` `update` `delete` |
+| `sessions` | `list` `revoke` `revoke-all` |
+| `virtual-keys` | `list` `get` `create` `update` `delete` |
+
+A small number of resources have resource-specific verbs (`rotate` on ingestion sources / bindings, `assign-to-user` on role bindings, `clone-from-platform` on templates, `revoke` on invites and sessions). These follow the same auth + audit shape as CRUD verbs.
+
+## Audit emission
+
+Every state-changing CLI invocation emits an audit row tagged with `surface="cli"`. The payload shape is identical to a Hono REST audit row apart from the surface field — this lets incident response queries filter by surface to see "what did automation change last night?" without losing the actor / target / event-kind details.
+
+```bash
+langwatch governance audit-log query --filter 'surface=cli' --since '24h ago'
+```
+
+## Setup-from-scratch via agent
+
+The end-state — what the umbrella spec calls the "agentic dogfood gate" — is that an agent can fully configure governance for a fresh org by chaining CLI commands:
+
+```bash
+# 1. List existing platform templates
+langwatch governance ingestion-templates list --output json
+
+# 2. Clone the claude_code template into the org for customisation
+langwatch governance ingestion-templates clone-from-platform \
+    --template-id <platform-claude-code-id> \
+    --organization-id <org-id> --output json
+
+# 3. Create a budget
+langwatch governance gateway-budgets create \
+    --scope organization --amount-usd 100 \
+    --period monthly --output json
+
+# 4. Set up an anomaly rule
+langwatch governance anomaly-rules create \
+    --name 'org-spend-100usd-day' \
+    --rule-spec '{"metric":"spend","window":"1d","threshold":100}' \
+    --output json
+
+# 5. Verify every step emitted an audit row
+langwatch governance audit-log query --since '5m ago' --output json
+```
+
+The same script runs against SaaS or self-hosted deployments — the CLI's `~/.langwatch/sessions/<endpoint>.json` per-endpoint session resolution handles both transparently.
+
+## Cross-references
+
+- [Governance REST API](/ai-governance/api) — the API the CLI shells over
+- [Governance MCP server](/ai-governance/mcp) — same surface for agent / MCP-client invocation
+- [`langwatch ingest …`](/ai-governance/cli-debug) — separate namespace for ingestion-source debugging
+- [Roles and permissions](/ai-governance/roles-and-permissions) — RBAC scopes the CLI enforces
+- [Audit log](/ai-governance/audit-log) — where state-change rows land
+- Spec — `specs/ai-gateway/governance/governance-api-cli-mcp-coverage.feature`

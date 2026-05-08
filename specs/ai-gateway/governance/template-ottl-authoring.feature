@@ -1,7 +1,7 @@
-Feature: AI Gateway Governance — Admin OTTL Authoring (Monaco editor)
+Feature: AI Gateway Governance — Admin OTTL Authoring
   As an org admin curating IngestionTemplates for my organization
-  I want to author / edit OTTL transform rules in a familiar code editor
-  with syntax highlighting, validation, and a save-with-audit lifecycle
+  I want to author / edit OTTL transform rules in a per-statement
+  editor with async validation and a save-with-audit lifecycle
   So that I can adapt platform-default templates to my org's
   upstream-tool quirks without filing a request for a custom template,
   and so my employees' personal-workspace traces land in our canonical
@@ -10,9 +10,12 @@ Feature: AI Gateway Governance — Admin OTTL Authoring (Monaco editor)
   Per gateway.md "admin OTTL authoring":
     Admin opens the IngestionTemplate detail page (in the
     /settings/governance/tool-catalog Ingestion Templates tab) and clicks
-    "Edit OTTL". A Monaco editor opens with the current ottlRules,
-    OTTL grammar syntax highlighting, validation on save, and a preview
-    pane showing the canonical-output shape for a sample input span.
+    "Edit OTTL". The OttlEditor (existing component at
+    @ee/governance/dashboard/components/OttlEditor) opens with the
+    current ottlRules as a per-statement list, async validates each
+    statement against the gateway's `pkg/ottl` parser via
+    `api.ingestionSources.validateOttl`, and shows per-statement error
+    coordinates (line/col) inline.
 
   Per template-ottl-principal-guard.feature:
     The 19-key `protectedTemplateAttributeKeys` closed list applies to
@@ -32,59 +35,67 @@ Feature: AI Gateway Governance — Admin OTTL Authoring (Monaco editor)
   # ---------------------------------------------------------------------------
 
   @bdd @template-ottl-authoring @open-editor @platform-default-fork
-  Scenario: Admin forks a platform-default template to author OTTL
-    When carol opens the platform claude_code template detail page and
-        clicks "Edit OTTL"
-    Then a confirmation dialog notes "You are forking the platform-default
-        claude_code template into your org. Your fork's `ottlRules` will
-        apply to acme employees' bindings; the platform default stays
-        unchanged for other orgs."
-    And on confirm a new IngestionTemplate row is created with:
+  Scenario: Admin clones a platform-default template to author OTTL
+    When carol opens the platform claude_code template row in the
+        IngestionTemplates editor and clicks "Clone to customise"
+    Then the platform row is read-only; the action calls
+        `ingestionTemplates.cloneFromPlatform({ templateId, organizationId })`
+    And a new IngestionTemplate row is created with:
       | column         | value                                           |
-      | slug           | claude_code (same)                              |
+      | slug           | claude_code-<nanoid> (slug-disambiguated)       |
       | sourceType     | claude_code (same)                              |
-      | organizationId | "acme" (NOT NULL — org-authored fork)           |
-      | ottlRules      | "" (empty starter — admin will fill in)          |
+      | organizationId | "acme" (NOT NULL — org-authored row)            |
+      | ottlRules      | (copied from the platform row as starter)       |
       | parentTemplateId | (platform-default's id, for provenance)        |
-    And the Monaco editor opens with the empty starter
+    And the Edit OTTL drawer opens on the new org row with the OttlEditor
+        loaded against the cloned starter (admin can refine from there)
     And acme's existing UserIngestionBindings for slug "claude_code" are
         re-pointed to the new fork on next trace receive (not snapshot —
         runtime-resolved per ingestion-templates-catalog.feature)
 
   @bdd @template-ottl-authoring @open-editor @org-fork-direct-edit
   Scenario: Admin edits an existing org-authored template directly (no fork)
-    Given acme already has an org-authored fork at templateId "tpl_acme_claude_code"
-    When carol clicks "Edit OTTL" on that template's detail page
-    Then NO fork dialog appears (it's already an org-authored row)
-    And the Monaco editor opens with the current `ottlRules` content
-    And the editor's title bar shows "Editing: tpl_acme_claude_code (claude_code, acme org)"
+    Given acme already has an org-authored row at templateId "tpl_acme_claude_code"
+    When carol clicks "Edit OTTL" on that row
+    Then NO clone affordance appears (it's already an org-authored row);
+        the action calls `ingestionTemplates.updateOttlRules` directly
+    And the Edit OTTL drawer opens with the OttlEditor loaded with the
+        current `ottlRules` content
+    And the drawer header shows "Edit OTTL — <displayName>" so the admin
+        knows which template they're editing
 
   # ---------------------------------------------------------------------------
   # Editor surface
   # ---------------------------------------------------------------------------
 
   @bdd @template-ottl-authoring @editor @ergonomics
-  Scenario: Monaco editor surface reuses the existing LangWatch editor component
+  Scenario: Editor surface reuses the existing OttlEditor component
     When the editor opens
-    Then it uses the same Monaco component already present in the
-        codebase (e.g. the prompts editor / scenario-test editor) — no
-        new editor implementation
+    Then it uses the existing `OttlEditor` component at
+        `@ee/governance/dashboard/components/OttlEditor` — no new editor
+        implementation; same component IngestionSources already uses
     And it has:
-      | feature                  | shape                                                  |
-      | OTTL syntax highlighting | language="ottl" or fallback "yaml" w/ keyword tokens   |
-      | Line numbers             | yes                                                    |
-      | Save button              | "Save & validate"                                      |
-      | Cancel button            | "Discard changes"                                      |
-      | Sample input pane        | a canned OTLP span shape from canned-payloads (e.g. anthropic.usage.* shape) |
-      | Preview pane             | dry-run-applies the current OTTL to the sample input + shows the resulting span shape |
+      | feature                       | shape                                                  |
+      | Per-statement Textarea list   | one Chakra Textarea per OTTL statement, add/remove rows |
+      | Async validation (debounced)  | 600ms debounce → `api.ingestionSources.validateOttl` against gateway `pkg/ottl` |
+      | Per-statement error display   | inline message + line/col coordinates from parser      |
+      | Starter template auto-fill    | source-type-specific starter from `api.ingestionSources.ottlStarter` (suppressible by caller) |
+      | Save button                   | "Save & validate" — drawer-level submit                |
+      | Cancel button                 | "Discard changes" — drawer-level cancel                |
+    # Note: a Monaco-based editor with full grammar highlighting +
+    # preview pane is a possible follow-on refinement; the current per-
+    # statement Textarea + async validation surface is what shipped in
+    # this PR (Alexis at d61842a3f) per rchaves's "use what we already
+    # have" directive.
 
   @bdd @template-ottl-authoring @editor @validation-on-save
   Scenario: Save triggers OTTL syntax + protected-key validation server-side
     Given carol has authored OTTL that includes a syntax error
     When she clicks "Save & validate"
     Then the server runs `validateOTTL(rules, mode="dryRun")`
-    And the response surfaces the parser error inline at the offending line
-        (Monaco gutter marker + error toast)
+    And the response surfaces the parser error inline at the offending
+        line (per-statement error message + line/col coordinates from
+        the gateway `pkg/ottl` parser, plus an error toast)
     And the template's `ottlRules` is NOT updated until validation passes
 
   @bdd @template-ottl-authoring @editor @protected-key-rejection
