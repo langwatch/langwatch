@@ -159,22 +159,49 @@ Feature: Ingestion attribution invariant — credential is authoritative; payloa
     And no cross-org leak: admin in org A sees ONLY org A's hidden Gov
 
   @bdd @ingestion @quarantine @admin @regression
-  Scenario: Admin warning fires when quarantine fill rate exceeds threshold
+  Scenario: Admin warning surfaces when quarantine fill rate exceeds threshold (polling Alert)
     Given >N spans/min are landing in the hidden Gov project for the
         org over a sliding window (default N tuned to alert on
-        misconfigured pull-mode pullers, not normal quiescent traffic)
-    When the quarantine-fill reactor evaluates the window
-    Then an OCSF event fires with shape:
-      | field        | value                                                    |
-      | category     | "ingestion"                                              |
-      | class        | "quarantine_fill_threshold_exceeded"                     |
-      | severity     | "warning"                                                |
-      | message      | "{N} spans/min landing in quarantine — likely misconfigured ingest" |
-      | metadata     | `{ ingestionSourceCounts: {...}, windowSeconds: ... }`   |
-    And an Alert renders on `/governance` for org admins (no member
-        visibility on this Alert — quarantine fills are admin-only)
-    And the Alert is dismissable but re-fires on the next window if
-        the rate stays elevated
+        misconfigured pull-mode pullers, not normal quiescent traffic;
+        Lane-S `5fba352c8` calibrated default to 100 spans/min over a
+        60s window — above quiescent + healthy-busy, below
+        misconfigured-puller loop volume)
+    When the `/governance` admin dashboard polls
+        `governance.quarantineFillStats({ organizationId })`
+    Then the response shape is:
+      ```
+      { windowSeconds, threshold, spanCount, rate, exceeded, perSource }
+      ```
+    And when `exceeded === true`, an Alert renders on `/governance`
+        for org admins with copy
+        "{rate} spans/min landing in quarantine — likely misconfigured ingest"
+    And the Alert lists the per-source breakdown so admins can pin
+        which source is misconfigured without a separate drill-down
+    And no member-side visibility on this Alert — quarantine fills are
+        admin-only (Layer-1 filter strips hidden-Gov rows for members
+        regardless of any explicit projectId)
+    And the Alert path is fail-safe — CH query error returns zero stats
+        instead of crashing the dashboard
+
+  @bdd @ingestion @quarantine @admin @follow-up
+  Scenario: OCSF auto-emission on threshold-crossed (deferred adoption)
+    Given the polling-Alert scenario above is the v1 admin-warning
+        surface satisfying this PR's `quarantine_fill_threshold_exceeded`
+        invariant
+    When future work needs to push the same signal to OCSF for SIEM
+        consumption (downstream alerting / pager integration / external
+        audit feed)
+    Then an OCSF reactor adopting the polling evaluator's signal is
+        the canonical extension point — fires
+        `category=ingestion class=quarantine_fill_threshold_exceeded
+         severity=warning` with the same `metadata` shape as the
+        polled response (windowSeconds + perSource)
+    And the dedup / re-fire-on-next-window state-machine is part of
+        that follow-up; deliberately deferred to allow production data
+        to inform the right threshold-tuning + cool-down window before
+        committing to a state-machine shape
+    # Building block is in place via `governance.quarantineFillStats`;
+    # follow-up worker is mechanical adoption when needed.
 
   # ---------------------------------------------------------------------------
   # NO admin catch-all read backdoor (SOC2 / ISO27001 invariant)
