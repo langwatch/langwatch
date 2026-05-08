@@ -4,7 +4,7 @@ description: Per-platform integration matrix for LangWatch governance receivers.
 sidebarTitle: Ingestion sources
 ---
 
-<Info>**Pairs with:** [AI Gateway → Observability](/ai-gateway/observability). The gateway is itself an ingestion source (its spans land in the same trace store); IngestionSources extend that substrate to platforms whose API key path you don't own (Workato, Copilot Studio, OpenAI/Anthropic compliance APIs).</Info>
+<Info>**Pairs with:** [AI Gateway → Observability](/ai-gateway/observability). The gateway is itself an ingestion source (its spans land in the same trace store); IngestionSources extend that substrate to platforms whose API key path you don't own (Workato, Copilot Studio, OpenAI/Anthropic compliance APIs). Also pairs with [Audit log](/ai-governance/audit-log) — S3 audit log feeds (Workato, Copilot Studio, Anthropic Compliance) become OTel-shaped events through this same pipeline, so a single audit log query at `/settings/audit-log` covers in-platform mutations and third-party-tool activity uniformly.</Info>
 
 <Note>**`otel_generic` + `thirty_days` retention are Apache 2.0 floor; multi-source + extended retention require Enterprise.** Self-hosted Apache 2.0 deployments can wire one OTel receiver at the default 30-day retention; the additional source types on this page (Workato, S3, Copilot Studio, OpenAI / Anthropic compliance APIs) and the `one_year` / `seven_years` retention classes ship under the Enterprise license. Non-enterprise organizations see an upgrade card on `/settings/governance/ingestion-sources`. See [Open-core licensing](/ai-governance/overview#open-core-licensing) for the full split.</Note>
 
