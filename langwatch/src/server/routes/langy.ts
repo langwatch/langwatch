@@ -9,6 +9,7 @@
  */
 import {
   convertToModelMessages,
+  generateText,
   stepCountIs,
   streamText,
   tool,
@@ -32,11 +33,112 @@ import { getVercelAIModel } from "~/server/modelProviders/utils";
 import { PromptService } from "~/server/prompt-config/prompt.service";
 import { parseEvaluationResult } from "~/utils/evaluationResults";
 import { createLogger } from "~/utils/logger/server";
+import { auditLog } from "~/server/auditLog";
+import { TiktokenClient } from "~/server/app-layer/clients/tokenizer/tiktoken.client";
+import {
+  LangyConversationService,
+  LangyMessageService,
+  LangyProjectMemoryService,
+  LangyUserPreferencesService,
+} from "~/server/services/langy";
+import { ConversationToolIdSet } from "~/server/services/langy/toolIdValidator";
+import {
+  LANGY_TOOL_CALLS_PER_MESSAGE,
+  checkLangyMessageRateLimit,
+} from "~/server/middleware/rate-limit-langy";
+import { esClient, TRACE_INDEX } from "~/server/elasticsearch";
 import type { NextRequestShim as any } from "./types";
 
 const logger = createLogger("langwatch:api:langy");
 
-const LANGY_MODEL = "openai/gpt-5";
+const LANGY_FALLBACK_MODEL = "openai/gpt-5-mini";
+
+function buildSystemPrompt(opts: {
+  projectMemory: string | null;
+  mode: string;
+}): string {
+  const segments = [LANGY_SYSTEM_PROMPT];
+  if (opts.mode === "expert") {
+    segments.push(
+      "\n## Mode: expert\n- Be terse. Drop confirmations the user did not ask for. Skip restating the question. Use jargon freely.",
+    );
+  } else {
+    segments.push(
+      "\n## Mode: non-expert\n- Default to plain language. Confirm before destructive actions. Prefer visual summaries over JSON.",
+    );
+  }
+  if (opts.projectMemory) {
+    segments.push(
+      `\n## Project memory\n${opts.projectMemory}\n\nUse this memory as context. If something here is wrong, the user can edit it in Settings → Langy.`,
+    );
+  }
+  return segments.join("\n");
+}
+
+async function loadInjectableProjectMemory(
+  projectId: string,
+): Promise<string | null> {
+  const service = LangyProjectMemoryService.create(prisma);
+  const memory = await service.getById({ projectId });
+  if (!memory) return null;
+  return memory.contentSummary ?? memory.content;
+}
+
+function extractAssistantText(
+  parts: Array<Record<string, unknown>> | undefined,
+): string {
+  if (!Array.isArray(parts)) return "";
+  return parts
+    .map((p) => (typeof p?.text === "string" ? (p.text as string) : ""))
+    .filter(Boolean)
+    .join("\n");
+}
+
+async function persistAssistantMessage(opts: {
+  conversationId: string;
+  projectId: string;
+  parts: unknown;
+  text: string;
+  model: string;
+}) {
+  const tokenizer = new TiktokenClient();
+  const tokenCount = (await tokenizer.countTokens(opts.model, opts.text)) ?? null;
+  const messageService = LangyMessageService.create(prisma);
+  await messageService.append({
+    conversationId: opts.conversationId,
+    projectId: opts.projectId,
+    role: "assistant",
+    parts: opts.parts ?? [],
+    tokenCount,
+  });
+  const conversationService = LangyConversationService.create(prisma);
+  await conversationService.touch({
+    id: opts.conversationId,
+    projectId: opts.projectId,
+  });
+}
+
+async function persistUserMessage(opts: {
+  conversationId: string;
+  projectId: string;
+  message: UIMessage;
+  model: string;
+}) {
+  const text =
+    Array.isArray(opts.message.parts) && opts.message.parts.length
+      ? extractAssistantText(opts.message.parts as Array<Record<string, unknown>>)
+      : "";
+  const tokenizer = new TiktokenClient();
+  const tokenCount = (await tokenizer.countTokens(opts.model, text)) ?? null;
+  const messageService = LangyMessageService.create(prisma);
+  await messageService.append({
+    conversationId: opts.conversationId,
+    projectId: opts.projectId,
+    role: "user",
+    parts: opts.message.parts ?? [],
+    tokenCount,
+  });
+}
 
 const LANGY_SYSTEM_PROMPT = `You are Langy, the in-product AI assistant for LangWatch. You live in a right-side sidebar inside the experiment workbench.
 
@@ -95,10 +197,16 @@ app.post("/langy/chat", async (c) => {
     );
   }
 
-  const { messages, projectId, experimentSlug } = (await c.req.json()) as {
+  const {
+    messages,
+    projectId,
+    experimentSlug,
+    conversationId: requestedConversationId,
+  } = (await c.req.json()) as {
     messages: UIMessage[];
     projectId: string;
     experimentSlug?: string;
+    conversationId?: string | null;
   };
 
   if (!projectId) {
@@ -117,8 +225,73 @@ app.post("/langy/chat", async (c) => {
     );
   }
 
+  const rl = await checkLangyMessageRateLimit({
+    userId: session.user.id,
+    projectId,
+  });
+  if (!rl.allowed) {
+    return c.json(
+      {
+        error: "Too many messages. Please slow down.",
+        retryAfterSeconds: rl.retryAfterSeconds,
+      },
+      {
+        status: 429,
+        headers: rl.retryAfterSeconds
+          ? { "Retry-After": String(rl.retryAfterSeconds) }
+          : undefined,
+      },
+    );
+  }
+
+  const conversationService = LangyConversationService.create(prisma);
+  const messageService = LangyMessageService.create(prisma);
+  const preferencesService = LangyUserPreferencesService.create(prisma);
+
+  const conversation = await conversationService.ensureConversation({
+    projectId,
+    userId: session.user.id,
+    conversationId: requestedConversationId ?? null,
+    title:
+      messages[0] && extractAssistantText(messages[0].parts as any)
+        ? extractAssistantText(messages[0].parts as any).slice(0, 80)
+        : null,
+  });
+
+  const lastUserMessage = messages[messages.length - 1];
+  const projectMemory = await loadInjectableProjectMemory(projectId);
+  const prefs = await preferencesService.getById({
+    userId: session.user.id,
+    projectId,
+  });
+
+  let model;
+  try {
+    model = await getVercelAIModel(projectId);
+  } catch (error) {
+    return c.json(
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : "No model configured for this project.",
+      },
+      { status: 409 },
+    );
+  }
+
+  if (lastUserMessage?.role === "user") {
+    await persistUserMessage({
+      conversationId: conversation.id,
+      projectId,
+      message: lastUserMessage,
+      model: LANGY_FALLBACK_MODEL,
+    });
+  }
+
   const evaluatorService = EvaluatorService.create(prisma);
   const promptService = new PromptService(prisma);
+  const seenIds = new ConversationToolIdSet();
 
   const tools = {
     list_evaluators: tool({
@@ -140,6 +313,8 @@ app.post("/langy/chat", async (c) => {
             projectId,
           });
           for (const e of projectEvaluators) {
+            seenIds.record("evaluator_id", e.id);
+            seenIds.record("evaluator_slug", e.slug);
             items.push({
               source: "project",
               id: e.id,
@@ -155,6 +330,7 @@ app.post("/langy/chat", async (c) => {
           for (const [evaluatorType, def] of Object.entries(
             AVAILABLE_EVALUATORS,
           )) {
+            seenIds.record("evaluator_type", evaluatorType);
             items.push({
               source: "built_in",
               evaluatorType,
@@ -198,6 +374,8 @@ app.post("/langy/chat", async (c) => {
               error: `No project evaluator found with slug '${slug}'.`,
             };
           }
+          seenIds.record("evaluator_id", evaluator.id);
+          seenIds.record("evaluator_slug", evaluator.slug);
           const enriched = await evaluatorService.enrichWithFields(evaluator);
           return {
             source: "project",
@@ -249,6 +427,10 @@ app.post("/langy/chat", async (c) => {
           projectId,
           version: "latest",
         });
+        for (const p of prompts as Array<Record<string, unknown>>) {
+          seenIds.record("prompt_id", p.id as string);
+          seenIds.record("prompt_handle", p.handle as string);
+        }
         return {
           items: prompts.map((p: Record<string, unknown>) => ({
             id: p.id,
@@ -271,6 +453,7 @@ app.post("/langy/chat", async (c) => {
           orderBy: { updatedAt: "desc" },
           include: { _count: { select: { datasetRecords: true } } },
         });
+        for (const d of datasets) seenIds.record("dataset_id", d.id);
         return {
           items: datasets.map((d) => ({
             id: d.id,
@@ -412,6 +595,11 @@ app.post("/langy/chat", async (c) => {
           ),
       }),
       execute: async ({ name, evaluatorType, settings, rationale }) => {
+        if (!seenIds.has("evaluator_type", evaluatorType)) {
+          return {
+            error: `Evaluator type '${evaluatorType}' was not surfaced by list_evaluators in this conversation. Call list_evaluators('built_in') and reference one of those types.`,
+          };
+        }
         const def =
           AVAILABLE_EVALUATORS[
             evaluatorType as keyof typeof AVAILABLE_EVALUATORS
@@ -734,6 +922,11 @@ app.post("/langy/chat", async (c) => {
         rationale: z.string(),
       }),
       execute: async ({ slug, name, settings, rationale }) => {
+        if (!seenIds.has("evaluator_slug", slug)) {
+          return {
+            error: `Evaluator slug '${slug}' was not surfaced by list_evaluators in this conversation. Call list_evaluators first.`,
+          };
+        }
         const evaluator = await evaluatorService.getBySlug({ slug, projectId });
         if (!evaluator) {
           return { error: `No project evaluator with slug '${slug}'.` };
@@ -783,6 +976,11 @@ app.post("/langy/chat", async (c) => {
           ),
       }),
       execute: async ({ slug, rationale }) => {
+        if (!seenIds.has("evaluator_slug", slug)) {
+          return {
+            error: `Evaluator slug '${slug}' was not surfaced by list_evaluators in this conversation.`,
+          };
+        }
         const evaluator = await evaluatorService.getBySlug({ slug, projectId });
         if (!evaluator) {
           return { error: `No project evaluator with slug '${slug}'.` };
@@ -832,6 +1030,11 @@ app.post("/langy/chat", async (c) => {
         rationale: z.string(),
       }),
       execute: async ({ slug, rationale }) => {
+        if (!seenIds.has("evaluator_slug", slug)) {
+          return {
+            error: `Evaluator slug '${slug}' was not surfaced by list_evaluators in this conversation.`,
+          };
+        }
         const evaluator = await evaluatorService.getBySlug({
           slug,
           projectId,
@@ -857,17 +1060,163 @@ app.post("/langy/chat", async (c) => {
         };
       },
     }),
+
+    search_traces: tool({
+      description:
+        "Lazy semantic-ish search over recent traces in this project. Use when the user asks to 'find traces' matching a description (errors, hallucinations, latency). Returns a small list of trace ids with brief context. Tool result is per-turn only — do not persist or recall ids across conversations.",
+      inputSchema: z.object({
+        query: z
+          .string()
+          .min(1)
+          .describe("Free-text query (e.g. 'hallucinations', 'rag failures')."),
+        limit: z.number().int().min(1).max(20).default(10),
+      }),
+      execute: async ({ query, limit }) => {
+        try {
+          const client = await esClient({ projectId });
+          const result = await client.search({
+            index: TRACE_INDEX.alias,
+            size: limit,
+            body: {
+              query: {
+                bool: {
+                  must: [
+                    { term: { project_id: projectId } },
+                    {
+                      multi_match: {
+                        query,
+                        fields: [
+                          "input.value^2",
+                          "output.value",
+                          "metadata.user_id",
+                          "metadata.thread_id",
+                          "error.message",
+                        ],
+                      },
+                    },
+                  ],
+                },
+              },
+              sort: [{ "timestamps.started_at": { order: "desc" } }],
+            },
+          });
+          const hits = (result.hits?.hits ?? []) as Array<{
+            _id: string;
+            _source?: Record<string, unknown>;
+          }>;
+          return {
+            items: hits.map((h) => ({
+              traceId: h._id,
+              startedAt:
+                (h._source as { timestamps?: { started_at?: number } } | undefined)
+                  ?.timestamps?.started_at ?? null,
+              snippet:
+                (h._source as { input?: { value?: string } } | undefined)?.input
+                  ?.value?.slice(0, 200) ?? null,
+            })),
+          };
+        } catch (error) {
+          logger.warn(
+            { error: error instanceof Error ? error.message : error },
+            "search_traces failed",
+          );
+          return { items: [], error: "search_traces is unavailable right now." };
+        }
+      },
+    }),
+
+    search_prompts: tool({
+      description:
+        "Search prompts in this project by handle/name keyword. Use when looking for an existing prompt to reference or update.",
+      inputSchema: z.object({
+        query: z.string().min(1),
+        limit: z.number().int().min(1).max(20).default(10),
+      }),
+      execute: async ({ query, limit }) => {
+        const rows = await prisma.llmPromptConfig.findMany({
+          where: {
+            projectId,
+            OR: [
+              { handle: { contains: query, mode: "insensitive" } },
+              { name: { contains: query, mode: "insensitive" } },
+            ],
+          },
+          orderBy: { updatedAt: "desc" },
+          take: limit,
+        });
+        for (const r of rows) {
+          seenIds.record("prompt_id", r.id);
+          seenIds.record("prompt_handle", r.handle);
+        }
+        return {
+          items: rows.map((r) => ({
+            id: r.id,
+            handle: r.handle,
+            name: r.name ?? r.handle,
+          })),
+        };
+      },
+    }),
+
+    search_past_runs: tool({
+      description:
+        "Search past evaluation runs (BatchEvaluation) for this project, optionally filtered by experiment slug or workflow id, ordered by recency.",
+      inputSchema: z.object({
+        experimentSlug: z.string().optional(),
+        workflowId: z.string().optional(),
+        limit: z.number().int().min(1).max(20).default(10),
+      }),
+      execute: async ({ experimentSlug, workflowId: _workflowId, limit }) => {
+        const where: Record<string, unknown> = { projectId };
+        if (experimentSlug) {
+          const exp = await prisma.experiment.findFirst({
+            where: { projectId, slug: experimentSlug },
+            select: { id: true },
+          });
+          if (!exp) return { items: [], error: "experiment not found" };
+          where.experimentId = exp.id;
+        }
+        const rows = await prisma.batchEvaluation.findMany({
+          where,
+          orderBy: { createdAt: "desc" },
+          take: limit,
+          select: {
+            id: true,
+            experimentId: true,
+            createdAt: true,
+            status: true,
+            score: true,
+            passed: true,
+            evaluation: true,
+          },
+        });
+        return {
+          items: rows.map((r) => ({
+            id: r.id,
+            experimentId: r.experimentId,
+            createdAt: r.createdAt,
+            status: r.status,
+            score: r.score,
+            passed: r.passed,
+            evaluation: r.evaluation,
+          })),
+        };
+      },
+    }),
   };
 
-  const model = await getVercelAIModel(projectId, LANGY_MODEL);
+  const systemPrompt = buildSystemPrompt({
+    projectMemory,
+    mode: prefs.mode,
+  });
   const modelMessages = await convertToModelMessages(messages);
 
   const result = streamText({
     model,
-    system: LANGY_SYSTEM_PROMPT,
+    system: systemPrompt,
     messages: modelMessages,
     tools,
-    stopWhen: stepCountIs(8),
+    stopWhen: stepCountIs(LANGY_TOOL_CALLS_PER_MESSAGE),
     maxRetries: 2,
     experimental_telemetry: {
       isEnabled: true,
@@ -875,17 +1224,400 @@ app.post("/langy/chat", async (c) => {
       metadata: {
         "langwatch.project_id": projectId,
         "langwatch.user_id": session.user.id,
+        "langy.conversation_id": conversation.id,
       },
     },
     onError: (error) => {
       logger.error({ error }, "error in langy chat stream");
     },
+    onFinish: async ({ text, response }) => {
+      try {
+        const assistantMessages = response.messages.filter(
+          (m) => m.role === "assistant" || m.role === "tool",
+        );
+        const parts = assistantMessages.flatMap((m) =>
+          Array.isArray(m.content) ? m.content : [],
+        );
+        await persistAssistantMessage({
+          conversationId: conversation.id,
+          projectId,
+          parts,
+          text,
+          model: LANGY_FALLBACK_MODEL,
+        });
+      } catch (error) {
+        logger.error({ error }, "failed to persist langy assistant message");
+      }
+    },
   });
 
   const response = result.toUIMessageStreamResponse();
+  const headers = new Headers(response.headers);
+  headers.set("x-langy-conversation-id", conversation.id);
   return new Response(response.body, {
     status: response.status,
-    headers: response.headers,
+    headers,
+  });
+});
+
+// ============================================================================
+// Conversation management
+// ============================================================================
+
+async function requireSessionAndPermission(c: any, projectId: string | undefined) {
+  const session = await getServerAuthSession({ req: c.req.raw as any });
+  if (!session) return { error: c.json({ error: "Unauthorized" }, { status: 401 }) };
+  if (!projectId) return { error: c.json({ error: "Missing projectId" }, { status: 400 }) };
+  const ok = await hasProjectPermission(
+    { prisma, session },
+    projectId,
+    "evaluations:view",
+  );
+  if (!ok) return { error: c.json({ error: "Forbidden" }, { status: 403 }) };
+  return { session };
+}
+
+async function requireProjectAdmin(session: Awaited<ReturnType<typeof getServerAuthSession>>, projectId: string) {
+  if (!session) return false;
+  return await hasProjectPermission(
+    { prisma, session },
+    projectId,
+    "project:manage",
+  );
+}
+
+app.get("/langy/conversations", async (c) => {
+  const projectId = c.req.query("projectId");
+  const guard = await requireSessionAndPermission(c, projectId);
+  if (guard.error) return guard.error;
+  const limit = Number(c.req.query("limit") ?? "50");
+  const service = LangyConversationService.create(prisma);
+  const conversations = await service.getAll({
+    projectId: projectId!,
+    userId: guard.session!.user.id,
+    limit: Math.min(Math.max(limit, 1), 100),
+  });
+  return c.json({ conversations });
+});
+
+app.get("/langy/conversations/:id", async (c) => {
+  const projectId = c.req.query("projectId");
+  const guard = await requireSessionAndPermission(c, projectId);
+  if (guard.error) return guard.error;
+  const id = c.req.param("id");
+  const convService = LangyConversationService.create(prisma);
+  const conv = await convService.getById({
+    id,
+    projectId: projectId!,
+    userId: guard.session!.user.id,
+  });
+  if (!conv) return c.json({ error: "Not found" }, { status: 404 });
+  const msgService = LangyMessageService.create(prisma);
+  const messages = await msgService.getAllByConversation({
+    conversationId: conv.id,
+    projectId: projectId!,
+  });
+  return c.json({ conversation: conv, messages });
+});
+
+app.patch("/langy/conversations/:id", async (c) => {
+  const body = (await c.req.json()) as {
+    projectId: string;
+    title?: string | null;
+    isShared?: boolean;
+  };
+  const guard = await requireSessionAndPermission(c, body.projectId);
+  if (guard.error) return guard.error;
+  const id = c.req.param("id");
+  const service = LangyConversationService.create(prisma);
+  try {
+    const updated = await service.updateById({
+      id,
+      projectId: body.projectId,
+      userId: guard.session!.user.id,
+      title: body.title,
+      isShared: body.isShared,
+    });
+    if (body.isShared !== undefined) {
+      await auditLog({
+        userId: guard.session!.user.id,
+        projectId: body.projectId,
+        action: body.isShared
+          ? "langy.conversation.share"
+          : "langy.conversation.unshare",
+        args: { conversationId: id },
+      });
+    }
+    return c.json({ conversation: updated });
+  } catch {
+    return c.json({ error: "Not found or not owned" }, { status: 404 });
+  }
+});
+
+app.delete("/langy/conversations/:id", async (c) => {
+  const projectId = c.req.query("projectId");
+  const guard = await requireSessionAndPermission(c, projectId);
+  if (guard.error) return guard.error;
+  const id = c.req.param("id");
+  const service = LangyConversationService.create(prisma);
+  const ok = await service.deleteById({
+    id,
+    projectId: projectId!,
+    userId: guard.session!.user.id,
+  });
+  if (!ok) return c.json({ error: "Not found or not owned" }, { status: 404 });
+  return c.json({ success: true });
+});
+
+// ============================================================================
+// Project memory
+// ============================================================================
+
+const PROJECT_MEMORY_REFRESH_PROMPT = `You are regenerating a project memory file for the LangWatch assistant Langy.
+
+Read the snapshot of the project state below (evaluators, prompts, datasets) and produce a concise, plain-language markdown brief covering:
+- What this project does (one sentence)
+- Active evaluators and what they check
+- Notable prompts and their purpose
+- Anything unusual worth noting
+
+Keep under 1500 tokens. No invented facts.`;
+
+app.get("/langy/project-memory", async (c) => {
+  const projectId = c.req.query("projectId");
+  const guard = await requireSessionAndPermission(c, projectId);
+  if (guard.error) return guard.error;
+  const service = LangyProjectMemoryService.create(prisma);
+  const memory = await service.getById({ projectId: projectId! });
+  return c.json({ memory });
+});
+
+app.put("/langy/project-memory", async (c) => {
+  const body = (await c.req.json()) as { projectId: string; content: string };
+  const guard = await requireSessionAndPermission(c, body.projectId);
+  if (guard.error) return guard.error;
+  const isAdmin = await requireProjectAdmin(guard.session!, body.projectId);
+  if (!isAdmin) {
+    return c.json(
+      { error: "Editing project memory requires project admin." },
+      { status: 403 },
+    );
+  }
+  const service = LangyProjectMemoryService.create(prisma);
+  const memory = await service.writeNewVersion({
+    projectId: body.projectId,
+    content: body.content,
+    changedById: guard.session!.user.id,
+    changeReason: "user_edit",
+  });
+  await auditLog({
+    userId: guard.session!.user.id,
+    projectId: body.projectId,
+    action: "langy.project_memory.edit",
+    args: { contentVersion: memory.contentVersion },
+  });
+  return c.json({ memory });
+});
+
+app.post("/langy/project-memory/refresh", async (c) => {
+  const body = (await c.req.json()) as { projectId: string };
+  const guard = await requireSessionAndPermission(c, body.projectId);
+  if (guard.error) return guard.error;
+  const isAdmin = await requireProjectAdmin(guard.session!, body.projectId);
+  if (!isAdmin) {
+    return c.json(
+      { error: "Refreshing project memory requires project admin." },
+      { status: 403 },
+    );
+  }
+
+  let model;
+  try {
+    model = await getVercelAIModel(body.projectId);
+  } catch (error) {
+    return c.json(
+      {
+        error:
+          error instanceof Error ? error.message : "No model configured.",
+      },
+      { status: 409 },
+    );
+  }
+
+  const [project, evaluators, prompts, datasets] = await Promise.all([
+    prisma.project.findUnique({
+      where: { id: body.projectId },
+      select: { name: true, language: true, framework: true },
+    }),
+    prisma.evaluator.findMany({
+      where: { projectId: body.projectId },
+      select: { name: true, slug: true, type: true },
+      take: 50,
+    }),
+    prisma.llmPromptConfig.findMany({
+      where: { projectId: body.projectId },
+      select: { handle: true, name: true },
+      take: 50,
+    }),
+    prisma.dataset.findMany({
+      where: { projectId: body.projectId, archivedAt: null },
+      select: { name: true, slug: true },
+      take: 50,
+    }),
+  ]);
+
+  const snapshot = JSON.stringify(
+    { project, evaluators, prompts, datasets },
+    null,
+    2,
+  );
+
+  const stream = streamText({
+    model,
+    system: PROJECT_MEMORY_REFRESH_PROMPT,
+    messages: [
+      {
+        role: "user",
+        content: `Project snapshot (JSON):\n\n${snapshot}`,
+      },
+    ],
+    onFinish: async ({ text }) => {
+      try {
+        const memoryService = LangyProjectMemoryService.create(prisma);
+        await memoryService.writeNewVersion({
+          projectId: body.projectId,
+          content: text,
+          changeReason: "user_refresh",
+          changedById: guard.session!.user.id,
+        });
+        await auditLog({
+          userId: guard.session!.user.id,
+          projectId: body.projectId,
+          action: "langy.project_memory.refresh",
+        });
+      } catch (error) {
+        logger.error({ error }, "failed to persist refreshed project memory");
+      }
+    },
+    onError: (error) => {
+      logger.error({ error }, "project memory refresh stream errored");
+    },
+  });
+
+  return stream.toUIMessageStreamResponse();
+});
+
+// ============================================================================
+// Preferences
+// ============================================================================
+
+app.get("/langy/preferences", async (c) => {
+  const projectId = c.req.query("projectId");
+  const guard = await requireSessionAndPermission(c, projectId);
+  if (guard.error) return guard.error;
+  const service = LangyUserPreferencesService.create(prisma);
+  const prefs = await service.getById({
+    userId: guard.session!.user.id,
+    projectId: projectId!,
+  });
+  return c.json({ preferences: prefs });
+});
+
+app.put("/langy/preferences", async (c) => {
+  const body = (await c.req.json()) as {
+    projectId: string;
+    mode?: "non_expert" | "expert";
+    dismissedSuggestionKinds?: string[];
+  };
+  const guard = await requireSessionAndPermission(c, body.projectId);
+  if (guard.error) return guard.error;
+  const service = LangyUserPreferencesService.create(prisma);
+  let prefs = await service.getById({
+    userId: guard.session!.user.id,
+    projectId: body.projectId,
+  });
+  if (body.mode) {
+    prefs = await service.setMode({
+      userId: guard.session!.user.id,
+      projectId: body.projectId,
+      mode: body.mode,
+    });
+  }
+  if (body.dismissedSuggestionKinds) {
+    prefs = await service.setDismissedSuggestionKinds({
+      userId: guard.session!.user.id,
+      projectId: body.projectId,
+      kinds: body.dismissedSuggestionKinds,
+    });
+  }
+  return c.json({ preferences: prefs });
+});
+
+// ============================================================================
+// Memory clear-all + GDPR export
+// ============================================================================
+
+app.delete("/langy/memory", async (c) => {
+  const projectId = c.req.query("projectId");
+  const guard = await requireSessionAndPermission(c, projectId);
+  if (guard.error) return guard.error;
+  const userId = guard.session!.user.id;
+  const convService = LangyConversationService.create(prisma);
+  const prefService = LangyUserPreferencesService.create(prisma);
+  const result = await convService.clearAllForUser({
+    projectId: projectId!,
+    userId,
+  });
+  await prefService.resetForUser({ projectId: projectId!, userId });
+  await auditLog({
+    userId,
+    projectId: projectId!,
+    action: "langy.memory.clear_all",
+    args: { deletedCount: result.deletedCount },
+  });
+  return c.json({ deletedCount: result.deletedCount });
+});
+
+app.get("/langy/memory/export", async (c) => {
+  const projectId = c.req.query("projectId");
+  const guard = await requireSessionAndPermission(c, projectId);
+  if (guard.error) return guard.error;
+  const userId = guard.session!.user.id;
+  const convService = LangyConversationService.create(prisma);
+  const conversations = await convService.getAll({
+    projectId: projectId!,
+    userId,
+    limit: 1000,
+  });
+  const msgService = LangyMessageService.create(prisma);
+  const conversationsWithMessages = await Promise.all(
+    conversations
+      .filter((c) => c.isOwn)
+      .map(async (c) => ({
+        conversation: c,
+        messages: await msgService.getAllByConversation({
+          conversationId: c.id,
+          projectId: projectId!,
+        }),
+      })),
+  );
+  const prefService = LangyUserPreferencesService.create(prisma);
+  const preferences = await prefService.getById({
+    userId,
+    projectId: projectId!,
+  });
+  await auditLog({
+    userId,
+    projectId: projectId!,
+    action: "langy.memory.export",
+    args: { conversationCount: conversationsWithMessages.length },
+  });
+  return c.json({
+    exportedAt: new Date().toISOString(),
+    projectId,
+    userId,
+    conversations: conversationsWithMessages,
+    preferences,
   });
 });
 
