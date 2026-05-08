@@ -37,6 +37,7 @@ import { api } from "../utils/api";
 import { findCurrentRoute, projectRoutes, type Route } from "../utils/routes";
 import { trackEvent } from "../utils/tracking";
 import { AnnouncementBanner } from "./AnnouncementBanner";
+import { AdminViewingAsBanner } from "./governance/AdminViewingAsBanner";
 import { CurrentDrawer } from "./CurrentDrawer";
 import { FullLogo } from "./icons/FullLogo";
 import { LogoIcon } from "./icons/LogoIcon";
@@ -417,6 +418,24 @@ export const DashboardLayout = ({
   // && Team.ownerUserId === me).
   const isOnOwnPersonalProject =
     !!team?.isPersonal && team.ownerUserId === session?.user?.id;
+  // Admin viewing-as detection: org-admin is on a project that belongs
+  // to another user's Personal Workspace OR a team they're not a TeamUser
+  // of. Drives the persistent <AdminViewingAsBanner> chrome — context-
+  // clarity affordance preventing the admin from confusing whose
+  // workspace they're seeing during serial drill-throughs from the
+  // bird's-eye list. Server-side-gated DOM (rendered at this layout
+  // layer, NOT a client-side flag) so direct-paste of the URL still
+  // surfaces the banner on first paint.
+  const adminViewingAs: { label: string; kind: "personal" | "team" } | null =
+    organizationRole === OrganizationUserRole.ADMIN && team
+      ? team.isPersonal
+        ? team.ownerUserId !== session?.user?.id
+          ? { label: team.name, kind: "personal" as const }
+          : null
+        : !team.members?.some((m) => m.userId === session?.user?.id)
+          ? { label: team.name, kind: "team" as const }
+          : null
+      : null;
   const isPersonalScopeRoute =
     personalScope ||
     router.pathname.startsWith("/me") ||
@@ -849,6 +868,13 @@ export const DashboardLayout = ({
 
             <AnnouncementBanner />
             <SdkRadarBanner />
+
+            {adminViewingAs && (
+              <AdminViewingAsBanner
+                workspaceLabel={adminViewingAs.label}
+                workspaceKind={adminViewingAs.kind}
+              />
+            )}
 
             {ssoStatus?.pendingSsoSetup && (
               <Alert.Root
