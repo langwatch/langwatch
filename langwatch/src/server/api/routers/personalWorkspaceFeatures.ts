@@ -23,6 +23,7 @@ import {
   PersonalWorkspaceFeaturesService,
 } from "@ee/governance/services/personalWorkspaceFeatures.service";
 
+import { skipPermissionCheck } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 const featureSchema = z.enum(
@@ -31,9 +32,17 @@ const featureSchema = z.enum(
 
 void featureSchema;
 
+const allowProjectIdForOwnerUserGate = skipPermissionCheck({
+  allow: {
+    projectId:
+      "auth is service-layer (PersonalWorkspaceFeaturesService asserts isPersonal && ownerUserId === caller)",
+  },
+});
+
 export const personalWorkspaceFeaturesRouter = createTRPCRouter({
   get: protectedProcedure
     .input(z.object({ projectId: z.string() }))
+    .use(allowProjectIdForOwnerUserGate)
     .query(async ({ ctx, input }) => {
       const service = PersonalWorkspaceFeaturesService.create(ctx.prisma);
       try {
@@ -54,6 +63,7 @@ export const personalWorkspaceFeaturesRouter = createTRPCRouter({
 
   enableAll: protectedProcedure
     .input(z.object({ projectId: z.string() }))
+    .use(allowProjectIdForOwnerUserGate)
     .mutation(async ({ ctx, input }) => {
       const service = PersonalWorkspaceFeaturesService.create(ctx.prisma);
       try {
@@ -74,6 +84,7 @@ export const personalWorkspaceFeaturesRouter = createTRPCRouter({
 
   disableAll: protectedProcedure
     .input(z.object({ projectId: z.string() }))
+    .use(allowProjectIdForOwnerUserGate)
     .mutation(async ({ ctx, input }) => {
       const service = PersonalWorkspaceFeaturesService.create(ctx.prisma);
       try {
