@@ -11,6 +11,7 @@ import type { FloatRect } from "./useFloatRect";
 interface FloatingAiBarProps {
   rect: FloatRect | null;
   onClose: () => void;
+  initialPrompt?: string;
 }
 
 const AI_TIPS = [
@@ -38,6 +39,7 @@ const useCyclingTip = (active: boolean): string => {
 export const FloatingAiBar: React.FC<FloatingAiBarProps> = ({
   rect,
   onClose,
+  initialPrompt,
 }) => {
   const [pending, setPending] = useState(false);
   const tip = useCyclingTip(!pending);
@@ -80,7 +82,11 @@ export const FloatingAiBar: React.FC<FloatingAiBarProps> = ({
           gap={2}
           zIndex={1}
         >
-          <AiQueryComposer onClose={onClose} onPendingChange={setPending} />
+          <AiQueryComposer
+            onClose={onClose}
+            onPendingChange={setPending}
+            initialPrompt={initialPrompt}
+          />
         </Box>
       </motion.div>
       <motion.div

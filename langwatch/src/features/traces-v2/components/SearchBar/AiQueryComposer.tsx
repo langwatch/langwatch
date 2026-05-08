@@ -6,6 +6,12 @@ import { useAiTraceAction } from "../ai/useAiTraceAction";
 interface AiQueryComposerProps {
   onClose: () => void;
   onPendingChange?: (pending: boolean) => void;
+  /**
+   * Seed value for the prompt input. Used when the user typed something
+   * into the search bar and then hit ⌘I / clicked Ask AI — without this
+   * the typed text gets wiped and the user has to re-type.
+   */
+  initialPrompt?: string;
 }
 
 const PLACEHOLDERS = [
@@ -20,8 +26,9 @@ const PLACEHOLDERS = [
 export const AiQueryComposer: React.FC<AiQueryComposerProps> = ({
   onClose,
   onPendingChange,
+  initialPrompt = "",
 }) => {
-  const [prompt, setPrompt] = useState("");
+  const [prompt, setPrompt] = useState(initialPrompt);
   const { submit, isPending, error, clearError } = useAiTraceAction({
     mode: "filter",
     onDone: onClose,

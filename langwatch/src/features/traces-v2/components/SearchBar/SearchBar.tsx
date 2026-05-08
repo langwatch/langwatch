@@ -2,13 +2,14 @@ import { Box, Flex, Icon } from "@chakra-ui/react";
 import { Search } from "lucide-react";
 import { AnimatePresence } from "motion/react";
 import type React from "react";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Kbd } from "~/components/ops/shared/Kbd";
 import { useModelProvidersSettings } from "~/hooks/useModelProvidersSettings";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { SEARCH_FIELDS } from "~/server/app-layer/traces/query-language/metadata";
-import { hasCrossFacetOR } from "~/server/app-layer/traces/query-language/queries";
 import { useTraceFacets } from "../../hooks/useTraceFacets";
+import { analyzeOrGroups } from "~/server/app-layer/traces/query-language/queries";
+import { useFacetHoverStore } from "../../stores/facetHoverStore";
 import { useFilterStore } from "../../stores/filterStore";
 import { AskAiButton } from "../ai/AskAiButton";
 import { ActiveSearchEditor } from "./ActiveSearchEditor";
@@ -22,7 +23,12 @@ import {
   statusBackgroundColor,
   statusBorderColor,
 } from "./SearchBarIndicators";
+import { SearchTipsPopover } from "./SearchTipsPopover";
 import { SyntaxHelpDrawerHost } from "./SyntaxHelpDrawer";
+import {
+  TokenValuePicker,
+  type TokenValuePickerAnchor,
+} from "./TokenValuePicker";
 import type { ValueResolver } from "./useFilterEditor";
 import { useFloatRect } from "./useFloatRect";
 import { useGlobalAiShortcut } from "./useGlobalAiShortcut";
@@ -59,20 +65,15 @@ export const SearchBar: React.FC = () => {
   const parseError = useFilterStore((s) => s.parseError);
   const applyQueryText = useFilterStore((s) => s.applyQueryText);
   const clearAll = useFilterStore((s) => s.clearAll);
-  const showCrossFacetWarning = useFilterStore((s) => hasCrossFacetOR(s.ast));
+  const lastAiTranslation = useFilterStore((s) => s.lastAiTranslation);
 
-  // Errors win over warnings — a query that doesn't parse already produces
-  // confusing facet behaviour, so the cross-facet OR warning is moot until
-  // the parse fixes itself.
+  // Cross-facet OR no longer triggers a warning chip: the sidebar now
+  // marks OR-grouped facets with a coloured "OR" pill + rail (see
+  // SidebarSection.orGroupId), so the situation reads honestly without
+  // a banner. Parse errors still win.
   const status: SearchBarStatus = parseError
     ? { kind: "error", message: parseError }
-    : showCrossFacetWarning
-      ? {
-          kind: "warning",
-          message:
-            "Query uses cross-facet OR — the sidebar may not fully reflect what you've searched for.",
-        }
-      : { kind: "ok" };
+    : { kind: "ok" };
 
   // Gate Ask AI on having at least one model provider configured. The
   // AI mode submits requests against the user's own keys; with none
@@ -90,6 +91,12 @@ export const SearchBar: React.FC = () => {
   const [editorMounted, setEditorMounted] = useState(false);
   const [editorHasContent, setEditorHasContent] = useState(false);
   const [aiMode, setAiMode] = useState(false);
+  // Anchor info for the click-a-chip-to-edit-value popover. Lifted to
+  // SearchBar so the popover can portal into document.body and share
+  // the same instance whether the click came from PlaceholderEditor or
+  // the live ProseMirror editor.
+  const [tokenAnchor, setTokenAnchor] =
+    useState<TokenValuePickerAnchor | null>(null);
 
   const requestEditor = useCallback(() => setEditorMounted(true), []);
 
@@ -107,6 +114,64 @@ export const SearchBar: React.FC = () => {
 
   const placeholderRef = useRef<HTMLDivElement>(null);
   const floatRect = useFloatRect(placeholderRef, aiMode);
+
+  // Delegate chip hover events on the search bar so both the cold-load
+  // PlaceholderEditor and the live ProseMirror editor's
+  // decoration-injected chips broadcast hover into the global
+  // `facetHoverStore`. The sidebar listens to that store and
+  // cross-highlights the matching row + any OR-group peers.
+  useEffect(() => {
+    // When the chip layer disappears (AI mode swap, unmount) no DOM
+    // mouseout fires for the removed chip nodes — clear up front so a
+    // mid-hover transition can't leave the sidebar latched on a chip
+    // that no longer exists.
+    if (aiMode) {
+      useFacetHoverStore.getState().clearHover();
+      return;
+    }
+    const root = placeholderRef.current;
+    if (!root) return;
+    const enter = (e: Event) => {
+      const target = (e.target as HTMLElement | null)?.closest(
+        "[data-filter-chip-field][data-filter-chip-value]",
+      ) as HTMLElement | null;
+      if (!target) return;
+      const field = target.dataset.filterChipField ?? "";
+      const value = target.dataset.filterChipValue ?? "";
+      if (!field || !value) return;
+      // Only broadcast the whole OR group when this exact (field,
+      // value) is one of its members. Sharing a field with a group
+      // member doesn't count — `origin:simulation` should not drag
+      // `origin:evaluation` and `origin:application` along just
+      // because they happen to be grouped under the same field.
+      const ast = useFilterStore.getState().ast;
+      const orAnalysis = analyzeOrGroups(ast);
+      const groupId = orAnalysis.memberToGroupId.get(`${field}|${value}`);
+      const group = groupId
+        ? orAnalysis.groups.find((g) => g.id === groupId)
+        : null;
+      if (group) {
+        useFacetHoverStore.getState().setHoveredGroup(group);
+      } else {
+        useFacetHoverStore.getState().setHoveredFacet({ field, value });
+      }
+    };
+    const leave = (e: Event) => {
+      const related = (e as MouseEvent).relatedTarget as HTMLElement | null;
+      // Don't clear if we're moving between two chips — the next chip's
+      // mouseenter will overwrite and we'd otherwise flicker the
+      // highlight off-then-on.
+      if (related?.closest("[data-filter-chip-field]")) return;
+      useFacetHoverStore.getState().clearHover();
+    };
+    root.addEventListener("mouseover", enter, true);
+    root.addEventListener("mouseout", leave, true);
+    return () => {
+      root.removeEventListener("mouseover", enter, true);
+      root.removeEventListener("mouseout", leave, true);
+      useFacetHoverStore.getState().clearHover();
+    };
+  }, [aiMode]);
 
   // ⌘I / Ctrl+I anywhere on the page enters AI mode. Gated through the
   // same provider-primer popover the button uses — pressing the shortcut
@@ -162,6 +227,19 @@ export const SearchBar: React.FC = () => {
             key="ai-bar"
             rect={floatRect}
             onClose={() => setAiMode(false)}
+            // If the URL query is still exactly what the last AI run
+            // produced (same project, no facet/free-text edits since),
+            // re-show the natural-language prompt — the user likely
+            // wants to refine *what they asked*, not edit the generated
+            // syntax. Otherwise fall back to the current query so a
+            // mid-typed expression isn't wiped on AI-mode entry.
+            initialPrompt={
+              lastAiTranslation &&
+              lastAiTranslation.projectId === project?.id &&
+              lastAiTranslation.query === queryText
+                ? lastAiTranslation.prompt
+                : queryText
+            }
           />
         )}
       </AnimatePresence>
@@ -196,22 +274,29 @@ export const SearchBar: React.FC = () => {
                 autoFocus
                 onHasContentChange={setEditorHasContent}
                 valueResolver={valueResolver}
+                onTokenClick={setTokenAnchor}
               />
             ) : (
               <PlaceholderEditor
                 queryText={queryText}
                 onActivate={requestEditor}
                 onApplyQueryText={applyQueryText}
+                onTokenClick={setTokenAnchor}
               />
             )}
           </Box>
 
           <StatusBadge status={status} />
+          <SearchTipsPopover />
           {hasContent ? (
             <ClearButton onClear={handleClear} />
           ) : (
             <Kbd>{"/"}</Kbd>
           )}
+          <TokenValuePicker
+            anchor={tokenAnchor}
+            onClose={() => setTokenAnchor(null)}
+          />
         </Flex>
       )}
     </Box>

@@ -12,8 +12,12 @@ import { STANDARD_COLUMNS } from "../../constants/columns";
 import type { ColumnConfig } from "../../stores/viewStore";
 import { useViewStore } from "../../stores/viewStore";
 
+// Section labels mirror the lens-config dialog so the two surfaces read
+// as the same picker. Previously the standard section had no label, so
+// users skimming the dropdown couldn't tell where Standard ended and
+// Evaluations began without scrolling.
 const SECTIONS: { key: ColumnConfig["section"]; title: string }[] = [
-  { key: "standard", title: "" },
+  { key: "standard", title: "Standard" },
   { key: "evaluations", title: "Evaluations" },
   { key: "events", title: "Events" },
 ];
@@ -50,8 +54,13 @@ export const ColumnsDropdown: React.FC = () => {
         </Button>
       </MenuTrigger>
       <MenuContent
-        minWidth="180px"
-        maxHeight="320px"
+        minWidth="200px"
+        // Lift the cap so all 17 columns + section headers fit without
+        // scrolling on most screens. The dialog version of the same
+        // picker shows everything at once; the dropdown should too —
+        // hidden sections below the fold made it look like the dropdown
+        // exposed fewer columns than the dialog (it doesn't).
+        maxHeight="min(560px, 70vh)"
         overflowY="auto"
         textStyle="xs"
         paddingY={1}

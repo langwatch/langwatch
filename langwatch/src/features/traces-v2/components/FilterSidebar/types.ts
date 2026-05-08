@@ -13,6 +13,14 @@ export interface FacetItem {
    * as loudly as the curated palettes for status / origin / spanType.
    */
   dimmed?: boolean;
+  /**
+   * Synthesised from FACET_DEFAULTS while real descriptors are still
+   * loading. The row is fully interactive (toggles still apply against
+   * the AST) but count + value-bar are hidden — the count would be `0`
+   * and the bar would render empty until real data lands, which read
+   * as "no matches" rather than "loading."
+   */
+  synthetic?: boolean;
 }
 
 export interface AttributeKey {

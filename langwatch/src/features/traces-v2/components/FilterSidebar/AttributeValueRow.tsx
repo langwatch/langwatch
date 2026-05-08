@@ -16,7 +16,11 @@ export const AttributeValueRow = memo(function AttributeValueRow({
   value: string;
   label: string;
   state: FacetValueState;
-  onToggle: (attrKey: string, value: string) => void;
+  onToggle: (
+    attrKey: string,
+    value: string,
+    options?: { modifierKey?: boolean },
+  ) => void;
 }) {
   const isInclude = state === "include";
   const isExclude = state === "exclude";
@@ -40,7 +44,14 @@ export const AttributeValueRow = memo(function AttributeValueRow({
       overflow="hidden"
       background="transparent"
       border="none"
-      onClick={() => onToggle(attrKey, value)}
+      onClick={(e) =>
+        onToggle(attrKey, value, {
+          // Same capture as `FacetRow` so attribute filters honour
+          // Shift/Ctrl/Cmd-click for OR-grouping just like categorical
+          // facets do — without this the modifier silently drops.
+          modifierKey: e.shiftKey || e.ctrlKey || e.metaKey,
+        })
+      }
       _hover={{
         "& [data-facet-label]": {
           color: "white",

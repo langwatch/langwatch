@@ -18,9 +18,12 @@ import {
   SELECT_ALL_MATCHING_CAP,
   useSelectionStore,
 } from "../../stores/selectionStore";
+import { useFilterStore } from "../../stores/filterStore";
 import { useUIStore } from "../../stores/uiStore";
+import { analyzeOrGroups } from "~/server/app-layer/traces/query-language/queries";
 import { DensityProvider } from "../DensityProvider";
 import { FilterSidebar } from "../FilterSidebar/FilterSidebar";
+import { ConnectorLaneWidth } from "../FilterSidebar/OrConnectorOverlay";
 import { FindBar } from "../FindBar";
 import { SearchBar } from "../SearchBar/SearchBar";
 import { BulkActionBar } from "../Toolbar/BulkActionBar";
@@ -38,8 +41,8 @@ import {
 } from "./useKeyboardShortcuts";
 import { useTracesPageTitle } from "./usePageTitle";
 
-const SIDEBAR_WIDTH_EXPANDED = "220px";
-const SIDEBAR_WIDTH_COLLAPSED = "40px";
+const SIDEBAR_WIDTH_EXPANDED = 220;
+const SIDEBAR_WIDTH_COLLAPSED = 40;
 
 const DIMMED_PROPS = {
   opacity: 0.45,
@@ -181,6 +184,14 @@ const FilterAside: React.FC<{
   dimmed?: boolean;
 }> = React.memo(({ dimmed = false }) => {
   const collapsed = useUIStore((s) => s.sidebarCollapsed);
+  // Grow the aside by one lane per active OR group so the connector
+  // overlay has room to draw without squeezing the facet rows. When
+  // the AST has no cross-facet OR the width is identical to before.
+  const orGroupCount = useFilterStore(
+    (s) => analyzeOrGroups(s.ast).groups.length,
+  );
+
+  const expandedWidth = SIDEBAR_WIDTH_EXPANDED + orGroupCount * ConnectorLaneWidth;
 
   return (
     <Box
@@ -195,7 +206,7 @@ const FilterAside: React.FC<{
       // ~1700px, which the parent then clipped — facets past the
       // viewport were invisible *and* unscrollable.
       height="full"
-      width={collapsed ? SIDEBAR_WIDTH_COLLAPSED : SIDEBAR_WIDTH_EXPANDED}
+      width={`${collapsed ? SIDEBAR_WIDTH_COLLAPSED : expandedWidth}px`}
       transition="width 0.15s ease"
       borderRightWidth="1px"
       borderColor="border"
@@ -265,6 +276,10 @@ const ResultsPane: React.FC = React.memo(() => {
           right={4}
           width="320px"
           pointerEvents="none"
+          // Sit above the table's row hover overlays (IOPreview, etc.) so the
+          // progress toast doesn't get painted under in-row text while a long
+          // export is running.
+          zIndex="overlay"
         >
           <Box pointerEvents="auto">
             <ExportProgress
