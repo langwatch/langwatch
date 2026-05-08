@@ -23,6 +23,7 @@ import { LoadingScreen } from "~/components/LoadingScreen";
 import { NotFoundScene } from "~/components/NotFoundScene";
 import MyLayout from "~/components/me/MyLayout";
 import { HomePagePicker } from "~/components/me/HomePagePicker";
+import { PersonalOtlpEndpointPanel } from "~/components/me/PersonalOtlpEndpointPanel";
 import {
   type PersonalApiKeyRow,
   usePersonalContext,
@@ -347,6 +348,17 @@ export default function MySettingsPage() {
             description="Where to land when you open LangWatch. Auto uses your detected persona."
           >
             <HomePagePicker organizationId={ctx.organizationId} />
+          </SectionCard>
+        ) : null}
+
+        {personalContextQuery.data?.workspace.project.apiKey ? (
+          <SectionCard
+            title="Personal OTLP Endpoint"
+            description="Send raw OTLP traces directly to your personal workspace. For tool-specific auto-shape (Claude Code, Cursor, etc.), use the Trace Ingest tile catalog on /me when available."
+          >
+            <PersonalOtlpEndpointPanel
+              apiKey={personalContextQuery.data.workspace.project.apiKey}
+            />
           </SectionCard>
         ) : null}
 
