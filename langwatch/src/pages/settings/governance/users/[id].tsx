@@ -58,6 +58,12 @@ function GovernanceUserDetailPage() {
     { organizationId: orgId, windowDays: 30, limit: 500 },
     { enabled: !!orgId, refetchOnWindowFocus: false },
   );
+  const personalProjectQuery =
+    api.governance.resolveActorPersonalProject.useQuery(
+      { organizationId: orgId, actor: actor ?? "" },
+      { enabled: !!orgId && !!actor, refetchOnWindowFocus: false },
+    );
+  const personalProject = personalProjectQuery.data;
 
   if (ffLoading) return <LoadingScreen />;
   if (!enabled) return <NotFoundScene />;
@@ -137,6 +143,22 @@ function GovernanceUserDetailPage() {
                 Per-day spend trend and per-model breakdown for this user
                 will land here in a follow-up.
               </Text>
+              {personalProject && (
+                <>
+                  <Link
+                    href={`/${personalProject.projectSlug}/traces`}
+                    color="orange.600"
+                    fontSize="sm"
+                    fontWeight="medium"
+                  >
+                    View {personalProject.displayName}'s personal workspace →
+                  </Link>
+                  <Text fontSize="xs" color="fg.subtle" marginTop={1} marginBottom={3}>
+                    Opens their trace explorer with a 'Viewing as admin'
+                    banner. Each access is recorded at /settings/audit-log.
+                  </Text>
+                </>
+              )}
               <Link
                 href="/settings/governance"
                 color="orange.600"
