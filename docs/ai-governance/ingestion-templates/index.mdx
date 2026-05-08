@@ -376,11 +376,28 @@ and we'll evaluate.
 
 ---
 
+## Verifying the contract
+
+The full admin OTTL authoring flow has a Playwright real-user dogfood at
+`langwatch/e2e/admin-ottl-dogfood.ts` (~30s loop), 8 steps end-to-end:
+navigate → list 3 platform rows → View OTTL drawer → Clone-to-customise →
+Save OTTL → list 4 rows → Edit OTTL → Archive. Pairs with the
+service-level integration test at
+`langwatch/ee/governance/services/__tests__/ingestionTemplate.authoring.integration.test.ts`
+and the wire-level REST integration test at
+`langwatch/src/app/api/governance/__tests__/governance-rest-api.integration.test.ts`.
+
+If you're touching the IngestionTemplatesEditor surface, the OttlEditor
+component, or the IngestionTemplateService, run the dogfood + both
+integration tests locally as a regression playbook before opening a PR.
+
 ## Related
 
 - [Personal Workspace](/ai-governance/personal-portal/end-user) — broader personal-workspace
   feature surface (Datasets, Evaluations, Annotations, Automations).
 - [Admin Trace Access](/ai-governance/admin-trace-access) — how admin drill-in works
   (and why it doesn't see personal-workspace traces by default).
+- [Governance REST API](/ai-governance/api) — the same IngestionTemplate surface, exposed
+  over Hono REST/JSON for agentic workflows.
 - `specs/ai-gateway/governance/ingestion-templates-catalog.feature` and siblings — the
   BDD specs that lock this feature's behaviour.
