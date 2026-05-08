@@ -99,6 +99,8 @@ async function main() {
     `✓ project: ${project.name} (slug=${project.slug}, id=${project.id})`,
   );
 
+  await ensureOrgHasLicense(project.team.organizationId);
+
   const actorUserId = await pickActor(project.team.organizationId);
   const openaiMp = await upsertModelProvider(project, "openai", {
     OPENAI_API_KEY: process.env.OPENAI_API_KEY,
@@ -1036,6 +1038,48 @@ async function upsertCacheRule(args: {
   });
   console.log(`✓ created cache rule '${args.name}' (${row.id})`);
   return row;
+}
+
+/**
+ * Mint an Enterprise license for the dogfood org if one isn't already
+ * in place. Without this the org sits on the FREE plan and governance
+ * / AI-gateway features gate off — replaces the old
+ * `LANGWATCH_DEV_FORCE_ENTERPRISE` escape hatch.
+ *
+ * Idempotent: skips if Organization.license is already set and
+ * unexpired.
+ */
+async function ensureOrgHasLicense(organizationId: string): Promise<void> {
+  const privateKey = process.env.LANGWATCH_LICENSE_PRIVATE_KEY;
+  if (!privateKey) {
+    console.warn(
+      "⚠ LANGWATCH_LICENSE_PRIVATE_KEY not set — skipping license mint. " +
+        "Org will fall through to FREE plan; governance features will gate off. " +
+        "Add the key to langwatch/.env to enable enterprise features in dev.",
+    );
+    return;
+  }
+
+  const org = await prisma.organization.findUnique({
+    where: { id: organizationId },
+    select: { license: true, licenseExpiresAt: true, name: true },
+  });
+  if (org?.license && org.licenseExpiresAt && org.licenseExpiresAt > new Date()) {
+    console.log(`✓ org "${org.name}" already has a valid license — skip`);
+    return;
+  }
+
+  const { applyLicenseToOrg } = await import("./generate-license");
+  const result = await applyLicenseToOrg({
+    prisma,
+    organizationId,
+    planType: "ENTERPRISE",
+    privateKey,
+  });
+  console.log(
+    `✓ minted ${result.planType} license for "${result.organizationName}" ` +
+      `(expires ${result.expiresAt})`,
+  );
 }
 
 async function pickActor(organizationId: string): Promise<string> {
