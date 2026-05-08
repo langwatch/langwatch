@@ -28,6 +28,10 @@ import {
   extractCredentials,
   patCeilingDenialResponse,
 } from "~/server/pat/auth-middleware";
+import {
+  stampBindingProvenanceOnLogRequest,
+  stampBindingProvenanceOnTraceRequest,
+} from "@ee/governance/services/bindingProvenance.utils";
 import { decodeBase64OpenTelemetryId } from "~/server/tracer/utils";
 import { createLogger } from "~/utils/logger/server";
 import { captureException } from "~/utils/posthogErrorCapture";
@@ -345,6 +349,20 @@ app.post("/traces", async (c) => {
         tokenResolver.markUsed({ patId: resolved.patId });
       }
 
+      // Receiver-authoritative provenance stamp for UserIngestionBinding
+      // tokens. Overwrites any payload-supplied values for the protected
+      // template attribute keys (langwatch.template.id /
+      // langwatch.user_ingestion_binding.id / langwatch.source) — even
+      // a malicious upstream cannot forge a different template/binding
+      // identity onto its own bound traces.
+      if (resolved.type === "user_ingestion_binding") {
+        stampBindingProvenanceOnTraceRequest(traceRequest, {
+          bindingId: resolved.bindingId,
+          templateId: resolved.templateId,
+          templateSlug: resolved.templateSlug,
+        });
+      }
+
       const collectionResult =
         await getApp().traces.collection.handleOtlpTraceRequest(
           project.id,
@@ -420,6 +438,14 @@ app.post("/logs", async (c) => {
       // Body successfully parsed — mark PAT as used
       if (resolved.type === "pat") {
         tokenResolver.markUsed({ patId: resolved.patId });
+      }
+
+      if (resolved.type === "user_ingestion_binding") {
+        stampBindingProvenanceOnLogRequest(logRequest, {
+          bindingId: resolved.bindingId,
+          templateId: resolved.templateId,
+          templateSlug: resolved.templateSlug,
+        });
       }
 
       await getApp().traces.logCollection.handleOtlpLogRequest({
