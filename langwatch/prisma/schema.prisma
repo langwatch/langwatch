@@ -412,6 +412,17 @@ model Project {
   ownerUserId String? @db.VarChar(255)
   ownerUser   User?   @relation("PersonalProjectOwner", fields: [ownerUserId], references: [id])
 
+  /// Per-feature unlock flags for personal projects only. Shape:
+  /// `{ evaluations: bool, datasets: bool, annotations: bool, automations: bool }`.
+  /// Empty `{}` (default) reads as all-false at the service layer —
+  /// existing rows pre-migration require no backfill. The bundle is
+  /// a UI/nav predicate, NOT an auth gate (the underlying tRPC
+  /// routers stay open even when the bundle is off; admin tooling +
+  /// offline migration scripts can still operate on the data).
+  /// Team / org-scope projects are not feature-gated — this column
+  /// is meaningful only when `isPersonal=true`.
+  personalFeatures Json @default("{}")
+
   @@index([teamId])
   @@index([isPersonal])
   @@index([ownerUserId])

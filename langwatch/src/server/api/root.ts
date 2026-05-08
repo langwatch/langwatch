@@ -59,6 +59,7 @@ import { gatewayUsageRouter } from "./routers/gatewayUsage";
 import { gatewayProvidersRouter } from "./routers/gatewayProviders";
 import { virtualKeysRouter } from "./routers/virtualKeys";
 import { personalVirtualKeysRouter } from "./routers/personalVirtualKeys";
+import { personalWorkspaceFeaturesRouter } from "./routers/personalWorkspaceFeatures";
 import { routingPoliciesRouter } from "./routers/routingPolicies";
 import { ingestionSourcesRouter } from "@ee/governance/routers/ingestionSources";
 import { activityMonitorRouter } from "@ee/governance/routers/activityMonitor";
@@ -127,6 +128,7 @@ const coreRouters = {
   ops: opsRouter,
   virtualKeys: virtualKeysRouter,
   personalVirtualKeys: personalVirtualKeysRouter,
+  personalWorkspaceFeatures: personalWorkspaceFeaturesRouter,
   routingPolicy: routingPoliciesRouter,
   ingestionSources: ingestionSourcesRouter,
   activityMonitor: activityMonitorRouter,
