@@ -1,0 +1,270 @@
+Feature: Admin trace access — bird's-eye drill-in with persistent 'viewing as' banner + audit-log
+  Org admins need read access to user-workspace + team-workspace traces
+  to do compliance, debugging, and offboarding work — but personal-
+  workspace privacy makes silent admin surveillance unacceptable. The
+  industry standard is **scoped read access + persistent visual context
+  + audit log on every read**: GitHub Enterprise (admins viewing
+  private repos triggers audit-log + repo banner), Stripe Connect
+  ('Acting as <merchant>' chrome), Linear 'View as user'. Each one
+  treats admin impersonation as a privileged context, not a magic
+  permission.
+
+  LangWatch matches: bird's-eye `/governance` rows are click-through to
+  scoped Traces views; the destination renders a persistent
+  'Viewing <user/team> as admin' banner that is server-side-gated DOM
+  (NOT a transient client flag — reload-safe + CSS-regression-tested);
+  every drill-in writes an OCSF audit-log row visible to org security
+  admins AND to the impersonated user themselves on /me/settings →
+  Activity tab.
+
+  No admin catch-all read backdoor: the drill-in IS the only path. No
+  bypass surface (no `governance.bypassAudit`, no service-token escape
+  hatch, no SQL-direct without firing the audit hook) — load-bearing
+  for SOC2 / ISO27001.
+
+  User-visible disclosure: /me/settings carries a static line "Org
+  admins can view your traces for compliance and debugging. Each
+  access is logged at /settings/audit-log." Users can grep their own
+  audit log entries to see who viewed their workspace and when.
+
+  Pairs with:
+    - specs/ai-gateway/governance/personal-workspace-features.feature  (UX contract)
+    - specs/ai-gateway/governance/ingestion-attribution.feature        (security boundary)
+    - specs/ai-gateway/governance/admin-oversight.feature              (bird's-eye home)
+    - specs/ai-gateway/governance/birds-eye-dashboard-v2.feature       (Top-N + click-through)
+
+  Implementation lives at:
+    - langwatch/src/pages/governance/index.tsx                         (bird's-eye home)
+    - langwatch/src/components/governance/AdminImpersonationBanner.tsx (persistent banner)
+    - langwatch/ee/governance/services/governanceImpersonation.service.ts
+                                                                       (server-side context)
+    - langwatch/src/server/governance/audit/                            (OCSF emission)
+    - langwatch/src/pages/me/settings.tsx                              (user-visible disclosure)
+
+  Background:
+    Given an admin "carol@acme.com" with `governance:view` permission
+    And a user "ariana@acme.com" with a Personal Project + traces in it
+    And a team "engineering" with shared-team traces under
+        `Project.kind=team_shared`
+    And both users are members of the same organization "acme"
+
+  # ---------------------------------------------------------------------------
+  # Bird's-eye click-through — entry point for admin drill-in
+  # ---------------------------------------------------------------------------
+
+  @bdd @ui @admin-trace-access @bird-eye
+  Scenario: Bird's-eye user-row click drills into the user's Personal Workspace traces
+    Given the bird's-eye By-User table on /governance lists ariana
+    When carol clicks ariana's row
+    Then carol is routed to a scoped Traces view of ariana's
+        Personal Project (e.g. `/[arianaPersonalProjectSlug]/traces`
+        or `/governance/workspaces/<arianaUserId>/traces` — exact
+        URL shape per Lane-B mount choice)
+    And the destination page renders inside an admin-impersonating
+        context (the persistent banner per next scenario fires)
+
+  @bdd @ui @admin-trace-access @bird-eye
+  Scenario: Bird's-eye team-row click drills into the team's shared-workspace traces
+    Given the bird's-eye By-Team table on /governance lists engineering
+    When carol clicks the engineering row
+    Then carol is routed to a scoped Traces view of the team's pooled
+        traces (e.g. `/governance/workspaces/team/<engineeringTeamId>/traces`)
+    And the destination renders the team-impersonating banner variant
+        (similar shape to the user variant, naming the team)
+
+  @bdd @ui @admin-trace-access @bird-eye
+  Scenario: Bird's-eye Org-wide row is NOT click-through (synthetic bucket)
+    Given the bird's-eye SpendByTeam table renders an Org-wide row
+        for sources without a teamId
+    Then the Org-wide row does NOT render as a clickable link
+    And the row visually differentiates per the existing 'synthetic'
+        subtitle treatment from G3 (already in production after a8f2342c8)
+
+  # ---------------------------------------------------------------------------
+  # Persistent server-side-gated banner
+  # ---------------------------------------------------------------------------
+
+  @bdd @ui @admin-trace-access @banner @regression
+  Scenario: Persistent 'Viewing <user> as admin' banner renders on every admin-impersonating page
+    Given carol drills into ariana's Personal Workspace traces
+    Then a banner renders at the top of every page within the
+        impersonating context:
+      | element            | content                                                     |
+      | leading icon       | 👁 (or equivalent privileged-context icon)                 |
+      | primary text       | "Viewing ariana@acme.com's personal workspace as org admin" |
+      | secondary text     | "This view is logged. Exit at any time."                    |
+      | exit affordance    | "Exit" button → returns to /governance bird's-eye           |
+      | color              | distinct from regular page chrome (warning / accent tone)   |
+    And the banner stays present across:
+      | nav target                                          |
+      | trace list view                                     |
+      | trace detail view                                   |
+      | filter sidebar interactions                         |
+      | search refinements                                  |
+      | URL deep-links pasted into a fresh tab              |
+    And the banner is NOT dismissable (no X close button) — the only
+        way to remove it is via the Exit affordance, which leaves the
+        impersonating context entirely
+
+  @bdd @ui @admin-trace-access @banner @regression
+  Scenario: Banner DOM is server-side-gated, NOT a client-only flag
+    Given carol direct-pastes `/[arianaPersonalProjectSlug]/traces` in
+        a fresh browser tab (no client-side state, no SPA hydration
+        from a prior bird's-eye click)
+    When the page hydrates
+    Then the banner DOM node is present in the SERVER-RENDERED HTML
+        (visible via curl + grep before any JS runs)
+    And the banner is NOT injected by a client-side useEffect / hook
+        running post-render
+    And the banner's render rule is the layout component detecting
+        an admin-impersonating context (carol's userId is the actor;
+        the URL's project/team scope is NOT one of carol's owned
+        scopes; the org admin RBAC predicate fires)
+    And a CSS regression that hides the banner OR a JavaScript
+        regression that fails to set the impersonating-context flag
+        does NOT silently bypass the audit-log emission — the audit
+        row writes server-side independent of the banner DOM
+
+  @bdd @ui @admin-trace-access @banner @reload-safe
+  Scenario: Banner survives reload + direct-paste without client-side state seeding
+    Given carol is in the impersonating context viewing ariana's traces
+    When carol reloads the page (Cmd-R / F5)
+    Then the banner re-renders with identical DOM + visual state
+    And there is NO loss-of-context where the banner momentarily
+        disappears during reload (because banner state is derived
+        from the URL scope + admin RBAC, not from React component
+        state that would be lost on unmount)
+
+  # ---------------------------------------------------------------------------
+  # Audit-log emission on every drill-in
+  # ---------------------------------------------------------------------------
+
+  @bdd @audit @admin-trace-access
+  Scenario: Every admin drill-in emits an OCSF audit-log row
+    Given carol enters the impersonating context for ariana's workspace
+    When the page loads (or, on direct-paste, when the
+        impersonating-context server-side check fires)
+    Then exactly one OCSF audit-log row is emitted per impersonating-
+        context entry (NOT per page render — a single drill-in is
+        one entry, not a stream)
+    And the row shape is:
+      | field         | value                                                          |
+      | category      | "user_account"                                                 |
+      | class         | "workspace_view"                                               |
+      | severity      | "informational"                                                |
+      | actor.userId  | carol's userId                                                 |
+      | actor.email   | carol@acme.com                                                 |
+      | target.userId | ariana's userId (when drilling into a user)                    |
+      | target.teamId | engineering teamId (when drilling into a team)                |
+      | target.scope  | "personal_workspace" / "team_workspace"                        |
+      | metadata      | `{ entryUrl, drillInSource: 'birds_eye_row' / 'direct_paste' }` |
+      | occurredAt    | server timestamp                                               |
+
+  @bdd @audit @admin-trace-access @user-visibility
+  Scenario: Impersonated user can grep their own audit log to see who viewed
+    Given an org admin previously drilled into ariana's workspace 3 times
+    When ariana navigates to `/me/settings → Activity` tab
+    Then ariana sees the 3 audit-log rows scoped to her own
+        impersonation history (actor = admin, target = ariana)
+    And the rows display: actor name + email, occurredAt, drill-in
+        source (bird's-eye row / direct-paste)
+    And ariana CANNOT see other users' audit-log entries via her
+        Activity tab (the same row table is scoped to `target.userId
+        = ariana` for member view)
+    And org admins via `/settings/audit-log` see the full audit feed
+        with all admin / user audit rows
+
+  # ---------------------------------------------------------------------------
+  # NO bypass surface — SOC2/ISO27001 load-bearing invariant
+  # ---------------------------------------------------------------------------
+
+  @bdd @audit @admin-trace-access @no-bypass
+  Scenario: Admin reads of user-scoped data ALWAYS fire the audit-log
+    Given the audit emission service is in the read-path of every
+        admin-impersonating tRPC call
+    When carol's bird's-eye drill-in calls `trace.list` /
+        `trace.getById` / any user-scoped read endpoint within the
+        impersonating context
+    Then the audit-log row is emitted as part of the read pipeline
+    And there is NO `governance.bypassAudit = true` flag, NO
+        service-account token that bypasses the audit, NO SQL-direct
+        helper that admins can use without firing the hook
+    And removing the audit emission from the codebase is a regression
+        that the integration test catches (the regression test asserts
+        the OCSF event count after a known drill-in sequence)
+
+  @bdd @audit @admin-trace-access @no-bypass
+  Scenario: Even support / debugging access uses the same drill-in path
+    Given the org has shipped LangWatch internal support tooling
+    When a LangWatch internal support user (NOT a customer admin)
+        needs to inspect customer trace data for debugging
+    Then the support user uses the same bird's-eye drill-in surface
+        with the same banner + audit emission
+    And there is NO separate 'support tools' surface that bypasses
+        the audit log
+    And LangWatch internal access is auditable to the customer org
+        (the audit row is visible to the customer org admin even
+        when actor is a LangWatch internal user)
+
+  # ---------------------------------------------------------------------------
+  # Write-affordance gating — admin context is read-mostly, dual-write avoided
+  # ---------------------------------------------------------------------------
+
+  @bdd @ui @admin-trace-access @write-gate
+  Scenario: Admin in impersonating context cannot dual-write as the user
+    Given carol is in the impersonating context viewing ariana's workspace
+    When carol attempts a write action that would mutate ariana's data
+        (e.g. annotate a trace, add to a dataset, score with an
+         evaluation, schedule an automation, mint a Personal VK)
+    Then the action is either:
+      | option                                          |
+      | DISABLED in the UI with a tooltip explaining   |
+      | WARN-ON-CONFIRM via a modal naming carol as actor |
+    And in either case, the action's audit-log entry records carol
+        as the actor (NOT ariana), so the trace-of-mutation is honest
+    And destructive actions (delete a dataset, delete an annotation,
+        revoke a VK) are gated to WARN-ON-CONFIRM at minimum (never
+        DISABLED, since admins legitimately need offboarding /
+        compliance-driven write capability)
+
+  # ---------------------------------------------------------------------------
+  # User-visible disclosure copy
+  # ---------------------------------------------------------------------------
+
+  @bdd @ui @admin-trace-access @disclosure
+  Scenario: /me/settings carries the admin-can-view disclosure
+    Given ariana navigates to `/me/settings`
+    Then a static copy line reads:
+      "Org admins can view your traces for compliance and debugging.
+       Each access is logged in your Activity tab."
+    And the line links to `/me/settings → Activity` tab inline
+    And the disclosure is NOT a dismissable banner / one-time onboarding
+        — it's persistent settings copy so users discover it any time
+        they wonder about admin visibility
+
+  @bdd @ui @admin-trace-access @disclosure
+  Scenario: Self-audit Activity tab is discoverable from Personal Workspace surfaces
+    Given ariana is on /me with the disclosure copy visible
+    When ariana clicks the disclosure's inline 'Activity' link
+    Then she lands on `/me/settings → Activity` tab
+    And the tab renders the audit-log rows scoped to her workspace
+        per the @user-visibility scenario above
+
+  # ---------------------------------------------------------------------------
+  # Cross-org isolation — admin in org A cannot drill into org B
+  # ---------------------------------------------------------------------------
+
+  @bdd @audit @admin-trace-access @cross-org
+  Scenario: Admin in org A cannot drill into org B's workspaces
+    Given carol is admin of org A only
+    And user wendy is in org B (totally separate org)
+    When carol attempts to drill into wendy's workspace via
+        URL-pasting the org-B drill-in URL
+    Then the request fails with 403 / NOT_FOUND (the org-scoping
+        guard fires before the impersonating-context check; carol
+        is not a member of org B at all)
+    And NO audit-log row is written (the cross-org rejection is
+        before the audit hook; the failed-auth attempt is logged
+        for security telemetry instead per
+        ingestion-attribution.feature @cross-org scenarios)
+    And NO part of org B's data is enumerable via this surface
