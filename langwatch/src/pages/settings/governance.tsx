@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import numeral from "numeral";
 import GovernanceLayout from "~/components/governance/GovernanceLayout";
+import { QuarantineFillAlert } from "~/components/governance/QuarantineFillAlert";
 import { SpendByTeamBar } from "~/components/governance/SpendByTeamBar";
 import {
   SpendOverTimeChart,
@@ -164,6 +165,8 @@ function GovernanceOverviewPage() {
           </VStack>
           <Spacer />
         </HStack>
+
+        {orgId && <QuarantineFillAlert organizationId={orgId} />}
 
         {!hasTraffic && (
           <Box
