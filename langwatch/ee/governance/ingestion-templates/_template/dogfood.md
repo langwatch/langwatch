@@ -6,9 +6,30 @@ This ritual is the **acceptance gate** for the `<TEMPLATE_SLUG>` tile shipping g
 
 The verifications align 1:1 with the scenarios in `specs/ai-gateway/governance/personal-project-ingest-via-template.feature`. If a step here passes but the matching scenario fails (or vice versa), the spec or the code is wrong — file as a blocker, not a nit.
 
+## What v1 actually verifies vs what's deferred
+
+Two parts of the spec'd ritual are deferred to v1.1 / v2 per @sergey's lane-S checkpoint (24f48a159):
+
+| Capability | v1 status | What it means for the ritual |
+|---|---|---|
+| Receiver auth via lwub_* token | ✅ shipped (60ae9847a) | hash lookup → defense-in-depth re-verify → personal project tenancy works end-to-end |
+| Receiver-stamped attribution keys (B6 16-key set: `langwatch.user.id`, `.team.id`, `.organization.id`, `.project.id`, `.tenant_id`, etc.) | ✅ shipped (existing B6 guard) | trace lands with correct user/team/org/project regardless of what the payload claims |
+| Receiver-stamped provenance keys (`langwatch.template.id`, `.user_ingestion_binding.id`, `.source`) | 🔵 deferred (next sergey commit) | Step 4 Then-clause asserting these keys is **blocked on sergey's provenance-stamping work** |
+| 19-key `protectedTemplateAttributeKeys` principal-field guard | 🟡 deferred to v1.1 / v2 | v1 templates ship empty `ottlRules` → no template OTTL ever runs → no audit row fires v1. **Step 6 forge-audit-row Then-clause is blocked on the principal-field-guard work.** Receiver still re-stamps attribution keys via existing B6 guard. |
+| `gateway.template_ottl_protected_field_attempt` audit row | 🟡 deferred to v1.1 / v2 | same as above |
+| Template OTTL transform | 🟡 deferred to v2 (admin-OTTL authoring UI) | v1 platform templates rely on the upstream tool emitting canonical gen_ai already (Claude Code / Cursor / claude_cowork all do). The receiver passthrough produces the canonical shape without OTTL involvement v1. |
+
+**v1 effectively proves**: real upstream tool with canonical gen_ai → user's binding token → receiver auth → personal-project tenancy → /me/traces with cost/tokens/model populated. That's the headline use case.
+
+**v1 explicitly does NOT prove**: provenance-key stamping (sergey deferred), OTTL transform correctness (no v1 template runs OTTL), or admin-OTTL forge rejection audit row (deferred).
+
+When running this ritual on v1, mark deferred steps as **"blocked on sergey's provenance-stamping work"** or **"blocked on v1.1 principal-field-guard work"** explicitly. Don't fail the tile for steps that are documented as deferred.
+
+---
+
 ## Fixture track vs real-user track — both required
 
-Two parallel tracks. Both must pass. **Fixture-only sign-off is forbidden.** Per `feedback_fixtures_dont_replace_real_user_dogfood.md`: fixtures lie when the real path has friction the fixture skipped — broken OAuth redirects, OTTL not loading at runtime, drawer copy mismatched, bound credentials not wired through to receiver auth, etc. Fixtures catch parser correctness; only the real path catches flow correctness.
+Two parallel tracks. Both must pass (modulo the deferred-step exemptions above). **Fixture-only sign-off is forbidden.** Per `feedback_fixtures_dont_replace_real_user_dogfood.md`: fixtures lie when the real path has friction the fixture skipped — broken OAuth redirects, OTTL not loading at runtime, drawer copy mismatched, bound credentials not wired through to receiver auth, etc. Fixtures catch parser correctness; only the real path catches flow correctness.
 
 | Track | What it proves | Tools | When to run |
 |---|---|---|---|
@@ -194,10 +215,10 @@ Run the same 7-step structure but **using the real UI for clicks, the real upstr
 ### R3 — Run the real upstream tool against the binding
 
 - **<TEMPLATE-SPECIFIC: real upstream tool invocation>**:
-  - `claude_code` → set `OTEL_EXPORTER_OTLP_ENDPOINT` + `OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer <lwub_TOKEN>"` in env, run an actual `claude` CLI session locally that hits the Anthropic API and emits real OTLP. **Blocked on**: Claude Code's actual OTLP exporter being wired up in the version I'm running. If not, mark this step "blocked on Claude Code OTLP integration" and skip.
-  - `cursor` → configure Cursor's telemetry export endpoint, run an actual Cursor agent action against a real codebase. **Blocked on**: Cursor's OTLP-export configurability in the version I'm running. If not, blocked.
-  - `claude_cowork` → run a real claude_cowork session (multi-collaborator) pointed at the binding. **Blocked on**: claude_cowork CLI/SDK availability.
-  - `raw_otlp_advanced` → run any OTel-instrumented script (Python `opentelemetry-instrument`, Node `@opentelemetry/sdk-node`) against the binding endpoint. This one IS dogfoodable today since it doesn't require a specific upstream tool.
+  - `claude_code` → set `OTEL_EXPORTER_OTLP_ENDPOINT=<BASE_HOST>/api/otel` + `OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer <lwub_TOKEN>"` in env, run an actual `claude` CLI session that emits real OTLP. Per sergey's checkpoint: Claude Code already emits canonical gen_ai natively, so v1 receiver passthrough suffices. **Conditional blocker**: only blocked if the locally-installed Claude Code version doesn't emit OTLP at all (e.g., older builds before OTLP exporter wiring). If yes-OTLP-emitting, dogfoodable today.
+  - `cursor` → configure Cursor's telemetry export endpoint, run an actual Cursor agent action against a real codebase. **Conditional blocker**: only blocked if Cursor's OTLP-export configurability isn't surfaced in the version I'm running.
+  - `claude_cowork` → run a real claude_cowork session pointed at the binding. **Conditional blocker**: only blocked if the claude_cowork CLI/SDK doesn't emit OTLP yet.
+  - `raw_otlp_advanced` → discovery card on /me Trace Ingest section that deep-links to /me/settings#otlp; user grabs the personal project apiKey + runs any OTel-instrumented script (Python `opentelemetry-instrument`, Node `@opentelemetry/sdk-node`). This one IS dogfoodable today; no IngestionTemplate row exists for it (per andre PM call at 348936e4f).
 - Capture the upstream tool's output (terminal log, "trace exported" confirmation)
 
 ### R4 — Verify trace lands at `/me/traces` with canonical shape
@@ -260,7 +281,7 @@ Before marking the `<TEMPLATE_SLUG>` tile green-checked in `/me`, **both tracks 
 - [ ] R4 real-trace-detail screenshot showing cost from REAL upstream response
 - [ ] R5 cross-user isolation verified with two REAL accounts
 - [ ] R6 admin drill-in screenshot + audit-log row from real `/governance` bird's-eye
-- [ ] R7 real OTTL forge attempt rejected (or explicit "blocked on v2 admin OTTL authoring" if pre-v2)
+- [ ] R7 real OTTL forge attempt rejected (or explicit "blocked on v2 admin OTTL authoring + v1.1 principal-field-guard" — both gates apply pre-v2)
 
 If any fixture-track step fails, **the tile does not ship green**. If any real-user-track step fails AND it's not legitimately blocked on a named dependency, **the tile does not ship green**. Either fix the impl + re-run, or mark the tile as v1.1 / defer + document the blocker.
 
