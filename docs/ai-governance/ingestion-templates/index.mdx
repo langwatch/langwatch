@@ -33,17 +33,21 @@ But many tools don't fit that path:
   emit OpenTelemetry traces locally; what they need is a place to ship them.
 
 For these, the user holds the upstream credential locally; LangWatch only needs to know
-**where to send the OTLP** and **how to shape the spans** into our canonical form.
+**where to send the OTLP** and **which template the user is binding** so the trace gets
+the right `langwatch.source` provenance and lands in the right personal project.
 
 That's an Ingestion Template:
 
-- **Admin/platform side:** the OTTL transform (`anthropic.usage.input_tokens` →
-  `gen_ai.usage.input_tokens`, etc.) and the credential schema.
+- **Admin/platform side:** a curated catalog row (slug, source identifier, credential
+  schema, optional `ottlRules`). v1 platform-published rows ship empty `ottlRules` —
+  Claude Code, Cursor, and Claude cowork all emit OpenTelemetry `gen_ai.*` canonical
+  spans natively, so no transform is needed. The OTTL slot is reserved for a future
+  admin-authored OTTL surface.
 - **User side:** a binding token (`lwub_…`) scoped to your personal project. You paste
-  that token into your tool's OTLP exporter; the tool ships, LangWatch shapes.
+  that token into your tool's OTLP exporter; the tool ships, LangWatch attributes.
 
 Credential is scope. Payload is advisory. The receiver attribution path is identical to
-gateway-VK ingest — only the source-shape parsing differs.
+gateway-VK ingest — only the source-shape parsing (a future v2 surface) differs.
 
 ---
 
@@ -114,14 +118,14 @@ Open the trace. You should see:
 
 - `gen_ai.system = "anthropic"`
 - `gen_ai.request.model = "claude-3-5-sonnet"` (or whichever model you ran)
-- `gen_ai.usage.input_tokens` — populated by the template's OTTL from
-  `anthropic.usage.input_tokens`
-- `gen_ai.usage.output_tokens` — same, from `anthropic.usage.output_tokens`
+- `gen_ai.usage.input_tokens` — emitted directly by Claude Code's OTel exporter
+  (Claude Code is gen_ai-canonical natively; v1 templates apply no OTTL transform).
+- `gen_ai.usage.output_tokens` — same.
 - `langwatch.cost.usd` — derived by the receiver's `canonicalCostExtractor` from the
-  template-OTTL output
+  upstream-emitted `gen_ai.usage.*` + `gen_ai.response.model`.
 - `langwatch.user.id`, `langwatch.project.id`, `langwatch.template.id`,
   `langwatch.user_ingestion_binding.id`, `langwatch.source = "claude_code"` — all
-  receiver-stamped post-OTTL (template OTTL cannot rewrite these).
+  receiver-stamped post-auth (authoritative attribution + template provenance).
 
 That's it. From here, every Claude Code action you run flows into your personal workspace
 shaped correctly — same as if you'd been running through the gateway VK path.
@@ -141,20 +145,15 @@ An `IngestionTemplate` row has:
 - `sourceType` (e.g. `claude_code`) — which upstream tool this template parses.
 - `credentialSchema` (closed enum, v1: `null` / `static_api_key` / `agent_id`) — what
   fields the install drawer captures from the user.
-- `ottlRules` — the OTTL transform that reshapes upstream span attributes into the
-  canonical `gen_ai.*` form.
+- `ottlRules` — an optional OTTL transform applied to the span before the receiver's
+  authoritative re-stamp pass. **v1 platform templates ship empty `ottlRules`** because
+  Claude Code, Cursor, and Claude cowork all emit OpenTelemetry `gen_ai.*` canonical
+  spans natively — there is nothing to reshape. The slot is reserved for a future
+  iteration when admin OTTL authoring lands and admins can curate org-specific
+  transforms.
 - `organizationId` — `NULL` for platform-published templates (visible everywhere); set
   for org-authored templates (visible only to that org). Authoring UI for org-scoped
-  templates lands in a future iteration.
-
-The canonical Claude Code template's OTTL is at `<CANONICAL_OTTL_PATH_TBD>`
-(canonicalCostExtractor + the starterTemplate from the platform-team-curated catalog —
-final path locked once the Lane-B / Lane-S work commits). It maps Anthropic-shaped
-attrs to canonical `gen_ai.*` attrs:
-
-```
-<CANONICAL_OTTL_QUOTE_TBD — copy from source file once committed>
-```
+  templates lands in a future iteration alongside `ottlRules` editing.
 
 ### credentialSchema shapes
 
@@ -181,12 +180,14 @@ receiver:
    scenarios where the binding row has been tampered out-of-band.)
 4. **Sets `tenantId`** to `binding.personalProjectId` — token-as-scope. This is
    authoritative.
-5. **Applies `template.ottlRules`** under a snapshot+restore principal-field guard. The
-   template OTTL can write `gen_ai.usage.*`, `gen_ai.response.model`, `langwatch.cost.usd`,
-   etc. — that's the template's job.
-6. **Post-OTTL re-stamps** the 19 closed `protectedTemplateAttributeKeys` as receiver-
-   authoritative. If template OTTL tried to write any of those, the original value is
-   restored and an audit row `gateway.template_ottl_protected_field_attempt` fires.
+5. **Applies `template.ottlRules`** under a snapshot+restore principal-field guard.
+   In v1 platform templates ship empty rules so this step is a no-op; the guard
+   infrastructure exists to wrap admin-authored OTTL when it lands.
+6. **Post-auth re-stamps** the 19 closed `protectedTemplateAttributeKeys` as receiver-
+   authoritative. If a future template's OTTL tried to write any of those, the original
+   value is restored and an audit row `gateway.template_ottl_protected_field_attempt`
+   fires. v1 templates have no OTTL, so the re-stamp is purely a write of the
+   receiver-known attribution + provenance keys.
 7. **Hands off** to the trace pipeline — same path as every other ingest source from
    here.
 
@@ -211,13 +212,15 @@ Notably **not** in the list:
 - `gen_ai.usage.input_tokens` / `.output_tokens` / `.total_tokens`
 - `gen_ai.response.model`
 
-These are legitimately writable by template OTTL — that's the template's literal purpose
-(parse upstream provider response.usage into canonical gen_ai keys). Locking them would
-defeat the feature. v1 trust boundary on these = platform-team review at template
-ship time.
+These would become legitimately writable by template OTTL when admin-authored OTTL
+lands in a future iteration — admins authoring OTTL can reshape upstream
+provider-specific attrs into the canonical `gen_ai.*` keys. Locking them would defeat
+that future feature. **v1 templates ship empty `ottlRules`** so the protection list
+is essentially dormant in v1; it activates the moment any non-empty OTTL runs through
+the guard.
 
-See [Security model recap](#security-model-recap) below for the explicit accepted-risk
-articulation.
+See [Security model recap](#security-model-recap) below for the v1-vs-future trust
+boundary articulation.
 
 ---
 
@@ -260,33 +263,32 @@ For security reviewers evaluating the feature.
 - **Cross-bind guard at receive** is the post-OTTL principal-field re-stamp. Forge attempts
   emit `gateway.template_ottl_protected_field_attempt` audit rows.
 
-### Accepted risk: template OTTL trusted on cost / tokens / model
+### v1 trust boundary: empty templates, upstream-emitted canonical
 
-v1 ships **only platform-team-authored templates**. Admin OTTL authoring is deferred to
-a future iteration, so the only OTTL paths that run in v1 are platform-curated, audited at
-ship time.
+v1 ships **only platform-team-authored templates with empty `ottlRules`**. Cost / tokens /
+model values come directly from the upstream tool's OTel exporter (Claude Code, Cursor,
+and Claude cowork all emit `gen_ai.*` canonical natively), and the receiver derives
+`langwatch.cost.usd` from those upstream-emitted values via `canonicalCostExtractor`.
 
-That means **cost / tokens / model integrity rides on platform-team review** — if our
-claude_code template miscalculates `gen_ai.usage.input_tokens`, every Claude Code trace
-in every personal workspace is affected, until we ship a template fix.
+That means v1 cost / tokens / model integrity rides on **upstream-tool correctness**, not
+on any LangWatch-side transform. We have no template OTTL writing those fields in v1; we
+trust Claude Code, Cursor, and Claude cowork to populate `gen_ai.usage.*` correctly per
+the OTel semantic-conventions spec.
 
-We accept this trade-off because the alternative — receiver re-deriving canonical
-`gen_ai.usage.*` from upstream-shaped intermediate attrs — duplicates the OTTL transform
-in code, doubling the surface area to keep correct.
-
-Concretely, that platform-team review takes the form of a **two-track dogfood discipline**:
-each catalog tile ships only after passing both (a) a fixture-track verification — canned
-OTLP payloads emitted via `scripts/dogfood/emit-otlp.sh`, including forge-attempt
-regressions against the 19-key protected list — and (b) a real-user track — admin publishes
-via `/settings/governance/tool-catalog`, a real user installs via `/me`, the real upstream
+Concretely, before each tile flips to green-checked we run a **two-track dogfood
+discipline**: (a) a fixture-track verification — canned OTLP payloads emitted via
+`scripts/dogfood/emit-otlp.sh`, including forge-attempt regressions against the 19-key
+protected list — and (b) a real-user track — admin publishes via
+`/settings/governance/tool-catalog`, a real user installs via `/me`, the real upstream
 tool emits a real trace, and the result is verified end-to-end with cross-user isolation.
 Per-template rituals live at `langwatch/ee/governance/ingestion-templates/<slug>/dogfood.md`.
 
-When admin OTTL authoring lands (v2), we'll add a **tier of trust**: platform-authored
-templates keep the v1 19-key list; org-authored templates use a 27-key list that adds
-cost / tokens / model to the protected set. Org admins author OTTL accepting within-org
-cost-integrity responsibility; cross-org cost integrity is structurally protected by the
-attribution-keys re-stamp regardless.
+When admin OTTL authoring lands in a future iteration, the trust boundary expands: an
+admin-authored OTTL transform that miscomputes cost / tokens / model would affect every
+trace through that template. The 19-key protected list stays as-is for platform-authored
+OTTL; we may layer a **tier of trust** that adds cost / tokens / model to the protected
+set for org-authored OTTL specifically. Cross-org cost integrity is structurally protected
+by the attribution-keys re-stamp regardless of the tier.
 
 ### What is audited
 
