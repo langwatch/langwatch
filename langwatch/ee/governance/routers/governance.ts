@@ -29,6 +29,9 @@ import {
   QUARANTINE_DEFAULT_WINDOW_SECONDS,
   QuarantineFillEvaluator,
 } from "@ee/governance/services/quarantineFillEvaluator.service";
+import { AdminWorkspaceViewAuditService } from "@ee/governance/services/adminWorkspaceViewAudit.service";
+import { GovernanceOcsfEventsClickHouseRepository } from "@ee/governance/services/governanceOcsfEvents.clickhouse.repository";
+import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
 
 import {
   ENTERPRISE_FEATURE_ERRORS,
@@ -187,6 +190,69 @@ export const governanceRouter = createTRPCRouter({
    * Spec: specs/ai-gateway/governance/ingestion-attribution.feature
    *       §"Admin warning fires when quarantine fill rate exceeds threshold"
    */
+  /**
+   * Records the admin's bird's-eye drill-in into a target Personal
+   * or Team workspace. Idempotent within a 5-minute window so the
+   * layout-level `adminViewingAs` detection can fire on every page
+   * paint without flooding the audit log.
+   *
+   * Hook point (Lane-B): in DashboardLayout / AdminViewingAsBanner,
+   * `useEffect(() => { if (adminViewingAs) mutate({ ... }); }, [project.id])`
+   * fires this once per drill-in navigation. Backend dedup absorbs
+   * any extra calls within the window.
+   *
+   * Writes:
+   *   - `AuditLog` row (`action='governance.viewWorkspaceAs'`) — the
+   *     SOC2 / ISO27001 evidence surface; visible at /settings/audit-log
+   *     to org admins AND to the user themselves on /me/settings →
+   *     Activity (per the user-visible disclosure copy).
+   *   - `governance_ocsf_events` mirror — best-effort SIEM stream
+   *     parity; OCSF write failures don't fail the AuditLog write.
+   *
+   * Permission: `governance:view`. Self-views (own personal
+   * workspace, own team) short-circuit at the service layer with
+   * no audit row written.
+   *
+   * Spec: specs/ai-gateway/governance/admin-trace-access.feature
+   *       specs/ai-gateway/governance/ingestion-attribution.feature
+   *         §"no bypass surface that returns user traces without
+   *           firing the audit-log row"
+   */
+  recordWorkspaceView: protectedProcedure
+    .input(
+      z.object({
+        organizationId: z.string(),
+        targetTeamId: z.string(),
+        kind: z.enum(["personal", "team"]),
+        workspaceLabel: z.string().max(256).optional(),
+      }),
+    )
+    .use(checkOrganizationPermission("governance:view"))
+    .mutation(async ({ ctx, input }) => {
+      const ocsfRepository = new GovernanceOcsfEventsClickHouseRepository(
+        async (tenantId) => {
+          const client = await getClickHouseClientForProject(tenantId);
+          if (!client) {
+            throw new Error(
+              `ClickHouse not available for tenant ${tenantId}`,
+            );
+          }
+          return client;
+        },
+      );
+      const service = AdminWorkspaceViewAuditService.create({
+        prisma: ctx.prisma,
+        ocsfRepository,
+      });
+      return await service.recordView({
+        actorUserId: ctx.session.user.id,
+        organizationId: input.organizationId,
+        targetTeamId: input.targetTeamId,
+        kind: input.kind,
+        workspaceLabel: input.workspaceLabel,
+      });
+    }),
+
   quarantineFillStats: protectedProcedure
     .input(
       z.object({
