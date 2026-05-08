@@ -2,9 +2,20 @@
 
 > **Starter file. Each tile copies this into `langwatch/ee/governance/ingestion-templates/<TEMPLATE_SLUG>/dogfood.md`** and replaces every `<TEMPLATE_SLUG>` occurrence with its own slug (`claude_code` / `cursor` / `claude_cowork` / `raw_otlp_advanced`). Per-tile customization sections are marked `<TEMPLATE-SPECIFIC: …>`.
 
-This ritual is the **acceptance gate** for the `<TEMPLATE_SLUG>` tile shipping green-checked in `/me`. **No tile turns green until every step below has been run end-to-end with a screenshot in the PR body.** Same B6 discipline rchaves bug-bashed the dashboard chrome with.
+This ritual is the **acceptance gate** for the `<TEMPLATE_SLUG>` tile shipping green-checked in `/me`. **No tile turns green until BOTH the fixture track AND the real-user track below have been run end-to-end with screenshots in the PR body.** Same B6 discipline rchaves bug-bashed the dashboard chrome with.
 
 The verifications align 1:1 with the scenarios in `specs/ai-gateway/governance/personal-project-ingest-via-template.feature`. If a step here passes but the matching scenario fails (or vice versa), the spec or the code is wrong — file as a blocker, not a nit.
+
+## Fixture track vs real-user track — both required
+
+Two parallel tracks. Both must pass. **Fixture-only sign-off is forbidden.** Per `feedback_fixtures_dont_replace_real_user_dogfood.md`: fixtures lie when the real path has friction the fixture skipped — broken OAuth redirects, OTTL not loading at runtime, drawer copy mismatched, bound credentials not wired through to receiver auth, etc. Fixtures catch parser correctness; only the real path catches flow correctness.
+
+| Track | What it proves | Tools | When to run |
+|---|---|---|---|
+| **Fixture track** | Receiver/parser handles the canonical post-OTTL shape; principal-field guard rejects forge attempts | `scripts/dogfood/governance/emit-otlp.sh` + `payloads/<slug>.json` + `forge-attempt/{attribution,provenance}.json` | Every commit that touches receiver/OTTL/principal-guard code; runs in seconds |
+| **Real-user track** | The actual user flow works end-to-end — admin publishes via UI, user installs via UI form, real upstream tool emits, receiver auth + OTTL + cost extraction all wire through, /me/traces shows parsed trace | Real admin UI + real `/me` install drawer + real upstream tool (Claude Code / Cursor / Claude cowork session) + real `/me/traces` browse | Before tile ships green; before claiming feature works |
+
+**Report both tracks side by side.** If real-user can't be done yet (e.g., upstream tool wrapper not built, OAuth provider not wired), say **"blocked on X"** explicitly so the dependency is visible.
 
 ---
 
@@ -20,7 +31,15 @@ If any prerequisite is missing, **stop here** and resolve before running the rit
 
 ---
 
-## Ritual — 7 steps
+---
+
+## FIXTURE TRACK — fast loop (parser + receiver correctness)
+
+The 7 steps below cover the fixture track. They use `emit-otlp.sh` to fire canned OTLP payloads + forge attempts at the receiver. They prove the receiver/parser/principal-guard are correct under the canonical shape.
+
+**These are necessary but NOT sufficient.** Pass them, then run the real-user track below.
+
+---
 
 ### Step 1 — Install drawer renders correctly
 
@@ -28,7 +47,7 @@ Open `/me`, scroll to the **Trace Ingest** section, click **Install** on the `<T
 
 Verify:
 - Drawer opens with template name + iconKey + description copy
-- Endpoint URL renders (read-only, copyable): `<BASE_HOST>/v1/traces`
+- Endpoint URL renders (read-only, copyable): `<BASE_HOST>/api/otel` — the OTEL SDK exporter auto-appends `/v1/traces` per OTLP convention. Receiver POSTs land at `<BASE_HOST>/api/otel/v1/traces`. The drawer shows the BASE URL (matches `OpenTelemetrySetup` pattern + the `OTEL_EXPORTER_OTLP_ENDPOINT` env-var convention).
 - Binding access token renders (one-time-show, masked thereafter, prefix-only display): `lwub_<8-char-prefix>…`
 - Copy button works for endpoint, token, and the full env-var snippet
 - Copy disambiguation copy is present:
@@ -146,9 +165,84 @@ If the old token still works after rotation, **blocker** — the hard-cut invari
 
 ---
 
+---
+
+## REAL-USER TRACK — end-to-end (flow correctness)
+
+This track is what proves the feature works for an actual user, not just for a fixture-shaped synthetic POST. **No sign-off without this.** Per `feedback_fixtures_dont_replace_real_user_dogfood.md`: a fixture-only-passing template will explode under real traffic; the real path is where OAuth redirects break, OTTL fails to load at runtime, drawer copy mismatches, etc.
+
+Run the same 7-step structure but **using the real UI for clicks, the real upstream tool for emission, and the real API path for everything**. No `emit-otlp.sh`. No canned payloads. No curl-to-internal-endpoints.
+
+### R1 — Admin publishes the template via real admin UI
+
+- Sign in as an admin (NOT via DB-set role; use the real signin flow)
+- Navigate to `/settings/governance/tool-catalog` → "Ingestion Templates" tab (Lane-B Iter 4 folds the new tab into the existing admin tool-catalog surface; no new `/settings/ai-tools` route)
+- Verify `<TEMPLATE_SLUG>` appears as a platform-default tile
+- Click "View OTTL" on the tile and confirm the OTTL rules render correctly (read-only v1)
+- **Screenshot**: `langwatch/docs/images/ai-governance/ingestion-templates/<TEMPLATE_SLUG>-admin-catalog.png`
+
+### R2 — User installs via real `/me` install drawer
+
+- Sign out, sign in as a non-admin user (`ariana@acme.test` or another seeded persona — your own personal account, not a synthetic user)
+- Navigate to `/me`, scroll to Trace Ingest section
+- Click `<TEMPLATE_SLUG>` tile → install drawer opens
+- Complete the credential form (otlp_token = nothing to fill; static_api_key = paste real key; agent_id = enter real agent id) and click Save
+- Verify the binding lwub_* token shows one-time, copy it for steps R3-R6
+- Verify the tile flips to green-checked
+- **Screenshot**: `<TEMPLATE_SLUG>-real-install-drawer.png` + `<TEMPLATE_SLUG>-tile-green-checked.png`
+
+### R3 — Run the real upstream tool against the binding
+
+- **<TEMPLATE-SPECIFIC: real upstream tool invocation>**:
+  - `claude_code` → set `OTEL_EXPORTER_OTLP_ENDPOINT` + `OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer <lwub_TOKEN>"` in env, run an actual `claude` CLI session locally that hits the Anthropic API and emits real OTLP. **Blocked on**: Claude Code's actual OTLP exporter being wired up in the version I'm running. If not, mark this step "blocked on Claude Code OTLP integration" and skip.
+  - `cursor` → configure Cursor's telemetry export endpoint, run an actual Cursor agent action against a real codebase. **Blocked on**: Cursor's OTLP-export configurability in the version I'm running. If not, blocked.
+  - `claude_cowork` → run a real claude_cowork session (multi-collaborator) pointed at the binding. **Blocked on**: claude_cowork CLI/SDK availability.
+  - `raw_otlp_advanced` → run any OTel-instrumented script (Python `opentelemetry-instrument`, Node `@opentelemetry/sdk-node`) against the binding endpoint. This one IS dogfoodable today since it doesn't require a specific upstream tool.
+- Capture the upstream tool's output (terminal log, "trace exported" confirmation)
+
+### R4 — Verify trace lands at `/me/traces` with canonical shape
+
+- Navigate to `/me/traces` filtered by `langwatch.source = "<TEMPLATE_SLUG>"`
+- Verify the trace from R3 appears within ~10 seconds (real upstream tool's batch flush is slower than fixture)
+- Click into the trace and verify the SAME canonical fields as fixture-track Step 4:
+  - `gen_ai.usage.input_tokens` + `output_tokens` populated **from the real upstream response** (NOT the fixture's hardcoded numbers)
+  - `langwatch.cost.usd` derived from `canonicalCostExtractor` reading the real token counts
+  - `gen_ai.response.model` matches the actual model the upstream tool used (e.g. `claude-3-5-sonnet-<actual date>`)
+  - All attribution + provenance keys receiver-stamped to the binding's authoritative principal
+- **Screenshot**: `<TEMPLATE_SLUG>-real-trace-detail.png` showing canonical fields populated by real OTTL parsing + real cost extraction
+
+If the trace doesn't appear OR cost is missing OR attribution is wrong, that's a flow-level bug the fixture track skipped — **blocker**.
+
+### R5 — Cross-user isolation (real, not fixture)
+
+- Sign out, sign in as a SECOND real user (different persona, different personal project)
+- Navigate to that user's `/me/traces`
+- Verify the first user's trace from R4 does NOT appear under any filter (no `<TEMPLATE_SLUG>`, no global view, no admin probe-as-user)
+- **Screenshot**: `<TEMPLATE_SLUG>-real-cross-user-isolation.png` showing second user's empty `/me/traces` (or only their own bindings' traces)
+
+### R6 — Admin drill-in via `/governance` bird's-eye
+
+- Sign in as an admin (org-admin, NOT the trace owner)
+- Navigate to `/governance` bird's-eye → click into the user/team that owns the trace from R4
+- Verify the trace surfaces with the "Viewing as admin" banner active
+- Verify an audit row `governance.viewWorkspaceAs` appears at `/settings/audit-log` within 5s
+- **Screenshot**: `<TEMPLATE_SLUG>-real-admin-drill-in.png` + `<TEMPLATE_SLUG>-real-drill-in-audit.png`
+
+### R7 — Real OTTL forge attempt
+
+- Sign in as admin, edit `<TEMPLATE_SLUG>`'s OTTL rules to attempt a protected-key write (e.g. add a statement that sets `langwatch.user.id = "FORGE"` or `langwatch.template.id = "FORGE"`)
+- **Note**: in v1 admin OTTL authoring is platform-only (no admin-author UI); to test this real-path, the platform-team OTTL must be edited in source AND deployed. **Blocked on v2 admin OTTL authoring UI**. Until then, the closest real-path test is the fixture-track Step 6 forge regression.
+- When v2 admin authoring lands: as user, fire a real upstream trace through the modified template
+- Verify the receiver re-stamps the protected key + emits `gateway.template_ottl_protected_field_attempt` audit row
+- **Screenshot when unblocked**: `<TEMPLATE_SLUG>-real-forge-rejected.png`
+
+---
+
 ## Hard-gate checklist
 
-Before marking the `<TEMPLATE_SLUG>` tile green-checked in `/me`, **all** of the following must be true:
+Before marking the `<TEMPLATE_SLUG>` tile green-checked in `/me`, **both tracks must pass** with the following:
+
+### Fixture track (fast loop, every receiver/OTTL change)
 
 - [ ] Step 1 install drawer screenshot in PR #3524 body
 - [ ] Step 2 bind-install audit row screenshot in PR body
@@ -157,9 +251,18 @@ Before marking the `<TEMPLATE_SLUG>` tile green-checked in `/me`, **all** of the
 - [ ] Step 5 source filter verified (or N/A note if single-binding user)
 - [ ] Step 6 both forge-attempt audit rows screenshot in PR body
 - [ ] Step 7 rotation tile screenshot + 401 stdout from old token
-- [ ] **Cross-user isolation regression** — pair this ritual with the matching run as the second user (`ben@acme.com`); jane's traces MUST NOT appear on ben's `/me/traces`. See `specs/ai-gateway/governance/personal-project-ingest-via-template.feature @cross-user-isolation` and `specs/ai-gateway/governance/template-cross-bind-guard.feature` for the contract.
 
-If a step fails, **the tile does not ship green**. Either fix the underlying impl + re-run the ritual, or mark the tile as v1.1 / defer.
+### Real-user track (no green check without)
+
+- [ ] R1 admin-catalog screenshot — admin publishes via real UI
+- [ ] R2 real-install-drawer + tile-green-checked screenshots — user installs via real UI
+- [ ] R3 upstream tool output captured (terminal log) OR explicit "blocked on <DEP>" note in PR body
+- [ ] R4 real-trace-detail screenshot showing cost from REAL upstream response
+- [ ] R5 cross-user isolation verified with two REAL accounts
+- [ ] R6 admin drill-in screenshot + audit-log row from real `/governance` bird's-eye
+- [ ] R7 real OTTL forge attempt rejected (or explicit "blocked on v2 admin OTTL authoring" if pre-v2)
+
+If any fixture-track step fails, **the tile does not ship green**. If any real-user-track step fails AND it's not legitimately blocked on a named dependency, **the tile does not ship green**. Either fix the impl + re-run, or mark the tile as v1.1 / defer + document the blocker.
 
 ---
 
