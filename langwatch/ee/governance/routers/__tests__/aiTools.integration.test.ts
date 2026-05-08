@@ -558,6 +558,158 @@ describe("aiToolsRouter integration", () => {
     });
   });
 
+  describe("update", () => {
+    // Pins the new mutation shape (Stage B+C) end-to-end:
+    //   teamIds[] toggling round-trips through the AiToolEntryTeam
+    //   join + the legacy scope/scopeId mirror, iconAsset transitions
+    //   between preset / data URL / null, and cross-org team binds
+    //   are rejected by the org-membership guard.
+    it("teamIds toggles round-trip through join table + legacy mirror", async () => {
+      const adminCaller = callerFor(adminUserId);
+      const created = await adminCaller.aiTools.create({
+        organizationId,
+        teamIds: [],
+        type: "external_tool",
+        displayName: `Update tile ${nanoid(4)}`,
+        config: { descriptionMarkdown: "x", linkUrl: "https://example.com" },
+      });
+      // Empty teams[] writes scope='organization' for back-compat.
+      expect(created.teamIds).toEqual([]);
+      expect(created.scope).toBe("organization");
+      expect(created.scopeId).toBe(organizationId);
+
+      // [] → [platform]
+      const single = await adminCaller.aiTools.update({
+        organizationId,
+        id: created.id,
+        teamIds: [teamPlatformId],
+      });
+      expect(single.teamIds).toEqual([teamPlatformId]);
+      expect(single.scope).toBe("team");
+      expect(single.scopeId).toBe(teamPlatformId);
+      const singleRows = await prisma.aiToolEntryTeam.findMany({
+        where: { entryId: created.id },
+      });
+      expect(singleRows.map((r) => r.teamId)).toEqual([teamPlatformId]);
+
+      // [platform] → [platform, dataScience] (multi-team)
+      const multi = await adminCaller.aiTools.update({
+        organizationId,
+        id: created.id,
+        teamIds: [teamPlatformId, teamDataScienceId],
+      });
+      expect(multi.teamIds.sort()).toEqual(
+        [teamPlatformId, teamDataScienceId].sort(),
+      );
+      // Legacy mirror still 'team' but only carries first id (best
+      // effort — multi-team can't be expressed in the legacy pair).
+      expect(multi.scope).toBe("team");
+      const multiRows = await prisma.aiToolEntryTeam.findMany({
+        where: { entryId: created.id },
+      });
+      expect(multiRows.map((r) => r.teamId).sort()).toEqual(
+        [teamPlatformId, teamDataScienceId].sort(),
+      );
+
+      // [platform, dataScience] → [] (back to org-wide)
+      const cleared = await adminCaller.aiTools.update({
+        organizationId,
+        id: created.id,
+        teamIds: [],
+      });
+      expect(cleared.teamIds).toEqual([]);
+      expect(cleared.scope).toBe("organization");
+      expect(cleared.scopeId).toBe(organizationId);
+      const clearedRows = await prisma.aiToolEntryTeam.findMany({
+        where: { entryId: created.id },
+      });
+      expect(clearedRows).toHaveLength(0);
+
+      await prisma.aiToolEntry.delete({ where: { id: created.id } });
+    });
+
+    it("iconAsset transitions: preset → data URL → null", async () => {
+      const adminCaller = callerFor(adminUserId);
+      const created = await adminCaller.aiTools.create({
+        organizationId,
+        teamIds: [],
+        type: "coding_assistant",
+        displayName: `Icon transitions ${nanoid(4)}`,
+        iconAsset: "preset:claude_code",
+        config: {
+          assistantKind: "claude_code",
+          setupCommand: "langwatch claude",
+        },
+      });
+      expect(created.iconAsset).toBe("preset:claude_code");
+
+      const dataUrl =
+        "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciLz4=";
+      const uploaded = await adminCaller.aiTools.update({
+        organizationId,
+        id: created.id,
+        iconAsset: dataUrl,
+      });
+      expect(uploaded.iconAsset).toBe(dataUrl);
+
+      const cleared = await adminCaller.aiTools.update({
+        organizationId,
+        id: created.id,
+        iconAsset: null,
+      });
+      expect(cleared.iconAsset).toBeNull();
+
+      await prisma.aiToolEntry.delete({ where: { id: created.id } });
+    });
+
+    it("rejects update binding a team from a foreign org", async () => {
+      const adminCaller = callerFor(adminUserId);
+      const foreignOrg = await prisma.organization.create({
+        data: { name: `Foreign ${nanoid(4)}`, slug: `--ait-foreign-${nanoid(6)}` },
+      });
+      const foreignTeam = await prisma.team.create({
+        data: {
+          name: `Foreign team ${nanoid(4)}`,
+          slug: `--ait-foreign-team-${nanoid(6)}`,
+          organizationId: foreignOrg.id,
+        },
+      });
+      const entry = await adminCaller.aiTools.create({
+        organizationId,
+        teamIds: [],
+        type: "external_tool",
+        displayName: `Cross-org guard ${nanoid(4)}`,
+        config: { descriptionMarkdown: "x", linkUrl: "https://example.com" },
+      });
+
+      try {
+        await expect(
+          adminCaller.aiTools.update({
+            organizationId,
+            id: entry.id,
+            teamIds: [foreignTeam.id],
+          }),
+        ).rejects.toThrow(/teams do not belong to this organization/);
+
+        // Atomicity: the failed update must NOT have written any
+        // join rows, and the legacy mirror must not have flipped.
+        const rows = await prisma.aiToolEntryTeam.findMany({
+          where: { entryId: entry.id },
+        });
+        expect(rows).toHaveLength(0);
+        const after = await adminCaller.aiTools.get({
+          organizationId,
+          id: entry.id,
+        });
+        expect(after.scope).toBe("organization");
+      } finally {
+        await prisma.aiToolEntry.delete({ where: { id: entry.id } });
+        await prisma.team.delete({ where: { id: foreignTeam.id } });
+        await prisma.organization.delete({ where: { id: foreignOrg.id } });
+      }
+    });
+  });
+
   describe("routingPolicyOptions", () => {
     it("returns org-scoped routing policies for the drawer dropdown", async () => {
       const policy = await prisma.routingPolicy.create({
