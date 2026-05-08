@@ -443,6 +443,16 @@ export const DashboardLayout = ({
   const isDemoProject = publicEnv.data?.DEMO_PROJECT_SLUG === project?.slug;
   const userIsPartOfTeam =
     publicPage ||
+    // Personal-scope routes (/me/* and the caller's own Personal Workspace
+    // project URLs) are theirs by construction — the user is always "on
+    // their own team" in this scope, even when team membership of the
+    // ambient org-default team can't be confirmed (e.g. team isn't resolved
+    // for /me/*, or the privacy filter redacts member rows below the field
+    // the predicate inspects). Without this clause, MEMBER users on /me/*
+    // hit "You are not part of any team" overlay and the page body never
+    // renders. Affects every persona-1 entry point + the v2 chrome-retention
+    // path on personal-project URLs.
+    isPersonalScopeRoute ||
     isDemoProject ||
     (team?.members?.some((member) => member.userId === user?.id) ?? false) ||
     // Org admins created via RoleBinding-only flow have no TeamUser row but still
