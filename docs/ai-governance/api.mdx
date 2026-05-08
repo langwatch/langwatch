@@ -125,6 +125,23 @@ All four rows have **identical** payload shapes apart from the `metadata.surface
 
 The seven mutating verbs across the two shipped resources (`createOrgTemplate`, `updateOttlRules`, `archiveOrgTemplate`, `cloneFromPlatform`, `install`, `uninstall`, `rotateToken`) all carry surface attribution as of Sergey's Lane B-3 commit at `fc6d54100`. The same commit also closed a forensic gap on `rotateToken` — token rotations now emit a `gateway.user_ingestion_binding.token_rotated` audit row (previously silent).
 
+## Verifying the contract
+
+The wire shape — request bodies, response envelopes, status-code mapping, and surface attribution — is locked by an integration test that runs against real Postgres + the real Hono pipeline (no service mocks):
+
+`langwatch/src/app/api/governance/__tests__/governance-rest-api.integration.test.ts`
+
+14 scenarios (as of Sergey's Lane B-4 commit at `1839d9f54`) cover ingestion-templates' full verb set, the 401 / 400 / 403 / 404 envelopes, and a wire-level audit-uniform assertion that `metadata.surface === "hono"` for state-changing calls. Downstream lanes (CLI, MCP) mirror this contract verbatim — if any lane drifts the snake_case body/response shape, RBAC ceiling, or status-code mapping, this test catches it.
+
+To run locally:
+
+```bash
+cd langwatch
+pnpm test:integration governance-rest-api.integration.test.ts
+```
+
+Use this file as the authoritative reference when implementing a CLI command or MCP tool against a governance route — the request/response shape that lives there is exactly what the route accepts and returns.
+
 ## Cross-references
 
 - [Governance CLI](/ai-governance/cli) — `langwatch governance <resource> <verb>` thin shell
@@ -133,3 +150,4 @@ The seven mutating verbs across the two shipped resources (`createOrgTemplate`, 
 - [Audit log](/ai-governance/audit-log) — where state-change rows land
 - [Compliance architecture](/ai-governance/compliance-architecture) — how the OCSF v1.1 export consumes the same audit stream
 - Spec — `specs/ai-gateway/governance/governance-api-cli-mcp-coverage.feature`
+- Wire-shape lock — `langwatch/src/app/api/governance/__tests__/governance-rest-api.integration.test.ts`
