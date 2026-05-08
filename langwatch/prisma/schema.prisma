@@ -107,6 +107,7 @@ model User {
   routingPoliciesUpdated  RoutingPolicy[]          @relation("RoutingPolicyUpdatedBy")
   ingestionSourcesCreated IngestionSource[]        @relation("IngestionSourceCreatedBy")
   anomalyRulesCreated     AnomalyRule[]            @relation("AnomalyRuleCreatedBy")
+  userIngestionBindings   UserIngestionBinding[]
 }
 
 model VerificationToken {
@@ -199,16 +200,16 @@ model Team {
 }
 
 model Organization {
-  id                     String               @id @default(nanoid())
-  name                   String
-  phoneNumber            String?
-  slug                   String               @unique
-  members                OrganizationUser[]
-  teams                  Team[]
-  createdAt              DateTime             @default(now())
-  updatedAt              DateTime             @default(now()) @updatedAt
-  OrganizationInvite     OrganizationInvite[]
-  usageSpendingMaxLimit  Int?
+  id                       String               @id @default(nanoid())
+  name                     String
+  phoneNumber              String?
+  slug                     String               @unique
+  members                  OrganizationUser[]
+  teams                    Team[]
+  createdAt                DateTime             @default(now())
+  updatedAt                DateTime             @default(now()) @updatedAt
+  OrganizationInvite       OrganizationInvite[]
+  usageSpendingMaxLimit    Int?
   /// Phase 8 — admin-configurable max lifetime for CLI device-flow
   /// sessions, in days. 0 = unbounded (default, mirrors GitHub CLI /
   /// gh-style flows). Companies that need finite session lifetime
@@ -217,7 +218,7 @@ model Organization {
   /// endpoint rejects refresh attempts where now - issued_at exceeds
   /// this value, regardless of the underlying refresh-token TTL.
   /// Spec: specs/ai-governance/sessions/session-ttl.feature.
-  maxSessionDurationDays Int                  @default(0)
+  maxSessionDurationDays   Int                  @default(0)
   /// Phase 9 — receiver-side gen_ai content stripping ("no-spy mode").
   /// Values:
   ///   "full"      (default) — store all content in CH (current behavior)
@@ -229,26 +230,26 @@ model Organization {
   /// `langwatch.origin = "gateway"`; user-app traces are untouched so
   /// customer-controlled data flows continue to work unchanged.
   /// Spec: specs/ai-governance/no-spy-mode/no-spy-mode.feature.
-  governanceLogContentMode String              @default("full")
-  signupData             Json?
-  signedDPA              Boolean              @default(false)
-  elasticsearchNodeUrl   String?
-  elasticsearchApiKey    String?
-  useCustomElasticsearch Boolean              @default(false)
-  s3Endpoint             String?
-  s3AccessKeyId          String?
-  s3SecretAccessKey      String?
-  s3Bucket               String?
-  useCustomS3            Boolean              @default(false)
-  sentPlanLimitAlert     DateTime?
-  ssoDomain              String?              @unique
-  ssoProvider            String?
-  presenceEnabled        Boolean              @default(true)
+  governanceLogContentMode String               @default("full")
+  signupData               Json?
+  signedDPA                Boolean              @default(false)
+  elasticsearchNodeUrl     String?
+  elasticsearchApiKey      String?
+  useCustomElasticsearch   Boolean              @default(false)
+  s3Endpoint               String?
+  s3AccessKeyId            String?
+  s3SecretAccessKey        String?
+  s3Bucket                 String?
+  useCustomS3              Boolean              @default(false)
+  sentPlanLimitAlert       DateTime?
+  ssoDomain                String?              @unique
+  ssoProvider              String?
+  presenceEnabled          Boolean              @default(true)
 
   promoCode              String?
-  stripeCustomerId       String?               @unique
-  currency               Currency              @default(EUR)
-  pricingModel           PricingModel          @default(TIERED)
+  stripeCustomerId       String?                @unique
+  currency               Currency               @default(EUR)
+  pricingModel           PricingModel           @default(TIERED)
   features               OrganizationFeature[]
   CustomRoles            CustomRole[]
   notifications          Notification[]
@@ -259,16 +260,18 @@ model Organization {
   roleBindings           RoleBinding[]
   personalAccessTokens   PersonalAccessToken[]
   // License enforcement fields (COSS-0226)
-  license                String?               @db.Text
+  license                String?                @db.Text
   licenseExpiresAt       DateTime?
   licenseLastValidatedAt DateTime?
-  gatewayBudgets         GatewayBudget[]       @relation("OrgScopedGatewayBudgets")
+  gatewayBudgets         GatewayBudget[]        @relation("OrgScopedGatewayBudgets")
   gatewayChangeEvents    GatewayChangeEvent[]
   routingPolicies        RoutingPolicy[]
   ingestionSources       IngestionSource[]
   anomalyRules           AnomalyRule[]
   anomalyAlerts          AnomalyAlert[]
   aiToolEntries          AiToolEntry[]
+  ingestionTemplates     IngestionTemplate[]
+  userIngestionBindings  UserIngestionBinding[]
 
   @@index([ssoProvider])
 }
@@ -403,6 +406,7 @@ model Project {
   gatewayProviderCreds     GatewayProviderCredential[]
   gatewayBudgets           GatewayBudget[]                     @relation("ProjectScopedGatewayBudgets")
   gatewayChangeEvents      GatewayChangeEvent[]
+  userIngestionBindings    UserIngestionBinding[]
 
   // Denormalised mirror of parent Team's personal flag for fast
   // lookup at trace ingest time without a Team join. Always equals
@@ -1893,13 +1897,13 @@ model AnomalyRule {
   createdById String?
   createdBy   User?    @relation("AnomalyRuleCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
 
+  alerts AnomalyAlert[]
+
   @@unique([organizationId, name])
   @@index([organizationId])
   @@index([scope, scopeId])
   @@index([ruleType])
   @@index([status])
-
-  alerts AnomalyAlert[]
 }
 
 /// Persisted anomaly detection. Inserted by the anomaly-detection
@@ -1998,7 +2002,7 @@ model AiToolEntry {
   /// entry with the same slug as an org-scoped one hides the org
   /// default for users in that team). Server-owned: generated from
   /// displayName + nanoid(6) on create, immutable on update.
-  slug    String
+  slug String
 
   /// @deprecated Use `iconAsset` instead. Kept for back-compat with
   /// pre-refactor rows; new writes should populate iconAsset.
@@ -2054,6 +2058,161 @@ model AiToolEntryTeam {
 
   @@unique([entryId, teamId])
   @@index([teamId])
+}
+
+/// Admin/platform-curated catalog row for upstream OTLP normalization.
+/// Owns the OTTL transform that reshapes a specific upstream tool's
+/// span shape into canonical gen_ai conventions. Users install via
+/// UserIngestionBinding to land traces in their personal project.
+///
+/// `organizationId` NULL = platform-published default (always-visible
+/// across every org). NOT NULL = org-authored (visible only within
+/// that org). v1 ships only platform-published; org-authored authoring
+/// UI lands v2 (the column ships now to avoid a future migration).
+///
+/// Spec: specs/ai-gateway/governance/ingestion-templates-catalog.feature
+model IngestionTemplate {
+  id             String        @id @default(nanoid())
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  /// Stable slug — unique within (organizationId, slug) scope. Generated
+  /// from displayName + nanoid(6) on create for org-authored; canonical
+  /// values for platform-published (`claude_code` / `cursor` /
+  /// `claude_cowork` / `raw_otlp_advanced`).
+  slug String
+
+  /// Mirrors the slug for v1 platform-published rows. Kept as a separate
+  /// column so a future v2 may publish two templates that share an
+  /// upstream sourceType (e.g. claude_code-personal vs claude_code-team)
+  /// without a migration. String not enum — extensibility.
+  sourceType String
+
+  displayName String
+  description String? @db.Text
+
+  /// Icon source — single column, prefix-discriminated, mirrors
+  /// AiToolEntry.iconAsset:
+  ///   `preset:<kind>`                 (built-in slot)
+  ///   `data:image/svg+xml;base64,…`   (admin-uploaded for org-authored)
+  ///   null                            → fall back to slug-default in UI
+  iconAsset String? @db.Text
+
+  /// Discriminator for what (if any) extra credential metadata the
+  /// install drawer captures from the user:
+  ///   null              → otlp_token-only (drawer auto-issues binding
+  ///                       token, no input form)
+  ///   `static_api_key`  → drawer captures the user's upstream tool
+  ///                       API key into UserIngestionBinding.encryptedCredential
+  ///   `agent_id`        → drawer captures an agent identifier (e.g.
+  ///                       Cursor agentId) into the same column
+  /// String not enum so v2 shapes (oauth_redirect / s3_bucket) ship
+  /// without a migration.
+  credentialSchema String?
+
+  /// Admin/platform-authored OTTL statements. Applied at receive time
+  /// AFTER the receiver re-stamps the binding's authoritative principal
+  /// + provenance keys (see `protectedTemplateAttributeKeys` 19-key
+  /// closed list). Templates write canonical OTTL outputs (gen_ai.*,
+  /// cost.usd, response.model) — they CANNOT write attribution or
+  /// provenance keys; the receiver guard restores those post-OTTL.
+  ottlRules String @default("") @db.Text
+
+  /// True for the v1 platform-published default templates
+  /// (organizationId IS NULL). Future org-authored rows write false.
+  /// Drives the admin UI "READ-ONLY view + Request a custom template"
+  /// surface — admins consume + opt-out only in v1.
+  platformPublished Boolean @default(false)
+
+  /// Admin/platform enable. False = hidden from /me catalog. Existing
+  /// UserIngestionBindings continue to land traces; new installs are
+  /// blocked.
+  enabled Boolean @default(true)
+
+  archivedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @default(now()) @updatedAt
+  createdById String?
+  updatedById String?
+
+  bindings UserIngestionBinding[]
+
+  @@unique([organizationId, slug])
+  @@index([organizationId, archivedAt])
+  @@index([sourceType])
+}
+
+/// User-managed binding from an IngestionTemplate to the user's personal
+/// project. Holds the `lwub_<base32>` binding access token (hashed) the
+/// user pastes into their upstream tool's OTLP exporter Bearer auth.
+///
+/// Cross-bind guard is service-layer (structural-impossibility): the
+/// service input shape MUST NOT accept personalProjectId. Server resolves
+/// from `getPersonalProjectForUser(userId)` at install time, so a caller
+/// cannot bind to another user's project even with the right templateId.
+///
+/// Hard-cut rotation v1: `bindingAccessTokenHash` is replaced in-place
+/// on rotate, no grace window. Receiver returns a structured 'binding
+/// rejected' state surfaced as a /me Trace Ingest tile banner.
+///
+/// Spec: specs/ai-gateway/governance/user-ingestion-binding-lifecycle.feature
+///       specs/ai-gateway/governance/template-cross-bind-guard.feature
+model UserIngestionBinding {
+  id String @id @default(nanoid())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  templateId String
+  template   IngestionTemplate @relation(fields: [templateId], references: [id], onDelete: Restrict)
+
+  /// Server-resolved at install (NOT input-accepted). Always points at
+  /// the user's personal Project (`Project.isPersonal=true` AND
+  /// `Project.team.ownerUserId === userId`). Receiver re-verifies at
+  /// auth time as defense-in-depth.
+  personalProjectId String
+  personalProject   Project @relation(fields: [personalProjectId], references: [id], onDelete: Cascade)
+
+  /// Denormalised for tenancy index — equals
+  /// `personalProject.team.organizationId`. Lets admin views query
+  /// bindings within an org without a 2-table join.
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  /// SHA256 hex of the `lwub_<base32>` token. Receiver auth path:
+  /// SHA256(incoming Bearer) → indexed lookup. Single source of truth
+  /// for binding auth.
+  bindingAccessTokenHash String @unique
+
+  /// First 8 characters of the token, displayed in /me Trace Ingest tile
+  /// for "is this the right token" recognition. Never used for auth.
+  bindingAccessTokenPrefix String
+
+  /// Optional credential metadata captured at install time when the
+  /// template's credentialSchema is `static_api_key` or `agent_id`.
+  /// NULL when credentialSchema is null (otlp_token-only templates).
+  /// Encrypted at rest via the same pepper-derived KEK as VirtualKey
+  /// secrets. NOT used for receiver auth.
+  encryptedCredential Json?
+
+  /// User-side toggle. False = receiver rejects bound traces; tile shows
+  /// 'Binding disabled — re-enable to resume'.
+  enabled Boolean @default(true)
+
+  /// Last successful trace landed timestamp. Surfaces in /me as
+  /// "last trace 2 minutes ago" + admin-side as "is this binding live".
+  /// NOT a per-trace audit row (volume).
+  lastSeenAt DateTime?
+
+  archivedAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @default(now()) @updatedAt
+
+  @@unique([userId, templateId])
+  @@index([organizationId, archivedAt])
+  @@index([userId, archivedAt])
+  @@index([templateId])
+  @@index([personalProjectId])
 }
 
 model GatewayProviderCredential {
