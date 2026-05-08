@@ -139,15 +139,18 @@ The wire shape — request bodies, response envelopes, status-code mapping, and 
 
 The PAT setup pattern in this file (PersonalAccessToken + RoleBinding(user, ADMIN) + RoleBinding(pat, MEMBER) + Personal Team + Personal Project) is the canonical reference for any downstream lane (CLI, MCP) that needs a PAT-test path.
 
+**No-bypass invariant (CI-enforced)** — `langwatch/ee/governance/repositories/__tests__/no-bypass.unit.test.ts`. 3 tests (Lane B-7 at `94c219035`) statically reject any future PR that adds a direct `prisma.ingestionTemplate.*` or `prisma.userIngestionBinding.*` call outside the allowlist. Locks the umbrella spec's `@no-bypass` invariant in CI so the repository-pattern boundary won't silently drift.
+
 To run locally:
 
 ```bash
 cd langwatch
 pnpm test:integration governance-rest-api.integration.test.ts
 pnpm test:integration governance-bindings-rest-api.integration.test.ts
+pnpm test:unit no-bypass.unit.test.ts
 ```
 
-Use these files as the authoritative reference when implementing a CLI command or MCP tool against a governance route — the request/response shape and audit-stamping invariants that live there are exactly what each route accepts, returns, and emits.
+Use these files as the authoritative reference when implementing a CLI command or MCP tool against a governance route — the request/response shape and audit-stamping invariants that live there are exactly what each route accepts, returns, and emits, and the no-bypass test will reject any direct-prisma shortcut at PR time.
 
 ## Cross-references
 
