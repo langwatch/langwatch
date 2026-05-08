@@ -645,35 +645,80 @@ export class AiToolEntryService {
   /**
    * Seed the documented starter pack onto an org's catalog (Phase 7
    * "fresh-org friction killer" per docs/ai-governance/personal-portal/
-   * admin-catalog.mdx). Idempotent: skips any tile whose `slug` is
-   * already published as an org-scoped entry — admins who already
-   * curated their catalog by hand and then click "Import starter pack"
-   * just get filled-in gaps, never duplicates or re-skinned tiles.
+   * admin-catalog.mdx). Three-way idempotent merge:
    *
-   * Returns the count of tiles actually created so the UI can report
-   * "imported N tiles" or "starter pack already in place" correctly.
+   *   - existing org-scoped row matches by (type, displayName) AND has
+   *     `iconAsset = null` → UPDATE that row's iconAsset in place
+   *     (closes the bug where admin-created "Claude Code" — slug
+   *     `claude-code-x7k2y9` from generateSlug — coexisted with a
+   *     starter row at slug `claude-code` and the older NULL-icon
+   *     row won the (order, displayName) sort)
+   *   - existing match with `iconAsset` already populated → SKIP
+   *     (admin curated the artwork; do not overwrite)
+   *   - no existing match → CREATE
+   *
+   * Match is case-insensitive on displayName + scoped to org-wide rows
+   * (scope='organization', scopeId=organizationId). Team-scoped tiles
+   * are intentionally untouched: they're admin-curated overrides.
+   *
+   * Returns `{ created, updated, skipped }` so the UI can report
+   * "imported N tiles, fixed M existing icons" instead of just an
+   * insert count.
    */
   async seedStarterPack(input: {
     organizationId: string;
     actorUserId?: string | null;
-  }): Promise<{ created: number; skipped: number }> {
+  }): Promise<{ created: number; updated: number; skipped: number }> {
     const existing = await this.prisma.aiToolEntry.findMany({
       where: {
         organizationId: input.organizationId,
         scope: "organization",
         scopeId: input.organizationId,
       },
-      select: { slug: true },
+      select: { id: true, type: true, displayName: true, iconAsset: true },
     });
-    const taken = new Set(existing.map((e) => e.slug));
 
-    const tiles = STARTER_PACK_TILES.filter((t) => !taken.has(t.slug));
-    if (tiles.length === 0) {
-      return { created: 0, skipped: STARTER_PACK_TILES.length };
+    type ExistingRow = (typeof existing)[number];
+    const fingerprint = (type: string, displayName: string) =>
+      `${type}::${displayName.trim().toLowerCase()}`;
+    const byFingerprint = new Map<string, ExistingRow>();
+    for (const row of existing) {
+      byFingerprint.set(fingerprint(row.type, row.displayName), row);
     }
 
-    await this.prisma.$transaction(
-      tiles.map((tile, index) =>
+    type StarterTile = (typeof STARTER_PACK_TILES)[number];
+    const toCreate: StarterTile[] = [];
+    const toUpdate: { id: string; iconAsset: string }[] = [];
+    let skipped = 0;
+
+    for (const tile of STARTER_PACK_TILES) {
+      const match = byFingerprint.get(fingerprint(tile.type, tile.displayName));
+      if (!match) {
+        toCreate.push(tile);
+        continue;
+      }
+      if (match.iconAsset === null) {
+        toUpdate.push({ id: match.id, iconAsset: tile.iconAsset });
+        continue;
+      }
+      skipped += 1;
+    }
+
+    if (toCreate.length === 0 && toUpdate.length === 0) {
+      return { created: 0, updated: 0, skipped };
+    }
+
+    await this.prisma.$transaction([
+      ...toUpdate.map((u) =>
+        this.prisma.aiToolEntry.update({
+          where: { id: u.id },
+          data: {
+            iconAsset: u.iconAsset,
+            updatedById: input.actorUserId ?? null,
+          },
+        }),
+      ),
+      ...toCreate.map((tile, index) =>
         this.prisma.aiToolEntry.create({
           data: {
             organizationId: input.organizationId,
@@ -693,11 +738,12 @@ export class AiToolEntryService {
           },
         }),
       ),
-    );
+    ]);
 
     return {
-      created: tiles.length,
-      skipped: STARTER_PACK_TILES.length - tiles.length,
+      created: toCreate.length,
+      updated: toUpdate.length,
+      skipped,
     };
   }
 

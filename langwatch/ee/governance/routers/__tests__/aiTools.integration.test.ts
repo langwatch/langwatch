@@ -21,6 +21,7 @@
  */
 import {
   OrganizationUserRole,
+  Prisma,
   RoleBindingScopeType,
   TeamUserRole,
 } from "@prisma/client";
@@ -433,6 +434,7 @@ describe("aiToolsRouter integration", () => {
           organizationId: freshOrgId,
         });
         expect(result.created).toBe(8); // 4 coding assistants + 4 model providers
+        expect(result.updated).toBe(0);
         expect(result.skipped).toBe(0);
 
         const adminList = await callerFor(adminUserId).aiTools.adminList({
@@ -455,6 +457,7 @@ describe("aiToolsRouter integration", () => {
           organizationId: freshOrgId,
         });
         expect(second.created).toBe(0);
+        expect(second.updated).toBe(0);
         expect(second.skipped).toBe(8);
         const after = await callerFor(adminUserId).aiTools.adminList({
           organizationId: freshOrgId,
@@ -485,6 +488,139 @@ describe("aiToolsRouter integration", () => {
           organizationId,
         }),
       ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+    });
+
+    it("merges iconAsset into pre-existing admin-created tiles by displayName", async () => {
+      // Regression for the duplicate-row bug found while dogfooding
+      // PR #3524: admin manually creates "Claude Code" via the UI
+      // (slug = generateSlug("Claude Code") = "claude-code-<nanoid6>",
+      // iconAsset = null) BEFORE clicking "Import starter pack". The
+      // old slug-only dedupe missed this row and created a SECOND
+      // "claude-code"-slugged row, leaving two coexisting tiles. The
+      // older NULL-icon row often won (order, displayName) sort, so
+      // /me showed a generic wrench icon despite correct wiring.
+      //
+      // Fix shape: match by (organizationId, type, displayName), case-
+      // insensitive. Existing row with NULL iconAsset → UPDATE in
+      // place (no duplicate). Existing row with non-NULL iconAsset
+      // → SKIP (don't clobber admin curation). No match → CREATE.
+      const freshOrgId = `merge-org-${nanoid(8)}`;
+      const freshTeamId = `merge-team-${nanoid(8)}`;
+      await prisma.organization.create({
+        data: {
+          id: freshOrgId,
+          name: `Merge ${nanoid(4)}`,
+          slug: `merge-${nanoid(6)}`,
+        },
+      });
+      await prisma.team.create({
+        data: {
+          id: freshTeamId,
+          name: `Merge Team ${nanoid(4)}`,
+          slug: `merge-team-${nanoid(6)}`,
+          organizationId: freshOrgId,
+        },
+      });
+      await prisma.organizationUser.create({
+        data: {
+          userId: adminUserId,
+          organizationId: freshOrgId,
+          role: OrganizationUserRole.ADMIN,
+        },
+      });
+      await prisma.roleBinding.create({
+        data: {
+          organizationId: freshOrgId,
+          userId: adminUserId,
+          role: TeamUserRole.ADMIN,
+          scopeType: RoleBindingScopeType.ORGANIZATION,
+          scopeId: freshOrgId,
+        },
+      });
+
+      try {
+        // Pre-state mirrors what dogfood produced: admin manually
+        // created "Claude Code" via UI → nanoid-suffixed slug, NULL
+        // iconAsset. And "Cursor" with iconAsset already set (the
+        // admin uploaded a custom logo) — must NOT be overwritten.
+        const adminClaudeRow = await prisma.aiToolEntry.create({
+          data: {
+            organizationId: freshOrgId,
+            scope: "organization",
+            scopeId: freshOrgId,
+            type: "coding_assistant",
+            displayName: "Claude Code",
+            slug: `claude-code-${nanoid(6)}`,
+            iconAsset: null,
+            order: 0,
+            enabled: true,
+            config: {
+              assistantKind: "claude_code",
+              setupCommand: "langwatch claude",
+            } as Prisma.InputJsonValue,
+          },
+        });
+        const customCursorIcon = "data:image/svg+xml;base64,PHN2Zy8+";
+        const adminCursorRow = await prisma.aiToolEntry.create({
+          data: {
+            organizationId: freshOrgId,
+            scope: "organization",
+            scopeId: freshOrgId,
+            type: "coding_assistant",
+            displayName: "Cursor",
+            slug: `cursor-${nanoid(6)}`,
+            iconAsset: customCursorIcon,
+            order: 1,
+            enabled: true,
+            config: {
+              assistantKind: "cursor",
+              setupCommand: "langwatch cursor",
+            } as Prisma.InputJsonValue,
+          },
+        });
+
+        const result = await callerFor(adminUserId).aiTools.importStarterPack({
+          organizationId: freshOrgId,
+        });
+        expect(result.updated).toBe(1); // Claude Code merged in place
+        expect(result.skipped).toBe(1); // Cursor admin-curated icon preserved
+        expect(result.created).toBe(6); // remaining starter set inserted
+
+        const after = await callerFor(adminUserId).aiTools.adminList({
+          organizationId: freshOrgId,
+        });
+        expect(after).toHaveLength(8); // no duplicate row created
+
+        const claudeRows = after.filter(
+          (e) => e.type === "coding_assistant" && e.displayName === "Claude Code",
+        );
+        expect(claudeRows).toHaveLength(1);
+        expect(claudeRows[0]!.id).toBe(adminClaudeRow.id);
+        expect(claudeRows[0]!.iconAsset).toBe("preset:claude_code");
+
+        const cursorRows = after.filter(
+          (e) => e.type === "coding_assistant" && e.displayName === "Cursor",
+        );
+        expect(cursorRows).toHaveLength(1);
+        expect(cursorRows[0]!.id).toBe(adminCursorRow.id);
+        expect(cursorRows[0]!.iconAsset).toBe(customCursorIcon);
+      } finally {
+        await prisma.aiToolEntry
+          .deleteMany({ where: { organizationId: freshOrgId } })
+          .catch(() => undefined);
+        await prisma.roleBinding
+          .deleteMany({ where: { organizationId: freshOrgId } })
+          .catch(() => undefined);
+        await prisma.organizationUser
+          .deleteMany({ where: { organizationId: freshOrgId } })
+          .catch(() => undefined);
+        await prisma.team
+          .deleteMany({ where: { id: freshTeamId } })
+          .catch(() => undefined);
+        await prisma.organization
+          .deleteMany({ where: { id: freshOrgId } })
+          .catch(() => undefined);
+      }
     });
   });
 
