@@ -81,9 +81,11 @@ Feature: AI Gateway Governance — Ingestion Templates Catalog (personal-workspa
   # ---------------------------------------------------------------------------
 
   @bdd @ingestion-templates @admin-readonly
-  Scenario: Admin sees catalog as READ-ONLY in /settings/ai-tools
+  Scenario: Admin sees catalog as READ-ONLY in /settings/governance/tool-catalog
     Given admin "carol@acme.com" has the `ingestionTemplate:view` permission
-    When carol navigates to "/settings/ai-tools" and selects the "Ingestion Templates" tab
+    When carol navigates to "/settings/governance/tool-catalog" and selects the "Ingestion Templates" tab
+    # Existing P7-B6 ToolCatalogEditor surface (AiToolEntry catalog) gets a
+    # second tab here. No new admin route v1.
     Then she sees the 4 platform-default templates listed
     And each template row has a "View OTTL" affordance opening a read-only modal
     But there is NO "Edit" button, NO "Disable" button, and NO "Fork" button v1
