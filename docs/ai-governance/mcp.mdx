@@ -114,6 +114,8 @@ Every state-changing tool call emits an audit row with `AuditLog.metadata.surfac
 
 Payload shapes are identical to the REST API's audit rows apart from `metadata.surface` — every other field (actorUserId, apiKeyId, target, error) follows the same shape. This lets incident response queries answer "what did the agent do?" without changing the audit-row event-kind taxonomy.
 
+The contract is service-layer-asserted by `langwatch/src/mcp/__tests__/governance-tools.audit-uniform.integration.test.ts` (Lane B-MCP audit at `66fd35162`) — 3 cases against real Postgres: `governance_ingestion_templates_create` stamps `metadata.surface = "mcp"`, `governance_user_ingestion_bindings_install` stamps `metadata.surface = "mcp"`, and the `AUTH_REQUIRED:` negative path fails before any audit row is written. No wire-level MCP test is needed (per the Path B architecture there is no MCP-over-HTTP wire to assert at).
+
 ## Agent setup-from-scratch (the dogfood gate)
 
 The umbrella spec defines an end-to-end test: an agent connecting with admin apiKey can fully configure governance via a sequence of MCP tool calls:
