@@ -242,4 +242,104 @@ describe("IngestionTemplateService admin authoring", () => {
       ).rejects.toThrow(TemplateNotFoundError);
     });
   });
+
+  describe("when surface attribution is supplied", () => {
+    // Per umbrella spec @audit-uniform — the audit row must capture
+    // which surface initiated the change so forensic readers can answer
+    // "did the dashboard, REST API, CLI, or an MCP agent flip this?".
+    // Spec: specs/ai-gateway/governance/governance-api-cli-mcp-coverage.feature
+    it("stamps surface=hono into audit metadata for create", async () => {
+      const created = await service.createOrgTemplate({
+        organizationId: ORG_ID,
+        callerUserId: ADMIN_ID,
+        sourceType: "surface_create",
+        displayName: "Surface Create",
+        surface: "hono",
+      });
+      const audit = await prisma.auditLog.findFirst({
+        where: {
+          organizationId: ORG_ID,
+          action: "gateway.ingestion_template.created",
+          targetId: created.id,
+        },
+      });
+      expect((audit?.metadata as { surface?: string } | null)?.surface).toBe(
+        "hono",
+      );
+    });
+
+    it("stamps surface=cli into audit metadata for updateOttlRules", async () => {
+      const created = await service.createOrgTemplate({
+        organizationId: ORG_ID,
+        callerUserId: ADMIN_ID,
+        sourceType: "surface_update",
+        displayName: "Surface Update",
+        surface: "trpc",
+      });
+      await service.updateOttlRules({
+        organizationId: ORG_ID,
+        callerUserId: ADMIN_ID,
+        id: created.id,
+        ottlRules: 'set(attributes["x"], "y")',
+        surface: "cli",
+      });
+      const audit = await prisma.auditLog.findFirst({
+        where: {
+          organizationId: ORG_ID,
+          action: "gateway.ingestion_template.ottl_updated",
+          targetId: created.id,
+        },
+      });
+      expect((audit?.metadata as { surface?: string } | null)?.surface).toBe(
+        "cli",
+      );
+    });
+
+    it("stamps surface=mcp into audit metadata for archive", async () => {
+      const created = await service.createOrgTemplate({
+        organizationId: ORG_ID,
+        callerUserId: ADMIN_ID,
+        sourceType: "surface_archive",
+        displayName: "Surface Archive",
+      });
+      await service.archiveOrgTemplate({
+        organizationId: ORG_ID,
+        callerUserId: ADMIN_ID,
+        id: created.id,
+        surface: "mcp",
+      });
+      const audit = await prisma.auditLog.findFirst({
+        where: {
+          organizationId: ORG_ID,
+          action: "gateway.ingestion_template.archived",
+          targetId: created.id,
+        },
+      });
+      expect((audit?.metadata as { surface?: string } | null)?.surface).toBe(
+        "mcp",
+      );
+    });
+
+    it("defaults to surface=trpc when caller omits the field (back-compat)", async () => {
+      const created = await service.createOrgTemplate({
+        organizationId: ORG_ID,
+        callerUserId: ADMIN_ID,
+        sourceType: "surface_default",
+        displayName: "Surface Default",
+        // surface intentionally omitted — pre-existing tRPC callers
+        // that haven't been updated yet still produce a meaningful
+        // audit attribution rather than a blank field.
+      });
+      const audit = await prisma.auditLog.findFirst({
+        where: {
+          organizationId: ORG_ID,
+          action: "gateway.ingestion_template.created",
+          targetId: created.id,
+        },
+      });
+      expect((audit?.metadata as { surface?: string } | null)?.surface).toBe(
+        "trpc",
+      );
+    });
+  });
 });

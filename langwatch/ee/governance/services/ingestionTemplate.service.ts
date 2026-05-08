@@ -16,6 +16,10 @@
 import { Prisma, type PrismaClient } from "@prisma/client";
 import { customAlphabet } from "nanoid";
 
+import {
+  DEFAULT_GOVERNANCE_SURFACE,
+  type GovernanceCallSurface,
+} from "./auditSurface";
 import { seedPlatformIngestionTemplates } from "./platformIngestionTemplates.seeds";
 
 import { createLogger } from "~/utils/logger/server";
@@ -252,6 +256,7 @@ export class IngestionTemplateService {
     iconAsset,
     credentialSchema,
     ottlRules,
+    surface,
   }: {
     organizationId: string;
     callerUserId: string;
@@ -261,6 +266,8 @@ export class IngestionTemplateService {
     iconAsset?: string | null;
     credentialSchema?: string | null;
     ottlRules?: string;
+    /** Audit-trail attribution per umbrella spec @audit-uniform. */
+    surface?: GovernanceCallSurface;
   }): Promise<IngestionTemplateRow> {
     if (!SOURCE_TYPE_PATTERN.test(sourceType)) {
       throw new InvalidSourceTypeError();
@@ -301,6 +308,7 @@ export class IngestionTemplateService {
             slug: created.slug,
             sourceType: created.sourceType,
             displayName: created.displayName,
+            surface: surface ?? DEFAULT_GOVERNANCE_SURFACE,
           },
         },
       });
@@ -320,11 +328,13 @@ export class IngestionTemplateService {
     callerUserId,
     id,
     ottlRules,
+    surface,
   }: {
     organizationId: string;
     callerUserId: string;
     id: string;
     ottlRules: string;
+    surface?: GovernanceCallSurface;
   }): Promise<IngestionTemplateRow> {
     return await this.prisma.$transaction(async (tx) => {
       const existing = await tx.ingestionTemplate.findFirst({
@@ -357,6 +367,7 @@ export class IngestionTemplateService {
             slug: existing.slug,
             previousLineCount: countLines(existing.ottlRules),
             nextLineCount: countLines(ottlRules),
+            surface: surface ?? DEFAULT_GOVERNANCE_SURFACE,
           },
         },
       });
@@ -375,10 +386,12 @@ export class IngestionTemplateService {
     organizationId,
     callerUserId,
     id,
+    surface,
   }: {
     organizationId: string;
     callerUserId: string;
     id: string;
+    surface?: GovernanceCallSurface;
   }): Promise<void> {
     await this.prisma.$transaction(async (tx) => {
       const existing = await tx.ingestionTemplate.findFirst({
@@ -402,7 +415,10 @@ export class IngestionTemplateService {
           action: "gateway.ingestion_template.archived",
           targetKind: "ingestion_template",
           targetId: existing.id,
-          metadata: { slug: existing.slug },
+          metadata: {
+            slug: existing.slug,
+            surface: surface ?? DEFAULT_GOVERNANCE_SURFACE,
+          },
         },
       });
     });
@@ -420,10 +436,12 @@ export class IngestionTemplateService {
     organizationId,
     callerUserId,
     sourceTemplateId,
+    surface,
   }: {
     organizationId: string;
     callerUserId: string;
     sourceTemplateId: string;
+    surface?: GovernanceCallSurface;
   }): Promise<IngestionTemplateRow> {
     const source = await this.prisma.ingestionTemplate.findFirst({
       where: { id: sourceTemplateId, archivedAt: null, organizationId: null },
@@ -439,6 +457,7 @@ export class IngestionTemplateService {
       iconAsset: source.iconAsset,
       credentialSchema: source.credentialSchema,
       ottlRules: source.ottlRules,
+      surface,
     });
   }
 

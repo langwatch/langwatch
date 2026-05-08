@@ -124,6 +124,7 @@ export const ingestionTemplatesRouter = createTRPCRouter({
           credentialSchema:
             input.credentialSchema === "otlp_token" ? null : input.credentialSchema ?? null,
           ottlRules: input.ottlRules,
+          surface: "trpc",
         });
       } catch (err) {
         mapServiceError(err);
@@ -152,6 +153,7 @@ export const ingestionTemplatesRouter = createTRPCRouter({
           callerUserId: ctx.session.user.id,
           id: input.id,
           ottlRules: input.ottlRules,
+          surface: "trpc",
         });
       } catch (err) {
         mapServiceError(err);
@@ -171,6 +173,7 @@ export const ingestionTemplatesRouter = createTRPCRouter({
           organizationId: input.organizationId,
           callerUserId: ctx.session.user.id,
           id: input.id,
+          surface: "trpc",
         });
         return { ok: true as const };
       } catch (err) {
@@ -199,6 +202,7 @@ export const ingestionTemplatesRouter = createTRPCRouter({
           organizationId: input.organizationId,
           callerUserId: ctx.session.user.id,
           sourceTemplateId: input.sourceTemplateId,
+          surface: "trpc",
         });
       } catch (err) {
         mapServiceError(err);

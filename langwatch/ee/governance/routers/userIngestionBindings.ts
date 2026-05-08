@@ -84,6 +84,7 @@ export const userIngestionBindingsRouter = createTRPCRouter({
           encryptedCredential:
             input.encryptedCredential as
               | Parameters<typeof service.install>[0]["encryptedCredential"],
+          surface: "trpc",
         });
       } catch (err) {
         if (err instanceof PersonalProjectMissingError) {
@@ -114,6 +115,7 @@ export const userIngestionBindingsRouter = createTRPCRouter({
           callerUserId: ctx.session.user.id,
           organizationId: input.organizationId,
           bindingId: input.bindingId,
+          surface: "trpc",
         });
         return { ok: true };
       } catch (err) {
@@ -144,6 +146,7 @@ export const userIngestionBindingsRouter = createTRPCRouter({
           callerUserId: ctx.session.user.id,
           organizationId: input.organizationId,
           bindingId: input.bindingId,
+          surface: "trpc",
         });
       } catch (err) {
         if (err instanceof BindingNotFoundError) {

@@ -513,6 +513,7 @@ export const app = new Hono<{ Variables: Variables }>()
               ? null
               : body.data.credential_schema ?? null,
           ottlRules: body.data.ottl_rules,
+          surface: "hono",
         });
         logger.info(
           { templateId: row.id, organizationId, callerUserId },
@@ -585,6 +586,7 @@ export const app = new Hono<{ Variables: Variables }>()
           callerUserId,
           id,
           ottlRules: body.data.ottl_rules,
+          surface: "hono",
         });
         return c.json({ ingestion_template: toTemplateDto(row) });
       } catch (err) {
@@ -633,7 +635,12 @@ export const app = new Hono<{ Variables: Variables }>()
         project.id,
       );
       try {
-        await service.archiveOrgTemplate({ organizationId, callerUserId, id });
+        await service.archiveOrgTemplate({
+          organizationId,
+          callerUserId,
+          id,
+          surface: "hono",
+        });
         return c.json({ archived: true as const });
       } catch (err) {
         const mapped = mapTemplateError(err);
@@ -695,6 +702,7 @@ export const app = new Hono<{ Variables: Variables }>()
           organizationId,
           callerUserId,
           sourceTemplateId: body.data.source_template_id,
+          surface: "hono",
         });
         return c.json({ ingestion_template: toTemplateDto(row) }, 201);
       } catch (err) {
@@ -833,6 +841,7 @@ export const app = new Hono<{ Variables: Variables }>()
           encryptedCredential: body.data.encrypted_credential as
             | Prisma.InputJsonValue
             | undefined,
+          surface: "hono",
         });
         logger.info(
           {
@@ -903,6 +912,7 @@ export const app = new Hono<{ Variables: Variables }>()
           callerUserId: caller.userId,
           organizationId,
           bindingId: id,
+          surface: "hono",
         });
         return c.json({ uninstalled: true as const });
       } catch (err) {
@@ -966,6 +976,7 @@ export const app = new Hono<{ Variables: Variables }>()
           callerUserId: caller.userId,
           organizationId,
           bindingId: id,
+          surface: "hono",
         });
         return c.json({
           binding: toBindingDto(result.binding),

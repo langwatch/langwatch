@@ -23,6 +23,10 @@
 import { Prisma, type PrismaClient } from "@prisma/client";
 
 import {
+  DEFAULT_GOVERNANCE_SURFACE,
+  type GovernanceCallSurface,
+} from "./auditSurface";
+import {
   BINDING_TOKEN_PREFIX_DISPLAY_LENGTH,
   issueBindingToken,
 } from "./userIngestionBindingToken.utils";
@@ -107,6 +111,7 @@ export class UserIngestionBindingService {
     organizationId,
     templateId,
     encryptedCredential,
+    surface,
   }: {
     callerUserId: string;
     /** The caller's currently-active organization. A user can have a
@@ -117,6 +122,8 @@ export class UserIngestionBindingService {
     organizationId: string;
     templateId: string;
     encryptedCredential?: Prisma.InputJsonValue;
+    /** Audit-trail attribution per umbrella spec @audit-uniform. */
+    surface?: GovernanceCallSurface;
   }): Promise<InstallBindingResult> {
     const project = await this.requireOwnedPersonalProject({
       callerUserId,
@@ -182,6 +189,7 @@ export class UserIngestionBindingService {
           metadata: {
             templateId: template.id,
             templateSlug: template.slug,
+            surface: surface ?? DEFAULT_GOVERNANCE_SURFACE,
           },
         },
       });
@@ -211,10 +219,12 @@ export class UserIngestionBindingService {
     callerUserId,
     organizationId,
     bindingId,
+    surface,
   }: {
     callerUserId: string;
     organizationId: string;
     bindingId: string;
+    surface?: GovernanceCallSurface;
   }): Promise<void> {
     const binding = await this.prisma.userIngestionBinding.findFirst({
       where: {
@@ -245,7 +255,10 @@ export class UserIngestionBindingService {
           action: "gateway.user_ingestion_binding.uninstalled",
           targetKind: "user_ingestion_binding",
           targetId: binding.id,
-          metadata: { templateId: binding.templateId },
+          metadata: {
+            templateId: binding.templateId,
+            surface: surface ?? DEFAULT_GOVERNANCE_SURFACE,
+          },
         },
       });
     });
@@ -260,10 +273,12 @@ export class UserIngestionBindingService {
     callerUserId,
     organizationId,
     bindingId,
+    surface,
   }: {
     callerUserId: string;
     organizationId: string;
     bindingId: string;
+    surface?: GovernanceCallSurface;
   }): Promise<{ binding: BindingRow; token: string }> {
     const binding = await this.prisma.userIngestionBinding.findFirst({
       where: {
@@ -277,12 +292,29 @@ export class UserIngestionBindingService {
 
     const issued = issueBindingToken();
 
-    const updated = await this.prisma.userIngestionBinding.update({
-      where: { id: binding.id },
-      data: {
-        bindingAccessTokenHash: issued.hash,
-        bindingAccessTokenPrefix: issued.prefix,
-      },
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const u = await tx.userIngestionBinding.update({
+        where: { id: binding.id },
+        data: {
+          bindingAccessTokenHash: issued.hash,
+          bindingAccessTokenPrefix: issued.prefix,
+        },
+      });
+      await tx.auditLog.create({
+        data: {
+          userId: callerUserId,
+          projectId: binding.personalProjectId,
+          organizationId: binding.organizationId,
+          action: "gateway.user_ingestion_binding.token_rotated",
+          targetKind: "user_ingestion_binding",
+          targetId: binding.id,
+          metadata: {
+            templateId: binding.templateId,
+            surface: surface ?? DEFAULT_GOVERNANCE_SURFACE,
+          },
+        },
+      });
+      return u;
     });
 
     return { binding: toRow(updated), token: issued.token };
