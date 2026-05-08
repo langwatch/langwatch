@@ -1,0 +1,32 @@
+{
+  "resourceSpans": [
+    {
+      "resource": {
+        "attributes": [
+          { "key": "service.name", "value": { "stringValue": "byo-telemetry-pipeline" } },
+          { "key": "service.version", "value": { "stringValue": "0.0.0-dogfood" } }
+        ]
+      },
+      "scopeSpans": [
+        {
+          "scope": { "name": "dogfood.raw_otlp_advanced", "version": "0.0.0" },
+          "spans": [
+            {
+              "traceId": "00000000000000000000000000000000",
+              "spanId": "0000000000000000",
+              "name": "byo.custom-operation",
+              "kind": 1,
+              "startTimeUnixNano": "1715175600000000000",
+              "endTimeUnixNano": "1715175600420000000",
+              "attributes": [
+                { "key": "byo.operation.kind", "value": { "stringValue": "custom" } },
+                { "key": "byo.payload.size_bytes", "value": { "intValue": "2048" } }
+              ],
+              "status": { "code": 1 }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
