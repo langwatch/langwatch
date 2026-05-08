@@ -103,7 +103,6 @@ export function createEnvConfig() {
       EMAIL_DEFAULT_FROM: z.string().optional(),
       S3_KEY_SALT: z.string().optional(),
       IS_SAAS: z.boolean().optional(),
-      LANGWATCH_DEV_FORCE_ENTERPRISE: z.boolean().optional(),
       // Controls SSRF blocking for outbound HTTP calls (TS proxy + scenario
       // runner; mirrored on the Python NLP side via the same env name). When
       // true: private IPs, localhost, and hostnames resolving to private IPs
@@ -244,9 +243,6 @@ export function createEnvConfig() {
       IS_SAAS:
         process.env.IS_SAAS === "1" ||
         process.env.IS_SAAS?.toLowerCase() === "true",
-      LANGWATCH_DEV_FORCE_ENTERPRISE:
-        process.env.LANGWATCH_DEV_FORCE_ENTERPRISE === "1" ||
-        process.env.LANGWATCH_DEV_FORCE_ENTERPRISE?.toLowerCase() === "true",
       BLOCK_LOCAL_HTTP_CALLS:
         process.env.BLOCK_LOCAL_HTTP_CALLS === "1" ||
         process.env.BLOCK_LOCAL_HTTP_CALLS?.toLowerCase() === "true",

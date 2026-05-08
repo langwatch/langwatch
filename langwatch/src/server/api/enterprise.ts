@@ -1,25 +1,6 @@
 import { TRPCError } from "@trpc/server";
-import { env } from "~/env.mjs";
 import { getApp } from "~/server/app-layer/app";
 import type { PlanProviderUser } from "~/server/app-layer/subscription/plan-provider";
-
-/**
- * Dev-only bypass for Enterprise gating, intended for dogfood / capture
- * runs against a self-hosted dev stack without a signed license. Honors
- * the same intent as planProvider.ts:70-75 (self-hosted → ENTERPRISE
- * features) without changing the production licensing semantics.
- *
- * Set `LANGWATCH_DEV_FORCE_ENTERPRISE=true` in .env to opt in. Has no
- * effect when IS_SAAS=true (production SaaS deploys ignore the bypass).
- *
- * Test runs are always opted out: integration tests assert real plan
- * resolution (e.g. 402 on FREE), and a leaked dev-bypass would mask
- * those assertions. NODE_ENV === 'test' short-circuits the bypass.
- */
-function isDevForceEnterpriseEnabled(): boolean {
-  if (env.NODE_ENV === "test") return false;
-  return !env.IS_SAAS && env.LANGWATCH_DEV_FORCE_ENTERPRISE === true;
-}
 
 type EnterpriseGateMiddlewareParams = {
   ctx: { session?: { user?: PlanProviderUser } | null };
@@ -66,7 +47,6 @@ export async function assertEnterprisePlan({
   user?: PlanProviderUser;
   errorMessage: string;
 }): Promise<void> {
-  if (isDevForceEnterpriseEnabled()) return;
   const plan = await getApp().planProvider.getActivePlan({
     organizationId,
     user,

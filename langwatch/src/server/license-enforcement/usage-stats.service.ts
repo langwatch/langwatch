@@ -1,6 +1,5 @@
 import type { PrismaClient } from "@prisma/client";
-import { UNLIMITED_MESSAGES, PLAN_LIMITS } from "../../../ee/billing/planLimits";
-import { PlanTypes } from "../../../ee/billing/planTypes";
+import { UNLIMITED_MESSAGES } from "../../../ee/billing/planLimits";
 import type { PlanInfo } from "../../../ee/licensing/planInfo";
 import type { PlanProvider } from "../app-layer/subscription/plan-provider";
 import type { UsageUnit } from "../app-layer/usage/usage-meter-policy";
@@ -197,28 +196,11 @@ export class UsageStatsService {
       activePlan.maxMessagesPerMonth,
     );
 
-    // Self-hosted dev bypass: when LANGWATCH_DEV_FORCE_ENTERPRISE=true,
-    // surface ENTERPRISE plan to the UI so client-side gates (audit-log,
-    // EnterpriseLockedSurface) match what the server-side bypass already
-    // grants. Has no effect on SaaS deploys or under NODE_ENV=test
-    // (integration tests assert real plan resolution).
-    const devForceEnterprise =
-      env.NODE_ENV !== "test" &&
-      !env.IS_SAAS &&
-      env.LANGWATCH_DEV_FORCE_ENTERPRISE === true;
-    const effectivePlan: PlanInfo = devForceEnterprise
-      ? {
-          ...PLAN_LIMITS[PlanTypes.ENTERPRISE],
-          planSource: activePlan.planSource,
-          overrideAddingLimitations: activePlan.overrideAddingLimitations,
-        }
-      : activePlan;
-
     return {
       projectsCount,
       currentMonthMessagesCount: resolvedCount,
       currentMonthCost,
-      activePlan: effectivePlan,
+      activePlan,
       maxMonthlyUsageLimit,
       membersCount,
       membersLiteCount,
