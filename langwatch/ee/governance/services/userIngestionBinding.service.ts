@@ -104,14 +104,24 @@ export class UserIngestionBindingService {
    */
   async install({
     callerUserId,
+    organizationId,
     templateId,
     encryptedCredential,
   }: {
     callerUserId: string;
+    /** The caller's currently-active organization. A user can have a
+     *  personal project per org they're a member of; the install lands
+     *  in the personal project for THIS org. The cross-bind invariant
+     *  is preserved: Project.ownerUserId === callerUserId is asserted
+     *  inside requireOwnedPersonalProject. */
+    organizationId: string;
     templateId: string;
     encryptedCredential?: Prisma.InputJsonValue;
   }): Promise<InstallBindingResult> {
-    const project = await this.requireOwnedPersonalProject(callerUserId);
+    const project = await this.requireOwnedPersonalProject({
+      callerUserId,
+      organizationId,
+    });
     const template = await this.requireVisibleTemplate({
       templateId,
       organizationId: project.organizationId,
@@ -182,14 +192,16 @@ export class UserIngestionBindingService {
     return { binding: toRow(binding), token: issued.token };
   }
 
-  /** Caller's own bindings, archived or not. Caller user-scope only. */
+  /** Caller's own bindings within `organizationId`. */
   async listForCaller({
     callerUserId,
+    organizationId,
   }: {
     callerUserId: string;
+    organizationId: string;
   }): Promise<BindingRow[]> {
     const rows = await this.prisma.userIngestionBinding.findMany({
-      where: { userId: callerUserId, archivedAt: null },
+      where: { userId: callerUserId, organizationId, archivedAt: null },
       orderBy: { createdAt: "asc" },
     });
     return rows.map(toRow);
@@ -197,13 +209,20 @@ export class UserIngestionBindingService {
 
   async uninstall({
     callerUserId,
+    organizationId,
     bindingId,
   }: {
     callerUserId: string;
+    organizationId: string;
     bindingId: string;
   }): Promise<void> {
     const binding = await this.prisma.userIngestionBinding.findFirst({
-      where: { id: bindingId, userId: callerUserId, archivedAt: null },
+      where: {
+        id: bindingId,
+        userId: callerUserId,
+        organizationId,
+        archivedAt: null,
+      },
       select: {
         id: true,
         templateId: true,
@@ -239,13 +258,20 @@ export class UserIngestionBindingService {
    */
   async rotateToken({
     callerUserId,
+    organizationId,
     bindingId,
   }: {
     callerUserId: string;
+    organizationId: string;
     bindingId: string;
   }): Promise<{ binding: BindingRow; token: string }> {
     const binding = await this.prisma.userIngestionBinding.findFirst({
-      where: { id: bindingId, userId: callerUserId, archivedAt: null },
+      where: {
+        id: bindingId,
+        userId: callerUserId,
+        organizationId,
+        archivedAt: null,
+      },
     });
     if (!binding) throw new BindingNotFoundError();
 
@@ -320,37 +346,49 @@ export class UserIngestionBindingService {
   // -------------------------------------------------------------------------
 
   /**
-   * Server-resolves the caller's personal project. Throws on missing —
-   * never returns another user's project even if the input were
-   * tampered (which it can't be, since the input shape doesn't accept
-   * personalProjectId at all).
+   * Server-resolves the caller's personal project within
+   * `organizationId`. Throws on missing — never returns another user's
+   * project even if the input were tampered.
+   *
+   * Implementation note: queries Project directly (Project is exempt
+   * from both `dbMultiTenancyProtection` and `dbOrganizationIdProtection`)
+   * keyed on `ownerUserId` + `isPersonal` + the team's `organizationId`.
+   * A user may have multiple personal projects across orgs; the caller
+   * passes their currently-active organizationId so the lookup is
+   * deterministic.
+   *
+   * Caught in real-user dogfood when Ariana clicked the Connect tile —
+   * the original Team-keyed lookup tripped the dbOrganizationIdProtection
+   * guard (Team is in PROTECTED_MODELS) and rejected the install.
    */
-  private async requireOwnedPersonalProject(callerUserId: string): Promise<{
+  private async requireOwnedPersonalProject({
+    callerUserId,
+    organizationId,
+  }: {
+    callerUserId: string;
+    organizationId: string;
+  }): Promise<{
     id: string;
     organizationId: string;
   }> {
-    const team = await this.prisma.team.findFirst({
+    const project = await this.prisma.project.findFirst({
       where: {
         ownerUserId: callerUserId,
         isPersonal: true,
         archivedAt: null,
+        team: { organizationId, archivedAt: null },
       },
       select: {
         id: true,
-        organizationId: true,
-        projects: {
-          where: { isPersonal: true, archivedAt: null },
-          select: { id: true },
-          take: 1,
-        },
+        team: { select: { organizationId: true } },
       },
     });
-    if (!team || team.projects.length === 0) {
+    if (!project || !project.team) {
       throw new PersonalProjectMissingError();
     }
     return {
-      id: team.projects[0]!.id,
-      organizationId: team.organizationId,
+      id: project.id,
+      organizationId: project.team.organizationId,
     };
   }
 

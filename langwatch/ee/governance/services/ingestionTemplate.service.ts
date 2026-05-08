@@ -13,6 +13,21 @@
  */
 import type { PrismaClient } from "@prisma/client";
 
+import { seedPlatformIngestionTemplates } from "./platformIngestionTemplates.seeds";
+
+import { createLogger } from "~/utils/logger/server";
+
+const logger = createLogger("langwatch:governance:ingestion-template");
+
+/**
+ * Once-per-process flag for lazy platform-template seeding. Lets the
+ * docker dev environment auto-seed on first `listForUser` call rather
+ * than depending on an explicit `pnpm tsx scripts/seed-...` run that
+ * developers forget. Idempotent at the DB level too (the seeder
+ * upserts), so concurrent requests are safe.
+ */
+let lazySeedPromise: Promise<void> | null = null;
+
 export interface IngestionTemplateRow {
   id: string;
   slug: string;
@@ -42,12 +57,19 @@ export class IngestionTemplateService {
    *
    * `ottlRules` is intentionally OMITTED from the user-facing shape —
    * end users see the install copy + snippet, never the OTTL source.
+   *
+   * Lazy-seeds the platform default catalog on first call per process —
+   * docker dev environments don't need an explicit
+   * `pnpm tsx scripts/seed-platform-ingestion-templates.ts` step, and
+   * production environments converge to the locked v1 catalog the first
+   * time anyone hits /me Trace Ingest. Idempotent at the DB layer.
    */
   async listForUser({
     organizationId,
   }: {
     organizationId: string;
   }): Promise<IngestionTemplateRow[]> {
+    await this.ensurePlatformDefaultsSeeded();
     const rows = await this.prisma.ingestionTemplate.findMany({
       where: {
         archivedAt: null,
@@ -91,6 +113,7 @@ export class IngestionTemplateService {
   }: {
     organizationId: string;
   }): Promise<IngestionTemplateRow[]> {
+    await this.ensurePlatformDefaultsSeeded();
     const rows = await this.prisma.ingestionTemplate.findMany({
       where: {
         archivedAt: null,
@@ -152,5 +175,35 @@ export class IngestionTemplateService {
       enabled: row.enabled,
       organizationId: row.organizationId,
     };
+  }
+
+  /**
+   * Lazy-seed the platform-default catalog on first call per process.
+   * Idempotent (the seeder upserts); concurrent calls share the same
+   * promise. Errors are logged but NOT thrown — a transient seeding
+   * failure shouldn't block the catalog read for users who already
+   * have rows in the DB.
+   */
+  private async ensurePlatformDefaultsSeeded(): Promise<void> {
+    if (lazySeedPromise) {
+      await lazySeedPromise;
+      return;
+    }
+    lazySeedPromise = (async () => {
+      try {
+        const result = await seedPlatformIngestionTemplates(this.prisma);
+        if (result.created > 0 || result.archived > 0) {
+          logger.info(
+            { created: result.created, updated: result.updated, archived: result.archived },
+            "platform IngestionTemplate catalog seeded on first request",
+          );
+        }
+      } catch (err) {
+        logger.error({ err }, "lazy seeding of platform IngestionTemplates failed");
+        // Reset so the next call retries instead of caching the failure.
+        lazySeedPromise = null;
+      }
+    })();
+    await lazySeedPromise;
   }
 }

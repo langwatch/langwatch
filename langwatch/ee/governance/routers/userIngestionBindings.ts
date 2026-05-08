@@ -5,16 +5,17 @@
  * uninstall/rotate flow for personal-project trace ingest.
  *
  * Cross-bind structural-impossibility: NONE of the input shapes carry
- * `personalProjectId`, `organizationId`, or `teamId`. Caller is
- * authenticated via `protectedProcedure`; the binding is scoped to the
- * caller's userId via `ctx.session.user.id`. The service layer
- * server-resolves the personal project from the User → personal Team →
- * personal Project ladder.
+ * `personalProjectId` (or `teamId`). The cross-bind invariant is the
+ * caller cannot bind into ANOTHER USER'S personal project — the service
+ * asserts `Project.ownerUserId === callerUserId` server-side.
  *
- * The `skipPermissionCheck` middleware is the v1 gate: it confirms the
- * input shape has no sensitive scope keys + skips the project/org
- * permission ladder. Auth is purely "caller is signed in + owns a
- * personal project" — same shape as personalWorkspaceFeaturesRouter.
+ * `organizationId` IS accepted in the input: a user can have a personal
+ * project per org they're a member of, and the caller's currently-
+ * active org disambiguates which one to install into. RBAC validates
+ * the caller is a member of `organizationId` via
+ * `checkOrganizationPermission("organization:view")` — every org member
+ * has that permission, so the gate is "are you a member of this org",
+ * not a stricter admin check.
  *
  * Spec:
  *   specs/ai-gateway/governance/user-ingestion-binding-lifecycle.feature
@@ -31,31 +32,31 @@ import {
   UserIngestionBindingService,
 } from "@ee/governance/services/userIngestionBinding.service";
 
-import { skipPermissionCheck } from "~/server/api/rbac";
+import { checkOrganizationPermission } from "~/server/api/rbac";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
-
-const callerSelfGate = skipPermissionCheck();
 
 export const userIngestionBindingsRouter = createTRPCRouter({
   /**
-   * Caller's own bindings. Powers the /me Trace Ingest tile-grid's
-   * "is this template installed" lookup so green-checked tile state
-   * survives page reload.
+   * Caller's own bindings within the active org. Powers the /me Trace
+   * Ingest tile-grid's "is this template installed" lookup so green-
+   * checked tile state survives page reload.
    */
   list: protectedProcedure
-    .input(z.object({}))
-    .use(callerSelfGate)
-    .query(async ({ ctx }) => {
+    .input(z.object({ organizationId: z.string() }))
+    .use(checkOrganizationPermission("organization:view"))
+    .query(async ({ ctx, input }) => {
       const service = UserIngestionBindingService.create(ctx.prisma);
       return await service.listForCaller({
         callerUserId: ctx.session.user.id,
+        organizationId: input.organizationId,
       });
     }),
 
   /**
    * Install a binding for the caller against `templateId`. Server-resolves
-   * the caller's personal project — input shape MUST NOT accept
-   * personalProjectId (cross-bind structural-impossibility per spec).
+   * the caller's personal project within `organizationId` — input shape
+   * MUST NOT accept personalProjectId (cross-bind structural-impossibility
+   * per spec).
    *
    * Returns the issued plaintext token ONCE. Subsequent reads only see
    * the prefix (8 chars).
@@ -63,6 +64,7 @@ export const userIngestionBindingsRouter = createTRPCRouter({
   install: protectedProcedure
     .input(
       z.object({
+        organizationId: z.string(),
         templateId: z.string().min(1),
         // Optional opaque metadata for templates whose credentialSchema
         // is "static_api_key" or "agent_id". v1 ships only otlp_token
@@ -71,12 +73,13 @@ export const userIngestionBindingsRouter = createTRPCRouter({
         encryptedCredential: z.unknown().optional(),
       }),
     )
-    .use(callerSelfGate)
+    .use(checkOrganizationPermission("organization:view"))
     .mutation(async ({ ctx, input }) => {
       const service = UserIngestionBindingService.create(ctx.prisma);
       try {
         return await service.install({
           callerUserId: ctx.session.user.id,
+          organizationId: input.organizationId,
           templateId: input.templateId,
           encryptedCredential:
             input.encryptedCredential as
@@ -97,13 +100,19 @@ export const userIngestionBindingsRouter = createTRPCRouter({
     }),
 
   uninstall: protectedProcedure
-    .input(z.object({ bindingId: z.string().min(1) }))
-    .use(callerSelfGate)
+    .input(
+      z.object({
+        organizationId: z.string(),
+        bindingId: z.string().min(1),
+      }),
+    )
+    .use(checkOrganizationPermission("organization:view"))
     .mutation(async ({ ctx, input }) => {
       const service = UserIngestionBindingService.create(ctx.prisma);
       try {
         await service.uninstall({
           callerUserId: ctx.session.user.id,
+          organizationId: input.organizationId,
           bindingId: input.bindingId,
         });
         return { ok: true };
@@ -121,13 +130,19 @@ export const userIngestionBindingsRouter = createTRPCRouter({
    * pins this behavior.
    */
   rotateToken: protectedProcedure
-    .input(z.object({ bindingId: z.string().min(1) }))
-    .use(callerSelfGate)
+    .input(
+      z.object({
+        organizationId: z.string(),
+        bindingId: z.string().min(1),
+      }),
+    )
+    .use(checkOrganizationPermission("organization:view"))
     .mutation(async ({ ctx, input }) => {
       const service = UserIngestionBindingService.create(ctx.prisma);
       try {
         return await service.rotateToken({
           callerUserId: ctx.session.user.id,
+          organizationId: input.organizationId,
           bindingId: input.bindingId,
         });
       } catch (err) {
