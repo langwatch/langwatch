@@ -16,6 +16,8 @@
 import { Prisma, type PrismaClient } from "@prisma/client";
 import { customAlphabet } from "nanoid";
 
+import { GovernanceAuditRepository } from "../repositories/governanceAudit.repository";
+import { IngestionTemplateRepository } from "../repositories/ingestionTemplate.repository";
 import {
   DEFAULT_GOVERNANCE_SURFACE,
   type GovernanceCallSurface,
@@ -106,7 +108,11 @@ function countLines(text: string): number {
 }
 
 export class IngestionTemplateService {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(
+    private readonly prisma: PrismaClient,
+    private readonly repo: IngestionTemplateRepository = new IngestionTemplateRepository(),
+    private readonly auditRepo: GovernanceAuditRepository = new GovernanceAuditRepository(),
+  ) {}
 
   static create(prisma: PrismaClient): IngestionTemplateService {
     return new IngestionTemplateService(prisma);
@@ -133,16 +139,8 @@ export class IngestionTemplateService {
     organizationId: string;
   }): Promise<IngestionTemplateRow[]> {
     await this.ensurePlatformDefaultsSeeded();
-    const rows = await this.prisma.ingestionTemplate.findMany({
-      where: {
-        archivedAt: null,
-        enabled: true,
-        OR: [
-          { organizationId: null },
-          { organizationId },
-        ],
-      },
-      orderBy: [{ platformPublished: "desc" }, { displayName: "asc" }],
+    const rows = await this.repo.findUserVisibleForOrg(this.prisma, {
+      organizationId,
     });
     return rows.map((r) => ({
       id: r.id,
@@ -177,15 +175,8 @@ export class IngestionTemplateService {
     organizationId: string;
   }): Promise<IngestionTemplateRow[]> {
     await this.ensurePlatformDefaultsSeeded();
-    const rows = await this.prisma.ingestionTemplate.findMany({
-      where: {
-        archivedAt: null,
-        OR: [
-          { organizationId: null },
-          { organizationId },
-        ],
-      },
-      orderBy: [{ platformPublished: "desc" }, { displayName: "asc" }],
+    const rows = await this.repo.findAdminVisibleForOrg(this.prisma, {
+      organizationId,
     });
     return rows.map((r) => ({
       id: r.id,
@@ -214,15 +205,9 @@ export class IngestionTemplateService {
     id: string;
     organizationId: string;
   }): Promise<IngestionTemplateRow | null> {
-    const row = await this.prisma.ingestionTemplate.findFirst({
-      where: {
-        id,
-        archivedAt: null,
-        OR: [
-          { organizationId: null },
-          { organizationId },
-        ],
-      },
+    const row = await this.repo.findByIdForOrg(this.prisma, {
+      id,
+      organizationId,
     });
     if (!row) return null;
     return {
@@ -280,36 +265,32 @@ export class IngestionTemplateService {
     const slug = `${slugBase || "custom"}_${generateSlugSuffix()}`;
 
     return await this.prisma.$transaction(async (tx) => {
-      const created = await tx.ingestionTemplate.create({
-        data: {
-          organizationId,
-          slug,
-          sourceType,
-          displayName,
-          description: description ?? null,
-          iconAsset: iconAsset ?? null,
-          credentialSchema: credentialSchema ?? null,
-          ottlRules: ottlRules ?? "",
-          platformPublished: false,
-          enabled: true,
-          createdById: callerUserId,
-          updatedById: callerUserId,
-        },
+      const created = await this.repo.create(tx, {
+        organizationId,
+        slug,
+        sourceType,
+        displayName,
+        description: description ?? null,
+        iconAsset: iconAsset ?? null,
+        credentialSchema: credentialSchema ?? null,
+        ottlRules: ottlRules ?? "",
+        platformPublished: false,
+        enabled: true,
+        createdById: callerUserId,
+        updatedById: callerUserId,
       });
 
-      await tx.auditLog.create({
-        data: {
-          userId: callerUserId,
-          organizationId,
-          action: "gateway.ingestion_template.created",
-          targetKind: "ingestion_template",
-          targetId: created.id,
-          metadata: {
-            slug: created.slug,
-            sourceType: created.sourceType,
-            displayName: created.displayName,
-            surface: surface ?? DEFAULT_GOVERNANCE_SURFACE,
-          },
+      await this.auditRepo.emit(tx, {
+        userId: callerUserId,
+        organizationId,
+        action: "gateway.ingestion_template.created",
+        targetKind: "ingestion_template",
+        targetId: created.id,
+        metadata: {
+          slug: created.slug,
+          sourceType: created.sourceType,
+          displayName: created.displayName,
+          surface: surface ?? DEFAULT_GOVERNANCE_SURFACE,
         },
       });
 
@@ -337,8 +318,9 @@ export class IngestionTemplateService {
     surface?: GovernanceCallSurface;
   }): Promise<IngestionTemplateRow> {
     return await this.prisma.$transaction(async (tx) => {
-      const existing = await tx.ingestionTemplate.findFirst({
-        where: { id, archivedAt: null, organizationId },
+      const existing = await this.repo.findOrgScopedNonArchived(tx, {
+        id,
+        organizationId,
         select: {
           id: true,
           slug: true,
@@ -351,24 +333,22 @@ export class IngestionTemplateService {
         throw new PlatformTemplateImmutableError();
       }
 
-      const updated = await tx.ingestionTemplate.update({
-        where: { id: existing.id },
+      const updated = await this.repo.updateById(tx, {
+        id: existing.id,
         data: { ottlRules, updatedById: callerUserId },
       });
 
-      await tx.auditLog.create({
-        data: {
-          userId: callerUserId,
-          organizationId,
-          action: "gateway.ingestion_template.ottl_updated",
-          targetKind: "ingestion_template",
-          targetId: existing.id,
-          metadata: {
-            slug: existing.slug,
-            previousLineCount: countLines(existing.ottlRules),
-            nextLineCount: countLines(ottlRules),
-            surface: surface ?? DEFAULT_GOVERNANCE_SURFACE,
-          },
+      await this.auditRepo.emit(tx, {
+        userId: callerUserId,
+        organizationId,
+        action: "gateway.ingestion_template.ottl_updated",
+        targetKind: "ingestion_template",
+        targetId: existing.id,
+        metadata: {
+          slug: existing.slug,
+          previousLineCount: countLines(existing.ottlRules ?? ""),
+          nextLineCount: countLines(ottlRules),
+          surface: surface ?? DEFAULT_GOVERNANCE_SURFACE,
         },
       });
 
@@ -394,8 +374,9 @@ export class IngestionTemplateService {
     surface?: GovernanceCallSurface;
   }): Promise<void> {
     await this.prisma.$transaction(async (tx) => {
-      const existing = await tx.ingestionTemplate.findFirst({
-        where: { id, archivedAt: null, organizationId },
+      const existing = await this.repo.findOrgScopedNonArchived(tx, {
+        id,
+        organizationId,
         select: { id: true, slug: true, platformPublished: true },
       });
       if (!existing) throw new TemplateNotFoundError();
@@ -403,22 +384,24 @@ export class IngestionTemplateService {
         throw new PlatformTemplateImmutableError();
       }
 
-      await tx.ingestionTemplate.update({
-        where: { id: existing.id },
-        data: { archivedAt: new Date(), enabled: false, updatedById: callerUserId },
+      await this.repo.updateById(tx, {
+        id: existing.id,
+        data: {
+          archivedAt: new Date(),
+          enabled: false,
+          updatedById: callerUserId,
+        },
       });
 
-      await tx.auditLog.create({
-        data: {
-          userId: callerUserId,
-          organizationId,
-          action: "gateway.ingestion_template.archived",
-          targetKind: "ingestion_template",
-          targetId: existing.id,
-          metadata: {
-            slug: existing.slug,
-            surface: surface ?? DEFAULT_GOVERNANCE_SURFACE,
-          },
+      await this.auditRepo.emit(tx, {
+        userId: callerUserId,
+        organizationId,
+        action: "gateway.ingestion_template.archived",
+        targetKind: "ingestion_template",
+        targetId: existing.id,
+        metadata: {
+          slug: existing.slug,
+          surface: surface ?? DEFAULT_GOVERNANCE_SURFACE,
         },
       });
     });
@@ -443,8 +426,8 @@ export class IngestionTemplateService {
     sourceTemplateId: string;
     surface?: GovernanceCallSurface;
   }): Promise<IngestionTemplateRow> {
-    const source = await this.prisma.ingestionTemplate.findFirst({
-      where: { id: sourceTemplateId, archivedAt: null, organizationId: null },
+    const source = await this.repo.findPlatformNonArchivedById(this.prisma, {
+      id: sourceTemplateId,
     });
     if (!source) throw new TemplateNotFoundError();
 

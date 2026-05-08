@@ -22,6 +22,9 @@
  */
 import { Prisma, type PrismaClient } from "@prisma/client";
 
+import { GovernanceAuditRepository } from "../repositories/governanceAudit.repository";
+import { IngestionTemplateRepository } from "../repositories/ingestionTemplate.repository";
+import { UserIngestionBindingRepository } from "../repositories/userIngestionBinding.repository";
 import {
   DEFAULT_GOVERNANCE_SURFACE,
   type GovernanceCallSurface,
@@ -90,7 +93,12 @@ export interface InstallBindingResult {
 }
 
 export class UserIngestionBindingService {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(
+    private readonly prisma: PrismaClient,
+    private readonly bindingRepo: UserIngestionBindingRepository = new UserIngestionBindingRepository(),
+    private readonly templateRepo: IngestionTemplateRepository = new IngestionTemplateRepository(),
+    private readonly auditRepo: GovernanceAuditRepository = new GovernanceAuditRepository(),
+  ) {}
 
   static create(prisma: PrismaClient): UserIngestionBindingService {
     return new UserIngestionBindingService(prisma);
@@ -134,15 +142,14 @@ export class UserIngestionBindingService {
       organizationId: project.organizationId,
     });
 
-    const existing = await this.prisma.userIngestionBinding.findUnique({
-      where: {
-        userId_templateId: {
-          userId: callerUserId,
-          templateId: template.id,
-        },
+    const existing = await this.bindingRepo.findUniqueByUserAndTemplate(
+      this.prisma,
+      {
+        userId: callerUserId,
+        templateId: template.id,
+        select: { id: true, archivedAt: true },
       },
-      select: { id: true, archivedAt: true },
-    });
+    );
     if (existing && !existing.archivedAt) {
       throw new BindingAlreadyExistsError();
     }
@@ -153,8 +160,8 @@ export class UserIngestionBindingService {
       // If a soft-archived row exists, revive it with new token + clear
       // archivedAt rather than violating the (userId, templateId) UNIQUE.
       const upserted = existing
-        ? await tx.userIngestionBinding.update({
-            where: { id: existing.id },
+        ? await this.bindingRepo.updateById(tx, {
+            id: existing.id,
             data: {
               personalProjectId: project.id,
               organizationId: project.organizationId,
@@ -166,31 +173,27 @@ export class UserIngestionBindingService {
               lastSeenAt: null,
             },
           })
-        : await tx.userIngestionBinding.create({
-            data: {
-              userId: callerUserId,
-              templateId: template.id,
-              personalProjectId: project.id,
-              organizationId: project.organizationId,
-              bindingAccessTokenHash: issued.hash,
-              bindingAccessTokenPrefix: issued.prefix,
-              encryptedCredential: encryptedCredential ?? Prisma.DbNull,
-            },
+        : await this.bindingRepo.create(tx, {
+            userId: callerUserId,
+            templateId: template.id,
+            personalProjectId: project.id,
+            organizationId: project.organizationId,
+            bindingAccessTokenHash: issued.hash,
+            bindingAccessTokenPrefix: issued.prefix,
+            encryptedCredential: encryptedCredential ?? Prisma.DbNull,
           });
 
-      await tx.auditLog.create({
-        data: {
-          userId: callerUserId,
-          projectId: project.id,
-          organizationId: project.organizationId,
-          action: "gateway.user_ingestion_binding.installed",
-          targetKind: "user_ingestion_binding",
-          targetId: upserted.id,
-          metadata: {
-            templateId: template.id,
-            templateSlug: template.slug,
-            surface: surface ?? DEFAULT_GOVERNANCE_SURFACE,
-          },
+      await this.auditRepo.emit(tx, {
+        userId: callerUserId,
+        projectId: project.id,
+        organizationId: project.organizationId,
+        action: "gateway.user_ingestion_binding.installed",
+        targetKind: "user_ingestion_binding",
+        targetId: upserted.id,
+        metadata: {
+          templateId: template.id,
+          templateSlug: template.slug,
+          surface: surface ?? DEFAULT_GOVERNANCE_SURFACE,
         },
       });
 
@@ -208,9 +211,9 @@ export class UserIngestionBindingService {
     callerUserId: string;
     organizationId: string;
   }): Promise<BindingRow[]> {
-    const rows = await this.prisma.userIngestionBinding.findMany({
-      where: { userId: callerUserId, organizationId, archivedAt: null },
-      orderBy: { createdAt: "asc" },
+    const rows = await this.bindingRepo.findManyForCallerInOrg(this.prisma, {
+      userId: callerUserId,
+      organizationId,
     });
     return rows.map(toRow);
   }
@@ -226,13 +229,10 @@ export class UserIngestionBindingService {
     bindingId: string;
     surface?: GovernanceCallSurface;
   }): Promise<void> {
-    const binding = await this.prisma.userIngestionBinding.findFirst({
-      where: {
-        id: bindingId,
-        userId: callerUserId,
-        organizationId,
-        archivedAt: null,
-      },
+    const binding = await this.bindingRepo.findOwnedNonArchived(this.prisma, {
+      bindingId,
+      userId: callerUserId,
+      organizationId,
       select: {
         id: true,
         templateId: true,
@@ -243,22 +243,20 @@ export class UserIngestionBindingService {
     if (!binding) throw new BindingNotFoundError();
 
     await this.prisma.$transaction(async (tx) => {
-      await tx.userIngestionBinding.update({
-        where: { id: binding.id },
+      await this.bindingRepo.updateById(tx, {
+        id: binding.id,
         data: { archivedAt: new Date(), enabled: false },
       });
-      await tx.auditLog.create({
-        data: {
-          userId: callerUserId,
-          projectId: binding.personalProjectId,
-          organizationId: binding.organizationId,
-          action: "gateway.user_ingestion_binding.uninstalled",
-          targetKind: "user_ingestion_binding",
-          targetId: binding.id,
-          metadata: {
-            templateId: binding.templateId,
-            surface: surface ?? DEFAULT_GOVERNANCE_SURFACE,
-          },
+      await this.auditRepo.emit(tx, {
+        userId: callerUserId,
+        projectId: binding.personalProjectId,
+        organizationId: binding.organizationId,
+        action: "gateway.user_ingestion_binding.uninstalled",
+        targetKind: "user_ingestion_binding",
+        targetId: binding.id,
+        metadata: {
+          templateId: binding.templateId,
+          surface: surface ?? DEFAULT_GOVERNANCE_SURFACE,
         },
       });
     });
@@ -280,38 +278,33 @@ export class UserIngestionBindingService {
     bindingId: string;
     surface?: GovernanceCallSurface;
   }): Promise<{ binding: BindingRow; token: string }> {
-    const binding = await this.prisma.userIngestionBinding.findFirst({
-      where: {
-        id: bindingId,
-        userId: callerUserId,
-        organizationId,
-        archivedAt: null,
-      },
+    const binding = await this.bindingRepo.findOwnedNonArchived(this.prisma, {
+      bindingId,
+      userId: callerUserId,
+      organizationId,
     });
     if (!binding) throw new BindingNotFoundError();
 
     const issued = issueBindingToken();
 
     const updated = await this.prisma.$transaction(async (tx) => {
-      const u = await tx.userIngestionBinding.update({
-        where: { id: binding.id },
+      const u = await this.bindingRepo.updateById(tx, {
+        id: binding.id,
         data: {
           bindingAccessTokenHash: issued.hash,
           bindingAccessTokenPrefix: issued.prefix,
         },
       });
-      await tx.auditLog.create({
-        data: {
-          userId: callerUserId,
-          projectId: binding.personalProjectId,
-          organizationId: binding.organizationId,
-          action: "gateway.user_ingestion_binding.token_rotated",
-          targetKind: "user_ingestion_binding",
-          targetId: binding.id,
-          metadata: {
-            templateId: binding.templateId,
-            surface: surface ?? DEFAULT_GOVERNANCE_SURFACE,
-          },
+      await this.auditRepo.emit(tx, {
+        userId: callerUserId,
+        projectId: binding.personalProjectId,
+        organizationId: binding.organizationId,
+        action: "gateway.user_ingestion_binding.token_rotated",
+        targetKind: "user_ingestion_binding",
+        targetId: binding.id,
+        metadata: {
+          templateId: binding.templateId,
+          surface: surface ?? DEFAULT_GOVERNANCE_SURFACE,
         },
       });
       return u;
@@ -338,21 +331,10 @@ export class UserIngestionBindingService {
     personalProjectId: string;
     organizationId: string;
   } | null> {
-    const binding = await this.prisma.userIngestionBinding.findUnique({
-      where: { bindingAccessTokenHash },
-      select: {
-        id: true,
-        userId: true,
-        templateId: true,
-        personalProjectId: true,
-        organizationId: true,
-        enabled: true,
-        archivedAt: true,
-        personalProject: {
-          select: { isPersonal: true, ownerUserId: true, archivedAt: true },
-        },
-      },
-    });
+    const binding = await this.bindingRepo.findUniqueByHashForReceive(
+      this.prisma,
+      { bindingAccessTokenHash },
+    );
     if (!binding) return null;
     if (binding.archivedAt) return null;
     if (!binding.enabled) return null;
@@ -403,18 +385,10 @@ export class UserIngestionBindingService {
     id: string;
     organizationId: string;
   }> {
-    const project = await this.prisma.project.findFirst({
-      where: {
-        ownerUserId: callerUserId,
-        isPersonal: true,
-        archivedAt: null,
-        team: { organizationId, archivedAt: null },
-      },
-      select: {
-        id: true,
-        team: { select: { organizationId: true } },
-      },
-    });
+    const project = await this.bindingRepo.findOwnedPersonalProjectInOrg(
+      this.prisma,
+      { callerUserId, organizationId },
+    );
     if (!project || !project.team) {
       throw new PersonalProjectMissingError();
     }
@@ -436,20 +410,19 @@ export class UserIngestionBindingService {
     templateId: string;
     organizationId: string;
   }): Promise<{ id: string; slug: string }> {
-    const template = await this.prisma.ingestionTemplate.findFirst({
-      where: {
-        id: templateId,
-        archivedAt: null,
-        enabled: true,
-        OR: [
-          { organizationId: null },
-          { organizationId },
-        ],
-      },
-      select: { id: true, slug: true },
+    // Cross-bind safety: the user-side surface only sees platform
+    // defaults OR org-authored rows for THIS org. Cross-org probes
+    // collapse to NotFound. Routed through the IngestionTemplate
+    // repository so all `prisma.ingestionTemplate.*` queries live in
+    // a single layer per umbrella spec @repository-pattern.
+    const template = await this.templateRepo.findByIdForOrg(this.prisma, {
+      id: templateId,
+      organizationId,
     });
-    if (!template) throw new IngestionTemplateNotFoundError();
-    return template;
+    if (!template || !template.enabled) {
+      throw new IngestionTemplateNotFoundError();
+    }
+    return { id: template.id, slug: template.slug };
   }
 }
 
