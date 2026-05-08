@@ -65,6 +65,8 @@ import { ingestionSourcesRouter } from "@ee/governance/routers/ingestionSources"
 import { activityMonitorRouter } from "@ee/governance/routers/activityMonitor";
 import { anomalyRulesRouter } from "@ee/governance/routers/anomalyRules";
 import { aiToolsRouter } from "@ee/governance/routers/aiTools";
+import { ingestionTemplatesRouter } from "@ee/governance/routers/ingestionTemplates";
+import { userIngestionBindingsRouter } from "@ee/governance/routers/userIngestionBindings";
 import { governanceRouter } from "@ee/governance/routers/governance";
 import { personalSessionsRouter } from "@ee/governance/routers/personalSessions";
 import { sessionPolicyRouter } from "@ee/governance/routers/sessionPolicy";
@@ -134,6 +136,8 @@ const coreRouters = {
   activityMonitor: activityMonitorRouter,
   anomalyRules: anomalyRulesRouter,
   aiTools: aiToolsRouter,
+  ingestionTemplates: ingestionTemplatesRouter,
+  userIngestionBindings: userIngestionBindingsRouter,
   governance: governanceRouter,
   personalSessions: personalSessionsRouter,
   sessionPolicy: sessionPolicyRouter,
