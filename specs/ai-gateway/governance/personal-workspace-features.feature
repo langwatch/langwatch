@@ -144,17 +144,44 @@ Feature: Personal-workspace progressive feature unlock — minimal-by-default, c
       And the sidebar re-renders with the new entries unlocked
 
   @bdd @ui @personal-workspace @modal
-  Scenario: The same modal fires on Evaluations / Annotations / Automations entry points too
+  Scenario: The same modal fires on every gated-feature trigger that exists in traces-v2 today
     Given the user has the bundle disabled
-    When the user clicks any of:
-      | trigger                                          | feature      |
-      | "Score this trace" on a trace                    | evaluations  |
-      | "Annotate" on a trace                            | annotations  |
-      | "Schedule a recurring run" on Traces Explorer    | automations  |
-      | sidebar 'Datasets' entry direct-paste of /me/[project]/datasets | datasets |
-    Then the same enable modal opens
-    And consent flips the bundle and resumes the triggering action
+    When the user clicks any in-traces-v2 trigger from the canonical
+        list of action surfaces shipped with personal-workspace v1:
+      | trigger                                                 | feature      |
+      | IOViewer 'Annotate' button                              | annotations  |
+      | TurnAnnotations 'Annotate' popover (per-turn)           | annotations  |
+      | TurnAnnotations 'Suggest' popover (per-turn)            | annotations  |
+      | TurnAnnotations 'Dataset' button (per-turn)             | datasets     |
+      | BulkActionBar 'Add to dataset' (multi-trace selection)  | datasets     |
+    Then the same enable modal opens (`PersonalFeatureGateDialog`
+        driven by `usePersonalFeatureGate(<feature>)`)
+    And consent flips the bundle (atomic via the personalWorkspaceFeatures
+        service) and resumes the triggering action — the popover /
+        drawer / picker that is the action's natural continuation opens
+        per modal-flow (b)
     And cancel returns the user to wherever they were
+
+  @bdd @ui @personal-workspace @modal @future-surfaces
+  Scenario: Future trigger callsites adopting the gate invariant
+    Given Evaluations + Automations do NOT have a trace-explorer trigger
+        callsite today (they live at `/[project]/evaluations/new` +
+        `/[project]/automations` page surfaces, not in features/traces-v2)
+    When future work adds a trigger for either feature inside the
+        traces-v2 explorer (e.g. 'Run evaluation on this trace' or
+        'Schedule recurring run on this query') OR a project-shell
+        preflight before navigating to those page surfaces from /me chrome
+    Then that new trigger MUST use `usePersonalFeatureGate(<feature>)`
+        + render `<PersonalFeatureGateDialog>` inline — the hook + dialog
+        are the canonical contract; per-surface wiring is mechanical
+    And the same modal-flow (b) invariant holds: confirm flips the bundle,
+        original action proceeds inline; cancel bails
+
+    # Lane-B reported via grep that no trace-explorer trigger exists for
+    # evaluations / automations today; per master orchestrator's scope
+    # acceptance (2026-05-08 channel ratification), wiring those page
+    # surfaces is a follow-up, not a blocker on this PR. The invariant
+    # above ensures any future adopter follows the same shape.
 
   # ---------------------------------------------------------------------------
   # tRPC routers stay open — bundle is a UI/nav predicate, not an auth gate
