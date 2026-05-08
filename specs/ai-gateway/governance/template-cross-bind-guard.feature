@@ -8,7 +8,9 @@ Feature: AI Gateway Governance — Template Cross-Bind Guard
   Two-layer guard (per the locked contract):
     1. STRUCTURAL impossibility at install — bindingService.install input
        schema has no personalProjectId field. Server resolves via
-       getPersonalProjectForUser(userId). Cross-user binding is
+       getPersonalProjectForUser(userId, organizationId) where userId comes
+       from `ctx.session.user.id` (authentication context) and organizationId
+       is the caller's active-workspace input. Cross-user binding is
        unrepresentable in the input shape.
     2. RUNTIME guard at receive — token-as-scope. If user A presents
        lwub_TOKEN_A and the payload claims TenantId=user_B's personalProject,
@@ -32,10 +34,11 @@ Feature: AI Gateway Governance — Template Cross-Bind Guard
     When the bindingService.install Zod schema is inspected
     Then the input shape is exactly:
       """
-      { userId: string, templateId: string, ...credentialSchemaFields }
+      { templateId: string, organizationId: string, ...credentialSchemaFields }
       """
     And the input shape MUST NOT include a `personalProjectId` field
-    And the server resolves personalProjectId via `getPersonalProjectForUser(userId)`
+    And userId is read from `ctx.session.user.id` (authentication context, not input)
+    And the server resolves personalProjectId via `getPersonalProjectForUser(userId, organizationId)`
     # Cross-user binding becomes unrepresentable — no enumeration vector
     # because there's no field to populate with another user's projectId.
 
@@ -46,7 +49,7 @@ Feature: AI Gateway Governance — Template Cross-Bind Guard
     When the call hits the server
     Then Zod's strict mode rejects the unrecognized key with a 400 BAD_REQUEST
     Or (if loose mode) the server simply ignores the extra field and resolves
-        personalProjectId from getPersonalProjectForUser(jane.id) = "personal-jane"
+        personalProjectId from `getPersonalProjectForUser(jane.id, "acme")` = "personal-jane"
     And under no condition does the resulting binding row have personalProjectId="personal-ben"
 
   # ---------------------------------------------------------------------------

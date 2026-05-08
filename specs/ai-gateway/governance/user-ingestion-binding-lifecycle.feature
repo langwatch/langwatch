@@ -10,7 +10,12 @@ Feature: AI Gateway Governance — UserIngestionBinding Lifecycle
     Token format: `lwub_<base32>` prefix-discriminated by the receiver.
     Credential lookup: `bindingAccessTokenHash` (SHA256, B-tree indexed).
     Cross-bind guard: SERVICE-LAYER. Input MUST NOT accept personalProjectId
-    — server resolves via `getPersonalProjectForUser(userId)`.
+    — server resolves via `getPersonalProjectForUser(userId, organizationId)`
+    where userId comes from `ctx.session.user.id` (authentication context, not
+    input) and organizationId is the caller's active workspace org passed as
+    an input parameter. Multi-org users naturally select the org via the
+    workspace switcher, mirroring how `PersonalWorkspaceService.ensure()` is
+    parameterized.
 
   Per gateway.md "audit on state-change":
     Per-trace landings emit nothing audit-side; `lastSeenAt` column on the
@@ -54,7 +59,8 @@ Feature: AI Gateway Governance — UserIngestionBinding Lifecycle
   Scenario: Install API does NOT accept personalProjectId in the request shape
     Given jane has no UserIngestionBinding for templateId="claude_code"
     When the bindingService.install RPC schema is inspected
-    Then the input schema has fields { userId, templateId, ...credentialSchemaFields }
+    Then the input schema has fields { templateId, organizationId, ...credentialSchemaFields }
+    And userId is derived from `ctx.session.user.id` (NOT an input field)
     And the input schema MUST NOT include a personalProjectId field
     # Structural-impossibility shape — cross-user binding is unrepresentable.
     # See template-cross-bind-guard.feature for the runtime regression scenario.
