@@ -274,6 +274,14 @@ We accept this trade-off because the alternative — receiver re-deriving canoni
 `gen_ai.usage.*` from upstream-shaped intermediate attrs — duplicates the OTTL transform
 in code, doubling the surface area to keep correct.
 
+Concretely, that platform-team review takes the form of a **two-track dogfood discipline**:
+each catalog tile ships only after passing both (a) a fixture-track verification — canned
+OTLP payloads emitted via `scripts/dogfood/emit-otlp.sh`, including forge-attempt
+regressions against the 19-key protected list — and (b) a real-user track — admin publishes
+via `/settings/governance/tool-catalog`, a real user installs via `/me`, the real upstream
+tool emits a real trace, and the result is verified end-to-end with cross-user isolation.
+Per-template rituals live at `langwatch/ee/governance/ingestion-templates/<slug>/dogfood.md`.
+
 When admin OTTL authoring lands (v2), we'll add a **tier of trust**: platform-authored
 templates keep the v1 19-key list; org-authored templates use a 27-key list that adds
 cost / tokens / model to the protected set. Org admins author OTTL accepting within-org
