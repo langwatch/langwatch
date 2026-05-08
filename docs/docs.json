@@ -590,7 +590,6 @@
                 "group": "Safety & Governance",
                 "pages": [
                   "ai-gateway/guardrails",
-                  "ai-gateway/blocked-patterns",
                   "ai-gateway/security",
                   "ai-gateway/audit"
                 ]

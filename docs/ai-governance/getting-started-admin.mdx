@@ -19,8 +19,6 @@ If you are a developer trying to *use* the org as a developer (not configure it)
 
 Open your LangWatch deployment in a browser. The first user to sign in becomes the **organization admin** automatically (the `ADMIN` org role plus an org-scoped `RoleBinding`).
 
-If your deployment is self-hosted and you have not yet stood it up, follow [AI Gateway → Self-hosting → Helm](/ai-gateway/self-hosting/helm) first — the same Helm chart deploys both the gateway data plane and the governance control plane.
-
 After sign-in you'll land on `/governance` (the org governance home — see the [control-plane page](/ai-governance/control-plane#daily-use-surfaces-vs-admin-authoring-surfaces) for how the daily-use vs admin-authoring split works).
 
 ## Step 2 — Publish your first Routing Policy
@@ -152,7 +150,6 @@ The reactor will start evaluating from the next ingest event. When today's 24h s
 - **Export to your SIEM** — every event is OCSF v1.1 mapped and replayable to a downstream SIEM (Splunk, Datadog, Sentinel) via the OCSF read API. See [Compliance architecture](/ai-governance/compliance-architecture).
 - **Ingest from another platform** — the [Ingestion Sources index](/ai-governance/ingestion-sources/index) has per-platform setup guides for Cowork, Workato, S3 NDJSON, Microsoft Copilot Studio, OpenAI/Anthropic compliance APIs.
 - **Delegate admin authority without giving full admin** — [RBAC roles](/ai-gateway/rbac) lets you build custom roles that grant specific governance permissions (e.g. `aiTools:manage` only) without `organization:manage`.
-- **Self-host or scale** — same Helm chart, both planes: [AI Gateway → Self-hosting → Helm](/ai-gateway/self-hosting/helm).
 
 ## Common first-day errors
 
