@@ -51,10 +51,20 @@ function GovernanceTeamDetailPage() {
   const router = useRouter();
   const teamId =
     typeof router.query.id === "string" ? router.query.id : null;
-  const { organization } = useOrganizationTeamProject({
+  const { organization, organizations } = useOrganizationTeamProject({
     redirectToOnboarding: false,
   });
   const orgId = organization?.id ?? "";
+  // Resolve the team's first project slug for the bird's-eye drill-in
+  // link. Teams typically have a primary project (or a small set);
+  // navigating to /[projectSlug]/traces lands the admin on the team's
+  // workspace via the existing project-shell + auto-switches to
+  // PersonalSidebar via the v2 chrome retention discriminator (admin's
+  // not a TeamUser → AdminViewingAsBanner fires from DashboardLayout).
+  const teamProjectSlug =
+    organizations
+      ?.flatMap((org) => org.teams ?? [])
+      .find((t) => t.id === teamId)?.projects?.[0]?.slug ?? null;
   const { enabled, isLoading: ffLoading } = useFeatureFlag(
     "release_ui_ai_governance_enabled",
     { organizationId: orgId, enabled: !!orgId },
@@ -145,6 +155,23 @@ function GovernanceTeamDetailPage() {
                 Per-day spend, per-user breakdown, and model mix for this
                 team will land here in a follow-up.
               </Text>
+              {teamProjectSlug && (
+                <>
+                  <Link
+                    href={`/${teamProjectSlug}/traces`}
+                    color="orange.600"
+                    fontSize="sm"
+                    fontWeight="medium"
+                  >
+                    View this team's workspace traces →
+                  </Link>
+                  <Text fontSize="xs" color="fg.subtle" marginTop={1} marginBottom={3}>
+                    The trace explorer opens with the team's data. A
+                    'Viewing as admin' banner stays present + the access
+                    is logged to /settings/audit-log.
+                  </Text>
+                </>
+              )}
               <Link
                 href="/settings/governance"
                 color="orange.600"

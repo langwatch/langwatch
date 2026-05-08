@@ -1,5 +1,5 @@
-import { Alert, HStack, Text } from "@chakra-ui/react";
-import { Eye } from "lucide-react";
+import { Alert, Button, HStack, Spacer, Text } from "@chakra-ui/react";
+import { Eye, LogOut } from "lucide-react";
 
 import { Link } from "~/components/ui/link";
 
@@ -34,7 +34,7 @@ export function AdminViewingAsBanner({
         <Eye size={16} />
       </Alert.Indicator>
       <Alert.Content>
-        <HStack gap={2} flexWrap="wrap" alignItems="center">
+        <HStack gap={2} flexWrap="wrap" alignItems="center" width="full">
           <Text fontSize="sm" fontWeight="medium">
             Viewing {workspaceLabel}'s {workspaceKind} workspace as org
             admin. This is not your data.
@@ -46,6 +46,19 @@ export function AdminViewingAsBanner({
             </Link>
             .
           </Text>
+          <Spacer />
+          <Button
+            asChild
+            size="xs"
+            variant="outline"
+            colorPalette="blue"
+            aria-label="Exit and return to governance bird's-eye"
+          >
+            <Link href="/governance">
+              <LogOut size={12} />
+              Exit
+            </Link>
+          </Button>
         </HStack>
       </Alert.Content>
     </Alert.Root>

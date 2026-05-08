@@ -14,7 +14,7 @@ import {
 import { OrganizationUserRole, type Organization, type Project, type Team } from "@prisma/client";
 import { Activity, Building2, ChevronDown, ChevronRight, Info, KeyRound, Plus } from "lucide-react";
 import numeral from "numeral";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 import { NotFoundScene } from "~/components/NotFoundScene";
 import Head from "~/utils/compat/next-head";
@@ -441,6 +441,35 @@ export const DashboardLayout = ({
     router.pathname.startsWith("/me") ||
     isOnOwnPersonalProject;
   const isOrgScopeRoute = orgScope || router.pathname === "/governance";
+
+  // Audit/OCSF emission for cross-scope reads. Fires once per project
+  // navigation when admin's drilled into another user/team's workspace —
+  // sergey's recordWorkspaceView writes the AuditLog row + OCSF event
+  // synchronously. Fail-quiet: emission errors don't block render.
+  const recordWorkspaceViewMutation =
+    api.governance.recordWorkspaceView.useMutation();
+  const targetTeamId = adminViewingAs ? team?.id : undefined;
+  useEffect(() => {
+    if (
+      adminViewingAs &&
+      targetTeamId &&
+      organization?.id &&
+      !recordWorkspaceViewMutation.isPending
+    ) {
+      recordWorkspaceViewMutation.mutate({
+        organizationId: organization.id,
+        targetTeamId,
+        kind: adminViewingAs.kind,
+        workspaceLabel: adminViewingAs.label,
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    targetTeamId,
+    organization?.id,
+    adminViewingAs?.kind,
+    adminViewingAs?.label,
+  ]);
 
   if (
     !publicPage &&
