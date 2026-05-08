@@ -1,16 +1,24 @@
 /**
- * Thin REST client for the CLI's governance read endpoints under
- * `/api/auth/cli/governance/*`. Each endpoint is a tRPC-shaped
- * proxy: same input/output as the corresponding
- * `api.{ingestionSources,activityMonitor,governance}.*` tRPC
- * procedure, just over a Bearer-auth REST transport because the
- * CLI doesn't carry a NextAuth session.
+ * Thin REST client for governance endpoints used by the
+ * `langwatch governance ...` CLI namespace.
  *
- * Authoring (create / rotate / archive) intentionally stays
- * browser-only — these wrappers are read-only.
+ * Two transports live in this file:
+ *
+ *   1. `/api/auth/cli/governance/*` — CLI-specific read proxies for
+ *      activity monitor + status that pre-date the public REST
+ *      surface. Read-only.
+ *   2. `/api/governance/*` — the public REST contract Sergey shipped
+ *      at 0bb951160 / 5275e7e11. Full CRUD on IngestionTemplate +
+ *      UserIngestionBinding. The CLI sends
+ *      `X-LangWatch-Surface: cli` so audit rows land with
+ *      `metadata.surface = 'cli'` per @audit-uniform.
  */
 
 import { GovernanceConfig } from "./config";
+import {
+  CLI_SURFACE_HEADER,
+  CLI_SURFACE_VALUE,
+} from "./surface";
 
 export interface IngestionSourceSummary {
   id: string;
@@ -242,4 +250,272 @@ export async function getCliBootstrap(
     }
     throw err;
   }
+}
+
+// ── Public REST: /api/governance/* ─────────────────────────────────────────
+//
+// Sergey's Hono routes at 0bb951160 (templates) + 5275e7e11 (bindings).
+// Wire shape locked at 1839d9f54 + 60f769498 (snake_case in/out).
+// All mutating calls send X-LangWatch-Surface: cli per @audit-uniform.
+
+export interface IngestionTemplateRow {
+  id: string;
+  organization_id: string | null;
+  slug: string;
+  source_type: string;
+  display_name: string;
+  description: string | null;
+  icon_asset: string | null;
+  credential_schema: string | null;
+  ottl_rules: string;
+  platform_published: boolean;
+  enabled: boolean;
+}
+
+export interface UserIngestionBindingRow {
+  id: string;
+  template_id: string;
+  user_id: string;
+  organization_id: string;
+  personal_project_id: string;
+  binding_access_token_prefix: string;
+  enabled: boolean;
+  created_at: string;
+}
+
+type RestMethod = "GET" | "POST" | "PATCH" | "DELETE";
+
+async function requestREST<T>(
+  cfg: GovernanceConfig,
+  method: RestMethod,
+  path: string,
+  options: { body?: unknown; mutating?: boolean } & CliApiOptions = {},
+): Promise<T> {
+  if (!cfg.access_token) {
+    throw new GovernanceCliError(
+      401,
+      "not_logged_in",
+      "Not logged in — run `langwatch login --device` first",
+    );
+  }
+  const url = cfg.control_plane_url.replace(/\/+$/, "") + path;
+  const f = options.fetchImpl ?? fetch;
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${cfg.access_token}`,
+    Accept: "application/json",
+  };
+  if (options.mutating) {
+    headers[CLI_SURFACE_HEADER] = CLI_SURFACE_VALUE;
+  }
+  if (options.body !== undefined) {
+    headers["Content-Type"] = "application/json";
+  }
+  const res = await f(url, {
+    method,
+    headers,
+    body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
+  });
+  if (res.status === 204) return undefined as T;
+  if (res.status === 401) {
+    throw new GovernanceCliError(
+      401,
+      "unauthorized",
+      "Session expired — run `langwatch login --device` again",
+    );
+  }
+  if (res.status === 403) {
+    const body = (await res.json().catch(() => ({}))) as {
+      error?: { message?: string; code?: string };
+    };
+    throw new GovernanceCliError(
+      403,
+      body.error?.code ?? "forbidden",
+      body.error?.message ?? "Forbidden",
+    );
+  }
+  if (res.status === 404) {
+    const body = (await res.json().catch(() => ({}))) as {
+      error?: { message?: string };
+    };
+    throw new GovernanceCliError(
+      404,
+      "not_found",
+      body.error?.message ?? "Not found",
+    );
+  }
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new GovernanceCliError(
+      res.status,
+      "other",
+      `${res.status} ${body.slice(0, 200)}`,
+    );
+  }
+  return (await res.json()) as T;
+}
+
+// IngestionTemplate verbs ----------------------------------------------------
+
+export async function listIngestionTemplates(
+  cfg: GovernanceConfig,
+  options: CliApiOptions = {},
+): Promise<IngestionTemplateRow[]> {
+  const body = await requestREST<{ ingestion_templates: IngestionTemplateRow[] }>(
+    cfg,
+    "GET",
+    "/api/governance/ingestion-templates",
+    options,
+  );
+  return body.ingestion_templates;
+}
+
+export async function adminListIngestionTemplates(
+  cfg: GovernanceConfig,
+  options: CliApiOptions = {},
+): Promise<IngestionTemplateRow[]> {
+  const body = await requestREST<{ ingestion_templates: IngestionTemplateRow[] }>(
+    cfg,
+    "GET",
+    "/api/governance/ingestion-templates/admin",
+    options,
+  );
+  return body.ingestion_templates;
+}
+
+export async function getIngestionTemplate(
+  cfg: GovernanceConfig,
+  id: string,
+  options: CliApiOptions = {},
+): Promise<IngestionTemplateRow> {
+  const body = await requestREST<{ ingestion_template: IngestionTemplateRow }>(
+    cfg,
+    "GET",
+    `/api/governance/ingestion-templates/${encodeURIComponent(id)}`,
+    options,
+  );
+  return body.ingestion_template;
+}
+
+export async function createIngestionTemplate(
+  cfg: GovernanceConfig,
+  input: {
+    source_type: string;
+    display_name: string;
+    description?: string;
+    icon_asset?: string;
+    credential_schema?: "otlp_token" | "static_api_key" | "agent_id" | null;
+    ottl_rules?: string;
+  },
+  options: CliApiOptions = {},
+): Promise<IngestionTemplateRow> {
+  const body = await requestREST<{ ingestion_template: IngestionTemplateRow }>(
+    cfg,
+    "POST",
+    "/api/governance/ingestion-templates",
+    { ...options, body: input, mutating: true },
+  );
+  return body.ingestion_template;
+}
+
+export async function updateIngestionTemplateOttlRules(
+  cfg: GovernanceConfig,
+  id: string,
+  ottlRules: string,
+  options: CliApiOptions = {},
+): Promise<IngestionTemplateRow> {
+  const body = await requestREST<{ ingestion_template: IngestionTemplateRow }>(
+    cfg,
+    "PATCH",
+    `/api/governance/ingestion-templates/${encodeURIComponent(id)}/ottl-rules`,
+    { ...options, body: { ottl_rules: ottlRules }, mutating: true },
+  );
+  return body.ingestion_template;
+}
+
+export async function archiveIngestionTemplate(
+  cfg: GovernanceConfig,
+  id: string,
+  options: CliApiOptions = {},
+): Promise<{ ok: true }> {
+  return requestREST<{ ok: true }>(
+    cfg,
+    "DELETE",
+    `/api/governance/ingestion-templates/${encodeURIComponent(id)}`,
+    { ...options, mutating: true },
+  );
+}
+
+export async function cloneIngestionTemplateFromPlatform(
+  cfg: GovernanceConfig,
+  sourceTemplateId: string,
+  options: CliApiOptions = {},
+): Promise<IngestionTemplateRow> {
+  const body = await requestREST<{ ingestion_template: IngestionTemplateRow }>(
+    cfg,
+    "POST",
+    "/api/governance/ingestion-templates/clone-from-platform",
+    {
+      ...options,
+      body: { source_template_id: sourceTemplateId },
+      mutating: true,
+    },
+  );
+  return body.ingestion_template;
+}
+
+// UserIngestionBinding verbs ------------------------------------------------
+
+export async function listUserIngestionBindings(
+  cfg: GovernanceConfig,
+  options: CliApiOptions = {},
+): Promise<UserIngestionBindingRow[]> {
+  const body = await requestREST<{
+    user_ingestion_bindings: UserIngestionBindingRow[];
+  }>(cfg, "GET", "/api/governance/user-ingestion-bindings", options);
+  return body.user_ingestion_bindings;
+}
+
+export async function installUserIngestionBinding(
+  cfg: GovernanceConfig,
+  templateId: string,
+  options: CliApiOptions = {},
+): Promise<{
+  user_ingestion_binding: UserIngestionBindingRow;
+  binding_access_token: string;
+}> {
+  return requestREST(
+    cfg,
+    "POST",
+    "/api/governance/user-ingestion-bindings",
+    { ...options, body: { template_id: templateId }, mutating: true },
+  );
+}
+
+export async function uninstallUserIngestionBinding(
+  cfg: GovernanceConfig,
+  bindingId: string,
+  options: CliApiOptions = {},
+): Promise<{ ok: true }> {
+  return requestREST<{ ok: true }>(
+    cfg,
+    "DELETE",
+    `/api/governance/user-ingestion-bindings/${encodeURIComponent(bindingId)}`,
+    { ...options, mutating: true },
+  );
+}
+
+export async function rotateUserIngestionBindingToken(
+  cfg: GovernanceConfig,
+  bindingId: string,
+  options: CliApiOptions = {},
+): Promise<{
+  user_ingestion_binding: UserIngestionBindingRow;
+  binding_access_token: string;
+}> {
+  return requestREST(
+    cfg,
+    "POST",
+    `/api/governance/user-ingestion-bindings/${encodeURIComponent(bindingId)}/rotate`,
+    { ...options, mutating: true },
+  );
 }

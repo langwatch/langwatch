@@ -330,6 +330,22 @@ function callerUserIdFromContext(
   return patUserId ?? `svc_${projectId}`;
 }
 
+/**
+ * Resolves the audit-surface tag for the current request. Defaults to
+ * `hono` (the route mount). The `langwatch` CLI sends
+ * `X-LangWatch-Surface: cli` on its mutating governance calls so the
+ * audit row reads `metadata.surface = 'cli'` end-to-end (per umbrella
+ * spec @audit-uniform). Only `cli` is currently honored — other values
+ * fall through to the default to prevent spoofing of in-process
+ * surfaces (`trpc` / `mcp`) over the wire.
+ */
+function resolveSurfaceFromRequest(
+  c: { req: { header: (name: string) => string | undefined } },
+): "hono" | "cli" {
+  const declared = c.req.header("X-LangWatch-Surface")?.toLowerCase();
+  return declared === "cli" ? "cli" : "hono";
+}
+
 // ── App ─────────────────────────────────────────────────────────────────────
 
 export const app = new Hono<{ Variables: Variables }>()
@@ -513,7 +529,7 @@ export const app = new Hono<{ Variables: Variables }>()
               ? null
               : body.data.credential_schema ?? null,
           ottlRules: body.data.ottl_rules,
-          surface: "hono",
+          surface: resolveSurfaceFromRequest(c),
         });
         logger.info(
           { templateId: row.id, organizationId, callerUserId },
@@ -586,7 +602,7 @@ export const app = new Hono<{ Variables: Variables }>()
           callerUserId,
           id,
           ottlRules: body.data.ottl_rules,
-          surface: "hono",
+          surface: resolveSurfaceFromRequest(c),
         });
         return c.json({ ingestion_template: toTemplateDto(row) });
       } catch (err) {
@@ -639,7 +655,7 @@ export const app = new Hono<{ Variables: Variables }>()
           organizationId,
           callerUserId,
           id,
-          surface: "hono",
+          surface: resolveSurfaceFromRequest(c),
         });
         return c.json({ archived: true as const });
       } catch (err) {
@@ -702,7 +718,7 @@ export const app = new Hono<{ Variables: Variables }>()
           organizationId,
           callerUserId,
           sourceTemplateId: body.data.source_template_id,
-          surface: "hono",
+          surface: resolveSurfaceFromRequest(c),
         });
         return c.json({ ingestion_template: toTemplateDto(row) }, 201);
       } catch (err) {
@@ -841,7 +857,7 @@ export const app = new Hono<{ Variables: Variables }>()
           encryptedCredential: body.data.encrypted_credential as
             | Prisma.InputJsonValue
             | undefined,
-          surface: "hono",
+          surface: resolveSurfaceFromRequest(c),
         });
         logger.info(
           {
@@ -912,7 +928,7 @@ export const app = new Hono<{ Variables: Variables }>()
           callerUserId: caller.userId,
           organizationId,
           bindingId: id,
-          surface: "hono",
+          surface: resolveSurfaceFromRequest(c),
         });
         return c.json({ uninstalled: true as const });
       } catch (err) {
@@ -976,7 +992,7 @@ export const app = new Hono<{ Variables: Variables }>()
           callerUserId: caller.userId,
           organizationId,
           bindingId: id,
-          surface: "hono",
+          surface: resolveSurfaceFromRequest(c),
         });
         return c.json({
           binding: toBindingDto(result.binding),

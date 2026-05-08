@@ -412,7 +412,9 @@ ingestCmd
 
 const governanceCmd = program
   .command("governance")
-  .description("Inspect org-level governance state from the CLI (read-only).");
+  .description(
+    "Manage governance resources (ingestion templates, user ingestion bindings) from the CLI. Mirrors the public REST surface at /api/governance/* — every mutating call lands an audit row with metadata.surface='cli'.",
+  );
 
 governanceCmd
   .command("status")
@@ -426,6 +428,163 @@ governanceCmd
       console.error(`Error: ${formatApiErrorMessage({ error })}`);
       process.exit(1);
     }
+  });
+
+// ── Ingestion templates (admin/platform-curated catalog) ──────────────────
+
+const templatesCmd = governanceCmd
+  .command("ingestion-templates")
+  .description("CRUD on IngestionTemplate rows. Reads use aiTools:view; mutations use aiTools:manage.");
+
+templatesCmd
+  .command("list")
+  .description("List enabled ingestion templates visible to the caller's org (platform + org-authored).")
+  .option("--json", "emit machine-readable JSON")
+  .action(async (options: { json?: boolean }) => {
+    const { listCommand } = await import(
+      "./commands/governance/ingestion-templates.js"
+    );
+    await listCommand(options);
+  });
+
+templatesCmd
+  .command("admin-list")
+  .description("Admin readonly catalog — includes ottl_rules. Requires aiTools:manage.")
+  .option("--json", "emit machine-readable JSON")
+  .action(async (options: { json?: boolean }) => {
+    const { adminListCommand } = await import(
+      "./commands/governance/ingestion-templates.js"
+    );
+    await adminListCommand(options);
+  });
+
+templatesCmd
+  .command("get <id>")
+  .description("Fetch a single ingestion template by id.")
+  .option("--json", "emit machine-readable JSON")
+  .action(async (id: string, options: { json?: boolean }) => {
+    const { getCommand } = await import(
+      "./commands/governance/ingestion-templates.js"
+    );
+    await getCommand(id, options);
+  });
+
+templatesCmd
+  .command("create")
+  .description("Author a new org-authored ingestion template.")
+  .requiredOption("--source-type <slug>", "lowercase letters/digits/underscores, max 40 chars")
+  .requiredOption("--display-name <name>", "human-readable label")
+  .option("--description <text>", "optional description")
+  .option("--icon-asset <asset>", "preset:<kind> | data:image/svg+xml;base64,...")
+  .option(
+    "--credential-schema <kind>",
+    "otlp_token | static_api_key | agent_id (defaults to otlp_token)",
+  )
+  .option("--ottl-rules <text>", "OTTL rules (newline-separated statements)")
+  .option("--json", "emit machine-readable JSON")
+  .action(
+    async (options: {
+      sourceType: string;
+      displayName: string;
+      description?: string;
+      iconAsset?: string;
+      credentialSchema?: string;
+      ottlRules?: string;
+      json?: boolean;
+    }) => {
+      const { createCommand } = await import(
+        "./commands/governance/ingestion-templates.js"
+      );
+      await createCommand(options);
+    },
+  );
+
+templatesCmd
+  .command("update-ottl-rules <id>")
+  .description("Replace ottl_rules on an org-authored template. Platform rows reject.")
+  .requiredOption("--ottl-rules <text>", "OTTL rules (newline-separated statements)")
+  .option("--json", "emit machine-readable JSON")
+  .action(
+    async (id: string, options: { ottlRules: string; json?: boolean }) => {
+      const { updateOttlRulesCommand } = await import(
+        "./commands/governance/ingestion-templates.js"
+      );
+      await updateOttlRulesCommand(id, options);
+    },
+  );
+
+templatesCmd
+  .command("archive <id>")
+  .description("Soft-archive an org-authored template. Platform rows reject.")
+  .option("--json", "emit machine-readable JSON")
+  .action(async (id: string, options: { json?: boolean }) => {
+    const { archiveCommand } = await import(
+      "./commands/governance/ingestion-templates.js"
+    );
+    await archiveCommand(id, options);
+  });
+
+templatesCmd
+  .command("clone-from-platform <sourceTemplateId>")
+  .description("Clone a platform-published template into the caller's org for OTTL customisation.")
+  .option("--json", "emit machine-readable JSON")
+  .action(
+    async (sourceTemplateId: string, options: { json?: boolean }) => {
+      const { cloneFromPlatformCommand } = await import(
+        "./commands/governance/ingestion-templates.js"
+      );
+      await cloneFromPlatformCommand(sourceTemplateId, options);
+    },
+  );
+
+// ── User ingestion bindings (caller's own bindings) ───────────────────────
+
+const bindingsCmd = governanceCmd
+  .command("user-ingestion-bindings")
+  .description("Caller-scoped binding CRUD. Mutations require a User-bound PAT (legacy project tokens 403).");
+
+bindingsCmd
+  .command("list")
+  .description("List the caller's installed bindings.")
+  .option("--json", "emit machine-readable JSON")
+  .action(async (options: { json?: boolean }) => {
+    const { listCommand } = await import(
+      "./commands/governance/user-ingestion-bindings.js"
+    );
+    await listCommand(options);
+  });
+
+bindingsCmd
+  .command("install <templateId>")
+  .description("Install a binding for an ingestion template. Returns the lwub_* token (shown once).")
+  .option("--json", "emit machine-readable JSON")
+  .action(async (templateId: string, options: { json?: boolean }) => {
+    const { installCommand } = await import(
+      "./commands/governance/user-ingestion-bindings.js"
+    );
+    await installCommand(templateId, options);
+  });
+
+bindingsCmd
+  .command("uninstall <bindingId>")
+  .description("Soft-archive a binding. Existing traces retained; new emits 401.")
+  .option("--json", "emit machine-readable JSON")
+  .action(async (bindingId: string, options: { json?: boolean }) => {
+    const { uninstallCommand } = await import(
+      "./commands/governance/user-ingestion-bindings.js"
+    );
+    await uninstallCommand(bindingId, options);
+  });
+
+bindingsCmd
+  .command("rotate <bindingId>")
+  .description("Rotate the binding's access token (hard-cut: previous token invalidated immediately).")
+  .option("--json", "emit machine-readable JSON")
+  .action(async (bindingId: string, options: { json?: boolean }) => {
+    const { rotateCommand } = await import(
+      "./commands/governance/user-ingestion-bindings.js"
+    );
+    await rotateCommand(bindingId, options);
   });
 } // end if (governancePreview)
 
