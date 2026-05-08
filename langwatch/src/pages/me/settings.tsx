@@ -9,6 +9,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { Checkbox } from "~/components/ui/checkbox";
 import {
   Copy,
   Laptop,
@@ -98,6 +99,70 @@ export default function MySettingsPage() {
       });
     },
   });
+
+  const personalContextQuery = api.user.personalContext.useQuery(
+    { organizationId: ctx.organizationId },
+    { enabled: !!ctx.organizationId, refetchOnWindowFocus: false },
+  );
+  const personalProjectId =
+    personalContextQuery.data?.workspace.project.id ?? null;
+
+  const featuresQuery = api.personalWorkspaceFeatures.get.useQuery(
+    { projectId: personalProjectId ?? "" },
+    { enabled: !!personalProjectId, refetchOnWindowFocus: false },
+  );
+  const featuresEnabled = !!(
+    featuresQuery.data?.evaluations &&
+    featuresQuery.data?.datasets &&
+    featuresQuery.data?.annotations &&
+    featuresQuery.data?.automations
+  );
+  const enableAllMutation =
+    api.personalWorkspaceFeatures.enableAll.useMutation({
+      onSuccess: () => {
+        if (personalProjectId) {
+          void utils.personalWorkspaceFeatures.get.invalidate({
+            projectId: personalProjectId,
+          });
+        }
+        toaster.create({
+          title: "Advanced features enabled",
+          description:
+            "Evaluations, datasets, annotations, and automations now appear in your sidebar.",
+          type: "success",
+        });
+      },
+      onError: (err) => {
+        toaster.create({
+          title: "Failed to enable features",
+          description: err.message,
+          type: "error",
+        });
+      },
+    });
+  const disableAllMutation =
+    api.personalWorkspaceFeatures.disableAll.useMutation({
+      onSuccess: () => {
+        if (personalProjectId) {
+          void utils.personalWorkspaceFeatures.get.invalidate({
+            projectId: personalProjectId,
+          });
+        }
+        toaster.create({
+          title: "Advanced features disabled",
+          description:
+            "Sidebar entries hidden. Existing data is preserved and reappears on re-enable.",
+          type: "success",
+        });
+      },
+      onError: (err) => {
+        toaster.create({
+          title: "Failed to disable features",
+          description: err.message,
+          type: "error",
+        });
+      },
+    });
 
   const revokeMutation = api.personalVirtualKeys.revokePersonal.useMutation({
     onSuccess: () => {
@@ -282,6 +347,33 @@ export default function MySettingsPage() {
             description="Where to land when you open LangWatch. Auto uses your detected persona."
           >
             <HomePagePicker organizationId={ctx.organizationId} />
+          </SectionCard>
+        ) : null}
+
+        {personalProjectId ? (
+          <SectionCard
+            title="Workspace features"
+            description="Evaluations, datasets, annotations, and automations are powerful for personal projects too — turn them on when you're ready. Disabling later hides the sidebar entries; existing data is preserved."
+          >
+            <Checkbox
+              checked={featuresEnabled}
+              disabled={
+                featuresQuery.isLoading ||
+                enableAllMutation.isPending ||
+                disableAllMutation.isPending
+              }
+              onCheckedChange={(details) => {
+                if (!personalProjectId) return;
+                if (details.checked) {
+                  enableAllMutation.mutate({ projectId: personalProjectId });
+                } else {
+                  disableAllMutation.mutate({ projectId: personalProjectId });
+                }
+              }}
+            >
+              Enable advanced features (evaluations, datasets, annotations,
+              automations)
+            </Checkbox>
           </SectionCard>
         ) : null}
 
