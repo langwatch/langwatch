@@ -31,6 +31,7 @@ import {
 } from "@ee/governance/services/quarantineFillEvaluator.service";
 import { AdminWorkspaceViewAuditService } from "@ee/governance/services/adminWorkspaceViewAudit.service";
 import { GovernanceOcsfEventsClickHouseRepository } from "@ee/governance/services/governanceOcsfEvents.clickhouse.repository";
+import { PersonalWorkspaceService } from "@ee/governance/services/personalWorkspace.service";
 import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
 
 import {
@@ -251,6 +252,74 @@ export const governanceRouter = createTRPCRouter({
         kind: input.kind,
         workspaceLabel: input.workspaceLabel,
       });
+    }),
+
+  /**
+   * Resolves a CH-side `actor` token (typically the email stamped on
+   * spans as `langwatch.user_id`, occasionally the User.id directly)
+   * to that user's Personal Workspace inside the given org. Drives
+   * the bird's-eye `/settings/governance/users/[id]` "View their
+   * workspace →" link — without this, admins can see who's been
+   * active but can't drill into their traces from the user row.
+   *
+   * Returns null when:
+   *   - the actor doesn't resolve to a User in this org, OR
+   *   - the resolved User has no Personal Workspace yet
+   * (no enumeration leak — both branches collapse to null).
+   *
+   * Permission: `governance:view`. Members never resolve other
+   * users' workspace ids.
+   *
+   * Spec: specs/ai-gateway/governance/admin-trace-access.feature
+   *       §"Admin clicks a user row + lands on their personal-workspace traces"
+   */
+  resolveActorPersonalProject: protectedProcedure
+    .input(
+      z.object({
+        organizationId: z.string(),
+        /** Email or User.id stamped on spans as the actor identity. */
+        actor: z.string().min(1).max(512),
+      }),
+    )
+    .use(checkOrganizationPermission("governance:view"))
+    .query(async ({ ctx, input }) => {
+      // Match by email (CH-stamped actor is typically the email) OR
+      // by id directly. Two-step: resolve User first, then ask
+      // PersonalWorkspaceService for the workspace under the supplied
+      // org. Cross-org probe (User exists but no membership in
+      // organizationId) collapses to null below — never confirms the
+      // user exists in another org.
+      const user = await ctx.prisma.user.findFirst({
+        where: {
+          OR: [{ email: input.actor }, { id: input.actor }],
+        },
+        select: { id: true, name: true, email: true },
+      });
+      if (!user) return null;
+
+      const membership = await ctx.prisma.organizationUser.findFirst({
+        where: {
+          userId: user.id,
+          organizationId: input.organizationId,
+        },
+        select: { userId: true },
+      });
+      if (!membership) return null;
+
+      const service = new PersonalWorkspaceService(ctx.prisma);
+      const workspace = await service.findExisting({
+        userId: user.id,
+        organizationId: input.organizationId,
+      });
+      if (!workspace) return null;
+
+      return {
+        userId: user.id,
+        displayName: user.name ?? user.email ?? user.id,
+        teamId: workspace.team.id,
+        projectId: workspace.project.id,
+        projectSlug: workspace.project.slug,
+      };
     }),
 
   quarantineFillStats: protectedProcedure
