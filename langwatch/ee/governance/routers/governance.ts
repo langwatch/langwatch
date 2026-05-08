@@ -24,6 +24,11 @@ import {
 } from "@ee/governance/services/personaResolver.service";
 import { UsageStatsService } from "~/server/license-enforcement/usage-stats.service";
 import { GovernanceOcsfExportService } from "@ee/governance/services/governanceOcsfExport.service";
+import {
+  QUARANTINE_DEFAULT_THRESHOLD,
+  QUARANTINE_DEFAULT_WINDOW_SECONDS,
+  QuarantineFillEvaluator,
+} from "@ee/governance/services/quarantineFillEvaluator.service";
 
 import {
   ENTERPRISE_FEATURE_ERRORS,
@@ -165,6 +170,47 @@ export const governanceRouter = createTRPCRouter({
         organizationId: input.organizationId,
         sinceMs: input.sinceMs ?? 0,
         limit: input.limit,
+      });
+    }),
+
+  /**
+   * Current quarantine-fill rate for the org's hidden Gov project.
+   * Admin UI on `/governance` polls this and surfaces a warning
+   * Alert when `exceeded` is true. Per-source breakdown lets the
+   * admin pin which IngestionSource is misconfigured without a
+   * separate drill-down.
+   *
+   * Permission: `governance:view` — admin-only (members never see
+   * quarantine activity per the spec's "no member visibility on
+   * this Alert" invariant).
+   *
+   * Spec: specs/ai-gateway/governance/ingestion-attribution.feature
+   *       §"Admin warning fires when quarantine fill rate exceeds threshold"
+   */
+  quarantineFillStats: protectedProcedure
+    .input(
+      z.object({
+        organizationId: z.string(),
+        windowSeconds: z
+          .number()
+          .int()
+          .min(10)
+          .max(3600)
+          .default(QUARANTINE_DEFAULT_WINDOW_SECONDS),
+        threshold: z
+          .number()
+          .int()
+          .min(1)
+          .default(QUARANTINE_DEFAULT_THRESHOLD),
+      }),
+    )
+    .use(checkOrganizationPermission("governance:view"))
+    .query(async ({ ctx, input }) => {
+      const evaluator = QuarantineFillEvaluator.create({ prisma: ctx.prisma });
+      return await evaluator.evaluate({
+        organizationId: input.organizationId,
+        windowSeconds: input.windowSeconds,
+        threshold: input.threshold,
       });
     }),
 });
