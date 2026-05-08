@@ -2,6 +2,7 @@ import {
   Heading,
   HStack,
   Spacer,
+  Tabs,
   Text,
   VStack,
 } from "@chakra-ui/react";
@@ -11,6 +12,7 @@ import GovernanceLayout from "~/components/governance/GovernanceLayout";
 import { LoadingScreen } from "~/components/LoadingScreen";
 import { NotFoundScene } from "~/components/NotFoundScene";
 import { AiToolEntryDrawer } from "~/components/settings/governance/AiToolEntryDrawer";
+import { IngestionTemplatesEditor } from "~/components/settings/governance/IngestionTemplatesEditor";
 import { ToolCatalogEditor } from "~/components/settings/governance/ToolCatalogEditor";
 import { useFeatureFlag } from "~/hooks/useFeatureFlag";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -20,10 +22,12 @@ import type { AiToolEntry } from "~/components/me/tiles/types";
 /**
  * Admin AI Tool Catalog editor — Phase 7 B6+B9 wired surface.
  *
- * Reads + setEnabled wired to Sergey's `aiToolsCatalogRouter`
- * (commit `6c1be0cda`). Add/edit drawer (B7) + drag-reorder (B8) ship
- * in follow-up commits — clicking +Add tile or Edit currently opens
- * a placeholder until those land.
+ * v1 ships two tabs per `ingestion-templates-catalog.feature` @admin-readonly
+ * scenario:
+ *   - Tool Tiles: existing AiToolEntry catalog (drag-reorder + add/edit)
+ *   - Ingestion Templates: new READ-ONLY catalog of platform-published
+ *     IngestionTemplate rows. Admin sees what's shipped + 'View OTTL' for
+ *     transparency. No edit/disable/fork v1; admin authoring lands v2.
  */
 export default function ToolCatalogPage() {
   const { project, organization } = useOrganizationTeamProject({
@@ -57,18 +61,44 @@ export default function ToolCatalogPage() {
               AI Tool Catalog
             </Heading>
             <Text color="fg.muted" fontSize="sm">
-              The AI tools your team sees on their <code>/me</code> portal.
-              Drag to reorder.
+              Catalog rows your members see on their <code>/me</code> portal.
             </Text>
           </VStack>
           <Spacer />
         </HStack>
 
-        <ToolCatalogEditor
-          organizationId={organization.id}
-          onAddTile={(type) => setDrawerState({ mode: "create", type })}
-          onEditTile={(entry) => setDrawerState({ mode: "edit", entry })}
-        />
+        <Tabs.Root variant="line" defaultValue="tool-tiles">
+          <Tabs.List>
+            <Tabs.Trigger
+              value="tool-tiles"
+              color="fg.muted"
+              _selected={{ color: "fg", fontWeight: "semibold" }}
+            >
+              Tool Tiles
+            </Tabs.Trigger>
+            <Tabs.Trigger
+              value="ingestion-templates"
+              color="fg.muted"
+              _selected={{ color: "fg", fontWeight: "semibold" }}
+            >
+              Ingestion Templates
+            </Tabs.Trigger>
+          </Tabs.List>
+          <Tabs.Content value="tool-tiles" paddingTop={4}>
+            <ToolCatalogEditor
+              organizationId={organization.id}
+              onAddTile={(type) =>
+                setDrawerState({ mode: "create", type })
+              }
+              onEditTile={(entry) =>
+                setDrawerState({ mode: "edit", entry })
+              }
+            />
+          </Tabs.Content>
+          <Tabs.Content value="ingestion-templates" paddingTop={4}>
+            <IngestionTemplatesEditor organizationId={organization.id} />
+          </Tabs.Content>
+        </Tabs.Root>
       </VStack>
 
       <AiToolEntryDrawer
