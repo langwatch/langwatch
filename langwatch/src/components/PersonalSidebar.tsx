@@ -1,10 +1,20 @@
 import { Box, VStack } from "@chakra-ui/react";
-import { Gauge, KeyRound, ListTree, Smartphone } from "lucide-react";
+import {
+  Bot,
+  ClipboardList,
+  Database,
+  Gauge,
+  KeyRound,
+  ListTree,
+  Smartphone,
+  Sparkles,
+} from "lucide-react";
 import React, { useMemo, useState } from "react";
 import { useRouter } from "~/utils/compat/next-router";
 
 import { useRequiredSession } from "~/hooks/useRequiredSession";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { api } from "~/utils/api";
 
 import { MENU_WIDTH_COMPACT, MENU_WIDTH_EXPANDED } from "./MainMenu";
 import { SideMenuLink } from "./sidebar/SideMenuLink";
@@ -40,22 +50,34 @@ export const PersonalSidebar = React.memo(function PersonalSidebar({
     redirectToOnboarding: false,
     redirectToProjectOnboarding: false,
   });
-  const personalProjectSlug = useMemo(() => {
+  const personalProject = useMemo(() => {
     const userId = session.data?.user?.id;
     if (!userId || !organizations) return null;
     for (const org of organizations) {
       for (const team of org.teams ?? []) {
         if (team.isPersonal && team.ownerUserId === userId) {
           const project = team.projects?.[0];
-          if (project) return project.slug;
+          if (project) return { id: project.id, slug: project.slug };
         }
       }
     }
     return null;
   }, [organizations, session.data?.user?.id]);
+  const personalProjectSlug = personalProject?.slug ?? null;
+  const personalProjectId = personalProject?.id ?? null;
   const tracesHref = personalProjectSlug
     ? `/${personalProjectSlug}/traces`
     : null;
+
+  // Personal-workspace advanced features unlock the library nav entries
+  // (datasets, evaluations, annotations, automations). Default-empty
+  // storage means existing users see Traces only; clicking the bundle
+  // checkbox in /me/settings flips them on with one atomic flip + audit.
+  const featuresQuery = api.personalWorkspaceFeatures.get.useQuery(
+    { projectId: personalProjectId ?? "" },
+    { enabled: !!personalProjectId, refetchOnWindowFocus: false },
+  );
+  const features = featuresQuery.data;
 
   return (
     <Box
@@ -101,6 +123,42 @@ export const PersonalSidebar = React.memo(function PersonalSidebar({
                 icon={ListTree}
                 label="Traces"
                 href={tracesHref}
+                isActive={false}
+                showLabel={showExpanded}
+              />
+            )}
+            {personalProjectSlug && features?.evaluations && (
+              <SideMenuLink
+                icon={ClipboardList}
+                label="Evaluations"
+                href={`/${personalProjectSlug}/evaluations`}
+                isActive={false}
+                showLabel={showExpanded}
+              />
+            )}
+            {personalProjectSlug && features?.datasets && (
+              <SideMenuLink
+                icon={Database}
+                label="Datasets"
+                href={`/${personalProjectSlug}/datasets`}
+                isActive={false}
+                showLabel={showExpanded}
+              />
+            )}
+            {personalProjectSlug && features?.annotations && (
+              <SideMenuLink
+                icon={Sparkles}
+                label="Annotations"
+                href={`/${personalProjectSlug}/annotations`}
+                isActive={false}
+                showLabel={showExpanded}
+              />
+            )}
+            {personalProjectSlug && features?.automations && (
+              <SideMenuLink
+                icon={Bot}
+                label="Automations"
+                href={`/${personalProjectSlug}/automations`}
                 isActive={false}
                 showLabel={showExpanded}
               />
