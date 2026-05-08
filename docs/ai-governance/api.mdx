@@ -70,6 +70,20 @@ A few resource-shape notes that generalise across the namespace:
 - **Resource-specific verbs** — `update-ottl-rules` (instead of generic `update`) and `clone-from-platform` (instead of generic `create`) reflect the domain — admins don't generically PATCH every field; they specifically replace OTTL or clone a platform row. Other resources will introduce their own resource-specific verbs (`rotate` on ingestion sources, `assign-to-user` on role bindings, `revoke` on sessions) the same way.
 - **Error mapping** — `403 PlatformTemplateImmutable` (admin tried to PATCH a platform-published row), `404 TemplateNotFound` (cross-org probe), `400 InvalidSourceType` / validation. All map to a common `errorSchema` with `{ type, code, message }`.
 
+The second resource to ship is `user-ingestion-bindings` (Sergey's Lane B-2 commit at `5275e7e11`). The verb set:
+
+| Verb | Method + path | Returns | RBAC |
+|---|---|---|---|
+| `list` | `GET /api/governance/user-ingestion-bindings` | `{ data: UserIngestionBindingDto[] }` (caller-scoped — cross-user reads are not possible) | `organization:view` + PAT bound to a User |
+| `install` | `POST /api/governance/user-ingestion-bindings` | `{ binding: ..., token: "lwub_…" }` (token returned exactly once; thereafter only `binding_access_token_prefix` is visible) | `organization:view` + PAT bound to a User |
+| `uninstall` | `DELETE /api/governance/user-ingestion-bindings/:id` | `{ uninstalled: true }` | `organization:view` + PAT bound to a User |
+| `rotate` | `POST /api/governance/user-ingestion-bindings/:id/rotate` | `{ binding: ..., token: "lwub_…" }` (hard-cut rotation per spec — old token is invalid immediately) | `organization:view` + PAT bound to a User |
+
+`user-ingestion-bindings` is **caller-scoped**: every org member manages their own bindings, no admin enumeration. Two consequences worth noting:
+
+- **PAT must be bound to a real User** — legacy project API keys without a `patUserId` reject with `403 human_caller_required`. Cross-binding requires a real human to own the personal project the binding routes traces into; project-token automation cannot install user-scoped bindings on someone else's behalf.
+- **Personal project is server-resolved** — the install request body MUST NOT carry `personalProjectId`. The personal project is derived from the caller's user id; the umbrella spec calls this the "structural cross-bind impossibility" — the input shape simply does not accept the field that would let you bind to someone else's personal project. Returning `412 PersonalProjectMissing` if the caller's user has no personal project yet.
+
 The Zod schemas backing each request and response body are the same schemas the corresponding service-layer function consumes. The OpenAPI generator (`describeRoute` + `hono-openapi`) reads them directly, so the spec and the runtime are guaranteed in sync.
 
 ## OpenAPI spec generation + SDK regen
@@ -99,7 +113,7 @@ State-changing calls always emit an audit row from the service layer (the same r
 
 All four rows have **identical** payload shapes apart from the `surface` field. Surface attribution helps incident response (which automation made this change?) without changing the audit-row event-kind taxonomy.
 
-<Note>**TBD-IMPL — surface attribution threading**: the current ingestion-templates routes at `0bb951160` emit audit rows from the service layer (correct), but the per-surface `surface` field is threaded through later (per Sergey's commit body: "surface attribution... is threaded through later once tRPC + CLI + MCP are all online"). Until that lands, all rows currently emit without an explicit surface tag — they'll backfill to the four-value enum once the threading PR lands.</Note>
+<Note>**TBD-IMPL — surface attribution threading**: routes at `0bb951160` (ingestion-templates) and `5275e7e11` (user-ingestion-bindings) emit audit rows from the service layer (correct), but the per-surface `surface` field is threaded through Sergey's Ask B-3 commit (`IngestionTemplateService` + `UserIngestionBindingService` get an optional `surface` param; CLI / MCP / tRPC pass `cli` / `mcp` / `trpc` respectively). Until B-3 lands, rows emit without an explicit surface tag.</Note>
 
 ## Cross-references
 

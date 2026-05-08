@@ -85,7 +85,7 @@ Use `--output json` in scripts and CI; the human table is for interactive explor
 | `gateway-budgets` | `list` `get` `create` `update` `delete` |
 | `ingestion-sources` | `list` `get` `create` `update` `delete` `rotate` |
 | `ingestion-templates` | `list` `admin-list` `get` `create` `update-ottl-rules` `archive` `clone-from-platform` |
-| `user-ingestion-bindings` | `list` `get` `install` `uninstall` `rotate` |
+| `user-ingestion-bindings` | `list` `install` `uninstall` `rotate` (caller-scoped — every org member manages their own; PAT must be bound to a real User) |
 | `members` | `list` `get` `update` `remove` |
 | `invites` | `list` `get` `create` `revoke` |
 | `role-bindings` | `list` `get` `assign-to-user` `revoke-from-user` |
