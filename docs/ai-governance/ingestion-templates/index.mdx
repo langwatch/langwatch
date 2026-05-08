@@ -70,15 +70,18 @@ fourth is for ad-hoc/custom telemetry.
 
 ### Step 2 — install the Claude Code template
 
-Click **Install** on the Claude Code tile.
+Click **Install** on the Claude Code tile. A drawer slides in headed
+**Connect Claude Code — auto-shaped**, with the subcopy *"Traces normalized into
+gen_ai.\* canonical. Cost/tokens/model populated automatically by the receiver."*
 
 `<SCREENSHOT_TBD: /me-install-drawer-claude-code.png — drawer with endpoint + token + curl snippet>`
 
-The install drawer shows three things:
+The drawer shows:
 
 - **OTLP endpoint** — read-only, copyable.
-- **Binding token** — `lwub_…` shown once. Copy it now; after you close the drawer it's
-  masked to its first 8 characters.
+- **Binding token** — `lwub_…` issued one-time, with a Show/Hide toggle. Copy it
+  while it's visible; after you dismiss the drawer it's masked to its first 8
+  characters.
 - **Snippet preview** — pre-wired environment variables for Claude Code:
   ```bash
   export OTEL_EXPORTER_OTLP_ENDPOINT="https://app.langwatch.ai/api/otel"
