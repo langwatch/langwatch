@@ -50,44 +50,56 @@ The pattern is `governance_<resource_with_underscores>_<verb_with_underscores>` 
 
 ## Authentication
 
-The MCP server reads the apiKey from a header set when the MCP client connects. The same apiKey resolution path as the REST API and CLI:
+Governance MCP tools register inside LangWatch's existing MCP server (mounted at `/api/mcp/*` on the same host that serves the dashboard) — there is **no separate `langwatch mcp serve` binary**. Clients connect over HTTP using either streamable-HTTP at `/mcp` or SSE at `/sse`, and authenticate with one of:
+
+- **Project API key as Bearer** (`Authorization: Bearer <projectApiKey>`) — read tools work immediately. Sufficient to call `governance_*_list`, `governance_*_get`, `governance_*_admin_list`.
+- **OAuth (PKCE) flow** at `/api/mcp/authorize` → `/oauth/token` — required for write tools. The OAuth flow captures the user's id at authorize time, threads it through the session token cache, and surfaces it to governance tools as `ctx.callerUserId`. Without it, a write tool returns an `AUTH_REQUIRED:` error pointing the client at the OAuth flow.
 
 ```jsonc
-// MCP client config (for Claude Code, Cursor, etc.)
+// MCP client config — points at the LangWatch instance's MCP endpoint
+// (SaaS shown; self-hosted uses your deployment's host).
 {
   "mcpServers": {
     "langwatch-governance": {
-      "command": "langwatch",
-      "args": ["governance", "mcp", "serve"],
-      "env": {
-        "LANGWATCH_API_KEY": "lwsk_…"
-      }
+      "url": "https://app.langwatch.ai/api/mcp"
+      // Read-only access: add Authorization: Bearer <projectApiKey>.
+      // Read+write access: complete the OAuth PKCE flow at /api/mcp/authorize.
     }
   }
 }
 ```
 
-<Note>**TBD-IMPL — exact transport + entrypoint**: the umbrella spec locks the MCP namespace + tool naming + RBAC behaviour. The actual transport (stdio vs HTTP), command entrypoint, and config file shape land with Lane-Q's MCP-toolset commits (Ariana, gated on Sergey's first Hono route SHA so the tools dispatch through the new shared service layer).</Note>
+The 11 governance tools register via `registerGovernanceMcpTools(server, ctx)` from `langwatch/src/mcp/governance-tools.ts` (Lane-Q at `7639b6c2b`). The same registration runs at all three `createMcpServer()` callsites in `handler.ts` so the tools are available regardless of which MCP transport the client chose.
 
 ## RBAC enforcement
 
-If an agent connects with a narrowly-scoped apiKey (e.g. `governance:read` only) and tries to call a `:manage`-scoped tool:
+Governance tools enforce two distinct gates at the tool layer (`langwatch/src/mcp/governance-tools.ts`), BEFORE the service call:
+
+**`AUTH_REQUIRED:`** — write tools (e.g. `governance_ingestion_templates_create`, `governance_user_ingestion_bindings_install`) called from a project-apiKey-only session without OAuth. Read tools are NOT subject to this gate; they work with project-apiKey-only sessions.
 
 ```jsonc
-// Agent calls governance_anomaly_rules_create with scope governance:read
-// Response:
 {
   "isError": true,
-  "content": [{ "type": "text", "text": "FORBIDDEN: apiKey scope governance:read does not include anomaly-rules:manage" }]
+  "content": [{ "type": "text", "text": "AUTH_REQUIRED: this tool requires an OAuth-authenticated MCP session. Complete the OAuth flow at /api/mcp/authorize and reconnect." }]
 }
 ```
 
-No record is created. No audit row is emitted (failed calls are not state-changes by design). The agent's harness can decide whether to ask the human for a more-privileged apiKey or back off.
+**`FORBIDDEN:`** — the caller has a session but their organization role doesn't include the required permission (mirrors `hasOrganizationPermission` from `langwatch/src/server/api/rbac.ts`).
 
-The Path B mechanics (per `fc6d54100` + Sergey's MCP guidance):
+```jsonc
+{
+  "isError": true,
+  "content": [{ "type": "text", "text": "FORBIDDEN: caller does not have aiTools:manage on this organization" }]
+}
+```
 
-- **RBAC check happens at the MCP tool layer**, BEFORE the service call — the tool mirrors `checkOrganizationPermission` from `langwatch/src/server/api/rbac.ts` against the apiKey's scopes and returns `FORBIDDEN` early if the required permission is missing. Services trust the surface — they do not gate on the MCP-resolved scope a second time. This split is intentional: the MCP tool owns the RBAC contract for its surface; the service owns the multitenancy + business-logic contract.
-- **`callerUserId` flows from the authenticated user** — for `UserIngestionBindingService.{install, uninstall, rotateToken}` (which need a real human caller), the MCP handler's authenticated user id is passed through as `callerUserId`. For `IngestionTemplateService` authoring methods (which take `callerUserId` only for the audit trail), same pattern.
+In both cases no record is created and no audit row is emitted (failed calls are not state-changes by design). The agent's harness can decide whether to escalate (ask the human to complete the OAuth flow / use a more-privileged apiKey) or back off.
+
+The Path B mechanics (per `fc6d54100` + `7639b6c2b`):
+
+- **RBAC check happens at the MCP tool layer**, BEFORE the service call — the tool mirrors `hasOrganizationPermission` from `langwatch/src/server/api/rbac.ts` and returns `FORBIDDEN:` early if the required permission is missing. Services trust the surface — they do not gate on the MCP-resolved scope a second time. This split is intentional: the MCP tool owns the RBAC contract for its surface; the service owns the multitenancy + business-logic contract.
+- **`callerUserId` flows from the OAuth session** — the OAuth PKCE flow at `/api/mcp/authorize` captures the user's id, threads it through the session token cache and `SessionState`, and surfaces it as `ctx.callerUserId`. For `UserIngestionBindingService.{install, uninstall, rotateToken}` it's required (write tools reject with `AUTH_REQUIRED:` if absent). For `IngestionTemplateService` authoring methods (which take `callerUserId` for the audit trail), same plumbing.
+- **Snake_case ↔ camelCase boundary** — MCP tool inputs use snake_case (`source_template_id`, `template_id`) per public-surface convention; the tool maps to camelCase (`sourceTemplateId`, `templateId`) before calling the service, since service signatures are camelCase. The mapping is the tool's job, not the service's.
 
 ## Audit emission
 
