@@ -1,6 +1,7 @@
 import {
   Badge,
   Box,
+  Button,
   Heading,
   HStack,
   SimpleGrid,
@@ -8,10 +9,16 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { Bot, MousePointer2, Terminal, Users } from "lucide-react";
-import type { ReactNode } from "react";
+import { Bot, Check, MousePointer2, Terminal, Users } from "lucide-react";
+import { useState, type ReactNode } from "react";
 
+import {
+  IngestionTemplateInstallDrawer,
+  type IngestionBindingResult,
+  type IngestionTemplateMeta,
+} from "~/components/me/IngestionTemplateInstallDrawer";
 import { Link } from "~/components/ui/link";
+import { usePublicEnv } from "~/hooks/usePublicEnv";
 
 /**
  * /me Trace Ingest section — tile-grid for IngestionTemplate v1 catalog.
@@ -21,17 +28,103 @@ import { Link } from "~/components/ui/link";
  *   (otlp_token install) + raw_otlp_advanced (visually distinct fallback
  *   discovery card pointing at /me/settings#otlp).
  *
- * v1 ships catalog-shape only — install drawers wire up next iter when
- * Sergey's IngestionTemplate Prisma model + tRPC list query land. Tiles
- * render disabled until then; raw_otlp_advanced is functional today
- * because it deep-links to the /me/settings 'Personal OTLP Endpoint'
- * panel which already ships (33c258d8a).
+ * Iter 3 wires the install drawer scaffold against a STUB onInstall.
+ * Real wiring lands when `api.ingestionTemplates.list` +
+ * `api.userIngestionBindings.install` ship — replace TEMPLATE_METADATA
+ * with the tRPC list result, swap stub install with the real mutation.
  *
  * Per the no-leak invariant in catalog.feature:
  *   This component MUST NOT render under /[project] chrome — only on
  *   /me. Embedding lives on /me/index.tsx.
  */
+const TEMPLATE_METADATA: Array<
+  IngestionTemplateMeta & { subtitle: string; icon: ReactNode }
+> = [
+  {
+    slug: "claude_code",
+    displayName: "Claude Code",
+    subtitle: "Anthropic Claude Code CLI",
+    credentialSchema: null,
+    icon: <Bot size={20} />,
+  },
+  {
+    slug: "cursor",
+    displayName: "Cursor",
+    subtitle: "Cursor IDE telemetry",
+    credentialSchema: null,
+    icon: <MousePointer2 size={20} />,
+  },
+  {
+    slug: "claude_cowork",
+    displayName: "Claude cowork",
+    subtitle: "Multi-agent Claude sessions",
+    credentialSchema: null,
+    icon: <Users size={20} />,
+  },
+];
+
 export function TraceIngestSection() {
+  const publicEnv = usePublicEnv();
+  const baseHost = publicEnv.data?.BASE_HOST ?? "";
+
+  const [openSlug, setOpenSlug] = useState<string | null>(null);
+  const [installResults, setInstallResults] = useState<
+    Record<string, IngestionBindingResult | null>
+  >({});
+  const [installing, setInstalling] = useState<Record<string, boolean>>({});
+  const [installErrors, setInstallErrors] = useState<
+    Record<string, string | null>
+  >({});
+
+  const openTemplate = openSlug
+    ? TEMPLATE_METADATA.find((t) => t.slug === openSlug) ?? null
+    : null;
+
+  /**
+   * STUB install — wires to api.userIngestionBindings.install when
+   * Sergey's tRPC router lands. Returns a synthetic token for UI
+   * verification only; receiver path will reject this token until
+   * the real mutation lands. NOT a security-relevant secret.
+   */
+  const stubInstall = async (slug: string): Promise<IngestionBindingResult> => {
+    await new Promise((r) => setTimeout(r, 500));
+    return {
+      token: `lwub_${slug}_PENDING_BINDING_SERVICE`,
+      endpoint: baseHost ? `${baseHost}/api/otel` : "/api/otel",
+    };
+  };
+
+  const handleInstall = async (slug: string) => {
+    setInstalling((s) => ({ ...s, [slug]: true }));
+    setInstallErrors((s) => ({ ...s, [slug]: null }));
+    try {
+      const result = await stubInstall(slug);
+      setInstallResults((s) => ({ ...s, [slug]: result }));
+    } catch (err) {
+      setInstallErrors((s) => ({
+        ...s,
+        [slug]: err instanceof Error ? err.message : "Install failed",
+      }));
+    } finally {
+      setInstalling((s) => ({ ...s, [slug]: false }));
+    }
+  };
+
+  const handleMarkInstalled = () => {
+    setOpenSlug(null);
+  };
+
+  const handleOpenChange = (slug: string, next: boolean) => {
+    if (!next) {
+      setOpenSlug(null);
+      // Keep installResults so the tile stays green-checked across
+      // open/close — until the real tRPC list query lands and the
+      // server is the source of truth.
+    } else {
+      setOpenSlug(slug);
+    }
+  };
+
   return (
     <VStack align="stretch" gap={3} width="full">
       <VStack align="start" gap={0}>
@@ -46,47 +139,67 @@ export function TraceIngestSection() {
       </VStack>
 
       <SimpleGrid columns={{ base: 1, md: 2, lg: 4 }} gap={3}>
-        <PlaceholderInstallTile
-          slug="claude_code"
-          label="Claude Code"
-          subtitle="Anthropic Claude Code CLI"
-          icon={<Bot size={20} />}
-        />
-        <PlaceholderInstallTile
-          slug="cursor"
-          label="Cursor"
-          subtitle="Cursor IDE telemetry"
-          icon={<MousePointer2 size={20} />}
-        />
-        <PlaceholderInstallTile
-          slug="claude_cowork"
-          label="Claude cowork"
-          subtitle="Multi-agent Claude sessions"
-          icon={<Users size={20} />}
-        />
+        {TEMPLATE_METADATA.map((t) => (
+          <InstallTile
+            key={t.slug}
+            slug={t.slug}
+            label={t.displayName}
+            subtitle={t.subtitle}
+            icon={t.icon}
+            installed={!!installResults[t.slug]}
+            onClick={() => {
+              setOpenSlug(t.slug);
+              if (!installResults[t.slug] && !installing[t.slug]) {
+                void handleInstall(t.slug);
+              }
+            }}
+          />
+        ))}
         <RawOtlpAdvancedTile />
       </SimpleGrid>
+
+      {openTemplate && (
+        <IngestionTemplateInstallDrawer
+          open={!!openSlug}
+          onOpenChange={(next) => handleOpenChange(openTemplate.slug, next)}
+          template={openTemplate}
+          installResult={installResults[openTemplate.slug] ?? null}
+          isInstalling={!!installing[openTemplate.slug]}
+          installError={installErrors[openTemplate.slug] ?? null}
+          onInstall={() => void handleInstall(openTemplate.slug)}
+          onMarkInstalled={handleMarkInstalled}
+        />
+      )}
     </VStack>
   );
 }
 
-function PlaceholderInstallTile({
+function InstallTile({
   slug,
   label,
   subtitle,
   icon,
+  installed,
+  onClick,
 }: {
   slug: string;
   label: string;
   subtitle: string;
   icon: ReactNode;
+  installed: boolean;
+  onClick: () => void;
 }) {
   return (
     <Box
+      as="button"
+      type="button"
+      onClick={onClick}
       borderWidth="1px"
-      borderColor="border.muted"
+      borderColor={installed ? "green.300" : "border.muted"}
       borderRadius="md"
       padding={3}
+      textAlign="left"
+      _hover={{ borderColor: "border.emphasized", cursor: "pointer" }}
       data-tile-slug={slug}
     >
       <HStack alignItems="start" gap={3}>
@@ -109,9 +222,15 @@ function PlaceholderInstallTile({
               {label}
             </Text>
             <Spacer />
-            <Badge size="xs" variant="surface" colorPalette="gray">
-              Soon
-            </Badge>
+            {installed ? (
+              <Badge size="xs" variant="surface" colorPalette="green">
+                <Check size={10} /> Installed
+              </Badge>
+            ) : (
+              <Badge size="xs" variant="surface" colorPalette="gray">
+                Connect
+              </Badge>
+            )}
           </HStack>
           <Text fontSize="xs" color="fg.muted" lineClamp={2}>
             {subtitle}
