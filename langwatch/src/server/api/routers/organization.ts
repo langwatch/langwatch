@@ -210,6 +210,27 @@ export const organizationRouter = createTRPCRouter({
             b.scopeType === RoleBindingScopeType.ORGANIZATION &&
             b.role === TeamUserRole.ADMIN,
         );
+        // RoleBinding(scope=ORGANIZATION, role=ADMIN) is authoritative when present:
+        // promote the user's exposed role so the frontend hook
+        // `useOrganizationTeamProject().organizationRole` and downstream guards
+        // (`withPermissionGuard("organization:manage")`) honor it. Without this,
+        // a stale `OrganizationUser.role=MEMBER` row shadows a fresh ADMIN
+        // RoleBinding, gating the admin out of /governance + /settings/governance/*.
+        // Backend RBAC paths already honor RoleBindings (`resolveOrganizationPermission`,
+        // `requirePatPermission`); this closes the page-guard / SSR-only drift.
+        if (isOrgAdminViaBinding) {
+          if (organization.members[0]) {
+            organization.members[0].role = OrganizationUserRole.ADMIN;
+          } else {
+            organization.members = [
+              {
+                userId,
+                organizationId: organization.id,
+                role: OrganizationUserRole.ADMIN,
+              } as (typeof organization.members)[number],
+            ];
+          }
+        }
         const isExternal =
           !isOrgAdminViaBinding &&
           organization.members[0]?.role !== "ADMIN" &&
