@@ -870,18 +870,17 @@ function ExternalToolFields({
               const value = toolPresetAsset(kind);
               const selected = iconAsset === value;
               return (
-                <Box
+                <Button
                   key={kind}
-                  as="button"
                   type="button"
+                  variant="outline"
                   onClick={() => onIconAssetChange(value)}
-                  borderWidth="1px"
                   borderColor={selected ? "blue.500" : "border.muted"}
                   backgroundColor={selected ? "blue.50" : "transparent"}
                   borderRadius="sm"
                   paddingX={3}
                   paddingY={2}
-                  cursor="pointer"
+                  height="auto"
                   display="flex"
                   alignItems="center"
                   gap={2}
@@ -890,7 +889,7 @@ function ExternalToolFields({
                 >
                   <Icon size={18} />
                   <Text fontSize="xs">{preset.label}</Text>
-                </Box>
+                </Button>
               );
             })}
           </HStack>
