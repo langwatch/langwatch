@@ -141,7 +141,9 @@ The PAT setup pattern in this file (PersonalAccessToken + RoleBinding(user, ADMI
 
 **No-bypass invariant (CI-enforced)** — `langwatch/ee/governance/repositories/__tests__/no-bypass.unit.test.ts`. 3 tests (Lane B-7 at `94c219035`) statically reject any future PR that adds a direct `prisma.ingestionTemplate.*` or `prisma.userIngestionBinding.*` call outside the allowlist. Locks the umbrella spec's `@no-bypass` invariant in CI so the repository-pattern boundary won't silently drift.
 
-**MCP audit-uniform regression** — `langwatch/src/mcp/__tests__/governance-tools.audit-uniform.integration.test.ts`. 3 cases (Lane B-MCP audit at `66fd35162`) prove the Path B contract end-to-end: `governance_ingestion_templates_create` and `governance_user_ingestion_bindings_install` both stamp `metadata.surface === "mcp"` against real Postgres, and the `AUTH_REQUIRED:` negative case stays closed (write tool with no `callerUserId` fails before any audit row is written). Pairs with Sergey's forthcoming Ask B-8 cross-surface comparison (trpc/hono/mcp shape equality) for the umbrella spec's `@audit-uniform` invariant.
+**MCP audit-uniform regression** — `langwatch/src/mcp/__tests__/governance-tools.audit-uniform.integration.test.ts`. 3 cases (Lane B-MCP audit at `66fd35162`) prove the Path B contract end-to-end: `governance_ingestion_templates_create` and `governance_user_ingestion_bindings_install` both stamp `metadata.surface === "mcp"` against real Postgres, and the `AUTH_REQUIRED:` negative case stays closed (write tool with no `callerUserId` fails before any audit row is written).
+
+**Cross-surface audit-uniformity regression** — `langwatch/ee/governance/services/__tests__/auditSurface.crossSurface.integration.test.ts`. Invokes `createOrgTemplate` via tRPC, Hono, and MCP service-direct in one test (Lane B-8 at `d96cd4300`); asserts the three audit rows have **identical** payload shape — same `action`, same `targetKind`, same `organizationId`, same metadata-key-set — with only `metadata.surface` varying (`"trpc"` / `"hono"` / `"mcp"`). Slug regex format identical, no default-fallback leakage. CLI is a placeholder anchor in this file; lands as a 4th case once Lane-B's scaffold ships. Pairs with the MCP audit-uniform regression above to pin the umbrella spec's `@audit-uniform` invariant exhaustively.
 
 To run locally:
 
@@ -150,6 +152,7 @@ cd langwatch
 pnpm test:integration governance-rest-api.integration.test.ts
 pnpm test:integration governance-bindings-rest-api.integration.test.ts
 pnpm test:integration governance-tools.audit-uniform.integration.test.ts
+pnpm test:integration auditSurface.crossSurface.integration.test.ts
 pnpm test:unit no-bypass.unit.test.ts
 ```
 
