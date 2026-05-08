@@ -4,9 +4,11 @@ description: An MCP server exposing every governance resource × verb as a tool 
 sidebarTitle: MCP server
 ---
 
-<Info>**Pairs with:** [Governance REST API](/ai-governance/api) (the MCP tools are a thin shell over it; both call the same service-layer functions) and [Governance CLI](/ai-governance/cli) (same surface for shell invocation). Distinct from LangWatch's general MCP server — this is a governance-namespaced toolset specifically for setting up and querying governance state.</Info>
+<Info>**Pairs with:** [Governance REST API](/ai-governance/api) and [Governance CLI](/ai-governance/cli) — all three surfaces dispatch through the same service-layer functions, with audit emission tagged `metadata.surface = "trpc" | "hono" | "cli" | "mcp"` for incident response. Distinct from LangWatch's general MCP server — this is a governance-namespaced toolset specifically for setting up and querying governance state.</Info>
 
-<Note>**RBAC enforced at the tool layer.** Per `specs/ai-gateway/governance/governance-api-cli-mcp-coverage.feature`, every MCP tool call resolves the caller's apiKey to its RBAC scopes and rejects with `FORBIDDEN` if the scope is missing. No tool can bypass the service-layer or the multitenancy middleware — the same defense-in-depth that protects the REST API protects the MCP surface.</Note>
+<Note>**Architecture: in-process service calls (not HTTP-shell over REST).** Governance MCP tools register in `langwatch/src/mcp/handler.ts` via `registerGovernanceMcpTools(server, prisma)` and call the governance services (`IngestionTemplateService`, `UserIngestionBindingService`, etc.) directly with `surface: "mcp"`. They do NOT route through `/api/governance/*` over HTTP. Reason: it avoids the project-API-key vs PAT auth mismatch and matches Sergey's explicit `GovernanceCallSurface` contract at `fc6d54100` without needing Hono middleware changes. Cross-path uniformity (audit, RBAC, multitenancy) still holds by construction — the service layer is the single source of truth, and `metadata.surface` distinguishes the entrypoint.</Note>
+
+<Note>**RBAC enforced at the tool layer.** Per `specs/ai-gateway/governance/governance-api-cli-mcp-coverage.feature`, every MCP tool call resolves the caller's apiKey to its RBAC scopes and rejects with `FORBIDDEN` if the scope is missing. No tool can bypass the service-layer or the multitenancy middleware — the same defense-in-depth that protects the REST API protects the MCP surface, even though MCP doesn't go through the REST surface.</Note>
 
 ## Why an MCP server for governance
 
@@ -81,6 +83,11 @@ If an agent connects with a narrowly-scoped apiKey (e.g. `governance:read` only)
 ```
 
 No record is created. No audit row is emitted (failed calls are not state-changes by design). The agent's harness can decide whether to ask the human for a more-privileged apiKey or back off.
+
+The Path B mechanics (per `fc6d54100` + Sergey's MCP guidance):
+
+- **RBAC check happens at the MCP tool layer**, BEFORE the service call — the tool mirrors `checkOrganizationPermission` from `langwatch/src/server/api/rbac.ts` against the apiKey's scopes and returns `FORBIDDEN` early if the required permission is missing. Services trust the surface — they do not gate on the MCP-resolved scope a second time. This split is intentional: the MCP tool owns the RBAC contract for its surface; the service owns the multitenancy + business-logic contract.
+- **`callerUserId` flows from the authenticated user** — for `UserIngestionBindingService.{install, uninstall, rotateToken}` (which need a real human caller), the MCP handler's authenticated user id is passed through as `callerUserId`. For `IngestionTemplateService` authoring methods (which take `callerUserId` only for the audit trail), same pattern.
 
 ## Audit emission
 
