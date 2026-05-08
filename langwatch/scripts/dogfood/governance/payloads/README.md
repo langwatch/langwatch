@@ -15,7 +15,7 @@ payloads/
 ├── raw_otlp_advanced.json               (no-template fallback shape)
 └── forge-attempt/
     ├── attribution.json                 (claims B6 16-key attribution keys)
-    └── provenance.json                  (claims template.id + binding.id + langwatch.source)
+    └── provenance.json                  (claims 5-key provenance: template.id + binding.id + source + origin + organization_id)
 ```
 
 Each `<slug>.json` is a complete OTLP/HTTP traces request body matching
@@ -95,10 +95,14 @@ Two categories cover the v1 closed list:
   (`langwatch.user.id`, `langwatch.team.id`, `langwatch.organization.id`,
   `langwatch.project.id`, `langwatch.tenant_id`, etc.). Receiver MUST
   re-stamp all 16 to the binding's authoritative principal.
-- `provenance.json` — claims values for the 3-key provenance set
+- `provenance.json` — claims values for the 5-key provenance set
   (`langwatch.template.id`, `langwatch.user_ingestion_binding.id`,
-  `langwatch.source`). Receiver MUST re-stamp all 3 to match the
-  resolving binding's actual identity.
+  `langwatch.source`, `langwatch.origin`, `langwatch.organization_id`).
+  Receiver MUST re-stamp all 5 to match the resolving binding's actual
+  identity. Forging `langwatch.origin` or `langwatch.organization_id`
+  could otherwise subvert the no-spy / strip-IO governance gate
+  (`GovernanceContentStripService.governanceTargetOrgId` discriminator —
+  gap #5 from the ralph-loop audit, closed at sergey 3a2ab641e).
 
 For QA convenience, the wrapper's `--forge-tenant-id <id>` flag injects
 `langwatch.tenant_id` into the resource attributes orthogonally to the
