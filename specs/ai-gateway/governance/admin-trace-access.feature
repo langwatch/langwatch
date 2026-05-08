@@ -146,7 +146,11 @@ Feature: Admin trace access — bird's-eye drill-in with persistent 'viewing as'
         impersonating-context server-side check fires)
     Then exactly one OCSF audit-log row is emitted per impersonating-
         context entry (NOT per page render — a single drill-in is
-        one entry, not a stream)
+        one entry, not a stream; implemented via Sergey's
+        `AdminWorkspaceViewAuditService` (`24fb3dc44`) idempotent
+        within a 5-min window per `(admin, target, kind)`, so the
+        Lane-B `useEffect`-based emission can fire on every page
+        paint without flooding the audit log)
     And the row shape is:
       | field         | value                                                          |
       | category      | "user_account"                                                 |
@@ -177,6 +181,35 @@ Feature: Admin trace access — bird's-eye drill-in with persistent 'viewing as'
   # ---------------------------------------------------------------------------
   # NO bypass surface — SOC2/ISO27001 load-bearing invariant
   # ---------------------------------------------------------------------------
+
+  @bdd @audit @admin-trace-access @regression @idempotent
+  Scenario: Audit emission is idempotent within a 5-min window per (admin, target, kind)
+    Given carol drills into ariana's Personal Workspace at T=0
+    And the AdminWorkspaceViewAuditService writes one audit-log row
+    When carol's page re-paints, refreshes, navigates within the same
+        impersonating context, OR re-enters the same context within
+        5 minutes
+    Then NO new audit-log row is written within the 5-min window
+    And exactly one row total exists for the (carol, ariana,
+        personal_workspace) tuple over the window
+    When carol re-enters the context AFTER the 5-min window has elapsed
+    Then a new audit-log row is written (the cool-down is a per-tuple
+        rolling window, not a once-per-session-ever)
+    And the dedup is implementation of the 'one row per
+        impersonating-context entry' invariant — Lane-B can safely
+        drive emission from a `useEffect` keyed on
+        (project.id, adminViewingAs flag) per Sergey's hook-point
+        suggestion without flooding the audit log
+
+  @bdd @audit @admin-trace-access @no-bypass @regression
+  Scenario: Self-view short-circuit — no audit row for own-workspace or team-member view
+    Given carol is viewing her own personal workspace
+    Or carol is viewing a team workspace where carol IS a TeamUser member
+    When the AdminWorkspaceViewAuditService is called
+    Then NO audit-log row is written (self-view + member-view are not
+        impersonating contexts; emitting rows there would be noise)
+    And the service short-circuit returns `recorded=false` for the
+        caller's confirmation
 
   @bdd @audit @admin-trace-access @no-bypass
   Scenario: Admin reads of user-scoped data ALWAYS fire the audit-log
