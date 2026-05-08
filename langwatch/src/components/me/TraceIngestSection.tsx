@@ -77,9 +77,10 @@ export function TraceIngestSection() {
     { organizationId: orgId },
     { enabled: !!orgId, refetchOnWindowFocus: false },
   );
-  const bindingsQuery = api.userIngestionBindings.list.useQuery(undefined, {
-    refetchOnWindowFocus: false,
-  });
+  const bindingsQuery = api.userIngestionBindings.list.useQuery(
+    { organizationId: orgId },
+    { enabled: !!orgId, refetchOnWindowFocus: false },
+  );
 
   const utils = api.useUtils();
   const installMutation = api.userIngestionBindings.install.useMutation({
@@ -116,7 +117,10 @@ export function TraceIngestSection() {
 
   const handleInstall = async (templateId: string, slug: string) => {
     try {
-      const result = await installMutation.mutateAsync({ templateId });
+      const result = await installMutation.mutateAsync({
+        organizationId: orgId,
+        templateId,
+      });
       setInstallResults((s) => ({
         ...s,
         [slug]: { token: result.token, endpoint: otlpEndpoint },

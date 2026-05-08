@@ -14,6 +14,7 @@ import { NotFoundScene } from "~/components/NotFoundScene";
 import { AiToolEntryDrawer } from "~/components/settings/governance/AiToolEntryDrawer";
 import { IngestionTemplatesEditor } from "~/components/settings/governance/IngestionTemplatesEditor";
 import { ToolCatalogEditor } from "~/components/settings/governance/ToolCatalogEditor";
+import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { useFeatureFlag } from "~/hooks/useFeatureFlag";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 
@@ -29,7 +30,7 @@ import type { AiToolEntry } from "~/components/me/tiles/types";
  *     IngestionTemplate rows. Admin sees what's shipped + 'View OTTL' for
  *     transparency. No edit/disable/fork v1; admin authoring lands v2.
  */
-export default function ToolCatalogPage() {
+function ToolCatalogPage() {
   const { project, organization } = useOrganizationTeamProject({
     redirectToOnboarding: false,
     redirectToProjectOnboarding: false,
@@ -109,3 +110,7 @@ export default function ToolCatalogPage() {
     </GovernanceLayout>
   );
 }
+
+export default withPermissionGuard("organization:manage", {
+  bypassOnboardingRedirect: true,
+})(ToolCatalogPage);
