@@ -7,17 +7,19 @@
  *   "ALL THREE rows have IDENTICAL payload shapes apart from the
  *    surface field"
  *
- * Exercises createOrgTemplate via THREE entrypoints in the same test:
+ * Exercises createOrgTemplate via FOUR entrypoints in the same test:
  *   1. tRPC pass-through (service-direct call with surface="trpc",
  *      mirroring what ee/governance/routers/ingestionTemplates.ts does)
  *   2. Hono REST (real HTTP request to POST /api/governance/ingestion-templates)
  *   3. MCP service-direct (mimicking what src/mcp/governance-tools.ts
  *      `registerGovernanceMcpTools` invokes; service trusts the surface)
+ *   4. CLI (real HTTP request with `X-LangWatch-Surface: cli` header,
+ *      matching what `langwatch governance ingestion-templates create`
+ *      sends per Alexis's CLI scaffold at ed51b0ea1; the resolver in
+ *      app.ts maps the header → surface="cli" before the service call)
  *
- * Then asserts that the three audit rows are identical apart from
- * metadata.surface. CLI is the fourth surface — gated on Lane-B
- * `langwatch governance` shipping; will fold into this test as a
- * fourth case once that lands.
+ * Then asserts that the four audit rows are identical apart from
+ * metadata.surface.
  *
  * Spec: specs/ai-gateway/governance/governance-api-cli-mcp-coverage.feature
  *       (@bdd @governance-api @audit-uniform)
@@ -160,7 +162,7 @@ describe("Audit uniformity: identical payload shape across all governance surfac
     orgIds.length = 0;
   });
 
-  it("audit rows from tRPC + Hono + MCP entrypoints share an identical shape apart from metadata.surface", async () => {
+  it("audit rows from tRPC + Hono + CLI + MCP entrypoints share an identical shape apart from metadata.surface", async () => {
     const service = IngestionTemplateService.create(prisma);
 
     // 1. tRPC pass-through — mirrors ee/governance/routers/ingestionTemplates.ts
@@ -219,8 +221,38 @@ describe("Audit uniformity: identical payload shape across all governance surfac
     });
     templateIds.push(mcpRow.id);
 
-    // Fetch the three audit rows. Order by id is unreliable (cuid +
-    // timestamps); fetch ALL three by templateId then index by surface.
+    // 4. CLI — real HTTP request through the same Hono app, but with
+    //    `X-LangWatch-Surface: cli` so resolveSurfaceFromRequest in the
+    //    route handler maps it to surface="cli". Mirrors what the
+    //    `langwatch governance ingestion-templates create` command
+    //    sends per Alexis's CLI scaffold at ed51b0ea1. In-process
+    //    spoofing of trpc/mcp via this header is BLOCKED by the
+    //    enum filter — only "cli" is honored over the wire.
+    const cliRes = await governanceApp.request(
+      "/api/governance/ingestion-templates",
+      {
+        method: "POST",
+        headers: {
+          "X-Auth-Token": testProject.apiKey,
+          "X-LangWatch-Surface": "cli",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          source_type: SHARED_INPUT.sourceType,
+          display_name: SHARED_INPUT.displayName,
+          description: SHARED_INPUT.description,
+          ottl_rules: SHARED_INPUT.ottlRules,
+        }),
+      },
+    );
+    expect(cliRes.status).toBe(201);
+    const cliBody = (await cliRes.json()) as {
+      ingestion_template: { id: string };
+    };
+    templateIds.push(cliBody.ingestion_template.id);
+
+    // Fetch the four audit rows. Order by id is unreliable (cuid +
+    // timestamps); fetch ALL four by templateId then index by surface.
     const auditRows = await prisma.auditLog.findMany({
       where: {
         organizationId: testOrg.id,
@@ -228,21 +260,26 @@ describe("Audit uniformity: identical payload shape across all governance surfac
         targetId: { in: templateIds },
       },
     });
-    expect(auditRows).toHaveLength(3);
+    expect(auditRows).toHaveLength(4);
 
     const bySurface: Record<string, (typeof auditRows)[number]> = {};
     for (const row of auditRows) {
       const md = row.metadata as { surface?: string } | null;
       if (md?.surface) bySurface[md.surface] = row;
     }
-    expect(Object.keys(bySurface).sort()).toEqual(["hono", "mcp", "trpc"]);
+    expect(Object.keys(bySurface).sort()).toEqual([
+      "cli",
+      "hono",
+      "mcp",
+      "trpc",
+    ]);
 
     // Per umbrella spec @audit-uniform: identical payload shapes apart
     // from the surface field. We compare:
     //   - action / targetKind (resource taxonomy)
     //   - metadata KEYS minus 'surface' (payload shape)
     //   - metadata VALUES on the shared keys (slug+sourceType+displayName)
-    for (const surface of ["trpc", "hono", "mcp"] as const) {
+    for (const surface of ["trpc", "hono", "cli", "mcp"] as const) {
       const row = bySurface[surface];
       if (!row) throw new Error(`audit row missing for surface=${surface}`);
       expect(row.action).toBe("gateway.ingestion_template.created");
@@ -260,7 +297,7 @@ describe("Audit uniformity: identical payload shape across all governance surfac
       expect(md?.sourceType).toBe(SHARED_INPUT.sourceType);
       expect(md?.displayName).toBe(SHARED_INPUT.displayName);
       // Slug is server-generated with a random suffix per row, so the
-      // exact string differs across the three calls; format is locked.
+      // exact string differs across the four calls; format is locked.
       expect(typeof md?.slug).toBe("string");
       expect(md?.slug).toMatch(/^cross_surface_uniform_[a-z0-9]{6}$/);
     }
@@ -269,10 +306,66 @@ describe("Audit uniformity: identical payload shape across all governance surfac
     // surface, no leakage / no default fallback fired by accident.
     const trpcMd = bySurface.trpc?.metadata as { surface?: string } | null;
     const honoMd = bySurface.hono?.metadata as { surface?: string } | null;
+    const cliMd = bySurface.cli?.metadata as { surface?: string } | null;
     const mcpMd = bySurface.mcp?.metadata as { surface?: string } | null;
     expect(trpcMd?.surface).toBe("trpc");
     expect(honoMd?.surface).toBe("hono");
+    expect(cliMd?.surface).toBe("cli");
     expect(mcpMd?.surface).toBe("mcp");
+  });
+
+  it("rejects in-process surface spoofing via X-LangWatch-Surface (only 'cli' is honored over the wire)", async () => {
+    // resolveSurfaceFromRequest in app.ts maps "cli" → "cli" but maps
+    // "trpc" / "mcp" / anything else → "hono". Locks the defense
+    // against an external HTTP caller forging an in-process surface
+    // tag to confuse forensic readers.
+    const service = IngestionTemplateService.create(prisma);
+    const inputBase = {
+      organizationId: testOrg.id,
+      callerUserId: testUser.id,
+      sourceType: SHARED_INPUT.sourceType,
+      displayName: `Spoof Probe ${nanoid(6)}`,
+      ottlRules: SHARED_INPUT.ottlRules,
+    } as const;
+
+    for (const spoofValue of ["trpc", "mcp", "evil"] as const) {
+      const res = await governanceApp.request(
+        "/api/governance/ingestion-templates",
+        {
+          method: "POST",
+          headers: {
+            "X-Auth-Token": testProject.apiKey,
+            "X-LangWatch-Surface": spoofValue,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            source_type: inputBase.sourceType,
+            display_name: `${inputBase.displayName}-${spoofValue}`,
+            ottl_rules: inputBase.ottlRules,
+          }),
+        },
+      );
+      expect(res.status).toBe(201);
+      const body = (await res.json()) as {
+        ingestion_template: { id: string };
+      };
+      templateIds.push(body.ingestion_template.id);
+      const audit = await prisma.auditLog.findFirst({
+        where: {
+          organizationId: testOrg.id,
+          action: "gateway.ingestion_template.created",
+          targetId: body.ingestion_template.id,
+        },
+      });
+      const md = audit?.metadata as { surface?: string } | null;
+      // Spoofed value is rejected; row falls back to "hono".
+      expect(md?.surface).toBe("hono");
+    }
+
+    // Reference the unused service binding so future scope changes
+    // (e.g. asserting a parallel non-Hono spoof attempt) have a
+    // pre-wired entrypoint.
+    expect(service).toBeDefined();
   });
 
   it("the CLI surface case is staged for fold once Lane-B `langwatch governance` ships", () => {

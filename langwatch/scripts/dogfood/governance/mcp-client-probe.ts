@@ -73,8 +73,11 @@ void (async () => {
     name: "governance_ingestion_templates_list",
     arguments: {},
   });
-  const listText = listResult.content
-    .map((c: any) => (c.type === "text" ? c.text : ""))
+  const listText = ((listResult.content ?? []) as Array<{
+    type: string;
+    text?: string;
+  }>)
+    .map((c) => (c.type === "text" ? c.text ?? "" : ""))
     .join("\n");
   console.log(listText.slice(0, 800));
 
@@ -88,8 +91,11 @@ void (async () => {
       ottl_rules: "",
     },
   });
-  const createText = createResult.content
-    .map((c: any) => (c.type === "text" ? c.text : ""))
+  const createText = ((createResult.content ?? []) as Array<{
+    type: string;
+    text?: string;
+  }>)
+    .map((c) => (c.type === "text" ? c.text ?? "" : ""))
     .join("\n");
   console.log(createText.slice(0, 400));
   if (!createText.startsWith("AUTH_REQUIRED")) {
