@@ -360,6 +360,7 @@ app.post("/traces", async (c) => {
           bindingId: resolved.bindingId,
           templateId: resolved.templateId,
           templateSlug: resolved.templateSlug,
+          organizationId: resolved.organizationId,
         });
       }
 
@@ -445,6 +446,7 @@ app.post("/logs", async (c) => {
           bindingId: resolved.bindingId,
           templateId: resolved.templateId,
           templateSlug: resolved.templateSlug,
+          organizationId: resolved.organizationId,
         });
       }
 

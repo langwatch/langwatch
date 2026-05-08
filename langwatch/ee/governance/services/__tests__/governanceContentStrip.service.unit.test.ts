@@ -121,17 +121,38 @@ describe("GovernanceContentStripService.governanceTargetOrgId", () => {
     });
   });
 
-  describe("when origin is not 'gateway'", () => {
-    it("returns null (customer-app traces are not subject to the policy)", () => {
+  describe("when origin is 'binding' and organization_id is set", () => {
+    // Closes ralph-loop gap #5 — UserIngestionBinding-routed traces
+    // (lwub_*) need to participate in the org's no-spy / strip-IO policy.
+    // See bindingProvenance.utils.ts:BINDING_ORIGIN_VALUE.
+    it("returns the organization id (binding traces are subject to the policy)", () => {
+      const orgId = GovernanceContentStripService.governanceTargetOrgId({
+        "langwatch.origin": "binding",
+        "langwatch.organization_id": "org-acme",
+      });
+      expect(orgId).toBe("org-acme");
+    });
+  });
+
+  describe("when origin is not in the governed-origins set", () => {
+    it("returns null for customer-app traces (out of scope by design)", () => {
       const orgId = GovernanceContentStripService.governanceTargetOrgId({
         "langwatch.origin": "application",
         "langwatch.organization_id": "org-acme",
       });
       expect(orgId).toBeNull();
     });
+
+    it("returns null for an unknown origin string", () => {
+      const orgId = GovernanceContentStripService.governanceTargetOrgId({
+        "langwatch.origin": "fake-origin",
+        "langwatch.organization_id": "org-acme",
+      });
+      expect(orgId).toBeNull();
+    });
   });
 
-  describe("when origin is 'gateway' but organization_id is missing", () => {
+  describe("when origin is governed but organization_id is missing", () => {
     it("returns null (cannot apply policy without an org binding)", () => {
       const orgId = GovernanceContentStripService.governanceTargetOrgId({
         "langwatch.origin": "gateway",

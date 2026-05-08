@@ -10,7 +10,10 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  BINDING_ORIGIN_VALUE,
   PROVENANCE_ATTR_BINDING_ID,
+  PROVENANCE_ATTR_ORGANIZATION_ID,
+  PROVENANCE_ATTR_ORIGIN,
   PROVENANCE_ATTR_SOURCE,
   PROVENANCE_ATTR_TEMPLATE_ID,
   stampBindingProvenanceOnLogRequest,
@@ -21,6 +24,7 @@ const PROVENANCE = {
   bindingId: "uib-123",
   templateId: "tmpl-456",
   templateSlug: "claude_code",
+  organizationId: "org-789",
 };
 
 function findAttr(
@@ -42,7 +46,7 @@ describe("stampBindingProvenanceOnTraceRequest", () => {
   });
 
   describe("when the request has a resource without attributes", () => {
-    it("creates the attributes array and stamps all 3 keys", () => {
+    it("creates the attributes array and stamps all 5 keys (provenance + no-spy gate)", () => {
       const req: any = { resourceSpans: [{ resource: {} }] };
       const stamped = stampBindingProvenanceOnTraceRequest(req, PROVENANCE);
       expect(stamped).toBe(1);
@@ -50,6 +54,11 @@ describe("stampBindingProvenanceOnTraceRequest", () => {
       expect(findAttr(attrs, PROVENANCE_ATTR_TEMPLATE_ID)).toBe("tmpl-456");
       expect(findAttr(attrs, PROVENANCE_ATTR_BINDING_ID)).toBe("uib-123");
       expect(findAttr(attrs, PROVENANCE_ATTR_SOURCE)).toBe("claude_code");
+      // Closes ralph-loop gap #5 — these two stamps make the strip
+      // pipeline's governanceTargetOrgId() succeed, so binding-routed
+      // traces respect the org's no-spy / strip-IO policy.
+      expect(findAttr(attrs, PROVENANCE_ATTR_ORIGIN)).toBe(BINDING_ORIGIN_VALUE);
+      expect(findAttr(attrs, PROVENANCE_ATTR_ORGANIZATION_ID)).toBe("org-789");
     });
   });
 
@@ -69,6 +78,16 @@ describe("stampBindingProvenanceOnTraceRequest", () => {
                   key: PROVENANCE_ATTR_SOURCE,
                   value: { stringValue: "evil-source" },
                 },
+                // Forge attempt on the no-spy gate — claims a different
+                // org so the strip pipeline picks up the wrong policy.
+                {
+                  key: PROVENANCE_ATTR_ORGANIZATION_ID,
+                  value: { stringValue: "evil-org" },
+                },
+                {
+                  key: PROVENANCE_ATTR_ORIGIN,
+                  value: { stringValue: "fake-origin" },
+                },
               ],
             },
           },
@@ -76,16 +95,24 @@ describe("stampBindingProvenanceOnTraceRequest", () => {
       };
       stampBindingProvenanceOnTraceRequest(req, PROVENANCE);
       const attrs = req.resourceSpans[0].resource.attributes;
-      // Receiver-stamped values win.
+      // Receiver-stamped values win across all 5 keys.
       expect(findAttr(attrs, PROVENANCE_ATTR_TEMPLATE_ID)).toBe("tmpl-456");
       expect(findAttr(attrs, PROVENANCE_ATTR_SOURCE)).toBe("claude_code");
+      expect(findAttr(attrs, PROVENANCE_ATTR_ORGANIZATION_ID)).toBe("org-789");
+      expect(findAttr(attrs, PROVENANCE_ATTR_ORIGIN)).toBe(BINDING_ORIGIN_VALUE);
       // Non-protected attrs are preserved.
       expect(findAttr(attrs, "service.name")).toBe("my-service");
       // No duplicate provenance keys.
-      const templateIdCount = attrs.filter(
-        (a: any) => a.key === PROVENANCE_ATTR_TEMPLATE_ID,
-      ).length;
-      expect(templateIdCount).toBe(1);
+      for (const key of [
+        PROVENANCE_ATTR_TEMPLATE_ID,
+        PROVENANCE_ATTR_BINDING_ID,
+        PROVENANCE_ATTR_SOURCE,
+        PROVENANCE_ATTR_ORIGIN,
+        PROVENANCE_ATTR_ORGANIZATION_ID,
+      ]) {
+        const count = attrs.filter((a: any) => a.key === key).length;
+        expect(count).toBe(1);
+      }
     });
   });
 
@@ -111,7 +138,7 @@ describe("stampBindingProvenanceOnTraceRequest", () => {
 
 describe("stampBindingProvenanceOnLogRequest", () => {
   describe("when the request has resourceLogs entries", () => {
-    it("stamps all 3 provenance keys onto each resource", () => {
+    it("stamps all 5 provenance keys onto each resource", () => {
       const req: any = {
         resourceLogs: [
           { resource: { attributes: [{ key: "host.name", value: { stringValue: "h1" } }] } },
@@ -123,6 +150,8 @@ describe("stampBindingProvenanceOnLogRequest", () => {
       expect(findAttr(attrs, PROVENANCE_ATTR_TEMPLATE_ID)).toBe("tmpl-456");
       expect(findAttr(attrs, PROVENANCE_ATTR_BINDING_ID)).toBe("uib-123");
       expect(findAttr(attrs, PROVENANCE_ATTR_SOURCE)).toBe("claude_code");
+      expect(findAttr(attrs, PROVENANCE_ATTR_ORIGIN)).toBe(BINDING_ORIGIN_VALUE);
+      expect(findAttr(attrs, PROVENANCE_ATTR_ORGANIZATION_ID)).toBe("org-789");
       expect(findAttr(attrs, "host.name")).toBe("h1");
     });
   });

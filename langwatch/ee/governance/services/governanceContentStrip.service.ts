@@ -47,6 +47,24 @@ const MODE_VALUES: readonly GovernanceLogContentMode[] = [
 const ORG_MODE_CACHE_TTL_MS = 30_000;
 
 const GATEWAY_ORIGIN_VALUE = "gateway";
+
+/**
+ * Origins subject to the org content-strip policy. Adding a new origin
+ * here opts that ingest path into no-spy honoring; entries omitted from
+ * the set bypass the policy (intentional for customer-owned trace flows
+ * like the gateway customertracebridge and direct-OTLP from customer
+ * apps).
+ *
+ * `gateway` — LangWatch AI Gateway proxy traces (the original v1 surface)
+ * `binding`  — UserIngestionBinding-routed personal-project traces
+ *              (closes ralph-loop gap #5; matches BINDING_ORIGIN_VALUE
+ *              in bindingProvenance.utils.ts)
+ */
+const BINDING_ORIGIN_VALUE = "binding";
+const GOVERNED_ORIGINS = new Set<string>([
+  GATEWAY_ORIGIN_VALUE,
+  BINDING_ORIGIN_VALUE,
+]);
 const ORG_ID_ATTR = "langwatch.organization_id";
 const ORIGIN_ATTR = "langwatch.origin";
 
@@ -246,7 +264,8 @@ export class GovernanceContentStripService {
   static governanceTargetOrgId(
     spanAttributes: Record<string, unknown>,
   ): string | null {
-    if (spanAttributes[ORIGIN_ATTR] !== GATEWAY_ORIGIN_VALUE) return null;
+    const origin = spanAttributes[ORIGIN_ATTR];
+    if (typeof origin !== "string" || !GOVERNED_ORIGINS.has(origin)) return null;
     const orgId = spanAttributes[ORG_ID_ATTR];
     if (typeof orgId !== "string" || orgId.length === 0) return null;
     return orgId;

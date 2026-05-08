@@ -3,43 +3,66 @@
 /**
  * Receiver-side provenance stamping for traces landed via a
  * UserIngestionBinding. The receiver mutates the parsed OTLP request
- * in-place to overwrite three resource attributes on every resource:
+ * in-place to overwrite five resource attributes on every resource:
  *
- *   - langwatch.template.id              (binding.templateId)
+ *   - langwatch.template.id                (binding.templateId)
  *   - langwatch.user_ingestion_binding.id  (binding.id)
- *   - langwatch.source                   (template.slug — drives /me/traces filter)
+ *   - langwatch.source                     (template.slug — drives /me/traces filter)
+ *   - langwatch.origin                     ("user_ingestion_binding") — feeds the
+ *                                          governance-content-strip pipeline; the
+ *                                          strip service uses this as the
+ *                                          discriminator that no-spy / strip-IO
+ *                                          policy is applicable.
+ *   - langwatch.organization_id            (binding.organizationId) — required by
+ *                                          GovernanceContentStripService.governanceTargetOrgId
+ *                                          to look up the org's content-mode
+ *                                          policy. Without this stamp,
+ *                                          binding-routed traces silently
+ *                                          BYPASS the org's no-spy setting
+ *                                          (compliance hole — gap #5 from the
+ *                                          ralph-loop audit).
  *
- * These are part of the closed `protectedTemplateAttributeKeys` set
- * (19 keys total — see template-ottl-principal-guard.feature). Stamping
- * happens AFTER the auth lookup but BEFORE the spans are forwarded to
- * the collector — even if a malicious upstream payload claimed values
+ * Stamping happens AFTER the auth lookup but BEFORE the spans are forwarded
+ * to the collector — even if a malicious upstream payload claimed values
  * for these keys, the receiver overwrite wins.
- *
- * For v1, OTTL transforms run as part of the upstream tool's exporter
- * (Claude Code / Cursor / claude_cowork are all already gen_ai-compliant)
- * and platform templates ship with empty ottlRules. The post-OTTL guard
- * shape is preserved here so v2 admin-OTTL authoring drops in without a
- * receiver refactor.
  *
  * Spec: specs/ai-gateway/governance/personal-project-ingest-via-template.feature
  *       specs/ai-gateway/governance/template-ottl-principal-guard.feature
+ *       specs/ai-gateway/governance/no-spy-mode.feature (forthcoming, andre)
  */
 
 export interface BindingProvenance {
   bindingId: string;
   templateId: string;
   templateSlug: string;
+  /** Org id of the bound personal project — feeds the no-spy policy lookup. */
+  organizationId: string;
 }
 
 export const PROVENANCE_ATTR_TEMPLATE_ID = "langwatch.template.id" as const;
 export const PROVENANCE_ATTR_BINDING_ID =
   "langwatch.user_ingestion_binding.id" as const;
 export const PROVENANCE_ATTR_SOURCE = "langwatch.source" as const;
+export const PROVENANCE_ATTR_ORIGIN = "langwatch.origin" as const;
+export const PROVENANCE_ATTR_ORGANIZATION_ID =
+  "langwatch.organization_id" as const;
+
+/**
+ * Origin value stamped on binding-routed traces. Mirrors the
+ * GOVERNED_ORIGINS set in GovernanceContentStripService — the strip
+ * service's `governanceTargetOrgId` check accepts this value alongside
+ * `gateway`, so binding-routed traces participate in the org's no-spy /
+ * strip-IO policy. Naming chosen short ('binding') per MO directive +
+ * matching the existing `gateway` literal in the same set.
+ */
+export const BINDING_ORIGIN_VALUE = "binding" as const;
 
 const PROVENANCE_KEYS: readonly string[] = [
   PROVENANCE_ATTR_TEMPLATE_ID,
   PROVENANCE_ATTR_BINDING_ID,
   PROVENANCE_ATTR_SOURCE,
+  PROVENANCE_ATTR_ORIGIN,
+  PROVENANCE_ATTR_ORGANIZATION_ID,
 ];
 
 /**
@@ -80,11 +103,7 @@ export function stampBindingProvenanceOnTraceRequest(
       rs.resource.attributes = [];
     }
     rs.resource.attributes = stripProvenanceKeys(rs.resource.attributes);
-    rs.resource.attributes.push(
-      { key: PROVENANCE_ATTR_TEMPLATE_ID, value: { stringValue: provenance.templateId } },
-      { key: PROVENANCE_ATTR_BINDING_ID, value: { stringValue: provenance.bindingId } },
-      { key: PROVENANCE_ATTR_SOURCE, value: { stringValue: provenance.templateSlug } },
-    );
+    rs.resource.attributes.push(...buildProvenanceAttributes(provenance));
     stamped++;
   }
   return stamped;
@@ -111,14 +130,22 @@ export function stampBindingProvenanceOnLogRequest(
       rl.resource.attributes = [];
     }
     rl.resource.attributes = stripProvenanceKeys(rl.resource.attributes);
-    rl.resource.attributes.push(
-      { key: PROVENANCE_ATTR_TEMPLATE_ID, value: { stringValue: provenance.templateId } },
-      { key: PROVENANCE_ATTR_BINDING_ID, value: { stringValue: provenance.bindingId } },
-      { key: PROVENANCE_ATTR_SOURCE, value: { stringValue: provenance.templateSlug } },
-    );
+    rl.resource.attributes.push(...buildProvenanceAttributes(provenance));
     stamped++;
   }
   return stamped;
+}
+
+function buildProvenanceAttributes(
+  provenance: BindingProvenance,
+): OtlpAttribute[] {
+  return [
+    { key: PROVENANCE_ATTR_TEMPLATE_ID, value: { stringValue: provenance.templateId } },
+    { key: PROVENANCE_ATTR_BINDING_ID, value: { stringValue: provenance.bindingId } },
+    { key: PROVENANCE_ATTR_SOURCE, value: { stringValue: provenance.templateSlug } },
+    { key: PROVENANCE_ATTR_ORIGIN, value: { stringValue: BINDING_ORIGIN_VALUE } },
+    { key: PROVENANCE_ATTR_ORGANIZATION_ID, value: { stringValue: provenance.organizationId } },
+  ];
 }
 
 function stripProvenanceKeys(attrs: OtlpAttribute[]): OtlpAttribute[] {
