@@ -105,6 +105,8 @@ Expected: `ok http://localhost:5560/api/otel/v1/traces — template:<TEMPLATE_SL
 
 If the wrapper returns non-2xx, capture the response body (`--verbose`) and treat as **blocker** — the receiver-side wiring is broken.
 
+**Verify-landing > verify-response.** A 2xx receiver response is necessary but NOT sufficient. The OTLP path can return `200 status + partialSuccess.rejectedSpans=N` which silently drops the span (e.g., timestamp past the SPAN_MAX_PAST_MS cutoff, body schema mismatch, etc.). The wrapper SHOULD surface rejectedSpans loudly when it sees them; if it doesn't, you'll see a clean `ok status=200` for spans that never landed. Always do Step 4 (verify the trace appears at /me/traces) before signing the wrapper response off as success. See `feedback_fixture_wrapper_time_anchor_and_2xx_drop_guard.md`.
+
 ### Step 4 — Trace lands on `/me/traces` with canonical shape
 
 Open `/me/traces` filtered by `langwatch.source = "<TEMPLATE_SLUG>"`. Verify the trace from step 3 appears within 5 seconds.
