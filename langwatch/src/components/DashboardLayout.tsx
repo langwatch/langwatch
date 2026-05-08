@@ -409,7 +409,18 @@ export const DashboardLayout = ({
   }
 
   const isOpsRoute = router.pathname.startsWith("/ops");
-  const isPersonalScopeRoute = personalScope || router.pathname.startsWith("/me");
+  // Personal-project URLs (`/[personalProjectSlug]/*`) get the /me chrome
+  // automatically — clicking from PersonalSidebar's Traces link into the
+  // existing project-scoped explorer keeps the sidebar shape consistent
+  // with the rest of /me/* instead of flipping to MainMenu. Detection:
+  // current team is the caller's own Personal Workspace (Team.isPersonal
+  // && Team.ownerUserId === me).
+  const isOnOwnPersonalProject =
+    !!team?.isPersonal && team.ownerUserId === session?.user?.id;
+  const isPersonalScopeRoute =
+    personalScope ||
+    router.pathname.startsWith("/me") ||
+    isOnOwnPersonalProject;
   const isOrgScopeRoute = orgScope || router.pathname === "/governance";
 
   if (
