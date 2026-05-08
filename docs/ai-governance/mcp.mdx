@@ -71,6 +71,8 @@ Governance MCP tools register inside LangWatch's existing MCP server (mounted at
 
 The 11 governance tools register via `registerGovernanceMcpTools(server, ctx)` from `langwatch/src/mcp/governance-tools.ts` (Lane-Q at `7639b6c2b`). The same registration runs at all three `createMcpServer()` callsites in `handler.ts` so the tools are available regardless of which MCP transport the client chose.
 
+<Note>**Dev-environment port routing** — in production, LangWatch listens on a single port and the `/mcp` + `/sse` + `/oauth/*` + `/.well-known/oauth-*` routes are all reachable on the same host. In dev (Vite), external MCP clients (e.g. Claude Code) hit `FRONTEND_PORT` (default `5560`) which proxies the seven MCP route prefixes through to the API port. Local Claude Code runbook: `claude mcp add langwatch http://localhost:5560/mcp` (or the OAuth flow at `http://localhost:5560/api/mcp/authorize` for write tools). The proxy wiring + a real-SDK probe at `langwatch/scripts/dogfood/governance/mcp-client-probe.ts` shipped at `82375478e`; the probe asserts all 11 tools register, that read tools return the catalog with a project apiKey Bearer, and that write tools return `AUTH_REQUIRED:` until the OAuth flow completes.</Note>
+
 ## RBAC enforcement
 
 Governance tools enforce two distinct gates at the tool layer (`langwatch/src/mcp/governance-tools.ts`), BEFORE the service call:
