@@ -127,35 +127,65 @@ ENDPOINT="${BASE_URL%/}/api/otel/v1/traces"
 # across an N>1 burst. We replace any "traceId"/"spanId" string fields the
 # canned payload happens to ship with — Ariana's payloads use placeholder
 # values that the wrapper is expected to overwrite.
+#
+# Timestamps also get rewritten per-request (using `date +%s%N` for now-nanos)
+# because the receiver drops spans whose start time is more than 31 days
+# in the past. The canned payloads ship with frozen timestamps for
+# determinism on the static fixture; we anchor them to current time at
+# emit so the receiver doesn't 'success_no_collect' silently with
+# rejectedSpans>0 (bug #77 root cause: 2024-05-08 timestamp + 31-day
+# past cutoff = silent drop).
 hex_id() {
   openssl rand -hex "$1"
 }
 
-# Build the per-request body in three steps:
+# Best-effort nanosecond clock. Linux `date +%s%N` gives nanos directly;
+# macOS `date` doesn't support %N, so fall back to seconds*1e9.
+now_nanos() {
+  local ns
+  ns="$(date +%s%N 2>/dev/null)"
+  if [[ "$ns" == *"N" ]] || [[ -z "$ns" ]]; then
+    # macOS path — multiply seconds out, append zeros for nano resolution.
+    printf '%s000000000\n' "$(date +%s)"
+  else
+    printf '%s\n' "$ns"
+  fi
+}
+
+# Build the per-request body in four steps:
 #   1. Load the canned payload as the base shape.
 #   2. Overwrite traceId / spanId fields recursively (per-request uniqueness).
-#   3. If --forge-tenant-id, splice langwatch.tenant_id into the FIRST
+#   3. Overwrite startTimeUnixNano / endTimeUnixNano so the receiver's
+#      31-day past cutoff doesn't silently drop the span.
+#   4. If --forge-tenant-id, splice langwatch.tenant_id into the FIRST
 #      resourceSpans[].resource.attributes — the principal-field guard at
 #      the receiver should restore the binding-authoritative tenant_id
 #      regardless of payload claim.
 emit_one() {
-  local trace_id span_id body
+  local trace_id span_id body start_ns end_ns
   trace_id="$(hex_id 16)"
   span_id="$(hex_id 8)"
+  start_ns="$(now_nanos)"
+  # 250ms span duration — arbitrary, just needs to be > 0 + close to start.
+  end_ns="$((start_ns + 250000000))"
 
   body="$(jq \
     --arg traceId "$trace_id" \
     --arg spanId "$span_id" \
+    --arg startNs "$start_ns" \
+    --arg endNs "$end_ns" \
     --arg forgeTenant "$FORGE_TENANT_ID" '
-      def replace_ids:
+      def replace_fields:
         if type == "object" then
           with_entries(
             if .key == "traceId" and (.value | type) == "string" then .value = $traceId
             elif .key == "spanId" and (.value | type) == "string" then .value = $spanId
-            else .value |= replace_ids
+            elif .key == "startTimeUnixNano" and (.value | type) == "string" then .value = $startNs
+            elif .key == "endTimeUnixNano" and (.value | type) == "string" then .value = $endNs
+            else .value |= replace_fields
             end
           )
-        elif type == "array" then map(replace_ids)
+        elif type == "array" then map(replace_fields)
         else .
         end;
 
@@ -168,7 +198,7 @@ emit_one() {
           )
         end;
 
-      replace_ids | maybe_inject_forge_tenant
+      replace_fields | maybe_inject_forge_tenant
     ' "$PAYLOAD_FILE")"
 
   local response status_code
@@ -183,7 +213,22 @@ emit_one() {
   response_body="$(printf '%s' "$response" | sed '$d')"
 
   if [[ "$status_code" =~ ^2 ]]; then
-    printf 'ok %s — %s status=%s trace_id=%s\n' "$ENDPOINT" "$PAYLOAD_LABEL" "$status_code" "$trace_id" >&2
+    # 2xx with rejectedSpans>0 is a SILENT-DROP — the receiver returns
+    # success but the spans were dropped post-auth (validation, dedup,
+    # past-cutoff, etc.). Surface the rejection count + errorMessage on
+    # stderr so the dogfood ritual doesn't false-positive.
+    local rejected=0
+    local err_msg=""
+    if command -v jq >/dev/null 2>&1; then
+      rejected="$(printf '%s' "$response_body" | jq -r '.partialSuccess.rejectedSpans // 0' 2>/dev/null || printf '0')"
+      err_msg="$(printf '%s' "$response_body" | jq -r '.partialSuccess.errorMessage // ""' 2>/dev/null || printf '')"
+    fi
+    if [[ "$rejected" != "0" ]]; then
+      printf 'WARN %s — %s status=%s trace_id=%s rejected=%s error=%s\n' \
+        "$ENDPOINT" "$PAYLOAD_LABEL" "$status_code" "$trace_id" "$rejected" "${err_msg:0:200}" >&2
+    else
+      printf 'ok %s — %s status=%s trace_id=%s\n' "$ENDPOINT" "$PAYLOAD_LABEL" "$status_code" "$trace_id" >&2
+    fi
     printf '%s\n' "$trace_id"
   else
     printf 'fail %s — %s status=%s body=%s\n' "$ENDPOINT" "$PAYLOAD_LABEL" "$status_code" "${response_body:0:200}" >&2
