@@ -23,10 +23,11 @@ Both paths call into the same service-layer functions — there is no business-l
 | Property | Value |
 |---|---|
 | Mount point | `/api/governance/<resource>` |
-| Spec | `openapi/governance.json` (checked into the repo, regenerated on every Hono route change) |
-| Auth | `Authorization: Bearer <apiKey>` — same apiKey resolution as `/api/dataset/*` and `/api/trace/*` |
-| RBAC | Per-record filter at the service layer; surface returns 403 / 401 / 404-collapse identically across Hono / CLI / MCP |
-| Tenancy | `organizationId` + `projectId` (where applicable) flow from the apiKey's resolved tenant scope into every service call |
+| Spec | Emitted into the canonical `openapiLangWatch.json` on the next `sdk:regen` — every governance route registers via the same `describeRoute` + `hono-openapi` pipeline as the rest of the public REST API |
+| Auth | Project API key — `Authorization: Bearer <projectApiKey>` or `X-Auth-Token`, same as `/api/dataset/*` and `/api/trace/*`. The org for the call derives from the project's team |
+| RBAC | Per-route ceiling permission for PAT-authed callers (`aiTools:view` on reads, `aiTools:manage` on writes for ingestion-templates; analogous `<resource>:view` / `<resource>:manage` on other resources). Legacy project tokens bypass the ceiling — same model as `gateway-platform` |
+| Tenancy | `organizationId` is derived from `project → team → organization`. Cross-org probes collapse to 404 at the service layer (no enumeration vector) |
+| Wire shape | Paths kebab-case, JSON fields snake_case (e.g. `ottl_rules`, `source_type`, `display_name`) per public-REST convention |
 
 ## Resource × verb matrix
 
@@ -49,35 +50,45 @@ Every governance resource exposes the full CRUD triple — `list` / `get` / `cre
 
 `audit-log` is intentionally read-only (no create / update / delete) — audit rows are emitted by other state-changing routes and are immutable by design.
 
-## Verb shape
+## Verb shape — worked example
 
-For a typical resource (using `anomaly-rules` as an example — the same shape applies to every resource above):
+The first surface to ship is `ingestion-templates` (Sergey's Lane B-1 commit). The verb set:
 
 | Verb | Method + path | Returns | RBAC |
 |---|---|---|---|
-| `list` | `GET /api/governance/anomaly-rules` | `{ items: AnomalyRule[], cursor: string\|null }` | `anomaly-rules:view` |
-| `get` | `GET /api/governance/anomaly-rules/:id` | `{ rule: AnomalyRule }` | `anomaly-rules:view` |
-| `create` | `POST /api/governance/anomaly-rules` | `{ rule: AnomalyRule }` | `anomaly-rules:manage` |
-| `update` | `PATCH /api/governance/anomaly-rules/:id` | `{ rule: AnomalyRule }` | `anomaly-rules:manage` |
-| `delete` | `DELETE /api/governance/anomaly-rules/:id` | `{ deleted: true }` | `anomaly-rules:manage` |
+| `list` | `GET /api/governance/ingestion-templates` | `{ data: IngestionTemplateDto[] }` (end-user shape, `ottl_rules` redacted) | `aiTools:view` |
+| `admin-list` | `GET /api/governance/ingestion-templates/admin` | `{ data: IngestionTemplateDto[] }` (admin shape, includes `ottl_rules`) | `aiTools:manage` |
+| `get` | `GET /api/governance/ingestion-templates/:id` | `{ ingestion_template: IngestionTemplateDto }` | `aiTools:view` |
+| `create` | `POST /api/governance/ingestion-templates` | `{ ingestion_template: IngestionTemplateDto }` (201) | `aiTools:manage` |
+| `update-ottl-rules` | `PATCH /api/governance/ingestion-templates/:id/ottl-rules` | `{ ingestion_template: IngestionTemplateDto }` | `aiTools:manage` |
+| `archive` | `DELETE /api/governance/ingestion-templates/:id` | `{ archived: true }` (soft-archive) | `aiTools:manage` |
+| `clone-from-platform` | `POST /api/governance/ingestion-templates/clone` | `{ ingestion_template: IngestionTemplateDto }` | `aiTools:manage` |
 
-The Zod schemas backing each request and response body are the same schemas the corresponding service-layer function consumes. The OpenAPI generator reads them directly, so the spec and the runtime are guaranteed in sync.
+A few resource-shape notes that generalise across the namespace:
+
+- **End-user vs admin shape** — list endpoints return a redacted shape by default and a separate `/admin` sub-route for the canonical shape. Avoids accidentally leaking the OTTL source to non-admins via list iteration.
+- **Resource-specific verbs** — `update-ottl-rules` (instead of generic `update`) and `clone-from-platform` (instead of generic `create`) reflect the domain — admins don't generically PATCH every field; they specifically replace OTTL or clone a platform row. Other resources will introduce their own resource-specific verbs (`rotate` on ingestion sources, `assign-to-user` on role bindings, `revoke` on sessions) the same way.
+- **Error mapping** — `403 PlatformTemplateImmutable` (admin tried to PATCH a platform-published row), `404 TemplateNotFound` (cross-org probe), `400 InvalidSourceType` / validation. All map to a common `errorSchema` with `{ type, code, message }`.
+
+The Zod schemas backing each request and response body are the same schemas the corresponding service-layer function consumes. The OpenAPI generator (`describeRoute` + `hono-openapi`) reads them directly, so the spec and the runtime are guaranteed in sync.
 
 ## OpenAPI spec generation + SDK regen
 
+Governance routes register through the same `describeRoute` + `hono-openapi` pipeline as the rest of the public REST API. The canonical OpenAPI spec lives at `langwatch/openapiLangWatch.json`, and both SDKs regenerate from it on the standard build target.
+
 ```bash
-pnpm openapi:governance:emit       # regenerate openapi/governance.json from Hono routes
-pnpm sdk:regen --target typescript # regenerate the TS SDK governance namespace
-pnpm sdk:regen --target python     # regenerate the Python SDK governance namespace
+pnpm openapi:emit                  # regenerate openapiLangWatch.json from Hono routes
+pnpm sdk:regen --target typescript # regenerate the TS SDK
+pnpm sdk:regen --target python     # regenerate the Python SDK
 ```
 
-<Note>**TBD-IMPL — script names**: the exact `package.json` script names land with Sergey's Ask B-1 commits. The umbrella spec at `specs/ai-gateway/governance/governance-api-cli-mcp-coverage.feature` locks the contract: a build step generates `openapi/governance.json`, both SDKs regenerate from that spec, and the regen is idempotent.</Note>
+<Note>**TBD-IMPL — exact script names**: Sergey's first route SHA at `0bb951160` mounts ingestion-templates into `api-router` + `generateOpenAPISpec` so the OpenAPI shape lands in `openapiLangWatch.json` on the next regen. The exact `package.json` script names fold in once the SDK regen target lands.</Note>
 
 The TS SDK exposes `langwatch.governance.<resource>.<verb>(...)`, the Python SDK exposes `langwatch.governance.<resource>.<verb>(...)`. Type signatures match the Zod-derived schemas exactly.
 
 ## Audit emission
 
-State-changing calls always emit an audit row tagged with the surface that made the change:
+State-changing calls always emit an audit row from the service layer (the same row a dashboard tRPC mutation would emit — there is one service-layer audit emitter, not three).
 
 | Surface | Audit row `surface` field |
 |---|---|
@@ -87,6 +98,8 @@ State-changing calls always emit an audit row tagged with the surface that made 
 | Dashboard tRPC | `"trpc"` |
 
 All four rows have **identical** payload shapes apart from the `surface` field. Surface attribution helps incident response (which automation made this change?) without changing the audit-row event-kind taxonomy.
+
+<Note>**TBD-IMPL — surface attribution threading**: the current ingestion-templates routes at `0bb951160` emit audit rows from the service layer (correct), but the per-surface `surface` field is threaded through later (per Sergey's commit body: "surface attribution... is threaded through later once tRPC + CLI + MCP are all online"). Until that lands, all rows currently emit without an explicit surface tag — they'll backfill to the four-value enum once the threading PR lands.</Note>
 
 ## Cross-references
 

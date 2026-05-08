@@ -23,15 +23,16 @@ The MCP server is the most agent-native of the three governance surfaces. It's a
 Every governance MCP tool's name starts with `governance_`:
 
 ```
-governance_anomaly_rules_list
-governance_anomaly_rules_get
-governance_anomaly_rules_create
-governance_anomaly_rules_update
-governance_anomaly_rules_delete
-
 governance_ingestion_templates_list
+governance_ingestion_templates_admin_list
+governance_ingestion_templates_get
 governance_ingestion_templates_create
+governance_ingestion_templates_update_ottl_rules
+governance_ingestion_templates_archive
 governance_ingestion_templates_clone_from_platform
+
+governance_anomaly_rules_list
+governance_anomaly_rules_create
 …
 
 governance_role_bindings_assign_to_user
@@ -93,7 +94,7 @@ Payload shapes are identical to the REST API's audit rows apart from the surface
 The umbrella spec defines an end-to-end test: an agent connecting with admin apiKey can fully configure governance via a sequence of MCP tool calls:
 
 1. `governance_ingestion_templates_list` — read existing platform templates
-2. `governance_ingestion_templates_clone_from_platform` — clone `claude_code` into the org
+2. `governance_ingestion_templates_clone_from_platform` — clone `claude_code` into the org (delegates to `POST /api/governance/ingestion-templates/clone`)
 3. `governance_anomaly_rules_create` — rule on org spend > $100/day
 4. `governance_role_bindings_assign_to_user` — give a user `governance:view`
 5. `governance_audit_log_query` — verify steps 2–4 all emitted audit rows

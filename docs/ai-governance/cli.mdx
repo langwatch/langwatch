@@ -84,7 +84,7 @@ Use `--output json` in scripts and CI; the human table is for interactive explor
 | `audit-log` | `query` (read-only) |
 | `gateway-budgets` | `list` `get` `create` `update` `delete` |
 | `ingestion-sources` | `list` `get` `create` `update` `delete` `rotate` |
-| `ingestion-templates` | `list` `get` `create` `update` `delete` `clone-from-platform` |
+| `ingestion-templates` | `list` `admin-list` `get` `create` `update-ottl-rules` `archive` `clone-from-platform` |
 | `user-ingestion-bindings` | `list` `get` `install` `uninstall` `rotate` |
 | `members` | `list` `get` `update` `remove` |
 | `invites` | `list` `get` `create` `revoke` |
@@ -112,9 +112,10 @@ The end-state — what the umbrella spec calls the "agentic dogfood gate" — is
 langwatch governance ingestion-templates list --output json
 
 # 2. Clone the claude_code template into the org for customisation
+#    (POST /api/governance/ingestion-templates/clone — auto-derives org from the apiKey's project)
 langwatch governance ingestion-templates clone-from-platform \
-    --template-id <platform-claude-code-id> \
-    --organization-id <org-id> --output json
+    --source-template-id <platform-claude-code-id> \
+    --output json
 
 # 3. Create a budget
 langwatch governance gateway-budgets create \
