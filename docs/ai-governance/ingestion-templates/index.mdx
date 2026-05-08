@@ -81,9 +81,11 @@ The install drawer shows three things:
   masked to its first 8 characters.
 - **Snippet preview** — pre-wired environment variables for Claude Code:
   ```bash
-  export OTEL_EXPORTER_OTLP_ENDPOINT="<INSTALL_DRAWER_ENDPOINT_TBD>"
+  export OTEL_EXPORTER_OTLP_ENDPOINT="https://app.langwatch.ai/api/otel"
   export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer lwub_<your-token>"
   ```
+  (Self-hosted: replace the host with your LangWatch base URL. The drawer always
+  shows the correct endpoint for your instance.)
 
 Copy the snippet, then click **Mark installed**. The tile flips to a green-checked state
 with a **View traces →** deep-link.
