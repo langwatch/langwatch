@@ -102,18 +102,28 @@ The TS SDK exposes `langwatch.governance.<resource>.<verb>(...)`, the Python SDK
 
 ## Audit emission
 
-State-changing calls always emit an audit row from the service layer (the same row a dashboard tRPC mutation would emit — there is one service-layer audit emitter, not three).
+State-changing calls always emit an audit row from the service layer (the same row a dashboard tRPC mutation would emit — there is one service-layer audit emitter, not three). Every audit row carries a **surface attribution** tag stamped into `AuditLog.metadata.surface`:
 
-| Surface | Audit row `surface` field |
+| Surface | `metadata.surface` value |
 |---|---|
+| Dashboard tRPC | `"trpc"` (default) |
 | Hono REST | `"hono"` |
 | CLI | `"cli"` |
 | MCP | `"mcp"` |
-| Dashboard tRPC | `"trpc"` |
 
-All four rows have **identical** payload shapes apart from the `surface` field. Surface attribution helps incident response (which automation made this change?) without changing the audit-row event-kind taxonomy.
+The shared type lives at `@ee/governance/services/auditSurface.ts` (`GovernanceCallSurface`); every mutating service method on the governance services takes an optional `surface` parameter (default `"trpc"`) which is stamped into `metadata` at audit emission. Forensic readers query `metadata->>'surface'` to filter by surface.
 
-<Note>**TBD-IMPL — surface attribution threading**: routes at `0bb951160` (ingestion-templates) and `5275e7e11` (user-ingestion-bindings) emit audit rows from the service layer (correct), but the per-surface `surface` field is threaded through Sergey's Ask B-3 commit (`IngestionTemplateService` + `UserIngestionBindingService` get an optional `surface` param; CLI / MCP / tRPC pass `cli` / `mcp` / `trpc` respectively). Until B-3 lands, rows emit without an explicit surface tag.</Note>
+```sql
+-- "What did automation change in the last 24h?"
+SELECT * FROM "AuditLog"
+ WHERE "createdAt" > now() - interval '24 hours'
+   AND metadata->>'surface' IN ('cli', 'mcp')
+ ORDER BY "createdAt" DESC;
+```
+
+All four rows have **identical** payload shapes apart from the `metadata.surface` field — same event kind, same target, same actor. Surface attribution helps incident response (which automation made this change?) without changing the audit-row event-kind taxonomy.
+
+The seven mutating verbs across the two shipped resources (`createOrgTemplate`, `updateOttlRules`, `archiveOrgTemplate`, `cloneFromPlatform`, `install`, `uninstall`, `rotateToken`) all carry surface attribution as of Sergey's Lane B-3 commit at `fc6d54100`. The same commit also closed a forensic gap on `rotateToken` — token rotations now emit a `gateway.user_ingestion_binding.token_rotated` audit row (previously silent).
 
 ## Cross-references
 

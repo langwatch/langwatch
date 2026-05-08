@@ -84,15 +84,16 @@ No record is created. No audit row is emitted (failed calls are not state-change
 
 ## Audit emission
 
-Every state-changing tool call emits an audit row tagged with `surface="mcp"`:
+Every state-changing tool call emits an audit row with `AuditLog.metadata.surface = "mcp"` (the shared `GovernanceCallSurface` type at `@ee/governance/services/auditSurface.ts`, threaded through every mutating governance service method as of Sergey's Lane B-3 at `fc6d54100`):
 
 | Tool | Audit row |
 |---|---|
-| `governance_anomaly_rules_create` | `gateway.anomaly_rule.created` with `surface="mcp"` |
-| `governance_ingestion_templates_clone_from_platform` | `gateway.ingestion_template.cloned` with `surface="mcp"` |
-| `governance_role_bindings_assign_to_user` | `organization.roleBinding.assignedToUser` with `surface="mcp"` |
+| `governance_anomaly_rules_create` | `gateway.anomaly_rule.created` (`metadata.surface = "mcp"`) |
+| `governance_ingestion_templates_clone_from_platform` | `gateway.ingestion_template.cloned` (`metadata.surface = "mcp"`) |
+| `governance_user_ingestion_bindings_rotate` | `gateway.user_ingestion_binding.token_rotated` (`metadata.surface = "mcp"`) |
+| `governance_role_bindings_assign_to_user` | `organization.roleBinding.assignedToUser` (`metadata.surface = "mcp"`) |
 
-Payload shapes are identical to the REST API's audit rows apart from the surface field — every other field (actorUserId, apiKeyId, target, error) follows the same shape. This lets incident response queries answer "what did the agent do?" without changing the audit-row event-kind taxonomy.
+Payload shapes are identical to the REST API's audit rows apart from `metadata.surface` — every other field (actorUserId, apiKeyId, target, error) follows the same shape. This lets incident response queries answer "what did the agent do?" without changing the audit-row event-kind taxonomy.
 
 ## Agent setup-from-scratch (the dogfood gate)
 

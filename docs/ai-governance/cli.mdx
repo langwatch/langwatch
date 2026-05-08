@@ -97,7 +97,7 @@ A small number of resources have resource-specific verbs (`rotate` on ingestion 
 
 ## Audit emission
 
-Every state-changing CLI invocation emits an audit row tagged with `surface="cli"`. The payload shape is identical to a Hono REST audit row apart from the surface field — this lets incident response queries filter by surface to see "what did automation change last night?" without losing the actor / target / event-kind details.
+Every state-changing CLI invocation emits an audit row with `AuditLog.metadata.surface = "cli"` (the shared `GovernanceCallSurface` type, threaded through every mutating governance service method as of Sergey's Lane B-3 at `fc6d54100`). The payload shape is identical to a Hono REST audit row apart from the surface field — this lets incident response queries filter by surface to see "what did automation change last night?" without losing the actor / target / event-kind details.
 
 ```bash
 langwatch governance audit-log query --filter 'surface=cli' --since '24h ago'
