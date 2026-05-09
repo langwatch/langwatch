@@ -35,4 +35,5 @@ export const projectFactory = Factory.define<Project>(({ sequence }) => ({
   isPersonal: false,
   ownerUserId: null,
   presenceEnabled: false,
+  personalFeatures: {},
 }));
