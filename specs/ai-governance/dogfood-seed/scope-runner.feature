@@ -542,3 +542,57 @@ Feature: Demo-seed scope-guard, runner, entry point: single dev-and-prod path
     When the module is imported by the wrapper
     Then no CH insert is issued at module-load time
     And the CLI bootstrap only fires when `import.meta.url` matches `process.argv[1]`
+
+  # ─────────────────────────────────────────────────────────────────────
+  # Cron vs operator-setup boundary: which scripts are wired into the
+  # daily cron path, and which stay CLI-only for once-per-environment
+  # operator setup.
+  # ─────────────────────────────────────────────────────────────────────
+
+  @bdd @demo-seed @runner @actions-list
+  Scenario: ACTIONS list is the cron-path roster only
+    Given the demo-seed entry point at `scripts/dogfood/governance/seed-demo.ts`
+    When the runner is invoked (CLI dev path or `/api/cron/seed_demo`)
+    Then the actions executed in order are
+      | name              |
+      | verifyOrgIdentity |
+      | seedBirdEye       |
+      | seedHeavyUsage    |
+    And `seedAnomalyFixture` is NOT in the ACTIONS list
+    And `seedPersonas` is NOT in the ACTIONS list
+
+  @bdd @demo-seed @operator-setup @anomaly-fixture
+  Scenario: seed-anomaly-fixture stays CLI-only for live-fire dogfood
+    Given an operator wants to dogfood the live-fire anomaly-detection loop
+      (mint VK, fire real LLM completion, watch alert + budget cap propagate)
+    When the operator runs `pnpm tsx scripts/dogfood/governance/seed-anomaly-fixture.ts --email <signed-up-user>`
+    Then the script seeds a tight personal budget + a `spend_spike` AnomalyRule
+      derived from the email so multiple operators do not collide
+    And it is idempotent (find-or-create on both the budget and the rule)
+    And it requires a pre-signed-up user, never mints credentials
+    And the script is NOT consumed by `runSeedDemo`
+    So that the daily cron path does not re-fire alert state on every tick
+
+  @bdd @demo-seed @operator-setup @personas
+  Scenario: seed-personas stays CLI-only for once-per-env user provisioning
+    Given an operator wants to provision personal VKs for already-signed-up demo users
+    When the operator runs `pnpm tsx scripts/dogfood/governance/seed-personas.ts`
+    Then the script issues personal VKs for each pre-signed-up user
+    And it never mints credentials (requires pre-signed-up users)
+    And `OPENAI_API_KEY` is OPTIONAL: when set, ModelProvider + RoutingPolicy
+      seed runs; when unset, the script warns and skips both, the VK still
+      issues but does not route until an admin attaches a provider via UI
+    And the script is NOT consumed by `runSeedDemo`
+    So that the production cron does not require knowledge of the real provider key
+
+  @bdd @demo-seed @operator-setup @import-safety
+  Scenario Outline: Operator-setup scripts are import-safe like the cron-wired ones
+    Given a fresh module-load of `<path>`
+    When the module is imported by another caller
+    Then no DB write is issued at module-load time
+    And the CLI bootstrap only fires when `import.meta.url` matches `process.argv[1]`
+
+    Examples:
+      | path                                                    |
+      | scripts/dogfood/governance/seed-anomaly-fixture         |
+      | scripts/dogfood/governance/seed-personas                |
