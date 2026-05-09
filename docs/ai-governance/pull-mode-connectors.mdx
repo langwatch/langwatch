@@ -1,6 +1,6 @@
 ---
 title: Pull-mode connector framework
-description: A universal framework for ingesting from third-party AI platforms that don't push events — declare a config, the framework polls + paginates + parses + lands events in the unified trace store. Built-in HTTP and S3 polling adapters; reference implementations for Microsoft Copilot Studio, OpenAI compliance API, and Anthropic compliance API.
+description: A universal framework for ingesting from third-party AI platforms that don't push events, declare a config, the framework polls + paginates + parses + lands events in the unified trace store. Built-in HTTP and S3 polling adapters; reference implementations for Microsoft Copilot Studio, OpenAI compliance API, and Anthropic compliance API.
 sidebarTitle: Pull-mode connectors
 ---
 
@@ -8,7 +8,7 @@ Some AI platforms push events to LangWatch via webhook or OTLP (see
 [ingestion sources](/ai-governance/ingestion-sources/index)). Others
 expose a paginated audit-log REST API or drop NDJSON files in an S3
 bucket on a schedule, and you're expected to pull. **Pull-mode
-connectors** are LangWatch's universal abstraction for those — you
+connectors** are LangWatch's universal abstraction for those, you
 declare the source shape, the framework handles polling + pagination +
 parsing + cursor-based resume.
 
@@ -16,7 +16,7 @@ parsing + cursor-based resume.
 
 <Warning>**Available on Enterprise plans.** Pull-mode connectors ship as part of the Enterprise multi-source governance ingestion stack. Apache 2.0 deployments use single-source `otel_generic` push only. See [Open-core licensing](/ai-governance/overview#open-core-licensing).</Warning>
 
-Inspired by Singer Tap / Airbyte CDK / Apache Camel / Kafka Connect (pull
+Inspired by Singer Tap, Airbyte CDK, Apache Camel, Kafka Connect (pull
 side). The goal is the same: **one declarative config → one universal
 runner → no per-platform adapter code unless absolutely required.**
 
@@ -25,12 +25,12 @@ runner → no per-platform adapter code unless absolutely required.**
 | Adapter | What it polls | When to use |
 |---|---|---|
 | `http_polling` | Paginated REST APIs with cursor-based pagination | Microsoft Copilot Studio audit logs; Anthropic compliance API; Workato job-history endpoint; any custom enterprise audit-log API |
-| `s3_polling` | S3 buckets containing NDJSON / CSV / JSON-array files | Anthropic compliance dump; OpenAI enterprise audit export; custom S3-to-archive pipelines; on-prem object storage with S3-compatible interface (MinIO, etc.) |
+| `s3_polling` | S3 buckets containing NDJSON, CSV, JSON-array files | Anthropic compliance dump; OpenAI enterprise audit export; custom S3-to-archive pipelines; on-prem object storage with S3-compatible interface (MinIO, etc.) |
 
 Reference implementations using `http_polling` ship for:
-- **Microsoft Copilot Studio** — one-click admin enable, credentials only
-- **OpenAI compliance API** — one-click admin enable, credentials only
-- **Anthropic compliance API** — one-click admin enable, credentials only
+- **Microsoft Copilot Studio**: one-click admin enable, credentials only
+- **OpenAI compliance API**: one-click admin enable, credentials only
+- **Anthropic compliance API**: one-click admin enable, credentials only
 
 ## How the framework works
 
@@ -122,7 +122,7 @@ is at-least-once).
 
 - Cursor = lexicographic-max key seen so far. New runs LIST the bucket
   + prefix and only read keys lexicographically AFTER the cursor.
-- `parser` ∈ `"ndjson" | "csv" | "json-array"` — applied per-file.
+- `parser` ∈ `"ndjson" | "csv" | "json-array"`, applied per-file.
 - Credential rotation is honored on every run (no in-process caching).
 
 ## Normalized event shape
@@ -141,7 +141,7 @@ produced them:
 | `cost_usd` | number | 0 if the source doesn't expose cost |
 | `tokens_input` | number | 0 if unknown |
 | `tokens_output` | number | 0 if unknown |
-| `raw_payload` | string | Full original event for audit / debugging |
+| `raw_payload` | string | Full original event for audit, debugging |
 
 ## Writing a custom puller (TypeScript module)
 
@@ -191,10 +191,10 @@ The same one-click pattern applies for `openai_compliance` and
 
 ## Where to next
 
-- [Ingestion sources](/ai-governance/ingestion-sources/index) — the
+- [Ingestion sources](/ai-governance/ingestion-sources/index): the
   broader substrate; push-mode and pull-mode both feed the same trace
   store
-- [CLI debugging](/ai-governance/cli-debug) — `langwatch ingest tail`
+- [CLI debugging](/ai-governance/cli-debug): `langwatch ingest tail`
   for live inspection of pulled events
 - [Compliance architecture](/ai-governance/compliance-architecture) —
   how pulled events flow through the unified observability substrate

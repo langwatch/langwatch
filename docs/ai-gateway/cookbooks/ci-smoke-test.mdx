@@ -1,10 +1,10 @@
 ---
-title: CI smoke test — end-to-end gateway health check
+title: CI smoke test end-to-end gateway health check
 description: Provision a short-lived VK, make a real call, verify the response, then revoke. Runs in under 10 seconds.
 sidebarTitle: CI smoke test
 ---
 
-Goal: catch misconfigurations in the gateway BEFORE they surface during an on-call incident. This recipe provisions a temporary virtual key, calls `/v1/chat/completions`, verifies the response and its trace headers, and cleans up — all from a CI job using only the `langwatch` CLI and `curl`.
+Goal: catch misconfigurations in the gateway BEFORE they surface during an on-call incident. This recipe provisions a temporary virtual key, calls `/v1/chat/completions`, verifies the response and its trace headers, and cleans up, all from a CI job using only the `langwatch` CLI and `curl`.
 
 <Info>Runtime: typically 3–8 seconds wall-clock. One gateway request + two REST round-trips.</Info>
 
@@ -15,7 +15,7 @@ Goal: catch misconfigurations in the gateway BEFORE they surface during an on-ca
 - VK creation + secret reveal flow works.
 - VK resolves end-to-end against the gateway data plane.
 - Response carries `X-LangWatch-Trace-Id`, `X-LangWatch-Span-Id`, `X-LangWatch-Request-Id`, and `traceparent`.
-- VK revocation propagates (best-effort — cache TTL applies).
+- VK revocation propagates (best-effort, cache TTL applies).
 
 ## Prerequisites
 
@@ -135,7 +135,7 @@ jobs:
 | `curl ... 401` | VK secret didn't resolve at the gateway | Auth cache bootstrapped against a stale `/changes` feed; check control-plane-to-gateway HMAC agreement |
 | `curl ... 403 model_not_allowed` | VK's provider binding doesn't expose `gpt-5-mini` | Replace the model in the script with one your `$CI_GPC_ID` actually supports |
 | `FAIL: trace propagation` | Per-tenant OTel middleware is off | See [Observability → trace-id handshake](/ai-gateway/observability#trace-id-propagation--concrete-handshake) |
-| `FAIL: empty content` | Upstream returned no content — provider outage | Compare to raw response body saved in `$RESPONSE_FILE` |
+| `FAIL: empty content` | Upstream returned no content, provider outage | Compare to raw response body saved in `$RESPONSE_FILE` |
 
 ## Running it against self-hosted
 
@@ -159,10 +159,10 @@ Pipe the script output into your alerting channel on failure. With PagerDuty:
             -d '{"routing_key":"${{ secrets.PD_KEY }}","event_action":"trigger","payload":{"summary":"Gateway smoke test failed","severity":"error","source":"github-actions"}}'
 ```
 
-Run this test at a higher frequency than your `/readyz` scrapes — it exercises the full hot path (auth cache → bifrost → upstream → debit enqueue → trace export) whereas `/readyz` only checks internal state.
+Run this test at a higher frequency than your `/readyz` scrapes, it exercises the full hot path (auth cache → bifrost → upstream → debit enqueue → trace export) whereas `/readyz` only checks internal state.
 
 ## See also
 
-- [langwatch CLI](/ai-gateway/cli/langwatch-cli) — the `virtual-keys` commands used here.
-- [Observability](/ai-gateway/observability) — what each response header means.
-- [Health Checks](/ai-gateway/self-hosting/health-checks) — complementary internal-state probe.
+- [langwatch CLI](/ai-gateway/cli/langwatch-cli): the `virtual-keys` commands used here.
+- [Observability](/ai-gateway/observability): what each response header means.
+- [Health Checks](/ai-gateway/self-hosting/health-checks): complementary internal-state probe.

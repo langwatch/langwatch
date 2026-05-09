@@ -1,10 +1,10 @@
 ---
 title: Grafana dashboard
-description: Importable Grafana dashboard JSON for the LangWatch AI Gateway — request rate, provider health, auth cache, budget, guardrail, streaming, and routing.
+description: Importable Grafana dashboard JSON for the LangWatch AI Gateway, request rate, provider health, auth cache, budget, guardrail, streaming, and routing.
 sidebarTitle: Grafana dashboard
 ---
 
-A single dashboard with every panel you actually look at during an incident. Pairs with [Prometheus alerts](/ai-gateway/cookbooks/prometheus-alerts) and [Production runbook](/ai-gateway/cookbooks/production-runbook) — alerts page you, this dashboard tells you *what* is wrong, the runbook tells you *how to dig*.
+A single dashboard with every panel you actually look at during an incident. Pairs with [Prometheus alerts](/ai-gateway/cookbooks/prometheus-alerts) and [Production runbook](/ai-gateway/cookbooks/production-runbook): alerts page you, this dashboard tells you *what* is wrong, the runbook tells you *how to dig*.
 
 ## What it covers
 
@@ -18,7 +18,7 @@ Eight rows, top to bottom:
 | Budgets & debits | outbox fill-pct, flush failures, 4xx drops | outbox pressure before silent data loss |
 | Guardrails | verdicts by direction, blocks by reason | catches both legit policy enforcement and regressions |
 | Streaming | active streams, usage-warning rate | streams that never reported usage = cost blind spot |
-| Cache (passthrough) | hits / bypass / forced — Anthropic discount proxy | cache outcome vs expectation |
+| Cache (passthrough) | hits, bypass, forced, Anthropic discount proxy | cache outcome vs expectation |
 | Infrastructure | pod replicas, CPU, memory, goroutines | k8s-side correlates for everything above |
 | Lifecycle | draining pods, in-flight requests | detect hung drains before SIGKILL |
 
@@ -26,7 +26,7 @@ Eight rows, top to bottom:
 
 - Grafana ≥ 10.0 (uses time series panels + `$__rate_interval`).
 - A Prometheus data source scraping the gateway's `/metrics`. See [Helm → Monitoring](/ai-gateway/self-hosting/helm#monitoring).
-- The `kube-state-metrics` exporter if you want the infrastructure row — it's how we read pod CPU/memory/replica count.
+- The `kube-state-metrics` exporter if you want the infrastructure row, it's how we read pod CPU/memory/replica count.
 
 ## Import
 
@@ -393,14 +393,14 @@ Save the JSON below as `langwatch-gateway.json`, then in Grafana: **Dashboards �
 
 The panels are deliberately ordered so an on-call engineer scans top-down:
 
-1. **Request health** — is this user-impacting? Latency + error rate together answer it.
-2. **Provider health** — if error rate is up, which provider? If circuit is open, we're degraded but not down (fallback is handling it).
-3. **Auth cache** — if latency is up with upstreams happy, L1 miss spike points at control-plane pressure.
-4. **Budgets & debits** — outbox shelf > 0 for minutes means debits are failing persistently; correlate with control-plane errors.
-5. **Guardrails** — block spikes are either a legit policy enforcement or a regression. `direction` + `reason` disambiguate.
-6. **Streaming** — active streams shows concurrency; fail-open rate is the stream_chunk guardrail escape hatch firing (by design).
-7. **Cache (passthrough)** — Anthropic `cache_control` discount is only visible here; a drop to near-zero hits on a prefix-heavy workload is a regression.
-8. **Infrastructure** — goroutines climbing monotonically is the leak signal. Replicas + CPU correlate HPA pressure to everything above.
+1. **Request health**: is this user-impacting? Latency + error rate together answer it.
+2. **Provider health**: if error rate is up, which provider? If circuit is open, we're degraded but not down (fallback is handling it).
+3. **Auth cache**: if latency is up with upstreams happy, L1 miss spike points at control-plane pressure.
+4. **Budgets & debits**: outbox shelf > 0 for minutes means debits are failing persistently; correlate with control-plane errors.
+5. **Guardrails**: block spikes are either a legit policy enforcement or a regression. `direction` + `reason` disambiguate.
+6. **Streaming**: active streams shows concurrency; fail-open rate is the stream_chunk guardrail escape hatch firing (by design).
+7. **Cache (passthrough)**: Anthropic `cache_control` discount is only visible here; a drop to near-zero hits on a prefix-heavy workload is a regression.
+8. **Infrastructure**: goroutines climbing monotonically is the leak signal. Replicas + CPU correlate HPA pressure to everything above.
 
 ## Pairing with alerts and runbook
 
@@ -423,10 +423,10 @@ When a page fires, the engineer lands on the dashboard, narrows the cause to a r
 
 ## Skipping panels you don't have metrics for
 
-If you haven't deployed Redis, the L2 hit-rate line is flat at zero — harmless. If you haven't enabled `networkPolicy`, the provider egress row doesn't need a custom panel since flow is unchanged. The JSON uses `label_values(...)` so missing labels degrade gracefully rather than breaking the dashboard.
+If you haven't deployed Redis, the L2 hit-rate line is flat at zero, harmless. If you haven't enabled `networkPolicy`, the provider egress row doesn't need a custom panel since flow is unchanged. The JSON uses `label_values(...)` so missing labels degrade gracefully rather than breaking the dashboard.
 
 ## See also
 
-- [Prometheus alerts](/ai-gateway/cookbooks/prometheus-alerts) — the rules that tell you *when* to open this dashboard.
-- [Production runbook](/ai-gateway/cookbooks/production-runbook) — what to do when the dashboard pinpoints a row.
-- [Observability](/ai-gateway/observability) — deep-dive on per-tenant OTel routing + span attribute reference.
+- [Prometheus alerts](/ai-gateway/cookbooks/prometheus-alerts): the rules that tell you *when* to open this dashboard.
+- [Production runbook](/ai-gateway/cookbooks/production-runbook): what to do when the dashboard pinpoints a row.
+- [Observability](/ai-gateway/observability): deep-dive on per-tenant OTel routing + span attribute reference.

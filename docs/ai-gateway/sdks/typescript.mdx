@@ -39,7 +39,7 @@ const openai = new OpenAI({
 });
 ```
 
-`getGatewayHeaders()` reads the active LangWatch trace (via the SDK's AsyncLocalStorage context) and returns a header object with `traceparent`, `X-LangWatch-Trace-Id`, `X-LangWatch-Parent-Span-Id`, `X-LangWatch-Thread-Id`. The gateway uses these to parent its span under your trace — no duplicate cost.
+`getGatewayHeaders()` reads the active LangWatch trace (via the SDK's AsyncLocalStorage context) and returns a header object with `traceparent`, `X-LangWatch-Trace-Id`, `X-LangWatch-Parent-Span-Id`, `X-LangWatch-Thread-Id`. The gateway uses these to parent its span under your trace, no duplicate cost.
 
 <Note>`getGatewayHeaders()` ships in langwatch npm ≥ `v0.26.0` alongside the gateway GA. Check with `npm ls langwatch`.</Note>
 
@@ -51,7 +51,7 @@ Every gateway response carries these headers so clients can stitch the gateway s
 |---|---|
 | `X-LangWatch-Trace-Id` | 32-hex trace id. Equals the incoming `traceparent` trace id if one was supplied; otherwise a freshly-minted id |
 | `X-LangWatch-Span-Id` | 16-hex gateway span id |
-| `traceparent` | W3C traceparent re-injected for downstream stitching — forward to any further hop |
+| `traceparent` | W3C traceparent re-injected for downstream stitching, forward to any further hop |
 | `X-LangWatch-Request-Id` | ULID, use in support tickets |
 
 ```ts
@@ -65,7 +65,7 @@ const traceId = raw.response.headers.get("X-LangWatch-Trace-Id");
 // await fetch(nextService, { headers: { traceparent } });
 ```
 
-### Without the LangWatch SDK — raw traceparent
+### Without the LangWatch SDK: raw traceparent
 
 Using OpenTelemetry JS directly:
 
@@ -85,7 +85,7 @@ const openai = new OpenAI({
 });
 ```
 
-The gateway honours W3C `traceparent` — any OTel-instrumented Node.js app already emits this.
+The gateway honours W3C `traceparent`, any OTel-instrumented Node.js app already emits this.
 
 ### Per-call overrides
 
@@ -188,8 +188,8 @@ const openai = new OpenAI({
 
 ## Troubleshooting
 
-- **`401 invalid_api_key`** — wrong VK or revoked. Verify the first 12 chars in the LangWatch UI.
-- **Cost double-counted** — trace propagation not working. Check that `getGatewayHeaders()` returned non-empty (log the dict). If the active trace is null, no headers are set.
-- **CORS errors in browser** — the gateway does not expose CORS for the `/v1` routes by default. Use a server-side proxy; don't call the gateway from a browser with a production VK (it would expose the VK to users).
+- **`401 invalid_api_key`**, wrong VK or revoked. Verify the first 12 chars in the LangWatch UI.
+- **Cost double-counted**: trace propagation not working. Check that `getGatewayHeaders()` returned non-empty (log the dict). If the active trace is null, no headers are set.
+- **CORS errors in browser**: the gateway does not expose CORS for the `/v1` routes by default. Use a server-side proxy; don't call the gateway from a browser with a production VK (it would expose the VK to users).
 
 See [API: Errors](/ai-gateway/api/errors).

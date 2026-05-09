@@ -1,11 +1,11 @@
 ---
-title: AI Tools Portal — tile interactions
+title: AI Tools Portal tile interactions
 description: What each tile class expands into when an end user clicks it on /me. Covers coding-assistant setup walkthroughs, inline virtual-key creation, and external-tool guidance pages.
 sidebarTitle: End-user
 ---
 
 When you sign in via `langwatch login` or open the LangWatch dashboard,
-you land on `/me`. The top of the page is your **AI Tools Portal** — a
+you land on `/me`. The top of the page is your **AI Tools Portal**: a
 card grid of every tool your IT admin has published for you. Below the
 grid, your usage dashboard (spend vs. budget, requests, recent
 activity) is unchanged.
@@ -20,7 +20,7 @@ Examples: Claude Code, Copilot, Cursor, Codex, Gemini CLI.
 
 Click expands the tile inline with the setup walkthrough:
 
-![Claude Code tile expanded — setup command + walkthrough](/images/ai-governance/portal/tile-claude-expanded.png)
+![Claude Code tile expanded, setup command + walkthrough](/images/ai-governance/portal/tile-claude-expanded.png)
 
 ```
 ┌─ Claude Code ──────────────────────────── [×] collapse ────────────┐
@@ -61,7 +61,7 @@ Examples: OpenAI, Anthropic, Bedrock, Gemini.
 
 Click expands the tile inline with a virtual-key creation form:
 
-![Anthropic tile expanded — VK creation form before issuance](/images/ai-governance/portal/tile-anthropic-form.png)
+![Anthropic tile expanded, VK creation form before issuance](/images/ai-governance/portal/tile-anthropic-form.png)
 
 ```
 ┌─ OpenAI ───────────────────────────────── [×] collapse ────────────┐
@@ -75,11 +75,11 @@ Click expands the tile inline with a virtual-key creation form:
 └────────────────────────────────────────────────────────────────────┘
 ```
 
-Type a label (anything that helps you identify the key — `my-rag-app`,
+Type a label (anything that helps you identify the key, `my-rag-app`,
 `weekend-experiment`), click **Generate**, and the form replaces itself
 with the issued state:
 
-![Anthropic tile issued — masked secret + reveal/copy + base URL](/images/ai-governance/portal/tile-anthropic-issued.png)
+![Anthropic tile issued, masked secret + reveal/copy + base URL](/images/ai-governance/portal/tile-anthropic-issued.png)
 
 ```
 ┌─ OpenAI ───────────────────────────────── [×] collapse ────────────┐
@@ -96,7 +96,7 @@ with the issued state:
 ```
 
 Important: the secret is shown **once**. Copy it now. If you lose it,
-generate a new key — there's no recovery surface (this is by design;
+generate a new key, there's no recovery surface (this is by design;
 secrets are hashed at rest with a peppered HMAC and we never see the
 plaintext after issuance).
 
@@ -109,17 +109,17 @@ provider; the policy does.
 
 The org-default routing policy exists but has zero providers bound, so
 the gateway would have nothing to forward to. The portal (and the CLI
-device-flow login) refuse to mint a key in that state — you'll see an
+device-flow login) refuse to mint a key in that state, you'll see an
 HTTP 422 response with an actionable hint rather than a green key that
 returns 504 on every call.
 
 Ask your admin to bind at least one provider in
 `/settings/governance/routing-policies`. Once a provider is bound,
-retry — issuance will succeed and your key works immediately.
+retry, issuance will succeed and your key works immediately.
 
 ### When to create a project instead
 
-If you're building a team-shared application — a customer-facing chat,
+If you're building a team-shared application, a customer-facing chat,
 an internal RAG system, anything that's not a one-developer experiment
 — create a **project** at `/settings/projects` and mint the virtual key
 there instead. Project keys aren't bound to your identity, so the spend
@@ -136,7 +136,7 @@ Examples: Copilot Studio, Workato, internal company chat agents.
 
 Click expands the tile inline with admin-authored markdown:
 
-![Copilot Studio tile expanded — admin markdown body + external CTA link](/images/ai-governance/portal/tile-copilot-studio.png)
+![Copilot Studio tile expanded, admin markdown body + external CTA link](/images/ai-governance/portal/tile-copilot-studio.png)
 
 ```
 ┌─ Copilot Studio ───────────────────────── [×] collapse ────────────┐
@@ -152,7 +152,7 @@ Click expands the tile inline with admin-authored markdown:
 └────────────────────────────────────────────────────────────────────┘
 ```
 
-External-tool tiles render markdown — your admin can include headings,
+External-tool tiles render markdown, your admin can include headings,
 lists, code blocks, and external links. External links open in a new
 tab with `rel="noopener noreferrer"` for safety.
 
@@ -174,9 +174,9 @@ admin to import the starter pack at
 
 ## Where to next
 
-- [Personal IDE keys](/ai-gateway/governance/personal-keys) — deep dive
+- [Personal IDE keys](/ai-gateway/governance/personal-keys): deep dive
   on the device-flow login that coding-assistant tiles trigger.
-- [Admin catalog](/ai-governance/personal-portal/admin-catalog) — what
+- [Admin catalog](/ai-governance/personal-portal/admin-catalog): what
   your admin sees on the other side.
-- [CLI debugging](/ai-governance/cli-debug) — error catalog if a tile's
+- [CLI debugging](/ai-governance/cli-debug): error catalog if a tile's
   setup command fails.

@@ -4,7 +4,7 @@ description: Point the gateway at any OpenAI-compatible endpoint (self-hosted vL
 sidebarTitle: Custom OpenAI-compatible
 ---
 
-The Custom OpenAI-compatible provider accepts any HTTP endpoint that implements the OpenAI Chat Completions shape — covering self-hosted servers (vLLM, SGLang, Ollama, LocalAI, TGI), hosted inference platforms (Groq, Together, Fireworks, Anyscale), and private fine-tunes exposed via an OpenAI-shape proxy.
+The Custom OpenAI-compatible provider accepts any HTTP endpoint that implements the OpenAI Chat Completions shape, covering self-hosted servers (vLLM, SGLang, Ollama, LocalAI, TGI), hosted inference platforms (Groq, Together, Fireworks, Anyscale), and private fine-tunes exposed via an OpenAI-shape proxy.
 
 ## Configure the provider credential
 
@@ -12,11 +12,11 @@ Under **Settings → Model Providers**:
 
 1. **Add provider → Custom (OpenAI-compatible)**.
 2. Fill:
-    - **Name** — human label (e.g. `internal-vllm`, `groq`).
-    - **Base URL** — without the `/chat/completions` suffix (e.g. `https://api.groq.com/openai/v1`, `http://vllm.internal:8000/v1`).
-    - **Auth mode** — `Bearer` (default), `api-key` header, or `custom header` (for non-standard keys).
-    - **API key** — or leave blank for unauthenticated self-hosted endpoints.
-    - **Supported models** — optional allowlist to expose a curated subset via `/v1/models`.
+    - **Name**: human label (e.g. `internal-vllm`, `groq`).
+    - **Base URL**: without the `/chat/completions` suffix (e.g. `https://api.groq.com/openai/v1`, `http://vllm.internal:8000/v1`).
+    - **Auth mode**: `Bearer` (default), `api-key` header, or `custom header` (for non-standard keys).
+    - **API key**: or leave blank for unauthenticated self-hosted endpoints.
+    - **Supported models**: optional allowlist to expose a curated subset via `/v1/models`.
 3. Save.
 
 ## Supported endpoints (varies by upstream)
@@ -25,9 +25,9 @@ The gateway forwards requests 1:1 to the upstream path (`/v1/chat/completions`, 
 
 Common subsets:
 
-- **Groq / Together / Fireworks** — chat + embeddings (most models).
-- **vLLM / SGLang** — chat + embeddings (depends on the model).
-- **Ollama** — chat (via the OpenAI-compat endpoint mode).
+- **Groq, Together, Fireworks**: chat + embeddings (most models).
+- **vLLM, SGLang**: chat + embeddings (depends on the model).
+- **Ollama**: chat (via the OpenAI-compat endpoint mode).
 
 ## Model id format
 
@@ -53,11 +53,11 @@ Gateway default `cache.mode = respect` forwards any cache-control headers or bod
 
 - **Streaming format drift.** Some OpenAI-compatible servers diverge on SSE chunk format (extra newlines, differing `[DONE]` casing, missing `data:` prefix on metadata frames). Test streaming early; bifrost/core normalises what it can but edge cases may require a client retry.
 - **Auth header unconventional.** Ollama historically uses no auth; vLLM uses Bearer; some self-hosted deployments use `X-Api-Key`. Pick the right mode at ModelProvider config time.
-- **`/v1/embeddings` response shape** — OpenAI-spec says each embedding is a list of floats. Some providers emit a single flat float array. Bifrost/core coerces to spec shape.
-- **Model allowlist enforcement.** If the upstream serves 100 models and you only want 3 exposed, set `models_allowed` on the VK rather than the ModelProvider — it's per-VK, so different VKs can curate different subsets.
+- **`/v1/embeddings` response shape**, OpenAI-spec says each embedding is a list of floats. Some providers emit a single flat float array. Bifrost/core coerces to spec shape.
+- **Model allowlist enforcement.** If the upstream serves 100 models and you only want 3 exposed, set `models_allowed` on the VK rather than the ModelProvider, it's per-VK, so different VKs can curate different subsets.
 
 ## Use cases
 
 - **Private fine-tunes.** Your ML team deploys a vLLM serving a fine-tuned model on internal infra. The gateway makes it accessible to every engineer's coding CLI with a VK, governed like any other model.
-- **Hosted inference platforms.** Groq / Together / Fireworks / DeepInfra ship OpenAI-compat APIs at competitive prices. Binding them behind the gateway lets you A/B against OpenAI without application changes.
+- **Hosted inference platforms.** Groq, Together, Fireworks, DeepInfra ship OpenAI-compat APIs at competitive prices. Binding them behind the gateway lets you A/B against OpenAI without application changes.
 - **Local dev.** An engineer on the road can point the gateway at a local `ollama` server to work offline while preserving the same VK-based auth contract.

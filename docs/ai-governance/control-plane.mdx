@@ -1,13 +1,13 @@
 ---
 title: Control plane & integration tiers
-description: Where the LangWatch CLI, AI Gateway, web app, and Activity Monitor fit in one shared control plane — and how the five integration tiers stack up.
+description: Where the LangWatch CLI, AI Gateway, web app, and Activity Monitor fit in one shared control plane, and how the five integration tiers stack up.
 sidebarTitle: Control plane
 ---
 
 <Info>**Pairs with:** [AI Gateway → Overview](/ai-gateway/overview). The gateway is the data plane (request path); this page is the control plane (configuration + fold reactors) that sits next to it in the same compose stack and Helm chart.</Info>
 
 LangWatch is positioned as a **control plane** above every AI tool an
-enterprise uses — not just the ones whose API key path you own. The
+enterprise uses, not just the ones whose API key path you own. The
 data plane (the AI Gateway proxy) is one of five integration tiers; the
 control plane is what stays the same across all of them.
 
@@ -24,18 +24,18 @@ existing routes:
 
 | Surface | Purpose | Audience | Where it lives |
 |---------|---------|----------|----------------|
-| `/governance` (forthcoming top-level home) | Daily-use **org governance home** — spend, ingestion-source health, anomalies, per-user breakdown. Read-mostly. | Org admins whose org's `setupState.governanceActive` is `true` (see [Persona-based home routing](#persona-based-home-routing--the-setup-state-signal) below) | Top-level route, org-scoped. Replaces the read-mostly content currently temporarily under `/settings/governance`. |
-| `/me`, `/me/settings` | Daily-use **personal home** — your usage, your budget, your personal VK, your IDE setup snippet. | Any user with a personal VK | Top-level route, principal-scoped. |
-| `/[project]/...` | LLMOps daily-use — traces, evals, datasets, scenarios, workflows. | Project members | Per-project routes. **Unchanged** from current LangWatch. |
-| `/settings/governance/ingestion-sources`, `/settings/governance/anomaly-rules`, `/settings/routing-policies` | Admin-authoring (CRUD) — create / rotate / archive sources, write rules, publish routing policies. | Org admins with `organization:manage` | Settings sub-routes, deliberately separate from daily-use surfaces. |
+| `/governance` (forthcoming top-level home) | Daily-use **org governance home**: spend, ingestion-source health, anomalies, per-user breakdown. Read-mostly. | Org admins whose org's `setupState.governanceActive` is `true` (see [Persona-based home routing](#persona-based-home-routing--the-setup-state-signal) below) | Top-level route, org-scoped. Replaces the read-mostly content currently temporarily under `/settings/governance`. |
+| `/me`, `/me/settings` | Daily-use **personal home**: your usage, your budget, your personal VK, your IDE setup snippet. | Any user with a personal VK | Top-level route, principal-scoped. |
+| `/[project]/...` | LLMOps daily-use, traces, evals, datasets, scenarios, workflows. | Project members | Per-project routes. **Unchanged** from current LangWatch. |
+| `/settings/governance/ingestion-sources`, `/settings/governance/anomaly-rules`, `/settings/routing-policies` | Admin-authoring (CRUD), create, rotate, archive sources, write rules, publish routing policies. | Org admins with `organization:manage` | Settings sub-routes, deliberately separate from daily-use surfaces. |
 
 This split is the answer to "why is governance overview hidden under
-Settings?" — it shouldn't be. The read-mostly daily home is moving
-out to `/governance` (top-level); only the create / rotate / archive
+Settings?", it shouldn't be. The read-mostly daily home is moving
+out to `/governance` (top-level); only the create, rotate, archive
 admin tools stay in Settings, where every other admin authoring
 tool lives.
 
-### Persona-based home routing — the setup-state signal
+### Persona-based home routing: the setup-state signal
 
 The `/governance` entry only appears for users whose org has
 **activated** governance. The signal is the
@@ -54,7 +54,7 @@ The `/governance` entry only appears for users whose org has
 ```
 
 The UI calls it once on session resolve. The promotion rule is
-deliberately conservative — **don't auto-redirect existing
+deliberately conservative, **don't auto-redirect existing
 LLMOps users**, just promote a `/governance` nav entry when
 the signal fires:
 
@@ -98,7 +98,7 @@ no nav change at all.
 ```
 
 The control-plane primitives are the same six entities described in
-the [governance overview](/ai-gateway/governance/overview) — Org,
+the [governance overview](/ai-gateway/governance/overview): Org,
 Members, Teams (personal + shared), Projects + IngestionSources,
 ApiCredentials (polymorphic owner), RoutingPolicies, Budgets. Every
 tier below uses them; every dashboard reads from the same trace store
@@ -115,18 +115,18 @@ without touching any other.
 | **1** | Gateway proxy | Yes | Mid-flight inspect, rewrite, **block**. Mint per-user virtual keys. Enforce policy + budget before the call leaves the gateway. |
 | **2** | BYOK endpoint routing | Sometimes | Customer points a SaaS platform's "custom LLM endpoint" at the gateway. Same depth as Tier 1 *for traffic that flows through it*. |
 | **3** | Audit log ingest | No | Pull from a closed platform's compliance API into [`IngestionSource`](#tier-3--audit-log-ingest) records. Detect anomalies, alert, **trigger admin-API revoke** out-of-band. |
-| **4** | OTel / SDK instrumentation | Partial | Customer's agent code (or an opt-in SaaS like Claude Cowork) emits OpenTelemetry to LangWatch. Per-turn detail, no block, but full trace context. |
+| **4** | OTel, SDK instrumentation | Partial | Customer's agent code (or an opt-in SaaS like Claude Cowork) emits OpenTelemetry to LangWatch. Per-turn detail, no block, but full trace context. |
 | **5** | Sandboxed runtime | Yes (you host it) | LangWatch runs the agent. Egress policy, MCP allowlist, file-system jail, tool approval. Maximum control. |
 
 Every real customer is a mix. A typical large enterprise adopts:
-**Tier 1** for Claude Code / Codex / Cursor / Gemini CLI / custom
+**Tier 1** for Claude Code, Codex, Cursor, Gemini CLI, custom
 agents (BYOK paths LangWatch can proxy). **Tier 3** for closed SaaS
-where Microsoft / Anthropic / OpenAI own the runtime (Copilot Studio,
+where Microsoft, Anthropic, OpenAI own the runtime (Copilot Studio,
 ChatGPT Enterprise, Claude for Work). **Tier 4** for in-house agents
 already instrumented. **Tier 5** later, for the agents they
 genuinely don't trust.
 
-## Tier 1 — Gateway proxy (where the CLI lives)
+## Tier 1: Gateway proxy (where the CLI lives)
 
 Tier 1 is everything documented under
 [Coding CLI Integrations](/ai-gateway/cli/overview). The CLI's job
@@ -159,14 +159,14 @@ Why Tier 1 wins:
   out (request size, model allowlist, denied tool, budget
   exceeded). Tier 3 only sees the call after it happened.
 - **One credential covers every tool the dev uses.** Same VK for
-  Claude Code, Codex, Cursor, Gemini CLI — see the matrix on the
+  Claude Code, Codex, Cursor, Gemini CLI, see the matrix on the
   [CLI overview](/ai-gateway/cli/overview).
 
 The CLI itself is documented end-to-end at
 [Personal IDE keys](/ai-gateway/governance/personal-keys) and
 the per-tool config pages under `/ai-gateway/cli/`.
 
-## Tier 2 — BYOK endpoint routing
+## Tier 2: BYOK endpoint routing
 
 A handful of closed SaaS platforms let an admin point their "custom
 LLM endpoint" at a third-party gateway. When the customer wires this
@@ -176,19 +176,19 @@ identity).
 
 Confirmed BYOK paths in 2026:
 
-- **Workato** — Genies recipes can target a custom LLM endpoint.
-- **Vertex AI custom endpoint** — point at the gateway as a
+- **Workato**: Genies recipes can target a custom LLM endpoint.
+- **Vertex AI custom endpoint**: point at the gateway as a
   passthrough.
-- **Bedrock proxy routing** — same.
-- **Some Copilot Studio scenarios** — mileage varies; check with
+- **Bedrock proxy routing**: same.
+- **Some Copilot Studio scenarios**: mileage varies; check with
   the customer before promising it.
 
 When BYOK isn't available, the platform falls back to Tier 3.
 
-## Tier 3 — Audit log ingest
+## Tier 3: Audit log ingest
 
-For closed SaaS where the runtime is owned by Anthropic / OpenAI /
-Microsoft / Google / Workato, LangWatch can't proxy the call but
+For closed SaaS where the runtime is owned by Anthropic, OpenAI /
+Microsoft, Google, Workato, LangWatch can't proxy the call but
 can ingest the **audit log** the platform exposes. The trace pipeline
 writes one row per audit event into the same store as Tier 1 traces,
 tagged by `SourceType` so dashboards can union or filter at will.
@@ -196,28 +196,28 @@ tagged by `SourceType` so dashboards can union or filter at will.
 Per-platform mode (matching the seven `IngestionSource.sourceType`
 values shipped on this branch):
 
-- **`copilot_studio`** — Microsoft Purview pull every 1-5 min via
+- **`copilot_studio`**, Microsoft Purview pull every 1-5 min via
   the Office 365 Management Activity API. `parserConfig`:
   `{ tenantId, clientId, clientSecretHash, pollEverySec }`.
-- **`claude_compliance`** — pull from the Claude Compliance API.
+- **`claude_compliance`**, pull from the Claude Compliance API.
   `parserConfig`: `{ workspaceApiKeyHash, pollEverySec }`.
-- **`claude_cowork`** — OTel push (Tier 4) — admin pastes the
+- **`claude_cowork`**, OTel push (Tier 4), admin pastes the
   LangWatch OTLP URL + bearer token into Cowork org settings;
   every Cowork install streams to LangWatch automatically.
   `parserConfig`: `{ workspaceId }`.
-- **`openai_compliance`** — pull JSONL files at minutes-level
+- **`openai_compliance`**, pull JSONL files at minutes-level
   latency from OpenAI's compliance bucket. `parserConfig`:
   `{ bucket, prefix, roleArn, pollEverySec }`.
-- **`workato`** — push to a webhook the customer configures
+- **`workato`**, push to a webhook the customer configures
   in their Activity Audit Log streaming settings.
   `parserConfig`: `{ sharedSecretLastFour }`.
-- **`s3_custom`** — generic S3 audit-log drop with a configurable
-  parser DSL, for any platform that drops JSON / JSONL / CSV
+- **`s3_custom`**, generic S3 audit-log drop with a configurable
+  parser DSL, for any platform that drops JSON, JSONL, CSV
   audit logs into a customer-owned bucket. `parserConfig`:
   `{ bucket, prefix, roleArn, parserDsl, pollEverySec }`.
   This is the catch-all for customer-specific audit feeds that
   don't have a first-party adapter yet.
-- **`otel_generic`** — generic OTLP/HTTP receiver. Any agent
+- **`otel_generic`**, generic OTLP/HTTP receiver. Any agent
   framework that speaks OpenTelemetry (Cowork OTel as a
   sub-case, in-house agents, OpenInference-instrumented stacks)
   can push to a per-source endpoint. `parserConfig`:
@@ -225,10 +225,10 @@ values shipped on this branch):
 
 You can't block in-flight here, but you can:
 
-1. Detect (anomaly rules — "user X did N actions outside business
+1. Detect (anomaly rules, "user X did N actions outside business
    hours").
-2. Alert (Slack / PagerDuty / SIEM via OCSF).
-3. **Trigger admin-API revoke** — call the platform's own admin
+2. Alert (Slack, PagerDuty, SIEM via OCSF).
+3. **Trigger admin-API revoke**: call the platform's own admin
    API (Anthropic, OpenAI, Microsoft Power Platform) to disable
    the offending workspace key or session within seconds. Tier 3 is
    "near-real-time stop", not "no stop".
@@ -237,29 +237,29 @@ The IngestionSource entity that holds the connection metadata is
 shared across Tier 3, Tier 4, and the S3 audit drop case. See the
 admin setup doc for the per-source forms.
 
-## Tier 4 — OpenTelemetry / SDK instrumentation
+## Tier 4: OpenTelemetry, SDK instrumentation
 
-Customer-side agents that emit OpenInference / Traceloop / standard
+Customer-side agents that emit OpenInference, Traceloop, standard
 OTel into LangWatch. This is the deepest visibility short of running
-the runtime — per-turn detail, full trace context, prompt + response
+the runtime, per-turn detail, full trace context, prompt + response
 in the trace, all the LangWatch eval/monitoring features attach
 automatically.
 
 Two important Tier 4 sub-cases:
 
 - **Claude Cowork OTel export.** Anthropic ships Cowork with a
-  central OTLP-endpoint config — admin pastes the LangWatch URL +
+  central OTLP-endpoint config, admin pastes the LangWatch URL +
   bearer token in the workspace settings, every Cowork install in
   the org streams to LangWatch. **No per-desktop config required.**
-- **In-house agents using the LangWatch SDKs** — the existing
+- **In-house agents using the LangWatch SDKs**: the existing
   `@langwatch/sdk` setup; nothing governance-specific needed.
 
-## Tier 5 — Sandboxed runtime (Open Managed Agents)
+## Tier 5: Sandboxed runtime (Open Managed Agents)
 
 For workloads the customer wants to run inside LangWatch's own
 runtime: Open Managed Agents, Hermes, OpenClaw, or any custom
 agent. Per gateway.md the recommended 2026 stack is **Firecracker
-microVMs with snapshot-restore** for cloud, **Kata Containers / Google
+microVMs with snapshot-restore** for cloud, **Kata Containers, Google
 Agent Sandbox on Kubernetes** for self-hosted. Egress policy via
 Envoy sidecar, MCP allowlist enforced at the runtime layer.
 
@@ -284,18 +284,18 @@ The current branch (PR #3524) implements Tier 1 end-to-end:
   (org-admin-only via `organization:manage` permission, plus the
   governance flag). Wired to real `api.activityMonitor.{summary,
   spendByUser, ingestionSourcesHealth, recentAnomalies}` tRPC
-  procedures; **no mocked fixtures** — empty data renders a setup
+  procedures; **no mocked fixtures**: empty data renders a setup
   checklist (publish a RoutingPolicy, connect an IngestionSource),
   data renders live cards + per-user table + source-health strip.
   Read-mostly daily-use surface; admin authoring lives at the
   `/settings/governance/*` sub-routes.
-- ✅ **Budget enforcement** (cross-surface — gateway 402 ↔ CLI
+- ✅ **Budget enforcement** (cross-surface, gateway 402 ↔ CLI
   Screen-8 box ↔ web `BudgetExceededBanner` all derive from
   `GatewayBudgetService.check()`).
 - ✅ **Helm `NOTES.txt` + post-install checklist** for self-hosted
   bootstrap.
 - ✅ **`IngestionSource` schema** (Postgres) + `trace_summaries.SourceType`
-  + `SourceId` columns (ClickHouse) — the data model for Tier 3
+  + `SourceId` columns (ClickHouse), the data model for Tier 3
   + Tier 4. Seven `sourceType` values supported on the schema
   side (see Tier 3 above).
 - ✅ **`IngestionSourceService` + REST receivers + tRPC admin
@@ -307,13 +307,13 @@ The current branch (PR #3524) implements Tier 1 end-to-end:
   rotateSecret,archive}` exposes the management surface to the
   admin UI; raw secret is returned exactly once on create /
   rotate, never echoed back afterwards.
-- ✅ **`api.governance.setupState`** — the persona-routing
+- ✅ **`api.governance.setupState`**, the persona-routing
   signal. Read-only summary of whether the org has personal VKs,
   routing policies, ingestion sources, anomaly rules, or recent
   activity. The boolean OR (`governanceActive`) drives whether
   the `/governance` nav entry appears for org admins. Wires the
   conservative no-auto-redirect promotion rule.
-- ✅ **MainMenu Governance entry** — gated on the three-of-three
+- ✅ **MainMenu Governance entry**: gated on the three-of-three
   predicate: `release_ui_ai_governance_enabled` flag on AND
   `organization:manage` permission AND
   `api.governance.setupState.governanceActive === true`. Renders
@@ -322,13 +322,13 @@ The current branch (PR #3524) implements Tier 1 end-to-end:
   majority of current LLMOps admins (no governance state) see no
   nav change at all.
 
-  ![MainMenu showing GOVERN Preview section with Governance entry — only visible when governanceActive=true](https://i.img402.dev/mck1l1ar3g.png)
+  ![MainMenu showing GOVERN Preview section with Governance entry, only visible when governanceActive=true](https://i.img402.dev/mck1l1ar3g.png)
 
 In flight on the same branch:
 
-- 🚧 IngestionSource setup forms (per-source-type, in lane B —
+- 🚧 IngestionSource setup forms (per-source-type, in lane B):
   wires to `api.ingestionSources.create`, surfaces the
-  one-time secret in a "paste this into upstream" modal).
+  one-time secret in a "paste this into upstream" modal.
 - 🚧 Architecture deep-dive doc (the diagram + per-tier internals).
 
 ## Verified end-to-end (D2 foundation)
@@ -336,7 +336,7 @@ In flight on the same branch:
 The IngestionSource auth path, the OTel receiver, and the
 `lastEventAt` flip were dogfooded against `pnpm dev` on `:6660`.
 The transcript IS the proof artifact (no UI to screenshot at this
-layer — that's lane B's setup form, in flight).
+layer, that's lane B's setup form, in flight).
 
 ```
 $ pnpm tsx tmp/dogfood-ingestion.ts
@@ -381,16 +381,16 @@ upstream, the list page polls and flips the source from
 
 The hero shot is the list page after the flip:
 
-![IngestionSource list — Active after curl receipt](https://i.img402.dev/supafck5au.png)
+![IngestionSource list, Active after curl receipt](https://i.img402.dev/supafck5au.png)
 
 Full 6-step carousel for reviewers:
 
 | # | Step | Shot |
 |---|------|------|
-| 1 | `/settings/governance/ingestion-sources` — empty state | [open](https://i.img402.dev/wx4v7m7a8g.png) |
-| 2 | Composer open — `sourceType` picker + dynamic per-type form | [open](https://i.img402.dev/ycld8afavo.png) |
-| 3 | Composer filled — Generic OTel example | [open](https://i.img402.dev/yixqegurj3.png) |
-| 4 | One-time secret reveal modal — `ingestSecret` + OTLP URL + Copy | [open](https://i.img402.dev/w4fl31ukrc.png) |
+| 1 | `/settings/governance/ingestion-sources`, empty state | [open](https://i.img402.dev/wx4v7m7a8g.png) |
+| 2 | Composer open, `sourceType` picker + dynamic per-type form | [open](https://i.img402.dev/ycld8afavo.png) |
+| 3 | Composer filled, Generic OTel example | [open](https://i.img402.dev/yixqegurj3.png) |
+| 4 | One-time secret reveal modal, `ingestSecret` + OTLP URL + Copy | [open](https://i.img402.dev/w4fl31ukrc.png) |
 | 5 | List polled, flipped to **Active**, last event 13 s ago | [open](https://i.img402.dev/supafck5au.png) |
 
 The dogfood walks the full Tier-3 push contract: admin issues
@@ -434,14 +434,14 @@ $ langwatch ingest tail JxQztBgN90QeX12-afJ0C --limit 5
 ```
 
 Every command also accepts `--json` for machine output (exact
-contract match with the equivalent tRPC procedure / web UI render).
+contract match with the equivalent tRPC procedure, web UI render).
 `langwatch ingest tail --follow` polls every 3 s and dedupes by
 `eventId`, so the CLI and the per-source detail page show the
 same event stream byte-for-byte.
 
 Auth for these REST adapters reuses the same Bearer
 `access_token` the device flow persists in
-`~/.langwatch/config.json` — no separate token. Unauthenticated
+`~/.langwatch/config.json`, no separate token. Unauthenticated
 calls bounce with `Not logged in — run \`langwatch login --device\` first`;
 unknown source IDs surface the underlying tRPC `NOT_FOUND` as
 `Error: IngestionSource not found`. Both error paths are
@@ -458,13 +458,13 @@ renders live cards + per-user table + source-health strip.
 
 | Surface | Real-data state | Shot |
 |---------|------------------|------|
-| `/settings/governance` — setup checklist + first real source visible in the health strip | live (`api.activityMonitor.{summary, spendByUser, ingestionSourcesHealth, recentAnomalies}`) | [open](https://i.img402.dev/hhghiq7gbb.png) |
-| `/settings/governance/ingestion-sources` — list page after the iter-13 customer-name scrub | live (`api.ingestionSources.list`) | [open](https://i.img402.dev/kfvazcuczp.png) |
-| `/settings/governance/anomaly-rules` — empty list (no rules yet) | live (`api.anomalyRules.list`) | [open](https://i.img402.dev/9fjdw9we08.png) |
-| `/settings/governance/anomaly-rules` — composer (name + severity + ruleType + scope + JSONB threshold/destination configs) | live (`api.anomalyRules.create`) | [open](https://i.img402.dev/9v33n8zzrk.png) |
-| `/settings/governance/anomaly-rules` — list after Create roundtrip; persisted rule grouped under Critical with the honest "rules persist now; evaluation + alerts arrive with the detection backend" banner | live (PG persistence; eval engine = Sergey Option C, deferred) | [open](https://i.img402.dev/15z3h6k32v.png) |
+| `/settings/governance`, setup checklist + first real source visible in the health strip | live (`api.activityMonitor.{summary, spendByUser, ingestionSourcesHealth, recentAnomalies}`) | [open](https://i.img402.dev/hhghiq7gbb.png) |
+| `/settings/governance/ingestion-sources`, list page after the iter-13 customer-name scrub | live (`api.ingestionSources.list`) | [open](https://i.img402.dev/kfvazcuczp.png) |
+| `/settings/governance/anomaly-rules`, empty list (no rules yet) | live (`api.anomalyRules.list`) | [open](https://i.img402.dev/9fjdw9we08.png) |
+| `/settings/governance/anomaly-rules`, composer (name + severity + ruleType + scope + JSONB threshold/destination configs) | live (`api.anomalyRules.create`) | [open](https://i.img402.dev/9v33n8zzrk.png) |
+| `/settings/governance/anomaly-rules`, list after Create roundtrip; persisted rule grouped under Critical with the honest "rules persist now; evaluation + alerts arrive with the detection backend" banner | live (PG persistence; eval engine = Sergey Option C, deferred) | [open](https://i.img402.dev/15z3h6k32v.png) |
 
-Tier 2 / Tier 5 are deferred; the architecture doesn't preclude them
+Tier 2, Tier 5 are deferred; the architecture doesn't preclude them
 and the control-plane primitives already accommodate them.
 
 ## Feature-flag gates (preview)
@@ -476,12 +476,12 @@ behind a single fence on each surface:
   Off by default. Force-enable with
   `FEATURE_FLAG_FORCE_ENABLE=release_ui_ai_governance_enabled`.
   Existing AI Gateway menu surface stays on the unrelated
-  `release_ui_ai_gateway_menu_enabled` flag — they ship
+  `release_ui_ai_gateway_menu_enabled` flag, they ship
   independently.
 - **CLI:** env var `LANGWATCH_GOVERNANCE_PREVIEW=1`. Off by default.
   When unset, the new subcommands aren't registered and
   `langwatch login` shows only `--api-key`. Existing
-  `langwatch login --api-key` / dataset / prompts / scenarios
+  `langwatch login --api-key`, dataset, prompts, scenarios
   surface is untouched and ships as-is.
 - **Backend:** the tRPC procedures, REST endpoints, gateway 402
   payload, and Prisma schema are not flag-gated. Hiding only the

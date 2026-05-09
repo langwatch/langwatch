@@ -5,13 +5,13 @@ sidebarTitle: SCIM Provisioning
 keywords: scim, provisioning, deprovisioning, okta, azure ad, identity provider, sso, user management
 ---
 
-SCIM (System for Cross-domain Identity Management) 2.0 allows your identity provider to automatically manage user lifecycle in LangWatch — provisioning new users when they join your organization and deprovisioning them when they leave, without any manual intervention.
+SCIM (System for Cross-domain Identity Management) 2.0 allows your identity provider to automatically manage user lifecycle in LangWatch, provisioning new users when they join your organization and deprovisioning them when they leave, without any manual intervention.
 
 ## Prerequisites
 
 - Organization Admin permissions in LangWatch
-- An identity provider that supports SCIM 2.0 (Okta, Azure AD / Entra ID, etc.)
-- SSO configured for your organization (recommended — see [SSO Setup](/self-hosting/sso-setup-langwatch))
+- An identity provider that supports SCIM 2.0 (Okta, Azure AD, Entra ID, etc.)
+- SSO configured for your organization (recommended, see [SSO Setup](/self-hosting/sso-setup-langwatch))
 
 ## Setting Up SCIM
 
@@ -34,7 +34,7 @@ https://your-langwatch-instance.example.com/api/scim/v2
 1. In **Settings → SCIM**, click **Generate Token**
 2. Optionally add a description (e.g., `Okta SCIM integration`)
 3. Click **Generate Token**
-4. **Copy the token immediately** — it will not be shown again
+4. **Copy the token immediately**: it will not be shown again
 
 <Warning>
   Store your SCIM bearer token securely. Once you close the dialog, the token
@@ -55,8 +55,8 @@ Use the SCIM Base URL and bearer token to configure SCIM in your identity provid
 
 Refer to your identity provider's own documentation for where to enter these values:
 
-- **Okta** — [Configure SCIM provisioning](https://help.okta.com/en-us/content/topics/apps/apps_app_integration_wizard_scim.htm)
-- **Azure AD / Entra ID** — [Configure automatic user provisioning](https://learn.microsoft.com/en-us/entra/identity/app-provisioning/configure-automatic-user-provisioning-portal)
+- **Okta**: [Configure SCIM provisioning](https://help.okta.com/en-us/content/topics/apps/apps_app_integration_wizard_scim.htm)
+- **Azure AD, Entra ID**: [Configure automatic user provisioning](https://learn.microsoft.com/en-us/entra/identity/app-provisioning/configure-automatic-user-provisioning-portal)
 
 ---
 
@@ -71,7 +71,7 @@ LangWatch SCIM 2.0 supports the following user operations:
 | **List Users**          | Lists all users in the organization, with optional `userName` filtering |
 | **Update User (PUT)**   | Replaces user attributes (name, email, active status)                   |
 | **Update User (PATCH)** | Partially updates user attributes (e.g., deactivate only)               |
-| **Delete User**         | Deactivates the user (soft delete — their data is preserved)            |
+| **Delete User**         | Deactivates the user (soft delete, their data is preserved)            |
 
 ### SCIM Endpoints
 
@@ -114,18 +114,18 @@ New users provisioned via SCIM are assigned the **Member** role by default. You 
 When your identity provider sends a **DELETE** for a user:
 
 - Their org membership and all role bindings are **removed**
-- Their account is **deactivated** — they can no longer sign in
+- Their account is **deactivated**: they can no longer sign in
 - Their data (traces, annotations, datasets) is **preserved**
-- A second DELETE returns `404 Not Found` — the operation is idempotent
+- A second DELETE returns `404 Not Found`, the operation is idempotent
 
 When your identity provider **suspends** a user (`PATCH active: false`):
 
-- Their account is **deactivated** — they can no longer sign in
+- Their account is **deactivated**: they can no longer sign in
 - Their org membership and role bindings are **preserved**
 - Re-activating (`active: true`) immediately restores access
 
 <Info>
-  Use `active: false` for temporary suspension and DELETE for permanent offboarding. DELETE removes all memberships and role bindings — re-provisioning the user starts from scratch.
+  Use `active: false` for temporary suspension and DELETE for permanent offboarding. DELETE removes all memberships and role bindings, re-provisioning the user starts from scratch.
 </Info>
 
 ---
@@ -146,10 +146,10 @@ To revoke a token, click the delete icon next to it and confirm. Any identity pr
 
 ## Security Considerations
 
-- **Rotate tokens regularly** — generate a new token and update your IdP before revoking the old one to avoid downtime
-- **One token per integration** — use separate tokens for each identity provider or environment so you can revoke them independently
-- **Combine with SSO** — SCIM works best when paired with SSO so that provisioned users sign in via your IdP rather than email/password
-- **Audit token usage** — the "Last Used" column helps identify unused or stale tokens
+- **Rotate tokens regularly**: generate a new token and update your IdP before revoking the old one to avoid downtime
+- **One token per integration**: use separate tokens for each identity provider or environment so you can revoke them independently
+- **Combine with SSO**: SCIM works best when paired with SSO so that provisioned users sign in via your IdP rather than email/password
+- **Audit token usage**: the "Last Used" column helps identify unused or stale tokens
 
 ---
 
@@ -174,7 +174,7 @@ To revoke a token, click the delete icon next to it and confirm. Any identity pr
 
 **User shows "already exists" error**
 
-- A user with the same email may already be a member of the organization — this is expected behavior and can be safely ignored
+- A user with the same email may already be a member of the organization, this is expected behavior and can be safely ignored
 
 ---
 

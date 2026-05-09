@@ -16,10 +16,10 @@ Under **Settings → Model Providers**:
 
 ## Supported models
 
-- `gemini-2.5-flash` — fast + cheap. Default recommendation for coding CLIs on a Gemini-first VK.
-- `gemini-2.5-pro` — bigger, more capable.
-- `gemini-2.0-flash` — prior generation.
-- `gemini-2.0-pro` — prior generation.
+- `gemini-2.5-flash`, fast + cheap. Default recommendation for coding CLIs on a Gemini-first VK.
+- `gemini-2.5-pro`, bigger, more capable.
+- `gemini-2.0-flash`, prior generation.
+- `gemini-2.0-pro`, prior generation.
 - Embedding models: `text-embedding-004`, `gemini-embedding-001`.
 
 Expose via VK `model_aliases`:
@@ -35,8 +35,8 @@ Expose via VK `model_aliases`:
 
 ## Supported endpoints
 
-- `POST /v1/chat/completions` — OpenAI-shape dispatched to Gemini's `generateContent` / `streamGenerateContent` endpoint.
-- `POST /v1/embeddings` — for Gemini embedding models.
+- `POST /v1/chat/completions`, OpenAI-shape dispatched to Gemini's `generateContent`, `streamGenerateContent` endpoint.
+- `POST /v1/embeddings`, for Gemini embedding models.
 
 Gemini has no `/v1/messages` equivalent; Anthropic-shape clients should use a VK that has Anthropic or Bedrock as primary.
 
@@ -44,21 +44,21 @@ Gemini has no `/v1/messages` equivalent; Anthropic-shape clients should use a VK
 
 Gemini has an implicit context cache for prompts > 32k tokens on most models. The gateway forwards requests untouched; caching behaviour is entirely upstream-managed.
 
-For explicit caching, Gemini offers a separate `caches.create` API that the gateway does not orchestrate in v1 — but clients can call Gemini directly to create a cache and reference it in subsequent gateway calls.
+For explicit caching, Gemini offers a separate `caches.create` API that the gateway does not orchestrate in v1, but clients can call Gemini directly to create a cache and reference it in subsequent gateway calls.
 
 ## Known quirks
 
 - **Safety filters on by default.** Gemini applies `safetySettings` thresholds that return `finish_reason: SAFETY` when content crosses the threshold. Bifrost/core surfaces this as `provider_error` with the safety metadata in the OTel trace.
 - **Rate limits.** AI Studio's free tier has aggressive rate limits; paid tier is unlocked via billing-attached Google account. A 429 triggers fallback if configured.
-- **Tool/function calling.** Gemini has its own function-calling format that bifrost/core translates from OpenAI-shape tools. Tool-call streaming deltas are less mature on Gemini — expect byte-level differences vs OpenAI.
-- **Streaming chunks size.** Gemini's streaming emits larger chunks than OpenAI — fewer, bigger SSE frames. Gateway passes these through unchanged.
+- **Tool/function calling.** Gemini has its own function-calling format that bifrost/core translates from OpenAI-shape tools. Tool-call streaming deltas are less mature on Gemini, expect byte-level differences vs OpenAI.
+- **Streaming chunks size.** Gemini's streaming emits larger chunks than OpenAI, fewer, bigger SSE frames. Gateway passes these through unchanged.
 - **No `system` role.** Gemini uses `systemInstruction` at the top level of the request. OpenAI-SDK clients that send a `system` role message get it rewritten by the translator.
 
 ## AI Studio vs Vertex
 
 Google has two paths to Gemini:
 
-- **AI Studio** (this page) — quickest, API-key auth, pay-as-you-go on a consumer-ish billing model.
-- **Vertex AI** — GCP-native, IAM-governed, data-residency, enterprise SLAs. See [Vertex](/ai-gateway/providers/vertex).
+- **AI Studio** (this page), quickest, API-key auth, pay-as-you-go on a consumer-ish billing model.
+- **Vertex AI**: GCP-native, IAM-governed, data-residency, enterprise SLAs. See [Vertex](/ai-gateway/providers/vertex).
 
-Use AI Studio for dev / scoping / SaaS; use Vertex for production enterprise.
+Use AI Studio for dev, scoping, SaaS; use Vertex for production enterprise.

@@ -6,15 +6,15 @@
 
 ## Context
 
-LangWatch uses Chakra UI v3 (backed by Zag.js) for its component library. Overlay components — Select, Menu, Popover, and Tooltip — are portalled to `document.body` and receive z-index values from Zag.js's internal layer stack. Chakra's token scale assigns `z-index: 1000` to dropdowns and `z-index: 1400` to modals.
+LangWatch uses Chakra UI v3 (backed by Zag.js) for its component library. Overlay components, Select, Menu, Popover, and Tooltip, are portalled to `document.body` and receive z-index values from Zag.js's internal layer stack. Chakra's token scale assigns `z-index: 1000` to dropdowns and `z-index: 1400` to modals.
 
 This creates a systemic problem: any portalled overlay that opens inside a modal or dialog renders *behind* it, because the dropdown z-index (1000) is lower than the modal z-index (1400). Both elements live at the same DOM level (`document.body`), so there is no stacking context inheritance to rely on.
 
 Developers worked around this with ad-hoc `zIndex` props scattered across ~30 consumer components (`zIndex="popover"`, `zIndex="1600"`, `zIndex={1501}`, etc.). These overrides were:
 
-- **Fragile** — each new overlay-in-modal usage required discovering and applying the workaround
-- **Inconsistent** — different values used across the codebase with no rationale
-- **Incomplete** — nested overlays (e.g., Select inside Popover inside Dialog) couldn't be solved with a single flat value
+- **Fragile**: each new overlay-in-modal usage required discovering and applying the workaround
+- **Inconsistent**: different values used across the codebase with no rationale
+- **Incomplete**: nested overlays (e.g., Select inside Popover inside Dialog) couldn't be solved with a single flat value
 
 ### Why not CSS custom properties?
 
@@ -52,7 +52,7 @@ Consumers can provide their own `<OverlayDepthContext.Provider value={N}>` to ov
 - All overlay-in-modal/dialog cases work correctly without any consumer-side code
 - Nested overlays stack correctly regardless of depth
 - Removed 30 ad-hoc `zIndex` overrides from consumer components
-- New overlay usages automatically get correct stacking — no workaround discovery needed
+- New overlay usages automatically get correct stacking, no workaround discovery needed
 
 **Negative:**
 - `!important` on z-index prevents consumers from lowering the value via normal CSS (the escape hatch via context still works)
@@ -61,7 +61,7 @@ Consumers can provide their own `<OverlayDepthContext.Provider value={N}>` to ov
 
 **Neutral:**
 - The increment of 10 allows ~100 nesting levels before reaching z-index 3000, which is far beyond any realistic UI scenario
-- The solution is specific to Chakra/Zag.js — a different UI library would require a different approach
+- The solution is specific to Chakra/Zag.js, a different UI library would require a different approach
 
 ## References
 

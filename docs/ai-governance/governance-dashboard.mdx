@@ -1,16 +1,16 @@
 ---
 title: /governance dashboard
-description: The daily-use org governance home — spend, anomalies, ingestion-source health, per-user activity. Read-mostly; the admin-authoring CRUD pages still live under /settings/governance/*. Available only after the org's setup-state OR-of-flags trips.
+description: The daily-use org governance home, spend, anomalies, ingestion-source health, per-user activity. Read-mostly; the admin-authoring CRUD pages still live under /settings/governance/*. Available only after the org's setup-state OR-of-flags trips.
 sidebarTitle: /governance dashboard
 ---
 
-The `/governance` route is the **org governance daily home** — the read-mostly oversight dashboard an admin opens to answer *"is the gateway healthy, are we within budget, did anything anomalous happen overnight, are users actually using this?"*. It's the counterpart of `/me` for the admin persona.
+The `/governance` route is the **org governance daily home**: the read-mostly oversight dashboard an admin opens to answer *"is the gateway healthy, are we within budget, did anything anomalous happen overnight, are users actually using this?"*. It's the counterpart of `/me` for the admin persona.
 
-It is intentionally distinct from the **admin-authoring** surface at `/settings/governance/*` — see [Control plane → Daily-use vs admin-authoring](/ai-governance/control-plane#daily-use-surfaces-vs-admin-authoring-surfaces) for why the split exists.
+It is intentionally distinct from the **admin-authoring** surface at `/settings/governance/*`, see [Control plane → Daily-use vs admin-authoring](/ai-governance/control-plane#daily-use-surfaces-vs-admin-authoring-surfaces) for why the split exists.
 
 <Info>**Pairs with:** [Control plane & integration tiers](/ai-governance/control-plane) for the surface map and [Anomaly rules](/ai-governance/anomaly-rules) for what populates the anomalies strip.</Info>
 
-<Note>**Visibility** — the `/governance` entry only appears in the main sidebar once the org's setup-state OR-of-flags trips (see [When the entry shows up](#when-the-entry-shows-up) below). A brand-new org sees the **Settings → AI Governance** admin pages instead until they have data flowing.</Note>
+<Note>**Visibility**: the `/governance` entry only appears in the main sidebar once the org's setup-state OR-of-flags trips (see [When the entry shows up](#when-the-entry-shows-up) below). A brand-new org sees the **Settings → AI Governance** admin pages instead until they have data flowing.</Note>
 
 ## What you see
 
@@ -40,28 +40,28 @@ The chart is the unified view across:
 - Project Virtual Keys minted from project pages.
 - Anything else that hit the gateway with a `lw_vk_*` Bearer.
 
-It does not include Ingestion Source events (those are governance-tagged but don't carry cost) — those land in [Ingestion-source health](#3-ingestion-source-health) below.
+It does not include Ingestion Source events (those are governance-tagged but don't carry cost), those land in [Ingestion-source health](#3-ingestion-source-health) below.
 
 ### 3. Ingestion-source health
 
 A status row per active IngestionSource:
 
-- **Status pill** — `active` / `awaiting_first_event` / `error`.
-- **Source type** — `otel_generic`, `claude_cowork`, `workato`, etc.
-- **Last event** — relative timestamp of the most recent successful ingest.
-- **Event count** — 24h / 7d / 30d, picked from the same `ingestionSources.healthMetrics` tRPC procedure that `langwatch ingest health` uses (so the CLI and the web UI are byte-for-byte identical on `--json`).
+- **Status pill**: `active`, `awaiting_first_event`, `error`.
+- **Source type**: `otel_generic`, `claude_cowork`, `workato`, etc.
+- **Last event**: relative timestamp of the most recent successful ingest.
+- **Event count**: 24h, 7d, 30d, picked from the same `ingestionSources.healthMetrics` tRPC procedure that `langwatch ingest health` uses (so the CLI and the web UI are byte-for-byte identical on `--json`).
 
-A red dot on a source means the receiver hasn't seen events in the configured window — see the [per-source detail page](/ai-gateway/governance/admin-setup#ingestion-sources) for the timeline + the receiver-side error log.
+A red dot on a source means the receiver hasn't seen events in the configured window, see the [per-source detail page](/ai-gateway/governance/admin-setup#ingestion-sources) for the timeline + the receiver-side error log.
 
 ### 4. Anomalies
 
 The list of `AnomalyAlert` rows in the window, sorted newest first. Each row shows:
 
-- **Severity chip** (critical / warning / info).
+- **Severity chip** (critical, warning, info).
 - **Rule name** that fired.
 - **Triggered at** timestamp.
 - **Current vs baseline** values for spend-spike anomalies.
-- **Scope** (organization / source_type / source).
+- **Scope** (organization, source_type, source).
 
 Click a row to expand the AnomalyAlert detail (the rule definition that matched, the event window that triggered it, the per-actor breakdown). Click the rule name to navigate to the [anomaly-rule editor](/ai-governance/anomaly-rules).
 
@@ -85,18 +85,18 @@ The same signal drives:
 
 - The **Govern (Preview)** entry visibility in the main sidebar.
 - The CLI `langwatch governance status` output (mirrors the same booleans).
-- The post-onboarding redirect — when an admin lands on `/`, the persona-2 home picker sends them to `/governance` if active, else to `/settings/governance` to keep configuring.
+- The post-onboarding redirect, when an admin lands on `/`, the persona-2 home picker sends them to `/governance` if active, else to `/settings/governance` to keep configuring.
 
 ## Permissions
 
 The `/governance` page itself is gated to `governance:view` (granted to ADMIN by default). Underlying procedures:
 
-- `governance.kpis(organizationId, window)` — KPI strip.
-- `governance.spendOverTime(organizationId, window)` — bar chart.
-- `ingestionSources.healthMetrics(organizationId)` — health strip.
-- `activityMonitor.recentAnomalies(organizationId, window)` — anomaly list (this lives in the `activityMonitor` router, not `governance`, for routing-through-service reasons).
+- `governance.kpis(organizationId, window)`, KPI strip.
+- `governance.spendOverTime(organizationId, window)`, bar chart.
+- `ingestionSources.healthMetrics(organizationId)`, health strip.
+- `activityMonitor.recentAnomalies(organizationId, window)`, anomaly list (this lives in the `activityMonitor` router, not `governance`, for routing-through-service reasons).
 
-The activity monitor procedures cap at `activityMonitor:view` — the recommended permission to grant a security-analyst custom role that should see anomalies without managing rules.
+The activity monitor procedures cap at `activityMonitor:view`, the recommended permission to grant a security-analyst custom role that should see anomalies without managing rules.
 
 ## What you can do FROM here
 
@@ -111,8 +111,8 @@ If the dashboard surfaces something you want to *act* on (rotate a key, edit a r
 
 ## Where to next
 
-- **Detect anomalies** — [Anomaly rules](/ai-governance/anomaly-rules).
-- **Inspect ingestion-source health from the terminal** — [CLI debug](/ai-governance/cli-debug).
-- **Export to your SIEM** — [Compliance architecture](/ai-governance/compliance-architecture).
-- **Tighten privacy** — [No-spy mode](/ai-governance/no-spy-mode).
-- **Audit who did what when** — [Audit log](/ai-governance/audit-log).
+- **Detect anomalies**: [Anomaly rules](/ai-governance/anomaly-rules).
+- **Inspect ingestion-source health from the terminal**: [CLI debug](/ai-governance/cli-debug).
+- **Export to your SIEM**: [Compliance architecture](/ai-governance/compliance-architecture).
+- **Tighten privacy**: [No-spy mode](/ai-governance/no-spy-mode).
+- **Audit who did what when**: [Audit log](/ai-governance/audit-log).

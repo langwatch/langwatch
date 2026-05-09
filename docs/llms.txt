@@ -10,7 +10,7 @@ Always navigate to docs links using the .md extension for better readability.
 ## Overview
 
 - [Self-Hosting Overview](https://langwatch.ai/docs/self-hosting/overview.md): Deploy LangWatch on your own infrastructure for full data control
-- [Hybrid Setup](https://langwatch.ai/docs/hybrid-setup/overview.md): Use LangWatch Cloud with your own data plane — keep full data ownership while leveraging LangWatch's managed control plane.
+- [Hybrid Setup](https://langwatch.ai/docs/hybrid-setup/overview.md): Use LangWatch Cloud with your own data plane, keep full data ownership while leveraging LangWatch's managed control plane.
 - [Troubleshooting & FAQ](https://langwatch.ai/docs/self-hosting/troubleshooting.md): Common issues and solutions for LangWatch self-hosting
 
 ## Configuration
@@ -25,13 +25,13 @@ Always navigate to docs links using the .md extension for better readability.
 ## Deployment
 
 - [Docker Compose](https://langwatch.ai/docs/self-hosting/deployment/docker-compose.md): Get LangWatch running locally in minutes with Docker Compose
-- [Docker Images](https://langwatch.ai/docs/self-hosting/deployment/docker-images.md): LangWatch Docker image reference — what each container does and how they communicate
+- [Docker Images](https://langwatch.ai/docs/self-hosting/deployment/docker-images.md): LangWatch Docker image reference, what each container does and how they communicate
 - [Kubernetes (Helm)](https://langwatch.ai/docs/self-hosting/deployment/kubernetes-helm.md): Production Kubernetes deployment with the LangWatch Helm chart
 - [Local Kubernetes (Kind + Helm)](https://langwatch.ai/docs/self-hosting/deployment/kubernetes-local.md): Run LangWatch locally on Kind for development and testing
 
 ## Infrastructure
 
-- [Architecture & Infrastructure](https://langwatch.ai/docs/self-hosting/infrastructure/architecture.md): How LangWatch components fit together — what you're deploying and how data flows through the system
+- [Architecture & Infrastructure](https://langwatch.ai/docs/self-hosting/infrastructure/architecture.md): How LangWatch components fit together, what you're deploying and how data flows through the system
 
 ## Operations
 

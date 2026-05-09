@@ -44,7 +44,7 @@ kubectl -n langwatch port-forward svc/langwatch-app 5560:5560
 ```
 
 <Warning>
-`autogen.enabled=true` generates random secrets on each install. This is fine for testing but not for production — secrets will change on reinstall and invalidate sessions. See [Production Deployment](#production-deployment) below.
+`autogen.enabled=true` generates random secrets on each install. This is fine for testing but not for production, secrets will change on reinstall and invalidate sessions. See [Production Deployment](#production-deployment) below.
 </Warning>
 
 ## Low-Resources Deployment
@@ -314,7 +314,7 @@ The chart ships with composable overlay files in `examples/overlays/`. Combine t
 
 ### Composing Overlays
 
-Overlays are composable — later files override earlier ones:
+Overlays are composable, later files override earlier ones:
 
 ```bash
 # Production with external DBs and S3 cold storage
@@ -367,11 +367,11 @@ clickhouse:
   memory: "8Gi" # Tunes memory limits, cache sizes, per-query limits
 ```
 
-You only need to set these two values — the subchart computes optimal settings for query limits, merge threads, insert batching, and S3 download parallelism.
+You only need to set these two values, the subchart computes optimal settings for query limits, merge threads, insert batching, and S3 download parallelism.
 
 ### AI Gateway sub-chart (optional)
 
-The umbrella chart bundles the AI Gateway as an opt-in sub-chart that runs alongside the core LangWatch app. Enabling it gives you virtual keys, hierarchical budgets, multi-provider routing via Bifrost, guardrails, and prompt caching — all governed by the same control plane.
+The umbrella chart bundles the AI Gateway as an opt-in sub-chart that runs alongside the core LangWatch app. Enabling it gives you virtual keys, hierarchical budgets, multi-provider routing via Bifrost, guardrails, and prompt caching, all governed by the same control plane.
 
 Minimum viable opt-in:
 
@@ -384,8 +384,8 @@ That ships sane defaults (2 replicas, ClusterIP service, no ingress). For per-en
 
 Three things to know before flipping it on:
 
-1. **Shared secrets must exist before install.** The gateway and the LangWatch app both mount `LW_GATEWAY_INTERNAL_SECRET` + `LW_GATEWAY_JWT_SECRET` (and the app additionally reads `LW_VIRTUAL_KEY_PEPPER`) — same byte-for-byte values. Pre-create the `gateway-runtime-secrets` Kubernetes Secret (the chart's `secrets.existingSecretName` default) holding all three keys before `helm install`, otherwise the gateway pod loops on `secret not found` until the install timeout. Override the name via `secrets.existingSecretName` if your platform conventions differ. See [AI Gateway → Self-hosting → Config → Secrets](/ai-gateway/self-hosting/config#secrets) for the recipe.
-2. **Public ingress needs DNS + TLS.** The gateway is what your LLM clients hit, so it usually wants its own hostname (e.g. `gateway.your-corp.com`) — separate cert, separate ingress rule. See [AI Gateway → Self-hosting → DNS & TLS](/ai-gateway/self-hosting/dns-and-tls).
+1. **Shared secrets must exist before install.** The gateway and the LangWatch app both mount `LW_GATEWAY_INTERNAL_SECRET` + `LW_GATEWAY_JWT_SECRET` (and the app additionally reads `LW_VIRTUAL_KEY_PEPPER`), same byte-for-byte values. Pre-create the `gateway-runtime-secrets` Kubernetes Secret (the chart's `secrets.existingSecretName` default) holding all three keys before `helm install`, otherwise the gateway pod loops on `secret not found` until the install timeout. Override the name via `secrets.existingSecretName` if your platform conventions differ. See [AI Gateway → Self-hosting → Config → Secrets](/ai-gateway/self-hosting/config#secrets) for the recipe.
+2. **Public ingress needs DNS + TLS.** The gateway is what your LLM clients hit, so it usually wants its own hostname (e.g. `gateway.your-corp.com`), separate cert, separate ingress rule. See [AI Gateway → Self-hosting → DNS & TLS](/ai-gateway/self-hosting/dns-and-tls).
 3. **Worker pods must be running.** Budget enforcement reads from a ClickHouse rollup that the trace-processing reactor folds into. If you deploy with `workers.enabled=false`, budgets stop accumulating spend and breach enforcement silently degrades. The default `workers.enabled=true` is correct for production.
 
 ## Upgrade
@@ -418,7 +418,7 @@ kubectl -n langwatch delete pvc --all
 
 ## FAQ
 
-### Istio / Service Mesh
+### Istio, Service Mesh
 
 If you're using Istio or another service mesh with automatic sidecar injection, the CronJob pods may fail because the sidecar keeps the pod alive after the job completes.
 

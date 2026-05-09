@@ -4,7 +4,7 @@ description: Use the LangWatch AI Gateway with the official OpenAI + Anthropic P
 sidebarTitle: Python
 ---
 
-The gateway is designed to be a drop-in replacement for provider base URLs — every Python LLM SDK works by setting its base URL env var and using a LangWatch virtual key as the API key.
+The gateway is designed to be a drop-in replacement for provider base URLs, every Python LLM SDK works by setting its base URL env var and using a LangWatch virtual key as the API key.
 
 This page covers the standard setup + how to propagate trace ids through the gateway so you don't double-count cost.
 
@@ -30,7 +30,7 @@ That's the whole integration. Everything else (streaming, tools, vision, embeddi
 
 ### Trace propagation
 
-If your application is already traced with the LangWatch SDK, pass the current trace context so the gateway's span nests inside yours — otherwise you'll have two disconnected traces and double-counted cost in dashboards.
+If your application is already traced with the LangWatch SDK, pass the current trace context so the gateway's span nests inside yours, otherwise you'll have two disconnected traces and double-counted cost in dashboards.
 
 ```python
 import langwatch
@@ -51,10 +51,10 @@ with langwatch.trace(name="my-agent-turn"):
 
 `langwatch.get_gateway_headers()` returns a dict with:
 
-- `traceparent` (W3C format) — set from the active LangWatch trace.
-- `X-LangWatch-Trace-Id` — LangWatch-native trace id override.
-- `X-LangWatch-Parent-Span-Id` — parent span.
-- `X-LangWatch-Thread-Id` — if the active trace has a thread id.
+- `traceparent` (W3C format), set from the active LangWatch trace.
+- `X-LangWatch-Trace-Id`, LangWatch-native trace id override.
+- `X-LangWatch-Parent-Span-Id`, parent span.
+- `X-LangWatch-Thread-Id`, if the active trace has a thread id.
 
 The gateway reads these on each request and attaches its own span as a child of your trace. The LangWatch UI shows the LLM call nested under your agent span with no cost duplication.
 
@@ -68,7 +68,7 @@ Every gateway response carries these headers so clients can stitch the span back
 |---|---|
 | `X-LangWatch-Trace-Id` | 32-hex trace id. Matches the incoming `traceparent` trace id if one was supplied; otherwise a freshly-minted trace id |
 | `X-LangWatch-Span-Id` | 16-hex gateway span id |
-| `traceparent` | W3C traceparent re-injected for downstream stitching — pass it to any further hop you call |
+| `traceparent` | W3C traceparent re-injected for downstream stitching, pass it to any further hop you call |
 | `X-LangWatch-Request-Id` | ULID, gateway-scoped. Use this in support tickets |
 
 ```python
@@ -83,7 +83,7 @@ print(f"span_id  = {headers['X-LangWatch-Span-Id']}")
 # requests.post(next_service, headers={"traceparent": headers["traceparent"]}, ...)
 ```
 
-### Without the LangWatch SDK — raw traceparent
+### Without the LangWatch SDK: raw traceparent
 
 If you don't use the LangWatch Python SDK but still want trace continuity (e.g. you're traced via OpenTelemetry directly):
 
@@ -103,7 +103,7 @@ client = OpenAI(
 )
 ```
 
-The gateway honours the standard W3C `traceparent` contract — any OTel-instrumented app already emits this; no LangWatch-specific code needed.
+The gateway honours the standard W3C `traceparent` contract, any OTel-instrumented app already emits this; no LangWatch-specific code needed.
 
 ### Per-call overrides
 
@@ -166,7 +166,7 @@ client = anthropic.Anthropic(
 
 Works identically to the OpenAI SDK.
 
-## LangChain / LangGraph
+## LangChain, LangGraph
 
 LangChain's `ChatOpenAI` and `ChatAnthropic` accept a `base_url` or `openai_api_base`:
 
@@ -181,7 +181,7 @@ llm = ChatOpenAI(
 )
 ```
 
-For LangGraph agents, set the headers on the LLM node — it propagates to every call the agent makes.
+For LangGraph agents, set the headers on the LLM node, it propagates to every call the agent makes.
 
 ## LlamaIndex
 
@@ -196,9 +196,9 @@ llm = OpenAI(
 )
 ```
 
-## PydanticAI / OpenInference / other OTel-aware frameworks
+## PydanticAI, OpenInference, other OTel-aware frameworks
 
-Frameworks that already emit OpenTelemetry spans will set `traceparent` automatically on outbound HTTP requests if the `opentelemetry-instrumentation-requests` / `httpx` / `aiohttp` packages are installed. No LangWatch SDK involvement needed.
+Frameworks that already emit OpenTelemetry spans will set `traceparent` automatically on outbound HTTP requests if the `opentelemetry-instrumentation-requests`, `httpx`, `aiohttp` packages are installed. No LangWatch SDK involvement needed.
 
 ## Self-hosted gateway
 
@@ -215,8 +215,8 @@ Rest of the setup is identical.
 
 ## Troubleshooting
 
-- **`401 invalid_api_key`** — wrong VK or VK revoked. Check the first 12 characters against the LangWatch UI.
-- **Cost double-counted** — trace propagation not working. Verify `default_headers` contains `traceparent` at request time (`client._custom_headers` on the OpenAI SDK).
-- **Anthropic auth header mismatch** — the Python Anthropic SDK sets `x-api-key` automatically from `api_key`. The gateway accepts all three (`Bearer`, `x-api-key`, `api-key`), so either works.
+- **`401 invalid_api_key`**, wrong VK or VK revoked. Check the first 12 characters against the LangWatch UI.
+- **Cost double-counted**: trace propagation not working. Verify `default_headers` contains `traceparent` at request time (`client._custom_headers` on the OpenAI SDK).
+- **Anthropic auth header mismatch**: the Python Anthropic SDK sets `x-api-key` automatically from `api_key`. The gateway accepts all three (`Bearer`, `x-api-key`, `api-key`), so either works.
 
 See [API: Errors](/ai-gateway/api/errors) for the full error-code list.

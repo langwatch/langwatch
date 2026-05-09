@@ -1,58 +1,86 @@
 ---
-title: AI Governance — Overview
-description: Bring your company's AI sprawl under one platform. Personal Virtual Keys for Claude Code / Codex / Cursor / Gemini, ingestion pipelines for Workato / Copilot Studio / OpenAI / Anthropic compliance feeds, anomaly detection across all of it. One dashboard, one policy engine.
+title: AI Governance Overview
+description: One platform for company-wide AI sprawl. Personal Virtual Keys for coding assistants, ingestion pipelines for compliance feeds, anomaly detection across all of it.
 sidebarTitle: Overview
 ---
 
-Your engineers are running AI through Claude Code, Codex, Cursor, Gemini CLI, Workato Genies, Copilot Studio agents, and a dozen homegrown automations. You have no idea who's doing what, what it's costing, or which agent just did 1,000 actions at 3 AM on a Saturday. **LangWatch sits above all of it** — proxying the traffic your teams' keys control, ingesting audit data from every AI platform you use, running anomaly detection and policy enforcement across everything. One dashboard, one policy engine, one throat for your security team to choke.
+Your engineers are running AI through Claude Code, Codex, Cursor, Gemini CLI, Workato Genies, Copilot Studio agents, and a dozen homegrown automations. You have no idea who's doing what, what it's costing, or which agent just did 1,000 actions at 3 AM on a Saturday. **LangWatch sits above all of it**: proxying the traffic your teams' keys control, ingesting audit data from every AI platform you use, running anomaly detection and policy enforcement across everything. One dashboard, one policy engine, one throat for your security team to choke.
 
-## How it feels day-to-day
+## How it feels day to day
 
-**For a developer**, signing in is one CLI command — `langwatch login`. After that, `langwatch claude` (or `codex` / `cursor` / `gemini` / `opencode`) just works: the wrapper pre-injects gateway env vars, the underlying tool is unchanged, and every request is attributed to that user with cost + token tracking. Their personal usage shows up at `/me` in real time.
+### For a developer
 
-<Frame caption="End-user /me — the Personal AI Tools Portal: clickable tiles for every Claude Code / Codex / Cursor wrapper, plus per-provider Virtual Key issuance, plus admin-curated internal tools.">
-  ![End-user /me Portal](/images/ai-governance/portal/portal-hero-populated.png)
+One CLI command signs them in: `langwatch login`. After that, `langwatch claude` (or `codex`, `cursor`, `gemini`, `opencode`) just works. The wrapper pre-injects gateway env vars, the underlying tool is unchanged, every request is attributed to that user with cost and token tracking.
+
+<Frame caption="The Personal AI Tools Portal at /me. Tiles for Claude Code, Codex, Cursor, Gemini, opencode wrappers, per-provider Virtual Key issuance, and admin-curated internal tools. Click a tile, follow the install drawer, copy one command, you're governed.">
+  ![/me portal](https://raw.githubusercontent.com/langwatch/pr-screenshots/main/pr-3524/post-bypass/01-me-portal.png)
 </Frame>
 
-**For an admin**, the bird-eye view at `/governance` is the daily home: org-wide spend, top spenders, anomaly alerts, ingestion-source health, recent activity. Below it, `/settings/governance/*` is the authoring surface — routing policies, ingestion sources, anomaly rules, the AI Tools Portal catalog, and the audit log every governance mutation lands in.
+If they're on a personal Anthropic 20x plan and don't want a Virtual Key, they can wire Claude Code's native OTLP export to LangWatch instead. The admin publishes an [IngestionTemplate](/ai-governance/ingestion-templates), the developer copies a binding token, traces normalize into canonical `gen_ai.*` attributes the same as Virtual Key traffic.
 
-<Frame caption="Admin /governance — read-mostly oversight: spend, anomalies, ingestion-source health, per-team breakdown.">
-  ![Admin governance home](/images/ai-governance/admin/governance-home.png)
+<Frame caption="Claude Code install drawer at /me. Auto-shaped header, OTTL mapping explanation, 'Issue binding token' CTA. The path that lets a 20x personal plan land governed traces in LangWatch with no Virtual Key in the loop.">
+  ![Claude Code install drawer](https://raw.githubusercontent.com/langwatch/pr-screenshots/main/pr-3524/post-bypass/11-claude-code-install-drawer.png)
+</Frame>
+
+Their personal usage shows up under their own Trace Explorer in real time, every span, every cost, every model.
+
+<Frame caption="Trace Explorer at /[personal-project]/traces. Real populated traces from claude_code spans with tokens, cost, duration columns, end-to-end attribution to the user. The same explorer admins use, scoped to the developer's own workspace.">
+  ![Trace explorer populated](https://raw.githubusercontent.com/langwatch/pr-screenshots/main/pr-3524/post-bypass/12-traces-populated.png)
+</Frame>
+
+### For an admin
+
+The bird-eye view at `/governance` is the daily home: org-wide spend, top spenders, anomaly alerts, ingestion-source health, recent activity. Below it, `/settings/governance/*` is the authoring surface where routing policies, ingestion sources, anomaly rules, the AI Tools Portal catalog, and the audit log all live.
+
+<Frame caption="The /governance dashboard. KPI summary (spend, sources, open anomalies), 30-day spend-over-time chart bucketed per team, spend-share-across-teams bar, ingestion-source health, recent activity. Read-mostly oversight, the place you check before standup.">
+  ![/governance bird-eye](https://raw.githubusercontent.com/langwatch/pr-screenshots/main/pr-3524/post-bypass/06-governance-birdeye.png)
+</Frame>
+
+The Tool Catalog at `/settings/governance/tool-catalog` is what stocks the developer-facing `/me` portal. Pick from a fixed roster of coding assistants and model providers, scope to the whole org or specific teams, publish.
+
+<Frame caption="Tool Catalog editor. Three tile classes (coding assistants, model providers, internal tools), preset picker for Claude Code, Codex, Cursor, Gemini, opencode with custom-icon upload, scope binding, publish lifecycle.">
+  ![Tool catalog editor](https://raw.githubusercontent.com/langwatch/pr-screenshots/main/pr-3524/post-bypass/07-tool-catalog.png)
+</Frame>
+
+Every governance mutation lands in the audit log: filterable, bookmarkable URL state, CSV export, ready for SIEM.
+
+<Frame caption="The /settings/audit-log table. Real entries: gateway.ingestion_template.archive, gateway.ingestion_template.update, gateway.ingestion_source.update. User, Action, Target, Project, IP, Error columns.">
+  ![/settings/audit-log](https://raw.githubusercontent.com/langwatch/pr-screenshots/main/pr-3524/post-bypass/08-audit-log.png)
 </Frame>
 
 ## What it covers
 
-- **Coding assistants** — Claude Code, Codex, Cursor, Gemini CLI, opencode. Wrapper CLI signs the user in, mints a Personal Virtual Key, and routes every request through the gateway.
-- **Provider Virtual Keys** — issue per-user keys for Anthropic, OpenAI, Bedrock, Gemini, etc. Drop them into your app's config; same gateway, same budget, no provider secret in dotfiles.
-- **Direct OTLP ingestion** — for tools the gateway doesn't wrap (Claude Code on a personal Anthropic 20x plan, Cursor with custom endpoints, your own SDK-instrumented agents): an admin-curated [IngestionTemplate](/ai-governance/ingestion-templates) maps the upstream wire shape to canonical `gen_ai.*` attributes; users install with one binding token.
-- **External AI platforms** — Workato, Microsoft Copilot Studio, OpenAI Enterprise Compliance, Anthropic Compliance API, generic S3 audit-log drops. Land in the same trace store as everything else; one `/governance` view across all of it.
-- **Anomaly detection** — admin-defined rules (spend-spike, geo-mismatch, off-hours) folded from the same event stream. Dispatch to Slack / PagerDuty / SIEM.
-- **Compliance + SIEM export** — every event is OCSF v1.1 mapped, replayable to Splunk / Datadog Security / Sentinel / Elastic Security via cron-pull.
+- **Coding assistants**: Claude Code, Codex, Cursor, Gemini CLI, opencode. Wrapper CLI signs the user in, mints a Personal Virtual Key, routes every request through the gateway.
+- **Provider Virtual Keys**: per-user keys for Anthropic, OpenAI, Bedrock, Gemini. Drop them into your app's config, same gateway, same budget, no provider secret in dotfiles.
+- **Direct OTLP ingestion**: for tools the gateway doesn't wrap (Claude Code on a personal Anthropic 20x plan, Cursor with custom endpoints, your own SDK-instrumented agents). An admin-curated [IngestionTemplate](/ai-governance/ingestion-templates) maps the upstream wire shape to canonical `gen_ai.*` attributes, users install with one binding token.
+- **External AI platforms**: Workato, Microsoft Copilot Studio, OpenAI Enterprise Compliance, Anthropic Compliance API, generic S3 audit-log drops. Land in the same trace store as everything else, one `/governance` view across all of it.
+- **Anomaly detection**: admin-defined rules (spend-spike, geo-mismatch, off-hours) folded from the same event stream. Dispatch to Slack, PagerDuty, SIEM.
+- **Compliance and SIEM export**: every event is OCSF v1.1 mapped, replayable to Splunk, Datadog Security, Sentinel, Elastic Security via cron-pull.
 
 ## Two personas
 
 LangWatch governance is shaped around two people who never need the same screen:
 
-- **End user** — a developer or analyst who needs a Personal Virtual Key, wants to see their own usage and budget at `/me`, and sometimes switches between Personal / Team / Project workspaces. They never see the admin surface.
-- **Admin** — an org-level operator who configures ingestion sources, publishes routing policies, defines anomaly rules, and signs off on the OCSF / SIEM export. They never see the end-user `/me` chrome.
+- **End user**: a developer or analyst who needs a Personal Virtual Key, wants to see their own usage and budget at `/me`, sometimes switches between Personal, Team, Project workspaces. They never see the admin surface.
+- **Admin**: an org-level operator who configures ingestion sources, publishes routing policies, defines anomaly rules, signs off on OCSF and SIEM export. They never see the end-user `/me` chrome.
 
-The persona-aware chrome (single-chip header on `/me`, full sidebar on `/settings/governance/*`) keeps both surfaces clean — neither has to navigate around the other.
+The persona-aware chrome (single-chip header on `/me`, full sidebar on `/settings/governance/*`) keeps both surfaces clean, so neither has to navigate around the other.
 
 ## Get started
 
-- **Developer** — [First 5 minutes](/ai-governance/getting-started-developer): install CLI, sign in via SSO, run your first request, read your spend back.
-- **Admin** — [First 30 minutes](/ai-governance/getting-started-admin): publish a routing policy, configure an ingestion source, import the AI Tools Portal starter pack, invite a developer, write your first spend-spike anomaly rule.
-- **Drive governance from an agent** — every governance feature has a [REST API](/ai-governance/api), [CLI](/ai-governance/cli), and [MCP server](/ai-governance/mcp); customers can fully set up governance via Claude Code or any MCP-capable agent.
+- **Developer**: [First 5 minutes](/ai-governance/getting-started-developer). Install CLI, sign in via SSO, run your first request, read your spend back.
+- **Admin**: [First 30 minutes](/ai-governance/getting-started-admin). Publish a routing policy, configure an ingestion source, import the AI Tools Portal starter pack, invite a developer, write your first spend-spike anomaly rule.
+- **Drive governance from an agent**: every governance feature has a [REST API](/ai-governance/api), [CLI](/ai-governance/cli), and [MCP server](/ai-governance/mcp). Customers can fully set up governance via Claude Code or any MCP-capable agent.
 
 ## Reference
 
-- [Personas](/ai-governance/personas) — who sees what
-- [Workspaces, members, roles](/ai-governance/workspaces) — Personal / Team / Project scopes
-- [`/governance` dashboard](/ai-governance/governance-dashboard) — daily admin home
-- [Ingestion templates](/ai-governance/ingestion-templates) — admin-curated catalog for direct-OTLP ingestion
-- [Ingestion sources](/ai-governance/ingestion-sources/index) — Workato / Copilot Studio / Compliance APIs / S3
+- [Personas](/ai-governance/personas): who sees what
+- [Workspaces, members, roles](/ai-governance/workspaces): Personal, Team, Project scopes
+- [`/governance` dashboard](/ai-governance/governance-dashboard): daily admin home
+- [Ingestion templates](/ai-governance/ingestion-templates): admin-curated catalog for direct-OTLP ingestion
+- [Ingestion sources](/ai-governance/ingestion-sources/index): Workato, Copilot Studio, Compliance APIs, S3
 - [Anomaly rules](/ai-governance/anomaly-rules)
 - [Audit log](/ai-governance/audit-log)
-- [Compliance architecture](/ai-governance/compliance-architecture) — OCSF, retention, SIEM
-- [No-spy mode](/ai-governance/no-spy-mode) — content-stripping for privacy-locked enterprises
-- [Open-core licensing](/ai-governance/open-core-licensing) — what's Apache 2.0 vs Enterprise
+- [Compliance architecture](/ai-governance/compliance-architecture): OCSF, retention, SIEM
+- [No-spy mode](/ai-governance/no-spy-mode): content-stripping for privacy-locked enterprises
+- [Open-core licensing](/ai-governance/open-core-licensing): what's Apache 2.0 vs Enterprise

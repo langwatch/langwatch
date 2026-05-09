@@ -37,11 +37,11 @@ Docker Compose starts the following services:
 | Service | Image | Port | Description |
 |---------|-------|------|-------------|
 | `app` | `langwatch/langwatch:latest` | 5560 | Main application |
-| `workers` | `langwatch/langwatch:latest` | — | Background job processing |
+| `workers` | `langwatch/langwatch:latest` |, | Background job processing |
 | `langwatch_nlp` | `langwatch/langwatch_nlp:latest` | 5561 | NLP processing, workflows |
 | `langevals` | `langwatch/langevals:latest` | 5562 | Evaluators, guardrails |
 | `postgres` | `postgres:16` | 5432 | Control plane database |
-| `redis` | `redis:alpine` | — | Job queue, caching |
+| `redis` | `redis:alpine` |, | Job queue, caching |
 | `clickhouse` | `langwatch/clickhouse-serverless:0.2.0` | 8123 | Trace and analytics storage |
 
 ## Configuration
@@ -145,15 +145,15 @@ services:
 
 Docker Compose is suitable for evaluation and small teams but lacks:
 
-- **High availability** — single instance of each service
-- **Horizontal scaling** — cannot scale workers independently
-- **Automated backups** — no built-in backup scheduling
-- **TLS** — no built-in HTTPS (use a reverse proxy like nginx or Caddy)
+- **High availability**: single instance of each service
+- **Horizontal scaling**: cannot scale workers independently
+- **Automated backups**: no built-in backup scheduling
+- **TLS**: no built-in HTTPS (use a reverse proxy like nginx or Caddy)
 
 For production, migrate to the [Kubernetes Helm chart](/self-hosting/deployment/kubernetes-helm).
 
 ## Next Steps
 
-- [Docker Images](/self-hosting/deployment/docker-images) — Learn about each container image
-- [Kubernetes (Helm)](/self-hosting/deployment/kubernetes-helm) — Production deployment
-- [Environment Variables](/self-hosting/configuration/environment-variables) — Full configuration reference
+- [Docker Images](/self-hosting/deployment/docker-images): Learn about each container image
+- [Kubernetes (Helm)](/self-hosting/deployment/kubernetes-helm): Production deployment
+- [Environment Variables](/self-hosting/configuration/environment-variables): Full configuration reference

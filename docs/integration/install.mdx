@@ -6,12 +6,12 @@ description: Install the `langwatch` CLI in under a minute. Works on macOS, Linu
 
 The LangWatch CLI ships as an npm package. Install it once and you get the
 unified `langwatch` binary that drives every part of the platform from
-your terminal — and the same tool your AI coding assistant uses to
+your terminal, and the same tool your AI coding assistant uses to
 operate LangWatch on your behalf.
 
 ## Prerequisites
 
-You need Node.js 18+ and npm (or pnpm / yarn). If you already run any
+You need Node.js 18+ and npm (or pnpm, yarn). If you already run any
 JavaScript or TypeScript locally, you have these. If not:
 
 - **macOS**: `brew install node`
@@ -75,7 +75,7 @@ echo 'export LANGWATCH_ENDPOINT=https://langwatch.your-company.com' >> ~/.zshrc
 
 For convenience, your dashboard's "Install CLI" empty-state card on
 `/me`, `/me/sessions`, and the governance setup checklist already
-renders the right prefilled commands for your deployment — copy-paste
+renders the right prefilled commands for your deployment, copy-paste
 straight from there.
 
 ## Authenticate
@@ -94,7 +94,7 @@ AI-tool sessions, `--endpoint` for self-hosted).
 
 Most enterprise networks proxy public npm through an internal mirror
 (Artifactory, Nexus, GitHub npm Enterprise). `npm install -g langwatch`
-fetches transparently through the mirror — no special configuration
+fetches transparently through the mirror, no special configuration
 needed. If your environment is fully air-gapped, your IT team's
 package-mirror process is the canonical path; ask them to mirror
 [npmjs.com/package/langwatch](https://www.npmjs.com/package/langwatch).
@@ -110,6 +110,6 @@ This removes the CLI binary. Personal device sessions persist in
 
 ## Next steps
 
-- **[CLI reference](/integration/cli)** — every subcommand, with examples
-- **[AI Governance: device login flow](/ai-governance/cli-debug)** — debug device login + token storage
-- **[Prompt management CLI](/prompt-management/cli)** — version + sync prompts from the terminal
+- **[CLI reference](/integration/cli)**: every subcommand, with examples
+- **[AI Governance: device login flow](/ai-governance/cli-debug)**: debug device login + token storage
+- **[Prompt management CLI](/prompt-management/cli)**: version + sync prompts from the terminal

@@ -65,7 +65,7 @@ def calculate_mrr(predictions: list[str], ground_truth: list[str]):
     return mrr
 ```
 
-If you retrieve a large number of documents (e.g., 100) and only a few are relevant, you have **high recall but low precision** — forcing the LLM to sift through noise. If you retrieve very few documents and miss many relevant ones, you have **high precision but low recall** — limiting the LLM’s ability to generate good answers. Assuming LLMs improve at selecting relevant information, recall becomes more and more important. That's why most practitioners focus on optimizing recall. MRR is helpful when displaying citations to users. If citation quality isn’t critical for your app, focusing on precision and recall is often enough.
+If you retrieve a large number of documents (e.g., 100) and only a few are relevant, you have **high recall but low precision**: forcing the LLM to sift through noise. If you retrieve very few documents and miss many relevant ones, you have **high precision but low recall**: limiting the LLM’s ability to generate good answers. Assuming LLMs improve at selecting relevant information, recall becomes more and more important. That's why most practitioners focus on optimizing recall. MRR is helpful when displaying citations to users. If citation quality isn’t critical for your app, focusing on precision and recall is often enough.
 
 ## Generating Synthetic Data
 
@@ -275,7 +275,7 @@ We can see that the best configuration for recall is the small embedding model w
 
 ## Conclusion
 
-Based on our evaluation results, we can now make data-driven decisions about the RAG system. In this case, the smaller embedding model outperformed the larger one for our use case, which brings both performance and cost benefits. Since many factors influence RAG performance, it's important to run more experiments — varying parameters like:
+Based on our evaluation results, we can now make data-driven decisions about the RAG system. In this case, the smaller embedding model outperformed the larger one for our use case, which brings both performance and cost benefits. Since many factors influence RAG performance, it's important to run more experiments, varying parameters like:
 
 1. **Document chunking strategies**: Try different chunk sizes and overlap percentages
 2. **Adding a reranker**: Test if a separate reranking step improves precision
@@ -284,6 +284,6 @@ Based on our evaluation results, we can now make data-driven decisions about the
 
 Keep in mind: these results are specific to our test dataset. Your evaluations may reveal different trade-offs based on your domain and data characteristics.
 
-In the next notebook, we’ll explore how fine-tuning embedding models can impact retrieval — and why you (almost) always should.
+In the next notebook, we’ll explore how fine-tuning embedding models can impact retrieval, and why you (almost) always should.
 
 For the full notebook, check it out on: [GitHub](https://github.com/langwatch/cookbooks/blob/main/notebooks/simple-rag-app.ipynb).

@@ -4,7 +4,7 @@ description: OpenAI-compatible chat completions through the LangWatch AI Gateway
 sidebarTitle: Chat Completions
 ---
 
-OpenAI-compatible chat completions endpoint. Any client that speaks the OpenAI Chat Completions API — official SDKs, Codex CLI, opencode, Cursor, Aider, a thousand internal scripts — works with zero code change by pointing its `OPENAI_BASE_URL` at the LangWatch AI Gateway and its `OPENAI_API_KEY` at a LangWatch virtual key.
+OpenAI-compatible chat completions endpoint. Any client that speaks the OpenAI Chat Completions API, official SDKs, Codex CLI, opencode, Cursor, Aider, a thousand internal scripts, works with zero code change by pointing its `OPENAI_BASE_URL` at the LangWatch AI Gateway and its `OPENAI_API_KEY` at a LangWatch virtual key.
 
 ## Request
 
@@ -43,7 +43,7 @@ Body matches OpenAI's [Chat Completions schema](https://platform.openai.com/docs
 The `model` field can be:
 
 - A VK-defined alias (e.g. `gpt-4o`, `claude`) → routed via the VK's `model_aliases` map.
-- An explicit `<provider>/<model>` form (e.g. `openai/gpt-5-mini`, `azure/my-deployment`) — bypasses aliases.
+- An explicit `<provider>/<model>` form (e.g. `openai/gpt-5-mini`, `azure/my-deployment`), bypasses aliases.
 
 If the alias/explicit form doesn't resolve to a provider in the VK's `providers` list, returns `403 model_not_allowed`.
 
@@ -74,7 +74,7 @@ X-LangWatch-Fallback-Count: 0
 
 ## Response (streaming)
 
-Set `"stream": true` in the body. The gateway proxies upstream SSE events byte-for-byte after the first chunk, preserving tool-call delta ordering — this is important for coding CLIs like Codex that parse tool-call streams incrementally.
+Set `"stream": true` in the body. The gateway proxies upstream SSE events byte-for-byte after the first chunk, preserving tool-call delta ordering, this is important for coding CLIs like Codex that parse tool-call streams incrementally.
 
 ```
 data: {"id":"chatcmpl-…","object":"chat.completion.chunk","choices":[{"index":0,"delta":{"role":"assistant","content":"Hi"}}]}
@@ -90,13 +90,13 @@ A response header `X-LangWatch-Request-Id` is emitted on the first frame. Mid-st
 
 All errors use the OpenAI-compatible envelope documented at [Errors](/ai-gateway/api/errors):
 
-- `401 invalid_api_key` — missing/malformed/unknown VK.
-- `402 budget_exceeded` — hard-cap budget breach.
-- `403 guardrail_blocked | tool_not_allowed | model_not_allowed | permission_denied | virtual_key_revoked` — policy.
-- `429 rate_limit_exceeded` — VK / project / org rate limit.
-- `502 provider_error` / `504 upstream_timeout` — upstream provider exhausted (possibly after fallback).
+- `401 invalid_api_key`, missing/malformed/unknown VK.
+- `402 budget_exceeded`, hard-cap budget breach.
+- `403 guardrail_blocked | tool_not_allowed | model_not_allowed | permission_denied | virtual_key_revoked`, policy.
+- `429 rate_limit_exceeded`, VK, project, org rate limit.
+- `502 provider_error`, `504 upstream_timeout`, upstream provider exhausted (possibly after fallback).
 
-Every error carries `X-LangWatch-Request-Id` — use it for support tickets and to jump straight to the trace in the LangWatch UI.
+Every error carries `X-LangWatch-Request-Id`, use it for support tickets and to jump straight to the trace in the LangWatch UI.
 
 ## Example (Python)
 
@@ -143,7 +143,7 @@ Every request emits a LangWatch trace with attributes:
 
 - `langwatch.vk_id`, `langwatch.project_id`, `langwatch.team_id`, `langwatch.org_id`, `langwatch.principal_id`.
 - `langwatch.model_requested` (what the client sent) vs `langwatch.model_resolved` (provider + model after alias).
-- `gen_ai.usage.cache_read.input_tokens` / `gen_ai.usage.cache_creation.input_tokens` (OTel GenAI semconv; cache economics).
+- `gen_ai.usage.cache_read.input_tokens`, `gen_ai.usage.cache_creation.input_tokens` (OTel GenAI semconv; cache economics).
 - `langwatch.cost_usd` (computed from tokens × price).
 - `langwatch.fallback.attempt` spans (one per attempt; `attempt=0` is primary).
 

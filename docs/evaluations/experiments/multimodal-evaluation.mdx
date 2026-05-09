@@ -1,27 +1,27 @@
 ---
-title: Multimodal Evaluation — Images, PDFs, and Vision
+title: Multimodal Evaluation Images, PDFs, and Vision
 sidebarTitle: Multimodal Evaluation
 description: Evaluate image generation, document parsing, and other multimodal AI pipelines with LLM-as-a-Judge vision models.
 ---
 
-LangWatch supports multimodal evaluation out of the box. You can evaluate image inputs and outputs using any vision-capable model (GPT-4o, GPT-5.2, Claude Sonnet, Gemini, etc.) through the built-in LLM-as-a-Judge evaluators — no custom code required.
+LangWatch supports multimodal evaluation out of the box. You can evaluate image inputs and outputs using any vision-capable model (GPT-4o, GPT-5.2, Claude Sonnet, Gemini, etc.) through the built-in LLM-as-a-Judge evaluators, no custom code required.
 
 This covers common multimodal use cases:
-- **Image generation quality** — score outputs of image generation models
-- **Document parsing** — evaluate extracted metadata from PDFs and scanned documents
-- **Content moderation** — detect NSFW or low-quality uploaded images
-- **Visual QA** — evaluate answers to questions about images
-- **Image comparison** — compare generated outputs against reference images
+- **Image generation quality**: score outputs of image generation models
+- **Document parsing**: evaluate extracted metadata from PDFs and scanned documents
+- **Content moderation**: detect NSFW or low-quality uploaded images
+- **Visual QA**: evaluate answers to questions about images
+- **Image comparison**: compare generated outputs against reference images
 
 <Info>
 **Image support works with all three LLM-as-a-Judge evaluator types:**
-- **Boolean** — pass/fail evaluation (e.g. "Is the generated image photorealistic?")
-- **Score** — numeric score evaluation (e.g. "Rate image quality from 1-5")
-- **Category** — classification evaluation (e.g. "Classify the image as: excellent / good / poor")
+- **Boolean**: pass/fail evaluation (e.g. "Is the generated image photorealistic?")
+- **Score**: numeric score evaluation (e.g. "Rate image quality from 1-5")
+- **Category**: classification evaluation (e.g. "Classify the image as: excellent, good, poor")
 
 **See also:**
-- [Dataset Images](/datasets/dataset-images) — Setting up image columns in datasets
-- [Saved Evaluators](/evaluations/evaluators/saved-evaluators) — Reuse evaluators via API
+- [Dataset Images](/datasets/dataset-images): Setting up image columns in datasets
+- [Saved Evaluators](/evaluations/evaluators/saved-evaluators): Reuse evaluators via API
 </Info>
 
 ## Supported Image Formats
@@ -37,7 +37,7 @@ Images can be provided in any of these formats:
 Supported extensions: `.png`, `.jpg`, `.jpeg`, `.gif`, `.webp`, `.svg`, `.bmp`, `.tiff`
 
 <Note>
-Image detection is strict by design — a field is treated as an image only when the **entire value** is an image URL or base64 string. Mixed text-and-image content is sent as plain text. This prevents unintended multipart content when a field happens to contain an image URL as part of a longer string.
+Image detection is strict by design, a field is treated as an image only when the **entire value** is an image URL or base64 string. Mixed text-and-image content is sent as plain text. This prevents unintended multipart content when a field happens to contain an image URL as part of a longer string.
 </Note>
 
 ## Evaluating Images via UI
@@ -54,18 +54,18 @@ Image detection is strict by design — a field is treated as an image only when
   </Frame>
 </div>
 
-4. Paste image URLs or base64 data URIs into the cells — the workbench renders them inline with click-to-expand
+4. Paste image URLs or base64 data URIs into the cells, the workbench renders them inline with click-to-expand
 
 ### Step 2: Add an LLM-as-a-Judge Evaluator
 
 1. Click **+ Add evaluator** on a row in the evaluators section
 2. Select an **LLM-as-a-Judge** evaluator (Boolean, Score, or Category)
 3. Choose a **vision-capable model** (e.g. `gpt-5.2`, `claude-sonnet-4-5-20250929`)
-4. Write a prompt that references the image fields — map dataset columns to the evaluator's `input`, `output`, `contexts`, or `expected_output` variables
+4. Write a prompt that references the image fields, map dataset columns to the evaluator's `input`, `output`, `contexts`, or `expected_output` variables
 
 The evaluator automatically detects image values and sends them as multipart content to the vision model. No special configuration needed.
 
-<Frame caption="Image evaluation workbench — LLM-as-a-Judge scoring virtual try-on quality with three image columns mapped to evaluator variables">
+<Frame caption="Image evaluation workbench, LLM-as-a-Judge scoring virtual try-on quality with three image columns mapped to evaluator variables">
   <img src="/images/evaluations/multimodal-image-evaluation-workbench.png" alt="LangWatch experiments workbench showing image evaluation with LLM-as-a-Judge score evaluator" />
 </Frame>
 
