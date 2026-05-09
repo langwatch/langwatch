@@ -1,6 +1,7 @@
 import {
   Box,
   Collapsible,
+  Badge,
   HStack,
   Spacer,
   Text,
@@ -28,6 +29,8 @@ export type CollapsibleMenuGroupProps = {
   project?: Project;
   showLabel?: boolean;
   defaultExpanded?: boolean;
+  beta?: string | boolean;
+  betaLabel?: string;
 };
 
 export const CollapsibleMenuGroup = ({
@@ -37,6 +40,8 @@ export const CollapsibleMenuGroup = ({
   project,
   showLabel = true,
   defaultExpanded = false,
+  beta,
+  betaLabel,
 }: CollapsibleMenuGroupProps) => {
   const isAnyChildActive = children.some((child) => child.isActive);
   const [isExpanded, setIsExpanded] = useState(
@@ -102,6 +107,17 @@ export const CollapsibleMenuGroup = ({
                   >
                     {label}
                   </Text>
+                  {beta && (
+                    <Badge
+                      colorPalette="blue"
+                      variant="subtle"
+                      fontSize="2xs"
+                      paddingX={1.5}
+                      lineHeight={1.2}
+                    >
+                      {betaLabel ?? "Beta"}
+                    </Badge>
+                  )}
                   <Spacer />
                   {isExpanded ? (
                     <ChevronDown
