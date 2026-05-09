@@ -95,6 +95,18 @@ export function TraceIngestSection() {
       });
     },
   });
+  const rotateMutation = api.userIngestionBindings.rotateToken.useMutation({
+    onSuccess: () => {
+      void utils.userIngestionBindings.list.invalidate();
+    },
+    onError: (err) => {
+      toaster.create({
+        title: "Rotate failed",
+        description: err.message,
+        type: "error",
+      });
+    },
+  });
 
   const publicEnv = usePublicEnv();
   const otlpEndpoint = publicEnv.data?.BASE_HOST
@@ -120,6 +132,21 @@ export function TraceIngestSection() {
       const result = await installMutation.mutateAsync({
         organizationId: orgId,
         templateId,
+      });
+      setInstallResults((s) => ({
+        ...s,
+        [slug]: { token: result.token, endpoint: otlpEndpoint },
+      }));
+    } catch {
+      // surfaced via toaster + drawer error state
+    }
+  };
+
+  const handleRotate = async (bindingId: string, slug: string) => {
+    try {
+      const result = await rotateMutation.mutateAsync({
+        organizationId: orgId,
+        bindingId,
       });
       setInstallResults((s) => ({
         ...s,
@@ -207,14 +234,19 @@ export function TraceIngestSection() {
             credentialSchema: openTemplate.credentialSchema,
           }}
           installResult={installResults[openTemplate.slug] ?? null}
-          isInstalling={installMutation.isPending}
+          isInstalling={installMutation.isPending || rotateMutation.isPending}
           installError={
             installMutation.error?.message &&
             installMutation.variables?.templateId === openTemplate.id
               ? installMutation.error.message
-              : null
+              : rotateMutation.error?.message ?? null
           }
+          hasExistingBinding={bindingByTemplateId.has(openTemplate.id)}
           onInstall={() => void handleInstall(openTemplate.id, openTemplate.slug)}
+          onRotate={() => {
+            const existing = bindingByTemplateId.get(openTemplate.id);
+            if (existing) void handleRotate(existing.id, openTemplate.slug);
+          }}
           onMarkInstalled={handleMarkInstalled}
         />
       )}

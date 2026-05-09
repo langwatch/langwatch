@@ -74,7 +74,9 @@ export function IngestionTemplateInstallDrawer({
   installResult,
   isInstalling,
   installError,
+  hasExistingBinding,
   onInstall,
+  onRotate,
   onMarkInstalled,
 }: {
   open: boolean;
@@ -85,12 +87,25 @@ export function IngestionTemplateInstallDrawer({
   isInstalling: boolean;
   installError: string | null;
   /**
+   * True when the user already has a binding for this template. Drives the
+   * CTA copy: 'Issue binding token' (fresh) vs 'Rotate token' (replace).
+   * Without this signal the drawer would mint-only and 409 on every
+   * already-installed template.
+   */
+  hasExistingBinding: boolean;
+  /**
    * Called when the drawer mounts (or the user clicks 'Install') for the
    * given template. Parent owns the tRPC mutation:
    *   `api.userIngestionBindings.install.useMutation()` (lands when
    *    Sergey's bindingService + tRPC router commit).
    */
   onInstall: () => void;
+  /**
+   * Called when the user clicks 'Rotate token' on an already-bound
+   * template. Parent owns rotateToken mutation; previous token is
+   * invalidated immediately (hard-cut v1).
+   */
+  onRotate: () => void;
   /**
    * Called when the user clicks 'Mark as installed'. Parent closes the
    * drawer + marks the tile green-checked. Distinct from 'cancel' so
@@ -130,7 +145,7 @@ export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer ${
           <VStack align="stretch" gap={4}>
             <Text fontSize="sm" color="fg.muted">
               Traces normalized into <code>gen_ai.*</code> canonical.
-              Cost/tokens/model populated automatically by the receiver.
+              Cost, tokens, and model populated automatically by the receiver.
             </Text>
 
             {installError && (
@@ -142,14 +157,31 @@ export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer ${
             )}
 
             {!installResult && !isInstalling && template.credentialSchema === null && (
-              <Button onClick={onInstall} colorPalette="orange">
-                Issue binding token
-              </Button>
+              hasExistingBinding ? (
+                <VStack align="stretch" gap={2}>
+                  <Alert.Root status="warning" variant="surface">
+                    <Alert.Indicator />
+                    <Alert.Content>
+                      <Text fontSize="sm">
+                        A binding already exists for this template. Rotating
+                        will invalidate the existing token immediately.
+                      </Text>
+                    </Alert.Content>
+                  </Alert.Root>
+                  <Button onClick={onRotate} colorPalette="orange">
+                    Rotate token
+                  </Button>
+                </VStack>
+              ) : (
+                <Button onClick={onInstall} colorPalette="orange">
+                  Issue binding token
+                </Button>
+              )
             )}
 
             {isInstalling && (
               <Text fontSize="sm" color="fg.muted">
-                Issuing binding token…
+                {hasExistingBinding ? "Rotating token…" : "Issuing binding token…"}
               </Text>
             )}
 
