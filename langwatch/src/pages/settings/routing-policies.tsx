@@ -293,9 +293,9 @@ function RoutingPoliciesPage() {
               Routing Policies
             </Heading>
             <Text color="fg.muted" fontSize="sm">
-              Define which providers + models personal/team/project keys
-              route through. The hierarchy is project → team → organization;
-              first match wins.
+              Define which providers and models personal, team, and project
+              keys route through. The hierarchy is project → team →
+              organization; first match wins.
             </Text>
           </VStack>
           <Spacer />
