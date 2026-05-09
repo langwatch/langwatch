@@ -22,8 +22,8 @@
               "attributes": [
                 { "key": "gen_ai.system", "value": { "stringValue": "anthropic" } },
                 { "key": "gen_ai.operation.name", "value": { "stringValue": "chat" } },
-                { "key": "gen_ai.request.model", "value": { "stringValue": "claude-3-5-sonnet-20241022" } },
-                { "key": "gen_ai.response.model", "value": { "stringValue": "claude-3-5-sonnet-20241022" } },
+                { "key": "gen_ai.request.model", "value": { "stringValue": "claude-sonnet-4.6" } },
+                { "key": "gen_ai.response.model", "value": { "stringValue": "claude-sonnet-4.6" } },
                 { "key": "gen_ai.request.max_tokens", "value": { "intValue": "1024" } },
                 { "key": "gen_ai.usage.input_tokens", "value": { "intValue": "187" } },
                 { "key": "gen_ai.usage.output_tokens", "value": { "intValue": "53" } },

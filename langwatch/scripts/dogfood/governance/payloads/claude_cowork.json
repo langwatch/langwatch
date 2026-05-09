@@ -22,8 +22,8 @@
               "attributes": [
                 { "key": "gen_ai.system", "value": { "stringValue": "anthropic" } },
                 { "key": "gen_ai.operation.name", "value": { "stringValue": "chat" } },
-                { "key": "gen_ai.request.model", "value": { "stringValue": "claude-3-5-sonnet-20241022" } },
-                { "key": "gen_ai.response.model", "value": { "stringValue": "claude-3-5-sonnet-20241022" } },
+                { "key": "gen_ai.request.model", "value": { "stringValue": "claude-sonnet-4.6" } },
+                { "key": "gen_ai.response.model", "value": { "stringValue": "claude-sonnet-4.6" } },
                 { "key": "gen_ai.usage.input_tokens", "value": { "intValue": "256" } },
                 { "key": "gen_ai.usage.output_tokens", "value": { "intValue": "92" } },
                 { "key": "claude.cowork.session_id", "value": { "stringValue": "ses_dogfood_claude_cowork_0001" } },

@@ -22,8 +22,8 @@
               "attributes": [
                 { "key": "gen_ai.system", "value": { "stringValue": "openai" } },
                 { "key": "gen_ai.operation.name", "value": { "stringValue": "chat" } },
-                { "key": "gen_ai.request.model", "value": { "stringValue": "gpt-4o-2024-08-06" } },
-                { "key": "gen_ai.response.model", "value": { "stringValue": "gpt-4o-2024-08-06" } },
+                { "key": "gen_ai.request.model", "value": { "stringValue": "gpt-5.4" } },
+                { "key": "gen_ai.response.model", "value": { "stringValue": "gpt-5.4" } },
                 { "key": "gen_ai.request.max_tokens", "value": { "intValue": "2048" } },
                 { "key": "gen_ai.usage.input_tokens", "value": { "intValue": "412" } },
                 { "key": "gen_ai.usage.output_tokens", "value": { "intValue": "118" } },
