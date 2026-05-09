@@ -201,8 +201,8 @@ export function ModelProviderTile({
         >
           <Text fontSize="sm" color="orange.900" marginBottom={2}>
             Your organization doesn&apos;t have {articleFor(displayName)}{" "}
-            {displayName} credential configured yet — issuing a key here would
-            mint a VK that fails on first call with{" "}
+            {displayName} credential configured yet, so issuing a key here
+            would mint a VK that fails on first call with{" "}
             <Code fontSize="xs" backgroundColor="transparent">
               provider_error
             </Code>

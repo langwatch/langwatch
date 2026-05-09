@@ -642,7 +642,7 @@ export const DashboardLayout = ({
               >
                 <Info size={12} color="var(--chakra-colors-purple-400)" />
                 <Text fontSize="xs" color="purple.400">
-                  Organization-scoped — not tied to a project
+                  Organization-scoped, not tied to a project
                 </Text>
               </HStack>
             </HStack>

@@ -122,7 +122,7 @@ export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer ${
       <DrawerContent>
         <DrawerHeader>
           <DrawerTitle>
-            Connect {template.displayName} — auto-shaped
+            Connect {template.displayName}, auto-shaped
           </DrawerTitle>
           <DrawerCloseTrigger />
         </DrawerHeader>
@@ -161,7 +161,7 @@ export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer ${
                   </Alert.Indicator>
                   <Alert.Content>
                     <Text fontSize="sm" fontWeight="medium">
-                      Binding issued. Copy the token now — it won't be
+                      Binding issued. Copy the token now, it won't be
                       shown again.
                     </Text>
                   </Alert.Content>

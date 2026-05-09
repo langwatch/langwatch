@@ -55,7 +55,7 @@ export function PersonalFeatureGateDialog({
               Datasets, Annotations, and Automations together.
             </Text>
             <Text fontSize="xs" color="fg.muted">
-              You can disable them later in /me/settings — your data is
+              You can disable them later in /me/settings, your data is
               preserved and reappears on re-enable.
             </Text>
           </VStack>

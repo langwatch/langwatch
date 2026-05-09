@@ -339,7 +339,7 @@ function RawOtlpAdvancedTile() {
             Raw OTLP (advanced)
           </Text>
           <Text fontSize="xs" color="fg.muted">
-            Bring your own OTLP — raw shape. Use for custom telemetry pipelines.
+            Bring your own OTLP, raw shape. Use for custom telemetry pipelines.
           </Text>
           <Link
             href="/me/settings#otlp"
