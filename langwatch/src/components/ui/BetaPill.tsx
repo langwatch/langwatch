@@ -77,9 +77,11 @@ export function BetaPill({
     >
       <PopoverAnchor asChild>
         <Badge
-          size="sm"
           variant="subtle"
           colorPalette={colorPalette}
+          fontSize="2xs"
+          paddingX={1.5}
+          lineHeight={1.2}
           cursor="pointer"
           tabIndex={0}
           onMouseEnter={handleOpen}
