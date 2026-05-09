@@ -23,6 +23,11 @@ import { migrateToColdStorage } from "~/tasks/cold/moveTracesToColdStorage";
 import { scheduleTopicClustering } from "~/server/background/queues/topicClusteringQueue";
 import cleanupOldLambdas from "~/tasks/cleanupOldLambdas";
 import { processCustomGraphTrigger } from "~/pages/api/cron/triggers/customGraphTrigger";
+import {
+  reportHasFailures,
+  type SeedRunReport,
+} from "../../../scripts/dogfood/governance/_lib/seedRunner";
+import { runSeedDemo } from "../../../scripts/dogfood/governance/seed-demo";
 import { ANALYTICS_KEYS } from "~/types";
 import { createLogger } from "~/utils/logger/server";
 import { captureException } from "~/utils/posthogErrorCapture";
@@ -423,6 +428,38 @@ app.get("/cron/triggers", async (c) => {
   }
 
   return c.json(results);
+});
+
+// ---------- POST /api/cron/seed_demo ----------
+//
+// Triggers a daily reset of the canonical demo org allowlist. The
+// langwatch-saas Kubernetes CronJob curls this route with the
+// `CRON_API_KEY` Bearer header. `runSeedDemo` is the same code path the
+// dev CLI uses (`scripts/dogfood/governance/seed-demo.ts`), gated by
+// the `DEMO_ORG_IDS` allowlist guard so an unset env returns a clean
+// 500 instead of touching real customer data.
+//
+// Returns the SeedRunReport JSON either way; HTTP 500 when any action
+// failed so CronJob alerting can fire on the response code.
+app.all("/cron/seed_demo", async (c) => {
+  if (!validateCronKey(c)) {
+    return c.body(null, 401);
+  }
+  let report: SeedRunReport;
+  try {
+    report = await runSeedDemo({ execute: true });
+  } catch (error: any) {
+    logger.error({ error }, "demo seed run threw before completing");
+    return c.json(
+      {
+        message: "demo seed run threw",
+        error: error?.message ? error.message.toString() : `${error}`,
+      },
+      500,
+    );
+  }
+  const status = reportHasFailures(report) ? 500 : 200;
+  return c.json({ report }, status);
 });
 
 // --- Scenario analytics helper functions ---
