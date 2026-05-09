@@ -448,3 +448,97 @@ Feature: Demo-seed scope-guard, runner, entry point: single dev-and-prod path
     When the module is imported by the runner
     Then no CH insert is issued at module-load time
     And the CLI bootstrap only fires when `import.meta.url` matches `process.argv[1]`
+
+  # ─────────────────────────────────────────────────────────────────────
+  # seedHeavyUsage: per-persona /me/usage + /gateway/usage chart fixture
+  # ─────────────────────────────────────────────────────────────────────
+
+  @bdd @demo-seed @actions @heavy-usage @persona-resolution
+  Scenario: Persona resolution walks personalTeams -> personal Project -> first ACTIVE VK
+    Given the target org has 3 personal teams `[t_a, t_b, t_c]` (each `isPersonal=true`)
+    And `t_a` has personal project `p_a` with ACTIVE VK `vk_a`
+    And `t_b` has personal project `p_b` with ACTIVE VK `vk_b1` (createdAt earlier) and `vk_b2`
+    And `t_c` has personal project `p_c` with NO ACTIVE VK
+    When `resolveDemoPersonas` runs against the target org
+    Then the resolved personas are
+      | personalProjectId | virtualKeyId |
+      | p_a               | vk_a         |
+      | p_b               | vk_b1        |
+    And `t_c` is silently dropped from the persona list
+
+  @bdd @demo-seed @actions @heavy-usage @persona-resolution @scope @blast-radius
+  Scenario: Persona resolution is scoped to the target org only
+    Given the target org has 1 personal project + ACTIVE VK
+    And a separate org has 5 personal projects + ACTIVE VKs
+    When `resolveDemoPersonas` runs against the target org
+    Then exactly 1 persona is resolved
+    And no project from the other org is included
+
+  @bdd @demo-seed @actions @heavy-usage @budget @optional
+  Scenario: VK without a virtual_key-scoped GatewayBudget resolves with budgetId undefined
+    Given a persona with VK `vk_a` and no `GatewayBudget` row at scope `VIRTUAL_KEY:vk_a`
+    When `resolveDemoPersonas` runs
+    Then the persona's `budgetId` is `undefined`
+
+  @bdd @demo-seed @actions @heavy-usage @budget @optional
+  Scenario: runSeedHeavyUsage seeds trace_summaries even when budget is undefined
+    Given a persona with `budgetId=undefined`
+    When the action invokes `runSeedHeavyUsage` for that persona
+    Then `trace_summaries` rows are written
+    And no `gateway_budget_ledger_events` rows are written for that persona
+    So that `/me/usage` (which reads trace_summaries) stays populated
+
+  @bdd @demo-seed @actions @heavy-usage @dry-run
+  Scenario: Dry-run with personas resolved returns skipped with row + persona count
+    Given a dry-run context (`execute=false`)
+    And `resolveDemoPersonas` returned 3 personas
+    And a `runSeedHeavyUsage` spy
+    When `seedHeavyUsage.run(context)` is invoked
+    Then the outcome is `skipped`
+    And the reason names the per-persona row count, the persona count, and the day count
+    And `runSeedHeavyUsage` was never invoked
+
+  @bdd @demo-seed @actions @heavy-usage @no-personas @graceful
+  Scenario: Fresh demo org with no signed-up personas returns skipped, not failed
+    Given the target org has 0 personal projects with ACTIVE VKs
+    And an execute-mode context
+    When `seedHeavyUsage.run(context)` is invoked
+    Then the outcome is `skipped`
+    And the reason directs the operator to sign up demo users + mint VKs first
+    And `runSeedHeavyUsage` was never invoked
+    So that the daily cron does not fail the run before the auth flow has been completed
+
+  @bdd @demo-seed @actions @heavy-usage @execute @iteration
+  Scenario: Execute mode invokes runSeedHeavyUsage once per resolved persona
+    Given an execute-mode context
+    And `resolveDemoPersonas` returned 3 personas with VK ids `[vk_a, vk_b, vk_c]`
+    When `seedHeavyUsage.run(context)` is invoked
+    Then `runSeedHeavyUsage` is invoked 3 times in persona order
+    And each call carries the persona's `personalProject`, `virtualKey`, and (optional) `budget`
+    And each call uses `days=30` and `rows=150`
+
+  @bdd @demo-seed @actions @heavy-usage @execute @summary
+  Scenario: Outcome summary aggregates rows, spend, and budget-coverage across personas
+    Given an execute-mode context
+    And `runSeedHeavyUsage` returned 100 rows + $0.50 + budgetSeeded=true for persona A
+    And `runSeedHeavyUsage` returned 200 rows + $1.20 + budgetSeeded=false for persona B
+    When `seedHeavyUsage.run(context)` is invoked
+    Then the outcome is `succeeded`
+    And the summary string includes "300 rows", "$1.7000", "2 personas", "1 with VK-scoped budgets"
+
+  @bdd @demo-seed @actions @heavy-usage @resilience
+  Scenario: A failing persona iteration aborts the action with a captured error
+    Given an execute-mode context with 3 resolved personas
+    And `runSeedHeavyUsage` succeeds for persona A
+    And `runSeedHeavyUsage` throws for persona B
+    When `seedHeavyUsage.run(context)` is invoked
+    Then the action throws
+    And the runner records the action's outcome as `failed` with the captured error
+    And subsequent SeedActions in the ACTIONS list still run
+
+  @bdd @demo-seed @actions @heavy-usage @import-safety
+  Scenario: Importing seed-heavy-usage does not kick off seeding
+    Given a fresh module-load of `scripts/dogfood/governance/seed-heavy-usage`
+    When the module is imported by the wrapper
+    Then no CH insert is issued at module-load time
+    And the CLI bootstrap only fires when `import.meta.url` matches `process.argv[1]`
