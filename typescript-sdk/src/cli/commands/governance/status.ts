@@ -19,7 +19,7 @@ export async function governanceStatusCommand(options: {
   const cfg = loadConfig();
   if (!isLoggedIn(cfg)) {
     process.stderr.write(
-      "Not logged in — run `langwatch login --device` first\n",
+      "Not logged in. Run `langwatch login --device` first.\n",
     );
     process.exit(1);
   }

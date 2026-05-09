@@ -47,7 +47,7 @@ Feature: CLI wrapper login → token → env injection → routing
     And `LANGWATCH_AUTO_LOGIN` is not set to `1`
     When the user runs `langwatch claude`
     Then the wrapper exits with code 1
-    And stderr contains "Not logged in — run `langwatch login --device` first"
+    And stderr contains "Not logged in. Run `langwatch login --device` first."
     And no child process is spawned
 
   Scenario: Forced auto-login overrides TTY check (LANGWATCH_AUTO_LOGIN=1)

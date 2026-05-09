@@ -109,12 +109,12 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
   if (!isLoggedIn(cfg)) {
     if (!shouldAutoLogin()) {
       process.stderr.write(
-        "Not logged in — run `langwatch login --device` first\n",
+        "Not logged in. Run `langwatch login --device` first.\n",
       );
       process.exit(1);
     }
     process.stderr.write(
-      "Not logged in — starting device-flow login...\n",
+      "Not logged in. Starting device-flow login...\n",
     );
     try {
       cfg = await runDeviceFlowLogin({ cfg });

@@ -85,7 +85,7 @@ async function getJSON<T>(
     throw new GovernanceCliError(
       401,
       "not_logged_in",
-      "Not logged in — run `langwatch login --device` first",
+      "Not logged in. Run `langwatch login --device` first.",
     );
   }
   const url = cfg.control_plane_url.replace(/\/+$/, "") + path;
@@ -295,7 +295,7 @@ async function requestREST<T>(
     throw new GovernanceCliError(
       401,
       "not_logged_in",
-      "Not logged in — run `langwatch login --device` first",
+      "Not logged in. Run `langwatch login --device` first.",
     );
   }
   const url = cfg.control_plane_url.replace(/\/+$/, "") + path;

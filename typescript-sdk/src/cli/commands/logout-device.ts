@@ -23,7 +23,7 @@ export const logoutDeviceCommand = async (): Promise<void> => {
   const cfg = loadConfig();
   if (!isLoggedIn(cfg)) {
     clearConfig();
-    console.log("Not logged in — local config cleared (idempotent).");
+    console.log("Not logged in. Local config cleared (idempotent).");
     return;
   }
 

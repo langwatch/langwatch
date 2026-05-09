@@ -95,5 +95,5 @@ Feature: CLI ingest debug commands
   Scenario: governance commands without a device-flow session
     Given ~/.langwatch/config.json does not exist
     When I run `langwatch ingest list` with LANGWATCH_GOVERNANCE_PREVIEW=1
-    Then stderr says "Not logged in — run `langwatch login --device` first"
+    Then stderr says "Not logged in. Run `langwatch login --device` first."
     And the exit code is 1
