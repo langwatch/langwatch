@@ -9,10 +9,15 @@ Feature: Demo-seed scope-guard, runner, entry point: single dev-and-prod path
   bounded blast radius, no fork to drift, and one source of truth.
 
   The harness lives at langwatch/scripts/dogfood/governance/. Dev runs
-  it via `pnpm tsx scripts/dogfood/governance/seed-demo.ts`. Prod runs
-  it via the langwatch-saas Lambda + EventBridge cron, which imports
-  the default export through a submodule and invokes with `--execute`
-  always passed.
+  it directly via `pnpm tsx scripts/dogfood/governance/seed-demo.ts`.
+  Prod runs it via the existing K8s CronJob pattern in
+  langwatch-saas/infrastructure/cronjobs.tf: a scheduled job inside
+  the cluster `curl`s an internal API route on the langwatch app pod
+  (`POST /api/cron/demo_seed`), authenticated with `CRON_API_KEY` in
+  the Authorization header, matching the existing
+  `topic_clustering` and `alert_triggers` cron-route shape. The route
+  handler invokes the same `runSeedActions` orchestrator the CLI
+  invokes; no Lambda, no submodule, one code path.
 
   Background:
     Given an allowlist of demo organization ids is configured via the
@@ -278,6 +283,93 @@ Feature: Demo-seed scope-guard, runner, entry point: single dev-and-prod path
     Then the directory `/tmp/seed/` is created if missing
     And `/tmp/seed/run.txt` contains the same string `formatReport(report)` returned
     And the report ends with a trailing newline
+
+  # ─────────────────────────────────────────────────────────────────────
+  # Prod cron route: POST /api/cron/demo_seed (K8s CronJob curls into pod)
+  # ─────────────────────────────────────────────────────────────────────
+
+  @bdd @demo-seed @cron-route @auth
+  Scenario: Missing Authorization header returns 401 with empty body
+    Given `CRON_API_KEY=ck_test` is set in the langwatch app env
+    When a request `POST /api/cron/demo_seed` arrives with no Authorization header
+    Then the response status is `401`
+    And the response body is empty
+    And `runSeedActions` was never invoked
+
+  @bdd @demo-seed @cron-route @auth
+  Scenario: Wrong CRON_API_KEY returns 401
+    Given `CRON_API_KEY=ck_test` is set
+    When a request `POST /api/cron/demo_seed` arrives with `Authorization: Bearer ck_wrong`
+    Then the response status is `401`
+    And `runSeedActions` was never invoked
+
+  @bdd @demo-seed @cron-route @auth
+  Scenario: Bare CRON_API_KEY without Bearer prefix is accepted
+    Given `CRON_API_KEY=ck_test` is set
+    When a request `POST /api/cron/demo_seed` arrives with `Authorization: ck_test`
+    Then the route handler proceeds past auth
+    So that the existing cron-route header convention is preserved
+
+  @bdd @demo-seed @cron-route @execute
+  Scenario: Route handler always invokes runSeedActions with execute=true
+    Given a valid CRON_API_KEY in the Authorization header
+    And `DEMO_ORG_IDS="org_demo_acme"` is configured in the pod env
+    When a request `POST /api/cron/demo_seed` arrives
+    Then `runSeedActions` is invoked with `execute=true`
+    And the prod path never runs in dry-run mode
+
+  @bdd @demo-seed @cron-route @scope
+  Scenario: Route handler resolves the target org via DEMO_ORG_IDS
+    Given a valid CRON_API_KEY
+    And `DEMO_ORG_IDS="org_demo_acme,org_demo_other"` in the pod env
+    When a request `POST /api/cron/demo_seed` arrives with no body
+    Then `runSeedActions` is invoked with `organizationId="org_demo_acme"`
+
+  @bdd @demo-seed @cron-route @scope
+  Scenario: Optional orgId in JSON body overrides default, allowlist still enforced
+    Given a valid CRON_API_KEY
+    And `DEMO_ORG_IDS="org_demo_acme,org_demo_other"` in the pod env
+    When a request `POST /api/cron/demo_seed` arrives with body `{"orgId":"org_demo_other"}`
+    Then `runSeedActions` is invoked with `organizationId="org_demo_other"`
+
+  @bdd @demo-seed @cron-route @scope @blast-radius
+  Scenario: Body orgId pointing off-list returns 400 without invoking runSeedActions
+    Given a valid CRON_API_KEY
+    And `DEMO_ORG_IDS="org_demo_acme"` in the pod env
+    When a request `POST /api/cron/demo_seed` arrives with body `{"orgId":"org_real_customer"}`
+    Then the response status is `400`
+    And the response body names the scope violation
+    And `runSeedActions` was never invoked
+
+  @bdd @demo-seed @cron-route @observability
+  Scenario: Clean run returns 200 with the formatted report in the JSON body
+    Given a valid CRON_API_KEY
+    And every seed action succeeds for the target org
+    When a request `POST /api/cron/demo_seed` arrives
+    Then the response status is `200`
+    And the response body has shape `{ ok: true, report: SeedRunReport }`
+    And `report.mode` equals `"execute"`
+    And `report.actions` lists every action with status `"succeeded"` or `"skipped"`
+
+  @bdd @demo-seed @cron-route @observability @cron-alarm
+  Scenario: Any failed action returns HTTP 500 so the cron alarm fires
+    Given a valid CRON_API_KEY
+    And at least one seed action throws during the run
+    When a request `POST /api/cron/demo_seed` arrives
+    Then the response status is `500`
+    And the response body has shape `{ ok: false, report: SeedRunReport }`
+    And the report records the failed action with its error message
+    So that the K8s CronJob success-rate metric reflects the failure
+       and operators page on partial-success runs
+
+  @bdd @demo-seed @cron-route @misconfig
+  Scenario: Pod missing DEMO_ORG_IDS returns 500 without seeding
+    Given a valid CRON_API_KEY
+    And `DEMO_ORG_IDS` is unset in the pod env
+    When a request `POST /api/cron/demo_seed` arrives
+    Then the response status is `500`
+    And the response body says the seed harness is misconfigured
+    And `runSeedActions` was never invoked
 
   # ─────────────────────────────────────────────────────────────────────
   # First action: verifyOrgIdentity proves the wiring
