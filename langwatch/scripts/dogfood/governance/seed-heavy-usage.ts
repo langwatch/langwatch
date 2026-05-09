@@ -43,28 +43,44 @@ interface ModelMix {
 
 const MODELS: ModelMix[] = [
   {
+    name: "claude-sonnet-4-7",
+    costPerInputToken: 0.000003,
+    costPerOutputToken: 0.000015,
+    weight: 0.50,
+    promptRange: [50, 2000],
+    completionRange: [80, 1800],
+  },
+  {
+    name: "claude-opus-4-7",
+    costPerInputToken: 0.000015,
+    costPerOutputToken: 0.000075,
+    weight: 0.20,
+    promptRange: [80, 3000],
+    completionRange: [120, 2500],
+  },
+  {
+    name: "claude-haiku-4-5",
+    costPerInputToken: 0.0000008,
+    costPerOutputToken: 0.000004,
+    weight: 0.15,
+    promptRange: [20, 1000],
+    completionRange: [10, 800],
+  },
+  {
     name: "gpt-5-mini",
     costPerInputToken: 0.00000025,
     costPerOutputToken: 0.000002,
-    weight: 0.55,
+    weight: 0.10,
     promptRange: [12, 800],
     completionRange: [10, 600],
   },
   {
-    name: "gpt-4o-mini",
-    costPerInputToken: 0.00000015,
-    costPerOutputToken: 0.0000006,
-    weight: 0.25,
-    promptRange: [20, 1500],
-    completionRange: [10, 1200],
-  },
-  {
-    name: "claude-sonnet-4-5",
-    costPerInputToken: 0.000003,
-    costPerOutputToken: 0.000015,
-    weight: 0.20,
-    promptRange: [50, 2000],
-    completionRange: [80, 1800],
+    name: "gemini-2-5-pro",
+    costPerInputToken: 0.00000125,
+    costPerOutputToken: 0.000005,
+    weight: 0.05,
+    promptRange: [30, 1500],
+    completionRange: [40, 1200],
   },
 ];
 
@@ -142,11 +158,20 @@ interface SyntheticTrace {
 
 /**
  * Curve: more activity in the recent week, sparser at the start.
- * Picks an offset days-ago weighted toward 0 (today).
+ * Picks an offset days-ago weighted toward 0 (today). Weekday/weekend
+ * shape is layered on top: weekend (Sat/Sun) draws are decimated by
+ * 60% to give the demo chart realistic peaks.
  */
 function pickDaysAgo(maxDays: number): number {
-  const r = Math.random();
-  return Math.floor(maxDays * Math.pow(r, 1.6));
+  while (true) {
+    const r = Math.random();
+    const days = Math.floor(maxDays * Math.pow(r, 1.6));
+    const candidate = new Date();
+    candidate.setUTCDate(candidate.getUTCDate() - days);
+    const dow = candidate.getUTCDay();
+    const isWeekend = dow === 0 || dow === 6;
+    if (!isWeekend || Math.random() < 0.4) return days;
+  }
 }
 
 function synthTrace(args: Args): SyntheticTrace {
