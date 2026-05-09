@@ -456,13 +456,6 @@ async function maybeSeedAnomalyAlert({
 }): Promise<void> {
   if (!withAnomaly) return;
   const alertName = "Bird's-eye spend-spike (seed)";
-  const existing = await prisma.anomalyAlert.findFirst({
-    where: { organizationId, ruleName: alertName },
-  });
-  if (existing) {
-    console.log(`[seed-bird-eye] anomaly alert already present id=${existing.id}`);
-    return;
-  }
   // Find or create a host AnomalyRule so the foreign-key reference resolves.
   const rule =
     (await prisma.anomalyRule.findFirst({
@@ -486,6 +479,46 @@ async function maybeSeedAnomalyAlert({
     }));
 
   const now = new Date();
+  const triggerWindowStart = new Date(now.getTime() - 60 * 60 * 1000);
+  const triggerWindowEnd = now;
+
+  // Re-runnable: if a prior alert exists for this rule + window, force it
+  // back to state="open" + refresh detectedAt so the bird-eye `Open
+  // anomalies` KPI shows non-zero. Earlier shape silently bailed when ANY
+  // alert existed under this ruleName, even if it was acknowledged or
+  // resolved, so re-running the seed didn't restore the populated state.
+  const existing = await prisma.anomalyAlert.findFirst({
+    where: { organizationId, ruleId: rule.id },
+    orderBy: { detectedAt: "desc" },
+  });
+
+  const detail = {
+    ratio: 2.4,
+    baselineUsd: 0.6,
+    sourceLabel: "Customer Support",
+  };
+
+  if (existing) {
+    const updated = await prisma.anomalyAlert.update({
+      where: { id: existing.id },
+      data: {
+        state: "open",
+        detectedAt: now,
+        triggerWindowStart,
+        triggerWindowEnd,
+        triggerSpendUsd: "1.42",
+        triggerEventCount: 87,
+        acknowledgedAt: null,
+        resolvedAt: null,
+        detail,
+      },
+    });
+    console.log(
+      `[seed-bird-eye] anomaly alert refreshed id=${updated.id} state=open`,
+    );
+    return;
+  }
+
   const created = await prisma.anomalyAlert.create({
     data: {
       organizationId,
@@ -493,17 +526,13 @@ async function maybeSeedAnomalyAlert({
       ruleName: alertName,
       ruleType: "spend_spike",
       severity: "warning",
-      triggerWindowStart: new Date(now.getTime() - 60 * 60 * 1000),
-      triggerWindowEnd: now,
+      triggerWindowStart,
+      triggerWindowEnd,
       triggerSpendUsd: "1.42",
       triggerEventCount: 87,
       detectedAt: now,
       state: "open",
-      detail: {
-        ratio: 2.4,
-        baselineUsd: 0.6,
-        sourceLabel: "Customer Support",
-      },
+      detail,
     },
   });
   console.log(`[seed-bird-eye] anomaly alert created id=${created.id}`);
