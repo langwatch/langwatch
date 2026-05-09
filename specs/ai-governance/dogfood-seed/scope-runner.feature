@@ -397,3 +397,54 @@ Feature: Demo-seed scope-guard, runner, entry point: single dev-and-prod path
     And a prisma spy that records every write
     When `verifyOrgIdentity.run(context)` is invoked
     Then no prisma write call was made
+
+  # ─────────────────────────────────────────────────────────────────────
+  # seedBirdEye: populated bird-eye dashboard fixture (4 teams, anomaly)
+  # ─────────────────────────────────────────────────────────────────────
+
+  @bdd @demo-seed @actions @bird-eye @dry-run
+  Scenario: seedBirdEye returns skipped in dry-run mode without firing CH inserts
+    Given a dry-run context (`execute=false`)
+    And a `runSeedBirdEye` spy
+    When `seedBirdEye.run(context)` is invoked
+    Then the outcome is `skipped`
+    And the reason string mentions the row count and the team count
+    And `runSeedBirdEye` was never invoked
+
+  @bdd @demo-seed @actions @bird-eye @execute
+  Scenario: seedBirdEye in execute mode invokes runSeedBirdEye with prod-shape defaults
+    Given an execute-mode context (`execute=true`)
+    And the target org id is `org_demo_acme`
+    When `seedBirdEye.run(context)` is invoked
+    Then `runSeedBirdEye` is invoked with arguments
+      | argument        | value           |
+      | organizationId  | org_demo_acme   |
+      | days            | 30              |
+      | rows            | 480             |
+      | withAnomaly     | true            |
+    And the outcome is `succeeded`
+    And the summary string includes the rows-inserted count and total synthetic spend
+
+  @bdd @demo-seed @actions @bird-eye @scope @blast-radius
+  Scenario: seedBirdEye uses the scope-asserted Organization handle, ignoring any external --org-id
+    Given an execute-mode context with `organization.id="org_demo_acme"`
+    And `runSeedBirdEye` records the `organizationId` it receives
+    When `seedBirdEye.run(context)` is invoked
+    Then `runSeedBirdEye` was invoked with `organizationId="org_demo_acme"`
+    And no env var, argv flag, or external override altered that target
+
+  @bdd @demo-seed @actions @bird-eye @resilience
+  Scenario: seedBirdEye throw is captured by the runner as a failed outcome
+    Given an execute-mode context
+    And `runSeedBirdEye` throws an Error with message `"CH insert failed"`
+    When the runner invokes `seedBirdEye.run(context)`
+    Then the runner records the outcome as `failed`
+    And the recorded error's message is `"CH insert failed"`
+    And subsequent actions in the ACTIONS list still run
+
+  @bdd @demo-seed @actions @bird-eye @import-safety
+  Scenario: Importing seed-bird-eye does not kick off seeding
+    Given a fresh module-load of `scripts/dogfood/governance/seed-bird-eye`
+    When the module is imported by the runner
+    Then no CH insert is issued at module-load time
+    And the CLI bootstrap only fires when `import.meta.url` matches `process.argv[1]`
