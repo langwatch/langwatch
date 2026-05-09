@@ -1,0 +1,305 @@
+Feature: Demo-seed scope-guard, runner, entry point: single dev-and-prod path
+  As a platform operator running the daily demo-org seed cron
+  And as a developer running the same harness locally for dogfood
+  I want the seeder to refuse to run without an explicit allowlist,
+  refuse to touch any org outside that allowlist, capture per-action
+  outcomes without aborting the rest of the run, and exit non-zero on
+  any failure so the cron alarm fires
+  So that the same code path runs in dev and prod with structurally
+  bounded blast radius, no fork to drift, and one source of truth.
+
+  The harness lives at langwatch/scripts/dogfood/governance/. Dev runs
+  it via `pnpm tsx scripts/dogfood/governance/seed-demo.ts`. Prod runs
+  it via the langwatch-saas Lambda + EventBridge cron, which imports
+  the default export through a submodule and invokes with `--execute`
+  always passed.
+
+  Background:
+    Given an allowlist of demo organization ids is configured via the
+      `DEMO_ORG_IDS` env var as a comma-separated list
+    And every id in the allowlist matches `[A-Za-z0-9_-]{8,64}`
+    And the langwatch prisma client is connected to the target database
+
+  # ─────────────────────────────────────────────────────────────────────
+  # DEMO_ORG_IDS allowlist parsing: refuse-to-run on missing or malformed
+  # ─────────────────────────────────────────────────────────────────────
+
+  @bdd @demo-seed @scope-guard
+  Scenario: Missing DEMO_ORG_IDS refuses to run
+    Given `DEMO_ORG_IDS` is unset in the environment
+    When `DemoOrgScope.fromEnv()` is called
+    Then it throws `DemoScopeMisconfigured`
+    And the error message names the missing env var
+    And no prisma read of org-scoped data has been issued
+
+  @bdd @demo-seed @scope-guard
+  Scenario: Empty DEMO_ORG_IDS refuses to run
+    Given `DEMO_ORG_IDS=""` is exported
+    When `DemoOrgScope.fromEnv()` is called
+    Then it throws `DemoScopeMisconfigured`
+    And no prisma read has been issued
+
+  @bdd @demo-seed @scope-guard
+  Scenario: DEMO_ORG_IDS with only whitespace and commas refuses to run
+    Given `DEMO_ORG_IDS=" , , "` is exported
+    When `DemoOrgScope.fromEnv()` is called
+    Then it throws `DemoScopeMisconfigured`
+    And the error message says no usable ids were found after trimming
+
+  @bdd @demo-seed @scope-guard
+  Scenario: DEMO_ORG_IDS containing a malformed id refuses to run
+    Given `DEMO_ORG_IDS="org_demo_acme,@@bad@@"` is exported
+    When `DemoOrgScope.fromEnv()` is called
+    Then it throws `DemoScopeMisconfigured`
+    And the error message names the malformed id and the expected pattern
+
+  @bdd @demo-seed @scope-guard
+  Scenario: DEMO_ORG_IDS deduplicates while preserving order
+    Given `DEMO_ORG_IDS="org_demo_acme,org_demo_other,org_demo_acme"` is exported
+    When `DemoOrgScope.fromEnv()` is called
+    Then the resulting allowlist is `["org_demo_acme", "org_demo_other"]`
+
+  # ─────────────────────────────────────────────────────────────────────
+  # Off-list rejection: synchronous assertion BEFORE any prisma read
+  # ─────────────────────────────────────────────────────────────────────
+
+  @bdd @demo-seed @scope-guard @blast-radius
+  Scenario: Off-list orgId throws before loadOrg issues findUnique
+    Given an `DemoOrgScope` constructed with allowlist `["org_demo_acme"]`
+    And a prisma spy that records every call
+    When `scope.loadOrg(prisma, "org_real_customer")` is called
+    Then it throws `DemoScopeViolation` synchronously
+    And `prisma.organization.findUnique` was never invoked
+    And the error message says the id is not in the demo allowlist
+
+  @bdd @demo-seed @scope-guard @blast-radius
+  Scenario: Off-list orgId rejected before any write path
+    Given an `DemoOrgScope` constructed with allowlist `["org_demo_acme"]`
+    When `scope.assertOrgIdAllowed("org_real_customer")` is called
+    Then it throws `DemoScopeViolation` synchronously
+    And the throw is observable BEFORE any DB connection has been issued
+
+  @bdd @demo-seed @scope-guard @blast-radius
+  Scenario: loadProject rejects projects whose parent org is off-list
+    Given an `DemoOrgScope` constructed with allowlist `["org_demo_acme"]`
+    And a project `proj_x` exists whose parent organization id is `org_real_customer`
+    When `scope.loadProject(prisma, "proj_x")` is called
+    Then it throws `DemoScopeViolation`
+    And the error message names the off-list parent org id
+
+  @bdd @demo-seed @scope-guard
+  Scenario: Allowlisted orgId that does not exist in DB throws DemoScopeViolation
+    Given an `DemoOrgScope` constructed with allowlist `["org_demo_acme"]`
+    And no organization row exists with id `org_demo_acme`
+    When `scope.loadOrg(prisma, "org_demo_acme")` is called
+    Then it throws `DemoScopeViolation`
+    And the error message says the org is in the allowlist but not in the DB
+
+  @bdd @demo-seed @scope-guard
+  Scenario: DemoOrgScope constructor refuses to accept an empty allowlist
+    When `new DemoOrgScope([])` is called
+    Then it throws `DemoScopeMisconfigured`
+
+  # ─────────────────────────────────────────────────────────────────────
+  # Runner orchestration: dry-run default, per-action error capture
+  # ─────────────────────────────────────────────────────────────────────
+
+  @bdd @demo-seed @runner
+  Scenario: Runner loads the target org once via the guard
+    Given an allowlisted org id `org_demo_acme`
+    And a list of seed actions `[A, B, C]`
+    When `runSeedActions` is called with that org id and action list
+    Then the org row is loaded once via `scope.loadOrg`
+    And each action receives the same `Organization` value in its context
+    And no action loads the org itself
+
+  @bdd @demo-seed @runner
+  Scenario: Dry-run is the default mode
+    Given an allowlisted org id `org_demo_acme`
+    And a single action that records the `execute` flag from its context
+    When `runSeedActions` is called without `execute=true`
+    Then the action's recorded `execute` flag is false
+    And the report's mode is `dry-run`
+
+  @bdd @demo-seed @runner
+  Scenario: --execute opts in to mutations
+    Given an allowlisted org id `org_demo_acme`
+    And a single action that records the `execute` flag from its context
+    When `runSeedActions` is called with `execute=true`
+    Then the action's recorded `execute` flag is true
+    And the report's mode is `execute`
+
+  @bdd @demo-seed @runner @resilience
+  Scenario: One failing action does not abort the rest
+    Given a list of seed actions `[A, B, C]` where `B` throws synchronously
+    When `runSeedActions` is invoked
+    Then action `A` completed with status `succeeded`
+    And action `B` is recorded with status `failed` and the captured error
+    And action `C` was still invoked and completed
+    And the report contains one entry per action in input order
+
+  @bdd @demo-seed @runner @resilience
+  Scenario: Action that throws a non-Error value is captured as a failed Error
+    Given a seed action that throws the string `"boom"`
+    When `runSeedActions` is invoked
+    Then the action is recorded with status `failed`
+    And the recorded error's `message` is `"boom"`
+
+  @bdd @demo-seed @runner
+  Scenario: Per-action duration is recorded in milliseconds
+    Given a seed action that returns after a measurable delay
+    When `runSeedActions` is invoked
+    Then the action's report entry has a non-negative `durationMs`
+
+  @bdd @demo-seed @runner
+  Scenario: reportHasFailures returns true when any action failed
+    Given a run report with action outcomes `[succeeded, failed, succeeded]`
+    When `reportHasFailures(report)` is called
+    Then it returns `true`
+
+  @bdd @demo-seed @runner
+  Scenario: reportHasFailures returns false on a clean run
+    Given a run report with action outcomes `[succeeded, succeeded, skipped]`
+    When `reportHasFailures(report)` is called
+    Then it returns `false`
+
+  # ─────────────────────────────────────────────────────────────────────
+  # Report formatting: observable cron output
+  # ─────────────────────────────────────────────────────────────────────
+
+  @bdd @demo-seed @report
+  Scenario: formatReport renders DRY-RUN header for dry-run mode
+    Given a dry-run report with one succeeded action
+    When `formatReport(report)` is called
+    Then the output contains the line `Mode: DRY-RUN`
+    And the output contains the closing line `Result: all actions ran clean.`
+
+  @bdd @demo-seed @report
+  Scenario: formatReport renders EXECUTE header for execute mode
+    Given an execute-mode report with one succeeded action
+    When `formatReport(report)` is called
+    Then the output contains the line `Mode: EXECUTE`
+
+  @bdd @demo-seed @report
+  Scenario: formatReport closing line diverges on failure vs clean
+    Given a report with one succeeded and one failed action
+    When `formatReport(report)` is called
+    Then the output contains the closing line `Result: at least one action failed.`
+
+  @bdd @demo-seed @report
+  Scenario: formatReport renders per-action status, duration, and detail
+    Given a report with a `succeeded` action named `verifyOrgIdentity`,
+      a `skipped` action with reason `"already seeded"`,
+      and a `failed` action whose error message is `"boom"`
+    When `formatReport(report)` is called
+    Then the output contains a line matching `verifyOrgIdentity (\d+ms): succeeded`
+    And the output contains a line matching `\(\d+ms\): skipped already seeded`
+    And the output contains a line matching `\(\d+ms\): failed boom`
+
+  # ─────────────────────────────────────────────────────────────────────
+  # Entry point: argv parsing for seed-demo.ts
+  # ─────────────────────────────────────────────────────────────────────
+
+  @bdd @demo-seed @entry @argv
+  Scenario: No args means dry-run, no override, no report path
+    When `parseArgs([])` is called
+    Then it returns `{ execute: false, orgId: undefined, reportPath: undefined }`
+
+  @bdd @demo-seed @entry @argv
+  Scenario: --execute flips the execute flag
+    When `parseArgs(["--execute"])` is called
+    Then it returns `{ execute: true, orgId: undefined, reportPath: undefined }`
+
+  @bdd @demo-seed @entry @argv
+  Scenario: --org-id consumes the next argv value
+    When `parseArgs(["--org-id", "org_demo_acme"])` is called
+    Then it returns `{ execute: false, orgId: "org_demo_acme", reportPath: undefined }`
+
+  @bdd @demo-seed @entry @argv
+  Scenario: --org-id without a value throws
+    When `parseArgs(["--org-id"])` is called
+    Then it throws an Error whose message says `--org-id requires a value`
+
+  @bdd @demo-seed @entry @argv
+  Scenario: --report-path consumes the next argv value
+    When `parseArgs(["--report-path", "/tmp/run.txt"])` is called
+    Then it returns `{ execute: false, orgId: undefined, reportPath: "/tmp/run.txt" }`
+
+  @bdd @demo-seed @entry @argv
+  Scenario: --report-path without a value throws
+    When `parseArgs(["--report-path"])` is called
+    Then it throws an Error whose message says `--report-path requires a value`
+
+  @bdd @demo-seed @entry @argv
+  Scenario: Unknown argv token throws
+    When `parseArgs(["--bogus"])` is called
+    Then it throws an Error whose message names `--bogus` as unknown
+
+  # ─────────────────────────────────────────────────────────────────────
+  # Entry point: target resolution + exit code
+  # ─────────────────────────────────────────────────────────────────────
+
+  @bdd @demo-seed @entry @resolution
+  Scenario: Default target is the first id in DEMO_ORG_IDS
+    Given `DEMO_ORG_IDS="org_demo_acme,org_demo_other"` is exported
+    When the entry point is invoked with no `--org-id`
+    Then `runSeedActions` is invoked with `organizationId="org_demo_acme"`
+
+  @bdd @demo-seed @entry @resolution
+  Scenario: --org-id override targets a secondary allowlisted org
+    Given `DEMO_ORG_IDS="org_demo_acme,org_demo_other"` is exported
+    When the entry point is invoked with `--org-id org_demo_other`
+    Then `runSeedActions` is invoked with `organizationId="org_demo_other"`
+
+  @bdd @demo-seed @entry @resolution @blast-radius
+  Scenario: --org-id pointing at an off-list id refuses to run
+    Given `DEMO_ORG_IDS="org_demo_acme"` is exported
+    When the entry point is invoked with `--org-id org_real_customer`
+    Then it throws `DemoScopeViolation`
+    And `runSeedActions` was never invoked
+
+  @bdd @demo-seed @entry @cron
+  Scenario: Any failed action sets process.exitCode to 1
+    Given a seed run where at least one action fails
+    When the entry point completes
+    Then `process.exitCode` is `1`
+    So that the prod cron alarm fires on partial failure
+
+  @bdd @demo-seed @entry @cron
+  Scenario: Clean run leaves process.exitCode unset
+    Given a seed run where every action succeeds
+    When the entry point completes
+    Then `process.exitCode` was never assigned to a non-zero value
+
+  @bdd @demo-seed @entry @observability
+  Scenario: --report-path writes the formatted report to disk
+    Given a clean dry-run completion
+    When the entry point is invoked with `--report-path /tmp/seed/run.txt`
+    Then the directory `/tmp/seed/` is created if missing
+    And `/tmp/seed/run.txt` contains the same string `formatReport(report)` returned
+    And the report ends with a trailing newline
+
+  # ─────────────────────────────────────────────────────────────────────
+  # First action: verifyOrgIdentity proves the wiring
+  # ─────────────────────────────────────────────────────────────────────
+
+  @bdd @demo-seed @actions @verify
+  Scenario: verifyOrgIdentity succeeds when name and slug are populated
+    Given the target org has `name="Acme Demo"` and `slug="acme-demo"`
+    When `verifyOrgIdentity.run(context)` is invoked
+    Then the outcome is `succeeded`
+    And the summary string mentions both the name and the slug
+
+  @bdd @demo-seed @actions @verify
+  Scenario: verifyOrgIdentity fails when name is missing
+    Given the target org has `name=null`
+    When `verifyOrgIdentity.run(context)` is invoked
+    Then the outcome is `failed`
+    And the error message names the missing field
+
+  @bdd @demo-seed @actions @verify @read-only
+  Scenario: verifyOrgIdentity is read-only regardless of execute mode
+    Given an execute-mode context (`execute=true`)
+    And a prisma spy that records every write
+    When `verifyOrgIdentity.run(context)` is invoked
+    Then no prisma write call was made
