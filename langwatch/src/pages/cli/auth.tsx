@@ -319,7 +319,7 @@ export default function CliAuthPage() {
                   <Alert.Content>
                     <Alert.Title>No code provided</Alert.Title>
                     <Alert.Description>
-                      Run <code>langwatch login</code> in your terminal — it
+                      Run <code>langwatch login</code> in your terminal, it
                       will print a link with your code embedded.
                     </Alert.Description>
                   </Alert.Content>
