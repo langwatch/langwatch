@@ -5,6 +5,11 @@
  *   curl -X POST .../api/auth/sign-up/email -d '{"email":"...","password":"...","name":"..."}'
  *   pnpm tsx scripts/dogfood/governance/seed-personas.ts --email <user-email> --persona <p1|p3|p4> [--mint-vk]
  *
+ * No password-mint — this script REQUIRES the user already signed up
+ * through the auth flow. Operator drives sign-up out-of-band; this
+ * script never touches the User row's credential material, only its
+ * org/team/project membership state.
+ *
  * Personas (from gateway.md Screen 6):
  *   p1 — personal-only (no Org/Team/Project). User remains an "anonymous IDE
  *        developer" who only has /me. Sign-up alone is sufficient.
@@ -19,6 +24,22 @@
  * secret to stdout so a follow-up `fire-completion.ts` (or `langwatch
  * claude`) can fire a real LLM completion through the local Go gateway.
  * The secret is shown ONCE — capture it from script output.
+ *
+ * --mint-vk in detail: the script seeds an org-default ModelProvider +
+ * RoutingPolicy so the personal VK has a routing chain to bind to.
+ * When `OPENAI_API_KEY` is set in env, an OpenAI ModelProvider is
+ * seeded with that key. When not set, the ModelProvider step is
+ * skipped with a warning — the VK is still issued, but it won't route
+ * any traffic until an admin attaches a provider through the UI.
+ * Production demo seeding deliberately runs without OPENAI_API_KEY in
+ * env so personal VKs get minted without the script knowing the real
+ * provider key.
+ *
+ * Why this script is NOT a cron SeedAction: per-user setup tied to a
+ * specific signed-up email. The cron path (seed-demo) reset's job is
+ * to refresh populated state in an already-provisioned demo org, not
+ * to provision new personas. Operator runs this script once per demo
+ * persona during environment setup; cron tops up the data afterwards.
  */
 import { randomBytes } from "crypto";
 import { RoleBindingScopeType, TeamUserRole } from "@prisma/client";
@@ -28,30 +49,47 @@ import { encrypt } from "~/utils/encryption";
 import { PersonalWorkspaceService } from "@ee/governance/services/personalWorkspace.service";
 import { PersonalVirtualKeyService } from "@ee/governance/services/personalVirtualKey.service";
 
-interface Args {
+export interface SeedPersonasArgs {
   email: string;
   persona: "p1" | "p3" | "p4";
   mintVk: boolean;
 }
 
-function parseArgs(argv: string[]): Args {
-  const out: Partial<Args> = { mintVk: false };
+export interface SeedPersonasSummary {
+  userId: string;
+  persona: SeedPersonasArgs["persona"];
+  organizationId?: string;
+  teamId?: string;
+  projectId?: string;
+  orgRole?: "ADMIN" | "MEMBER";
+  vk?: {
+    id: string;
+    secret: string;
+    baseUrl: string;
+    personalProjectId: string;
+  };
+  modelProviderSeeded: boolean;
+}
+
+function parseArgs(argv: string[]): SeedPersonasArgs {
+  const out: Partial<SeedPersonasArgs> = { mintVk: false };
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === "--email") out.email = argv[++i] as string;
-    else if (argv[i] === "--persona") out.persona = argv[++i] as Args["persona"];
+    else if (argv[i] === "--persona") out.persona = argv[++i] as SeedPersonasArgs["persona"];
     else if (argv[i] === "--mint-vk") out.mintVk = true;
   }
   if (!out.email) throw new Error("--email is required");
   if (!out.persona) throw new Error("--persona is required (p1|p3|p4)");
-  return out as Args;
+  return out as SeedPersonasArgs;
 }
 
 function shortId(): string {
   return randomBytes(4).toString("base64url").toLowerCase();
 }
 
-async function main() {
-  const args = parseArgs(process.argv.slice(2));
+export async function runSeedPersonas(
+  args: SeedPersonasArgs,
+): Promise<SeedPersonasSummary> {
   const user = await prisma.user.findUnique({ where: { email: args.email } });
   if (!user) throw new Error(`user ${args.email} not found — sign up first`);
 
@@ -62,8 +100,11 @@ async function main() {
       where: { id: user.id },
       data: { emailVerified: true },
     });
-    process.stdout.write(JSON.stringify({ userId: user.id, persona: "p1" }) + "\n");
-    return;
+    return {
+      userId: user.id,
+      persona: "p1",
+      modelProviderSeeded: false,
+    };
   }
 
   const orgRole = args.persona === "p4" ? "ADMIN" : "MEMBER";
@@ -136,59 +177,64 @@ async function main() {
     data: { emailVerified: true },
   });
 
-  let vkOutput: { id: string; secret: string; baseUrl: string; personalProjectId: string } | null = null;
+  let vkOutput: SeedPersonasSummary["vk"];
+  let modelProviderSeeded = false;
   if (args.mintVk) {
     // Seed an org-default RoutingPolicy + ModelProvider so PersonalVK
-    // issuance has a chain to bind to. Without this the VK service
-    // falls into the "needs explicit credentials" branch and 400s
-    // ("At least one provider credential is required"). Idempotent
-    // per (org, scope, isDefault).
+    // issuance has a chain to bind to. When OPENAI_API_KEY is set, the
+    // ModelProvider step runs and the personal VK can route end-to-end.
+    // When not set, we skip ModelProvider + RoutingPolicy and the VK is
+    // still issued — production-demo path runs the cron without a real
+    // provider key in env, the admin attaches credentials through the
+    // UI separately.
     const openaiKey = process.env.OPENAI_API_KEY;
-    if (!openaiKey) {
-      throw new Error(
-        "OPENAI_API_KEY required in env for --mint-vk so seeded ModelProvider can route through Go gateway",
+    if (openaiKey) {
+      const modelProvider = await prisma.modelProvider.create({
+        data: {
+          projectId: project.id,
+          name: "OpenAI",
+          provider: "openai",
+          enabled: true,
+          // customKeys is an AES-GCM encrypted JSON blob, not a plain object —
+          // config.materialiser decrypts and pick()s OPENAI_API_KEY off it
+          // before handing the value to the gateway. An empty {} produces
+          // {api_key: ""} downstream and the gateway 504s with
+          // "provider is required".
+          customKeys: encrypt(JSON.stringify({ OPENAI_API_KEY: openaiKey })),
+          scopes: { create: [{ scopeType: "ORGANIZATION", scopeId: org.id }] },
+        },
+      });
+      // GatewayProviderCredential wraps ModelProvider for gateway routing —
+      // RoutingPolicy.providerCredentialIds expects GatewayProviderCredential
+      // ids, NOT ModelProvider ids.
+      const gatewayCred = await prisma.gatewayProviderCredential.create({
+        data: {
+          projectId: project.id,
+          modelProviderId: modelProvider.id,
+          slot: "primary",
+        },
+      });
+      const policy = await prisma.routingPolicy.create({
+        data: {
+          organizationId: org.id,
+          scope: "organization",
+          scopeId: org.id,
+          name: "developer-default",
+          isDefault: true,
+          strategy: "priority",
+          providerCredentialIds: [gatewayCred.id],
+          modelAllowlist: ["gpt-5-mini", "gpt-5", "gpt-4o", "gpt-4o-mini"],
+        },
+      });
+      modelProviderSeeded = true;
+      process.stderr.write(
+        `[seed-personas] seeded org modelProvider=${modelProvider.id} gatewayCred=${gatewayCred.id} routing-policy=${policy.id} (org-default)\n`,
+      );
+    } else {
+      process.stderr.write(
+        `[seed-personas] OPENAI_API_KEY not set — skipping ModelProvider + RoutingPolicy seed. Personal VK will issue but won't route until an admin attaches a provider.\n`,
       );
     }
-    const modelProvider = await prisma.modelProvider.create({
-      data: {
-        projectId: project.id,
-        name: "OpenAI",
-        provider: "openai",
-        enabled: true,
-        // customKeys is an AES-GCM encrypted JSON blob, not a plain object —
-        // config.materialiser decrypts and pick()s OPENAI_API_KEY off it
-        // before handing the value to the gateway. An empty {} produces
-        // {api_key: ""} downstream and the gateway 504s with
-        // "provider is required".
-        customKeys: encrypt(JSON.stringify({ OPENAI_API_KEY: openaiKey })),
-        scopes: { create: [{ scopeType: "ORGANIZATION", scopeId: org.id }] },
-      },
-    });
-    // GatewayProviderCredential wraps ModelProvider for gateway routing —
-    // RoutingPolicy.providerCredentialIds expects GatewayProviderCredential
-    // ids, NOT ModelProvider ids.
-    const gatewayCred = await prisma.gatewayProviderCredential.create({
-      data: {
-        projectId: project.id,
-        modelProviderId: modelProvider.id,
-        slot: "primary",
-      },
-    });
-    const policy = await prisma.routingPolicy.create({
-      data: {
-        organizationId: org.id,
-        scope: "organization",
-        scopeId: org.id,
-        name: "developer-default",
-        isDefault: true,
-        strategy: "priority",
-        providerCredentialIds: [gatewayCred.id],
-        modelAllowlist: ["gpt-5-mini", "gpt-5", "gpt-4o", "gpt-4o-mini"],
-      },
-    });
-    process.stderr.write(
-      `[seed-personas] seeded org modelProvider=${modelProvider.id} gatewayCred=${gatewayCred.id} routing-policy=${policy.id} (org-default)\n`,
-    );
 
     const workspaceSvc = new PersonalWorkspaceService(prisma);
     const workspace = await workspaceSvc.ensure({
@@ -264,24 +310,34 @@ async function main() {
     }
   }
 
-  process.stdout.write(
-    JSON.stringify({
-      userId: user.id,
-      organizationId: org.id,
-      teamId: team.id,
-      projectId: project.id,
-      persona: args.persona,
-      orgRole,
-      ...(vkOutput ? { vk: vkOutput } : {}),
-    }) + "\n",
-  );
+  return {
+    userId: user.id,
+    persona: args.persona,
+    organizationId: org.id,
+    teamId: team.id,
+    projectId: project.id,
+    orgRole,
+    vk: vkOutput,
+    modelProviderSeeded,
+  };
 }
 
-main()
-  .catch((err) => {
-    process.stderr.write(`[seed-personas] ERROR: ${err.message}\n${err.stack}\n`);
-    process.exit(1);
-  })
-  .finally(async () => {
-    await prisma.$disconnect();
-  });
+// CLI bootstrap — only fires when this file is the entry point.
+const isCliInvocation =
+  typeof process.argv[1] === "string" &&
+  import.meta.url === `file://${process.argv[1]}`;
+
+if (isCliInvocation) {
+  const args = parseArgs(process.argv.slice(2));
+  runSeedPersonas(args)
+    .then((summary) => {
+      process.stdout.write(JSON.stringify(summary) + "\n");
+    })
+    .catch((err) => {
+      process.stderr.write(`[seed-personas] ERROR: ${err.message}\n${err.stack}\n`);
+      process.exit(1);
+    })
+    .finally(async () => {
+      await prisma.$disconnect();
+    });
+}
