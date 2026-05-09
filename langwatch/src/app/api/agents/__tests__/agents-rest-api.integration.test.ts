@@ -76,6 +76,7 @@ describe("Feature: Agent REST API", () => {
       data: {
         ...testProject,
         teamId: testTeam.id,
+        personalFeatures: {},
       },
     });
 

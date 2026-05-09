@@ -68,6 +68,7 @@ describe("Feature: REST API resource limit enforcement parity", () => {
       data: {
         ...testProject,
         teamId: testTeam.id,
+        personalFeatures: {},
       },
     });
 

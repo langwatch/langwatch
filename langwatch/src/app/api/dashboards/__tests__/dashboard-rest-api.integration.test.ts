@@ -67,6 +67,7 @@ describe("Feature: Dashboard REST API", () => {
       data: {
         ...testProject,
         teamId: testTeam.id,
+        personalFeatures: {},
       },
     });
 

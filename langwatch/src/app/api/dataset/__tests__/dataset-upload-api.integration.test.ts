@@ -55,6 +55,7 @@ describe("Feature: Dataset File Upload REST API", () => {
       data: {
         ...testProject,
         teamId: testTeam.id,
+        personalFeatures: {},
       },
     });
 

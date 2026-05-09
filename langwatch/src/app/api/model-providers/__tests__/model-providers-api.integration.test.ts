@@ -47,6 +47,7 @@ describe("Model Providers API", () => {
       data: {
         ...testProject,
         teamId: testTeam.id,
+        personalFeatures: {},
       },
     });
 

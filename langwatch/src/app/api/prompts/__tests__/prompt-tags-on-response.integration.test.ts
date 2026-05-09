@@ -56,6 +56,7 @@ describe("Prompt tags appear in prompt responses", () => {
       data: {
         ...projectFactory.build({ slug: `test-project-${slug}` }),
         teamId: testTeam.id,
+        personalFeatures: {},
       },
     });
 

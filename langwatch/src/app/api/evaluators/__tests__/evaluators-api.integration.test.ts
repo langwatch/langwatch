@@ -48,6 +48,7 @@ describe("Evaluators API", () => {
       data: {
         ...testProject,
         teamId: testTeam.id,
+        personalFeatures: {},
       },
     });
 
