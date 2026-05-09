@@ -10,55 +10,53 @@ LangWatch gives every developer a personal home for Claude Code, Codex, Cursor, 
 
 ### For a developer
 
-The sign-in flow starts in the terminal, moves through the browser for approval, then comes back to the CLI with the session ready.
+The sign-in flow starts in the terminal, moves through the browser for one-click approval, comes back to the CLI ready to wrap any supported tool.
 
-<Frame caption="The developer signs in from the terminal first.">
+<Frame caption="Running a wrapped tool before signing in is a hard fail with one clear next step. The wrapper exits 1, prints 'Not logged in. Run `langwatch login --device` first.', spawns no child process, leaves no half-broken state.">
   ![CLI not logged in](/images/ai-governance/cli-flow/01-cli-not-logged-in.png)
 </Frame>
 
-<Frame caption="The browser approves the device flow.">
+<Frame caption="`langwatch login` opens a device-flow approval in the browser. SSO already linked through the org's identity provider, pre-filled user code, single Approve button.">
   ![Device flow approval](/images/ai-governance/cli-flow/02-device-flow-approval.png)
 </Frame>
 
-<Frame caption="The CLI comes back signed in.">
+<Frame caption="Back in the terminal: 'Logged in as you@org.com'. The session is persisted to ~/.langwatch/config.json. From this point every wrapper call is attributed to the user.">
   ![CLI login success](/images/ai-governance/cli-flow/03-cli-login-success.png)
 </Frame>
 
-<Frame caption="The wrapped tool still behaves like the original command, but it is governed and attributed.">
+<Frame caption="`langwatch claude` (or codex, cursor, gemini, opencode) just works. The wrapper pre-injects gateway env vars, the underlying tool is unchanged, every request is gateway-routed and cost-attributed.">
   ![CLI wrapped tool](/images/ai-governance/cli-flow/04-cli-wrapped-tool.png)
 </Frame>
 
-<Frame caption="The CLI shows budget enforcement when the limit is reached.">
+<Frame caption="If the user hits a budget cap, the wrapper surfaces it inline, names the cap, the spend so far, and the `langwatch request-increase` command to ping the admin. No silent failures.">
   ![CLI budget exceeded](/images/ai-governance/cli-flow/05-cli-budget-exceeded.png)
 </Frame>
 
-The personal portal at `/me` shows the approved tools for the user.
+The Personal AI Tools Portal at `/me` is the dashboard for everything they have access to.
 
-<Frame caption="The personal portal shows the approved AI tools.">
+<Frame caption="The Personal AI Tools Portal at /me. Tiles for Claude Code, Codex, Cursor, Gemini, opencode wrappers, per-provider Virtual Key issuance, admin-curated internal tools. Click a tile, follow the install drawer, copy one command, you're governed.">
   ![Personal portal populated](/images/ai-governance/post-bypass/01-me-portal.png)
 </Frame>
 
-Below the tools, the usage panel shows this month's spend and the chart for the current window.
+Below the tools, the live usage panel shows this month's spend against the personal budget, request count, the daily-bucket cost chart, and the model breakdown.
 
-<Frame caption="The populated usage panel sits below the tiles and shows this month's spend, request count, and chart.">
+<Frame caption="The /me usage panel below the tile fold. SPENT-of-budget gauge, request count, MOST-USED model with share, Spending-over-time daily bar chart, By-tool breakdown. Real numbers, real time, no extra setup.">
   ![My usage populated](/images/ai-governance/post-bypass/37-me-usage-scrolled.png)
 </Frame>
 
-If the developer is on a personal Anthropic 20x plan, use the direct OTLP guide instead of the Virtual Key path: [Ingestion templates](/ai-governance/ingestion-templates).
+Every span the wrapper produces lands in the developer's own Trace Explorer, with cost, tokens, duration, and model attributed to them.
 
-<Frame caption="The direct OTLP install drawer for Claude Code.">
-  ![Claude Code install drawer](/images/ai-governance/post-bypass/11-claude-code-install-drawer.png)
-</Frame>
-
-<Frame caption="Trace Explorer shows the user's own traces with tokens, cost, and duration.">
+<Frame caption="Trace Explorer at /[personal-project]/traces. Real populated traces with tokens, cost, duration columns. The same explorer admins use, scoped to the developer's own workspace.">
   ![Trace explorer populated](/images/ai-governance/post-bypass/12-traces-populated.png)
 </Frame>
 
+> Subscription-based tools that authenticate client-side (a personal Anthropic 20x plan, an OpenAI Enterprise plan, a Cursor with a custom endpoint) skip the Virtual Key proxy path entirely. The direct-OTLP route is documented in [Ingestion templates](/ai-governance/ingestion-templates).
+
 ### For an admin
 
-The bird-eye view at `/governance` is the daily home for admin oversight.
+The bird-eye view at `/governance` is the daily home for admin oversight: org-wide spend, top spenders, open anomaly count, ingestion-source health, recent activity. Below it, `/settings/governance/*` is the authoring surface where routing policies, ingestion sources, anomaly rules, the AI Tools Portal catalog, and the audit log all live.
 
-<Frame caption="The governance bird-eye shows spend, sources, open anomalies, and team charts.">
+<Frame caption="The /governance dashboard. KPI summary (org-wide spend, active users, open anomalies), 30-day spend-over-time chart bucketed per team, spend-share-across-teams bar, ingestion-source health, recent activity. Read-mostly oversight, the place admins check before standup.">
   ![Governance bird-eye](/images/ai-governance/post-bypass/06-governance-birdeye.png)
 </Frame>
 
