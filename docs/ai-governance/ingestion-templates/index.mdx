@@ -65,7 +65,7 @@ trace visible at `/me/traces` with `gen_ai.usage.*`, `gen_ai.response.model`, an
 `langwatch.cost.usd` populated.
 
 > **Before you start:** you need a LangWatch account. If you're brand new, sign in at
-> [`/auth/signin`](/auth/signin) — first-time sign-in completes onboarding and lands you on
+> `/auth/signin` — first-time sign-in completes onboarding and lands you on
 > your **personal workspace** (`/me`). On self-hosted instances the same path works against
 > your own deployment's host.
 
@@ -74,7 +74,7 @@ trace visible at `/me/traces` with `gen_ai.usage.*`, `gen_ai.response.model`, an
 Navigate to `/me` and scroll to the **Trace Ingest** section (or jump straight to
 `/me#trace-ingest`).
 
-![/me Trace Ingest section — 4 tiles populated](/images/ai-governance/ingestion-templates/me-trace-ingest-tile-grid.png)
+![/me Trace Ingest section — 4 tiles populated](https://raw.githubusercontent.com/langwatch/pr-screenshots/main/pr-3524/post-bypass/10-me-trace-ingest-scrolled.png)
 
 You'll see four tiles: **Claude Code**, **Cursor**, **Claude cowork**, and the
 **Raw OTLP (advanced)** discovery card. The first three are tool-specific templates; the
@@ -86,7 +86,7 @@ Click **Install** on the Claude Code tile. A drawer slides in headed
 **Connect Claude Code — auto-shaped**, with the subcopy *"Traces normalized into
 gen_ai.\* canonical. Cost/tokens/model populated automatically by the receiver."*
 
-![Install drawer — Connect Claude Code](/images/ai-governance/ingestion-templates/me-install-drawer-claude-code.png)
+![Install drawer — Connect Claude Code](https://raw.githubusercontent.com/langwatch/pr-screenshots/main/pr-3524/post-bypass/11-claude-code-install-drawer.png)
 
 The drawer shows:
 
@@ -120,7 +120,7 @@ to your LangWatch personal workspace.
 
 Click **View traces →** on the tile, or navigate directly to `/me/traces`.
 
-![/me/traces — Claude Code traces with tokens + model populated](/images/ai-governance/ingestion-templates/me-traces-claude-code-trace-detail.png)
+![/me/traces — Claude Code traces with tokens + model populated](https://raw.githubusercontent.com/langwatch/pr-screenshots/main/pr-3524/post-bypass/12-traces-populated.png)
 
 Open the trace. You should see:
 
@@ -250,7 +250,7 @@ which surfaces your personal-project's existing OTLP endpoint and API key for ad
 custom telemetry. No template OTTL is applied; your spans land at `/me/traces` exactly
 as you emit them.
 
-![Personal OTLP Endpoint panel on /me/settings](/images/ai-governance/ingestion-templates/me-settings-personal-otlp-panel.png)
+![Personal OTLP Endpoint panel on /me/settings](https://raw.githubusercontent.com/langwatch/pr-screenshots/main/pr-3524/post-bypass/04-me-settings.png)
 
 ### When to choose Raw OTLP vs a template
 
@@ -394,8 +394,7 @@ integration tests locally as a regression playbook before opening a PR.
 
 - [Personal Workspace](/ai-governance/personal-portal/end-user) — broader personal-workspace
   feature surface (Datasets, Evaluations, Annotations, Automations).
-- [Admin Trace Access](/ai-governance/admin-trace-access) — how admin drill-in works
-  (and why it doesn't see personal-workspace traces by default).
+- [Personas](/ai-governance/personas) — how admin drill-in works (and why it doesn't see personal-workspace traces by default).
 - [Governance REST API](/ai-governance/api) — the same IngestionTemplate surface, exposed
   over Hono REST/JSON for agentic workflows.
 - `specs/ai-gateway/governance/ingestion-templates-catalog.feature` and siblings — the
