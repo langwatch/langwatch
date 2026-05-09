@@ -24,12 +24,27 @@ import { randomBytes } from "crypto";
 
 import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
 
-interface Args {
+export interface Args {
   personalProject: string;
   virtualKey: string;
-  budget: string;
+  /**
+   * Budget id to record `gateway_budget_ledger_events` rows against. When
+   * omitted the action seeds `trace_summaries` only, which still
+   * populates the /me/usage spend chart (it reads from trace_summaries),
+   * but the per-budget detail page won't render new rows.
+   */
+  budget: string | undefined;
   days: number;
   rows: number;
+}
+
+export interface SeedHeavyUsageSummary {
+  tenantId: string;
+  rowsInserted: number;
+  totalCostUsd: number;
+  spanDays: number;
+  budgetSeeded: boolean;
+  byModel: Record<string, { rows: number; costUsd: number }>;
 }
 
 interface ModelMix {
@@ -121,7 +136,6 @@ function parseArgs(argv: string[]): Args {
   }
   if (!out.personalProject) throw new Error("--personal-project is required");
   if (!out.virtualKey) throw new Error("--virtual-key is required");
-  if (!out.budget) throw new Error("--budget is required");
   return out as Args;
 }
 
@@ -209,10 +223,14 @@ function synthTrace(args: Args): SyntheticTrace {
   };
 }
 
-async function main(): Promise<void> {
-  const args = parseArgs(process.argv.slice(2));
+/**
+ * Run the heavy-usage seed for one (project, vk, budget?) tuple.
+ * Caller (CLI bootstrap or SeedAction wrapper) is responsible for
+ * resolving inputs.
+ */
+export async function runSeedHeavyUsage(args: Args): Promise<SeedHeavyUsageSummary> {
   process.stderr.write(
-    `[seed-heavy-usage] tenant=${args.personalProject} vk=${args.virtualKey} budget=${args.budget} window=${args.days}d rows=${args.rows}\n`,
+    `[seed-heavy-usage] tenant=${args.personalProject} vk=${args.virtualKey} budget=${args.budget ?? "(none)"} window=${args.days}d rows=${args.rows}\n`,
   );
 
   const traces: SyntheticTrace[] = [];
@@ -293,37 +311,44 @@ async function main(): Promise<void> {
     clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
   });
 
-  const ledgerRows = traces.map((t) => ({
-    TenantId: args.personalProject,
-    BudgetId: args.budget,
-    Scope: "principal",
-    ScopeId: args.virtualKey,
-    Window: "MONTH",
-    VirtualKeyId: args.virtualKey,
-    ProviderCredentialId: "",
-    GatewayRequestId: t.gatewayRequestId,
-    AmountUSD: t.costUsd.toFixed(10),
-    TokensInput: t.promptTokens,
-    TokensOutput: t.completionTokens,
-    TokensCacheRead: 0,
-    TokensCacheWrite: 0,
-    Model: t.model.name,
-    ProviderSlot: "",
-    DurationMS: t.durationMs,
-    Status: "success",
-    OccurredAt: t.occurredAtMs,
-    EventTimestamp: Date.now(),
-  }));
+  const budgetId = args.budget;
+  if (budgetId !== undefined) {
+    const ledgerRows = traces.map((t) => ({
+      TenantId: args.personalProject,
+      BudgetId: budgetId,
+      Scope: "principal",
+      ScopeId: args.virtualKey,
+      Window: "MONTH",
+      VirtualKeyId: args.virtualKey,
+      ProviderCredentialId: "",
+      GatewayRequestId: t.gatewayRequestId,
+      AmountUSD: t.costUsd.toFixed(10),
+      TokensInput: t.promptTokens,
+      TokensOutput: t.completionTokens,
+      TokensCacheRead: 0,
+      TokensCacheWrite: 0,
+      Model: t.model.name,
+      ProviderSlot: "",
+      DurationMS: t.durationMs,
+      Status: "success",
+      OccurredAt: t.occurredAtMs,
+      EventTimestamp: Date.now(),
+    }));
 
-  process.stderr.write(
-    `[seed-heavy-usage] inserting ${ledgerRows.length} gateway_budget_ledger_events rows\n`,
-  );
-  await client.insert({
-    table: "gateway_budget_ledger_events",
-    values: ledgerRows,
-    format: "JSONEachRow",
-    clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
-  });
+    process.stderr.write(
+      `[seed-heavy-usage] inserting ${ledgerRows.length} gateway_budget_ledger_events rows\n`,
+    );
+    await client.insert({
+      table: "gateway_budget_ledger_events",
+      values: ledgerRows,
+      format: "JSONEachRow",
+      clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
+    });
+  } else {
+    process.stderr.write(
+      `[seed-heavy-usage] skipping gateway_budget_ledger_events (no --budget supplied)\n`,
+    );
+  }
 
   // Summary stats for the operator.
   const totalCost = traces.reduce((s, t) => s + t.costUsd, 0);
@@ -334,11 +359,12 @@ async function main(): Promise<void> {
     e.cost += t.costUsd;
     byModel.set(t.model.name, e);
   }
-  const summary = {
+  const summary: SeedHeavyUsageSummary = {
     tenantId: args.personalProject,
     rowsInserted: traces.length,
     totalCostUsd: Number(totalCost.toFixed(6)),
     spanDays: args.days,
+    budgetSeeded: budgetId !== undefined,
     byModel: Object.fromEntries(
       [...byModel.entries()].map(([k, v]) => [
         k,
@@ -347,13 +373,24 @@ async function main(): Promise<void> {
     ),
   };
   process.stdout.write(JSON.stringify(summary) + "\n");
+  return summary;
 }
 
-main()
-  .catch((err) => {
-    process.stderr.write(`[seed-heavy-usage] ERROR: ${err.message}\n${err.stack}\n`);
-    process.exit(1);
-  })
-  .finally(() => {
-    setTimeout(() => process.exit(0), 250);
-  });
+// CLI bootstrap — only fires when this file is the entry point.
+const isCliInvocation =
+  typeof process.argv[1] === "string" &&
+  import.meta.url === `file://${process.argv[1]}`;
+
+if (isCliInvocation) {
+  const args = parseArgs(process.argv.slice(2));
+  runSeedHeavyUsage(args)
+    .catch((err) => {
+      process.stderr.write(
+        `[seed-heavy-usage] ERROR: ${err.message}\n${err.stack}\n`,
+      );
+      process.exit(1);
+    })
+    .finally(() => {
+      setTimeout(() => process.exit(0), 250);
+    });
+}
