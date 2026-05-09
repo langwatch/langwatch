@@ -10,11 +10,7 @@ LangWatch gives every developer a personal home for Claude Code, Codex, Cursor, 
 
 ### For a developer
 
-The sign-in flow starts in the terminal, moves through the browser for one-click approval, comes back to the CLI ready to wrap any supported tool.
-
-<Frame caption="Running a wrapped tool before signing in is a hard fail with one clear next step. The wrapper exits 1, prints 'Not logged in. Run `langwatch login --device` first.', spawns no child process, leaves no half-broken state.">
-  ![CLI not logged in](/images/ai-governance/cli-flow/01-cli-not-logged-in.png)
-</Frame>
+`langwatch login` opens a device-flow approval in the browser, comes back to the CLI ready to wrap any supported tool.
 
 <Frame caption="`langwatch login` opens a device-flow approval in the browser. SSO already linked through the org's identity provider, pre-filled user code, single Approve button.">
   ![Device flow approval](/images/ai-governance/cli-flow/02-device-flow-approval.png)
@@ -26,10 +22,6 @@ The sign-in flow starts in the terminal, moves through the browser for one-click
 
 <Frame caption="`langwatch claude` (or codex, cursor, gemini, opencode) just works. The wrapper pre-injects gateway env vars, the underlying tool is unchanged, every request is gateway-routed and cost-attributed.">
   ![CLI wrapped tool](/images/ai-governance/cli-flow/04-cli-wrapped-tool.png)
-</Frame>
-
-<Frame caption="If the user hits a budget cap, the wrapper surfaces it inline, names the cap, the spend so far, and the `langwatch request-increase` command to ping the admin. No silent failures.">
-  ![CLI budget exceeded](/images/ai-governance/cli-flow/05-cli-budget-exceeded.png)
 </Frame>
 
 The Personal AI Tools Portal at `/me` is the dashboard for everything they have access to.
