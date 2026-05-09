@@ -31,6 +31,7 @@ import * as fs from "fs";
 import * as path from "path";
 import { prisma as defaultPrisma } from "~/server/db";
 import { createLogger } from "~/utils/logger";
+import { seedBirdEye } from "./_actions/seedBirdEye";
 import { verifyOrgIdentity } from "./_actions/verifyOrgIdentity";
 import { DemoOrgScope } from "./_lib/scopeGuard";
 import type { PrismaClient } from "@prisma/client";
@@ -75,7 +76,7 @@ export function parseArgs(args: readonly string[]): ParsedArgs {
   return { execute, orgId, reportPath };
 }
 
-const ACTIONS: readonly SeedAction[] = [verifyOrgIdentity];
+const ACTIONS: readonly SeedAction[] = [verifyOrgIdentity, seedBirdEye];
 
 export interface RunSeedDemoOptions {
   execute: boolean;

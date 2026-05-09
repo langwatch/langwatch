@@ -538,8 +538,23 @@ async function maybeSeedAnomalyAlert({
   console.log(`[seed-bird-eye] anomaly alert created id=${created.id}`);
 }
 
-async function main(): Promise<void> {
-  const args = parseArgs(process.argv.slice(2));
+export interface SeedBirdEyeSummary {
+  organizationId: string;
+  govProjectId: string;
+  rowsInserted: number;
+  totalCostUsd: number;
+  sources: Array<{ id: string; team: string }>;
+}
+
+/**
+ * Same orchestration the CLI ran inline before, exposed as a named
+ * function so the SeedAction wrapper (and any other in-process caller,
+ * e.g., the cron API route running this via runSeedDemo) can invoke it
+ * with already-resolved inputs. The exported function does NOT manage
+ * the prisma connection lifecycle, the CLI bootstrap below still
+ * `prisma.$disconnect()`s on exit when invoked directly.
+ */
+export async function runSeedBirdEye(args: Args): Promise<SeedBirdEyeSummary> {
   console.log(
     `[seed-bird-eye] org=${args.organizationId} dashboard-window=${args.days}d ` +
       `data-spread=${args.days * 2}d rows=${args.rows}`,
@@ -564,7 +579,7 @@ async function main(): Promise<void> {
     withAnomaly: args.withAnomaly,
   });
 
-  const summary = {
+  const summary: SeedBirdEyeSummary = {
     organizationId: args.organizationId,
     govProjectId: govProject.id,
     rowsInserted,
@@ -573,14 +588,24 @@ async function main(): Promise<void> {
   };
   console.log("[seed-bird-eye] summary:");
   console.log(JSON.stringify(summary, null, 2));
+  return summary;
 }
 
-main()
-  .catch((err) => {
-    console.error(`[seed-bird-eye] ERROR: ${err.message}\n${err.stack}`);
-    process.exit(1);
-  })
-  .finally(async () => {
-    await prisma.$disconnect();
-    setTimeout(() => process.exit(0), 250);
-  });
+// CLI bootstrap — only fires when this file is the entry point, not
+// when imported by the SeedAction wrapper or the cron API path.
+const isCliInvocation =
+  typeof process.argv[1] === "string" &&
+  import.meta.url === `file://${process.argv[1]}`;
+
+if (isCliInvocation) {
+  const args = parseArgs(process.argv.slice(2));
+  runSeedBirdEye(args)
+    .catch((err) => {
+      console.error(`[seed-bird-eye] ERROR: ${err.message}\n${err.stack}`);
+      process.exit(1);
+    })
+    .finally(async () => {
+      await prisma.$disconnect();
+      setTimeout(() => process.exit(0), 250);
+    });
+}
