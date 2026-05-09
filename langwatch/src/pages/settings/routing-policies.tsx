@@ -26,6 +26,7 @@ import {
 import { useMemo, useState } from "react";
 
 import { ConfirmDialog } from "~/components/gateway/ConfirmDialog";
+import { FieldInfoTooltip } from "~/components/gateway/FieldInfoTooltip";
 import GovernanceLayout from "~/components/governance/GovernanceLayout";
 import { LoadingScreen } from "~/components/LoadingScreen";
 import { NotFoundScene } from "~/components/NotFoundScene";
@@ -1083,7 +1084,13 @@ function RoutingPolicyDrawer({
               </Field.Root>
 
               <Field.Root required>
-                <Field.Label>Provider credentials (ordered)</Field.Label>
+                <Field.Label>
+                  Provider credentials (ordered)
+                  <FieldInfoTooltip
+                    description="Ordered list of the org's gateway provider credentials. The gateway tries #1 first; on 5xx, timeout, rate-limit, or circuit-breaker the next item in the list takes over. Re-order with the ↑/↓ arrows on each row to set fallback priority."
+                    docHref="/ai-gateway/governance/routing-policies"
+                  />
+                </Field.Label>
                 <ProviderCredentialPicker
                   selectedIds={composer.providerCredentialIds}
                   onChange={(next) =>
