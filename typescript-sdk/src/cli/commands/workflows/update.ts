@@ -1,9 +1,8 @@
 import chalk from "chalk";
 import ora from "ora";
+import { apiRequest } from "../../utils/apiClient";
 import { checkApiKey } from "../../utils/apiKey";
-import { formatFetchError } from "../../utils/formatFetchError";
 import { failSpinner } from "../../utils/spinnerError";
-import { buildAuthHeaders } from "@/internal/api/auth";
 
 export const updateWorkflowCommand = async (
   id: string,
@@ -27,25 +26,13 @@ export const updateWorkflowCommand = async (
       process.exit(1);
     }
 
-    const response = await fetch(
-      `${endpoint}/api/workflows/${encodeURIComponent(id)}`,
-      {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          ...buildAuthHeaders({ apiKey }),
-        },
-        body: JSON.stringify(body),
-      },
-    );
-
-    if (!response.ok) {
-      const message = await formatFetchError(response);
-      spinner.fail(`Failed to update workflow: ${message}`);
-      process.exit(1);
-    }
-
-    const workflow = await response.json() as {
+    const workflow = (await apiRequest({
+      method: "PATCH",
+      path: `/api/workflows/${encodeURIComponent(id)}`,
+      apiKey,
+      endpoint,
+      body,
+    })) as {
       id: string;
       name: string;
       icon: string | null;

@@ -1,9 +1,8 @@
 import chalk from "chalk";
 import ora from "ora";
+import { apiRequest } from "../../utils/apiClient";
 import { checkApiKey } from "../../utils/apiKey";
-import { formatFetchError } from "../../utils/formatFetchError";
 import { failSpinner } from "../../utils/spinnerError";
-import { buildAuthHeaders } from "@/internal/api/auth";
 
 export const updateMonitorCommand = async (
   id: string,
@@ -38,22 +37,13 @@ export const updateMonitorCommand = async (
       >;
     }
 
-    const response = await fetch(`${endpoint}/api/monitors/${id}`, {
+    const monitor = (await apiRequest({
       method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
-        ...buildAuthHeaders({ apiKey }),
-      },
-      body: JSON.stringify(body),
-    });
-
-    if (!response.ok) {
-      const message = await formatFetchError(response);
-      spinner.fail(`Failed to update monitor: ${message}`);
-      process.exit(1);
-    }
-
-    const monitor = (await response.json()) as {
+      path: `/api/monitors/${encodeURIComponent(id)}`,
+      apiKey,
+      endpoint,
+      body,
+    })) as {
       id: string;
       name: string;
       enabled: boolean;

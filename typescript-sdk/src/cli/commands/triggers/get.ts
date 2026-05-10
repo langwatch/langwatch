@@ -1,9 +1,8 @@
 import chalk from "chalk";
 import ora from "ora";
+import { apiRequest } from "../../utils/apiClient";
 import { checkApiKey } from "../../utils/apiKey";
-import { formatFetchError } from "../../utils/formatFetchError";
 import { failSpinner } from "../../utils/spinnerError";
-import { buildAuthHeaders } from "@/internal/api/auth";
 
 export const getTriggerCommand = async (
   id: string,
@@ -17,17 +16,7 @@ export const getTriggerCommand = async (
   const spinner = ora(`Fetching trigger "${id}"...`).start();
 
   try {
-    const response = await fetch(`${endpoint}/api/triggers/${encodeURIComponent(id)}`, {
-      headers: buildAuthHeaders({ apiKey }),
-    });
-
-    if (!response.ok) {
-      const message = await formatFetchError(response);
-      spinner.fail(`Failed to fetch trigger "${id}": ${message}`);
-      process.exit(1);
-    }
-
-    const trigger = await response.json() as {
+    type Trigger = {
       id: string;
       name: string;
       action: string;
@@ -40,6 +29,19 @@ export const getTriggerCommand = async (
       updatedAt: string;
       platformUrl?: string;
     };
+    let trigger: Trigger;
+    try {
+      trigger = (await apiRequest({
+        method: "GET",
+        path: `/api/triggers/${encodeURIComponent(id)}`,
+        apiKey,
+        endpoint,
+      })) as Trigger;
+    } catch (httpError) {
+      const message = httpError instanceof Error ? httpError.message : String(httpError);
+      spinner.fail(`Failed to fetch trigger "${id}": ${message}`);
+      process.exit(1);
+    }
 
     spinner.succeed(`Found trigger "${trigger.name}"`);
 

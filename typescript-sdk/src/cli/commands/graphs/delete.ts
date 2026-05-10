@@ -1,8 +1,7 @@
 import ora from "ora";
+import { apiRequest } from "../../utils/apiClient";
 import { checkApiKey } from "../../utils/apiKey";
-import { formatFetchError } from "../../utils/formatFetchError";
 import { failSpinner } from "../../utils/spinnerError";
-import { buildAuthHeaders } from "@/internal/api/auth";
 
 export const deleteGraphCommand = async (
   id: string,
@@ -16,18 +15,19 @@ export const deleteGraphCommand = async (
   const spinner = ora(`Deleting graph "${id}"...`).start();
 
   try {
-    const response = await fetch(`${endpoint}/api/graphs/${encodeURIComponent(id)}`, {
-      method: "DELETE",
-      headers: buildAuthHeaders({ apiKey }),
-    });
-
-    if (!response.ok) {
-      const message = await formatFetchError(response);
+    let result: { id: string; deleted: boolean };
+    try {
+      result = (await apiRequest({
+        method: "DELETE",
+        path: `/api/graphs/${encodeURIComponent(id)}`,
+        apiKey,
+        endpoint,
+      })) as { id: string; deleted: boolean };
+    } catch (httpError) {
+      const message = httpError instanceof Error ? httpError.message : String(httpError);
       spinner.fail(`Failed to delete graph "${id}": ${message}`);
       process.exit(1);
     }
-
-    const result = await response.json() as { id: string; deleted: boolean };
     spinner.succeed(`Graph "${id}" deleted`);
 
     if (options?.format === "json") {

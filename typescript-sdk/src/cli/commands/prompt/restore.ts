@@ -1,9 +1,8 @@
 import chalk from "chalk";
 import ora from "ora";
+import { apiRequest } from "../../utils/apiClient";
 import { checkApiKey } from "../../utils/apiKey";
-import { formatFetchError } from "../../utils/formatFetchError";
 import { failSpinner } from "../../utils/spinnerError";
-import { buildAuthHeaders } from "@/internal/api/auth";
 
 export const promptRestoreCommand = async (
   handle: string,
@@ -21,28 +20,19 @@ export const promptRestoreCommand = async (
   ).start();
 
   try {
-    const response = await fetch(
-      `${endpoint}/api/prompts/${encodeURIComponent(handle)}/versions/${encodeURIComponent(versionId)}/restore`,
-      {
+    let restored: { id: string; version: number; commitMessage: string | null };
+    try {
+      restored = (await apiRequest({
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...buildAuthHeaders({ apiKey }),
-        },
-      }
-    );
-
-    if (!response.ok) {
-      const message = await formatFetchError(response);
+        path: `/api/prompts/${encodeURIComponent(handle)}/versions/${encodeURIComponent(versionId)}/restore`,
+        apiKey,
+        endpoint,
+      })) as { id: string; version: number; commitMessage: string | null };
+    } catch (httpError) {
+      const message = httpError instanceof Error ? httpError.message : String(httpError);
       spinner.fail(`Failed to restore "${handle}" to ${versionId}: ${message}`);
       process.exit(1);
     }
-
-    const restored = (await response.json()) as {
-      id: string;
-      version: number;
-      commitMessage: string | null;
-    };
 
     spinner.succeed(
       `Restored "${handle}" — new version v${restored.version} created`

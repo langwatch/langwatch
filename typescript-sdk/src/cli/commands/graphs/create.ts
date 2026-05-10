@@ -1,9 +1,8 @@
 import chalk from "chalk";
 import ora from "ora";
+import { apiRequest } from "../../utils/apiClient";
 import { checkApiKey } from "../../utils/apiKey";
-import { formatFetchError } from "../../utils/formatFetchError";
 import { failSpinner } from "../../utils/spinnerError";
-import { buildAuthHeaders } from "@/internal/api/auth";
 
 export const createGraphCommand = async (
   name: string,
@@ -29,29 +28,20 @@ export const createGraphCommand = async (
       graphDef = JSON.parse(options.graph) as Record<string, unknown>;
     }
 
-    const response = await fetch(`${endpoint}/api/graphs`, {
+    const graph = (await apiRequest({
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...buildAuthHeaders({ apiKey }),
-      },
-      body: JSON.stringify({
+      path: "/api/graphs",
+      apiKey,
+      endpoint,
+      body: {
         name,
         graph: graphDef,
         dashboardId: options.dashboardId,
         ...(options.filters && { filters: JSON.parse(options.filters) }),
         ...(options.colSpan && { colSpan: parseInt(options.colSpan, 10) }),
         ...(options.rowSpan && { rowSpan: parseInt(options.rowSpan, 10) }),
-      }),
-    });
-
-    if (!response.ok) {
-      const message = await formatFetchError(response);
-      spinner.fail(`Failed to create graph: ${message}`);
-      process.exit(1);
-    }
-
-    const graph = await response.json() as { id: string; name: string; dashboardId: string | null };
+      },
+    })) as { id: string; name: string; dashboardId: string | null };
     spinner.succeed(`Graph "${graph.name}" created (${graph.id})`);
 
     if (options.format === "json") {

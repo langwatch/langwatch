@@ -1,10 +1,9 @@
 import chalk from "chalk";
 import ora from "ora";
+import { apiRequest } from "../../utils/apiClient";
 import { checkApiKey } from "../../utils/apiKey";
-import { formatFetchError } from "../../utils/formatFetchError";
 import { formatTable } from "../../utils/formatting";
 import { failSpinner } from "../../utils/spinnerError";
-import { buildAuthHeaders } from "@/internal/api/auth";
 
 export const listTriggersCommand = async (options?: { format?: string }): Promise<void> => {
   checkApiKey();
@@ -15,17 +14,12 @@ export const listTriggersCommand = async (options?: { format?: string }): Promis
   const spinner = ora("Fetching triggers...").start();
 
   try {
-    const response = await fetch(`${endpoint}/api/triggers`, {
-      headers: buildAuthHeaders({ apiKey }),
-    });
-
-    if (!response.ok) {
-      const message = await formatFetchError(response);
-      spinner.fail(`Failed to fetch triggers: ${message}`);
-      process.exit(1);
-    }
-
-    const triggers = await response.json() as Array<{
+    const triggers = (await apiRequest({
+      method: "GET",
+      path: "/api/triggers",
+      apiKey,
+      endpoint,
+    })) as Array<{
       id: string;
       name: string;
       action: string;

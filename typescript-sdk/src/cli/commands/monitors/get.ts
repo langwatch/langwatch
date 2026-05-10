@@ -1,9 +1,8 @@
 import chalk from "chalk";
 import ora from "ora";
+import { apiRequest } from "../../utils/apiClient";
 import { checkApiKey } from "../../utils/apiKey";
-import { formatFetchError } from "../../utils/formatFetchError";
 import { failSpinner } from "../../utils/spinnerError";
-import { buildAuthHeaders } from "@/internal/api/auth";
 
 export const getMonitorCommand = async (
   id: string,
@@ -18,17 +17,12 @@ export const getMonitorCommand = async (
   const spinner = ora(`Fetching monitor "${id}"...`).start();
 
   try {
-    const response = await fetch(`${endpoint}/api/monitors/${id}`, {
-      headers: buildAuthHeaders({ apiKey }),
-    });
-
-    if (!response.ok) {
-      const message = await formatFetchError(response);
-      spinner.fail(`Failed to fetch monitor: ${message}`);
-      process.exit(1);
-    }
-
-    const monitor = (await response.json()) as {
+    const monitor = (await apiRequest({
+      method: "GET",
+      path: `/api/monitors/${encodeURIComponent(id)}`,
+      apiKey,
+      endpoint,
+    })) as {
       id: string;
       name: string;
       slug: string;
