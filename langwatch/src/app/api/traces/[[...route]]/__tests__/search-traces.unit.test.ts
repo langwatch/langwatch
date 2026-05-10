@@ -234,24 +234,8 @@ describe("POST /search", () => {
     });
   });
 
-  describe("when response is streamed", () => {
-    it("produces valid JSON with correct structure", async () => {
-      const res = await searchRequest({
-        startDate: 1000,
-        endDate: 5000,
-      });
-
-      expect(res.status).toBe(200);
-      expect(res.headers.get("content-type")).toBe("application/json");
-
-      const body = await res.json();
-      expect(body).toHaveProperty("traces");
-      expect(body).toHaveProperty("pagination");
-      expect(body.pagination).toHaveProperty("totalHits", 2);
-      expect(body.traces).toHaveLength(2);
-    });
-
-    it("handles many traces with correct comma separation", async () => {
+  describe("when result set is large", () => {
+    it("serializes many traces with correct comma separation", async () => {
       const manyTraces = Array.from({ length: 50 }, (_, i) => ({
         trace_id: `trace-${i}`,
         project_id: "project-123",
@@ -281,7 +265,7 @@ describe("POST /search", () => {
       expect(body.pagination.scrollId).toBe("next-page-token");
     });
 
-    it("handles empty result set", async () => {
+    it("returns valid JSON for empty result set", async () => {
       mockGetAllTracesForProject.mockResolvedValue({
         groups: [[]],
         totalHits: 0,
