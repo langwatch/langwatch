@@ -38,7 +38,7 @@ overrides:
   # Security: axios prototype pollution gadgets, header injection, loopback bypass (#982/#984/#987/#988)
   "axios@>=1.0.0 <1.16.0": "1.16.0"
   # Security: fast-xml-builder attribute value quote bypass (#1028)
-  "fast-xml-builder@<1.2.0": "1.2.0"
+  "fast-xml-builder@<1.1.7": "1.1.7"
   # Security: fast-uri path traversal + host confusion (#1031-#1042)
   "fast-uri@<3.1.2": "3.1.2"
 
