@@ -1,16 +1,1 @@
-<svg width="66" height="52" viewBox="0 0 66 52" fill="none" xmlns="http://www.w3.org/2000/svg">
-<g clip-path="url(#clip0_7772_29892)">
-<path d="M6 13H0V26H6V13Z" fill="#CC785C"/>
-<path d="M66 13H60V26H66V13Z" fill="#CC785C"/>
-<path d="M12 39H6V52H12V39Z" fill="#CC785C"/>
-<path d="M24 39H18V52H24V39Z" fill="#CC785C"/>
-<path d="M48 39H42V52H48V39Z" fill="#CC785C"/>
-<path d="M60 39H54V52H60V39Z" fill="#CC785C"/>
-<path d="M60 39H6V0H60V39ZM12 19.5H18V13H12V19.5ZM48 19.5H54V13H48V19.5Z" fill="#CC785C"/>
-</g>
-<defs>
-<clipPath id="clip0_7772_29892">
-<rect width="66" height="52" fill="white"/>
-</clipPath>
-</defs>
-</svg>
+<svg height="1em" style="flex:none;line-height:1" viewBox="0 0 24 24" width="1em" xmlns="http://www.w3.org/2000/svg"><title>Claude Code</title><path d="M20.998 10.949H24v3.102h-3v3.028h-1.487V20H18v-2.921h-1.487V20H15v-2.921H9V20H7.488v-2.921H6V20H4.487v-2.921H3V14.05H0V10.95h3V5h17.998v5.949z" fill="#D97757"></path><path d="M6 10.949h1.488V8.102H6v2.847zm10.51 0H18V8.102h-1.49v2.847z" fill="#000"></path></svg>
