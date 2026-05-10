@@ -797,18 +797,17 @@ wheels = [
 
 [[package]]
 name = "fastapi-sso"
-version = "0.19.0"
+version = "0.16.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "fastapi" },
     { name = "httpx" },
     { name = "oauthlib" },
     { name = "pydantic", extra = ["email"] },
-    { name = "pyjwt" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/74/fc/644bc8f82fc887fffcf9a3eab8eb3dea06ee9ea160ef20441455ed7a0001/fastapi_sso-0.19.0.tar.gz", hash = "sha256:629f00581f72ea7e57f7b8775f8d2c425629c428c194359a2b4ebaa6bcb8e12b", size = 17278, upload-time = "2025-12-17T15:18:06.721Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/57/9b/25c43c928b46ec919cb8941d3de53dd2e12bab12e1c0182646425dbefd60/fastapi_sso-0.16.0.tar.gz", hash = "sha256:f3941f986347566b7d3747c710cf474a907f581bfb6697ff3bb3e44eb76b438c", size = 16555, upload-time = "2024-11-04T11:54:38.579Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/d7/61/d2ac0800cb1f390ec2aad464ea4cc5944de285fabc8f987327da4633f17d/fastapi_sso-0.19.0-py3-none-any.whl", hash = "sha256:d958c46cd9996234c7b162e192168b4c0807a248224a55b0f877d3a82a16a930", size = 26419, upload-time = "2025-12-17T15:18:05.439Z" },
+    { url = "https://files.pythonhosted.org/packages/72/84/df15745ff06c1b44e478b72759d5cf48e4583e221389d4cdea76c472dd1c/fastapi_sso-0.16.0-py3-none-any.whl", hash = "sha256:3a66a942474ef9756d3a9d8b945d55bd9faf99781facdb9b87a40b73d6d6b0c3", size = 23942, upload-time = "2024-11-04T11:54:37.189Z" },
 ]
 
 [[package]]
@@ -1901,7 +1900,7 @@ examples = [
     { name = "strands-agents", extras = ["otel"], specifier = ">=1.14.0,<2.0.0" },
     { name = "streamlit", specifier = ">=1.37.1,<2.0.0" },
     { name = "unstructured", extras = ["pdf"], specifier = ">=0.18.18" },
-    { name = "uvicorn", specifier = ">=0.38.0,<0.41.0" },
+    { name = "uvicorn", specifier = ">=0.46.0,<0.47.0" },
 ]
 tests = [
     { name = "factory-boy", specifier = ">=3.3.3" },
@@ -1991,7 +1990,7 @@ requires-dist = [
     { name = "sentry-sdk", extras = ["fastapi"], specifier = ">=2.58.0,<3" },
     { name = "structlog", specifier = ">=24.1.0" },
     { name = "tenacity", specifier = ">=8.5.0,<9" },
-    { name = "uvicorn", specifier = ">=0.31.1" },
+    { name = "uvicorn", specifier = ">=0.46.0" },
     { name = "watchdog", specifier = ">=5.0.3" },
     { name = "watchdog", marker = "extra == 'dev'", specifier = ">=5.0.3,<6" },
 ]
@@ -1999,7 +1998,7 @@ provides-extras = ["dev"]
 
 [[package]]
 name = "litellm"
-version = "1.83.14"
+version = "1.83.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiohttp" },
@@ -2015,9 +2014,9 @@ dependencies = [
     { name = "tiktoken" },
     { name = "tokenizers" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/8d/7c/c095649380adc96c8630273c1768c2ad1e74aa2ee1dd8dd05d218a60569f/litellm-1.83.14.tar.gz", hash = "sha256:24aef9b47cdc424c833e32f3727f411741c690832cd1fe4405e0077144fe09c9", size = 14836599, upload-time = "2026-04-26T03:16:10.176Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/22/92/6ce9737554994ca8e536e5f4f6a87cc7c4774b656c9eb9add071caf7d54b/litellm-1.83.0.tar.gz", hash = "sha256:860bebc76c4bb27b4cf90b4a77acd66dba25aced37e3db98750de8a1766bfb7a", size = 17333062, upload-time = "2026-03-31T05:08:25.331Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/7f/5c/1b5691575420135e90578543b2bf219497caa33cfd0af64cb38f30288450/litellm-1.83.14-py3-none-any.whl", hash = "sha256:92b11ba2a32cf80707ddf388d18526696c7999a21b418c5e3b6eda1243d2cfdb", size = 16457054, upload-time = "2026-04-26T03:16:05.72Z" },
+    { url = "https://files.pythonhosted.org/packages/19/2c/a670cc050fcd6f45c6199eb99e259c73aea92edba8d5c2fc1b3686d36217/litellm-1.83.0-py3-none-any.whl", hash = "sha256:88c536d339248f3987571493015784671ba3f193a328e1ea6780dbebaa2094a8", size = 15610306, upload-time = "2026-03-31T05:08:21.987Z" },
 ]
 
 [package.optional-dependencies]
@@ -2041,7 +2040,6 @@ proxy = [
     { name = "pyroscope-io", marker = "sys_platform != 'win32'" },
     { name = "python-multipart" },
     { name = "pyyaml" },
-    { name = "restrictedpython" },
     { name = "rich" },
     { name = "rq" },
     { name = "soundfile" },
@@ -2052,11 +2050,11 @@ proxy = [
 
 [[package]]
 name = "litellm-enterprise"
-version = "0.1.39"
+version = "0.1.35"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/3d/0b/79fb68abf7c787d951dd367f662c52b922278548f244f5d36e623cdb2161/litellm_enterprise-0.1.39.tar.gz", hash = "sha256:434e2c15280218bb9224adbbac878bcffe0b8a75b0b46deeb0b90bc4f2e2152b", size = 69465, upload-time = "2026-04-26T03:09:36.828Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/23/5f/e593f335698a5c70d7e96e8ab9fdc4cfd4cc9249c524723fe64ed7f00cbb/litellm_enterprise-0.1.35.tar.gz", hash = "sha256:b752d07e538424743fcc08ba0d3d9d83d1f04a45c115811ac7828d789b6d87cc", size = 58817, upload-time = "2026-03-21T15:06:16.519Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/cb/b0/30df9b36366559efd9c1fae39c67856481c7418056eb2196266bda605bc8/litellm_enterprise-0.1.39-py3-none-any.whl", hash = "sha256:e5f48745fb127dc4f72fd1fa7cdeba0ddd4066dc5f0d9e8e87eea4e4571d42b3", size = 136645, upload-time = "2026-04-26T03:09:35.492Z" },
+    { url = "https://files.pythonhosted.org/packages/ef/fa/39efe3dfa680ca5bc5795b9c904c914b09a65278c2970c8fece6e0e30e47/litellm_enterprise-0.1.35-py3-none-any.whl", hash = "sha256:8d2d9c925de8ee35e308c0f4975483b60f5e22beb50506e261e555e466f019c5", size = 122659, upload-time = "2026-03-21T15:06:15.586Z" },
 ]
 
 [[package]]
@@ -3744,15 +3742,6 @@ wheels = [
 ]
 
 [[package]]
-name = "restrictedpython"
-version = "8.1"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/5f/1c/aec08bcb4ab14a1521579fbe21ceff2a634bb1f737f11cf7f9c8bb96e680/restrictedpython-8.1.tar.gz", hash = "sha256:4a69304aceacf6bee74bdf153c728221d4e3109b39acbfe00b3494927080d898", size = 838331, upload-time = "2025-10-19T14:11:32.531Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/1a/c0/3848f4006f7e164ee20833ca984067e4b3fc99fe7f1dfa88b4927e681299/restrictedpython-8.1-py3-none-any.whl", hash = "sha256:4769449c6cdb10f2071649ba386902befff0eff2a8fd6217989fa7b16aeae926", size = 27651, upload-time = "2025-10-19T14:11:30.201Z" },
-]
-
-[[package]]
 name = "retry"
 version = "0.9.2"
 source = { registry = "https://pypi.org/simple" }
@@ -4478,15 +4467,15 @@ wheels = [
 
 [[package]]
 name = "uvicorn"
-version = "0.33.0"
+version = "0.46.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "click" },
     { name = "h11" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/cb/81/a083ae41716b00df56d45d4b5f6ca8e90fc233a62e6c04ab3ad3c476b6c4/uvicorn-0.33.0.tar.gz", hash = "sha256:3577119f82b7091cf4d3d4177bfda0bae4723ed92ab1439e8d779de880c9cc59", size = 76590, upload-time = "2024-12-14T11:14:46.526Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/1f/93/041fca8274050e40e6791f267d82e0e2e27dd165627bd640d3e0e378d877/uvicorn-0.46.0.tar.gz", hash = "sha256:fb9da0926999cc6cb22dc7cd71a94a632f078e6ae47ff683c5c420750fb7413d", size = 88758, upload-time = "2026-04-23T07:16:00.151Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/98/79/2e2620337ef1e4ef7a058b351603b765f59ac28e6e3ac7c5e7cdee9ea1ab/uvicorn-0.33.0-py3-none-any.whl", hash = "sha256:2c30de4aeea83661a520abab179b24084a0019c0c1bbe137e5409f741cbde5f8", size = 62297, upload-time = "2024-12-14T11:14:43.408Z" },
+    { url = "https://files.pythonhosted.org/packages/31/a3/5b1562db76a5a488274b2332a97199b32d0442aca0ed193697fd47786316/uvicorn-0.46.0-py3-none-any.whl", hash = "sha256:bbebbcbed972d162afca128605223022bedd345b7bc7855ce66deb31487a9048", size = 70926, upload-time = "2026-04-23T07:15:58.355Z" },
 ]
 
 [[package]]

@@ -30,7 +30,7 @@ dependencies = [
     "scipy>=1.14.1,<2",
     "sentry-sdk[fastapi]>=2.58.0,<3",
     "tenacity>=8.5.0,<9",
-    "uvicorn>=0.31.1",
+    "uvicorn>=0.46.0",
     "watchdog>=5.0.3",
     "structlog>=24.1.0",
 ]
