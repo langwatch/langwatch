@@ -152,13 +152,31 @@ app.post(
       }));
     }
 
-    return c.json({
+    const responseBody = {
       traces,
       pagination: {
         totalHits: results.totalHits,
         scrollId: results.scrollId,
       },
-    });
+    };
+
+    try {
+      return c.json(responseBody);
+    } catch (err) {
+      if (err instanceof RangeError) {
+        return c.json(
+          {
+            error: "Response too large",
+            message:
+              `The response for the requested date range exceeds serialization limits ` +
+              `(${rawTraces.length} traces). Use a smaller "pageSize" (e.g. 50 or 100) ` +
+              `and paginate with the "scrollId" returned in each response.`,
+          },
+          413,
+        );
+      }
+      throw err;
+    }
   },
 );
 
