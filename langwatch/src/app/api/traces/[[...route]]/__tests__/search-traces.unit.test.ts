@@ -233,4 +233,70 @@ describe("POST /search", () => {
       expect(body.traces[1].evaluations).toEqual([]);
     });
   });
+
+  describe("when response is streamed", () => {
+    it("produces valid JSON with correct structure", async () => {
+      const res = await searchRequest({
+        startDate: 1000,
+        endDate: 5000,
+      });
+
+      expect(res.status).toBe(200);
+      expect(res.headers.get("content-type")).toBe("application/json");
+
+      const body = await res.json();
+      expect(body).toHaveProperty("traces");
+      expect(body).toHaveProperty("pagination");
+      expect(body.pagination).toHaveProperty("totalHits", 2);
+      expect(body.traces).toHaveLength(2);
+    });
+
+    it("handles many traces with correct comma separation", async () => {
+      const manyTraces = Array.from({ length: 50 }, (_, i) => ({
+        trace_id: `trace-${i}`,
+        project_id: "project-123",
+        input: { value: `input-${i}` },
+        output: { value: `output-${i}` },
+        timestamps: { started_at: i * 100, inserted_at: i * 100, updated_at: i * 100 },
+        metadata: {},
+        spans: [],
+      }));
+
+      mockGetAllTracesForProject.mockResolvedValue({
+        groups: [manyTraces],
+        totalHits: 50,
+        traceChecks: Object.fromEntries(manyTraces.map((t) => [t.trace_id, []])),
+        scrollId: "next-page-token",
+      });
+
+      const res = await searchRequest({
+        startDate: 0,
+        endDate: 10000,
+      });
+
+      const body = await res.json();
+      expect(body.traces).toHaveLength(50);
+      expect(body.traces[0].trace_id).toBe("trace-0");
+      expect(body.traces[49].trace_id).toBe("trace-49");
+      expect(body.pagination.scrollId).toBe("next-page-token");
+    });
+
+    it("handles empty result set", async () => {
+      mockGetAllTracesForProject.mockResolvedValue({
+        groups: [[]],
+        totalHits: 0,
+        traceChecks: {},
+        scrollId: undefined,
+      });
+
+      const res = await searchRequest({
+        startDate: 1000,
+        endDate: 5000,
+      });
+
+      const body = await res.json();
+      expect(body.traces).toHaveLength(0);
+      expect(body.pagination.totalHits).toBe(0);
+    });
+  });
 });

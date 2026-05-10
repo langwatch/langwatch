@@ -126,57 +126,59 @@ app.post(
       traceChecks: results.traceChecks,
     });
 
-    let traces: unknown[];
-    if (format === "digest") {
-      traces = enrichedTraces.map((trace) => ({
-        trace_id: trace.trace_id,
-        formatted_trace: formatTraceSummaryDigest(trace),
-        input: trace.input,
-        output: trace.output,
-        timestamps: trace.timestamps,
-        metadata: trace.metadata,
-        error: trace.error,
-        evaluations: trace.evaluations,
-        platformUrl: platformUrl({
-          projectSlug: project.slug,
-          path: `/messages/${trace.trace_id}`,
-        }),
-      }));
-    } else {
-      traces = enrichedTraces.map((trace) => ({
+    const formatTrace = (trace: Trace) => {
+      if (format === "digest") {
+        return {
+          trace_id: trace.trace_id,
+          formatted_trace: formatTraceSummaryDigest(trace),
+          input: trace.input,
+          output: trace.output,
+          timestamps: trace.timestamps,
+          metadata: trace.metadata,
+          error: trace.error,
+          evaluations: trace.evaluations,
+          platformUrl: platformUrl({
+            projectSlug: project.slug,
+            path: `/messages/${trace.trace_id}`,
+          }),
+        };
+      }
+      return {
         ...trace,
         platformUrl: platformUrl({
           projectSlug: project.slug,
           path: `/messages/${trace.trace_id}`,
         }),
-      }));
-    }
-
-    const responseBody = {
-      traces,
-      pagination: {
-        totalHits: results.totalHits,
-        scrollId: results.scrollId,
-      },
+      };
     };
 
-    try {
-      return c.json(responseBody);
-    } catch (err) {
-      if (err instanceof RangeError) {
-        return c.json(
-          {
-            error: "Response too large",
-            message:
-              `The response for the requested date range exceeds serialization limits ` +
-              `(${rawTraces.length} traces). Use a smaller "pageSize" (e.g. 50 or 100) ` +
-              `and paginate with the "scrollId" returned in each response.`,
-          },
-          413,
+    const pagination = JSON.stringify({
+      totalHits: results.totalHits,
+      scrollId: results.scrollId,
+    });
+
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream({
+      start(controller) {
+        controller.enqueue(encoder.encode('{"traces":['));
+
+        for (let i = 0; i < enrichedTraces.length; i++) {
+          const prefix = i > 0 ? "," : "";
+          controller.enqueue(
+            encoder.encode(prefix + JSON.stringify(formatTrace(enrichedTraces[i]!)))
+          );
+        }
+
+        controller.enqueue(
+          encoder.encode(`],"pagination":${pagination}}`)
         );
-      }
-      throw err;
-    }
+        controller.close();
+      },
+    });
+
+    return new Response(stream, {
+      headers: { "Content-Type": "application/json" },
+    });
   },
 );
 
