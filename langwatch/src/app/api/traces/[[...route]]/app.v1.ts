@@ -157,16 +157,26 @@ app.post(
       scrollId: results.scrollId,
     });
 
+    const serializedTraces: string[] = [];
+    for (const trace of enrichedTraces) {
+      try {
+        serializedTraces.push(JSON.stringify(formatTrace(trace)));
+      } catch (err) {
+        logger.error(
+          { traceId: trace.trace_id, error: err instanceof Error ? err.message : err },
+          "Failed to serialize trace, skipping",
+        );
+      }
+    }
+
     const encoder = new TextEncoder();
     const stream = new ReadableStream({
       start(controller) {
         controller.enqueue(encoder.encode('{"traces":['));
 
-        for (let i = 0; i < enrichedTraces.length; i++) {
+        for (let i = 0; i < serializedTraces.length; i++) {
           const prefix = i > 0 ? "," : "";
-          controller.enqueue(
-            encoder.encode(prefix + JSON.stringify(formatTrace(enrichedTraces[i]!)))
-          );
+          controller.enqueue(encoder.encode(prefix + serializedTraces[i]!));
         }
 
         controller.enqueue(
