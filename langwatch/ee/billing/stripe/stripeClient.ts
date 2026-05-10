@@ -8,6 +8,6 @@ export const createStripeClient = () => {
   }
 
   return new Stripe(secretKey, {
-    apiVersion: "2024-04-10",
+    apiVersion: "2026-04-22.dahlia",
   });
 };
