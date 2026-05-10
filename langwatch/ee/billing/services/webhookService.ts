@@ -295,14 +295,21 @@ export class EEWebhookService implements WebhookService {
         | "invoice.payment_failed";
     },
   ): Promise<HandleEventResult> {
-    const paymentIntent = event.data.object as
-      | Stripe.Checkout.Session
-      | Stripe.Invoice;
+    const eventObject = event.data.object;
 
-    const subscriptionId =
-      typeof paymentIntent.subscription === "string"
-        ? paymentIntent.subscription
-        : paymentIntent.subscription?.id;
+    let subscriptionId: string | undefined;
+    if (event.type === "checkout.session.completed") {
+      const session = eventObject as Stripe.Checkout.Session;
+      subscriptionId =
+        typeof session.subscription === "string"
+          ? session.subscription
+          : session.subscription?.id ?? undefined;
+    } else {
+      const invoice = eventObject as Stripe.Invoice;
+      const subRef = invoice.parent?.subscription_details?.subscription;
+      subscriptionId =
+        typeof subRef === "string" ? subRef : subRef?.id ?? undefined;
+    }
 
     if (!subscriptionId) {
       logger.info(
@@ -316,10 +323,11 @@ export class EEWebhookService implements WebhookService {
     // Core handlers only need subscriptionId (+ client_reference_id for
     // checkout) — dropping the work here would ACK the event to Stripe
     // (no retry) while leaving the DB subscription PENDING.
+    const customerField = (eventObject as { customer?: string | { id: string } | null }).customer;
     const customerId =
-      typeof paymentIntent.customer === "string"
-        ? paymentIntent.customer
-        : paymentIntent.customer?.id;
+      typeof customerField === "string"
+        ? customerField
+        : customerField?.id;
 
     const organization = customerId
       ? await this.organizationRepository.findByStripeCustomerId(customerId)

@@ -290,12 +290,12 @@ export class StripeUsageReportingService implements UsageReportingService {
 
 const isStripeInvalidRequestError = (
   error: unknown
-): error is Stripe.errors.StripeInvalidRequestError =>
+): error is InstanceType<typeof Stripe.errors.StripeInvalidRequestError> =>
   error instanceof Error &&
-  (error as Stripe.errors.StripeError).type === "StripeInvalidRequestError";
+  (error as InstanceType<typeof Stripe.errors.StripeError>).type === "StripeInvalidRequestError";
 
 const isStripeAuthenticationError = (
   error: unknown
-): error is Stripe.errors.StripeAuthenticationError =>
+): error is InstanceType<typeof Stripe.errors.StripeAuthenticationError> =>
   error instanceof Error &&
-  (error as Stripe.errors.StripeError).type === "StripeAuthenticationError";
+  (error as InstanceType<typeof Stripe.errors.StripeError>).type === "StripeAuthenticationError";
