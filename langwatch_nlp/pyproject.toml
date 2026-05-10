@@ -49,6 +49,7 @@ dev = [
 
 [tool.uv]
 package = false
+override-dependencies = ["python-multipart>=0.0.27"]
 
 [tool.uv.sources]
 langwatch = { path = "../python-sdk", editable = true }
