@@ -6,6 +6,9 @@ import type { Permission } from "~/server/api/rbac";
 import { resolvePatPermission } from "~/server/rbac/role-binding-resolver";
 import { DomainError } from "~/server/app-layer/domain-error";
 import { createLogger } from "~/utils/logger/server";
+import { connection } from "~/server/redis";
+import { recordActiveUser } from "~/server/active-user/recordActiveUser";
+import { parseClientSource } from "~/server/active-user/parseClientSource";
 
 const logger = createLogger("langwatch:api:unified-auth");
 const permissionLogger = createLogger("langwatch:api:pat-ceiling");
@@ -192,6 +195,16 @@ export function createUnifiedAuthMiddleware({
       c.res.status < 300
     ) {
       resolver.markUsed({ patId: resolved.patId });
+
+      // Heartbeat for the api_active_user PostHog metric. Same trigger as
+      // markUsed (PAT + 2xx) so a "user is active today" follows the same
+      // truth as "this token was successfully used today". Fire-and-forget;
+      // errors are swallowed inside recordActiveUser.
+      const { source, version } = parseClientSource(c.req.header("user-agent"));
+      void recordActiveUser(
+        { userId: resolved.userId, source, version },
+        { redis: connection },
+      );
     }
   };
 }
