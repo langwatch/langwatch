@@ -37,7 +37,7 @@ export async function runTrackEventJob(job: Job<TrackEventJob, void, string>) {
   // the worker's concurrency slots; the trace itself is still recorded
   // through the regular collector pipeline.
   if (!env.ELASTICSEARCH_NODE_URL) {
-    getJobProcessingCounter("track_events", "skipped_no_es").inc();
+    getJobProcessingCounter("track_events", "completed").inc();
     return;
   }
   let event: ElasticSearchEvent = {
