@@ -121,6 +121,20 @@ export const workerRestartsCounter = new Counter({
   help: "Number of times the worker has been restarted",
 });
 
+// Online-evaluator loop guard counter (post-2026-05-11 incident). A healthy
+// fleet emits this at ~zero rate. Sustained increments indicate either
+// causality_depth propagation is broken on the evaluator side or a customer
+// has produced a loop the existing guards haven't anticipated.
+//
+// labels.reason ∈ "depth_direct" (incoming span attr already >= 1)
+//               | "parent_in_subtree" (parent span is in causal subtree)
+register.removeSingleMetric("langwatch_evaluator_loop_blocked_total");
+export const evaluatorLoopBlockedCounter = new Counter({
+  name: "langwatch_evaluator_loop_blocked_total",
+  help: "Number of online-evaluator dispatches blocked by the loop guards",
+  labelNames: ["tenant_id", "reason"] as const,
+});
+
 // Histogram for evaluation duration
 register.removeSingleMetric("evaluation_duration_milliseconds");
 export const evaluationDurationHistogram = new Histogram({

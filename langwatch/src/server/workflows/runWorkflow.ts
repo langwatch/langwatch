@@ -105,6 +105,7 @@ export async function runEvaluationWorkflow(
   projectId: string,
   inputs: Record<string, string>,
   versionId?: string,
+  causalityDepth?: number,
 ): Promise<{
   result: SingleEvaluationResult;
   status: ExecutionStatus;
@@ -118,6 +119,7 @@ export async function runEvaluationWorkflow(
       true, // do_not_trace
       false, // run_evaluations - disable evaluators inside the workflow when running as an online evaluation
       "evaluation",
+      causalityDepth,
     );
 
     // Process the result
@@ -162,6 +164,7 @@ export async function runWorkflow(
   do_not_trace?: boolean,
   run_evaluations?: boolean,
   origin: NLPOrigin = "workflow",
+  causalityDepth?: number,
 ) {
   const workflow = await prisma.workflow.findUnique({
     where: { id: workflowId, projectId },
@@ -224,6 +227,8 @@ export async function runWorkflow(
     path: "/studio/execute_sync",
     body: event,
     origin,
+    causalityDepth,
+    traceId: trace_id.replace(/^trace_/, ""),
   });
 
   if (!response.ok) {

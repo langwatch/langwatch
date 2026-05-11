@@ -19,6 +19,7 @@ import {
 } from "../errors";
 import {
   EvaluationExecutionService,
+  maxCausalityDepthOfSpans,
   type EvaluationExecutionDeps,
   type ModelEnvResolver,
   type WorkflowExecutor,
@@ -220,6 +221,8 @@ describe("EvaluationExecutionService", () => {
             trace_id: "trace-1",
             do_not_trace: true,
           }),
+          undefined,
+          expect.any(Number),
         );
       });
 
@@ -351,5 +354,51 @@ describe("EvaluationExecutionService", () => {
         );
       });
     });
+  });
+});
+
+describe("maxCausalityDepthOfSpans", () => {
+  it("returns 0 for empty / null / undefined spans", () => {
+    expect(maxCausalityDepthOfSpans([])).toBe(0);
+    expect(maxCausalityDepthOfSpans(undefined)).toBe(0);
+    expect(maxCausalityDepthOfSpans(null)).toBe(0);
+  });
+
+  it("returns 0 when no span has the attribute", () => {
+    expect(
+      maxCausalityDepthOfSpans([
+        { attributes: { "service.name": "x" } },
+        { attributes: null },
+      ]),
+    ).toBe(0);
+  });
+
+  it("returns the max numeric depth across spans", () => {
+    expect(
+      maxCausalityDepthOfSpans([
+        { attributes: { "langwatch.causality_depth": 0 } },
+        { attributes: { "langwatch.causality_depth": 2 } },
+        { attributes: { "langwatch.causality_depth": 1 } },
+      ]),
+    ).toBe(2);
+  });
+
+  it("parses string-encoded depth values", () => {
+    expect(
+      maxCausalityDepthOfSpans([
+        { attributes: { "langwatch.causality_depth": "1" } },
+        { attributes: { "langwatch.causality_depth": "3" } },
+      ]),
+    ).toBe(3);
+  });
+
+  it("ignores malformed values without crashing", () => {
+    expect(
+      maxCausalityDepthOfSpans([
+        { attributes: { "langwatch.causality_depth": "not-a-number" } },
+        { attributes: { "langwatch.causality_depth": NaN } },
+        { attributes: { "langwatch.causality_depth": 2 } },
+      ]),
+    ).toBe(2);
   });
 });

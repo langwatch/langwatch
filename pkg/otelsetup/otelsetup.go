@@ -77,6 +77,18 @@ func isTransportAuthError(err error) bool {
 		strings.Contains(s, "no such host")
 }
 
+// BaggageKeyCausalityDepth is the W3C baggage key whose value is auto-
+// stamped onto every span via BaggageAttributeProcessor. See
+// specs/monitors/online-evaluator-loop-prevention.feature for the design.
+const BaggageKeyCausalityDepth = "langwatch.causality_depth"
+
+// AutoStampedBaggageKeys lists the baggage keys that the default tracer
+// provider copies onto every span at OnStart. Keep narrow — every entry
+// adds one attribute lookup per span.
+var AutoStampedBaggageKeys = []string{
+	BaggageKeyCausalityDepth,
+}
+
 // Options configures the telemetry provider. Fields left empty are filled from
 // the context's ServiceInfo when available.
 type Options struct {
@@ -173,6 +185,7 @@ func New(ctx context.Context, opts Options) (*Provider, error) {
 		router := NewTenantRouter(opts.OTLPEndpoint)
 		tp := sdktrace.NewTracerProvider(
 			sdktrace.WithResource(res),
+			sdktrace.WithSpanProcessor(NewBaggageAttributeProcessor(AutoStampedBaggageKeys...)),
 			sdktrace.WithSpanProcessor(router),
 			sdktrace.WithSampler(sdktrace.ParentBased(rootSampler)),
 		)
@@ -228,6 +241,7 @@ func New(ctx context.Context, opts Options) (*Provider, error) {
 
 	tp := sdktrace.NewTracerProvider(
 		sdktrace.WithResource(res),
+		sdktrace.WithSpanProcessor(NewBaggageAttributeProcessor(AutoStampedBaggageKeys...)),
 		sdktrace.WithBatcher(wrappedExp,
 			sdktrace.WithBatchTimeout(batchTimeout),
 			sdktrace.WithMaxQueueSize(queueSize),

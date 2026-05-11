@@ -1,7 +1,13 @@
+import { randomBytes } from "crypto";
+
 import { featureFlagService } from "../featureFlag/featureFlag.service";
 import { resolveOrganizationId } from "../organizations/resolveOrganizationId";
 import { lambdaFetch } from "../../utils/lambdaFetch";
 import { getProjectLambdaArn } from "../../optimization_studio/server/lambda";
+
+function randomHex(byteLength: number): string {
+  return randomBytes(byteLength).toString("hex");
+}
 
 /**
  * Origin tag for the X-LangWatch-Origin header. Set at the request
@@ -36,6 +42,28 @@ export interface NLPGOFetchOptions<TBody = unknown> {
   origin: NLPOrigin;
   /** Optional organization scope for PostHog group targeting. */
   organizationId?: string;
+  /**
+   * Causality depth of the *caller*. nlpgo increments by 1 and stamps
+   * the result on every span it emits. The reactor in trace-processing
+   * skips dispatching evaluations on spans where depth >= 1, breaking
+   * the eval-of-eval loop. See
+   * specs/monitors/online-evaluator-loop-prevention.feature.
+   *
+   * 0 (or absent) means "this call originates from non-evaluator code"
+   * (eg. user-triggered Studio run). The receiver always emits depth=1
+   * on its spans in that case.
+   */
+  causalityDepth?: number;
+  /**
+   * Parent trace identifiers used to synthesise a W3C `traceparent`
+   * header so nlpgo's root studio span becomes a child of the
+   * parent trace (same trace_id end-to-end). When both are present
+   * we send `traceparent: 00-<traceId>-<parentSpanId>-01`. When only
+   * `traceId` is present we mint a synthetic parent span_id so the
+   * trace_id still carries through.
+   */
+  traceId?: string;
+  parentSpanId?: string;
 }
 
 export interface NLPGOFetchResult<T> {
@@ -77,6 +105,25 @@ export async function nlpgoFetch<T = unknown>(
     "Content-Type": "application/json",
     "X-LangWatch-Origin": opts.origin,
   };
+
+  // Causality depth: forwarded to nlpgo so it increments and stamps
+  // depth+1 on every emitted span via its BaggageAttributeProcessor.
+  // Default 0 when caller didn't compute it.
+  const callerDepth = Math.max(0, Math.floor(opts.causalityDepth ?? 0));
+  headers["X-LangWatch-Causality-Depth"] = String(callerDepth);
+
+  // Synthesised W3C traceparent so nlpgo's root studio span continues
+  // the parent trace. `00` version, sampled (`01`). When parentSpanId
+  // is absent we mint a random 8-byte hex parent so the trace_id at
+  // least carries through (nlpgo's startStudioSpan accepts this via
+  // the otelapi.GetTextMapPropagator().Extract path).
+  if (opts.traceId && /^[0-9a-f]{32}$/i.test(opts.traceId)) {
+    const parentSpanId =
+      opts.parentSpanId && /^[0-9a-f]{16}$/i.test(opts.parentSpanId)
+        ? opts.parentSpanId
+        : randomHex(16);
+    headers["traceparent"] = `00-${opts.traceId.toLowerCase()}-${parentSpanId.toLowerCase()}-01`;
+  }
 
   const functionArn = process.env.LANGWATCH_NLP_LAMBDA_CONFIG
     ? await getProjectLambdaArn(opts.projectId)

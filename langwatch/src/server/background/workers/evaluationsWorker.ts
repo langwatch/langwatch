@@ -70,6 +70,7 @@ import {
 } from "../../app-layer/evaluations/azure-safety-env";
 import { getAzureSafetyEnvFromProject } from "../../app-layer/evaluations/azure-safety-env.server";
 import { runEvaluationWorkflow } from "../../workflows/runWorkflow";
+import { maxCausalityDepthOfSpans } from "../../app-layer/evaluations/evaluation-execution.service";
 import {
   EVALUATIONS_QUEUE,
   updateEvaluationStatusInES,
@@ -480,6 +481,9 @@ export const runEvaluationForTrace = async ({
     settings: settings && typeof settings === "object" ? settings : undefined,
     trace,
     workflowId,
+    parentCausalityDepth: maxCausalityDepthOfSpans(
+      trace.spans as unknown as Array<{ attributes?: Record<string, unknown> | null }>,
+    ),
   });
 
   return {
@@ -497,6 +501,7 @@ export const runEvaluation = async ({
   trace,
   workflowId,
   retries = 1,
+  parentCausalityDepth,
 }: {
   projectId: string;
   evaluatorType: EvaluatorTypes | "workflow";
@@ -505,6 +510,7 @@ export const runEvaluation = async ({
   trace?: Trace;
   workflowId?: string | null;
   retries?: number;
+  parentCausalityDepth?: number;
 }): Promise<SingleEvaluationResult> => {
   if (data.type === "custom") {
     return customEvaluation(
@@ -513,6 +519,7 @@ export const runEvaluation = async ({
       data.data,
       trace,
       workflowId,
+      parentCausalityDepth,
     );
   }
 
@@ -817,6 +824,7 @@ const customEvaluation = async (
   data: Record<string, any>,
   trace?: Trace,
   workflowId?: string | null,
+  parentCausalityDepth?: number,
 ): Promise<SingleEvaluationResult> => {
   // For workflow evaluators (checkType "workflow"), workflowId comes from the evaluator record
   // For custom evaluators (checkType "custom/<workflowId>"), workflowId is parsed from the type
@@ -844,6 +852,8 @@ const customEvaluation = async (
     resolvedWorkflowId,
     project.id,
     requestBody,
+    undefined,
+    parentCausalityDepth,
   );
 
   const { result, status } = response;

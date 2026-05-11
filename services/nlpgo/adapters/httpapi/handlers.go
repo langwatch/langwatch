@@ -76,6 +76,7 @@ func executeSyncHandler(application *app.App) http.HandlerFunc {
 		if req.Origin != "" {
 			ctx = withOrigin(ctx, req.Origin)
 		}
+		ctx = applyInboundCausality(ctx, r)
 		ctx, span := startStudioSpan(ctx, "nlpgo.studio.execute_sync", req, req.APIKey)
 		defer span.End()
 		clog.Get(ctx).Info("execute_flow_received")
@@ -387,6 +388,7 @@ func executeStreamHandler(application *app.App) http.HandlerFunc {
 		if req.Origin != "" {
 			ctx = withOrigin(ctx, req.Origin)
 		}
+		ctx = applyInboundCausality(ctx, r)
 		ctx, span := startStudioSpan(ctx, "nlpgo.studio.execute_stream", req, req.APIKey)
 		defer span.End()
 		clog.Get(ctx).Info("execute_flow_received", zap.Bool("stream", true))

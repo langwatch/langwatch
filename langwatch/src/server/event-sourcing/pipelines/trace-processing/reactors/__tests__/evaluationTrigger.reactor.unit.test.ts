@@ -4,6 +4,7 @@ import type { ReactorContext } from "../../../../reactors/reactor.types";
 import type { TraceProcessingEvent } from "../../schemas/events";
 import {
   createEvaluationTriggerReactor,
+  detectCausalityLoop,
   type EvaluationTriggerReactorDeps,
 } from "../evaluationTrigger.reactor";
 import { DEFERRED_CHECK_DELAY_MS } from "../originGate.reactor";
@@ -53,32 +54,19 @@ function createFoldState(
     createdAt: Date.now(),
     updatedAt: Date.now(),
     attributes: {},
+    causalSubtreeSpans: undefined,
     ...overrides,
   };
 }
 
-function createEvent(
-  overrides: Partial<TraceProcessingEvent> & { spanName?: string } = {},
-): TraceProcessingEvent {
-  const { spanName, ...rest } = overrides;
-  // When spanName is provided, build a valid span_received event. When omitted,
-  // build an origin_resolved event — represents non-span events flowing through
-  // the reactor (must NOT be short-circuited by the synthetic-span filter).
-  if (spanName === undefined) {
-    return {
-      id: "event-1",
-      aggregateId: "trace-1",
-      aggregateType: "trace",
-      tenantId: "tenant-1",
-      createdAt: Date.now(),
-      occurredAt: Date.now(),
-      type: "lw.obs.trace.origin_resolved",
-      version: 1,
-      data: { origin: "application" },
-      metadata: { traceId: "trace-1" },
-      ...rest,
-    } as TraceProcessingEvent;
-  }
+interface SpanEventOpts {
+  spanName?: string;
+  spanId?: string;
+  parentSpanId?: string | null;
+  attributes?: Array<{ key: string; value: unknown }>;
+}
+
+function createSpanEvent(opts: SpanEventOpts = {}): TraceProcessingEvent {
   return {
     id: "event-1",
     aggregateId: "trace-1",
@@ -88,9 +76,30 @@ function createEvent(
     occurredAt: Date.now(),
     type: "lw.obs.trace.span_received",
     version: 1,
-    data: { span: { name: spanName } },
-    metadata: { spanId: "span-1", traceId: "trace-1" },
-    ...rest,
+    data: {
+      span: {
+        name: opts.spanName ?? "openai.chat",
+        spanId: opts.spanId ?? "span-1",
+        parentSpanId: opts.parentSpanId ?? null,
+        attributes: opts.attributes ?? [],
+      },
+    },
+    metadata: { spanId: opts.spanId ?? "span-1", traceId: "trace-1" },
+  } as TraceProcessingEvent;
+}
+
+function createOriginEvent(origin = "application"): TraceProcessingEvent {
+  return {
+    id: "event-1",
+    aggregateId: "trace-1",
+    aggregateType: "trace",
+    tenantId: "tenant-1",
+    createdAt: Date.now(),
+    occurredAt: Date.now(),
+    type: "lw.obs.trace.origin_resolved",
+    version: 1,
+    data: { origin },
+    metadata: { traceId: "trace-1" },
   } as TraceProcessingEvent;
 }
 
@@ -118,10 +127,89 @@ function createDeps(
   };
 }
 
+describe("detectCausalityLoop (pure)", () => {
+  /** @scenario Incoming span with causality_depth=1 does not trigger evaluations */
+  it("returns 'depth_direct' when inbound span attr has causality_depth=1", () => {
+    const reason = detectCausalityLoop({
+      spanAttributes: [
+        { key: "langwatch.causality_depth", value: { intValue: 1 } },
+      ],
+      parentSpanId: null,
+      causalSubtreeSpans: undefined,
+    });
+    expect(reason).toBe("depth_direct");
+  });
+
+  /** @scenario Incoming span with causality_depth=0 still triggers evaluations */
+  it("returns null when inbound span attr has causality_depth=0", () => {
+    const reason = detectCausalityLoop({
+      spanAttributes: [
+        { key: "langwatch.causality_depth", value: { intValue: 0 } },
+      ],
+      parentSpanId: null,
+      causalSubtreeSpans: undefined,
+    });
+    expect(reason).toBeNull();
+  });
+
+  /** @scenario Incoming span with no causality_depth attribute is treated as depth 0 */
+  it("returns null when no causality_depth attribute is present", () => {
+    const reason = detectCausalityLoop({
+      spanAttributes: [{ key: "service.name", value: { stringValue: "x" } }],
+      parentSpanId: null,
+      causalSubtreeSpans: undefined,
+    });
+    expect(reason).toBeNull();
+  });
+
+  /** @scenario Child span without depth attribute, but whose parent is in the eval subtree, is blocked */
+  it("returns 'parent_in_subtree' when parent_span_id is in causalSubtreeSpans", () => {
+    const reason = detectCausalityLoop({
+      spanAttributes: [],
+      parentSpanId: "S1",
+      causalSubtreeSpans: ["S1"],
+    });
+    expect(reason).toBe("parent_in_subtree");
+  });
+
+  /** @scenario Fresh app-origin span on a trace that already has eval spans still dispatches */
+  it("returns null when parent_span_id is NOT in causalSubtreeSpans (re-trigger case)", () => {
+    const reason = detectCausalityLoop({
+      spanAttributes: [],
+      parentSpanId: "S_FRESH",
+      causalSubtreeSpans: ["S_EVAL_1", "S_EVAL_2"],
+    });
+    expect(reason).toBeNull();
+  });
+
+  it("accepts depth as a string-valued OTLP attribute", () => {
+    const reason = detectCausalityLoop({
+      spanAttributes: [
+        { key: "langwatch.causality_depth", value: { stringValue: "2" } },
+      ],
+      parentSpanId: null,
+      causalSubtreeSpans: undefined,
+    });
+    expect(reason).toBe("depth_direct");
+  });
+
+  it("ignores malformed depth values", () => {
+    const reason = detectCausalityLoop({
+      spanAttributes: [
+        { key: "langwatch.causality_depth", value: { stringValue: "abc" } },
+      ],
+      parentSpanId: null,
+      causalSubtreeSpans: undefined,
+    });
+    expect(reason).toBeNull();
+  });
+});
+
 describe("evaluationTrigger reactor", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.setSystemTime(Date.now());
+    delete process.env.LANGWATCH_DISABLE_CAUSALITY_LOOP_GUARD;
   });
 
   afterEach(() => {
@@ -136,34 +224,122 @@ describe("evaluationTrigger reactor", () => {
         attributes: { "langwatch.origin": "application" },
       });
 
-      await reactor.handle(createEvent(), createContext(state));
+      await reactor.handle(createOriginEvent(), createContext(state));
 
       expect(deps.monitors.getEnabledOnMessageMonitors).toHaveBeenCalledWith("tenant-1");
       expect(deps.evaluation).toHaveBeenCalledTimes(1);
     });
   });
 
-  describe("when trace has non-application origin", () => {
-    it("dispatches for origin 'simulation' (preconditions handle filtering)", async () => {
-      const deps = createDeps();
-      const reactor = createEvaluationTriggerReactor(deps);
-      const state = createFoldState({
-        attributes: { "langwatch.origin": "simulation" },
-      });
-
-      await reactor.handle(createEvent(), createContext(state));
-
-      expect(deps.evaluation).toHaveBeenCalledTimes(1);
-    });
-
-    it("dispatches for origin 'evaluation' (preconditions handle filtering)", async () => {
+  describe("when trace has origin=evaluation (no longer hardcoded skip)", () => {
+    it("dispatches normally — preconditions filter, not the reactor", async () => {
+      // Per user direction post-2026-05-11 plan-mode debate: origin is a
+      // user-configurable precondition, not a hardcoded reactor guard.
+      // The depth signal (per-span) is the sole hard rule.
       const deps = createDeps();
       const reactor = createEvaluationTriggerReactor(deps);
       const state = createFoldState({
         attributes: { "langwatch.origin": "evaluation" },
       });
 
-      await reactor.handle(createEvent(), createContext(state));
+      await reactor.handle(createOriginEvent("evaluation"), createContext(state));
+
+      expect(deps.evaluation).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("loop prevention via per-span causality_depth", () => {
+    /** @scenario Incoming span with causality_depth=1 does not trigger evaluations */
+    it("blocks dispatch when inbound span has causality_depth=1", async () => {
+      const deps = createDeps();
+      const reactor = createEvaluationTriggerReactor(deps);
+      const state = createFoldState({
+        attributes: { "langwatch.origin": "application" },
+      });
+      const event = createSpanEvent({
+        attributes: [
+          { key: "langwatch.causality_depth", value: { intValue: 1 } },
+        ],
+      });
+
+      await reactor.handle(event, createContext(state));
+
+      expect(deps.evaluation).not.toHaveBeenCalled();
+    });
+
+    /** @scenario Incoming span with causality_depth=0 still triggers evaluations */
+    it("dispatches when inbound span has causality_depth=0", async () => {
+      const deps = createDeps();
+      const reactor = createEvaluationTriggerReactor(deps);
+      const state = createFoldState({
+        attributes: { "langwatch.origin": "application" },
+      });
+      const event = createSpanEvent({
+        attributes: [
+          { key: "langwatch.causality_depth", value: { intValue: 0 } },
+        ],
+      });
+
+      await reactor.handle(event, createContext(state));
+
+      expect(deps.evaluation).toHaveBeenCalledTimes(1);
+    });
+
+    /** @scenario Child span without depth attribute, but whose parent is in the eval subtree, is blocked */
+    it("blocks when parent_span_id is in foldState.causalSubtreeSpans", async () => {
+      const deps = createDeps();
+      const reactor = createEvaluationTriggerReactor(deps);
+      const state = createFoldState({
+        attributes: { "langwatch.origin": "application" },
+        causalSubtreeSpans: ["S_EVAL_PARENT"],
+      });
+      const event = createSpanEvent({
+        spanId: "S_EVAL_CHILD",
+        parentSpanId: "S_EVAL_PARENT",
+        attributes: [],
+      });
+
+      await reactor.handle(event, createContext(state));
+
+      expect(deps.evaluation).not.toHaveBeenCalled();
+    });
+
+    /** @scenario Fresh app-origin span on a trace that already has eval spans still dispatches */
+    it("dispatches when fresh app span lands on a trace with prior eval subtree", async () => {
+      const deps = createDeps();
+      const reactor = createEvaluationTriggerReactor(deps);
+      const state = createFoldState({
+        attributes: { "langwatch.origin": "application" },
+        causalSubtreeSpans: ["S_EVAL_OLD"],
+      });
+      const event = createSpanEvent({
+        spanId: "S_FRESH_APP",
+        parentSpanId: null,
+        attributes: [],
+      });
+
+      await reactor.handle(event, createContext(state));
+
+      expect(deps.evaluation).toHaveBeenCalledTimes(1);
+    });
+
+    /** @scenario LANGWATCH_DISABLE_CAUSALITY_LOOP_GUARD bypasses both checks */
+    it("env kill-switch bypasses both depth and parent-walk checks", async () => {
+      process.env.LANGWATCH_DISABLE_CAUSALITY_LOOP_GUARD = "1";
+      const deps = createDeps();
+      const reactor = createEvaluationTriggerReactor(deps);
+      const state = createFoldState({
+        attributes: { "langwatch.origin": "application" },
+        causalSubtreeSpans: ["S1"],
+      });
+      const event = createSpanEvent({
+        parentSpanId: "S1",
+        attributes: [
+          { key: "langwatch.causality_depth", value: { intValue: 5 } },
+        ],
+      });
+
+      await reactor.handle(event, createContext(state));
 
       expect(deps.evaluation).toHaveBeenCalledTimes(1);
     });
@@ -175,7 +351,7 @@ describe("evaluationTrigger reactor", () => {
       const reactor = createEvaluationTriggerReactor(deps);
       const state = createFoldState({ attributes: {} });
 
-      await reactor.handle(createEvent(), createContext(state));
+      await reactor.handle(createOriginEvent(""), createContext(state));
 
       expect(deps.monitors.getEnabledOnMessageMonitors).not.toHaveBeenCalled();
       expect(deps.evaluation).not.toHaveBeenCalled();
@@ -190,7 +366,7 @@ describe("evaluationTrigger reactor", () => {
         attributes: { "langwatch.origin": "application" },
       });
 
-      await reactor.handle(createEvent(), createContext(state));
+      await reactor.handle(createOriginEvent(), createContext(state));
 
       const [_payload, options] = vi.mocked(deps.evaluation).mock.calls[0]!;
       expect(options).toBeDefined();
@@ -210,30 +386,23 @@ describe("evaluationTrigger reactor", () => {
         computedOutput: null,
       });
 
-      await reactor.handle(createEvent(), createContext(state));
+      await reactor.handle(createOriginEvent(), createContext(state));
 
       expect(deps.evaluation).not.toHaveBeenCalled();
     });
   });
 
   describe("when inbound event is a synthetic span (langwatch.track_event)", () => {
-    // Regression test for Bug 2 of issue #3875: the reactor must short-circuit
-    // BEFORE querying monitors when the inbound span name is a synthetic event
-    // like TRACK_EVENT_SPAN_NAME. Without this filter, thumbs-up/down feedback
-    // spans re-trigger ON_MESSAGE monitors and the presidio evaluator crashes
-    // on null computedInput/Output.
     it("does NOT invoke monitor service", async () => {
       const deps = createDeps();
       const reactor = createEvaluationTriggerReactor(deps);
-      // Origin gate must pass so that only the synthetic-span check rejects.
       const state = createFoldState({
         attributes: { "langwatch.origin": "application" },
       });
-      const event = createEvent({ spanName: TRACK_EVENT_SPAN_NAME });
+      const event = createSpanEvent({ spanName: TRACK_EVENT_SPAN_NAME });
 
       await reactor.handle(event, createContext(state));
 
-      // Filter must happen BEFORE the DB lookup.
       expect(deps.monitors.getEnabledOnMessageMonitors).not.toHaveBeenCalled();
     });
 
@@ -243,7 +412,7 @@ describe("evaluationTrigger reactor", () => {
       const state = createFoldState({
         attributes: { "langwatch.origin": "application" },
       });
-      const event = createEvent({ spanName: TRACK_EVENT_SPAN_NAME });
+      const event = createSpanEvent({ spanName: TRACK_EVENT_SPAN_NAME });
 
       await reactor.handle(event, createContext(state));
 
@@ -258,7 +427,7 @@ describe("evaluationTrigger reactor", () => {
       const state = createFoldState({
         attributes: { "langwatch.origin": "application" },
       });
-      const event = createEvent({ spanName: "openai.chat" });
+      const event = createSpanEvent({ spanName: "openai.chat" });
 
       await reactor.handle(event, createContext(state));
 
@@ -268,16 +437,14 @@ describe("evaluationTrigger reactor", () => {
   });
 
   describe("when inbound event has no span data field", () => {
-    // Events without a span (e.g. non-span event types) must NOT be short-circuited
-    // by the synthetic-span filter — only an explicit name match should reject.
-    it("dispatches evaluation commands", async () => {
+    it("dispatches evaluation commands (non-span events bypass span-only guards)", async () => {
       const deps = createDeps();
       const reactor = createEvaluationTriggerReactor(deps);
       const state = createFoldState({
         attributes: { "langwatch.origin": "application" },
       });
 
-      await reactor.handle(createEvent(), createContext(state));
+      await reactor.handle(createOriginEvent(), createContext(state));
 
       expect(deps.evaluation).toHaveBeenCalledTimes(1);
     });
