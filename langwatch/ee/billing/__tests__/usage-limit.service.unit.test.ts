@@ -36,6 +36,7 @@ import { env } from "../../../src/env.mjs";
 import {
   UsageLimitService,
   resourceLimitCooldown,
+  resourceLimitInFlight,
   planLimitCooldown,
   planLimitInFlight,
 } from "../notifications/usage-limit.service";
@@ -323,6 +324,7 @@ describe("UsageLimitService", () => {
       await resourceLimitCooldown.delete("org_1:workflows");
       await resourceLimitCooldown.delete("org_1:agents");
       await resourceLimitCooldown.delete("org_missing:workflows");
+      resourceLimitInFlight.clear();
     });
 
     describe("when IS_SAAS is false", () => {
@@ -430,7 +432,7 @@ describe("UsageLimitService", () => {
     });
 
     describe("when called concurrently for the same organization", () => {
-      it("sends at most one notification per concurrent batch (in-memory cooldown has a race window)", async () => {
+      it("sends exactly one notification per concurrent batch", async () => {
         const { service, organizationService, notificationService } = createService();
         (organizationService.findWithAdmins as ReturnType<typeof vi.fn>).mockResolvedValue(ORG_WITH_ADMIN);
 
@@ -449,12 +451,9 @@ describe("UsageLimitService", () => {
           }),
         ]);
 
-        // The in-memory cooldown has a documented race window: two concurrent calls both see
-        // a cache miss before either writes the cooldown entry. The worst case is a duplicate
-        // alert (see NOTE in usage-limit.service.ts). Both calls proceed when concurrent.
         expect(
           notificationService.sendSlackResourceLimitAlert,
-        ).toHaveBeenCalledTimes(2);
+        ).toHaveBeenCalledTimes(1);
       });
     });
 

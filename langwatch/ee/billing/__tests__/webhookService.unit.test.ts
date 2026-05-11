@@ -23,7 +23,7 @@ import {
   PLATFORM_DEFAULT_RETENTION_DAYS,
   RETENTION_CATEGORIES,
 } from "../../../src/server/data-retention/retentionPolicy.schema";
-import { EEWebhookService } from "../services/webhookService";
+import { EEWebhookService, subscriptionConfirmedCooldown } from "../services/webhookService";
 import type { SubscriptionRepository, SubscriptionWithOrg } from "../../../src/server/app-layer/subscription/subscription.repository";
 import type { OrganizationRepository } from "../../../src/server/app-layer/organizations/repositories/organization.repository";
 
@@ -125,9 +125,10 @@ describe("webhookService", () => {
   let mockStripeInstance: ReturnType<typeof createMockStripe>;
   let service: EEWebhookService;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
     vi.useFakeTimers();
+    await subscriptionConfirmedCooldown.delete("sub_stripe_1");
     subRepo = createMockSubscriptionRepository();
     orgRepo = createMockOrganizationRepository();
     itemCalculator = createMockItemCalculator();
@@ -1129,6 +1130,103 @@ describe("webhookService", () => {
 
         expect(subRepo.cancel).toHaveBeenCalledWith({ id: "sub_db_1" });
         expect(mockRemoveForScope).not.toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe("subscription confirmed notification dedup", () => {
+    describe("when checkout.session.completed and invoice.payment_succeeded both trigger syncInvoicePaymentSuccess", () => {
+      it("sends exactly one confirmed notification", async () => {
+        subRepo.findByStripeId.mockResolvedValue(
+          makeSubscription({ status: SubscriptionStatus.PENDING }),
+        );
+        subRepo.activate.mockResolvedValue(
+          makeSubscriptionWithOrg({ status: SubscriptionStatus.ACTIVE }),
+        );
+        subRepo.linkStripeId.mockResolvedValue({ count: 1 });
+
+        const checkoutPromise = service.handleCheckoutCompleted({
+          subscriptionId: "sub_stripe_1",
+          clientReferenceId: "subscription_setup_sub_db_1",
+        });
+
+        const invoicePromise = service.handleInvoicePaymentSucceeded({
+          subscriptionId: "sub_stripe_1",
+        });
+
+        await vi.advanceTimersByTimeAsync(2000);
+        await Promise.allSettled([checkoutPromise, invoicePromise]);
+
+        const confirmedCalls = mockSendSlackSubscriptionEvent.mock.calls.filter(
+          (call: unknown[]) => (call[0] as { type: string }).type === "confirmed",
+        );
+        expect(confirmedCalls).toHaveLength(1);
+      });
+    });
+
+    describe("when handleSubscriptionUpdated fires alongside syncInvoicePaymentSuccess", () => {
+      it("sends exactly one confirmed notification across both paths", async () => {
+        subRepo.findByStripeId.mockResolvedValue(
+          makeSubscription({ status: SubscriptionStatus.PENDING }),
+        );
+        subRepo.activate.mockResolvedValue(
+          makeSubscriptionWithOrg({ status: SubscriptionStatus.ACTIVE }),
+        );
+        subRepo.updateQuantities.mockResolvedValue(
+          makeSubscriptionWithOrg({ status: SubscriptionStatus.ACTIVE }),
+        );
+
+        const invoicePromise = service.handleInvoicePaymentSucceeded({
+          subscriptionId: "sub_stripe_1",
+        });
+
+        const updatePromise = service.handleSubscriptionUpdated({
+          subscription: {
+            id: "sub_stripe_1",
+            status: "active",
+            canceled_at: null,
+            ended_at: null,
+            items: { data: [] },
+          } as any,
+        });
+
+        await vi.advanceTimersByTimeAsync(2000);
+        await Promise.allSettled([invoicePromise, updatePromise]);
+
+        const confirmedCalls = mockSendSlackSubscriptionEvent.mock.calls.filter(
+          (call: unknown[]) => (call[0] as { type: string }).type === "confirmed",
+        );
+        expect(confirmedCalls).toHaveLength(1);
+      });
+    });
+
+    describe("when different subscriptions activate concurrently", () => {
+      it("sends one notification per subscription", async () => {
+        await subscriptionConfirmedCooldown.delete("sub_stripe_2");
+
+        subRepo.findByStripeId.mockImplementation((id: string) => {
+          if (id === "sub_stripe_1") {
+            return makeSubscription({ status: SubscriptionStatus.PENDING, stripeSubscriptionId: "sub_stripe_1" });
+          }
+          return makeSubscription({ id: "sub_db_2", organizationId: "org_456", status: SubscriptionStatus.PENDING, stripeSubscriptionId: "sub_stripe_2" });
+        });
+        subRepo.activate.mockImplementation(({ id }: { id: string }) => {
+          if (id === "sub_db_1") {
+            return makeSubscriptionWithOrg({ status: SubscriptionStatus.ACTIVE });
+          }
+          return makeSubscriptionWithOrg({ id: "sub_db_2", organizationId: "org_456", status: SubscriptionStatus.ACTIVE });
+        });
+
+        const promise1 = service.handleInvoicePaymentSucceeded({ subscriptionId: "sub_stripe_1" });
+        const promise2 = service.handleInvoicePaymentSucceeded({ subscriptionId: "sub_stripe_2" });
+
+        await vi.advanceTimersByTimeAsync(2000);
+        await Promise.allSettled([promise1, promise2]);
+
+        const confirmedCalls = mockSendSlackSubscriptionEvent.mock.calls.filter(
+          (call: unknown[]) => (call[0] as { type: string }).type === "confirmed",
+        );
+        expect(confirmedCalls).toHaveLength(2);
       });
     });
   });
