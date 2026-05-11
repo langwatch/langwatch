@@ -84,6 +84,7 @@ describe("getProjectLambdaArn", () => {
   });
 
   describe("ARN cache + single-flight", () => {
+    /** @scenario First call hits AWS; subsequent calls within TTL serve from cache with zero AWS calls */
     it("serves repeated calls within TTL from cache with zero AWS calls", async () => {
       const send = vi
         .spyOn(LambdaClient.prototype as any, "send")
@@ -109,6 +110,7 @@ describe("getProjectLambdaArn", () => {
       expect(send.mock.calls.length).toBe(callsAfterFirst);
     });
 
+    /** @scenario Concurrent burst for one project collapses into a single AWS resolution */
     it("collapses a concurrent burst into a single in-flight resolution", async () => {
       let resolveCheck: (v: any) => void = () => {};
       const send = vi
@@ -143,6 +145,7 @@ describe("getProjectLambdaArn", () => {
       expect(send.mock.calls.length).toBeLessThanOrEqual(3);
     });
 
+    /** @scenario A failed resolution does not poison the cache */
     it("does not cache failures — TooManyRequests then success re-resolves", async () => {
       const send = vi
         .spyOn(LambdaClient.prototype as any, "send")
@@ -172,6 +175,7 @@ describe("getProjectLambdaArn", () => {
       expect(send.mock.calls.length).toBeGreaterThan(callsAfterFailure);
     });
 
+    /** @scenario Deploy bumps image_uri and the cache invalidates automatically */
     it("invalidates the cache when image_uri changes (deploy)", async () => {
       vi.spyOn(LambdaClient.prototype as any, "send")
         // v1 resolution
@@ -205,6 +209,7 @@ describe("getProjectLambdaArn", () => {
       expect(send.mock.calls.length).toBeGreaterThan(callsBeforeV2);
     });
 
+    /** @scenario Different projects do not share cache slots */
     it("keeps cache entries independent per project", async () => {
       const arnA = "arn:aws:lambda:us-east-1:123:function:A";
       const arnB = "arn:aws:lambda:us-east-1:123:function:B";

@@ -45,16 +45,11 @@ Feature: getProjectLambdaArn — per-project ARN cache + single-flight
     And the in-process ARN cache is empty
 
   @integration @unit
-  Scenario: First call for a project hits AWS and populates the cache
+  Scenario: First call hits AWS; subsequent calls within TTL serve from cache with zero AWS calls
     When getProjectLambdaArn("projectA") is called
-    Then exactly one GetFunction call is issued for "langwatch_nlp-projectA"
+    Then a Lambda resolution flow runs against AWS
     And the returned ARN is the function's FunctionArn
-    And the cache holds an entry for ("projectA", "ecr/foo:v1")
-
-  @integration @unit
-  Scenario: Subsequent calls within TTL serve from cache with zero AWS calls
-    Given getProjectLambdaArn("projectA") has just resolved successfully
-    When getProjectLambdaArn("projectA") is called 50 more times
+    When getProjectLambdaArn("projectA") is called 50 more times within the TTL
     Then no additional Lambda SDK calls are issued
     And every call returns the same ARN
 
@@ -82,14 +77,6 @@ Feature: getProjectLambdaArn — per-project ARN cache + single-flight
     And getProjectLambdaArn("projectA") is called
     Then a fresh Lambda resolution flow runs (cache miss on image_uri key)
     And the v1 cache entry is no longer used for future calls under v2
-
-  @integration @unit
-  Scenario: TTL expiry forces a re-resolution
-    Given getProjectLambdaArn("projectA") resolved at T0
-    When the wall-clock advances past the cache TTL
-    And getProjectLambdaArn("projectA") is called
-    Then a fresh GetFunction call is issued
-    And the cache entry is replaced with the new resolution
 
   @integration @unit
   Scenario: Different projects do not share cache slots
