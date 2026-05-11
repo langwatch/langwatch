@@ -1405,6 +1405,148 @@ describe("GroupStagingScripts", () => {
       expect(result!.stagedJobId).toBe("j1");
     });
   });
+
+  // Tenant-level pause via "tenant:<tenantId>" entries in the same
+  // paused-jobs SET. Added post-2026-05-11 incident — see
+  // specs/queue-pausing/queue-pausing.feature.
+  describe("when head-of-line group's tenant is paused", () => {
+    function makeBenignJobData(overrides: Record<string, unknown> = {}): string {
+      return JSON.stringify({
+        __pipelineName: "ingestion",
+        __jobType: "projection",
+        __jobName: "traceProjection",
+        ...overrides,
+      });
+    }
+
+    /** @scenario Pausing a tenant halts dispatch for that tenant only */
+    it("skips a group whose tenantId-prefix is in paused-jobs as 'tenant:<id>'", async () => {
+      await scripts.stage(
+        makeJob({
+          stagedJobId: "j1",
+          groupId: "project_A/command/recordSpan/trace:xyz",
+          dispatchAfterMs: 100,
+          jobDataJson: makeBenignJobData(),
+        }),
+      );
+      await scripts.addPauseKey("tenant:project_A");
+
+      const result = await scripts.dispatch({ nowMs: 200, activeTtlSec: 60 });
+      expect(result).toBeNull();
+    });
+
+    it("dispatches groups for non-paused tenants while paused tenant is skipped", async () => {
+      await scripts.stage(
+        makeJob({
+          stagedJobId: "j-bad",
+          groupId: "project_A/command/recordSpan/trace:aaa",
+          dispatchAfterMs: 100,
+          jobDataJson: makeBenignJobData(),
+        }),
+      );
+      await scripts.stage(
+        makeJob({
+          stagedJobId: "j-ok",
+          groupId: "project_B/command/recordSpan/trace:bbb",
+          dispatchAfterMs: 100,
+          jobDataJson: makeBenignJobData(),
+        }),
+      );
+      await scripts.addPauseKey("tenant:project_A");
+
+      const result = await scripts.dispatch({ nowMs: 200, activeTtlSec: 60 });
+      expect(result).not.toBeNull();
+      expect(result!.groupId).toBe("project_B/command/recordSpan/trace:bbb");
+      expect(result!.stagedJobId).toBe("j-ok");
+    });
+
+    /** @scenario Unpausing a tenant resumes dispatch immediately */
+    it("resumes dispatch immediately after the tenant pause key is removed", async () => {
+      await scripts.stage(
+        makeJob({
+          stagedJobId: "j1",
+          groupId: "project_A/command/recordSpan/trace:xyz",
+          dispatchAfterMs: 100,
+          jobDataJson: makeBenignJobData(),
+        }),
+      );
+      await scripts.addPauseKey("tenant:project_A");
+
+      const blocked = await scripts.dispatch({ nowMs: 200, activeTtlSec: 60 });
+      expect(blocked).toBeNull();
+
+      await scripts.removePauseKey("tenant:project_A");
+
+      const result = await scripts.dispatch({ nowMs: 200, activeTtlSec: 60 });
+      expect(result).not.toBeNull();
+      expect(result!.stagedJobId).toBe("j1");
+    });
+
+    it("does not pause an unrelated tenant whose id is a prefix of the paused one", async () => {
+      // SISMEMBER on the full string "tenant:project_A" must NOT match
+      // a group for tenantId "project_AA". This guards against accidental
+      // prefix-substring matches in the Lua extraction.
+      await scripts.stage(
+        makeJob({
+          stagedJobId: "j1",
+          groupId: "project_AA/command/recordSpan/trace:xyz",
+          dispatchAfterMs: 100,
+          jobDataJson: makeBenignJobData(),
+        }),
+      );
+      await scripts.addPauseKey("tenant:project_A");
+
+      const result = await scripts.dispatch({ nowMs: 200, activeTtlSec: 60 });
+      expect(result).not.toBeNull();
+      expect(result!.stagedJobId).toBe("j1");
+    });
+
+    it("tenant pause works alongside pipeline pause without interference", async () => {
+      await scripts.stage(
+        makeJob({
+          stagedJobId: "j1",
+          groupId: "project_A/command/recordSpan/trace:xyz",
+          dispatchAfterMs: 100,
+          jobDataJson: makeBenignJobData(),
+        }),
+      );
+      // Pause BOTH the tenant AND a pipeline; the group should remain blocked
+      // even if one of the pauses is later removed.
+      await scripts.addPauseKey("tenant:project_A");
+      await scripts.addPauseKey("ingestion");
+
+      let result = await scripts.dispatch({ nowMs: 200, activeTtlSec: 60 });
+      expect(result).toBeNull();
+
+      // Remove pipeline pause — tenant pause still blocks
+      await scripts.removePauseKey("ingestion");
+      result = await scripts.dispatch({ nowMs: 200, activeTtlSec: 60 });
+      expect(result).toBeNull();
+
+      // Remove tenant pause — now dispatches
+      await scripts.removePauseKey("tenant:project_A");
+      result = await scripts.dispatch({ nowMs: 200, activeTtlSec: 60 });
+      expect(result).not.toBeNull();
+      expect(result!.stagedJobId).toBe("j1");
+    });
+
+    it("falls back gracefully when groupId has no '/' (single-segment id)", async () => {
+      // Defensive: a groupId without "/" means the whole string is the tenant.
+      // This shouldn't happen in production but the Lua must not error.
+      await scripts.stage(
+        makeJob({
+          stagedJobId: "j1",
+          groupId: "single_segment_group",
+          dispatchAfterMs: 100,
+          jobDataJson: makeBenignJobData(),
+        }),
+      );
+      await scripts.addPauseKey("tenant:single_segment_group");
+
+      const result = await scripts.dispatch({ nowMs: 200, activeTtlSec: 60 });
+      expect(result).toBeNull();
+    });
+  });
   });
 
   describe("dispatchBatch", () => {
@@ -1510,6 +1652,59 @@ describe("GroupStagingScripts", () => {
       // Paused job should still be in its queue
       const jobs = await inspectGroupJobs("group-paused");
       expect(jobs).toContain("j1");
+    });
+
+    // Mirror of dispatch() tenant-pause coverage. dispatchBatch shares the
+    // same pause-check Lua block but iterates multiple jobs per call, so a
+    // separate test guards against the second branch drifting from the first.
+    it("skips groups whose tenantId is paused and returns only other tenants", async () => {
+      await scripts.stage(
+        makeJob({
+          stagedJobId: "j-bad",
+          groupId: "project_A/command/recordSpan/trace:a",
+          dispatchAfterMs: 100,
+          jobDataJson: JSON.stringify({}),
+        }),
+      );
+      await scripts.stage(
+        makeJob({
+          stagedJobId: "j-ok",
+          groupId: "project_B/command/recordSpan/trace:b",
+          dispatchAfterMs: 100,
+          jobDataJson: JSON.stringify({}),
+        }),
+      );
+      await scripts.addPauseKey("tenant:project_A");
+
+      const results = await scripts.dispatchBatch({
+        nowMs: 200,
+        activeTtlSec: 60,
+        maxJobs: 10,
+      });
+
+      expect(results).toHaveLength(1);
+      expect(results[0]!.groupId).toBe("project_B/command/recordSpan/trace:b");
+    });
+
+    it("a non-paused tenant whose id is a prefix of a paused one still dispatches", async () => {
+      await scripts.stage(
+        makeJob({
+          stagedJobId: "j1",
+          groupId: "project_AA/command/recordSpan/trace:x",
+          dispatchAfterMs: 100,
+          jobDataJson: JSON.stringify({}),
+        }),
+      );
+      await scripts.addPauseKey("tenant:project_A");
+
+      const results = await scripts.dispatchBatch({
+        nowMs: 200,
+        activeTtlSec: 60,
+        maxJobs: 10,
+      });
+
+      expect(results).toHaveLength(1);
+      expect(results[0]!.stagedJobId).toBe("j1");
     });
   });
   });
