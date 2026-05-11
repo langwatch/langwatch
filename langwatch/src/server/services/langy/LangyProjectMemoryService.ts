@@ -26,8 +26,8 @@ export class LangyProjectMemoryRepository {
       where: { projectId },
     });
     if (existing) {
-      return await this.prisma.langyProjectMemory.update({
-        where: { id: existing.id },
+      await this.prisma.langyProjectMemory.updateMany({
+        where: { id: existing.id, projectId },
         data: {
           content,
           contentSummary: contentSummary ?? null,
@@ -36,6 +36,9 @@ export class LangyProjectMemoryRepository {
           lastEditorId: lastEditorId ?? null,
         },
       });
+      return (await this.prisma.langyProjectMemory.findFirst({
+        where: { projectId },
+      }))!;
     }
     return await this.prisma.langyProjectMemory.create({
       data: {

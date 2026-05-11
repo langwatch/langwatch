@@ -91,7 +91,16 @@ export async function runLangyBootstrapJob(
 
     let content: string;
     try {
-      const model = await getVercelAIModel(projectId, FALLBACK_MODEL);
+      // Spec: project's configured default LLM; fallback gpt-5-mini if none.
+      // getVercelAIModel(projectId) uses project default with its own
+      // fallback (DEFAULT_MODEL). If neither resolves, we retry with
+      // gpt-5-mini explicitly.
+      let model;
+      try {
+        model = await getVercelAIModel(projectId);
+      } catch {
+        model = await getVercelAIModel(projectId, FALLBACK_MODEL);
+      }
       const result = await generateText({
         model,
         system: BOOTSTRAP_PROMPT,

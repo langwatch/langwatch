@@ -28,19 +28,32 @@ export class LangyUserPreferencesRepository {
     mode?: LangyMode;
     dismissedSuggestionKinds?: string[];
   }) {
-    return await this.prisma.langyUserPreferences.upsert({
-      where: { userId_projectId: { userId, projectId } },
-      create: {
+    // Avoid Prisma's compound-unique upsert because the multi-tenancy
+    // middleware only recognizes `projectId` (or specific compound keys)
+    // in `where`. Do an explicit find → update / create.
+    const existing = await this.prisma.langyUserPreferences.findFirst({
+      where: { userId, projectId },
+    });
+    if (existing) {
+      await this.prisma.langyUserPreferences.updateMany({
+        where: { id: existing.id, projectId },
+        data: {
+          ...(mode !== undefined ? { mode } : {}),
+          ...(dismissedSuggestionKinds !== undefined
+            ? { dismissedSuggestionKinds }
+            : {}),
+        },
+      });
+      return (await this.prisma.langyUserPreferences.findFirst({
+        where: { userId, projectId },
+      }))!;
+    }
+    return await this.prisma.langyUserPreferences.create({
+      data: {
         userId,
         projectId,
         mode: mode ?? "non_expert",
         dismissedSuggestionKinds: dismissedSuggestionKinds ?? [],
-      },
-      update: {
-        ...(mode !== undefined ? { mode } : {}),
-        ...(dismissedSuggestionKinds !== undefined
-          ? { dismissedSuggestionKinds }
-          : {}),
       },
     });
   }

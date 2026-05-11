@@ -245,7 +245,6 @@ app.post("/langy/chat", async (c) => {
   }
 
   const conversationService = LangyConversationService.create(prisma);
-  const messageService = LangyMessageService.create(prisma);
   const preferencesService = LangyUserPreferencesService.create(prisma);
 
   const conversation = await conversationService.ensureConversation({
@@ -1235,9 +1234,17 @@ app.post("/langy/chat", async (c) => {
         const assistantMessages = response.messages.filter(
           (m) => m.role === "assistant" || m.role === "tool",
         );
-        const parts = assistantMessages.flatMap((m) =>
-          Array.isArray(m.content) ? m.content : [],
-        );
+        const parts = assistantMessages.flatMap((m) => {
+          if (typeof m.content === "string") {
+            return m.content
+              ? [{ type: "text", text: m.content, role: m.role }]
+              : [];
+          }
+          if (Array.isArray(m.content)) {
+            return m.content.map((c) => ({ ...c, role: m.role }));
+          }
+          return [];
+        });
         await persistAssistantMessage({
           conversationId: conversation.id,
           projectId,
