@@ -1223,7 +1223,7 @@ function MessageContent({
   );
 }
 
-function ProposalCard({
+export function ProposalCard({
   proposal,
   appliedOutcome,
   isDiscarded,
