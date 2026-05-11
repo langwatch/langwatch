@@ -327,12 +327,89 @@ const updateProjectLambdaImage = async (
   return response;
 };
 
+// Per-pod in-memory cache for resolved Lambda ARNs.
+//
+// Why: getProjectLambdaArn() issues 2-N AWS Lambda control-plane calls
+// (GetFunction + poll loop) per invocation. Under a single tenant's event
+// burst, langwatch-workers fans this out across hundreds of concurrent
+// jobs, each hitting the same function name. AWS Lambda's GetFunction
+// quota is regional and shared across all pods, so one chatty project
+// can exhaust the quota and trigger CallerRateLimitExceeded for every
+// worker in the region — stalling unrelated fold/reactor groups behind
+// 4-12s SDK retry backoffs. See specs/nlp-go/studio-lambda-cache.feature.
+//
+// The cache key includes the current image_uri from the config so a
+// deploy (which bumps image_uri) automatically invalidates: the next
+// call is a miss and re-runs the UpdateFunctionCode path. We do NOT
+// cache failures — a TooManyRequestsException must self-heal on the
+// next call.
+//
+// TTL is intentionally short: long enough to absorb minute-scale bursts,
+// short enough that any drift (manual console edit, out-of-band image
+// rebuild) self-heals within the window.
+export const LAMBDA_ARN_CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
+
+type LambdaArnCacheEntry = {
+  arn: string;
+  imageUri: string;
+  cachedAt: number;
+};
+
+const lambdaArnCache = new Map<string, LambdaArnCacheEntry>();
+const inFlightLambdaArn = new Map<string, Promise<string>>();
+
+/** Test/ops helper: drop all cached ARNs (e.g. on config rotation). */
+export const clearLambdaArnCache = (): void => {
+  lambdaArnCache.clear();
+  inFlightLambdaArn.clear();
+};
+
 export const getProjectLambdaArn = async (
   projectId: string,
 ): Promise<string> => {
   const config = parseLambdaConfig();
-  const lambda = createLambdaClient();
   const functionName = `langwatch_nlp-${projectId}`;
+
+  const now = Date.now();
+  const cached = lambdaArnCache.get(projectId);
+  if (
+    cached &&
+    cached.imageUri === config.image_uri &&
+    now - cached.cachedAt < LAMBDA_ARN_CACHE_TTL_MS
+  ) {
+    return cached.arn;
+  }
+
+  // Single-flight: collapse concurrent misses for the same projectId
+  // onto one in-flight resolution. Without this, a 100-event burst from
+  // one project produces 100 parallel GetFunction calls instead of 1.
+  const existing = inFlightLambdaArn.get(projectId);
+  if (existing) return existing;
+
+  const resolution = (async () => {
+    try {
+      const arn = await resolveProjectLambdaArn(projectId, config, functionName);
+      lambdaArnCache.set(projectId, {
+        arn,
+        imageUri: config.image_uri,
+        cachedAt: Date.now(),
+      });
+      return arn;
+    } finally {
+      inFlightLambdaArn.delete(projectId);
+    }
+  })();
+
+  inFlightLambdaArn.set(projectId, resolution);
+  return resolution;
+};
+
+const resolveProjectLambdaArn = async (
+  projectId: string,
+  config: LangWatchLambdaConfig,
+  functionName: string,
+): Promise<string> => {
+  const lambda = createLambdaClient();
 
   // Check if Lambda exists
   let lambdaConfig = await checkLambdaExists(lambda, functionName).catch(
