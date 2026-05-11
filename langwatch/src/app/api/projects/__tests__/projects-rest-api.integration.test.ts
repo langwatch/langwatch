@@ -5,8 +5,10 @@ import {
   type Organization,
   type Team,
 } from "@prisma/client";
+import { generate } from "@langwatch/ksuid";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi, beforeEach } from "vitest";
+import { KSUID_RESOURCES } from "~/utils/constants";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
 import {
@@ -91,6 +93,17 @@ describe("Feature: Projects REST API", () => {
       },
     });
 
+    await prisma.roleBinding.create({
+      data: {
+        id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+        organizationId: testOrganization.id,
+        userId,
+        role: TeamUserRole.ADMIN,
+        scopeType: RoleBindingScopeType.ORGANIZATION,
+        scopeId: testOrganization.id,
+      },
+    });
+
     const patService = PatService.create(prisma);
     const created = await patService.create({
       name: `projects-pat-${nanoid(6)}`,
@@ -98,7 +111,7 @@ describe("Feature: Projects REST API", () => {
       organizationId: testOrganization.id,
       bindings: [
         {
-          role: TeamUserRole.MEMBER,
+          role: TeamUserRole.ADMIN,
           scopeType: RoleBindingScopeType.ORGANIZATION,
           scopeId: testOrganization.id,
         },
