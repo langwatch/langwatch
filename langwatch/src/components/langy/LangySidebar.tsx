@@ -14,6 +14,7 @@ import {
 } from "@chakra-ui/react";
 import { DefaultChatTransport, type UIMessage } from "ai";
 import { MeshGradient } from "@paper-design/shaders-react";
+import { keyframes } from "@emotion/react";
 import {
   ArrowRight,
   Check,
@@ -24,10 +25,16 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Kbd } from "~/components/ops/shared/Kbd";
 import { Markdown } from "~/components/Markdown";
 import { toaster } from "~/components/ui/toaster";
+import { Tooltip } from "~/components/ui/tooltip";
 import { aiBrandPalette } from "~/features/traces-v2/components/ai/aiBrandPalette";
+import {
+  DEFAULT_THINKING_VERBS,
+  useCyclingVerb,
+} from "~/features/traces-v2/components/ai/useCyclingVerb";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useReducedMotion } from "~/hooks/useReducedMotion";
 import { isHandledByGlobalHandler } from "~/utils/trpcError";
@@ -72,6 +79,141 @@ const SUGGESTION_CHIPS = [
   "Explain a low score",
 ];
 
+const COMPOSER_PLACEHOLDER_EXAMPLES = [
+  "Ask Langy or describe what you want…",
+  "Try: which evaluators are failing most?",
+  "Maybe: summarize today's runs",
+  "How about: suggest an evaluator for hallucinations",
+  "Like: compare last two experiment runs",
+];
+
+// Sweep the AI palette through the muted body colour for the "thinking"
+// shimmer. Lifted from AiPromptInput.tsx; the keyframes helper is the only
+// way to actually emit @keyframes from a CSS-in-JS object.
+const langyThinkingShimmer = keyframes`
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+`;
+const thinkingShimmerStyles = {
+  background: `linear-gradient(
+    90deg,
+    var(--chakra-colors-fg-muted) 0%,
+    var(--chakra-colors-fg-muted) 25%,
+    ${aiBrandPalette[0]} 42%,
+    ${aiBrandPalette[1]} 50%,
+    ${aiBrandPalette[2]} 58%,
+    var(--chakra-colors-fg-muted) 75%,
+    var(--chakra-colors-fg-muted) 100%
+  )`,
+  backgroundSize: "250% 100%",
+  WebkitBackgroundClip: "text",
+  backgroundClip: "text",
+  WebkitTextFillColor: "transparent",
+  animation: `${langyThinkingShimmer} 4.5s linear infinite`,
+} as const;
+
+const TYPEWRITER_TYPING_MS = 70;
+const TYPEWRITER_ERASING_MS = 40;
+const TYPEWRITER_HOLD_MS = 2600;
+
+/**
+ * Cycle through `examples`, typing each one, holding, then erasing — used
+ * as the composer placeholder when idle. Returns to the first example
+ * (no animation) under reduced-motion. Mirrors AiPromptInput's local
+ * implementation; copied inline to avoid forcing an export from a file
+ * that's otherwise unrelated to Langy.
+ */
+function useTypewriterPlaceholder(
+  active: boolean,
+  examples: readonly string[],
+): string {
+  const reduceMotion = useReducedMotion();
+  const [text, setText] = useState(examples[0] ?? "");
+
+  useEffect(() => {
+    if (!active || reduceMotion) {
+      setText(examples[0] ?? "");
+      return;
+    }
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    let index = 0;
+    let charIndex = (examples[0] ?? "").length;
+    let phase: "type" | "hold" | "erase" = "hold";
+
+    const tick = () => {
+      if (cancelled) return;
+      const word = examples[index] ?? "";
+      if (phase === "type") {
+        charIndex++;
+        setText(word.slice(0, charIndex));
+        if (charIndex >= word.length) {
+          phase = "hold";
+          timer = setTimeout(tick, TYPEWRITER_HOLD_MS);
+        } else {
+          timer = setTimeout(tick, TYPEWRITER_TYPING_MS);
+        }
+        return;
+      }
+      if (phase === "hold") {
+        phase = "erase";
+        timer = setTimeout(tick, TYPEWRITER_ERASING_MS);
+        return;
+      }
+      charIndex--;
+      setText(word.slice(0, Math.max(charIndex, 0)));
+      if (charIndex <= 0) {
+        index = (index + 1) % examples.length;
+        charIndex = 0;
+        phase = "type";
+      }
+      timer = setTimeout(tick, TYPEWRITER_ERASING_MS);
+    };
+
+    timer = setTimeout(tick, TYPEWRITER_HOLD_MS);
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+    };
+  }, [active, reduceMotion, examples]);
+
+  return text;
+}
+
+/**
+ * `⌘L` / `Ctrl+L` toggles the Langy panel globally. Mirrors
+ * useGlobalAiShortcut from traces-v2. ⌘L is normally captured by the
+ * browser to focus the URL bar; preventDefault claims it for the page
+ * when keyboard focus is inside the document. If a text input is active
+ * with a non-empty selection we bail to avoid hijacking OS shortcuts
+ * users might be relying on (e.g. select-line).
+ */
+function useGlobalLangyShortcut(onTrigger: () => void): void {
+  useEffect(() => {
+    const handler = (event: KeyboardEvent) => {
+      const isAccel = event.metaKey || event.ctrlKey;
+      if (!isAccel) return;
+      if (event.key !== "l" && event.key !== "L") return;
+      if (event.altKey || event.shiftKey) return;
+      const target = event.target;
+      if (target instanceof HTMLElement) {
+        const isTextInput =
+          target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.isContentEditable;
+        if (isTextInput) {
+          const sel = window.getSelection?.();
+          if (sel && sel.toString().length > 0) return;
+        }
+      }
+      event.preventDefault();
+      onTrigger();
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [onTrigger]);
+}
+
 export interface LangyProposal {
   langyProposal: true;
   kind: string;
@@ -108,15 +250,20 @@ export function LangyDrawer({
   const isControlled = isOpenProp !== undefined;
   const [internalOpen, setInternalOpen] = useState(false);
   const isOpen = isControlled ? isOpenProp : internalOpen;
-  const setIsOpen = (next: boolean) => {
-    if (!isControlled) setInternalOpen(next);
-    onOpenChange?.(next);
-  };
+  const setIsOpen = useCallback(
+    (next: boolean) => {
+      if (!isControlled) setInternalOpen(next);
+      onOpenChange?.(next);
+    },
+    [isControlled, onOpenChange],
+  );
+  const toggle = useCallback(() => setIsOpen(!isOpen), [isOpen, setIsOpen]);
+  useGlobalLangyShortcut(toggle);
 
   return (
     <>
       <SparkleGradientDefs />
-      <LangyHandle isOpen={isOpen} onToggle={() => setIsOpen(!isOpen)} />
+      <LangyHandle isOpen={isOpen} onToggle={toggle} />
       <LangyPanel
         isOpen={isOpen}
         onClose={() => setIsOpen(false)}
@@ -242,13 +389,14 @@ function LangyHandle({
   onToggle: () => void;
 }) {
   const [hover, setHover] = useState(false);
-  return (
+  const button = (
     <chakra.button
       type="button"
       onClick={onToggle}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
       aria-label={isOpen ? "Close Langy" : "Open Langy assistant"}
+      aria-keyshortcuts="Meta+L Control+L"
       position="fixed"
       right={isOpen ? `${PANEL_WIDTH + PANEL_GUTTER + 4}px` : 0}
       top="50%"
@@ -292,6 +440,24 @@ function LangyHandle({
         </Text>
       </VStack>
     </chakra.button>
+  );
+
+  return (
+    <Tooltip
+      content={
+        <HStack gap={2}>
+          <Text>{isOpen ? "Close Langy" : "Open Langy"}</Text>
+          <HStack gap={1}>
+            <Kbd>⌘</Kbd>
+            <Kbd>L</Kbd>
+          </HStack>
+        </HStack>
+      }
+      positioning={{ placement: "left" }}
+      openDelay={200}
+    >
+      {button}
+    </Tooltip>
   );
 }
 
@@ -777,30 +943,39 @@ function Chip({
 }
 
 function ThinkingIndicator({ messages }: { messages: UIMessage[] }) {
+  const reduceMotion = useReducedMotion();
   const last = messages.at(-1);
   const activeTool =
     last?.role === "assistant"
       ? last.parts.findLast((part) => part.type?.startsWith("tool-"))
       : undefined;
-  const label = activeTool?.type
+  const toolLabel = activeTool?.type
     ? activeTool.type.replace(/^tool-/, "").replace(/_/g, " ")
-    : "thinking";
+    : null;
+
+  // While a tool is active, surface what it is — that's higher-signal
+  // than a generic verb. Otherwise cycle through the AI thinking verbs
+  // so the panel doesn't feel frozen during long generations.
+  const cyclingVerb = useCyclingVerb(!toolLabel, DEFAULT_THINKING_VERBS);
+  const text = toolLabel ? `Langy is ${toolLabel}…` : `${cyclingVerb}…`;
+
+  // Reduced-motion: drop the keyframes animation but keep the static
+  // gradient so the text still reads as "AI activity" without sweep.
+  const shimmerCss = reduceMotion
+    ? { ...thinkingShimmerStyles, animation: "none" }
+    : thinkingShimmerStyles;
 
   return (
-    <HStack gap={2} alignSelf="flex-start" color="fg.muted">
+    <HStack gap={2} alignSelf="flex-start">
       <SparkleTile size={24} sparkleSize={12} />
-      <HStack
-        gap={2}
-        paddingX={2.5}
-        paddingY={1.5}
-        borderRadius="md"
-        background="bg.subtle"
-        borderWidth="1px"
-        borderColor="border.muted"
+      <Box
+        textStyle="xs"
+        fontWeight="500"
+        letterSpacing="-0.005em"
+        css={shimmerCss}
       >
-        <Spinner size="xs" colorPalette="purple" />
-        <Text textStyle="xs">Langy is {label}…</Text>
-      </HStack>
+        {text}
+      </Box>
     </HStack>
   );
 }
@@ -823,6 +998,10 @@ function Composer({
   canSend: boolean;
 }) {
   const filled = input.trim().length > 0;
+  const typewriterPlaceholder = useTypewriterPlaceholder(
+    !filled && !isBusy && !disabled,
+    COMPOSER_PLACEHOLDER_EXAMPLES,
+  );
   return (
     <>
       <Separator />
@@ -857,7 +1036,7 @@ function Composer({
               }
             }}
             placeholder={
-              isBusy ? "Langy is working…" : "Ask Langy or describe what you want…"
+              isBusy ? "Langy is working…" : typewriterPlaceholder
             }
             disabled={disabled || isBusy}
             rows={1}
