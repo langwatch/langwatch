@@ -11,19 +11,21 @@ import {
   chakra,
 } from "@chakra-ui/react";
 import { DefaultChatTransport, type UIMessage } from "ai";
-import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  LuArrowRight,
-  LuCheck,
-  LuPlus,
-  LuSend,
-  LuSquare,
-  LuTrash2,
-  LuX,
-} from "react-icons/lu";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+  ArrowRight,
+  Check,
+  Plus,
+  Send,
+  Sparkles,
+  Square,
+  Trash2,
+  X,
+} from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Markdown } from "~/components/Markdown";
 import { toaster } from "~/components/ui/toaster";
+import { aiBrandPalette } from "~/features/traces-v2/components/ai/aiBrandPalette";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { isHandledByGlobalHandler } from "~/utils/trpcError";
 import {
   useLangyConversations,
@@ -38,18 +40,25 @@ const PILL_WIDTH = 30;
 export const LANGY_DOCKED_OFFSET = PANEL_WIDTH + PANEL_GUTTER;
 export const LANGY_TRANSITION = "240ms cubic-bezier(0.32, 0.72, 0, 1)";
 
-const BRAND = {
-  primary: "#ea580c",
-  hover: "#c2410c",
-  bg50: "#fff7ed",
-  bg100: "#ffedd5",
-  border: "#fed7aa",
-  inverse: "#1c1917",
-  gradient: "linear-gradient(135deg, #fb923c 0%, #f97316 50%, #ea580c 100%)",
-  tileGradient: "linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%)",
-  shadow: "0 6px 18px -4px rgba(234, 88, 12, 0.35)",
-  shadowSoft: "0 4px 12px -4px rgba(234, 88, 12, 0.25)",
-} as const;
+// Single source of truth for the gradient id used by every gradient-stroke
+// Sparkle in this component. Defined once in <SparkleGradientDefs /> and
+// referenced via `stroke="url(#langy-sparkle-grad)"`. Mirrors AiPromptInput.
+const SPARKLE_GRADIENT_ID = "langy-sparkle-grad";
+
+// Static three-stop AI brand gradient. Used for the LANGY pill, Send and
+// Apply buttons. Mirrors the colours of MeshGradient + AskAiButton so Langy
+// reads as the same AI surface as the rest of the product.
+const AI_GRADIENT = `linear-gradient(135deg, ${aiBrandPalette[0]} 0%, ${aiBrandPalette[1]} 50%, ${aiBrandPalette[2]} 100%)`;
+
+// AI accent shadows — purple-leaning so they feel cool, not warm.
+const AI_SHADOW = "0 6px 18px -4px rgba(168, 85, 247, 0.35)";
+const AI_SHADOW_SOFT = "0 4px 12px -4px rgba(168, 85, 247, 0.22)";
+
+// AI brand surface tones. Kept literal because we want the same exact tones
+// across light/dark; semantic purple.subtle from Chakra is too pale.
+const AI_BG_SUBTLE = "rgba(168, 85, 247, 0.06)";
+const AI_BG_HOVER = "rgba(168, 85, 247, 0.10)";
+const AI_BORDER = "rgba(168, 85, 247, 0.24)";
 
 const SUGGESTION_CHIPS = [
   "Summarize my experiment",
@@ -102,6 +111,7 @@ export function LangyDrawer({
 
   return (
     <>
+      <SparkleGradientDefs />
       <LangyHandle isOpen={isOpen} onToggle={() => setIsOpen(!isOpen)} />
       <LangyPanel
         isOpen={isOpen}
@@ -113,51 +123,68 @@ export function LangyDrawer({
   );
 }
 
-function GradientSparkle({ size = 16 }: { size?: number }) {
-  const id = `langy-sparkle-${size}`;
+/**
+ * Hidden SVG that defines the AI brand linear gradient. Every `<Sparkles>`
+ * (or other lucide icon) that wants the rainbow brand stroke references it
+ * via `stroke="url(#langy-sparkle-grad)"`. Defined once at the root so the
+ * gradient is available globally and the icons reuse the same paint server.
+ */
+function SparkleGradientDefs() {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden>
+    <svg
+      width="0"
+      height="0"
+      aria-hidden
+      style={{ position: "absolute", pointerEvents: "none" }}
+    >
       <defs>
-        <linearGradient id={id} x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stopColor="#fbbf24" />
-          <stop offset="60%" stopColor="#f97316" />
-          <stop offset="100%" stopColor="#c2410c" />
+        <linearGradient id={SPARKLE_GRADIENT_ID} x1="0%" y1="0%" x2="100%" y2="100%">
+          {aiBrandPalette.map((color, i) => (
+            <stop
+              key={color}
+              offset={`${(i / (aiBrandPalette.length - 1)) * 100}%`}
+              stopColor={color}
+            />
+          ))}
         </linearGradient>
       </defs>
-      <path
-        d="M12 2.5l1.85 5.4 5.4 1.85-5.4 1.85L12 17l-1.85-5.4-5.4-1.85 5.4-1.85L12 2.5z"
-        fill={`url(#${id})`}
-      />
-      <path
-        d="M19 14l.85 2.15L22 17l-2.15.85L19 20l-.85-2.15L16 17l2.15-.85L19 14z"
-        fill={`url(#${id})`}
-        opacity={0.75}
-      />
     </svg>
+  );
+}
+
+/** AI-brand sparkle: outline-only icon with the rainbow gradient stroke. */
+function GradientSparkle({ size = 16 }: { size?: number }) {
+  return (
+    <Sparkles
+      size={size}
+      stroke={`url(#${SPARKLE_GRADIENT_ID})`}
+      strokeWidth={2}
+    />
   );
 }
 
 function SparkleTile({
   size,
   sparkleSize,
+  hero = false,
 }: {
   size: number;
   sparkleSize: number;
+  hero?: boolean;
 }) {
   return (
     <Box
       width={`${size}px`}
       height={`${size}px`}
-      borderRadius={size >= 48 ? "18px" : "8px"}
-      background={BRAND.tileGradient}
+      borderRadius={hero ? "full" : "8px"}
+      background={hero ? AI_BG_SUBTLE : AI_BG_SUBTLE}
       borderWidth="1px"
-      borderColor={BRAND.border}
+      borderStyle="solid"
+      borderColor={AI_BORDER}
       display="grid"
       placeItems="center"
       flexShrink={0}
-      boxShadow={
-        size >= 48 ? "0 6px 16px -8px rgba(234, 88, 12, 0.4)" : undefined
-      }
+      boxShadow={hero ? AI_SHADOW_SOFT : undefined}
     >
       <GradientSparkle size={sparkleSize} />
     </Box>
@@ -188,22 +215,23 @@ function LangyHandle({
       cursor="pointer"
       borderTopLeftRadius="999px"
       borderBottomLeftRadius="999px"
-      background={BRAND.tileGradient}
+      background={AI_GRADIENT}
       borderWidth="1px"
-      borderColor={BRAND.border}
+      borderStyle="solid"
+      borderColor="rgba(255,255,255,0.18)"
       borderRightWidth={0}
-      color={BRAND.primary}
-      boxShadow={hover ? BRAND.shadow : BRAND.shadowSoft}
+      color="white"
+      boxShadow={hover ? AI_SHADOW : AI_SHADOW_SOFT}
       transform={hover ? "translate(-2px, -50%)" : "translateY(-50%)"}
       transition={`right ${LANGY_TRANSITION}, transform 180ms ease, box-shadow 180ms ease`}
     >
       <VStack gap={2} align="center" justify="center">
-        <GradientSparkle size={14} />
+        <Sparkles size={14} color="white" />
         <Text
           fontSize="11px"
-          fontWeight="600"
+          fontWeight="700"
           letterSpacing="1.4px"
-          color={BRAND.primary}
+          color="white"
           style={{
             writingMode: "vertical-rl",
             textOrientation: "mixed",
@@ -395,6 +423,7 @@ function LangyPanel({
       borderRadius="14px"
       background="bg.surface"
       borderWidth="1px"
+      borderStyle="solid"
       borderColor="border.muted"
       boxShadow="0 24px 48px -16px rgba(0, 0, 0, 0.18), 0 2px 6px rgba(0, 0, 0, 0.06)"
       overflow="hidden"
@@ -498,10 +527,10 @@ function PanelHeader({
         </Text>
       </VStack>
       <HeaderIconButton aria-label="New chat" onClick={onNewChat}>
-        <LuPlus size={17} />
+        <Plus size={17} />
       </HeaderIconButton>
       <HeaderIconButton aria-label="Close Langy" onClick={onClose}>
-        <LuX size={17} />
+        <X size={17} />
       </HeaderIconButton>
     </HStack>
   );
@@ -548,9 +577,6 @@ function RecentList({
   onDelete: (id: string) => void;
 }) {
   if (hasError) return null;
-  // Keep the empty state pristine: hide the section entirely once we know
-  // there are no conversations to show. Still render while loading so the
-  // user sees their history is being fetched.
   if (!isLoading && conversations.length === 0) return null;
 
   return (
@@ -623,7 +649,7 @@ function RecentList({
                 aria-label="Delete conversation"
                 onClick={() => onDelete(conv.id)}
               >
-                <LuTrash2 size={12} />
+                <Trash2 size={12} />
               </IconButton>
             </HStack>
           ))}
@@ -644,7 +670,7 @@ function EmptyState({ onPick }: { onPick: (prompt: string) => void }) {
       paddingY="32px"
       height="full"
     >
-      <SparkleTile size={60} sparkleSize={28} />
+      <SparkleTile size={64} sparkleSize={28} hero />
       <Text
         fontSize="20px"
         fontWeight="600"
@@ -692,18 +718,22 @@ function Chip({
       onClick={onClick}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
+      appearance="none"
       paddingX="12px"
       paddingY="7px"
       borderRadius="999px"
       borderWidth="1px"
-      borderColor={hover ? BRAND.primary : "border.muted"}
-      background={hover ? BRAND.bg50 : "bg.surface"}
-      color={hover ? BRAND.primary : "fg.muted"}
+      borderStyle="solid"
+      borderColor={hover ? AI_BORDER : "border.emphasized"}
+      background={hover ? AI_BG_HOVER : "bg.subtle"}
+      color="fg"
       fontSize="12.5px"
       fontWeight={500}
+      lineHeight="1.2"
       cursor="pointer"
       transition="all 120ms ease"
       whiteSpace="nowrap"
+      boxShadow={hover ? "0 1px 2px rgba(168, 85, 247, 0.12)" : "none"}
     >
       {children}
     </chakra.button>
@@ -732,7 +762,7 @@ function ThinkingIndicator({ messages }: { messages: UIMessage[] }) {
         borderWidth="1px"
         borderColor="border.muted"
       >
-        <Spinner size="xs" colorPalette="orange" />
+        <Spinner size="xs" colorPalette="purple" />
         <Text fontSize="12px">Langy is {label}…</Text>
       </HStack>
     </HStack>
@@ -774,9 +804,10 @@ function Composer({
         paddingRight="6px"
         borderRadius="999px"
         borderWidth="1px"
-        borderColor={filled ? BRAND.primary : "border.emphasized"}
+        borderStyle="solid"
+        borderColor={filled ? AI_BORDER : "border.emphasized"}
         background="bg.surface"
-        boxShadow={filled ? `0 0 0 3px ${BRAND.bg50}` : undefined}
+        boxShadow={filled ? `0 0 0 3px ${AI_BG_SUBTLE}` : undefined}
         transition="border-color 150ms ease, box-shadow 150ms ease"
         align="center"
       >
@@ -816,19 +847,19 @@ function Composer({
             shadow={false}
             cursor="pointer"
           >
-            <LuSquare size={12} />
+            <Square size={12} />
           </SendButton>
         ) : (
           <SendButton
             aria-label="Send"
             onClick={onSend}
             disabled={!canSend}
-            background={canSend ? BRAND.gradient : "#f5f5f4"}
+            background={canSend ? AI_GRADIENT : "#f5f5f4"}
             color={canSend ? "white" : "var(--chakra-colors-fg-muted)"}
             shadow={canSend}
             cursor={canSend ? "pointer" : "default"}
           >
-            <LuSend size={14} />
+            <Send size={14} />
           </SendButton>
         )}
       </HStack>
@@ -872,7 +903,7 @@ function SendButton({
       display="grid"
       placeItems="center"
       flexShrink={0}
-      boxShadow={shadow ? BRAND.shadow : undefined}
+      boxShadow={shadow ? AI_SHADOW : undefined}
       transition="background 150ms ease, box-shadow 150ms ease"
       {...rest}
     >
@@ -916,7 +947,7 @@ function MessageContent({
         <Box
           paddingX="13px"
           paddingY="9px"
-          background={BRAND.inverse}
+          background="#1c1917"
           color="white"
           borderRadius="14px"
           borderBottomRightRadius="4px"
@@ -1015,7 +1046,7 @@ function ProposalCard({
         ? "var(--chakra-colors-green-fg)"
         : isDiscarded
           ? "var(--chakra-colors-fg-muted)"
-          : BRAND.primary;
+          : "var(--chakra-colors-purple-fg)";
 
   const triggerOpen = () => {
     if (onOpen) {
@@ -1055,7 +1086,7 @@ function ProposalCard({
         color={overlineColor}
       >
         {isApplied && !destructive ? (
-          <LuCheck size={11} />
+          <Check size={11} />
         ) : (
           <GradientSparkle size={11} />
         )}
@@ -1084,7 +1115,7 @@ function ProposalCard({
             borderRadius="8px"
             borderWidth={0}
             background={
-              destructive ? "var(--chakra-colors-red-solid)" : BRAND.gradient
+              destructive ? "var(--chakra-colors-red-solid)" : AI_GRADIENT
             }
             color="white"
             fontSize="12.5px"
@@ -1095,11 +1126,11 @@ function ProposalCard({
             alignItems="center"
             justifyContent="center"
             gap="5px"
-            boxShadow={destructive ? undefined : BRAND.shadow}
+            boxShadow={destructive ? undefined : AI_SHADOW}
             onClick={onApply}
             disabled={isApplying}
           >
-            <LuCheck size={12} />
+            <Check size={12} />
             {isApplying
               ? destructive
                 ? "Deleting…"
@@ -1128,13 +1159,13 @@ function ProposalCard({
               onClick={triggerOpen}
             >
               {openLabel}
-              <LuArrowRight size={12} />
+              <ArrowRight size={12} />
             </Button>
           ) : openHref ? (
             <Button size="xs" variant="outline" colorPalette="green" asChild>
               <a href={openHref}>
                 {openLabel}
-                <LuArrowRight size={12} />
+                <ArrowRight size={12} />
               </a>
             </Button>
           ) : null}
