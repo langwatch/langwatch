@@ -45,10 +45,13 @@ import {
 } from "./useLangyConversations";
 
 const PANEL_WIDTH = 380;
-const PANEL_GUTTER = 16;
+// The panel docks flush against the right edge of the viewport. Page
+// layouts coordinate via LANGY_DOCKED_OFFSET; we keep a small reserve so
+// content underneath still has breathing room when the panel is open.
+const PANEL_RESERVE = 0;
 const PILL_WIDTH = 30;
 
-export const LANGY_DOCKED_OFFSET = PANEL_WIDTH + PANEL_GUTTER;
+export const LANGY_DOCKED_OFFSET = PANEL_WIDTH + PANEL_RESERVE;
 export const LANGY_TRANSITION = "240ms cubic-bezier(0.32, 0.72, 0, 1)";
 
 // Single source of truth for the gradient id used by every gradient-stroke
@@ -398,7 +401,7 @@ function LangyHandle({
       aria-label={isOpen ? "Close Langy" : "Open Langy assistant"}
       aria-keyshortcuts="Meta+L Control+L"
       position="fixed"
-      right={isOpen ? `${PANEL_WIDTH + PANEL_GUTTER + 4}px` : 0}
+      right={isOpen ? `${PANEL_WIDTH}px` : 0}
       top="50%"
       width={`${PILL_WIDTH}px`}
       paddingY="14px"
@@ -632,23 +635,21 @@ function LangyPanel({
   return (
     <Box
       position="fixed"
-      top={2}
-      right={2}
-      bottom={2}
+      top={0}
+      right={0}
+      bottom={0}
       width={`${PANEL_WIDTH}px`}
       zIndex={1500}
-      borderRadius="14px"
       background="bg.surface"
-      borderWidth="1px"
-      borderStyle="solid"
-      borderColor="border.muted"
-      boxShadow="0 24px 48px -16px rgba(0, 0, 0, 0.18), 0 2px 6px rgba(0, 0, 0, 0.06)"
+      borderLeftWidth="1px"
+      borderLeftStyle="solid"
+      borderLeftColor="border.muted"
+      // No corner radius and no drop shadow — the panel reads as part of
+      // the page chrome (a docked drawer), not a floating popover.
       overflow="hidden"
       transition={`transform ${LANGY_TRANSITION}, opacity 220ms ease`}
       transform={
-        isOpen
-          ? "translateX(0)"
-          : `translateX(calc(${PANEL_WIDTH}px + ${PANEL_GUTTER}px))`
+        isOpen ? "translateX(0)" : `translateX(${PANEL_WIDTH}px)`
       }
       opacity={isOpen ? 1 : 0}
       pointerEvents={isOpen ? "auto" : "none"}
