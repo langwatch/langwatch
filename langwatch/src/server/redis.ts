@@ -126,7 +126,13 @@ if (!isBuildOrNoRedis) {
  *
  * No-ops in build/test modes where {@link isBuildOrNoRedis} is true.
  */
-export async function verifyRedisReady(timeoutMs = 3000): Promise<void> {
+// 15s, not 3s: ElastiCache with TLS+AUTH can take longer than 3s on a cold
+// connection under load (observed twice on 2026-05-11 during a routine
+// langwatch-workers restart cycle — PING timed out, process.exit(1) fired,
+// and the pod crashlooped right when the event-sourcing dispatcher needed
+// to come back online). The boot guard is still useful for dev surface
+// errors; it just shouldn't trip on a real-world TLS handshake.
+export async function verifyRedisReady(timeoutMs = 15_000): Promise<void> {
   if (isBuildOrNoRedis || !connection) return;
   const target =
     env.REDIS_CLUSTER_ENDPOINTS ??
