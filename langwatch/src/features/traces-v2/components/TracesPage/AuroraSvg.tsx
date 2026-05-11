@@ -165,6 +165,17 @@ export const AuroraSvg: React.FC<AuroraSvgProps> = ({ idSuffix = "" }) => (
         78%  { transform: translate(70px, -8px)   skewX(11deg)  scaleY(0.95); opacity: 0.8;  }
         100% { transform: translate(90px, 20px)   skewX(8deg)   scaleY(0.78); opacity: 0.45; }
       }
+      /*
+       * Aurora curtain blend mode is theme-conditional. "screen" adds light
+       * over dark — perfect on dark backgrounds, but on a light background
+       * it washes the curtains out to invisible white. Default to "multiply"
+       * so the cyan/blue curtains tint the light surface; switch to
+       * "screen" only when html.dark is set (Chakra v3's class-based
+       * color-mode toggle). Keeps the same curtain definitions usable in
+       * both themes without a separate palette per mode.
+       */
+      .tracesV2-aurora-curtain { mix-blend-mode: multiply; }
+      html.dark .tracesV2-aurora-curtain { mix-blend-mode: screen; }
     `}</style>
   </svg>
 );
@@ -177,6 +188,7 @@ const CurtainEllipse: React.FC<{ curtain: Curtain; gradientId: string }> = ({
 
   return (
     <ellipse
+      className="tracesV2-aurora-curtain"
       cx={curtain.cx}
       cy={CURTAIN_CY}
       rx={curtain.rx}
@@ -185,7 +197,8 @@ const CurtainEllipse: React.FC<{ curtain: Curtain; gradientId: string }> = ({
       style={{
         transformBox: "fill-box",
         transformOrigin: "center",
-        mixBlendMode: "screen",
+        // mix-blend-mode lives in the stylesheet so it can switch between
+        // "multiply" (light mode) and "screen" (dark mode).
         animation: `tracesV2AuroraDrift ${curtain.durationMs}ms ease-in-out ${curtain.delayMs}ms infinite ${direction}`,
         willChange: "transform, opacity",
       }}

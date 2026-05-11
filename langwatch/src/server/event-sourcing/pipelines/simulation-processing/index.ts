@@ -9,6 +9,7 @@ export {
   TextMessageEndCommand,
   FinishRunCommand,
   DeleteRunCommand,
+  ArchiveSetCommand,
 } from "./commands";
 export { ComputeRunMetricsCommand } from "./commands/computeRunMetrics.command";
 export type { ComputeRunMetricsDeps } from "./commands/computeRunMetrics.command";

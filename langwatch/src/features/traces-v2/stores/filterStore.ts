@@ -4,6 +4,9 @@ import {
   removeFacetValueFromQuery,
   removeFieldFromQuery,
   setRangeInQuery,
+  addToOrGroupAtLocation,
+  setFacetValueAtLocation,
+  swapOperatorAtLocation,
   toggleFacetInQuery,
 } from "~/server/app-layer/traces/query-language/mutations";
 import {
@@ -42,6 +45,25 @@ interface FilterState {
   /** Debounced version of timeRange to drive network requests */
   debouncedTimeRange: TimeRange;
 
+  /**
+   * The most recent successful Ask AI translation: the natural-language
+   * prompt the user typed and the query the model produced. Read by the
+   * search bar so re-entering AI mode after an AI translation re-shows
+   * the user's original prompt rather than the generated query (which
+   * would be the URL state). Cleared the moment any other code path
+   * mutates the query — facet toggle, free-text edit, lens switch — so
+   * we never re-show a stale prompt against an unrelated query.
+   *
+   * `projectId` scoping protects against showing one project's prompt
+   * after the user switches workspaces (the store is module-level and
+   * persists across project changes).
+   */
+  lastAiTranslation: {
+    projectId: string;
+    prompt: string;
+    query: string;
+  } | null;
+
   /** Apply a query string from the search bar (parses → AST) */
   applyQueryText: (text: string) => void;
   /** Set query text and AST together */
@@ -53,8 +75,30 @@ interface FilterState {
    */
   setFilterFromLens: (text: string) => void;
 
-  /** Three-stage facet toggle: neutral → include → exclude → neutral */
-  toggleFacet: (field: string, value: string) => void;
+  /**
+   * Three-stage facet toggle: neutral → include → exclude → neutral.
+   * Pass `combinator: "OR"` (typically from a Shift/Ctrl-click in the
+   * sidebar) to glue the new clause via OR rather than the default AND.
+   * Pass `orGroupLocation` to splice the new value into an existing OR
+   * group rather than appending a fresh OR — so clicking a value in an
+   * OR-grouped facet extends the same group instead of opening a new
+   * cross-facet OR scope.
+   */
+  toggleFacet: (
+    field: string,
+    value: string,
+    options?: {
+      combinator?: "AND" | "OR";
+      orGroupLocation?: { start: number; end: number };
+    },
+  ) => void;
+  /** Swap the AND/OR keyword at a given liqe text location. Used by the
+   * search-bar token cycle handler. */
+  swapOperator: (start: number, end: number) => void;
+
+  /** Replace the value of the Tag at the given liqe location. Used by
+   * the click-a-token-to-edit-value popover in the search bar. */
+  setFacetValueAt: (start: number, end: number, newValue: string) => void;
   /** Remove a specific facet value (force to neutral) */
   removeFacet: (field: string, value: string) => void;
   /** Remove all values for a field */
@@ -73,6 +117,15 @@ interface FilterState {
   clearAll: () => void;
   /** Update the debounced values (usually called by a global timer/effect) */
   commitDebounced: () => void;
+
+  /** Record the last AI prompt + result so the next AI mode entry can
+   * surface the original natural-language prompt instead of the produced
+   * query string. */
+  recordAiTranslation: (translation: {
+    projectId: string;
+    prompt: string;
+    query: string;
+  }) => void;
 }
 
 const EMPTY_AST: LiqeQuery = {
@@ -124,7 +177,7 @@ function safeParseAndSerialize(text: string): ParseResult {
 
 function applyMutation(state: FilterState, mutate: (text: string) => string) {
   const next = safeParseAndSerialize(mutate(state.queryText));
-  return { ...next, page: 1 };
+  return { ...next, page: 1, lastAiTranslation: null };
 }
 
 /**
@@ -141,6 +194,9 @@ export const useFilterStore = create<FilterState>((set, get) => ({
   pageSize: 50,
   debouncedQueryText: "",
   debouncedTimeRange: INITIAL_TIME_RANGE,
+  lastAiTranslation: null,
+
+  recordAiTranslation: (translation) => set({ lastAiTranslation: translation }),
 
   applyQueryText: (text) =>
     set((state) => {
@@ -152,7 +208,11 @@ export const useFilterStore = create<FilterState>((set, get) => ({
         ) {
           return state;
         }
-        return { queryText: text, parseError: result.parseError };
+        return {
+          queryText: text,
+          parseError: result.parseError,
+          lastAiTranslation: null,
+        };
       }
       // Canonical text matches and we're already error-free → the AST is
       // structurally the same. Keep the previous reference so `s.ast`
@@ -160,7 +220,7 @@ export const useFilterStore = create<FilterState>((set, get) => ({
       if (result.queryText === state.queryText && state.parseError === null) {
         return state;
       }
-      return { ...result, page: 1 };
+      return { ...result, page: 1, lastAiTranslation: null };
     }),
 
   setQuery: (text, ast) =>
@@ -169,6 +229,7 @@ export const useFilterStore = create<FilterState>((set, get) => ({
       queryText: text,
       parseError: null,
       page: 1,
+      lastAiTranslation: null,
     }),
 
   setFilterFromLens: (text) =>
@@ -182,36 +243,84 @@ export const useFilterStore = create<FilterState>((set, get) => ({
           queryText: "",
           parseError: null,
           page: 1,
+          lastAiTranslation: null,
         };
       }
-      return { ...result, page: 1 };
+      return { ...result, page: 1, lastAiTranslation: null };
     }),
 
-  toggleFacet: (field, value) =>
+  toggleFacet: (field, value, options) =>
+    set((s) => {
+      const state = getFacetValueState(s.ast, field, value);
+      // OR-group splice path: when the field is currently part of an
+      // OR group AND we're adding a new value (not removing one), put
+      // it into the same group via `addToOrGroupAtLocation` instead of
+      // the generic toggleFacet which would AND-combine at the top.
+      // Removal still goes through removeFacetValueFromQuery which
+      // walks the whole AST.
+      if (state === "neutral" && options?.orGroupLocation) {
+        return applyMutation(s, (q) =>
+          addToOrGroupAtLocation({
+            currentQuery: q,
+            groupStart: options.orGroupLocation!.start,
+            groupEnd: options.orGroupLocation!.end,
+            fieldName: field,
+            value,
+          }),
+        );
+      }
+      return applyMutation(s, (q) =>
+        toggleFacetInQuery({
+          currentQuery: q,
+          fieldName: field,
+          value,
+          currentState: state,
+          combinator: options?.combinator ?? "AND",
+        }),
+      );
+    }),
+
+  swapOperator: (start, end) =>
     set((s) =>
       applyMutation(s, (q) =>
-        toggleFacetInQuery(
-          q,
-          field,
-          value,
-          getFacetValueState(s.ast, field, value),
-        ),
+        swapOperatorAtLocation({ currentQuery: q, start, end }),
+      ),
+    ),
+
+  setFacetValueAt: (start, end, newValue) =>
+    set((s) =>
+      applyMutation(s, (q) =>
+        setFacetValueAtLocation({ currentQuery: q, start, end, newValue }),
       ),
     ),
 
   removeFacet: (field, value) =>
     set((s) =>
-      applyMutation(s, (q) => removeFacetValueFromQuery(q, field, value)),
+      applyMutation(s, (q) =>
+        removeFacetValueFromQuery({ currentQuery: q, fieldName: field, value }),
+      ),
     ),
 
   removeField: (field) =>
-    set((s) => applyMutation(s, (q) => removeFieldFromQuery(q, field))),
+    set((s) =>
+      applyMutation(s, (q) =>
+        removeFieldFromQuery({ currentQuery: q, fieldName: field }),
+      ),
+    ),
 
   setRange: (field, from, to) =>
-    set((s) => applyMutation(s, (q) => setRangeInQuery(q, field, from, to))),
+    set((s) =>
+      applyMutation(s, (q) =>
+        setRangeInQuery({ currentQuery: q, fieldName: field, from, to }),
+      ),
+    ),
 
   removeRange: (field) =>
-    set((s) => applyMutation(s, (q) => removeFieldFromQuery(q, field))),
+    set((s) =>
+      applyMutation(s, (q) =>
+        removeFieldFromQuery({ currentQuery: q, fieldName: field }),
+      ),
+    ),
 
   setTimeRange: (range) => set({ timeRange: range, page: 1 }),
   rollTimeRange: (range) => set({ timeRange: range }),
@@ -223,6 +332,7 @@ export const useFilterStore = create<FilterState>((set, get) => ({
       queryText: "",
       parseError: null,
       page: 1,
+      lastAiTranslation: null,
     }),
 
   commitDebounced: () => {

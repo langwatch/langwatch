@@ -129,11 +129,11 @@ export class LicenseEnforcementRepository
   }
 
   /**
-   * Counts all projects in organization.
+   * Counts non-archived projects in organization.
    */
   async getProjectCount(organizationId: string): Promise<number> {
     return this.prisma.project.count({
-      where: { team: { organizationId } },
+      where: { team: { organizationId }, archivedAt: null },
     });
   }
 

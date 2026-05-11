@@ -23,11 +23,11 @@ Feature: LiteLLM Model ID Translation
 
     # LiteLLM requires the full dated version for Claude 3.5 Haiku
 
-  @unit @unimplemented
+  @unit
   Scenario: Translates Anthropic Claude 3.5 Sonnet model ID
     Given a model ID "anthropic/claude-3.5-sonnet"
     When calling translateModelIdForLitellm
-    Then the result should be "anthropic/claude-3-5-sonnet"
+    Then the result should be "anthropic/claude-3-5-sonnet-20240620"
 
     # Gemini uses dashes natively, no conversion needed
 
@@ -46,15 +46,21 @@ Feature: LiteLLM Model ID Translation
     # LiteLLM requires the full dated version for Claude 4 models
 
   # Unit Tests: Boundary Integration
+  #
+  # @unimplemented: prepareLitellmParams isn't directly tested with
+  # the dot-to-dash translation assertion — `modelIdBoundary.integration.test.ts`
+  # exercises the same boundary against a real provider, but the
+  # specific "translates / preserves" cases would benefit from
+  # dedicated unit cases. Cheap to add.
 
-  @unit @unimplemented
+  @unit
   Scenario: prepareLitellmParams translates Anthropic model ID
     Given a call to prepareLitellmParams with model "anthropic/claude-opus-4.5"
     And a valid Anthropic model provider
     When the function returns
     Then params.model should be "anthropic/claude-opus-4-5"
 
-  @unit @unimplemented
+  @unit
   Scenario: prepareLitellmParams preserves OpenAI model ID
     Given a call to prepareLitellmParams with model "openai/gpt-5"
     And a valid OpenAI model provider

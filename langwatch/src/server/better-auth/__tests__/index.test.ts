@@ -29,6 +29,7 @@ describe("better-auth config", () => {
       expect(options?.session?.storeSessionInDatabase).toBe(true);
     });
 
+    /** @scenario Credentials-only on-prem mode */
     it("gates emailAndPassword.enabled on NEXTAUTH_PROVIDER=email", async () => {
       // Regression for iter-20 bug 16: BetterAuth's email/password routes
       // (`/sign-up/email`, `/sign-in/email`) were unconditionally enabled,

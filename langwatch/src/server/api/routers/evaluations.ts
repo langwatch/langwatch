@@ -86,7 +86,7 @@ export const evaluationsRouter = createTRPCRouter({
         traceId: input.traceId,
         evaluatorType: input.evaluatorType as EvaluatorTypes,
         settings: input.settings,
-        mappings: input.mappings ?? {},
+        mappings: input.mappings ?? null,
         protections,
       });
 

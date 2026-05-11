@@ -18,11 +18,18 @@ interface FacetSectionProps {
   field: string;
   items: FacetItem[];
   getValueState: (value: string) => FacetValueState;
-  onToggle: (field: string, value: string) => void;
+  onToggle: (
+    field: string,
+    value: string,
+    options?: { modifierKey?: boolean },
+  ) => void;
   dragHandleProps?: React.HTMLAttributes<HTMLDivElement>;
   /** When set, renders a "(none)" row pinned at the bottom that toggles a `none:`/`has:` filter. */
   noneRow?: { active: boolean; onToggle: () => void };
   onShiftToggle?: (nextOpen: boolean) => void;
+  orGroupId?: string;
+  orPeers?: readonly string[];
+  orMemberValues?: ReadonlySet<string>;
 }
 
 export const FacetSection: React.FC<FacetSectionProps> = ({
@@ -35,6 +42,9 @@ export const FacetSection: React.FC<FacetSectionProps> = ({
   dragHandleProps,
   noneRow,
   onShiftToggle,
+  orGroupId,
+  orPeers,
+  orMemberValues,
 }) => {
   const lensOverride = useFacetLensStore((s) => s.lens.sectionOpen[field]);
   const setSectionOpen = useFacetLensStore((s) => s.setSectionOpen);
@@ -42,7 +52,8 @@ export const FacetSection: React.FC<FacetSectionProps> = ({
   const [searchQuery, setSearchQuery] = useState("");
 
   const handleToggle = useCallback(
-    (value: string) => onToggle(field, value),
+    (value: string, options?: { modifierKey?: boolean }) =>
+      onToggle(field, value, options),
     [onToggle, field],
   );
 
@@ -58,16 +69,39 @@ export const FacetSection: React.FC<FacetSectionProps> = ({
     [items, searchQuery],
   );
 
-  const isHighCardinality = items.length >= MAX_VISIBLE_FACETS;
+  // Active rows = currently-filtered values + OR-group members. We
+  // pin them above the collapsible content so they stay visible even
+  // when the section is collapsed — the connector line keeps its
+  // anchors and the user can see / remove what's filtered without
+  // expanding the whole list.
+  const activeItems = useMemo(
+    () =>
+      filtered.filter(
+        (item) =>
+          getValueState(item.value) !== "neutral" ||
+          orMemberValues?.has(item.value),
+      ),
+    [filtered, getValueState, orMemberValues],
+  );
+  const activeValueSet = useMemo(
+    () => new Set(activeItems.map((i) => i.value)),
+    [activeItems],
+  );
+  const restItems = useMemo(
+    () => filtered.filter((item) => !activeValueSet.has(item.value)),
+    [filtered, activeValueSet],
+  );
+
+  const isHighCardinality = restItems.length >= MAX_VISIBLE_FACETS;
   const facetWindow = useMemo(
     () =>
       computeWindow({
-        filtered,
+        filtered: restItems,
         isHighCardinality,
         showMore,
         searchActive: searchQuery.length > 0,
       }),
-    [filtered, isHighCardinality, showMore, searchQuery],
+    [restItems, isHighCardinality, showMore, searchQuery],
   );
 
   const maxCount = useMemo(
@@ -87,8 +121,29 @@ export const FacetSection: React.FC<FacetSectionProps> = ({
       onOpenChange={(next) => setSectionOpen(field, next)}
       dragHandleProps={dragHandleProps}
       onShiftToggle={onShiftToggle}
+      orGroupId={orGroupId}
+      orPeers={orPeers}
       valueCount={items.length}
       hasActive={activeCount > 0}
+      pinnedContent={
+        activeItems.length > 0 ? (
+          <VStack gap={0.5} align="stretch">
+            {activeItems.map((item) => (
+              <FacetRow
+                key={item.value}
+                item={item}
+                state={getValueState(item.value)}
+                maxCount={maxCount}
+                onToggle={handleToggle}
+                orGroupId={
+                  orMemberValues?.has(item.value) ? orGroupId : undefined
+                }
+                field={field}
+              />
+            ))}
+          </VStack>
+        ) : undefined
+      }
       activeIndicator={
         activeCount > 0 ? (
           <Badge
@@ -116,6 +171,10 @@ export const FacetSection: React.FC<FacetSectionProps> = ({
             state={getValueState(item.value)}
             maxCount={maxCount}
             onToggle={handleToggle}
+            orGroupId={
+              orMemberValues?.has(item.value) ? orGroupId : undefined
+            }
+            field={field}
           />
         ))}
 

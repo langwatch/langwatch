@@ -51,8 +51,17 @@ export function useAiTraceAction({
   const { project } = useOrganizationTeamProject();
   const timeRange = useFilterStore((s) => s.debouncedTimeRange);
   const applyQueryText = useFilterStore((s) => s.applyQueryText);
+  const recordAiTranslation = useFilterStore((s) => s.recordAiTranslation);
   const createLens = useViewStore((s) => s.createLens);
   const [error, setError] = useState<string | null>(null);
+  // Track the prompt across the async boundary so onSuccess can save it
+  // alongside the model's response — no plumbing through the mutation
+  // result, which is keyed off the server reply only.
+  const lastSubmittedPromptRef = useRef<string>("");
+  // Pin the project id at submit time so a late-arriving response can't
+  // record the translation against the wrong project if the user
+  // navigated workspaces while the request was in flight.
+  const lastSubmittedProjectIdRef = useRef<string | null>(null);
 
   // If the hosting composer unmounts (user closed it, navigated away,
   // reopened it for a new prompt), drop the in-flight mutation's response
@@ -69,12 +78,28 @@ export function useAiTraceAction({
     onSuccess: (result) => {
       if (cancelledRef.current) return;
       if (!result.ok) {
-        setError(`Couldn't understand that. ${result.error}`);
+        setError(result.error);
         return;
       }
       // Apply the query first so the resulting view is filtered (also so
       // that lens creation captures the right snapshot).
       applyQueryText(result.query);
+      // Pin the user's natural-language prompt against the produced
+      // query. Next time the user enters AI mode, if the URL query is
+      // still this exact string, the search bar reads the prompt back
+      // out of the store instead of seeding the composer with the
+      // (already-displayed) generated query — they get to keep editing
+      // their original wording rather than start from the syntax.
+      if (
+        lastSubmittedProjectIdRef.current &&
+        lastSubmittedPromptRef.current
+      ) {
+        recordAiTranslation({
+          projectId: lastSubmittedProjectIdRef.current,
+          prompt: lastSubmittedPromptRef.current,
+          query: result.query,
+        });
+      }
       const shouldCreateLens =
         mode === "lens" || (mode === "auto" && result.kind === "create_lens");
       if (shouldCreateLens) {
@@ -92,10 +117,13 @@ export function useAiTraceAction({
 
   const submit = (prompt: string): void => {
     if (!project?.id || !prompt.trim() || aiAction.isPending) return;
+    const trimmed = prompt.trim();
+    lastSubmittedPromptRef.current = trimmed;
+    lastSubmittedProjectIdRef.current = project.id;
     setError(null);
     aiAction.mutate({
       projectId: project.id,
-      prompt: prompt.trim(),
+      prompt: trimmed,
       timeRange: { from: timeRange.from, to: timeRange.to },
     });
   };

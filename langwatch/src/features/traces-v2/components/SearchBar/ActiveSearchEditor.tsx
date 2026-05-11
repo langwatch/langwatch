@@ -14,6 +14,13 @@ interface ActiveSearchEditorProps {
   onHasContentChange: (hasContent: boolean) => void;
   /** Synchronous resolver for dynamic value suggestions (model, service, …). */
   valueResolver?: ValueResolver;
+  /** Forwarded to useFilterEditor — fires when an existing chip is clicked. */
+  onTokenClick?: (payload: {
+    rect: DOMRect;
+    field: string;
+    currentValue: string;
+    location: { start: number; end: number };
+  }) => void;
 }
 
 /**
@@ -27,6 +34,7 @@ export const ActiveSearchEditor: React.FC<ActiveSearchEditorProps> = ({
   autoFocus,
   onHasContentChange,
   valueResolver,
+  onTokenClick,
 }) => {
   const { editor, suggestion, acceptSuggestion, cursorAnchorX } =
     useFilterEditor({
@@ -34,6 +42,7 @@ export const ActiveSearchEditor: React.FC<ActiveSearchEditorProps> = ({
       applyQueryText,
       onHasContentChange,
       valueResolver,
+      onTokenClick,
     });
 
   useGlobalSlashFocus(editor);

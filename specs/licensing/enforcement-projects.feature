@@ -63,7 +63,6 @@ Feature: Project Limit Enforcement with License
   # Edge Cases
   # ============================================================================
 
-  @unimplemented
   Scenario: Counts only non-archived projects toward limit
     Given the organization has a license with maxProjects 3
     And the organization has 2 active projects

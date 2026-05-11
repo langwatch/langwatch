@@ -1,5 +1,9 @@
 import { Badge, Box, HStack, Text } from "@chakra-ui/react";
-import { memo } from "react";
+import { memo, useCallback } from "react";
+import { analyzeOrGroups } from "~/server/app-layer/traces/query-language/queries";
+import { useFacetHoverStore } from "../../stores/facetHoverStore";
+import { useFilterStore } from "../../stores/filterStore";
+import { orGroupColor } from "./orGroupPalette";
 import { RowButton } from "./RowButton";
 import type { FacetItem, FacetValueState } from "./types";
 import { formatCount, paletteFromColor } from "./utils";
@@ -19,16 +23,34 @@ export const FacetRow = memo(function FacetRow({
   state,
   maxCount,
   onToggle,
+  orGroupId,
+  field,
 }: {
   item: FacetItem;
   state: FacetValueState;
   maxCount: number;
-  onToggle: (value: string) => void;
+  /**
+   * `modifierKey` is `true` when the user held Shift or Ctrl/Cmd while
+   * clicking. The store reads this as "combine with OR" instead of the
+   * default AND, so users can build alternative-set queries without
+   * dropping into the search bar to type the operator themselves.
+   */
+  onToggle: (value: string, options?: { modifierKey?: boolean }) => void;
+  /** Set when this specific value is a member of an OR group — paints
+   * the row with a coloured outline matching the section's OR pill. */
+  orGroupId?: string;
+  /** Field name (e.g. "status", "model") — used to broadcast hover so
+   * the matching search-bar chip can highlight even when the row isn't
+   * part of an OR group. */
+  field?: string;
 }) {
   const { typeTag, text } = parseTypedLabel(item.label);
 
+  // Synthetic rows have no real count yet — render with zero fill so they
+  // don't look like "0 matches" while we're still waiting on the real
+  // descriptors. Once real data lands the row gets a count + bar.
   const fillPct =
-    maxCount > 0
+    !item.synthetic && maxCount > 0
       ? Math.max(
           (item.count / maxCount) * 100,
           item.count > 0 ? MIN_VISIBLE_FILL_PCT : 0,
@@ -49,6 +71,36 @@ export const FacetRow = memo(function FacetRow({
 
   const subtleBg = `${palette}.subtle`;
   const solidBar = `${palette}.solid`;
+  // OR group ring: when this row's value is a member of an OR group,
+  // paint a coloured outline matching the section's OR pill so users
+  // can match values to their group at a glance, even across distant
+  // sections in the sidebar.
+  const orPalette = orGroupId ? orGroupColor(orGroupId) : null;
+
+  const setHoveredFacet = useFacetHoverStore((s) => s.setHoveredFacet);
+  const setHoveredGroup = useFacetHoverStore((s) => s.setHoveredGroup);
+  const clearHover = useFacetHoverStore((s) => s.clearHover);
+  // Hovering a row that's actually a member of an OR group lights up
+  // every other member too. Just being in a *field* that participates
+  // in some OR group isn't enough — `origin:simulation` hovered
+  // shouldn't drag `origin:evaluation` and `origin:application`
+  // along just because they happen to share the field. So look up
+  // membership at the (field, value) level, not the field level.
+  const handleMouseEnter = useCallback(() => {
+    if (!field) return;
+    const ast = useFilterStore.getState().ast;
+    const orAnalysis = analyzeOrGroups(ast);
+    const groupId = orAnalysis.memberToGroupId.get(`${field}|${item.value}`);
+    const group = groupId
+      ? orAnalysis.groups.find((g) => g.id === groupId)
+      : null;
+    if (group) {
+      setHoveredGroup(group);
+    } else {
+      setHoveredFacet({ field, value: item.value });
+    }
+  }, [field, item.value, setHoveredFacet, setHoveredGroup]);
+  const handleMouseLeave = useCallback(() => clearHover(), [clearHover]);
 
   return (
     <RowButton
@@ -67,8 +119,20 @@ export const FacetRow = memo(function FacetRow({
       overflow="hidden"
       background={isActive ? subtleBg : "transparent"}
       borderWidth={0}
+      outline={orPalette ? "1px solid" : undefined}
+      outlineColor={orPalette ? `${orPalette}.muted` : undefined}
+      outlineOffset="-1px"
       data-state={state}
-      onClick={() => onToggle(item.value)}
+      data-or-group={orGroupId}
+      data-facet-field={field}
+      data-facet-value={item.value}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+      onClick={(e) =>
+        onToggle(item.value, {
+          modifierKey: e.shiftKey || e.ctrlKey || e.metaKey,
+        })
+      }
       transition="background 120ms ease, border-color 120ms ease"
       _hover={{
         background: isActive ? subtleBg : "bg.muted",
@@ -141,16 +205,18 @@ export const FacetRow = memo(function FacetRow({
         >
           {text}
         </Text>
-        <Text
-          textStyle="xs"
-          color="fg.subtle"
-          fontFamily="mono"
-          mr={2}
-          fontWeight={isActive ? "600" : "400"}
-          flexShrink={0}
-        >
-          {formatCount(item.count)}
-        </Text>
+        {!item.synthetic && (
+          <Text
+            textStyle="xs"
+            color="fg.subtle"
+            fontFamily="mono"
+            mr={2}
+            fontWeight={isActive ? "600" : "400"}
+            flexShrink={0}
+          >
+            {formatCount(item.count)}
+          </Text>
+        )}
       </HStack>
     </RowButton>
   );

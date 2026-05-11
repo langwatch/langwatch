@@ -74,6 +74,7 @@ export const AGGREGATE_TYPE_IDENTIFIERS = [
   "evaluation",
   "experiment_run",
   "simulation_run",
+  "simulation_set",
   "suite_run",
   "billing_report",
   "global",

@@ -1,4 +1,4 @@
-import { SIMULATION_RUN_EVENT_TYPES } from "./constants";
+import { SIMULATION_RUN_EVENT_TYPES, SIMULATION_SET_EVENT_TYPES } from "./constants";
 import type {
     SimulationMessageSnapshotEvent,
     SimulationProcessingEvent,
@@ -8,6 +8,7 @@ import type {
     SimulationRunMetricsComputedEvent,
     SimulationRunQueuedEvent,
     SimulationRunStartedEvent,
+    SimulationSetArchivedEvent,
     SimulationTextMessageEndEvent,
     SimulationTextMessageStartEvent,
 } from "./events";
@@ -64,4 +65,10 @@ export function isSimulationRunDeletedEvent(
   event: SimulationProcessingEvent,
 ): event is SimulationRunDeletedEvent {
   return event.type === SIMULATION_RUN_EVENT_TYPES.DELETED;
+}
+
+export function isSimulationSetArchivedEvent(
+  event: SimulationProcessingEvent,
+): event is SimulationSetArchivedEvent {
+  return event.type === SIMULATION_SET_EVENT_TYPES.ARCHIVED;
 }

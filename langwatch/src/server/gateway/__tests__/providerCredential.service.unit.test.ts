@@ -134,6 +134,7 @@ describe("GatewayProviderCredentialService.create", () => {
   });
 
   describe("happy path", () => {
+    /** @scenario Enabling a provider for the gateway does NOT re-enter the API key */
     it("defaults slot='primary' and rotationPolicy='MANUAL' when unspecified", async () => {
       const { prisma, createArgs } = mockPrisma({
         modelProvider: stubModelProvider(),

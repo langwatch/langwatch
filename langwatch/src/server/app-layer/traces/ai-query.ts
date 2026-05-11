@@ -171,25 +171,41 @@ export async function generateTraceAction(
 
   let lastError = "Unknown error";
   let lastQuery = "";
+  // Track only the *last* attempt's failure kind so the UI message
+  // matches what actually happened on the final try. A transient
+  // provider blip on attempt 1 followed by a validation failure on
+  // attempt 2 should surface as "couldn't parse the query," not
+  // "provider error."
+  let lastFailure: "provider" | "validation" | null = null;
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     let parsedAction: z.infer<typeof aiActionSchema>;
     try {
       const { object } = await generateObject({
         model,
+        schemaName: "TraceAction",
+        schemaDescription:
+          "Either an apply_query (filter the current view) or a create_lens (create a saved view) action with a trace query language string.",
+        schema: aiActionSchema,
+        // Only inject the retry-context blurb when the previous failure
+        // was a parse/validation issue. After a provider/SDK throw,
+        // `lastQuery` is "" and `lastError` is a stack-y SDK message —
+        // splicing those into a "previous attempt produced query X
+        // which failed to parse: Y" sentence misleads the model into
+        // thinking it produced an empty query that won't parse.
         system:
-          attempt === 1
+          attempt === 1 || lastFailure !== "validation"
             ? systemPrompt
             : `${systemPrompt}\n\nThe previous attempt produced query "${lastQuery}" which failed to parse: ${lastError}\nReturn a valid query this time.`,
-        schema: aiActionSchema,
         prompt: input.prompt,
         maxRetries: 1,
       });
       parsedAction = object;
     } catch (e) {
+      lastFailure = "provider";
       lastError = e instanceof Error ? e.message : "Unknown generation error.";
-      logger.info(
-        { projectId: input.projectId, attempt, lastError },
-        "AI action generation failed, retrying",
+      logger.error(
+        { projectId: input.projectId, attempt, lastError, err: e },
+        "AI action generation failed",
       );
       continue;
     }
@@ -206,6 +222,7 @@ export async function generateTraceAction(
             query: parsedAction.query,
           };
     }
+    lastFailure = "validation";
     lastError = validation.error;
     logger.info(
       { projectId: input.projectId, attempt, lastError, lastQuery },
@@ -213,11 +230,22 @@ export async function generateTraceAction(
     );
   }
 
-  return { ok: false, error: lastError };
+  // Don't leak provider/SDK errors to the UI — those carry stack-y messages
+  // like "litellm.BadRequestError: OpenAIException - …" that aren't actionable
+  // for the user. Distinguish "model errored" from "model returned an
+  // unparseable query" so the message can be tailored without losing context.
+  return {
+    ok: false,
+    error:
+      lastFailure === "provider"
+        ? "AI couldn't generate a query right now. Try again, or rephrase."
+        : "AI's reply didn't match the trace query syntax. Try rephrasing.",
+  };
 }
 
 function buildActionSystemPrompt(fieldsBlock: string): string {
-  return `You translate natural-language descriptions into a trace-view action.
+  return `You translate natural-language descriptions into a trace-view action,
+and reply as a JSON object matching the TraceAction schema.
 
 There are two action kinds you can return:
 
@@ -239,9 +267,10 @@ ${QUERY_SYNTAX_DOC}
 
 ${fieldsBlock}
 
-## Output rules
+## JSON output rules
 
-- Use uppercase AND, OR, NOT.
+- The response must be a JSON object matching the TraceAction schema.
+- Use uppercase AND, OR, NOT inside the query string.
 - Only use fields listed above.
 - For value-side OR, group with parens, e.g. status:(error OR warning).
 - For wildcards, use *.

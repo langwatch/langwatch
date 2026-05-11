@@ -28,7 +28,11 @@ export const AttributeKeyRow = memo(function AttributeKeyRow({
   count: number;
   getValueState: (attrKey: string, value: string) => FacetValueState;
   noneActive: boolean;
-  onToggleValue: (attrKey: string, value: string) => void;
+  onToggleValue: (
+    attrKey: string,
+    value: string,
+    options?: { modifierKey?: boolean },
+  ) => void;
   onToggleNone: () => void;
 }) {
   const [open, setOpen] = useState(false);

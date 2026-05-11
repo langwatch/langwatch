@@ -206,6 +206,7 @@ describe("Feature: EvaluatorTypeSelectorDrawer Azure Safety BYOK gating", () => 
         renderDrawer();
       });
 
+      /** @scenario Azure evaluators are disabled when no Azure Safety provider is configured */
       it("marks Azure Content Safety as disabled", async () => {
         await waitFor(() => {
           const card = screen.getByTestId("evaluator-type-azure-content_safety");
@@ -234,6 +235,7 @@ describe("Feature: EvaluatorTypeSelectorDrawer Azure Safety BYOK gating", () => 
         });
       });
 
+      /** @scenario Non-Azure safety evaluators are unaffected by Azure Safety config */
       it("leaves non-Azure safety evaluators enabled", async () => {
         await waitFor(() => {
           const piiCard = screen.getByTestId(
@@ -260,6 +262,7 @@ describe("Feature: EvaluatorTypeSelectorDrawer Azure Safety BYOK gating", () => 
       });
 
       describe("when the user clicks the Configure Azure Safety CTA", () => {
+        /** @scenario Disabled Azure card shows CTA to configure the provider */
         it("navigates to settings/model-providers preselecting azure_safety", async () => {
           const user = userEvent.setup();
 
@@ -294,6 +297,7 @@ describe("Feature: EvaluatorTypeSelectorDrawer Azure Safety BYOK gating", () => 
         renderDrawer();
       });
 
+      /** @scenario Configuring Azure Safety enables all three Azure evaluators */
       it("leaves Azure Content Safety enabled", async () => {
         await waitFor(() => {
           const card = screen.getByTestId(

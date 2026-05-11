@@ -180,13 +180,14 @@ describe("LicenseEnforcementRepository", () => {
 
   describe("getProjectCount", () => {
     /** @scenario Counts projects across all teams */
-    it("queries projects with organization filter that traverses every team", async () => {
+    /** @scenario Counts only non-archived projects toward limit */
+    it("queries non-archived projects with organization filter that traverses every team", async () => {
       mockPrisma.project.count.mockResolvedValue(4);
 
       const result = await repository.getProjectCount(organizationId);
 
       expect(mockPrisma.project.count).toHaveBeenCalledWith({
-        where: { team: { organizationId } },
+        where: { team: { organizationId }, archivedAt: null },
       });
       expect(result).toBe(4);
     });

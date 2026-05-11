@@ -4,11 +4,19 @@ Feature: Evaluator management
   I want to create, edit, and manage reusable evaluators
   So that I can use them across evaluations and other platform features
 
+  # Drawer-component scenarios are bound to the existing component tests
+  # (EvaluatorListDrawer, EvaluatorCategorySelectorDrawer,
+  # EvaluatorTypeSelectorDrawer). The remaining @unimplemented scenarios
+  # describe full agents/evaluators-page CRUD flows or backing-store
+  # invariants (config JSON shape, project scoping, mappings storage)
+  # — they need a Next.js page-level harness or a service-layer test
+  # that doesn't exist for the evaluator service yet. Each is a tracked
+  # gap, not an aspirational stretch goal.
+
   # ============================================================================
   # Evaluator types
   # ============================================================================
 
-  @unimplemented
   Scenario: Evaluator types available
     When I create a new evaluator
     Then I can choose from the following types:
@@ -20,7 +28,6 @@ Feature: Evaluator management
   # Evaluator categories (for built-in evaluators)
   # ============================================================================
 
-  @unimplemented
   Scenario: Evaluator categories displayed
     When I start creating a built-in evaluator
     Then I see the following categories:
@@ -30,7 +37,6 @@ Feature: Evaluator management
       | RAG Quality      | Evaluate retrieval and generation        |
       | Safety           | Check for harmful content                |
 
-  @unimplemented
   Scenario: Each category contains specific evaluators
     When I select category "Expected Answer"
     Then I see evaluators like:
@@ -171,21 +177,18 @@ Feature: Evaluator management
   # Evaluator selection drawer (for use in Evaluations V3)
   # ============================================================================
 
-  @unimplemented
   Scenario: EvaluatorListDrawer shows available evaluators
     Given evaluators "Exact Match", "LLM Judge", and "Custom Scorer" exist
     When the EvaluatorListDrawer opens
     Then I see all three evaluators listed
     And I see a "New Evaluator" button at the top
 
-  @unimplemented
   Scenario: EvaluatorListDrawer empty state
     Given no evaluators exist
     When the EvaluatorListDrawer opens
     Then I see "Create your first evaluator" message
     And I see a "New Evaluator" button
 
-  @unimplemented
   Scenario: Select evaluator from drawer
     Given the EvaluatorListDrawer is open
     And evaluator "Exact Match" exists
@@ -197,33 +200,28 @@ Feature: Evaluator management
   # Evaluator creation flow from drawer
   # ============================================================================
 
-  @unimplemented
   Scenario: Create new evaluator from drawer flow
     Given the EvaluatorListDrawer is open
     When I click "New Evaluator"
     Then the EvaluatorCategorySelectorDrawer opens
 
-  @unimplemented
   Scenario: EvaluatorCategorySelectorDrawer shows categories
     When the EvaluatorCategorySelectorDrawer opens
     Then I see all evaluator categories listed
     And each category shows its name and description
     And I see a "Custom (from Workflow)" option at the bottom
 
-  @unimplemented
   Scenario: Select category opens type selector
     Given the EvaluatorCategorySelectorDrawer is open
     When I select category "Expected Answer"
     Then the EvaluatorTypeSelectorDrawer opens
     And it shows evaluators in the "Expected Answer" category
 
-  @unimplemented
   Scenario: EvaluatorTypeSelectorDrawer shows evaluators in category
     Given the EvaluatorTypeSelectorDrawer is open for "Expected Answer"
     Then I see evaluators like "Exact Match", "Contains", "Semantic Similarity"
     And each evaluator shows its name and brief description
 
-  @unimplemented
   Scenario: Select evaluator type opens editor
     Given the EvaluatorTypeSelectorDrawer is open for "Expected Answer"
     When I select "Exact Match"
@@ -237,6 +235,11 @@ Feature: Evaluator management
     Then I see a form generated from the evaluator's Zod schema
     And required fields are marked
     And I can enter values for all settings
+
+  @unit
+  Scenario: Custom workflow evaluator option is shown
+    Given the EvaluatorCategorySelectorDrawer is open
+    Then the option "Custom (from Workflow)" is rendered alongside the built-in evaluator categories
 
   @unimplemented
   Scenario: Custom workflow evaluator skips category/type selection

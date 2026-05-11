@@ -1,6 +1,10 @@
 import { z } from "zod";
 import { EventSchema } from "../../../domain/types";
-import { SIMULATION_EVENT_VERSIONS, SIMULATION_RUN_EVENT_TYPES } from "./constants";
+import {
+  SIMULATION_EVENT_VERSIONS,
+  SIMULATION_RUN_EVENT_TYPES,
+  SIMULATION_SET_EVENT_TYPES,
+} from "./constants";
 import { simulationMessageSchema, simulationResultsSchema } from "./shared";
 export type { SimulationRunStatus, SimulationVerdict } from "./shared";
 
@@ -179,6 +183,36 @@ export const SimulationRunDeletedEventSchema = EventSchema.extend({
 export type SimulationRunDeletedEvent = z.infer<typeof SimulationRunDeletedEventSchema>;
 
 /**
+ * SetArchived event — emitted when a user archives a whole scenario set.
+ * One user intent → one event carrying the affected runs, instead of N
+ * independent `lw.simulation_run.deleted` events.
+ *
+ * Aggregate is the set (`scenarioSetId`). The fold projection for
+ * `simulation_run` aggregates is currently per-run; wiring this event
+ * through the dispatcher fan-out is tracked separately — see lw#3636.
+ *
+ * Idempotency keys on `(tenantId, scenarioSetId)` so that retrying the
+ * same archive request collapses into a single event.
+ */
+export const simulationSetArchivedEventDataSchema = z.object({
+  scenarioSetId: z.string(),
+  /**
+   * Runs that belonged to the set at archive time. Snapshotted into the
+   * payload so replay produces the same projection state regardless of
+   * later run inserts/deletes.
+   */
+  scenarioRunIds: z.array(z.string()).min(1),
+});
+export type SimulationSetArchivedEventData = z.infer<typeof simulationSetArchivedEventDataSchema>;
+
+export const SimulationSetArchivedEventSchema = EventSchema.extend({
+  type: z.literal(SIMULATION_SET_EVENT_TYPES.ARCHIVED),
+  version: z.literal(SIMULATION_EVENT_VERSIONS.SET_ARCHIVED),
+  data: simulationSetArchivedEventDataSchema,
+});
+export type SimulationSetArchivedEvent = z.infer<typeof SimulationSetArchivedEventSchema>;
+
+/**
  * Union of all simulation processing event types.
  */
 export type SimulationProcessingEvent =
@@ -190,7 +224,8 @@ export type SimulationProcessingEvent =
   | SimulationRunFinishedEvent
   | SimulationRunMetricsComputedEvent
   | SimulationRunCancelRequestedEvent
-  | SimulationRunDeletedEvent;
+  | SimulationRunDeletedEvent
+  | SimulationSetArchivedEvent;
 
 export {
   isSimulationRunQueuedEvent,
@@ -202,5 +237,6 @@ export {
   isSimulationRunStartedEvent,
   isSimulationRunMetricsComputedEvent,
   isSimulationRunCancelRequestedEvent,
+  isSimulationSetArchivedEvent,
 } from "./typeGuards";
 

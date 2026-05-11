@@ -5,7 +5,10 @@ import Placeholder from "@tiptap/extension-placeholder";
 import { Text as TiptapText } from "@tiptap/extension-text";
 import { type Editor, useEditor } from "@tiptap/react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { removeNodeAtLocation } from "~/server/app-layer/traces/query-language/mutations";
+import {
+  removeNodeAtLocation,
+  swapOperatorAtLocation,
+} from "~/server/app-layer/traces/query-language/mutations";
 import { AutoUppercaseOperators } from "./autoUppercaseOperators";
 import {
   applyAcceptToEditor,
@@ -151,6 +154,18 @@ interface UseFilterEditorParams {
    * Return `null` to fall back to the static `FIELD_VALUES` enum.
    */
   valueResolver?: ValueResolver;
+  /**
+   * Fired when the user clicks an existing categorical chip in the
+   * search bar. Caller decides whether to render a value-picker
+   * popover; if undefined, chip clicks behave like normal text clicks
+   * (cursor placement).
+   */
+  onTokenClick?: (payload: {
+    rect: DOMRect;
+    field: string;
+    currentValue: string;
+    location: { start: number; end: number };
+  }) => void;
 }
 
 interface FilterEditorApi {
@@ -171,6 +186,7 @@ export function useFilterEditor({
   applyQueryText,
   onHasContentChange,
   valueResolver,
+  onTokenClick,
 }: UseFilterEditorParams): FilterEditorApi {
   const [suggestion, setSuggestion] =
     useState<SuggestionUIState>(CLOSED_SUGGESTION);
@@ -349,6 +365,27 @@ export function useFilterEditor({
     },
     editorProps: {
       attributes: { spellcheck: "false" },
+      // Suppress PM's default cursor placement when the user clicks on a
+      // chip pill or its X widget. PM otherwise drops the caret into the
+      // text node *inside* the chip (between "value" and the widget), so
+      // typing the next clause read as if it were extending the chip's
+      // value (`status:errorx`). Returning `true` here keeps PM out of
+      // the click — the addEventListener-based handler below still runs
+      // and opens the value picker / deletes the chip.
+      handleDOMEvents: {
+        mousedown: (_view, event) => {
+          const target = event.target as HTMLElement | null;
+          if (!target) return false;
+          if (
+            target.closest("[data-filter-chip-start]") ||
+            target.closest("[data-filter-delete]") ||
+            target.closest("[data-filter-op-start]")
+          ) {
+            return true;
+          }
+          return false;
+        },
+      },
       handleKeyDown: (view, event) => {
         const text = view.state.doc.textContent;
         const cursorPos = view.state.selection.from - PARAGRAPH_OFFSET;
@@ -453,6 +490,66 @@ export function useFilterEditor({
       // destroyed view crashes ProseMirror.
       if (editor.isDestroyed) return;
       const target = event.target as HTMLElement | null;
+
+      // Chip click → open the value-picker popover. Chip spans carry
+      // field/value/location data attrs from filterHighlight's
+      // decoration pass; the parent receives the click rect to anchor
+      // the popover. Skip when no callback is wired so chip clicks
+      // still place the cursor as before.
+      const chipEl = target?.closest("[data-filter-chip-start]") as
+        | HTMLElement
+        | null;
+      if (chipEl && onTokenClick) {
+        event.preventDefault();
+        event.stopPropagation();
+        const start = Number(chipEl.dataset.filterChipStart);
+        const end = Number(chipEl.dataset.filterChipEnd);
+        const field = chipEl.dataset.filterChipField ?? "";
+        const value = chipEl.dataset.filterChipValue ?? "";
+        if (
+          Number.isFinite(start) &&
+          Number.isFinite(end) &&
+          field &&
+          value
+        ) {
+          onTokenClick({
+            rect: chipEl.getBoundingClientRect(),
+            field,
+            currentValue: value,
+            location: { start, end },
+          });
+        }
+        return;
+      }
+
+      // AND/OR operator click → cycle the keyword in place. The inline
+      // span carries the liqe-text coordinates as data attributes (set
+      // by `filterHighlight`'s decoration pass) so we can flip without
+      // re-parsing the AST here.
+      const opEl = target?.closest("[data-filter-op-start]") as
+        | HTMLElement
+        | null;
+      if (opEl) {
+        event.preventDefault();
+        event.stopPropagation();
+        const start = Number(opEl.dataset.filterOpStart);
+        const end = Number(opEl.dataset.filterOpEnd);
+        if (!Number.isFinite(start) || !Number.isFinite(end)) return;
+        const current = editor.getText();
+        const next = swapOperatorAtLocation({
+          currentQuery: current,
+          start,
+          end,
+        });
+        if (next === current) return;
+        isProgrammaticRef.current = true;
+        editor.commands.setContent(buildDocument(next));
+        isProgrammaticRef.current = false;
+        lastCommittedTextRef.current = next;
+        applyQueryTextRef.current(next);
+        return;
+      }
+
       const btn = target?.closest("[data-filter-delete]") as HTMLElement | null;
       if (!btn) return;
       event.preventDefault();
@@ -469,7 +566,7 @@ export function useFilterEditor({
       // out of the raw text and tidy any AND/OR glue we leave behind.
       const next =
         kind === "ast"
-          ? removeNodeAtLocation(current, start, end)
+          ? removeNodeAtLocation({ currentQuery: current, start, end })
           : sliceFallbackTokenRange(current, start, end);
       // Update the editor directly — the sync effect skips while focused
       // (so it doesn't race with typing), so a delete from a still-focused
@@ -482,7 +579,7 @@ export function useFilterEditor({
     };
     dom.addEventListener("mousedown", handler);
     return () => dom.removeEventListener("mousedown", handler);
-  }, [editor, applyQueryTextRef]);
+  }, [editor, applyQueryTextRef, onTokenClick]);
 
   // Sync external query changes back into the editor. Only runs while the
   // editor is NOT focused — while focused, the editor is the source of

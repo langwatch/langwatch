@@ -1,4 +1,10 @@
 Feature: Gateway health checks
+
+  # All scenarios in this file describe gateway HTTP probe endpoints
+  # (/healthz, /readyz, /startupz) implemented in the Go gateway
+  # service. Out of scope for the TS parity check — verified via Go
+  # tests in services/aigateway/.
+
   Kubernetes uses three probe endpoints to distinguish transient
   dependency hiccups from a dead pod. Each has distinct semantics.
 

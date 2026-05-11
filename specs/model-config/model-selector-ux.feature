@@ -4,6 +4,9 @@ Feature: Model Selector UX Improvements
   I want a compact and intuitive model selector
   So that I can quickly choose and configure the right model for my task
 
+  # All scenarios describe model-selector UI rendering. Need a JSDOM
+  # render of the selector component — no test fixture exists yet.
+
   Background:
     Given I am on a page with the model selector
     And model providers are loaded for my project

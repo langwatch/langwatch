@@ -3,6 +3,15 @@ Feature: Migrate satisfaction score to sentiment evaluator
   I want sentiment analysis to be a standard evaluator in langevals
   So that it follows the same infrastructure as all other evaluators
 
+  # The sentiment evaluator lives in the external langevals/ Python
+  # repo, not in this codebase; the @unit "sentiment evaluator computes /
+  # uses embedding similarity" scenarios belong there. The remaining
+  # @unit/@integration assertions in this LangWatch codebase (analytics
+  # dashboard no longer shows satisfaction graph; trace processing
+  # pipeline no longer emits satisfaction events) need a fresh test
+  # against the post-migration analytics page render and the trace
+  # pipeline's reactor list.
+
   Background:
     The satisfaction score was previously computed by a reactor in the trace processing pipeline,
     calling out to langwatch_nlp's sentiment analysis endpoint. This is being migrated to a

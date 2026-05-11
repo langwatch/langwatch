@@ -180,7 +180,17 @@ export function FlameBlock({
       >
         <Text
           textStyle="xs"
+          // In dark mode the saturated block bg is dark enough to read
+          // white text against; in light mode the same blocks render as
+          // pastel tints and white-on-pastel becomes invisible. Flip to
+          // a near-black foreground in light mode and drop the dark
+          // text-shadow that exists to lift white off colour — it
+          // becomes a fuzzy halo under dark text.
           color={isEmphasized ? "white" : "white/90"}
+          _light={{
+            color: isEmphasized ? "gray.900" : "gray.800",
+            textShadow: "0 1px 0 rgba(255,255,255,0.45)",
+          }}
           truncate
           lineHeight={1}
           userSelect="none"
