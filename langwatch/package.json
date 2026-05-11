@@ -354,5 +354,6 @@
     "@rollup/rollup-linux-x64-gnu": "^4.60.2",
     "bufferutil": "^4.1.0"
   },
-  "workspaces": []
+  "workspaces": [],
+  "packageManager": "pnpm@10.24.0"
 }
