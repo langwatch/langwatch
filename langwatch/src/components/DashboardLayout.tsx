@@ -39,6 +39,7 @@ import { trackEvent } from "../utils/tracking";
 import { AnnouncementBanner } from "./AnnouncementBanner";
 import { CurrentDrawer } from "./CurrentDrawer";
 import { LangyProvider, useLangy } from "./langy/LangyContext";
+import { shouldShowLangy } from "./langy/visibility";
 import {
   LangyDrawer,
   LANGY_DOCKED_OFFSET,
@@ -364,10 +365,11 @@ export const DashboardLayout = ({
     router.pathname.startsWith("/[project]/analytics");
   const showSavedViews = isTracesOrAnalyticsPage;
 
-  const isProjectRoute =
-    router.pathname === "/[project]" ||
-    router.pathname.startsWith("/[project]/");
-  const showLangy = !publicPage && userIsPartOfTeam && isProjectRoute;
+  const showLangy = shouldShowLangy({
+    publicPage,
+    userIsPartOfTeam,
+    pathname: router.pathname,
+  });
 
   return (
     <LangyProvider>
