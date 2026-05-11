@@ -59,11 +59,6 @@ export const LANGY_TRANSITION = "240ms cubic-bezier(0.32, 0.72, 0, 1)";
 // referenced via `stroke="url(#langy-sparkle-grad)"`. Mirrors AiPromptInput.
 const SPARKLE_GRADIENT_ID = "langy-sparkle-grad";
 
-// Static three-stop AI brand gradient. Used for the LANGY pill, Send and
-// Apply buttons. Mirrors the colours of MeshGradient + AskAiButton so Langy
-// reads as the same AI surface as the rest of the product.
-const AI_GRADIENT = `linear-gradient(135deg, ${aiBrandPalette[0]} 0%, ${aiBrandPalette[1]} 50%, ${aiBrandPalette[2]} 100%)`;
-
 // AI accent shadows — purple-leaning so they feel cool, not warm.
 const AI_SHADOW = "0 6px 18px -4px rgba(168, 85, 247, 0.35)";
 const AI_SHADOW_SOFT = "0 4px 12px -4px rgba(168, 85, 247, 0.22)";
@@ -1292,6 +1287,25 @@ function ProposalCard({
       background="bg.subtle"
       opacity={isDiscarded ? 0.65 : 1}
       cursor={hasOpen ? "pointer" : "default"}
+      // When the card behaves as a button (an applied proposal that opens
+      // something on click) it needs button semantics so keyboard / screen-
+      // reader users can activate it. Without this, only mouse users could
+      // reach the affordance — the inner Open button is the keyboard
+      // fallback but the whole-card click target is invisible to a11y.
+      {...(hasOpen
+        ? {
+            role: "button",
+            tabIndex: 0,
+            "aria-label": `${openLabel}: ${proposal.summary}`,
+            onKeyDown: (e: React.KeyboardEvent<HTMLDivElement>) => {
+              if (e.key !== "Enter" && e.key !== " ") return;
+              const target = e.target as HTMLElement;
+              if (target.closest("a, button")) return;
+              e.preventDefault();
+              triggerOpen();
+            },
+          }
+        : {})}
       onClick={(e) => {
         if (!hasOpen) return;
         const target = e.target as HTMLElement;
