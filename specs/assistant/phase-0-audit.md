@@ -73,6 +73,20 @@ Scan: `grep -rnE "\bsage\b|\bSage\b|TODO\(sage\)"` over `langwatch/src` and `spe
 
 ## Acceptance summary for #3953
 
-- [x] **Audit doc** — this file.
-- [x] **`// TODO(sage)` / stale Sage references removed or re-scoped** — source tree is clean; remaining spec mentions are intentional history except the one fixed above.
-- [ ] **Refactor-only PR (no behavior change)** — N/A retroactively. Phase 0 cleanup was absorbed into #3908 / #3961 / #3963 / #3972 alongside feature work. Future cleanup will be its own PR.
+- [x] **Audit doc** — this file. Verified against `find langwatch/src -iname "*langy*"` plus the two non-`langy`-named files in `src/server/services/langy/` (`toolIdValidator.ts`, `index.ts`): 22 files on disk, 22 files in the table.
+- [x] **`// TODO(sage)` / stale Sage references removed or re-scoped** — `grep -rnE "\bsage\b|\bSage\b|TODO\(sage\)" langwatch/src` returns zero matches. The 4 mentions remaining repo-wide are all intentional (rename history note in `README.md`, branch-history note in this file and `implementation-plan.md`, historical PR link in `PRD.md`).
+- [x] **Refactor-only PR (no behavior change)** — the closing commit (`f5aceedb8`) only touches `specs/*.md`. Zero code changes, so behavior is identical. The original *intent* of "Phase 0 lands before any v2 feature" was missed — cleanup was absorbed into #3908 / #3961 / #3963 / #3972 alongside feature work — but the *measurable* refactor-only criterion is satisfied by this commit.
+
+## Verification commands
+
+```bash
+# 1. Every langy file is in the audit
+find langwatch/src -iname "*langy*" -type f
+ls langwatch/src/server/services/langy/
+
+# 2. Source tree clean of Sage
+grep -rnE "\bsage\b|\bSage\b|TODO\(sage\)" langwatch/src
+
+# 3. Closing commit is docs-only
+git show --stat f5aceedb8
+```
