@@ -36,10 +36,16 @@ but understood. We are ready to test what already exists.
   - `langwatch/src/components/langy/*` — note any TODOs/unused exports
   - `langwatch/src/server/routes/langy.ts` — confirm tool surface vs PRD §3
 
-- **Outcome:** PRD and `.feature` files are merged on a feature branch off
-  `feat/sage-assistant`. No code changes yet.
+- **Outcome:** PRD and `.feature` files merged on `langy-v2-integration`
+  (the branch was originally named `feat/sage-assistant` before the
+  Sage → Langy rename). No code changes yet.
 
 - **Verification:** spec docs render correctly on GitHub; team review on PRD.
+
+- **Status (2026-05-11):** retroactively closed by
+  [`phase-0-audit.md`](./phase-0-audit.md) — the cleanup itself was
+  absorbed into PRs #3908 / #3961 / #3963 / #3972, see the audit doc
+  for the full file-by-file disposition.
 
 ---
 
