@@ -120,12 +120,10 @@ export class PrismaProjectRepository implements ProjectRepository {
     organizationId: string;
     data: UpdateProjectInput;
   }): Promise<Project | null> {
-    const project = await this.prisma.project.findFirst({
-      where: { id, archivedAt: null, team: { organizationId } },
-    });
-    if (!project) return null;
-
-    return this.prisma.project.update({ where: { id }, data });
+    const where = { id, archivedAt: null, team: { organizationId } };
+    const result = await this.prisma.project.updateMany({ where, data });
+    if (result.count === 0) return null;
+    return this.prisma.project.findUnique({ where: { id } });
   }
 
   async archive({
@@ -135,15 +133,13 @@ export class PrismaProjectRepository implements ProjectRepository {
     id: string;
     organizationId: string;
   }): Promise<Project | null> {
-    const project = await this.prisma.project.findFirst({
-      where: { id, archivedAt: null, team: { organizationId } },
-    });
-    if (!project) return null;
-
-    return this.prisma.project.update({
-      where: { id },
+    const where = { id, archivedAt: null, team: { organizationId } };
+    const result = await this.prisma.project.updateMany({
+      where,
       data: { archivedAt: new Date() },
     });
+    if (result.count === 0) return null;
+    return this.prisma.project.findUnique({ where: { id } });
   }
 
   async findAllByOrganization({
