@@ -1,4 +1,4 @@
-import type { Project, Team } from "@prisma/client";
+import type { Project, PIIRedactionLevel, ProjectSensitiveDataVisibilityLevel, Team } from "@prisma/client";
 
 export type ProjectWithTeam = Project & { team: Team };
 
@@ -6,6 +6,31 @@ export type UpdateProjectMetadataInput = {
   id: string;
   data: { firstMessage: boolean; integrated: boolean; language: string };
 };
+
+export interface CreateProjectInput {
+  id: string;
+  name: string;
+  slug: string;
+  language: string;
+  framework: string;
+  teamId: string;
+  apiKey: string;
+  piiRedactionLevel: PIIRedactionLevel;
+  capturedInputVisibility: ProjectSensitiveDataVisibilityLevel;
+  capturedOutputVisibility: ProjectSensitiveDataVisibilityLevel;
+}
+
+export interface UpdateProjectInput {
+  name?: string;
+  language?: string;
+  framework?: string;
+  piiRedactionLevel?: PIIRedactionLevel;
+}
+
+export interface PaginatedResult<T> {
+  data: T[];
+  pagination: { page: number; limit: number; total: number };
+}
 
 export interface ProjectWithOrgAdmin {
   firstMessage: boolean;
@@ -44,6 +69,15 @@ export interface ProjectRepository {
     organizationId?: string;
     limit?: number;
   }): Promise<SearchProjectsResult[]>;
+  create(data: CreateProjectInput): Promise<Project>;
+  update(params: { id: string; organizationId: string; data: UpdateProjectInput }): Promise<Project | null>;
+  archive(params: { id: string; organizationId: string }): Promise<Project | null>;
+  findAllByOrganization(params: {
+    organizationId: string;
+    page: number;
+    limit: number;
+  }): Promise<PaginatedResult<Project>>;
+  findBySlugInTeam(params: { slug: string; teamId: string }): Promise<Project | null>;
 }
 
 export class NullProjectRepository implements ProjectRepository {
@@ -73,5 +107,29 @@ export class NullProjectRepository implements ProjectRepository {
     limit?: number;
   }): Promise<SearchProjectsResult[]> {
     return [];
+  }
+
+  async create(_data: CreateProjectInput): Promise<Project> {
+    throw new Error("NullProjectRepository.create not implemented");
+  }
+
+  async update(_params: { id: string; organizationId: string; data: UpdateProjectInput }): Promise<Project | null> {
+    return null;
+  }
+
+  async archive(_params: { id: string; organizationId: string }): Promise<Project | null> {
+    return null;
+  }
+
+  async findAllByOrganization(_params: {
+    organizationId: string;
+    page: number;
+    limit: number;
+  }): Promise<PaginatedResult<Project>> {
+    return { data: [], pagination: { page: 1, limit: 50, total: 0 } };
+  }
+
+  async findBySlugInTeam(_params: { slug: string; teamId: string }): Promise<Project | null> {
+    return null;
   }
 }

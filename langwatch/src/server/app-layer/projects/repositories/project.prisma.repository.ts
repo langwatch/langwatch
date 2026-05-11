@@ -1,10 +1,13 @@
 import type { PrismaClient, Project } from "@prisma/client";
 import type {
+  CreateProjectInput,
+  PaginatedResult,
   PresenceConfig,
   ProjectRepository,
   ProjectWithOrgAdmin,
   ProjectWithTeam,
   SearchProjectsResult,
+  UpdateProjectInput,
   UpdateProjectMetadataInput,
 } from "./project.repository";
 
@@ -102,5 +105,76 @@ export class PrismaProjectRepository implements ProjectRepository {
       select: { id: true, name: true, slug: true },
       take: limit,
     });
+  }
+
+  async create(data: CreateProjectInput): Promise<Project> {
+    return this.prisma.project.create({ data });
+  }
+
+  async update({
+    id,
+    organizationId,
+    data,
+  }: {
+    id: string;
+    organizationId: string;
+    data: UpdateProjectInput;
+  }): Promise<Project | null> {
+    const project = await this.prisma.project.findFirst({
+      where: { id, archivedAt: null, team: { organizationId } },
+    });
+    if (!project) return null;
+
+    return this.prisma.project.update({ where: { id }, data });
+  }
+
+  async archive({
+    id,
+    organizationId,
+  }: {
+    id: string;
+    organizationId: string;
+  }): Promise<Project | null> {
+    const project = await this.prisma.project.findFirst({
+      where: { id, archivedAt: null, team: { organizationId } },
+    });
+    if (!project) return null;
+
+    return this.prisma.project.update({
+      where: { id },
+      data: { archivedAt: new Date() },
+    });
+  }
+
+  async findAllByOrganization({
+    organizationId,
+    page,
+    limit,
+  }: {
+    organizationId: string;
+    page: number;
+    limit: number;
+  }): Promise<PaginatedResult<Project>> {
+    const where = { archivedAt: null, team: { organizationId } };
+    const [data, total] = await Promise.all([
+      this.prisma.project.findMany({
+        where,
+        skip: (page - 1) * limit,
+        take: limit,
+        orderBy: { createdAt: "desc" },
+      }),
+      this.prisma.project.count({ where }),
+    ]);
+    return { data, pagination: { page, limit, total } };
+  }
+
+  async findBySlugInTeam({
+    slug,
+    teamId,
+  }: {
+    slug: string;
+    teamId: string;
+  }): Promise<Project | null> {
+    return this.prisma.project.findFirst({ where: { slug, teamId } });
   }
 }

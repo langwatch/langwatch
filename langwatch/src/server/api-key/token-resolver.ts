@@ -20,6 +20,17 @@ export type ResolvedToken =
     };
 
 /**
+ * Org-level API key resolution — no project context required.
+ * Used by endpoints that operate at the organization level (e.g. project creation).
+ */
+export type OrgResolvedToken = {
+  type: "apiKey-org";
+  apiKeyId: string;
+  userId: string | null;
+  organizationId: string;
+};
+
+/**
  * Strategy-based token resolver. Routes tokens to the correct verification
  * path based on prefix and structure:
  *   - pat-lw-* → API key lookup (old PAT format, backward compat)
@@ -107,6 +118,29 @@ export class TokenResolver {
       userId: apiKey.userId,
       organizationId: apiKey.organizationId,
       project,
+    };
+  }
+
+  /**
+   * Resolves an API key to organization-level context without requiring a project.
+   * Returns null when the token is invalid or not an API key.
+   */
+  async resolveOrgOnly({
+    token,
+  }: {
+    token: string;
+  }): Promise<OrgResolvedToken | null> {
+    const tokenType = getTokenType(token);
+    if (tokenType !== "apiKey") return null;
+
+    const apiKey = await this.apiKeyService.verify({ token });
+    if (!apiKey) return null;
+
+    return {
+      type: "apiKey-org",
+      apiKeyId: apiKey.id,
+      userId: apiKey.userId,
+      organizationId: apiKey.organizationId,
     };
   }
 
