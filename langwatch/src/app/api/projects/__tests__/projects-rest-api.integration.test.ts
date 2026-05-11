@@ -83,6 +83,14 @@ describe("Feature: Projects REST API", () => {
       },
     });
 
+    await prisma.teamUser.create({
+      data: {
+        userId,
+        teamId: testTeam.id,
+        role: TeamUserRole.ADMIN,
+      },
+    });
+
     const patService = PatService.create(prisma);
     const created = await patService.create({
       name: `projects-pat-${nanoid(6)}`,
@@ -90,7 +98,7 @@ describe("Feature: Projects REST API", () => {
       organizationId: testOrganization.id,
       bindings: [
         {
-          role: TeamUserRole.ADMIN,
+          role: TeamUserRole.MEMBER,
           scopeType: RoleBindingScopeType.ORGANIZATION,
           scopeId: testOrganization.id,
         },
@@ -124,7 +132,7 @@ describe("Feature: Projects REST API", () => {
       where: { organizationId: testOrganization.id },
     }).catch(() => {});
     await prisma.teamUser.deleteMany({
-      where: { teamId: testTeam.id },
+      where: { userId },
     }).catch(() => {});
     await prisma.organizationUser.deleteMany({
       where: { organizationId: testOrganization.id },
