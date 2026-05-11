@@ -4,10 +4,11 @@ import {
   Button,
   HStack,
   IconButton,
-  Input,
   Spinner,
   Text,
+  Textarea,
   VStack,
+  chakra,
 } from "@chakra-ui/react";
 import { DefaultChatTransport, type UIMessage } from "ai";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -16,7 +17,6 @@ import {
   LuCheck,
   LuPlus,
   LuSend,
-  LuSparkles,
   LuSquare,
   LuTrash2,
   LuX,
@@ -31,22 +31,32 @@ import {
   type LangyMessageRecord,
 } from "./useLangyConversations";
 
-const DRAWER_WIDTH = 420;
-const HANDLE_WIDTH = 26;
+const PANEL_WIDTH = 380;
 const PANEL_GUTTER = 16;
+const PILL_WIDTH = 30;
 
-/**
- * Total horizontal space the Langy panel occupies when docked open
- * (panel width + the right-side gutter). Page layouts can use this
- * to shift content out of the way with a matching transition.
- */
-export const LANGY_DOCKED_OFFSET = DRAWER_WIDTH + PANEL_GUTTER;
-export const LANGY_TRANSITION = "360ms cubic-bezier(0.32, 0.72, 0, 1)";
+export const LANGY_DOCKED_OFFSET = PANEL_WIDTH + PANEL_GUTTER;
+export const LANGY_TRANSITION = "240ms cubic-bezier(0.32, 0.72, 0, 1)";
 
-const SAMPLE_PROMPTS = [
-  "Summarize my current experiment",
-  "Which rows are failing and why?",
-  "Suggest an evaluator for measuring RAG hallucinations",
+const BRAND = {
+  primary: "#ea580c",
+  hover: "#c2410c",
+  bg50: "#fff7ed",
+  bg100: "#ffedd5",
+  border: "#fed7aa",
+  inverse: "#1c1917",
+  gradient: "linear-gradient(135deg, #fb923c 0%, #f97316 50%, #ea580c 100%)",
+  tileGradient: "linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%)",
+  shadow: "0 6px 18px -4px rgba(234, 88, 12, 0.35)",
+  shadowSoft: "0 4px 12px -4px rgba(234, 88, 12, 0.25)",
+} as const;
+
+const SUGGESTION_CHIPS = [
+  "Summarize my experiment",
+  "Find failing traces",
+  "Suggest an evaluator",
+  "Compare two runs",
+  "Explain a low score",
 ];
 
 export interface LangyProposal {
@@ -59,11 +69,8 @@ export interface LangyProposal {
 }
 
 export type AppliedOutcome = {
-  /** Label for the "open" affordance. Defaults to "Open". */
   label?: string;
-  /** If provided, clicking the applied card triggers this (e.g. openDrawer). */
   onOpen?: () => void;
-  /** Fallback link target if no onOpen is provided. */
   href?: string;
 } | void;
 
@@ -75,11 +82,6 @@ export type ProposalHandlers = Record<
 interface LangyDrawerProps {
   proposalHandlers?: ProposalHandlers;
   experimentSlug?: string;
-  /**
-   * Controlled open state. When provided, the parent owns visibility —
-   * which is what enables the surrounding layout to shift in lockstep.
-   * If omitted, the drawer manages its own state (overlay-style).
-   */
   isOpen?: boolean;
   onOpenChange?: (open: boolean) => void;
 }
@@ -111,6 +113,57 @@ export function LangyDrawer({
   );
 }
 
+function GradientSparkle({ size = 16 }: { size?: number }) {
+  const id = `langy-sparkle-${size}`;
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden>
+      <defs>
+        <linearGradient id={id} x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="#fbbf24" />
+          <stop offset="60%" stopColor="#f97316" />
+          <stop offset="100%" stopColor="#c2410c" />
+        </linearGradient>
+      </defs>
+      <path
+        d="M12 2.5l1.85 5.4 5.4 1.85-5.4 1.85L12 17l-1.85-5.4-5.4-1.85 5.4-1.85L12 2.5z"
+        fill={`url(#${id})`}
+      />
+      <path
+        d="M19 14l.85 2.15L22 17l-2.15.85L19 20l-.85-2.15L16 17l2.15-.85L19 14z"
+        fill={`url(#${id})`}
+        opacity={0.75}
+      />
+    </svg>
+  );
+}
+
+function SparkleTile({
+  size,
+  sparkleSize,
+}: {
+  size: number;
+  sparkleSize: number;
+}) {
+  return (
+    <Box
+      width={`${size}px`}
+      height={`${size}px`}
+      borderRadius={size >= 48 ? "18px" : "8px"}
+      background={BRAND.tileGradient}
+      borderWidth="1px"
+      borderColor={BRAND.border}
+      display="grid"
+      placeItems="center"
+      flexShrink={0}
+      boxShadow={
+        size >= 48 ? "0 6px 16px -8px rgba(234, 88, 12, 0.4)" : undefined
+      }
+    >
+      <GradientSparkle size={sparkleSize} />
+    </Box>
+  );
+}
+
 function LangyHandle({
   isOpen,
   onToggle,
@@ -118,51 +171,48 @@ function LangyHandle({
   isOpen: boolean;
   onToggle: () => void;
 }) {
+  const [hover, setHover] = useState(false);
   return (
-    <Box
-      as="button"
+    <chakra.button
+      type="button"
       onClick={onToggle}
-      aria-label={isOpen ? "Close Langy" : "Open Langy"}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      aria-label={isOpen ? "Close Langy" : "Open Langy assistant"}
       position="fixed"
-      right={isOpen ? `${DRAWER_WIDTH + PANEL_GUTTER / 2}px` : 0}
+      right={isOpen ? `${PANEL_WIDTH + PANEL_GUTTER + 4}px` : 0}
       top="50%"
-      transform="translateY(-50%)"
-      width={`${HANDLE_WIDTH}px`}
-      height="84px"
+      width={`${PILL_WIDTH}px`}
+      paddingY="14px"
       zIndex={1600}
       cursor="pointer"
-      borderTopLeftRadius="lg"
-      borderBottomLeftRadius="lg"
-      background="bg.surface/80"
-      backdropFilter="blur(25px)"
+      borderTopLeftRadius="999px"
+      borderBottomLeftRadius="999px"
+      background={BRAND.tileGradient}
       borderWidth="1px"
-      borderColor="border.emphasized"
+      borderColor={BRAND.border}
       borderRightWidth={0}
-      boxShadow="sm"
-      color={isOpen ? "blue.fg" : "fg.muted"}
-      transition={`right ${LANGY_TRANSITION}, transform 180ms ease, color 180ms ease, background 180ms ease`}
-      _hover={{
-        transform: "translate(-2px, -50%)",
-        color: "blue.fg",
-        background: "bg.panel/90",
-      }}
+      color={BRAND.primary}
+      boxShadow={hover ? BRAND.shadow : BRAND.shadowSoft}
+      transform={hover ? "translate(-2px, -50%)" : "translateY(-50%)"}
+      transition={`right ${LANGY_TRANSITION}, transform 180ms ease, box-shadow 180ms ease`}
     >
-      <VStack gap={1.5} height="full" justify="center">
-        <LuSparkles size={14} />
+      <VStack gap={2} align="center" justify="center">
+        <GradientSparkle size={14} />
         <Text
-          fontSize="10px"
+          fontSize="11px"
           fontWeight="600"
-          letterSpacing="0.12em"
+          letterSpacing="1.4px"
+          color={BRAND.primary}
           style={{
             writingMode: "vertical-rl",
             textOrientation: "mixed",
-            transform: "rotate(180deg)",
           }}
         >
           LANGY
         </Text>
       </VStack>
-    </Box>
+    </chakra.button>
   );
 }
 
@@ -182,10 +232,7 @@ function LangyPanel({
 
   const [input, setInput] = useState("");
   const [appliedOutcomes, setAppliedOutcomes] = useState<
-    Record<
-      string,
-      { href?: string; label?: string; onOpen?: () => void }
-    >
+    Record<string, { href?: string; label?: string; onOpen?: () => void }>
   >({});
   const [discardedProposals, setDiscardedProposals] = useState<Set<string>>(
     new Set(),
@@ -257,6 +304,7 @@ function LangyPanel({
   }, [messages, status]);
 
   const isBusy = status === "submitted" || status === "streaming";
+  const isEmpty = messages.length === 0;
 
   const send = async (text: string) => {
     if (!text.trim() || !projectId || isBusy) return;
@@ -265,6 +313,14 @@ function LangyPanel({
       { role: "user", parts: [{ type: "text", text }] },
       { body: { projectId, experimentSlug } },
     );
+  };
+
+  const handleNewChat = () => {
+    startNewConversation();
+  };
+
+  const handleSelectConversation = (id: string) => {
+    void selectConversation(id);
   };
 
   const applyProposal = async (
@@ -322,45 +378,62 @@ function LangyPanel({
     setDiscardedProposals((prev) => new Set(prev).add(proposalId));
   };
 
+  const subtitle = experimentSlug
+    ? `On: ${experimentSlug}`
+    : isEmpty
+      ? "Your AI copilot"
+      : "Working in this project";
+
   return (
     <Box
       position="fixed"
       top={2}
       right={2}
       bottom={2}
-      width={`${DRAWER_WIDTH}px`}
+      width={`${PANEL_WIDTH}px`}
       zIndex={1500}
-      borderRadius="lg"
-      background="bg.surface/85"
-      backdropFilter="blur(28px) saturate(140%)"
+      borderRadius="14px"
+      background="bg.surface"
       borderWidth="1px"
-      borderColor="border.emphasized"
-      boxShadow="0 24px 60px -20px rgba(15, 23, 42, 0.35), 0 8px 20px -8px rgba(15, 23, 42, 0.2)"
+      borderColor="border.muted"
+      boxShadow="0 24px 48px -16px rgba(0, 0, 0, 0.18), 0 2px 6px rgba(0, 0, 0, 0.06)"
+      overflow="hidden"
       transition={`transform ${LANGY_TRANSITION}, opacity 220ms ease`}
       transform={
         isOpen
           ? "translateX(0)"
-          : `translateX(calc(${DRAWER_WIDTH}px + ${PANEL_GUTTER}px))`
+          : `translateX(calc(${PANEL_WIDTH}px + ${PANEL_GUTTER}px))`
       }
       opacity={isOpen ? 1 : 0}
       pointerEvents={isOpen ? "auto" : "none"}
       aria-hidden={!isOpen}
+      role="complementary"
+      aria-label="Langy assistant"
     >
       <VStack gap={0} align="stretch" height="full">
-        <PanelHeader onClose={onClose} />
-        <LangyRecentList
+        <PanelHeader
+          subtitle={subtitle}
+          onNewChat={handleNewChat}
+          onClose={onClose}
+        />
+        <RecentList
           conversations={conversations}
           isLoading={isLoadingConversations}
           hasError={hasListError}
-          onSelect={(id) => void selectConversation(id)}
-          onStartNew={startNewConversation}
+          onSelect={handleSelectConversation}
           onDelete={(id) => void removeConversation(id)}
         />
-        <Box ref={scrollRef} flex={1} overflowY="auto" paddingX={4} paddingY={4}>
-          {messages.length === 0 ? (
+        <Box ref={scrollRef} flex={1} overflowY="auto" aria-live="polite">
+          {isEmpty ? (
             <EmptyState onPick={(prompt) => void send(prompt)} />
           ) : (
-            <VStack gap={3} align="stretch">
+            <VStack
+              gap="14px"
+              align="stretch"
+              paddingX="18px"
+              paddingTop="18px"
+              paddingBottom="12px"
+            >
               {messages.map((message) => (
                 <MessageContent
                   key={message.id}
@@ -390,103 +463,169 @@ function LangyPanel({
   );
 }
 
-function LangyRecentList({
+function PanelHeader({
+  subtitle,
+  onNewChat,
+  onClose,
+}: {
+  subtitle: string;
+  onNewChat: () => void;
+  onClose: () => void;
+}) {
+  return (
+    <HStack
+      paddingY="14px"
+      paddingLeft="18px"
+      paddingRight="14px"
+      borderBottomWidth="1px"
+      borderColor="border.muted"
+      gap={2.5}
+      flexShrink={0}
+    >
+      <SparkleTile size={28} sparkleSize={15} />
+      <VStack align="start" gap={0} flex={1} minWidth={0}>
+        <Text fontSize="14px" fontWeight="600" lineHeight="1.2" color="fg">
+          Langy
+        </Text>
+        <Text
+          fontSize="11.5px"
+          color="fg.muted"
+          lineHeight="1.3"
+          marginTop="1px"
+          truncate
+        >
+          {subtitle}
+        </Text>
+      </VStack>
+      <HeaderIconButton aria-label="New chat" onClick={onNewChat}>
+        <LuPlus size={17} />
+      </HeaderIconButton>
+      <HeaderIconButton aria-label="Close Langy" onClick={onClose}>
+        <LuX size={17} />
+      </HeaderIconButton>
+    </HStack>
+  );
+}
+
+function HeaderIconButton({
+  children,
+  ...rest
+}: {
+  children: React.ReactNode;
+} & React.ButtonHTMLAttributes<HTMLButtonElement>) {
+  return (
+    <chakra.button
+      type="button"
+      width="30px"
+      height="30px"
+      borderRadius="8px"
+      borderWidth={0}
+      background="transparent"
+      color="fg.muted"
+      cursor="pointer"
+      display="grid"
+      placeItems="center"
+      transition="background 120ms ease, color 120ms ease"
+      _hover={{ background: "bg.subtle", color: "fg" }}
+      {...rest}
+    >
+      {children}
+    </chakra.button>
+  );
+}
+
+function RecentList({
   conversations,
   isLoading,
   hasError,
   onSelect,
-  onStartNew,
   onDelete,
 }: {
   conversations: LangyConversationSummary[];
   isLoading: boolean;
   hasError: boolean;
   onSelect: (id: string) => void;
-  onStartNew: () => void;
   onDelete: (id: string) => void;
 }) {
-  if (isLoading) {
-    return (
-      <HStack
-        paddingX={4}
-        paddingY={2}
-        borderBottomWidth="1px"
-        borderColor="border.muted"
-        gap={2}
-        aria-label="Loading recent conversations"
-      >
-        <Spinner size="xs" />
-        <Text fontSize="xs" color="fg.muted">
-          Loading recent…
-        </Text>
-      </HStack>
-    );
-  }
-
   if (hasError) return null;
+  // Keep the empty state pristine: hide the section entirely once we know
+  // there are no conversations to show. Still render while loading so the
+  // user sees their history is being fetched.
+  if (!isLoading && conversations.length === 0) return null;
 
   return (
     <VStack
       align="stretch"
       gap={1}
-      paddingX={3}
-      paddingY={2}
+      paddingX="14px"
+      paddingY="10px"
       borderBottomWidth="1px"
       borderColor="border.muted"
+      background="bg.subtle"
+      flexShrink={0}
+      maxHeight="220px"
+      overflowY="auto"
     >
-      <HStack justify="space-between" paddingX={1}>
-        <Text fontSize="2xs" fontWeight="600" color="fg.muted" letterSpacing="0.08em">
-          RECENT
-        </Text>
-        <Button
-          size="2xs"
-          variant="ghost"
-          onClick={onStartNew}
-          aria-label="New chat"
+      <Text
+        fontSize="10.5px"
+        fontWeight="600"
+        letterSpacing="0.5px"
+        color="fg.muted"
+        textTransform="uppercase"
+        paddingX="4px"
+        paddingBottom="4px"
+      >
+        Recent chats
+      </Text>
+      {isLoading ? (
+        <HStack
+          gap={2}
+          paddingX="4px"
+          paddingY="6px"
+          aria-label="Loading recent conversations"
         >
-          <LuPlus size={12} />
-          <Text fontSize="xs">New chat</Text>
-        </Button>
-      </HStack>
-      {conversations.length === 0 ? (
-        <Text fontSize="xs" color="fg.muted" paddingX={2} paddingY={1}>
-          No conversations yet.
-        </Text>
+          <Spinner size="xs" />
+          <Text fontSize="xs" color="fg.muted">
+            Loading…
+          </Text>
+        </HStack>
       ) : (
-        <Box as="ul" aria-label="Recent conversations" listStyleType="none" margin={0} padding={0}>
+        <Box
+          as="ul"
+          aria-label="Recent conversations"
+          listStyleType="none"
+          margin={0}
+          padding={0}
+        >
           {conversations.map((conv) => (
-            <Box
-              as="li"
-              key={conv.id}
-              display="flex"
-              alignItems="center"
-              gap={1}
-            >
-              <Box
-                as="button"
+            <HStack key={conv.id} as="li" gap={1}>
+              <chakra.button
                 type="button"
                 onClick={() => onSelect(conv.id)}
                 flex={1}
                 textAlign="left"
-                paddingX={2}
-                paddingY="6px"
-                borderRadius="md"
-                fontSize="xs"
+                paddingX="8px"
+                paddingY="7px"
+                borderRadius="6px"
+                fontSize="12.5px"
                 color="fg"
                 cursor="pointer"
-                _hover={{ background: "bg.subtle" }}
+                truncate
+                background="transparent"
+                borderWidth={0}
+                _hover={{ background: "bg.surface" }}
               >
                 {conv.title ?? "Untitled"}
-              </Box>
+              </chakra.button>
               <IconButton
                 size="2xs"
                 variant="ghost"
-                aria-label="Delete"
+                aria-label="Delete conversation"
                 onClick={() => onDelete(conv.id)}
               >
                 <LuTrash2 size={12} />
               </IconButton>
-            </Box>
+            </HStack>
           ))}
         </Box>
       )}
@@ -494,45 +633,80 @@ function LangyRecentList({
   );
 }
 
-function PanelHeader({ onClose }: { onClose: () => void }) {
+function EmptyState({ onPick }: { onPick: (prompt: string) => void }) {
   return (
-    <HStack
-      paddingX={4}
-      paddingY={3}
-      borderBottomWidth="1px"
-      borderColor="border.muted"
-      gap={3}
+    <VStack
+      gap={0}
+      align="center"
+      justify="center"
+      flex={1}
+      paddingX="24px"
+      paddingY="32px"
+      height="full"
     >
-      <Box
-        width="28px"
-        height="28px"
-        borderRadius="md"
-        display="flex"
-        alignItems="center"
-        justifyContent="center"
-        background="blue.subtle"
-        color="blue.fg"
+      <SparkleTile size={60} sparkleSize={28} />
+      <Text
+        fontSize="20px"
+        fontWeight="600"
+        letterSpacing="-0.3px"
+        color="fg"
+        textAlign="center"
+        marginTop="18px"
       >
-        <LuSparkles size={14} />
-      </Box>
-      <VStack align="start" gap={0}>
-        <Text fontSize="sm" fontWeight="600" color="fg">
-          Langy
-        </Text>
-        <Text fontSize="xs" color="fg.muted">
-          Propose &amp; apply
-        </Text>
-      </VStack>
-      <Box flex={1} />
-      <IconButton
-        size="xs"
-        variant="ghost"
-        aria-label="Close Langy"
-        onClick={onClose}
+        How can I help?
+      </Text>
+      <Text
+        fontSize="13px"
+        color="fg.muted"
+        lineHeight="1.5"
+        textAlign="center"
+        maxWidth="280px"
+        marginTop="8px"
+        marginBottom="22px"
       >
-        <LuX size={14} />
-      </IconButton>
-    </HStack>
+        Ask in plain language. I&apos;ll read your traces and evals, then
+        propose changes you can apply.
+      </Text>
+      <HStack gap="6px" flexWrap="wrap" justify="center" maxWidth="320px">
+        {SUGGESTION_CHIPS.map((chip) => (
+          <Chip key={chip} onClick={() => onPick(chip)}>
+            {chip}
+          </Chip>
+        ))}
+      </HStack>
+    </VStack>
+  );
+}
+
+function Chip({
+  children,
+  onClick,
+}: {
+  children: React.ReactNode;
+  onClick: () => void;
+}) {
+  const [hover, setHover] = useState(false);
+  return (
+    <chakra.button
+      type="button"
+      onClick={onClick}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      paddingX="12px"
+      paddingY="7px"
+      borderRadius="999px"
+      borderWidth="1px"
+      borderColor={hover ? BRAND.primary : "border.muted"}
+      background={hover ? BRAND.bg50 : "bg.surface"}
+      color={hover ? BRAND.primary : "fg.muted"}
+      fontSize="12.5px"
+      fontWeight={500}
+      cursor="pointer"
+      transition="all 120ms ease"
+      whiteSpace="nowrap"
+    >
+      {children}
+    </chakra.button>
   );
 }
 
@@ -547,19 +721,20 @@ function ThinkingIndicator({ messages }: { messages: UIMessage[] }) {
     : "thinking";
 
   return (
-    <HStack
-      color="fg.muted"
-      fontSize="xs"
-      paddingX={3}
-      paddingY={2}
-      borderRadius="md"
-      background="bg.subtle"
-      borderWidth="1px"
-      borderColor="border.muted"
-      alignSelf="flex-start"
-    >
-      <Spinner size="xs" colorPalette="blue" />
-      <Text>Langy is {label}…</Text>
+    <HStack gap={2} alignSelf="flex-start" color="fg.muted">
+      <SparkleTile size={24} sparkleSize={12} />
+      <HStack
+        gap={2}
+        paddingX="10px"
+        paddingY="6px"
+        borderRadius="10px"
+        background="bg.subtle"
+        borderWidth="1px"
+        borderColor="border.muted"
+      >
+        <Spinner size="xs" colorPalette="orange" />
+        <Text fontSize="12px">Langy is {label}…</Text>
+      </HStack>
     </HStack>
   );
 }
@@ -581,103 +756,128 @@ function Composer({
   disabled: boolean;
   canSend: boolean;
 }) {
+  const filled = input.trim().length > 0;
   return (
     <Box
-      paddingX={3}
-      paddingY={3}
+      paddingX="14px"
+      paddingTop="12px"
+      paddingBottom="14px"
       borderTopWidth="1px"
       borderColor="border.muted"
+      background="bg.surface"
+      flexShrink={0}
     >
-      <HStack gap={2}>
-        <Input
-          placeholder={
-            isBusy ? "Langy is working…" : "Ask Langy or describe what you want…"
-          }
+      <HStack
+        gap={2}
+        paddingY="6px"
+        paddingLeft="14px"
+        paddingRight="6px"
+        borderRadius="999px"
+        borderWidth="1px"
+        borderColor={filled ? BRAND.primary : "border.emphasized"}
+        background="bg.surface"
+        boxShadow={filled ? `0 0 0 3px ${BRAND.bg50}` : undefined}
+        transition="border-color 150ms ease, box-shadow 150ms ease"
+        align="center"
+      >
+        <Textarea
           value={input}
           onChange={(e) => onInputChange(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) {
               e.preventDefault();
-              if (!isBusy) onSend();
+              if (!isBusy && canSend) onSend();
             }
           }}
+          placeholder={
+            isBusy ? "Langy is working…" : "Ask Langy or describe what you want…"
+          }
           disabled={disabled || isBusy}
-          size="sm"
-          variant="outline"
-          borderColor="border.emphasized"
-          background="bg.panel"
+          rows={1}
+          autoresize
+          maxHeight="120px"
+          minHeight="22px"
+          padding={0}
+          border="none"
+          background="transparent"
+          fontSize="13.5px"
+          lineHeight="1.45"
+          color="fg"
+          resize="none"
+          _focus={{ outline: "none", boxShadow: "none" }}
+          _focusVisible={{ outline: "none", boxShadow: "none" }}
         />
         {isBusy ? (
-          <IconButton
-            size="sm"
-            colorPalette="red"
-            variant="outline"
+          <SendButton
             aria-label="Stop"
             onClick={onStop}
+            background="var(--chakra-colors-red-solid)"
+            color="white"
+            shadow={false}
+            cursor="pointer"
           >
             <LuSquare size={12} />
-          </IconButton>
+          </SendButton>
         ) : (
-          <IconButton
-            size="sm"
-            colorPalette="blue"
+          <SendButton
             aria-label="Send"
             onClick={onSend}
             disabled={!canSend}
+            background={canSend ? BRAND.gradient : "#f5f5f4"}
+            color={canSend ? "white" : "var(--chakra-colors-fg-muted)"}
+            shadow={canSend}
+            cursor={canSend ? "pointer" : "default"}
           >
             <LuSend size={14} />
-          </IconButton>
+          </SendButton>
         )}
       </HStack>
+      <Text
+        marginTop="8px"
+        fontSize="10.5px"
+        color="fg.muted"
+        textAlign="center"
+        letterSpacing="0.1px"
+      >
+        Langy proposes — you review and apply.
+      </Text>
     </Box>
   );
 }
 
-function EmptyState({ onPick }: { onPick: (prompt: string) => void }) {
+function SendButton({
+  children,
+  background,
+  color,
+  shadow,
+  cursor,
+  ...rest
+}: {
+  children: React.ReactNode;
+  background: string;
+  color: string;
+  shadow: boolean;
+  cursor: string;
+} & React.ButtonHTMLAttributes<HTMLButtonElement>) {
   return (
-    <VStack align="stretch" gap={3} paddingTop={2}>
-      <VStack align="start" gap={1}>
-        <Text fontSize="sm" fontWeight="600" color="fg">
-          Hey, I&apos;m Langy.
-        </Text>
-        <Text fontSize="xs" color="fg.muted" lineHeight="1.55">
-          I can propose evaluators, help you pick the right one for your
-          experiment, and (soon) touch prompts and datasets. Try:
-        </Text>
-      </VStack>
-      <VStack align="stretch" gap={2}>
-        {SAMPLE_PROMPTS.map((prompt) => (
-          <Box
-            key={prompt}
-            as="button"
-            textAlign="left"
-            paddingX={3}
-            paddingY="10px"
-            borderRadius="md"
-            cursor="pointer"
-            background="bg.panel"
-            borderWidth="1px"
-            borderColor="border.muted"
-            boxShadow="2xs"
-            transition="background 150ms ease, border-color 150ms ease"
-            _hover={{
-              background: "bg.subtle",
-              borderColor: "border.emphasized",
-            }}
-            onClick={() => onPick(prompt)}
-          >
-            <HStack gap={2} align="flex-start">
-              <Box color="blue.fg" paddingTop="2px">
-                <LuArrowRight size={12} />
-              </Box>
-              <Text fontSize="xs" color="fg" lineHeight="1.5">
-                {prompt}
-              </Text>
-            </HStack>
-          </Box>
-        ))}
-      </VStack>
-    </VStack>
+    <chakra.button
+      type="button"
+      width="32px"
+      height="32px"
+      borderRadius="999px"
+      borderWidth={0}
+      background={background}
+      color={color}
+      cursor={cursor}
+      display="grid"
+      placeItems="center"
+      flexShrink={0}
+      boxShadow={shadow ? BRAND.shadow : undefined}
+      transition="background 150ms ease, box-shadow 150ms ease"
+      {...rest}
+    >
+      {children}
+    </chakra.button>
   );
 }
 
@@ -700,74 +900,75 @@ function MessageContent({
   onDiscard: (proposalId: string) => void;
 }) {
   const isUser = message.role === "user";
-  const textParts = message.parts
-    .filter((part): part is { type: "text"; text: string } => part.type === "text")
+  const text = message.parts
+    .filter(
+      (part): part is { type: "text"; text: string } => part.type === "text",
+    )
     .map((part) => part.text)
     .join("");
 
   const proposals = extractProposals(message);
+  if (!text && proposals.length === 0) return null;
 
-  if (!textParts && proposals.length === 0) return null;
+  if (isUser) {
+    return (
+      <Box alignSelf="flex-end" maxWidth="85%">
+        <Box
+          paddingX="13px"
+          paddingY="9px"
+          background={BRAND.inverse}
+          color="white"
+          borderRadius="14px"
+          borderBottomRightRadius="4px"
+          fontSize="13px"
+          lineHeight="1.45"
+          whiteSpace="pre-wrap"
+        >
+          {text}
+        </Box>
+      </Box>
+    );
+  }
 
   return (
-    <VStack align="stretch" gap={2} width="full">
-      {textParts && (
-        <Box
-          width="full"
-          display="flex"
-          justifyContent={isUser ? "flex-end" : "flex-start"}
-        >
+    <HStack gap="9px" align="flex-start" width="full">
+      <SparkleTile size={24} sparkleSize={12} />
+      <VStack align="stretch" gap="10px" flex={1} minWidth={0}>
+        {text && (
           <Box
-            maxWidth="88%"
-            paddingX={3}
-            paddingY={2}
-            borderRadius="md"
-            borderTopRightRadius={isUser ? "sm" : "md"}
-            borderTopLeftRadius={isUser ? "md" : "sm"}
-            background={isUser ? "blue.solid" : "bg.panel"}
-            color={isUser ? "white" : "fg"}
-            borderWidth={isUser ? 0 : "1px"}
-            borderColor="border.muted"
-            boxShadow="2xs"
+            fontSize="13px"
+            color="fg"
+            lineHeight="1.55"
+            css={{
+              "& p": { margin: 0 },
+              "& p + p": { marginTop: "6px" },
+              "& ul, & ol": { paddingLeft: "18px", margin: "4px 0" },
+              "& code": {
+                fontSize: "12px",
+                padding: "1px 5px",
+                borderRadius: "4px",
+                background: "var(--chakra-colors-bg-subtle)",
+                fontFamily:
+                  "ui-monospace, SFMono-Regular, Menlo, monospace",
+              },
+            }}
           >
-            {isUser ? (
-              <Text fontSize="sm" whiteSpace="pre-wrap" lineHeight="1.5">
-                {textParts}
-              </Text>
-            ) : (
-              <Box
-                fontSize="sm"
-                lineHeight="1.55"
-                css={{
-                  "& p": { margin: 0 },
-                  "& p + p": { marginTop: "6px" },
-                  "& ul, & ol": { paddingLeft: "18px", margin: "4px 0" },
-                  "& code": {
-                    fontSize: "12px",
-                    padding: "1px 5px",
-                    borderRadius: "4px",
-                    background: "bg.subtle",
-                  },
-                }}
-              >
-                <Markdown>{textParts}</Markdown>
-              </Box>
-            )}
+            <Markdown>{text}</Markdown>
           </Box>
-        </Box>
-      )}
-      {proposals.map(({ id, proposal }) => (
-        <ProposalCard
-          key={id}
-          proposal={proposal}
-          appliedOutcome={appliedOutcomes[id]}
-          isDiscarded={discardedProposals.has(id)}
-          isApplying={applyingProposals.has(id)}
-          onApply={() => void onApply(id, proposal)}
-          onDiscard={() => onDiscard(id)}
-        />
-      ))}
-    </VStack>
+        )}
+        {proposals.map(({ id, proposal }) => (
+          <ProposalCard
+            key={id}
+            proposal={proposal}
+            appliedOutcome={appliedOutcomes[id]}
+            isDiscarded={discardedProposals.has(id)}
+            isApplying={applyingProposals.has(id)}
+            onApply={() => void onApply(id, proposal)}
+            onDiscard={() => onDiscard(id)}
+          />
+        ))}
+      </VStack>
+    </HStack>
   );
 }
 
@@ -788,8 +989,12 @@ function ProposalCard({
 }) {
   const isApplied = !!appliedOutcome;
   const destructive = !!proposal.destructive;
-  const faded = isDiscarded;
-  const statusLabel = isApplied
+  const openHref = appliedOutcome?.href;
+  const onOpen = appliedOutcome?.onOpen;
+  const openLabel = appliedOutcome?.label ?? "Open";
+  const hasOpen = !!onOpen || !!openHref;
+
+  const overlineLabel = isApplied
     ? destructive
       ? "Done"
       : "Applied"
@@ -800,27 +1005,17 @@ function ProposalCard({
           ? "Deleting…"
           : "Applying…"
         : destructive
-          ? "Langy wants to delete"
-          : "Langy proposes";
-  const accentPalette = isApplied
-    ? destructive
-      ? "gray"
-      : "green"
-    : destructive
-      ? "red"
-      : "blue";
-  const borderTone = isApplied
-    ? destructive
-      ? "border.emphasized"
-      : "green.emphasized"
-    : destructive
-      ? "red.emphasized"
-      : "blue.emphasized";
-  const primaryButtonLabel = destructive ? "Delete" : "Apply";
-  const openHref = appliedOutcome?.href;
-  const onOpen = appliedOutcome?.onOpen;
-  const openLabel = appliedOutcome?.label ?? "Open";
-  const hasOpen = !!onOpen || !!openHref;
+          ? "Wants to delete"
+          : "Proposal";
+
+  const overlineColor =
+    destructive && !isApplied
+      ? "var(--chakra-colors-red-fg)"
+      : isApplied && !destructive
+        ? "var(--chakra-colors-green-fg)"
+        : isDiscarded
+          ? "var(--chakra-colors-fg-muted)"
+          : BRAND.primary;
 
   const triggerOpen = () => {
     if (onOpen) {
@@ -834,13 +1029,12 @@ function ProposalCard({
 
   return (
     <Box
-      padding={3}
-      borderRadius="lg"
-      background="bg.panel"
       borderWidth="1px"
-      borderColor={borderTone}
-      boxShadow="sm"
-      opacity={faded ? 0.75 : 1}
+      borderColor="border.muted"
+      borderRadius="12px"
+      padding="12px"
+      background="bg.subtle"
+      opacity={isDiscarded ? 0.65 : 1}
       cursor={hasOpen ? "pointer" : "default"}
       onClick={(e) => {
         if (!hasOpen) return;
@@ -849,89 +1043,103 @@ function ProposalCard({
         triggerOpen();
       }}
       transition="border-color 150ms ease, box-shadow 150ms ease"
-      _hover={
-        hasOpen
-          ? { borderColor: "green.fg", boxShadow: "md" }
-          : undefined
-      }
+      _hover={hasOpen ? { borderColor: "green.fg", boxShadow: "sm" } : undefined}
     >
-      <VStack align="stretch" gap={2}>
-        <HStack gap={2}>
-          <Box
-            width="20px"
-            height="20px"
-            borderRadius="sm"
+      <HStack
+        gap="6px"
+        marginBottom="8px"
+        fontSize="10.5px"
+        fontWeight="600"
+        letterSpacing="0.5px"
+        textTransform="uppercase"
+        color={overlineColor}
+      >
+        {isApplied && !destructive ? (
+          <LuCheck size={11} />
+        ) : (
+          <GradientSparkle size={11} />
+        )}
+        <Text>{overlineLabel}</Text>
+      </HStack>
+      <Text fontSize="13px" fontWeight="600" color="fg" marginBottom="2px">
+        {proposal.summary}
+      </Text>
+      {proposal.rationale && (
+        <Text
+          fontSize="12px"
+          color="fg.muted"
+          lineHeight="1.45"
+          marginBottom="12px"
+        >
+          {proposal.rationale}
+        </Text>
+      )}
+      {!isApplied && !isDiscarded && (
+        <HStack gap="6px" paddingTop={proposal.rationale ? "0px" : "10px"}>
+          <chakra.button
+            type="button"
+            flex={1}
+            paddingX="12px"
+            paddingY="8px"
+            borderRadius="8px"
+            borderWidth={0}
+            background={
+              destructive ? "var(--chakra-colors-red-solid)" : BRAND.gradient
+            }
+            color="white"
+            fontSize="12.5px"
+            fontWeight={500}
+            cursor={isApplying ? "default" : "pointer"}
+            opacity={isApplying ? 0.7 : 1}
             display="flex"
             alignItems="center"
             justifyContent="center"
-            background={`${accentPalette}.subtle`}
-            color={`${accentPalette}.fg`}
+            gap="5px"
+            boxShadow={destructive ? undefined : BRAND.shadow}
+            onClick={onApply}
+            disabled={isApplying}
           >
-            {isApplied ? <LuCheck size={12} /> : <LuSparkles size={12} />}
-          </Box>
-          <Text
-            fontSize="10px"
-            fontWeight="600"
-            letterSpacing="0.08em"
-            textTransform="uppercase"
-            color={`${accentPalette}.fg`}
+            <LuCheck size={12} />
+            {isApplying
+              ? destructive
+                ? "Deleting…"
+                : "Applying…"
+              : destructive
+                ? "Delete"
+                : "Apply"}
+          </chakra.button>
+          <Button
+            size="xs"
+            variant="outline"
+            onClick={onDiscard}
+            disabled={isApplying}
           >
-            {statusLabel}
-          </Text>
+            {destructive ? "Cancel" : "Discard"}
+          </Button>
         </HStack>
-        <Text fontSize="sm" fontWeight="600" color="fg">
-          {proposal.summary}
-        </Text>
-        {proposal.rationale && (
-          <Text fontSize="xs" color="fg.muted" lineHeight="1.5">
-            {proposal.rationale}
-          </Text>
-        )}
-        {!isApplied && !isDiscarded && (
-          <HStack gap={2} paddingTop={1}>
+      )}
+      {isApplied && hasOpen && (
+        <HStack paddingTop="10px">
+          {onOpen ? (
             <Button
               size="xs"
-              colorPalette={destructive ? "red" : "blue"}
-              onClick={onApply}
-              disabled={isApplying}
-              loading={isApplying}
+              variant="outline"
+              colorPalette="green"
+              onClick={triggerOpen}
             >
-              <LuCheck size={12} />
-              {primaryButtonLabel}
+              {openLabel}
+              <LuArrowRight size={12} />
             </Button>
-            <Button
-              size="xs"
-              variant="ghost"
-              onClick={onDiscard}
-              disabled={isApplying}
-            >
-              {destructive ? "Cancel" : "Discard"}
-            </Button>
-          </HStack>
-        )}
-        {isApplied && hasOpen && (
-          <HStack gap={2} paddingTop={1}>
-            {onOpen ? (
-              <Button
-                size="xs"
-                variant="outline"
-                colorPalette="green"
-                onClick={triggerOpen}
-              >
+          ) : openHref ? (
+            <Button size="xs" variant="outline" colorPalette="green" asChild>
+              <a href={openHref}>
                 {openLabel}
                 <LuArrowRight size={12} />
-              </Button>
-            ) : openHref ? (
-              <Button size="xs" variant="outline" colorPalette="green" asChild>
-                <a href={openHref}>
-                  {openLabel}
-                  <LuArrowRight size={12} />
-                </a>
-              </Button>
-            ) : null}
-          </HStack>
-        )}
-      </VStack>
+              </a>
+            </Button>
+          ) : null}
+        </HStack>
+      )}
     </Box>
   );
 }
