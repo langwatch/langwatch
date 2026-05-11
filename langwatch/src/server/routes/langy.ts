@@ -1234,7 +1234,11 @@ app.post("/langy/chat", async (c) => {
         const assistantMessages = response.messages.filter(
           (m) => m.role === "assistant" || m.role === "tool",
         );
-        const parts = assistantMessages.flatMap((m) => {
+        // Return type is annotated as `unknown[]` because the AI SDK content
+        // union (text/file/image/tool-call/…) doesn't unify with the literal
+        // text-shape we synthesise from string content. persistAssistantMessage
+        // takes `parts: unknown`, so we lose nothing by widening here.
+        const parts = assistantMessages.flatMap((m): unknown[] => {
           if (typeof m.content === "string") {
             return m.content
               ? [{ type: "text", text: m.content, role: m.role }]

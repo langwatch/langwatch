@@ -4,6 +4,27 @@ import { vi } from "vitest";
 import { TEST_PUBLIC_KEY } from "./ee/licensing/__tests__/fixtures/testKeys";
 dotenv.config({ path: ".env" });
 
+// Polyfill the Web Streams API for jsdom — Node 18+ exposes these via
+// `node:stream/web` but jsdom doesn't expose them as globals. Several
+// transitive deps (eventsource-parser via @ai-sdk/react, etc.) crash at
+// module-load with `ReferenceError: TransformStream is not defined`,
+// which then takes down every test that touches code importing them
+// (or that vitest coverage-instruments).
+import {
+  ReadableStream as NodeReadableStream,
+  TransformStream as NodeTransformStream,
+  WritableStream as NodeWritableStream,
+} from "node:stream/web";
+if (typeof globalThis.TransformStream === "undefined") {
+  globalThis.TransformStream = NodeTransformStream as unknown as typeof TransformStream;
+}
+if (typeof globalThis.ReadableStream === "undefined") {
+  globalThis.ReadableStream = NodeReadableStream as unknown as typeof ReadableStream;
+}
+if (typeof globalThis.WritableStream === "undefined") {
+  globalThis.WritableStream = NodeWritableStream as unknown as typeof WritableStream;
+}
+
 // Mock recharts to avoid ESM/CJS compatibility issues with @reduxjs/toolkit in vmThreads pool.
 // Tests don't need actual chart rendering - we're testing our logic, not recharts itself.
 vi.mock("recharts", () => {
