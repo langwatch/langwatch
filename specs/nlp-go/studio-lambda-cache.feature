@@ -22,19 +22,23 @@ Feature: getProjectLambdaArn — per-project ARN cache + single-flight
   # event-sourcing fold groups (e.g. projectDailySdkUsage/<date>:other:)
   # because workers were saturated on retry sleeps.
   #
-  # The fix has two parts, both in-process per pod:
+  # The fix has two layers:
   #
-  #   A. Single-flight: concurrent calls for the same projectId share one
-  #      in-flight Promise. Resolves once; rejects once; everyone sees the
-  #      same result. Eliminates the burst-amplification factor.
-  #
-  #   B. ARN cache: a successful resolution is memoized per projectId,
-  #      keyed by the current image_uri from LANGWATCH_NLP_LAMBDA_CONFIG.
-  #      TTL is short enough that a stale entry self-heals; the image_uri
-  #      portion of the key invalidates the cache automatically on deploy
-  #      (a new image_uri = a cache miss, which re-runs the update path).
+  #   A. ARN cache via TtlCache (Redis-backed, with per-pod memory
+  #      fallback when Redis is unavailable): a successful resolution is
+  #      memoized per projectId. The cached value carries the image_uri
+  #      it was resolved under, so a deploy (which bumps image_uri)
+  #      auto-invalidates: readers treat an image_uri mismatch as a miss
+  #      and re-run the UpdateFunctionCode path. Redis-backed means the
+  #      first miss anywhere in the fleet warms every other pod.
   #      Failures are NOT cached — a TooManyRequestsException must not
-  #      poison subsequent calls.
+  #      poison subsequent calls cluster-wide.
+  #
+  #   B. In-process single-flight (per pod): concurrent misses for the
+  #      same projectId share one in-flight Promise. The shared Redis
+  #      cache is great after the first writer lands, but a cold burst
+  #      on one pod can still race before that write completes; this
+  #      closes that per-pod window.
 
   Background:
     Given LANGWATCH_NLP_LAMBDA_CONFIG is set with image_uri "ecr/foo:v1"

@@ -28,15 +28,15 @@ describe("getProjectLambdaArn", () => {
     LastUpdateStatus: "Successful",
   };
 
-  beforeEach(() => {
+  beforeEach(async () => {
     setConfig("123456789012.dkr.ecr.us-east-1.amazonaws.com/test:latest");
-    clearLambdaArnCache();
+    await clearLambdaArnCache();
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     vi.restoreAllMocks();
     delete process.env.LANGWATCH_NLP_LAMBDA_CONFIG;
-    clearLambdaArnCache();
+    await clearLambdaArnCache();
   });
 
   describe("When race condition for creating Lambda", () => {

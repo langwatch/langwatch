@@ -12,6 +12,7 @@ import {
   UpdateFunctionCodeCommand,
 } from "@aws-sdk/client-lambda";
 import { env } from "../../../env.mjs";
+import { TtlCache } from "../../../server/utils/ttlCache";
 import { createLogger } from "../../../utils/logger/server";
 import { captureException } from "../../../utils/posthogErrorCapture";
 import type { StudioClientEvent } from "../../types/events";
@@ -327,41 +328,60 @@ const updateProjectLambdaImage = async (
   return response;
 };
 
-// Per-pod in-memory cache for resolved Lambda ARNs.
+// Cluster-wide ARN cache, plus per-pod single-flight.
 //
-// Why: getProjectLambdaArn() issues 2-N AWS Lambda control-plane calls
-// (GetFunction + poll loop) per invocation. Under a single tenant's event
-// burst, langwatch-workers fans this out across hundreds of concurrent
-// jobs, each hitting the same function name. AWS Lambda's GetFunction
-// quota is regional and shared across all pods, so one chatty project
-// can exhaust the quota and trigger CallerRateLimitExceeded for every
-// worker in the region — stalling unrelated fold/reactor groups behind
-// 4-12s SDK retry backoffs. See specs/nlp-go/studio-lambda-cache.feature.
+// Why this exists: getProjectLambdaArn() issues 2-N AWS Lambda control-plane
+// calls (GetFunction + poll loop) per invocation. Under a single tenant's
+// event burst, langwatch-workers fans this out across the pod's fastq slots
+// (GLOBAL_QUEUE_CONCURRENCY=100), each call hitting the same per-project
+// function. AWS Lambda's GetFunction quota is *regional* and shared across
+// every pod in the cluster, so one chatty project can exhaust it and trigger
+// CallerRateLimitExceeded for every worker in the region. Each retried call
+// then burns 4-12s of fastq budget against a 429, pinning all 100 slots and
+// stalling every other group on the pod — including unrelated fold groups
+// like projectDailySdkUsage/<date>:other:. See
+// specs/nlp-go/studio-lambda-cache.feature.
 //
-// The cache key includes the current image_uri from the config so a
-// deploy (which bumps image_uri) automatically invalidates: the next
-// call is a miss and re-runs the UpdateFunctionCode path. We do NOT
-// cache failures — a TooManyRequestsException must self-heal on the
-// next call.
+// Two layers:
 //
-// TTL is intentionally short: long enough to absorb minute-scale bursts,
-// short enough that any drift (manual console edit, out-of-band image
-// rebuild) self-heals within the window.
-export const LAMBDA_ARN_CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
+//   1. Redis-backed cache via TtlCache (cluster-wide; first miss anywhere
+//      in the fleet warms every other pod). Falls back to per-pod memory
+//      automatically when Redis is unavailable.
+//
+//   2. In-process single-flight on cache misses (per-pod). Without this, a
+//      100-event burst from one project on one pod produces 100 parallel
+//      GetFunction calls before any of them populates the shared cache.
+//
+// The cache key is projectId, and the cached payload includes image_uri so
+// a deploy (which bumps image_uri) auto-invalidates without any extra
+// plumbing — readers compare to the current config.image_uri and treat a
+// mismatch as a miss, re-running the UpdateFunctionCode path.
+//
+// Failures are NOT cached: a TooManyRequestsException must self-heal on
+// the next call so we don't pin a stale rejection cluster-wide.
+//
+// TTL: 10 min is long enough to absorb minute-scale bursts and short
+// enough that any out-of-band drift (manual console edit, rebuilt image)
+// self-heals within the window.
+export const LAMBDA_ARN_CACHE_TTL_MS = 10 * 60 * 1000;
 
-type LambdaArnCacheEntry = {
-  arn: string;
-  imageUri: string;
-  cachedAt: number;
-};
+type LambdaArnCacheEntry = { arn: string; imageUri: string };
 
-const lambdaArnCache = new Map<string, LambdaArnCacheEntry>();
+const lambdaArnCache = new TtlCache<LambdaArnCacheEntry>(
+  LAMBDA_ARN_CACHE_TTL_MS,
+  "lambda_arn:",
+);
 const inFlightLambdaArn = new Map<string, Promise<string>>();
+// Tracks the projectIds we've written to lambdaArnCache so clear() (test/ops)
+// can wipe them without needing a SCAN. Only grows on cache writes.
+const trackedProjectIds = new Set<string>();
 
 /** Test/ops helper: drop all cached ARNs (e.g. on config rotation). */
-export const clearLambdaArnCache = (): void => {
-  lambdaArnCache.clear();
+export const clearLambdaArnCache = async (): Promise<void> => {
   inFlightLambdaArn.clear();
+  const ids = [...trackedProjectIds];
+  trackedProjectIds.clear();
+  await Promise.all(ids.map((id) => lambdaArnCache.delete(id)));
 };
 
 export const getProjectLambdaArn = async (
@@ -370,30 +390,23 @@ export const getProjectLambdaArn = async (
   const config = parseLambdaConfig();
   const functionName = `langwatch_nlp-${projectId}`;
 
-  const now = Date.now();
-  const cached = lambdaArnCache.get(projectId);
-  if (
-    cached &&
-    cached.imageUri === config.image_uri &&
-    now - cached.cachedAt < LAMBDA_ARN_CACHE_TTL_MS
-  ) {
+  const cached = await lambdaArnCache.get(projectId);
+  if (cached && cached.imageUri === config.image_uri) {
     return cached.arn;
   }
 
-  // Single-flight: collapse concurrent misses for the same projectId
-  // onto one in-flight resolution. Without this, a 100-event burst from
-  // one project produces 100 parallel GetFunction calls instead of 1.
+  // Single-flight: collapse concurrent misses on this pod for the same
+  // projectId onto one in-flight resolution. The Redis cache is shared,
+  // but a cold burst can still race before the first writer lands; this
+  // closes that per-pod window.
   const existing = inFlightLambdaArn.get(projectId);
   if (existing) return existing;
 
   const resolution = (async () => {
     try {
       const arn = await resolveProjectLambdaArn(projectId, config, functionName);
-      lambdaArnCache.set(projectId, {
-        arn,
-        imageUri: config.image_uri,
-        cachedAt: Date.now(),
-      });
+      trackedProjectIds.add(projectId);
+      await lambdaArnCache.set(projectId, { arn, imageUri: config.image_uri });
       return arn;
     } finally {
       inFlightLambdaArn.delete(projectId);
