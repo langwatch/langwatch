@@ -131,6 +131,7 @@ describe("organization.acceptInvite", () => {
         // internals are not under test here
         await fn({
           organizationUser: { createMany: vi.fn() },
+          teamUser: { createMany: vi.fn(), create: vi.fn() },
           roleBinding: { deleteMany: vi.fn(), create: vi.fn() },
           organizationInvite: {
             update: vi.fn().mockResolvedValue(makeInvite({ status: "ACCEPTED" })),
