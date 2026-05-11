@@ -18,6 +18,7 @@ import { SubscriptionRecordNotFoundError } from "../errors";
 import { fireSubscriptionSyncNurturing } from "../nurturing/hooks/subscriptionSync";
 import { SubscriptionStatus } from "../planTypes";
 import {
+  getEventsUsageThreshold,
   isGrowthEventsPrice,
   isGrowthSeatEventPlan,
   isGrowthSeatPrice,
@@ -689,7 +690,9 @@ export class EEWebhookService implements WebhookService {
         if (isGrowthSeatPrice(item.price.id)) {
           usersQuantity = item.quantity ?? 0;
         } else if (isGrowthEventsPrice(item.price.id)) {
-          // Events price exists on the subscription; traces limit comes from plan limits
+          if (!item.billing_thresholds) {
+            await this.applyEventsUsageThresholdToItem(item.id, subscription.id);
+          }
         } else if (
           item.price.id === this.itemCalculator.prices.LAUNCH_USERS ||
           item.price.id === this.itemCalculator.prices.ACCELERATE_USERS ||
@@ -849,6 +852,7 @@ export class EEWebhookService implements WebhookService {
         }
 
         await this.applySeatRetentionPolicy(updatedSubscription.organizationId);
+        await this.applyEventsUsageThreshold(subscriptionId);
       }
 
       await getApp().notifications.sendSlackSubscriptionEvent({
@@ -957,6 +961,56 @@ export class EEWebhookService implements WebhookService {
     await this.organizationRepository.clearTrialLicense(
       updatedSubscription.organizationId,
     );
+  }
+
+  private async applyEventsUsageThreshold(
+    stripeSubscriptionId: string,
+  ): Promise<void> {
+    try {
+      const stripeSubscription =
+        await this.stripe.subscriptions.retrieve(stripeSubscriptionId);
+      const eventsItem = stripeSubscription.items.data.find((item) =>
+        isGrowthEventsPrice(item.price.id),
+      );
+      if (eventsItem) {
+        await this.applyEventsUsageThresholdToItem(
+          eventsItem.id,
+          stripeSubscriptionId,
+        );
+      } else {
+        logger.warn(
+          { stripeSubscriptionId },
+          "[stripeWebhook] No events subscription item found to set billing_thresholds",
+        );
+      }
+    } catch (err) {
+      logger.error(
+        { stripeSubscriptionId, err },
+        "[stripeWebhook] Failed to apply billing_thresholds on events item. " +
+          "Usage will be billed at end-of-period rather than at threshold.",
+      );
+    }
+  }
+
+  private async applyEventsUsageThresholdToItem(
+    subscriptionItemId: string,
+    stripeSubscriptionId: string,
+  ): Promise<void> {
+    const threshold = getEventsUsageThreshold();
+    try {
+      await this.stripe.subscriptionItems.update(subscriptionItemId, {
+        billing_thresholds: { usage_gte: threshold },
+      });
+      logger.info(
+        { stripeSubscriptionId, subscriptionItemId, threshold },
+        "[stripeWebhook] Set billing_thresholds on events subscription item",
+      );
+    } catch (err) {
+      logger.warn(
+        { stripeSubscriptionId, subscriptionItemId, err },
+        "[stripeWebhook] Failed to set billing_thresholds on events item",
+      );
+    }
   }
 
   private normalizeSelectedCurrency(value?: string | null): Currency | null {
