@@ -41,6 +41,10 @@ export class ProjectSlugConflictError extends Error {
   name = "ProjectSlugConflictError" as const;
 }
 
+export class TeamNotInOrganizationError extends Error {
+  name = "TeamNotInOrganizationError" as const;
+}
+
 export interface CreateProjectParams {
   organizationId: string;
   teamId: string;
@@ -57,6 +61,16 @@ export class ProjectService {
   }
 
   async create(params: CreateProjectParams): Promise<Project> {
+    const belongsToOrg = await this.repo.teamBelongsToOrganization({
+      teamId: params.teamId,
+      organizationId: params.organizationId,
+    });
+    if (!belongsToOrg) {
+      throw new TeamNotInOrganizationError(
+        "Team does not belong to this organization",
+      );
+    }
+
     const projectNanoId = nanoid();
     const projectId = `project_${projectNanoId}`;
     const slug =

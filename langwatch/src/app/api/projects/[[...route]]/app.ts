@@ -7,6 +7,7 @@ import { prisma } from "~/server/db";
 import {
   ProjectNotFoundError,
   ProjectSlugConflictError,
+  TeamNotInOrganizationError,
   type ProjectService,
 } from "~/server/app-layer/projects/project.service";
 import {
@@ -91,16 +92,6 @@ function projectResponse(project: {
   };
 }
 
-async function verifyTeamBelongsToOrg(
-  teamId: string,
-  organizationId: string,
-): Promise<boolean> {
-  const team = await prisma.team.findFirst({
-    where: { id: teamId, organizationId },
-  });
-  return !!team;
-}
-
 export const app = new Hono<{ Variables: Variables }>()
   .basePath("/api/projects")
   .use(tracerMiddleware({ name: "projects" }))
@@ -144,16 +135,6 @@ export const app = new Hono<{ Variables: Variables }>()
       const body = c.req.valid("json");
       const service = c.get("projectService") as ProjectService;
 
-      const teamBelongsToOrg = await verifyTeamBelongsToOrg(
-        body.teamId,
-        organization.id,
-      );
-      if (!teamBelongsToOrg) {
-        throw new BadRequestError(
-          "Team does not belong to this organization",
-        );
-      }
-
       const enforcement = createLicenseEnforcementService(prisma);
       try {
         await enforcement.enforceLimit(organization.id, "projects");
@@ -183,6 +164,9 @@ export const app = new Hono<{ Variables: Variables }>()
           framework: body.framework,
         });
       } catch (error) {
+        if (error instanceof TeamNotInOrganizationError) {
+          throw new BadRequestError(error.message);
+        }
         if (error instanceof ProjectSlugConflictError) {
           return c.json(
             { error: "Conflict", message: error.message },

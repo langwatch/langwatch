@@ -78,6 +78,7 @@ export interface ProjectRepository {
     limit: number;
   }): Promise<PaginatedResult<Project>>;
   findBySlugInTeam(params: { slug: string; teamId: string }): Promise<Project | null>;
+  teamBelongsToOrganization(params: { teamId: string; organizationId: string }): Promise<boolean>;
 }
 
 export class NullProjectRepository implements ProjectRepository {
@@ -131,5 +132,9 @@ export class NullProjectRepository implements ProjectRepository {
 
   async findBySlugInTeam(_params: { slug: string; teamId: string }): Promise<Project | null> {
     return null;
+  }
+
+  async teamBelongsToOrganization(_params: { teamId: string; organizationId: string }): Promise<boolean> {
+    return false;
   }
 }
