@@ -3,23 +3,19 @@ import { Hono } from "hono";
 import { describeRoute } from "hono-openapi";
 import { validator as zValidator } from "hono-openapi/zod";
 import { z } from "zod";
-import { prisma } from "~/server/db";
 import {
   ProjectNotFoundError,
   ProjectSlugConflictError,
   TeamNotInOrganizationError,
   type ProjectService,
 } from "~/server/app-layer/projects/project.service";
-import {
-  createLicenseEnforcementService,
-  LimitExceededError,
-} from "~/server/license-enforcement";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import type { OrgAuthMiddlewareVariables } from "../../middleware/org-auth";
 import { orgAuthMiddleware } from "../../middleware/org-auth";
 import type { ProjectServiceMiddlewareVariables } from "../../middleware/project-service";
 import { projectServiceMiddleware } from "../../middleware/project-service";
 import { loggerMiddleware } from "../../middleware/logger";
+import { resourceLimitMiddleware } from "../../middleware/resource-limit";
 import { tracerMiddleware } from "../../middleware/tracer";
 import {
   BadRequestError,
@@ -132,31 +128,12 @@ export const app = new Hono<{ Variables: Variables }>()
     describeRoute({
       description: "Create a new project",
     }),
+    resourceLimitMiddleware("projects"),
     zValidator("json", createProjectSchema, validationHook),
     async (c) => {
       const organization = c.get("organization") as Organization;
       const body = c.req.valid("json");
       const service = c.get("projectService") as ProjectService;
-
-      const enforcement = createLicenseEnforcementService(prisma);
-      try {
-        await enforcement.enforceLimit(organization.id, "projects");
-      } catch (error) {
-        if (error instanceof LimitExceededError) {
-          return c.json(
-            {
-              error: error.kind,
-              message: error.message,
-              limitType: error.limitType,
-              current: error.current,
-              max: error.max,
-            },
-            403,
-          );
-        }
-        throw error;
-      }
-
       const userId = c.get("patUserId") as string;
 
       let project;
