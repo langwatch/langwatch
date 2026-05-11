@@ -1,6 +1,7 @@
-import type { PrismaClient, Project } from "@prisma/client";
+import { RoleBindingScopeType, TeamUserRole, type PrismaClient, type Project } from "@prisma/client";
 import type {
   CreateProjectInput,
+  CreateTeamWithBindingInput,
   PaginatedResult,
   PresenceConfig,
   ProjectRepository,
@@ -186,5 +187,29 @@ export class PrismaProjectRepository implements ProjectRepository {
       select: { id: true },
     });
     return !!team;
+  }
+
+  async createTeamWithRoleBinding(input: CreateTeamWithBindingInput): Promise<{ id: string }> {
+    const team = await this.prisma.team.create({
+      data: {
+        id: input.teamId,
+        name: input.teamName,
+        slug: input.teamSlug,
+        organizationId: input.organizationId,
+      },
+    });
+
+    await this.prisma.roleBinding.create({
+      data: {
+        id: input.roleBindingId,
+        organizationId: input.organizationId,
+        userId: input.userId,
+        role: TeamUserRole.ADMIN,
+        scopeType: RoleBindingScopeType.TEAM,
+        scopeId: team.id,
+      },
+    });
+
+    return team;
   }
 }

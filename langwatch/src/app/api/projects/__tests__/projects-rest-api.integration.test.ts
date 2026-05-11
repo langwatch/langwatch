@@ -215,13 +215,29 @@ describe("Feature: Projects REST API", () => {
       expect(res.status).toBe(422);
     });
 
-    it("returns 422 when teamId is missing", async () => {
+    it("returns 422 when neither teamId nor newTeamName provided", async () => {
       const res = await api.post("/api/projects", {
         name: "No Team",
         language: "python",
         framework: "langchain",
       });
       expect(res.status).toBe(422);
+    });
+
+    it("creates a project with a new team via newTeamName", async () => {
+      const res = await api.post("/api/projects", {
+        name: "New Team Project",
+        newTeamName: `API Team ${nanoid(6)}`,
+        language: "typescript",
+        framework: "vercel-ai",
+      });
+      expect(res.status).toBe(201);
+
+      const body = await res.json();
+      expect(body.id).toMatch(/^project_/);
+      expect(body.teamId).toMatch(/^team_/);
+      expect(body.teamId).not.toBe(testTeam.id);
+      expect(body.apiKey).toMatch(/^sk-lw-/);
     });
 
     it("returns 400 when team does not belong to org", async () => {

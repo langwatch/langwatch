@@ -20,6 +20,15 @@ export interface CreateProjectInput {
   capturedOutputVisibility: ProjectSensitiveDataVisibilityLevel;
 }
 
+export interface CreateTeamWithBindingInput {
+  teamId: string;
+  teamName: string;
+  teamSlug: string;
+  organizationId: string;
+  roleBindingId: string;
+  userId: string;
+}
+
 export interface UpdateProjectInput {
   name?: string;
   language?: string;
@@ -79,6 +88,7 @@ export interface ProjectRepository {
   }): Promise<PaginatedResult<Project>>;
   findBySlugInTeam(params: { slug: string; teamId: string }): Promise<Project | null>;
   teamBelongsToOrganization(params: { teamId: string; organizationId: string }): Promise<boolean>;
+  createTeamWithRoleBinding(input: CreateTeamWithBindingInput): Promise<{ id: string }>;
 }
 
 export class NullProjectRepository implements ProjectRepository {
@@ -136,5 +146,9 @@ export class NullProjectRepository implements ProjectRepository {
 
   async teamBelongsToOrganization(_params: { teamId: string; organizationId: string }): Promise<boolean> {
     return false;
+  }
+
+  async createTeamWithRoleBinding(_input: CreateTeamWithBindingInput): Promise<{ id: string }> {
+    throw new Error("NullProjectRepository.createTeamWithRoleBinding not implemented");
   }
 }

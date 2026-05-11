@@ -38,9 +38,12 @@ const paginationQuerySchema = z.object({
 
 const createProjectSchema = z.object({
   name: z.string().min(1, "name is required").max(255),
-  teamId: z.string().min(1, "teamId is required"),
+  teamId: z.string().min(1).optional(),
+  newTeamName: z.string().min(1).max(255).optional(),
   language: z.string().min(1, "language is required"),
   framework: z.string().min(1, "framework is required"),
+}).refine((data) => data.teamId || data.newTeamName, {
+  message: "Either teamId or newTeamName must be provided",
 });
 
 const updateProjectSchema = z.object({
@@ -154,11 +157,15 @@ export const app = new Hono<{ Variables: Variables }>()
         throw error;
       }
 
+      const userId = c.get("patUserId") as string;
+
       let project;
       try {
         project = await service.create({
           organizationId: organization.id,
+          userId,
           teamId: body.teamId,
+          newTeamName: body.newTeamName,
           name: body.name,
           language: body.language,
           framework: body.framework,
