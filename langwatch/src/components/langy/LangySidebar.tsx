@@ -2,8 +2,10 @@ import { useChat } from "@ai-sdk/react";
 import {
   Box,
   Button,
+  Circle,
   HStack,
   IconButton,
+  Separator,
   Spinner,
   Text,
   Textarea,
@@ -166,25 +168,22 @@ function GradientSparkle({ size = 16 }: { size?: number }) {
 function SparkleTile({
   size,
   sparkleSize,
-  hero = false,
 }: {
   size: number;
   sparkleSize: number;
-  hero?: boolean;
 }) {
   return (
     <Box
       width={`${size}px`}
       height={`${size}px`}
-      borderRadius={hero ? "full" : "8px"}
-      background={hero ? AI_BG_SUBTLE : AI_BG_SUBTLE}
+      borderRadius="8px"
+      background={AI_BG_SUBTLE}
       borderWidth="1px"
       borderStyle="solid"
       borderColor={AI_BORDER}
       display="grid"
       placeItems="center"
       flexShrink={0}
-      boxShadow={hero ? AI_SHADOW_SOFT : undefined}
     >
       <GradientSparkle size={sparkleSize} />
     </Box>
@@ -228,9 +227,9 @@ function LangyHandle({
       <VStack gap={2} align="center" justify="center">
         <Sparkles size={14} color="white" />
         <Text
-          fontSize="11px"
+          textStyle="2xs"
           fontWeight="700"
-          letterSpacing="1.4px"
+          letterSpacing="0.12em"
           color="white"
           style={{
             writingMode: "vertical-rl",
@@ -502,64 +501,50 @@ function PanelHeader({
   onClose: () => void;
 }) {
   return (
-    <HStack
-      paddingY="14px"
-      paddingLeft="18px"
-      paddingRight="14px"
-      borderBottomWidth="1px"
-      borderColor="border.muted"
-      gap={2.5}
-      flexShrink={0}
-    >
-      <SparkleTile size={28} sparkleSize={15} />
-      <VStack align="start" gap={0} flex={1} minWidth={0}>
-        <Text fontSize="14px" fontWeight="600" lineHeight="1.2" color="fg">
-          Langy
-        </Text>
-        <Text
-          fontSize="11.5px"
+    <>
+      <HStack
+        paddingY={3}
+        paddingLeft={4}
+        paddingRight={3}
+        gap={2.5}
+        flexShrink={0}
+      >
+        <SparkleTile size={28} sparkleSize={15} />
+        <VStack align="start" gap={0} flex={1} minWidth={0}>
+          <Text textStyle="sm" fontWeight="600" lineHeight="1.2" color="fg">
+            Langy
+          </Text>
+          <Text
+            textStyle="2xs"
+            color="fg.muted"
+            lineHeight="1.3"
+            marginTop="1px"
+            truncate
+          >
+            {subtitle}
+          </Text>
+        </VStack>
+        <IconButton
+          size="xs"
+          variant="ghost"
+          aria-label="New chat"
           color="fg.muted"
-          lineHeight="1.3"
-          marginTop="1px"
-          truncate
+          onClick={onNewChat}
         >
-          {subtitle}
-        </Text>
-      </VStack>
-      <HeaderIconButton aria-label="New chat" onClick={onNewChat}>
-        <Plus size={17} />
-      </HeaderIconButton>
-      <HeaderIconButton aria-label="Close Langy" onClick={onClose}>
-        <X size={17} />
-      </HeaderIconButton>
-    </HStack>
-  );
-}
-
-function HeaderIconButton({
-  children,
-  ...rest
-}: {
-  children: React.ReactNode;
-} & React.ButtonHTMLAttributes<HTMLButtonElement>) {
-  return (
-    <chakra.button
-      type="button"
-      width="30px"
-      height="30px"
-      borderRadius="8px"
-      borderWidth={0}
-      background="transparent"
-      color="fg.muted"
-      cursor="pointer"
-      display="grid"
-      placeItems="center"
-      transition="background 120ms ease, color 120ms ease"
-      _hover={{ background: "bg.subtle", color: "fg" }}
-      {...rest}
-    >
-      {children}
-    </chakra.button>
+          <Plus size={15} />
+        </IconButton>
+        <IconButton
+          size="xs"
+          variant="ghost"
+          aria-label="Close Langy"
+          color="fg.muted"
+          onClick={onClose}
+        >
+          <X size={15} />
+        </IconButton>
+      </HStack>
+      <Separator />
+    </>
   );
 }
 
@@ -580,82 +565,79 @@ function RecentList({
   if (!isLoading && conversations.length === 0) return null;
 
   return (
-    <VStack
-      align="stretch"
-      gap={1}
-      paddingX="14px"
-      paddingY="10px"
-      borderBottomWidth="1px"
-      borderColor="border.muted"
-      background="bg.subtle"
-      flexShrink={0}
-      maxHeight="220px"
-      overflowY="auto"
-    >
-      <Text
-        fontSize="10.5px"
-        fontWeight="600"
-        letterSpacing="0.5px"
-        color="fg.muted"
-        textTransform="uppercase"
-        paddingX="4px"
-        paddingBottom="4px"
+    <>
+      <VStack
+        align="stretch"
+        gap={1}
+        paddingX={3}
+        paddingY={2}
+        background="bg.subtle"
+        flexShrink={0}
+        maxHeight="220px"
+        overflowY="auto"
       >
-        Recent chats
-      </Text>
-      {isLoading ? (
-        <HStack
-          gap={2}
-          paddingX="4px"
-          paddingY="6px"
-          aria-label="Loading recent conversations"
+        <Text
+          textStyle="2xs"
+          fontWeight="600"
+          letterSpacing="0.08em"
+          color="fg.subtle"
+          textTransform="uppercase"
+          paddingX={1}
+          paddingBottom={1}
         >
-          <Spinner size="xs" />
-          <Text fontSize="xs" color="fg.muted">
-            Loading…
-          </Text>
-        </HStack>
-      ) : (
-        <Box
-          as="ul"
-          aria-label="Recent conversations"
-          listStyleType="none"
-          margin={0}
-          padding={0}
-        >
-          {conversations.map((conv) => (
-            <HStack key={conv.id} as="li" gap={1}>
-              <chakra.button
-                type="button"
-                onClick={() => onSelect(conv.id)}
-                flex={1}
-                textAlign="left"
-                paddingX="8px"
-                paddingY="7px"
-                borderRadius="6px"
-                fontSize="12.5px"
-                color="fg"
-                cursor="pointer"
-                truncate
-                background="transparent"
-                borderWidth={0}
-                _hover={{ background: "bg.surface" }}
-              >
-                {conv.title ?? "Untitled"}
-              </chakra.button>
-              <IconButton
-                size="2xs"
-                variant="ghost"
-                aria-label="Delete conversation"
-                onClick={() => onDelete(conv.id)}
-              >
-                <Trash2 size={12} />
-              </IconButton>
-            </HStack>
-          ))}
-        </Box>
-      )}
-    </VStack>
+          Recent chats
+        </Text>
+        {isLoading ? (
+          <HStack
+            gap={2}
+            paddingX={1}
+            paddingY={1.5}
+            aria-label="Loading recent conversations"
+          >
+            <Spinner size="xs" />
+            <Text textStyle="xs" color="fg.muted">
+              Loading…
+            </Text>
+          </HStack>
+        ) : (
+          <Box
+            as="ul"
+            aria-label="Recent conversations"
+            listStyleType="none"
+            margin={0}
+            padding={0}
+          >
+            {conversations.map((conv) => (
+              <HStack key={conv.id} as="li" gap={1}>
+                <Button
+                  size="xs"
+                  variant="ghost"
+                  onClick={() => onSelect(conv.id)}
+                  flex={1}
+                  justifyContent="flex-start"
+                  fontWeight="normal"
+                  color="fg"
+                  paddingX={2}
+                  truncate
+                >
+                  {conv.title ?? "Untitled"}
+                </Button>
+                <IconButton
+                  size="2xs"
+                  variant="ghost"
+                  color="fg.subtle"
+                  aria-label="Delete conversation"
+                  onClick={() => onDelete(conv.id)}
+                >
+                  <Trash2 size={12} />
+                </IconButton>
+              </HStack>
+            ))}
+          </Box>
+        )}
+      </VStack>
+      <Separator />
+    </>
   );
 }
 
@@ -666,34 +648,43 @@ function EmptyState({ onPick }: { onPick: (prompt: string) => void }) {
       align="center"
       justify="center"
       flex={1}
-      paddingX="24px"
-      paddingY="32px"
+      paddingX={6}
+      paddingY={8}
       height="full"
     >
-      <SparkleTile size={64} sparkleSize={28} hero />
+      <Circle
+        size="64px"
+        bg={AI_BG_SUBTLE}
+        borderWidth="1px"
+        borderStyle="solid"
+        borderColor={AI_BORDER}
+        boxShadow={AI_SHADOW_SOFT}
+      >
+        <GradientSparkle size={28} />
+      </Circle>
       <Text
-        fontSize="20px"
+        textStyle="lg"
         fontWeight="600"
         letterSpacing="-0.3px"
         color="fg"
         textAlign="center"
-        marginTop="18px"
+        marginTop={4}
       >
         How can I help?
       </Text>
       <Text
-        fontSize="13px"
+        textStyle="sm"
         color="fg.muted"
         lineHeight="1.5"
         textAlign="center"
         maxWidth="280px"
-        marginTop="8px"
-        marginBottom="22px"
+        marginTop={2}
+        marginBottom={5}
       >
         Ask in plain language. I&apos;ll read your traces and evals, then
         propose changes you can apply.
       </Text>
-      <HStack gap="6px" flexWrap="wrap" justify="center" maxWidth="320px">
+      <HStack gap={1.5} flexWrap="wrap" justify="center" maxWidth="320px">
         {SUGGESTION_CHIPS.map((chip) => (
           <Chip key={chip} onClick={() => onPick(chip)}>
             {chip}
@@ -711,32 +702,25 @@ function Chip({
   children: React.ReactNode;
   onClick: () => void;
 }) {
-  const [hover, setHover] = useState(false);
   return (
-    <chakra.button
-      type="button"
+    <Button
+      size="xs"
+      variant="outline"
       onClick={onClick}
-      onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => setHover(false)}
-      appearance="none"
-      paddingX="12px"
-      paddingY="7px"
-      borderRadius="999px"
-      borderWidth="1px"
-      borderStyle="solid"
-      borderColor={hover ? AI_BORDER : "border.emphasized"}
-      background={hover ? AI_BG_HOVER : "bg.subtle"}
+      borderRadius="full"
+      fontWeight="500"
       color="fg"
-      fontSize="12.5px"
-      fontWeight={500}
-      lineHeight="1.2"
-      cursor="pointer"
-      transition="all 120ms ease"
+      borderColor="border.emphasized"
+      bg="bg.subtle"
+      _hover={{
+        bg: AI_BG_HOVER,
+        borderColor: AI_BORDER,
+        boxShadow: "0 1px 2px rgba(168, 85, 247, 0.12)",
+      }}
       whiteSpace="nowrap"
-      boxShadow={hover ? "0 1px 2px rgba(168, 85, 247, 0.12)" : "none"}
     >
       {children}
-    </chakra.button>
+    </Button>
   );
 }
 
@@ -755,15 +739,15 @@ function ThinkingIndicator({ messages }: { messages: UIMessage[] }) {
       <SparkleTile size={24} sparkleSize={12} />
       <HStack
         gap={2}
-        paddingX="10px"
-        paddingY="6px"
-        borderRadius="10px"
+        paddingX={2.5}
+        paddingY={1.5}
+        borderRadius="md"
         background="bg.subtle"
         borderWidth="1px"
         borderColor="border.muted"
       >
         <Spinner size="xs" colorPalette="purple" />
-        <Text fontSize="12px">Langy is {label}…</Text>
+        <Text textStyle="xs">Langy is {label}…</Text>
       </HStack>
     </HStack>
   );
@@ -788,91 +772,92 @@ function Composer({
 }) {
   const filled = input.trim().length > 0;
   return (
-    <Box
-      paddingX="14px"
-      paddingTop="12px"
-      paddingBottom="14px"
-      borderTopWidth="1px"
-      borderColor="border.muted"
-      background="bg.surface"
-      flexShrink={0}
-    >
-      <HStack
-        gap={2}
-        paddingY="6px"
-        paddingLeft="14px"
-        paddingRight="6px"
-        borderRadius="999px"
-        borderWidth="1px"
-        borderStyle="solid"
-        borderColor={filled ? AI_BORDER : "border.emphasized"}
+    <>
+      <Separator />
+      <Box
+        paddingX={3}
+        paddingTop={3}
+        paddingBottom={3}
         background="bg.surface"
-        boxShadow={filled ? `0 0 0 3px ${AI_BG_SUBTLE}` : undefined}
-        transition="border-color 150ms ease, box-shadow 150ms ease"
-        align="center"
+        flexShrink={0}
       >
-        <Textarea
-          value={input}
-          onChange={(e) => onInputChange(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
-              e.preventDefault();
-              if (!isBusy && canSend) onSend();
+        <HStack
+          gap={2}
+          paddingY={1.5}
+          paddingLeft={3}
+          paddingRight={1.5}
+          borderRadius="full"
+          borderWidth="1px"
+          borderStyle="solid"
+          borderColor={filled ? AI_BORDER : "border.emphasized"}
+          background="bg.surface"
+          boxShadow={filled ? `0 0 0 3px ${AI_BG_SUBTLE}` : undefined}
+          transition="border-color 150ms ease, box-shadow 150ms ease"
+          align="center"
+        >
+          <Textarea
+            value={input}
+            onChange={(e) => onInputChange(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                if (!isBusy && canSend) onSend();
+              }
+            }}
+            placeholder={
+              isBusy ? "Langy is working…" : "Ask Langy or describe what you want…"
             }
-          }}
-          placeholder={
-            isBusy ? "Langy is working…" : "Ask Langy or describe what you want…"
-          }
-          disabled={disabled || isBusy}
-          rows={1}
-          autoresize
-          maxHeight="120px"
-          minHeight="22px"
-          padding={0}
-          border="none"
-          background="transparent"
-          fontSize="13.5px"
-          lineHeight="1.45"
-          color="fg"
-          resize="none"
-          _focus={{ outline: "none", boxShadow: "none" }}
-          _focusVisible={{ outline: "none", boxShadow: "none" }}
-        />
-        {isBusy ? (
-          <SendButton
-            aria-label="Stop"
-            onClick={onStop}
-            background="var(--chakra-colors-red-solid)"
-            color="white"
-            shadow={false}
-            cursor="pointer"
-          >
-            <Square size={12} />
-          </SendButton>
-        ) : (
-          <SendButton
-            aria-label="Send"
-            onClick={onSend}
-            disabled={!canSend}
-            background={canSend ? AI_GRADIENT : "#f5f5f4"}
-            color={canSend ? "white" : "var(--chakra-colors-fg-muted)"}
-            shadow={canSend}
-            cursor={canSend ? "pointer" : "default"}
-          >
-            <Send size={14} />
-          </SendButton>
-        )}
-      </HStack>
-      <Text
-        marginTop="8px"
-        fontSize="10.5px"
-        color="fg.muted"
-        textAlign="center"
-        letterSpacing="0.1px"
-      >
-        Langy proposes — you review and apply.
-      </Text>
-    </Box>
+            disabled={disabled || isBusy}
+            rows={1}
+            autoresize
+            maxHeight="120px"
+            minHeight="22px"
+            padding={0}
+            border="none"
+            background="transparent"
+            textStyle="sm"
+            lineHeight="1.45"
+            color="fg"
+            resize="none"
+            _focus={{ outline: "none", boxShadow: "none" }}
+            _focusVisible={{ outline: "none", boxShadow: "none" }}
+          />
+          {isBusy ? (
+            <SendButton
+              aria-label="Stop"
+              onClick={onStop}
+              background="var(--chakra-colors-red-solid)"
+              color="white"
+              shadow={false}
+              cursor="pointer"
+            >
+              <Square size={12} />
+            </SendButton>
+          ) : (
+            <SendButton
+              aria-label="Send"
+              onClick={onSend}
+              disabled={!canSend}
+              background={canSend ? AI_GRADIENT : "#f5f5f4"}
+              color={canSend ? "white" : "var(--chakra-colors-fg-muted)"}
+              shadow={canSend}
+              cursor={canSend ? "pointer" : "default"}
+            >
+              <Send size={14} />
+            </SendButton>
+          )}
+        </HStack>
+        <Text
+          marginTop={2}
+          textStyle="2xs"
+          color="fg.subtle"
+          textAlign="center"
+          letterSpacing="0.01em"
+        >
+          Langy proposes — you review and apply.
+        </Text>
+      </Box>
+    </>
   );
 }
 
@@ -945,13 +930,13 @@ function MessageContent({
     return (
       <Box alignSelf="flex-end" maxWidth="85%">
         <Box
-          paddingX="13px"
-          paddingY="9px"
+          paddingX={3}
+          paddingY={2}
           background="#1c1917"
           color="white"
-          borderRadius="14px"
-          borderBottomRightRadius="4px"
-          fontSize="13px"
+          borderRadius="lg"
+          borderBottomRightRadius="sm"
+          textStyle="sm"
           lineHeight="1.45"
           whiteSpace="pre-wrap"
         >
@@ -962,12 +947,12 @@ function MessageContent({
   }
 
   return (
-    <HStack gap="9px" align="flex-start" width="full">
+    <HStack gap={2} align="flex-start" width="full">
       <SparkleTile size={24} sparkleSize={12} />
-      <VStack align="stretch" gap="10px" flex={1} minWidth={0}>
+      <VStack align="stretch" gap={2.5} flex={1} minWidth={0}>
         {text && (
           <Box
-            fontSize="13px"
+            textStyle="sm"
             color="fg"
             lineHeight="1.55"
             css={{
@@ -1062,8 +1047,8 @@ function ProposalCard({
     <Box
       borderWidth="1px"
       borderColor="border.muted"
-      borderRadius="12px"
-      padding="12px"
+      borderRadius="md"
+      padding={3}
       background="bg.subtle"
       opacity={isDiscarded ? 0.65 : 1}
       cursor={hasOpen ? "pointer" : "default"}
@@ -1077,11 +1062,11 @@ function ProposalCard({
       _hover={hasOpen ? { borderColor: "green.fg", boxShadow: "sm" } : undefined}
     >
       <HStack
-        gap="6px"
-        marginBottom="8px"
-        fontSize="10.5px"
+        gap={1.5}
+        marginBottom={2}
+        textStyle="2xs"
         fontWeight="600"
-        letterSpacing="0.5px"
+        letterSpacing="0.08em"
         textTransform="uppercase"
         color={overlineColor}
       >
@@ -1092,27 +1077,27 @@ function ProposalCard({
         )}
         <Text>{overlineLabel}</Text>
       </HStack>
-      <Text fontSize="13px" fontWeight="600" color="fg" marginBottom="2px">
+      <Text textStyle="sm" fontWeight="600" color="fg" marginBottom={0.5}>
         {proposal.summary}
       </Text>
       {proposal.rationale && (
         <Text
-          fontSize="12px"
+          textStyle="xs"
           color="fg.muted"
           lineHeight="1.45"
-          marginBottom="12px"
+          marginBottom={3}
         >
           {proposal.rationale}
         </Text>
       )}
       {!isApplied && !isDiscarded && (
-        <HStack gap="6px" paddingTop={proposal.rationale ? "0px" : "10px"}>
+        <HStack gap={1.5} paddingTop={proposal.rationale ? 0 : 2.5}>
           <chakra.button
             type="button"
             flex={1}
-            paddingX="12px"
-            paddingY="8px"
-            borderRadius="8px"
+            paddingX={3}
+            paddingY={2}
+            borderRadius="md"
             borderWidth={0}
             background={
               destructive ? "var(--chakra-colors-red-solid)" : AI_GRADIENT
@@ -1125,7 +1110,7 @@ function ProposalCard({
             display="flex"
             alignItems="center"
             justifyContent="center"
-            gap="5px"
+            gap={1.5}
             boxShadow={destructive ? undefined : AI_SHADOW}
             onClick={onApply}
             disabled={isApplying}
@@ -1150,7 +1135,7 @@ function ProposalCard({
         </HStack>
       )}
       {isApplied && hasOpen && (
-        <HStack paddingTop="10px">
+        <HStack paddingTop={2.5}>
           {onOpen ? (
             <Button
               size="xs"
