@@ -10,6 +10,7 @@ import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
 import { trackServerEvent } from "~/server/posthog";
 import { fireTeamMemberInvitedNurturing } from "~/../ee/billing/nurturing/hooks/featureAdoption";
+import { fireInviteAcceptedNurturingCalls } from "~/../ee/billing/nurturing/hooks/inviteAcceptance";
 import {
   InviteService,
   ORGANIZATION_TO_TEAM_ROLE_MAP,
@@ -773,6 +774,22 @@ export const inviteRouter = createTRPCRouter({
           where: { id: invite.id, organizationId: invite.organizationId },
           data: { status: "ACCEPTED" },
         });
+      });
+
+      void getApp()
+        .notifications.sendSlackSignupEvent({
+          userName: session.user.name,
+          userEmail: session.user.email,
+          organizationName: invite.organization.name,
+        })
+        .catch(captureException);
+
+      fireInviteAcceptedNurturingCalls({
+        userId: session.user.id,
+        email: session.user.email,
+        name: session.user.name,
+        organizationId: invite.organization.id,
+        organizationName: invite.organization.name,
       });
 
       const inviteService = InviteService.create(prisma);
