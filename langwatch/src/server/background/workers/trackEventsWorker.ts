@@ -11,6 +11,7 @@ import {
   captureException,
   withScope,
 } from "../../../utils/posthogErrorCapture";
+import { env } from "../../../env.mjs";
 import { esClient, TRACE_INDEX, traceIndexId } from "../../elasticsearch";
 import {
   recordJobWaitDuration,
@@ -28,6 +29,17 @@ export async function runTrackEventJob(job: Job<TrackEventJob, void, string>) {
   logger.info({ jobId: job.id, data: job.data }, "processing job");
   getJobProcessingCounter("track_events", "processing").inc();
   const start = Date.now();
+
+  // Track events live in the Elasticsearch trace index — without ES,
+  // there's no destination and no parity with ClickHouse for this shape
+  // (event arrays appended onto a trace doc via painless script). Drain
+  // the job successfully so it doesn't BullMQ-retry forever and starve
+  // the worker's concurrency slots; the trace itself is still recorded
+  // through the regular collector pipeline.
+  if (!env.ELASTICSEARCH_NODE_URL) {
+    getJobProcessingCounter("track_events", "skipped_no_es").inc();
+    return;
+  }
   let event: ElasticSearchEvent = {
     ...job.data.event,
     project_id: job.data.project_id,
