@@ -58,6 +58,7 @@ export const SUPPORTED_ASSISTANT_KINDS = [
   "gemini",
   "opencode",
   "cursor",
+  "github_copilot",
   "custom",
 ] as const;
 export type AssistantKind = (typeof SUPPORTED_ASSISTANT_KINDS)[number];

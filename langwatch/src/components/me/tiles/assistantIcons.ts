@@ -14,6 +14,7 @@ export const ASSISTANT_KINDS = [
   "gemini",
   "opencode",
   "cursor",
+  "github_copilot",
   "custom",
 ] as const;
 
@@ -58,6 +59,11 @@ export const ASSISTANT_PRESETS: Record<
   cursor: {
     label: "Cursor",
     iconUrl: "/images/external-icons/cursor.svg",
+    darkModeInvert: true,
+  },
+  github_copilot: {
+    label: "GitHub Copilot",
+    iconUrl: "/images/external-icons/github-copilot.svg",
     darkModeInvert: true,
   },
 };
