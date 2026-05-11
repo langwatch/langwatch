@@ -157,7 +157,7 @@ export class PrismaProjectRepository implements ProjectRepository {
         where,
         skip: (page - 1) * limit,
         take: limit,
-        orderBy: { createdAt: "desc" },
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
       }),
       this.prisma.project.count({ where }),
     ]);
