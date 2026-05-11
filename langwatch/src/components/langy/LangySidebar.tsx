@@ -14,15 +14,22 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   LuArrowRight,
   LuCheck,
+  LuPlus,
   LuSend,
   LuSparkles,
   LuSquare,
+  LuTrash2,
   LuX,
 } from "react-icons/lu";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { Markdown } from "~/components/Markdown";
 import { toaster } from "~/components/ui/toaster";
 import { isHandledByGlobalHandler } from "~/utils/trpcError";
+import {
+  useLangyConversations,
+  type LangyConversationSummary,
+  type LangyMessageRecord,
+} from "./useLangyConversations";
 
 const DRAWER_WIDTH = 420;
 const HANDLE_WIDTH = 26;
@@ -192,7 +199,7 @@ function LangyPanel({
     () => new DefaultChatTransport({ api: "/api/langy/chat" }),
     [],
   );
-  const { messages, sendMessage, stop, status } = useChat({
+  const { messages, sendMessage, stop, status, setMessages } = useChat({
     transport,
     onError: (error) => {
       if (isHandledByGlobalHandler(error)) return;
@@ -204,6 +211,44 @@ function LangyPanel({
         meta: { closable: true },
       });
     },
+  });
+
+  const surfaceConversationError = useMemo(
+    () => (message: string) => {
+      toaster.create({
+        title: "Langy",
+        description: message,
+        type: "error",
+        duration: 5000,
+        meta: { closable: true },
+      });
+    },
+    [],
+  );
+
+  const applyMessagesFromHistory = useMemo(
+    () => (history: LangyMessageRecord[]) => {
+      const uiMessages = history.map((m) => ({
+        id: m.id,
+        role: m.role,
+        parts: [{ type: "text" as const, text: m.content }],
+      })) as unknown as UIMessage[];
+      setMessages(uiMessages);
+    },
+    [setMessages],
+  );
+
+  const {
+    conversations,
+    isLoading: isLoadingConversations,
+    hasListError,
+    select: selectConversation,
+    startNew: startNewConversation,
+    remove: removeConversation,
+  } = useLangyConversations({
+    projectId,
+    setMessages: applyMessagesFromHistory,
+    onError: surfaceConversationError,
   });
 
   useEffect(() => {
@@ -303,6 +348,14 @@ function LangyPanel({
     >
       <VStack gap={0} align="stretch" height="full">
         <PanelHeader onClose={onClose} />
+        <LangyRecentList
+          conversations={conversations}
+          isLoading={isLoadingConversations}
+          hasError={hasListError}
+          onSelect={(id) => void selectConversation(id)}
+          onStartNew={startNewConversation}
+          onDelete={(id) => void removeConversation(id)}
+        />
         <Box ref={scrollRef} flex={1} overflowY="auto" paddingX={4} paddingY={4}>
           {messages.length === 0 ? (
             <EmptyState onPick={(prompt) => void send(prompt)} />
@@ -334,6 +387,110 @@ function LangyPanel({
         />
       </VStack>
     </Box>
+  );
+}
+
+function LangyRecentList({
+  conversations,
+  isLoading,
+  hasError,
+  onSelect,
+  onStartNew,
+  onDelete,
+}: {
+  conversations: LangyConversationSummary[];
+  isLoading: boolean;
+  hasError: boolean;
+  onSelect: (id: string) => void;
+  onStartNew: () => void;
+  onDelete: (id: string) => void;
+}) {
+  if (isLoading) {
+    return (
+      <HStack
+        paddingX={4}
+        paddingY={2}
+        borderBottomWidth="1px"
+        borderColor="border.muted"
+        gap={2}
+        aria-label="Loading recent conversations"
+      >
+        <Spinner size="xs" />
+        <Text fontSize="xs" color="fg.muted">
+          Loading recent…
+        </Text>
+      </HStack>
+    );
+  }
+
+  if (hasError) return null;
+
+  return (
+    <VStack
+      align="stretch"
+      gap={1}
+      paddingX={3}
+      paddingY={2}
+      borderBottomWidth="1px"
+      borderColor="border.muted"
+    >
+      <HStack justify="space-between" paddingX={1}>
+        <Text fontSize="2xs" fontWeight="600" color="fg.muted" letterSpacing="0.08em">
+          RECENT
+        </Text>
+        <Button
+          size="2xs"
+          variant="ghost"
+          onClick={onStartNew}
+          aria-label="New chat"
+        >
+          <LuPlus size={12} />
+          <Text fontSize="xs">New chat</Text>
+        </Button>
+      </HStack>
+      {conversations.length === 0 ? (
+        <Text fontSize="xs" color="fg.muted" paddingX={2} paddingY={1}>
+          No conversations yet.
+        </Text>
+      ) : (
+        <Box as="ul" aria-label="Recent conversations" listStyleType="none" margin={0} padding={0}>
+          {conversations.map((conv) => (
+            <Box
+              as="li"
+              key={conv.id}
+              display="flex"
+              alignItems="center"
+              gap={1}
+            >
+              <Box
+                as="button"
+                type="button"
+                onClick={() => onSelect(conv.id)}
+                flex={1}
+                textAlign="left"
+                paddingX={2}
+                paddingY="6px"
+                borderRadius="md"
+                fontSize="xs"
+                color="fg"
+                cursor="pointer"
+                _hover={{ background: "bg.subtle" }}
+              >
+                {conv.title ?? "Untitled"}
+              </Box>
+              <IconButton
+                size="2xs"
+                variant="ghost"
+                aria-label="Delete"
+                onClick={() => onDelete(conv.id)}
+              >
+                <LuTrash2 size={12} />
+              </IconButton>
+            </Box>
+          ))}
+        </Box>
+      )}
+    </VStack>
   );
 }
 
