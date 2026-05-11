@@ -9,7 +9,6 @@
  */
 import {
   convertToModelMessages,
-  generateText,
   stepCountIs,
   streamText,
   tool,
