@@ -2,6 +2,7 @@ import { createLogger } from "../../utils/logger/server";
 import { connection } from "../redis";
 import { AnomalyDetector } from "./anomalyDetector";
 import { AnomalyStateStore } from "./anomalyState";
+import { FingerprintTracker } from "./fingerprintTracker";
 import { TenantRateTracker } from "./tenantRateTracker";
 
 const logger = createLogger("langwatch:observability:anomalyWorker");
@@ -25,9 +26,11 @@ export function startAnomalyWorker(): AnomalyWorkerHandle | undefined {
   }
 
   const rateTracker = new TenantRateTracker(connection);
+  const fingerprintTracker = new FingerprintTracker(connection);
   const anomalyState = new AnomalyStateStore(connection);
   const detector = new AnomalyDetector({
     rateTracker,
+    fingerprintTracker,
     anomalyState,
     // The hard-tier auto-pause hook is wired here. Currently a no-op
     // (logs only) — pairing it with the per-tenant pause mechanism is

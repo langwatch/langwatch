@@ -26,6 +26,10 @@ import { OtlpSpanTokenEstimationService } from "~/server/app-layer/traces/span-t
 import { TiktokenClient } from "~/server/app-layer/clients/tokenizer/tiktoken.client";
 import { featureFlagService } from "~/server/featureFlag";
 import { TraceRequestUtils } from "../utils/traceRequest.utils";
+import {
+  computeStructuralFingerprint,
+  getFingerprintTracker,
+} from "~/server/observability";
 
 /**
  * Dependencies for RecordSpanCommand that can be injected for testing.
@@ -210,6 +214,28 @@ export class RecordSpanCommand implements CommandHandler<
           },
           "Emitting SpanReceivedEvent",
         );
+
+        // Per-span structural fingerprint recording (post-2026-05-11
+        // incident follow-up). Fire-and-forget; failures are swallowed
+        // by the tracker. Keys only, never values, so LLM nondeterminism
+        // does not affect the fingerprint.
+        const fpTracker = getFingerprintTracker();
+        if (fpTracker) {
+          const attrKeys = (spanToProcess.attributes ?? []).map(
+            (a) => a.key,
+          );
+          const fingerprint = computeStructuralFingerprint([
+            {
+              name: spanToProcess.name,
+              kind:
+                typeof spanToProcess.kind === "number"
+                  ? spanToProcess.kind
+                  : 0,
+              attributeKeys: attrKeys,
+            },
+          ]);
+          void fpTracker.record(tenantIdStr, fingerprint);
+        }
 
         return [spanReceivedEvent];
       },
