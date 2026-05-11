@@ -76,10 +76,5 @@
   "bin": {
     "langwatch-mcp-server": "./dist/index.js"
   },
-  "pnpm": {
-    "overrides": {
-      "protobufjs": ">=7.5.5 <8.0.0 || >=8.0.1",
-      "fast-uri@<3.1.2": "3.1.2"
-    }
-  }
+  "pnpm": {}
 }
