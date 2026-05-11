@@ -6,6 +6,7 @@ import { PipelineTreeCard } from "./PipelineTreeCard";
 import { BlockedCard } from "./BlockedCard";
 import { DlqCard } from "./DlqCard";
 import { GroupsCard } from "./GroupsCard";
+import { AnomaliesCard } from "./AnomaliesCard";
 
 export function QueuesContent() {
   const { data: sseData } = useOpsSSE();
@@ -32,6 +33,7 @@ export function QueuesContent() {
           </Card.Body>
         </Card.Root>
       )}
+      <AnomaliesCard />
       <BlockedCard queueNames={queueNames} />
       <DlqCard queueNames={queueNames} />
       <GroupsCard queueNames={queueNames} />

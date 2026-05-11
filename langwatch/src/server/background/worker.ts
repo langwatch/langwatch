@@ -20,6 +20,7 @@ import {
   startEvaluationsWorker,
 } from "./workers/evaluationsWorker";
 import { registerEvaluationsFallbackWorker } from "./queues/evaluationsQueue";
+import { startAnomalyWorker } from "../observability/anomalyWorker";
 import { startTopicClusteringWorker } from "./workers/topicClusteringWorker";
 import { startTrackEventsWorker } from "./workers/trackEventsWorker";
 
@@ -185,6 +186,17 @@ export const start = async (
     registerCloseable("queueMetrics", {
       close: () => stopQueueMetrics(),
     });
+
+    // Per-tenant anomaly detector (post-2026-05-11 incident follow-up).
+    // Scans tenant enqueue rates every 60s, surfaces 10×/100× baseline
+    // spikes on the Ops page so we catch runaway tenants before they
+    // starve the cluster.
+    const anomalyWorker = startAnomalyWorker();
+    if (anomalyWorker) {
+      registerCloseable("anomalyWorker", {
+        close: () => anomalyWorker.stop(),
+      });
+    }
 
     incrementWorkerRestartCount();
 

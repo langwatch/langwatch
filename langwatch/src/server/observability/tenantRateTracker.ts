@@ -1,0 +1,134 @@
+import type IORedis from "ioredis";
+import type { Cluster } from "ioredis";
+import { createLogger } from "../../utils/logger/server";
+
+const logger = createLogger("langwatch:observability:tenantRateTracker");
+
+/**
+ * Per-tenant rolling enqueue-rate tracker.
+ *
+ * Post-2026-05-11 incident follow-up: surfaces tenants whose event-sourcing
+ * group-creation rate has spiked far above their normal baseline. The
+ * 2026-05-11 outage was caused by one tenant producing ~95% of all groups
+ * after an evaluator-recursion loop, starving every other tenant. With
+ * this tracker + the AnomalyDetector worker, we would have flagged the
+ * runaway pattern within minutes instead of after a customer-perceived
+ * outage.
+ *
+ * Storage model:
+ *  - `obs:tenant_rate:<tenantId>` is a Redis HASH whose fields are
+ *    minute-truncated unix timestamps (in seconds) and whose values are
+ *    the count of enqueues in that minute.
+ *  - HASH TTL of ~8 days ensures stale tenant tracking auto-purges and
+ *    bounds memory.
+ *  - The active-tenants index `obs:tenant_rate:active` is a SET — fast
+ *    SMEMBERS for the periodic anomaly sweep, no key SCAN required.
+ *
+ * Why minute-bucketed (not per-event ZSET):
+ *  - O(1) write per enqueue (HINCRBY) vs O(log N) for ZADD with random nonce
+ *  - Memory bounded by `minute_count × tenant_count`, not by event count
+ *  - ~12 KiB per tenant per week at 1Hz baseline (vs MBs of ZSET nonces)
+ *  - 1-minute resolution is sufficient — we alert on 5-min sustained spikes
+ */
+export class TenantRateTracker {
+  private static readonly KEY_PREFIX = "obs:tenant_rate:";
+  private static readonly ACTIVE_SET = "obs:tenant_rate:active";
+  private static readonly TTL_SECONDS = 8 * 24 * 3600; // 8 days
+
+  constructor(
+    private readonly redis: IORedis | Cluster,
+    private readonly nowFn: () => number = Date.now,
+  ) {}
+
+  /**
+   * Record a single enqueue against a tenant. Called from the GroupQueue
+   * send() / sendBatch() hot path — must be O(1), non-blocking on errors.
+   * Failures are logged at debug level and swallowed so observability
+   * never breaks production traffic.
+   */
+  async record(tenantId: string, count = 1): Promise<void> {
+    if (!tenantId) return;
+    const minute = Math.floor(this.nowFn() / 60_000);
+    const key = `${TenantRateTracker.KEY_PREFIX}${tenantId}`;
+    try {
+      // ioredis pipelines auto-batch for both standalone and cluster modes
+      const pipe = this.redis.pipeline();
+      pipe.hincrby(key, String(minute), count);
+      pipe.expire(key, TenantRateTracker.TTL_SECONDS);
+      pipe.sadd(TenantRateTracker.ACTIVE_SET, tenantId);
+      pipe.expire(TenantRateTracker.ACTIVE_SET, TenantRateTracker.TTL_SECONDS);
+      await pipe.exec();
+    } catch (err) {
+      logger.debug(
+        { tenantId, err: err instanceof Error ? err.message : String(err) },
+        "TenantRateTracker.record failed (non-fatal)",
+      );
+    }
+  }
+
+  /**
+   * Sum enqueues for `tenantId` across the last `windowSeconds` window.
+   * Returns 0 when the tenant has no data.
+   */
+  async currentWindowCount(
+    tenantId: string,
+    windowSeconds: number,
+  ): Promise<number> {
+    const minuteNow = Math.floor(this.nowFn() / 60_000);
+    const minutesBack = Math.max(1, Math.ceil(windowSeconds / 60));
+    const fields: string[] = [];
+    for (let i = 0; i < minutesBack; i++) {
+      fields.push(String(minuteNow - i));
+    }
+    const key = `${TenantRateTracker.KEY_PREFIX}${tenantId}`;
+    const values = await this.redis.hmget(key, ...fields);
+    let sum = 0;
+    for (const v of values) {
+      if (!v) continue;
+      const n = Number.parseInt(v, 10);
+      if (Number.isFinite(n)) sum += n;
+    }
+    return sum;
+  }
+
+  /**
+   * Per-minute rates across the last `lookbackSeconds`. Sorted oldest-first.
+   * Used by the anomaly detector to compute rolling p95 baselines without
+   * fetching unbounded data.
+   */
+  async perMinuteSeries(
+    tenantId: string,
+    lookbackSeconds: number,
+  ): Promise<number[]> {
+    const minuteNow = Math.floor(this.nowFn() / 60_000);
+    const minutesBack = Math.max(1, Math.ceil(lookbackSeconds / 60));
+    const fields: string[] = [];
+    for (let i = minutesBack - 1; i >= 0; i--) {
+      fields.push(String(minuteNow - i));
+    }
+    const key = `${TenantRateTracker.KEY_PREFIX}${tenantId}`;
+    const values = await this.redis.hmget(key, ...fields);
+    return values.map((v) => (v ? Number.parseInt(v, 10) || 0 : 0));
+  }
+
+  /**
+   * Returns all tenants we have rate data for. The anomaly worker iterates
+   * this list every tick.
+   */
+  async listActiveTenants(): Promise<string[]> {
+    return await this.redis.smembers(TenantRateTracker.ACTIVE_SET);
+  }
+}
+
+/**
+ * Extract the tenant prefix from an event-sourcing groupId (everything
+ * before the first `/`). Returns null when the groupId has no slash.
+ * Mirrors the convention used by the DISPATCH_LUA scripts in
+ * groupQueue/scripts.ts where tenantId is also derived from the prefix.
+ */
+export function tenantIdFromGroupId(groupId: string): string | null {
+  if (!groupId) return null;
+  const idx = groupId.indexOf("/");
+  if (idx <= 0) return null;
+  return groupId.substring(0, idx);
+}

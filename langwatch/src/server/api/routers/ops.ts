@@ -7,6 +7,8 @@ import { getApp } from "~/server/app-layer/app";
 import { DASHBOARD_EVENT } from "~/server/app-layer/ops/metrics-collector";
 import type { DashboardData } from "~/server/app-layer/ops/types";
 import { getProjectionMetadata, getReactorMetadata } from "~/server/event-sourcing/pipelineRegistry";
+import { AnomalyStateStore } from "~/server/observability/anomalyState";
+import { connection } from "~/server/redis";
 
 const opsViewPermission = checkOpsPermission("ops:view");
 
@@ -565,5 +567,46 @@ export const opsRouter = createTRPCRouter({
         });
       }
       return result;
+    }),
+
+  // ---------------------------------------------------------------------------
+  // Tenant anomalies (post-2026-05-11 incident follow-up).
+  // ---------------------------------------------------------------------------
+
+  /**
+   * List currently-active tenant anomalies (rate breaker + structural
+   * fingerprint loops). Sorted with hard-tier first.
+   */
+  listAnomalies: protectedProcedure
+    .use(opsViewPermission)
+    .query(async () => {
+      if (!connection) return { anomalies: [] };
+      const store = new AnomalyStateStore(connection);
+      const anomalies = await store.list();
+      anomalies.sort((a, b) => {
+        if (a.tier !== b.tier) return a.tier === "hard" ? -1 : 1;
+        return b.triggeredAt - a.triggeredAt;
+      });
+      return { anomalies };
+    }),
+
+  /**
+   * Dismiss an active anomaly manually. The next detector tick may
+   * resurface it if conditions are still met — this is just an operator
+   * ack to stop the badge from blinking.
+   */
+  dismissAnomaly: protectedProcedure
+    .use(opsManagePermission)
+    .input(
+      z.object({
+        tenantId: z.string().min(1),
+        kind: z.enum(["rate_breaker", "fingerprint_loop"]),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      if (!connection) return { dismissed: false };
+      const store = new AnomalyStateStore(connection);
+      await store.clear(input.tenantId, input.kind);
+      return { dismissed: true };
     }),
 });

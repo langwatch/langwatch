@@ -85,7 +85,7 @@ function createSpanEvent(opts: SpanEventOpts = {}): TraceProcessingEvent {
       },
     },
     metadata: { spanId: opts.spanId ?? "span-1", traceId: "trace-1" },
-  } as TraceProcessingEvent;
+  } as unknown as TraceProcessingEvent;
 }
 
 function createOriginEvent(origin = "application"): TraceProcessingEvent {
@@ -100,7 +100,7 @@ function createOriginEvent(origin = "application"): TraceProcessingEvent {
     version: 1,
     data: { origin },
     metadata: { traceId: "trace-1" },
-  } as TraceProcessingEvent;
+  } as unknown as TraceProcessingEvent;
 }
 
 function createContext(
