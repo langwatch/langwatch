@@ -120,9 +120,15 @@ describe("Feature: Projects REST API", () => {
     patToken = created.token;
   });
 
+  const unlimitedPlan = {
+    ...FREE_PLAN,
+    maxProjects: 9999,
+    overrideAddingLimitations: false,
+  };
+
   beforeEach(() => {
     resetApp();
-    mockGetActivePlan = vi.fn().mockResolvedValue(FREE_PLAN);
+    mockGetActivePlan = vi.fn().mockResolvedValue(unlimitedPlan);
     globalForApp.__langwatch_app = createTestApp({
       planProvider: PlanProviderService.create({
         getActivePlan: mockGetActivePlan as PlanProvider["getActivePlan"],
