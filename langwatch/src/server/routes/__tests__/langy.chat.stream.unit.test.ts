@@ -56,12 +56,24 @@ vi.mock("~/server/auditLog", () => ({
 }));
 
 const mockEvaluatorGetAllWithFields = vi.fn();
+const mockEvaluatorGetBySlug = vi.fn();
 vi.mock("~/server/evaluators/evaluator.service", () => ({
   EvaluatorService: {
     create: () => ({
       getAllWithFields: (...args: unknown[]) =>
         mockEvaluatorGetAllWithFields(...args),
+      getBySlug: (...args: unknown[]) => mockEvaluatorGetBySlug(...args),
     }),
+  },
+}));
+
+const mockPrismaExperimentFindFirst = vi.fn();
+vi.mock("~/server/db", () => ({
+  prisma: {
+    experiment: {
+      findFirst: (...args: unknown[]) =>
+        mockPrismaExperimentFindFirst(...args),
+    },
   },
 }));
 
@@ -124,22 +136,33 @@ function makeStubModel(textChunks: string[]) {
 }
 
 /**
- * Two-turn stub model: first turn invokes `list_evaluators` with the
- * given input; second turn emits a short final text. Used to exercise
- * the tool execute path (project scoping, return-value shape) end-to-end.
+ * Two-turn stub model: first turn invokes `toolName` with `input`,
+ * second turn emits a short final text. Used to exercise the tool
+ * execute path (project scoping, return-value shape) end-to-end.
+ *
+ * The V3 contract expects tool-input-start/-end to envelope the
+ * tool-call so streamText can track partial-input state correctly.
  */
 function makeToolCallingStubModel(toolName: string, input: unknown) {
-  const turns = [
-    {
-      stream: simulateReadableStream({
+  const stringifiedInput = JSON.stringify(input);
+  const turnBuilders = [
+    () =>
+      simulateReadableStream({
         chunks: [
           { type: "stream-start", warnings: [] },
           { type: "response-metadata", id: "rsp-1", modelId: "mock-1" },
+          { type: "tool-input-start", id: "tc-1", toolName },
+          {
+            type: "tool-input-delta",
+            id: "tc-1",
+            delta: stringifiedInput,
+          },
+          { type: "tool-input-end", id: "tc-1" },
           {
             type: "tool-call",
             toolCallId: "tc-1",
             toolName,
-            input: JSON.stringify(input),
+            input: stringifiedInput,
           },
           {
             type: "finish",
@@ -150,9 +173,8 @@ function makeToolCallingStubModel(toolName: string, input: unknown) {
         initialDelayInMs: null,
         chunkDelayInMs: null,
       }),
-    },
-    {
-      stream: simulateReadableStream({
+    () =>
+      simulateReadableStream({
         chunks: [
           { type: "stream-start", warnings: [] },
           { type: "response-metadata", id: "rsp-2", modelId: "mock-1" },
@@ -168,9 +190,20 @@ function makeToolCallingStubModel(toolName: string, input: unknown) {
         initialDelayInMs: null,
         chunkDelayInMs: null,
       }),
-    },
   ];
-  return new MockLanguageModelV3({ doStream: turns });
+  // Workaround for an off-by-one in MockLanguageModelV3: it indexes
+  // doStream by `doStreamCalls.length` AFTER pushing, so a plain
+  // array would skip the first turn. We track our own counter and
+  // clamp to the last turn for any extra calls.
+  let turnIndex = 0;
+  return new MockLanguageModelV3({
+    doStream: async () => {
+      const builder =
+        turnBuilders[turnIndex] ?? turnBuilders[turnBuilders.length - 1]!;
+      turnIndex += 1;
+      return { stream: builder() };
+    },
+  });
 }
 
 async function readBody(res: Response): Promise<string> {
@@ -201,6 +234,8 @@ beforeEach(() => {
   mockGetProjectMemory.mockResolvedValue(null);
   mockGetUserPrefs.mockResolvedValue({ mode: "non-expert" });
   mockEvaluatorGetAllWithFields.mockResolvedValue([]);
+  mockEvaluatorGetBySlug.mockResolvedValue(null);
+  mockPrismaExperimentFindFirst.mockResolvedValue(null);
   mockEnsureConversation.mockResolvedValue({ id: "conv_test_abc" });
   mockTouchConversation.mockResolvedValue(undefined);
   mockAppendMessage.mockResolvedValue(undefined);
@@ -326,10 +361,138 @@ describe("POST /api/langy/chat streaming — binds langy-baseline.feature § str
     });
   });
 
-  // NOTE: A two-turn `makeToolCallingStubModel` is provided above for
-  // when V3 tool-call event shape lands in the test suite. Scenarios 4
-  // (project-scoped tool calls) and 6/7 (list_evaluators/find_failing_rows
-  // payloads) will bind here. The route's projectId propagation is
-  // already proven via `calls getVercelAIModel with the request's
-  // projectId` above; the full tool-execute path lands in a follow-up.
+  describe("given the stub model invokes list_evaluators — binds langy-baseline.feature § ask what evaluators exist + § tool calls scoped to active project", () => {
+    beforeEach(() => {
+      mockGetVercelAIModel.mockResolvedValue(
+        makeToolCallingStubModel("list_evaluators", { scope: "project" }),
+      );
+      mockEvaluatorGetAllWithFields.mockResolvedValue([
+        {
+          id: "ev_1",
+          slug: "ragas-faithfulness",
+          name: "RagFaithfulness",
+          type: "ragas",
+          fields: [{ identifier: "input" }, { identifier: "output" }],
+        },
+        {
+          id: "ev_2",
+          slug: "toxicity",
+          name: "Toxicity",
+          type: "presidio",
+          fields: [{ identifier: "output" }],
+        },
+      ]);
+    });
+
+    describe("when the chat triggers the tool", () => {
+      it("calls EvaluatorService.getAllWithFields with the active project id", async () => {
+        const res = await app.request("/api/langy/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            projectId: "proj_demo",
+            messages: [
+              {
+                id: "m1",
+                role: "user",
+                parts: [
+                  { type: "text", text: "what evaluators are configured?" },
+                ],
+              },
+            ],
+          }),
+        });
+        const body = await readBody(res);
+        if (mockEvaluatorGetAllWithFields.mock.calls.length === 0) {
+          // eslint-disable-next-line no-console
+          console.error("tool-call test: body=", body);
+        }
+        expect(mockEvaluatorGetAllWithFields).toHaveBeenCalledWith({
+          projectId: "proj_demo",
+        });
+      });
+
+      it("never asks the evaluator service for a different project's data", async () => {
+        const res = await app.request("/api/langy/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            projectId: "proj_demo",
+            messages: [
+              {
+                id: "m1",
+                role: "user",
+                parts: [
+                  { type: "text", text: "what evaluators are configured?" },
+                ],
+              },
+            ],
+          }),
+        });
+        await readBody(res);
+        expect(mockEvaluatorGetAllWithFields.mock.calls.length).toBeGreaterThan(0);
+        for (const call of mockEvaluatorGetAllWithFields.mock.calls) {
+          const arg = call[0] as { projectId: string };
+          expect(arg.projectId).toBe("proj_demo");
+        }
+      });
+    });
+  });
+
+  describe("given the stub model invokes find_failing_rows — binds langy-baseline.feature § ask why rows are failing", () => {
+    beforeEach(() => {
+      mockGetVercelAIModel.mockResolvedValue(
+        makeToolCallingStubModel("find_failing_rows", { limit: 10 }),
+      );
+    });
+
+    describe("when the chat triggers the tool with an active experimentSlug", () => {
+      it("scopes the experiment lookup to the request's projectId", async () => {
+        const res = await app.request("/api/langy/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            projectId: "proj_demo",
+            experimentSlug: "exp1",
+            messages: [
+              {
+                id: "m1",
+                role: "user",
+                parts: [
+                  { type: "text", text: "which rows are failing?" },
+                ],
+              },
+            ],
+          }),
+        });
+        await readBody(res);
+        expect(mockPrismaExperimentFindFirst).toHaveBeenCalledWith({
+          where: { projectId: "proj_demo", slug: "exp1" },
+        });
+      });
+    });
+
+    describe("when no experimentSlug is in scope", () => {
+      it("does not touch the experiment table at all", async () => {
+        const res = await app.request("/api/langy/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            projectId: "proj_demo",
+            messages: [
+              {
+                id: "m1",
+                role: "user",
+                parts: [
+                  { type: "text", text: "which rows are failing?" },
+                ],
+              },
+            ],
+          }),
+        });
+        await readBody(res);
+        expect(mockPrismaExperimentFindFirst).not.toHaveBeenCalled();
+      });
+    });
+  });
 });

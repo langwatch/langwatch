@@ -32,12 +32,20 @@ vi.hoisted(() => {
   }
 });
 
+// Variables controlling useChat's mocked return value, mutable per
+// test. Using top-level `let` rather than a vi.fn(...) factory because
+// vi.mock is hoisted and would otherwise capture state before the
+// `beforeEach` resets run.
+let mockStatus: "ready" | "submitted" | "streaming" | "error" = "ready";
+let mockStop = vi.fn();
+let mockMessages: unknown[] = [];
+
 vi.mock("@ai-sdk/react", () => ({
   useChat: () => ({
-    messages: [],
+    messages: mockMessages,
     sendMessage: vi.fn(),
-    stop: vi.fn(),
-    status: "ready",
+    stop: mockStop,
+    status: mockStatus,
   }),
 }));
 
@@ -60,7 +68,7 @@ vi.mock("~/components/Markdown", () => ({
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { LangyDrawer } from "~/components/langy/LangySidebar";
 
@@ -81,6 +89,12 @@ function getHandle(label: RegExp): HTMLElement {
   const buttons = screen.getAllByRole("button", { name: label });
   return buttons[0]!;
 }
+
+beforeEach(() => {
+  mockStatus = "ready";
+  mockStop = vi.fn();
+  mockMessages = [];
+});
 
 afterEach(() => cleanup());
 
@@ -141,6 +155,53 @@ describe("LangyDrawer", () => {
         expect(closeButtons.length).toBeGreaterThanOrEqual(2);
         await userEvent.click(closeButtons[1]!);
         expect(onOpenChange).toHaveBeenCalledWith(false);
+      });
+    });
+  });
+
+  describe("given the panel is open and a response is in flight — binds langy-baseline.feature § Stop an in-flight generation", () => {
+    describe("when useChat reports status='streaming'", () => {
+      it("renders the Stop control in place of Send", () => {
+        mockStatus = "streaming";
+        renderDrawer({ isOpen: true });
+        expect(
+          screen.getByRole("button", { name: /^Stop$/i }),
+        ).toBeDefined();
+        expect(
+          screen.queryByRole("button", { name: /^Send$/i }),
+        ).toBeNull();
+      });
+
+      it("invokes useChat.stop() when the Stop control is clicked", async () => {
+        mockStatus = "streaming";
+        renderDrawer({ isOpen: true });
+        await userEvent.click(
+          screen.getByRole("button", { name: /^Stop$/i }),
+        );
+        expect(mockStop).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    describe("when useChat reports status='submitted' (waiting on the model)", () => {
+      it("also renders the Stop control — the user can cancel a queued generation", () => {
+        mockStatus = "submitted";
+        renderDrawer({ isOpen: true });
+        expect(
+          screen.getByRole("button", { name: /^Stop$/i }),
+        ).toBeDefined();
+      });
+    });
+
+    describe("when useChat returns to status='ready' after stopping", () => {
+      it("renders the Send control again", () => {
+        mockStatus = "ready";
+        renderDrawer({ isOpen: true });
+        expect(
+          screen.getByRole("button", { name: /^Send$/i }),
+        ).toBeDefined();
+        expect(
+          screen.queryByRole("button", { name: /^Stop$/i }),
+        ).toBeNull();
       });
     });
   });
