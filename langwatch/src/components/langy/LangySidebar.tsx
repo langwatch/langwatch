@@ -13,6 +13,7 @@ import {
   chakra,
 } from "@chakra-ui/react";
 import { DefaultChatTransport, type UIMessage } from "ai";
+import { MeshGradient } from "@paper-design/shaders-react";
 import {
   ArrowRight,
   Check,
@@ -28,6 +29,7 @@ import { Markdown } from "~/components/Markdown";
 import { toaster } from "~/components/ui/toaster";
 import { aiBrandPalette } from "~/features/traces-v2/components/ai/aiBrandPalette";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { useReducedMotion } from "~/hooks/useReducedMotion";
 import { isHandledByGlobalHandler } from "~/utils/trpcError";
 import {
   useLangyConversations,
@@ -165,6 +167,48 @@ function GradientSparkle({ size = 16 }: { size?: number }) {
   );
 }
 
+/**
+ * Animated WebGL mesh of the AI brand colours, positioned absolute and
+ * sized to fill its parent. Drop into any AI affordance with
+ * `position: relative` and ensure the foreground content sits at
+ * `position: relative; zIndex: 1` so it stacks above the mesh. Mirrors
+ * the AskAiButton + AiShaderBackdrop usage from traces-v2.
+ *
+ * `active` lifts the swirl speed for the "thinking" state. Returns a
+ * static gradient when `prefers-reduced-motion: reduce` is set.
+ */
+function MeshGradientLayer({
+  active = false,
+  borderRadius,
+}: {
+  active?: boolean;
+  borderRadius?: string;
+}) {
+  const reduceMotion = useReducedMotion();
+  const speed = reduceMotion ? 0 : active ? 0.6 : 0.3;
+  return (
+    <Box
+      position="absolute"
+      inset={0}
+      pointerEvents="none"
+      overflow="hidden"
+      borderRadius={borderRadius}
+      _dark={{ opacity: 0.75 }}
+    >
+      <MeshGradient
+        colors={[...aiBrandPalette]}
+        distortion={0.5}
+        swirl={0.5}
+        grainMixer={0}
+        grainOverlay={0}
+        speed={speed}
+        scale={1.5}
+        style={{ width: "100%", height: "100%" }}
+      />
+    </Box>
+  );
+}
+
 function SparkleTile({
   size,
   sparkleSize,
@@ -214,7 +258,7 @@ function LangyHandle({
       cursor="pointer"
       borderTopLeftRadius="999px"
       borderBottomLeftRadius="999px"
-      background={AI_GRADIENT}
+      background="transparent"
       borderWidth="1px"
       borderStyle="solid"
       borderColor="rgba(255,255,255,0.18)"
@@ -223,8 +267,16 @@ function LangyHandle({
       boxShadow={hover ? AI_SHADOW : AI_SHADOW_SOFT}
       transform={hover ? "translate(-2px, -50%)" : "translateY(-50%)"}
       transition={`right ${LANGY_TRANSITION}, transform 180ms ease, box-shadow 180ms ease`}
+      overflow="hidden"
     >
-      <VStack gap={2} align="center" justify="center">
+      <MeshGradientLayer active={hover} />
+      <VStack
+        gap={2}
+        align="center"
+        justify="center"
+        position="relative"
+        zIndex={1}
+      >
         <Sparkles size={14} color="white" />
         <Text
           textStyle="2xs"
@@ -838,10 +890,11 @@ function Composer({
               aria-label="Send"
               onClick={onSend}
               disabled={!canSend}
-              background={canSend ? AI_GRADIENT : "#f5f5f4"}
+              background={canSend ? "transparent" : "#f5f5f4"}
               color={canSend ? "white" : "var(--chakra-colors-fg-muted)"}
               shadow={canSend}
               cursor={canSend ? "pointer" : "default"}
+              meshOverlay={canSend}
             >
               <Send size={14} />
             </SendButton>
@@ -867,6 +920,7 @@ function SendButton({
   color,
   shadow,
   cursor,
+  meshOverlay = false,
   ...rest
 }: {
   children: React.ReactNode;
@@ -874,13 +928,14 @@ function SendButton({
   color: string;
   shadow: boolean;
   cursor: string;
+  meshOverlay?: boolean;
 } & React.ButtonHTMLAttributes<HTMLButtonElement>) {
   return (
     <chakra.button
       type="button"
       width="32px"
       height="32px"
-      borderRadius="999px"
+      borderRadius="full"
       borderWidth={0}
       background={background}
       color={color}
@@ -890,9 +945,14 @@ function SendButton({
       flexShrink={0}
       boxShadow={shadow ? AI_SHADOW : undefined}
       transition="background 150ms ease, box-shadow 150ms ease"
+      position="relative"
+      overflow="hidden"
       {...rest}
     >
-      {children}
+      {meshOverlay && <MeshGradientLayer borderRadius="full" />}
+      <Box position="relative" zIndex={1} display="grid" placeItems="center">
+        {children}
+      </Box>
     </chakra.button>
   );
 }
@@ -1100,7 +1160,7 @@ function ProposalCard({
             borderRadius="md"
             borderWidth={0}
             background={
-              destructive ? "var(--chakra-colors-red-solid)" : AI_GRADIENT
+              destructive ? "var(--chakra-colors-red-solid)" : "transparent"
             }
             color="white"
             fontSize="12.5px"
@@ -1114,15 +1174,28 @@ function ProposalCard({
             boxShadow={destructive ? undefined : AI_SHADOW}
             onClick={onApply}
             disabled={isApplying}
+            position="relative"
+            overflow="hidden"
           >
-            <Check size={12} />
-            {isApplying
-              ? destructive
-                ? "Deleting…"
-                : "Applying…"
-              : destructive
-                ? "Delete"
-                : "Apply"}
+            {!destructive && (
+              <MeshGradientLayer borderRadius="md" active={isApplying} />
+            )}
+            <Box
+              position="relative"
+              zIndex={1}
+              display="flex"
+              alignItems="center"
+              gap={1.5}
+            >
+              <Check size={12} />
+              {isApplying
+                ? destructive
+                  ? "Deleting…"
+                  : "Applying…"
+                : destructive
+                  ? "Delete"
+                  : "Apply"}
+            </Box>
           </chakra.button>
           <Button
             size="xs"
