@@ -80,6 +80,14 @@ vi.mock("ai", () => ({
   },
 }));
 
+// @paper-design/shaders-react requires WebGL, which jsdom does not provide.
+// MeshGradient is purely cosmetic — stub it out so Stage C's animated AI
+// cues don't spam the test output with unhandled "WebGL is not supported"
+// errors. Same pattern used in SearchBar.integration.test.tsx.
+vi.mock("@paper-design/shaders-react", () => ({
+  MeshGradient: () => null,
+}));
+
 import { LangyDrawer } from "../LangySidebar";
 import { toaster } from "~/components/ui/toaster";
 
