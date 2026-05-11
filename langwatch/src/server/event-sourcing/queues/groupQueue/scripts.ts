@@ -208,21 +208,33 @@ while offset < scanBudget do
           -- Check pause status before dequeuing
           local paused = false
           if hasPauses then
-            local dataKey = keyPrefix .. "group:" .. groupId .. ":data"
-            local jobDataJson = redis.call("HGET", dataKey, stagedJobId)
-            if jobDataJson then
-              local ok, data = pcall(cjson.decode, jobDataJson)
-              if ok and type(data) == "table" then
-                local p = data["__pipelineName"]
-                local t = data["__jobType"]
-                local n = data["__jobName"]
-                local pIsStr = type(p) == "string"
-                local tIsStr = type(t) == "string"
-                local nIsStr = type(n) == "string"
-                if pIsStr then
-                  if redis.call("SISMEMBER", pausedJobKey, p) == 1 then paused = true
-                  elseif tIsStr and redis.call("SISMEMBER", pausedJobKey, p .. "/" .. t) == 1 then paused = true
-                  elseif tIsStr and nIsStr and redis.call("SISMEMBER", pausedJobKey, p .. "/" .. t .. "/" .. n) == 1 then paused = true
+            -- Tenant-level pause: derived from groupId prefix (everything
+            -- before the first "/"). Added post-2026-05-11 incident so an
+            -- operator can halt ALL processing for a runaway tenant without
+            -- touching pipeline names. Pause key format: "tenant:<tenantId>".
+            local slashIdx = string.find(groupId, "/", 1, true)
+            local tenantId = slashIdx and string.sub(groupId, 1, slashIdx - 1) or groupId
+            if redis.call("SISMEMBER", pausedJobKey, "tenant:" .. tenantId) == 1 then
+              paused = true
+            end
+
+            if not paused then
+              local dataKey = keyPrefix .. "group:" .. groupId .. ":data"
+              local jobDataJson = redis.call("HGET", dataKey, stagedJobId)
+              if jobDataJson then
+                local ok, data = pcall(cjson.decode, jobDataJson)
+                if ok and type(data) == "table" then
+                  local p = data["__pipelineName"]
+                  local t = data["__jobType"]
+                  local n = data["__jobName"]
+                  local pIsStr = type(p) == "string"
+                  local tIsStr = type(t) == "string"
+                  local nIsStr = type(n) == "string"
+                  if pIsStr then
+                    if redis.call("SISMEMBER", pausedJobKey, p) == 1 then paused = true
+                    elseif tIsStr and redis.call("SISMEMBER", pausedJobKey, p .. "/" .. t) == 1 then paused = true
+                    elseif tIsStr and nIsStr and redis.call("SISMEMBER", pausedJobKey, p .. "/" .. t .. "/" .. n) == 1 then paused = true
+                    end
                   end
                 end
               end
@@ -316,21 +328,33 @@ while offset < scanBudget and dispatched < maxJobs do
           -- Check pause status before dequeuing
           local paused = false
           if hasPauses then
-            local dataKey = keyPrefix .. "group:" .. groupId .. ":data"
-            local jobDataJson = redis.call("HGET", dataKey, stagedJobId)
-            if jobDataJson then
-              local ok, data = pcall(cjson.decode, jobDataJson)
-              if ok and type(data) == "table" then
-                local p = data["__pipelineName"]
-                local t = data["__jobType"]
-                local n = data["__jobName"]
-                local pIsStr = type(p) == "string"
-                local tIsStr = type(t) == "string"
-                local nIsStr = type(n) == "string"
-                if pIsStr then
-                  if redis.call("SISMEMBER", pausedJobKey, p) == 1 then paused = true
-                  elseif tIsStr and redis.call("SISMEMBER", pausedJobKey, p .. "/" .. t) == 1 then paused = true
-                  elseif tIsStr and nIsStr and redis.call("SISMEMBER", pausedJobKey, p .. "/" .. t .. "/" .. n) == 1 then paused = true
+            -- Tenant-level pause: derived from groupId prefix (everything
+            -- before the first "/"). Added post-2026-05-11 incident so an
+            -- operator can halt ALL processing for a runaway tenant without
+            -- touching pipeline names. Pause key format: "tenant:<tenantId>".
+            local slashIdx = string.find(groupId, "/", 1, true)
+            local tenantId = slashIdx and string.sub(groupId, 1, slashIdx - 1) or groupId
+            if redis.call("SISMEMBER", pausedJobKey, "tenant:" .. tenantId) == 1 then
+              paused = true
+            end
+
+            if not paused then
+              local dataKey = keyPrefix .. "group:" .. groupId .. ":data"
+              local jobDataJson = redis.call("HGET", dataKey, stagedJobId)
+              if jobDataJson then
+                local ok, data = pcall(cjson.decode, jobDataJson)
+                if ok and type(data) == "table" then
+                  local p = data["__pipelineName"]
+                  local t = data["__jobType"]
+                  local n = data["__jobName"]
+                  local pIsStr = type(p) == "string"
+                  local tIsStr = type(t) == "string"
+                  local nIsStr = type(n) == "string"
+                  if pIsStr then
+                    if redis.call("SISMEMBER", pausedJobKey, p) == 1 then paused = true
+                    elseif tIsStr and redis.call("SISMEMBER", pausedJobKey, p .. "/" .. t) == 1 then paused = true
+                    elseif tIsStr and nIsStr and redis.call("SISMEMBER", pausedJobKey, p .. "/" .. t .. "/" .. n) == 1 then paused = true
+                    end
                   end
                 end
               end

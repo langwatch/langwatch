@@ -701,6 +701,94 @@ export class QueueRedisRepository implements QueueRepository {
     return this.redis.smembers(`${params.queueName}:gq:paused-jobs`);
   }
 
+  // Tenant pause: encoded as a special "tenant:<id>" entry in the same
+  // paused-jobs SET that DISPATCH_LUA already consults. The Lua dispatcher
+  // extracts the tenantId from each groupId (everything before the first
+  // "/") and checks SISMEMBER for "tenant:<id>". Added post-2026-05-11
+  // incident so an operator can halt ALL processing for a runaway tenant
+  // without touching pipeline keys. See specs/queue-pausing/.
+  static readonly TENANT_PAUSE_PREFIX = "tenant:";
+
+  async pauseTenant(params: {
+    queueName: string;
+    tenantId: string;
+  }): Promise<void> {
+    await this.redis.sadd(
+      `${params.queueName}:gq:paused-jobs`,
+      `${QueueRedisRepository.TENANT_PAUSE_PREFIX}${params.tenantId}`,
+    );
+  }
+
+  async unpauseTenant(params: {
+    queueName: string;
+    tenantId: string;
+  }): Promise<void> {
+    await this.redis.srem(
+      `${params.queueName}:gq:paused-jobs`,
+      `${QueueRedisRepository.TENANT_PAUSE_PREFIX}${params.tenantId}`,
+    );
+    // Kick the dispatcher loop so paused work resumes within the next scan.
+    await this.redis.lpush(`${params.queueName}:gq:signal`, "1");
+  }
+
+  async listPausedTenants(params: {
+    queueName: string;
+  }): Promise<string[]> {
+    const all = await this.redis.smembers(
+      `${params.queueName}:gq:paused-jobs`,
+    );
+    const prefix = QueueRedisRepository.TENANT_PAUSE_PREFIX;
+    return all
+      .filter((k) => k.startsWith(prefix))
+      .map((k) => k.slice(prefix.length));
+  }
+
+  // Bulk-drain every group whose ID starts with "<tenantId>/" for the given
+  // queue, optionally filtered to a single pipeline name. Returns the total
+  // job count drained. Added post-2026-05-11 incident — clicking 500K Drain
+  // buttons by hand wasn't feasible.
+  async drainTenant(params: {
+    queueName: string;
+    tenantId: string;
+    pipelineFilter?: string;
+  }): Promise<{ groupsDrained: number; jobsDrained: number }> {
+    const prefix = `${params.queueName}:gq:`;
+    const readyKey = `${prefix}ready`;
+    const tenantPrefix = `${params.tenantId}/`;
+    const pipelineFragment = params.pipelineFilter
+      ? `/${params.pipelineFilter}/`
+      : null;
+
+    // ZSCAN streams the zset without ever materializing all members.
+    let cursor = "0";
+    let groupsDrained = 0;
+    let jobsDrained = 0;
+    const SCAN_BATCH = 1000;
+    do {
+      const [next, members] = await this.redis.zscan(
+        readyKey,
+        cursor,
+        "COUNT",
+        SCAN_BATCH,
+      );
+      cursor = next;
+      // members alternates [groupId, score, groupId, score, ...]
+      for (let i = 0; i < members.length; i += 2) {
+        const groupId = members[i]!;
+        if (!groupId.startsWith(tenantPrefix)) continue;
+        if (pipelineFragment && !groupId.includes(pipelineFragment)) continue;
+        const result = await this.drainGroup({
+          queueName: params.queueName,
+          groupId,
+        });
+        groupsDrained++;
+        jobsDrained += result.jobsRemoved;
+      }
+    } while (cursor !== "0");
+
+    return { groupsDrained, jobsDrained };
+  }
+
   // ── DLQ Operations ──────────────────────────────────────────────
 
   async moveToDlq(params: {

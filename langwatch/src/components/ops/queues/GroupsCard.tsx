@@ -87,6 +87,7 @@ export function GroupsCard({ queueNames }: { queueNames: string[] }) {
 
   const [selectedGroup, setSelectedGroup] = useState<{ queueName: string; groupId: string } | null>(null);
   const [drainTarget, setDrainTarget] = useState<{ queueName: string; groupId: string } | null>(null);
+  const [drainTenantTarget, setDrainTenantTarget] = useState<string | null>(null);
   const drainGroupMutation = api.ops.drainGroup.useMutation({
     onSuccess: (data) => { toaster.create({ title: `Drained, removed ${data.jobsRemoved} jobs`, type: "success" }); setDrainTarget(null); void utils.ops.invalidate(); },
     onError: (error) => { toaster.create({ title: "Failed to drain", description: error.message, type: "error" }); },
@@ -94,6 +95,45 @@ export function GroupsCard({ queueNames }: { queueNames: string[] }) {
   const unblockMutation = api.ops.unblockGroup.useMutation({
     onSuccess: () => { toaster.create({ title: "Group unblocked", type: "success" }); void utils.ops.invalidate(); },
     onError: (error) => { toaster.create({ title: "Failed to unblock", description: error.message, type: "error" }); },
+  });
+
+  // Tenant-scoped controls. Activated when the search box is a single
+  // tenant prefix (no slash) — typically `project_…`. Reuses the same
+  // search input the operator was already typing for filter scope.
+  const tenantScope = useMemo(() => {
+    const s = search.trim();
+    if (!s || s.includes("/") || s.includes(" ")) return null;
+    if (!s.startsWith("project_")) return null;
+    return s;
+  }, [search]);
+
+  const pausedTenantsQuery = api.ops.listPausedTenants.useQuery(
+    { queueName: primaryQueue ?? "" },
+    { enabled: !!primaryQueue, refetchInterval: 10000 },
+  );
+  const isTenantPaused = !!(
+    tenantScope &&
+    pausedTenantsQuery.data?.includes(tenantScope)
+  );
+
+  const pauseTenantMutation = api.ops.pauseTenant.useMutation({
+    onSuccess: (_, vars) => { toaster.create({ title: `Paused tenant ${vars.tenantId}`, type: "success" }); void utils.ops.invalidate(); },
+    onError: (error) => { toaster.create({ title: "Failed to pause tenant", description: error.message, type: "error" }); },
+  });
+  const unpauseTenantMutation = api.ops.unpauseTenant.useMutation({
+    onSuccess: (_, vars) => { toaster.create({ title: `Unpaused tenant ${vars.tenantId}`, type: "success" }); void utils.ops.invalidate(); },
+    onError: (error) => { toaster.create({ title: "Failed to unpause tenant", description: error.message, type: "error" }); },
+  });
+  const drainTenantMutation = api.ops.drainTenant.useMutation({
+    onSuccess: (data, vars) => {
+      toaster.create({
+        title: `Drained ${data.groupsDrained} groups (${data.jobsDrained} jobs) for ${vars.tenantId}`,
+        type: "success",
+      });
+      setDrainTenantTarget(null);
+      void utils.ops.invalidate();
+    },
+    onError: (error) => { toaster.create({ title: "Failed to drain tenant", description: error.message, type: "error" }); setDrainTenantTarget(null); },
   });
 
   const statusButtons: Array<{ value: StatusFilter; label: string; count: number; color: string }> = [
@@ -108,6 +148,28 @@ export function GroupsCard({ queueNames }: { queueNames: string[] }) {
     <>
       <Card.Root>
         <Card.Body padding={0}>
+          {/* Paused-tenants banner: always visible when at least one tenant is paused so
+              operators don't accidentally assume a tenant's silence means it's healthy. */}
+          {hasAccess && pausedTenantsQuery.data && pausedTenantsQuery.data.length > 0 && (
+            <HStack paddingX={4} paddingY={2} borderBottom="1px solid" borderBottomColor="border" bg="yellow.subtle" gap={2} flexWrap="wrap">
+              <Text textStyle="xs" fontWeight="medium">Paused tenants:</Text>
+              {pausedTenantsQuery.data.map((tid) => (
+                <HStack key={tid} gap={1}>
+                  <Badge size="xs" colorPalette="yellow" variant="solid" fontFamily="mono">{tid}</Badge>
+                  <Button
+                    size="2xs"
+                    variant="outline"
+                    colorPalette="green"
+                    onClick={() => primaryQueue && unpauseTenantMutation.mutate({ queueName: primaryQueue, tenantId: tid })}
+                    loading={unpauseTenantMutation.isPending && unpauseTenantMutation.variables?.tenantId === tid}
+                  >
+                    Unpause
+                  </Button>
+                </HStack>
+              ))}
+            </HStack>
+          )}
+
           <HStack paddingX={4} paddingY={2.5} borderBottom="1px solid" borderBottomColor="border" gap={2} flexWrap="wrap">
             <Text textStyle="sm" fontWeight="medium">Groups</Text>
             <Spacer />
@@ -135,6 +197,47 @@ export function GroupsCard({ queueNames }: { queueNames: string[] }) {
               </>
             )}
           </HStack>
+
+          {/* Tenant-scoped action bar: visible when the operator searches for an
+              exact tenant id (e.g. project_W_7kPya...). Lets them pause/unpause
+              ALL processing for that tenant or bulk-drain every group. Added
+              post-2026-05-11 incident — clicking 500K Drain buttons by hand
+              was the actual blocker that day. */}
+          {hasAccess && tenantScope && primaryQueue && (
+            <HStack paddingX={4} paddingY={2} borderBottom="1px solid" borderBottomColor="border" gap={2} flexWrap="wrap" bg="bg.subtle">
+              <Text textStyle="xs" fontWeight="medium">Tenant actions:</Text>
+              <Badge size="xs" variant="subtle" fontFamily="mono">{tenantScope}</Badge>
+              {isTenantPaused ? (
+                <Button
+                  size="2xs"
+                  variant="outline"
+                  colorPalette="green"
+                  onClick={() => { pauseTenantMutation.reset(); unpauseTenantMutation.mutate({ queueName: primaryQueue, tenantId: tenantScope }); }}
+                  loading={unpauseTenantMutation.isPending}
+                >
+                  Unpause Tenant
+                </Button>
+              ) : (
+                <Button
+                  size="2xs"
+                  variant="outline"
+                  colorPalette="yellow"
+                  onClick={() => { unpauseTenantMutation.reset(); pauseTenantMutation.mutate({ queueName: primaryQueue, tenantId: tenantScope }); }}
+                  loading={pauseTenantMutation.isPending}
+                >
+                  Pause Tenant
+                </Button>
+              )}
+              <Button
+                size="2xs"
+                variant="outline"
+                colorPalette="red"
+                onClick={() => setDrainTenantTarget(tenantScope)}
+              >
+                Drain All Tenant Groups
+              </Button>
+            </HStack>
+          )}
 
           {isLoading ? (
             <Center paddingY={6}><Spinner size="sm" /></Center>
@@ -250,6 +353,19 @@ export function GroupsCard({ queueNames }: { queueNames: string[] }) {
         title="Drain Group"
         description={`Permanently remove all jobs from "${drainTarget?.groupId}". Cannot be undone.`}
         isLoading={drainGroupMutation.isPending}
+      />
+
+      <ConfirmDialog
+        open={!!drainTenantTarget}
+        onClose={() => setDrainTenantTarget(null)}
+        onConfirm={() => {
+          if (drainTenantTarget && primaryQueue) {
+            drainTenantMutation.mutate({ queueName: primaryQueue, tenantId: drainTenantTarget });
+          }
+        }}
+        title="Drain All Tenant Groups"
+        description={`Permanently remove ALL pending groups for tenant "${drainTenantTarget}" across every pipeline. Cannot be undone. The event log in ClickHouse is preserved; you can replay later if needed.`}
+        isLoading={drainTenantMutation.isPending}
       />
     </>
   );
