@@ -89,14 +89,11 @@ export async function runLangyBootstrapJob(
 
     let content: string;
     try {
-      // Spec: project's configured default LLM; fallback gpt-5-mini if none.
-      // getVercelAIModel(projectId) uses project default with its own
-      // fallback (DEFAULT_MODEL). If neither resolves, we retry with
-      // gpt-5-mini explicitly.
       let model;
       try {
         model = await getVercelAIModel(projectId);
-      } catch {
+      } catch (error) {
+        if (!isNoModelConfiguredError(error)) throw error;
         model = await getVercelAIModel(projectId, FALLBACK_MODEL);
       }
       const result = await generateText({
@@ -132,6 +129,14 @@ export async function runLangyBootstrapJob(
     });
     throw error;
   }
+}
+
+function isNoModelConfiguredError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  // All four "no model configured" errors in getVercelAIModel point at
+  // "Settings → Model Providers". "Project not found" and transient
+  // provider errors do not — those should propagate so BullMQ retries.
+  return error.message.includes("Model Providers");
 }
 
 function renderMinimalStarter(snapshot: Awaited<ReturnType<typeof gatherProjectSnapshot>>) {
