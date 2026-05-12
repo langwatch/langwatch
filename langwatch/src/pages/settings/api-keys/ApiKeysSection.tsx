@@ -11,7 +11,7 @@ import {
   useDisclosure,
 } from "@chakra-ui/react";
 import { Tooltip } from "../../../components/ui/tooltip";
-import { Clipboard, Eye, EyeOff, Key, Pencil, Plus, Trash2 } from "lucide-react";
+import { Clipboard, Key, Pencil, Plus, Trash2 } from "lucide-react";
 import { PageLayout } from "../../../components/ui/layouts/PageLayout";
 import { useState } from "react";
 import { toaster } from "../../../components/ui/toaster";
@@ -27,39 +27,24 @@ import { TokenCreatedDialog } from "./TokenCreatedDialog";
 
 type ApiKeyRow = RouterOutputs["apiKey"]["list"][number];
 
-function ProjectKeySecretCell({ apiKey }: { apiKey: string }) {
-  const [revealed, setRevealed] = useState(false);
-
+function ProjectKeyActions({ apiKey }: { apiKey: string }) {
   return (
-    <HStack gap={1}>
-      <Text fontSize="xs" fontFamily="monospace" color="fg.muted">
-        {revealed ? apiKey : `sk-...${apiKey.slice(-4)}`}
-      </Text>
-      <Button
-        size="2xs"
-        variant="ghost"
-        aria-label={revealed ? "Hide secret key" : "Reveal secret key"}
-        onClick={() => setRevealed((v) => !v)}
-      >
-        {revealed ? <EyeOff size={12} /> : <Eye size={12} />}
-      </Button>
-      <Button
-        size="2xs"
-        variant="ghost"
-        aria-label="Copy secret key"
-        onClick={() => {
-          void navigator.clipboard.writeText(apiKey);
-          toaster.create({
-            title: "API key copied to clipboard",
-            type: "success",
-            duration: 2000,
-            meta: { closable: true },
-          });
-        }}
-      >
-        <Clipboard size={12} />
-      </Button>
-    </HStack>
+    <Button
+      size="xs"
+      variant="ghost"
+      aria-label="Copy secret key"
+      onClick={() => {
+        void navigator.clipboard.writeText(apiKey);
+        toaster.create({
+          title: "API key copied to clipboard",
+          type: "success",
+          duration: 2000,
+          meta: { closable: true },
+        });
+      }}
+    >
+      <Clipboard size={14} />
+    </Button>
   );
 }
 
@@ -283,7 +268,9 @@ export function ApiKeysSection({
                       <Badge size="sm" colorPalette="green">Active</Badge>
                     </Table.Cell>
                     <Table.Cell>
-                      <ProjectKeySecretCell apiKey={projectApiKey} />
+                      <Text fontSize="xs" fontFamily="monospace" color="fg.muted">
+                        sk-...{projectApiKey.slice(-4)}
+                      </Text>
                     </Table.Cell>
                     <Table.Cell>
                       <Text fontSize="sm" color="fg.muted">—</Text>
@@ -298,7 +285,7 @@ export function ApiKeysSection({
                       <Text fontSize="sm">Project only</Text>
                     </Table.Cell>
                     <Table.Cell>
-                      {/* No edit/revoke for legacy project keys */}
+                      <ProjectKeyActions apiKey={projectApiKey} />
                     </Table.Cell>
                   </Table.Row>
                 )}
