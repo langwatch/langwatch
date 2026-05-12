@@ -38,6 +38,10 @@ import { CHILD_PROCESS, SCENARIO_WORKER } from "./scenario.constants";
 import { ScenarioFailureHandler, type FailureEventParams } from "./scenario-failure-handler";
 import { ScenarioService } from "./scenario.service";
 import { resolveChildProcessSpawn } from "./execution/child-process-spawn";
+import {
+  encodeScenarioLogContext,
+  SCENARIO_LOG_CONTEXT_ENV,
+} from "./execution/child-logger";
 
 // ============================================================================
 // Dependency Interfaces (Dependency Inversion Principle)
@@ -316,11 +320,19 @@ async function spawnScenarioChildProcess(
     };
 
     const otelResourceAttrs = buildOtelResourceAttributes(childProcessData.scenario.labels);
+    const logContext = encodeScenarioLogContext({
+      scenarioRunId: jobData.scenarioRunId,
+      batchRunId,
+      projectId,
+      scenarioId,
+      setId,
+    });
     const childEnv = buildChildProcessEnv({
       LANGWATCH_API_KEY: telemetry.apiKey,
       LANGWATCH_ENDPOINT: telemetry.endpoint,
       SCENARIO_HEADLESS: "true",
       OTEL_RESOURCE_ATTRIBUTES: otelResourceAttrs,
+      [SCENARIO_LOG_CONTEXT_ENV]: logContext,
     });
 
     const packageRoot = path.resolve(__dirname, "../../..");
