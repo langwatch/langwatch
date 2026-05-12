@@ -11,6 +11,7 @@ import {
   type SignatureComponentConfig,
   signatureComponentSchema,
 } from "~/optimization_studio/types/dsl";
+import { normalizeAgentConfigForType } from "./code-normalization";
 
 /**
  * Agent types enum - matches ComponentType for signature/code/custom(workflow)/http
@@ -264,8 +265,14 @@ export class AgentRepository {
     // Validate type
     const type = agentTypeSchema.parse(input.type);
 
-    // Validate config matches type's DSL schema
+    // Validate config matches type's DSL schema, then normalise
+    // Python source for code agents so accidental Monaco-paste indent
+    // can't break Black at runtime (#3013).
     const validatedConfig = validateConfig(type, input.config);
+    const normalizedConfig = normalizeAgentConfigForType(
+      type,
+      validatedConfig,
+    );
 
     const agent = await this.prisma.agent.create({
       data: {
@@ -273,7 +280,7 @@ export class AgentRepository {
         projectId: input.projectId,
         name: input.name,
         type,
-        config: validatedConfig as unknown as Prisma.InputJsonValue,
+        config: normalizedConfig as unknown as Prisma.InputJsonValue,
         workflowId: input.workflowId,
         ...(input.copiedFromAgentId && {
           copiedFromAgentId: input.copiedFromAgentId,
@@ -309,11 +316,16 @@ export class AgentRepository {
       ? agentTypeSchema.parse(input.data.type)
       : agentTypeSchema.parse(existing.type);
 
-    // Validate config if provided
+    // Validate config if provided, then normalise Python source for
+    // code agents (see create() / #3013).
     let configToStore: Prisma.InputJsonValue | undefined;
     if (input.data.config) {
       const validatedConfig = validateConfig(type, input.data.config);
-      configToStore = validatedConfig as unknown as Prisma.InputJsonValue;
+      const normalizedConfig = normalizeAgentConfigForType(
+        type,
+        validatedConfig,
+      );
+      configToStore = normalizedConfig as unknown as Prisma.InputJsonValue;
     }
 
     const agent = await this.prisma.agent.update({
@@ -405,7 +417,10 @@ export class AgentRepository {
     const configToStore =
       data.config === null
         ? Prisma.JsonNull
-        : (validateConfig(type, data.config) as unknown as Prisma.InputJsonValue);
+        : (normalizeAgentConfigForType(
+            type,
+            validateConfig(type, data.config),
+          ) as unknown as Prisma.InputJsonValue);
     await this.prisma.agent.update({
       where: { id: agentId, projectId },
       data: { name: data.name, config: configToStore },
