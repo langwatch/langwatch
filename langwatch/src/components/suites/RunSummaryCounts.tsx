@@ -23,6 +23,7 @@ function CountBadge({
   icon: Icon,
   color,
   bg,
+  animate = false,
 }: {
   count: number;
   label: string;
@@ -30,6 +31,7 @@ function CountBadge({
   icon: LucideIcon;
   color: string;
   bg: string;
+  animate?: boolean;
 }) {
   return (
     <Tooltip content={tooltip}>
@@ -40,7 +42,14 @@ function CountBadge({
         borderRadius="md"
         bg={bg}
       >
-        <Icon size={12} style={{ color: `var(--chakra-colors-${color})` }} />
+        <Icon
+          size={12}
+          style={{
+            color: `var(--chakra-colors-${color})`,
+            ...(animate ? { animation: "spin 2s linear infinite" } : {}),
+          }}
+          data-testid={animate ? "running-spinner-icon" : undefined}
+        />
         <Text fontSize="xs" fontWeight="semibold" color={color} whiteSpace="nowrap">
           {count} {label}
         </Text>
@@ -104,6 +113,7 @@ export function RunSummaryCounts({ summary }: RunSummaryCountsProps) {
           icon={Loader}
           color="orange.fg"
           bg="orange.subtle"
+          animate
         />
       )}
 

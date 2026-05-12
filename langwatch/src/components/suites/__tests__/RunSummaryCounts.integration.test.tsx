@@ -91,6 +91,34 @@ describe("<RunSummaryCounts/>", () => {
     });
   });
 
+  describe("given a summary with inProgressCount non-zero", () => {
+    it("renders the running badge icon with a spin animation", () => {
+      render(
+        <RunSummaryCounts
+          summary={makeSummary({ passedCount: 0, failedCount: 0, inProgressCount: 3 })}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      expect(screen.getByText("3 running")).toBeInTheDocument();
+      const spinner = screen.getByTestId("running-spinner-icon");
+      expect(spinner.getAttribute("style") ?? "").toContain("spin 2s linear infinite");
+    });
+  });
+
+  describe("given a summary with inProgressCount at zero", () => {
+    it("does not render a spinning icon", () => {
+      render(
+        <RunSummaryCounts
+          summary={makeSummary({ passedCount: 8, failedCount: 0, inProgressCount: 0 })}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      expect(screen.queryByTestId("running-spinner-icon")).not.toBeInTheDocument();
+    });
+  });
+
   describe("given a summary with all counts at zero", () => {
     it("renders empty container with no status items", () => {
       const { container } = render(
