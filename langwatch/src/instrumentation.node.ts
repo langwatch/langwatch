@@ -11,6 +11,7 @@ import {
   BatchSpanProcessor,
   SimpleSpanProcessor,
 } from "@opentelemetry/sdk-trace-node";
+import { format } from "node:util";
 import { setupObservability } from "langwatch/observability/node";
 import { createLogger } from "./utils/logger/server";
 
@@ -34,12 +35,7 @@ const originalInfo = console.info;
 const originalWarn = console.warn;
 const originalError = console.error;
 
-const formatArgs = (args: unknown[]) =>
-  args
-    .map((arg) =>
-      typeof arg === "object" ? JSON.stringify(arg) : String(arg)
-    )
-    .join(" ");
+const formatArgs = (args: unknown[]) => format(...args);
 
 console.log = (...args: unknown[]) => {
   consoleLogger.info(formatArgs(args));

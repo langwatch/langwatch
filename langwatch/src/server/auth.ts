@@ -29,6 +29,42 @@ import { captureException } from "../utils/posthogErrorCapture";
 
 const logger = createLogger("langwatch:auth");
 
+const SENSITIVE_METADATA_KEYS = new Set([
+  "access_token",
+  "refresh_token",
+  "id_token",
+  "token",
+  "accessToken",
+  "refreshToken",
+  "idToken",
+  "client_secret",
+  "clientSecret",
+  "authorization",
+  "Authorization",
+]);
+
+const redactNextAuthMetadata = (value: unknown): unknown => {
+  if (value instanceof Error) {
+    return {
+      name: value.name,
+      message: value.message,
+      stack: value.stack,
+    };
+  }
+  if (Array.isArray(value)) {
+    return value.map(redactNextAuthMetadata);
+  }
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>).map(([key, v]) => [
+        key,
+        SENSITIVE_METADATA_KEYS.has(key) ? "[redacted]" : redactNextAuthMetadata(v),
+      ]),
+    );
+  }
+  return value;
+};
+
 /**
  * Module augmentation for `next-auth` types. Allows us to add custom properties to the `session`
  * object and keep type safety.
@@ -53,13 +89,19 @@ export const authOptions = (
 ): NextAuthOptions => ({
   logger: {
     error(code, metadata) {
-      logger.error({ code, metadata }, "next-auth error");
+      logger.error(
+        { code, metadata: redactNextAuthMetadata(metadata) },
+        "next-auth error",
+      );
     },
     warn(code) {
       logger.warn({ code }, "next-auth warning");
     },
     debug(code, metadata) {
-      logger.debug({ code, metadata }, "next-auth debug");
+      logger.debug(
+        { code, metadata: redactNextAuthMetadata(metadata) },
+        "next-auth debug",
+      );
     },
   },
   session: {

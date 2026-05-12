@@ -12,23 +12,19 @@ const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
 };
 
+const errorLog = { emit: "event", level: "error" } as const;
+const warnLog = { emit: "event", level: "warn" } as const;
+
 export const prisma =
   globalForPrisma.prisma ??
-  new PrismaClient({
-    log:
-      env.NODE_ENV === "development"
-        ? [
-            { emit: "event", level: "error" },
-            { emit: "event", level: "warn" },
-          ]
-        : [{ emit: "event", level: "error" }],
-  });
+  new PrismaClient({ log: [errorLog, warnLog] });
 
-// Route Prisma logs through the custom logger
-prisma.$on("error" as never, (e: { message: string; target?: string }) => {
+type PrismaLogEvent = { message: string; target?: string };
+
+prisma.$on("error" as never, (e: PrismaLogEvent) => {
   logger.error({ target: e.target }, e.message);
 });
-prisma.$on("warn" as never, (e: { message: string; target?: string }) => {
+prisma.$on("warn" as never, (e: PrismaLogEvent) => {
   logger.warn({ target: e.target }, e.message);
 });
 
