@@ -224,7 +224,7 @@ export function createOrgAuthMiddleware({
         {
           error: "Unauthorized",
           message:
-            "Authentication required. Use Authorization: Bearer <pat-token>.",
+            "Authentication required. Use Authorization: Bearer <api-key>.",
         },
         401,
       );
@@ -244,7 +244,7 @@ export function createOrgAuthMiddleware({
     if (!resolved) {
       orgLogger.warn(
         { ...diag, hasToken: true },
-        "Org auth failed: invalid or non-PAT credentials",
+        "Org auth failed: invalid credentials",
       );
       return c.json(
         {
