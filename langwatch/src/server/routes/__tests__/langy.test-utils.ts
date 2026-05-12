@@ -20,7 +20,7 @@ export interface LangyChatRequestBody {
  * POST a chat request to the Langy route. The caller is responsible
  * for installing whatever auth/permission/rate-limit mocks they need.
  */
-export function postLangyChat(
+export async function postLangyChat(
   app: Hono,
   body: LangyChatRequestBody,
 ): Promise<Response> {

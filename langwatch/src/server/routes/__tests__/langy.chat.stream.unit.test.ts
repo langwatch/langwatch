@@ -7,6 +7,12 @@
  */
 import { simulateReadableStream } from "ai/test";
 import { MockLanguageModelV3 } from "ai/test";
+
+// The `chunks` we feed `simulateReadableStream` are typed loosely by upstream;
+// `MockLanguageModelV3`'s `doStream` wants `ReadableStream<LanguageModelV3StreamPart>`.
+// We assert at the boundary instead of fighting deep generic narrowing in tests.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type DoStreamFactory = (...args: any[]) => Promise<{ stream: ReadableStream<any> }>;
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // ---------------------------------------------------------------------------
@@ -109,30 +115,29 @@ const { app } = await import("../langy");
 // ---------------------------------------------------------------------------
 
 function makeStubModel(textChunks: string[]) {
-  return new MockLanguageModelV3({
-    doStream: async () => ({
-      stream: simulateReadableStream({
-        chunks: [
-          { type: "stream-start", warnings: [] },
-          { type: "response-metadata", id: "rsp-1", modelId: "mock-1" },
-          { type: "text-start", id: "txt-1" },
-          ...textChunks.map((delta) => ({
-            type: "text-delta" as const,
-            id: "txt-1",
-            delta,
-          })),
-          { type: "text-end", id: "txt-1" },
-          {
-            type: "finish",
-            finishReason: "stop",
-            usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 },
-          },
-        ],
-        initialDelayInMs: null,
-        chunkDelayInMs: null,
-      }),
-    }),
+  const doStream: DoStreamFactory = async () => ({
+    stream: simulateReadableStream({
+      chunks: [
+        { type: "stream-start", warnings: [] },
+        { type: "response-metadata", id: "rsp-1", modelId: "mock-1" },
+        { type: "text-start", id: "txt-1" },
+        ...textChunks.map((delta) => ({
+          type: "text-delta" as const,
+          id: "txt-1",
+          delta,
+        })),
+        { type: "text-end", id: "txt-1" },
+        {
+          type: "finish",
+          finishReason: "stop",
+          usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 },
+        },
+      ],
+      initialDelayInMs: null,
+      chunkDelayInMs: null,
+    }) as never,
   });
+  return new MockLanguageModelV3({ doStream });
 }
 
 /**
@@ -196,14 +201,13 @@ function makeToolCallingStubModel(toolName: string, input: unknown) {
   // array would skip the first turn. We track our own counter and
   // clamp to the last turn for any extra calls.
   let turnIndex = 0;
-  return new MockLanguageModelV3({
-    doStream: async () => {
-      const builder =
-        turnBuilders[turnIndex] ?? turnBuilders[turnBuilders.length - 1]!;
-      turnIndex += 1;
-      return { stream: builder() };
-    },
-  });
+  const doStream: DoStreamFactory = async () => {
+    const builder =
+      turnBuilders[turnIndex] ?? turnBuilders[turnBuilders.length - 1]!;
+    turnIndex += 1;
+    return { stream: builder() as never };
+  };
+  return new MockLanguageModelV3({ doStream });
 }
 
 async function readBody(res: Response): Promise<string> {

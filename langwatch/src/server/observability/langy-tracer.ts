@@ -52,7 +52,7 @@ export interface LangyTelemetrySettings {
  * Pure read; safe to call in tests.
  */
 export function getLangyDogfoodConfig(
-  env: NodeJS.ProcessEnv = process.env,
+  env: Partial<Record<string, string | undefined>> = process.env,
 ): LangyDogfoodConfig | null {
   const explicit = env.LANGY_DOGFOOD_ENABLED;
   if (explicit === "false") return null;
@@ -72,7 +72,7 @@ export function getLangyDogfoodConfig(
  */
 export function buildLangyTelemetrySettings(
   input: LangyTelemetryInput,
-  env: NodeJS.ProcessEnv = process.env,
+  env: Partial<Record<string, string | undefined>> = process.env,
 ): LangyTelemetrySettings | null {
   if (!getLangyDogfoodConfig(env)) return null;
 

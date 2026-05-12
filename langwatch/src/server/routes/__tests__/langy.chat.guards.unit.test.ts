@@ -27,7 +27,7 @@ const VALID_SESSION = {
   expires: "2099-01-01",
 } as const;
 
-function postChat(body: unknown): Promise<Response> {
+async function postChat(body: unknown): Promise<Response> {
   return app.request("/api/langy/chat", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
