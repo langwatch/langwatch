@@ -3,6 +3,12 @@ Feature: Model Provider Configuration
   I want to set up API keys, models, and provider-specific settings
   So that I can use the provider for LangWatch operations
 
+  # Most remaining @unimplemented scenarios describe the provider drawer UI
+  # (toggles, Custom Models section, extra-headers). Need a JSDOM render of
+  # `ModelProviderForm` + the Custom Models / Extra Headers subforms. The
+  # masking/preservation pieces are bound to `modelProvider.service.unit.test.ts`
+  # (mergeCustomKeys / maskApiKeys). Aspirational pending the form harness.
+
   Background:
     Given I am logged in
     And I have access to a project
@@ -52,14 +58,14 @@ Feature: Model Provider Configuration
     And the provider is saved with the API key
     And the drawer closes
 
-  @integration @unimplemented
+  @integration
   Scenario: API key masking when editing existing provider
     Given I have "openai" provider configured with API key "sk-actual123"
     When I open the model provider configuration drawer for "openai"
     Then the "OPENAI_API_KEY" field shows "HAS_KEY••••••••••••••••••••••••"
     And the actual API key value is not displayed
 
-  @integration @unimplemented
+  @integration
   Scenario: Preserve original API key when saving with masked placeholder
     Given I have "openai" provider configured with API key "sk-actual123"
     When I open the model provider configuration drawer for "openai"
