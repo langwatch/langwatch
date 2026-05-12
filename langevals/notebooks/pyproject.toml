@@ -6,7 +6,7 @@ authors = [{name = "Rogerio Chaves", email = "rogerio@langwatch.ai"}]
 license = {text = "MIT"}
 requires-python = ">=3.11,<3.13"
 dependencies = [
-    "pytest>=8.1.2",
+    "pytest>=9.0.3",
     "fastapi>=0.115.11",
     "arize-phoenix>=4.9.0",
     "openinference-instrumentation-dspy>=0.1.9",
