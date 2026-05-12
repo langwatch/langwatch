@@ -227,13 +227,8 @@ export default function SimulationsPage() {
   });
 
   const { requestRun, isPending: isRunPending, pendingBatchRunId, dialogProps: runDialogProps } = useRunSuite({
-    onRunScheduled: (suiteId) => {
+    onRunScheduled: () => {
       void utils.suites.getSummaries.invalidate();
-      // Navigate to the suite so the user sees the run starting
-      const suite = suites?.find((s) => s.id === suiteId);
-      if (suite && selectedSuiteSlug !== suite.slug) {
-        navigateToSuite(suite.slug);
-      }
     },
   });
 
