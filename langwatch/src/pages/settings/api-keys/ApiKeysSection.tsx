@@ -421,6 +421,7 @@ export function ApiKeysSection({
         newToken={newToken}
         projectId={projectId}
         endpoint={endpoint}
+        orgProjects={orgProjects.data ?? []}
         onClose={() => {
           setNewToken(null);
           onCreateClose();

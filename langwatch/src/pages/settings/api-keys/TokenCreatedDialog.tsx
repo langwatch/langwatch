@@ -1,6 +1,7 @@
 import {
   Alert,
   Box,
+  createListCollection,
   HStack,
   Text,
   VStack,
@@ -8,6 +9,7 @@ import {
 import { Terminal } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Dialog } from "../../../components/ui/dialog";
+import { Select } from "../../../components/ui/select";
 import { maskApiKey } from "../../../features/onboarding/components/sections/shared/api-key-utils";
 import {
   buildMcpJson,
@@ -102,26 +104,38 @@ export function TokenCreatedDialog({
   newToken,
   projectId,
   endpoint,
+  orgProjects,
   onClose,
 }: {
   newToken: string | null;
   projectId?: string;
   endpoint: string;
+  orgProjects: Array<{ id: string; name: string }>;
   onClose: () => void;
 }) {
   const [assistantTab, setAssistantTab] = useState<AssistantTab>("claude-code");
   const [codeTab, setCodeTab] = useState<CodeTab>("env");
+  const [selectedProjectId, setSelectedProjectId] = useState<string>(projectId ?? "");
 
+  const activeProjectId = selectedProjectId || projectId;
   const maskedKey = maskApiKey(newToken ?? "");
+
+  const projectCollection = useMemo(
+    () =>
+      createListCollection({
+        items: orgProjects.map((p) => ({ label: p.name, value: p.id })),
+      }),
+    [orgProjects],
+  );
 
   const isSelfHosted = endpoint && endpoint !== CLOUD_ENDPOINT;
   const endpointFlag = isSelfHosted ? ` --endpoint ${endpoint}` : "";
   const maskedEndpointFlag = isSelfHosted ? ` --endpoint ${endpoint}` : "";
-  const projectIdEnvBefore = projectId
-    ? ` --env LANGWATCH_PROJECT_ID=${projectId}`
+  const projectIdEnvBefore = activeProjectId
+    ? ` --env LANGWATCH_PROJECT_ID=${activeProjectId}`
     : "";
-  const projectIdEnvAfter = projectId
-    ? ` --env LANGWATCH_PROJECT_ID=${projectId}`
+  const projectIdEnvAfter = activeProjectId
+    ? ` --env LANGWATCH_PROJECT_ID=${activeProjectId}`
     : "";
 
   const mcpJson = useMemo(
@@ -129,9 +143,9 @@ export function TokenCreatedDialog({
       buildMcpJson({
         apiKey: newToken ?? "",
         endpoint,
-        projectId,
+        projectId: activeProjectId,
       }),
-    [newToken, endpoint, projectId],
+    [newToken, endpoint, activeProjectId],
   );
 
   const displayConfigJson = useMemo(
@@ -139,9 +153,9 @@ export function TokenCreatedDialog({
       buildMcpJson({
         apiKey: maskedKey,
         endpoint,
-        projectId,
+        projectId: activeProjectId,
       }),
-    [maskedKey, endpoint, projectId],
+    [maskedKey, endpoint, activeProjectId],
   );
 
   return (
@@ -172,9 +186,33 @@ export function TokenCreatedDialog({
                 Use with Code Assistants
               </Text>
 
-              <HStack gap={1} px={1.5} py={1.5} borderRadius="xl" border="1px solid" borderColor="border.subtle" bg="bg.panel/70" boxShadow="sm" width="fit-content">
-                <TabButton label="Claude Code" active={assistantTab === "claude-code"} onClick={() => setAssistantTab("claude-code")} />
-                <TabButton label="Codex" active={assistantTab === "codex"} onClick={() => setAssistantTab("codex")} />
+              <HStack gap={3} align="center" flexWrap="wrap">
+                <HStack gap={1} px={1.5} py={1.5} borderRadius="xl" border="1px solid" borderColor="border.subtle" bg="bg.panel/70" boxShadow="sm" width="fit-content">
+                  <TabButton label="Claude Code" active={assistantTab === "claude-code"} onClick={() => setAssistantTab("claude-code")} />
+                  <TabButton label="Codex" active={assistantTab === "codex"} onClick={() => setAssistantTab("codex")} />
+                </HStack>
+                {orgProjects.length > 1 && (
+                  <Select.Root
+                    collection={projectCollection}
+                    value={activeProjectId ? [activeProjectId] : []}
+                    onValueChange={(details) => {
+                      setSelectedProjectId(details.value[0] ?? "");
+                    }}
+                    size="sm"
+                    width="200px"
+                  >
+                    <Select.Trigger>
+                      <Select.ValueText placeholder="Select project" />
+                    </Select.Trigger>
+                    <Select.Content>
+                      {projectCollection.items.map((item) => (
+                        <Select.Item key={item.value} item={item}>
+                          {item.label}
+                        </Select.Item>
+                      ))}
+                    </Select.Content>
+                  </Select.Root>
+                )}
               </HStack>
 
               {/* Quick setup command */}
@@ -282,17 +320,17 @@ export function TokenCreatedDialog({
                   defaultRevealed
                   display={formatEnvLines([
                     { key: "LANGWATCH_API_KEY", value: newToken, mask: true },
-                    { key: "LANGWATCH_PROJECT_ID", value: projectId ?? "<your-project-id>" },
+                    { key: "LANGWATCH_PROJECT_ID", value: activeProjectId ?? "<your-project-id>" },
                     { key: "LANGWATCH_ENDPOINT", value: endpoint },
                   ])}
                   revealedDisplay={formatEnvLines([
                     { key: "LANGWATCH_API_KEY", value: newToken },
-                    { key: "LANGWATCH_PROJECT_ID", value: projectId ?? "<your-project-id>" },
+                    { key: "LANGWATCH_PROJECT_ID", value: activeProjectId ?? "<your-project-id>" },
                     { key: "LANGWATCH_ENDPOINT", value: endpoint },
                   ])}
                   copyValue={formatEnvLines([
                     { key: "LANGWATCH_API_KEY", value: newToken },
-                    { key: "LANGWATCH_PROJECT_ID", value: projectId ?? "<your-project-id>" },
+                    { key: "LANGWATCH_PROJECT_ID", value: activeProjectId ?? "<your-project-id>" },
                     { key: "LANGWATCH_ENDPOINT", value: endpoint },
                   ])}
                   copyToastTitle=".env copied to clipboard"
@@ -308,9 +346,9 @@ export function TokenCreatedDialog({
                   </Text>
                   <CodeBlock
                     label="http"
-                    display={`Authorization: Bearer ${newToken ? maskSecret(newToken) : "pat-lw-..."}\nX-Project-Id: ${projectId ?? "<your-project-id>"}`}
-                    revealedDisplay={`Authorization: Bearer ${newToken ?? ""}\nX-Project-Id: ${projectId ?? "<your-project-id>"}`}
-                    copyValue={`Authorization: Bearer ${newToken ?? ""}\nX-Project-Id: ${projectId ?? "<your-project-id>"}`}
+                    display={`Authorization: Bearer ${newToken ? maskSecret(newToken) : "pat-lw-..."}\nX-Project-Id: ${activeProjectId ?? "<your-project-id>"}`}
+                    revealedDisplay={`Authorization: Bearer ${newToken ?? ""}\nX-Project-Id: ${activeProjectId ?? "<your-project-id>"}`}
+                    copyValue={`Authorization: Bearer ${newToken ?? ""}\nX-Project-Id: ${activeProjectId ?? "<your-project-id>"}`}
                     copyToastTitle="Bearer headers copied"
                     ariaLabel="Copy Bearer headers"
                   />
@@ -325,15 +363,15 @@ export function TokenCreatedDialog({
                   </Text>
                   <CodeBlock
                     label="http"
-                    display={`Authorization: Basic base64(${projectId ?? "<your-project-id>"}:pat-lw-...)`}
+                    display={`Authorization: Basic base64(${activeProjectId ?? "<your-project-id>"}:pat-lw-...)`}
                     revealedDisplay={
-                      newToken && projectId
-                        ? `Authorization: Basic ${btoa(`${projectId}:${newToken}`)}`
+                      newToken && activeProjectId
+                        ? `Authorization: Basic ${btoa(`${activeProjectId}:${newToken}`)}`
                         : ""
                     }
                     copyValue={
-                      newToken && projectId
-                        ? `Authorization: Basic ${btoa(`${projectId}:${newToken}`)}`
+                      newToken && activeProjectId
+                        ? `Authorization: Basic ${btoa(`${activeProjectId}:${newToken}`)}`
                         : ""
                     }
                     copyToastTitle="Basic Auth header copied"
