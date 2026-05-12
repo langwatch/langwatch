@@ -1,4 +1,5 @@
 import {
+  Alert,
   Box,
   HStack,
   Text,
@@ -158,9 +159,12 @@ export function TokenCreatedDialog({
         <Dialog.CloseTrigger />
         <Dialog.Body paddingBottom={6}>
           <VStack gap={6} align="stretch">
-            <Text color="red.500" fontWeight="600" fontSize="sm">
-              Copy this token now. You won&apos;t be able to see it again.
-            </Text>
+            <Alert.Root status="warning">
+              <Alert.Indicator />
+              <Alert.Title>
+                Copy this token now. You won&apos;t be able to see it again.
+              </Alert.Title>
+            </Alert.Root>
 
             {/* ── Section 1: Code Assistants ── */}
             <VStack gap={3} align="stretch">
