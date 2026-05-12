@@ -4,6 +4,10 @@ Feature: Quick Access Links
   I want quick access to key platform features
   So that I can easily navigate to common tasks
 
+  # All scenarios describe QuickAccessLinks component rendering (cards,
+  # icons, labels, click navigation). Need a JSDOM render of the
+  # component — no test fixture exists yet.
+
   Background:
     Given I am on the home page
     And I have access to project "test-project"

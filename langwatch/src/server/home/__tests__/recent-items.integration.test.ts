@@ -82,6 +82,10 @@ describe("Recent Items Integration", () => {
       expect(Array.isArray(result)).toBe(true);
     });
 
+    /** @scenario Extracts prompt IDs from prompts.update actions */
+    /** @scenario Extracts prompt IDs from prompts.create actions */
+    /** @scenario Returns items from AuditLog filtered by user and project */
+    /** @scenario Hydrates items with entity name and updatedAt */
     it("returns recent prompt from audit log", async () => {
       // Create a prompt
       const prompt = await prisma.llmPromptConfig.create({
@@ -117,6 +121,8 @@ describe("Recent Items Integration", () => {
       expect(promptItem?.href?.includes("/prompts")).toBe(true);
     });
 
+    /** @scenario Extracts workflow IDs from workflow.update actions */
+    /** @scenario Extracts workflow IDs from workflow.create actions */
     it("returns recent workflow from audit log", async () => {
       // Create a workflow
       const workflow = await prisma.workflow.create({
@@ -153,6 +159,8 @@ describe("Recent Items Integration", () => {
       expect(workflowItem?.href?.includes("/studio/")).toBe(true);
     });
 
+    /** @scenario Extracts dataset IDs from dataset.update actions */
+    /** @scenario Extracts dataset IDs from dataset.create actions */
     it("returns recent dataset from audit log", async () => {
       // Create a dataset
       const dataset = await prisma.dataset.create({
@@ -189,6 +197,7 @@ describe("Recent Items Integration", () => {
       expect(datasetItem?.href?.includes("/datasets/")).toBe(true);
     });
 
+    /** @scenario Excludes soft-deleted prompts from results */
     it("excludes deleted prompts from results", async () => {
       // Create a deleted prompt
       const deletedPrompt = await prisma.llmPromptConfig.create({
@@ -259,6 +268,7 @@ describe("Recent Items Integration", () => {
       expect(archivedItem).toBeUndefined();
     });
 
+    /** @scenario Limits results to requested count */
     it("respects the limit parameter", async () => {
       const result = await caller.home.getRecentItems({
         projectId,
