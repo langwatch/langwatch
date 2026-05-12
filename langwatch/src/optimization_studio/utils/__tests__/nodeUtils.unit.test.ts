@@ -82,9 +82,7 @@ function makeEdge(identifier: string, targetNodeId: string, edgeIndex: number): 
 
 describe("getInputsOutputs", () => {
   describe("when entry node has wired fields", () => {
-    /**
-     * @scenario Wired entry field still appears once in the drawer's mappable inputs
-     */
+    /** @scenario Wired entry field still appears once in the drawer's mappable inputs */
     it("returns exactly one input for a wired non-evaluator field without the optional flag", () => {
       const { nodes, edges } = buildWorkflow({
         entryOutputs: [{ identifier: "query", type: "str" }],
@@ -100,9 +98,7 @@ describe("getInputsOutputs", () => {
   });
 
   describe("when entry node has evaluator-only wired fields", () => {
-    /**
-     * @scenario Evaluator-only wired entry output keeps its optional flag
-     */
+    /** @scenario Evaluator-only wired entry output keeps its optional flag */
     it("returns one input marked optional for a field wired only to an evaluator", () => {
       const { nodes, edges } = buildWorkflow({
         entryOutputs: [{ identifier: "eval_only", type: "str" }],
@@ -117,9 +113,7 @@ describe("getInputsOutputs", () => {
   });
 
   describe("when entry node has a mix of wired and unwired fields", () => {
-    /**
-     * @scenario Mixed wired and unwired entry fields all appear exactly once with correct flags
-     */
+    /** @scenario Mixed wired and unwired entry fields all appear exactly once with correct flags */
     it("includes all three fields with correct optional flags", () => {
       const { nodes, edges } = buildWorkflow({
         entryOutputs: [
@@ -173,9 +167,7 @@ describe("getInputsOutputs", () => {
   // ---------------------------------------------------------------------------
 
   describe("when end node declares inputs", () => {
-    /**
-     * @scenario End-node outputs continue to derive from endNode.data.inputs unchanged
-     */
+    /** @scenario End-node outputs continue to derive from endNode.data.inputs unchanged */
     it("derives outputs from the end node's declared inputs unchanged", () => {
       const endInputs: EndInput[] = [
         { identifier: "response", type: "str" },

@@ -534,9 +534,7 @@ describe("autoComputeAgentMappings", () => {
   });
 
   describe("when the entry node declares a field with no downstream edge (unwired)", () => {
-    /**
-     * @scenario Auto-compute on workflow save includes an unwired entry field in scenarioMappings
-     */
+    /** @scenario Auto-compute on workflow save includes an unwired entry field in scenarioMappings */
     it("includes the unwired field in the auto-computed scenarioMappings", async () => {
       // Entry node declares "new_field" but no downstream edge exists for it.
       const dsl = buildUnwiredDSL({
@@ -565,9 +563,7 @@ describe("autoComputeAgentMappings", () => {
   });
 
   describe("when the entry node declares a wired field (regression baseline)", () => {
-    /**
-     * @scenario Wired entry field still appears in auto-computed scenarioMappings
-     */
+    /** @scenario Wired entry field still appears in auto-computed scenarioMappings */
     it("includes the wired field in the auto-computed scenarioMappings", async () => {
       // Entry node declares "query" and it IS wired to an LLM node downstream.
       const dsl = buildUnwiredDSL({

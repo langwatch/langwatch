@@ -262,9 +262,7 @@ describe("AgentWorkflowEditorDrawer", () => {
   afterEach(cleanup);
 
   describe("when the linked workflow has an unwired entry output", () => {
-    /**
-     * @scenario Edit Workflow Agent drawer lists an unwired entry field as a mappable input
-     */
+    /** @scenario Edit Workflow Agent drawer lists an unwired entry field as a mappable input */
     it("lists the unwired field as a mappable input in the scenario-mapping section", async () => {
       renderDrawer({ agentId: "agent-1" });
 
