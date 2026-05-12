@@ -543,7 +543,7 @@ describe("POST /api/langy/chat streaming — binds langy-baseline.feature § str
   });
 });
 
-describe("POST /api/langy/chat system prompt — preferences.mode flips the suffix", () => {
+describe("POST /api/langy/chat system prompt — binds langy-baseline.feature § Switch to expert mode (prompt half)", () => {
   // The system prompt is passed directly to the model's `doStream`, so we
   // capture the first call's `system` field and inspect it.
   function makeCapturingStubModel() {
@@ -639,7 +639,7 @@ describe("POST /api/langy/chat system prompt — preferences.mode flips the suff
   });
 });
 
-describe("POST /api/langy/chat tool-output validation — hallucinated IDs are refused", () => {
+describe("POST /api/langy/chat tool-output validation — binds langy-baseline.feature § Langy cannot act on entities it never looked up", () => {
   async function sendMessage(): Promise<string> {
     const res = await app.request("/api/langy/chat", {
       method: "POST",
@@ -707,6 +707,85 @@ describe("POST /api/langy/chat tool-output validation — hallucinated IDs are r
     it("returns the validator error referencing list_datasets", async () => {
       const body = await sendMessage();
       expect(body).toContain("not surfaced by list_datasets");
+    });
+  });
+});
+
+describe("POST /api/langy/chat tool-call cap — binds langy-baseline.feature § Runaway agent loops are capped per message", () => {
+  // The rate-limit module mock pins LANGY_TOOL_CALLS_PER_MESSAGE = 5 at the
+  // top of this file, and the chat route does stepCountIs(...) with that
+  // value. A model that always emits a tool call would otherwise loop
+  // forever; we prove the cap halts it.
+
+  /** Model that emits list_evaluators on every turn (never produces final text). */
+  function makeAlwaysToolModel(): {
+    model: MockLanguageModelV3;
+    calls: { count: number };
+  } {
+    const calls = { count: 0 };
+    const stringifiedInput = JSON.stringify({ scope: "project" });
+    const doStream: DoStreamFactory = async () => {
+      calls.count += 1;
+      const id = `tc-${calls.count}`;
+      return {
+        stream: simulateReadableStream({
+          chunks: [
+            { type: "stream-start", warnings: [] },
+            {
+              type: "response-metadata",
+              id: `rsp-${calls.count}`,
+              modelId: "mock-1",
+            },
+            { type: "tool-input-start", id, toolName: "list_evaluators" },
+            { type: "tool-input-delta", id, delta: stringifiedInput },
+            { type: "tool-input-end", id },
+            {
+              type: "tool-call",
+              toolCallId: id,
+              toolName: "list_evaluators",
+              input: stringifiedInput,
+            },
+            {
+              type: "finish",
+              finishReason: "tool-calls",
+              usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 },
+            },
+          ],
+          initialDelayInMs: null,
+          chunkDelayInMs: null,
+        }) as never,
+      };
+    };
+    return { model: new MockLanguageModelV3({ doStream }), calls };
+  }
+
+  describe("given a model that always requests a tool call", () => {
+    it("halts at LANGY_TOOL_CALLS_PER_MESSAGE model invocations", async () => {
+      const { model, calls } = makeAlwaysToolModel();
+      mockGetVercelAIModel.mockResolvedValue(model);
+
+      const res = await app.request("/api/langy/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          projectId: "proj_demo",
+          messages: [
+            {
+              id: "m1",
+              role: "user",
+              parts: [{ type: "text", text: "loop forever" }],
+            },
+          ],
+        }),
+      });
+      await readBody(res);
+
+      // Mock at top of file: LANGY_TOOL_CALLS_PER_MESSAGE = 5.
+      // stepCountIs(5) means the model is invoked at most 5 times.
+      expect(calls.count).toBeLessThanOrEqual(5);
+      // And it must have actually iterated more than once — otherwise we'd
+      // just be testing that streamText returns after a single call.
+      expect(calls.count).toBeGreaterThan(1);
     });
   });
 });

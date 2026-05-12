@@ -84,7 +84,7 @@ async function putPreferences(body: unknown): Promise<Response> {
   });
 }
 
-describe("GET /api/langy/preferences", () => {
+describe("GET /api/langy/preferences — binds langy-baseline.feature § Default mode is non-expert", () => {
   describe("given no session cookie", () => {
     beforeEach(() => {
       mockGetServerAuthSession.mockResolvedValue(null);
@@ -155,7 +155,7 @@ describe("GET /api/langy/preferences", () => {
   });
 });
 
-describe("PUT /api/langy/preferences", () => {
+describe("PUT /api/langy/preferences — binds langy-baseline.feature § Switch to expert mode", () => {
   describe("given a session with permission", () => {
     beforeEach(() => {
       mockGetServerAuthSession.mockResolvedValue(VALID_SESSION);
@@ -218,6 +218,57 @@ describe("PUT /api/langy/preferences", () => {
           mode: "expert",
         });
         expect(res.status).toBe(401);
+        expect(mockUpdate).not.toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe("given a malformed body", () => {
+    beforeEach(() => {
+      mockGetServerAuthSession.mockResolvedValue(VALID_SESSION);
+      mockHasProjectPermission.mockResolvedValue(true);
+    });
+
+    describe("when mode is null", () => {
+      it("rejects with 400 invalid_body and never reaches the service", async () => {
+        const res = await putPreferences({
+          projectId: "proj_demo",
+          mode: null,
+        });
+        expect(res.status).toBe(400);
+        const body = (await res.json()) as { error: { code: string } };
+        expect(body.error.code).toBe("invalid_body");
+        expect(mockUpdate).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when mode is an unknown string", () => {
+      it("rejects with 400 invalid_body", async () => {
+        const res = await putPreferences({
+          projectId: "proj_demo",
+          mode: "godmode",
+        });
+        expect(res.status).toBe(400);
+        expect(mockUpdate).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when projectId is missing", () => {
+      it("rejects with 400 invalid_body before the auth guard runs", async () => {
+        const res = await putPreferences({ mode: "expert" });
+        expect(res.status).toBe(400);
+        expect(mockHasProjectPermission).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when body is not valid JSON", () => {
+      it("rejects with 400 invalid_body", async () => {
+        const res = await app.request("/api/langy/preferences", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: "not json",
+        });
+        expect(res.status).toBe(400);
         expect(mockUpdate).not.toHaveBeenCalled();
       });
     });

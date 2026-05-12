@@ -1,4 +1,7 @@
 import { connection } from "../redis";
+import { createLogger } from "~/utils/logger/server";
+
+const logger = createLogger("langwatch:middleware:rate-limit-langy");
 
 export const LANGY_MESSAGES_PER_MINUTE = 30;
 export const LANGY_TOOL_CALLS_PER_MESSAGE = 8;
@@ -9,9 +12,15 @@ export type RateLimitResult = {
   retryAfterSeconds?: number;
 };
 
+// Logged at most once per process — a sustained Redis outage would otherwise
+// flood logs with one line per chat message.
+let redisDownWarned = false;
+
 /**
  * Sliding-window-ish rate limit using Redis INCR + EXPIRE on a per-minute key.
- * No-ops (always allows) when Redis is unavailable to keep dev/test usable.
+ * Fails open when Redis is unavailable (so dev/test stay usable and a brief
+ * Redis blip doesn't 500 the chat endpoint), but logs a warning so the outage
+ * is visible in the platform's logs.
  */
 export async function checkLangyMessageRateLimit({
   userId,
@@ -23,6 +32,12 @@ export async function checkLangyMessageRateLimit({
   limit?: number;
 }): Promise<RateLimitResult> {
   if (!connection) {
+    if (!redisDownWarned) {
+      redisDownWarned = true;
+      logger.warn(
+        "Redis unavailable — Langy chat rate limit is disabled until it returns. Subsequent requests will not be re-logged until the process restarts.",
+      );
+    }
     return { allowed: true, remaining: limit };
   }
   const bucket = Math.floor(Date.now() / 60_000);

@@ -47,7 +47,7 @@ beforeEach(() => {
   vi.setSystemTime(new Date(30_000));
 });
 
-describe("checkLangyMessageRateLimit", () => {
+describe("checkLangyMessageRateLimit — binds langy-baseline.feature § Burst of messages is throttled per user per project", () => {
   describe("given a fresh per-minute bucket", () => {
     describe("when called once", () => {
       it("allows the request", async () => {

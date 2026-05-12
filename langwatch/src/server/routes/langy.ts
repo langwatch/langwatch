@@ -36,6 +36,7 @@ import { TiktokenClient } from "~/server/app-layer/clients/tokenizer/tiktoken.cl
 import { buildLangyTelemetrySettings } from "~/server/observability/langy-tracer";
 import {
   LangyConversationService,
+  type LangyMode,
   LangyMessageService,
   LangyProjectMemoryService,
   LangyUserPreferencesService,
@@ -63,7 +64,7 @@ const LANGY_FALLBACK_MODEL = "openai/gpt-5-mini";
 
 function buildSystemPrompt(opts: {
   projectMemory: string | null;
-  mode: string;
+  mode: LangyMode;
 }): string {
   const segments = [LANGY_SYSTEM_PROMPT];
   if (opts.mode === "expert") {

@@ -50,6 +50,36 @@ vi.mock("~/utils/trpcError", () => ({
   isHandledByGlobalHandler: () => false,
 }));
 
+// Chakra v3 Switch wraps an Ark Toggle whose state machine doesn't react
+// straightforwardly to userEvent.click in jsdom; the rest of the codebase
+// stubs it as a plain checkbox in tests for this reason
+// (see src/tests/settings/annotation-scores.lite-member.integration.test.tsx).
+vi.mock("~/components/ui/switch", () => ({
+  Switch: ({
+    checked,
+    disabled,
+    onCheckedChange,
+    children,
+  }: {
+    checked?: boolean;
+    disabled?: boolean;
+    onCheckedChange?: (details: { checked: boolean }) => void;
+    children?: React.ReactNode;
+  }) => (
+    <label>
+      <input
+        type="checkbox"
+        checked={!!checked}
+        disabled={disabled}
+        onChange={(e) =>
+          onCheckedChange?.({ checked: (e.target as HTMLInputElement).checked })
+        }
+      />
+      {children}
+    </label>
+  ),
+}));
+
 import { LangyMemorySettings } from "../LangyMemorySettings";
 
 // ---------------------------------------------------------------------------
@@ -440,6 +470,102 @@ describe("LangyMemorySettings", () => {
           expect(exp).toBeTruthy();
           expect(String(exp![0])).toContain("projectId=project-demo");
         });
+      });
+    });
+  });
+
+  describe("given the mode toggle — binds langy-baseline.feature § Switch to expert mode (UI half)", () => {
+    describe("when the user flips Expert mode on", () => {
+      it("PUTs mode=expert to /api/langy/preferences", async () => {
+        const fetchMock = installFetchMock({
+          memory: baseMemory,
+          conversations: [],
+        });
+        renderSettings();
+        const toggle = await screen.findByRole("checkbox", {
+          name: /expert mode/i,
+        });
+        await userEvent.click(toggle);
+
+        await waitFor(() => {
+          const put = fetchMock.mock.calls.find(
+            ([url, init]) =>
+              String(url).startsWith("/api/langy/preferences") &&
+              (init as RequestInit | undefined)?.method === "PUT",
+          );
+          expect(put).toBeTruthy();
+          const body = JSON.parse(
+            String((put![1] as RequestInit).body),
+          ) as { projectId: string; mode: string };
+          expect(body.mode).toBe("expert");
+          expect(body.projectId).toBe("project-demo");
+        });
+      });
+    });
+
+    describe("when the PUT fails", () => {
+      it("reverts the toggle to its previous state", async () => {
+        // Custom fetch mock that 500s on PUT /api/langy/preferences.
+        const fetchMock = vi.fn(
+          async (input: RequestInfo | URL, init?: RequestInit) => {
+            const url = typeof input === "string" ? input : input.toString();
+            const method = (init?.method ?? "GET").toUpperCase();
+            if (
+              url.startsWith("/api/langy/preferences") &&
+              method === "GET"
+            ) {
+              return new Response(
+                JSON.stringify({
+                  preferences: {
+                    id: "pref-1",
+                    userId: "user-1",
+                    projectId: "project-demo",
+                    mode: "non_expert",
+                    dismissedSuggestionKinds: [],
+                  },
+                }),
+                { status: 200 },
+              );
+            }
+            if (
+              url.startsWith("/api/langy/preferences") &&
+              method === "PUT"
+            ) {
+              return new Response(JSON.stringify({ error: "boom" }), {
+                status: 500,
+              });
+            }
+            if (url.startsWith("/api/langy/project-memory")) {
+              return new Response(
+                JSON.stringify({ memory: baseMemory, isStale: false }),
+                { status: 200 },
+              );
+            }
+            if (url.startsWith("/api/langy/conversations")) {
+              return new Response(JSON.stringify({ conversations: [] }), {
+                status: 200,
+              });
+            }
+            return new Response("not stubbed", { status: 501 });
+          },
+        );
+        vi.stubGlobal("fetch", fetchMock);
+
+        renderSettings();
+        const toggle = (await screen.findByRole("checkbox", {
+          name: /expert mode/i,
+        })) as HTMLInputElement;
+        // Initial state: non-expert.
+        expect(toggle.checked).toBe(false);
+        await userEvent.click(toggle);
+
+        // PUT 500s → optimistic update is rolled back to unchecked.
+        await waitFor(
+          () => {
+            expect(toggle.checked).toBe(false);
+          },
+          { timeout: 3000 },
+        );
       });
     });
   });
