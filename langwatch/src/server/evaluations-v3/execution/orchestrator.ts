@@ -11,6 +11,8 @@
  */
 
 import { generate } from "@langwatch/ksuid";
+import { SpanStatusCode } from "@opentelemetry/api";
+import { ESpanKind } from "@opentelemetry/otlp-transformer-next/build/esm/trace/internal-types";
 import { studioBackendPostEvent } from "~/app/api/workflows/post_event/post-event";
 import type { EvaluationsV3State, TargetConfig } from "~/evaluations-v3/types";
 import { isRowEmpty } from "~/evaluations-v3/utils/emptyRowDetection";
@@ -25,7 +27,7 @@ import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { generateHumanReadableId } from "~/utils/humanReadableId";
 import { createLogger } from "~/utils/logger/server";
-import { generateOtelTraceId } from "~/utils/trace";
+import { generateOtelSpanId, generateOtelTraceId } from "~/utils/trace";
 import { abortManager } from "./abortManager";
 import { buildStripScoreEvaluatorIds } from "./evaluatorScoreFilter";
 import {
@@ -722,6 +724,71 @@ export async function* runOrchestrator(
           chDispatchFailures++;
           logger.warn({ err, runId }, "Failed to dispatch recordTargetResult to CH");
         });
+
+        // Phase 1 / #3900: guarantee a trace_summaries row for this offline-cell
+        // trace so the analytics INNER JOIN evaluation_runs ON (TenantId, TraceId)
+        // matches. The OTLP path from langwatch_nlp normally writes this, but
+        // offline-experiment cells silently lose the trace at runtime (root cause
+        // TBD — tracked as a follow-up). Without this synthetic span the Custom
+        // Graphs chart shows an empty plot for offline experiments.
+        if (event.traceId) {
+          const nowMs = Date.now();
+          const startMs = nowMs - (event.duration ?? 0);
+          try {
+            await getApp().traces.recordSpan({
+              tenantId: projectId,
+              span: {
+                traceId: event.traceId,
+                spanId: generateOtelSpanId(),
+                traceState: null,
+                parentSpanId: null,
+                name: "offline_experiment.cell",
+                kind: ESpanKind.SPAN_KIND_INTERNAL,
+                startTimeUnixNano: String(startMs * 1_000_000),
+                endTimeUnixNano: String(nowMs * 1_000_000),
+                attributes: [
+                  {
+                    key: "langwatch.origin",
+                    value: { stringValue: "evaluation" },
+                  },
+                  {
+                    key: "langwatch.experiment_id",
+                    value: { stringValue: experimentId },
+                  },
+                  {
+                    key: "langwatch.run_id",
+                    value: { stringValue: runId },
+                  },
+                ],
+                events: [],
+                links: [],
+                status: event.error
+                  ? { code: SpanStatusCode.ERROR as 2 }
+                  : { code: SpanStatusCode.OK as 1 },
+                droppedAttributesCount: null,
+                droppedEventsCount: null,
+                droppedLinksCount: null,
+              },
+              resource: {
+                attributes: [
+                  {
+                    key: "service.name",
+                    value: { stringValue: "langwatch-evaluations-v3" },
+                  },
+                ],
+              },
+              instrumentationScope: {
+                name: "langwatch-evaluations-v3-orchestrator",
+              },
+              occurredAt: nowMs,
+            });
+          } catch (err) {
+            logger.warn(
+              { err, traceId: event.traceId, runId },
+              "Failed to dispatch synthetic trace span for offline-experiment cell — evaluation data is intact but analytics JOIN may miss this cell",
+            );
+          }
+        }
       } else if (event.type === "error" && event.rowIndex !== undefined && event.targetId) {
         const datasetEntry = datasetRows[event.rowIndex] ?? {};
         chDispatchTotal++;
