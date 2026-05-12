@@ -187,7 +187,7 @@ function SettingsForm({
               </HorizontalFormControl>
               <HorizontalFormControl
                 label="Project ID"
-                helper="Use this ID when authenticating with Personal Access Tokens"
+                helper="Use this ID when authenticating with API Keys"
               >
                 <Input
                   width="full"
