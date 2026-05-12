@@ -82,10 +82,11 @@ export function ApiKeysSection({
   } = useDisclosure();
 
   const [newToken, setNewToken] = useState<string | null>(null);
+  const [newKeyInput, setNewKeyInput] = useState<CreateApiKeyInput | null>(null);
   const [apiKeyToRevoke, setApiKeyToRevoke] = useState<string | null>(null);
   const [apiKeyToEdit, setApiKeyToEdit] = useState<ApiKeyRow | null>(null);
 
-  const handleCreate = (input: CreateApiKeyInput) => {
+  const handleCreate = (input: CreateApiKeyInput): void => {
     if (input.keyType === "personal" && input.bindings.length === 0) {
       toaster.create({
         title: "No permissions to grant",
@@ -114,6 +115,7 @@ export function ApiKeysSection({
       {
         onSuccess: (result) => {
           setNewToken(result.token);
+          setNewKeyInput(input);
           void queryClient.apiKey.list.invalidate();
         },
         onError: (error) => {
@@ -421,9 +423,15 @@ export function ApiKeysSection({
         newToken={newToken}
         projectId={projectId}
         endpoint={endpoint}
-        orgProjects={orgProjects.data ?? []}
+        orgProjects={(orgProjects.data ?? []).filter((p) => {
+          if (!newKeyInput) return true;
+          if (newKeyInput.keyType === "service") return true;
+          if (newKeyInput.permissionMode !== "restricted") return true;
+          return newKeyInput.bindings.some((b) => b.scopeId === p.id);
+        })}
         onClose={() => {
           setNewToken(null);
+          setNewKeyInput(null);
           onCreateClose();
         }}
       />
