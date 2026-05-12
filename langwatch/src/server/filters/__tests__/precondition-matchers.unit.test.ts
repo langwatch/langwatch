@@ -373,6 +373,7 @@ describe("PRECONDITION_FIELD_MATCHERS", () => {
 // ---------------------------------------------------------------------------
 
 describe("PRECONDITION_ALLOWED_RULES", () => {
+  /** @scenario Allowed rules derive from field characteristics */
   it("allows all 4 text rules for input and output", () => {
     const textRules = ["is", "contains", "not_contains", "matches_regex"];
     expect(PRECONDITION_ALLOWED_RULES["input"]).toEqual(textRules);
