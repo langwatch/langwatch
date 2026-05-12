@@ -3005,7 +3005,7 @@
         ],
         "responses": {
           "200": {
-            "description": "List of PATs",
+            "description": "List of API keys",
             "content": {
               "application/json": {
                 "schema": {
@@ -3023,7 +3023,7 @@
             }
           },
           "401": {
-            "description": "Invalid or missing PAT token"
+            "description": "Invalid or missing API key token"
           }
         }
       },
@@ -3139,7 +3139,7 @@
             }
           },
           "401": {
-            "description": "Invalid or missing PAT token"
+            "description": "Invalid or missing API key token"
           },
           "403": {
             "description": "Requested binding exceeds the creator's own permissions, or scope does not belong to this organization"
@@ -3173,7 +3173,7 @@
         ],
         "responses": {
           "200": {
-            "description": "PAT revoked successfully",
+            "description": "API key revoked successfully",
             "content": {
               "application/json": {
                 "schema": {
@@ -3188,7 +3188,7 @@
             }
           },
           "401": {
-            "description": "Invalid or missing PAT token"
+            "description": "Invalid or missing API key token"
           },
           "403": {
             "description": "Not authorized to revoke this API key (owned by another user)"
@@ -12020,7 +12020,7 @@
       "get": {
         "operationId": "listProjects",
         "summary": "List projects",
-        "description": "List all non-archived projects for the organization (paginated). Requires a PAT with organization-level access.",
+        "description": "List all non-archived projects for the organization (paginated). Requires an API key with organization-level access.",
         "security": [
           {
             "pat_token": []
@@ -12070,7 +12070,7 @@
             }
           },
           "401": {
-            "description": "Invalid or missing PAT token"
+            "description": "Invalid or missing API key token"
           }
         }
       },
@@ -12151,13 +12151,13 @@
             "description": "Team does not belong to this organization"
           },
           "401": {
-            "description": "Invalid or missing PAT token"
+            "description": "Invalid or missing API key token"
           },
           "409": {
             "description": "A project with this name already exists in the team"
           },
           "422": {
-            "description": "Validation error (missing required fields, or neither teamId nor newTeamName provided)"
+            "description": "Validation error (missing required fields)"
           }
         }
       }
@@ -12208,7 +12208,7 @@
             }
           },
           "401": {
-            "description": "Invalid or missing PAT token"
+            "description": "Invalid or missing API key token"
           },
           "404": {
             "description": "Project not found"
@@ -12278,7 +12278,7 @@
             }
           },
           "401": {
-            "description": "Invalid or missing PAT token"
+            "description": "Invalid or missing API key token"
           },
           "404": {
             "description": "Project not found"
@@ -12329,7 +12329,7 @@
             }
           },
           "401": {
-            "description": "Invalid or missing PAT token"
+            "description": "Invalid or missing API key token"
           },
           "404": {
             "description": "Project not found"
