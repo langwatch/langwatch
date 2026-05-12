@@ -638,3 +638,75 @@ describe("POST /api/langy/chat system prompt — preferences.mode flips the suff
     });
   });
 });
+
+describe("POST /api/langy/chat tool-output validation — hallucinated IDs are refused", () => {
+  async function sendMessage(): Promise<string> {
+    const res = await app.request("/api/langy/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        projectId: "proj_demo",
+        messages: [
+          {
+            id: "m1",
+            role: "user",
+            parts: [{ type: "text", text: "go" }],
+          },
+        ],
+      }),
+    });
+    return readBody(res);
+  }
+
+  describe("given the model calls propose_update_evaluator with an unlisted slug", () => {
+    beforeEach(() => {
+      mockGetVercelAIModel.mockResolvedValue(
+        makeToolCallingStubModel("propose_update_evaluator", {
+          slug: "ghost-evaluator",
+          settings: { foo: "bar" },
+          rationale: "test",
+        }),
+      );
+    });
+
+    it("returns the validator error and never asks the service for the slug", async () => {
+      const body = await sendMessage();
+      expect(body).toContain("not surfaced by list_evaluators");
+      expect(mockEvaluatorGetBySlug).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given the model calls propose_update_prompt with an unlisted id", () => {
+    beforeEach(() => {
+      mockGetVercelAIModel.mockResolvedValue(
+        makeToolCallingStubModel("propose_update_prompt", {
+          id: "prm_fabricated",
+          commitMessage: "test",
+          rationale: "test",
+        }),
+      );
+    });
+
+    it("returns the validator error referencing list_prompts", async () => {
+      const body = await sendMessage();
+      expect(body).toContain("not surfaced by list_prompts");
+    });
+  });
+
+  describe("given the model calls propose_add_dataset_rows with an unlisted datasetId", () => {
+    beforeEach(() => {
+      mockGetVercelAIModel.mockResolvedValue(
+        makeToolCallingStubModel("propose_add_dataset_rows", {
+          datasetId: "ds_fabricated",
+          rows: [{ a: 1 }],
+          rationale: "test",
+        }),
+      );
+    });
+
+    it("returns the validator error referencing list_datasets", async () => {
+      const body = await sendMessage();
+      expect(body).toContain("not surfaced by list_datasets");
+    });
+  });
+});

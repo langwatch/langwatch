@@ -150,6 +150,21 @@ Feature: Langy in-product AI assistant — baseline (v1)
     And Langy returns its best partial answer
 
   # ============================================================================
+  # Tool-output validation (PR-3.3)
+  # ============================================================================
+
+  Scenario: Langy cannot act on entities it never looked up
+    Given Langy has not called list_evaluators in this conversation
+    When Langy proposes updating an evaluator by slug
+    Then the proposal is refused with a "not surfaced by list_evaluators" error
+    And the same rule applies to prompts and datasets
+
+  Scenario: Langy can act on entities surfaced by an earlier list call
+    Given Langy has called list_evaluators and seen evaluator "Toxicity"
+    When Langy proposes updating that evaluator
+    Then the proposal is accepted and presented to me as a card
+
+  # ============================================================================
   # Read-only boundary (v1)
   # ============================================================================
 

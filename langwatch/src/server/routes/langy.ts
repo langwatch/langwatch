@@ -766,6 +766,11 @@ app.post("/langy/chat", async (c) => {
         maxTokens,
         rationale,
       }) => {
+        if (!seenIds.hasAny(["prompt_id", "prompt_handle"], id)) {
+          return {
+            error: `Prompt '${id}' was not surfaced by list_prompts in this conversation. Call list_prompts first and reference one of those id/handle values.`,
+          };
+        }
         const existing = await promptService.getPromptByIdOrHandle({
           idOrHandle: id,
           projectId,
@@ -849,6 +854,11 @@ app.post("/langy/chat", async (c) => {
         rationale: z.string(),
       }),
       execute: async ({ datasetId, rows, rationale }) => {
+        if (!seenIds.has("dataset_id", datasetId)) {
+          return {
+            error: `Dataset '${datasetId}' was not surfaced by list_datasets in this conversation. Call list_datasets first and reference one of those ids.`,
+          };
+        }
         const dataset = await prisma.dataset.findFirst({
           where: { id: datasetId, projectId, archivedAt: null },
           select: { id: true, name: true, slug: true },
