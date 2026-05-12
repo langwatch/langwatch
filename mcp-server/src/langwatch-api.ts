@@ -118,10 +118,14 @@ export async function makeRequest(
   path: string,
   body?: unknown
 ): Promise<unknown> {
-  const url = getConfig().endpoint + path;
+  const config = getConfig();
+  const url = config.endpoint + path;
   const headers: Record<string, string> = {
     "X-Auth-Token": requireApiKey(),
   };
+  if (config.projectId) {
+    headers["X-Project-Id"] = config.projectId;
+  }
 
   if (body !== undefined) {
     headers["Content-Type"] = "application/json";
