@@ -15,7 +15,7 @@ import { app as gatewayPlatformApp } from "../app/api/gateway-platform/[[...rout
 import { app as graphsApp } from "../app/api/graphs/[[...route]]/app";
 import { app as modelProvidersApp } from "../app/api/model-providers/[[...route]]/app";
 import { app as monitorsApp } from "../app/api/monitors/[[...route]]/app";
-import { app as apiKeysApp } from "../app/api/pats/[[...route]]/app";
+import { app as apiKeysApp } from "../app/api/api-keys/[[...route]]/app";
 import { app as projectsApp } from "../app/api/projects/[[...route]]/app";
 import { app as promptsApp } from "../app/api/prompts/[[...route]]/app";
 import { app as scenarioEventsApp } from "../app/api/scenario-events/[[...route]]/app";

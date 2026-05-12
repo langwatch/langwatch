@@ -9,9 +9,10 @@ import {
   TeamNotInOrganizationError,
   type ProjectService,
 } from "~/server/app-layer/projects/project.service";
-import { ApiKeyService } from "~/server/api-key/api-key.service";
-import { prisma } from "~/server/db";
+import type { ApiKeyService } from "~/server/api-key/api-key.service";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
+import type { ApiKeyServiceMiddlewareVariables } from "../../middleware/api-key-service";
+import { apiKeyServiceMiddleware } from "../../middleware/api-key-service";
 import type { OrgAuthMiddlewareVariables } from "../../middleware/org-auth";
 import { orgAuthMiddleware, requireOrgPermission } from "../../middleware/org-auth";
 import type { ProjectServiceMiddlewareVariables } from "../../middleware/project-service";
@@ -26,7 +27,7 @@ import { handleProjectError } from "./error-handler";
 
 patchZodOpenapi();
 
-type Variables = OrgAuthMiddlewareVariables & ProjectServiceMiddlewareVariables;
+type Variables = OrgAuthMiddlewareVariables & ProjectServiceMiddlewareVariables & ApiKeyServiceMiddlewareVariables;
 
 const paginationQuerySchema = z.object({
   page: z.coerce.number().int().positive().optional().default(1),
@@ -98,6 +99,7 @@ export const app = new Hono<{ Variables: Variables }>()
   .use(loggerMiddleware())
   .use(orgAuthMiddleware)
   .use(projectServiceMiddleware)
+  .use(apiKeyServiceMiddleware)
   .onError(handleProjectError)
 
   .get(
@@ -162,7 +164,7 @@ export const app = new Hono<{ Variables: Variables }>()
         throw error;
       }
 
-      const apiKeyService = ApiKeyService.create(prisma);
+      const apiKeyService = c.get("apiKeyService") as ApiKeyService;
       const serviceKey = await apiKeyService.create({
         name: `${project.name} Service Key`,
         userId: null,

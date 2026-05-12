@@ -4,14 +4,15 @@ import { describeRoute } from "hono-openapi";
 import { validator as zValidator } from "hono-openapi/zod";
 import { z } from "zod";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
-import { prisma } from "~/server/db";
-import { ApiKeyService } from "~/server/api-key/api-key.service";
+import type { ApiKeyService } from "~/server/api-key/api-key.service";
 import {
   ApiKeyNotFoundError,
   ApiKeyNotOwnedError,
   ApiKeyAlreadyRevokedError,
   ApiKeyScopeViolationError,
 } from "~/server/api-key/errors";
+import type { ApiKeyServiceMiddlewareVariables } from "../../middleware/api-key-service";
+import { apiKeyServiceMiddleware } from "../../middleware/api-key-service";
 import type { OrgAuthMiddlewareVariables } from "../../middleware/org-auth";
 import { orgAuthMiddleware, requireOrgPermission } from "../../middleware/org-auth";
 import { loggerMiddleware } from "../../middleware/logger";
@@ -20,7 +21,7 @@ import { handleApiKeyError } from "./error-handler";
 
 patchZodOpenapi();
 
-type Variables = OrgAuthMiddlewareVariables;
+type Variables = OrgAuthMiddlewareVariables & ApiKeyServiceMiddlewareVariables;
 
 const bindingSchema = z.object({
   role: z.enum(["ADMIN", "MEMBER", "VIEWER"]),
@@ -77,6 +78,7 @@ export const app = new Hono<{ Variables: Variables }>()
   .use(tracerMiddleware({ name: "api-keys" }))
   .use(loggerMiddleware())
   .use(orgAuthMiddleware)
+  .use(apiKeyServiceMiddleware)
   .onError(handleApiKeyError)
 
   .get(
@@ -88,7 +90,7 @@ export const app = new Hono<{ Variables: Variables }>()
     async (c) => {
       const organization = c.get("organization") as Organization;
       const userId = c.get("apiKeyUserId") as string | null;
-      const service = ApiKeyService.create(prisma);
+      const service = c.get("apiKeyService") as ApiKeyService;
 
       const keys = userId
         ? await service.list({ userId, organizationId: organization.id })
@@ -125,7 +127,7 @@ export const app = new Hono<{ Variables: Variables }>()
       const organization = c.get("organization") as Organization;
       const callerUserId = c.get("apiKeyUserId") as string | null;
       const body = c.req.valid("json");
-      const service = ApiKeyService.create(prisma);
+      const service = c.get("apiKeyService") as ApiKeyService;
 
       const isService = body.keyType === "service";
       const bindings = isService
@@ -183,7 +185,7 @@ export const app = new Hono<{ Variables: Variables }>()
       const { id } = c.req.param();
       const organization = c.get("organization") as Organization;
       const userId = c.get("apiKeyUserId") as string | null;
-      const service = ApiKeyService.create(prisma);
+      const service = c.get("apiKeyService") as ApiKeyService;
 
       try {
         await service.revoke({
