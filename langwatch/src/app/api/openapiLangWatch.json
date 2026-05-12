@@ -3033,7 +3033,7 @@
       "post": {
         "operationId": "createApiKey",
         "summary": "Create an API key",
-        "description": "Create a new API key. The plaintext token is returned once in the response \u2014 store it securely. Each binding grants the key a role at a specific scope (organization, team, or project). The key cannot exceed the creator's own permissions. Requires organization:manage permission.",
+        "description": "Create a new API key. For service keys, pass keyType:\"service\". Optionally scope to specific projects via projectIds (ADMIN on each). Omit projectIds for full org access. The plaintext token is returned once \u2014 store it securely.",
         "security": [
           {
             "admin_api_key": []
@@ -3099,6 +3099,23 @@
                         "scopeId"
                       ]
                     }
+                  },
+                  "keyType": {
+                    "type": "string",
+                    "enum": [
+                      "personal",
+                      "service"
+                    ],
+                    "default": "personal",
+                    "description": "personal = tied to a user. service = not tied to any user, for automation."
+                  },
+                  "projectIds": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "maxItems": 50,
+                    "description": "For service keys with restricted scope: list of project IDs to grant ADMIN access to. Omit for full org access."
                   }
                 },
                 "required": [
@@ -12131,7 +12148,7 @@
         },
         "responses": {
           "201": {
-            "description": "Project created successfully",
+            "description": "Project created. Returns a scoped service API key for this project.",
             "content": {
               "application/json": {
                 "schema": {
@@ -12142,9 +12159,13 @@
                     {
                       "type": "object",
                       "properties": {
-                        "apiKey": {
+                        "serviceApiKey": {
                           "type": "string",
-                          "description": "Project API key for sending traces (sk-lw-...). Only returned on create and get-by-id."
+                          "description": "Scoped service API key with ADMIN on this project (sk-lw-..._...). Store securely \u2014 shown only once."
+                        },
+                        "serviceApiKeyId": {
+                          "type": "string",
+                          "description": "ID of the auto-created service key, for management via DELETE /api/api-keys/{id}."
                         }
                       }
                     }
@@ -12194,24 +12215,11 @@
         ],
         "responses": {
           "200": {
-            "description": "Project details with API key",
+            "description": "Project details.",
             "content": {
               "application/json": {
                 "schema": {
-                  "allOf": [
-                    {
-                      "$ref": "#/components/schemas/Project"
-                    },
-                    {
-                      "type": "object",
-                      "properties": {
-                        "apiKey": {
-                          "type": "string",
-                          "description": "Project API key (sk-lw-...)"
-                        }
-                      }
-                    }
-                  ]
+                  "$ref": "#/components/schemas/Project"
                 }
               }
             }
