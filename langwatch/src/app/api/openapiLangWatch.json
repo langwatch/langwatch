@@ -2997,7 +2997,7 @@
       "get": {
         "operationId": "listApiKeys",
         "summary": "List API keys",
-        "description": "List all API keys owned by the authenticated user in this organization.",
+        "description": "List all API keys owned by the authenticated user in this organization. Requires organization:view permission.",
         "security": [
           {
             "admin_api_key": []
@@ -3024,13 +3024,16 @@
           },
           "401": {
             "description": "Invalid or missing API key token"
+          },
+          "403": {
+            "description": "Insufficient permissions (requires organization:view)"
           }
         }
       },
       "post": {
         "operationId": "createApiKey",
         "summary": "Create an API key",
-        "description": "Create a new API key. The plaintext token is returned once in the response \u2014 store it securely. Each binding grants the key a role at a specific scope (organization, team, or project). The key cannot exceed the creator's own permissions.",
+        "description": "Create a new API key. The plaintext token is returned once in the response \u2014 store it securely. Each binding grants the key a role at a specific scope (organization, team, or project). The key cannot exceed the creator's own permissions. Requires organization:manage permission.",
         "security": [
           {
             "admin_api_key": []
@@ -3154,7 +3157,7 @@
       "delete": {
         "operationId": "revokeApiKey",
         "summary": "Revoke an API key",
-        "description": "Revoke (soft-delete) an API key. Revoked keys can no longer authenticate.",
+        "description": "Revoke (soft-delete) an API key. Revoked keys can no longer authenticate. Requires organization:manage permission.",
         "security": [
           {
             "admin_api_key": []
@@ -12020,7 +12023,7 @@
       "get": {
         "operationId": "listProjects",
         "summary": "List projects",
-        "description": "List all non-archived projects for the organization (paginated). Requires an API key with organization-level access.",
+        "description": "List all non-archived projects for the organization (paginated). Requires an admin API key with project:view permission.",
         "security": [
           {
             "admin_api_key": []
@@ -12071,13 +12074,16 @@
           },
           "401": {
             "description": "Invalid or missing API key token"
+          },
+          "403": {
+            "description": "Insufficient permissions for this operation"
           }
         }
       },
       "post": {
         "operationId": "createProject",
         "summary": "Create a project",
-        "description": "Create a new project in the organization. Returns the project with its API key (sk-lw-...) for sending traces. Provide either teamId (existing team) or newTeamName (creates a new team).",
+        "description": "Create a new project in the organization. Returns the project with its API key (sk-lw-...) for sending traces. Provide either teamId (existing team) or newTeamName (creates a new team). Requires project:create permission.",
         "security": [
           {
             "admin_api_key": []
@@ -12158,6 +12164,9 @@
           },
           "422": {
             "description": "Validation error (missing required fields)"
+          },
+          "403": {
+            "description": "Insufficient permissions (requires project:create)"
           }
         }
       }
@@ -12166,7 +12175,7 @@
       "get": {
         "operationId": "getProject",
         "summary": "Get a project",
-        "description": "Get a project by ID, including its API key.",
+        "description": "Get a project by ID, including its API key. Requires project:view permission.",
         "security": [
           {
             "admin_api_key": []
@@ -12212,13 +12221,16 @@
           },
           "404": {
             "description": "Project not found"
+          },
+          "403": {
+            "description": "Insufficient permissions for this operation"
           }
         }
       },
       "patch": {
         "operationId": "updateProject",
         "summary": "Update a project",
-        "description": "Update project fields. Only provided fields are changed.",
+        "description": "Update project fields. Only provided fields are changed. Requires project:update permission.",
         "security": [
           {
             "admin_api_key": []
@@ -12282,13 +12294,16 @@
           },
           "404": {
             "description": "Project not found"
+          },
+          "403": {
+            "description": "Insufficient permissions (requires project:update)"
           }
         }
       },
       "delete": {
         "operationId": "archiveProject",
         "summary": "Archive a project",
-        "description": "Soft-delete (archive) a project. Archived projects are excluded from list responses.",
+        "description": "Soft-delete (archive) a project. Archived projects are excluded from list responses. Requires project:delete permission.",
         "security": [
           {
             "admin_api_key": []
@@ -12333,6 +12348,9 @@
           },
           "404": {
             "description": "Project not found"
+          },
+          "403": {
+            "description": "Insufficient permissions (requires project:delete)"
           }
         }
       }
