@@ -193,7 +193,7 @@ export function TokenCreatedDialog({
                 </HStack>
                 {orgProjects.length > 1 && (
                   <VStack gap={1} align="start">
-                    <Text fontSize="xs" fontWeight="600" color="fg.muted">
+                    <Text fontSize="sm" fontWeight="700">
                       Project
                     </Text>
                     <Select.Root
