@@ -190,7 +190,14 @@ local activeUntil = nowMs + activeTtlSec * 1000
 -- Page through the ready zset so a head full of paused / blocked / legacy-drift
 -- entries does not cause dispatch to return nil while eligible work exists later.
 local pageSize = 200
+-- Default scan budget bounds the worst-case cost of a single dispatch
+-- call. When the tenant soft-cap is enabled we widen it so a head full
+-- of one tenant's over-cap groups (which we correctly skip but still
+-- count against the budget) cannot starve other tenants deeper in the
+-- zset. This is the explicit cost of the cap: more work per poll, in
+-- exchange for cross-tenant fairness.
 local scanBudget = 1000
+if tenantCap > 0 then scanBudget = 50000 end
 local offset = 0
 
 while offset < scanBudget do
@@ -329,6 +336,9 @@ local dispatched = 0
 local pageSize = maxJobs * 3
 if pageSize < 30 then pageSize = 30 end
 local scanBudget = pageSize * 5
+-- See DISPATCH_LUA: widen scan budget when the tenant cap is on so a
+-- head full of one over-cap tenant cannot starve other tenants.
+if tenantCap > 0 then scanBudget = pageSize * 250 end
 local offset = 0
 
 while offset < scanBudget and dispatched < maxJobs do
@@ -526,10 +536,15 @@ return 1
 const REFRESH_LUA = `
 local activeKey    = KEYS[1]
 local readyKey     = KEYS[2]
-local stagedJobId  = ARGV[1]
-local activeTtlSec = tonumber(ARGV[2])
-local groupId      = ARGV[3]
-local nowMs        = tonumber(ARGV[4])
+local stagedJobId           = ARGV[1]
+local activeTtlSec          = tonumber(ARGV[2])
+local groupId               = ARGV[3]
+local nowMs                 = tonumber(ARGV[4])
+-- Tenant counter prefix (post-2026-05-11 soft-cap). When provided, the
+-- tenant_active counter's TTL is refreshed alongside the activeKey TTL
+-- so long-running groups don't expire their tenant slot mid-execution
+-- (which would let the same tenant grab another slot, drifting cap up).
+local tenantCountKeyPrefix  = ARGV[5]
 
 local currentActive = redis.call("GET", activeKey)
 if currentActive == stagedJobId then
@@ -540,6 +555,16 @@ if currentActive == stagedJobId then
   -- reinsert it (would violate "blocked => not in ready").
   if redis.call("ZSCORE", readyKey, groupId) then
     redis.call("ZADD", readyKey, nowMs + activeTtlSec * 1000, groupId)
+  end
+  if tenantCountKeyPrefix and tenantCountKeyPrefix ~= "" then
+    local slashPos = string.find(groupId, "/", 1, true)
+    if slashPos and slashPos > 1 then
+      local tenantId = string.sub(groupId, 1, slashPos - 1)
+      local key = tenantCountKeyPrefix .. tenantId
+      if redis.call("EXISTS", key) == 1 then
+        redis.call("EXPIRE", key, activeTtlSec)
+      end
+    end
   end
   return 1
 end
@@ -622,13 +647,17 @@ return 1
 const RETRY_RESTAGE_LUA = `
 local activeKey = KEYS[1]
 
-local keyPrefix       = ARGV[1]
-local groupId         = ARGV[2]
-local stagedJobId     = ARGV[3]
-local newStagedJobId  = ARGV[4]
-local dispatchAfterMs = tonumber(ARGV[5])
-local jobDataJson     = ARGV[6]
-local retryTtlSec     = tonumber(ARGV[7])
+local keyPrefix             = ARGV[1]
+local groupId               = ARGV[2]
+local stagedJobId           = ARGV[3]
+local newStagedJobId        = ARGV[4]
+local dispatchAfterMs       = tonumber(ARGV[5])
+local jobDataJson           = ARGV[6]
+local retryTtlSec           = tonumber(ARGV[7])
+-- Tenant counter prefix (post-2026-05-11 soft-cap). Keeps the tenant
+-- counter TTL aligned with the activeKey TTL across backoff retries
+-- so an in-flight retry doesn't expire its tenant slot.
+local tenantCountKeyPrefix  = ARGV[8]
 
 -- 1. Validate active key matches
 local currentActive = redis.call("GET", activeKey)
@@ -651,6 +680,21 @@ redis.call("ZADD", readyKey, dispatchAfterMs, groupId)
 --    While the key exists the group is locked (preserves FIFO ordering).
 --    When it expires the dispatcher picks up the retry job on its next poll.
 redis.call("EXPIRE", activeKey, retryTtlSec)
+
+-- 5. Mirror activeKey TTL onto tenant_active counter so the soft cap
+-- stays accurate during backoff windows. Only set when the counter
+-- exists to avoid silently re-creating a counter that COMPLETE_LUA
+-- legitimately decremented to zero.
+if tenantCountKeyPrefix and tenantCountKeyPrefix ~= "" then
+  local slashPos = string.find(groupId, "/", 1, true)
+  if slashPos and slashPos > 1 then
+    local tenantId = string.sub(groupId, 1, slashPos - 1)
+    local key = tenantCountKeyPrefix .. tenantId
+    if redis.call("EXISTS", key) == 1 then
+      redis.call("EXPIRE", key, retryTtlSec)
+    end
+  end
+end
 
 return 1
 `;
@@ -962,6 +1006,7 @@ export class GroupStagingScripts {
       String(activeTtlSec),
       groupId,
       String(Date.now()),
+      `${this.keyPrefix}tenant_active:`,
     );
 
     return result === 1;
@@ -1048,6 +1093,7 @@ export class GroupStagingScripts {
       String(dispatchAfterMs),
       jobDataJson,
       String(retryTtlSec),
+      `${this.keyPrefix}tenant_active:`,
     );
 
     return result === 1;
