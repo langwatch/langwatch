@@ -30,6 +30,7 @@ export function AnomaliesCard() {
 
   const anomalies = query.data?.anomalies ?? [];
   const hasAny = anomalies.length > 0;
+  const hasError = query.isError && !query.isFetching;
   const hardCount = useMemo(
     () => anomalies.filter((a) => a.tier === "hard").length,
     [anomalies],
@@ -53,7 +54,13 @@ export function AnomaliesCard() {
           <Spacer />
           {query.isFetching && <Spinner size="xs" />}
         </HStack>
-        {!hasAny && !query.isLoading && (
+        {hasError && (
+          <Text paddingX={4} paddingBottom={3} color="red.500" textStyle="xs">
+            Could not load anomalies — Redis may be unavailable. Retrying every
+            30s. Do NOT interpret this as &ldquo;all clear&rdquo;.
+          </Text>
+        )}
+        {!hasAny && !query.isLoading && !hasError && (
           <Text paddingX={4} paddingBottom={3} color="gray.500" textStyle="xs">
             No active anomalies in the last 60 minutes.
           </Text>

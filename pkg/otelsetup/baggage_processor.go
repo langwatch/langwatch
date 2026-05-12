@@ -50,6 +50,6 @@ func (p *BaggageAttributeProcessor) OnStart(parent context.Context, span sdktrac
 	}
 }
 
-func (p *BaggageAttributeProcessor) OnEnd(_ sdktrace.ReadOnlySpan)             {}
-func (p *BaggageAttributeProcessor) Shutdown(_ context.Context) error          { return nil }
-func (p *BaggageAttributeProcessor) ForceFlush(_ context.Context) error        { return nil }
+func (p *BaggageAttributeProcessor) OnEnd(_ sdktrace.ReadOnlySpan)      {}
+func (p *BaggageAttributeProcessor) Shutdown(_ context.Context) error   { return nil }
+func (p *BaggageAttributeProcessor) ForceFlush(_ context.Context) error { return nil }

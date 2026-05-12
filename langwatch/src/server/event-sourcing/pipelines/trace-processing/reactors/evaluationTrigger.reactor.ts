@@ -162,8 +162,10 @@ function extractCausalityDepthFromOtlpAttrs(
   return 0;
 }
 
-function recordLoopBlocked(tenantId: string, reason: string): void {
-  evaluatorLoopBlockedCounter.inc({ tenant_id: tenantId, reason });
+function recordLoopBlocked(_tenantId: string, reason: string): void {
+  // tenant attribution lives in the structured log line, not the
+  // Prometheus label (cardinality control — see metrics.ts comment).
+  evaluatorLoopBlockedCounter.inc({ reason });
 }
 
 // ---------------------------------------------------------------------------

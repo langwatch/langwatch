@@ -86,12 +86,16 @@ export class AnomalyDetector {
       BASELINE_LOOKBACK_SECONDS,
     );
 
-    if (series.length < 60) {
-      // Insufficient data for a baseline (less than 1h of history). Skip.
+    // perMinuteSeries pads missing buckets with 0, so `series.length`
+    // always equals the lookback width. Filter to non-zero samples to
+    // skip tenants who haven't actually produced traffic.
+    const nonZero = series.filter((v) => v > 0);
+    if (nonZero.length < 60) {
+      // Less than 1h of actual activity — baseline would be noise. Skip.
       return "noop";
     }
 
-    const baseline = percentile(series.filter((v) => v > 0), 95);
+    const baseline = percentile({ values: nonZero, p: 95 });
     if (baseline < MIN_BASELINE_RATE) {
       // Too quiet to reliably detect anomalies.
       return "noop";
@@ -254,10 +258,10 @@ export class AnomalyDetector {
 }
 
 /**
- * Linear-interpolated percentile. Sorts in place; pass a defensive copy
- * when the caller cares about ordering. Returns 0 for empty input.
+ * Linear-interpolated percentile. Returns 0 for empty input. Sorts a
+ * defensive copy so the input array is not mutated.
  */
-export function percentile(values: number[], p: number): number {
+export function percentile({ values, p }: { values: number[]; p: number }): number {
   if (values.length === 0) return 0;
   const sorted = [...values].sort((a, b) => a - b);
   const rank = (p / 100) * (sorted.length - 1);

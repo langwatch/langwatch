@@ -5,12 +5,20 @@ import (
 	"net/http"
 	"strconv"
 
-	otelapi "go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/baggage"
 	"go.opentelemetry.io/otel/propagation"
 
 	"github.com/langwatch/langwatch/pkg/otelsetup"
 )
+
+// traceContextPropagator extracts ONLY the W3C traceparent / tracestate
+// from inbound headers. We intentionally do NOT extract baggage — the
+// global propagator (otelsetup.New) is configured with TraceContext +
+// Baggage so that *outbound* nlpgo calls can inject the depth baggage
+// we set ourselves, but importing inbound baggage would let any caller
+// replay arbitrary baggage entries cross-service. The only baggage key
+// we trust is the explicit X-LangWatch-Causality-Depth header below.
+var traceContextPropagator = propagation.TraceContext{}
 
 // causalityDepthHeader is the inbound header carrying the caller's current
 // causality depth. nlpgo increments by 1 and stamps that value on every
@@ -34,7 +42,7 @@ const causalityDepthHeader = "X-LangWatch-Causality-Depth"
 // workflow runs. The TS dispatcher always sends the header on the
 // evaluator path (nlpgoFetch.ts) so eval-chain detection stays intact.
 func applyInboundCausality(ctx context.Context, r *http.Request) context.Context {
-	ctx = otelapi.GetTextMapPropagator().Extract(ctx, propagation.HeaderCarrier(r.Header))
+	ctx = traceContextPropagator.Extract(ctx, propagation.HeaderCarrier(r.Header))
 
 	raw := r.Header.Get(causalityDepthHeader)
 	if raw == "" {

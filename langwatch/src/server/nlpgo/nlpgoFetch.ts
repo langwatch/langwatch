@@ -126,7 +126,7 @@ export async function nlpgoFetch<T = unknown>(
     const parentSpanId =
       opts.parentSpanId && /^[0-9a-f]{16}$/i.test(opts.parentSpanId)
         ? opts.parentSpanId
-        : randomHex(16);
+        : randomHex(8); // 8 bytes = 16 hex chars (W3C traceparent span-id)
     headers["traceparent"] = `00-${opts.traceId.toLowerCase()}-${parentSpanId.toLowerCase()}-01`;
   }
 

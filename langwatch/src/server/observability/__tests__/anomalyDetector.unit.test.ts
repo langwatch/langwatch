@@ -38,22 +38,24 @@ function makeFakes() {
 
 describe("percentile", () => {
   it("returns 0 for empty", () => {
-    expect(percentile([], 95)).toBe(0);
+    expect(percentile({ values: [], p: 95 })).toBe(0);
   });
 
   it("returns the value for single-element", () => {
-    expect(percentile([42], 95)).toBe(42);
+    expect(percentile({ values: [42], p: 95 })).toBe(42);
   });
 
   it("computes p95 with linear interpolation", () => {
     const series = Array.from({ length: 100 }, (_, i) => i + 1);
-    expect(percentile(series, 95)).toBeCloseTo(95.05, 1);
+    expect(percentile({ values: series, p: 95 })).toBeCloseTo(95.05, 1);
   });
 
   it("is order-independent (sorts internally)", () => {
     const a = [10, 1, 5, 8, 2, 7, 3, 9, 4, 6];
     const b = [...a].reverse();
-    expect(percentile(a, 50)).toBeCloseTo(percentile(b, 50));
+    expect(percentile({ values: a, p: 50 })).toBeCloseTo(
+      percentile({ values: b, p: 50 }),
+    );
   });
 });
 
