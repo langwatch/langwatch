@@ -1062,7 +1062,7 @@ app.post("/langy/chat", async (c) => {
 
     search_traces: tool({
       description:
-        "Lazy semantic-ish search over recent traces in this project. Use when the user asks to 'find traces' matching a description (errors, hallucinations, latency). Returns a small list of trace ids with brief context. Tool result is per-turn only — do not persist or recall ids across conversations.",
+        "Keyword search over recent traces in this project (BM25 over input/output text and error messages — not semantic). Use when the user asks to 'find traces' with specific words or phrases in them ('error', 'timeout', a particular customer name). Returns a small list of trace ids with brief context. Tool result is per-turn only — do not persist or recall ids across conversations.",
       inputSchema: z.object({
         query: z
           .string()
@@ -1159,13 +1159,12 @@ app.post("/langy/chat", async (c) => {
 
     search_past_runs: tool({
       description:
-        "Search past evaluation runs (BatchEvaluation) for this project, optionally filtered by experiment slug or workflow id, ordered by recency.",
+        "Search past evaluation runs (BatchEvaluation) for this project, optionally filtered by experiment slug, ordered by recency.",
       inputSchema: z.object({
         experimentSlug: z.string().optional(),
-        workflowId: z.string().optional(),
         limit: z.number().int().min(1).max(20).default(10),
       }),
-      execute: async ({ experimentSlug, workflowId: _workflowId, limit }) => {
+      execute: async ({ experimentSlug, limit }) => {
         const where: Record<string, unknown> = { projectId };
         if (experimentSlug) {
           const exp = await prisma.experiment.findFirst({
