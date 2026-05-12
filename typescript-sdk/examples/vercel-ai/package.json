@@ -16,7 +16,7 @@
   "dependencies": {
     "@ai-sdk/openai": "^2.0.6",
     "@opentelemetry/context-async-hooks": "^2.0.1",
-    "@opentelemetry/sdk-node": "^0.203.0",
+    "@opentelemetry/sdk-node": "^0.217.0",
     "@vercel/otel": "^1.13.0",
     "ai": "^5.0.52",
     "cli-markdown": "^3.5.1",
