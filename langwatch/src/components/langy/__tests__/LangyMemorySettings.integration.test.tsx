@@ -77,6 +77,13 @@ interface FetchScenario {
   exportPayload?: unknown;
   putShouldFail?: boolean;
   isStale?: boolean;
+  preferences?: {
+    id: string;
+    userId: string;
+    projectId: string;
+    mode: "non_expert" | "expert";
+    dismissedSuggestionKinds: string[];
+  };
 }
 
 function installFetchMock(scenario: FetchScenario): Mock {
@@ -142,6 +149,35 @@ function installFetchMock(scenario: FetchScenario): Mock {
     }
     if (url.startsWith("/api/langy/memory") && method === "DELETE") {
       return new Response(JSON.stringify({ deletedCount: 3 }), { status: 200 });
+    }
+    if (url.startsWith("/api/langy/preferences") && method === "GET") {
+      return new Response(
+        JSON.stringify({
+          preferences: scenario.preferences ?? {
+            id: "pref-1",
+            userId: "user-1",
+            projectId: "project-demo",
+            mode: "non_expert",
+            dismissedSuggestionKinds: [],
+          },
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    }
+    if (url.startsWith("/api/langy/preferences") && method === "PUT") {
+      const body = init?.body ? JSON.parse(String(init.body)) : {};
+      return new Response(
+        JSON.stringify({
+          preferences: {
+            id: "pref-1",
+            userId: "user-1",
+            projectId: body.projectId,
+            mode: body.mode ?? "non_expert",
+            dismissedSuggestionKinds: body.dismissedSuggestionKinds ?? [],
+          },
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
     }
     return new Response("not stubbed", { status: 501 });
   });

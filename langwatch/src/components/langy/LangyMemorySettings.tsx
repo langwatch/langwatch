@@ -13,6 +13,17 @@ import { useCallback, useEffect, useState } from "react";
 import { LuDownload, LuRefreshCw, LuTrash2, LuTriangle } from "react-icons/lu";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { toaster } from "~/components/ui/toaster";
+import { Switch } from "~/components/ui/switch";
+
+type LangyMode = "non_expert" | "expert";
+
+interface PreferencesDTO {
+  id: string;
+  userId: string;
+  projectId: string;
+  mode: LangyMode;
+  dismissedSuggestionKinds: string[];
+}
 
 interface ProjectMemoryDTO {
   id: string;
@@ -66,6 +77,10 @@ export function LangyMemorySettings() {
   const [isClearing, setIsClearing] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
 
+  const [mode, setMode] = useState<LangyMode>("non_expert");
+  const [isLoadingPreferences, setIsLoadingPreferences] = useState(false);
+  const [isSavingMode, setIsSavingMode] = useState(false);
+
   const loadMemory = useCallback(async () => {
     if (!projectId) return;
     setIsLoadingMemory(true);
@@ -88,6 +103,46 @@ export function LangyMemorySettings() {
     }
   }, [projectId]);
 
+  const loadPreferences = useCallback(async () => {
+    if (!projectId) return;
+    setIsLoadingPreferences(true);
+    try {
+      const res = await fetch(
+        `/api/langy/preferences?projectId=${encodeURIComponent(projectId)}`,
+      );
+      if (!res.ok) throw new Error(`Failed: ${res.status}`);
+      const data = (await res.json()) as { preferences: PreferencesDTO };
+      setMode(data.preferences.mode);
+    } catch {
+      reportError("Failed to load Langy preferences.");
+    } finally {
+      setIsLoadingPreferences(false);
+    }
+  }, [projectId]);
+
+  const saveMode = async (nextMode: LangyMode) => {
+    if (!projectId) return;
+    const previousMode = mode;
+    setMode(nextMode);
+    setIsSavingMode(true);
+    try {
+      const res = await fetch("/api/langy/preferences", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ projectId, mode: nextMode }),
+      });
+      if (!res.ok) throw new Error(`Failed: ${res.status}`);
+      reportSuccess(
+        nextMode === "expert" ? "Expert mode on." : "Expert mode off.",
+      );
+    } catch {
+      setMode(previousMode);
+      reportError("Failed to save preference.");
+    } finally {
+      setIsSavingMode(false);
+    }
+  };
+
   const loadConversations = useCallback(async () => {
     if (!projectId) return;
     try {
@@ -107,7 +162,8 @@ export function LangyMemorySettings() {
   useEffect(() => {
     void loadMemory();
     void loadConversations();
-  }, [loadMemory, loadConversations]);
+    void loadPreferences();
+  }, [loadMemory, loadConversations, loadPreferences]);
 
   const save = async () => {
     if (!projectId || !isAdmin) return;
@@ -288,6 +344,34 @@ export function LangyMemorySettings() {
               Project admins can edit and refresh.
             </Text>
           )}
+        </HStack>
+      </VStack>
+
+      {/* Mode */}
+      <VStack gap={3} align="stretch">
+        <HStack justify="space-between">
+          <Heading as="h3" size="md">
+            Mode
+          </Heading>
+          {isLoadingPreferences && <Spinner size="xs" />}
+        </HStack>
+        <HStack justify="space-between" align="start">
+          <VStack gap={1} align="start">
+            <Switch
+              checked={mode === "expert"}
+              disabled={isSavingMode || isLoadingPreferences}
+              onCheckedChange={(details) =>
+                void saveMode(details.checked ? "expert" : "non_expert")
+              }
+            >
+              Expert mode
+            </Switch>
+            <Text fontSize="xs" color="fg.muted">
+              {mode === "expert"
+                ? "Terse responses, fewer confirmations, jargon allowed."
+                : "Plain language, confirms before destructive actions."}
+            </Text>
+          </VStack>
         </HStack>
       </VStack>
 
