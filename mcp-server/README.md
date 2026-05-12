@@ -18,7 +18,7 @@ For Claude Code (manual) or other MCP clients (Cursor, Copilot, etc.), add an en
 
 The API key is required for observability and prompt tools. Documentation tools work without it.
 
-> The config is described in prose rather than as a JSON snippet because some CLI agents (notably Gemini CLI 0.36.0 and earlier) parse `@`-prefixed runs as file paths and can crash with `ENAMETOOLONG` on multi-line JSON containing `"@langwatch/mcp-server"`. See [#3104](https://github.com/langwatch/langwatch/issues/3104). The bash form above is safe — the package name is followed by a whitespace terminator.
+> The config is described in prose rather than as a JSON snippet because some CLI agents (notably Gemini CLI 0.36.0 and earlier) parse `@`-prefixed runs as file paths and can crash with `ENAMETOOLONG` when a multi-line JSON snippet wraps the scoped package name in double quotes. See [#3104](https://github.com/langwatch/langwatch/issues/3104). The bash form above is safe — the package name is followed by a whitespace terminator.
 
 ## Configuration
 
