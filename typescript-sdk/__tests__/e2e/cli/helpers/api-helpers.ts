@@ -6,12 +6,25 @@ export class ApiHelpers {
 
   cleapUpTestPrompts = async () => {
     const prompts = await this.langwatch.prompts.getAll();
-    const promises = prompts.map((prompt) => {
-      if (prompt.handle?.startsWith(PROMPT_NAME_PREFIX)) {
-        return this.langwatch.prompts.delete(prompt.handle);
-      }
-      return Promise.resolve();
-    });
-    await Promise.all(promises);
+    const targets = prompts.filter((p) =>
+      p.handle?.startsWith(PROMPT_NAME_PREFIX),
+    );
+    const results = await Promise.allSettled(
+      targets.map((p) => this.langwatch.prompts.delete(p.handle!)),
+    );
+    const failures = results
+      .map((r, i) => ({ r, handle: targets[i]?.handle }))
+      .filter(({ r }) => r.status === "rejected");
+    if (failures.length > 0) {
+      const detail = failures
+        .map(
+          ({ r, handle }) =>
+            `${handle}: ${(r as PromiseRejectedResult).reason}`,
+        )
+        .join("; ");
+      throw new Error(
+        `cleapUpTestPrompts: ${failures.length} prompt deletion(s) failed: ${detail}`,
+      );
+    }
   };
 }

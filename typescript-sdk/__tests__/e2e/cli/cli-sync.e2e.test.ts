@@ -18,6 +18,7 @@ import {
 } from "vitest";
 import * as fs from "fs";
 import * as path from "path";
+import { randomUUID } from "crypto";
 
 import { config } from "dotenv";
 import {
@@ -36,7 +37,7 @@ const { expectCliResultSuccess } = expectations;
 const TMP_BASE_DIR = path.join(__dirname, "tmp", "sync");
 
 const createUniquePromptName = () => {
-  return `${PROMPT_NAME_PREFIX}-${Date.now()}`;
+  return `${PROMPT_NAME_PREFIX}${randomUUID()}`;
 };
 
 describe("CLI E2E", () => {
@@ -75,18 +76,20 @@ describe("CLI E2E", () => {
 
   afterEach(async () => {
     process.chdir(originalCwd);
+    if (testDir && fs.existsSync(testDir)) {
+      fs.rmSync(testDir, { recursive: true, force: true });
+    }
   });
 
   afterAll(async () => {
-    // Clean up test prompts
     const apiHelpers = new ApiHelpers(langwatch);
     await apiHelpers.cleapUpTestPrompts();
+    if (fs.existsSync(TMP_BASE_DIR)) {
+      fs.rmSync(TMP_BASE_DIR, { recursive: true, force: true });
+    }
   });
 
-  // Entire sync suite skipped due to chronic CI flakes — see langwatch/langwatch#3240.
-  // Multiple tests in this describe block fail non-deterministically; skip
-  // the whole group rather than whack-a-mole individual tests.
-  describe.skip("sync", () => {
+  describe("sync", () => {
     describe("create local -> sync -> update local -> sync", () => {
       it("should keep remote prompt up to date", async () => {
         // Initialize project
