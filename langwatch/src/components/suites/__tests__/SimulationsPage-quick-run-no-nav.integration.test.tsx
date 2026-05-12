@@ -310,6 +310,7 @@ describe("SimulationsPage quick-run no-navigation invariant (#3363)", () => {
    */
   describe("given the suite editor drawer is open", () => {
     describe("when Save and Run fires for a saved suite (AC6 regression guard)", () => {
+      /** @scenario Save and Run from the suite editor drawer still navigates to the suite detail page */
       it("calls router push toward the suite detail page", async () => {
         const user = userEvent.setup();
         routerQueryPath.current = undefined; // Start on All Runs
