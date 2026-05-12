@@ -10,6 +10,12 @@ Feature: Proxy passthrough — playground LLM calls via /go/proxy/v1/*
   # and forwards verbatim — preserving every byte of the OpenAI shape including
   # streaming SSE, tool calls, image content, and the function-calling Beta variants.
 
+  # All scenarios are @unimplemented because services/nlpgo/ does not yet exist.
+  # The TS feature-parity checker only scans TS test roots, so Go-side proxy
+  # passthrough scenarios cannot be bound via @scenario JSDoc. TS-side routing
+  # logic is partially in langwatch/src/server/routes/playground.ts; Go-side
+  # tests will live under services/nlpgo/. Aspirational pending nlpgo stand-up.
+
   Background:
     Given nlpgo is running with the in-process AI Gateway dispatcher loaded
     And a project "acme-api" exists

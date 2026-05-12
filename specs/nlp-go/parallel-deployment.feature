@@ -8,6 +8,12 @@ Feature: Parallel deployment — Go and Python share one container/lambda
   # reverse-proxies everything else to the uvicorn child. NLPGO_BYPASS=1 is the emergency
   # lever that swaps :5562 to be uvicorn directly.
 
+  # All scenarios are @unimplemented because services/nlpgo/ + Dockerfile changes
+  # do not yet exist. The TS feature-parity checker only scans TS test roots,
+  # so container topology and Lambda deployment scenarios cannot be bound via
+  # @scenario JSDoc. Aspirational pending nlpgo service stand-up + lambda image
+  # changes; coverage will live as Go integration tests + dockerfile lint.
+
   Background:
     Given the docker image "langwatch_nlp.lambda" is built from Dockerfile.langwatch_nlp.lambda
     And the image bundles the nlpgo Go binary AND the Python uvicorn app

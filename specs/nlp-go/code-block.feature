@@ -8,6 +8,15 @@ Feature: Code block — execute user Python with isolated subprocess and structu
 
   See _shared/contract.md §7.
 
+  # All scenarios are @unimplemented because the TS feature-parity checker only
+  # scans TS test roots, so Go-side scenarios in services/nlpgo/ cannot be bound
+  # via @scenario JSDoc until the checker grows Go-side support (or a parallel
+  # Go-side binder ships). services/nlpgo/ exists and contains the engine + a
+  # growing set of integration tests; the gap is pure tooling/binding, not
+  # service stand-up. Existing Python-side parity reference:
+  # langwatch_nlp/langwatch_nlp/studio/execute/code_node.py and
+  # langwatch_nlp/tests/studio/. Aspirational pending parity-binder coverage.
+
   Background:
     Given nlpgo is listening on :5562
     And a Python 3.12+ interpreter is available on PATH inside the container
