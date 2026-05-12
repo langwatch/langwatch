@@ -46,6 +46,7 @@ import {
   type LangyMessageRecord,
 } from "./useLangyConversations";
 import { useLangy } from "./LangyContext";
+import { parseLangyErrorMessage } from "./parseLangyErrorMessage";
 
 const PANEL_WIDTH = 380;
 // The panel docks flush against the right edge of the viewport. Page
@@ -501,7 +502,7 @@ function LangyPanel({
       if (isHandledByGlobalHandler(error)) return;
       toaster.create({
         title: "Langy error",
-        description: error.message,
+        description: parseLangyErrorMessage(error.message),
         type: "error",
         duration: 5000,
         meta: { closable: true },
