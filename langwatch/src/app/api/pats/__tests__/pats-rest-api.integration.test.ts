@@ -10,19 +10,19 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { prisma } from "~/server/db";
-import { PatService } from "~/server/pat/pat.service";
+import { ApiKeyService } from "~/server/api-key/api-key.service";
 import { app } from "../[[...route]]/app";
 
-describe("Feature: PATs REST API", () => {
-  const ns = `pats-api-${nanoid(8)}`;
+describe("Feature: API Keys REST API", () => {
+  const ns = `api-keys-api-${nanoid(8)}`;
 
   let testOrganization: Organization;
   let testTeam: Team;
-  let patToken: string;
+  let bootstrapToken: string;
   let userId: string;
 
   const authHeaders = () => ({
-    Authorization: `Bearer ${patToken}`,
+    Authorization: `Bearer ${bootstrapToken}`,
     "Content-Type": "application/json",
   });
 
@@ -44,12 +44,12 @@ describe("Feature: PATs REST API", () => {
 
   beforeAll(async () => {
     testOrganization = await prisma.organization.create({
-      data: { name: "PATs Test Org", slug: `--test-org-${ns}` },
+      data: { name: "API Keys Test Org", slug: `--test-org-${ns}` },
     });
 
     testTeam = await prisma.team.create({
       data: {
-        name: "PATs Test Team",
+        name: "API Keys Test Team",
         slug: `--test-team-${ns}`,
         organizationId: testOrganization.id,
       },
@@ -57,7 +57,7 @@ describe("Feature: PATs REST API", () => {
 
     const user = await prisma.user.create({
       data: {
-        name: "PATs Test User",
+        name: "API Keys Test User",
         email: `test-${ns}@example.com`,
       },
     });
@@ -90,11 +90,13 @@ describe("Feature: PATs REST API", () => {
       },
     });
 
-    const patService = PatService.create(prisma);
-    const created = await patService.create({
-      name: `pats-bootstrap-${nanoid(6)}`,
+    const apiKeyService = ApiKeyService.create(prisma);
+    const created = await apiKeyService.create({
+      name: `api-keys-bootstrap-${nanoid(6)}`,
       userId,
+      createdByUserId: userId,
       organizationId: testOrganization.id,
+      permissionMode: "scoped",
       bindings: [
         {
           role: TeamUserRole.ADMIN,
@@ -103,14 +105,14 @@ describe("Feature: PATs REST API", () => {
         },
       ],
     });
-    patToken = created.token;
+    bootstrapToken = created.token;
   });
 
   afterAll(async () => {
     await prisma.roleBinding.deleteMany({
       where: { organizationId: testOrganization.id },
     }).catch(() => {});
-    await prisma.personalAccessToken.deleteMany({
+    await prisma.apiKey.deleteMany({
       where: { organizationId: testOrganization.id },
     }).catch(() => {});
     await prisma.teamUser.deleteMany({
@@ -129,21 +131,21 @@ describe("Feature: PATs REST API", () => {
 
   describe("Authentication", () => {
     it("returns 401 without auth header", async () => {
-      const res = await app.request("/api/pats");
+      const res = await app.request("/api/api-keys");
       expect(res.status).toBe(401);
     });
 
-    it("returns 401 with invalid PAT", async () => {
-      const res = await app.request("/api/pats", {
-        headers: { Authorization: "Bearer pat-lw-invalid_token" },
+    it("returns 401 with invalid token", async () => {
+      const res = await app.request("/api/api-keys", {
+        headers: { Authorization: "Bearer sk-lw-invalid_token" },
       });
       expect(res.status).toBe(401);
     });
   });
 
-  describe("POST /api/pats", () => {
-    it("creates a PAT and returns the token (shown once)", async () => {
-      const res = await api.post("/api/pats", {
+  describe("POST /api/api-keys", () => {
+    it("creates an API key and returns the token (shown once)", async () => {
+      const res = await api.post("/api/api-keys", {
         name: "My API Token",
         bindings: [
           {
@@ -156,14 +158,14 @@ describe("Feature: PATs REST API", () => {
       expect(res.status).toBe(201);
 
       const body = await res.json();
-      expect(body.token).toMatch(/^pat-lw-/);
-      expect(body.pat.id).toBeDefined();
-      expect(body.pat.name).toBe("My API Token");
-      expect(body.pat.createdAt).toBeDefined();
+      expect(body.token).toMatch(/^sk-lw-/);
+      expect(body.apiKey.id).toBeDefined();
+      expect(body.apiKey.name).toBe("My API Token");
+      expect(body.apiKey.createdAt).toBeDefined();
     });
 
-    it("creates a PAT with team-scoped binding", async () => {
-      const res = await api.post("/api/pats", {
+    it("creates an API key with team-scoped binding", async () => {
+      const res = await api.post("/api/api-keys", {
         name: "Team Scoped Token",
         bindings: [
           {
@@ -176,12 +178,12 @@ describe("Feature: PATs REST API", () => {
       expect(res.status).toBe(201);
 
       const body = await res.json();
-      expect(body.token).toMatch(/^pat-lw-/);
+      expect(body.token).toMatch(/^sk-lw-/);
     });
 
-    it("creates a PAT with expiration", async () => {
+    it("creates an API key with expiration", async () => {
       const expiresAt = new Date(Date.now() + 86400000).toISOString();
-      const res = await api.post("/api/pats", {
+      const res = await api.post("/api/api-keys", {
         name: "Expiring Token",
         expiresAt,
         bindings: [
@@ -196,7 +198,7 @@ describe("Feature: PATs REST API", () => {
     });
 
     it("returns 422 when name is missing", async () => {
-      const res = await api.post("/api/pats", {
+      const res = await api.post("/api/api-keys", {
         bindings: [
           {
             role: "ADMIN",
@@ -209,7 +211,7 @@ describe("Feature: PATs REST API", () => {
     });
 
     it("returns 422 when bindings are empty", async () => {
-      const res = await api.post("/api/pats", {
+      const res = await api.post("/api/api-keys", {
         name: "No Bindings",
         bindings: [],
       });
@@ -217,7 +219,7 @@ describe("Feature: PATs REST API", () => {
     });
 
     it("returns 403 when scope does not belong to org", async () => {
-      const res = await api.post("/api/pats", {
+      const res = await api.post("/api/api-keys", {
         name: "Bad Scope",
         bindings: [
           {
@@ -231,9 +233,9 @@ describe("Feature: PATs REST API", () => {
     });
   });
 
-  describe("GET /api/pats", () => {
-    it("lists PATs for the authenticated user", async () => {
-      const res = await api.get("/api/pats");
+  describe("GET /api/api-keys", () => {
+    it("lists API keys for the authenticated user", async () => {
+      const res = await api.get("/api/api-keys");
       expect(res.status).toBe(200);
 
       const body = await res.json();
@@ -241,26 +243,26 @@ describe("Feature: PATs REST API", () => {
       expect(Array.isArray(body.data)).toBe(true);
       expect(body.data.length).toBeGreaterThanOrEqual(1);
 
-      const pat = body.data[0];
-      expect(pat.id).toBeDefined();
-      expect(pat.name).toBeDefined();
-      expect(pat.roleBindings).toBeDefined();
+      const key = body.data[0];
+      expect(key.id).toBeDefined();
+      expect(key.name).toBeDefined();
+      expect(key.roleBindings).toBeDefined();
     });
 
     it("does not include token in list response", async () => {
-      const res = await api.get("/api/pats");
+      const res = await api.get("/api/api-keys");
       const body = await res.json();
-      for (const pat of body.data) {
-        expect(pat).not.toHaveProperty("token");
-        expect(pat).not.toHaveProperty("hashedSecret");
-        expect(pat).not.toHaveProperty("lookupId");
+      for (const key of body.data) {
+        expect(key).not.toHaveProperty("token");
+        expect(key).not.toHaveProperty("hashedSecret");
+        expect(key).not.toHaveProperty("lookupId");
       }
     });
   });
 
-  describe("DELETE /api/pats/:id", () => {
-    it("revokes a PAT", async () => {
-      const createRes = await api.post("/api/pats", {
+  describe("DELETE /api/api-keys/:id", () => {
+    it("revokes an API key", async () => {
+      const createRes = await api.post("/api/api-keys", {
         name: `Revoke Test ${nanoid(6)}`,
         bindings: [
           {
@@ -272,15 +274,15 @@ describe("Feature: PATs REST API", () => {
       });
       const created = await createRes.json();
 
-      const res = await api.delete(`/api/pats/${created.pat.id}`);
+      const res = await api.delete(`/api/api-keys/${created.apiKey.id}`);
       expect(res.status).toBe(200);
 
       const body = await res.json();
       expect(body.success).toBe(true);
     });
 
-    it("returns 409 when revoking an already-revoked PAT", async () => {
-      const createRes = await api.post("/api/pats", {
+    it("returns 409 when revoking an already-revoked key", async () => {
+      const createRes = await api.post("/api/api-keys", {
         name: `Double Revoke ${nanoid(6)}`,
         bindings: [
           {
@@ -292,13 +294,13 @@ describe("Feature: PATs REST API", () => {
       });
       const created = await createRes.json();
 
-      await api.delete(`/api/pats/${created.pat.id}`);
-      const res = await api.delete(`/api/pats/${created.pat.id}`);
+      await api.delete(`/api/api-keys/${created.apiKey.id}`);
+      const res = await api.delete(`/api/api-keys/${created.apiKey.id}`);
       expect(res.status).toBe(409);
     });
 
-    it("returns 404 for non-existent PAT", async () => {
-      const res = await api.delete("/api/pats/nonexistent-pat-id");
+    it("returns 404 for non-existent API key", async () => {
+      const res = await api.delete("/api/api-keys/nonexistent-key-id");
       expect(res.status).toBe(404);
     });
   });

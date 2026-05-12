@@ -1,14 +1,14 @@
 import type { Organization } from "@prisma/client";
 import type { MiddlewareHandler } from "hono";
 import { prisma } from "~/server/db";
-import { createOrgAuthMiddleware } from "~/server/pat/auth-middleware";
-import type { OrgResolvedToken } from "~/server/pat/token-resolver";
+import { createOrgAuthMiddleware } from "~/server/api-key/auth-middleware";
+import type { OrgResolvedToken } from "~/server/api-key/token-resolver";
 
 export type OrgAuthMiddlewareVariables = {
   organization: Organization;
-  patId: string;
-  patUserId: string;
-  patOrganizationId: string;
+  apiKeyId: string;
+  apiKeyUserId: string | null;
+  apiKeyOrganizationId: string;
   orgResolvedToken: OrgResolvedToken;
 };
 

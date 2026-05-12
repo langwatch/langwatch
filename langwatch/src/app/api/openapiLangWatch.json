@@ -2993,6 +2993,215 @@
         }
       }
     },
+    "/api/api-keys": {
+      "get": {
+        "operationId": "listApiKeys",
+        "summary": "List API keys",
+        "description": "List all API keys owned by the authenticated user in this organization.",
+        "security": [
+          {
+            "pat_token": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of PATs",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/ApiKeyInfo"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid or missing PAT token"
+          }
+        }
+      },
+      "post": {
+        "operationId": "createApiKey",
+        "summary": "Create an API key",
+        "description": "Create a new API key. The plaintext token is returned once in the response \u2014 store it securely. Each binding grants the key a role at a specific scope (organization, team, or project). The key cannot exceed the creator's own permissions.",
+        "security": [
+          {
+            "pat_token": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100,
+                    "description": "Human-readable name for this token"
+                  },
+                  "description": {
+                    "type": "string",
+                    "maxLength": 500,
+                    "description": "Optional description"
+                  },
+                  "expiresAt": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "Optional expiration date (ISO 8601)"
+                  },
+                  "bindings": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 20,
+                    "description": "Role bindings that define what this token can access",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "role": {
+                          "type": "string",
+                          "enum": [
+                            "ADMIN",
+                            "MEMBER",
+                            "VIEWER"
+                          ],
+                          "description": "Role to grant"
+                        },
+                        "scopeType": {
+                          "type": "string",
+                          "enum": [
+                            "ORGANIZATION",
+                            "TEAM",
+                            "PROJECT"
+                          ],
+                          "description": "Scope level"
+                        },
+                        "scopeId": {
+                          "type": "string",
+                          "description": "ID of the organization, team, or project"
+                        }
+                      },
+                      "required": [
+                        "role",
+                        "scopeType",
+                        "scopeId"
+                      ]
+                    }
+                  }
+                },
+                "required": [
+                  "name",
+                  "bindings"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "API key created. The token field contains the plaintext key \u2014 it is only shown once.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "token": {
+                      "type": "string",
+                      "description": "Plaintext API key token (sk-lw-...). Store securely \u2014 shown only once."
+                    },
+                    "apiKey": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "createdAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid or missing PAT token"
+          },
+          "403": {
+            "description": "Requested binding exceeds the creator's own permissions, or scope does not belong to this organization"
+          },
+          "422": {
+            "description": "Validation error (missing name, empty bindings, etc.)"
+          }
+        }
+      }
+    },
+    "/api/api-keys/{id}": {
+      "delete": {
+        "operationId": "revokeApiKey",
+        "summary": "Revoke an API key",
+        "description": "Revoke (soft-delete) an API key. Revoked keys can no longer authenticate.",
+        "security": [
+          {
+            "pat_token": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "API key ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "PAT revoked successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid or missing PAT token"
+          },
+          "403": {
+            "description": "Not authorized to revoke this API key (owned by another user)"
+          },
+          "404": {
+            "description": "API key not found"
+          },
+          "409": {
+            "description": "API key is already revoked"
+          }
+        }
+      }
+    },
     "/api/dashboards": {
       "get": {
         "responses": {},
@@ -11803,215 +12012,6 @@
                 ]
               }
             }
-          }
-        }
-      }
-    },
-    "/api/pats": {
-      "get": {
-        "operationId": "listPats",
-        "summary": "List Personal Access Tokens",
-        "description": "List all PATs owned by the authenticated user in this organization.",
-        "security": [
-          {
-            "pat_token": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "List of PATs",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "data": {
-                      "type": "array",
-                      "items": {
-                        "$ref": "#/components/schemas/PersonalAccessToken"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Invalid or missing PAT token"
-          }
-        }
-      },
-      "post": {
-        "operationId": "createPat",
-        "summary": "Create a Personal Access Token",
-        "description": "Create a new PAT. The plaintext token is returned once in the response \u2014 store it securely. Each binding grants the PAT a role at a specific scope (organization, team, or project). The PAT cannot exceed the creator's own permissions.",
-        "security": [
-          {
-            "pat_token": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "name": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 100,
-                    "description": "Human-readable name for this token"
-                  },
-                  "description": {
-                    "type": "string",
-                    "maxLength": 500,
-                    "description": "Optional description"
-                  },
-                  "expiresAt": {
-                    "type": "string",
-                    "format": "date-time",
-                    "description": "Optional expiration date (ISO 8601)"
-                  },
-                  "bindings": {
-                    "type": "array",
-                    "minItems": 1,
-                    "maxItems": 20,
-                    "description": "Role bindings that define what this token can access",
-                    "items": {
-                      "type": "object",
-                      "properties": {
-                        "role": {
-                          "type": "string",
-                          "enum": [
-                            "ADMIN",
-                            "MEMBER",
-                            "VIEWER"
-                          ],
-                          "description": "Role to grant"
-                        },
-                        "scopeType": {
-                          "type": "string",
-                          "enum": [
-                            "ORGANIZATION",
-                            "TEAM",
-                            "PROJECT"
-                          ],
-                          "description": "Scope level"
-                        },
-                        "scopeId": {
-                          "type": "string",
-                          "description": "ID of the organization, team, or project"
-                        }
-                      },
-                      "required": [
-                        "role",
-                        "scopeType",
-                        "scopeId"
-                      ]
-                    }
-                  }
-                },
-                "required": [
-                  "name",
-                  "bindings"
-                ]
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "PAT created. The token field contains the plaintext token \u2014 it is only shown once.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "token": {
-                      "type": "string",
-                      "description": "Plaintext PAT token (pat-lw-...). Store securely \u2014 shown only once."
-                    },
-                    "pat": {
-                      "type": "object",
-                      "properties": {
-                        "id": {
-                          "type": "string"
-                        },
-                        "name": {
-                          "type": "string"
-                        },
-                        "createdAt": {
-                          "type": "string",
-                          "format": "date-time"
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Invalid or missing PAT token"
-          },
-          "403": {
-            "description": "Requested binding exceeds the creator's own permissions, or scope does not belong to this organization"
-          },
-          "422": {
-            "description": "Validation error (missing name, empty bindings, etc.)"
-          }
-        }
-      }
-    },
-    "/api/pats/{id}": {
-      "delete": {
-        "operationId": "revokePat",
-        "summary": "Revoke a Personal Access Token",
-        "description": "Revoke (soft-delete) a PAT. Revoked tokens can no longer authenticate.",
-        "security": [
-          {
-            "pat_token": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            },
-            "description": "PAT ID"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "PAT revoked successfully",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Invalid or missing PAT token"
-          },
-          "403": {
-            "description": "Not authorized to revoke this PAT (owned by another user)"
-          },
-          "404": {
-            "description": "PAT not found"
-          },
-          "409": {
-            "description": "PAT is already revoked"
           }
         }
       }
@@ -27511,7 +27511,7 @@
           }
         }
       },
-      "PersonalAccessToken": {
+      "ApiKeyInfo": {
         "type": "object",
         "properties": {
           "id": {
@@ -27585,7 +27585,7 @@
       "pat_token": {
         "type": "http",
         "scheme": "bearer",
-        "description": "Personal Access Token (PAT). Create one in Settings > API Keys, or via POST /api/pats. Format: pat-lw-..."
+        "description": "API key. Create one in Settings > API Keys, or via POST /api/api-keys. Format: sk-lw-... or pat-lw-... (legacy)"
       }
     }
   }

@@ -10,7 +10,7 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { prisma } from "~/server/db";
-import { PatService } from "~/server/pat/pat.service";
+import { ApiKeyService } from "~/server/api-key/api-key.service";
 import { app } from "../[[...route]]/app";
 
 describe("Feature: Projects REST API", () => {
@@ -96,11 +96,13 @@ describe("Feature: Projects REST API", () => {
       },
     });
 
-    const patService = PatService.create(prisma);
-    const created = await patService.create({
-      name: `projects-pat-${nanoid(6)}`,
+    const apiKeyService = ApiKeyService.create(prisma);
+    const created = await apiKeyService.create({
+      name: `projects-key-${nanoid(6)}`,
       userId,
+      createdByUserId: userId,
       organizationId: testOrganization.id,
+      permissionMode: "scoped",
       bindings: [
         {
           role: TeamUserRole.ADMIN,
@@ -119,7 +121,7 @@ describe("Feature: Projects REST API", () => {
     await prisma.roleBinding.deleteMany({
       where: { organizationId: testOrganization.id },
     }).catch(() => {});
-    await prisma.personalAccessToken.deleteMany({
+    await prisma.apiKey.deleteMany({
       where: { organizationId: testOrganization.id },
     }).catch(() => {});
     await prisma.teamUser.deleteMany({

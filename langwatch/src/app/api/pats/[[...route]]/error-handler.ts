@@ -4,9 +4,9 @@ import { createLogger } from "../../../../utils/logger/server";
 import { HttpError, InternalServerError } from "../../shared/errors";
 import { errorSchema } from "../../shared/schemas";
 
-const logger = createLogger("langwatch:api:pats:errors");
+const logger = createLogger("langwatch:api:api-keys:errors");
 
-export const handlePatError = async (
+export const handleApiKeyError = async (
   error: Error & { status?: ContentfulStatusCode },
   c: Context,
 ): Promise<Response> => {
@@ -25,7 +25,7 @@ export const handlePatError = async (
         stack: error.stack,
       },
     },
-    `PATs API Error [${status}]: ${error.message || String(error)}`,
+    `API Keys Error [${status}]: ${error.message || String(error)}`,
   );
 
   if (error instanceof HttpError) {

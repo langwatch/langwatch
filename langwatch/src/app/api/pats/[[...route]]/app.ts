@@ -5,24 +5,24 @@ import { validator as zValidator } from "hono-openapi/zod";
 import { z } from "zod";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { prisma } from "~/server/db";
-import { PatService } from "~/server/pat/pat.service";
+import { ApiKeyService } from "~/server/api-key/api-key.service";
 import {
-  PatNotFoundError,
-  PatNotOwnedError,
-  PatAlreadyRevokedError,
-  PatScopeViolationError,
-} from "~/server/pat/errors";
+  ApiKeyNotFoundError,
+  ApiKeyNotOwnedError,
+  ApiKeyAlreadyRevokedError,
+  ApiKeyScopeViolationError,
+} from "~/server/api-key/errors";
 import type { OrgAuthMiddlewareVariables } from "../../middleware/org-auth";
 import { orgAuthMiddleware } from "../../middleware/org-auth";
 import { loggerMiddleware } from "../../middleware/logger";
 import { tracerMiddleware } from "../../middleware/tracer";
-import { handlePatError } from "./error-handler";
+import { handleApiKeyError } from "./error-handler";
 
 patchZodOpenapi();
 
 type Variables = OrgAuthMiddlewareVariables;
 
-const createPatSchema = z.object({
+const createApiKeySchema = z.object({
   name: z.string().min(1).max(100),
   description: z.string().max(500).optional(),
   expiresAt: z.coerce.date().optional(),
@@ -62,37 +62,37 @@ function validationHook(
 }
 
 export const app = new Hono<{ Variables: Variables }>()
-  .basePath("/api/pats")
-  .use(tracerMiddleware({ name: "pats" }))
+  .basePath("/api/api-keys")
+  .use(tracerMiddleware({ name: "api-keys" }))
   .use(loggerMiddleware())
   .use(orgAuthMiddleware)
-  .onError(handlePatError)
+  .onError(handleApiKeyError)
 
   .get(
     "/",
     describeRoute({
-      description: "List all Personal Access Tokens for the authenticated user in this organization",
+      description: "List all API keys for the authenticated user in this organization",
     }),
     async (c) => {
       const organization = c.get("organization") as Organization;
-      const userId = c.get("patUserId") as string;
-      const patService = PatService.create(prisma);
+      const userId = c.get("apiKeyUserId") as string;
+      const service = ApiKeyService.create(prisma);
 
-      const pats = await patService.list({
+      const keys = await service.list({
         userId,
         organizationId: organization.id,
       });
 
       return c.json({
-        data: pats.map((pat) => ({
-          id: pat.id,
-          name: pat.name,
-          description: pat.description,
-          createdAt: pat.createdAt,
-          expiresAt: pat.expiresAt,
-          lastUsedAt: pat.lastUsedAt,
-          revokedAt: pat.revokedAt,
-          roleBindings: pat.roleBindings.map((rb) => ({
+        data: keys.map((key) => ({
+          id: key.id,
+          name: key.name,
+          description: key.description,
+          createdAt: key.createdAt,
+          expiresAt: key.expiresAt,
+          lastUsedAt: key.lastUsedAt,
+          revokedAt: key.revokedAt,
+          roleBindings: key.roleBindings.map((rb) => ({
             id: rb.id,
             role: rb.role,
             scopeType: rb.scopeType,
@@ -106,38 +106,40 @@ export const app = new Hono<{ Variables: Variables }>()
   .post(
     "/",
     describeRoute({
-      description: "Create a new Personal Access Token",
+      description: "Create a new API key",
     }),
-    zValidator("json", createPatSchema, validationHook),
+    zValidator("json", createApiKeySchema, validationHook),
     async (c) => {
       const organization = c.get("organization") as Organization;
-      const userId = c.get("patUserId") as string;
+      const userId = c.get("apiKeyUserId") as string;
       const body = c.req.valid("json");
-      const patService = PatService.create(prisma);
+      const service = ApiKeyService.create(prisma);
 
       try {
-        const result = await patService.create({
+        const result = await service.create({
           name: body.name,
           description: body.description,
           userId,
+          createdByUserId: userId,
           organizationId: organization.id,
           expiresAt: body.expiresAt,
+          permissionMode: "scoped",
           bindings: body.bindings,
         });
 
         return c.json(
           {
             token: result.token,
-            pat: {
-              id: result.pat.id,
-              name: result.pat.name,
-              createdAt: result.pat.createdAt,
+            apiKey: {
+              id: result.apiKey.id,
+              name: result.apiKey.name,
+              createdAt: result.apiKey.createdAt,
             },
           },
           201,
         );
       } catch (error) {
-        if (error instanceof PatScopeViolationError) {
+        if (error instanceof ApiKeyScopeViolationError) {
           return c.json(
             { error: "Forbidden", message: error.message },
             403,
@@ -151,29 +153,35 @@ export const app = new Hono<{ Variables: Variables }>()
   .delete(
     "/:id",
     describeRoute({
-      description: "Revoke a Personal Access Token",
+      description: "Revoke an API key",
     }),
     async (c) => {
       const { id } = c.req.param();
-      const userId = c.get("patUserId") as string;
-      const patService = PatService.create(prisma);
+      const organization = c.get("organization") as Organization;
+      const userId = c.get("apiKeyUserId") as string;
+      const service = ApiKeyService.create(prisma);
 
       try {
-        await patService.revoke({ id, userId });
+        await service.revoke({
+          id,
+          callerUserId: userId,
+          callerIsAdmin: true,
+          organizationId: organization.id,
+        });
       } catch (error) {
-        if (error instanceof PatNotFoundError) {
+        if (error instanceof ApiKeyNotFoundError) {
           return c.json(
-            { error: "Not Found", message: "Personal Access Token not found" },
+            { error: "Not Found", message: "API key not found" },
             404,
           );
         }
-        if (error instanceof PatNotOwnedError) {
+        if (error instanceof ApiKeyNotOwnedError) {
           return c.json(
             { error: "Forbidden", message: error.message },
             403,
           );
         }
-        if (error instanceof PatAlreadyRevokedError) {
+        if (error instanceof ApiKeyAlreadyRevokedError) {
           return c.json(
             { error: "Conflict", message: error.message },
             409,
