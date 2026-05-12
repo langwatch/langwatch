@@ -198,6 +198,56 @@ export const opsRouter = createTRPCRouter({
       return ops.queues.unpausePipeline(input);
     }),
 
+  pauseTenant: protectedProcedure
+    .use(opsManagePermission)
+    .input(
+      z.object({
+        queueName: z.string(),
+        tenantId: z.string().min(1),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      const ops = requireOps();
+      return ops.queues.pauseTenant(input);
+    }),
+
+  unpauseTenant: protectedProcedure
+    .use(opsManagePermission)
+    .input(
+      z.object({
+        queueName: z.string(),
+        tenantId: z.string().min(1),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      const ops = requireOps();
+      return ops.queues.unpauseTenant(input);
+    }),
+
+  listPausedTenants: protectedProcedure
+    .use(opsViewPermission)
+    .input(z.object({ queueName: z.string() }))
+    .query(async ({ input }) => {
+      const ops = requireOps();
+      return ops.queues.listPausedTenants(input);
+    }),
+
+  drainTenant: protectedProcedure
+    .use(opsManagePermission)
+    .input(
+      z.object({
+        queueName: z.string(),
+        tenantId: z.string().min(1),
+        // Optional substring filter on groupId. Honest substring semantics —
+        // see drainTenant repo doc for example fragments to type.
+        groupIdContains: z.string().optional(),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      const ops = requireOps();
+      return ops.queues.drainTenant(input);
+    }),
+
   retryBlocked: protectedProcedure
     .use(opsManagePermission)
     .input(

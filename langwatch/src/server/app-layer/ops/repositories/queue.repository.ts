@@ -83,6 +83,26 @@ export interface QueueRepository {
     queueName: string;
   }): Promise<string[]>;
 
+  pauseTenant(params: {
+    queueName: string;
+    tenantId: string;
+  }): Promise<void>;
+
+  unpauseTenant(params: {
+    queueName: string;
+    tenantId: string;
+  }): Promise<void>;
+
+  listPausedTenants(params: {
+    queueName: string;
+  }): Promise<string[]>;
+
+  drainTenant(params: {
+    queueName: string;
+    tenantId: string;
+    groupIdContains?: string;
+  }): Promise<{ groupsDrained: number; jobsDrained: number }>;
+
   moveToDlq(params: {
     queueName: string;
     groupId: string;
@@ -167,6 +187,18 @@ export class NullQueueRepository implements QueueRepository {
 
   async listPausedKeys(): Promise<string[]> {
     return [];
+  }
+
+  async pauseTenant(): Promise<void> {}
+
+  async unpauseTenant(): Promise<void> {}
+
+  async listPausedTenants(): Promise<string[]> {
+    return [];
+  }
+
+  async drainTenant(): Promise<{ groupsDrained: number; jobsDrained: number }> {
+    return { groupsDrained: 0, jobsDrained: 0 };
   }
 
   async moveToDlq(): Promise<{ jobsMoved: number }> {
