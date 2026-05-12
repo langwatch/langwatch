@@ -3,6 +3,15 @@ Feature: Open existing prompt from trace
   I want "Open in Prompts" to offer opening the original prompt with traced variables
   So that I can reproduce and iterate on exactly what happened in production
 
+  # Per AUDIT_MANIFEST.md, all 13 remaining @unimplemented scenarios are KEEP class:
+  # behavior is implemented (typescript-sdk prompt-tracing.decorator.ts emits
+  # langwatch.prompt.id; useLoadSpanIntoPromptPlayground.ts handles
+  # open-existing/create-new actions, version-not-found toasts, missing-variable
+  # merging) but no end-to-end scenario test binds these flows. Backend extraction
+  # is unit-covered by parsePromptReference.unit.test.ts and
+  # findPromptReferenceInAncestors.unit.test.ts. Aspirational pending Playground
+  # E2E or scenario-runner harness for the SDK→trace→Open-existing round-trip.
+
   Background:
     Given a project with traced LLM calls
     And a prompt "team/sample-prompt" exists with versions 1, 2, and 3

@@ -3,6 +3,13 @@ Feature: Full Liquid template support
   I want to use full Liquid template syntax (if, for, assign, filters) in my prompts
   So that I can create dynamic, conditional prompt templates without custom code
 
+  # Both remaining @unimplemented scenarios are KEEP class per AUDIT_MANIFEST.md:
+  # they assert TS/Python SDK Liquid output parity (cross-SDK golden-file test).
+  # Each SDK has unit coverage independently (typescript-sdk liquid-template-support.unit.test.ts;
+  # python-sdk tests/prompts/test_liquid_template_support.py) but no harness
+  # exists to run both SDKs against the same template and compare output bytes.
+  # Aspirational pending cross-language test harness.
+
   # ============================================================================
   # TypeScript SDK - compile() with Liquid constructs
   # ============================================================================
