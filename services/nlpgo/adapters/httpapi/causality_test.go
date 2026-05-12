@@ -38,7 +38,11 @@ func TestApplyInboundCausality_HeaderToBaggage_DepthPlusOne(t *testing.T) {
 	}
 }
 
-func TestApplyInboundCausality_MissingHeader_DepthOne(t *testing.T) {
+// Header gate: missing header → no baggage stamp at all. This is what
+// prevents non-evaluator workflow runs (playground, scenarios, customer
+// workflow runs) from polluting their spans with causality_depth and
+// silently tripping the TS reactor's depth_direct guard.
+func TestApplyInboundCausality_MissingHeader_NoStamp(t *testing.T) {
 	otelapi.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(
 		propagation.TraceContext{},
 		propagation.Baggage{},
@@ -48,8 +52,8 @@ func TestApplyInboundCausality_MissingHeader_DepthOne(t *testing.T) {
 	ctx := applyInboundCausality(context.Background(), r)
 
 	got := CurrentCausalityDepth(ctx)
-	if got != 1 {
-		t.Fatalf("CurrentCausalityDepth = %d, want 1 (missing header → 0 + 1)", got)
+	if got != 0 {
+		t.Fatalf("CurrentCausalityDepth = %d, want 0 (missing header must NOT stamp)", got)
 	}
 }
 
@@ -66,6 +70,25 @@ func TestApplyInboundCausality_NegativeHeader_TreatedAsZero(t *testing.T) {
 	got := CurrentCausalityDepth(ctx)
 	if got != 1 {
 		t.Fatalf("CurrentCausalityDepth = %d, want 1 (negative coerced to 0 + 1)", got)
+	}
+}
+
+// Header present but value is "0" still stamps depth=1 so the eval
+// chain root span carries the attribute. Distinguishes "depth=0 from
+// caller" (still in eval chain) from "no header" (not in eval chain).
+func TestApplyInboundCausality_HeaderZero_StampsOne(t *testing.T) {
+	otelapi.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(
+		propagation.TraceContext{},
+		propagation.Baggage{},
+	))
+	r := httptest.NewRequest("POST", "/", nil)
+	r.Header.Set(causalityDepthHeader, "0")
+
+	ctx := applyInboundCausality(context.Background(), r)
+
+	got := CurrentCausalityDepth(ctx)
+	if got != 1 {
+		t.Fatalf("CurrentCausalityDepth = %d, want 1 (header=0 → 0+1)", got)
 	}
 }
 

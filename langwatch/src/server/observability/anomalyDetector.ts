@@ -190,10 +190,12 @@ export class AnomalyDetector {
     if (!fpTracker) return "noop";
 
     const windowSec = FINGERPRINT_WINDOW_MINUTES * 60;
-    const tenantTotal = await this.deps.rateTracker.currentWindowCount(
-      tenantId,
-      windowSec,
-    );
+    // Use the FingerprintTracker's own per-tenant total — matches the
+    // call site (recordSpanCommand). The TenantRateTracker counts
+    // per-group-enqueue across the whole pipeline (fold writes, reactor
+    // outputs, dispatch commands, ...) so dividing fp counts by it
+    // biases share low and the 80% gate would silently never fire.
+    const tenantTotal = await fpTracker.tenantTotalCount(tenantId, windowSec);
     if (tenantTotal === 0) {
       const existing = await this.deps.anomalyState.get(tenantId, "fingerprint_loop");
       if (existing) {

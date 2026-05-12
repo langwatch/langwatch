@@ -1,4 +1,5 @@
 import type { Node } from "@xyflow/react";
+import { randomBytes } from "crypto";
 import { nanoid } from "nanoid";
 import { addEnvs } from "../../optimization_studio/server/addEnvs";
 import type {
@@ -119,7 +120,10 @@ export async function runEvaluationWorkflow(
       true, // do_not_trace
       false, // run_evaluations - disable evaluators inside the workflow when running as an online evaluation
       "evaluation",
-      causalityDepth,
+      // Always pass a concrete depth (default 0) so the downstream
+      // header gate in nlpgoFetch sees this as an evaluator-chain call
+      // even when the parent had no depth attribute yet.
+      causalityDepth ?? 0,
     );
 
     // Process the result
@@ -219,6 +223,17 @@ export async function runWorkflow(
 
   const event = await addEnvs(messageWithoutEnvs, projectId);
 
+  // Mint a 32-hex traceparent trace id alongside the public `trace_id`
+  // contract. Customer-facing trace_ids are typically `trace_<nanoid>`
+  // (21 base64url chars) which fails the W3C traceparent regex
+  // `/^[0-9a-f]{32}$/i` — without this normalisation, server-initiated
+  // workflow runs without an explicit 32-hex `trace_id` never get
+  // traceparent propagated and nlpgo starts a fresh trace.
+  const rawTraceId = trace_id.replace(/^trace_/, "");
+  const traceparentTraceId = /^[0-9a-f]{32}$/i.test(rawTraceId)
+    ? rawTraceId
+    : randomBytes(16).toString("hex");
+
   const response = await nlpgoFetch<{
     result: any;
     status: ExecutionStatus;
@@ -228,7 +243,7 @@ export async function runWorkflow(
     body: event,
     origin,
     causalityDepth,
-    traceId: trace_id.replace(/^trace_/, ""),
+    traceId: traceparentTraceId,
   });
 
   if (!response.ok) {

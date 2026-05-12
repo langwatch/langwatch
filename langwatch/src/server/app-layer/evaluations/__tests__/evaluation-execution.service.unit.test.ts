@@ -401,4 +401,26 @@ describe("maxCausalityDepthOfSpans", () => {
       ]),
     ).toBe(2);
   });
+
+  // Real production path: spans come from mapNormalizedSpanToSpan which
+  // unflattens OTLP dot-notation into nested objects under params. The
+  // old helper signature only inspected `attributes` and silently
+  // returned 0 for production-shaped spans.
+  it("reads depth from unflattened params.langwatch.causality_depth (real Span shape)", () => {
+    expect(
+      maxCausalityDepthOfSpans([
+        { params: { langwatch: { causality_depth: 1 } } },
+        { params: { langwatch: { causality_depth: 3 } } },
+        { params: { service: { name: "x" } } },
+      ]),
+    ).toBe(3);
+  });
+
+  it("falls back to dot-notation key when nested ns is absent", () => {
+    expect(
+      maxCausalityDepthOfSpans([
+        { params: { "langwatch.causality_depth": "2" } },
+      ]),
+    ).toBe(2);
+  });
 });

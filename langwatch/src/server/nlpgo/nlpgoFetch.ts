@@ -106,11 +106,16 @@ export async function nlpgoFetch<T = unknown>(
     "X-LangWatch-Origin": opts.origin,
   };
 
-  // Causality depth: forwarded to nlpgo so it increments and stamps
-  // depth+1 on every emitted span via its BaggageAttributeProcessor.
-  // Default 0 when caller didn't compute it.
-  const callerDepth = Math.max(0, Math.floor(opts.causalityDepth ?? 0));
-  headers["X-LangWatch-Causality-Depth"] = String(callerDepth);
+  // Causality depth: forwarded to nlpgo only when the caller is part of
+  // an evaluator chain (i.e. opts.causalityDepth is explicitly set, even
+  // to 0). When undefined we DO NOT send the header — otherwise nlpgo
+  // would stamp depth>=1 on every non-evaluator workflow run (playground,
+  // scenarios, customer workflow API), silently blocking ON_MESSAGE
+  // monitors from firing on workflow-produced traces.
+  if (opts.causalityDepth !== undefined) {
+    const callerDepth = Math.max(0, Math.floor(opts.causalityDepth));
+    headers["X-LangWatch-Causality-Depth"] = String(callerDepth);
+  }
 
   // Synthesised W3C traceparent so nlpgo's root studio span continues
   // the parent trace. `00` version, sampled (`01`). When parentSpanId

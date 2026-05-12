@@ -551,16 +551,22 @@ local blockedKey = KEYS[1]
 local readyKey   = KEYS[2]
 local statsKey   = KEYS[3]
 
-local keyPrefix       = ARGV[1]
-local groupId         = ARGV[2]
-local newStagedJobId  = ARGV[3]
-local score           = tonumber(ARGV[4])
-local jobDataJson     = ARGV[5]
-local errorMessage    = ARGV[6]
-local errorStack      = ARGV[7]
+local keyPrefix             = ARGV[1]
+local groupId               = ARGV[2]
+local newStagedJobId        = ARGV[3]
+local score                 = tonumber(ARGV[4])
+local jobDataJson           = ARGV[5]
+local errorMessage          = ARGV[6]
+local errorStack            = ARGV[7]
+-- Same shape as COMPLETE_LUA's ARGV[4]: when non-empty, DECRs the
+-- tenant_active counter so the soft cap doesn't leak slots when a
+-- group exhausts retries. Without this, every exhausted-retry leaves
+-- the counter +1 and the cap eventually starves the tenant.
+local tenantCountKeyPrefix  = ARGV[8]
 
 local groupJobsKey = keyPrefix .. "group:" .. groupId .. ":jobs"
 local groupDataKey = keyPrefix .. "group:" .. groupId .. ":data"
+local activeKey    = keyPrefix .. "group:" .. groupId .. ":active"
 
 -- 1. Block the group — prevents dispatcher from re-dispatching
 redis.call("SADD", blockedKey, groupId)
@@ -573,16 +579,35 @@ redis.call("HSET", groupDataKey, newStagedJobId, jobDataJson)
 --    UNBLOCK_LUA re-adds the group when it is unblocked.
 redis.call("ZREM", readyKey, groupId)
 
--- 4. Store error info for Skynet visibility
+-- 4. Free the in-flight slot. activeKey would expire on its own after
+-- activeTtlSec, but the tenant_active counter wouldn't — Redis key
+-- expiration has no callback. Mirror COMPLETE_LUA's free path.
+redis.call("DEL", activeKey)
+
+if tenantCountKeyPrefix and tenantCountKeyPrefix ~= "" then
+  local slashPos = string.find(groupId, "/", 1, true)
+  if slashPos and slashPos > 1 then
+    local tenantId = string.sub(groupId, 1, slashPos - 1)
+    local key = tenantCountKeyPrefix .. tenantId
+    local n = tonumber(redis.call("GET", key)) or 0
+    if n > 1 then
+      redis.call("DECR", key)
+    else
+      redis.call("DEL", key)
+    end
+  end
+end
+
+-- 5. Store error info for Skynet visibility
 if errorMessage and errorMessage ~= "" then
   local errorKey = keyPrefix .. "group:" .. groupId .. ":error"
   redis.call("HSET", errorKey, "message", errorMessage, "stack", errorStack or "", "timestamp", tostring(score))
 end
 
--- 5. Increment failed counter for Skynet
+-- 6. Increment failed counter for Skynet
 redis.call("INCR", statsKey)
 
--- 6. Increment per-job-name failed counter
+-- 7. Increment per-job-name failed counter
 local ok, data = pcall(cjson.decode, jobDataJson)
 if ok and data then
   local jn = data["__jobName"]
@@ -978,6 +1003,7 @@ export class GroupStagingScripts {
       jobDataJson,
       errorMessage ?? "",
       errorStack ?? "",
+      `${this.keyPrefix}tenant_active:`,
     );
   }
 

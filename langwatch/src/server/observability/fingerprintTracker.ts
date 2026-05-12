@@ -18,6 +18,7 @@ const logger = createLogger("langwatch:observability:fingerprintTracker");
 export class FingerprintTracker {
   private static readonly RATE_PREFIX = "obs:fp_rate:";
   private static readonly INDEX_PREFIX = "obs:fp_index:";
+  private static readonly TOTAL_PREFIX = "obs:fp_total:";
   private static readonly TTL_SECONDS = 8 * 24 * 3600;
   private static readonly MAX_FINGERPRINTS_PER_TENANT = 1024;
 
@@ -31,6 +32,14 @@ export class FingerprintTracker {
     const minute = Math.floor(this.nowFn() / 60_000);
     const rateKey = `${FingerprintTracker.RATE_PREFIX}${tenantId}:${fingerprint}`;
     const indexKey = `${FingerprintTracker.INDEX_PREFIX}${tenantId}`;
+    // Per-tenant total spans-fingerprinted counter (same minute buckets
+    // as the per-fingerprint counter so the anomaly detector can divide
+    // numerator-by-denominator with both populations matching the same
+    // call site — recordSpanCommand at the SpanReceivedEvent emission).
+    // Without this, the detector previously divided per-span fp counts
+    // by per-group-enqueue tenant volume, biasing share systematically
+    // low and breaking the 80% concentration gate.
+    const totalKey = `${FingerprintTracker.TOTAL_PREFIX}${tenantId}`;
     try {
       const size = await this.redis.scard(indexKey);
       // Allow updating existing fingerprints even past the cap; only
@@ -42,6 +51,8 @@ export class FingerprintTracker {
       const pipe = this.redis.pipeline();
       pipe.hincrby(rateKey, String(minute), 1);
       pipe.expire(rateKey, FingerprintTracker.TTL_SECONDS);
+      pipe.hincrby(totalKey, String(minute), 1);
+      pipe.expire(totalKey, FingerprintTracker.TTL_SECONDS);
       pipe.sadd(indexKey, fingerprint);
       pipe.expire(indexKey, FingerprintTracker.TTL_SECONDS);
       await pipe.exec();
@@ -55,6 +66,33 @@ export class FingerprintTracker {
         "FingerprintTracker.record failed (non-fatal)",
       );
     }
+  }
+
+  /**
+   * Sum total span-fingerprint recordings for `tenantId` across last
+   * `windowSeconds`. Use this — NOT TenantRateTracker — as the
+   * denominator when computing fingerprint concentration share. The
+   * two trackers count different populations (spans vs group-enqueues).
+   */
+  async tenantTotalCount(
+    tenantId: string,
+    windowSeconds: number,
+  ): Promise<number> {
+    const minuteNow = Math.floor(this.nowFn() / 60_000);
+    const minutesBack = Math.max(1, Math.ceil(windowSeconds / 60));
+    const fields: string[] = [];
+    for (let i = 0; i < minutesBack; i++) {
+      fields.push(String(minuteNow - i));
+    }
+    const key = `${FingerprintTracker.TOTAL_PREFIX}${tenantId}`;
+    const values = await this.redis.hmget(key, ...fields);
+    let sum = 0;
+    for (const v of values) {
+      if (!v) continue;
+      const n = Number.parseInt(v, 10);
+      if (Number.isFinite(n)) sum += n;
+    }
+    return sum;
   }
 
   async listFingerprints(tenantId: string): Promise<string[]> {
