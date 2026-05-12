@@ -7,17 +7,10 @@ import {
 } from "@prisma/client";
 import { generate } from "@langwatch/ksuid";
 import { nanoid } from "nanoid";
-import { afterAll, beforeAll, describe, expect, it, vi, beforeEach } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { KSUID_RESOURCES } from "~/utils/constants";
-import { globalForApp, resetApp } from "~/server/app-layer/app";
-import { createTestApp } from "~/server/app-layer/presets";
-import {
-  PlanProviderService,
-  type PlanProvider,
-} from "~/server/app-layer/subscription/plan-provider";
 import { prisma } from "~/server/db";
 import { PatService } from "~/server/pat/pat.service";
-import { FREE_PLAN } from "../../../../../ee/licensing/constants";
 import { app } from "../[[...route]]/app";
 
 describe("Feature: Projects REST API", () => {
@@ -27,7 +20,6 @@ describe("Feature: Projects REST API", () => {
   let testTeam: Team;
   let patToken: string;
   let userId: string;
-  let mockGetActivePlan: ReturnType<typeof vi.fn>;
 
   const authHeaders = () => ({
     Authorization: `Bearer ${patToken}`,
@@ -120,26 +112,6 @@ describe("Feature: Projects REST API", () => {
     patToken = created.token;
   });
 
-  const unlimitedPlan = {
-    ...FREE_PLAN,
-    maxProjects: 9999,
-    overrideAddingLimitations: false,
-  };
-
-  beforeEach(() => {
-    resetApp();
-    mockGetActivePlan = vi.fn().mockResolvedValue(unlimitedPlan);
-    globalForApp.__langwatch_app = createTestApp({
-      planProvider: PlanProviderService.create({
-        getActivePlan: mockGetActivePlan as PlanProvider["getActivePlan"],
-      }),
-      usageLimits: {
-        notifyPlanLimitReached: vi.fn().mockResolvedValue(undefined),
-        checkAndSendWarning: vi.fn().mockResolvedValue(undefined),
-      } as any,
-    });
-  });
-
   afterAll(async () => {
     await prisma.project.deleteMany({
       where: { team: { organizationId: testOrganization.id } },
@@ -162,7 +134,6 @@ describe("Feature: Projects REST API", () => {
     await prisma.organization.delete({
       where: { id: testOrganization.id },
     }).catch(() => {});
-    resetApp();
   });
 
   describe("Authentication", () => {
@@ -250,24 +221,7 @@ describe("Feature: Projects REST API", () => {
       expect(res.status).toBe(400);
     });
 
-    describe("when project plan limit is reached", () => {
-      it("returns 403", async () => {
-        mockGetActivePlan.mockResolvedValue({
-          ...FREE_PLAN,
-          maxProjects: 0,
-          overrideAddingLimitations: false,
-        });
-
-        const res = await api.post("/api/projects", {
-          name: "Over Limit",
-          teamId: testTeam.id,
-          language: "python",
-          framework: "langchain",
-        });
-        expect(res.status).toBe(403);
-      });
-    });
-  });
+});
 
   describe("GET /api/projects", () => {
     it("lists non-archived projects for the organization", async () => {

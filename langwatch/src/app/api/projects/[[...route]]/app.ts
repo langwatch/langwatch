@@ -15,7 +15,6 @@ import { orgAuthMiddleware } from "../../middleware/org-auth";
 import type { ProjectServiceMiddlewareVariables } from "../../middleware/project-service";
 import { projectServiceMiddleware } from "../../middleware/project-service";
 import { loggerMiddleware } from "../../middleware/logger";
-import { resourceLimitMiddleware } from "../../middleware/resource-limit";
 import { tracerMiddleware } from "../../middleware/tracer";
 import {
   BadRequestError,
@@ -128,7 +127,6 @@ export const app = new Hono<{ Variables: Variables }>()
     describeRoute({
       description: "Create a new project",
     }),
-    resourceLimitMiddleware("projects"),
     zValidator("json", createProjectSchema, validationHook),
     async (c) => {
       const organization = c.get("organization") as Organization;
