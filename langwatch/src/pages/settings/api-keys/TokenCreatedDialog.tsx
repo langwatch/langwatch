@@ -205,7 +205,7 @@ export function TokenCreatedDialog({
                       size="sm"
                       width="200px"
                     >
-                      <Select.Trigger background="bg">
+                      <Select.Trigger background="bg" borderRadius="lg">
                         <Select.ValueText placeholder="Select project" />
                       </Select.Trigger>
                       <Select.Content>
