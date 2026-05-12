@@ -1,6 +1,11 @@
-import type { LangyProjectMemory, PrismaClient } from "@prisma/client";
+import type { LangyProjectMemory, PrismaClient, Prisma } from "@prisma/client";
 
 export type ChangeReason = "auto_bootstrap" | "auto_refresh" | "user_edit" | "user_refresh";
+
+// Accepts the top-level PrismaClient or a Prisma.TransactionClient (the
+// scoped client passed into $transaction callbacks). Both expose the same
+// model accessors; only $-prefix helpers differ.
+type MemoryDb = Pick<PrismaClient, "langyProjectMemory" | "langyProjectMemoryHistory">;
 
 export class LangyProjectMemoryRepository {
   constructor(private readonly prisma: PrismaClient) {}
@@ -11,22 +16,26 @@ export class LangyProjectMemoryRepository {
     });
   }
 
-  async upsert({
-    projectId,
-    content,
-    contentSummary,
-    lastEditorId,
-  }: {
-    projectId: string;
-    content: string;
-    contentSummary?: string | null;
-    lastEditorId?: string | null;
-  }) {
-    const existing = await this.prisma.langyProjectMemory.findFirst({
+  async upsert(
+    {
+      projectId,
+      content,
+      contentSummary,
+      lastEditorId,
+    }: {
+      projectId: string;
+      content: string;
+      contentSummary?: string | null;
+      lastEditorId?: string | null;
+    },
+    tx?: MemoryDb,
+  ) {
+    const db = tx ?? this.prisma;
+    const existing = await db.langyProjectMemory.findFirst({
       where: { projectId },
     });
     if (existing) {
-      await this.prisma.langyProjectMemory.updateMany({
+      await db.langyProjectMemory.updateMany({
         where: { id: existing.id, projectId },
         data: {
           content,
@@ -36,11 +45,11 @@ export class LangyProjectMemoryRepository {
           lastEditorId: lastEditorId ?? null,
         },
       });
-      return (await this.prisma.langyProjectMemory.findFirst({
+      return (await db.langyProjectMemory.findFirst({
         where: { projectId },
       }))!;
     }
-    return await this.prisma.langyProjectMemory.create({
+    return await db.langyProjectMemory.create({
       data: {
         projectId,
         content,
@@ -62,12 +71,14 @@ export class LangyProjectMemoryService {
   constructor(
     private readonly repository: LangyProjectMemoryRepository,
     private readonly historyService: LangyProjectMemoryHistoryService,
+    private readonly prisma: PrismaClient,
   ) {}
 
   static create(prisma: PrismaClient): LangyProjectMemoryService {
     return new LangyProjectMemoryService(
       new LangyProjectMemoryRepository(prisma),
       LangyProjectMemoryHistoryService.create(prisma),
+      prisma,
     );
   }
 
@@ -92,21 +103,32 @@ export class LangyProjectMemoryService {
     changedById?: string | null;
     changeReason: ChangeReason;
   }): Promise<LangyProjectMemory> {
-    const memory = await this.repository.upsert({
-      projectId,
-      content,
-      contentSummary,
-      lastEditorId: changedById,
+    // Memory upsert + history append must be atomic — otherwise a failure
+    // between steps leaves memory at v(N+1) with no history row at v(N+1),
+    // breaking rollback.
+    return await this.prisma.$transaction(async (tx) => {
+      const memory = await this.repository.upsert(
+        {
+          projectId,
+          content,
+          contentSummary,
+          lastEditorId: changedById,
+        },
+        tx as MemoryDb,
+      );
+      await this.historyService.append(
+        {
+          projectMemoryId: memory.id,
+          projectId,
+          contentVersion: memory.contentVersion,
+          content,
+          changedById,
+          changeReason,
+        },
+        tx as MemoryDb,
+      );
+      return memory;
     });
-    await this.historyService.append({
-      projectMemoryId: memory.id,
-      projectId,
-      contentVersion: memory.contentVersion,
-      content,
-      changedById,
-      changeReason,
-    });
-    return memory;
   }
 
   async isStale({
@@ -130,15 +152,19 @@ export class LangyProjectMemoryService {
 export class LangyProjectMemoryHistoryRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
-  async create(input: {
-    projectMemoryId: string;
-    projectId: string;
-    contentVersion: number;
-    content: string;
-    changedById?: string | null;
-    changeReason?: string | null;
-  }) {
-    return await this.prisma.langyProjectMemoryHistory.create({
+  async create(
+    input: {
+      projectMemoryId: string;
+      projectId: string;
+      contentVersion: number;
+      content: string;
+      changedById?: string | null;
+      changeReason?: string | null;
+    },
+    tx?: MemoryDb,
+  ) {
+    const db = tx ?? this.prisma;
+    return await db.langyProjectMemoryHistory.create({
       data: {
         projectMemoryId: input.projectMemoryId,
         projectId: input.projectId,
@@ -173,15 +199,18 @@ export class LangyProjectMemoryHistoryService {
     );
   }
 
-  async append(input: {
-    projectMemoryId: string;
-    projectId: string;
-    contentVersion: number;
-    content: string;
-    changedById?: string | null;
-    changeReason: ChangeReason;
-  }) {
-    return await this.repository.create(input);
+  async append(
+    input: {
+      projectMemoryId: string;
+      projectId: string;
+      contentVersion: number;
+      content: string;
+      changedById?: string | null;
+      changeReason: ChangeReason;
+    },
+    tx?: MemoryDb,
+  ) {
+    return await this.repository.create(input, tx);
   }
 
   async getAll({
