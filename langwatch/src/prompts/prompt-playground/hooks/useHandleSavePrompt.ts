@@ -43,11 +43,18 @@ export function useHandleSavePrompt() {
    * Single Responsibility: Validates handle, triggers appropriate save operation, and updates UI state on success/error.
    */
   const handleSaveVersion = useCallback(async () => {
-    const isValid = await methods.trigger("version.configData.llm");
+    // Validate the full form so the save-time refinement (#3196: system
+    // prompt required) fires alongside the LLM config rules.
+    const isValid = await methods.trigger();
     if (!isValid) {
+      const messagesError = methods.formState.errors.version?.configData
+        ?.messages as { message?: string } | undefined;
+      const description =
+        messagesError?.message ??
+        "Please fix the configuration errors before saving";
       toaster.create({
         title: "Validation error",
-        description: "Please fix the LLM configuration errors before saving",
+        description,
         type: "error",
         meta: { closable: true },
       });
