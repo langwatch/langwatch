@@ -1396,7 +1396,10 @@ app.get("/langy/project-memory", async (c) => {
   if (guard.error) return guard.error;
   const service = LangyProjectMemoryService.create(prisma);
   const memory = await service.getById({ projectId: projectId! });
-  return c.json({ memory });
+  const isStale = memory
+    ? await service.isStale({ projectId: projectId! })
+    : false;
+  return c.json({ memory, isStale });
 });
 
 app.put("/langy/project-memory", async (c) => {

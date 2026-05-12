@@ -14,8 +14,6 @@ import { LuDownload, LuRefreshCw, LuTrash2, LuTriangle } from "react-icons/lu";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { toaster } from "~/components/ui/toaster";
 
-const STALE_THRESHOLD_MS = 30 * 24 * 60 * 60 * 1000;
-
 interface ProjectMemoryDTO {
   id: string;
   projectId: string;
@@ -29,13 +27,6 @@ interface ConversationSummary {
   id: string;
   title: string | null;
   lastActivityAt: string;
-}
-
-function isStale(memory: ProjectMemoryDTO | null): boolean {
-  if (!memory) return false;
-  const refreshed = new Date(memory.refreshedAt).getTime();
-  if (Number.isNaN(refreshed)) return false;
-  return Date.now() - refreshed > STALE_THRESHOLD_MS;
 }
 
 function reportError(message: string) {
@@ -64,6 +55,7 @@ export function LangyMemorySettings() {
   const isAdmin = hasPermission("project:manage");
 
   const [memory, setMemory] = useState<ProjectMemoryDTO | null>(null);
+  const [isStale, setIsStale] = useState(false);
   const [draft, setDraft] = useState("");
   const [isLoadingMemory, setIsLoadingMemory] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -82,8 +74,12 @@ export function LangyMemorySettings() {
         `/api/langy/project-memory?projectId=${encodeURIComponent(projectId)}`,
       );
       if (!res.ok) throw new Error(`Failed: ${res.status}`);
-      const data = (await res.json()) as { memory: ProjectMemoryDTO | null };
+      const data = (await res.json()) as {
+        memory: ProjectMemoryDTO | null;
+        isStale?: boolean;
+      };
       setMemory(data.memory);
+      setIsStale(Boolean(data.isStale));
       setDraft(data.memory?.content ?? "");
     } catch {
       reportError("Failed to load project memory.");
@@ -242,7 +238,7 @@ export function LangyMemorySettings() {
           {isLoadingMemory && <Spinner size="xs" />}
         </HStack>
 
-        {isStale(memory) && (
+        {isStale && memory && (
           <HStack
             background="orange.subtle"
             color="orange.fg"

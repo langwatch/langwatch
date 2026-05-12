@@ -76,6 +76,7 @@ interface FetchScenario {
   }>;
   exportPayload?: unknown;
   putShouldFail?: boolean;
+  isStale?: boolean;
 }
 
 function installFetchMock(scenario: FetchScenario): Mock {
@@ -84,10 +85,16 @@ function installFetchMock(scenario: FetchScenario): Mock {
     const method = (init?.method ?? "GET").toUpperCase();
 
     if (url.startsWith("/api/langy/project-memory") && method === "GET") {
-      return new Response(JSON.stringify({ memory: scenario.memory }), {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      });
+      return new Response(
+        JSON.stringify({
+          memory: scenario.memory,
+          isStale: scenario.isStale ?? false,
+        }),
+        {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
     }
     if (url.startsWith("/api/langy/project-memory") && method === "PUT") {
       if (scenario.putShouldFail) {
@@ -295,6 +302,7 @@ describe("LangyMemorySettings", () => {
         installFetchMock({
           memory: { ...baseMemory, refreshedAt: staleDate },
           conversations: [],
+          isStale: true,
         });
         renderSettings();
         expect(
