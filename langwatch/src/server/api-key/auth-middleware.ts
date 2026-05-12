@@ -249,7 +249,7 @@ export function createOrgAuthMiddleware({
       return c.json(
         {
           error: "Unauthorized",
-          message: "Invalid credentials. Organization-level endpoints require an API key (pat-lw-... or sk-lw-...).",
+          message: "Invalid credentials. Organization-level endpoints require an admin API key created in Settings > API Keys. Project API keys cannot be used here.",
         },
         401,
       );
