@@ -11,7 +11,7 @@ import {
 } from "~/server/app-layer/projects/project.service";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import type { OrgAuthMiddlewareVariables } from "../../middleware/org-auth";
-import { orgAuthMiddleware } from "../../middleware/org-auth";
+import { orgAuthMiddleware, requireOrgPermission } from "../../middleware/org-auth";
 import type { ProjectServiceMiddlewareVariables } from "../../middleware/project-service";
 import { projectServiceMiddleware } from "../../middleware/project-service";
 import { loggerMiddleware } from "../../middleware/logger";
@@ -103,6 +103,7 @@ export const app = new Hono<{ Variables: Variables }>()
     describeRoute({
       description: "List all non-archived projects for the organization (paginated)",
     }),
+    requireOrgPermission("project:view"),
     zValidator("query", paginationQuerySchema),
     async (c) => {
       const organization = c.get("organization") as Organization;
@@ -127,6 +128,7 @@ export const app = new Hono<{ Variables: Variables }>()
     describeRoute({
       description: "Create a new project",
     }),
+    requireOrgPermission("project:create"),
     zValidator("json", createProjectSchema, validationHook),
     async (c) => {
       const organization = c.get("organization") as Organization;
@@ -173,6 +175,7 @@ export const app = new Hono<{ Variables: Variables }>()
     describeRoute({
       description: "Get a project by its id",
     }),
+    requireOrgPermission("project:view"),
     async (c) => {
       const { id } = c.req.param();
       const organization = c.get("organization") as Organization;
@@ -195,6 +198,7 @@ export const app = new Hono<{ Variables: Variables }>()
     describeRoute({
       description: "Update a project by its id",
     }),
+    requireOrgPermission("project:update"),
     zValidator("json", updateProjectSchema, validationHook),
     async (c) => {
       const { id } = c.req.param();
@@ -232,6 +236,7 @@ export const app = new Hono<{ Variables: Variables }>()
     describeRoute({
       description: "Archive a project (soft-delete)",
     }),
+    requireOrgPermission("project:delete"),
     async (c) => {
       const { id } = c.req.param();
       const organization = c.get("organization") as Organization;

@@ -13,7 +13,7 @@ import {
   ApiKeyScopeViolationError,
 } from "~/server/api-key/errors";
 import type { OrgAuthMiddlewareVariables } from "../../middleware/org-auth";
-import { orgAuthMiddleware } from "../../middleware/org-auth";
+import { orgAuthMiddleware, requireOrgPermission } from "../../middleware/org-auth";
 import { loggerMiddleware } from "../../middleware/logger";
 import { tracerMiddleware } from "../../middleware/tracer";
 import { handleApiKeyError } from "./error-handler";
@@ -73,6 +73,7 @@ export const app = new Hono<{ Variables: Variables }>()
     describeRoute({
       description: "List all API keys for the authenticated user in this organization",
     }),
+    requireOrgPermission("organization:view"),
     async (c) => {
       const organization = c.get("organization") as Organization;
       const userId = c.get("apiKeyUserId") as string;
@@ -108,6 +109,7 @@ export const app = new Hono<{ Variables: Variables }>()
     describeRoute({
       description: "Create a new API key",
     }),
+    requireOrgPermission("organization:manage"),
     zValidator("json", createApiKeySchema, validationHook),
     async (c) => {
       const organization = c.get("organization") as Organization;
@@ -152,6 +154,7 @@ export const app = new Hono<{ Variables: Variables }>()
 
   .delete(
     "/:id",
+    requireOrgPermission("organization:manage"),
     describeRoute({
       description: "Revoke an API key",
     }),
