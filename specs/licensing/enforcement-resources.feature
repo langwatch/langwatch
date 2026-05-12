@@ -426,7 +426,7 @@ Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators, Scenarios, 
     Then the request fails with FORBIDDEN
     And the error message contains "maximum number of experiments"
 
-  @integration @unimplemented
+  @integration
   Scenario: Counts experiments across all projects in organization
     Given the organization has a license with maxExperiments 3
     And project "proj-A" has 2 experiments
@@ -494,7 +494,7 @@ Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators, Scenarios, 
     Then the request fails with FORBIDDEN
     And the error message contains "maximum number of agents"
 
-  @integration @unimplemented
+  @integration
   Scenario: Counts agents across all projects in organization
     Given the organization has a license with maxAgents 3
     And project "proj-A" has 2 agents
@@ -502,7 +502,7 @@ Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators, Scenarios, 
     When I create an agent in project "proj-789"
     Then the request fails with FORBIDDEN
 
-  @integration @unimplemented
+  @integration
   Scenario: Counts only non-archived agents toward limit
     Given the organization has a license with maxAgents 3
     And the organization has 2 active agents

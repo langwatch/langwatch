@@ -91,7 +91,6 @@ Feature: Member Limit Enforcement with License
   # Pending Invites Count Toward Member Limit
   # ============================================================================
 
-  @unimplemented
   Scenario: Pending invites count toward total member limit
     Given the organization has 2 accepted members
     And the organization has 2 pending invites
@@ -108,7 +107,6 @@ Feature: Member Limit Enforcement with License
     When I invite user "new@example.com" to the organization
     Then the invite is created successfully
 
-  @unimplemented
   Scenario: Expired invites do not count toward member limit
     Given the organization has 2 accepted members
     And the organization has 2 expired pending invites
@@ -116,7 +114,6 @@ Feature: Member Limit Enforcement with License
     When I invite user "new@example.com" to the organization
     Then the invite is created successfully
 
-  @unimplemented
   Scenario: Only non-expired pending invites count toward limit
     Given the organization has 2 accepted members
     And the organization has 1 pending invite
@@ -131,7 +128,6 @@ Feature: Member Limit Enforcement with License
   # Lite Member: EXTERNAL role (with view-only or no custom permissions)
   # Full Member: ADMIN/MEMBER role OR any role with non-view permissions
 
-  @unimplemented
   Scenario: Lite Member users are counted separately from full members
     Given the organization has 2 Full Members
     And the organization has 1 Lite Member with role EXTERNAL
@@ -220,7 +216,6 @@ Feature: Member Limit Enforcement with License
     When I invite user "new@example.com" with custom role "Sharer" to the organization
     Then the request fails with FORBIDDEN
 
-  @unimplemented
   Scenario: Pending invite with view-only custom role counts as Lite Member
     Given a custom role "Viewer" exists with permissions:
       | project:view    |
@@ -232,7 +227,6 @@ Feature: Member Limit Enforcement with License
     Then the request fails with FORBIDDEN
     And the error message contains "Over the limit of lite members allowed"
 
-  @unimplemented
   Scenario: Pending invite with non-view custom role counts as Full Member
     Given a custom role "Manager" exists with permissions:
       | project:view    |
