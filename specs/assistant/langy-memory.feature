@@ -85,11 +85,11 @@ Feature: Langy memory
     When I open Langy
     Then a non-blocking banner offers to refresh project memory
 
-  Scenario: Project memory token budget is enforced
-    Given project "demo"'s memory file would exceed 2k tokens
+  Scenario: Project memory has no fixed token cap
+    Given project "demo"'s memory file is large
     When the memory is injected
-    Then it is summarized to fit the 2k cap
-    And the user can see the summarized version
+    Then the full content is included in the system prompt
+    And the LLM provider's context limit is the only ceiling
 
   Scenario: Project memory does not cross project boundaries
     Given project "demo" has a project memory file

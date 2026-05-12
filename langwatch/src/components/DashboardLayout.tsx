@@ -38,7 +38,7 @@ import { findCurrentRoute, projectRoutes, type Route } from "../utils/routes";
 import { trackEvent } from "../utils/tracking";
 import { AnnouncementBanner } from "./AnnouncementBanner";
 import { CurrentDrawer } from "./CurrentDrawer";
-import { LangyProvider, useLangy } from "./langy/LangyContext";
+import { useLangy } from "./langy/LangyContext";
 import { shouldShowLangy } from "./langy/visibility";
 import {
   LangyDrawer,
@@ -372,8 +372,7 @@ export const DashboardLayout = ({
   });
 
   return (
-    <LangyProvider>
-      <LangyShiftedRoot showLangy={showLangy}>
+    <LangyShiftedRoot showLangy={showLangy}>
       <Head>
         <title>
           LangWatch{project ? ` - ${project.name}` : ""}
@@ -811,7 +810,6 @@ export const DashboardLayout = ({
       </HStack>
       <GlobalUpgradeModal />
     </LangyShiftedRoot>
-    </LangyProvider>
   );
 };
 

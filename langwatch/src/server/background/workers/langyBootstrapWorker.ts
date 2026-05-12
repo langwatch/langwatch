@@ -16,27 +16,16 @@ import { connection } from "../../redis";
 import { prisma } from "../../db";
 import { LANGY_BOOTSTRAP_QUEUE } from "../queues/constants";
 import { LangyProjectMemoryService } from "../../services/langy";
+import { LANGY_BOOTSTRAP_PROMPT } from "../../services/langy/prompts";
 import { getVercelAIModel } from "../../modelProviders/utils";
-import { TiktokenClient } from "../../app-layer/clients/tokenizer/tiktoken.client";
 
 const logger = createLogger("langwatch:workers:langyBootstrapWorker");
 
 const FALLBACK_MODEL = "openai/gpt-5-mini";
-const TARGET_TOKEN_CAP = 2000;
 
 export type LangyBootstrapJob = {
   projectId: string;
 };
-
-const BOOTSTRAP_PROMPT = `You are bootstrapping a project memory file for the LangWatch assistant "Langy".
-
-Read the snapshot of the project below (evaluators, prompts, recent traces). Produce a concise markdown brief that helps Langy understand:
-- What this project appears to do (one sentence)
-- Key evaluators in use and what they check
-- Notable prompts and their purpose
-- Anything unusual or noteworthy in recent activity
-
-Keep it under 1500 tokens. Use plain language. No code blocks unless essential. Do not invent facts.`;
 
 async function gatherProjectSnapshot(projectId: string) {
   const [project, evaluators, prompts, datasets] = await Promise.all([
@@ -91,19 +80,16 @@ export async function runLangyBootstrapJob(
 
     let content: string;
     try {
-      // Spec: project's configured default LLM; fallback gpt-5-mini if none.
-      // getVercelAIModel(projectId) uses project default with its own
-      // fallback (DEFAULT_MODEL). If neither resolves, we retry with
-      // gpt-5-mini explicitly.
       let model;
       try {
         model = await getVercelAIModel(projectId);
-      } catch {
+      } catch (error) {
+        if (!isNoModelConfiguredError(error)) throw error;
         model = await getVercelAIModel(projectId, FALLBACK_MODEL);
       }
       const result = await generateText({
         model,
-        system: BOOTSTRAP_PROMPT,
+        system: LANGY_BOOTSTRAP_PROMPT,
         messages: [{ role: "user", content: userMessage }],
       });
       content = result.text.trim();
@@ -115,17 +101,9 @@ export async function runLangyBootstrapJob(
       content = renderMinimalStarter(snapshot);
     }
 
-    const tokenizer = new TiktokenClient();
-    const tokens = await tokenizer.countTokens(FALLBACK_MODEL, content);
-    const contentSummary =
-      tokens && tokens > TARGET_TOKEN_CAP
-        ? content.slice(0, Math.floor((TARGET_TOKEN_CAP / tokens) * content.length))
-        : null;
-
     await memoryService.writeNewVersion({
       projectId,
       content,
-      contentSummary,
       changeReason: "auto_bootstrap",
       changedById: null,
     });
@@ -142,6 +120,14 @@ export async function runLangyBootstrapJob(
     });
     throw error;
   }
+}
+
+function isNoModelConfiguredError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  // All four "no model configured" errors in getVercelAIModel point at
+  // "Settings → Model Providers". "Project not found" and transient
+  // provider errors do not — those should propagate so BullMQ retries.
+  return error.message.includes("Model Providers");
 }
 
 function renderMinimalStarter(snapshot: Awaited<ReturnType<typeof gatherProjectSnapshot>>) {

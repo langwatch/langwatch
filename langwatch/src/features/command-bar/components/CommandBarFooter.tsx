@@ -31,6 +31,10 @@ export function CommandBarFooter({ isMac }: CommandBarFooterProps) {
         <Text>Navigate</Text>
       </HStack>
       <HStack gap={1}>
+        <Text opacity={0.5}>↹</Text>
+        <Text>Ask Langy</Text>
+      </HStack>
+      <HStack gap={1}>
         <Text opacity={0.5}>esc</Text>
         <Text>Close</Text>
       </HStack>

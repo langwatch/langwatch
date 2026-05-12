@@ -71,11 +71,14 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { LangyDrawer } from "~/components/langy/LangySidebar";
+import { LangyProvider } from "~/components/langy/LangyContext";
 
 function renderDrawer(props: Partial<Parameters<typeof LangyDrawer>[0]> = {}) {
   return render(
     <ChakraProvider value={defaultSystem}>
-      <LangyDrawer {...props} />
+      <LangyProvider>
+        <LangyDrawer {...props} />
+      </LangyProvider>
     </ChakraProvider>,
   );
 }
@@ -202,6 +205,89 @@ describe("LangyDrawer", () => {
         expect(
           screen.queryByRole("button", { name: /^Stop$/i }),
         ).toBeNull();
+      });
+    });
+  });
+
+  describe("given the panel is open — binds langy-memory.feature § Stale project memory prompts a refresh", () => {
+    function mockProjectMemory(isStale: boolean) {
+      const originalFetch = global.fetch;
+      const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+        const url = typeof input === "string" ? input : input.toString();
+        if (url.startsWith("/api/langy/project-memory")) {
+          return new Response(
+            JSON.stringify({
+              memory: { id: "m", projectId: "proj_demo", content: "x" },
+              isStale,
+            }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          );
+        }
+        // /api/langy/conversations is hit by the recent list; respond empty.
+        if (url.startsWith("/api/langy/conversations")) {
+          return new Response(JSON.stringify({ conversations: [] }), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+        return new Response("", { status: 404 });
+      });
+      global.fetch = fetchMock as unknown as typeof fetch;
+      return () => {
+        global.fetch = originalFetch;
+      };
+    }
+
+    describe("when the server reports isStale=true on mount", () => {
+      it("renders a non-blocking stale banner with a link to settings", async () => {
+        const restore = mockProjectMemory(true);
+        try {
+          renderDrawer({ isOpen: true });
+          const banner = await screen.findByRole("status", {
+            name: /over 30 days old/i,
+          });
+          expect(banner).toBeDefined();
+          const link = screen.getByRole("link", {
+            name: /refresh in settings/i,
+          });
+          expect(link.getAttribute("href")).toBe("/settings/langy-memory");
+        } finally {
+          restore();
+        }
+      });
+
+      it("hides the banner after the user clicks dismiss", async () => {
+        const restore = mockProjectMemory(true);
+        try {
+          renderDrawer({ isOpen: true });
+          await screen.findByRole("status", { name: /over 30 days old/i });
+          await userEvent.click(
+            screen.getByRole("button", {
+              name: /dismiss stale memory banner/i,
+            }),
+          );
+          expect(
+            screen.queryByRole("status", { name: /over 30 days old/i }),
+          ).toBeNull();
+        } finally {
+          restore();
+        }
+      });
+    });
+
+    describe("when the server reports isStale=false on mount", () => {
+      it("renders no stale banner", async () => {
+        const restore = mockProjectMemory(false);
+        try {
+          renderDrawer({ isOpen: true });
+          // Wait a tick for the fetch effect to resolve.
+          await new Promise((resolve) => setTimeout(resolve, 0));
+          expect(
+            screen.queryByRole("status", { name: /over 30 days old/i }),
+          ).toBeNull();
+        } finally {
+          restore();
+        }
       });
     });
   });

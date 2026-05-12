@@ -32,7 +32,6 @@ import { getVercelAIModel } from "~/server/modelProviders/utils";
 import { PromptService } from "~/server/prompt-config/prompt.service";
 import { parseEvaluationResult } from "~/utils/evaluationResults";
 import { createLogger } from "~/utils/logger/server";
-import { auditLog } from "~/server/auditLog";
 import { TiktokenClient } from "~/server/app-layer/clients/tokenizer/tiktoken.client";
 import { buildLangyTelemetrySettings } from "~/server/observability/langy-tracer";
 import {
@@ -41,12 +40,17 @@ import {
   LangyProjectMemoryService,
   LangyUserPreferencesService,
 } from "~/server/services/langy";
+import { LANGY_SYSTEM_PROMPT } from "~/server/services/langy/prompts";
 import { ConversationToolIdSet } from "~/server/services/langy/toolIdValidator";
 import {
   LANGY_TOOL_CALLS_PER_MESSAGE,
   checkLangyMessageRateLimit,
 } from "~/server/middleware/rate-limit-langy";
 import { esClient, TRACE_INDEX } from "~/server/elasticsearch";
+import { registerLangyConversationRoutes } from "./langy.conversations";
+import { registerLangyProjectMemoryRoutes } from "./langy.project-memory";
+import { registerLangyPreferencesRoutes } from "./langy.preferences";
+import { registerLangyPrivacyRoutes } from "./langy.privacy";
 import type { NextRequestShim as any } from "./types";
 
 const logger = createLogger("langwatch:api:langy");
@@ -81,7 +85,7 @@ async function loadInjectableProjectMemory(
   const service = LangyProjectMemoryService.create(prisma);
   const memory = await service.getById({ projectId });
   if (!memory) return null;
-  return memory.contentSummary ?? memory.content;
+  return memory.content;
 }
 
 function extractAssistantText(
@@ -139,50 +143,6 @@ async function persistUserMessage(opts: {
     tokenCount,
   });
 }
-
-const LANGY_SYSTEM_PROMPT = `You are Langy, the in-product AI assistant for LangWatch. You live in a right-side sidebar inside the experiment workbench.
-
-## What you can do
-- **Read** the project's evaluators, prompts, and datasets. Use these tools autonomously whenever they help you answer.
-- **Propose changes** that the user can apply with one click — creating/updating evaluators and prompts, creating datasets and appending rows, adding evaluators to the workbench, and running the experiment. You never mutate state yourself. Every "propose_*" tool returns a card; the user clicks Apply to commit.
-
-## Ground rules
-- Never fabricate names, IDs, or slugs. Only reference entities your tools returned.
-- When asked to "do" something, propose it via the relevant propose_* tool. Say "I'll propose this for you to approve" rather than "I did it".
-- One proposal per turn unless the user explicitly asked for multiple. Don't spam cards.
-
-## Tone
-- Informative, not over-helpful. Curate — do not enumerate.
-- "What do I have?" → surface **at most 3–5** most relevant items, grouped by category if useful. Never paste the full catalog.
-- Prefer 1–3 short bullets. No filler openers ("Great question!", "Sure!"). No closing offers unless the user is likely to need more.
-- If the honest answer needs more than 5 items, summarize + offer drill-down instead of listing everything.
-- When recommending, pick the single best match first, then at most two alternatives, each in one line.
-
-## Tool use
-- When the user asks about "my experiment", "this experiment", the results, or what's configured in the workbench, call **get_workbench_state** first. That tool is authoritative for what's actually on screen.
-- To investigate failures or underperformance, use **find_failing_rows**. Report the pattern (what inputs fail, which evaluator flagged them) rather than dumping the raw list.
-- Before talking about the user's evaluators/prompts/datasets at the project level (not the workbench), call the matching list_* tool with 'project' scope first.
-- Use list_evaluators 'built_in' or 'all' only when suggesting new evaluators from the catalog.
-- After a tool call, synthesize — don't regurgitate the raw list.
-- Workbench state reflects the last autosave, which usually lags the UI by a second or two. If the user says "I just added X", call get_workbench_state anyway — it'll usually be there.
-
-## Running experiments
-- Use **propose_run_workbench** when the user asks to run/evaluate/execute the experiment. Before proposing, call get_workbench_state and sanity-check that there's at least one target and at least one evaluator. If mappings look missing, note that in your reply so the user knows a run might fail validation.
-
-## Prompts
-- Call get_prompt_details before proposing an update so you know which fields are already set. Only include fields you actually want to change.
-- propose_update_prompt requires a commitMessage — make it specific ("add safety system message" beats "updated prompt").
-- When proposing a brand-new prompt, pick a handle that reflects intent and slug-conventions (kebab-case).
-
-## Datasets
-- Before propose_add_dataset_rows, call get_dataset_details so your row values line up with the declared column types — mismatches will fail validation.
-- propose_create_dataset can include initialRows so the dataset lands with seed data in a single Apply.
-- When the user asks for "N examples", generate the actual row values inline in the tool call. Don't ask them to specify each one unless the domain is ambiguous.
-
-## Evaluator models
-- propose_create_evaluator auto-fills settings from the evaluator's defaults, using the **project's default model** for any \`model\` field. You do NOT need to pass settings.model unless the user explicitly asked for a specific one.
-- If the user wants to choose a model, ask them which and then pass it in settings.model when proposing.
-- Mention the chosen model briefly in your reply so the user can catch it before applying.`;
 
 export const app = new Hono().basePath("/api");
 app.use(tracerMiddleware({ name: "langy" }));
@@ -1062,7 +1022,7 @@ app.post("/langy/chat", async (c) => {
 
     search_traces: tool({
       description:
-        "Lazy semantic-ish search over recent traces in this project. Use when the user asks to 'find traces' matching a description (errors, hallucinations, latency). Returns a small list of trace ids with brief context. Tool result is per-turn only — do not persist or recall ids across conversations.",
+        "Keyword search over recent traces in this project (BM25 over input/output text and error messages — not semantic). Use when the user asks to 'find traces' with specific words or phrases in them ('error', 'timeout', a particular customer name). Returns a small list of trace ids with brief context. Tool result is per-turn only — do not persist or recall ids across conversations.",
       inputSchema: z.object({
         query: z
           .string()
@@ -1159,13 +1119,12 @@ app.post("/langy/chat", async (c) => {
 
     search_past_runs: tool({
       description:
-        "Search past evaluation runs (BatchEvaluation) for this project, optionally filtered by experiment slug or workflow id, ordered by recency.",
+        "Search past evaluation runs (BatchEvaluation) for this project, optionally filtered by experiment slug, ordered by recency.",
       inputSchema: z.object({
         experimentSlug: z.string().optional(),
-        workflowId: z.string().optional(),
         limit: z.number().int().min(1).max(20).default(10),
       }),
-      execute: async ({ experimentSlug, workflowId: _workflowId, limit }) => {
+      execute: async ({ experimentSlug, limit }) => {
         const where: Record<string, unknown> = { projectId };
         if (experimentSlug) {
           const exp = await prisma.experiment.findFirst({
@@ -1268,373 +1227,14 @@ app.post("/langy/chat", async (c) => {
   });
 });
 
-// ============================================================================
-// Conversation management
-// ============================================================================
-
-async function requireSessionAndPermission(c: any, projectId: string | undefined) {
-  const session = await getServerAuthSession({ req: c.req.raw as any });
-  if (!session) return { error: c.json({ error: "Unauthorized" }, { status: 401 }) };
-  if (!projectId) return { error: c.json({ error: "Missing projectId" }, { status: 400 }) };
-  const ok = await hasProjectPermission(
-    { prisma, session },
-    projectId,
-    "evaluations:view",
-  );
-  if (!ok) return { error: c.json({ error: "Forbidden" }, { status: 403 }) };
-  return { session };
-}
-
-async function requireProjectAdmin(session: Awaited<ReturnType<typeof getServerAuthSession>>, projectId: string) {
-  if (!session) return false;
-  return await hasProjectPermission(
-    { prisma, session },
-    projectId,
-    "project:manage",
-  );
-}
-
-app.get("/langy/conversations", async (c) => {
-  const projectId = c.req.query("projectId");
-  const guard = await requireSessionAndPermission(c, projectId);
-  if (guard.error) return guard.error;
-  const limit = Number(c.req.query("limit") ?? "50");
-  const service = LangyConversationService.create(prisma);
-  const conversations = await service.getAll({
-    projectId: projectId!,
-    userId: guard.session!.user.id,
-    limit: Math.min(Math.max(limit, 1), 100),
-  });
-  return c.json({ conversations });
-});
-
-app.get("/langy/conversations/:id", async (c) => {
-  const projectId = c.req.query("projectId");
-  const guard = await requireSessionAndPermission(c, projectId);
-  if (guard.error) return guard.error;
-  const id = c.req.param("id");
-  const convService = LangyConversationService.create(prisma);
-  const conv = await convService.getById({
-    id,
-    projectId: projectId!,
-    userId: guard.session!.user.id,
-  });
-  if (!conv) return c.json({ error: "Not found" }, { status: 404 });
-  const msgService = LangyMessageService.create(prisma);
-  const messages = await msgService.getAllByConversation({
-    conversationId: conv.id,
-    projectId: projectId!,
-  });
-  return c.json({ conversation: conv, messages });
-});
-
-app.patch("/langy/conversations/:id", async (c) => {
-  const body = (await c.req.json()) as {
-    projectId: string;
-    title?: string | null;
-    isShared?: boolean;
-  };
-  const guard = await requireSessionAndPermission(c, body.projectId);
-  if (guard.error) return guard.error;
-  const id = c.req.param("id");
-  const service = LangyConversationService.create(prisma);
-  try {
-    const updated = await service.updateById({
-      id,
-      projectId: body.projectId,
-      userId: guard.session!.user.id,
-      title: body.title,
-      isShared: body.isShared,
-    });
-    if (body.isShared !== undefined) {
-      await auditLog({
-        userId: guard.session!.user.id,
-        projectId: body.projectId,
-        action: body.isShared
-          ? "langy.conversation.share"
-          : "langy.conversation.unshare",
-        args: { conversationId: id },
-      });
-    }
-    return c.json({ conversation: updated });
-  } catch {
-    return c.json({ error: "Not found or not owned" }, { status: 404 });
-  }
-});
-
-app.delete("/langy/conversations/:id", async (c) => {
-  const projectId = c.req.query("projectId");
-  const guard = await requireSessionAndPermission(c, projectId);
-  if (guard.error) return guard.error;
-  const id = c.req.param("id");
-  const service = LangyConversationService.create(prisma);
-  const ok = await service.deleteById({
-    id,
-    projectId: projectId!,
-    userId: guard.session!.user.id,
-  });
-  if (!ok) return c.json({ error: "Not found or not owned" }, { status: 404 });
-  return c.json({ success: true });
-});
-
-// ============================================================================
-// Project memory
-// ============================================================================
-
-const PROJECT_MEMORY_REFRESH_PROMPT = `You are regenerating a project memory file for the LangWatch assistant Langy.
-
-Read the snapshot of the project state below (evaluators, prompts, datasets) and produce a concise, plain-language markdown brief covering:
-- What this project does (one sentence)
-- Active evaluators and what they check
-- Notable prompts and their purpose
-- Anything unusual worth noting
-
-Keep under 1500 tokens. No invented facts.`;
-
-app.get("/langy/project-memory", async (c) => {
-  const projectId = c.req.query("projectId");
-  const guard = await requireSessionAndPermission(c, projectId);
-  if (guard.error) return guard.error;
-  const service = LangyProjectMemoryService.create(prisma);
-  const memory = await service.getById({ projectId: projectId! });
-  return c.json({ memory });
-});
-
-app.put("/langy/project-memory", async (c) => {
-  const body = (await c.req.json()) as { projectId: string; content: string };
-  const guard = await requireSessionAndPermission(c, body.projectId);
-  if (guard.error) return guard.error;
-  const isAdmin = await requireProjectAdmin(guard.session!, body.projectId);
-  if (!isAdmin) {
-    return c.json(
-      { error: "Editing project memory requires project admin." },
-      { status: 403 },
-    );
-  }
-  const service = LangyProjectMemoryService.create(prisma);
-  const memory = await service.writeNewVersion({
-    projectId: body.projectId,
-    content: body.content,
-    changedById: guard.session!.user.id,
-    changeReason: "user_edit",
-  });
-  await auditLog({
-    userId: guard.session!.user.id,
-    projectId: body.projectId,
-    action: "langy.project_memory.edit",
-    args: { contentVersion: memory.contentVersion },
-  });
-  return c.json({ memory });
-});
-
-app.post("/langy/project-memory/refresh", async (c) => {
-  const body = (await c.req.json()) as { projectId: string };
-  const guard = await requireSessionAndPermission(c, body.projectId);
-  if (guard.error) return guard.error;
-  const isAdmin = await requireProjectAdmin(guard.session!, body.projectId);
-  if (!isAdmin) {
-    return c.json(
-      { error: "Refreshing project memory requires project admin." },
-      { status: 403 },
-    );
-  }
-
-  let model;
-  try {
-    model = await getVercelAIModel(body.projectId);
-  } catch (error) {
-    return c.json(
-      {
-        error:
-          error instanceof Error ? error.message : "No model configured.",
-      },
-      { status: 409 },
-    );
-  }
-
-  const [project, evaluators, prompts, datasets] = await Promise.all([
-    prisma.project.findUnique({
-      where: { id: body.projectId },
-      select: { name: true, language: true, framework: true },
-    }),
-    prisma.evaluator.findMany({
-      where: { projectId: body.projectId },
-      select: { name: true, slug: true, type: true },
-      take: 50,
-    }),
-    prisma.llmPromptConfig.findMany({
-      where: { projectId: body.projectId },
-      select: { handle: true, name: true },
-      take: 50,
-    }),
-    prisma.dataset.findMany({
-      where: { projectId: body.projectId, archivedAt: null },
-      select: { name: true, slug: true },
-      take: 50,
-    }),
-  ]);
-
-  const snapshot = JSON.stringify(
-    { project, evaluators, prompts, datasets },
-    null,
-    2,
-  );
-
-  const stream = streamText({
-    model,
-    system: PROJECT_MEMORY_REFRESH_PROMPT,
-    messages: [
-      {
-        role: "user",
-        content: `Project snapshot (JSON):\n\n${snapshot}`,
-      },
-    ],
-    // Memory-refresh is a one-shot, not a conversation; synthesise a stable
-    // id so the dogfood project can group all refresh traces per project.
-    experimental_telemetry: buildLangyTelemetrySettings({
-      userProjectId: body.projectId,
-      userId: guard.session!.user.id,
-      conversationId: `memory-refresh:${body.projectId}`,
-    }),
-    onFinish: async ({ text }) => {
-      try {
-        const memoryService = LangyProjectMemoryService.create(prisma);
-        await memoryService.writeNewVersion({
-          projectId: body.projectId,
-          content: text,
-          changeReason: "user_refresh",
-          changedById: guard.session!.user.id,
-        });
-        await auditLog({
-          userId: guard.session!.user.id,
-          projectId: body.projectId,
-          action: "langy.project_memory.refresh",
-        });
-      } catch (error) {
-        logger.error({ error }, "failed to persist refreshed project memory");
-      }
-    },
-    onError: (error) => {
-      logger.error({ error }, "project memory refresh stream errored");
-    },
-  });
-
-  return stream.toUIMessageStreamResponse();
-});
-
-// ============================================================================
-// Preferences
-// ============================================================================
-
-app.get("/langy/preferences", async (c) => {
-  const projectId = c.req.query("projectId");
-  const guard = await requireSessionAndPermission(c, projectId);
-  if (guard.error) return guard.error;
-  const service = LangyUserPreferencesService.create(prisma);
-  const prefs = await service.getById({
-    userId: guard.session!.user.id,
-    projectId: projectId!,
-  });
-  return c.json({ preferences: prefs });
-});
-
-app.put("/langy/preferences", async (c) => {
-  const body = (await c.req.json()) as {
-    projectId: string;
-    mode?: "non_expert" | "expert";
-    dismissedSuggestionKinds?: string[];
-  };
-  const guard = await requireSessionAndPermission(c, body.projectId);
-  if (guard.error) return guard.error;
-  const service = LangyUserPreferencesService.create(prisma);
-  let prefs = await service.getById({
-    userId: guard.session!.user.id,
-    projectId: body.projectId,
-  });
-  if (body.mode) {
-    prefs = await service.setMode({
-      userId: guard.session!.user.id,
-      projectId: body.projectId,
-      mode: body.mode,
-    });
-  }
-  if (body.dismissedSuggestionKinds) {
-    prefs = await service.setDismissedSuggestionKinds({
-      userId: guard.session!.user.id,
-      projectId: body.projectId,
-      kinds: body.dismissedSuggestionKinds,
-    });
-  }
-  return c.json({ preferences: prefs });
-});
-
-// ============================================================================
-// Memory clear-all + GDPR export
-// ============================================================================
-
-app.delete("/langy/memory", async (c) => {
-  const projectId = c.req.query("projectId");
-  const guard = await requireSessionAndPermission(c, projectId);
-  if (guard.error) return guard.error;
-  const userId = guard.session!.user.id;
-  const convService = LangyConversationService.create(prisma);
-  const prefService = LangyUserPreferencesService.create(prisma);
-  const result = await convService.clearAllForUser({
-    projectId: projectId!,
-    userId,
-  });
-  await prefService.resetForUser({ projectId: projectId!, userId });
-  await auditLog({
-    userId,
-    projectId: projectId!,
-    action: "langy.memory.clear_all",
-    args: { deletedCount: result.deletedCount },
-  });
-  return c.json({ deletedCount: result.deletedCount });
-});
-
-app.get("/langy/memory/export", async (c) => {
-  const projectId = c.req.query("projectId");
-  const guard = await requireSessionAndPermission(c, projectId);
-  if (guard.error) return guard.error;
-  const userId = guard.session!.user.id;
-  const convService = LangyConversationService.create(prisma);
-  const conversations = await convService.getAll({
-    projectId: projectId!,
-    userId,
-    limit: 1000,
-  });
-  const msgService = LangyMessageService.create(prisma);
-  const conversationsWithMessages = await Promise.all(
-    conversations
-      .filter((c) => c.isOwn)
-      .map(async (c) => ({
-        conversation: c,
-        messages: await msgService.getAllByConversation({
-          conversationId: c.id,
-          projectId: projectId!,
-        }),
-      })),
-  );
-  const prefService = LangyUserPreferencesService.create(prisma);
-  const preferences = await prefService.getById({
-    userId,
-    projectId: projectId!,
-  });
-  await auditLog({
-    userId,
-    projectId: projectId!,
-    action: "langy.memory.export",
-    args: { conversationCount: conversationsWithMessages.length },
-  });
-  return c.json({
-    exportedAt: new Date().toISOString(),
-    projectId,
-    userId,
-    conversations: conversationsWithMessages,
-    preferences,
-  });
-});
+// Conversation CRUD, project-memory CRUD, preferences, and privacy
+// (clear-all + export) live in sibling files. Each register function
+// mutates this same `app`, so middleware applied above (tracer, logger)
+// covers every route uniformly.
+registerLangyConversationRoutes(app);
+registerLangyProjectMemoryRoutes(app);
+registerLangyPreferencesRoutes(app);
+registerLangyPrivacyRoutes(app);
 
 type ParsedState = ReturnType<
   typeof persistedEvaluationsV3StateSchema.parse

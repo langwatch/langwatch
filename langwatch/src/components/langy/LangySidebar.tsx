@@ -16,6 +16,7 @@ import { DefaultChatTransport, type UIMessage } from "ai";
 import { MeshGradient } from "@paper-design/shaders-react";
 import { keyframes } from "@emotion/react";
 import {
+  AlertTriangle,
   ArrowRight,
   Check,
   Plus,
@@ -25,6 +26,7 @@ import {
   Trash2,
   X,
 } from "lucide-react";
+import NextLink from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Kbd } from "~/components/ops/shared/Kbd";
 import { Markdown } from "~/components/Markdown";
@@ -43,6 +45,7 @@ import {
   type LangyConversationSummary,
   type LangyMessageRecord,
 } from "./useLangyConversations";
+import { useLangy } from "./LangyContext";
 
 const PANEL_WIDTH = 380;
 // The panel docks flush against the right edge of the viewport. Page
@@ -179,19 +182,18 @@ function useTypewriterPlaceholder(
 }
 
 /**
- * `⌘L` / `Ctrl+L` toggles the Langy panel globally. Mirrors
- * useGlobalAiShortcut from traces-v2. ⌘L is normally captured by the
- * browser to focus the URL bar; preventDefault claims it for the page
- * when keyboard focus is inside the document. If a text input is active
- * with a non-empty selection we bail to avoid hijacking OS shortcuts
- * users might be relying on (e.g. select-line).
+ * `⌘I` / `Ctrl+I` toggles the Langy panel globally. Originally bound to
+ * `⌘L` / `Ctrl+L`, but that chord is reserved by Chrome/Edge/Firefox to
+ * focus the address bar and never reaches the page on Windows/Linux.
+ * If a text input is active with a non-empty selection we bail to avoid
+ * stomping on text-formatting shortcuts (e.g. italics in rich editors).
  */
 function useGlobalLangyShortcut(onTrigger: () => void): void {
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
       const isAccel = event.metaKey || event.ctrlKey;
       if (!isAccel) return;
-      if (event.key !== "l" && event.key !== "L") return;
+      if (event.key !== "i" && event.key !== "I") return;
       if (event.altKey || event.shiftKey) return;
       const target = event.target;
       if (target instanceof HTMLElement) {
@@ -447,7 +449,7 @@ function LangyHandle({
           <Text>{isOpen ? "Close Langy" : "Open Langy"}</Text>
           <HStack gap={1}>
             <Kbd>⌘</Kbd>
-            <Kbd>L</Kbd>
+            <Kbd>I</Kbd>
           </HStack>
         </HStack>
       }
@@ -483,6 +485,10 @@ function LangyPanel({
   const [applyingProposals, setApplyingProposals] = useState<Set<string>>(
     new Set(),
   );
+  // L4 staleness signal: server flags memory older than 30 days; sidebar
+  // surfaces a dismissible banner so users see it without visiting Settings.
+  const [memoryIsStale, setMemoryIsStale] = useState(false);
+  const [staleBannerDismissed, setStaleBannerDismissed] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const transport = useMemo(
@@ -546,6 +552,26 @@ function LangyPanel({
     scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [messages, status]);
 
+  useEffect(() => {
+    if (!isOpen || !projectId) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch(
+          `/api/langy/project-memory?projectId=${encodeURIComponent(projectId)}`,
+        );
+        if (!res.ok) return;
+        const data = (await res.json()) as { isStale?: boolean };
+        if (!cancelled) setMemoryIsStale(Boolean(data.isStale));
+      } catch {
+        // staleness signal is non-critical; ignore network errors
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, projectId]);
+
   const isBusy = status === "submitted" || status === "streaming";
   const isEmpty = messages.length === 0;
 
@@ -557,6 +583,21 @@ function LangyPanel({
       { body: { projectId, experimentSlug } },
     );
   };
+
+  // Drains "Ask Langy" intents fired from the global command palette
+  // (Cmd+K → Tab → Enter, or the "Ask Langy" entry). If autoSubmit is
+  // set the query is sent immediately; otherwise we just seed the input.
+  const { pendingAsk, consumePendingAsk } = useLangy();
+  useEffect(() => {
+    if (!pendingAsk || !isOpen) return;
+    if (pendingAsk.autoSubmit) {
+      if (!projectId || isBusy) return;
+      void send(pendingAsk.text);
+    } else {
+      setInput(pendingAsk.text);
+    }
+    consumePendingAsk();
+  }, [pendingAsk, isOpen, projectId, isBusy, consumePendingAsk]);
 
   const handleNewChat = () => {
     startNewConversation();
@@ -665,6 +706,40 @@ function LangyPanel({
           onSelect={handleSelectConversation}
           onDelete={(id) => void removeConversation(id)}
         />
+        {memoryIsStale && !staleBannerDismissed && (
+          <HStack
+            background="orange.subtle"
+            color="orange.fg"
+            paddingX={3}
+            paddingY={2}
+            marginX="18px"
+            marginTop="12px"
+            borderRadius="md"
+            gap={2}
+            role="status"
+            aria-label="Project memory is over 30 days old"
+          >
+            <AlertTriangle size={14} />
+            <Text fontSize="sm" flex={1}>
+              Project memory is over 30 days old.{" "}
+              <NextLink
+                href="/settings/langy-memory"
+                style={{ textDecoration: "underline" }}
+              >
+                Refresh in settings
+              </NextLink>
+              .
+            </Text>
+            <IconButton
+              aria-label="Dismiss stale memory banner"
+              size="xs"
+              variant="ghost"
+              onClick={() => setStaleBannerDismissed(true)}
+            >
+              <X size={12} />
+            </IconButton>
+          </HStack>
+        )}
         <Box ref={scrollRef} flex={1} overflowY="auto" aria-live="polite">
           {isEmpty ? (
             <EmptyState onPick={(prompt) => void send(prompt)} />

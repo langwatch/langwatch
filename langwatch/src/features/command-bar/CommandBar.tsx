@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useDrawer } from "~/hooks/useDrawer";
 import { usePublicEnv } from "~/hooks/usePublicEnv";
+import { useLangy } from "~/components/langy/LangyContext";
 import { Dialog } from "~/components/ui/dialog";
 import { toaster } from "~/components/ui/toaster";
 import { useCommandBar } from "./CommandBarContext";
@@ -150,6 +151,8 @@ export function CommandBar() {
   const { openDrawer } = useDrawer();
   const publicEnv = usePublicEnv();
   const { setTheme } = useTheme();
+  const { askLangy } = useLangy();
+  const [askLangyMode, setAskLangyMode] = useState(false);
   const {
     idResult,
     searchResults,
@@ -228,6 +231,16 @@ export function CommandBar() {
           return;
         }
 
+        // Handle Ask Langy — open the Langy panel. If there's a typed
+        // query, seed it as the first message and auto-submit; otherwise
+        // just open the panel for the user to type.
+        if (cmd.id === "action-ask-langy") {
+          const trimmed = query.trim();
+          askLangy(trimmed, { autoSubmit: trimmed.length > 0 });
+          close();
+          return;
+        }
+
         // Handle Open Chat (Crisp)
         if (cmd.id === "action-open-chat") {
           const crisp = (
@@ -300,8 +313,28 @@ export function CommandBar() {
       setTheme,
       query,
       triggerEffect,
+      askLangy,
     ],
   );
+
+  // "Tab → Ask Langy" omnibox flow: when there's a typed query, Tab
+  // flips the input into Ask Langy mode (chip prefix). Enter then
+  // submits the query into Langy and closes the palette.
+  const handleAskLangyFromTab = useCallback(() => {
+    const trimmed = query.trim();
+    if (!trimmed) return;
+    askLangy(trimmed, { autoSubmit: true });
+    setAskLangyMode(false);
+    close();
+  }, [query, askLangy, close]);
+
+  // Reset Ask Langy mode whenever the palette closes or query empties.
+  useEffect(() => {
+    if (!isOpen) setAskLangyMode(false);
+  }, [isOpen]);
+  useEffect(() => {
+    if (askLangyMode && query.length === 0) setAskLangyMode(false);
+  }, [askLangyMode, query]);
 
   // Copy link to clipboard
   const handleCopyLink = useCallback(() => {
@@ -335,6 +368,12 @@ export function CommandBar() {
     handleSelect,
     handleCopyLink,
     isMac,
+    {
+      askLangyMode,
+      setAskLangyMode,
+      onAskLangy: handleAskLangyFromTab,
+      hasQuery: query.length > 0,
+    },
   );
 
   return (
@@ -358,6 +397,7 @@ export function CommandBar() {
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={handleKeyDown}
           isLoading={searchLoading}
+          askLangyMode={askLangyMode}
         />
 
         <CommandBarResults
