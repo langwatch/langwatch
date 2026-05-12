@@ -22,6 +22,11 @@ Feature: Structured Logging for ClickHouse Queries
     When a ClickHouse query succeeds
     Then a structured debug log is emitted with source, operation, durationMs, and queryId
 
+  # @unimplemented: needs a dedicated test that asserts the structured log
+  # objects do NOT contain raw `query` text or `query_params` values — the
+  # current resilient-client tests only assert the presence of source/operation/
+  # durationMs fields, not the absence of sensitive fields. Cheap to add when
+  # someone touches this path.
   @unit @regression @unimplemented
   Scenario: Sensitive data is excluded from logs
     When a ClickHouse query is logged

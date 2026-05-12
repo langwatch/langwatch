@@ -3,6 +3,13 @@ Feature: Analytics Chart Rendering
   Charts on the analytics dashboard render data correctly across
   all graph types, metrics, and color configurations.
 
+  # The remaining `@unimplemented` scenarios in this file describe React /
+  # frontend rendering behavior on the analytics dashboard. They need a
+  # JSDOM/component-render harness for the dashboard chart components — no
+  # such harness exists today for the analytics chart wrappers. Tracked here
+  # rather than dropped because the assertions are concrete and would catch
+  # real regressions once the harness lands.
+
   Background:
     Given a project with analytics data stored in ClickHouse
 
