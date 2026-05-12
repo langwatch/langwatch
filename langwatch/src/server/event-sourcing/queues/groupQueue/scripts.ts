@@ -713,7 +713,9 @@ export interface DispatchResult {
 /**
  * Read the tenant soft-cap from the environment. 0 = disabled (default).
  * Post-2026-05-11 incident follow-up; see DISPATCH_LUA comment for design.
- * Exported for tests; mutate process.env in test setup to toggle.
+ * Symbol is captured in env-create.mjs for schema discoverability; we
+ * read process.env directly at call time so tests can mutate it without
+ * re-importing the frozen env module.
  */
 export function readTenantCap(): number {
   const raw = process.env.LANGWATCH_DISPATCH_TENANT_CAP;

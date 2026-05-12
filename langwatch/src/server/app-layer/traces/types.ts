@@ -104,18 +104,6 @@ export const traceSummaryDataSchema = z.object({
   createdAt: z.number(),
   updatedAt: z.number(),
   LastEventOccurredAt: z.number(),
-  /**
-   * Span IDs known to be part of an evaluator (or otherwise downstream
-   * causality) subtree on this trace. A span enters the set when its
-   * own `langwatch.causality_depth` attribute is >= 1 OR when its
-   * parent_span_id is already in the set. The evaluationTrigger reactor
-   * consults this to skip dispatching evaluations for spans that come
-   * from an evaluator workflow, breaking the eval-of-eval loop. See
-   * specs/monitors/online-evaluator-loop-prevention.feature.
-   *
-   * Optional for back-compat with older fold snapshots.
-   */
-  causalSubtreeSpans: z.array(z.string()).optional(),
 });
 
 export type TraceSummaryData = z.infer<typeof traceSummaryDataSchema>;

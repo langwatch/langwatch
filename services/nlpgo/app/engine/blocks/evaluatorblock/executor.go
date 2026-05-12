@@ -33,6 +33,7 @@ import (
 	"go.opentelemetry.io/otel/propagation"
 
 	"github.com/langwatch/langwatch/pkg/otelsetup"
+	"github.com/langwatch/langwatch/services/nlpgo/adapters/httpapi"
 )
 
 // Executor runs a single evaluator block invocation.
@@ -204,7 +205,7 @@ func (e *Executor) Execute(ctx context.Context, req Request) (*Result, error) {
 	if depth := currentCausalityDepthFromBaggage(reqCtx); depth > 0 {
 		// Also surface as a plain header for non-OTel consumers (eg.
 		// langwatch app's collector reads this directly).
-		httpReq.Header.Set("X-LangWatch-Causality-Depth", strconv.Itoa(depth))
+		httpReq.Header.Set(httpapi.CausalityDepthHeader, strconv.Itoa(depth))
 	}
 
 	start := time.Now()

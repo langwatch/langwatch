@@ -1,5 +1,4 @@
 import type { Node } from "@xyflow/react";
-import { randomBytes } from "crypto";
 import { nanoid } from "nanoid";
 import { addEnvs } from "../../optimization_studio/server/addEnvs";
 import type {
@@ -223,17 +222,6 @@ export async function runWorkflow(
 
   const event = await addEnvs(messageWithoutEnvs, projectId);
 
-  // Mint a 32-hex traceparent trace id alongside the public `trace_id`
-  // contract. Customer-facing trace_ids are typically `trace_<nanoid>`
-  // (21 base64url chars) which fails the W3C traceparent regex
-  // `/^[0-9a-f]{32}$/i` — without this normalisation, server-initiated
-  // workflow runs without an explicit 32-hex `trace_id` never get
-  // traceparent propagated and nlpgo starts a fresh trace.
-  const rawTraceId = trace_id.replace(/^trace_/, "");
-  const traceparentTraceId = /^[0-9a-f]{32}$/i.test(rawTraceId)
-    ? rawTraceId
-    : randomBytes(16).toString("hex");
-
   const response = await nlpgoFetch<{
     result: any;
     status: ExecutionStatus;
@@ -243,7 +231,6 @@ export async function runWorkflow(
     body: event,
     origin,
     causalityDepth,
-    traceId: traceparentTraceId,
   });
 
   if (!response.ok) {

@@ -78,9 +78,11 @@ func isTransportAuthError(err error) bool {
 }
 
 // BaggageKeyCausalityDepth is the W3C baggage key whose value is auto-
-// stamped onto every span via BaggageAttributeProcessor. See
-// specs/monitors/online-evaluator-loop-prevention.feature for the design.
-const BaggageKeyCausalityDepth = "langwatch.causality_depth"
+// stamped onto every span via BaggageAttributeProcessor. The
+// `langwatch.reserved.*` prefix signals "system-set, do not override
+// from client SDKs" — same convention as the rest of the reserved
+// namespace. See specs/monitors/online-evaluator-loop-prevention.feature.
+const BaggageKeyCausalityDepth = "langwatch.reserved.causality_depth"
 
 // AutoStampedBaggageKeys lists the baggage keys that the default tracer
 // provider copies onto every span at OnStart. Keep narrow — every entry

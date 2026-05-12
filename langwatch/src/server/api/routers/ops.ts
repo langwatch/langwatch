@@ -600,7 +600,7 @@ export const opsRouter = createTRPCRouter({
     .input(
       z.object({
         tenantId: z.string().min(1),
-        kind: z.enum(["rate_breaker", "fingerprint_loop"]),
+        kind: z.enum(["rate_breaker"]),
       }),
     )
     .mutation(async ({ input }) => {

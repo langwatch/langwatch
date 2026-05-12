@@ -19,7 +19,7 @@ import (
 
 // applyInboundCausality should:
 //  1. Read X-LangWatch-Causality-Depth header
-//  2. Set baggage `langwatch.causality_depth = inbound + 1`
+//  2. Set baggage `langwatch.reserved.causality_depth = inbound + 1`
 //  3. Extract W3C trace context from `traceparent` so subsequent
 //     tracer.Start sees it as the parent
 func TestApplyInboundCausality_HeaderToBaggage_DepthPlusOne(t *testing.T) {
@@ -28,7 +28,7 @@ func TestApplyInboundCausality_HeaderToBaggage_DepthPlusOne(t *testing.T) {
 		propagation.Baggage{},
 	))
 	r := httptest.NewRequest("POST", "/", nil)
-	r.Header.Set(causalityDepthHeader, "3")
+	r.Header.Set(CausalityDepthHeader, "3")
 
 	ctx := applyInboundCausality(context.Background(), r)
 
@@ -63,7 +63,7 @@ func TestApplyInboundCausality_NegativeHeader_TreatedAsZero(t *testing.T) {
 		propagation.Baggage{},
 	))
 	r := httptest.NewRequest("POST", "/", nil)
-	r.Header.Set(causalityDepthHeader, "-5")
+	r.Header.Set(CausalityDepthHeader, "-5")
 
 	ctx := applyInboundCausality(context.Background(), r)
 
@@ -82,7 +82,7 @@ func TestApplyInboundCausality_HeaderZero_StampsOne(t *testing.T) {
 		propagation.Baggage{},
 	))
 	r := httptest.NewRequest("POST", "/", nil)
-	r.Header.Set(causalityDepthHeader, "0")
+	r.Header.Set(CausalityDepthHeader, "0")
 
 	ctx := applyInboundCausality(context.Background(), r)
 
@@ -233,11 +233,11 @@ func TestCurrentCausalityDepth_ReadsBaggage(t *testing.T) {
 // dispatcher relies on. If anyone renames either, the integration breaks
 // silently. Pin them in a test so a rename forces a conversation.
 func TestCausalityWireContract_Pinned(t *testing.T) {
-	if causalityDepthHeader != "X-LangWatch-Causality-Depth" {
-		t.Errorf("header = %q, want X-LangWatch-Causality-Depth", causalityDepthHeader)
+	if CausalityDepthHeader != "X-LangWatch-Causality-Depth" {
+		t.Errorf("header = %q, want X-LangWatch-Causality-Depth", CausalityDepthHeader)
 	}
-	if otelsetup.BaggageKeyCausalityDepth != "langwatch.causality_depth" {
-		t.Errorf("baggage key = %q, want langwatch.causality_depth", otelsetup.BaggageKeyCausalityDepth)
+	if otelsetup.BaggageKeyCausalityDepth != "langwatch.reserved.causality_depth" {
+		t.Errorf("baggage key = %q, want langwatch.reserved.causality_depth", otelsetup.BaggageKeyCausalityDepth)
 	}
 }
 

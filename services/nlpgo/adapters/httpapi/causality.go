@@ -20,11 +20,13 @@ import (
 // we trust is the explicit X-LangWatch-Causality-Depth header below.
 var traceContextPropagator = propagation.TraceContext{}
 
-// causalityDepthHeader is the inbound header carrying the caller's current
+// CausalityDepthHeader is the inbound header carrying the caller's current
 // causality depth. nlpgo increments by 1 and stamps that value on every
 // span it emits (via the BaggageAttributeProcessor registered in
-// otelsetup). See specs/monitors/online-evaluator-loop-prevention.feature.
-const causalityDepthHeader = "X-LangWatch-Causality-Depth"
+// otelsetup). Exported so outbound HTTP callers (eg. evaluatorblock)
+// can reuse the same string. See
+// specs/monitors/online-evaluator-loop-prevention.feature.
+const CausalityDepthHeader = "X-LangWatch-Causality-Depth"
 
 // applyInboundCausality extracts the W3C trace context and causality
 // depth from request headers, increments depth, and returns a context
@@ -44,7 +46,7 @@ const causalityDepthHeader = "X-LangWatch-Causality-Depth"
 func applyInboundCausality(ctx context.Context, r *http.Request) context.Context {
 	ctx = traceContextPropagator.Extract(ctx, propagation.HeaderCarrier(r.Header))
 
-	raw := r.Header.Get(causalityDepthHeader)
+	raw := r.Header.Get(CausalityDepthHeader)
 	if raw == "" {
 		// No caller depth → not part of an evaluator chain. Preserve
 		// trace context extraction but do NOT stamp depth baggage.

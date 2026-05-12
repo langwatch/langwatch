@@ -54,7 +54,6 @@ function createFoldState(
     createdAt: Date.now(),
     updatedAt: Date.now(),
     attributes: {},
-    causalSubtreeSpans: undefined,
     ...overrides,
   };
 }
@@ -129,25 +128,21 @@ function createDeps(
 
 describe("detectCausalityLoop (pure)", () => {
   /** @scenario Incoming span with causality_depth=1 does not trigger evaluations */
-  it("returns 'depth_direct' when inbound span attr has causality_depth=1", () => {
+  it("returns 'depth_direct' when inbound span attr has reserved.causality_depth=1", () => {
     const reason = detectCausalityLoop({
       spanAttributes: [
-        { key: "langwatch.causality_depth", value: { intValue: 1 } },
+        { key: "langwatch.reserved.causality_depth", value: { intValue: 1 } },
       ],
-      parentSpanId: null,
-      causalSubtreeSpans: undefined,
     });
     expect(reason).toBe("depth_direct");
   });
 
   /** @scenario Incoming span with causality_depth=0 still triggers evaluations */
-  it("returns null when inbound span attr has causality_depth=0", () => {
+  it("returns null when inbound span attr has reserved.causality_depth=0", () => {
     const reason = detectCausalityLoop({
       spanAttributes: [
-        { key: "langwatch.causality_depth", value: { intValue: 0 } },
+        { key: "langwatch.reserved.causality_depth", value: { intValue: 0 } },
       ],
-      parentSpanId: null,
-      causalSubtreeSpans: undefined,
     });
     expect(reason).toBeNull();
   });
@@ -156,28 +151,6 @@ describe("detectCausalityLoop (pure)", () => {
   it("returns null when no causality_depth attribute is present", () => {
     const reason = detectCausalityLoop({
       spanAttributes: [{ key: "service.name", value: { stringValue: "x" } }],
-      parentSpanId: null,
-      causalSubtreeSpans: undefined,
-    });
-    expect(reason).toBeNull();
-  });
-
-  /** @scenario Child span without depth attribute, but whose parent is in the eval subtree, is blocked */
-  it("returns 'parent_in_subtree' when parent_span_id is in causalSubtreeSpans", () => {
-    const reason = detectCausalityLoop({
-      spanAttributes: [],
-      parentSpanId: "S1",
-      causalSubtreeSpans: ["S1"],
-    });
-    expect(reason).toBe("parent_in_subtree");
-  });
-
-  /** @scenario Fresh app-origin span on a trace that already has eval spans still dispatches */
-  it("returns null when parent_span_id is NOT in causalSubtreeSpans (re-trigger case)", () => {
-    const reason = detectCausalityLoop({
-      spanAttributes: [],
-      parentSpanId: "S_FRESH",
-      causalSubtreeSpans: ["S_EVAL_1", "S_EVAL_2"],
     });
     expect(reason).toBeNull();
   });
@@ -185,10 +158,8 @@ describe("detectCausalityLoop (pure)", () => {
   it("accepts depth as a string-valued OTLP attribute", () => {
     const reason = detectCausalityLoop({
       spanAttributes: [
-        { key: "langwatch.causality_depth", value: { stringValue: "2" } },
+        { key: "langwatch.reserved.causality_depth", value: { stringValue: "2" } },
       ],
-      parentSpanId: null,
-      causalSubtreeSpans: undefined,
     });
     expect(reason).toBe("depth_direct");
   });
@@ -196,10 +167,8 @@ describe("detectCausalityLoop (pure)", () => {
   it("ignores malformed depth values", () => {
     const reason = detectCausalityLoop({
       spanAttributes: [
-        { key: "langwatch.causality_depth", value: { stringValue: "abc" } },
+        { key: "langwatch.reserved.causality_depth", value: { stringValue: "abc" } },
       ],
-      parentSpanId: null,
-      causalSubtreeSpans: undefined,
     });
     expect(reason).toBeNull();
   });
@@ -258,7 +227,7 @@ describe("evaluationTrigger reactor", () => {
       });
       const event = createSpanEvent({
         attributes: [
-          { key: "langwatch.causality_depth", value: { intValue: 1 } },
+          { key: "langwatch.reserved.causality_depth", value: { intValue: 1 } },
         ],
       });
 
@@ -276,7 +245,7 @@ describe("evaluationTrigger reactor", () => {
       });
       const event = createSpanEvent({
         attributes: [
-          { key: "langwatch.causality_depth", value: { intValue: 0 } },
+          { key: "langwatch.reserved.causality_depth", value: { intValue: 0 } },
         ],
       });
 
@@ -285,57 +254,18 @@ describe("evaluationTrigger reactor", () => {
       expect(deps.evaluation).toHaveBeenCalledTimes(1);
     });
 
-    /** @scenario Child span without depth attribute, but whose parent is in the eval subtree, is blocked */
-    it("blocks when parent_span_id is in foldState.causalSubtreeSpans", async () => {
-      const deps = createDeps();
-      const reactor = createEvaluationTriggerReactor(deps);
-      const state = createFoldState({
-        attributes: { "langwatch.origin": "application" },
-        causalSubtreeSpans: ["S_EVAL_PARENT"],
-      });
-      const event = createSpanEvent({
-        spanId: "S_EVAL_CHILD",
-        parentSpanId: "S_EVAL_PARENT",
-        attributes: [],
-      });
-
-      await reactor.handle(event, createContext(state));
-
-      expect(deps.evaluation).not.toHaveBeenCalled();
-    });
-
-    /** @scenario Fresh app-origin span on a trace that already has eval spans still dispatches */
-    it("dispatches when fresh app span lands on a trace with prior eval subtree", async () => {
-      const deps = createDeps();
-      const reactor = createEvaluationTriggerReactor(deps);
-      const state = createFoldState({
-        attributes: { "langwatch.origin": "application" },
-        causalSubtreeSpans: ["S_EVAL_OLD"],
-      });
-      const event = createSpanEvent({
-        spanId: "S_FRESH_APP",
-        parentSpanId: null,
-        attributes: [],
-      });
-
-      await reactor.handle(event, createContext(state));
-
-      expect(deps.evaluation).toHaveBeenCalledTimes(1);
-    });
-
-    /** @scenario LANGWATCH_DISABLE_CAUSALITY_LOOP_GUARD bypasses both checks */
-    it("env kill-switch bypasses both depth and parent-walk checks", async () => {
+    /** @scenario LANGWATCH_DISABLE_CAUSALITY_LOOP_GUARD bypasses depth check */
+    it("env kill-switch bypasses the depth check", async () => {
       process.env.LANGWATCH_DISABLE_CAUSALITY_LOOP_GUARD = "1";
       const deps = createDeps();
       const reactor = createEvaluationTriggerReactor(deps);
       const state = createFoldState({
         attributes: { "langwatch.origin": "application" },
-        causalSubtreeSpans: ["S1"],
       });
       const event = createSpanEvent({
         parentSpanId: "S1",
         attributes: [
-          { key: "langwatch.causality_depth", value: { intValue: 5 } },
+          { key: "langwatch.reserved.causality_depth", value: { intValue: 5 } },
         ],
       });
 

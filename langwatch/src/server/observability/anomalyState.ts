@@ -5,7 +5,7 @@ import { createLogger } from "../../utils/logger/server";
 const logger = createLogger("langwatch:observability:anomalyState");
 
 export type AnomalyTier = "surface" | "hard";
-export type AnomalyKind = "rate_breaker" | "fingerprint_loop";
+export type AnomalyKind = "rate_breaker";
 
 export interface Anomaly {
   tenantId: string;

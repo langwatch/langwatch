@@ -123,8 +123,16 @@ export class TenantRateTracker {
 /**
  * Extract the tenant prefix from an event-sourcing groupId (everything
  * before the first `/`). Returns null when the groupId has no slash.
- * Mirrors the convention used by the DISPATCH_LUA scripts in
- * groupQueue/scripts.ts where tenantId is also derived from the prefix.
+ *
+ * WARNING: this is convention, not enforced. Today every groupId
+ * producer happens to put the tenantId first, and DISPATCH_LUA also
+ * relies on this exact parse. A future cross-tenant groupId (or any
+ * group that doesn't follow the prefix rule) would silently land in
+ * the wrong bucket here — the right long-term fix is to document the
+ * "groupId MUST start with <tenantId>/ OR a global prefix" rule on the
+ * GroupQueue producer surface, then make this function fail loudly
+ * when violated. Tracked as a code smell to revisit when we touch
+ * groupId formatting next.
  */
 export function tenantIdFromGroupId(groupId: string): string | null {
   if (!groupId) return null;

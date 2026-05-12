@@ -144,17 +144,6 @@ export function applySpanToSummary({
 
   const containsAi = state.containsAi || AI_SPAN_TYPES.has(spanType);
 
-  // Causality-subtree membership (loop-prevention secondary defense).
-  // A span enters the set when its own depth attribute is >= 1 OR when
-  // its parent is already in the set. The reactor uses this to skip
-  // dispatching evaluations for spans inside an evaluator subtree even
-  // when the SpanProcessor on the emitting service missed an attr.
-  // See specs/monitors/online-evaluator-loop-prevention.feature.
-  const causalSubtreeSpans = updateCausalSubtree({
-    existing: state.causalSubtreeSpans,
-    span,
-  });
-
   const events = accumulateEvents({ state, span });
 
   const promptRollup = tracePromptAccumulationService.accumulate({ state, span });
@@ -182,52 +171,7 @@ export function applySpanToSummary({
     attributes,
     ...roleAccumulation,
     events,
-    causalSubtreeSpans,
   };
-}
-
-const CAUSALITY_DEPTH_ATTR = "langwatch.causality_depth";
-
-// Bound the persisted set so a runaway trace cannot blow up fold storage.
-// 50K spans per trace is already far beyond any healthy real workload —
-// past this point we drop new additions and rely on the inbound-attribute
-// check (primary defense) alone.
-const CAUSAL_SUBTREE_MAX = 50_000;
-
-function updateCausalSubtree({
-  existing,
-  span,
-}: {
-  existing: string[] | undefined;
-  span: NormalizedSpan;
-}): string[] | undefined {
-  const set = new Set(existing ?? []);
-
-  const directDepth = parseCausalityDepth(
-    span.spanAttributes[CAUSALITY_DEPTH_ATTR],
-  );
-  const parentInSet =
-    span.parentSpanId !== null && set.has(span.parentSpanId);
-
-  if (directDepth >= 1 || parentInSet) {
-    if (set.size < CAUSAL_SUBTREE_MAX) {
-      set.add(span.spanId);
-    }
-  }
-
-  if (set.size === 0) return existing;
-  return Array.from(set);
-}
-
-function parseCausalityDepth(raw: unknown): number {
-  if (raw === undefined || raw === null) return 0;
-  const n =
-    typeof raw === "number"
-      ? raw
-      : typeof raw === "string"
-        ? Number.parseInt(raw, 10)
-        : NaN;
-  return Number.isFinite(n) && n > 0 ? n : 0;
 }
 
 // ─── Fold projection class ──────────────────────────────────────────
@@ -313,7 +257,6 @@ export class TraceSummaryFoldProjection
       // occurredAt > 0 to decide first-span vs min-of-existing. Using Date.now()
       // here would break Math.min logic -- wall-clock time >> span startTimeUnixMs.
       occurredAt: 0,
-      causalSubtreeSpans: undefined,
     };
   }
 
