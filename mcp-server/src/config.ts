@@ -3,7 +3,7 @@ import { AsyncLocalStorage } from "node:async_hooks";
 export interface McpConfig {
   apiKey: string | undefined;
   endpoint: string;
-  projectId: string | undefined;
+  projectId?: string;
 }
 
 // ---------------------------------------------------------------------------
