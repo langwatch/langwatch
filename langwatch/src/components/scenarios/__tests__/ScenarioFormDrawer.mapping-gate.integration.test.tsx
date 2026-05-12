@@ -311,6 +311,55 @@ describe("<ScenarioFormDrawer /> mapping gate", () => {
         );
       });
     });
+
+    /** @scenario Toast surfaces the missing scenario input field in its description */
+    it("describes which scenario input field is unmapped", async () => {
+      const user = userEvent.setup();
+      renderWithTarget({ type: "workflow", id: "workflow-agent-1" });
+
+      await user.click(screen.getByTestId("save-and-run-button"));
+
+      await waitFor(() => {
+        expect(mockToasterCreate).toHaveBeenCalledWith(
+          expect.objectContaining({
+            description: expect.stringMatching(/input.*messages|messages.*input/i),
+          }),
+        );
+      });
+    });
+
+    /** @scenario Toast exposes an "Open agent editor" action that reopens the editor drawer */
+    it("exposes an Open agent editor action that opens the workflow editor for the target", async () => {
+      const user = userEvent.setup();
+      renderWithTarget({ type: "workflow", id: "workflow-agent-1" });
+
+      await user.click(screen.getByTestId("save-and-run-button"));
+
+      await waitFor(() => {
+        expect(mockToasterCreate).toHaveBeenCalledWith(
+          expect.objectContaining({
+            action: expect.objectContaining({
+              label: "Open agent editor",
+              onClick: expect.any(Function),
+            }),
+          }),
+        );
+      });
+
+      const toastArg = mockToasterCreate.mock.calls.find(
+        (call) =>
+          (call[0] as { action?: { label?: string } })?.action?.label ===
+          "Open agent editor",
+      )?.[0] as { action: { onClick: () => void } };
+      // Auto-open already fired once during the click; clear and re-invoke via
+      // the action handler to prove the action itself is wired independently.
+      mocks.mockOpenDrawer.mockClear();
+      toastArg.action.onClick();
+      expect(mocks.mockOpenDrawer).toHaveBeenCalledWith(
+        "agentWorkflowEditor",
+        { urlParams: { agentId: "workflow-agent-1" } },
+      );
+    });
   });
 
   describe("when target is a workflow agent with no input-field mapping", () => {

@@ -250,16 +250,22 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
             // covers output validation. Share the input half of the rule with
             // the editor drawer via hasScenarioInputMapping.
             if (!hasScenarioInputMapping(mappings)) {
+              const openAgentEditor = () =>
+                openDrawer("agentWorkflowEditor", {
+                  urlParams: { agentId: target.id },
+                });
               toaster.create({
                 title: "Configure scenario mappings",
                 description:
-                  "Set up how this workflow agent maps scenario inputs and outputs before running.",
+                  "No mapping wires a source to the scenario \"input\" or \"messages\" field. Open the agent editor to set this up before running.",
                 type: "warning",
                 meta: { closable: true },
+                action: {
+                  label: "Open agent editor",
+                  onClick: openAgentEditor,
+                },
               });
-              openDrawer("agentWorkflowEditor", {
-                urlParams: { agentId: target.id },
-              });
+              openAgentEditor();
               return;
             }
           }
