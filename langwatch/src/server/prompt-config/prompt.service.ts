@@ -14,7 +14,11 @@ import {
   type promptingTechniqueSchema,
 } from "~/prompts/schemas/field-schemas";
 import { SchemaVersion } from "./enums";
-import { NotFoundError, SystemPromptConflictError } from "./errors";
+import {
+  NotFoundError,
+  SystemPromptConflictError,
+  SystemPromptRequiredError,
+} from "./errors";
 import { PromptVersionService } from "./prompt-version.service";
 import { TagValidationError } from "./repositories/llm-config-tag.repository";
 import { normalizeReasoningFromProviderFields } from "./reasoningBoundary";
@@ -444,9 +448,7 @@ export class PromptService {
       | undefined;
 
     if (!normalizedCreate.prompt && !params.prompt) {
-      throw new SystemPromptConflictError(
-        "A system prompt is required when creating a prompt",
-      );
+      throw new SystemPromptRequiredError();
     }
 
     const config = await this.repository.createConfigWithInitialVersion({
