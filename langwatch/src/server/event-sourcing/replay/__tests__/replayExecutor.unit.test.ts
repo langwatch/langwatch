@@ -430,6 +430,31 @@ describe("MapAccumulator", () => {
     });
   });
 
+  describe("when bulkAppend is used across multiple aggregates", () => {
+    it("groups records by aggregateId so each call carries the originating context", async () => {
+      const { projection, bulkAppendSpy } = createTestMapProjection();
+      const acc = new MapAccumulator(projection);
+
+      acc.apply(makeEvent({ aggregateId: "agg-A", data: { value: 1 } }));
+      acc.apply(makeEvent({ aggregateId: "agg-B", data: { value: 2 } }));
+      acc.apply(makeEvent({ aggregateId: "agg-A", data: { value: 3 } }));
+
+      await acc.flush();
+
+      expect(bulkAppendSpy).toHaveBeenCalledTimes(2);
+
+      const byAggregate = new Map<string, Array<{ doubled: number }>>();
+      for (const [records, context] of bulkAppendSpy.mock.calls as Array<
+        [Array<{ doubled: number }>, { aggregateId: string }]
+      >) {
+        expect(context.aggregateId).not.toBe("");
+        byAggregate.set(context.aggregateId, records);
+      }
+      expect(byAggregate.get("agg-A")).toEqual([{ doubled: 2 }, { doubled: 6 }]);
+      expect(byAggregate.get("agg-B")).toEqual([{ doubled: 4 }]);
+    });
+  });
+
   describe("when store has no bulkAppend", () => {
     it("falls back to sequential append calls preserving per-event context", async () => {
       const appendSpy = vi.fn().mockResolvedValue(undefined);

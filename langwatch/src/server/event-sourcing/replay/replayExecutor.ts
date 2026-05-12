@@ -162,17 +162,29 @@ export class MapAccumulator {
 
     const store = this.projection.store;
 
-    for (const [tenantId, entries] of this.byTenant) {
+    for (const [_tenantId, entries] of this.byTenant) {
       if (store.bulkAppend) {
-        // bulkAppend takes one context per chunk — use a tenant-scoped one;
-        // individual records carry their aggregateId on the record itself.
-        const bulkContext: ProjectionStoreContext = {
-          aggregateId: "",
-          tenantId: tenantId as unknown as TenantId,
-        };
-        for (let i = 0; i < entries.length; i += writeBatchSize) {
-          const chunk = entries.slice(i, i + writeBatchSize).map((e) => e.record);
-          await store.bulkAppend(chunk, bulkContext);
+        // Group by aggregateId so each `bulkAppend` call gets a real
+        // per-aggregate context. Stores that key off `context.aggregateId`
+        // (rather than reading it from the record) then see the same value
+        // they would on the non-optimized `append()` path.
+        const byAggregate = new Map<string, BufferedMapRecord[]>();
+        for (const entry of entries) {
+          const key = entry.context.aggregateId;
+          let list = byAggregate.get(key);
+          if (!list) {
+            list = [];
+            byAggregate.set(key, list);
+          }
+          list.push(entry);
+        }
+
+        for (const aggregateEntries of byAggregate.values()) {
+          const groupContext = aggregateEntries[0]!.context;
+          for (let i = 0; i < aggregateEntries.length; i += writeBatchSize) {
+            const chunk = aggregateEntries.slice(i, i + writeBatchSize).map((e) => e.record);
+            await store.bulkAppend(chunk, groupContext);
+          }
         }
       } else {
         // Sequential fallback: pass each record's original per-event context
