@@ -14,13 +14,15 @@ import { AddDatasetRecordDrawerV2 } from "./AddDatasetRecordDrawer";
 import { AddOrEditAnnotationScoreDrawer } from "./AddOrEditAnnotationScoreDrawer";
 import { AddOrEditDatasetDrawer } from "./AddOrEditDatasetDrawer";
 import { AutomationDrawer } from "./AddAutomationDrawer";
-import { AgentCodeEditorDrawer } from "./agents/AgentCodeEditorDrawer";
 import { AgentHistoryDrawer } from "./agents/AgentHistoryDrawer";
-import { AgentHttpEditorDrawer } from "./agents/AgentHttpEditorDrawer";
 import { AgentListDrawer } from "./agents/AgentListDrawer";
 import { AgentTypeSelectorDrawer } from "./agents/AgentTypeSelectorDrawer";
 import { AgentWorkflowEditorDrawer } from "./agents/AgentWorkflowEditorDrawer";
-import { WorkflowSelectorDrawer } from "./agents/WorkflowSelectorDrawer";
+import {
+  AgentCodeEditorDrawerFromUrl,
+  AgentHttpEditorDrawerFromUrl,
+  WorkflowSelectorDrawerFromUrl,
+} from "./agents/drawerFromUrl";
 import { AlertDrawer } from "./analytics/AlertDrawer";
 import { DashboardNameDrawer } from "./analytics/DashboardNameDrawer";
 import { BatchEvaluationDrawer } from "./BatchEvaluationDrawer";
@@ -87,10 +89,10 @@ export const drawers = {
   agentList: AgentListDrawer,
   agentHistory: AgentHistoryDrawer,
   agentTypeSelector: AgentTypeSelectorDrawer,
-  agentCodeEditor: AgentCodeEditorDrawer,
-  agentHttpEditor: AgentHttpEditorDrawer,
+  agentCodeEditor: AgentCodeEditorDrawerFromUrl,
+  agentHttpEditor: AgentHttpEditorDrawerFromUrl,
   agentWorkflowEditor: AgentWorkflowEditorDrawer,
-  workflowSelector: WorkflowSelectorDrawer,
+  workflowSelector: WorkflowSelectorDrawerFromUrl,
   evaluatorHistory: EvaluatorHistoryDrawer,
   evaluatorList: EvaluatorListDrawer,
   evaluatorCategorySelector: EvaluatorCategorySelectorDrawer,
