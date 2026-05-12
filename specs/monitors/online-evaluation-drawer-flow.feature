@@ -4,6 +4,31 @@ Feature: Online Evaluation Drawer Complete Flow
   I want to complete the entire online evaluation creation flow
   So that I can set up monitoring for my traces
 
+  # All 13 @unimplemented scenarios remain unbound — per AUDIT_MANIFEST.md most
+  # are DUPLICATE / UPDATE / KEEP-end-to-end classifications:
+  # - "Create trace-level online evaluation with auto-mappings": UPDATE per manifest
+  #   (tests show ALL trace evaluators auto-open editor; "no editor opens" path obsolete).
+  # - "Create with pending mappings that need configuration": KEEP per manifest
+  #   (end-to-end flow not covered by single it() block).
+  # - "User closes editor without completing mappings": KEEP per manifest
+  #   (warning banner + click-to-reopen flow).
+  # - "Remove evaluator shows pending state": DUPLICATE of online-evaluation-drawer
+  #   "Clear selected evaluator".
+  # - "Switch from trace to thread level": UPDATE per manifest
+  #   (editor does NOT auto-open on level switch per NewIssues:1020).
+  # - "Switch back from thread to trace level": UPDATE per manifest
+  #   (level-switch clears+re-infers mappings; "may open editor" wording is wrong).
+  # - "Edit existing online evaluation": DUPLICATE of EditSave Edit mode block (367-444).
+  # - "Evaluator has no required fields": UPDATE per manifest
+  #   (editor opens for ALL trace evaluators regardless; spec premise is false).
+  # - "Create new evaluator on the spot": DUPLICATE of NewIssues:512.
+  # - "Cancel online evaluation creation": DUPLICATE of EditSave Cancel + unsaved-changes block.
+  # - "Drawer preserves state during sub-drawer navigation": DUPLICATE of EditSave:633.
+  # - "Configure all options before save": UPDATE per manifest
+  #   (preconditions UI exists but no single test asserts all 4 fields persist together).
+  # - "Validation errors prevent save": DUPLICATE of OnlineEvaluationDrawer Validation describe.
+  # Aspirational pending DELETE/UPDATE rewrites + KEEP test additions tracked in PR #3458.
+
   Background:
     Given I am logged in to a project
     And I have evaluators available

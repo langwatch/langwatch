@@ -4,6 +4,24 @@ Feature: New Evaluation Menu
   I want a dropdown menu with evaluation options
   So that I can choose between experiments, online evaluations, and guardrails
 
+  # All 9 @unimplemented scenarios remain unbound — per AUDIT_MANIFEST.md
+  # all are UPDATE / DELETE / DUPLICATE classifications:
+  # - "Display dropdown menu with three options": UPDATE per manifest (menu now has 4
+  #   items including "Evaluate via SDK"; labels are "Create Experiment / Add Online
+  #   Evaluation / Setup Guardrail" not "New X").
+  # - "New Experiment opens dialog and creates experiment": DELETE per manifest
+  #   (no dialog exists; handleCreateExperiment auto-generates via generateHumanReadableId).
+  # - "Create experiment with name": UPDATE per manifest (no name input; redirects to
+  #   /experiments/workbench/[slug]).
+  # - "Create experiment with empty name": DELETE per manifest (no name dialog).
+  # - "Cancel experiment creation": DELETE per manifest (no dialog to cancel).
+  # - "New Online Evaluation opens drawer": DUPLICATE of online-evaluation-drawer "Open drawer from menu".
+  # - "New Guardrail opens evaluator list": DUPLICATE of guardrails-drawer "Open evaluator list".
+  # - "Menu closes on outside click": DELETE per manifest (Chakra Menu.Root primitive,
+  #   not custom code).
+  # - "Menu closes after option selection": DELETE per manifest (Chakra Menu.Item primitive).
+  # Aspirational pending DELETE/UPDATE rewrites tracked in PR #3458.
+
   Background:
     Given I am logged in to a project
     And I am on the evaluations page
