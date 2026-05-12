@@ -19,6 +19,7 @@ import { handleSystemPromptDomainErrors } from "../handle-system-prompt-domain-e
 
 describe("handleSystemPromptDomainErrors", () => {
   describe("when given a SystemPromptRequiredError (Issue #3196)", () => {
+    /** @scenario "Toast on server-side validation failure shows a friendly message" */
     it("throws an HTTPException(400) with the friendly user-facing message", () => {
       const domainError = new SystemPromptRequiredError();
       try {
