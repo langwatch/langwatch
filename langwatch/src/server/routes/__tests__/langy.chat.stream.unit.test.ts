@@ -28,6 +28,8 @@ const mockTouchConversation = vi.fn();
 const mockGetProjectMemory = vi.fn();
 const mockGetUserPrefs = vi.fn();
 const mockAppendMessage = vi.fn();
+const mockFeatureFlagIsEnabled = vi.fn();
+const mockStreamLangyMastraResponse = vi.fn();
 
 vi.mock("~/server/auth", () => ({
   getServerAuthSession: (...args: unknown[]) =>
@@ -98,6 +100,17 @@ vi.mock("~/server/observability/langy-tracer", async () => {
     },
   };
 });
+
+vi.mock("~/server/featureFlag", () => ({
+  featureFlagService: {
+    isEnabled: (...args: unknown[]) => mockFeatureFlagIsEnabled(...args),
+  },
+}));
+
+vi.mock("~/server/services/langy/mastra-agent", () => ({
+  streamLangyMastraResponse: (...args: unknown[]) =>
+    mockStreamLangyMastraResponse(...args),
+}));
 
 vi.mock("~/server/services/langy", () => ({
   LangyConversationService: {
@@ -253,6 +266,8 @@ beforeEach(() => {
   mockCheckRateLimit.mockResolvedValue({ allowed: true });
   mockGetProjectMemory.mockResolvedValue(null);
   mockGetUserPrefs.mockResolvedValue({ mode: "non-expert" });
+  mockFeatureFlagIsEnabled.mockResolvedValue(false);
+  mockStreamLangyMastraResponse.mockReset();
   mockEvaluatorGetAllWithFields.mockResolvedValue([]);
   mockEvaluatorGetBySlug.mockResolvedValue(null);
   mockPrismaExperimentFindFirst.mockResolvedValue(null);
@@ -786,6 +801,107 @@ describe("POST /api/langy/chat tool-call cap — binds langy-baseline.feature §
       // And it must have actually iterated more than once — otherwise we'd
       // just be testing that streamText returns after a single call.
       expect(calls.count).toBeGreaterThan(1);
+    });
+  });
+});
+
+describe("POST /api/langy/chat — Mastra path (PR-4.3 spike behind feature flag)", () => {
+  describe("given the release_ui_langy_mastra_enabled flag is OFF", () => {
+    beforeEach(() => {
+      mockFeatureFlagIsEnabled.mockResolvedValue(false);
+      mockGetVercelAIModel.mockResolvedValue(
+        makeStubModel(["legacy path"]),
+      );
+    });
+
+    it("does not invoke the Mastra agent", async () => {
+      const res = await app.request("/api/langy/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          projectId: "proj_demo",
+          messages: [
+            {
+              id: "m1",
+              role: "user",
+              parts: [{ type: "text", text: "hello" }],
+            },
+          ],
+        }),
+      });
+      await readBody(res);
+      expect(mockStreamLangyMastraResponse).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given the release_ui_langy_mastra_enabled flag is ON", () => {
+    beforeEach(() => {
+      mockFeatureFlagIsEnabled.mockResolvedValue(true);
+      mockGetVercelAIModel.mockResolvedValue(makeStubModel(["unused"]));
+      mockStreamLangyMastraResponse.mockResolvedValue(
+        new Response("mastra-streamed", { status: 200 }),
+      );
+    });
+
+    it("routes the request through the Mastra agent instead of streamText", async () => {
+      const res = await app.request("/api/langy/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          projectId: "proj_demo",
+          messages: [
+            {
+              id: "m1",
+              role: "user",
+              parts: [{ type: "text", text: "hello" }],
+            },
+          ],
+        }),
+      });
+      expect(res.status).toBe(200);
+      expect(mockStreamLangyMastraResponse).toHaveBeenCalledTimes(1);
+    });
+
+    it("forwards projectId, model, systemPrompt, and tool-cap to the Mastra agent", async () => {
+      await app.request("/api/langy/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          projectId: "proj_demo",
+          messages: [
+            {
+              id: "m1",
+              role: "user",
+              parts: [{ type: "text", text: "hello" }],
+            },
+          ],
+        }),
+      });
+      expect(mockStreamLangyMastraResponse).toHaveBeenCalledWith(
+        expect.objectContaining({
+          ctx: expect.objectContaining({ projectId: "proj_demo" }),
+          systemPrompt: expect.stringContaining("Mode:"),
+          maxSteps: 5, // LANGY_TOOL_CALLS_PER_MESSAGE pinned at top of file
+        }),
+      );
+    });
+
+    it("preserves the x-langy-conversation-id header on the Mastra response", async () => {
+      const res = await app.request("/api/langy/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          projectId: "proj_demo",
+          messages: [
+            {
+              id: "m1",
+              role: "user",
+              parts: [{ type: "text", text: "hello" }],
+            },
+          ],
+        }),
+      });
+      expect(res.headers.get("x-langy-conversation-id")).toBe("conv_test_abc");
     });
   });
 });

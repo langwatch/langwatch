@@ -39,6 +39,8 @@ import {
 } from "~/server/services/langy/prompts";
 import { ConversationToolIdSet } from "~/server/services/langy/toolIdValidator";
 import { buildLangyTools } from "~/server/services/langy/tools";
+import { streamLangyMastraResponse } from "~/server/services/langy/mastra-agent";
+import { featureFlagService } from "~/server/featureFlag";
 import {
   LANGY_TOOL_CALLS_PER_MESSAGE,
   checkLangyMessageRateLimit,
@@ -261,6 +263,44 @@ app.post("/langy/chat", async (c) => {
     mode: prefs.mode as LangyMode,
   });
   const modelMessages = await convertToModelMessages(messages);
+
+  // Phase 4 spike (PR-4.3): route a small slice of traffic through Mastra.
+  // Default-off; flip via PostHog or FEATURE_FLAG_FORCE_ENABLE. The legacy
+  // streamText path below stays the production default until PR-4.5 cutover.
+  const useMastra = await featureFlagService.isEnabled(
+    "release_ui_langy_mastra_enabled",
+    session.user.id,
+    false,
+    { projectId },
+  );
+  if (useMastra) {
+    logger.info(
+      { projectId, userId: session.user.id, conversationId: conversation.id },
+      "langy.chat: serving via Mastra path",
+    );
+    const mastraResponse = await streamLangyMastraResponse({
+      ctx: {
+        projectId,
+        experimentSlug,
+        evaluatorService,
+        promptService,
+        seenIds,
+        prisma,
+      },
+      model,
+      systemPrompt,
+      messages: modelMessages,
+      maxSteps: LANGY_TOOL_CALLS_PER_MESSAGE,
+      // Assistant-message persistence + telemetry stay on the legacy path
+      // until PR-4.4 (memory adapter). The spike's job is SSE parity.
+    });
+    const headers = new Headers(mastraResponse.headers);
+    headers.set("x-langy-conversation-id", conversation.id);
+    return new Response(mastraResponse.body, {
+      status: mastraResponse.status,
+      headers,
+    });
+  }
 
   const result = streamText({
     model,
