@@ -12,6 +12,7 @@ import {
   type AuthMiddlewareVariables,
   type OrganizationMiddlewareVariables,
   organizationMiddleware,
+  requirePermission,
   resourceLimitMiddleware,
 } from "../../middleware";
 import {
@@ -50,6 +51,7 @@ app.use("/*", evaluatorServiceMiddleware);
 // Get all evaluators
 app.get(
   "/",
+  requirePermission("evaluations:view"),
   describeRoute({
     description: "Get all evaluators for a project",
     responses: {
@@ -87,6 +89,7 @@ app.get(
 // Get evaluator by ID or slug
 app.get(
   "/:idOrSlug{.+}",
+  requirePermission("evaluations:view"),
   describeRoute({
     description: "Get a specific evaluator by ID or slug",
     responses: {
@@ -150,6 +153,7 @@ app.get(
 // Create evaluator
 app.post(
   "/",
+  requirePermission("evaluations:manage"),
   resourceLimitMiddleware("evaluators"),
   describeRoute({
     description: "Create a new evaluator",
@@ -206,6 +210,7 @@ app.post(
 // Update evaluator
 app.put(
   "/:id",
+  requirePermission("evaluations:manage"),
   describeRoute({
     description: "Update an existing evaluator",
     responses: {
@@ -308,6 +313,7 @@ app.put(
 // Delete (archive) evaluator
 app.delete(
   "/:id",
+  requirePermission("evaluations:manage"),
   describeRoute({
     description: "Archive (soft-delete) an evaluator",
     responses: {

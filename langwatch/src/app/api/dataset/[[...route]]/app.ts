@@ -9,7 +9,7 @@ import { datasetColumnTypeSchema } from "../../../../server/datasets/types";
 import { patchZodOpenapi } from "../../../../utils/extend-zod-openapi";
 import {
   type AuthMiddlewareVariables,
-  authMiddleware,
+  authMiddleware, requirePermission,
   resourceLimitMiddleware,
 } from "../../middleware";
 import {
@@ -117,6 +117,7 @@ export const app = new Hono<{ Variables: Variables }>()
   // ── List Datasets (paginated) ──────────────────────────────────
   .get(
     "/",
+    requirePermission("datasets:view"),
     describeRoute({
       description: "List all non-archived datasets for the project (paginated)",
     }),
@@ -148,9 +149,11 @@ export const app = new Hono<{ Variables: Variables }>()
   // ── Create Dataset ─────────────────────────────────────────────
   .post(
     "/",
+    requirePermission("datasets:manage"),
     describeRoute({
       description: "Create a new dataset",
     }),
+    requirePermission("datasets:manage"),
     resourceLimitMiddleware("datasets"),
     zValidator("json", createDatasetSchema, validationHook),
     async (c) => {
@@ -200,9 +203,11 @@ export const app = new Hono<{ Variables: Variables }>()
   // so Hono doesn't match "upload" as a slugOrId parameter.
   .post(
     "/upload",
+    requirePermission("datasets:manage"),
     describeRoute({
       description: "Create a new dataset from an uploaded file (CSV, JSON, JSONL)",
     }),
+    requirePermission("datasets:manage"),
     resourceLimitMiddleware("datasets"),
     async (c) => {
       const project = c.get("project");
@@ -260,6 +265,7 @@ export const app = new Hono<{ Variables: Variables }>()
   // ── Upload File to Existing Dataset ─────────────────────────────
   .post(
     "/:slugOrId/upload",
+    requirePermission("datasets:manage"),
     describeRoute({
       description: "Upload a file (CSV, JSON, JSONL) to an existing dataset",
     }),
@@ -312,6 +318,7 @@ export const app = new Hono<{ Variables: Variables }>()
   // ── Batch Create Records ──────────────────────────────────────
   .post(
     "/:slugOrId/records",
+    requirePermission("datasets:manage"),
     describeRoute({
       description: "Create records in a dataset in batch",
     }),
@@ -348,6 +355,7 @@ export const app = new Hono<{ Variables: Variables }>()
   // ── Legacy: Add Entries ────────────────────────────────────────
   .post(
     "/:slug/entries",
+    requirePermission("datasets:manage"),
     describeRoute({
       description: "Add entries to a dataset",
     }),
@@ -420,6 +428,7 @@ export const app = new Hono<{ Variables: Variables }>()
   // ── Get Single Dataset ─────────────────────────────────────────
   .get(
     "/:slugOrId",
+    requirePermission("datasets:view"),
     describeRoute({
       description: "Get a dataset by its slug or id.",
       responses: {
@@ -479,6 +488,7 @@ export const app = new Hono<{ Variables: Variables }>()
   // ── Update Dataset ─────────────────────────────────────────────
   .patch(
     "/:slugOrId",
+    requirePermission("datasets:manage"),
     describeRoute({
       description: "Update a dataset by its slug or id",
     }),
@@ -542,6 +552,7 @@ export const app = new Hono<{ Variables: Variables }>()
   // ── Delete (Archive) Dataset ───────────────────────────────────
   .delete(
     "/:slugOrId",
+    requirePermission("datasets:manage"),
     describeRoute({
       description: "Archive a dataset (soft-delete)",
     }),
@@ -565,6 +576,7 @@ export const app = new Hono<{ Variables: Variables }>()
   // ── List Records (paginated) ───────────────────────────────────
   .get(
     "/:slugOrId/records",
+    requirePermission("datasets:view"),
     describeRoute({
       description: "List records for a dataset (paginated)",
     }),
@@ -592,6 +604,7 @@ export const app = new Hono<{ Variables: Variables }>()
   // ── Update / Upsert Record ─────────────────────────────────────
   .patch(
     "/:slugOrId/records/:recordId",
+    requirePermission("datasets:manage"),
     describeRoute({
       description: "Update or create a record in a dataset",
     }),
@@ -620,6 +633,7 @@ export const app = new Hono<{ Variables: Variables }>()
   // ── Batch Delete Records ───────────────────────────────────────
   .delete(
     "/:slugOrId/records",
+    requirePermission("datasets:manage"),
     describeRoute({
       description: "Delete records from a dataset by IDs",
     }),

@@ -10,6 +10,7 @@ import { ScenarioService } from "~/server/scenarios/scenario.service";
 import { createLogger } from "~/utils/logger/server";
 import {
   type AuthMiddlewareVariables,
+  requirePermission,
   resourceLimitMiddleware,
 } from "../../middleware";
 import { baseResponses } from "../../shared/base-responses";
@@ -61,6 +62,7 @@ function toScenarioResponse(scenario: Scenario) {
 
 app.get(
   "/",
+  requirePermission("scenarios:view"),
   describeRoute({
     description: "Get all scenarios for a project",
     responses: {
@@ -94,6 +96,7 @@ app.get(
 
 app.get(
   "/:id",
+  requirePermission("scenarios:view"),
   describeRoute({
     description: "Get a specific scenario by ID",
     responses: {
@@ -138,6 +141,7 @@ app.get(
 
 app.post(
   "/",
+  requirePermission("scenarios:manage"),
   resourceLimitMiddleware("scenarios"),
   describeRoute({
     description: "Create a new scenario",
@@ -181,6 +185,7 @@ app.post(
 
 app.put(
   "/:id",
+  requirePermission("scenarios:manage"),
   describeRoute({
     description: "Update an existing scenario",
     responses: {
@@ -237,6 +242,7 @@ app.put(
 
 app.delete(
   "/:id",
+  requirePermission("scenarios:manage"),
   describeRoute({
     description: "Archive (soft-delete) a scenario",
     responses: {
