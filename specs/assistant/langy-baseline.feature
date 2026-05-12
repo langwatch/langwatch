@@ -132,6 +132,24 @@ Feature: Langy in-product AI assistant — baseline (v1)
     Then my mode in "other" is whatever I set there, independent of "demo"
 
   # ============================================================================
+  # Rate limiting (PR-3.2)
+  # ============================================================================
+
+  Scenario: Burst of messages is throttled per user per project
+    Given I have sent the per-minute message limit to Langy in project "demo"
+    When I send one more message
+    Then the request is rejected with a 429
+    And the response tells me how many seconds until I can retry
+    And the throttle does not affect other users in the same project
+    And the throttle does not affect me in a different project
+
+  Scenario: Runaway agent loops are capped per message
+    Given I have sent one message to Langy
+    When the agent attempts to chain tool calls past the configured cap
+    Then the run halts at the cap
+    And Langy returns its best partial answer
+
+  # ============================================================================
   # Read-only boundary (v1)
   # ============================================================================
 

@@ -137,6 +137,23 @@ describe("POST /api/langy/chat guards — binds langy-baseline.feature § permis
         });
         expect(res.headers.get("Retry-After")).toBe("30");
       });
+
+      it("returns a structured rate_limited error envelope", async () => {
+        const res = await postChat({
+          messages: [],
+          projectId: "proj_demo",
+        });
+        const body = (await res.json()) as {
+          error: {
+            code: string;
+            message: string;
+            retryAfterSeconds?: number;
+          };
+        };
+        expect(body.error.code).toBe("rate_limited");
+        expect(body.error.retryAfterSeconds).toBe(30);
+        expect(body.error.message).toMatch(/slow down/i);
+      });
     });
   });
 });

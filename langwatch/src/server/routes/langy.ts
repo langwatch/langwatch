@@ -192,8 +192,11 @@ app.post("/langy/chat", async (c) => {
   if (!rl.allowed) {
     return c.json(
       {
-        error: "Too many messages. Please slow down.",
-        retryAfterSeconds: rl.retryAfterSeconds,
+        error: {
+          code: "rate_limited" as const,
+          message: "Too many messages. Please slow down.",
+          retryAfterSeconds: rl.retryAfterSeconds,
+        },
       },
       {
         status: 429,
