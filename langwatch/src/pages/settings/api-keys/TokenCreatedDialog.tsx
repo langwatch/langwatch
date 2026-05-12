@@ -166,30 +166,24 @@ export function TokenCreatedDialog({
         if (!open) onClose();
       }}
     >
-      <Dialog.Content>
+      <Dialog.Content bg="bg">
         <Dialog.Header>
           <Dialog.Title>Token Created</Dialog.Title>
         </Dialog.Header>
         <Dialog.CloseTrigger />
         <Dialog.Body paddingBottom={6}>
           <VStack gap={6} align="stretch">
-            <Alert.Root status="warning">
-              <Alert.Indicator />
-              <Alert.Title>
-                Copy this token now. You won&apos;t be able to see it again.
-              </Alert.Title>
-            </Alert.Root>
-
-            {/* ── Section 1: Code Assistants ── */}
+            {/* ── Section 1: Code Implementation (token visible first) ── */}
             <VStack gap={3} align="stretch">
               <HStack gap={4} align="start">
                 <VStack gap={2} align="start" flex={1}>
                   <Text fontWeight="700" fontSize="sm">
-                    Use with Code Assistants
+                    Use in Code
                   </Text>
                   <HStack gap={1} px={1.5} py={1.5} borderRadius="xl" border="1px solid" borderColor="border.subtle" bg="bg.panel/70" boxShadow="sm" width="fit-content">
-                    <TabButton label="Claude Code" active={assistantTab === "claude-code"} onClick={() => setAssistantTab("claude-code")} />
-                    <TabButton label="Codex" active={assistantTab === "codex"} onClick={() => setAssistantTab("codex")} />
+                <TabButton label=".env" active={codeTab === "env"} onClick={() => setCodeTab("env")} />
+                <TabButton label="Bearer" active={codeTab === "bearer"} onClick={() => setCodeTab("bearer")} />
+                <TabButton label="Basic Auth" active={codeTab === "basic"} onClick={() => setCodeTab("basic")} />
                   </HStack>
                 </VStack>
                 {orgProjects.length > 1 && (
@@ -219,6 +213,91 @@ export function TokenCreatedDialog({
                     </Select.Root>
                   </VStack>
                 )}
+              </HStack>
+
+              {codeTab === "env" && newToken && (
+                <CodeBlock
+                  label=".env"
+                  defaultRevealed
+                  display={formatEnvLines([
+                    { key: "LANGWATCH_API_KEY", value: newToken, mask: true },
+                    { key: "LANGWATCH_PROJECT_ID", value: activeProjectId ?? "<your-project-id>" },
+                    { key: "LANGWATCH_ENDPOINT", value: endpoint },
+                  ])}
+                  revealedDisplay={formatEnvLines([
+                    { key: "LANGWATCH_API_KEY", value: newToken },
+                    { key: "LANGWATCH_PROJECT_ID", value: activeProjectId ?? "<your-project-id>" },
+                    { key: "LANGWATCH_ENDPOINT", value: endpoint },
+                  ])}
+                  copyValue={formatEnvLines([
+                    { key: "LANGWATCH_API_KEY", value: newToken },
+                    { key: "LANGWATCH_PROJECT_ID", value: activeProjectId ?? "<your-project-id>" },
+                    { key: "LANGWATCH_ENDPOINT", value: endpoint },
+                  ])}
+                  copyToastTitle=".env copied to clipboard"
+                  ariaLabel="Copy .env contents"
+                />
+              )}
+
+              {codeTab === "bearer" && (
+                <VStack gap={1} align="stretch">
+                  <Text fontSize="xs" color="fg.muted">
+                    Use the <code>Authorization</code> header plus{" "}
+                    <code>X-Project-Id</code>:
+                  </Text>
+                  <CodeBlock
+                    label="http"
+                    display={`Authorization: Bearer ${newToken ? maskSecret(newToken) : "pat-lw-..."}\nX-Project-Id: ${activeProjectId ?? "<your-project-id>"}`}
+                    revealedDisplay={`Authorization: Bearer ${newToken ?? ""}\nX-Project-Id: ${activeProjectId ?? "<your-project-id>"}`}
+                    copyValue={`Authorization: Bearer ${newToken ?? ""}\nX-Project-Id: ${activeProjectId ?? "<your-project-id>"}`}
+                    copyToastTitle="Bearer headers copied"
+                    ariaLabel="Copy Bearer headers"
+                  />
+                </VStack>
+              )}
+
+              {codeTab === "basic" && (
+                <VStack gap={1} align="stretch">
+                  <Text fontSize="xs" color="fg.muted">
+                    Encode the project ID and token as{" "}
+                    <code>base64(projectId:token)</code>:
+                  </Text>
+                  <CodeBlock
+                    label="http"
+                    display={`Authorization: Basic base64(${activeProjectId ?? "<your-project-id>"}:pat-lw-...)`}
+                    revealedDisplay={
+                      newToken && activeProjectId
+                        ? `Authorization: Basic ${btoa(`${activeProjectId}:${newToken}`)}`
+                        : ""
+                    }
+                    copyValue={
+                      newToken && activeProjectId
+                        ? `Authorization: Basic ${btoa(`${activeProjectId}:${newToken}`)}`
+                        : ""
+                    }
+                    copyToastTitle="Basic Auth header copied"
+                    ariaLabel="Copy Basic Auth header"
+                  />
+                </VStack>
+              )}
+            </VStack>
+
+            <Alert.Root status="warning" variant="subtle" opacity={0.8}>
+              <Alert.Indicator />
+              <Alert.Title fontSize="xs">
+                Copy this token now. You won&apos;t be able to see it again.
+              </Alert.Title>
+            </Alert.Root>
+
+            {/* ── Section 2: Code Assistants ── */}
+            <VStack gap={3} align="stretch">
+              <Text fontWeight="700" fontSize="sm">
+                Use with Code Assistants
+              </Text>
+
+              <HStack gap={1} px={1.5} py={1.5} borderRadius="xl" border="1px solid" borderColor="border.subtle" bg="bg.panel/70" boxShadow="sm" width="fit-content">
+                <TabButton label="Claude Code" active={assistantTab === "claude-code"} onClick={() => setAssistantTab("claude-code")} />
+                <TabButton label="Codex" active={assistantTab === "codex"} onClick={() => setAssistantTab("codex")} />
               </HStack>
 
               {/* Quick setup command */}
@@ -308,84 +387,6 @@ export function TokenCreatedDialog({
               )}
             </VStack>
 
-            {/* ── Section 2: Code Implementation ── */}
-            <VStack gap={3} align="stretch">
-              <Text fontWeight="700" fontSize="sm">
-                Use in Code
-              </Text>
-
-              <HStack gap={1} px={1.5} py={1.5} borderRadius="xl" border="1px solid" borderColor="border.subtle" bg="bg.panel/70" boxShadow="sm" width="fit-content">
-                <TabButton label=".env" active={codeTab === "env"} onClick={() => setCodeTab("env")} />
-                <TabButton label="Bearer" active={codeTab === "bearer"} onClick={() => setCodeTab("bearer")} />
-                <TabButton label="Basic Auth" active={codeTab === "basic"} onClick={() => setCodeTab("basic")} />
-              </HStack>
-
-              {codeTab === "env" && newToken && (
-                <CodeBlock
-                  label=".env"
-                  defaultRevealed
-                  display={formatEnvLines([
-                    { key: "LANGWATCH_API_KEY", value: newToken, mask: true },
-                    { key: "LANGWATCH_PROJECT_ID", value: activeProjectId ?? "<your-project-id>" },
-                    { key: "LANGWATCH_ENDPOINT", value: endpoint },
-                  ])}
-                  revealedDisplay={formatEnvLines([
-                    { key: "LANGWATCH_API_KEY", value: newToken },
-                    { key: "LANGWATCH_PROJECT_ID", value: activeProjectId ?? "<your-project-id>" },
-                    { key: "LANGWATCH_ENDPOINT", value: endpoint },
-                  ])}
-                  copyValue={formatEnvLines([
-                    { key: "LANGWATCH_API_KEY", value: newToken },
-                    { key: "LANGWATCH_PROJECT_ID", value: activeProjectId ?? "<your-project-id>" },
-                    { key: "LANGWATCH_ENDPOINT", value: endpoint },
-                  ])}
-                  copyToastTitle=".env copied to clipboard"
-                  ariaLabel="Copy .env contents"
-                />
-              )}
-
-              {codeTab === "bearer" && (
-                <VStack gap={1} align="stretch">
-                  <Text fontSize="xs" color="fg.muted">
-                    Use the <code>Authorization</code> header plus{" "}
-                    <code>X-Project-Id</code>:
-                  </Text>
-                  <CodeBlock
-                    label="http"
-                    display={`Authorization: Bearer ${newToken ? maskSecret(newToken) : "pat-lw-..."}\nX-Project-Id: ${activeProjectId ?? "<your-project-id>"}`}
-                    revealedDisplay={`Authorization: Bearer ${newToken ?? ""}\nX-Project-Id: ${activeProjectId ?? "<your-project-id>"}`}
-                    copyValue={`Authorization: Bearer ${newToken ?? ""}\nX-Project-Id: ${activeProjectId ?? "<your-project-id>"}`}
-                    copyToastTitle="Bearer headers copied"
-                    ariaLabel="Copy Bearer headers"
-                  />
-                </VStack>
-              )}
-
-              {codeTab === "basic" && (
-                <VStack gap={1} align="stretch">
-                  <Text fontSize="xs" color="fg.muted">
-                    Encode the project ID and token as{" "}
-                    <code>base64(projectId:token)</code>:
-                  </Text>
-                  <CodeBlock
-                    label="http"
-                    display={`Authorization: Basic base64(${activeProjectId ?? "<your-project-id>"}:pat-lw-...)`}
-                    revealedDisplay={
-                      newToken && activeProjectId
-                        ? `Authorization: Basic ${btoa(`${activeProjectId}:${newToken}`)}`
-                        : ""
-                    }
-                    copyValue={
-                      newToken && activeProjectId
-                        ? `Authorization: Basic ${btoa(`${activeProjectId}:${newToken}`)}`
-                        : ""
-                    }
-                    copyToastTitle="Basic Auth header copied"
-                    ariaLabel="Copy Basic Auth header"
-                  />
-                </VStack>
-              )}
-            </VStack>
           </VStack>
         </Dialog.Body>
       </Dialog.Content>
