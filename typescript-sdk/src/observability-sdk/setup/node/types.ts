@@ -12,6 +12,27 @@ import { type SemConvAttributes } from "../../semconv";
 import { type DataCaptureOptions } from "../../features/data-capture/types";
 
 /**
+ * Sentinel value for completely disabling the LangWatch integration when
+ * passed as `SetupObservabilityOptions.langwatch`.
+ *
+ * Prefer importing this constant over writing the string literal `'disabled'`
+ * at call sites — it eliminates silent typos (e.g. `'disable'`, `'disbled'`)
+ * that would otherwise fall through to the enabled code path.
+ *
+ * @example
+ * ```typescript
+ * import { setupObservability, LangwatchDisabled } from "langwatch/observability/node";
+ *
+ * setupObservability({
+ *   langwatch: LangwatchDisabled,
+ *   spanProcessors: [myCustomProcessor],
+ * });
+ * ```
+ */
+export const LangwatchDisabled = "disabled" as const;
+export type LangwatchDisabled = typeof LangwatchDisabled;
+
+/**
  * Configuration options for setting up LangWatch observability.
  *
  * This interface provides comprehensive configuration for initializing
@@ -41,9 +62,9 @@ export interface SetupObservabilityOptions {
   /**
    * LangWatch configuration for sending observability data to LangWatch.
    *
-   * Set to 'disabled' to completely disable LangWatch integration.
-   * API key and endpoint can also be set via LANGWATCH_API_KEY and
-   * LANGWATCH_ENDPOINT environment variables.
+   * Set to the {@link LangwatchDisabled} constant to completely disable
+   * LangWatch integration. API key and endpoint can also be set via
+   * LANGWATCH_API_KEY and LANGWATCH_ENDPOINT environment variables.
    */
   langwatch?:
     | {
@@ -75,7 +96,7 @@ export interface SetupObservabilityOptions {
          */
         processorType?: "simple" | "batch";
       }
-    | "disabled";
+    | LangwatchDisabled;
 
   /**
    * Name of the service being instrumented.

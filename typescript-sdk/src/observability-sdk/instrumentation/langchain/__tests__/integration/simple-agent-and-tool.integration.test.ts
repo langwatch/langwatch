@@ -10,7 +10,7 @@ import { z } from "zod";
 import { AgentExecutor, createToolCallingAgent } from "langchain/agents";
 import { ChatPromptTemplate } from "@langchain/core/prompts";
 import { LangWatchCallbackHandler } from "../..";
-import { setupObservability } from "../../../../setup/node";
+import { LangwatchDisabled, setupObservability } from "../../../../setup/node";
 import { getLangWatchTracer } from "../../../../tracer";
 import { NoOpLogger } from "../../../../../logger";
 
@@ -35,7 +35,7 @@ describe("LangChain Integration Tests", () => {
     spanProcessor = new SimpleSpanProcessor(spanExporter);
 
     observabilityHandle = setupObservability({
-      langwatch: "disabled",
+      langwatch: LangwatchDisabled,
       serviceName: "langchain-integration-test",
       debug: { logger: new NoOpLogger() },
       spanProcessors: [spanProcessor],

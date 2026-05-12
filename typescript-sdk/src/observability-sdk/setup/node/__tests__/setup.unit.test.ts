@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { setupObservability, createAndStartNodeSdk } from "../setup.js";
+import { LangwatchDisabled } from "../types.js";
 import { resourceFromAttributes } from "@opentelemetry/resources";
 import { resetObservabilitySdkConfig } from "../../../config.js";
 import { shouldCaptureInput, shouldCaptureOutput } from "../../../config.js";
@@ -169,7 +170,7 @@ describe("langwatch configuration", () => {
   it("warns about misconfiguration when langwatch disabled without alternatives", () => {
     const logger = new MockLogger({});
     const sdk = createAndStartNodeSdk({
-      langwatch: 'disabled',
+      langwatch: LangwatchDisabled,
       debug: { logger }
     }, logger, resourceFromAttributes({}));
 
@@ -183,7 +184,7 @@ describe("langwatch configuration", () => {
     const logger = new MockLogger({});
 
     expect(() => createAndStartNodeSdk({
-      langwatch: 'disabled',
+      langwatch: LangwatchDisabled,
       advanced: { throwOnSetupError: true },
       debug: { logger }
     }, logger, resourceFromAttributes({}))).toThrow();
@@ -199,7 +200,7 @@ describe("langwatch configuration", () => {
     };
 
     const sdk = createAndStartNodeSdk({
-      langwatch: 'disabled',
+      langwatch: LangwatchDisabled,
       spanProcessors: [fakeProcessor],
       debug: { logger }
     }, logger, resourceFromAttributes({}));
@@ -214,7 +215,7 @@ describe("langwatch configuration", () => {
     const logger = new MockLogger({});
 
     const sdk = createAndStartNodeSdk({
-      langwatch: 'disabled',
+      langwatch: LangwatchDisabled,
       debug: {
         consoleTracing: true,
         logger

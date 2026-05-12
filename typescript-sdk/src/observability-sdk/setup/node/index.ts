@@ -4,4 +4,5 @@
  */
 
 export { setupObservability, ensureSetup } from "./setup";
+export { LangwatchDisabled } from "./types";
 export type { SetupObservabilityOptions, ObservabilityHandle } from "./types";

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { setupObservability } from '../../setup';
+import { LangwatchDisabled } from '../../types';
 import { InMemoryLogRecordExporter, SimpleLogRecordProcessor } from "@opentelemetry/sdk-logs";
 import { getLangWatchLogger } from '../../../../logger';
 import { resetObservabilitySdkConfig } from '../../../../config.js';
@@ -28,7 +29,7 @@ describe('setupObservability Integration - Log Records Functionality', () => {
     // Setup observability with real OpenTelemetry SDK
     observabilityHandle = setupObservability({
       serviceName: "log-records-functionality-test",
-      langwatch: 'disabled', // Disable LangWatch to use only custom processors
+      langwatch: LangwatchDisabled, // Disable LangWatch to use only custom processors
       logRecordProcessors: [logRecordProcessor],
       debug: { logger: createMockLogger() },
       advanced: { throwOnSetupError: true },

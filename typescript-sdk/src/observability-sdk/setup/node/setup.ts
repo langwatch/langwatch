@@ -1,7 +1,7 @@
 import { NodeSDK } from "@opentelemetry/sdk-node";
 import { SimpleLogRecordProcessor, BatchLogRecordProcessor, type LogRecordProcessor, ConsoleLogRecordExporter, LoggerProvider } from "@opentelemetry/sdk-logs";
 import { createMergedResource, isConcreteProvider } from "../utils";
-import { type SetupObservabilityOptions, type ObservabilityHandle } from "./types";
+import { LangwatchDisabled, type SetupObservabilityOptions, type ObservabilityHandle } from "./types";
 import { trace } from "@opentelemetry/api";
 import {
   ConsoleSpanExporter,
@@ -24,7 +24,7 @@ const createNoOpHandle = (logger: Logger): ObservabilityHandle => ({
 });
 
 const getLangWatchConfig = (options: SetupObservabilityOptions) => {
-  const isDisabled = options.langwatch === 'disabled';
+  const isDisabled = options.langwatch === LangwatchDisabled;
   const config = typeof options.langwatch === 'object' ? options.langwatch : {};
 
   return {
@@ -90,7 +90,7 @@ const warnIfMisconfigured = (options: SetupObservabilityOptions, langwatch: Retu
         "LangWatch integration is disabled but no custom span processors, trace exporters, or console tracing is configured. " +
         "OpenTelemetry will be set up but traces will not be exported anywhere. " +
         "Either:\n" +
-        "  1. Enable LangWatch integration (remove langwatch: 'disabled')\n" +
+        `  1. Enable LangWatch integration (remove langwatch: '${LangwatchDisabled}')\n` +
         "  2. Provide custom spanProcessors, logRecordProcessors, or traceExporter\n" +
         "  3. Enable debug.consoleTracing or debug.consoleLogging for development\n" +
         "  4. Use advanced.disabled to completely disable observability\n" +

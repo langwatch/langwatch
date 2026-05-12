@@ -4,7 +4,7 @@ import { SpanStatusCode, trace } from "@opentelemetry/api";
 import { getLangWatchTracer } from "../..";
 import { NoOpLogger } from "../../../../logger";
 import * as semconv from "../../../semconv";
-import { setupObservability } from "../../../setup/node";
+import { LangwatchDisabled, setupObservability } from "../../../setup/node";
 
 /**
  * Integration tests for LangWatch tracer with real OpenTelemetry setup.
@@ -57,7 +57,7 @@ describe("Tracer Integration Tests", () => {
     // Use spanProcessors instead of traceExporter as we don't want to wrap in a BatchSpanProcessor
     observabilityHandle = setupObservability({
       serviceName: "tracer-integration-test",
-      langwatch: "disabled",
+      langwatch: LangwatchDisabled,
       spanProcessors: [spanProcessor],
       debug: { logger: new NoOpLogger() },
       advanced: {

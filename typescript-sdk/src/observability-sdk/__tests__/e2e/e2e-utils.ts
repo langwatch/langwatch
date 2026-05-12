@@ -3,7 +3,7 @@
  */
 
 import { beforeAll, afterAll, afterEach, expect } from "vitest";
-import { setupObservability } from "../../setup/node";
+import { LangwatchDisabled, setupObservability } from "../../setup/node";
 import { getLangWatchTracer } from "../../tracer";
 import { LangWatch } from "../../../client-sdk";
 import { LangWatchExporter } from "../../exporters";
@@ -64,7 +64,7 @@ export function setupE2EObservability(): [LangWatchExporter, SimpleSpanProcessor
   console.debug("🔧 Calling setupObservability...");
   setupObservability({
     spanProcessors: [spanProcessor],
-    langwatch: 'disabled',
+    langwatch: LangwatchDisabled,
     debug: { logLevel: "debug" },
     advanced: { UNSAFE_forceOpenTelemetryReinitialization: true },
   });
