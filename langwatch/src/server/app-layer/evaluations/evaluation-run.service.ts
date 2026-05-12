@@ -20,10 +20,18 @@ export class EvaluationRunService {
     return result;
   }
 
-  async getByTraceId(
+  async findByTraceId(
     tenantId: string,
     traceId: string,
   ): Promise<EvaluationRunData[]> {
     return this.repository.findByTraceId(tenantId, traceId);
+  }
+
+  async findSummariesByTraceIds(
+    tenantId: string,
+    traceIds: string[],
+    since: number,
+  ): Promise<Record<string, EvalSummary[]>> {
+    return this.repository.findSummariesByTraceIds(tenantId, traceIds, since);
   }
 }

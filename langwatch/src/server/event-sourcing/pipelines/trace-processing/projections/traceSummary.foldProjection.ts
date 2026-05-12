@@ -42,6 +42,7 @@ import {
   TraceAttributeAccumulationService,
   TraceIOAccumulationService,
   ScenarioRoleCostService,
+  TracePromptAccumulationService,
   accumulateEvents,
   shouldOverrideOutput,
   extractIOFromLogRecord,
@@ -115,7 +116,37 @@ export function applySpanToSummary({
     span,
   });
 
+  // Pick the canonical root span. Precedence:
+  //   1. Named roots win over empty-named roots ("" = not set yet)
+  //   2. Among multiple named roots, earliest startTimeUnixMs wins
+  // After checkpoint reload, rootSpanStartTimeMs is undefined so the first
+  // root we see post-reload wins on tie. `traceName`, `rootSpanType`, and
+  // `rootSpanStartTimeMs` move together — they all describe the same span.
+  const isRootSpan = span.parentSpanId === null;
+  const spanStartMs = span.startTimeUnixMs;
+  const spanType = String(span.spanAttributes[ATTR_KEYS.SPAN_TYPE] ?? "");
+
+  let traceName = state.traceName;
+  let rootSpanType = state.rootSpanType;
+  let rootSpanStartTimeMs = state.rootSpanStartTimeMs;
+  if (isRootSpan) {
+    const haveNamedRoot = traceName !== "";
+    const isEarlierNamedRoot =
+      span.name !== "" &&
+      rootSpanStartTimeMs !== undefined &&
+      spanStartMs < rootSpanStartTimeMs;
+    if (!haveNamedRoot || isEarlierNamedRoot) {
+      traceName = span.name;
+      rootSpanType = spanType || null;
+      rootSpanStartTimeMs = spanStartMs;
+    }
+  }
+
+  const containsAi = state.containsAi || AI_SPAN_TYPES.has(spanType);
+
   const events = accumulateEvents({ state, span });
+
+  const promptRollup = tracePromptAccumulationService.accumulate({ state, span });
 
   return {
     ...state,
