@@ -170,12 +170,13 @@ Tiebreakers when the team disagrees. Read these before any non-trivial design ca
   **streaming** (visible composition).
 - **Always editable** in a settings page — the user is the source of truth.
   Markdown editor.
-- Always injected into the system prompt. Token budget cap: **≤2k tokens for v2**.
-  If longer, summarized on read with a cheap model; user always sees the full
-  file in settings.
-- **Cap revisit trigger:** raise to 4k if (a) median project memory regularly
-  exceeds 80% of the 2k cap, or (b) users repeatedly ask Langy to remember
-  things that won't fit. Revisit decision at v2.5.
+- Always injected into the system prompt at full size. **No fixed token cap in v2** —
+  modern context windows (200k–1M tokens) plus prompt caching make a small ceiling
+  unnecessary and artificially limiting. The LLM provider's context limit is the
+  only hard ceiling.
+- **Revisit trigger:** introduce a cap only if a project's memory consistently
+  approaches the provider's hard context limit, or if cost-per-turn becomes a
+  blocker for long-tail projects.
 
 ### L6 — semantic retrieval (lazy)
 
@@ -464,7 +465,7 @@ Decisions made through this PRD discussion:
 - ~~Dogfood approach~~ → engineers first (PostHog model)
 - ~~Buyer profile~~ → mix of all three; Langy must demo well to all
 - ~~Per-user vs per-project memory~~ → per-user, with opt-in conversation share
-- ~~L4 size cap~~ → 2k for v2; revisit trigger documented in §6
+- ~~L4 size cap~~ → no fixed cap in v2 (revised — modern context windows + prompt caching obsoleted the 2k limit); revisit trigger documented in §6
 - ~~Default model~~ → project's configured default; clear error if none
 - ~~Proactive suggestion shape~~ → post-turn inline, no worker
 - ~~OSS / self-hosted~~ → included, BYO API keys

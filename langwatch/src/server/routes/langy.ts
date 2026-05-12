@@ -81,7 +81,7 @@ async function loadInjectableProjectMemory(
   const service = LangyProjectMemoryService.create(prisma);
   const memory = await service.getById({ projectId });
   if (!memory) return null;
-  return memory.contentSummary ?? memory.content;
+  return memory.content;
 }
 
 function extractAssistantText(

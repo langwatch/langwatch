@@ -77,8 +77,8 @@ model LangyMessage {
 model LangyProjectMemory {
   id              String    @id @default(cuid())
   projectId       String    @unique
-  content         String    @db.Text                  // markdown, full version
-  contentSummary  String?   @db.Text                  // summarized for injection if content > 2k tokens
+  content         String    @db.Text                  // markdown, full version — injected as-is
+  contentSummary  String?   @db.Text                  // reserved column; not used by v2 (no fixed token cap)
   contentVersion  Int       @default(1)
   generatedAt     DateTime  @default(now())
   refreshedAt     DateTime  @default(now())           // last regenerate or edit
@@ -151,7 +151,7 @@ Hono route /api/langy/chat
    │
    ├─► Build prompt:
    │       1. system prompt (hardcoded identity + rules)
-   │       2. inject LangyProjectMemory.contentSummary (or content if ≤2k)
+   │       2. inject LangyProjectMemory.content (no fixed token cap)
    │       3. inject LangyUserPreferences (mode, etc.)
    │       4. recent N messages from this conversation
    │       5. (lazy retrieval results come in later, via tool calls)
@@ -208,8 +208,6 @@ Worker
    ├─► Render bootstrap prompt → LLM (gpt-5-mini, cheap)
    │
    ├─► LLM returns markdown summary
-   │
-   ├─► Truncate or summarize if > 2k tokens
    │
    ├─► INSERT LangyProjectMemory (changeReason="auto_bootstrap")
    │
@@ -434,9 +432,11 @@ No separate datastore = no new transfer surface.
 
 - **Metrics.** Track per-project: conversation count, message count, project
   memory token size, refresh frequency, opt-out rate. Watch for outliers.
-- **Cost ceiling.** Project memory injection costs tokens on every turn. Cap
-  at 2k tokens; alert if any project's effective injected memory exceeds
-  budget repeatedly.
+- **Cost ceiling.** No fixed cap in v2 — modern model context windows
+  (200k–1M tokens) plus prompt caching make a 2k ceiling unnecessary and
+  artificially limiting. Track project memory token size as a metric;
+  revisit a cap only if a project's memory consistently approaches the
+  LLM provider's hard context limit.
 - **Observability.** Every Langy LLM call is itself a LangWatch trace
   (dogfood). The trace includes which memory tiers were injected.
 - **Backup & DR.** Memory is backed up alongside Postgres. RTO/RPO matches

@@ -17,12 +17,10 @@ import { prisma } from "../../db";
 import { LANGY_BOOTSTRAP_QUEUE } from "../queues/constants";
 import { LangyProjectMemoryService } from "../../services/langy";
 import { getVercelAIModel } from "../../modelProviders/utils";
-import { TiktokenClient } from "../../app-layer/clients/tokenizer/tiktoken.client";
 
 const logger = createLogger("langwatch:workers:langyBootstrapWorker");
 
 const FALLBACK_MODEL = "openai/gpt-5-mini";
-const TARGET_TOKEN_CAP = 2000;
 
 export type LangyBootstrapJob = {
   projectId: string;
@@ -115,17 +113,9 @@ export async function runLangyBootstrapJob(
       content = renderMinimalStarter(snapshot);
     }
 
-    const tokenizer = new TiktokenClient();
-    const tokens = await tokenizer.countTokens(FALLBACK_MODEL, content);
-    const contentSummary =
-      tokens && tokens > TARGET_TOKEN_CAP
-        ? content.slice(0, Math.floor((TARGET_TOKEN_CAP / tokens) * content.length))
-        : null;
-
     await memoryService.writeNewVersion({
       projectId,
       content,
-      contentSummary,
       changeReason: "auto_bootstrap",
       changedById: null,
     });
