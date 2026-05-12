@@ -10,7 +10,8 @@
  * @see specs/features/suites/quick-run-stay-in-place.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 // ---------------------------------------------------------------------------
@@ -31,6 +32,17 @@ const capturedOnRunScheduled = vi.hoisted(
       current: null,
     }) as { current: ((suiteId: string, batchRunId: string) => void) | null },
 );
+
+/**
+ * Capture the flow callbacks registered by SimulationsPage via setFlowCallbacks("suiteEditor", …)
+ * so AC6 tests can directly invoke onRunRequested and assert navigation fires.
+ */
+const capturedFlowCallbacks = vi.hoisted(() => ({
+  current: null as {
+    onRunRequested?: (suite: any) => void;
+    onSaved?: (suite: any) => void;
+  } | null,
+}));
 
 // Router mock — path is overridden per describe block via routerQueryPath
 const routerQueryPath = vi.hoisted(() => ({ current: undefined as string[] | undefined }));
@@ -90,7 +102,9 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
 vi.mock("~/hooks/useDrawer", () => ({
   useDrawer: () => ({
     openDrawer: vi.fn(),
-    setFlowCallbacks: vi.fn(),
+    setFlowCallbacks: (_flow: string, callbacks: any) => {
+      capturedFlowCallbacks.current = callbacks;
+    },
   }),
 }));
 
@@ -215,6 +229,7 @@ describe("SimulationsPage quick-run no-navigation invariant (#3363)", () => {
     cleanup();
     vi.clearAllMocks();
     capturedOnRunScheduled.current = null;
+    capturedFlowCallbacks.current = null;
     routerQueryPath.current = undefined;
   });
 
@@ -262,6 +277,61 @@ describe("SimulationsPage quick-run no-navigation invariant (#3363)", () => {
         capturedOnRunScheduled.current!("suite_target", "batch_003");
 
         expect(mockRouterPush).not.toHaveBeenCalled();
+      });
+    });
+  });
+
+  /**
+   * AC6 regression guard — positive invariant.
+   *
+   * The Save-and-Run flow (handleRunRequested registered via setFlowCallbacks)
+   * MUST still navigate to the suite detail page. This is the OPPOSITE of the
+   * no-nav invariant above: we are guarding against a future change that
+   * accidentally widens the no-nav fix to cover this drawer flow too.
+   */
+  describe("AC6 regression guard — Save and Run from suite editor drawer still navigates", () => {
+    it("calls router push toward the suite detail page when the run is requested from the editor", async () => {
+      const user = userEvent.setup();
+      routerQueryPath.current = undefined; // Start on All Runs
+
+      await renderSimulationsPage();
+
+      // Open the suite editor drawer — this causes SimulationsPage to call
+      // setFlowCallbacks("suiteEditor", { onSaved, onRunRequested }) which
+      // populates capturedFlowCallbacks.current.
+      const newSuiteButton = await screen.findByRole("button", {
+        name: /New Run Plan/i,
+      });
+      await user.click(newSuiteButton);
+
+      expect(capturedFlowCallbacks.current).not.toBeNull();
+      expect(capturedFlowCallbacks.current!.onRunRequested).toBeDefined();
+
+      // Simulate the Save-and-Run callback firing with a newly saved suite
+      const testSuite = {
+        id: "suite_saved",
+        projectId: "project_1",
+        name: "Newly Saved Suite",
+        slug: "newly-saved-slug",
+        description: null,
+        scenarioIds: [],
+        targets: [],
+        repeatCount: 1,
+        labels: [],
+        archivedAt: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      capturedFlowCallbacks.current!.onRunRequested!(testSuite);
+
+      // navigateToSuite must fire — router.push called with the run-plans path
+      expect(mockRouterPush).toHaveBeenCalled();
+      const pushCall = mockRouterPush.mock.calls[0]!;
+      const [routeArg] = pushCall;
+      expect(routeArg).toMatchObject({
+        query: expect.objectContaining({
+          path: expect.arrayContaining(["run-plans", "newly-saved-slug"]),
+        }),
       });
     });
   });
