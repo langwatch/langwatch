@@ -47,6 +47,13 @@ const capturedFlowCallbacks = vi.hoisted(() => ({
 // Router mock — path is overridden per describe block via routerQueryPath
 const routerQueryPath = vi.hoisted(() => ({ current: undefined as string[] | undefined }));
 
+/**
+ * Hoisted spy on the suites.getSummaries cache invalidator. Pins AC4:
+ * onRunScheduled must keep firing the invalidation so the sidebar row
+ * refreshes after a quick run.
+ */
+const mockGetSummariesInvalidate = vi.hoisted(() => vi.fn());
+
 vi.mock("~/utils/compat/next-router", () => ({
   useRouter: () => ({
     push: mockRouterPush,
@@ -127,7 +134,7 @@ vi.mock("~/utils/api", () => ({
     useContext: () => ({
       suites: {
         getAll: { invalidate: vi.fn() },
-        getSummaries: { invalidate: vi.fn() },
+        getSummaries: { invalidate: mockGetSummariesInvalidate },
       },
       scenarios: {
         getSuiteRunData: { invalidate: vi.fn() },
@@ -248,6 +255,18 @@ describe("SimulationsPage quick-run no-navigation invariant (#3363)", () => {
 
         expect(mockRouterPush).not.toHaveBeenCalled();
       });
+
+      it("still invalidates the suites.getSummaries cache so the sidebar row refreshes", async () => {
+        routerQueryPath.current = undefined;
+
+        await renderSimulationsPage();
+
+        expect(capturedOnRunScheduled.current).not.toBeNull();
+
+        capturedOnRunScheduled.current!("suite_target", "batch_004");
+
+        expect(mockGetSummariesInvalidate).toHaveBeenCalled();
+      });
     });
 
     describe("when the user is on a different suite's detail page", () => {
@@ -289,49 +308,51 @@ describe("SimulationsPage quick-run no-navigation invariant (#3363)", () => {
    * no-nav invariant above: we are guarding against a future change that
    * accidentally widens the no-nav fix to cover this drawer flow too.
    */
-  describe("AC6 regression guard — Save and Run from suite editor drawer still navigates", () => {
-    it("calls router push toward the suite detail page when the run is requested from the editor", async () => {
-      const user = userEvent.setup();
-      routerQueryPath.current = undefined; // Start on All Runs
+  describe("given the suite editor drawer is open", () => {
+    describe("when Save and Run fires for a saved suite (AC6 regression guard)", () => {
+      it("calls router push toward the suite detail page", async () => {
+        const user = userEvent.setup();
+        routerQueryPath.current = undefined; // Start on All Runs
 
-      await renderSimulationsPage();
+        await renderSimulationsPage();
 
-      // Open the suite editor drawer — this causes SimulationsPage to call
-      // setFlowCallbacks("suiteEditor", { onSaved, onRunRequested }) which
-      // populates capturedFlowCallbacks.current.
-      const newSuiteButton = await screen.findByRole("button", {
-        name: /New Run Plan/i,
-      });
-      await user.click(newSuiteButton);
+        // Open the suite editor drawer — this causes SimulationsPage to call
+        // setFlowCallbacks("suiteEditor", { onSaved, onRunRequested }) which
+        // populates capturedFlowCallbacks.current.
+        const newSuiteButton = await screen.findByRole("button", {
+          name: /New Run Plan/i,
+        });
+        await user.click(newSuiteButton);
 
-      expect(capturedFlowCallbacks.current).not.toBeNull();
-      expect(capturedFlowCallbacks.current!.onRunRequested).toBeDefined();
+        expect(capturedFlowCallbacks.current).not.toBeNull();
+        expect(capturedFlowCallbacks.current!.onRunRequested).toBeDefined();
 
-      // Simulate the Save-and-Run callback firing with a newly saved suite
-      const testSuite = {
-        id: "suite_saved",
-        projectId: "project_1",
-        name: "Newly Saved Suite",
-        slug: "newly-saved-slug",
-        description: null,
-        scenarioIds: [],
-        targets: [],
-        repeatCount: 1,
-        labels: [],
-        archivedAt: null,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
-      capturedFlowCallbacks.current!.onRunRequested!(testSuite);
+        // Simulate the Save-and-Run callback firing with a newly saved suite
+        const testSuite = {
+          id: "suite_saved",
+          projectId: "project_1",
+          name: "Newly Saved Suite",
+          slug: "newly-saved-slug",
+          description: null,
+          scenarioIds: [],
+          targets: [],
+          repeatCount: 1,
+          labels: [],
+          archivedAt: null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        };
+        capturedFlowCallbacks.current!.onRunRequested!(testSuite);
 
-      // navigateToSuite must fire — router.push called with the run-plans path
-      expect(mockRouterPush).toHaveBeenCalled();
-      const pushCall = mockRouterPush.mock.calls[0]!;
-      const [routeArg] = pushCall;
-      expect(routeArg).toMatchObject({
-        query: expect.objectContaining({
-          path: expect.arrayContaining(["run-plans", "newly-saved-slug"]),
-        }),
+        // navigateToSuite must fire — router.push called with the run-plans path
+        expect(mockRouterPush).toHaveBeenCalled();
+        const pushCall = mockRouterPush.mock.calls[0]!;
+        const [routeArg] = pushCall;
+        expect(routeArg).toMatchObject({
+          query: expect.objectContaining({
+            path: expect.arrayContaining(["run-plans", "newly-saved-slug"]),
+          }),
+        });
       });
     });
   });
