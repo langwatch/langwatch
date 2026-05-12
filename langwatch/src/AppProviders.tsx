@@ -11,6 +11,7 @@ import { useAttributionCapture } from "./hooks/useAttributionCapture";
 import { usePostHog } from "./hooks/usePostHog";
 import { ExtraFooterComponents } from "../ee/saas/ExtraFooterComponents";
 import { CommandBarProvider } from "./features/command-bar";
+import { LangyProvider } from "./components/langy/LangyContext";
 import { system } from "./theme";
 import { TRPCProvider } from "./utils/api";
 
@@ -47,21 +48,23 @@ export function InnerProviders({ children }: { children: ReactNode }) {
 
   return (
     <>
-      <CommandBarProvider>
-        <AnalyticsProvider
-          client={createAppAnalyticsClient({
-            isSaaS: Boolean(publicEnv.data?.IS_SAAS),
-            posthogClient: postHog,
-          })}
-        >
-          {postHog ? (
-            <PostHogProvider client={postHog}>{children}</PostHogProvider>
-          ) : (
-            children
-          )}
-        </AnalyticsProvider>
-        <Toaster />
-      </CommandBarProvider>
+      <LangyProvider>
+        <CommandBarProvider>
+          <AnalyticsProvider
+            client={createAppAnalyticsClient({
+              isSaaS: Boolean(publicEnv.data?.IS_SAAS),
+              posthogClient: postHog,
+            })}
+          >
+            {postHog ? (
+              <PostHogProvider client={postHog}>{children}</PostHogProvider>
+            ) : (
+              children
+            )}
+          </AnalyticsProvider>
+          <Toaster />
+        </CommandBarProvider>
+      </LangyProvider>
       <ExtraFooterComponents />
     </>
   );

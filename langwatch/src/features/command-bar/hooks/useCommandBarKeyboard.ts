@@ -1,8 +1,20 @@
 import { useCallback } from "react";
 import type { ListItem } from "../getIconInfo";
 
+interface AskLangyKeyboardOpts {
+  askLangyMode: boolean;
+  setAskLangyMode: (on: boolean) => void;
+  onAskLangy: () => void;
+  hasQuery: boolean;
+}
+
 /**
  * Hook that handles keyboard navigation and shortcuts for the command bar.
+ *
+ * In addition to standard arrow/Enter/Cmd+L behavior, this hook implements
+ * a Chrome-omnibox-style "Tab → Ask Langy" flow: pressing Tab with a
+ * non-empty query flips the input into Ask Langy mode; Enter in that mode
+ * submits the query into Langy.
  */
 export function useCommandBarKeyboard(
   allItems: ListItem[],
@@ -10,8 +22,11 @@ export function useCommandBarKeyboard(
   setSelectedIndex: (index: number | ((prev: number) => number)) => void,
   handleSelect: (item: ListItem, newTab?: boolean) => void,
   handleCopyLink: () => void,
-  isMac: boolean
+  isMac: boolean,
+  ask: AskLangyKeyboardOpts,
 ) {
+  const { askLangyMode, setAskLangyMode, onAskLangy, hasQuery } = ask;
+
   return useCallback(
     (e: React.KeyboardEvent) => {
       const modKey = isMac ? e.metaKey : e.ctrlKey;
@@ -27,8 +42,24 @@ export function useCommandBarKeyboard(
           if (allItems.length === 0) break;
           setSelectedIndex((i) => (i <= 0 ? allItems.length - 1 : i - 1));
           break;
+        case "Tab":
+          if (!e.shiftKey && !askLangyMode && hasQuery) {
+            e.preventDefault();
+            setAskLangyMode(true);
+          }
+          break;
+        case "Backspace":
+          if (askLangyMode && !hasQuery) {
+            e.preventDefault();
+            setAskLangyMode(false);
+          }
+          break;
         case "Enter":
           e.preventDefault();
+          if (askLangyMode) {
+            onAskLangy();
+            break;
+          }
           if (allItems[selectedIndex]) {
             handleSelect(allItems[selectedIndex], modKey);
           }
@@ -42,6 +73,17 @@ export function useCommandBarKeyboard(
           break;
       }
     },
-    [allItems, selectedIndex, setSelectedIndex, handleSelect, handleCopyLink, isMac]
+    [
+      allItems,
+      selectedIndex,
+      setSelectedIndex,
+      handleSelect,
+      handleCopyLink,
+      isMac,
+      askLangyMode,
+      setAskLangyMode,
+      onAskLangy,
+      hasQuery,
+    ],
   );
 }

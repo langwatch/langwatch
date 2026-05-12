@@ -9,6 +9,11 @@ import {
 } from "react";
 import type { ProposalHandlers } from "./LangySidebar";
 
+export interface PendingAsk {
+  text: string;
+  autoSubmit: boolean;
+}
+
 interface LangyContextValue {
   isOpen: boolean;
   setIsOpen: (open: boolean) => void;
@@ -19,6 +24,9 @@ interface LangyContextValue {
     opts?: { experimentSlug?: string },
   ) => void;
   clearHandlers: () => void;
+  pendingAsk: PendingAsk | null;
+  askLangy: (text: string, opts?: { autoSubmit?: boolean }) => void;
+  consumePendingAsk: () => void;
 }
 
 const LangyContext = createContext<LangyContextValue | null>(null);
@@ -29,6 +37,7 @@ export function LangyProvider({ children }: { children: ReactNode }) {
     {},
   );
   const [experimentSlug, setExperimentSlug] = useState<string | undefined>();
+  const [pendingAsk, setPendingAsk] = useState<PendingAsk | null>(null);
 
   const registerHandlers = useCallback(
     (handlers: ProposalHandlers, opts?: { experimentSlug?: string }) => {
@@ -43,6 +52,18 @@ export function LangyProvider({ children }: { children: ReactNode }) {
     setExperimentSlug(undefined);
   }, []);
 
+  const askLangy = useCallback(
+    (text: string, opts?: { autoSubmit?: boolean }) => {
+      setPendingAsk({ text, autoSubmit: opts?.autoSubmit ?? false });
+      setIsOpen(true);
+    },
+    [],
+  );
+
+  const consumePendingAsk = useCallback(() => {
+    setPendingAsk(null);
+  }, []);
+
   const value = useMemo<LangyContextValue>(
     () => ({
       isOpen,
@@ -51,6 +72,9 @@ export function LangyProvider({ children }: { children: ReactNode }) {
       experimentSlug,
       registerHandlers,
       clearHandlers,
+      pendingAsk,
+      askLangy,
+      consumePendingAsk,
     }),
     [
       isOpen,
@@ -58,6 +82,9 @@ export function LangyProvider({ children }: { children: ReactNode }) {
       experimentSlug,
       registerHandlers,
       clearHandlers,
+      pendingAsk,
+      askLangy,
+      consumePendingAsk,
     ],
   );
 

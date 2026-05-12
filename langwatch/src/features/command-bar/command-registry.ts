@@ -28,6 +28,7 @@ import {
   ScrollText,
   Settings,
   Shield,
+  Sparkles,
   Terminal,
   Stethoscope,
   Sun,
@@ -428,6 +429,14 @@ export const navigationCommands: Command[] = [
  * Action commands that trigger create/edit flows.
  */
 export const actionCommands: Command[] = [
+  {
+    id: "action-ask-langy",
+    label: "Ask Langy",
+    description: "Open Langy and ask a question (Tab to ask with your query)",
+    icon: Sparkles,
+    category: "actions",
+    keywords: ["langy", "ai", "assistant", "ask", "chat", "help", "question"],
+  },
   {
     id: "action-new-agent",
     label: "New Agent",
