@@ -160,7 +160,7 @@ describe("Feature: Projects REST API", () => {
   });
 
   describe("POST /api/projects", () => {
-    it("creates a project and returns it with apiKey", async () => {
+    it("creates a project and returns it with serviceApiKey", async () => {
       const res = await api.post("/api/projects", {
         name: "My Test Project",
         teamId: testTeam.id,
@@ -173,7 +173,9 @@ describe("Feature: Projects REST API", () => {
       expect(body.id).toMatch(/^project_/);
       expect(body.name).toBe("My Test Project");
       expect(body.slug).toContain("my-test-project");
-      expect(body.apiKey).toMatch(/^sk-lw-/);
+      expect(body.serviceApiKey).toMatch(/^sk-lw-/);
+      expect(body.serviceApiKeyId).toBeDefined();
+      expect(body).not.toHaveProperty("apiKey");
       expect(body.language).toBe("python");
       expect(body.framework).toBe("langchain");
       expect(body.teamId).toBe(testTeam.id);
@@ -210,7 +212,7 @@ describe("Feature: Projects REST API", () => {
       expect(body.id).toMatch(/^project_/);
       expect(body.teamId).toMatch(/^team_/);
       expect(body.teamId).not.toBe(testTeam.id);
-      expect(body.apiKey).toMatch(/^sk-lw-/);
+      expect(body.serviceApiKey).toMatch(/^sk-lw-/);
     });
 
     it("returns 400 when team does not belong to org", async () => {
@@ -261,7 +263,7 @@ describe("Feature: Projects REST API", () => {
   });
 
   describe("GET /api/projects/:id", () => {
-    it("returns a project with apiKey", async () => {
+    it("returns a project without apiKey", async () => {
       const createRes = await api.post("/api/projects", {
         name: `Get Test ${nanoid(6)}`,
         teamId: testTeam.id,
@@ -275,7 +277,8 @@ describe("Feature: Projects REST API", () => {
 
       const body = await res.json();
       expect(body.id).toBe(created.id);
-      expect(body.apiKey).toMatch(/^sk-lw-/);
+      expect(body).not.toHaveProperty("apiKey");
+      expect(body).not.toHaveProperty("serviceApiKey");
     });
 
     it("returns 404 for non-existent project", async () => {

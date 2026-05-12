@@ -29,26 +29,17 @@ const bindingSchema = z.object({
   scopeId: z.string().min(1),
 });
 
-const createPersonalKeySchema = z.object({
-  keyType: z.literal("personal").default("personal"),
+const createApiKeySchema = z.object({
+  keyType: z.enum(["personal", "service"]).default("personal"),
   name: z.string().min(1).max(100),
   description: z.string().max(500).optional(),
   expiresAt: z.coerce.date().optional(),
-  bindings: z.array(bindingSchema).min(1).max(20),
-});
-
-const createServiceKeySchema = z.object({
-  keyType: z.literal("service"),
-  name: z.string().min(1).max(100),
-  description: z.string().max(500).optional(),
-  expiresAt: z.coerce.date().optional(),
+  bindings: z.array(bindingSchema).max(20).optional(),
   projectIds: z.array(z.string().min(1)).max(50).optional(),
-});
-
-const createApiKeySchema = z.discriminatedUnion("keyType", [
-  createPersonalKeySchema,
-  createServiceKeySchema,
-]);
+}).refine(
+  (data) => data.keyType === "service" || (data.bindings && data.bindings.length > 0),
+  { message: "bindings are required for personal keys", path: ["bindings"] },
+);
 
 function validationHook(
   result: {
@@ -136,7 +127,7 @@ export const app = new Hono<{ Variables: Variables }>()
             scopeType: "PROJECT" as const,
             scopeId: projectId,
           }))
-        : body.bindings;
+        : (body.bindings ?? []);
 
       try {
         const result = await service.create({

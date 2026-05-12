@@ -403,10 +403,8 @@ export function requireApiKeyPermission({
   return async (c, next) => {
     const resolved = c.get("resolvedToken") as ResolvedToken | undefined;
     if (!resolved) {
-      return c.json(
-        { error: "Unauthorized", message: "Authentication required" },
-        401,
-      );
+      await next();
+      return;
     }
 
     try {
