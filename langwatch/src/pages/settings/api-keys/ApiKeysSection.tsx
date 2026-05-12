@@ -261,10 +261,10 @@ export function ApiKeysSection({
                       <Badge size="sm" colorPalette="purple">Service</Badge>
                     </Table.Cell>
                     <Table.Cell>
-                      <Text fontSize="sm">All</Text>
+                      <Text fontSize="sm">Project only</Text>
                     </Table.Cell>
                     <Table.Cell>
-                      {/* No edit/revoke for service keys — only regenerate via project settings */}
+                      {/* No edit/revoke for legacy project keys */}
                     </Table.Cell>
                   </Table.Row>
                 )}
