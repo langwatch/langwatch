@@ -277,6 +277,7 @@ describe("Annotation scores settings page", () => {
       mockIsLiteMemberRef.current = true;
     });
 
+    /** @scenario Lite member cannot delete annotations or manage scoring metrics */
     it("hides the add new score metric button", () => {
       renderPage();
 
