@@ -16,7 +16,6 @@ const generateSecret = customAlphabet(ALPHABET, SECRET_LENGTH);
  */
 export const API_KEY_PREFIX = "sk-lw-";
 export const LEGACY_PAT_PREFIX = "pat-lw-";
-export const LEGACY_PROJECT_KEY_PREFIX = "sk-lw-";
 
 /**
  * Returns the server-side pepper used when HMAC-hashing API key secrets.

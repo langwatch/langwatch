@@ -76,7 +76,7 @@ function ancestorScopes(
  * (i.e. at any ancestor scope: project → team → org).
  *
  * For user principals: direct bindings + group-memberships bindings.
- * For PAT principals: queries by patId only; no group expansion.
+ * For API key principals: queries by apiKeyId only; no group expansion.
  *
  * @internal — use checkRoleBindingPermission for access-control decisions.
  */
