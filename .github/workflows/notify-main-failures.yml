@@ -1,0 +1,121 @@
+# Single consolidated Slack notifier for all CI failures on main. See #3270.
+#
+# Replaces the ~7 inline `notify-slack-*.sh` steps that used to be sprinkled
+# across `langwatch-app-ci.yml` (6) and `e2e-ci.yml` (1). Those steps:
+#   - only covered 2 of 10 active workflows (silent for langwatch-nlp,
+#     langevals, sdk-python, sdk-javascript, sdk-go, mcp-javascript,
+#     clickhouse-serverless, codeql, docker-build-app, docs-ci),
+#   - did NOT mention <!here>, so the channel was never pinged,
+#   - had to be added by hand to every new workflow.
+#
+# This workflow listens for the `check_suite` event, which every GitHub App
+# (incl. `github-actions`) fires automatically when its checks finish. By
+# filtering on conclusion=failure + head_branch=main + an app allowlist, we
+# catch failures from every current and future CI workflow with zero
+# per-workflow plumbing.
+#
+# Cost: a runner only spawns when `if:` evaluates true (failure on main from
+# an allowlisted app). With current traffic this is < a few times/week
+# steady-state, so well under 5min/month of runner time.
+name: notify-main-failures
+
+on:
+  check_suite:
+    types:
+      - completed
+
+# Same secret as the old inline scripts. Reusing avoids a permissions/secret
+# rotation; the consolidated message format is the only behavioral change.
+permissions:
+  contents: read
+
+jobs:
+  notify:
+    # Filter at the workflow level so non-matching events don't even
+    # spin up a runner:
+    #   - failure-only (success/neutral/skipped do not notify)
+    #   - main-only (branch failures, PR failures handled by reviewers)
+    #   - app allowlist:
+    #       github-actions      — all our CI workflows
+    #       vercel              — preview deploys
+    #       render              — backend/data deploys
+    #       google-cloud-build  — image builds
+    #       mintlify            — docs deploys
+    #     Anything else (cursor, kilo-code-bot, mrsnapsclaws, random PR
+    #     bots that fail their own checks) is ignored.
+    if: >-
+      github.event.check_suite.conclusion == 'failure' &&
+      github.event.check_suite.head_branch == 'main' &&
+      contains(fromJSON('["github-actions","vercel","render","google-cloud-build","mintlify"]'),
+               github.event.check_suite.app.slug)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (for commit metadata)
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          # check_suite events use the suite's head_sha, not the
+          # default branch tip — match what actually failed.
+          ref: ${{ github.event.check_suite.head_sha }}
+          fetch-depth: 1
+
+      - name: Post Slack notification with <!here>
+        env:
+          SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL: ${{ secrets.SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL }}
+          APP_SLUG: ${{ github.event.check_suite.app.slug }}
+          HEAD_SHA: ${{ github.event.check_suite.head_sha }}
+          REPO: ${{ github.repository }}
+          # Suite URL: the GitHub UI for the check_suite, which lists
+          # the failing check_runs underneath. More useful than a
+          # workflow-run URL when multiple workflows share one suite.
+          SUITE_URL: ${{ github.event.check_suite.html_url }}
+        run: |
+          set -euo pipefail
+          if [ -z "${SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL:-}" ]; then
+            echo "SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL not set; skipping."
+            exit 0
+          fi
+
+          SHORT_SHA="${HEAD_SHA:0:7}"
+          COMMIT_MSG=$(git log -1 --pretty=format:'%s' 2>/dev/null || echo "unknown")
+          COMMIT_AUTHOR=$(git log -1 --pretty=format:'%an' 2>/dev/null || echo "unknown")
+
+          # check_suite has no native run-URL field, but the suite URL
+          # links to all check_runs in the failed suite.
+          RUN_URL="${SUITE_URL:-https://github.com/$REPO/commit/$HEAD_SHA/checks}"
+
+          SECTION_TEXT=$(printf '<!here> *Check suite failed on main*\n*Source:* %s\n*Commit:* `%s` - %s\n*Author:* %s' \
+            "$APP_SLUG" "$SHORT_SHA" "$COMMIT_MSG" "$COMMIT_AUTHOR")
+
+          # Build the payload via jq so commit messages with quotes,
+          # backticks, or newlines can't break the JSON.
+          PAYLOAD=$(jq -n \
+            --arg section_text "$SECTION_TEXT" \
+            --arg run_url "$RUN_URL" \
+            '{
+              blocks: [
+                {
+                  type: "header",
+                  text: { type: "plain_text", text: "🚨 CI Check Suite Failed on main", emoji: true }
+                },
+                {
+                  type: "section",
+                  text: { type: "mrkdwn", text: $section_text }
+                },
+                {
+                  type: "actions",
+                  elements: [
+                    {
+                      type: "button",
+                      text: { type: "plain_text", text: "View Checks", emoji: true },
+                      url: $run_url
+                    }
+                  ]
+                }
+              ]
+            }')
+
+          curl -fsS -X POST \
+            -H 'Content-Type: application/json' \
+            --data "$PAYLOAD" \
+            "$SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL"
+          echo "Posted check_suite failure for app=$APP_SLUG sha=$SHORT_SHA"
