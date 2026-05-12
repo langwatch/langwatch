@@ -43,16 +43,25 @@ return wasBlocked
 `;
 
 const DRAIN_GROUP_LUA = `
-local jobsKey    = KEYS[1]
-local dataKey    = KEYS[2]
-local activeKey  = KEYS[3]
-local readyKey   = KEYS[4]
-local blockedKey = KEYS[5]
-local signalKey  = KEYS[6]
-local errorKey   = KEYS[7]
-local groupId    = ARGV[1]
+local jobsKey         = KEYS[1]
+local dataKey         = KEYS[2]
+local activeKey       = KEYS[3]
+local readyKey        = KEYS[4]
+local blockedKey      = KEYS[5]
+local signalKey       = KEYS[6]
+local errorKey        = KEYS[7]
+local totalPendingKey = KEYS[8]
+local groupId         = ARGV[1]
 
-local count = redis.call("ZCARD", jobsKey)
+-- Total dropped = staged jobs (ZCARD) + the active job if one exists.
+-- The active job is in flight on a worker; once that worker calls
+-- COMPLETE_LUA it will be a no-op because the activeKey is gone, so the
+-- total-pending counter would otherwise leak forever. We must account
+-- for it here. Added post-2026-05-11 incident — bulk drain at 500K
+-- scale would otherwise leave the stat permanently overstated.
+local pendingCount = redis.call("ZCARD", jobsKey)
+local hadActive    = redis.call("EXISTS", activeKey)
+local totalDropped = pendingCount + hadActive
 
 redis.call("DEL", jobsKey)
 redis.call("DEL", dataKey)
@@ -63,7 +72,11 @@ redis.call("SREM", blockedKey, groupId)
 redis.call("LPUSH", signalKey, "1")
 redis.call("LTRIM", signalKey, 0, 999)
 
-return count
+if totalDropped > 0 then
+  redis.call("DECRBY", totalPendingKey, totalDropped)
+end
+
+return totalDropped
 `;
 
 const MOVE_TO_DLQ_LUA = `
@@ -656,7 +669,7 @@ export class QueueRedisRepository implements QueueRepository {
     const prefix = `${params.queueName}:gq:`;
     const result = await this.redis.eval(
       DRAIN_GROUP_LUA,
-      7,
+      8,
       `${prefix}group:${params.groupId}:jobs`,
       `${prefix}group:${params.groupId}:data`,
       `${prefix}group:${params.groupId}:active`,
@@ -664,6 +677,7 @@ export class QueueRedisRepository implements QueueRepository {
       `${prefix}blocked`,
       `${prefix}signal`,
       `${prefix}group:${params.groupId}:error`,
+      `${prefix}stats:total-pending`,
       params.groupId,
     );
     return { jobsRemoved: Number(result) };
@@ -744,26 +758,30 @@ export class QueueRedisRepository implements QueueRepository {
   }
 
   // Bulk-drain every group whose ID starts with "<tenantId>/" for the given
-  // queue, optionally filtered to a single pipeline name. Returns the total
-  // job count drained. Added post-2026-05-11 incident — clicking 500K Drain
-  // buttons by hand wasn't feasible.
+  // queue. Returns the total group count and total job count drained.
+  // Added post-2026-05-11 incident — clicking 500K Drain buttons by hand
+  // wasn't feasible.
+  //
+  // Performance: ZSCAN pages 1000 groupIds at a time, then ALL matching
+  // DRAIN_GROUP_LUA EVALs for that page are issued as a single Redis
+  // pipeline. At 500K groups → ~500 page round-trips instead of 500,000
+  // sequential ones. The PR-#3970 production drain of 507K groups took
+  // 4 min via a similar pipelined approach; the previous one-at-a-time
+  // shape would have been ~tens of minutes through TLS+ElastiCache.
   async drainTenant(params: {
     queueName: string;
     tenantId: string;
-    pipelineFilter?: string;
   }): Promise<{ groupsDrained: number; jobsDrained: number }> {
     const prefix = `${params.queueName}:gq:`;
     const readyKey = `${prefix}ready`;
+    const totalPendingKey = `${prefix}stats:total-pending`;
     const tenantPrefix = `${params.tenantId}/`;
-    const pipelineFragment = params.pipelineFilter
-      ? `/${params.pipelineFilter}/`
-      : null;
 
-    // ZSCAN streams the zset without ever materializing all members.
     let cursor = "0";
     let groupsDrained = 0;
     let jobsDrained = 0;
     const SCAN_BATCH = 1000;
+
     do {
       const [next, members] = await this.redis.zscan(
         readyKey,
@@ -772,17 +790,41 @@ export class QueueRedisRepository implements QueueRepository {
         SCAN_BATCH,
       );
       cursor = next;
-      // members alternates [groupId, score, groupId, score, ...]
+
+      // members alternates [groupId, score, groupId, score, ...] — collect
+      // just the groupIds that match our tenant prefix.
+      const matched: string[] = [];
       for (let i = 0; i < members.length; i += 2) {
         const groupId = members[i]!;
-        if (!groupId.startsWith(tenantPrefix)) continue;
-        if (pipelineFragment && !groupId.includes(pipelineFragment)) continue;
-        const result = await this.drainGroup({
-          queueName: params.queueName,
+        if (groupId.startsWith(tenantPrefix)) matched.push(groupId);
+      }
+      if (matched.length === 0) continue;
+
+      // Pipeline all DRAIN_GROUP_LUA evals for this page into a single
+      // network round-trip. Each EVAL is independent; ioredis batches
+      // them and returns results in the same order.
+      const pipeline = this.redis.pipeline();
+      for (const groupId of matched) {
+        pipeline.eval(
+          DRAIN_GROUP_LUA,
+          8,
+          `${prefix}group:${groupId}:jobs`,
+          `${prefix}group:${groupId}:data`,
+          `${prefix}group:${groupId}:active`,
+          readyKey,
+          `${prefix}blocked`,
+          `${prefix}signal`,
+          `${prefix}group:${groupId}:error`,
+          totalPendingKey,
           groupId,
-        });
+        );
+      }
+      const results = await pipeline.exec();
+      if (!results) continue;
+      for (const [err, value] of results) {
+        if (err) continue;
         groupsDrained++;
-        jobsDrained += result.jobsRemoved;
+        jobsDrained += Number(value);
       }
     } while (cursor !== "0");
 

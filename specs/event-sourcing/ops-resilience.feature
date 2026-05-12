@@ -11,10 +11,14 @@ Feature: Tenant-scoped bulk drain (post-2026-05-11 incident)
   # DRAIN_GROUP_LUA script in a loop — an action that can't be performed
   # by non-engineers during an outage.
   #
-  # ops.queues.drainTenant({ queueName, tenantId, pipelineFilter? }) pages
-  # through the ready zset in batches of 1000, matching groupIds that start
-  # with `<tenantId>/`, and drains each via the same atomic Lua script the
-  # per-group Drain button uses.
+  # ops.queues.drainTenant({ queueName, tenantId }) pages through the
+  # ready zset in batches of 1000 via ZSCAN, filters groupIds that start
+  # with `<tenantId>/`, and pipelines DRAIN_GROUP_LUA EVALs for that
+  # page in a single Redis round-trip. Drains everything for the tenant
+  # across every pipeline / projection / reactor — same blast radius as
+  # the in-prod shell loop we ran during the incident, just safe and
+  # one-click. There is no pipeline scoping: the only realistic use
+  # case for this endpoint is "drop everything for this runaway tenant".
 
   @integration @v1 @bulk-drain
   Scenario: drainTenant bulk-drains all groups for a tenantId
@@ -25,8 +29,9 @@ Feature: Tenant-scoped bulk drain (post-2026-05-11 incident)
     And tenant B's groups are untouched
 
   @integration @v1 @bulk-drain
-  Scenario: drainTenant supports optional pipeline filter
-    Given tenant A has groups in multiple pipelines
-    When the operator calls drainTenant with pipelineFilter="trace_processing"
-    Then only groups whose pipeline is trace_processing are drained
-    And groups in other pipelines for tenant A are preserved
+  Scenario: drainTenant decrements stats:total-pending atomically per group
+    Given a queue with N pending jobs across tenant A's groups
+    When drainTenant is called for tenant A
+    Then stats:total-pending decreases by N (the staged jobs)
+    And if a group also had an active job, total-pending decreases by 1 more
+    And total-pending never silently leaks after bulk drain

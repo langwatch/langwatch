@@ -432,22 +432,25 @@ describe("QueueService", () => {
         });
       });
 
-      /** @scenario drainTenant supports optional pipeline filter */
-      it("forwards pipelineFilter when provided", async () => {
-        const repo = createMockRepo();
+      /** @scenario drainTenant decrements stats:total-pending atomically per group */
+      it("returns counts in the shape the UI expects (groupsDrained + jobsDrained)", async () => {
+        // Decrement semantics are tested at the Lua level (see
+        // scripts.integration.test.ts "decrements stats:total-pending");
+        // here we just verify the service surfaces the repo's totals
+        // through to the caller without re-shaping them.
+        const repo = createMockRepo({
+          drainTenant: vi
+            .fn()
+            .mockResolvedValue({ groupsDrained: 3, jobsDrained: 12 }),
+        });
         const service = new QueueService(repo);
 
-        await service.drainTenant({
+        const result = await service.drainTenant({
           queueName: "q1",
           tenantId: "project_X",
-          pipelineFilter: "trace_processing",
         });
 
-        expect(repo.drainTenant).toHaveBeenCalledWith({
-          queueName: "q1",
-          tenantId: "project_X",
-          pipelineFilter: "trace_processing",
-        });
+        expect(result).toEqual({ groupsDrained: 3, jobsDrained: 12 });
       });
     });
   });

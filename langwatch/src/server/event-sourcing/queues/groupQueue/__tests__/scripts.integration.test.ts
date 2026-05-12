@@ -6,6 +6,7 @@ import {
   getTestRedisConnection,
 } from "../../../__tests__/integration/testContainers";
 import { GroupStagingScripts, type DispatchResult } from "../scripts";
+import { QueueRedisRepository } from "../../../../app-layer/ops/repositories/queue.redis.repository";
 
 let redis: Redis;
 let scripts: GroupStagingScripts;
@@ -1707,6 +1708,90 @@ describe("GroupStagingScripts", () => {
       expect(results[0]!.stagedJobId).toBe("j1");
     });
   });
+  });
+
+  // ============================================================================
+  // DRAIN_GROUP_LUA (lives in queue.redis.repository.ts but consumes the same
+  // group keys and stats:total-pending counter that the scripts in this suite
+  // produce, so it belongs here). Post-2026-05-11 incident: drain MUST
+  // decrement total-pending or bulk-drain at 500K scale leaks the stat.
+  // ============================================================================
+  describe("DRAIN_GROUP_LUA total-pending decrement", () => {
+    let repo: QueueRedisRepository;
+    beforeAll(() => {
+      repo = new QueueRedisRepository(redis);
+    });
+
+    /** @scenario drainTenant decrements stats:total-pending atomically per group */
+    it("decrements stats:total-pending by the count of staged jobs dropped", async () => {
+      await scripts.stage(makeJob({ stagedJobId: "j1", groupId: "g-drain", dispatchAfterMs: 1000 }));
+      await scripts.stage(makeJob({ stagedJobId: "j2", groupId: "g-drain", dispatchAfterMs: 2000 }));
+      await scripts.stage(makeJob({ stagedJobId: "j3", groupId: "g-drain", dispatchAfterMs: 3000 }));
+
+      const before = Number(await redis.get(`${keyPrefix()}stats:total-pending`));
+      expect(before).toBe(3);
+
+      const result = await repo.drainGroup({ queueName: QUEUE_NAME, groupId: "g-drain" });
+      expect(result.jobsRemoved).toBe(3);
+
+      const after = Number(await redis.get(`${keyPrefix()}stats:total-pending`));
+      expect(after).toBe(0);
+    });
+
+    it("also decrements for an active in-flight job (active key is dropped, COMPLETE_LUA would no-op)", async () => {
+      // Stage two, dispatch one (now active), then drain. Total dropped
+      // should be 2: 1 staged + 1 active. total-pending must drop by 2,
+      // not 1, otherwise the active job's eventual COMPLETE_LUA call —
+      // which now no-ops because the active key is gone — would leak the
+      // counter forever.
+      await scripts.stage(makeJob({ stagedJobId: "j1", groupId: "g-active", dispatchAfterMs: 100 }));
+      await scripts.stage(makeJob({ stagedJobId: "j2", groupId: "g-active", dispatchAfterMs: 200 }));
+
+      const before = Number(await redis.get(`${keyPrefix()}stats:total-pending`));
+      expect(before).toBe(2);
+
+      // Move j1 from staged → active
+      const dispatched = await scripts.dispatch({ nowMs: 150, activeTtlSec: 60 });
+      expect(dispatched).not.toBeNull();
+      expect(dispatched!.stagedJobId).toBe("j1");
+      // Sanity: active key exists, only j2 left in staged jobsKey
+      expect(await inspectActiveKey("g-active")).toBe("j1");
+      const staged = await inspectGroupJobs("g-active");
+      expect(staged.filter((s) => !s.match(/^\d+$/))).toEqual(["j2"]);
+
+      const result = await repo.drainGroup({ queueName: QUEUE_NAME, groupId: "g-active" });
+      expect(result.jobsRemoved).toBe(2); // 1 staged (j2) + 1 active (j1)
+
+      const after = Number(await redis.get(`${keyPrefix()}stats:total-pending`));
+      expect(after).toBe(0); // started at 2, dropped 2
+    });
+
+    it("decrements only the active count when no jobs are staged", async () => {
+      // Edge case: ZCARD=0 but activeKey exists. Drop must still account for 1.
+      await scripts.stage(makeJob({ stagedJobId: "j1", groupId: "g-only-active", dispatchAfterMs: 100 }));
+      await scripts.dispatch({ nowMs: 150, activeTtlSec: 60 });
+      const beforeStaged = await inspectGroupJobs("g-only-active");
+      expect(beforeStaged.filter((s) => !s.match(/^\d+$/))).toEqual([]);
+      expect(await inspectActiveKey("g-only-active")).toBe("j1");
+
+      const before = Number(await redis.get(`${keyPrefix()}stats:total-pending`));
+      const result = await repo.drainGroup({ queueName: QUEUE_NAME, groupId: "g-only-active" });
+      expect(result.jobsRemoved).toBe(1);
+
+      const after = Number(await redis.get(`${keyPrefix()}stats:total-pending`));
+      expect(after).toBe(before - 1);
+    });
+
+    it("returns 0 and does not touch total-pending when the group is empty", async () => {
+      // Defensive: drain on a never-existed group should not push counter negative.
+      await redis.set(`${keyPrefix()}stats:total-pending`, "5");
+
+      const result = await repo.drainGroup({ queueName: QUEUE_NAME, groupId: "never-existed" });
+      expect(result.jobsRemoved).toBe(0);
+
+      const after = Number(await redis.get(`${keyPrefix()}stats:total-pending`));
+      expect(after).toBe(5);
+    });
   });
 
   describe("signal list cap", () => {

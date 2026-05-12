@@ -238,7 +238,6 @@ export const opsRouter = createTRPCRouter({
       z.object({
         queueName: z.string(),
         tenantId: z.string().min(1),
-        pipelineFilter: z.string().optional(),
       }),
     )
     .mutation(async ({ input }) => {
