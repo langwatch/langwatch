@@ -50,7 +50,7 @@ import { translateRouter } from "./routers/translate";
 import { automationRouter } from "./routers/automations";
 import { scimTokenRouter } from "./routers/scimToken";
 import { roleBindingRouter } from "./routers/roleBinding";
-import { personalAccessTokenRouter } from "./routers/personalAccessToken";
+import { apiKeyRouter } from "./routers/apiKey";
 import { groupRouter } from "./routers/group";
 import { userRouter } from "./routers/user";
 import { gatewayBudgetsRouter } from "./routers/gatewayBudgets";
@@ -113,7 +113,7 @@ const coreRouters = {
   licenseEnforcement: licenseEnforcementRouter,
   scimToken: scimTokenRouter,
   roleBinding: roleBindingRouter,
-  personalAccessToken: personalAccessTokenRouter,
+  apiKey: apiKeyRouter,
   group: groupRouter,
   ops: opsRouter,
   virtualKeys: virtualKeysRouter,

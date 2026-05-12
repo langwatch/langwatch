@@ -4,7 +4,7 @@ import { checkApiKey } from "../utils/apiKey";
 import {
   createLangWatchApiClient,
 } from "@/internal/api/client";
-import { buildAuthHeaders } from "@/internal/api/auth";
+import { buildAuthHeaders, isPersonalAccessToken } from "@/internal/api/auth";
 import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
 
 export const statusCommand = async (options?: { format?: string }): Promise<void> => {
@@ -107,7 +107,11 @@ export const statusCommand = async (options?: { format?: string }): Promise<void
     console.log(chalk.red("  ✗ Could not fetch any project resources."));
     console.log(chalk.gray(`    Reason: ${sampleError}`));
     console.log();
-    if (allUnauthorized) {
+    if (allUnauthorized && isPersonalAccessToken(apiKey) && !process.env.LANGWATCH_PROJECT_ID) {
+      console.log(chalk.gray(`    Your PAT requires ${chalk.cyan("LANGWATCH_PROJECT_ID")} to be set.`));
+      console.log(chalk.gray(`    Set it via: ${chalk.cyan("export LANGWATCH_PROJECT_ID=<your-project-id>")}`));
+      console.log(chalk.gray(`    Or add to .env: ${chalk.cyan("LANGWATCH_PROJECT_ID=<your-project-id>")}`));
+    } else if (allUnauthorized) {
       console.log(chalk.gray(`    Your API key appears to be invalid or revoked. Re-run ${chalk.cyan("langwatch login")} or check ${chalk.cyan("LANGWATCH_API_KEY")}.`));
     } else {
       console.log(chalk.gray(`    Check ${chalk.cyan("LANGWATCH_API_KEY")} (current endpoint: ${chalk.cyan(endpoint)}).`));

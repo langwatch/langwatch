@@ -21,13 +21,13 @@ import { loggerMiddleware } from "~/app/api/middleware/logger";
 import { tracerMiddleware } from "~/app/api/middleware/tracer";
 import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
-import { TokenResolver } from "~/server/pat/token-resolver";
+import { TokenResolver } from "~/server/api-key/token-resolver";
 import {
   collectAuthDiagnostics,
-  enforcePatCeiling,
+  enforceApiKeyCeiling,
   extractCredentials,
-  patCeilingDenialResponse,
-} from "~/server/pat/auth-middleware";
+  apiKeyCeilingDenialResponse,
+} from "~/server/api-key/auth-middleware";
 import { decodeBase64OpenTelemetryId } from "~/server/tracer/utils";
 import { createLogger } from "~/utils/logger/server";
 import { captureException } from "~/utils/posthogErrorCapture";
@@ -160,13 +160,13 @@ async function authenticate(c: RouteContext, logger: ReturnType<typeof createLog
   // Enforce PAT ceiling (legacy tokens bypass). `traces:create` gates write
   // access on OTLP ingestion — same semantics as the collector path.
   try {
-    await enforcePatCeiling({
+    await enforceApiKeyCeiling({
       prisma,
       resolved,
       permission: "traces:create",
     });
   } catch (error) {
-    const denial = patCeilingDenialResponse(error);
+    const denial = apiKeyCeilingDenialResponse(error);
     logger.warn(
       {
         ...diag,
@@ -174,7 +174,7 @@ async function authenticate(c: RouteContext, logger: ReturnType<typeof createLog
         tokenType: classifyTokenType(credentials.token),
         denialStatus: denial.status,
       },
-      "PAT permission denied for traces:create",
+      "API key permission denied for traces:create",
     );
     return { error: denial.message, status: denial.status };
   }
@@ -415,8 +415,8 @@ app.post("/traces", async (c) => {
       }
 
       // Body successfully parsed — mark PAT as used
-      if (resolved.type === "pat") {
-        tokenResolver.markUsed({ patId: resolved.patId });
+      if (resolved.type === "apiKey") {
+        tokenResolver.markUsed({ apiKeyId: resolved.apiKeyId });
       }
 
       const collectionResult =
@@ -527,8 +527,8 @@ app.post("/logs", async (c) => {
       }
 
       // Body successfully parsed — mark PAT as used
-      if (resolved.type === "pat") {
-        tokenResolver.markUsed({ patId: resolved.patId });
+      if (resolved.type === "apiKey") {
+        tokenResolver.markUsed({ apiKeyId: resolved.apiKeyId });
       }
 
       await getApp().traces.logCollection.handleOtlpLogRequest({
@@ -632,8 +632,8 @@ app.post("/metrics", async (c) => {
       }
 
       // Body successfully parsed — mark PAT as used
-      if (resolved.type === "pat") {
-        tokenResolver.markUsed({ patId: resolved.patId });
+      if (resolved.type === "apiKey") {
+        tokenResolver.markUsed({ apiKeyId: resolved.apiKeyId });
       }
 
       await getApp().traces.metricCollection.handleOtlpMetricRequest({
