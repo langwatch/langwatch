@@ -21,7 +21,7 @@ const traceColumnDefs = {
   }),
   trace: traceCol.accessor("name", {
     id: "trace",
-    header: "Trace",
+    header: "Trace (summary)",
     // Was flex (`size: 9999, meta.flex`) so the column absorbed every
     // pixel of leftover space — fine on a typical lens with eight to
     // ten columns visible, but with a slimmer column set (or a

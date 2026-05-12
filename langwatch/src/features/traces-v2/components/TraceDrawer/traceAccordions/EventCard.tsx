@@ -109,15 +109,29 @@ export const EventCard: React.FC<EventCardProps> = ({
   );
 };
 
+// Cap serialised attribute payloads so a single span dropping a 200KB
+// object doesn't blow up the renderer (the event drawer is a sibling of
+// the trace timeline — a freeze here means the whole drawer goes
+// unresponsive). Truncation keeps the first chunk so the user still
+// recognises the value.
+const MAX_VALUE_LENGTH = 500;
+
 function formatValue(value: unknown): string {
   if (value === null) return "null";
   if (value === undefined) return "—";
-  if (typeof value === "string") return value;
+  if (typeof value === "string") {
+    return value.length > MAX_VALUE_LENGTH
+      ? value.slice(0, MAX_VALUE_LENGTH) + "… (truncated)"
+      : value;
+  }
   if (typeof value === "number" || typeof value === "boolean") {
     return String(value);
   }
   try {
-    return JSON.stringify(value);
+    const serialised = JSON.stringify(value);
+    return serialised.length > MAX_VALUE_LENGTH
+      ? serialised.slice(0, MAX_VALUE_LENGTH) + "… (truncated)"
+      : serialised;
   } catch {
     return String(value);
   }

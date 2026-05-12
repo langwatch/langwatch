@@ -491,7 +491,7 @@ export const tracesV2Router = createTRPCRouter({
         newName: z.string(),
       }),
     )
-    .use(checkProjectPermission("traces:view"))
+    .use(checkProjectPermission("traces:update"))
     .mutation(async ({ input, ctx }) => {
       const trimmed = input.newName.trim();
       const parsed = changeTraceNameInputSchema.safeParse({ newName: trimmed });

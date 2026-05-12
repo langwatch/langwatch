@@ -137,8 +137,8 @@ describe("applySpanToSummary() trace name extraction", () => {
   });
 
   describe("when multiple root spans exist", () => {
-    /** @scenario Multiple root spans use earliest start time */
-    it("uses the root span with earliest start time", () => {
+    /** @scenario Trace name is sticky once set */
+    it("keeps the first set trace name even when an earlier root arrives later", () => {
       const laterRoot = createTestSpan({
         id: "root-2",
         spanId: "root-2",
@@ -159,9 +159,11 @@ describe("applySpanToSummary() trace name extraction", () => {
       let state = applySpanToSummary({ state: createInitState(), span: laterRoot });
       expect(state.traceName).toBe("manual-handler");
 
-      // Earlier root arrives later — should overwrite
+      // Earlier root arrives second — trace name is sticky, but the
+      // canonical-root metadata still rotates to the truly earlier one.
       state = applySpanToSummary({ state, span: earlierRoot });
-      expect(state.traceName).toBe("auto-instrumented-GET");
+      expect(state.traceName).toBe("manual-handler");
+      expect(state.rootSpanStartTimeMs).toBe(1000);
     });
 
     it("keeps earlier root name when later root arrives second", () => {
@@ -302,6 +304,36 @@ describe("applySpanToSummary() trace name extraction", () => {
       // rootSpanType still updates from the discovered span — the latch
       // only protects the user-facing name.
       expect(state.rootSpanStartTimeMs).toBe(1000);
+    });
+
+    it("still records rootSpanType/StartTimeMs when the rename arrives before any root span", () => {
+      // Regression: the canonical-root gate used to be `traceName !== ""`,
+      // which a TraceNameChanged event could trip before any root span
+      // existed — freezing out later root-span discoveries entirely. The
+      // gate is now anchored on `rootSpanStartTimeMs` so root metadata
+      // still populates even when the name is latched.
+      const projection = makeProjection();
+      let state = createInitState();
+
+      state = projection.apply(
+        state,
+        makeTraceNameChangedEvent({ newName: "Manually labelled trace" }),
+      );
+      expect(state.traceName).toBe("Manually labelled trace");
+      expect(state.rootSpanStartTimeMs).toBeUndefined();
+
+      const root = createTestSpan({
+        id: "root-1",
+        spanId: "root-1",
+        parentSpanId: null,
+        name: "auto-instrumented-GET",
+        startTimeUnixMs: 1500,
+      });
+      state = applySpanToSummary({ state, span: root });
+
+      expect(state.traceName).toBe("Manually labelled trace");
+      expect(state.traceNameUserOverridden).toBe(true);
+      expect(state.rootSpanStartTimeMs).toBe(1500);
     });
 
     it("can be replayed multiple times with the latest value winning", () => {

@@ -1,8 +1,6 @@
 import { Box, HStack, Text } from "@chakra-ui/react";
-import type React from "react";
 import { TracePresenceAvatars } from "~/features/presence/components/TracePresenceAvatars";
 import type { TraceListItem } from "../../../../../types/trace";
-import { TraceIdPeek } from "../../../../TraceIdPeek";
 import type { CellDef } from "../../types";
 import { SpanTypeBadge } from "./SpanTypeBadge";
 
@@ -11,18 +9,12 @@ export const TraceCell = {
   label: "Trace",
   render: ({ row }) => (
     <HStack gap={1.5} minWidth={0}>
-      <Box onClick={(e: React.MouseEvent) => e.stopPropagation()}>
-        <TraceIdPeek traceId={row.traceId} />
-      </Box>
       <TraceContent trace={row} size="compact" />
       <TracePresenceAvatars traceId={row.traceId} max={3} size="2xs" />
     </HStack>
   ),
   renderComfortable: ({ row }) => (
     <HStack gap={2} minWidth={0}>
-      <Box onClick={(e: React.MouseEvent) => e.stopPropagation()}>
-        <TraceIdPeek traceId={row.traceId} />
-      </Box>
       <TraceContent trace={row} size="comfortable" />
       <TracePresenceAvatars traceId={row.traceId} max={3} size="xs" />
     </HStack>

@@ -45,6 +45,7 @@ import {
   TraceIOAccumulationService,
   ScenarioRoleCostService,
   TracePromptAccumulationService,
+  TraceNameResolutionService,
   accumulateEvents,
   shouldOverrideOutput,
   extractIOFromLogRecord,
@@ -76,6 +77,7 @@ const traceIOAccumulationService = new TraceIOAccumulationService(
 );
 const scenarioRoleCostService = new ScenarioRoleCostService(spanCostService);
 const tracePromptAccumulationService = new TracePromptAccumulationService();
+const traceNameResolutionService = new TraceNameResolutionService();
 
 // ─── Main composition ───────────────────────────────────────────────
 
@@ -124,39 +126,12 @@ export function applySpanToSummary({
     span,
   });
 
-  // Pick the canonical root span. Precedence:
-  //   1. Named roots win over empty-named roots ("" = not set yet)
-  //   2. Among multiple named roots, earliest startTimeUnixMs wins
-  // After checkpoint reload, rootSpanStartTimeMs is undefined so the first
-  // root we see post-reload wins on tie. `traceName`, `rootSpanType`, and
-  // `rootSpanStartTimeMs` move together — they all describe the same span.
-  const isRootSpan = span.parentSpanId === null;
-  const spanStartMs = span.startTimeUnixMs;
+  // Precedence rules for traceName / rootSpanType / rootSpanStartTimeMs
+  // live in TraceNameResolutionService — see that file for the full set.
+  const { traceName, rootSpanType, rootSpanStartTimeMs } =
+    traceNameResolutionService.resolveFromSpan({ state, span });
+
   const spanType = String(span.spanAttributes[ATTR_KEYS.SPAN_TYPE] ?? "");
-
-  let traceName = state.traceName;
-  let rootSpanType = state.rootSpanType;
-  let rootSpanStartTimeMs = state.rootSpanStartTimeMs;
-  if (isRootSpan) {
-    const haveNamedRoot = traceName !== "";
-    const isEarlierNamedRoot =
-      span.name !== "" &&
-      rootSpanStartTimeMs !== undefined &&
-      spanStartMs < rootSpanStartTimeMs;
-    if (!haveNamedRoot || isEarlierNamedRoot) {
-      // Skip the trace-name overwrite when the user has explicitly
-      // renamed the trace — otherwise a delayed root span landing
-      // post-rename would silently wipe the edit. rootSpanType /
-      // rootSpanStartTimeMs still update (those are derived from the
-      // span itself, not user intent).
-      if (!state.traceNameUserOverridden) {
-        traceName = span.name;
-      }
-      rootSpanType = spanType || null;
-      rootSpanStartTimeMs = spanStartMs;
-    }
-  }
-
   const containsAi = state.containsAi || AI_SPAN_TYPES.has(spanType);
 
   const events = accumulateEvents({ state, span });

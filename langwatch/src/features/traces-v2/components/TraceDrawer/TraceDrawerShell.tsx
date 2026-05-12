@@ -351,19 +351,25 @@ function ResizeEdgeGrip({
   // The OS cursor reflects that — `w-resize` for the maximized state and
   // `e-resize` for the restored state. Single-click toggles between the
   // two; the previous double-click-only handler made the grip feel
-  // unresponsive (users tapped once, nothing happened, gave up). Both
-  // `onClick` and `onDoubleClick` are wired so a fast double-tap still
-  // toggles exactly once instead of toggling and immediately reverting.
+  // unresponsive (users tapped once, nothing happened, gave up).
   const cursor = isMaximized ? "w-resize" : "e-resize";
   const lastClickRef = useRef(0);
   const handleClick = () => {
     const now = Date.now();
-    // Browsers fire `click` once for the first press of a double-click
-    // sequence and then a `dblclick` event afterward. Coalescing inside a
-    // 350ms window prevents the two events from racing and toggling twice.
+    // Browsers fire `click` twice during a double-tap (once per press) and
+    // then a `dblclick`. Coalescing inside a 350ms window prevents the
+    // second click from undoing the toggle. We don't wire `onDoubleClick`
+    // — the click coalescing already handles it, and a separate dblclick
+    // handler would bypass the guard.
     if (now - lastClickRef.current < 350) return;
     lastClickRef.current = now;
     onToggle();
+  };
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      handleClick();
+    }
   };
   return (
     <Tooltip
@@ -383,8 +389,14 @@ function ResizeEdgeGrip({
         // sticky table header / focus outline could swallow the click.
         zIndex={10}
         onClick={handleClick}
-        onDoubleClick={onToggle}
+        onKeyDown={handleKeyDown}
+        tabIndex={0}
         _hover={{ "& > [data-edge-grip]": { opacity: 1 } }}
+        _focusVisible={{
+          outline: "2px solid",
+          outlineColor: "blue.500",
+          outlineOffset: "-2px",
+        }}
         aria-label={
           isMaximized
             ? "Restore drawer width (click)"
