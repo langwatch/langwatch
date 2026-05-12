@@ -182,9 +182,16 @@ export function TokenCreatedDialog({
 
             {/* ── Section 1: Code Assistants ── */}
             <VStack gap={3} align="stretch">
-              <Text fontWeight="700" fontSize="sm">
-                Use with Code Assistants
-              </Text>
+              <HStack justify="space-between" align="baseline">
+                <Text fontWeight="700" fontSize="sm">
+                  Use with Code Assistants
+                </Text>
+                {orgProjects.length > 1 && (
+                  <Text fontSize="sm" fontWeight="700">
+                    Project
+                  </Text>
+                )}
+              </HStack>
 
               <HStack gap={3} align="center" flexWrap="wrap" justify="space-between">
                 <HStack gap={1} px={1.5} py={1.5} borderRadius="xl" border="1px solid" borderColor="border.subtle" bg="bg.panel/70" boxShadow="sm" width="fit-content">
@@ -192,31 +199,26 @@ export function TokenCreatedDialog({
                   <TabButton label="Codex" active={assistantTab === "codex"} onClick={() => setAssistantTab("codex")} />
                 </HStack>
                 {orgProjects.length > 1 && (
-                  <VStack gap={1} align="start">
-                    <Text fontSize="sm" fontWeight="700">
-                      Project
-                    </Text>
-                    <Select.Root
-                      collection={projectCollection}
-                      value={activeProjectId ? [activeProjectId] : []}
-                      onValueChange={(details) => {
-                        setSelectedProjectId(details.value[0] ?? "");
-                      }}
-                      size="sm"
-                      width="200px"
-                    >
-                      <Select.Trigger background="bg" borderRadius="lg">
-                        <Select.ValueText placeholder="Select project" />
-                      </Select.Trigger>
-                      <Select.Content>
-                        {projectCollection.items.map((item) => (
-                          <Select.Item key={item.value} item={item}>
-                            {item.label}
-                          </Select.Item>
-                        ))}
-                      </Select.Content>
-                    </Select.Root>
-                  </VStack>
+                  <Select.Root
+                    collection={projectCollection}
+                    value={activeProjectId ? [activeProjectId] : []}
+                    onValueChange={(details) => {
+                      setSelectedProjectId(details.value[0] ?? "");
+                    }}
+                    size="sm"
+                    width="200px"
+                  >
+                    <Select.Trigger background="bg" borderRadius="lg">
+                      <Select.ValueText placeholder="Select project" />
+                    </Select.Trigger>
+                    <Select.Content>
+                      {projectCollection.items.map((item) => (
+                        <Select.Item key={item.value} item={item}>
+                          {item.label}
+                        </Select.Item>
+                      ))}
+                    </Select.Content>
+                  </Select.Root>
                 )}
               </HStack>
 
