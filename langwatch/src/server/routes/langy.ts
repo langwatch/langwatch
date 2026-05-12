@@ -40,7 +40,11 @@ import {
   LangyProjectMemoryService,
   LangyUserPreferencesService,
 } from "~/server/services/langy";
-import { LANGY_SYSTEM_PROMPT } from "~/server/services/langy/prompts";
+import {
+  LANGY_EXPERT_MODE_SUFFIX,
+  LANGY_NON_EXPERT_MODE_SUFFIX,
+  LANGY_SYSTEM_PROMPT,
+} from "~/server/services/langy/prompts";
 import { ConversationToolIdSet } from "~/server/services/langy/toolIdValidator";
 import {
   LANGY_TOOL_CALLS_PER_MESSAGE,
@@ -63,13 +67,9 @@ function buildSystemPrompt(opts: {
 }): string {
   const segments = [LANGY_SYSTEM_PROMPT];
   if (opts.mode === "expert") {
-    segments.push(
-      "\n## Mode: expert\n- Be terse. Drop confirmations the user did not ask for. Skip restating the question. Use jargon freely.",
-    );
+    segments.push(LANGY_EXPERT_MODE_SUFFIX);
   } else {
-    segments.push(
-      "\n## Mode: non-expert\n- Default to plain language. Confirm before destructive actions. Prefer visual summaries over JSON.",
-    );
+    segments.push(LANGY_NON_EXPERT_MODE_SUFFIX);
   }
   if (opts.projectMemory) {
     segments.push(

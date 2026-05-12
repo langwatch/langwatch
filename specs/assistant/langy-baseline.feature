@@ -106,6 +106,32 @@ Feature: Langy in-product AI assistant — baseline (v1)
     And the partial response is preserved
 
   # ============================================================================
+  # Mode toggle (PR-3.1)
+  # ============================================================================
+
+  Scenario: Default mode is non-expert
+    Given I have never set my Langy mode preference
+    When I open Langy in project "demo"
+    Then Langy responds in plain language
+    And Langy asks me to confirm before applying destructive proposals
+
+  Scenario: Switch to expert mode
+    Given I am in project "demo"
+    When I open Langy settings and turn on "Expert mode"
+    Then my preference is saved
+    And subsequent Langy responses are terse and skip restating my question
+
+  Scenario: Mode preference persists across sessions
+    Given I have turned on "Expert mode" in project "demo"
+    When I reload the page or sign back in
+    Then "Expert mode" is still on
+
+  Scenario: Mode is scoped per project
+    Given I have turned on "Expert mode" in project "demo"
+    When I switch to project "other"
+    Then my mode in "other" is whatever I set there, independent of "demo"
+
+  # ============================================================================
   # Read-only boundary (v1)
   # ============================================================================
 

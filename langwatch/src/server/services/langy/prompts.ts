@@ -51,6 +51,14 @@ export const LANGY_SYSTEM_PROMPT = `You are Langy, the in-product AI assistant f
 - If the user wants to choose a model, ask them which and then pass it in settings.model when proposing.
 - Mention the chosen model briefly in your reply so the user can catch it before applying.`;
 
+export const LANGY_EXPERT_MODE_SUFFIX = `
+## Mode: expert
+- Be terse. Drop confirmations the user did not ask for. Skip restating the question. Use jargon freely.`;
+
+export const LANGY_NON_EXPERT_MODE_SUFFIX = `
+## Mode: non-expert
+- Default to plain language. Confirm before destructive actions. Prefer visual summaries over JSON.`;
+
 export const PROJECT_MEMORY_REFRESH_PROMPT = `You are regenerating a project memory file for the LangWatch assistant Langy.
 
 Read the snapshot of the project state below (evaluators, prompts, datasets) and produce a concise, plain-language markdown brief covering:

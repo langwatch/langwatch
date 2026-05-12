@@ -120,6 +120,25 @@ export class LangyUserPreferencesService {
     });
   }
 
+  async update({
+    userId,
+    projectId,
+    mode,
+    dismissedSuggestionKinds,
+  }: {
+    userId: string;
+    projectId: string;
+    mode?: LangyMode;
+    dismissedSuggestionKinds?: string[];
+  }): Promise<LangyUserPreferences> {
+    return await this.repository.upsert({
+      userId,
+      projectId,
+      mode,
+      dismissedSuggestionKinds,
+    });
+  }
+
   async resetForUser({
     userId,
     projectId,

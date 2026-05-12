@@ -25,24 +25,12 @@ export function registerLangyPreferencesRoutes(app: Hono) {
     const guard = await requireSessionAndPermission(c, body.projectId);
     if (guard.error) return guard.error;
     const service = LangyUserPreferencesService.create(prisma);
-    let prefs = await service.getById({
+    const prefs = await service.update({
       userId: guard.session.user.id,
       projectId: body.projectId,
+      mode: body.mode,
+      dismissedSuggestionKinds: body.dismissedSuggestionKinds,
     });
-    if (body.mode) {
-      prefs = await service.setMode({
-        userId: guard.session.user.id,
-        projectId: body.projectId,
-        mode: body.mode,
-      });
-    }
-    if (body.dismissedSuggestionKinds) {
-      prefs = await service.setDismissedSuggestionKinds({
-        userId: guard.session.user.id,
-        projectId: body.projectId,
-        kinds: body.dismissedSuggestionKinds,
-      });
-    }
     return c.json({ preferences: prefs });
   });
 }

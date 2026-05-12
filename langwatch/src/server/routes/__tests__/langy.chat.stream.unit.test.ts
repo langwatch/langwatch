@@ -542,3 +542,99 @@ describe("POST /api/langy/chat streaming — binds langy-baseline.feature § str
     });
   });
 });
+
+describe("POST /api/langy/chat system prompt — preferences.mode flips the suffix", () => {
+  // The system prompt is passed directly to the model's `doStream`, so we
+  // capture the first call's `system` field and inspect it.
+  function makeCapturingStubModel() {
+    const captured: { system?: string } = {};
+    const doStream: DoStreamFactory = async (args: {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      prompt?: Array<{ role: string; content: any }>;
+      system?: string;
+    }) => {
+      if (typeof args.system === "string") {
+        captured.system = args.system;
+      } else if (Array.isArray(args.prompt)) {
+        const systemMsg = args.prompt.find((m) => m.role === "system");
+        if (systemMsg) {
+          captured.system =
+            typeof systemMsg.content === "string"
+              ? systemMsg.content
+              : Array.isArray(systemMsg.content)
+                ? systemMsg.content
+                    .map((p: { text?: string }) => p.text ?? "")
+                    .join("")
+                : "";
+        }
+      }
+      return {
+        stream: simulateReadableStream({
+          chunks: [
+            { type: "stream-start", warnings: [] },
+            { type: "response-metadata", id: "rsp-1", modelId: "mock-1" },
+            { type: "text-start", id: "txt-1" },
+            { type: "text-delta", id: "txt-1", delta: "ok" },
+            { type: "text-end", id: "txt-1" },
+            {
+              type: "finish",
+              finishReason: "stop",
+              usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 },
+            },
+          ],
+          initialDelayInMs: null,
+          chunkDelayInMs: null,
+        }) as never,
+      };
+    };
+    return { model: new MockLanguageModelV3({ doStream }), captured };
+  }
+
+  async function sendMessage(): Promise<void> {
+    const res = await app.request("/api/langy/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        projectId: "proj_demo",
+        messages: [
+          {
+            id: "m1",
+            role: "user",
+            parts: [{ type: "text", text: "hi" }],
+          },
+        ],
+      }),
+    });
+    await readBody(res);
+  }
+
+  describe("given preferences.mode is 'expert'", () => {
+    it("passes the expert-mode suffix in the system prompt", async () => {
+      const { model, captured } = makeCapturingStubModel();
+      mockGetVercelAIModel.mockResolvedValue(model);
+      mockGetUserPrefs.mockResolvedValue({ mode: "expert" });
+
+      await sendMessage();
+
+      expect(captured.system).toBeDefined();
+      expect(captured.system).toContain("Mode: expert");
+      expect(captured.system).toContain("Be terse");
+      expect(captured.system).not.toContain("Mode: non-expert");
+    });
+  });
+
+  describe("given preferences.mode is 'non_expert'", () => {
+    it("passes the non-expert-mode suffix in the system prompt", async () => {
+      const { model, captured } = makeCapturingStubModel();
+      mockGetVercelAIModel.mockResolvedValue(model);
+      mockGetUserPrefs.mockResolvedValue({ mode: "non_expert" });
+
+      await sendMessage();
+
+      expect(captured.system).toBeDefined();
+      expect(captured.system).toContain("Mode: non-expert");
+      expect(captured.system).toContain("plain language");
+      expect(captured.system).not.toContain("Mode: expert");
+    });
+  });
+});
