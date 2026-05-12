@@ -181,7 +181,6 @@ export const app = new Hono<{ Variables: Variables }>()
       return c.json(
         {
           ...projectResponse(project),
-          apiKey: project.apiKey,
           serviceApiKey: serviceKey.token,
           serviceApiKeyId: serviceKey.apiKey.id,
         },
@@ -206,10 +205,7 @@ export const app = new Hono<{ Variables: Variables }>()
         throw new NotFoundError("Project not found");
       }
 
-      return c.json({
-        ...projectResponse(project),
-        apiKey: project.apiKey,
-      });
+      return c.json(projectResponse(project));
     },
   )
 
