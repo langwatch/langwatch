@@ -1,0 +1,79 @@
+# Post-merge build of the main LangWatch app Dockerfile. See #3269.
+#
+# Why post-merge, not PR-time:
+#   The app Docker build is slow (~20m on the release builder — monorepo
+#   pnpm install + Next.js/Vite build + Prisma + mcp-server linking).
+#   Current critical path for PR merge is ~11m (sdk-python test). Adding
+#   a 20m job to PR critical path would roughly double merge time. The
+#   smaller Dockerfiles (langevals, langwatch_nlp) build in <5m so they
+#   stay on PR.
+#
+# What it catches:
+#   Dockerfile syntax errors, missing build args, broken deps, or any
+#   transient breakage of the production image — within ~20m of merge,
+#   instead of "whenever someone next cuts a release."
+#
+# Failure surfaces through the consolidated Slack notifier
+# (.github/workflows/notify-main-failures.yml) — no inline notify step
+# here, since check_suite picks it up automatically.
+name: docker-build-app
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      # Trigger only when something that affects the production image
+      # actually changes. Most main pushes are SDK/docs/CI churn that
+      # leaves the Dockerfile unaffected, so this saves ~20m of runner
+      # time per merge.
+      - "Dockerfile"
+      - "langwatch/**"
+      - "mcp-server/**"
+      - "langevals/ts-integration/evaluators.generated.ts"
+      - "typescript-sdk/package.json"
+      - "python-sdk/pyproject.toml"
+      - ".github/workflows/docker-build-app.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    # The release builder reports ~20m; give the validator a generous
+    # cap to absorb cold-cache runs after a lockfile change.
+    timeout-minutes: 35
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      - name: Build app image (validation only)
+        # Mirrors the publish-docker-app.yml amd64 build (same Dockerfile,
+        # same cache scope) so warm-cache hits transfer between this job
+        # and the release builder. push=false: we're proving the build
+        # works, not shipping an image — the release workflow owns
+        # pushing.
+        uses: docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f # v7.1.0
+        with:
+          context: .
+          file: Dockerfile
+          push: false
+          platforms: linux/amd64
+          cache-from: type=gha,scope=langwatch-amd64
+          cache-to: type=gha,mode=max,scope=langwatch-amd64
+          tags: langwatch/langwatch:main-validate
+
+  docker-build-app-complete:
+    needs: [build]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: re-actors/alls-green@05ac9388f0aebcb5727afa17fcccfecd6f8ec5fe # v1.2.2
+        with:
+          jobs: ${{ toJSON(needs) }}

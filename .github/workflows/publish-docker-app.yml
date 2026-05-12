@@ -11,7 +11,40 @@ on:
         default: 'next'
 
 jobs:
+  # Verify the latest post-merge Dockerfile build on main was green
+  # (#3269). The release builds the same Dockerfile; if main's docker
+  # validator hasn't run yet or failed, we'd otherwise discover a broken
+  # image during release tagging — too late.
+  check-main-build-green:
+    runs-on: ubuntu-latest
+    if: >-
+      startsWith(github.event.release.tag_name, 'langwatch@')
+      || github.event_name == 'workflow_dispatch'
+    steps:
+      - name: Verify latest docker-build-app on main is success
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # Look at the most recent completed run of docker-build-app.yml
+          # on main. If it doesn't exist (workflow never ran) or it
+          # failed, refuse to release.
+          conclusion=$(gh run list \
+            --workflow docker-build-app.yml \
+            --branch main \
+            --status completed \
+            --limit 1 \
+            --json conclusion \
+            --jq '.[0].conclusion // "missing"')
+          echo "Latest docker-build-app run on main: $conclusion"
+          if [ "$conclusion" != "success" ]; then
+            echo "::error::Refusing to release: latest docker-build-app on main is '$conclusion' (expected 'success')."
+            echo "::error::Investigate or re-run docker-build-app.yml against the release commit before retrying."
+            exit 1
+          fi
+
   extract-version:
+    needs: check-main-build-green
     runs-on: ubuntu-latest
     if: >-
       startsWith(github.event.release.tag_name, 'langwatch@')
