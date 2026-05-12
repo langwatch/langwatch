@@ -16,6 +16,7 @@ import { DefaultChatTransport, type UIMessage } from "ai";
 import { MeshGradient } from "@paper-design/shaders-react";
 import { keyframes } from "@emotion/react";
 import {
+  AlertTriangle,
   ArrowRight,
   Check,
   Plus,
@@ -25,6 +26,7 @@ import {
   Trash2,
   X,
 } from "lucide-react";
+import NextLink from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Kbd } from "~/components/ops/shared/Kbd";
 import { Markdown } from "~/components/Markdown";
@@ -483,6 +485,10 @@ function LangyPanel({
   const [applyingProposals, setApplyingProposals] = useState<Set<string>>(
     new Set(),
   );
+  // L4 staleness signal: server flags memory older than 30 days; sidebar
+  // surfaces a dismissible banner so users see it without visiting Settings.
+  const [memoryIsStale, setMemoryIsStale] = useState(false);
+  const [staleBannerDismissed, setStaleBannerDismissed] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const transport = useMemo(
@@ -545,6 +551,26 @@ function LangyPanel({
     if (!scrollRef.current) return;
     scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [messages, status]);
+
+  useEffect(() => {
+    if (!isOpen || !projectId) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch(
+          `/api/langy/project-memory?projectId=${encodeURIComponent(projectId)}`,
+        );
+        if (!res.ok) return;
+        const data = (await res.json()) as { isStale?: boolean };
+        if (!cancelled) setMemoryIsStale(Boolean(data.isStale));
+      } catch {
+        // staleness signal is non-critical; ignore network errors
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, projectId]);
 
   const isBusy = status === "submitted" || status === "streaming";
   const isEmpty = messages.length === 0;
@@ -680,6 +706,40 @@ function LangyPanel({
           onSelect={handleSelectConversation}
           onDelete={(id) => void removeConversation(id)}
         />
+        {memoryIsStale && !staleBannerDismissed && (
+          <HStack
+            background="orange.subtle"
+            color="orange.fg"
+            paddingX={3}
+            paddingY={2}
+            marginX="18px"
+            marginTop="12px"
+            borderRadius="md"
+            gap={2}
+            role="status"
+            aria-label="Project memory is over 30 days old"
+          >
+            <AlertTriangle size={14} />
+            <Text fontSize="sm" flex={1}>
+              Project memory is over 30 days old.{" "}
+              <NextLink
+                href="/settings/langy-memory"
+                style={{ textDecoration: "underline" }}
+              >
+                Refresh in settings
+              </NextLink>
+              .
+            </Text>
+            <IconButton
+              aria-label="Dismiss stale memory banner"
+              size="xs"
+              variant="ghost"
+              onClick={() => setStaleBannerDismissed(true)}
+            >
+              <X size={12} />
+            </IconButton>
+          </HStack>
+        )}
         <Box ref={scrollRef} flex={1} overflowY="auto" aria-live="polite">
           {isEmpty ? (
             <EmptyState onPick={(prompt) => void send(prompt)} />
