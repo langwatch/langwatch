@@ -1,6 +1,7 @@
 import posthog from "posthog-js";
 import { useEffect } from "react";
 import { usePublicEnv } from "./usePublicEnv";
+import { installPosthogRateLimitLogDowngrade } from "~/utils/posthogRateLimitLogDowngrade";
 
 export function usePostHog() {
   const publicEnv = usePublicEnv();
@@ -12,6 +13,7 @@ export function usePostHog() {
     const posthogHost = publicEnv.data?.POSTHOG_HOST;
 
     if (posthogKey) {
+      installPosthogRateLimitLogDowngrade();
       // capture_pageview: "history_change" tells posthog-js to capture
       // $pageview on every History API navigation (pushState / popstate),
       // not just on initial page load. In posthog-js 1.369 this defaults
