@@ -16,6 +16,7 @@ import { connection } from "../../redis";
 import { prisma } from "../../db";
 import { LANGY_BOOTSTRAP_QUEUE } from "../queues/constants";
 import { LangyProjectMemoryService } from "../../services/langy";
+import { LANGY_BOOTSTRAP_PROMPT } from "../../services/langy/prompts";
 import { getVercelAIModel } from "../../modelProviders/utils";
 
 const logger = createLogger("langwatch:workers:langyBootstrapWorker");
@@ -25,16 +26,6 @@ const FALLBACK_MODEL = "openai/gpt-5-mini";
 export type LangyBootstrapJob = {
   projectId: string;
 };
-
-const BOOTSTRAP_PROMPT = `You are bootstrapping a project memory file for the LangWatch assistant "Langy".
-
-Read the snapshot of the project below (evaluators, prompts, recent traces). Produce a concise markdown brief that helps Langy understand:
-- What this project appears to do (one sentence)
-- Key evaluators in use and what they check
-- Notable prompts and their purpose
-- Anything unusual or noteworthy in recent activity
-
-Keep it under 1500 tokens. Use plain language. No code blocks unless essential. Do not invent facts.`;
 
 async function gatherProjectSnapshot(projectId: string) {
   const [project, evaluators, prompts, datasets] = await Promise.all([
@@ -98,7 +89,7 @@ export async function runLangyBootstrapJob(
       }
       const result = await generateText({
         model,
-        system: BOOTSTRAP_PROMPT,
+        system: LANGY_BOOTSTRAP_PROMPT,
         messages: [{ role: "user", content: userMessage }],
       });
       content = result.text.trim();
