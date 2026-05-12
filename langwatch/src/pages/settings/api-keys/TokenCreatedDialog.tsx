@@ -192,7 +192,7 @@ export function TokenCreatedDialog({
                   <TabButton label="Codex" active={assistantTab === "codex"} onClick={() => setAssistantTab("codex")} />
                 </HStack>
                 {orgProjects.length > 1 && (
-                  <VStack gap={1} align="end">
+                  <VStack gap={1} align="start">
                     <Text fontSize="xs" fontWeight="600" color="fg.muted">
                       Project
                     </Text>
