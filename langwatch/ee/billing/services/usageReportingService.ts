@@ -4,6 +4,8 @@ import { createLogger } from "../../../src/utils/logger";
 
 const logger = createLogger("langwatch:billing:usageReportingService");
 
+const STRIPE_METER_EVENT_VALUE_MAX = 999_999_999_999_999;
+
 const meterEventSchema = z.object({
   eventName: z.string().min(1),
   value: z.number().int().nonnegative(),
@@ -89,6 +91,28 @@ export class StripeUsageReportingService implements UsageReportingService {
     timestamp: number;
     identifier: string;
   }): Promise<MeterEventResult> {
+    if (value > STRIPE_METER_EVENT_VALUE_MAX) {
+      const error = "Stripe meter event values must not exceed 15 digits";
+
+      logger.warn(
+        {
+          organizationId,
+          identifier,
+          valueSent: value,
+          reported: false,
+          error,
+        },
+        "[billing] Meter event value rejected before Stripe call"
+      );
+
+      return {
+        identifier,
+        reported: false,
+        valueSent: 0,
+        error,
+      };
+    }
+
     try {
       await this.stripe.billing.meterEvents.create({
         event_name: eventName,
