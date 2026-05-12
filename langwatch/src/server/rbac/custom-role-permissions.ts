@@ -57,8 +57,8 @@ export class MalformedCustomRolePermissionsError extends DomainError {
  * `MalformedCustomRolePermissionsError` if the value does not conform.
  *
  * Shared across:
- *   - `PatService.assertCustomRoleWithinCeiling` — lets the throw bubble so
- *     PAT creation rejects with 403 (wrapped as `PatScopeViolationError`)
+ *   - `ApiKeyService.assertCustomRoleWithinCeiling` — lets the throw bubble so
+ *     API key creation rejects with 403 (wrapped as `ApiKeyScopeViolationError`)
  *   - `checkRoleBindingPermission` — catches and returns `false` (denied)
  *
  * The caller is responsible for mapping the throw to the right outcome for
