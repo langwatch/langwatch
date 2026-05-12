@@ -258,7 +258,7 @@ export function ApiKeysSection({
                       <Text fontSize="sm" color="fg.muted">—</Text>
                     </Table.Cell>
                     <Table.Cell>
-                      <Badge size="sm" colorPalette="purple">Project</Badge>
+                      <Text fontSize="sm" color="fg.muted">—</Text>
                     </Table.Cell>
                     <Table.Cell>
                       <Text fontSize="sm">Project only</Text>
