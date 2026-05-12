@@ -457,6 +457,37 @@ export async function startScenarioProcessor(
     void handleCancelledJobResult(jobData, "Cancelled before execution started", deps);
   });
 
+  // Wire the drain callback so worker restarts (maxRuntime, deploy, OOM)
+  // emit terminal failure events for every in-flight job. Without this,
+  // runs orphan at QUEUED/STARTING when the worker is killed mid-execution
+  // (#3195, #3365).
+  //
+  // Each drain dispatch is tracked so close() can await every failure event
+  // before allowing the worker process to exit — otherwise the events would
+  // race a process restart and the runs would still orphan.
+  const inflightDrainEvents = new Set<Promise<void>>();
+  pool.setOnDrain((jobData, reason) => {
+    logger.info(
+      { scenarioRunId: jobData.scenarioRunId, reason },
+      "Dispatching finished(ERROR) for drained job",
+    );
+    const promise = handleFailedJobResult(
+      jobData,
+      "Scenario execution interrupted by worker restart (worker_drain)",
+      deps,
+    ).catch((err: unknown) =>
+      logger.error(
+        {
+          scenarioRunId: jobData.scenarioRunId,
+          err: err instanceof Error ? err.message : String(err),
+        },
+        "Failed to dispatch terminal failed event for drained job",
+      ),
+    );
+    inflightDrainEvents.add(promise);
+    void promise.finally(() => inflightDrainEvents.delete(promise));
+  });
+
   // Subscribe to cancellation signals from the event-sourcing reactor
   const subscriber = connection.duplicate();
   const unsubscribe = await subscribeToCancellations({
@@ -482,6 +513,16 @@ export async function startScenarioProcessor(
   return {
     close: async () => {
       pool.drain();
+      // Wait for every drain-triggered failure event to flush so the runs
+      // transition out of QUEUED/STARTING before the worker process exits
+      // (#3195, #3365).
+      if (inflightDrainEvents.size > 0) {
+        logger.info(
+          { inflight: inflightDrainEvents.size },
+          "Awaiting drain-triggered failure events before close",
+        );
+        await Promise.allSettled(Array.from(inflightDrainEvents));
+      }
       await unsubscribe().catch((err: unknown) =>
         logger.warn({ err }, "Error closing cancellation subscriber"),
       );

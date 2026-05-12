@@ -133,22 +133,36 @@ describe("SerializedCodeAgentAdapter", () => {
   });
 
   describe("when the code execution fails", () => {
-    it("extracts error detail from JSON response", async () => {
+    it("extracts error detail from JSON response and labels user code", async () => {
       mockFetch.mockResolvedValue({
         ok: false,
         status: 500,
-        json: vi.fn().mockResolvedValue({ detail: "Python runtime error" }),
-        text: vi.fn().mockResolvedValue('{"detail": "Python runtime error"}'),
+        json: vi.fn().mockResolvedValue({
+          detail:
+            "Traceback (most recent call last):\n  File 'agent.py', line 12\nValueError: Python runtime error",
+        }),
+        text: vi.fn().mockResolvedValue(
+          '{"detail": "Traceback (most recent call last):\\n  File \'agent.py\', line 12\\nValueError: Python runtime error"}',
+        ),
       });
 
       const adapter = new SerializedCodeAgentAdapter(defaultConfig, nlpServiceUrl, apiKey);
 
-      await expect(adapter.call(defaultInput)).rejects.toThrow(
-        "Code execution failed: HTTP 500 - Python runtime error",
-      );
+      const err: Error = await adapter
+        .call(defaultInput)
+        .then(
+          () => {
+            throw new Error("expected call to reject");
+          },
+          (e: unknown) => e as Error,
+        );
+      expect(err).toBeInstanceOf(Error);
+      expect(err.message).toMatch(/^\[user code\]/);
+      expect(err.message).toContain("HTTP 500");
+      expect(err.message).toContain("ValueError: Python runtime error");
     });
 
-    it("falls back to text when JSON parsing fails", async () => {
+    it("falls back to text when JSON parsing fails and labels as nlp_service", async () => {
       mockFetch.mockResolvedValue({
         ok: false,
         status: 502,
@@ -158,9 +172,65 @@ describe("SerializedCodeAgentAdapter", () => {
 
       const adapter = new SerializedCodeAgentAdapter(defaultConfig, nlpServiceUrl, apiKey);
 
-      await expect(adapter.call(defaultInput)).rejects.toThrow(
-        "Code execution failed: HTTP 502 - Bad Gateway",
-      );
+      const err: Error = await adapter
+        .call(defaultInput)
+        .then(
+          () => {
+            throw new Error("expected call to reject");
+          },
+          (e: unknown) => e as Error,
+        );
+      expect(err.message).toMatch(/^\[nlp service\]/);
+      expect(err.message).toContain("HTTP 502");
+      expect(err.message).toContain("Bad Gateway");
+    });
+
+    it("strips AI SDK warnings and OTEL flush noise from the surfaced detail", async () => {
+      const noisyDetail = [
+        "AI SDK Warning (openai.chat / openai/gpt-5.2): The feature \"specificationVersion\" is used in a compatibility mode.",
+        "Traceback (most recent call last):",
+        "  File 'agent.py', line 1",
+        "ValueError: real cause",
+        "Flushing OTEL traces...",
+        "OTEL traces flushed",
+      ].join("\n");
+      mockFetch.mockResolvedValue({
+        ok: false,
+        status: 500,
+        json: vi.fn().mockResolvedValue({ detail: noisyDetail }),
+        text: vi.fn().mockResolvedValue(JSON.stringify({ detail: noisyDetail })),
+      });
+
+      const adapter = new SerializedCodeAgentAdapter(defaultConfig, nlpServiceUrl, apiKey);
+      const err: Error = await adapter
+        .call(defaultInput)
+        .then(
+          () => {
+            throw new Error("expected call to reject");
+          },
+          (e: unknown) => e as Error,
+        );
+      expect(err.message).not.toContain("AI SDK Warning");
+      expect(err.message).not.toContain("Flushing OTEL traces");
+      expect(err.message).not.toContain("OTEL traces flushed");
+      expect(err.message).toContain("ValueError: real cause");
+    });
+
+    it("labels fetch network failures as adapter errors with the endpoint", async () => {
+      mockFetch.mockRejectedValue(new TypeError("connect ECONNREFUSED"));
+
+      const adapter = new SerializedCodeAgentAdapter(defaultConfig, nlpServiceUrl, apiKey);
+      const err: Error = await adapter
+        .call(defaultInput)
+        .then(
+          () => {
+            throw new Error("expected call to reject");
+          },
+          (e: unknown) => e as Error,
+        );
+      expect(err.message).toMatch(/^\[adapter\]/);
+      expect(err.message).toContain(`${nlpServiceUrl}/studio/execute_sync`);
+      expect(err.message).toContain("connect ECONNREFUSED");
     });
   });
 

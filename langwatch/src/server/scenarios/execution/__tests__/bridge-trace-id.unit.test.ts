@@ -4,6 +4,7 @@
 
 import { describe, expect, it, vi } from "vitest";
 import type { AgentInput, JudgeAgentConfig } from "@langwatch/scenario";
+import * as ScenarioRunner from "@langwatch/scenario";
 import { bridgeTraceIdFromAdapterToJudge } from "../bridge-trace-id";
 import { RemoteSpanJudgeAgent } from "../remote-span-judge-agent";
 
@@ -92,6 +93,35 @@ describe("bridgeTraceIdFromAdapterToJudge()", () => {
       adapter.getTraceId.mockReturnValue("second_trace_id");
       await judge.call(stubInput);
       expect(setTraceIdSpy).toHaveBeenCalledWith("second_trace_id");
+    });
+  });
+
+  describe("when the RemoteSpanJudgeAgent delegates to the vendored judge", () => {
+    it("passes a criteria-only systemPrompt that excludes any scenario description", async () => {
+      const judge = new RemoteSpanJudgeAgent({
+        criteria: ["Agent apologises", "Agent offers refund"],
+        model: {
+          provider: "openai",
+          model: "gpt-4o",
+        } as unknown as JudgeAgentConfig["model"],
+        projectId: "project_123",
+        querySpans: vi.fn().mockResolvedValue([]),
+      });
+
+      const judgeAgentMock = vi.mocked(ScenarioRunner.judgeAgent);
+      judgeAgentMock.mockClear();
+
+      await judge.call({
+        ...stubInput,
+        scenarioConfig: { description: "leaky-situation-text" } as AgentInput["scenarioConfig"],
+      });
+
+      expect(judgeAgentMock).toHaveBeenCalledTimes(1);
+      const cfg = judgeAgentMock.mock.calls[0]![0] ?? {};
+      expect(cfg.systemPrompt).toBeDefined();
+      expect(cfg.systemPrompt).toContain("Agent apologises");
+      expect(cfg.systemPrompt).not.toContain("leaky-situation-text");
+      expect(cfg.systemPrompt).not.toContain("<scenario>");
     });
   });
 });

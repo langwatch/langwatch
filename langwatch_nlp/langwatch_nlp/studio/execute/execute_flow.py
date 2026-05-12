@@ -10,6 +10,7 @@ from langwatch_nlp.studio.parser import (
 )
 from langwatch_nlp.studio.runtimes.base_runtime import ServerEventQueue
 from langwatch_nlp.studio.types.dsl import (
+    End,
     Entry,
     EntryNode,
     ExecutionStatus,
@@ -178,10 +179,27 @@ def validate_workflow(workflow: Workflow) -> None:
     if not entry_node:
         raise ClientReadableValueError("Entry node is missing")
 
+    # End node is required so /execute_sync can collect a terminal result.
+    # Without it the execution stream finishes with no success/error state, which
+    # used to surface as an uninterpretable HTTP 500 (see #3198).
+    end_nodes = [node for node in workflow.nodes if isinstance(node.data, End)]
+    if not end_nodes:
+        raise ClientReadableValueError(
+            "End node is missing — add an End node and wire your final outputs into it"
+        )
+
     # Map edges to connected inputs
     for edge in workflow.edges:
         target_id, target_field = edge.target, edge.targetHandle.split(".")[-1]
         connected_inputs[target_id].add(target_field)
+
+    # Every End node must have at least one inbound edge, otherwise execution
+    # cannot produce a terminal result (#3198).
+    for end_node in end_nodes:
+        if not connected_inputs[end_node.id]:
+            raise ClientReadableValueError(
+                f"End node '{end_node.id}' has no wired inputs — connect at least one upstream output to the End node"
+            )
 
     # Validate required inputs
     connected_nodes = set(x.target for x in workflow.edges)

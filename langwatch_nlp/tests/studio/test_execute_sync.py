@@ -103,3 +103,79 @@ def test_returns_error_for_execution_state_change_error(monkeypatch, client):
 
     assert response.status_code == 500
     assert "state-change error detail" in response.json()["detail"]
+
+
+def _execute_flow_payload(nodes, edges):
+    """Build a minimal execute_flow client event payload for execute_sync."""
+    return {
+        "type": "execute_flow",
+        "payload": {
+            "trace_id": "tid-topology",
+            "workflow": {
+                "api_key": "",
+                "workflow_id": "topology-test",
+                "spec_version": "1.4",
+                "name": "Topology Test",
+                "icon": "🧪",
+                "description": "Topology validation fixture",
+                "version": "1.0",
+                "template_adapter": "default",
+                "nodes": nodes,
+                "edges": edges,
+                "state": {},
+            },
+            "inputs": [{"question": "hi"}],
+            "manual_execution_mode": False,
+            "do_not_trace": True,
+            "run_evaluations": False,
+        },
+    }
+
+
+_ENTRY_NODE = {
+    "id": "entry",
+    "type": "entry",
+    "data": {
+        "name": "Entry",
+        "outputs": [{"identifier": "question", "type": "str"}],
+        "train_size": 0.5,
+        "test_size": 0.5,
+        "seed": 42,
+        "dataset": {"name": "Inline", "inline": None},
+    },
+}
+
+_END_NODE = {
+    "id": "end",
+    "type": "end",
+    "data": {
+        "name": "End",
+        "inputs": [{"identifier": "answer", "type": "str"}],
+    },
+}
+
+
+def test_execute_flow_returns_400_when_workflow_has_no_end_node(client):
+    """
+    Issue #3198 — workflows missing an End node must surface a 400 with an
+    actionable message (NOT the generic 500 "completed without success or error").
+    """
+    body = _execute_flow_payload(nodes=[_ENTRY_NODE], edges=[])
+
+    response = client.post("/execute_sync", json=body)
+
+    assert response.status_code == 400
+    detail = response.json()["detail"]
+    assert "End node is missing" in detail
+    assert "Execution completed without success or error" not in detail
+
+
+def test_execute_flow_returns_400_when_end_node_has_no_inbound_edges(client):
+    """Issue #3198 — End node present but not wired returns 400."""
+    body = _execute_flow_payload(nodes=[_ENTRY_NODE, _END_NODE], edges=[])
+
+    response = client.post("/execute_sync", json=body)
+
+    assert response.status_code == 400
+    detail = response.json()["detail"]
+    assert "End node 'end' has no wired inputs" in detail

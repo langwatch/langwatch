@@ -159,5 +159,74 @@ describe("ScenarioExecutionPool", () => {
       expect((child1 as any).kill).toHaveBeenCalledWith("SIGTERM");
       expect((child2 as any).kill).toHaveBeenCalledWith("SIGTERM");
     });
+
+    describe("when onDrain is wired", () => {
+      it("invokes onDrain once per running job with reason worker_drain", () => {
+        const onDrain = vi.fn();
+        pool.setOnDrain(onDrain);
+
+        pool.submit(makeJob("run-1"));
+        pool.submit(makeJob("run-2"));
+
+        pool.drain();
+
+        expect(onDrain).toHaveBeenCalledTimes(2);
+        const ids = onDrain.mock.calls.map((c) => c[0].scenarioRunId).sort();
+        expect(ids).toEqual(["run-1", "run-2"]);
+        for (const call of onDrain.mock.calls) {
+          expect(call[1]).toBe("worker_drain");
+        }
+      });
+
+      it("invokes onDrain for pending jobs even when they never spawned", () => {
+        const onDrain = vi.fn();
+        pool.setOnDrain(onDrain);
+
+        pool.submit(makeJob("run-1"));
+        pool.submit(makeJob("run-2"));
+        pool.submit(makeJob("run-3")); // pending
+        pool.submit(makeJob("run-4")); // pending
+
+        pool.drain();
+
+        const drainedIds = onDrain.mock.calls
+          .map((c) => c[0].scenarioRunId)
+          .sort();
+        expect(drainedIds).toEqual(["run-1", "run-2", "run-3", "run-4"]);
+      });
+
+      it("does not crash when onDrain throws — surfaces all remaining jobs", () => {
+        const onDrain = vi.fn().mockImplementation((jobData: ExecutionJobData) => {
+          if (jobData.scenarioRunId === "run-1") {
+            throw new Error("handler exploded");
+          }
+        });
+        pool.setOnDrain(onDrain);
+
+        pool.submit(makeJob("run-1"));
+        pool.submit(makeJob("run-2"));
+
+        expect(() => pool.drain()).not.toThrow();
+        expect(onDrain).toHaveBeenCalledTimes(2);
+      });
+
+      it("invokes onDrain for jobs whose child has not yet registered", () => {
+        // Substitute a spawn function that intentionally never calls
+        // registerChild() so the job is in _runningJobs but not _running.
+        const lateSpawnPool = new ScenarioExecutionPool({ concurrency: 2 });
+        const onDrain = vi.fn();
+        lateSpawnPool.setOnDrain(onDrain);
+        lateSpawnPool.setSpawnFunction(async () => {
+          // never registers the child
+        });
+
+        lateSpawnPool.submit(makeJob("run-1"));
+        lateSpawnPool.submit(makeJob("run-2"));
+
+        lateSpawnPool.drain();
+
+        expect(onDrain).toHaveBeenCalledTimes(2);
+      });
+    });
   });
 });

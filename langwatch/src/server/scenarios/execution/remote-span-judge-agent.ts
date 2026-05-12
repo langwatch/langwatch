@@ -20,6 +20,7 @@ import {
   type JudgeAgentConfig,
 } from "@langwatch/scenario";
 import { createLogger } from "~/utils/logger/server";
+import { buildCriteriaOnlyJudgePrompt } from "./criteria-only-judge-prompt";
 import { collectRemoteSpans } from "./remote-span-collector";
 import type { SpanQueryFn } from "./types";
 
@@ -84,10 +85,13 @@ export class RemoteSpanJudgeAgent extends JudgeAgentAdapter {
       logger.debug("No trace ID provided, skipping remote span collection");
     }
 
-    // Create a standard judge agent with the collected spans
+    // Create a standard judge agent with the collected spans.
+    // systemPrompt is overridden to a criteria-only prompt so the judge does
+    // not treat the scenario Situation as implicit success criteria (#3197).
     const delegate = judgeAgent({
       criteria: this.params.criteria,
       model: this.params.model,
+      systemPrompt: buildCriteriaOnlyJudgePrompt(this.params.criteria),
       ...(spanCollector ? { spanCollector } : {}),
     });
 

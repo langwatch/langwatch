@@ -18,6 +18,9 @@ from langwatch_nlp.studio.dspy.evaluation import EvaluationReporting
 from langwatch_nlp.studio.execute.execute_evaluation import (
     error_evaluation_event,
 )
+from langwatch_nlp.studio.execute.execute_flow import (
+    validate_workflow,
+)
 from langwatch_nlp.studio.execute.execute_optimization import (
     error_optimization_event,
 )
@@ -44,6 +47,7 @@ from langwatch_nlp.studio.types.events import (
     get_project_id,
 )
 from langwatch_nlp.studio.utils import (
+    ClientReadableValueError,
     SerializableWithPydanticAndPredictEncoder,
     shutdown_handler,
 )
@@ -243,6 +247,16 @@ async def execute(
 
 @app.post("/execute_sync")
 async def execute_sync(event: StudioClientEvent):
+    # Pre-flight topology checks for execute_flow so user-facing misconfigurations
+    # (missing End node, End node with no wired inputs, etc.) surface as HTTP 400
+    # with an actionable message — instead of the generic 500 that used to fire
+    # when the subprocess stream completed without a terminal state (#3198).
+    if isinstance(event, ExecuteFlow):
+        try:
+            validate_workflow(event.payload.workflow)
+        except ClientReadableValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+
     event_stream = execute_event_on_a_subprocess(event)
 
     # Monitor the stream for the "success" state

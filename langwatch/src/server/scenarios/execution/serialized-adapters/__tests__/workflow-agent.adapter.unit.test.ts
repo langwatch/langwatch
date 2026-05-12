@@ -435,12 +435,14 @@ describe("SerializedWorkflowAgentAdapter", () => {
   });
 
   describe("when the workflow execution fails", () => {
-    it("extracts error detail from JSON response", async () => {
+    it("classifies 500 with a traceback as user code", async () => {
+      const userCodeDetail =
+        "Traceback (most recent call last):\n  File 'flow.py'\nValueError: Workflow crashed";
       mockFetch.mockResolvedValue({
         ok: false,
         status: 500,
-        json: vi.fn().mockResolvedValue({ detail: "Workflow crashed" }),
-        text: vi.fn().mockResolvedValue('{"detail": "Workflow crashed"}'),
+        json: vi.fn().mockResolvedValue({ detail: userCodeDetail }),
+        text: vi.fn().mockResolvedValue(JSON.stringify({ detail: userCodeDetail })),
       });
 
       const adapter = new SerializedWorkflowAgentAdapter(
@@ -449,12 +451,20 @@ describe("SerializedWorkflowAgentAdapter", () => {
         apiKey,
       );
 
-      await expect(adapter.call(defaultInput)).rejects.toThrow(
-        "Workflow execution failed: HTTP 500 - Workflow crashed",
-      );
+      const err: Error = await adapter
+        .call(defaultInput)
+        .then(
+          () => {
+            throw new Error("expected call to reject");
+          },
+          (e: unknown) => e as Error,
+        );
+      expect(err.message).toMatch(/^\[user code\]/);
+      expect(err.message).toContain("HTTP 500");
+      expect(err.message).toContain("ValueError: Workflow crashed");
     });
 
-    it("falls back to text when JSON parsing fails", async () => {
+    it("falls back to text and labels as nlp_service when JSON parsing fails", async () => {
       mockFetch.mockResolvedValue({
         ok: false,
         status: 502,
@@ -468,9 +478,39 @@ describe("SerializedWorkflowAgentAdapter", () => {
         apiKey,
       );
 
-      await expect(adapter.call(defaultInput)).rejects.toThrow(
-        "Workflow execution failed: HTTP 502 - Bad Gateway",
+      const err: Error = await adapter
+        .call(defaultInput)
+        .then(
+          () => {
+            throw new Error("expected call to reject");
+          },
+          (e: unknown) => e as Error,
+        );
+      expect(err.message).toMatch(/^\[nlp service\]/);
+      expect(err.message).toContain("HTTP 502");
+      expect(err.message).toContain("Bad Gateway");
+    });
+
+    it("labels fetch network failures as adapter errors with the endpoint", async () => {
+      mockFetch.mockRejectedValue(new TypeError("connect ECONNREFUSED"));
+
+      const adapter = new SerializedWorkflowAgentAdapter(
+        defaultConfig,
+        nlpServiceUrl,
+        apiKey,
       );
+
+      const err: Error = await adapter
+        .call(defaultInput)
+        .then(
+          () => {
+            throw new Error("expected call to reject");
+          },
+          (e: unknown) => e as Error,
+        );
+      expect(err.message).toMatch(/^\[adapter\]/);
+      expect(err.message).toContain(`${nlpServiceUrl}/studio/execute_sync`);
+      expect(err.message).toContain("connect ECONNREFUSED");
     });
   });
 

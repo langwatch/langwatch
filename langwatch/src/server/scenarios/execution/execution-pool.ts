@@ -33,13 +33,30 @@ export type SpawnFunction = (jobData: ExecutionJobData) => Promise<void>;
 /** Called when the pool skips a cancelled job. Responsible for writing the terminal event. */
 export type OnSkipCancelledFn = (jobData: ExecutionJobData) => void;
 
+/**
+ * Called once per running and pending job during drain (worker shutdown /
+ * maxRuntime restart). Responsible for writing the terminal failure event so
+ * the run does not orphan at QUEUED/STARTING. See #3195 / #3365.
+ */
+export type OnDrainFn = (
+  jobData: ExecutionJobData,
+  reason: "worker_drain",
+) => void;
+
 export class ScenarioExecutionPool {
   private readonly _running = new Map<string, ChildProcess>();
+  /**
+   * Mirror of _running keyed by scenarioRunId but holding job metadata
+   * (projectId, scenarioId, …) so drain() can emit terminal failure events
+   * without touching the child process handle.
+   */
+  private readonly _runningJobs = new Map<string, ExecutionJobData>();
   private readonly _pending: ExecutionJobData[] = [];
   private readonly _cancelled = new Set<string>();
   private readonly _concurrency: number;
   private _spawnFn: SpawnFunction | null = null;
   private _onSkipCancelled: OnSkipCancelledFn | null = null;
+  private _onDrain: OnDrainFn | null = null;
 
   constructor({ concurrency }: { concurrency: number }) {
     this._concurrency = concurrency;
@@ -53,6 +70,15 @@ export class ScenarioExecutionPool {
   /** Set the callback for when a cancelled job is skipped. Writes finished(CANCELLED). */
   setOnSkipCancelled(fn: OnSkipCancelledFn): void {
     this._onSkipCancelled = fn;
+  }
+
+  /**
+   * Set the callback invoked during drain() for each running + pending job.
+   * Responsible for emitting a terminal failure event so the run leaves
+   * QUEUED/STARTING when the worker restarts (#3195, #3365).
+   */
+  setOnDrain(fn: OnDrainFn): void {
+    this._onDrain = fn;
   }
 
   /** Number of currently running child processes. */
@@ -98,6 +124,7 @@ export class ScenarioExecutionPool {
    */
   deregisterChild(scenarioRunId: string): void {
     this._running.delete(scenarioRunId);
+    this._runningJobs.delete(scenarioRunId);
     this.dequeueNext();
   }
 
@@ -123,13 +150,53 @@ export class ScenarioExecutionPool {
     }
   }
 
-  /** Kill all running children and clear pending queue. */
+  /**
+   * Kill all running children and clear the pending queue.
+   *
+   * For every in-flight job — both jobs whose child was already spawned and
+   * jobs still buffered in `_pending` — the onDrain callback is invoked so a
+   * terminal failed event is emitted. Without this, worker restarts
+   * (maxRuntime, deploy, OOM) leave runs orphaned at QUEUED/STARTING with no
+   * way to recover (#3195, #3365).
+   *
+   * Iteration uses `_runningJobs` (the metadata mirror) rather than `_running`
+   * so jobs that started but never reached registerChild() are still surfaced
+   * — `_running` is keyed off the actual child process and lags startJob().
+   */
   drain(): void {
-    for (const [id, child] of this._running) {
-      logger.info({ scenarioRunId: id }, "Draining: killing child process");
-      child.kill("SIGTERM");
+    for (const [id, jobData] of this._runningJobs) {
+      const child = this._running.get(id);
+      if (child) {
+        logger.info({ scenarioRunId: id }, "Draining: killing child process");
+        child.kill("SIGTERM");
+      } else {
+        logger.info(
+          { scenarioRunId: id },
+          "Draining: job in flight but child not yet spawned",
+        );
+      }
+      this.invokeDrainCallback(jobData);
+    }
+    for (const jobData of this._pending) {
+      this.invokeDrainCallback(jobData);
     }
     this._pending.length = 0;
+    this._runningJobs.clear();
+  }
+
+  private invokeDrainCallback(jobData: ExecutionJobData): void {
+    if (!this._onDrain) return;
+    try {
+      this._onDrain(jobData, "worker_drain");
+    } catch (err) {
+      logger.error(
+        {
+          scenarioRunId: jobData.scenarioRunId,
+          err: err instanceof Error ? err.message : String(err),
+        },
+        "onDrain callback threw",
+      );
+    }
   }
 
   private startJob(jobData: ExecutionJobData): void {
@@ -143,6 +210,10 @@ export class ScenarioExecutionPool {
       "Starting scenario execution",
     );
 
+    // Record the job metadata so drain() can emit failure events even before
+    // the child process has been registered via registerChild() (#3195).
+    this._runningJobs.set(jobData.scenarioRunId, jobData);
+
     // Fire and forget — the spawn function handles the full lifecycle
     void this._spawnFn(jobData).catch((error) => {
       logger.error(
@@ -151,6 +222,7 @@ export class ScenarioExecutionPool {
       );
       // Ensure we deregister even on unexpected errors
       this._running.delete(jobData.scenarioRunId);
+      this._runningJobs.delete(jobData.scenarioRunId);
       this.dequeueNext();
     });
   }

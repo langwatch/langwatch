@@ -20,12 +20,22 @@
 
 import type { AgentInput } from "@langwatch/scenario";
 import { AgentAdapter, AgentRole } from "@langwatch/scenario";
+import { SpanKind, SpanStatusCode } from "@opentelemetry/api";
 import { randomBytes } from "crypto";
+import { getLangWatchTracer } from "langwatch";
 import { resolveFieldMappings } from "../resolve-field-mappings";
 import type { WorkflowAgentData } from "../types";
+import {
+  SerializedAdapterError,
+  classifyHttpFailure,
+} from "./format-execution-error";
 
 /** Timeout for NLP service requests (2 minutes) — matches code adapter. */
 const NLP_FETCH_TIMEOUT_MS = 120_000;
+
+const tracer = getLangWatchTracer(
+  "langwatch.scenarios.serialized-workflow-adapter",
+);
 
 /**
  * Serialized workflow agent adapter that uses pre-fetched workflow DSL.
@@ -99,6 +109,11 @@ export class SerializedWorkflowAgentAdapter extends AgentAdapter {
    * The DSL is passed through unchanged (unlike the code adapter which
    * synthesizes a minimal entry→code→end workflow). The NLP service injects
    * the inputs dict into the entry node when evaluating the graph.
+   *
+   * Wrapped in an OTEL span so timeouts and exceptions always leave a
+   * footprint in the trace (#3438). Errors are classified by source so the
+   * surfaced message tells the user where the failure actually happened
+   * (#3439).
    */
   private async executeOnNlpService(
     inputRecord: Record<string, string>,
@@ -128,64 +143,108 @@ export class SerializedWorkflowAgentAdapter extends AgentAdapter {
       },
     };
 
-    const controller = new AbortController();
-    const timeout = setTimeout(
-      () => controller.abort(),
-      NLP_FETCH_TIMEOUT_MS,
-    );
+    const endpoint = `${this.nlpServiceUrl}/studio/execute_sync`;
+    return tracer.withActiveSpan(
+      "SerializedWorkflowAgentAdapter.execute_nlp_request",
+      {
+        kind: SpanKind.CLIENT,
+        attributes: {
+          "http.method": "POST",
+          "http.url": endpoint,
+          "nlp.timeout_ms": NLP_FETCH_TIMEOUT_MS,
+        },
+      },
+      async (span) => {
+        const controller = new AbortController();
+        let timedOut = false;
+        const timeout = setTimeout(() => {
+          timedOut = true;
+          controller.abort();
+        }, NLP_FETCH_TIMEOUT_MS);
 
-    try {
-      let response: Response;
-      try {
-        response = await fetch(`${this.nlpServiceUrl}/studio/execute_sync`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(event),
-          signal: controller.signal,
-        });
-      } catch (fetchError) {
-        const cause =
-          fetchError instanceof Error && "cause" in fetchError
-            ? ` (cause: ${String(
-                (fetchError as Error & { cause?: unknown }).cause,
-              )})`
-            : "";
-        throw new Error(
-          `Workflow execution failed: fetch to ${this.nlpServiceUrl}/studio/execute_sync failed - ${
-            fetchError instanceof Error ? fetchError.message : String(fetchError)
-          }${cause}`,
-        );
-      }
-
-      if (!response.ok) {
-        let errorMessage = "";
         try {
-          const bodyStr = await response.text();
+          let response: Response;
           try {
-            const errorBody = JSON.parse(bodyStr) as { detail?: string };
-            errorMessage = errorBody.detail ?? bodyStr;
-          } catch {
-            errorMessage = bodyStr;
+            response = await fetch(endpoint, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(event),
+              signal: controller.signal,
+            });
+          } catch (fetchError) {
+            const source: "network" | "timeout" = timedOut
+              ? "timeout"
+              : "network";
+            const cause =
+              fetchError instanceof Error && "cause" in fetchError
+                ? String((fetchError as Error & { cause?: unknown }).cause)
+                : "";
+            const message = timedOut
+              ? `Workflow execution request timed out after ${NLP_FETCH_TIMEOUT_MS}ms`
+              : `Workflow execution request failed before reaching ${endpoint}`;
+            const detail = [
+              fetchError instanceof Error
+                ? fetchError.message
+                : String(fetchError),
+              cause ? `cause: ${cause}` : "",
+            ]
+              .filter(Boolean)
+              .join("\n");
+            span.setAttribute("error.kind", source);
+            const err = new SerializedAdapterError({
+              adapter: this.name,
+              source,
+              message,
+              rawDetail: detail,
+              endpoint,
+            });
+            span.recordException(err);
+            span.setStatus({ code: SpanStatusCode.ERROR, message });
+            throw err;
           }
-        } catch {
-          errorMessage = "";
-        }
-        throw new Error(
-          `Workflow execution failed: HTTP ${response.status}${
-            errorMessage ? ` - ${errorMessage}` : ""
-          }`,
-        );
-      }
 
-      const result = (await response.json()) as {
-        trace_id: string;
-        status: string;
-        result: Record<string, unknown> | null;
-      };
-      return result.result;
-    } finally {
-      clearTimeout(timeout);
-    }
+          span.setAttribute("http.status_code", response.status);
+
+          if (!response.ok) {
+            let detail: string | undefined;
+            try {
+              const bodyStr = await response.text();
+              try {
+                const parsed = JSON.parse(bodyStr) as { detail?: string };
+                detail = parsed.detail ?? bodyStr;
+              } catch {
+                detail = bodyStr;
+              }
+            } catch {
+              detail = undefined;
+            }
+            const source = classifyHttpFailure(response.status, detail);
+            span.setAttribute("error.kind", source);
+            const err = new SerializedAdapterError({
+              adapter: this.name,
+              source,
+              message: `Workflow execution failed: HTTP ${response.status}`,
+              rawDetail: detail,
+              endpoint,
+              httpStatusCode: response.status,
+            });
+            span.recordException(err);
+            span.setStatus({ code: SpanStatusCode.ERROR, message: err.message });
+            throw err;
+          }
+
+          const result = (await response.json()) as {
+            trace_id: string;
+            status: string;
+            result: Record<string, unknown> | null;
+          };
+          span.setStatus({ code: SpanStatusCode.OK });
+          return result.result;
+        } finally {
+          clearTimeout(timeout);
+        }
+      },
+    );
   }
 
   /**

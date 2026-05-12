@@ -28,6 +28,7 @@ import * as ScenarioRunner from "@langwatch/scenario";
 import type { ChildProcessJobData } from "./types";
 import { createModelFromParams } from "./model.factory";
 import { createAdapter } from "./serialized-adapter.registry";
+import { buildCriteriaOnlyJudgePrompt } from "./criteria-only-judge-prompt";
 import { RemoteSpanJudgeAgent } from "./remote-span-judge-agent";
 import { createTraceApiSpanQuery } from "./trace-api-span-query";
 import { SerializedHttpAgentAdapter } from "./serialized-adapters/http-agent.adapter";
@@ -120,7 +121,14 @@ async function executeScenario(jobData: ChildProcessJobData): Promise<void> {
           });
           return remoteSpanJudge;
         })()
-      : ScenarioRunner.judgeAgent({ criteria: scenario.criteria, model });
+      : ScenarioRunner.judgeAgent({
+          criteria: scenario.criteria,
+          model,
+          // Override the vendored judge prompt so Situation is NOT treated as
+          // success criteria. The judge evaluates against declared criteria
+          // only (#3197).
+          systemPrompt: buildCriteriaOnlyJudgePrompt(scenario.criteria),
+        });
 
   // Results are reported via LangWatch SDK automatically
   const verbose = process.env.SCENARIO_VERBOSE === "true";
