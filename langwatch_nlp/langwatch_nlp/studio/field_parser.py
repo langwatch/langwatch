@@ -171,6 +171,30 @@ def with_autoparsing(module: type[T]) -> type[T]:
         except Exception:
             return forward(instance_self, *args, **kwargs)
 
+        accepts_var_keyword = any(
+            p.kind == inspect.Parameter.VAR_KEYWORD for p in sig.parameters.values()
+        )
+        if not accepts_var_keyword:
+            declared = [
+                name
+                for name, p in sig.parameters.items()
+                if p.kind
+                in (
+                    inspect.Parameter.POSITIONAL_OR_KEYWORD,
+                    inspect.Parameter.KEYWORD_ONLY,
+                )
+                and name != "self"
+            ]
+            unexpected = [k for k in kwargs.keys() if k not in sig.parameters]
+            if unexpected:
+                entrypoint = getattr(forward, "__name__", "forward")
+                raise TypeError(
+                    f"{entrypoint}() signature mismatch: received unexpected input(s) "
+                    f"{unexpected!r}. Declared parameters: {declared!r}. "
+                    f"Add the missing parameter(s) to your function signature, "
+                    f"or use **kwargs to accept any inputs."
+                )
+
         def _coerce(field_type, value):
             parsed = autoparse_field_value(
                 Field(identifier="_", type=field_type), value
