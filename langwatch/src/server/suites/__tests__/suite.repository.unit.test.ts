@@ -194,6 +194,7 @@ describe("SuiteRepository", () => {
 
   describe("archive()", () => {
     describe("given an existing suite", () => {
+      /** @scenario Archiving frees up the suite name for reuse */
       it("sets archivedAt timestamp and returns the archived suite", async () => {
         const existing = makeSuiteRow({ archivedAt: null });
         const archived = makeSuiteRow({ archivedAt: new Date("2026-02-01") });
@@ -235,6 +236,7 @@ describe("SuiteRepository", () => {
     });
 
     describe("given an already-archived suite", () => {
+      /** @scenario Archiving an already-archived suite succeeds without error */
       it("preserves the original archivedAt timestamp", async () => {
         const originalDate = new Date("2026-01-15");
         const existing = makeSuiteRow({ archivedAt: originalDate, slug: "critical-path--archived" });
