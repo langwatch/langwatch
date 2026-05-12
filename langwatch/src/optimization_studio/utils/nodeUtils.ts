@@ -1,4 +1,5 @@
 import type { Edge, Node } from "@xyflow/react";
+import type { Field } from "../types/dsl";
 import { camelCaseToSnakeCase } from "../../utils/stringCasing";
 
 export const nameToId = (name: string) => {
@@ -58,33 +59,34 @@ export const getEntryInputs = (
 };
 
 /**
- * Derives mappable entry inputs from the entry node's declared outputs,
- * overlaying the optional flag based on edge connectivity.
+ * Returns the set of entry-node fields that should appear on the scenario
+ * mapping surface — one row per declared entry output, with the optional flag
+ * set when there is at least one downstream edge AND every such edge targets
+ * an evaluator node.
  *
- * A declared output is marked optional when every downstream edge from that
- * output leads exclusively to evaluator nodes. Declared outputs with no edges
- * (unwired) are included without the optional flag — they are real workflow
- * inputs that simply haven't been connected yet.
+ * Unwired declared outputs (no downstream edges at all) are included without
+ * the optional flag: they are real workflow inputs that simply have not been
+ * connected yet.
  *
- * Falls back to edge-based derivation (same as getEntryInputs) when the entry
- * node is absent or declares no outputs, preserving backwards compatibility
- * with DSLs that omit the entry node entirely.
+ * Falls back to `getEntryInputs` when the entry node is absent or declares no
+ * outputs — fallback for legacy DSLs without a declared entry node, should be
+ * unreachable for current schemas.
  */
-export const getDeclaredEntryInputs = (
+export const getMappingSurfaceInputs = (
   edges: Edge[],
   nodes: Node[],
-): Array<{ identifier: string; type: string; optional?: boolean }> => {
+): Array<Pick<Field, "identifier" | "type" | "optional">> => {
   const entryNode = nodes.find(
     (node: Node) => node.type === "entry" || node.id === "entry",
   );
-  const declaredOutputs: Array<{ identifier: string; type: string }> =
+  const declaredOutputs: Array<Pick<Field, "identifier" | "type">> =
     Array.isArray(entryNode?.data?.outputs) ? entryNode.data.outputs : [];
 
   if (declaredOutputs.length === 0) {
-    // Fall back to edge-based derivation for DSLs without a declared entry node
+    // fallback for legacy DSLs without a declared entry node — should be unreachable for current schemas
     return getEntryInputs(edges, nodes).map((edge) => ({
       identifier: edge.sourceHandle?.split(".")[1] ?? "",
-      type: "str",
+      type: "str" as Field["type"],
       ...(edge.optional ? { optional: true } : {}),
     }));
   }
@@ -108,14 +110,20 @@ export const getDeclaredEntryInputs = (
 
     return {
       identifier,
-      type: typeof type === "string" ? type : "str",
+      type: (typeof type === "string" ? type : "str") as Field["type"],
       ...(evaluatorOnly ? { optional: true } : {}),
     };
   });
 };
 
 export const getInputsOutputs = (edges: Edge[], nodes: Node[]) => {
-  const inputs = getDeclaredEntryInputs(edges, nodes);
+  const entryInputs = getEntryInputs(edges, nodes);
+
+  const inputs = entryInputs.map((edge) => ({
+    identifier: edge.sourceHandle?.split(".")[1],
+    type: "str",
+    ...(edge.optional ? { optional: true } : {}),
+  }));
 
   const outputs = nodes.find(
     (node: Node) => node.type === "end" || node.id === "end",

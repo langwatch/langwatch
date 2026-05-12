@@ -8,7 +8,7 @@
 import type { PrismaClient, Prisma } from "@prisma/client";
 import type { Edge, Node } from "@xyflow/react";
 import { computeBestMatchMappings } from "../scenarios/execution/resolve-field-mappings";
-import { getInputsOutputs } from "../../optimization_studio/utils/nodeUtils";
+import { getMappingSurfaceInputs } from "../../optimization_studio/utils/nodeUtils";
 
 /** Minimal DSL shape needed for I/O extraction — avoids importing the full Workflow type. */
 interface WorkflowDSL {
@@ -19,6 +19,10 @@ interface WorkflowDSL {
 /**
  * Extracts normalized inputs and outputs from a workflow DSL.
  *
+ * Inputs come from `getMappingSurfaceInputs`, which includes declared entry
+ * outputs regardless of whether they have downstream edges. Outputs come from
+ * the end node's declared inputs directly.
+ *
  * Replicates the client-side extractVariables helper server-side so we do not
  * depend on browser-only modules.
  */
@@ -26,17 +30,23 @@ function extractVariablesFromDSL({ dsl }: { dsl: WorkflowDSL }): {
   inputs: Array<{ identifier: string }>;
   outputs: Array<{ identifier: string }>;
 } {
-  const { inputs: rawInputs, outputs: rawOutputs } = getInputsOutputs(
-    dsl.edges,
-    dsl.nodes,
-  );
+  const rawInputs = getMappingSurfaceInputs(dsl.edges, dsl.nodes);
 
-  const inputs = (rawInputs ?? []).flatMap(
+  const inputs = rawInputs.flatMap(
     (i): Array<{ identifier: string }> =>
       typeof i.identifier === "string" ? [{ identifier: i.identifier }] : [],
   );
 
-  const outputs = (Array.isArray(rawOutputs) ? rawOutputs : []).flatMap(
+  const endNodeData = dsl.nodes.find(
+    (n) => n.type === "end" || n.id === "end",
+  )?.data;
+  const rawOutputs: unknown[] = Array.isArray(
+    (endNodeData as { inputs?: unknown } | undefined)?.inputs,
+  )
+    ? ((endNodeData as { inputs: unknown[] }).inputs)
+    : [];
+
+  const outputs = rawOutputs.flatMap(
     (o: unknown): Array<{ identifier: string }> => {
       if (typeof o !== "object" || o === null) return [];
       const field = o as { identifier?: unknown };

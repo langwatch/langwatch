@@ -3,7 +3,7 @@
  */
 import { describe, it, expect } from "vitest";
 import type { Edge, Node } from "@xyflow/react";
-import { getInputsOutputs } from "../nodeUtils";
+import { getMappingSurfaceInputs, getInputsOutputs } from "../nodeUtils";
 import type { Field } from "../../types/dsl";
 
 // ---------------------------------------------------------------------------
@@ -80,7 +80,7 @@ function makeEdge(identifier: string, targetNodeId: string, edgeIndex: number): 
 // getInputsOutputs — entry inputs
 // ---------------------------------------------------------------------------
 
-describe("getInputsOutputs", () => {
+describe("getMappingSurfaceInputs", () => {
   describe("when entry node has wired fields", () => {
     /** @scenario Wired entry field still appears once in the drawer's mappable inputs */
     it("returns exactly one input for a wired non-evaluator field without the optional flag", () => {
@@ -89,11 +89,11 @@ describe("getInputsOutputs", () => {
         edges: [makeEdge("query", "llm1", 0)],
       });
 
-      const { inputs } = getInputsOutputs(edges, nodes);
+      const inputs = getMappingSurfaceInputs(edges, nodes);
 
       expect(inputs).toHaveLength(1);
-      expect(inputs![0]).toMatchObject({ identifier: "query" });
-      expect(inputs![0]).not.toHaveProperty("optional");
+      expect(inputs[0]).toMatchObject({ identifier: "query" });
+      expect(inputs[0]).not.toHaveProperty("optional");
     });
   });
 
@@ -105,10 +105,10 @@ describe("getInputsOutputs", () => {
         edges: [makeEdge("eval_only", "eval1", 0)],
       });
 
-      const { inputs } = getInputsOutputs(edges, nodes);
+      const inputs = getMappingSurfaceInputs(edges, nodes);
 
       expect(inputs).toHaveLength(1);
-      expect(inputs![0]).toMatchObject({ identifier: "eval_only", optional: true });
+      expect(inputs[0]).toMatchObject({ identifier: "eval_only", optional: true });
     });
   });
 
@@ -128,13 +128,13 @@ describe("getInputsOutputs", () => {
         ],
       });
 
-      const { inputs } = getInputsOutputs(edges, nodes);
+      const inputs = getMappingSurfaceInputs(edges, nodes);
 
       expect(inputs).toHaveLength(3);
 
-      const wiredInput = inputs!.find((i) => i.identifier === "wired");
-      const unwiredInput = inputs!.find((i) => i.identifier === "unwired");
-      const evalOnlyInput = inputs!.find((i) => i.identifier === "eval_only");
+      const wiredInput = inputs.find((i) => i.identifier === "wired");
+      const unwiredInput = inputs.find((i) => i.identifier === "unwired");
+      const evalOnlyInput = inputs.find((i) => i.identifier === "eval_only");
 
       expect(wiredInput).toBeDefined();
       expect(wiredInput).not.toHaveProperty("optional");
@@ -148,24 +148,28 @@ describe("getInputsOutputs", () => {
   });
 
   describe("when entry node has a field with no downstream edges", () => {
+    /** @scenario Pure unwired entry field still appears as an input */
     it("returns the unwired field as an input without the optional flag", () => {
       const { nodes, edges } = buildWorkflow({
         entryOutputs: [{ identifier: "orphan_field", type: "str" }],
         edges: [], // no edges at all
       });
 
-      const { inputs } = getInputsOutputs(edges, nodes);
+      const inputs = getMappingSurfaceInputs(edges, nodes);
 
       expect(inputs).toHaveLength(1);
-      expect(inputs![0]).toMatchObject({ identifier: "orphan_field" });
-      expect(inputs![0]).not.toHaveProperty("optional");
+      expect(inputs[0]).toMatchObject({ identifier: "orphan_field" });
+      expect(inputs[0]).not.toHaveProperty("optional");
     });
   });
 
-  // ---------------------------------------------------------------------------
-  // getInputsOutputs — end outputs (regression guard, untouched by the fix)
-  // ---------------------------------------------------------------------------
+});
 
+// ---------------------------------------------------------------------------
+// getInputsOutputs — end outputs (regression guard, end side is unaffected)
+// ---------------------------------------------------------------------------
+
+describe("getInputsOutputs", () => {
   describe("when end node declares inputs", () => {
     /** @scenario End-node outputs continue to derive from endNode.data.inputs unchanged */
     it("derives outputs from the end node's declared inputs unchanged", () => {

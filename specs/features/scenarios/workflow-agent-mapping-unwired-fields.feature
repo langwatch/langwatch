@@ -28,6 +28,14 @@ Feature: Workflow agent mapping surfaces unwired entry fields
     When the user opens the Edit Workflow Agent drawer for the linked agent
     Then the scenario-mapping section lists "new_field" as a mappable input
 
+  @unit
+  Scenario: Pure unwired entry field still appears as an input
+    Given the workflow's entry node declares an output field "orphan_field"
+    And the workflow has no edges at all
+    When the inputs list is extracted via getInputsOutputs for the drawer
+    Then the inputs include exactly one entry with identifier "orphan_field"
+    And the entry does not carry the optional flag
+
   # --- AC 2: auto-compute includes unwired entry fields ---
 
   @unit
@@ -88,6 +96,7 @@ Feature: Workflow agent mapping surfaces unwired entry fields
 
 # --- AC Coverage Map ---
 # AC 1: "Drawer lists unwired entry field as mappable" → Scenario: Edit Workflow Agent drawer lists an unwired entry field as a mappable input
+# AC 1: "Drawer lists unwired entry field as mappable" → Scenario: Pure unwired entry field still appears as an input
 # AC 2: "Auto-compute includes unwired entry field" → Scenario: Auto-compute on workflow save includes an unwired entry field in scenarioMappings
 # AC 3: "Regression — wired entry fields unchanged in both paths" → Scenario: Wired entry field still appears once in the drawer's mappable inputs
 # AC 3: "Regression — wired entry fields unchanged in both paths" → Scenario: Wired entry field still appears in auto-computed scenarioMappings
