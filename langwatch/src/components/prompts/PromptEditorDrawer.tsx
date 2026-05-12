@@ -43,6 +43,8 @@ import {
   SaveVersionDialog,
 } from "~/prompts/forms/SaveVersionDialog";
 import type { ChangeHandleFormValues } from "~/prompts/forms/schemas/change-handle-form.schema";
+import { hasNonEmptySystemMessage } from "~/prompts/schemas/form-schema";
+import { getSaveBlockerMessage } from "~/prompts/utils/getSaveBlockerMessage";
 import { useLatestPromptVersion } from "~/prompts/hooks/useLatestPromptVersion";
 import { usePromptConfigForm } from "~/prompts/hooks/usePromptConfigForm";
 import type { PromptConfigFormValues } from "~/prompts/types";
@@ -733,7 +735,7 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
   /**
    * Reactive validity of the system-prompt-required rule (#3196).
    * Watch the messages array so the Save button (and inline error) react
-   * as the user types. The rule mirrors the Zod refinement in
+   * as the user types. Shares the predicate with the Zod refinement in
    * `formSchemaForSave` so client and server stay in sync — a non-empty
    * trimmed system message must exist.
    */
@@ -741,15 +743,7 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
     control: methods.control,
     name: "version.configData.messages",
   });
-  const hasSystemPrompt =
-    Array.isArray(messages) &&
-    messages.some(
-      (m: { role?: string; content?: string }) =>
-        m?.role === "system" &&
-        typeof m?.content === "string" &&
-        m.content.trim() !== "",
-    );
-  const isValid = hasSystemPrompt;
+  const isValid = hasNonEmptySystemMessage(messages);
 
   // State for save version dialog (asks for commit message when updating existing prompt)
   const [saveVersionDialogOpen, setSaveVersionDialogOpen] = useState(false);
@@ -769,14 +763,9 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
     // system prompt required) fires alongside the LLM config rules.
     const formValid = await methods.trigger();
     if (!formValid) {
-      const messagesError = methods.formState.errors.version?.configData
-        ?.messages as { message?: string } | undefined;
-      const description =
-        messagesError?.message ??
-        "Please fix the configuration errors before saving";
       toaster.create({
         title: "Validation error",
-        description,
+        description: getSaveBlockerMessage(methods),
         type: "error",
       });
       return false;

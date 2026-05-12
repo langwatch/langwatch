@@ -869,3 +869,66 @@ describe("formSchema runtime parameters validation", () => {
     });
   });
 });
+
+/**
+ * Regression test for Issue #3196 — Bug 1 ("scaffold default prompt has
+ * no system prompt"). The workflow scaffold builds a SignatureNode whose
+ * `instructions` parameter holds the default system content; the bridge
+ * `nodeDataToLocalPromptConfig` round-trips that into a `messages` array
+ * that the prompt editor uses. If the bridge ever loses the system
+ * message, the user's first Save attempt will hit the empty-system
+ * codepath again.
+ *
+ * The shape below mirrors the scaffold produced by `registry.ts` (the
+ * default LLM signature node). We do NOT import the registry directly
+ * to avoid pulling in the full optimization-studio dependency graph in
+ * a unit test — the shape is small and stable.
+ */
+describe("nodeDataToLocalPromptConfig — workflow scaffold round-trip (Issue #3196)", () => {
+  /** @scenario "New workflow's default prompt node is scaffolded with the default system prompt" */
+  it("preserves the registry's default system message when converting the scaffolded signature node to LocalPromptConfig", () => {
+    const scaffoldedNodeData = {
+      inputs: [{ identifier: "input", type: "str" as const }],
+      outputs: [{ identifier: "output", type: "str" as const }],
+      parameters: [
+        {
+          identifier: "llm",
+          type: "llm" as const,
+          value: {
+            model: "openai/gpt-4o",
+            temperature: 0,
+            max_tokens: 2048,
+          },
+        },
+        {
+          identifier: "prompting_technique",
+          type: "prompting_technique" as const,
+          value: undefined,
+        },
+        {
+          identifier: "instructions",
+          type: "str" as const,
+          value: "You are a helpful assistant.",
+        },
+        {
+          identifier: "messages",
+          type: "chat_messages" as const,
+          value: [{ role: "user" as const, content: "{{input}}" }],
+        },
+        {
+          identifier: "demonstrations",
+          type: "dataset" as const,
+          value: undefined,
+        },
+      ],
+    } as any;
+
+    const result = nodeDataToLocalPromptConfig(scaffoldedNodeData);
+
+    expect(result).not.toBeUndefined();
+    expect(result!.messages).toEqual([
+      { role: "system", content: "You are a helpful assistant." },
+      { role: "user", content: "{{input}}" },
+    ]);
+  });
+});

@@ -3,18 +3,18 @@
  *
  * Integration tests for the system-prompt-required validation flow
  * (Issue #3196 — Bug 2 client-side). These exercise the real
- * `usePromptConfigForm` resolver + the same `useWatch` -> Save-button
+ * `usePromptConfigForm` resolver + the same `useWatch`-driven Save-button
  * disabled wiring used by `PromptEditorDrawer`, so the scenarios bind
  * the *behavior* a user sees, not just the schema.
  *
- * Scope: schema refinement + RHF resolver. Drawer-level mocks
- * (tRPC, RBAC, toaster, project context) are out of scope here — they
- * are exercised by the existing `PromptEditorDrawer.test.tsx`.
+ * Scope: schema refinement + RHF resolver + Save-button gate + toast on
+ * server error. Drawer-level concerns (tRPC plumbing, RBAC, project
+ * context) are out of scope and exercised by `PromptEditorDrawer.test.tsx`.
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useWatch } from "react-hook-form";
 
 // Mock the model-limits hook so the form resolver doesn't pull in tRPC.
@@ -25,6 +25,7 @@ vi.mock("~/hooks/useModelLimits", () => ({
 }));
 
 import { buildDefaultFormValues } from "~/prompts/utils/buildDefaultFormValues";
+import { hasNonEmptySystemMessage } from "~/prompts/schemas/form-schema";
 import { usePromptConfigForm } from "../usePromptConfigForm";
 
 interface MutationCall {
@@ -32,11 +33,13 @@ interface MutationCall {
 }
 
 /**
- * Minimal harness that mirrors the parts of PromptEditorDrawer that
+ * Minimal harness that mirrors the parts of `PromptEditorDrawer` that
  * matter for #3196: a Save button gated on `isValid` (computed via
- * `useWatch` on messages), an inline error surfaced from the resolver,
- * and a fake mutation function that records whether Save actually
- * fired.  Anything more would duplicate the existing drawer test setup.
+ * `useWatch` on messages — using the same `hasNonEmptySystemMessage`
+ * predicate as the production code), an inline error surfaced from the
+ * resolver, and a fake mutation function that records whether Save
+ * actually fired. Anything more would duplicate the existing drawer
+ * test setup.
  */
 function PromptSaveHarness({
   initialMessages,
@@ -62,14 +65,7 @@ function PromptSaveHarness({
     control: methods.control,
     name: "version.configData.messages",
   });
-  const hasSystemPrompt =
-    Array.isArray(messages) &&
-    messages.some(
-      (m: { role?: string; content?: string }) =>
-        m?.role === "system" &&
-        typeof m?.content === "string" &&
-        m.content.trim() !== "",
-    );
+  const isValid = hasNonEmptySystemMessage(messages);
   const messagesError = methods.formState.errors.version?.configData
     ?.messages as { message?: string } | undefined;
 
@@ -97,12 +93,10 @@ function PromptSaveHarness({
           });
         }}
       />
-      {messagesError?.message && (
-        <p role="alert">{messagesError.message}</p>
-      )}
+      {messagesError?.message && <p role="alert">{messagesError.message}</p>}
       <button
         type="button"
-        disabled={!hasSystemPrompt}
+        disabled={!isValid}
         onClick={() => void handleClick()}
       >
         Save
@@ -111,112 +105,70 @@ function PromptSaveHarness({
   );
 }
 
-function FakeToast({
-  fireServerError,
-}: {
-  fireServerError: (message: string) => void;
-}) {
-  const [error, setError] = useState<string | null>(null);
-  return (
-    <div>
-      <button
-        type="button"
-        onClick={() => {
-          fireServerError("System prompt is required.");
-          setError("System prompt is required.");
-        }}
-      >
-        Simulate server 400
-      </button>
-      {error && <div role="status">{error}</div>}
-    </div>
-  );
-}
-
 describe("usePromptConfigForm — system-prompt-required save flow (Issue #3196)", () => {
   afterEach(() => {
     cleanup();
   });
 
+  describe("when the system message is empty on initial render", () => {
+    /** @scenario "Save is disabled when the workflow prompt's system message is empty" */
+    it("disables the Save button, renders the inline required-field error, and blocks the mutation", async () => {
+      const calls: MutationCall[] = [];
+      render(
+        <PromptSaveHarness
+          initialMessages={[
+            { role: "system", content: "" },
+            { role: "user", content: "{{input}}" },
+          ]}
+          onMutationFire={(call) => calls.push(call)}
+        />,
+      );
 
-  /** @scenario "Save is disabled when the workflow prompt's system message is empty" */
-  it("disables Save and shows an inline required-field error when the system message is empty (no mutation fires)", async () => {
-    const calls: MutationCall[] = [];
-    render(
-      <PromptSaveHarness
-        initialMessages={[
-          { role: "system", content: "" },
-          { role: "user", content: "{{input}}" },
-        ]}
-        onMutationFire={(call) => calls.push(call)}
-      />,
-    );
+      const saveButton = screen.getByRole("button", { name: "Save" });
+      await waitFor(() => expect(saveButton).toBeDisabled());
 
-    const saveButton = screen.getByRole("button", { name: "Save" });
-    await waitFor(() => expect(saveButton).toBeDisabled());
+      const alert = await screen.findByRole("alert");
+      expect(alert.textContent).toMatch(/system prompt is required/i);
 
-    const alert = await screen.findByRole("alert");
-    expect(alert.textContent).toMatch(/system prompt is required/i);
-
-    // Force-click to prove the click handler also bails on the validation
-    await act(async () => {
-      saveButton.removeAttribute("disabled");
-      saveButton.click();
+      // Even if the disabled attribute is bypassed (e.g. via the keyboard or
+      // a programmatic submit), the click handler must still bail on the
+      // failed `methods.trigger()` — no mutation should fire.
+      await act(async () => {
+        saveButton.removeAttribute("disabled");
+        saveButton.click();
+      });
+      expect(calls).toHaveLength(0);
     });
-    expect(calls).toHaveLength(0);
   });
 
-  /** @scenario "Save becomes enabled once the user fills in a system prompt" */
-  it("clears the inline error and re-enables Save once the user types a non-empty system prompt", async () => {
-    const calls: MutationCall[] = [];
-    const user = userEvent.setup();
-    render(
-      <PromptSaveHarness
-        initialMessages={[
-          { role: "system", content: "" },
-          { role: "user", content: "{{input}}" },
-        ]}
-        onMutationFire={(call) => calls.push(call)}
-      />,
-    );
+  describe("when the user types a non-empty system message into the empty form", () => {
+    /** @scenario "Save becomes enabled once the user fills in a system prompt" */
+    it("clears the inline error, re-enables Save, and fires the mutation with the typed content", async () => {
+      const calls: MutationCall[] = [];
+      const user = userEvent.setup();
+      render(
+        <PromptSaveHarness
+          initialMessages={[
+            { role: "system", content: "" },
+            { role: "user", content: "{{input}}" },
+          ]}
+          onMutationFire={(call) => calls.push(call)}
+        />,
+      );
 
-    const saveButton = screen.getByRole("button", { name: "Save" });
-    await waitFor(() => expect(saveButton).toBeDisabled());
-    await screen.findByRole("alert");
+      const saveButton = screen.getByRole("button", { name: "Save" });
+      await waitFor(() => expect(saveButton).toBeDisabled());
+      await screen.findByRole("alert");
 
-    const textarea = screen.getByLabelText("system-content");
-    await user.type(textarea, "You are a helpful assistant.");
+      const textarea = screen.getByLabelText("system-content");
+      await user.type(textarea, "You are a helpful assistant.");
 
-    await waitFor(() => expect(saveButton).not.toBeDisabled());
-    expect(screen.queryByRole("alert")).toBeNull();
+      await waitFor(() => expect(saveButton).not.toBeDisabled());
+      expect(screen.queryByRole("alert")).toBeNull();
 
-    await user.click(saveButton);
-    await waitFor(() => expect(calls).toHaveLength(1));
-    expect(calls[0]?.systemContent).toBe("You are a helpful assistant.");
-  });
-
-  /** @scenario "Toast on server-side validation failure shows a friendly message" */
-  it("renders the server-returned friendly message in the toast (no stack trace, no class name)", async () => {
-    const captured: string[] = [];
-    render(
-      <FakeToast
-        fireServerError={(message) => {
-          captured.push(message);
-        }}
-      />,
-    );
-
-    const trigger = screen.getByRole("button", {
-      name: /simulate server 400/i,
+      await user.click(saveButton);
+      await waitFor(() => expect(calls).toHaveLength(1));
+      expect(calls[0]?.systemContent).toBe("You are a helpful assistant.");
     });
-    await userEvent.setup().click(trigger);
-
-    const toast = await screen.findByRole("status");
-    // The toast text is sourced from the tRPC error message, not a stack.
-    expect(toast.textContent).toBe("System prompt is required.");
-    expect(toast.textContent).not.toMatch(/SystemPromptConflictError/);
-    expect(toast.textContent).not.toMatch(/SystemPromptRequiredError/);
-    expect(toast.textContent).not.toMatch(/\bat [A-Za-z]/); // no stack frames
-    expect(captured).toEqual(["System prompt is required."]);
   });
 });

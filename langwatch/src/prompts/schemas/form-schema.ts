@@ -150,16 +150,16 @@ function baseFormSchemaWithModelLimits(
  * Trim before checking so whitespace-only content also fails — empty +
  * whitespace are functionally identical to the user.
  */
-const hasNonEmptySystemMessage = (
+export const hasNonEmptySystemMessage = (
   messages:
-    | readonly { role: string; content: string }[]
+    | readonly { role?: string; content?: string }[]
     | undefined
     | null,
 ): boolean =>
   !!messages?.some(
     (m) =>
-      m.role === "system" &&
-      typeof m.content === "string" &&
+      m?.role === "system" &&
+      typeof m?.content === "string" &&
       m.content.trim() !== "",
   );
 

@@ -21,7 +21,7 @@ import {
  * @param error - The error to handle
  * @returns void
  */
-export const handleSystemPromptConflict = (error: any) => {
+export const handleSystemPromptDomainErrors = (error: any) => {
   if (error instanceof SystemPromptRequiredError) {
     throw new HTTPException(400, {
       message: error.message,
