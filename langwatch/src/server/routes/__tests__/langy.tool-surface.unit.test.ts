@@ -1,27 +1,28 @@
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { buildLangyTools } from "~/server/services/langy/tools";
+import { ConversationToolIdSet } from "~/server/services/langy/toolIdValidator";
 
-const ROUTE_FILE = join(__dirname, "..", "langy.ts");
-const ROUTE_SOURCE = readFileSync(ROUTE_FILE, "utf8");
-
-const TOOL_REGISTRATION_REGEX = /\n\s{4}([a-z_][a-z0-9_]*):\s*tool\(/g;
 const ALLOWED_PREFIXES = ["list_", "get_", "find_", "search_", "propose_"];
 
-function extractRegisteredToolNames(source: string): string[] {
-  const names: string[] = [];
-  for (const match of source.matchAll(TOOL_REGISTRATION_REGEX)) {
-    const name = match[1];
-    if (name) names.push(name);
-  }
-  return names;
-}
+/**
+ * Stub context — `buildLangyTools` reads from `ctx` lazily during
+ * tool `execute`, so we never touch the stub during this surface test.
+ * Tool names are determined statically by the barrel.
+ */
+const stubCtx = {
+  projectId: "proj-test",
+  experimentSlug: undefined,
+  evaluatorService: {} as never,
+  promptService: {} as never,
+  seenIds: new ConversationToolIdSet(),
+  prisma: {} as never,
+};
+
+const toolNames = Object.keys(buildLangyTools(stubCtx));
 
 describe("Langy v1 tool surface contract — binds langy-baseline.feature § read-only boundary", () => {
-  describe("given the registered tools in src/server/routes/langy.ts", () => {
-    const toolNames = extractRegisteredToolNames(ROUTE_SOURCE);
-
-    it("registers at least one tool (route file is wired up)", () => {
+  describe("given the registered tools assembled by buildLangyTools", () => {
+    it("registers at least one tool (the barrel is wired up)", () => {
       expect(toolNames.length).toBeGreaterThan(0);
     });
 
